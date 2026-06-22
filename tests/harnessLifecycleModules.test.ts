@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS } from "../src/constants.ts";
+import { PROVIDERS, PROMPT_DELIMITERS } from "../src/constants.ts";
+import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import FileService from "../src/services/FileService.ts";
+import { appendAndFinalize } from "../src/utils/ConversationUtilities.ts";
 import { APPROVAL_TIERS } from "../src/services/AutoApprovalEngine.ts";
 import CriticGate from "../src/services/harnesses/lifecycle/CriticGate.ts";
 import { pendingApprovals } from "../src/services/ApprovalRegistry.ts";
@@ -36,6 +39,11 @@ import {
 import { logKVCacheHitRate } from "../src/services/harnesses/lifecycle/KVCacheReporter.ts";
 import { finalizePassTracker } from "../src/services/harnesses/lifecycle/TrackerFinalizer.ts";
 import { handleCodexPlanningResponse } from "../src/services/harnesses/lifecycle/CodexPlanningDetector.ts";
+import {
+  finalizeTextGeneration,
+  swapMessageContent,
+  sanitizeMessagesForPersistence,
+} from "../src/services/harnesses/lifecycle/Finalizer.ts";
 
 import { execSync } from "node:child_process";
 import logger from "../src/utils/logger.ts";
@@ -63,6 +71,7 @@ vi.mock("../src/utils/logger.ts", () => ({
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
+    request: vi.fn(),
   },
 }));
 
@@ -131,6 +140,11 @@ vi.mock("../src/services/WebhookEventBus.ts", () => ({
   default: {
     emit: vi.fn(),
   },
+}));
+
+vi.mock("../src/utils/ConversationUtilities.ts", () => ({
+  appendAndFinalize: vi.fn().mockResolvedValue(undefined),
+  computeNewTurnMessages: vi.fn(),
 }));
 
 describe("Harness Lifecycle Modules", () => {
@@ -241,6 +255,125 @@ describe("Harness Lifecycle Modules", () => {
       const reviewResult = await criticGate.review(toolCall, mockAgenticContext as any);
       expect(reviewResult.isApproved).toBe(true);
       expect(reviewResult.reason).toBe("critic_error_fallback");
+    });
+
+    it("should approve tool immediately if toolCall approval info is undefined", async () => {
+      const criticGate = new CriticGate();
+      const toolCall = {
+        id: "call-1",
+        name: "read_file",
+        args: { path: "test.txt" },
+        _approval: undefined,
+      };
+
+      const reviewResult = await criticGate.review(toolCall, mockAgenticContext as any);
+      expect(reviewResult.isApproved).toBe(true);
+      expect(reviewResult.reason).toBe("below_danger_tier");
+    });
+
+    it("should fallback when logging details are missing in context", async () => {
+      const criticGate = new CriticGate();
+      const toolCall = {
+        id: "call-1",
+        name: "execute_command",
+        args: undefined,
+        _approval: { tier: APPROVAL_TIERS.DANGER as any, tierLabel: "DANGER" },
+      };
+
+      const mockProviderMinimal = {
+        generateTextStream: vi.fn().mockImplementation(async function* () {
+          yield "APPROVE";
+        }),
+      };
+
+      const contextMinimal = {
+        provider: mockProviderMinimal,
+        resolvedModel: "gemini-3.5-flash",
+        options: {},
+      };
+
+      const reviewResult = await criticGate.review(toolCall, contextMinimal as any);
+      expect(reviewResult.isApproved).toBe(true);
+      expect(reviewResult.reason).toBe("critic_approved");
+    });
+
+    it("should fallback to default reason if DENY first line has no other lines", async () => {
+      const criticGate = new CriticGate();
+      const toolCall = {
+        id: "call-1",
+        name: "execute_command",
+        args: { command: "rm -rf /" },
+        _approval: { tier: APPROVAL_TIERS.DANGER as any, tierLabel: "DANGER" },
+      };
+
+      const mockProviderDenyEmpty = {
+        generateTextStream: vi.fn().mockImplementation(async function* () {
+          yield "DENY";
+        }),
+      };
+
+      const contextMinimal = {
+        provider: mockProviderDenyEmpty,
+        resolvedModel: "gemini-3.5-flash",
+        options: {},
+      };
+
+      const reviewResult = await criticGate.review(toolCall, contextMinimal as any);
+      expect(reviewResult.isApproved).toBe(false);
+      expect(reviewResult.reason).toBe("critic_denied");
+    });
+
+    it("should return critic_parse_fallback if critic response is ambiguous", async () => {
+      const criticGate = new CriticGate();
+      const toolCall = {
+        id: "call-1",
+        name: "execute_command",
+        args: { command: "rm -rf /" },
+        _approval: { tier: APPROVAL_TIERS.DANGER as any, tierLabel: "DANGER" },
+      };
+
+      const mockProviderAmbiguous = {
+        generateTextStream: vi.fn().mockImplementation(async function* () {
+          yield "MAYBE\nI am not sure about safety.";
+        }),
+      };
+
+      const contextMinimal = {
+        provider: mockProviderAmbiguous,
+        resolvedModel: "gemini-3.5-flash",
+        options: {},
+      };
+
+      const reviewResult = await criticGate.review(toolCall, contextMinimal as any);
+      expect(reviewResult.isApproved).toBe(true);
+      expect(reviewResult.reason).toBe("critic_parse_fallback");
+    });
+
+    it("should handle prompt without Tool heading when prompt is overridden", async () => {
+      vi.spyOn(CriticGate.prototype as any, "buildReviewPrompt").mockReturnValueOnce("Some prompt text without any colon heading");
+      const criticGate = new CriticGate();
+      const toolCall = {
+        id: "call-1",
+        name: "execute_command",
+        args: { command: "rm -rf /" },
+        _approval: { tier: APPROVAL_TIERS.DANGER as any, tierLabel: "DANGER" },
+      };
+
+      const mockProviderApprove = {
+        generateTextStream: vi.fn().mockImplementation(async function* () {
+          yield "APPROVE";
+        }),
+      };
+
+      const contextMinimal = {
+        provider: mockProviderApprove,
+        resolvedModel: "gemini-3.5-flash",
+        options: {},
+      };
+
+      const reviewResult = await criticGate.review(toolCall, contextMinimal as any);
+      expect(reviewResult.isApproved).toBe(true);
+      expect(reviewResult.reason).toBe("critic_approved");
     });
   });
 
@@ -458,6 +591,63 @@ describe("Harness Lifecycle Modules", () => {
         "distilled text",
       );
     });
+
+    it("should handle error when persistCompactionSummary rejects", async () => {
+      vi.mocked(AutoCompactionTrigger.evaluate).mockReturnValue({ shouldCompact: true } as any);
+      vi.mocked(CompactionService.compactConversation).mockResolvedValue({
+        compactedMessages: [{ role: "system", content: "Summary" }],
+        summaryText: "distilled text",
+        preCompactTokenCount: 500,
+        postCompactTokenCount: 100,
+      } as any);
+      vi.mocked(ConversationEmbeddingService.persistCompactionSummary).mockRejectedValueOnce(new Error("Database write error"));
+
+      const pressureResult = await manageContextPressure(
+        [{ role: "user", content: "long message" }],
+        mockAgenticContext as any,
+        mockAgenticLoopState as any,
+        "TestHarness",
+      );
+
+      expect(pressureResult.messages).toHaveLength(1);
+      expect(ConversationEmbeddingService.persistCompactionSummary).toHaveBeenCalled();
+    });
+
+    it("should fallback to defaults when metadata fields are missing in context", async () => {
+      vi.mocked(AutoCompactionTrigger.evaluate).mockReturnValue({ shouldCompact: true } as any);
+      vi.mocked(CompactionService.compactConversation).mockResolvedValue({
+        compactedMessages: [{ role: "system", content: "Summary" }],
+        summaryText: "distilled text",
+        preCompactTokenCount: 500,
+        postCompactTokenCount: 100,
+      } as any);
+
+      const contextWithoutMetadata = {
+        ...mockAgenticContext,
+        project: undefined,
+        username: undefined,
+        traceId: undefined,
+        agent: undefined,
+      };
+
+      const pressureResult = await manageContextPressure(
+        [{ role: "user", content: "long message" }],
+        contextWithoutMetadata as any,
+        mockAgenticLoopState as any,
+        "TestHarness",
+      );
+
+      expect(pressureResult.messages).toHaveLength(1);
+      expect(CompactionService.compactConversation).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.objectContaining({
+          project: "",
+          username: "",
+          traceId: null,
+          agent: null,
+        })
+      );
+    });
   });
 
   describe("CostBudgetEnforcer", () => {
@@ -557,12 +747,228 @@ describe("Harness Lifecycle Modules", () => {
       expect(pendingToolCalls[0].name).toBe("exit_plan_mode");
     });
 
+    it("should block all tools during plan mode and append warning message", () => {
+      const pendingToolCalls = [
+        { id: "call-1", name: "read_file", args: {} },
+      ];
+      const currentMessages: any[] = [];
+      const pass = { streamedText: "distilled plan text", streamedThinking: "thinking content", thinkingSignature: "signature" };
+
+      const result = blockUnauthorizedToolCalls(pendingToolCalls as any, currentMessages, pass as any, {} as any);
+      expect(result.allBlocked).toBe(true);
+      expect(pendingToolCalls).toHaveLength(0);
+      expect(currentMessages).toHaveLength(2);
+      expect(currentMessages[0].content).toBe("distilled plan text");
+      expect(currentMessages[1].content).toContain("You are in PLANNING MODE");
+    });
+
     it("should enter plan mode when enter_plan_mode is encountered", () => {
       const state = { planModeActive: false, planModeText: "" };
       const emitSpy = vi.fn();
       checkForPlanModeEntry([{ name: "enter_plan_mode" }] as any, [], state as any, emitSpy);
       expect(state.planModeActive).toBe(true);
       expect(emitSpy).toHaveBeenCalled();
+    });
+
+    it("should handle exit_plan_mode with autoApprove: true", async () => {
+      const exitPlanToolCall = { id: "exit-call-id", name: "exit_plan_mode", args: {} };
+      const pass = { streamedText: "A gorgeous layout design plan", streamedThinking: "", thinkingSignature: "" };
+      const toolResults = [{ id: "exit-call-id", name: "exit_plan_mode", result: null }];
+      const currentMessages = [{ role: "system", content: "instructions" }];
+      const context = {
+        options: { autoApprove: true },
+        emit: vi.fn(),
+        conversationId: "conversation-id-123",
+        requestStart: performance.now(),
+      };
+      const state = {
+        planModeActive: true,
+        planModeText: "Active plan text value",
+        overallUsage: { inputTokens: 10, outputTokens: 20 },
+      };
+
+      const result = await handleExitPlanMode(
+        exitPlanToolCall as any,
+        pass as any,
+        toolResults as any,
+        currentMessages as any,
+        context as any,
+        state as any
+      );
+
+      expect(result.shouldContinueLoop).toBe(true);
+      expect(state.planModeActive).toBe(false);
+      expect(state.planModeText).toBe("");
+      expect(toolResults[0].result).not.toBeNull();
+      expect((toolResults[0].result as any).isApproved).toBe(true);
+    });
+
+    it("should handle exit_plan_mode with manual approval true", async () => {
+      const exitPlanToolCall = { id: "exit-call-id", name: "exit_plan_mode", args: {} };
+      const pass = { streamedText: "Manual plan text", streamedThinking: "", thinkingSignature: "" };
+      const toolResults = [{ id: "exit-call-id", name: "exit_plan_mode", result: null }];
+      const currentMessages: any[] = [];
+      const context = {
+        options: { autoApprove: false },
+        emit: vi.fn(),
+        conversationId: "conversation-id-123",
+        requestStart: performance.now(),
+      };
+      const state = {
+        planModeActive: true,
+        planModeText: "",
+        overallUsage: { inputTokens: 10, outputTokens: 20 },
+      };
+
+      const promise = handleExitPlanMode(
+        exitPlanToolCall as any,
+        pass as any,
+        toolResults as any,
+        currentMessages as any,
+        context as any,
+        state as any
+      );
+
+      await vi.waitFor(() => {
+        expect(pendingApprovals.has("conversation-id-123")).toBe(true);
+      });
+
+      const pendingApproval = pendingApprovals.get("conversation-id-123");
+      (pendingApproval as any).resolve(true);
+
+      const result = await promise;
+      expect(result.shouldContinueLoop).toBe(true);
+      expect(state.planModeActive).toBe(false);
+    });
+
+    it("should handle exit_plan_mode when manual approval is rejected", async () => {
+      const exitPlanToolCall = { id: "exit-call-id", name: "exit_plan_mode", args: {} };
+      const pass = { streamedText: "Manual plan text", streamedThinking: "", thinkingSignature: "" };
+      const toolResults = [{ id: "exit-call-id", name: "exit_plan_mode", result: null }];
+      const currentMessages: any[] = [];
+      const emitSpy = vi.fn();
+      const context = {
+        options: { autoApprove: false },
+        emit: emitSpy,
+        conversationId: "conversation-id-123",
+        requestStart: performance.now(),
+      };
+      const state = {
+        planModeActive: true,
+        planModeText: "",
+        overallUsage: { inputTokens: 10, outputTokens: 20 },
+      };
+
+      const promise = handleExitPlanMode(
+        exitPlanToolCall as any,
+        pass as any,
+        toolResults as any,
+        currentMessages as any,
+        context as any,
+        state as any
+      );
+
+      await vi.waitFor(() => {
+        expect(pendingApprovals.has("conversation-id-123")).toBe(true);
+      });
+
+      const pendingApproval = pendingApprovals.get("conversation-id-123");
+      (pendingApproval as any).resolve(false);
+
+      const result = await promise;
+      expect(result.shouldContinueLoop).toBe(false);
+      expect(emitSpy).toHaveBeenCalledWith(expect.objectContaining({ message: "Plan rejected — execution cancelled." }));
+    });
+
+    it("should cancel previous pending approval if a new one is requested", async () => {
+      const exitPlanToolCall = { id: "exit-call-id", name: "exit_plan_mode", args: {} };
+      const pass = { streamedText: "Manual plan text", streamedThinking: "", thinkingSignature: "" };
+      const toolResults = [{ id: "exit-call-id", name: "exit_plan_mode", result: null }];
+      const currentMessages: any[] = [];
+      const context = {
+        options: { autoApprove: false },
+        emit: vi.fn(),
+        conversationId: "conversation-id-123",
+        requestStart: performance.now(),
+      };
+      const state = {
+        planModeActive: true,
+        planModeText: "",
+        overallUsage: { inputTokens: 10, outputTokens: 20 },
+      };
+
+      const promise1 = handleExitPlanMode(
+        exitPlanToolCall as any,
+        pass as any,
+        toolResults as any,
+        currentMessages as any,
+        context as any,
+        state as any
+      );
+
+      await vi.waitFor(() => {
+        expect(pendingApprovals.has("conversation-id-123")).toBe(true);
+      });
+
+      const promise2 = handleExitPlanMode(
+        exitPlanToolCall as any,
+        pass as any,
+        toolResults as any,
+        currentMessages as any,
+        context as any,
+        state as any
+      );
+
+      await vi.waitFor(() => {
+        expect(pendingApprovals.has("conversation-id-123")).toBe(true);
+      });
+
+      const result1 = await promise1;
+      expect(result1.shouldContinueLoop).toBe(false);
+
+      const pendingApproval = pendingApprovals.get("conversation-id-123");
+      (pendingApproval as any).resolve(true);
+
+      const result2 = await promise2;
+      expect(result2.shouldContinueLoop).toBe(true);
+    });
+
+    it("should reject manual approval on timeout", async () => {
+      vi.useFakeTimers();
+      const exitPlanToolCall = { id: "exit-call-id", name: "exit_plan_mode", args: {} };
+      const pass = { streamedText: "Manual plan text", streamedThinking: "", thinkingSignature: "" };
+      const toolResults = [{ id: "exit-call-id", name: "exit_plan_mode", result: null }];
+      const currentMessages: any[] = [];
+      const context = {
+        options: { autoApprove: false },
+        emit: vi.fn(),
+        conversationId: "conversation-id-123",
+        requestStart: performance.now(),
+      };
+      const state = {
+        planModeActive: true,
+        planModeText: "",
+        overallUsage: { inputTokens: 10, outputTokens: 20 },
+      };
+
+      const promise = handleExitPlanMode(
+        exitPlanToolCall as any,
+        pass as any,
+        toolResults as any,
+        currentMessages as any,
+        context as any,
+        state as any
+      );
+
+      await vi.waitFor(() => {
+        expect(pendingApprovals.has("conversation-id-123")).toBe(true);
+      });
+
+      vi.advanceTimersByTime(120_000);
+
+      const result = await promise;
+      expect(result.shouldContinueLoop).toBe(false);
+      vi.useRealTimers();
     });
   });
 
@@ -658,8 +1064,8 @@ describe("Harness Lifecycle Modules", () => {
     it("should create stash checkpoint when inside git repository", () => {
       vi.mocked(execSync).mockReturnValue("stash-sha-123");
       const emitSpy = vi.fn();
-      const sha = createSandboxCheckpoint("/my-git-repo", emitSpy);
-      expect(sha).toBe("stash-sha-123");
+      const stashReference = createSandboxCheckpoint("/my-git-repo", emitSpy);
+      expect(stashReference).toBe("stash-sha-123");
       expect(emitSpy).toHaveBeenCalled();
     });
 
@@ -669,6 +1075,53 @@ describe("Harness Lifecycle Modules", () => {
       const success = restoreSandboxCheckpoint("/my-git-repo", "stash-sha-123", emitSpy);
       expect(success).toBe(true);
       expect(emitSpy).toHaveBeenCalled();
+    });
+
+    it("should fail open and return null if workspaceRoot is undefined", () => {
+      const result = createSandboxCheckpoint(undefined, vi.fn());
+      expect(result).toBeNull();
+    });
+
+    it("should return false when restoring sandbox if workspaceRoot is undefined", () => {
+      const result = restoreSandboxCheckpoint(undefined, "stash-reference-123", vi.fn());
+      expect(result).toBe(false);
+    });
+
+    it("should fail open if isGitRepository returns false", () => {
+      vi.mocked(execSync).mockImplementation(() => {
+        throw new Error("not a git repo");
+      });
+      const result = createSandboxCheckpoint("/non-git-directory", vi.fn());
+      expect(result).toBeNull();
+    });
+
+    it("should fail open and return null if git stash create returns empty string", () => {
+      vi.mocked(execSync)
+        .mockReturnValueOnce("" as any)
+        .mockReturnValueOnce("" as any)
+        .mockReturnValueOnce("" as any);
+
+      const result = createSandboxCheckpoint("/git-repo", vi.fn());
+      expect(result).toBeNull();
+    });
+
+    it("should log warning and return null if git add fails", () => {
+      vi.mocked(execSync)
+        .mockReturnValueOnce("" as any)
+        .mockImplementationOnce(() => {
+          throw new Error("git add failed");
+        });
+
+      const result = createSandboxCheckpoint("/git-repo", vi.fn());
+      expect(result).toBeNull();
+    });
+
+    it("should log error and return false if git checkout fails during restore", () => {
+      vi.mocked(execSync).mockImplementation(() => {
+        throw new Error("git checkout failed");
+      });
+      const result = restoreSandboxCheckpoint("/git-repo", "stash-reference-123", vi.fn());
+      expect(result).toBe(false);
     });
   });
 
@@ -691,6 +1144,57 @@ describe("Harness Lifecycle Modules", () => {
       expect(results[0].result).toBe("executed-val");
       expect(ToolOrchestratorService.executeTool).toHaveBeenCalled();
     });
+
+    it("should execute streaming tools", async () => {
+      vi.mocked(ToolOrchestratorService.isStreamable).mockReturnValueOnce(true);
+      const executeToolStreamingMock = vi.fn().mockImplementation(async (name, args, onProgress, context) => {
+        onProgress("chunk", "progress data", { progress: 50 });
+        return "streaming-result";
+      });
+      vi.spyOn(ToolOrchestratorService, "executeToolStreaming").mockImplementation(executeToolStreamingMock as any);
+
+      const hooks = { run: vi.fn() } as unknown as AgentHooks;
+      const emitSpy = vi.fn();
+      const context = { emit: emitSpy, options: {}, requestId: "request-id-123" };
+      const tools = { finalTools: [] };
+
+      const results = await executeToolBatch(
+        [{ name: "write_file", id: "stream-id-1", args: { content: "content" } }],
+        context as any,
+        tools as any,
+        hooks,
+        { iterations: 2 } as any,
+      );
+
+      expect(results).toHaveLength(1);
+      expect(results[0].result).toBe("streaming-result");
+      expect(executeToolStreamingMock).toHaveBeenCalled();
+      expect(emitSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: SERVER_SENT_EVENT_TYPES.TOOL_OUTPUT,
+          toolCallId: "stream-id-1",
+          event: "chunk",
+          data: "progress data",
+        })
+      );
+    });
+
+    it("should execute a single tool call", async () => {
+      vi.mocked(ToolOrchestratorService.executeTool).mockResolvedValue("single-val");
+      const hooks = { run: vi.fn() } as unknown as AgentHooks;
+      const context = { emit: vi.fn(), options: {} };
+      const tools = { finalTools: [] };
+
+      const result = await executeToolSingle(
+        { name: "read_file", id: "single-1", args: {} },
+        context as any,
+        tools as any,
+        hooks,
+        { iterations: 1 } as any,
+      );
+
+      expect(result.result).toBe("single-val");
+    });
   });
 
   describe("KVCacheReporter", () => {
@@ -707,6 +1211,20 @@ describe("Harness Lifecycle Modules", () => {
       const result = finalizePassTracker(pass as any, "req-1");
       expect(result.finalInputTokens).toBe(100);
       expect(ConversationGenerationTracker.complete).toHaveBeenCalledWith("req-1");
+    });
+
+    it("should fallback to promptTokens if inputTokens is 0", () => {
+      const pass = { usage: { inputTokens: 0, promptTokens: 75, outputTokens: 0 } };
+      const result = finalizePassTracker(pass as any, "req-2");
+      expect(result.finalInputTokens).toBe(75);
+      expect(ConversationGenerationTracker.complete).toHaveBeenCalledWith("req-2");
+    });
+
+    it("should handle 0 inputTokens and 0 promptTokens", () => {
+      const pass = { usage: { inputTokens: 0, promptTokens: 0, outputTokens: 0 } };
+      const result = finalizePassTracker(pass as any, "req-3");
+      expect(result.finalInputTokens).toBe(0);
+      expect(ConversationGenerationTracker.complete).toHaveBeenCalledWith("req-3");
     });
   });
 
@@ -729,5 +1247,483 @@ describe("Harness Lifecycle Modules", () => {
       expect(currentMessages).toHaveLength(2);
       expect(currentMessages[1].content).toContain("Please proceed with the next step");
     });
+
+    it("should return false if model is not Codex", () => {
+      const pass = { streamedText: "plan outline", streamedThinking: "" };
+      const currentMessages: any[] = [];
+      const context = { resolvedModel: "gemini-3.5-flash" };
+
+      const detection = handleCodexPlanningResponse(
+        pass as any,
+        currentMessages,
+        context as any,
+        { iterations: 1 } as any,
+        [{ name: "run_code" }] as any,
+        "TestHarness",
+      );
+
+      expect(detection.shouldContinueLoop).toBe(false);
+      expect(currentMessages).toHaveLength(0);
+    });
+
+    it("should return false if no tools are available", () => {
+      const pass = { streamedText: "plan outline", streamedThinking: "" };
+      const currentMessages: any[] = [];
+      const context = { resolvedModel: "openai-codex-1" };
+
+      const detection = handleCodexPlanningResponse(
+        pass as any,
+        currentMessages,
+        context as any,
+        { iterations: 1 } as any,
+        [],
+        "TestHarness",
+      );
+
+      expect(detection.shouldContinueLoop).toBe(false);
+      expect(currentMessages).toHaveLength(0);
+    });
+
+    it("should return false if already prompted with continuation request", () => {
+      const pass = { streamedText: "plan outline", streamedThinking: "" };
+      const currentMessages = [
+        { role: "system", content: "If you have fully completed the user's request, please output..." }
+      ];
+      const context = { resolvedModel: "openai-codex-1" };
+
+      const detection = handleCodexPlanningResponse(
+        pass as any,
+        currentMessages as any,
+        context as any,
+        { iterations: 1 } as any,
+        [{ name: "run_code" }] as any,
+        "TestHarness",
+      );
+
+      expect(detection.shouldContinueLoop).toBe(false);
+    });
+  });
+
+  describe("ToolDiscoveryNudge", () => {
+    it("should nudging higher-tier model by advising manual enable_tools call", () => {
+      const currentMessages: any[] = [];
+      const context = {
+        resolvedModel: "gemini-3.5-pro",
+        agentConversationId: "conversation-id-123",
+      };
+
+      injectToolDiscoveryNudge(
+        [{ name: "search_tools", id: "search-id-1" }] as any,
+        [{ id: "search-id-1", result: { matches: [{ name: "run_tests", isEnabled: false }] } }] as any,
+        currentMessages,
+        context as any,
+      );
+
+      expect(currentMessages).toHaveLength(1);
+      expect(currentMessages[0].content).toContain("Call enable_tools with these tool names now");
+    });
+
+    it("should return immediately if search matches is not an array", () => {
+      const currentMessages: any[] = [];
+      const context = {
+        resolvedModel: "gemini-3.5-pro",
+        agentConversationId: "conversation-id-123",
+      };
+
+      injectToolDiscoveryNudge(
+        [{ name: "search_tools", id: "search-id-1" }] as any,
+        [{ id: "search-id-1", result: { matches: "not-an-array" } }] as any,
+        currentMessages,
+        context as any,
+      );
+
+      expect(currentMessages).toHaveLength(0);
+    });
+
+    it("should return immediately if no tools are disabled", () => {
+      const currentMessages: any[] = [];
+      const context = {
+        resolvedModel: "gemini-3.5-pro",
+        agentConversationId: "conversation-id-123",
+      };
+
+      injectToolDiscoveryNudge(
+        [{ name: "search_tools", id: "search-id-1" }] as any,
+        [{ id: "search-id-1", result: { matches: [{ name: "run_tests", isEnabled: true }] } }] as any,
+        currentMessages,
+        context as any,
+      );
+
+      expect(currentMessages).toHaveLength(0);
+    });
+  });
+
+  describe("SystemReminderInjector", () => {
+    it("should return immediately if reminderModel option is not configured", async () => {
+      const currentMessages: any[] = [];
+      const state = { iterations: 8 };
+      const context = {
+        options: { reminderModel: undefined },
+        emit: vi.fn(),
+      };
+
+      await maybeInjectSystemReminder(currentMessages, state as any, context as any);
+      expect(currentMessages).toHaveLength(0);
+    });
+
+    it("should return immediately if iteration is less than first trigger limit", async () => {
+      const currentMessages: any[] = [];
+      const state = { iterations: 3 };
+      const context = {
+        options: { reminderModel: "gemini-3.5-flash", reminderInterval: 8 },
+        emit: vi.fn(),
+      };
+
+      await maybeInjectSystemReminder(currentMessages, state as any, context as any);
+      expect(currentMessages).toHaveLength(0);
+    });
+
+    it("should return immediately if iteration is not modulo of interval", async () => {
+      const currentMessages: any[] = [];
+      const state = { iterations: 6 };
+      const context = {
+        options: { reminderModel: "gemini-3.5-flash", reminderInterval: 8 },
+        emit: vi.fn(),
+      };
+
+      await maybeInjectSystemReminder(currentMessages, state as any, context as any);
+      expect(currentMessages).toHaveLength(0);
+    });
+
+    it("should return immediately if system prompt message is missing or too short", async () => {
+      const currentMessages = [{ role: "system", content: "Short" }];
+      const state = { iterations: 8 };
+      const context = {
+        options: { reminderModel: "gemini-3.5-flash", reminderInterval: 8 },
+        emit: vi.fn(),
+        provider: {},
+      };
+
+      await maybeInjectSystemReminder(currentMessages as any, state as any, context as any);
+      expect(currentMessages).toHaveLength(1);
+    });
+
+    it("should return immediately if extractReminderViaLLM returns null", async () => {
+      const currentMessages = [{ role: "system", content: "A".repeat(300) }];
+      const state = { iterations: 8 };
+      const context = {
+        options: { reminderModel: "gemini-3.5-flash", reminderInterval: 8 },
+        emit: vi.fn(),
+        provider: {
+          generateTextStream: vi.fn().mockImplementation(async function* () {
+            yield "- Short constraint";
+          }),
+        },
+      };
+
+      await maybeInjectSystemReminder(currentMessages as any, state as any, context as any);
+      expect(currentMessages).toHaveLength(1);
+    });
+
+    it("should reuse cached reminders for subsequent injections", async () => {
+      const currentMessages1 = [{ role: "system", content: "A".repeat(300) }];
+      const state1 = { iterations: 8 };
+      const generateTextStreamSpy = vi.fn().mockImplementation(async function* () {
+        yield "- Cached rule one\n- Cached rule two\n- Cached rule three";
+      });
+      const context = {
+        options: { reminderModel: "gemini-3.5-flash", reminderInterval: 8 },
+        emit: vi.fn(),
+        provider: {
+          generateTextStream: generateTextStreamSpy,
+        },
+        agentConversationId: "cached-session-id",
+      };
+
+      await maybeInjectSystemReminder(currentMessages1 as any, state1 as any, context as any);
+      expect(currentMessages1).toHaveLength(2);
+      expect(generateTextStreamSpy).toHaveBeenCalledTimes(1);
+
+      const currentMessages2 = [{ role: "system", content: "A".repeat(300) }];
+      const state2 = { iterations: 16 };
+      await maybeInjectSystemReminder(currentMessages2 as any, state2 as any, context as any);
+      expect(currentMessages2).toHaveLength(2);
+      expect(currentMessages2[1].content).toContain("- Cached rule one");
+      expect(generateTextStreamSpy).toHaveBeenCalledTimes(1);
+      cleanupReminderCache("cached-session-id");
+    });
+  });
+
+  describe("SystemReminderExtractor", () => {
+    it("should successfully extract behavioral constraints with valid bullet points", async () => {
+      const mockProvider = {
+        generateTextStream: vi.fn().mockImplementation(async function* () {
+          yield "- Always verify your code\n- Never skip testing\n- Follow instructions strictly";
+        }),
+      };
+      const logBackgroundLlmCallSpy = vi.spyOn(RequestLogger, "logBackgroundLlmCall").mockResolvedValue({} as any);
+
+      const result = await extractReminderViaLLM(
+        "A system prompt that needs to be distilled",
+        mockProvider as any,
+        "gemini-3.5-flash",
+        undefined,
+        {
+          project: "test-project",
+          username: "test-user",
+          requestId: "request-id-123",
+        }
+      );
+
+      expect(result).toBe("- Always verify your code\n- Never skip testing\n- Follow instructions strictly");
+      expect(mockProvider.generateTextStream).toHaveBeenCalled();
+      expect(logBackgroundLlmCallSpy).toHaveBeenCalled();
+    });
+
+    it("should return null if LLM output is too short", async () => {
+      const mockProvider = {
+        generateTextStream: vi.fn().mockImplementation(async function* () {
+          yield "- Short";
+        }),
+      };
+
+      const result = await extractReminderViaLLM(
+        "System prompt content",
+        mockProvider as any,
+        "gemini-3.5-flash",
+        undefined
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it("should return null if LLM output does not have at least 3 bullet points", async () => {
+      const mockProvider = {
+        generateTextStream: vi.fn().mockImplementation(async function* () {
+          yield "- Only one bullet point\n- And a second one, but no third";
+        }),
+      };
+
+      const result = await extractReminderViaLLM(
+        "System prompt content",
+        mockProvider as any,
+        "gemini-3.5-flash",
+        undefined
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it("should cap at 12 bullets and break if total characters exceed 1500", async () => {
+      const bulletPoints: string[] = [];
+      for (let index = 0; index < 20; index++) {
+        bulletPoints.push(`- Constaining rule number ${index} which is extremely long and repetitive to push the limit`);
+      }
+      const mockProvider = {
+        generateTextStream: vi.fn().mockImplementation(async function* () {
+          yield bulletPoints.join("\n");
+        }),
+      };
+
+      const result = await extractReminderViaLLM(
+        "System prompt content",
+        mockProvider as any,
+        "gemini-3.5-flash",
+        undefined
+      );
+
+      expect(result).not.toBeNull();
+      const resultingBullets = result!.split("\n");
+      expect(resultingBullets.length).toBeLessThanOrEqual(12);
+      expect(result!.length).toBeLessThanOrEqual(1500);
+    });
+
+    it("should fail silently and return null on LLM generator exception", async () => {
+      const mockProvider = {
+        generateTextStream: vi.fn().mockImplementation(() => {
+          throw new Error("API Limit Exceeded");
+        }),
+      };
+
+      const result = await extractReminderViaLLM(
+        "System prompt content",
+        mockProvider as any,
+        "gemini-3.5-flash",
+        undefined
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it("should handle error in RequestLogger.logBackgroundLlmCall without crashing", async () => {
+      const mockProvider = {
+        generateTextStream: vi.fn().mockImplementation(async function* () {
+          yield "- First constraint rule line\n- Second constraint rule line\n- Third constraint rule line";
+        }),
+      };
+      vi.spyOn(RequestLogger, "logBackgroundLlmCall").mockRejectedValue(new Error("Logger failed"));
+
+      const result = await extractReminderViaLLM(
+        "System prompt content",
+        mockProvider as any,
+        "gemini-3.5-flash",
+        undefined,
+        {
+          project: "test-project",
+          username: "test-user",
+          requestId: "request-id-123",
+        }
+      );
+
+      expect(result).toBe("- First constraint rule line\n- Second constraint rule line\n- Third constraint rule line");
+    });
+  });
+
+  describe("Finalizer", () => {
+    describe("swapMessageContent", () => {
+      it("should return immediately if rawContent starts with SYSTEM_CONTEXT prefix", () => {
+        const message = {
+          role: "user",
+          content: "Clean content text",
+          rawContent: `${PROMPT_DELIMITERS.SYSTEM_CONTEXT} Some context notes`,
+        };
+        swapMessageContent(message as any);
+        expect(message.content).toBe("Clean content text");
+      });
+
+      it("should swap content and rawContent if rawContent is set", () => {
+        const message = {
+          role: "user",
+          content: "Clean content text",
+          rawContent: "Dirty raw content text",
+        };
+        swapMessageContent(message as any);
+        expect(message.content).toBe("Dirty raw content text");
+        expect(message.rawContent).toBe("Clean content text");
+      });
+
+      it("should parse clean content from SYSTEM_CONTEXT prefix with altSplit", () => {
+        const message = {
+          role: "user",
+          content: `${PROMPT_DELIMITERS.SYSTEM_CONTEXT} System context\n${PROMPT_DELIMITERS.USER_MESSAGE}\nExpected clean content`,
+          rawContent: undefined,
+        };
+        swapMessageContent(message as any);
+        expect(message.content).toBe("Expected clean content");
+        expect(message.rawContent).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      });
+
+      it("should parse clean content from local time prefix index split", () => {
+        const message = {
+          role: "user",
+          content: `${PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX} 2026-06-22]\n\nExpected clean content text value`,
+          rawContent: undefined,
+        };
+        swapMessageContent(message as any);
+        expect(message.content).toBe("Expected clean content text value");
+        expect(message.rawContent).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX);
+      });
+    });
+
+    describe("finalizeTextGeneration", () => {
+      it("should assemble WAV from audio chunks and upload file", async () => {
+        const mockFileServiceUpload = vi.spyOn(FileService, "uploadFile").mockResolvedValue({ ref: "minio-audio-reference-url" } as any);
+        const emitSpy = vi.fn();
+        const context = {
+          providerName: "google",
+          resolvedModel: "gemini-3.5-flash",
+          options: { agenticLoopEnabled: true },
+          conversationId: "conversation-id-123",
+          emit: emitSpy,
+        };
+        const payload = {
+          text: "Response with speech",
+          thinking: null,
+          audioChunks: [Buffer.from("PCM audio bytes chunk one").toString("base64")],
+          audioSampleRate: 16000,
+          usage: { inputTokens: 5, outputTokens: 10 },
+          totalSec: 1.5,
+        };
+
+        await finalizeTextGeneration(context as any, payload as any);
+
+        expect(mockFileServiceUpload).toHaveBeenCalled();
+        expect(emitSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: SERVER_SENT_EVENT_TYPES.DONE,
+            audioRef: "minio-audio-reference-url",
+          })
+        );
+      });
+
+      it("should log chat generation if agenticLoopEnabled is false", async () => {
+        const logChatGenerationSpy = vi.spyOn(RequestLogger, "logChatGeneration").mockImplementation(() => Promise.resolve());
+        const context = {
+          providerName: "openai",
+          resolvedModel: "gpt-4o",
+          options: { agenticLoopEnabled: false },
+          conversationId: "conversation-id-123",
+          emit: vi.fn(),
+        };
+        const payload = {
+          text: "Regular chat text response",
+          thinking: null,
+          usage: { inputTokens: 20, outputTokens: 30 },
+          totalSec: 0.8,
+        };
+
+        await finalizeTextGeneration(context as any, payload as any);
+
+        expect(logChatGenerationSpy).toHaveBeenCalled();
+      });
+
+      it("should include telemetry metadata parentConversationId and parentAgentConversationId", async () => {
+        const appendAndFinalizeSpy = vi.mocked(appendAndFinalize);
+        const context = {
+          providerName: "google",
+          resolvedModel: "gemini-3.5-flash",
+          options: { agenticLoopEnabled: true },
+          conversationId: "conversation-id-123",
+          parentConversationId: "parent-conversation-id-456",
+          parentAgentConversationId: "parent-agent-conversation-id-789",
+          emit: vi.fn(),
+        };
+        const payload = {
+          text: "Response content",
+          thinking: null,
+        };
+
+        await finalizeTextGeneration(context as any, payload as any);
+
+        expect(appendAndFinalizeSpy).toHaveBeenCalledWith(
+          "conversation-id-123",
+          "",
+          undefined,
+          expect.any(Array),
+          expect.objectContaining({
+            parentConversationId: "parent-conversation-id-456",
+            parentAgentConversationId: "parent-agent-conversation-id-789",
+            isSubAgent: true,
+          }),
+          undefined
+        );
+      });
+    });
+
+    describe("sanitizeMessagesForPersistence", () => {
+      it("should filter out identity prompts and compaction summaries", () => {
+        const messages = [
+          { role: "system", content: "Identity prompt text", _isIdentityPrompt: true },
+          { role: "user", content: "compaction summary here", isCompactSummary: true },
+          { role: "user", content: `${PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX} system context note` },
+          { role: "user", content: "Normal user message content" },
+        ];
+
+        const result = sanitizeMessagesForPersistence(messages as any);
+        expect(result).toHaveLength(1);
+        expect(result[0].content).toBe("Normal user message content");
+      });
+    });
   });
 });
+

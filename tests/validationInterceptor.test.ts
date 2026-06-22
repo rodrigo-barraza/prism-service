@@ -54,7 +54,7 @@ describe("ValidationInterceptor", () => {
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "read_file", args: { path: "test.ts" } },
       ];
-      const results: ToolResult[] = [
+      const results: any[] = [
         { id: "call-1", result: { content: "file contents" } },
       ];
 
@@ -67,7 +67,7 @@ describe("ValidationInterceptor", () => {
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "run_command", args: { command: "ls" } },
       ];
-      const results: ToolResult[] = [
+      const results: any[] = [
         { id: "call-1", result: { stdout: "file1.ts" } },
       ];
 
@@ -80,7 +80,7 @@ describe("ValidationInterceptor", () => {
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "search_files", args: { pattern: "test" } },
       ];
-      const results: ToolResult[] = [
+      const results: any[] = [
         { id: "call-1", result: { matches: [] } },
       ];
 
@@ -95,7 +95,7 @@ describe("ValidationInterceptor", () => {
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "write_file", args: { path: "test.ts" } },
       ];
-      const results: ToolResult[] = [
+      const results: any[] = [
         { id: "call-1", result: { error: "Permission denied" } },
       ];
 
@@ -108,7 +108,7 @@ describe("ValidationInterceptor", () => {
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "string_replace_file", args: { path: "app.tsx" } },
       ];
-      const results: ToolResult[] = [
+      const results: any[] = [
         { id: "call-1", result: { error: "No match found" } },
       ];
 
@@ -123,7 +123,7 @@ describe("ValidationInterceptor", () => {
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "write_file", args: { content: "no path here" } },
       ];
-      const results: ToolResult[] = [
+      const results: any[] = [
         { id: "call-1", result: { success: true } },
       ];
 
@@ -142,7 +142,7 @@ describe("ValidationInterceptor", () => {
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "write_file", args: { path: "/workspace/src/test.ts" } },
       ];
-      const results: ToolResult[] = [
+      const results: any[] = [
         { id: "call-1", result: { success: true } },
       ];
 
@@ -161,7 +161,7 @@ describe("ValidationInterceptor", () => {
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "write_file", args: { filePath: "/workspace/src/app.tsx" } },
       ];
-      const results: ToolResult[] = [
+      const results: any[] = [
         { id: "call-1", result: { success: true } },
       ];
 
@@ -176,7 +176,7 @@ describe("ValidationInterceptor", () => {
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "write_file", args: { path: "script.py" } },
       ];
-      const results: ToolResult[] = [
+      const results: any[] = [
         { id: "call-1", result: { success: true } },
       ];
 
@@ -190,7 +190,7 @@ describe("ValidationInterceptor", () => {
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "write_file", args: { path: "styles.css" } },
       ];
-      const results: ToolResult[] = [
+      const results: any[] = [
         { id: "call-1", result: { success: true } },
       ];
 
@@ -203,7 +203,7 @@ describe("ValidationInterceptor", () => {
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "write_file", args: { path: "config.json" } },
       ];
-      const results: ToolResult[] = [
+      const results: any[] = [
         { id: "call-1", result: { success: true } },
       ];
 
@@ -225,7 +225,7 @@ describe("ValidationInterceptor", () => {
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "write_file", args: { path: "/workspace/src/test.ts" } },
       ];
-      const results: ToolResult[] = [
+      const results: any[] = [
         { id: "call-1", result: { success: true } },
       ];
 
@@ -247,7 +247,7 @@ describe("ValidationInterceptor", () => {
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "write_file", args: { path: "/workspace/src/clean.ts" } },
       ];
-      const results: ToolResult[] = [
+      const results: any[] = [
         { id: "call-1", result: { success: true } },
       ];
 
@@ -266,7 +266,7 @@ describe("ValidationInterceptor", () => {
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "write_file", args: { path: "/workspace/src/timeout.ts" } },
       ];
-      const results: ToolResult[] = [
+      const results: any[] = [
         { id: "call-1", result: { success: true } },
       ];
 
@@ -294,7 +294,7 @@ describe("ValidationInterceptor", () => {
         { id: "call-1", name: "write_file", args: { path: "/workspace/src/broken.ts" } },
         { id: "call-2", name: "string_replace_file", args: { path: "/workspace/src/fine.tsx" } },
       ];
-      const results: ToolResult[] = [
+      const results: any[] = [
         { id: "call-1", result: { success: true } },
         { id: "call-2", result: { success: true } },
       ];
@@ -317,7 +317,7 @@ describe("ValidationInterceptor", () => {
       const toolCalls: ToolCall[] = [
         { id: "call-abc", name: "write_file", args: { path: "/workspace/test.ts" } },
       ];
-      const results: ToolResult[] = [
+      const results: any[] = [
         { id: "call-abc", result: { success: true } },
       ];
 
@@ -330,7 +330,7 @@ describe("ValidationInterceptor", () => {
       const toolCalls: ToolCall[] = [
         { id: "call-xyz", name: "write_file", args: { path: "/workspace/orphan.ts" } },
       ];
-      const results: ToolResult[] = [
+      const results: any[] = [
         { id: "call-different", result: { success: true }, name: "read_file" },
       ];
 
@@ -352,7 +352,7 @@ describe("ValidationInterceptor", () => {
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "patch_file", args: { path: "/workspace/src/patched.ts" } },
       ];
-      const results: ToolResult[] = [
+      const results: any[] = [
         { id: "call-1", result: { success: true } },
       ];
 
@@ -371,12 +371,141 @@ describe("ValidationInterceptor", () => {
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "move_file", args: { newPath: "/workspace/src/moved.tsx" } },
       ];
-      const results: ToolResult[] = [
+      const results: any[] = [
         { id: "call-1", result: { success: true } },
       ];
 
       await validateAfterToolExecution(toolCalls, results, mockAgenticContext, mockLoopState);
 
+      expect(ToolOrchestratorService.executeTool).toHaveBeenCalled();
+    });
+  });
+
+  describe("findNearestConfigDir and path extraction edge cases", () => {
+    it("should find nearest config directory when config file exists", async () => {
+      vi.mocked(fs.existsSync).mockReturnValueOnce(true);
+      vi.mocked(ToolOrchestratorService.executeTool).mockResolvedValue({
+        exitCode: 0,
+        stdout: "",
+        stderr: "",
+      });
+
+      const toolCalls: ToolCall[] = [
+        { id: "call-1", name: "write_file", args: { path: "src/subdir/test.ts" } },
+      ];
+      const results: any[] = [
+        { id: "call-1", result: { success: true } },
+      ];
+
+      await validateAfterToolExecution(toolCalls, results, mockAgenticContext, mockLoopState);
+
+      expect(fs.existsSync).toHaveBeenCalled();
+    });
+
+    it("should fallback to ToolOrchestratorService.getWorkspaceRoot if workspaceRoot in context is falsy", async () => {
+      vi.mocked(ToolOrchestratorService.executeTool).mockResolvedValue({
+        exitCode: 0,
+        stdout: "",
+        stderr: "",
+      });
+
+      const contextWithoutWorkspace = {
+        ...mockAgenticContext,
+        workspaceRoot: undefined,
+      };
+
+      const toolCalls: ToolCall[] = [
+        { id: "call-1", name: "write_file", args: { path: "src/test.ts" } },
+      ];
+      const results: any[] = [
+        { id: "call-1", result: { success: true } },
+      ];
+
+      await validateAfterToolExecution(toolCalls, results, contextWithoutWorkspace as any, mockLoopState);
+
+      expect(ToolOrchestratorService.getWorkspaceRoot).toHaveBeenCalled();
+    });
+
+    it("should skip validation if both context workspaceRoot and global workspaceRoot are falsy", async () => {
+      vi.mocked(ToolOrchestratorService.getWorkspaceRoot).mockReturnValueOnce(null as any);
+
+      const contextWithoutWorkspace = {
+        ...mockAgenticContext,
+        workspaceRoot: undefined,
+      };
+
+      const toolCalls: ToolCall[] = [
+        { id: "call-1", name: "write_file", args: { path: "src/test.ts" } },
+      ];
+      const results: any[] = [
+        { id: "call-1", result: { success: true } },
+      ];
+
+      const feedback = await validateAfterToolExecution(toolCalls, results, contextWithoutWorkspace as any, mockLoopState);
+
+      expect(feedback).toHaveLength(0);
+    });
+  });
+
+  describe("shell validator output parsing edge cases", () => {
+    it("should return null feedback if exitCode is non-zero but combinedOutput is empty", async () => {
+      vi.mocked(ToolOrchestratorService.executeTool).mockResolvedValue({
+        exitCode: 1,
+        stdout: "",
+        stderr: "",
+      });
+
+      const toolCalls: ToolCall[] = [
+        { id: "call-1", name: "write_file", args: { path: "src/test.ts" } },
+      ];
+      const results: any[] = [
+        { id: "call-1", result: { success: true } },
+      ];
+
+      const feedback = await validateAfterToolExecution(toolCalls, results, mockAgenticContext, mockLoopState);
+
+      expect(feedback).toHaveLength(0);
+    });
+
+    it("should return raw output slice if combinedOutput length is >= 20 but does not contain error keywords", async () => {
+      vi.mocked(ToolOrchestratorService.executeTool).mockResolvedValue({
+        exitCode: 1,
+        stdout: "Some unexpected compilation output here that is long",
+        stderr: "",
+      });
+
+      const toolCalls: ToolCall[] = [
+        { id: "call-1", name: "write_file", args: { path: "src/test.ts" } },
+      ];
+      const results: any[] = [
+        { id: "call-1", result: { success: true } },
+      ];
+
+      const feedback = await validateAfterToolExecution(toolCalls, results, mockAgenticContext, mockLoopState);
+
+      expect(feedback).toHaveLength(1);
+      expect(feedback[0].errors[0]).toContain("Some unexpected compilation output");
+    });
+  });
+
+  describe("result name fallback matching", () => {
+    it("should match by name fallback when result has no ID", async () => {
+      vi.mocked(ToolOrchestratorService.executeTool).mockResolvedValue({
+        exitCode: 0,
+        stdout: "",
+        stderr: "",
+      });
+
+      const toolCalls: ToolCall[] = [
+        { id: "call-abc", name: "write_file", args: { path: "src/test.ts" } },
+      ];
+      const results: [ToolResult] = [
+        { name: "write_file", result: { success: true } } as any,
+      ];
+
+      const feedback = await validateAfterToolExecution(toolCalls, results, mockAgenticContext, mockLoopState);
+
+      expect(feedback).toHaveLength(0);
       expect(ToolOrchestratorService.executeTool).toHaveBeenCalled();
     });
   });

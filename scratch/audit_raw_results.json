@@ -1,2897 +1,1118 @@
 [
   {
-    "file": "tests/adminStats.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 20,
-        "content": "const exists = (value as any).$exists;"
-      },
-      {
-        "line": 25,
-        "content": "const neValue = (value as any).$ne;"
-      },
-      {
-        "line": 42,
-        "content": "const sizeExpr = (expression as any).$size;"
-      },
-      {
-        "line": 53,
-        "content": "const fieldName = (expression as any).replace(\"$\", \"\");"
-      },
-      {
-        "line": 95,
-        "content": "const sumExpr = (op as any).$sum;"
-      },
-      {
-        "line": 145,
-        "content": "const setExpr = (op as any).$addToSet.replace(\"$\", \"\");"
-      },
-      {
-        "line": 149,
-        "content": "const avgExpr = (op as any).$avg;"
-      },
-      {
-        "line": 160,
-        "content": "const minExpr = (op as any).$min.replace(\"$\", \"\");"
-      },
-      {
-        "line": 164,
-        "content": "const maxExpr = (op as any).$max.replace(\"$\", \"\");"
-      },
-      {
-        "line": 168,
-        "content": "const pushExpr = (op as any).$push.replace(\"$\", \"\");"
-      },
-      {
-        "line": 231,
-        "content": "vi.mocked(MongoWrapper.getDb).mockReturnValue(mockDb as any);"
-      },
-      {
-        "line": 416,
-        "content": "vi.mocked(MongoWrapper.getDb).mockReturnValue(mockDb as any);"
-      }
-    ],
-    "mocks": [],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 139,
+    "lineEnd": 139,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/agenticLoopService.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 163,
-        "content": "(SettingsService.getCached as any).mockReturnValue({"
-      },
-      {
-        "line": 265,
-        "content": "(ContextWindowManager.enforce as any).mockReturnValueOnce({"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 8,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      },
-      {
-        "line": 19,
-        "content": "vi.mock(\"../src/services/ToolOrchestratorService.ts\", () => ({"
-      },
-      {
-        "line": 39,
-        "content": "vi.mock(\"../src/wrappers/MongoWrapper.ts\", () => ({"
-      },
-      {
-        "line": 56,
-        "content": "vi.mock(\"../src/services/FileService.ts\", () => ({"
-      },
-      {
-        "line": 62,
-        "content": "vi.mock(\"../src/services/RequestLogger.ts\", () => ({"
-      },
-      {
-        "line": 68,
-        "content": "vi.mock(\"../src/services/local-tools/InternalToolRegistry.ts\", () => ({"
-      },
-      {
-        "line": 74,
-        "content": "vi.mock(\"../src/utils/ContextWindowManager.ts\", () => ({"
-      },
-      {
-        "line": 86,
-        "content": "vi.mock(\"../src/services/ConversationGenerationTracker.ts\", () => ({"
-      },
-      {
-        "line": 112,
-        "content": "vi.mock(\"../src/services/system-prompt/index.ts\", () => ({"
-      },
-      {
-        "line": 121,
-        "content": "vi.mock(\"../src/services/SettingsService.ts\", async () => {"
-      },
-      {
-        "line": 138,
-        "content": "vi.mock(\"../src/routes/ChatRoutes.ts\", () => ({"
-      },
-      {
-        "line": 142,
-        "content": "vi.mock(\"../src/services/MemoryExtractor.ts\", () => ({"
-      },
-      {
-        "line": 148,
-        "content": "vi.mock(\"../src/services/PlanningModeService.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 164,
+    "lineEnd": 164,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/agenticLoopState.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 225,
-        "content": "expect((cleanSegments[0] as any).toolIds).toEqual(['tc-1', 'tc-2']);"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 11,
-        "content": "vi.mock(\"../src/utils/CostCalculator.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 231,
+    "lineEnd": 231,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/agenticSessionPersistence.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 90,
-        "content": "} as any),"
-      },
-      {
-        "line": 91,
-        "content": "get: vi.fn().mockResolvedValue({} as any),"
-      },
-      {
-        "line": 92,
-        "content": "getSection: vi.fn().mockResolvedValue({} as any),"
-      },
-      {
-        "line": 98,
-        "content": "const ConversationService = (await import(\"../src/services/ConversationService.ts\")).default as any;"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 24,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      },
-      {
-        "line": 35,
-        "content": "vi.mock(\"../../config.ts\", () => ({"
-      },
-      {
-        "line": 53,
-        "content": "vi.mock(\"../src/wrappers/MongoWrapper.ts\", () => ({"
-      },
-      {
-        "line": 61,
-        "content": "vi.mock(\"../src/services/FileService.ts\", () => ({"
-      },
-      {
-        "line": 69,
-        "content": "vi.mock(\"../src/services/RequestLogger.ts\", () => ({"
-      },
-      {
-        "line": 76,
-        "content": "vi.mock(\"../src/services/ConversationService.ts\", () => ({"
-      },
-      {
-        "line": 84,
-        "content": "vi.mock(\"../src/services/SettingsService.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 314,
+    "lineEnd": 314,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/agenticToolResolver.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 106,
-        "content": "vi.mock(\"../src/services/ToolOrchestratorService.ts\", () => ({"
-      },
-      {
-        "line": 123,
-        "content": "vi.mock(\"../src/wrappers/MongoWrapper.ts\", () => ({"
-      },
-      {
-        "line": 131,
-        "content": "vi.mock(\"../../config.ts\", () => ({"
-      },
-      {
-        "line": 136,
-        "content": "vi.mock(\"../config.ts\", () => ({"
-      },
-      {
-        "line": 162,
-        "content": "vi.mock(\"../src/services/AgentPersonaRegistry.ts\", () => ({"
-      },
-      {
-        "line": 178,
-        "content": "vi.mock(\"../src/services/local-tools/InternalToolRegistry.ts\", () => ({"
-      },
-      {
-        "line": 184,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 428,
+    "lineEnd": 428,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/authMiddleware.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 28,
-        "content": "} as unknown as Request;"
-      },
-      {
-        "line": 32,
-        "content": "return {} as unknown as Response;"
-      },
-      {
-        "line": 281,
-        "content": "const agent = supertest(app as any);"
-      }
-    ],
-    "mocks": [],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 586,
+    "lineEnd": 586,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/autoApprovalEngine.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 387,
-        "content": "const result = await hook({ name: \"read_file\", args: {}, id: \"tc1\" }, {} as any);"
-      },
-      {
-        "line": 397,
-        "content": "const result = await hook({ name: \"execute_shell\", args: {}, id: \"tc2\" }, {} as any);"
-      },
-      {
-        "line": 407,
-        "content": "const result = await hook({ name: \"execute_shell\", args: {}, id: \"tc3\" }, {} as any);"
-      },
-      {
-        "line": 421,
-        "content": "expect((engine as any).fullAuto).toBe(false);"
-      },
-      {
-        "line": 426,
-        "content": "expect((engine as any).tierOverrides).toEqual({});"
-      },
-      {
-        "line": 431,
-        "content": "expect((engine as any).fullAuto).toBe(false);"
-      },
-      {
-        "line": 432,
-        "content": "expect((engine as any).tierOverrides).toEqual({});"
-      },
-      {
-        "line": 790,
-        "content": "} as unknown as import('../src/services/ApprovalRegistry.ts').PendingToolApprovalEntry);"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 4,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 647,
+    "lineEnd": 647,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/backgroundCostPropagation.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 51,
-        "content": "vi.mock(\"../config.ts\", () => configMock);"
-      },
-      {
-        "line": 53,
-        "content": "vi.mock(\"../src/config.ts\", () => configMock);"
-      },
-      {
-        "line": 60,
-        "content": "vi.mock(\"../src/providers/index.ts\", () => ({"
-      },
-      {
-        "line": 67,
-        "content": "vi.mock(\"../src/services/SettingsService.ts\", () => ({"
-      },
-      {
-        "line": 91,
-        "content": "vi.mock(\"../src/services/RequestLogger.ts\", () => ({"
-      },
-      {
-        "line": 99,
-        "content": "vi.mock(\"../src/services/MemoryService.ts\", () => ({"
-      },
-      {
-        "line": 108,
-        "content": "vi.mock(\"../src/services/MemoryConsolidationService.ts\", () => ({"
-      },
-      {
-        "line": 115,
-        "content": "vi.mock(\"../src/services/AgentPersonaRegistry.ts\", () => ({"
-      },
-      {
-        "line": 122,
-        "content": "vi.mock(\"../src/wrappers/MongoWrapper.ts\", () => ({"
-      },
-      {
-        "line": 130,
-        "content": "vi.mock(\"../src/services/EmbeddingService.ts\", () => ({"
-      },
-      {
-        "line": 138,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 694,
+    "lineEnd": 694,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/backgroundTokenAccuracy.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 20,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      },
-      {
-        "line": 30,
-        "content": "vi.mock(\"../config.ts\", () => ({"
-      },
-      {
-        "line": 36,
-        "content": "vi.mock(\"../src/wrappers/MongoWrapper.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 725,
+    "lineEnd": 725,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/benchmarkService.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 40,
-        "content": "(MongoWrapper.getDb as any).mockReturnValue(mockDatabase);"
-      },
-      {
-        "line": 44,
-        "content": "(handleConversation as any).mockImplementation("
-      },
-      {
-        "line": 82,
-        "content": "(handleAgent as any).mockImplementation("
-      },
-      {
-        "line": 120,
-        "content": "(handleConversation as any).mockImplementation("
-      }
-    ],
-    "mocks": [
-      {
-        "line": 7,
-        "content": "vi.mock(\"../src/routes/ChatRoutes.ts\", () => ({"
-      },
-      {
-        "line": 12,
-        "content": "vi.mock(\"../src/wrappers/MongoWrapper.ts\", () => ({"
-      },
-      {
-        "line": 18,
-        "content": "vi.mock(\"../src/providers/index.ts\", () => ({"
-      },
-      {
-        "line": 24,
-        "content": "vi.mock(\"../src/providers/instance-registry.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 861,
+    "lineEnd": 861,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/changeStreamService.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 54,
-        "content": "const getDatabaseSpy = vi.spyOn(MongoWrapper, \"getDb\").mockReturnValueOnce(null as any);"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 5,
-        "content": "vi.mock(\"../config.ts\", () => ({"
-      },
-      {
-        "line": 19,
-        "content": "vi.mock(\"../src/wrappers/MongoWrapper.ts\", () => ({"
-      },
-      {
-        "line": 30,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 918,
+    "lineEnd": 918,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"anthropic\"` duplicates production constant `PROVIDERS.ANTHROPIC`.",
+    "fix": "Replace literal `\"anthropic\"` with `PROVIDERS.ANTHROPIC` imported from constants."
   },
   {
-    "file": "tests/client-tool-state-updaters.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 336,
-        "content": "result: { success: true } as any,"
-      }
-    ],
-    "mocks": [],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 986,
+    "lineEnd": 986,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"anthropic\"` duplicates production constant `PROVIDERS.ANTHROPIC`.",
+    "fix": "Replace literal `\"anthropic\"` with `PROVIDERS.ANTHROPIC` imported from constants."
   },
   {
-    "file": "tests/compaction.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 248,
-        "content": "expect((compacted[1] as any).isCompactSummary).toBe(true);"
-      },
-      {
-        "line": 367,
-        "content": "} as any);"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 5,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 1064,
+    "lineEnd": 1064,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/contextWindowManager.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 609,
-        "content": "const result = ContextWindowManager.enforce([giantSystemMessage] as any, {"
-      },
-      {
-        "line": 623,
-        "content": "const result = ContextWindowManager.enforce(messagesWithUndefined as any, {"
-      },
-      {
-        "line": 649,
-        "content": "const result = ContextWindowManager.enforce(messagesWithDeepToolResults as any, {"
-      },
-      {
-        "line": 660,
-        "content": "const result = ContextWindowManager.enforce(messages as any, {"
-      },
-      {
-        "line": 673,
-        "content": "const result = ContextWindowManager.enforce(messages as any, {"
-      },
-      {
-        "line": 707,
-        "content": "const estimate = ContextWindowManager.estimateTokens(emptyMessages as any);"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 4,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 1150,
+    "lineEnd": 1150,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"anthropic\"` duplicates production constant `PROVIDERS.ANTHROPIC`.",
+    "fix": "Replace literal `\"anthropic\"` with `PROVIDERS.ANTHROPIC` imported from constants."
   },
   {
-    "file": "tests/conversationDerivedUtils.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 12,
-        "content": "vi.mock(\"../src/services/FileService.ts\", () => ({"
-      },
-      {
-        "line": 20,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 1214,
+    "lineEnd": 1214,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/conversationListCostEnrichment.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 177,
-        "content": "const conversations = [{ id: \"conv-1\", totalCost: undefined as unknown as number }];"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 25,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      },
-      {
-        "line": 34,
-        "content": "vi.mock(\"../config.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 1270,
+    "lineEnd": 1270,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/conversationService.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 53,
-        "content": ") as any;"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 18,
-        "content": "vi.mock(\"../config.ts\", () => ({"
-      },
-      {
-        "line": 23,
-        "content": "vi.mock(\"../src/services/FileService.ts\", () => ({"
-      },
-      {
-        "line": 101,
-        "content": "vi.mock(\"../src/wrappers/MongoWrapper.ts\", () => {"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 1354,
+    "lineEnd": 1354,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"anthropic\"` duplicates production constant `PROVIDERS.ANTHROPIC`.",
+    "fix": "Replace literal `\"anthropic\"` with `PROVIDERS.ANTHROPIC` imported from constants."
   },
   {
-    "file": "tests/conversationSubAgentsEnrichment.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 106,
-        "content": "vi.mocked(MongoWrapper.getDb).mockReturnValue(mockDb as any);"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 5,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      },
-      {
-        "line": 14,
-        "content": "vi.mock(\"../config.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 1424,
+    "lineEnd": 1424,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"anthropic\"` duplicates production constant `PROVIDERS.ANTHROPIC`.",
+    "fix": "Replace literal `\"anthropic\"` with `PROVIDERS.ANTHROPIC` imported from constants."
   },
   {
-    "file": "tests/conversationTimerService.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 17,
-        "content": "vi.mock(\"../config.ts\", () => ({"
-      },
-      {
-        "line": 27,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      },
-      {
-        "line": 39,
-        "content": "vi.mock(\"../src/utils/CleanupRegistry.ts\", () => ({"
-      },
-      {
-        "line": 44,
-        "content": "vi.mock(\"../src/services/ScheduledTaskService.ts\", () => ({"
-      },
-      {
-        "line": 52,
-        "content": "vi.mock(\"../src/services/ConversationService.ts\", () => ({"
-      },
-      {
-        "line": 62,
-        "content": "vi.mock(\"../src/services/AgenticLoopService.ts\", () => ({"
-      },
-      {
-        "line": 69,
-        "content": "vi.mock(\"../src/providers/index.ts\", () => ({"
-      },
-      {
-        "line": 87,
-        "content": "vi.mock(\"../src/wrappers/MongoWrapper.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 1479,
+    "lineEnd": 1479,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/conversationUtilities.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 20,
-        "content": "vi.mock(\"../src/services/ConversationService.ts\", () => ({"
-      },
-      {
-        "line": 27,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 1533,
+    "lineEnd": 1533,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/customAgents-adversarial.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 146,
-        "content": "expect(persona?.identity({} as any)).toBe('');"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 8,
-        "content": "vi.mock('../src/utils/logger.ts', () => ({"
-      },
-      {
-        "line": 19,
-        "content": "vi.mock('../config.ts', () => ({"
-      },
-      {
-        "line": 26,
-        "content": "vi.mock('../src/wrappers/MongoWrapper.ts', () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 1566,
+    "lineEnd": 1566,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/fileService.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 5,
-        "content": "vi.mock(\"../src/wrappers/MinioWrapper.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 1635,
+    "lineEnd": 1635,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/finalize-message-persistence.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 27,
-        "content": "const messagesAsPayload = currentMessages as unknown as MessagePayload[];"
-      },
-      {
-        "line": 28,
-        "content": "return computeNewTurnMessages(messagesAsPayload, messagesAsPayload, originalMessageCount) as unknown as TestMessage[];"
-      },
-      {
-        "line": 38,
-        "content": "return sanitizeMessagesForPersistence(messagesToAppend as any) as unknown as TestMessage[];"
-      },
-      {
-        "line": 1010,
-        "content": "(message) => (message as any)._alreadyPersisted,"
-      },
-      {
-        "line": 1185,
-        "content": "(message) => (message as any)._alreadyPersisted,"
-      }
-    ],
-    "mocks": [],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 1695,
+    "lineEnd": 1695,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/finalizer-race-condition.test.ts",
-    "interfaces": [
-      {
-        "name": "TimelineEvent",
-        "line": 324,
-        "content": "interface TimelineEvent {"
-      },
-      {
-        "name": "SimpleMessage",
-        "line": 466,
-        "content": "interface SimpleMessage {"
-      },
-      {
-        "name": "SimpleMessage",
-        "line": 503,
-        "content": "interface SimpleMessage {"
-      }
-    ],
-    "types": [
-      {
-        "name": "FinalizerInput",
-        "line": 22,
-        "content": "type FinalizerInput = Parameters<typeof assembleMessagesToAppendReal>[0];"
-      }
-    ],
-    "anyAssertions": [],
-    "mocks": [],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 1743,
+    "lineEnd": 1743,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"anthropic\"` duplicates production constant `PROVIDERS.ANTHROPIC`.",
+    "fix": "Replace literal `\"anthropic\"` with `PROVIDERS.ANTHROPIC` imported from constants."
   },
   {
-    "file": "tests/functionCallingUtilities.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 33,
-        "content": "const result = truncateToolResult(largeArray) as unknown[];"
-      },
-      {
-        "line": 58,
-        "content": "expect((result.events as unknown[]).length).toBe(10);"
-      },
-      {
-        "line": 148,
-        "content": "expect((parsed.events as unknown[]).length).toBe(10);"
-      },
-      {
-        "line": 328,
-        "content": "expect((result.events as unknown[]).length).toBe(10);"
-      },
-      {
-        "line": 330,
-        "content": "expect((result.products as unknown[]).length).toBe(10);"
-      },
-      {
-        "line": 354,
-        "content": "expect(({} as any).isAdmin).toBeUndefined();"
-      },
-      {
-        "line": 366,
-        "content": "const messages = [{ role: 'user', content: null }] as any;"
-      },
-      {
-        "line": 376,
-        "content": "] as any;"
-      },
-      {
-        "line": 392,
-        "content": "] as any;"
-      },
-      {
-        "line": 404,
-        "content": "] as any;"
-      },
-      {
-        "line": 413,
-        "content": "] as any;"
-      },
-      {
-        "line": 432,
-        "content": "] as any;"
-      },
-      {
-        "line": 459,
-        "content": "] as any;"
-      },
-      {
-        "line": 495,
-        "content": "] as any;"
-      },
-      {
-        "line": 543,
-        "content": "] as any;"
-      }
-    ],
-    "mocks": [],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 1786,
+    "lineEnd": 1786,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"anthropic\"` duplicates production constant `PROVIDERS.ANTHROPIC`.",
+    "fix": "Replace literal `\"anthropic\"` with `PROVIDERS.ANTHROPIC` imported from constants."
   },
   {
-    "file": "tests/harness-lifecycle.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 248,
-        "content": "const updatedResult = results[0].result as any;"
-      },
-      {
-        "line": 264,
-        "content": "const toolCalls = [{ name: \"write_file\", id: \"toolCall-1\", args: {} }] as any;"
-      },
-      {
-        "line": 276,
-        "content": "const toolCalls = [{ name: \"write_file\", id: \"toolCall-1\", args: {} }] as any;"
-      },
-      {
-        "line": 288,
-        "content": "const toolCalls = [{ name: \"write_file\", id: \"toolCall-1\", args: {} }] as any;"
-      },
-      {
-        "line": 324,
-        "content": "pass as any,"
-      },
-      {
-        "line": 325,
-        "content": "{} as any,"
-      },
-      {
-        "line": 343,
-        "content": "pass as any,"
-      },
-      {
-        "line": 344,
-        "content": "{} as any,"
-      },
-      {
-        "line": 364,
-        "content": "pass as any,"
-      },
-      {
-        "line": 365,
-        "content": "{} as any,"
-      },
-      {
-        "line": 383,
-        "content": "state as any,"
-      },
-      {
-        "line": 403,
-        "content": "state as any,"
-      },
-      {
-        "line": 430,
-        "content": "context as any,"
-      },
-      {
-        "line": 431,
-        "content": "approvalEngine as any,"
-      },
-      {
-        "line": 459,
-        "content": "context as any,"
-      },
-      {
-        "line": 460,
-        "content": "approvalEngine as any,"
-      },
-      {
-        "line": 525,
-        "content": "} as any);"
-      },
-      {
-        "line": 669,
-        "content": "} as unknown as ResolvedTools;"
-      },
-      {
-        "line": 672,
-        "content": "} as unknown as AgentHooks;"
-      },
-      {
-        "line": 675,
-        "content": "} as unknown as AgenticLoopState;"
-      },
-      {
-        "line": 737,
-        "content": "const internalHooks = (hooks as any)._hooks;"
-      },
-      {
-        "line": 759,
-        "content": "const internalHooks = (hooks as any)._hooks;"
-      },
-      {
-        "line": 772,
-        "content": "mockContext = createMockAgenticContext({ provider: {} as any });"
-      },
-      {
-        "line": 773,
-        "content": "mockState = {} as any;"
-      },
-      {
-        "line": 908,
-        "content": "_approval: { tier: 2 } as any, // WRITE tier"
-      },
-      {
-        "line": 924,
-        "content": "_approval: { tier: 3 } as any, // DANGER tier"
-      },
-      {
-        "line": 940,
-        "content": "_approval: { tier: 3 } as any,"
-      },
-      {
-        "line": 966,
-        "content": "_approval: { tier: 3 } as any,"
-      },
-      {
-        "line": 985,
-        "content": "_approval: { tier: 3 } as any,"
-      },
-      {
-        "line": 1004,
-        "content": "_approval: { tier: 3 } as any,"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 30,
-        "content": "vi.mock(\"../src/services/ToolOrchestratorService.ts\", () => ({"
-      },
-      {
-        "line": 42,
-        "content": "vi.mock(\"../src/services/ConversationGenerationTracker.ts\", () => ({"
-      },
-      {
-        "line": 471,
-        "content": "vi.mock(\"../src/services/AgentPersonaRegistry.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 1834,
+    "lineEnd": 1834,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/harness-registry.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 12,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      },
-      {
-        "line": 23,
-        "content": "vi.mock(\"../../config.ts\", () => ({"
-      },
-      {
-        "line": 41,
-        "content": "vi.mock(\"../src/wrappers/MongoWrapper.ts\", () => ({"
-      },
-      {
-        "line": 49,
-        "content": "vi.mock(\"../src/services/SettingsService.ts\", async () => {"
-      },
-      {
-        "line": 66,
-        "content": "vi.mock(\"../src/services/ConversationService.ts\", () => ({"
-      },
-      {
-        "line": 74,
-        "content": "vi.mock(\"../src/services/RequestLogger.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 1940,
+    "lineEnd": 1940,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/harness-stream-processing.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 123,
-        "content": "(context as any).signal = controller.signal;"
-      },
-      {
-        "line": 338,
-        "content": "] as any[];"
-      },
-      {
-        "line": 385,
-        "content": "const assistantContent = messages[0].content as any[];"
-      },
-      {
-        "line": 470,
-        "content": "(context as any).signal = controller.signal;"
-      },
-      {
-        "line": 641,
-        "content": "finalTools: initialToolNames.map((name) => ({ name, description: `${name} tool`, parameters: { type: 'object', properties: {} } })) as any,"
-      }
-    ],
-    "mocks": [],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 2040,
+    "lineEnd": 2040,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"google\"` duplicates production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Replace literal `\"google\"` with `PROVIDERS.GOOGLE` imported from constants."
   },
   {
-    "file": "tests/harnessAdversarial.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 1243,
-        "content": "} as unknown as import(\"../src/services/AgenticLoopState.ts\").default;"
-      },
-      {
-        "line": 1280,
-        "content": "} as unknown as import(\"../src/services/harnesses/types.ts\").AgenticContext;"
-      }
-    ],
-    "mocks": [],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 2098,
+    "lineEnd": 2098,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"google\"` duplicates production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Replace literal `\"google\"` with `PROVIDERS.GOOGLE` imported from constants."
   },
   {
-    "file": "tests/hasSubAgentsDerivation.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 4,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      },
-      {
-        "line": 13,
-        "content": "vi.mock(\"../config.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 2127,
+    "lineEnd": 2127,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/hfMetadata.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 3,
-        "content": "vi.mock('../src/utils/logger.ts', () => ({"
-      },
-      {
-        "line": 7,
-        "content": "vi.mock('@rodrigo-barraza/utilities-library', () => ({"
-      },
-      {
-        "line": 11,
-        "content": "vi.mock('../src/services/local-provider/nameParsers.ts', () => ({"
-      },
-      {
-        "line": 32,
-        "content": "vi.mock('../../config.ts', () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 2276,
+    "lineEnd": 2276,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/live/lmStudioModels.live.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 180,
-        "content": "const data = await res.json() as any;"
-      }
-    ],
-    "mocks": [],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 2384,
+    "lineEnd": 2384,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"google\"` duplicates production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Replace literal `\"google\"` with `PROVIDERS.GOOGLE` imported from constants."
   },
   {
-    "file": "tests/lmStudioProvider.test.ts",
-    "interfaces": [
-      {
-        "name": "FetchCallRecord",
-        "line": 105,
-        "content": "interface FetchCallRecord {"
-      }
-    ],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 2459,
+    "lineEnd": 2459,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"anthropic\"` duplicates production constant `PROVIDERS.ANTHROPIC`.",
+    "fix": "Replace literal `\"anthropic\"` with `PROVIDERS.ANTHROPIC` imported from constants."
   },
   {
-    "file": "tests/localModelQueue.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 5,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      },
-      {
-        "line": 13,
-        "content": "vi.mock(\"../src/providers/instance-registry.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 2549,
+    "lineEnd": 2549,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/localProviderCapabilities.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 3,
-        "content": "vi.mock('../src/config.ts', () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 2636,
+    "lineEnd": 2636,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/localProviderNormalizers.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 153,
-        "content": "} as unknown as OllamaRawModel;"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 3,
-        "content": "vi.mock('../src/config.ts', () => ({"
-      },
-      {
-        "line": 14,
-        "content": "vi.mock('@rodrigo-barraza/utilities-library', () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 2735,
+    "lineEnd": 2735,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/localProviderVramEstimation.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 3,
-        "content": "vi.mock('../src/utils/gguf-arch.ts', () => ({"
-      },
-      {
-        "line": 18,
-        "content": "vi.mock('../src/providers/index.ts', () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 3050,
+    "lineEnd": 3050,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/loggerContextTags.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 11,
-        "content": "vi.mock('@rodrigo-barraza/utilities-library/node', () => ({"
-      },
-      {
-        "line": 16,
-        "content": "vi.mock('../src/utils/RequestContext.ts', () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 3211,
+    "lineEnd": 3211,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/mcpSearchMerge.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 320,
-        "content": "const matches = result.matches as unknown[];"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 71,
-        "content": "vi.mock(\"../src/services/MCPClientService.ts\", () => ({"
-      },
-      {
-        "line": 78,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      },
-      {
-        "line": 86,
-        "content": "vi.mock(\"../config.ts\", () => ({"
-      },
-      {
-        "line": 91,
-        "content": "vi.mock(\"../src/wrappers/MongoWrapper.ts\", () => ({"
-      },
-      {
-        "line": 97,
-        "content": "vi.mock(\"../src/services/SettingsService.ts\", () => ({"
-      },
-      {
-        "line": 105,
-        "content": "vi.mock(\"../src/services/local-tools/InternalToolRegistry.ts\", () => ({"
-      },
-      {
-        "line": 113,
-        "content": "vi.mock(\"../src/services/AgentPersonaRegistry.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 3331,
+    "lineEnd": 3331,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/mediaUtilities.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 4,
-        "content": "vi.mock('../src/utils/logger.ts', () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "src/services/harnesses/__tests__/messageArrayConstruction.test.ts",
+    "lineStart": 3459,
+    "lineEnd": 3459,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/memoryBatchBuilder.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 3,
-        "content": "vi.mock('@rodrigo-barraza/utilities-library', () => ({"
-      },
-      {
-        "line": 12,
-        "content": "vi.mock('../src/utils/CostCalculator.ts', () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/chatRoute-adversarial.test.ts",
+    "lineStart": 88,
+    "lineEnd": 88,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/memoryClusterDetection.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 3,
-        "content": "vi.mock('@rodrigo-barraza/utilities-library', () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/contextPressureManager.test.ts",
+    "lineStart": 89,
+    "lineEnd": 89,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"google\"` duplicates production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Replace literal `\"google\"` with `PROVIDERS.GOOGLE` imported from constants."
   },
   {
-    "file": "tests/memoryConsolidationPrompts.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 3,
-        "content": "vi.mock('@rodrigo-barraza/utilities-library', () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/criticGate.test.ts",
+    "lineStart": 25,
+    "lineEnd": 25,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"google\"` duplicates production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Replace literal `\"google\"` with `PROVIDERS.GOOGLE` imported from constants."
   },
   {
-    "file": "tests/memoryConversationalPartitioner.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 3,
-        "content": "vi.mock('@rodrigo-barraza/utilities-library', () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/divideAndConquer-adversarial.test.ts",
+    "lineStart": 31,
+    "lineEnd": 31,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL`.",
+    "fix": "Replace literal `\"hierarchical\"` with `TOPOLOGIES.HIERARCHICAL` imported from constants."
   },
   {
-    "file": "tests/minioWrapper.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 15,
-        "content": "vi.mock('@rodrigo-barraza/service-library/minio', () => ({"
-      },
-      {
-        "line": 19,
-        "content": "vi.mock('../src/utils/logger.ts', () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessLifecycleModules.test.ts",
+    "lineStart": 1633,
+    "lineEnd": 1633,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"google\"` duplicates production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Replace literal `\"google\"` with `PROVIDERS.GOOGLE` imported from constants."
   },
   {
-    "file": "tests/mongoWrapper.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 11,
-        "content": "vi.mock('@rodrigo-barraza/service-library/mongo', () => ({"
-      },
-      {
-        "line": 18,
-        "content": "vi.mock('../src/utils/logger.ts', () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessLifecycleModules.test.ts",
+    "lineStart": 1662,
+    "lineEnd": 1662,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/openai-responses-id.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 36,
-        "content": "const typedFunctionCall = functionCallItem as unknown as {"
-      },
-      {
-        "line": 62,
-        "content": "const typedFunctionCall = functionCallItem as unknown as {"
-      },
-      {
-        "line": 87,
-        "content": "const typedFunctionCall = functionCallItem as unknown as {"
-      },
-      {
-        "line": 113,
-        "content": "const typedFunctionCall = functionCallItem as unknown as {"
-      },
-      {
-        "line": 140,
-        "content": "const typedFunctionCall = functionCallItem as unknown as {"
-      },
-      {
-        "line": 181,
-        "content": "const typedFunctionCall = functionCallItem as unknown as { id: string; call_id: string };"
-      },
-      {
-        "line": 182,
-        "content": "const typedFunctionCallOutput = functionCallOutputItem as unknown as { call_id: string };"
-      },
-      {
-        "line": 228,
-        "content": "const typedFirstCall = functionCallItems[0] as unknown as { call_id: string };"
-      },
-      {
-        "line": 229,
-        "content": "const typedSecondCall = functionCallItems[1] as unknown as { call_id: string };"
-      },
-      {
-        "line": 318,
-        "content": "const typedFunctionCall = functionCallItem as unknown as { call_id: string };"
-      },
-      {
-        "line": 319,
-        "content": "const typedFunctionCallOutput = functionCallOutputItem as unknown as { call_id: string };"
-      },
-      {
-        "line": 375,
-        "content": "const functionCallItem = inputItems[0] as unknown as { arguments: string };"
-      },
-      {
-        "line": 408,
-        "content": "const typedFunctionCall = functionCallItem as unknown as { call_id: string };"
-      },
-      {
-        "line": 409,
-        "content": "const typedOutput = functionCallOutputItem as unknown as { call_id: string; output: string };"
-      },
-      {
-        "line": 445,
-        "content": "const firstOutput = functionCallOutputItems[0] as unknown as { call_id: string };"
-      },
-      {
-        "line": 446,
-        "content": "const secondOutput = functionCallOutputItems[1] as unknown as { call_id: string };"
-      },
-      {
-        "line": 496,
-        "content": "const typedOutput = functionCallOutputItems[0] as unknown as { call_id: string };"
-      }
-    ],
-    "mocks": [],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/harnessLifecycleModules.test.ts",
+    "lineStart": 1683,
+    "lineEnd": 1683,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"google\"` duplicates production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Replace literal `\"google\"` with `PROVIDERS.GOOGLE` imported from constants."
   },
   {
-    "file": "tests/openaiCompat.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 14,
-        "content": "vi.mock('../src/utils/logger.ts', () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/infrastructureRoutes.test.ts",
+    "lineStart": 49,
+    "lineEnd": 49,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/infrastructureRoutes.test.ts",
+    "lineStart": 50,
+    "lineEnd": 50,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "lineStart": 1948,
+    "lineEnd": 1948,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"sequential\"` duplicates production constant `TOPOLOGIES.SEQUENTIAL`.",
+    "fix": "Replace literal `\"sequential\"` with `TOPOLOGIES.SEQUENTIAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "lineStart": 1958,
+    "lineEnd": 1958,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"sequential\"` duplicates production constant `TOPOLOGIES.SEQUENTIAL`.",
+    "fix": "Replace literal `\"sequential\"` with `TOPOLOGIES.SEQUENTIAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "lineStart": 2002,
+    "lineEnd": 2002,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"sequential\"` duplicates production constant `TOPOLOGIES.SEQUENTIAL`.",
+    "fix": "Replace literal `\"sequential\"` with `TOPOLOGIES.SEQUENTIAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "lineStart": 2558,
+    "lineEnd": 2558,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"sequential\"` duplicates production constant `TOPOLOGIES.SEQUENTIAL`.",
+    "fix": "Replace literal `\"sequential\"` with `TOPOLOGIES.SEQUENTIAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "lineStart": 2559,
+    "lineEnd": 2559,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL`.",
+    "fix": "Replace literal `\"hierarchical\"` with `TOPOLOGIES.HIERARCHICAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "lineStart": 2560,
+    "lineEnd": 2560,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical_aggregation\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL_AGGREGATION`.",
+    "fix": "Replace literal `\"hierarchical_aggregation\"` with `TOPOLOGIES.HIERARCHICAL_AGGREGATION` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "lineStart": 2561,
+    "lineEnd": 2561,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"peer_to_peer\"` duplicates production constant `TOPOLOGIES.PEER_TO_PEER`.",
+    "fix": "Replace literal `\"peer_to_peer\"` with `TOPOLOGIES.PEER_TO_PEER` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "lineStart": 2685,
+    "lineEnd": 2685,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"sequential\"` duplicates production constant `TOPOLOGIES.SEQUENTIAL`.",
+    "fix": "Replace literal `\"sequential\"` with `TOPOLOGIES.SEQUENTIAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "lineStart": 2686,
+    "lineEnd": 2686,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL`.",
+    "fix": "Replace literal `\"hierarchical\"` with `TOPOLOGIES.HIERARCHICAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "lineStart": 2687,
+    "lineEnd": 2687,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical_aggregation\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL_AGGREGATION`.",
+    "fix": "Replace literal `\"hierarchical_aggregation\"` with `TOPOLOGIES.HIERARCHICAL_AGGREGATION` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "lineStart": 2688,
+    "lineEnd": 2688,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"peer_to_peer\"` duplicates production constant `TOPOLOGIES.PEER_TO_PEER`.",
+    "fix": "Replace literal `\"peer_to_peer\"` with `TOPOLOGIES.PEER_TO_PEER` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "lineStart": 2772,
+    "lineEnd": 2772,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"peer_to_peer\"` duplicates production constant `TOPOLOGIES.PEER_TO_PEER`.",
+    "fix": "Replace literal `\"peer_to_peer\"` with `TOPOLOGIES.PEER_TO_PEER` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "lineStart": 2804,
+    "lineEnd": 2804,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"sequential\"` duplicates production constant `TOPOLOGIES.SEQUENTIAL`.",
+    "fix": "Replace literal `\"sequential\"` with `TOPOLOGIES.SEQUENTIAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "lineStart": 2805,
+    "lineEnd": 2805,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL`.",
+    "fix": "Replace literal `\"hierarchical\"` with `TOPOLOGIES.HIERARCHICAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "lineStart": 2806,
+    "lineEnd": 2806,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical_aggregation\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL_AGGREGATION`.",
+    "fix": "Replace literal `\"hierarchical_aggregation\"` with `TOPOLOGIES.HIERARCHICAL_AGGREGATION` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "lineStart": 2807,
+    "lineEnd": 2807,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"peer_to_peer\"` duplicates production constant `TOPOLOGIES.PEER_TO_PEER`.",
+    "fix": "Replace literal `\"peer_to_peer\"` with `TOPOLOGIES.PEER_TO_PEER` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "lineStart": 2940,
+    "lineEnd": 2940,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"sequential\"` duplicates production constant `TOPOLOGIES.SEQUENTIAL`.",
+    "fix": "Replace literal `\"sequential\"` with `TOPOLOGIES.SEQUENTIAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "lineStart": 2946,
+    "lineEnd": 2946,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"peer_to_peer\"` duplicates production constant `TOPOLOGIES.PEER_TO_PEER`.",
+    "fix": "Replace literal `\"peer_to_peer\"` with `TOPOLOGIES.PEER_TO_PEER` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "lineStart": 3013,
+    "lineEnd": 3013,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL`.",
+    "fix": "Replace literal `\"hierarchical\"` with `TOPOLOGIES.HIERARCHICAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/harnessFlow.live.test.ts",
+    "lineStart": 3061,
+    "lineEnd": 3061,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"peer_to_peer\"` duplicates production constant `TOPOLOGIES.PEER_TO_PEER`.",
+    "fix": "Replace literal `\"peer_to_peer\"` with `TOPOLOGIES.PEER_TO_PEER` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/modelCapability.live.test.ts",
+    "lineStart": 1082,
+    "lineEnd": 1082,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"sequential\"` duplicates production constant `TOPOLOGIES.SEQUENTIAL`.",
+    "fix": "Replace literal `\"sequential\"` with `TOPOLOGIES.SEQUENTIAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/modelCapability.live.test.ts",
+    "lineStart": 1090,
+    "lineEnd": 1090,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"sequential\"` duplicates production constant `TOPOLOGIES.SEQUENTIAL`.",
+    "fix": "Replace literal `\"sequential\"` with `TOPOLOGIES.SEQUENTIAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/recursiveSubAgents.live.test.ts",
+    "lineStart": 59,
+    "lineEnd": 59,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"anthropic\"` duplicates production constant `PROVIDERS.ANTHROPIC`.",
+    "fix": "Replace literal `\"anthropic\"` with `PROVIDERS.ANTHROPIC` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/recursiveSubAgents.live.test.ts",
+    "lineStart": 72,
+    "lineEnd": 72,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL`.",
+    "fix": "Replace literal `\"hierarchical\"` with `TOPOLOGIES.HIERARCHICAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/tokenMetricsLive.live.test.ts",
+    "lineStart": 496,
+    "lineEnd": 496,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineStart": 34,
+    "lineEnd": 34,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"lm-studio\"` duplicates production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Replace literal `\"lm-studio\"` with `PROVIDERS.LM_STUDIO` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineStart": 34,
+    "lineEnd": 34,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"ollama\"` duplicates production constant `PROVIDERS.OLLAMA`.",
+    "fix": "Replace literal `\"ollama\"` with `PROVIDERS.OLLAMA` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/localProviderGateway.test.ts",
+    "lineStart": 146,
+    "lineEnd": 146,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"lm-studio\"` duplicates production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Replace literal `\"lm-studio\"` with `PROVIDERS.LM_STUDIO` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/openaiProvider.test.ts",
+    "lineStart": 18,
+    "lineEnd": 18,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
     "file": "tests/orchestratorPrompt.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 43,
-        "content": "const topologyParam = (createTeam?.parameters as any)?.properties?.topology;"
-      },
-      {
-        "line": 57,
-        "content": "const topologyParam = (createTeam?.parameters as any)?.properties?.topology;"
-      },
-      {
-        "line": 70,
-        "content": "const topologyParam = (createTeam?.parameters as any)?.properties?.topology;"
-      }
-    ],
-    "mocks": [],
-    "hardcodedStrings": []
+    "lineStart": 8,
+    "lineEnd": 8,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL`.",
+    "fix": "Replace literal `\"hierarchical\"` with `TOPOLOGIES.HIERARCHICAL` imported from constants."
   },
   {
-    "file": "tests/orchestratorService.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 193,
-        "content": "} as any;"
-      },
-      {
-        "line": 203,
-        "content": "members: \"not-an-array\" as any,"
-      },
-      {
-        "line": 222,
-        "content": "mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>"
-      },
-      {
-        "line": 321,
-        "content": "mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>"
-      },
-      {
-        "line": 354,
-        "content": "mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>"
-      },
-      {
-        "line": 381,
-        "content": "mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>"
-      },
-      {
-        "line": 404,
-        "content": "null as unknown as ReturnType<typeof MongoWrapper.getCollection>"
-      },
-      {
-        "line": 426,
-        "content": "mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>"
-      },
-      {
-        "line": 448,
-        "content": "mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 8,
-        "content": "vi.mock(\"node:fs\", async (importOriginal) => {"
-      },
-      {
-        "line": 25,
-        "content": "vi.mock(\"../src/services/AgenticLoopService.ts\", () => ({"
-      },
-      {
-        "line": 35,
-        "content": "vi.mock(\"../src/services/orchestrator/GitWorktreeHelper.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 9,
+    "lineEnd": 9,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"sequential\"` duplicates production constant `TOPOLOGIES.SEQUENTIAL`.",
+    "fix": "Replace literal `\"sequential\"` with `TOPOLOGIES.SEQUENTIAL` imported from constants."
   },
   {
-    "file": "tests/outputTruncationRecovery.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 73,
-        "content": "} as unknown as AgenticContext;"
-      },
-      {
-        "line": 291,
-        "content": "expect((errorMessage as any)._isErrorIndicator).toBe(true);"
-      },
-      {
-        "line": 434,
-        "content": "expect((lastMessage as any)._isErrorIndicator).toBe(true);"
-      },
-      {
-        "line": 462,
-        "content": "expect((errorMessage as any)._isErrorIndicator).toBe(true);"
-      }
-    ],
-    "mocks": [],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 10,
+    "lineEnd": 10,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"peer_to_peer\"` duplicates production constant `TOPOLOGIES.PEER_TO_PEER`.",
+    "fix": "Replace literal `\"peer_to_peer\"` with `TOPOLOGIES.PEER_TO_PEER` imported from constants."
   },
   {
-    "file": "tests/planningModeService.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 11,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 16,
+    "lineEnd": 16,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"sequential\"` duplicates production constant `TOPOLOGIES.SEQUENTIAL`.",
+    "fix": "Replace literal `\"sequential\"` with `TOPOLOGIES.SEQUENTIAL` imported from constants."
   },
   {
-    "file": "tests/policyEngine.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 373,
-        "content": "const result = PolicyEngine.evaluate(null as any, 'any_tool', {});"
-      },
-      {
-        "line": 429,
-        "content": "expect(({} as any).polluted).toBeUndefined();"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 4,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 18,
+    "lineEnd": 18,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"sequential\"` duplicates production constant `TOPOLOGIES.SEQUENTIAL`.",
+    "fix": "Replace literal `\"sequential\"` with `TOPOLOGIES.SEQUENTIAL` imported from constants."
   },
   {
-    "file": "tests/providerInstanceRegistry.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 8,
-        "content": "vi.mock('../src/providers/lm-studio.ts', () => ({"
-      },
-      {
-        "line": 11,
-        "content": "vi.mock('../src/providers/ollama.ts', () => ({"
-      },
-      {
-        "line": 14,
-        "content": "vi.mock('../src/providers/vllm.ts', () => ({"
-      },
-      {
-        "line": 17,
-        "content": "vi.mock('../src/providers/llama-cpp.ts', () => ({"
-      },
-      {
-        "line": 20,
-        "content": "vi.mock('../src/utils/logger.ts', () => ({"
-      },
-      {
-        "line": 25,
-        "content": "vi.mock('../config.ts', () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 19,
+    "lineEnd": 19,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL`.",
+    "fix": "Replace literal `\"hierarchical\"` with `TOPOLOGIES.HIERARCHICAL` imported from constants."
   },
   {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 20,
+    "lineEnd": 20,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"peer_to_peer\"` duplicates production constant `TOPOLOGIES.PEER_TO_PEER`.",
+    "fix": "Replace literal `\"peer_to_peer\"` with `TOPOLOGIES.PEER_TO_PEER` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 26,
+    "lineEnd": 26,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"peer_to_peer\"` duplicates production constant `TOPOLOGIES.PEER_TO_PEER`.",
+    "fix": "Replace literal `\"peer_to_peer\"` with `TOPOLOGIES.PEER_TO_PEER` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 28,
+    "lineEnd": 28,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"peer_to_peer\"` duplicates production constant `TOPOLOGIES.PEER_TO_PEER`.",
+    "fix": "Replace literal `\"peer_to_peer\"` with `TOPOLOGIES.PEER_TO_PEER` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 29,
+    "lineEnd": 29,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL`.",
+    "fix": "Replace literal `\"hierarchical\"` with `TOPOLOGIES.HIERARCHICAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 30,
+    "lineEnd": 30,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"sequential\"` duplicates production constant `TOPOLOGIES.SEQUENTIAL`.",
+    "fix": "Replace literal `\"sequential\"` with `TOPOLOGIES.SEQUENTIAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 36,
+    "lineEnd": 36,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL`.",
+    "fix": "Replace literal `\"hierarchical\"` with `TOPOLOGIES.HIERARCHICAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 39,
+    "lineEnd": 39,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL`.",
+    "fix": "Replace literal `\"hierarchical\"` with `TOPOLOGIES.HIERARCHICAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 40,
+    "lineEnd": 40,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"sequential\"` duplicates production constant `TOPOLOGIES.SEQUENTIAL`.",
+    "fix": "Replace literal `\"sequential\"` with `TOPOLOGIES.SEQUENTIAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 41,
+    "lineEnd": 41,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"peer_to_peer\"` duplicates production constant `TOPOLOGIES.PEER_TO_PEER`.",
+    "fix": "Replace literal `\"peer_to_peer\"` with `TOPOLOGIES.PEER_TO_PEER` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 51,
+    "lineEnd": 51,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"sequential\"` duplicates production constant `TOPOLOGIES.SEQUENTIAL`.",
+    "fix": "Replace literal `\"sequential\"` with `TOPOLOGIES.SEQUENTIAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 53,
+    "lineEnd": 53,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"sequential\"` duplicates production constant `TOPOLOGIES.SEQUENTIAL`.",
+    "fix": "Replace literal `\"sequential\"` with `TOPOLOGIES.SEQUENTIAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 54,
+    "lineEnd": 54,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL`.",
+    "fix": "Replace literal `\"hierarchical\"` with `TOPOLOGIES.HIERARCHICAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 55,
+    "lineEnd": 55,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"peer_to_peer\"` duplicates production constant `TOPOLOGIES.PEER_TO_PEER`.",
+    "fix": "Replace literal `\"peer_to_peer\"` with `TOPOLOGIES.PEER_TO_PEER` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 64,
+    "lineEnd": 64,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"peer_to_peer\"` duplicates production constant `TOPOLOGIES.PEER_TO_PEER`.",
+    "fix": "Replace literal `\"peer_to_peer\"` with `TOPOLOGIES.PEER_TO_PEER` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 66,
+    "lineEnd": 66,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"peer_to_peer\"` duplicates production constant `TOPOLOGIES.PEER_TO_PEER`.",
+    "fix": "Replace literal `\"peer_to_peer\"` with `TOPOLOGIES.PEER_TO_PEER` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 67,
+    "lineEnd": 67,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL`.",
+    "fix": "Replace literal `\"hierarchical\"` with `TOPOLOGIES.HIERARCHICAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 68,
+    "lineEnd": 68,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"sequential\"` duplicates production constant `TOPOLOGIES.SEQUENTIAL`.",
+    "fix": "Replace literal `\"sequential\"` with `TOPOLOGIES.SEQUENTIAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/orchestratorPrompt.test.ts",
+    "lineStart": 73,
+    "lineEnd": 73,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"sequential\"` duplicates production constant `TOPOLOGIES.SEQUENTIAL`.",
+    "fix": "Replace literal `\"sequential\"` with `TOPOLOGIES.SEQUENTIAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/outputTruncationRecoveryLifecycle.test.ts",
+    "lineStart": 104,
+    "lineEnd": 104,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"google\"` duplicates production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Replace literal `\"google\"` with `PROVIDERS.GOOGLE` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
     "file": "tests/rateLimitExtraction.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 87,
-        "content": "extractOpenAIRateLimits({} as any, 'gpt-4o'),"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 5,
-        "content": "vi.mock('../src/services/RateLimitStore.ts', () => ({"
-      },
-      {
-        "line": 11,
-        "content": "vi.mock('../src/constants.ts', () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "lineStart": 14,
+    "lineEnd": 14,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/rateLimitStore.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 64,
-        "content": "rateLimitStore.update(PROVIDERS.OPENAI, \"gpt-5.5\", null as any);"
-      },
-      {
-        "line": 106,
-        "content": "rateLimitStore.update(PROVIDERS.OPENAI, 'gpt-5', null as unknown as { rpm?: number });"
-      }
-    ],
-    "mocks": [],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/rateLimitExtraction.test.ts",
+    "lineStart": 15,
+    "lineEnd": 15,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"anthropic\"` duplicates production constant `PROVIDERS.ANTHROPIC`.",
+    "fix": "Replace literal `\"anthropic\"` with `PROVIDERS.ANTHROPIC` imported from constants."
   },
   {
-    "file": "tests/reasoningStrategy.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 50,
-        "content": "} as any);"
-      },
-      {
-        "line": 147,
-        "content": "const harness = new ReActHarness(mockContext, {} as any, {"
-      },
-      {
-        "line": 150,
-        "content": "} as any);"
-      },
-      {
-        "line": 161,
-        "content": "const harness = new ReActHarness(mockContext, {} as any, {"
-      },
-      {
-        "line": 164,
-        "content": "} as any);"
-      },
-      {
-        "line": 184,
-        "content": "} as any);"
-      },
-      {
-        "line": 204,
-        "content": "} as any);"
-      },
-      {
-        "line": 255,
-        "content": "} as any);"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 13,
-        "content": "vi.mock(\"../src/services/harnesses/strategies/TreeOfThoughtsStrategy.ts\", () => ({"
-      },
-      {
-        "line": 20,
-        "content": "vi.mock(\"../src/services/harnesses/strategies/GraphOfThoughtsStrategy.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/rateLimitExtraction.test.ts",
+    "lineStart": 16,
+    "lineEnd": 16,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"google\"` duplicates production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Replace literal `\"google\"` with `PROVIDERS.GOOGLE` imported from constants."
   },
   {
-    "file": "tests/recurrenceMatcher.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 233,
-        "content": "const rule = { frequency: 'hourly' as any, interval: 1 };"
-      }
-    ],
-    "mocks": [],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/rateLimitExtraction.test.ts",
+    "lineStart": 17,
+    "lineEnd": 17,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"elevenlabs\"` duplicates production constant `PROVIDERS.ELEVENLABS`.",
+    "fix": "Replace literal `\"elevenlabs\"` with `PROVIDERS.ELEVENLABS` imported from constants."
   },
   {
-    "file": "tests/scheduledTaskService.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 112,
-        "content": "} as any);"
-      },
-      {
-        "line": 137,
-        "content": "taskWithToolConfig as any,"
-      },
-      {
-        "line": 172,
-        "content": "taskWithOmniWildcard as any,"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 5,
-        "content": "vi.mock(\"../config.ts\", () => ({"
-      },
-      {
-        "line": 15,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      },
-      {
-        "line": 27,
-        "content": "vi.mock(\"../src/utils/CleanupRegistry.ts\", () => ({"
-      },
-      {
-        "line": 34,
-        "content": "vi.mock(\"../src/services/AgenticLoopService.ts\", () => ({"
-      },
-      {
-        "line": 41,
-        "content": "vi.mock(\"../src/providers/index.ts\", () => ({"
-      },
-      {
-        "line": 58,
-        "content": "vi.mock(\"../src/wrappers/MongoWrapper.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/rateLimitExtraction.test.ts",
+    "lineStart": 18,
+    "lineEnd": 18,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"inworld\"` duplicates production constant `PROVIDERS.INWORLD`.",
+    "fix": "Replace literal `\"inworld\"` with `PROVIDERS.INWORLD` imported from constants."
   },
   {
-    "file": "tests/scheduledTasks-adversarial.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 14,
-        "content": "vi.mock('../src/utils/logger.ts', () => ({"
-      },
-      {
-        "line": 25,
-        "content": "vi.mock('../src/utils/CleanupRegistry.ts', () => ({"
-      },
-      {
-        "line": 30,
-        "content": "vi.mock('../src/services/AgenticLoopService.ts', () => ({"
-      },
-      {
-        "line": 36,
-        "content": "vi.mock('../src/providers/index.ts', () => ({"
-      },
-      {
-        "line": 43,
-        "content": "vi.mock('../config.ts', () => ({"
-      },
-      {
-        "line": 53,
-        "content": "vi.mock('../src/wrappers/MongoWrapper.ts', () => ({"
-      }
-    ],
-    "hardcodedStrings": []
-  },
-  {
-    "file": "tests/sessionCostReconciliation.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 432,
-        "content": "vi.mocked(MongoWrapper.getDb).mockReturnValue(mockDb as any);"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 20,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      },
-      {
-        "line": 29,
-        "content": "vi.mock(\"../config.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
-  },
-  {
-    "file": "tests/somatic/somaticStateService.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 139,
-        "content": "engine.addEmotion(first as any, 30);"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 5,
-        "content": "vi.mock(\"../../src/utils/logger.ts\", () => ({"
-      },
-      {
-        "line": 18,
-        "content": "vi.mock(\"../../src/wrappers/MongoWrapper.ts\", () => ({"
-      },
-      {
-        "line": 29,
-        "content": "vi.mock(\"../../../config.ts\", () => ({"
-      },
-      {
-        "line": 35,
-        "content": "vi.mock(\"../../src/providers/index.ts\", () => ({"
-      },
-      {
-        "line": 41,
-        "content": "vi.mock(\"../../src/services/SettingsService.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
-  },
-  {
-    "file": "tests/somatic/statFactory.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 3,
-        "content": "vi.mock(\"../../src/utils/logger.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
-  },
-  {
-    "file": "tests/somatic/systemPromptAssemblerIntegration.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 500,
-        "content": "{ role: \"user\", content: [{ type: \"image_url\", image_url: { url: \"data:...\" } }] as unknown as string },"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 6,
-        "content": "vi.mock(\"../../src/utils/logger.ts\", () => ({"
-      },
-      {
-        "line": 16,
-        "content": "vi.mock(\"../../src/utils/ErrorHelpers.ts\", () => ({"
-      },
-      {
-        "line": 24,
-        "content": "vi.mock(\"../../src/services/somatic/SomaticStateService.ts\", () => ({"
-      },
-      {
-        "line": 35,
-        "content": "vi.mock(\"../../src/services/AgentPersonaRegistry.ts\", () => ({"
-      },
-      {
-        "line": 41,
-        "content": "vi.mock(\"../../src/services/ToolOrchestratorService.ts\", () => ({"
-      },
-      {
-        "line": 53,
-        "content": "vi.mock(\"../../src/services/SettingsService.ts\", () => ({"
-      },
-      {
-        "line": 63,
-        "content": "vi.mock(\"../../src/services/OrchestratorPrompt.ts\", () => ({"
-      },
-      {
-        "line": 68,
-        "content": "vi.mock(\"../../src/utils/resolveToolEntriesToSet.ts\", () => ({"
-      },
-      {
-        "line": 72,
-        "content": "vi.mock(\"../../src/utils/resolveLockedOffToolNames.ts\", () => ({"
-      },
-      {
-        "line": 76,
-        "content": "vi.mock(\"../../src/services/system-prompt/DirectoryTreeFormatter.ts\", () => ({"
-      },
-      {
-        "line": 82,
-        "content": "vi.mock(\"../../src/services/system-prompt/ToolDocFormatter.ts\", () => ({"
-      },
-      {
-        "line": 88,
-        "content": "vi.mock(\"../../src/services/system-prompt/SkillMemoryScorer.ts\", () => ({"
-      },
-      {
-        "line": 95,
-        "content": "vi.mock(\"../../../config.ts\", () => ({"
-      },
-      {
-        "line": 99,
-        "content": "vi.mock(\"../../src/wrappers/MongoWrapper.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
-  },
-  {
-    "file": "tests/sseUtilities.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 11,
-        "content": "vi.mock(\"../config.ts\", () => ({"
-      },
-      {
-        "line": 29,
-        "content": "vi.mock(\"../src/wrappers/MongoWrapper.ts\", () => ({"
-      },
-      {
-        "line": 37,
-        "content": "vi.mock(\"../src/services/ConversationService.ts\", () => ({"
-      },
-      {
-        "line": 45,
-        "content": "vi.mock(\"../src/services/RequestLogger.ts\", () => ({"
-      },
-      {
-        "line": 49,
-        "content": "vi.mock(\"../src/services/SettingsService.ts\", () => ({"
-      },
-      {
-        "line": 63,
-        "content": "vi.mock(\"../src/providers/index.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
-  },
-  {
-    "file": "tests/streamChunkDispatcher.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 408,
-        "content": "{ type: \"stopReason\", stopReason: \"max_tokens\" } as any,"
-      },
-      {
-        "line": 501,
-        "content": "await dispatchChunk({ type: 'thinking', content: null } as any, streamState, streamContext);"
-      },
-      {
-        "line": 506,
-        "content": "await dispatchChunk({ type: 'usage', usage: null } as any, streamState, streamContext);"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 13,
-        "content": "vi.mock(\"../src/services/FileService.ts\", () => ({"
-      },
-      {
-        "line": 21,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
-  },
-  {
-    "file": "tests/streamingResilience.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 204,
-        "content": "} as unknown as ReadableStreamDefaultReader<Uint8Array>;"
-      },
-      {
-        "line": 226,
-        "content": "} as unknown as ReadableStreamDefaultReader<Uint8Array>;"
-      }
-    ],
-    "mocks": [],
-    "hardcodedStrings": []
-  },
-  {
-    "file": "tests/streamingToolPersistence.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 19,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      },
-      {
-        "line": 31,
-        "content": "vi.mock(\"../../config.ts\", () => ({"
-      },
-      {
-        "line": 37,
-        "content": "vi.mock(\"../src/services/MCPClientService.ts\", () => ({"
-      },
-      {
-        "line": 44,
-        "content": "vi.mock(\"../src/services/local-tools/InternalToolRegistry.ts\", () => ({"
-      },
-      {
-        "line": 53,
-        "content": "vi.mock(\"../src/utils/AbortController.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
-  },
-  {
-    "file": "tests/subAgentResultBuilder.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 52,
-        "content": "expect(getLastAssistantText(null as unknown as ConversationMessage[])).toBe(\"\");"
-      },
-      {
-        "line": 53,
-        "content": "expect(getLastAssistantText(undefined as unknown as ConversationMessage[])).toBe(\"\");"
-      }
-    ],
-    "mocks": [],
-    "hardcodedStrings": []
-  },
-  {
+    "category": "Hard-Coded Magic Strings & Values",
     "file": "tests/subagentIntensive.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 801,
-        "content": "} as unknown as SubAgentState);"
-      },
-      {
-        "line": 805,
-        "content": "} as unknown as SubAgentState);"
-      },
-      {
-        "line": 809,
-        "content": "} as unknown as SubAgentState);"
-      },
-      {
-        "line": 826,
-        "content": "] as unknown as InstanceEntry[];"
-      },
-      {
-        "line": 868,
-        "content": "] as unknown as InstanceEntry[];"
-      },
-      {
-        "line": 876,
-        "content": "} as unknown as SubAgentState);"
-      },
-      {
-        "line": 896,
-        "content": "] as unknown as InstanceEntry[];"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 27,
-        "content": "vi.mock(\"../src/services/AgenticLoopService.ts\", () => ({"
-      },
-      {
-        "line": 45,
-        "content": "vi.mock(\"../src/services/orchestrator/GitWorktreeHelper.ts\", () => ({"
-      },
-      {
-        "line": 59,
-        "content": "vi.mock(\"../src/services/SettingsService.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "lineStart": 65,
+    "lineEnd": 65,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL`.",
+    "fix": "Replace literal `\"hierarchical\"` with `TOPOLOGIES.HIERARCHICAL` imported from constants."
   },
   {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/subagentIntensive.test.ts",
+    "lineStart": 171,
+    "lineEnd": 171,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL`.",
+    "fix": "Replace literal `\"hierarchical\"` with `TOPOLOGIES.HIERARCHICAL` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/subagentTopologyDepth.test.ts",
+    "lineStart": 1244,
+    "lineEnd": 1244,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"google\"` duplicates production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Replace literal `\"google\"` with `PROVIDERS.GOOGLE` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
     "file": "tests/systemPromptAssembler.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 367,
-        "content": "} as any;"
-      },
-      {
-        "line": 376,
-        "content": "return { ok: false, json: async () => ({ error: \"Not mocked\" }) } as any;"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 194,
-        "content": "vi.mock(\"../src/services/ToolOrchestratorService.ts\", () => ({"
-      },
-      {
-        "line": 252,
-        "content": "vi.mock(\"../src/services/AgentPersonaRegistry.ts\", () => ({"
-      },
-      {
-        "line": 265,
-        "content": "vi.mock(\"../src/services/OrchestratorPrompt.ts\", () => ({"
-      },
-      {
-        "line": 296,
-        "content": "vi.mock(\"../src/services/SettingsService.ts\", () => ({"
-      },
-      {
-        "line": 307,
-        "content": "vi.mock(\"../src/wrappers/MongoWrapper.ts\", () => ({"
-      },
-      {
-        "line": 315,
-        "content": "vi.mock(\"../config.ts\", () => ({"
-      },
-      {
-        "line": 322,
-        "content": "vi.mock(\"../src/services/EmbeddingService.ts\", () => ({"
-      },
-      {
-        "line": 328,
-        "content": "vi.mock(\"../src/services/MemoryService.ts\", () => ({"
-      },
-      {
-        "line": 337,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      },
-      {
-        "line": 349,
-        "content": "vi.mock(\"../src/constants.ts\", async (importOriginal) => {"
-      }
-    ],
-    "hardcodedStrings": []
+    "lineStart": 275,
+    "lineEnd": 275,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL`.",
+    "fix": "Replace literal `\"hierarchical\"` with `TOPOLOGIES.HIERARCHICAL` imported from constants."
   },
   {
-    "file": "tests/telemetryContext.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 103,
-        "content": "setupWebSocket(mockWss as any);"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 18,
-        "content": "vi.mock(\"@google/genai\", async (importOriginal) => {"
-      }
-    ],
-    "hardcodedStrings": []
-  },
-  {
-    "file": "tests/thinkingMode.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 29,
-        "content": "const res = (mockMessagesCreate as any)(...args);"
-      },
-      {
-        "line": 49,
-        "content": "stream: (...args: Parameters<InstanceType<typeof import(\"@anthropic-ai/sdk\").default>[\"messages\"][\"stream\"]>) => (mockMessagesStream as any)(...args),"
-      },
-      {
-        "line": 60,
-        "content": "generateContent: (...args: Parameters<InstanceType<typeof import(\"@google/genai\").GoogleGenAI>[\"models\"][\"generateContent\"]>) => (mockGenerateContent as any)(...args),"
-      },
-      {
-        "line": 61,
-        "content": "generateContentStream: (...args: Parameters<InstanceType<typeof import(\"@google/genai\").GoogleGenAI>[\"models\"][\"generateContentStream\"]>) => (mockGenerateContentStream as any)(...args),"
-      },
-      {
-        "line": 64,
-        "content": "connect: (...args: Parameters<InstanceType<typeof import(\"@google/genai\").GoogleGenAI>[\"live\"][\"connect\"]>) => (mockConnect as any)(...args),"
-      },
-      {
-        "line": 98,
-        "content": "return mockLiveSession as any;"
-      },
-      {
-        "line": 109,
-        "content": "} as any);"
-      },
-      {
-        "line": 118,
-        "content": "const args = mockGenerateContent.mock.calls[0][0] as any;"
-      },
-      {
-        "line": 129,
-        "content": "} as any);"
-      },
-      {
-        "line": 139,
-        "content": "const args = mockGenerateContent.mock.calls[0][0] as any;"
-      },
-      {
-        "line": 150,
-        "content": "} as any);"
-      },
-      {
-        "line": 158,
-        "content": "const args = mockGenerateContent.mock.calls[0][0] as any;"
-      },
-      {
-        "line": 166,
-        "content": "} as any);"
-      },
-      {
-        "line": 173,
-        "content": "const args = mockGenerateContent.mock.calls[0][0] as any;"
-      },
-      {
-        "line": 181,
-        "content": "} as any);"
-      },
-      {
-        "line": 189,
-        "content": "const args = mockGenerateContent.mock.calls[0][0] as any;"
-      },
-      {
-        "line": 197,
-        "content": "} as any);"
-      },
-      {
-        "line": 205,
-        "content": "const args = mockGenerateContent.mock.calls[0][0] as any;"
-      },
-      {
-        "line": 213,
-        "content": "} as any);"
-      },
-      {
-        "line": 221,
-        "content": "const args = mockGenerateContent.mock.calls[0][0] as any;"
-      },
-      {
-        "line": 229,
-        "content": "} as any);"
-      },
-      {
-        "line": 246,
-        "content": "const args = mockGenerateContent.mock.calls[0][0] as any;"
-      },
-      {
-        "line": 284,
-        "content": "mockGenerateContentStream.mockResolvedValueOnce(mockGenerator() as any);"
-      },
-      {
-        "line": 504,
-        "content": "} as any);"
-      },
-      {
-        "line": 517,
-        "content": "const args = mockMessagesCreate.mock.calls[0][0] as any;"
-      },
-      {
-        "line": 531,
-        "content": "} as any);"
-      },
-      {
-        "line": 539,
-        "content": "const args1 = mockMessagesCreate.mock.calls[0][0] as any;"
-      },
-      {
-        "line": 546,
-        "content": "} as any);"
-      },
-      {
-        "line": 551,
-        "content": "const args2 = mockMessagesCreate.mock.calls[1][0] as any;"
-      },
-      {
-        "line": 559,
-        "content": "} as any);"
-      },
-      {
-        "line": 567,
-        "content": "const args = mockMessagesCreate.mock.calls[0][0] as any;"
-      },
-      {
-        "line": 575,
-        "content": "} as any);"
-      },
-      {
-        "line": 580,
-        "content": "const args2 = mockMessagesCreate.mock.calls[1][0] as any;"
-      },
-      {
-        "line": 588,
-        "content": "} as any);"
-      },
-      {
-        "line": 601,
-        "content": "const args = mockMessagesCreate.mock.calls[0][0] as any;"
-      },
-      {
-        "line": 614,
-        "content": "} as any);"
-      },
-      {
-        "line": 622,
-        "content": "const args = mockMessagesCreate.mock.calls[0][0] as any;"
-      },
-      {
-        "line": 630,
-        "content": "} as any);"
-      },
-      {
-        "line": 636,
-        "content": "const args = mockMessagesCreate.mock.calls[0][0] as any;"
-      },
-      {
-        "line": 648,
-        "content": "} as any);"
-      },
-      {
-        "line": 656,
-        "content": "const args = mockMessagesCreate.mock.calls[0][0] as any;"
-      },
-      {
-        "line": 717,
-        "content": "mockMessagesStream.mockReturnValueOnce(mockStream as any);"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 23,
-        "content": "vi.mock(\"@anthropic-ai/sdk\", () => {"
-      },
-      {
-        "line": 55,
-        "content": "vi.mock(\"@google/genai\", () => {"
-      }
-    ],
-    "hardcodedStrings": []
-  },
-  {
+    "category": "Hard-Coded Magic Strings & Values",
     "file": "tests/toolAvailabilityAndEnablement.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 532,
-        "content": "(ToolOrchestratorService.getToolSchemas as ReturnType<typeof vi.fn>).mockImplementation(originalGetToolSchemas as any);"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 174,
-        "content": "vi.mock(\"../src/services/ToolOrchestratorService.ts\", () => ({"
-      },
-      {
-        "line": 187,
-        "content": "vi.mock(\"../src/services/SettingsService.ts\", () => ({"
-      },
-      {
-        "line": 196,
-        "content": "vi.mock(\"../src/wrappers/MongoWrapper.ts\", () => ({"
-      },
-      {
-        "line": 206,
-        "content": "vi.mock(\"../../config.ts\", () => ({"
-      },
-      {
-        "line": 211,
-        "content": "vi.mock(\"../config.ts\", () => ({"
-      },
-      {
-        "line": 246,
-        "content": "vi.mock(\"../src/services/AgentPersonaRegistry.ts\", () => ({"
-      },
-      {
-        "line": 260,
-        "content": "vi.mock(\"../src/services/local-tools/InternalToolRegistry.ts\", () => ({"
-      },
-      {
-        "line": 268,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "lineStart": 190,
+    "lineEnd": 190,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL`.",
+    "fix": "Replace literal `\"hierarchical\"` with `TOPOLOGIES.HIERARCHICAL` imported from constants."
   },
   {
-    "file": "tests/toolContext.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 4,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      },
-      {
-        "line": 20,
-        "content": "vi.mock(\"../src/wrappers/MongoWrapper.ts\", () => ({"
-      },
-      {
-        "line": 30,
-        "content": "vi.mock(\"../../config.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/toolAvailabilityAndEnablement.test.ts",
+    "lineStart": 302,
+    "lineEnd": 302,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"hierarchical\"` duplicates production constant `TOPOLOGIES.HIERARCHICAL`.",
+    "fix": "Replace literal `\"hierarchical\"` with `TOPOLOGIES.HIERARCHICAL` imported from constants."
   },
   {
-    "file": "tests/toolCountSync.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 110,
-        "content": "vi.mock(\"../src/services/ToolOrchestratorService.ts\", () => ({"
-      },
-      {
-        "line": 159,
-        "content": "vi.mock(\"../src/wrappers/MongoWrapper.ts\", () => ({"
-      },
-      {
-        "line": 167,
-        "content": "vi.mock(\"../../config.ts\", () => ({"
-      },
-      {
-        "line": 172,
-        "content": "vi.mock(\"../config.ts\", () => ({"
-      },
-      {
-        "line": 205,
-        "content": "vi.mock(\"../src/services/AgentPersonaRegistry.ts\", () => ({"
-      },
-      {
-        "line": 217,
-        "content": "vi.mock(\"../src/services/local-tools/InternalToolRegistry.ts\", () => ({"
-      },
-      {
-        "line": 223,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/validationInterceptor.test.ts",
+    "lineStart": 36,
+    "lineEnd": 36,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"google\"` duplicates production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Replace literal `\"google\"` with `PROVIDERS.GOOGLE` imported from constants."
   },
   {
-    "file": "tests/toolNameUniqueness.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 46,
-        "content": "} as any;"
-      },
-      {
-        "line": 53,
-        "content": "} as any;"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 6,
-        "content": "vi.mock(\"../src/services/FileService.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
-  },
-  {
-    "file": "tests/toolOrchestratorService.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 60,
-        "content": "} as any;"
-      },
-      {
-        "line": 67,
-        "content": "} as any;"
-      },
-      {
-        "line": 74,
-        "content": "const generateImageSchema = clientSchemas.find((tool) => tool.name === \"generate_image\") as any;"
-      },
-      {
-        "line": 78,
-        "content": "const transcribeAudioSchema = clientSchemas.find((tool) => tool.name === \"transcribe_audio\") as any;"
-      },
-      {
-        "line": 82,
-        "content": "const getWeatherSchema = clientSchemas.find((tool) => tool.name === \"get_weather\") as any;"
-      },
-      {
-        "line": 120,
-        "content": "} as any;"
-      },
-      {
-        "line": 128,
-        "content": "} as any;"
-      },
-      {
-        "line": 135,
-        "content": "} as any;"
-      },
-      {
-        "line": 171,
-        "content": "} as any;"
-      },
-      {
-        "line": 179,
-        "content": "} as any;"
-      },
-      {
-        "line": 186,
-        "content": "} as any;"
-      },
-      {
-        "line": 223,
-        "content": "} as any;"
-      },
-      {
-        "line": 231,
-        "content": "} as any;"
-      },
-      {
-        "line": 238,
-        "content": "} as any;"
-      },
-      {
-        "line": 275,
-        "content": "} as any;"
-      },
-      {
-        "line": 283,
-        "content": "} as any;"
-      },
-      {
-        "line": 290,
-        "content": "} as any;"
-      },
-      {
-        "line": 339,
-        "content": "} as any;"
-      },
-      {
-        "line": 347,
-        "content": "} as any;"
-      },
-      {
-        "line": 354,
-        "content": "} as any;"
-      },
-      {
-        "line": 390,
-        "content": "} as any;"
-      },
-      {
-        "line": 398,
-        "content": "} as any;"
-      },
-      {
-        "line": 405,
-        "content": "} as any;"
-      },
-      {
-        "line": 442,
-        "content": "} as any;"
-      },
-      {
-        "line": 450,
-        "content": "} as any;"
-      },
-      {
-        "line": 457,
-        "content": "} as any;"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 5,
-        "content": "vi.mock(\"../src/services/FileService.ts\", () => {"
-      }
-    ],
-    "hardcodedStrings": []
-  },
-  {
-    "file": "tests/topologyRouters.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 328,
-        "content": "{ agent: \"Dev\", description: \"Write Code\", prompt: undefined as unknown as string },"
-      },
-      {
-        "line": 329,
-        "content": "{ agent: \"QA\", description: \"Verify Code\", prompt: undefined as unknown as string },"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 10,
-        "content": "vi.mock(\"../src/services/orchestrator/GitWorktreeHelper.ts\", () => ({"
-      },
-      {
-        "line": 22,
-        "content": "vi.mock(\"../src/services/SettingsService.ts\", () => ({"
-      },
-      {
-        "line": 39,
-        "content": "vi.mock(\"../src/providers/index.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
-  },
-  {
-    "file": "tests/validationFlowOrdering.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 117,
-        "content": "provider: {} as any,"
-      },
-      {
-        "line": 124,
-        "content": "mockState = {} as any;"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 22,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      },
-      {
-        "line": 33,
-        "content": "vi.mock(\"../config.ts\", () => ({"
-      },
-      {
-        "line": 51,
-        "content": "vi.mock(\"../src/wrappers/MongoWrapper.ts\", () => ({"
-      },
-      {
-        "line": 59,
-        "content": "vi.mock(\"../src/services/SettingsService.ts\", () => ({"
-      },
-      {
-        "line": 73,
-        "content": "vi.mock(\"../src/services/ConversationService.ts\", () => ({"
-      },
-      {
-        "line": 80,
-        "content": "vi.mock(\"../src/services/RequestLogger.ts\", () => ({"
-      },
-      {
-        "line": 87,
-        "content": "vi.mock(\"../src/services/ToolOrchestratorService.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
-  },
-  {
-    "file": "tests/visionLanguageHarness.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 129,
-        "content": "vi.spyOn(harness as any, \"finalize\").mockResolvedValue(undefined);"
-      },
-      {
-        "line": 143,
-        "content": "vi.spyOn(harness as any, \"finalize\").mockResolvedValue(undefined);"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 6,
-        "content": "vi.mock(\"../src/utils/logger.ts\", () => ({"
-      },
-      {
-        "line": 17,
-        "content": "vi.mock(\"../src/services/LiveFrameService.ts\", () => ({"
-      },
-      {
-        "line": 25,
-        "content": "vi.mock(\"../src/services/harnesses/lifecycle/HookInitializer.ts\", () => ({"
-      },
-      {
-        "line": 32,
-        "content": "vi.mock(\"../src/services/harnesses/lifecycle/Finalizer.ts\", () => ({"
-      },
-      {
-        "line": 36,
-        "content": "vi.mock(\"../src/utils/ContextWindowManager.ts\", () => ({"
-      },
-      {
-        "line": 48,
-        "content": "vi.mock(\"../src/services/ConversationGenerationTracker.ts\", () => ({"
-      },
-      {
-        "line": 74,
-        "content": "vi.mock(\"../src/services/RequestLogger.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
-  },
-  {
+    "category": "Hard-Coded Magic Strings & Values",
     "file": "tests/voiceCatalog.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [],
-    "mocks": [
-      {
-        "line": 3,
-        "content": "vi.mock('../src/config.ts', () => ({"
-      },
-      {
-        "line": 20,
-        "content": "vi.mock('../src/constants.ts', () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "lineStart": 22,
+    "lineEnd": 22,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"openai\"` duplicates production constant `PROVIDERS.OPENAI`.",
+    "fix": "Replace literal `\"openai\"` with `PROVIDERS.OPENAI` imported from constants."
   },
   {
-    "file": "tests/webhookEventBus.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 962,
-        "content": "vi.mocked(MongoWrapper.getDb).mockReturnValue(mockDb as any);"
-      },
-      {
-        "line": 966,
-        "content": "vi.mocked(MongoWrapper.getDb).mockReturnValue(null as any);"
-      },
-      {
-        "line": 1068,
-        "content": "const address = server.address() as any;"
-      },
-      {
-        "line": 1136,
-        "content": "vi.mocked(MongoWrapper.getDb).mockReturnValue(mockDb as any);"
-      },
-      {
-        "line": 1199,
-        "content": "const harness = new ReActHarness(mockContext as any, mockState as any, mockTools as any);"
-      }
-    ],
-    "mocks": [],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 23,
+    "lineEnd": 23,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"anthropic\"` duplicates production constant `PROVIDERS.ANTHROPIC`.",
+    "fix": "Replace literal `\"anthropic\"` with `PROVIDERS.ANTHROPIC` imported from constants."
   },
   {
-    "file": "tests/workflowAssembler.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 31,
-        "content": "const result = assembleGraph(null as any);"
-      },
-      {
-        "line": 51,
-        "content": "const result = assembleGraph(steps as any);"
-      },
-      {
-        "line": 69,
-        "content": "const result = assembleGraph(steps as any);"
-      },
-      {
-        "line": 86,
-        "content": "const result = assembleGraph(steps as any);"
-      },
-      {
-        "line": 97,
-        "content": "const result = assembleGraph(steps as any);"
-      },
-      {
-        "line": 113,
-        "content": "const result = assembleGraph(steps as any);"
-      },
-      {
-        "line": 130,
-        "content": "const result = assembleGraph(steps as any);"
-      },
-      {
-        "line": 150,
-        "content": "const result = assembleGraph(steps as any);"
-      },
-      {
-        "line": 166,
-        "content": "const result = assembleGraph(steps as any);"
-      },
-      {
-        "line": 184,
-        "content": "const result = assembleGraph(steps as any);"
-      },
-      {
-        "line": 195,
-        "content": "const result = assembleGraph(steps as any);"
-      },
-      {
-        "line": 212,
-        "content": "const result = assembleGraph(steps as any);"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 13,
-        "content": "vi.mock(\"../src/config.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 24,
+    "lineEnd": 24,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"google\"` duplicates production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Replace literal `\"google\"` with `PROVIDERS.GOOGLE` imported from constants."
   },
   {
-    "file": "tests/workflowExecution.test.ts",
-    "interfaces": [],
-    "types": [],
-    "anyAssertions": [
-      {
-        "line": 60,
-        "content": "const sortedIds = WorkflowExecutionService.topologicalSort(nodes as any, edges);"
-      },
-      {
-        "line": 80,
-        "content": "return {} as any;"
-      },
-      {
-        "line": 88,
-        "content": "nodes as any,"
-      },
-      {
-        "line": 121,
-        "content": "nodes as any,"
-      },
-      {
-        "line": 155,
-        "content": "nodes as any,"
-      }
-    ],
-    "mocks": [
-      {
-        "line": 10,
-        "content": "vi.mock(\"../src/routes/ChatRoutes.ts\", () => ({"
-      },
-      {
-        "line": 15,
-        "content": "vi.mock(\"../src/providers/index.ts\", () => ({"
-      },
-      {
-        "line": 22,
-        "content": "vi.mock(\"../src/services/EmbeddingService.ts\", () => ({"
-      },
-      {
-        "line": 28,
-        "content": "vi.mock(\"../src/services/FileService.ts\", () => ({"
-      },
-      {
-        "line": 37,
-        "content": "vi.mock(\"../src/wrappers/MinioWrapper.ts\", () => ({"
-      }
-    ],
-    "hardcodedStrings": []
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 25,
+    "lineEnd": 25,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"elevenlabs\"` duplicates production constant `PROVIDERS.ELEVENLABS`.",
+    "fix": "Replace literal `\"elevenlabs\"` with `PROVIDERS.ELEVENLABS` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 26,
+    "lineEnd": 26,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"inworld\"` duplicates production constant `PROVIDERS.INWORLD`.",
+    "fix": "Replace literal `\"inworld\"` with `PROVIDERS.INWORLD` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 27,
+    "lineEnd": 27,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"lm-studio\"` duplicates production constant `PROVIDERS.LM_STUDIO`.",
+    "fix": "Replace literal `\"lm-studio\"` with `PROVIDERS.LM_STUDIO` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 28,
+    "lineEnd": 28,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"vllm\"` duplicates production constant `PROVIDERS.VLLM`.",
+    "fix": "Replace literal `\"vllm\"` with `PROVIDERS.VLLM` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 29,
+    "lineEnd": 29,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"ollama\"` duplicates production constant `PROVIDERS.OLLAMA`.",
+    "fix": "Replace literal `\"ollama\"` with `PROVIDERS.OLLAMA` imported from constants."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/voiceCatalog.test.ts",
+    "lineStart": 30,
+    "lineEnd": 30,
+    "severity": "🔵",
+    "description": "Hard-coded string `\"llama-cpp\"` duplicates production constant `PROVIDERS.LLAMA_CPP`.",
+    "fix": "Replace literal `\"llama-cpp\"` with `PROVIDERS.LLAMA_CPP` imported from constants."
   }
 ]
