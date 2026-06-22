@@ -64,6 +64,7 @@ vi.mock('../src/services/BenchmarkService.ts', () => ({
 vi.mock('../src/services/OrchestratorService.ts', () => ({
   default: {
     listSubAgents: vi.fn().mockReturnValue([{ agentId: 'sub-1', status: 'running' }]),
+    listAllDescendantSubAgents: vi.fn().mockReturnValue([{ agentId: 'sub-1', status: 'running' }]),
     abortSubAgentsByConversation: vi.fn().mockResolvedValue({ aborted: true }),
     getSubAgentStatus: vi.fn().mockReturnValue({ agentId: 'sub-1', status: 'running' })
   }
