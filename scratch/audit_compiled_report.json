@@ -180,6 +180,15 @@
     "fix": "Ensure object is properly typed using production type and verify shape alignment."
   },
   {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/contextPressureManager.test.ts",
+    "lineStart": 89,
+    "lineEnd": 89,
+    "severity": "🟡",
+    "description": "Literal string `\"google\"` duplicates the production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Import and use `PROVIDERS.GOOGLE` from `src/constants.ts`."
+  },
+  {
     "category": "Stale Mock Contracts",
     "file": "tests/contextWindowManager.test.ts",
     "lineStart": 180,
@@ -313,6 +322,15 @@
     "severity": "🔵",
     "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `expect((conversation as any).requestErrorCount).toBe(5);`.",
     "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/criticGate.test.ts",
+    "lineStart": 25,
+    "lineEnd": 25,
+    "severity": "🟡",
+    "description": "Literal string `\"google\"` duplicates the production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Import and use `PROVIDERS.GOOGLE` from `src/constants.ts`."
   },
   {
     "category": "Stale Mock Contracts",
@@ -594,6 +612,15 @@
     "fix": "Ensure object is properly typed using production type and verify shape alignment."
   },
   {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/live/recursiveSubAgents.live.test.ts",
+    "lineStart": 59,
+    "lineEnd": 59,
+    "severity": "🟡",
+    "description": "Literal string `\"anthropic\"` duplicates the production constant `PROVIDERS.ANTHROPIC`.",
+    "fix": "Import and use `PROVIDERS.ANTHROPIC` from `src/constants.ts`."
+  },
+  {
     "category": "Stale Mock Contracts",
     "file": "tests/live/sessionGenTrackerLive.live.test.ts",
     "lineStart": 47,
@@ -774,6 +801,15 @@
     "fix": "Ensure object is properly typed using production type and verify shape alignment."
   },
   {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/outputTruncationRecoveryLifecycle.test.ts",
+    "lineStart": 104,
+    "lineEnd": 104,
+    "severity": "🟡",
+    "description": "Literal string `\"google\"` duplicates the production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Import and use `PROVIDERS.GOOGLE` from `src/constants.ts`."
+  },
+  {
     "category": "Stale Mock Contracts",
     "file": "tests/policyEngine.test.ts",
     "lineStart": 373,
@@ -837,6 +873,24 @@
     "fix": "Ensure object is properly typed using production type and verify shape alignment."
   },
   {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/subagentTopologyDepth.test.ts",
+    "lineStart": 1101,
+    "lineEnd": 1101,
+    "severity": "🟡",
+    "description": "Literal string `\"google\"` duplicates the production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Import and use `PROVIDERS.GOOGLE` from `src/constants.ts`."
+  },
+  {
+    "category": "Stale Mock Contracts",
+    "file": "tests/subagentTopologyDepth.test.ts",
+    "lineStart": 1138,
+    "lineEnd": 1138,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = buildSubAgentResult(subAgentState as any);`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
     "category": "Stale Mock Contracts",
     "file": "tests/thinkingMode.test.ts",
     "lineStart": 29,
@@ -856,6 +910,15 @@
   },
   {
     "category": "Stale Mock Contracts",
+    "file": "tests/toolRetryInterceptor.test.ts",
+    "lineStart": 210,
+    "lineEnd": 210,
+    "severity": "🔵",
+    "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `{ id: undefined as any, name: \"run_command\", result: { error: \"Command not found\" } },`.",
+    "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Stale Mock Contracts",
     "file": "tests/treeOfThoughts.test.ts",
     "lineStart": 113,
     "lineEnd": 113,
@@ -871,6 +934,15 @@
     "severity": "🔵",
     "description": "Object casted using `as any` / `as unknown` may bypass type-checking against production type: `const result = await runTreeOfThoughts(mockHarnessInstance as any);`.",
     "fix": "Ensure object is properly typed using production type and verify shape alignment."
+  },
+  {
+    "category": "Hard-Coded Magic Strings & Values",
+    "file": "tests/validationInterceptor.test.ts",
+    "lineStart": 36,
+    "lineEnd": 36,
+    "severity": "🟡",
+    "description": "Literal string `\"google\"` duplicates the production constant `PROVIDERS.GOOGLE`.",
+    "fix": "Import and use `PROVIDERS.GOOGLE` from `src/constants.ts`."
   },
   {
     "category": "Hard-Coded Magic Strings & Values",
