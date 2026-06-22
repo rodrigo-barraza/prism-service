@@ -106,6 +106,20 @@ async function getSubAgentFallback(): Promise<{
   }
 }
 
+import type { ToolCall } from "./harnesses/types.ts";
+
+function buildToolNamesMap(
+  toolCalls: ToolCall[] | null | undefined,
+): Record<string, number> {
+  const toolNames: Record<string, number> = {};
+  if (!toolCalls?.length) return toolNames;
+  for (const toolCall of toolCalls) {
+    const name = toolCall.name || "unknown";
+    toolNames[name] = (toolNames[name] || 0) + 1;
+  }
+  return toolNames;
+}
+
 /** Active sub-agents spawned via chat tools, keyed by agentId */
 const activeSubAgents = new Map<string, SubAgentState>();
 
@@ -758,6 +772,8 @@ export default class OrchestratorService {
     branchName?: string | null;
     files?: string[];
     toolCallCount?: number;
+    recursionDepth?: number;
+    toolNames?: Record<string, number>;
   }> {
     let list = Array.from(activeSubAgents.values());
     if (parentConversationId) {
@@ -765,23 +781,112 @@ export default class OrchestratorService {
         (subAgent) => subAgent.parentConversationId === parentConversationId,
       );
     }
-    return list.map((subAgent) => ({
-      agentId: subAgent.agentId,
-      description: subAgent.description,
-      status: subAgent.status,
-      providerName: subAgent.providerName,
-      resolvedModel: subAgent.resolvedModel,
-      durationMs:
-        subAgent.status === "running"
-          ? Date.now() - subAgent.startedAt
-          : subAgent.durationMs,
-      toolUses: subAgent.toolCalls?.length || 0,
-      hasChanges: subAgent.diff?.hasChanges || false,
-      totalCost: subAgent.totalCost,
-      branchName: subAgent.branchName,
-      files: subAgent.files,
-      toolCallCount: subAgent.toolCalls?.length || 0,
-    }));
+    return list.map((subAgent) => {
+      const toolNames = buildToolNamesMap(subAgent.toolCalls);
+      return {
+        agentId: subAgent.agentId,
+        description: subAgent.description,
+        status: subAgent.status,
+        providerName: subAgent.providerName,
+        resolvedModel: subAgent.resolvedModel,
+        durationMs:
+          subAgent.status === "running"
+            ? Date.now() - subAgent.startedAt
+            : subAgent.durationMs,
+        toolUses: subAgent.toolCalls?.length || 0,
+        hasChanges: subAgent.diff?.hasChanges || false,
+        totalCost: subAgent.totalCost,
+        branchName: subAgent.branchName,
+        files: subAgent.files,
+        toolCallCount: subAgent.toolCalls?.length || 0,
+        recursionDepth: subAgent.recursionDepth,
+        toolNames: Object.keys(toolNames).length > 0 ? toolNames : undefined,
+      };
+    });
+  }
+
+  static listAllDescendantSubAgents(
+    rootConversationId: string,
+  ): Array<{
+    agentId: string;
+    description: string;
+    status: string;
+    providerName: string;
+    resolvedModel: string;
+    durationMs: number;
+    toolUses: number;
+    hasChanges: boolean;
+    totalCost?: number | null;
+    branchName?: string | null;
+    files?: string[];
+    toolCallCount?: number;
+    recursionDepth?: number;
+    toolNames?: Record<string, number>;
+  }> {
+    const collectedSubAgentIds = new Set<string>();
+    const results: Array<{
+      agentId: string;
+      description: string;
+      status: string;
+      providerName: string;
+      resolvedModel: string;
+      durationMs: number;
+      toolUses: number;
+      hasChanges: boolean;
+      totalCost?: number | null;
+      branchName?: string | null;
+      files?: string[];
+      toolCallCount?: number;
+      recursionDepth?: number;
+      toolNames?: Record<string, number>;
+    }> = [];
+
+    let frontier = [rootConversationId];
+    const visitedParentConversationIds = new Set<string>([rootConversationId]);
+    const maxDepth = 10;
+
+    for (let depth = 0; depth < maxDepth && frontier.length > 0; depth++) {
+      const nextFrontier: string[] = [];
+      for (const subAgentState of activeSubAgents.values()) {
+        if (
+          !frontier.includes(subAgentState.parentConversationId) ||
+          collectedSubAgentIds.has(subAgentState.agentId)
+        ) {
+          continue;
+        }
+        collectedSubAgentIds.add(subAgentState.agentId);
+        const toolNames = buildToolNamesMap(subAgentState.toolCalls);
+        results.push({
+          agentId: subAgentState.agentId,
+          description: subAgentState.description,
+          status: subAgentState.status,
+          providerName: subAgentState.providerName,
+          resolvedModel: subAgentState.resolvedModel,
+          durationMs:
+            subAgentState.status === "running"
+              ? Date.now() - subAgentState.startedAt
+              : subAgentState.durationMs,
+          toolUses: subAgentState.toolCalls?.length || 0,
+          hasChanges: subAgentState.diff?.hasChanges || false,
+          totalCost: subAgentState.totalCost,
+          branchName: subAgentState.branchName,
+          files: subAgentState.files,
+          toolCallCount: subAgentState.toolCalls?.length || 0,
+          recursionDepth: subAgentState.recursionDepth,
+          toolNames: Object.keys(toolNames).length > 0 ? toolNames : undefined,
+        });
+        if (
+          subAgentState.subAgentConversationId &&
+          !visitedParentConversationIds.has(subAgentState.subAgentConversationId)
+        ) {
+          visitedParentConversationIds.add(subAgentState.subAgentConversationId);
+          nextFrontier.push(subAgentState.subAgentConversationId);
+        }
+      }
+      frontier = nextFrontier;
+    }
+
+    return results;
   }
 
   static cleanupConversation(parentAgentConversationId: string): void {
