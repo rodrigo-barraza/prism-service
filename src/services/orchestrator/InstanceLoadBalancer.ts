@@ -48,31 +48,43 @@ export class InstanceLoadBalancer {
       `[Orchestrator] selectAndReserveInstance: siblings=[${stateSnapshot}], orchestrator=${orchestratorInstanceId}`,
     );
 
-    // Least-connections strategy: always pick the instance with the most
-    // available capacity (concurrency - active). This distributes work
+    // Least-connections strategy: always pick the instance with the lowest load
+    // normalized by capacity (active / concurrency). This distributes work
     // evenly across heterogeneous hardware instead of saturating one
     // device before touching the next.
     //
-    // Tie-breaking: when multiple instances have equal availability,
-    // prefer the orchestrator's own instance (its inference is IDLE
-    // while sub-agents run, so its slots are effectively free).
+    // Tie-breaking: when multiple instances have equal load:
+    // 1. Prefer the orchestrator's own instance (its inference is IDLE
+    //    while sub-agents run, so its slots are effectively free).
+    // 2. Prefer the instance with higher concurrency limit.
 
     let bestInstance: InstanceEntry | null = null;
-    let bestAvailable = -Infinity;
+    let lowestLoad = Infinity;
     for (const instance of siblings) {
       const active = InstanceLoadBalancer.getActiveOn(
         instance.id,
         activeSubAgents,
       );
-      const available = instance.concurrency - active;
+      const load = active / instance.concurrency;
+
+      const isOrchestrator = instance.id === orchestratorInstanceId;
+      const isBestOrchestrator = bestInstance?.id === orchestratorInstanceId;
+
       if (
-        available > bestAvailable ||
-        (available === bestAvailable && instance.id === orchestratorInstanceId)
+        load < lowestLoad ||
+        (load === lowestLoad && (
+          (isOrchestrator && !isBestOrchestrator) ||
+          (isOrchestrator === isBestOrchestrator && instance.concurrency > (bestInstance?.concurrency || 0))
+        ))
       ) {
-        bestAvailable = available;
+        lowestLoad = load;
         bestInstance = instance;
       }
     }
+
+    const bestAvailable = bestInstance
+      ? bestInstance.concurrency - InstanceLoadBalancer.getActiveOn(bestInstance.id, activeSubAgents)
+      : -Infinity;
 
     if (bestInstance && bestAvailable <= 0) {
       logger.info(

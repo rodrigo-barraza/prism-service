@@ -47,7 +47,7 @@ import ConversationGenerationTracker from "../services/ConversationGenerationTra
 import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
 import localModelQueue from "../services/LocalModelQueue.ts";
 import LocalProviderGateway from "../services/local-provider/index.ts";
-import { getInstancesByType, getInstanceType } from "../providers/instance-registry.ts";
+import { getInstancesByType, getInstanceType, getInstance } from "../providers/instance-registry.ts";
 import { resolveModelForInstances } from "../utils/ModelResolution.ts";
 import {
   markGenerating,
@@ -442,17 +442,20 @@ async function prepareGenerationContext(
       }
       // ── Multi-instance load balancing (least-connections) ────────
       if (siblings.length > 1) {
-        // Least-connections: pick the instance with the lowest total
-        // in-flight work (active + pending queue depth). This ensures
+        // Least-connections: pick the instance with the lowest load
+        // normalized by capacity (total in-flight / concurrency). This ensures
         // the faster device drains its queue and picks up new work
         // sooner, rather than piling up behind a slower device.
         let bestId = providerName;
-        let lowestInflight = Infinity;
+        let lowestLoad = Infinity;
         for (const inst of siblings) {
           const queueState = localModelQueue._getQueue(inst.id);
-          const inflight = queueState.totalInflight;
-          if (inflight < lowestInflight) {
-            lowestInflight = inflight;
+          const load = queueState.totalInflight / inst.concurrency;
+          if (
+            load < lowestLoad ||
+            (load === lowestLoad && inst.concurrency > (getInstance(bestId)?.concurrency || 0))
+          ) {
+            lowestLoad = load;
             bestId = inst.id;
           }
         }
@@ -670,7 +673,6 @@ export async function handleConversation(
       }
     } finally {
       if (localRelease) {
-        localRelease();
         localRelease();
         logger.info(`[chat] 🔓 Released local GPU lock for ${resolvedModel}`);
       }

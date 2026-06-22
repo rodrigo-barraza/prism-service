@@ -30,7 +30,10 @@ class InstanceQueue {
 
   acquire(): Promise<() => void> {
     return new Promise((resolve) => {
+      let released = false;
       const release = () => {
+        if (released) return;
+        released = true;
         this._activeCount--;
         this._totalProcessed++;
         const next = this._queue.shift();

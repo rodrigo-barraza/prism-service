@@ -853,7 +853,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       expect(InstanceLoadBalancer.getActiveOn("local-gpu-1", activeSubAgentsMap)).toBe(2);
     });
 
-    it("should prioritize orchestrator instance and perform fill-first strategy when slots are available", () => {
+    it("should prioritize orchestrator instance and perform capacity-based selection when slots are available", () => {
       const activeSubAgentsMap = new Map() as Map<string, SubAgentState>;
       const siblingInstances = [
         { id: "local-gpu-1", concurrency: 2 },
