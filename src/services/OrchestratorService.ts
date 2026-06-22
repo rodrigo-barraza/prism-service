@@ -1309,6 +1309,20 @@ export default class OrchestratorService {
     const hasWorkspaceSetup =
       Array.isArray(workspaceRoots) && workspaceRoots.length > 0;
 
+    const parentWorkspaceRoot =
+      orchestratorContext.workspaceRoot ||
+      (hasWorkspaceSetup ? workspaceRoots[0] : subAgent.repositoryPath);
+
+    // Register spawned sub-agent worktree in activeWorktrees automatically
+    if (subAgent.isolated && subAgent.worktreePath) {
+      ToolOrchestratorService._setWorktree(subAgent.subAgentConversationId, {
+        originalRoot: parentWorkspaceRoot,
+        worktreePath: subAgent.worktreePath,
+        branch: subAgent.branchName || undefined,
+        repoPath: subAgent.repositoryPath,
+      });
+    }
+
     let isWorkspaceAvailable = false;
     if (hasWorkspaceSetup) {
       isWorkspaceAvailable = workspaceRoots.some((rootPath) => {
@@ -1544,6 +1558,7 @@ export default class OrchestratorService {
         requestStart: performance.now(),
         emit: subAgentEmit,
         signal: subAgent.abortController?.signal,
+        workspaceRoot: subAgent.worktreePath || parentWorkspaceRoot,
         // Recursive spawning: propagate incremented depth so child create_team
         // calls know they're one level deeper. The ToolExecutor forwards these
         // to ToolOrchestratorService.executeOrchestratorTool → OrchestratorContext.
@@ -1557,6 +1572,9 @@ export default class OrchestratorService {
       ) {
         subAgent.status = "stopped";
       } else {
+        if (!preserveWorktree && subAgent.isolated) {
+          ToolOrchestratorService._clearWorktree(subAgent.subAgentConversationId);
+        }
         throw error;
       }
     }
@@ -1671,6 +1689,11 @@ export default class OrchestratorService {
     logger.info(
       `[Orchestrator] Sub-agent ${subAgent.agentId} completed in ${subAgent.durationMs}ms (${telemetry.toolCalls.length} tool calls)`,
     );
+
+    // Release the active worktree registration if we don't want to preserve it
+    if (!preserveWorktree && subAgent.isolated) {
+      ToolOrchestratorService._clearWorktree(subAgent.subAgentConversationId);
+    }
 
     // ── VRAM eviction for secondary instances ──────────────────
     await evictIdleSecondaryModel(
