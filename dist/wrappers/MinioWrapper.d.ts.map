@@ -1,1 +1,0 @@
-{"version":3,"file":"MinioWrapper.d.ts","sourceRoot":"","sources":["../../src/wrappers/MinioWrapper.ts"],"names":[],"mappings":"AAcA,QAAA,MAAM,YAAY;IAChB;;;;OAIG;mBACkB,MAAM,aAAa,MAAM,aAAa,MAAM,UAAU,MAAM;;;wBAa7D,MAAM;kBACZ,MAAM,UAAU,MAAM,eAAe,MAAM;eAE9C,MAAM;kBACH,MAAM;gBACR,MAAM;0BACI,MAAM;CAC7B,CAAC;AAEF,eAAe,YAAY,CAAC"}
