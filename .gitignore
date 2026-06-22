@@ -14,3 +14,6 @@ dist/
 # Scratch test scripts
 tests/scratch/
 coverage/
+
+# Migrated to pnpm
+package-lock.json
