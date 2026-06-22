@@ -98,21 +98,9 @@ export const AVG_TOKENS_PER_SEC_EXPR = {
   },
 };
 
-// ─── Provider & Modality Constants ──────────────────────────
+// ─── Provider & Modality Constants (re-exported from utilities-library) ──
 
-export const PROVIDERS = {
-  OPENAI: "openai",
-  ANTHROPIC: "anthropic",
-  GOOGLE: "google",
-  ELEVENLABS: "elevenlabs",
-  INWORLD: "inworld",
-  LM_STUDIO: "lm-studio",
-  VLLM: "vllm",
-  OLLAMA: "ollama",
-  LLAMA_CPP: "llama-cpp",
-};
-
-export const PROVIDER_LIST = Object.values(PROVIDERS);
+export { PROVIDERS, PROVIDER_LIST } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 export const TYPES = {
   TEXT: "text",
@@ -150,11 +138,8 @@ export const HARNESS_IDS = {
   STANDARD: "standard",
 } as const;
 
-export const THOUGHT_STRUCTURES = {
-  CHAIN_OF_THOUGHT: "chain_of_thought",
-  TREE_OF_THOUGHTS: "tree_of_thoughts",
-  GRAPH_OF_THOUGHTS: "graph_of_thoughts",
-} as const;
+// Re-exported from utilities-library (single source of truth)
+export { THOUGHT_STRUCTURES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 // ─── Prompt Construction Delimiters ──────────────────────────
 

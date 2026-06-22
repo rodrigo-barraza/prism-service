@@ -4,6 +4,7 @@ import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
   TOOL_NAMES,
+  MAX_TOOL_ITERATIONS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import LiveFrameService from "../LiveFrameService.ts";
 
@@ -70,7 +71,6 @@ interface IterationPassOptions extends AgenticOptions {
   username: string;
 }
 
-const MAX_TOOL_ITERATIONS = 25;
 const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
 
 /**

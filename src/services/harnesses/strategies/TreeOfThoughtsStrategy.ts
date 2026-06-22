@@ -38,6 +38,7 @@ import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
   TOOL_NAMES,
+  MAX_TOOL_ITERATIONS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import logger from "../../../utils/logger.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
@@ -96,7 +97,6 @@ interface IterationPassOptions extends AgenticOptions {
   username: string;
 }
 
-const MAX_TOOL_ITERATIONS = 25;
 const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
 const DEFAULT_BRANCH_COUNT = 3;
 const MAX_BACKTRACK_ATTEMPTS_PER_ITERATION = 2;

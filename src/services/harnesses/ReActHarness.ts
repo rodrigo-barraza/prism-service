@@ -7,6 +7,7 @@ import {
   STATUS_MESSAGES,
   TOOL_NAMES,
   THOUGHT_STRUCTURES,
+  MAX_TOOL_ITERATIONS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import { createStandardHooks } from "./lifecycle/HookInitializer.ts";
@@ -82,7 +83,6 @@ interface IterationPassOptions extends AgenticOptions {
   username: string;
 }
 
-const MAX_TOOL_ITERATIONS = 25;
 const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
 
 /**

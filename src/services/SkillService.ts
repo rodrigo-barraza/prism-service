@@ -1,6 +1,7 @@
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import { COLLECTIONS } from "../constants.ts";
+import { MAX_TOOL_ITERATIONS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import logger from "../utils/logger.ts";
 
 // ────────────────────────────────────────────────────────────
@@ -76,7 +77,7 @@ const SkillService = {
       maxIterations:
         typeof maxIterations === "number"
           ? Math.min(100, Math.max(1, maxIterations))
-          : 25,
+          : MAX_TOOL_ITERATIONS,
       model: model || null,
       project: project || null,
       agent: agent || null,
@@ -195,7 +196,7 @@ const SkillService = {
     );
 
     const config = {
-      maxIterations: document.maxIterations || 25,
+      maxIterations: document.maxIterations || MAX_TOOL_ITERATIONS,
       model: document.model || null,
       tools: document.tools || null, // null = all tools
       agent: document.agent || null,
