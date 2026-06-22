@@ -497,6 +497,10 @@ export default class OrchestratorService {
         subAgentId: agentId,
         message: "spawned",
         description,
+        conversationId: subAgentConversationId,
+        parentConversationId: parentConversationId || null,
+        model: subAgentModel,
+        provider: subAgentProvider,
       });
     }
     // Run the sub-agent loop — blocks until the sub-agent completes.
@@ -1128,6 +1132,10 @@ export default class OrchestratorService {
         subAgentId: agentId,
         message: "spawned",
         description: subAgent.description,
+        conversationId: subAgent.subAgentConversationId,
+        parentConversationId: subAgent.parentConversationId || null,
+        model: subAgent.resolvedModel,
+        provider: subAgent.providerName,
       });
     }
 
