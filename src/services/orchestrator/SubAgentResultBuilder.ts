@@ -274,10 +274,61 @@ function isSerializedSubAgentResult(
 }
 
 /**
+ * Collect SubAgentResult entries from a raw payload (parsed JSON or live object).
+ * Used by both scan passes in extractSubtreeMetrics.
+ */
+function collectChildSummariesFromPayload(
+  payload: unknown,
+  childSummaries: SubAgentChildSummary[],
+): void {
+  const resultsArray: unknown[] = Array.isArray(payload) ? payload : [payload];
+  const MAX_RESULT_LENGTH_FOR_PROPAGATION = 2000;
+
+  for (const entry of resultsArray) {
+    if (!isSerializedSubAgentResult(entry)) {
+      continue;
+    }
+
+    const childSummary: SubAgentChildSummary = {
+      agent_id: String(entry.agent_id),
+      description: entry.description || "",
+      status: entry.status,
+      recursionDepth: entry.recursionDepth || 0,
+      durationMs: entry.durationMs || 0,
+      toolUses: entry.toolUses || 0,
+      cost: 0,
+    };
+
+    if (typeof entry.result === "string" && entry.result.trim()) {
+      const trimmedResult = entry.result.trim();
+      childSummary.result =
+        trimmedResult.length > MAX_RESULT_LENGTH_FOR_PROPAGATION
+          ? trimmedResult.slice(0, MAX_RESULT_LENGTH_FOR_PROPAGATION) + "…"
+          : trimmedResult;
+    } else {
+      childSummary.result = null;
+    }
+
+    if (typeof entry.error === "string" && entry.error.trim()) {
+      childSummary.error = entry.error.trim();
+    }
+
+    if (entry.subtreeMetrics) {
+      childSummary.subtreeMetrics = entry.subtreeMetrics;
+    }
+
+    childSummaries.push(childSummary);
+  }
+}
+
+/**
  * Scan a sub-agent's conversation for create_team tool results that contain
  * SubAgentResult payloads. When a child agent spawned grandchildren, those
- * results appear as tool_result messages in the child's conversation. We
- * parse these to build aggregated subtree metrics for the parent.
+ * results are propagated upward so the parent has full subtree visibility.
+ *
+ * Two scan passes cover both conversation formats:
+ *   1. Anthropic-style: separate `role: "tool"` messages with JSON string content
+ *   2. ReAct-style: assistant messages with `toolCalls[].result` objects (our primary format)
  *
  * Paper alignment: THREAD (arXiv:2405.17402) — hierarchical result aggregation.
  */
@@ -287,55 +338,33 @@ export function extractSubtreeMetrics(
   const childSummaries: SubAgentChildSummary[] = [];
 
   for (const message of messages) {
-    if (message.role !== "tool" && message.role !== "tool_result") continue;
+    // Pass 1: Anthropic-style separate tool_result messages (JSON string content)
+    if (message.role === "tool" || message.role === "tool_result") {
+      const content = typeof message.content === "string" ? message.content : "";
+      if (!content.includes("agent_id")) continue;
 
-    const content = typeof message.content === "string" ? message.content : "";
-    if (!content.includes("agent_id")) continue;
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      continue;
-    }
-
-    const resultsArray: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
-
-    for (const entry of resultsArray) {
-      if (!isSerializedSubAgentResult(entry)) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(content);
+      } catch {
         continue;
       }
 
-      const childSummary: SubAgentChildSummary = {
-        agent_id: String(entry.agent_id),
-        description: entry.description || "",
-        status: entry.status,
-        recursionDepth: entry.recursionDepth || 0,
-        durationMs: entry.durationMs || 0,
-        toolUses: entry.toolUses || 0,
-        cost: 0,
-      };
+      collectChildSummariesFromPayload(parsed, childSummaries);
+      continue;
+    }
 
-      const MAX_RESULT_LENGTH_FOR_PROPAGATION = 2000;
-      if (typeof entry.result === "string" && entry.result.trim()) {
-        const trimmedResult = entry.result.trim();
-        childSummary.result =
-          trimmedResult.length > MAX_RESULT_LENGTH_FOR_PROPAGATION
-            ? trimmedResult.slice(0, MAX_RESULT_LENGTH_FOR_PROPAGATION) + "…"
-            : trimmedResult;
-      } else {
-        childSummary.result = null;
+    // Pass 2: ReAct-style — tool results stored inline on assistant messages
+    // as toolCalls[].result (already-parsed objects, not JSON strings).
+    // This is the primary format used by our ReActHarness.
+    if (message.role === "assistant" && Array.isArray(message.toolCalls)) {
+      for (const toolCall of message.toolCalls) {
+        if (toolCall.name !== "create_team" || !toolCall.result) continue;
+
+        // toolCall.result is the raw return value from OrchestratorService.createTeam(),
+        // which is SubAgentResult[] — already a parsed object, not a JSON string.
+        collectChildSummariesFromPayload(toolCall.result, childSummaries);
       }
-
-      if (typeof entry.error === "string" && entry.error.trim()) {
-        childSummary.error = entry.error.trim();
-      }
-
-      if (entry.subtreeMetrics) {
-        childSummary.subtreeMetrics = entry.subtreeMetrics;
-      }
-
-      childSummaries.push(childSummary);
     }
   }
 

@@ -294,6 +294,149 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
       expect(metrics!.childResults![1].result).toBe("Grandchild 2 done");
     });
 
+    it("extractSubtreeMetrics should extract child results from ReAct-style assistant toolCalls (inline result objects)", () => {
+      const messages: ConversationMessage[] = [
+        { role: "user", content: "Orchestrator prompt" },
+        {
+          role: "assistant",
+          content: "I'll spawn a sub-team to handle this.",
+          toolCalls: [
+            {
+              id: "tool-call-1",
+              name: "create_team",
+              args: { name: "Research_Team", members: [] },
+              result: [
+                {
+                  agent_id: "agent-1-55df",
+                  description: "Pokemon TCG Investment Expert",
+                  status: "completed",
+                  summary: "Agent completed successfully",
+                  result: "The sub-agents provided research results about Pokemon card values.",
+                  toolUses: 3,
+                  iterations: 4,
+                  durationMs: 422847,
+                  recursionDepth: 1,
+                },
+                {
+                  agent_id: "agent-2-a1b2",
+                  description: "Market Analysis Specialist",
+                  status: "completed",
+                  summary: "Agent completed successfully",
+                  result: "Market trends analyzed across Japanese and English markets.",
+                  toolUses: 5,
+                  iterations: 3,
+                  durationMs: 315000,
+                  recursionDepth: 1,
+                },
+              ],
+            },
+          ],
+        },
+        { role: "assistant", content: "All research complete." },
+      ];
+
+      const metrics = extractSubtreeMetrics(messages);
+
+      expect(metrics).not.toBeNull();
+      expect(metrics!.totalDescendants).toBe(2);
+      expect(metrics!.maxDepthReached).toBe(1);
+      expect(metrics!.aggregatedDurationMs).toBe(422847 + 315000);
+      expect(metrics!.aggregatedToolUses).toBe(3 + 5);
+      expect(metrics!.childResults).toHaveLength(2);
+      expect(metrics!.childResults![0].agent_id).toBe("agent-1-55df");
+      expect(metrics!.childResults![0].result).toContain("Pokemon card values");
+      expect(metrics!.childResults![1].agent_id).toBe("agent-2-a1b2");
+    });
+
+    it("extractSubtreeMetrics should handle mixed Anthropic-style and ReAct-style messages in the same conversation", () => {
+      const messages: ConversationMessage[] = [
+        {
+          role: "tool",
+          content: JSON.stringify({
+            agent_id: "anthropic-child",
+            description: "Anthropic-format child",
+            status: "completed",
+            recursionDepth: 1,
+            durationMs: 1000,
+            toolUses: 2,
+            result: "Anthropic style result",
+          }),
+        },
+        {
+          role: "assistant",
+          content: "Spawning another team...",
+          toolCalls: [
+            {
+              id: "tool-call-2",
+              name: "create_team",
+              args: { name: "Second_Team", members: [] },
+              result: [
+                {
+                  agent_id: "react-child",
+                  description: "ReAct-format child",
+                  status: "completed",
+                  recursionDepth: 1,
+                  durationMs: 2000,
+                  toolUses: 4,
+                  result: "ReAct style result",
+                },
+              ],
+            },
+          ],
+        },
+      ];
+
+      const metrics = extractSubtreeMetrics(messages);
+
+      expect(metrics).not.toBeNull();
+      expect(metrics!.totalDescendants).toBe(2);
+      expect(metrics!.childResults).toHaveLength(2);
+      expect(metrics!.childResults![0].agent_id).toBe("anthropic-child");
+      expect(metrics!.childResults![1].agent_id).toBe("react-child");
+      expect(metrics!.aggregatedDurationMs).toBe(3000);
+      expect(metrics!.aggregatedToolUses).toBe(6);
+    });
+
+    it("extractSubtreeMetrics should ignore non-create_team tool results on assistant messages", () => {
+      const messages: ConversationMessage[] = [
+        {
+          role: "assistant",
+          content: "Running some tools...",
+          toolCalls: [
+            {
+              id: "tool-call-search",
+              name: "search_files",
+              args: { query: "test" },
+              result: { agent_id: "not-a-real-agent", status: "completed" },
+            },
+            {
+              id: "tool-call-team",
+              name: "create_team",
+              args: { name: "Real_Team", members: [] },
+              result: [
+                {
+                  agent_id: "real-agent",
+                  description: "Real sub-agent",
+                  status: "completed",
+                  recursionDepth: 1,
+                  durationMs: 500,
+                  toolUses: 1,
+                  result: "Real result",
+                },
+              ],
+            },
+          ],
+        },
+      ];
+
+      const metrics = extractSubtreeMetrics(messages);
+
+      expect(metrics).not.toBeNull();
+      expect(metrics!.totalDescendants).toBe(1);
+      expect(metrics!.childResults).toHaveLength(1);
+      expect(metrics!.childResults![0].agent_id).toBe("real-agent");
+    });
+
     it("HierarchicalRouter depth-2 scenario: children report grandchild subtreeMetrics", async () => {
       const router = new HierarchicalRouter();
       const members = [
