@@ -2,29 +2,8 @@ import { ObjectId } from "mongodb";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import { COLLECTIONS } from "../constants.ts";
+import { deriveAgentId } from "@rodrigo-barraza/utilities-library";
 import logger from "../utils/logger.ts";
-
-// ────────────────────────────────────────────────────────────
-// CustomAgentService — CRUD for user-defined agent personas
-//
-// Stores custom agents in the `custom_agents` collection.
-// Each document defines an agent persona that gets registered
-// into AgentPersonaRegistry at runtime.
-// ────────────────────────────────────────────────────────────
-
-/**
- * Derive a stable agent ID from a display name.
- * Always uppercased and prefixed with CUSTOM_ to avoid collisions.
-
-
- */
-function deriveAgentId(name: string) {
-  const slug = name
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-  return `CUSTOM_${slug}`;
-}
 
 /** @returns {import("mongodb").Collection} */
 function getCollection() {
