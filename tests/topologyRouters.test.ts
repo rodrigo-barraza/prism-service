@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { PROVIDERS } from "../src/constants.ts";
+import { TOPOLOGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import type {
   OrchestratorContext,
   SubAgentResult,
@@ -25,7 +26,7 @@ vi.mock("../src/services/SettingsService.ts", () => ({
     getSection: vi.fn().mockResolvedValue({
       subAgentProvider: PROVIDERS.GOOGLE,
       subAgentModel: "gemini-3.5-flash",
-      topology: "hierarchical",
+      topology: TOPOLOGIES.HIERARCHICAL,
     }),
   },
 }));
@@ -143,9 +144,8 @@ describe("Topology Routers Test Suite", () => {
         { description: "Step B", prompt: "Do B" },
       ];
 
-      // Make spawn fail on first call
+      // Simulate a pre-spawn failure (returns the { error: string } union branch)
       spawnSubAgentMock.mockResolvedValueOnce({
-        status: "failed",
         error: "Compilation error",
       });
 
@@ -631,7 +631,6 @@ describe("Topology Routers Test Suite", () => {
 
       mockGenerateText.mockClear();
       spawnSubAgentMock.mockResolvedValue({
-        status: "failed",
         error: "Execution error",
       });
 
@@ -662,7 +661,6 @@ describe("Topology Routers Test Suite", () => {
           messages: [],
         })
         .mockResolvedValueOnce({
-          status: "failed",
           error: "Task B failed",
         });
 

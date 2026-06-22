@@ -68,12 +68,13 @@ router.get(
           { username: regex },
         ];
 
-        if (/^[\d.:a-f]+$/i.test((search as string).trim())) {
-          const matchingConvIds = await req.db
+        const searchString = typeof search === "string" ? search.trim() : "";
+        if (/^[\d.:a-f]+$/i.test(searchString)) {
+          const matchingConversationIds = await req.db
             .collection(REQUESTS_COLLECTION)
             .distinct("conversationId", { clientIp: regex });
-          if (matchingConvIds.length > 0) {
-            orClauses.push({ id: { $in: matchingConvIds } });
+          if (matchingConversationIds.length > 0) {
+            orClauses.push({ id: { $in: matchingConversationIds } });
           }
         }
         filter.$or = orClauses;
@@ -81,15 +82,18 @@ router.get(
 
       if (provider) filter.providers = provider;
       if (model) filter["messages.model"] = model;
-      applyDateRangeFilter(filter, from as string, to as string, "updatedAt");
 
-      const sortDir = sortDirection;
+      const fromString = typeof from === "string" ? from : undefined;
+      const toString = typeof to === "string" ? to : undefined;
+      applyDateRangeFilter(filter, fromString, toString, "updatedAt");
+
+      const sortDirectionValue = sortDirection;
 
       const isDirectOnly = type === "direct" || agent === AGENT_IDS.NONE;
       const isAgentOnly =
         agent && agent !== AGENT_IDS.NONE && agent !== AGENT_IDS.ALL;
 
-      const shouldFetchConvs = !isAgentOnly;
+      const shouldFetchDirectConversations = !isAgentOnly;
       const shouldFetchAgentConversations = !isDirectOnly;
 
       const agentFilter = { ...filter };
@@ -97,12 +101,14 @@ router.get(
         agentFilter.agent = agent;
       }
 
-      let convs: Document[] = [];
+      let directConversations: Document[] = [];
       let agentConversations: Document[] = [];
 
       const queryPromises: Promise<void>[] = [];
 
-      if (shouldFetchConvs) {
+      const sortKey = typeof sort === "string" ? sort : "updatedAt";
+
+      if (shouldFetchDirectConversations) {
         queryPromises.push(
           req.db
             .collection(CONVERSATIONS_COLLECTION)
@@ -112,11 +118,11 @@ router.get(
               messageCount: { $size: { $ifNull: ["$messages", []] } },
               totalCost: { $ifNull: ["$totalCost", 0] },
             })
-            .sort({ [sort as string]: sortDir })
+            .sort({ [sortKey]: sortDirectionValue })
             .limit(skip + limit)
             .toArray()
             .then((result) => {
-              convs = result;
+              directConversations = result;
             }),
         );
       }
@@ -131,7 +137,7 @@ router.get(
               messageCount: { $size: { $ifNull: ["$messages", []] } },
               totalCost: { $ifNull: ["$totalCost", 0] },
             })
-            .sort({ [sort as string]: sortDir })
+            .sort({ [sortKey]: sortDirectionValue })
             .limit(skip + limit)
             .toArray()
             .then((result) => {
@@ -142,17 +148,17 @@ router.get(
 
       await Promise.all(queryPromises);
 
-      let totalConvs = 0;
+      let totalDirectConversations = 0;
       let totalAgentConversations = 0;
       const countPromises: Promise<void>[] = [];
 
-      if (shouldFetchConvs) {
+      if (shouldFetchDirectConversations) {
         countPromises.push(
           req.db
             .collection(CONVERSATIONS_COLLECTION)
             .countDocuments(filter)
             .then((result) => {
-              totalConvs = result;
+              totalDirectConversations = result;
             }),
         );
       }
@@ -170,18 +176,19 @@ router.get(
 
       await Promise.all(countPromises);
 
+      const getSortValue = (item: Record<string, unknown>): string => {
+        const value = item[sortKey];
+        return value !== undefined ? String(value) : "";
+      };
+
       const merged = [
-        ...convs.map((item) => ({ ...item, type: "direct" as const })),
+        ...directConversations.map((item) => ({ ...item, type: "direct" as const })),
         ...agentConversations.map((session) => ({ ...session, type: "agent" as const })),
       ].sort((firstItem, secondItem) => {
-        const valueA = String(
-          (firstItem as Record<string, unknown>)[sort as string] ?? "",
-        );
-        const valueB = String(
-          (secondItem as Record<string, unknown>)[sort as string] ?? "",
-        );
-        if (valueA < valueB) return -sortDir;
-        if (valueA > valueB) return sortDir;
+        const valueA = getSortValue(firstItem as Record<string, unknown>);
+        const valueB = getSortValue(secondItem as Record<string, unknown>);
+        if (valueA < valueB) return -sortDirectionValue;
+        if (valueA > valueB) return sortDirectionValue;
         return 0;
       });
 
@@ -192,7 +199,10 @@ router.get(
       );
       const agentConversationIds = paginatedDocuments
         .filter((document) => document.type === "agent")
-        .map((document) => (document as Record<string, unknown>).id as string)
+        .map((document) => {
+          const id = (document as Record<string, unknown>).id;
+          return typeof id === "string" ? id : "";
+        })
         .filter(Boolean);
 
       const requests = await req.db
@@ -246,8 +256,9 @@ router.get(
 
       const enrichedDocuments = paginatedDocuments.map(
         (document: Record<string, unknown>) => {
+          const documentId = typeof document.id === "string" ? document.id : "";
           const associatedRequests =
-            requestLogMap.get(document.id as string) || ([] as Document[]);
+            requestLogMap.get(documentId) || ([] as Document[]);
           const models = Array.from(
             new Set(
               associatedRequests
@@ -260,7 +271,9 @@ router.get(
               associatedRequests
                 .flatMap(
                   (requestItem: Document) =>
-                    (requestItem.toolDisplayNames as string[]) || [],
+                    (Array.isArray(requestItem.toolDisplayNames)
+                      ? requestItem.toolDisplayNames
+                      : []) || [],
                 )
                 .filter(Boolean),
             ),
@@ -270,7 +283,9 @@ router.get(
               associatedRequests
                 .flatMap(
                   (requestItem: Document) =>
-                    (requestItem.toolApiNames as string[]) || [],
+                    (Array.isArray(requestItem.toolApiNames)
+                      ? requestItem.toolApiNames
+                      : []) || [],
                 )
                 .filter(Boolean),
             ),
@@ -321,7 +336,7 @@ router.get(
 
       res.json({
         data: enrichedDocuments,
-        total: totalConvs + totalAgentConversations,
+        total: totalDirectConversations + totalAgentConversations,
         page: parsePaginationParams(req.query).page,
         limit,
       });
@@ -337,7 +352,7 @@ router.get(
   "/filters",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const [convProjects, requestProjects, usernames, models, providers] =
+      const [conversationProjects, requestProjects, usernames, models, providers] =
         await Promise.all([
           req.db.collection(CONVERSATIONS_COLLECTION).distinct("project"),
           req.db.collection(REQUESTS_COLLECTION).distinct("project"),
@@ -346,9 +361,8 @@ router.get(
           req.db.collection(REQUESTS_COLLECTION).distinct("provider"),
         ]);
 
-      const projects = [...new Set([...convProjects, ...requestProjects])];
-      const workspaceRoots =
-        ToolOrchestratorService.getWorkspaceRoots() as string[];
+      const projects = [...new Set([...conversationProjects, ...requestProjects])];
+      const workspaceRoots = ToolOrchestratorService.getWorkspaceRoots();
       const agentPersonas = AgentPersonaRegistry.list().map((persona) => ({
         id: persona.id,
         name: persona.name,

@@ -236,7 +236,6 @@ function detectDegenerationOfThought(
 ): boolean {
   if (!previousFeedback) return false;
 
-  // Normalize whitespace for comparison
   const normalizedPrevious = previousFeedback.trim().toLowerCase().replace(/\s+/g, " ");
   const normalizedCurrent = currentFeedback.trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -287,7 +286,6 @@ export class CriticLoopRouter implements TopologyRouter {
       return [{ error: errorMessage }];
     }
 
-    // Route to Jury mode when actorCount > 1
     if (actorCount > 1) {
       return this.executeJuryMode(
         teamName, members, orchestratorContext,
@@ -296,7 +294,6 @@ export class CriticLoopRouter implements TopologyRouter {
       );
     }
 
-    // Default: Council of Judges mode (1 actor + N critics)
     return this.executeCouncilMode(
       teamName, members, orchestratorContext,
       spawnSubAgent, continueSubAgent,
@@ -317,7 +314,6 @@ export class CriticLoopRouter implements TopologyRouter {
     const { providerName, resolvedModel } = orchestratorContext;
     const actorMember = members[0];
 
-    // Build critic panel: members[1..N] or auto-generate a single generic critic
     const criticMembers: TeamMember[] = members.length > 1
       ? members.slice(1)
       : [{
@@ -401,7 +397,6 @@ export class CriticLoopRouter implements TopologyRouter {
         `[CriticLoopRouter] Round ${roundNumber}/${maximumRounds}: Spawning ${criticCount} critic(s) in parallel...`,
       );
 
-      // Spawn ALL critics in parallel — each evaluates independently
       const criticSpawnPromises: Promise<SubAgentResult | { error: string }>[] =
         criticMembers.map((criticMember, criticMemberIndex) => {
           const { assignedProvider: criticProvider, assignedModel: criticModel } =
@@ -440,7 +435,6 @@ export class CriticLoopRouter implements TopologyRouter {
       const criticResults = await Promise.all(criticSpawnPromises);
       allResults.push(...criticResults);
 
-      // Parse all critic verdicts
       const verdicts: CriticVerdict[] = [];
 
       for (let criticResultIndex = 0; criticResultIndex < criticResults.length; criticResultIndex++) {
@@ -484,7 +478,6 @@ export class CriticLoopRouter implements TopologyRouter {
         });
       }
 
-      // Check for unanimous consensus
       const passingVerdicts = verdicts.filter((verdict) => verdict.isPassing);
       const failingVerdicts = verdicts.filter((verdict) => !verdict.isPassing);
 
@@ -636,7 +629,6 @@ export class CriticLoopRouter implements TopologyRouter {
     );
     allResults.push(...actorResults);
 
-    // Collect successful actor outputs for judging
     const successfulActors: { actorIndex: number; result: SubAgentResult }[] = [];
     for (let actorIndex = 0; actorIndex < actorResults.length; actorIndex++) {
       const actorResult = actorResults[actorIndex];
@@ -669,7 +661,6 @@ export class CriticLoopRouter implements TopologyRouter {
       output: extractActorOutputText(actor.result),
     }));
 
-    // First round: judge all competing actors
     const juryPrompt = buildJurySelectionPrompt(originalTask, actorOutputs);
     const juryMessages = [{ role: "user", content: juryPrompt }];
 
@@ -711,7 +702,6 @@ export class CriticLoopRouter implements TopologyRouter {
     }
 
     for (let roundNumber = 2; roundNumber <= maximumRounds; roundNumber++) {
-      // DoT detection
       if (detectDegenerationOfThought(previousFeedback, selection.feedback)) {
         logger.warn(
           `[CriticLoopRouter] Degeneration-of-Thought detected in Jury mode. Force-terminating.`,
@@ -746,7 +736,6 @@ export class CriticLoopRouter implements TopologyRouter {
 
       winnerResult = revisedResult;
 
-      // Re-evaluate the revised output
       const revisedOutput = extractActorOutputText(revisedResult);
       const reevaluationPrompt = buildJurySelectionPrompt(originalTask, [{
         actorIndex: winnerActorIndex,
