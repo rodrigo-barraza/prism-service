@@ -1,0 +1,118 @@
+=== Critical Findings (0) ===
+=== Warning Findings (29) ===
+1. [tests/audioRoutes.test.ts:95] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"anthropic"` duplicates the production constant `PROVIDERS.ANTHROPIC`.
+   Fix: Import and use `PROVIDERS.ANTHROPIC` from `src/constants.ts`.
+
+2. [tests/chatRoute-adversarial.test.ts:88] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"openai"` duplicates the production constant `PROVIDERS.OPENAI`.
+   Fix: Import and use `PROVIDERS.OPENAI` from `src/constants.ts`.
+
+3. [tests/contextPressureManager.test.ts:89] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"google"` duplicates the production constant `PROVIDERS.GOOGLE`.
+   Fix: Import and use `PROVIDERS.GOOGLE` from `src/constants.ts`.
+
+4. [tests/criticGate.test.ts:25] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"google"` duplicates the production constant `PROVIDERS.GOOGLE`.
+   Fix: Import and use `PROVIDERS.GOOGLE` from `src/constants.ts`.
+
+5. [tests/infrastructureRoutes.test.ts:49] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"openai"` duplicates the production constant `PROVIDERS.OPENAI`.
+   Fix: Import and use `PROVIDERS.OPENAI` from `src/constants.ts`.
+
+6. [tests/infrastructureRoutes.test.ts:50] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"openai"` duplicates the production constant `PROVIDERS.OPENAI`.
+   Fix: Import and use `PROVIDERS.OPENAI` from `src/constants.ts`.
+
+7. [tests/live/recursiveSubAgents.live.test.ts:59] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"anthropic"` duplicates the production constant `PROVIDERS.ANTHROPIC`.
+   Fix: Import and use `PROVIDERS.ANTHROPIC` from `src/constants.ts`.
+
+8. [tests/live/tokenMetricsLive.live.test.ts:496] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"openai"` duplicates the production constant `PROVIDERS.OPENAI`.
+   Fix: Import and use `PROVIDERS.OPENAI` from `src/constants.ts`.
+
+9. [tests/localProviderGateway.test.ts:34] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"lm-studio"` duplicates the production constant `PROVIDERS.LM_STUDIO`.
+   Fix: Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`.
+
+10. [tests/localProviderGateway.test.ts:34] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"ollama"` duplicates the production constant `PROVIDERS.OLLAMA`.
+   Fix: Import and use `PROVIDERS.OLLAMA` from `src/constants.ts`.
+
+11. [tests/localProviderGateway.test.ts:146] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"lm-studio"` duplicates the production constant `PROVIDERS.LM_STUDIO`.
+   Fix: Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`.
+
+12. [tests/openaiProvider.test.ts:18] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"openai"` duplicates the production constant `PROVIDERS.OPENAI`.
+   Fix: Import and use `PROVIDERS.OPENAI` from `src/constants.ts`.
+
+13. [tests/outputTruncationRecoveryLifecycle.test.ts:104] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"google"` duplicates the production constant `PROVIDERS.GOOGLE`.
+   Fix: Import and use `PROVIDERS.GOOGLE` from `src/constants.ts`.
+
+14. [tests/rateLimitExtraction.test.ts:14] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"openai"` duplicates the production constant `PROVIDERS.OPENAI`.
+   Fix: Import and use `PROVIDERS.OPENAI` from `src/constants.ts`.
+
+15. [tests/rateLimitExtraction.test.ts:15] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"anthropic"` duplicates the production constant `PROVIDERS.ANTHROPIC`.
+   Fix: Import and use `PROVIDERS.ANTHROPIC` from `src/constants.ts`.
+
+16. [tests/rateLimitExtraction.test.ts:16] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"google"` duplicates the production constant `PROVIDERS.GOOGLE`.
+   Fix: Import and use `PROVIDERS.GOOGLE` from `src/constants.ts`.
+
+17. [tests/rateLimitExtraction.test.ts:17] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"elevenlabs"` duplicates the production constant `PROVIDERS.ELEVENLABS`.
+   Fix: Import and use `PROVIDERS.ELEVENLABS` from `src/constants.ts`.
+
+18. [tests/rateLimitExtraction.test.ts:18] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"inworld"` duplicates the production constant `PROVIDERS.INWORLD`.
+   Fix: Import and use `PROVIDERS.INWORLD` from `src/constants.ts`.
+
+19. [tests/subagentTopologyDepth.test.ts:1101] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"google"` duplicates the production constant `PROVIDERS.GOOGLE`.
+   Fix: Import and use `PROVIDERS.GOOGLE` from `src/constants.ts`.
+
+20. [tests/validationInterceptor.test.ts:36] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"google"` duplicates the production constant `PROVIDERS.GOOGLE`.
+   Fix: Import and use `PROVIDERS.GOOGLE` from `src/constants.ts`.
+
+21. [tests/voiceCatalog.test.ts:22] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"openai"` duplicates the production constant `PROVIDERS.OPENAI`.
+   Fix: Import and use `PROVIDERS.OPENAI` from `src/constants.ts`.
+
+22. [tests/voiceCatalog.test.ts:23] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"anthropic"` duplicates the production constant `PROVIDERS.ANTHROPIC`.
+   Fix: Import and use `PROVIDERS.ANTHROPIC` from `src/constants.ts`.
+
+23. [tests/voiceCatalog.test.ts:24] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"google"` duplicates the production constant `PROVIDERS.GOOGLE`.
+   Fix: Import and use `PROVIDERS.GOOGLE` from `src/constants.ts`.
+
+24. [tests/voiceCatalog.test.ts:25] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"elevenlabs"` duplicates the production constant `PROVIDERS.ELEVENLABS`.
+   Fix: Import and use `PROVIDERS.ELEVENLABS` from `src/constants.ts`.
+
+25. [tests/voiceCatalog.test.ts:26] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"inworld"` duplicates the production constant `PROVIDERS.INWORLD`.
+   Fix: Import and use `PROVIDERS.INWORLD` from `src/constants.ts`.
+
+26. [tests/voiceCatalog.test.ts:27] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"lm-studio"` duplicates the production constant `PROVIDERS.LM_STUDIO`.
+   Fix: Import and use `PROVIDERS.LM_STUDIO` from `src/constants.ts`.
+
+27. [tests/voiceCatalog.test.ts:28] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"vllm"` duplicates the production constant `PROVIDERS.VLLM`.
+   Fix: Import and use `PROVIDERS.VLLM` from `src/constants.ts`.
+
+28. [tests/voiceCatalog.test.ts:29] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"ollama"` duplicates the production constant `PROVIDERS.OLLAMA`.
+   Fix: Import and use `PROVIDERS.OLLAMA` from `src/constants.ts`.
+
+29. [tests/voiceCatalog.test.ts:30] - Hard-Coded Magic Strings & Values
+   Description: Literal string `"llama-cpp"` duplicates the production constant `PROVIDERS.LLAMA_CPP`.
+   Fix: Import and use `PROVIDERS.LLAMA_CPP` from `src/constants.ts`.
+
