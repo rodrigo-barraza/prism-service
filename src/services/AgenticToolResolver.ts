@@ -383,7 +383,7 @@ export default class AgenticToolResolver {
     if (
       providerName &&
       resolvedModel &&
-      LOCAL_PROVIDER_TYPES.has(providerName)
+      LOCAL_PROVIDER_TYPES.has(providerName as any)
     ) {
       const modelNameLowercase = resolvedModel.toLowerCase();
       if (

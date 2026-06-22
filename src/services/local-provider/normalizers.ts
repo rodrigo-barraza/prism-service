@@ -179,4 +179,4 @@ export const NORMALIZER_BY_TYPE: Record<string, NormalizerFunction> = {
 };
 
 /** Provider types that should get HuggingFace metadata enrichment. */
-export const HF_ENRICHED_TYPES = new Set([PROVIDERS.VLLM, PROVIDERS.LLAMA_CPP]);
+export const HF_ENRICHED_TYPES = new Set<string>([PROVIDERS.VLLM, PROVIDERS.LLAMA_CPP]);

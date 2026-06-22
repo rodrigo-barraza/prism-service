@@ -43,7 +43,7 @@ class LocalProviderGateway {
    */
   isLocal(providerOrInstanceId: string | null | undefined): boolean {
     if (!providerOrInstanceId) return false;
-    if (LOCAL_PROVIDER_TYPES.has(providerOrInstanceId)) return true;
+    if (LOCAL_PROVIDER_TYPES.has(providerOrInstanceId as any)) return true;
     return isInstance(providerOrInstanceId);
   }
 
@@ -90,7 +90,7 @@ class LocalProviderGateway {
     providerOrInstanceId: string | null | undefined,
   ): string | null {
     if (!providerOrInstanceId) return null;
-    if (LOCAL_PROVIDER_TYPES.has(providerOrInstanceId))
+    if (LOCAL_PROVIDER_TYPES.has(providerOrInstanceId as any))
       return providerOrInstanceId;
     return getInstanceType(providerOrInstanceId);
   }
