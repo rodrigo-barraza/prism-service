@@ -48,61 +48,35 @@ export class InstanceLoadBalancer {
       `[Orchestrator] selectAndReserveInstance: siblings=[${stateSnapshot}], orchestrator=${orchestratorInstanceId}`,
     );
 
-    // Two-phase assignment strategy:
+    // Least-connections strategy: always pick the instance with the most
+    // available capacity (concurrency - active). This distributes work
+    // evenly across heterogeneous hardware instead of saturating one
+    // device before touching the next.
     //
-    // Phase 1 — Fill-first (bin-packing): saturate each instance's
-    // concurrency in declaration order before spilling to the next.
-    // The orchestrator's own instance gets priority when it has slots
-    // (its orchestrator inference is IDLE while sub-agents run).
-    //
-    // Phase 2 — Least-loaded overflow: when ALL instances are at
-    // capacity, distribute the overflow evenly by picking the instance
-    // with the fewest active sub-agents. This prevents piling all excess
-    // sub-agents onto a single instance or falling through to cloud
-    // fallback unnecessarily.
+    // Tie-breaking: when multiple instances have equal availability,
+    // prefer the orchestrator's own instance (its inference is IDLE
+    // while sub-agents run, so its slots are effectively free).
 
-    // Build ordered candidate list: orchestrator's instance first, then rest in order
-    const ordered: InstanceEntry[] = [];
-    for (const instance of siblings) {
-      if (instance.id === orchestratorInstanceId) {
-        ordered.unshift(instance); // orchestrator instance goes first
-      } else {
-        ordered.push(instance);
-      }
-    }
-
-    // Phase 1: find the first instance with free concurrency slots
     let bestInstance: InstanceEntry | null = null;
-    for (const instance of ordered) {
+    let bestAvailable = -Infinity;
+    for (const instance of siblings) {
       const active = InstanceLoadBalancer.getActiveOn(
         instance.id,
         activeSubAgents,
       );
       const available = instance.concurrency - active;
-      if (available > 0) {
+      if (
+        available > bestAvailable ||
+        (available === bestAvailable && instance.id === orchestratorInstanceId)
+      ) {
+        bestAvailable = available;
         bestInstance = instance;
-        break; // fill-first: take the first instance with any availability
       }
     }
 
-    // Phase 2: all instances at capacity — least-loaded overflow
-    // Spread the overload evenly across instances instead of returning
-    // null (which would force all overflow to cloud fallback or queue).
-    if (!bestInstance && siblings.length > 0) {
-      let minActive = Infinity;
-      for (const instance of ordered) {
-        const active = InstanceLoadBalancer.getActiveOn(
-          instance.id,
-          activeSubAgents,
-        );
-        if (active < minActive) {
-          minActive = active;
-          bestInstance = instance;
-        }
-      }
-      const overload = minActive - bestInstance!.concurrency;
+    if (bestInstance && bestAvailable <= 0) {
       logger.info(
-        `[Orchestrator] selectAndReserveInstance: all at capacity — overflow to ${bestInstance!.id} (active=${minActive}, overload=+${overload + 1})`,
+        `[Orchestrator] selectAndReserveInstance: all at capacity — overflow to ${bestInstance.id} (active=${bestInstance.concurrency - bestAvailable}, overload=+${-bestAvailable + 1})`,
       );
     }
 
