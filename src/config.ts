@@ -1530,7 +1530,7 @@ function getModelOptions(
       // JSON mode: OpenAI + Google support response_format / responseMimeType
       if (
         model.modelType === MODEL_TYPES.CONVERSATION &&
-        [PROVIDERS.OPENAI, PROVIDERS.GOOGLE].includes(model.provider)
+        (model.provider === PROVIDERS.OPENAI || model.provider === PROVIDERS.GOOGLE)
       ) {
         entry.jsonMode = true;
       }
