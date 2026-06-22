@@ -95,8 +95,8 @@ export function injectToolDiscoveryNudge(
           `<tool-update>\n` +
           `Your search found ${disabledToolNames.length} tool(s) that are not yet enabled: ` +
           `${disabledToolNames.join(", ")}. ` +
-          `To use them, call enable_tools with these tool names now. ` +
-          `After enabling, you can call them on the next iteration.` +
+          `Call enable_tools with these tool names now. ` +
+          `TIP: Next time, use discover_and_enable_tools instead of search_tools — it searches AND enables in a single step, saving an iteration.` +
           `\n</tool-update>`,
       });
       logger.info(
