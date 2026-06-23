@@ -16,7 +16,7 @@ import { Readable } from "stream";
 import { ProviderError } from "../utils/errors.ts";
 import logger from "../utils/logger.ts";
 import {
-  GOOGLE_API_KEY,
+  GOOGLE_CLOUD_GEMINI_API_KEY,
   GOOGLE_TTS_MODEL,
   GOOGLE_EMBEDDING_MODEL,
 } from "../../config.ts";
@@ -105,10 +105,10 @@ let client: GoogleGenAI | null = null;
 
 function getClient(): GoogleGenAI {
   if (!client) {
-    if (!GOOGLE_API_KEY) {
-      throw new ProviderError("google", "GOOGLE_API_KEY is not set", 401);
+    if (!GOOGLE_CLOUD_GEMINI_API_KEY) {
+      throw new ProviderError("google", "GOOGLE_CLOUD_GEMINI_API_KEY is not set", 401);
     }
-    client = new GoogleGenAI({ apiKey: GOOGLE_API_KEY });
+    client = new GoogleGenAI({ apiKey: GOOGLE_CLOUD_GEMINI_API_KEY });
   }
   return client;
 }

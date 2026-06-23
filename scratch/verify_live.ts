@@ -55,7 +55,7 @@ const providersToTest = [
   },
   {
     name: PROVIDERS.GOOGLE,
-    apiKeyEnv: "GOOGLE_API_KEY",
+    apiKeyEnv: "GOOGLE_CLOUD_GEMINI_API_KEY",
     model: "gemini-3-flash-preview",
     options: {
       temperature: 0,

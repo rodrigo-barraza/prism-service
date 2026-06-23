@@ -36,7 +36,7 @@ vi.mock("../config.ts", () => ({
   PRISM_SERVICE_PORT: 0,
   OPENAI_API_KEY: "fake",
   ANTHROPIC_API_KEY: "fake",
-  GOOGLE_API_KEY: "fake",
+  GOOGLE_CLOUD_GEMINI_API_KEY: "fake",
   ELEVENLABS_API_KEY: "fake",
   INWORLD_BASIC: "fake",
   PROVIDER_LM_STUDIO: [],

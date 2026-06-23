@@ -570,7 +570,7 @@ function discoverCloudProviders(): ProviderTarget[] {
     });
   }
 
-  if (process.env.GOOGLE_API_KEY) {
+  if (process.env.GOOGLE_CLOUD_GEMINI_API_KEY) {
     targets.push({
       providerName: PROVIDERS.GOOGLE,
       model: "gemini-2.5-flash",
