@@ -191,16 +191,15 @@ export async function runGraphOfThoughts(
   };
   await hooks.run("beforePrompt", hookContext);
 
-  const assembledSystemMessage =
-    currentMessages.find(
-      (message) =>
-        message.role === "system" && message._isIdentityPrompt === true,
-    ) || currentMessages.find((message) => message.role === "system");
-  if (assembledSystemMessage?.content) {
+  if (hookContext._assembledSystemPrompt) {
+    const assembledPrompt = hookContext._assembledSystemPrompt as string;
     context.conversationMeta = {
       ...(context.conversationMeta || {}),
-      systemPrompt: assembledSystemMessage.content,
+      systemPrompt: assembledPrompt,
     };
+    if (!options.systemPrompt) {
+      options.systemPrompt = assembledPrompt;
+    }
   }
 
   if (
