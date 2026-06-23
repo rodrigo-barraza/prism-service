@@ -693,6 +693,12 @@ export function assembleMessagesToAppend(options: {
  * Slice and filter message history to identify new messages for the current turn.
  * Shared between BaseAgenticHarness execution and test suite assertion suites to ensure
  * they do not diverge.
+ *
+ * For sub-agents, the initial messages array contains both a system message
+ * (operational context: topology, workspace, delegation rules) and a user
+ * message (the task prompt). Both are new and must be persisted. The scan
+ * below walks backward from the default slice point to find the earliest
+ * consecutive non-persisted original message so nothing is dropped.
  */
 export function computeNewTurnMessages(
   originalMessages: MessagePayload[],
@@ -703,9 +709,21 @@ export function computeNewTurnMessages(
   const isLastAlreadyPersisted =
     lastOriginalMessage && lastOriginalMessage._alreadyPersisted === true;
 
-  const sliceIndex = isLastAlreadyPersisted
-    ? originalMessageCount
-    : Math.max(0, originalMessageCount - 1);
+  let sliceIndex: number;
+  if (isLastAlreadyPersisted) {
+    // All originals are already in the DB — only persist new messages
+    sliceIndex = originalMessageCount;
+  } else {
+    // Default: include the last original message (the triggering user input)
+    sliceIndex = Math.max(0, originalMessageCount - 1);
+
+    // Walk backward to include any preceding non-persisted original messages
+    // (e.g. sub-agent operational context system message at index 0)
+    for (let scanIndex = sliceIndex - 1; scanIndex >= 0; scanIndex--) {
+      if (originalMessages[scanIndex]?._alreadyPersisted) break;
+      sliceIndex = scanIndex;
+    }
+  }
 
   return currentMessages
     .slice(sliceIndex)
