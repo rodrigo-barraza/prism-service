@@ -25,6 +25,11 @@ interface HarnessPayload extends HarnessBasePayload, Pick<MessagePayload, "rawCo
 }
 
 // ── Simulate hook injection (delegates to SystemPromptAssembler.injectSystemPromptContext) ──
+// In production, the identity systemPrompt is no longer injected into the messages
+// array — it flows through hookContext._assembledSystemPrompt → options.systemPrompt
+// to the provider as a first-class parameter. This helper mirrors that by only
+// passing contextual messages (platform, somatic, skills, memories) to the injection
+// function, keeping the identity prompt separate.
 function simulateBeforePromptHook(
   currentMessages: HarnessPayload[],
   options: {
@@ -35,8 +40,9 @@ function simulateBeforePromptHook(
     memoriesText?: string;
   },
 ): void {
+  const { systemPrompt: _identityPrompt, ...contextualOptions } = options;
   injectSystemPromptContext(currentMessages, {
-    ...options,
+    ...contextualOptions,
     localTimeText: "Sunday, June 15, 2026 at 4:40:00 PM PDT",
   });
 }
@@ -98,38 +104,33 @@ describe("Message Array Construction", () => {
       });
     });
 
-    it("should have 4 messages after hook injection", () => {
-      expect(currentMessages).toHaveLength(4);
+    it("should have 3 messages after hook injection (identity prompt is out-of-band)", () => {
+      expect(currentMessages).toHaveLength(3);
     });
 
-    it("should place identity system prompt at index 0", () => {
+    it("should place platform context at index 0", () => {
       expect(currentMessages[0].role).toBe("system");
-      expect(currentMessages[0].content).toBe(LUPOS_IDENTITY);
+      expect(currentMessages[0].content).toBe(PLATFORM_CONTEXT);
     });
 
-    it("should place platform context at index 1", () => {
+    it("should place somatic state at index 1 (before user message)", () => {
       expect(currentMessages[1].role).toBe("system");
-      expect(currentMessages[1].content).toBe(PLATFORM_CONTEXT);
+      expect(currentMessages[1].content).toBe(SOMATIC_STATE);
     });
 
-    it("should place somatic state at index 2 (before user message)", () => {
-      expect(currentMessages[2].role).toBe("system");
-      expect(currentMessages[2].content).toBe(SOMATIC_STATE);
-    });
-
-    it("should place user message at index 3 with system context prepended", () => {
-      expect(currentMessages[3].role).toBe("user");
-      expect(currentMessages[3].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
-      expect(currentMessages[3].content).toContain(PROMPT_DELIMITERS.USER_MESSAGE);
-      expect(currentMessages[3].content).toContain(
+    it("should place user message at index 2 with system context prepended", () => {
+      expect(currentMessages[2].role).toBe("user");
+      expect(currentMessages[2].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(currentMessages[2].content).toContain(PROMPT_DELIMITERS.USER_MESSAGE);
+      expect(currentMessages[2].content).toContain(
         "hey lupos, how are you feeling today?",
       );
-      expect(currentMessages[3].rawContent).toBe(
+      expect(currentMessages[2].rawContent).toBe(
         "hey lupos, how are you feeling today?",
       );
     });
 
-    it("should persist all 4 hook-injected messages plus assistant response via finalize", () => {
+    it("should persist all 3 hook-injected messages plus assistant response via finalize", () => {
       // Simulate assistant response
       currentMessages.push({
         role: "assistant",
@@ -145,10 +146,9 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      // sliceIndex = max(0, 1 - 1) = 0 → all 5 messages should be included
-      expect(newTurnMessages).toHaveLength(5);
+      // Identity prompt is out-of-band → 4 messages (platform, somatic, user, assistant)
+      expect(newTurnMessages).toHaveLength(4);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
-        "system", // identity
         "system", // platform context
         "system", // somatic state
         "user", // user message with [System Context]
@@ -156,7 +156,7 @@ describe("Message Array Construction", () => {
       ]);
     });
 
-    it("should include all three system message types in persisted messages", () => {
+    it("should include both contextual system message types in persisted messages", () => {
       currentMessages.push({
         role: "assistant",
         content: "Response text",
@@ -173,10 +173,9 @@ describe("Message Array Construction", () => {
       const systemMessages = newTurnMessages.filter(
         (message) => message.role === "system",
       );
-      expect(systemMessages).toHaveLength(3);
-      expect(systemMessages[0].content).toBe(LUPOS_IDENTITY);
-      expect(systemMessages[1].content).toBe(PLATFORM_CONTEXT);
-      expect(systemMessages[2].content).toBe(SOMATIC_STATE);
+      expect(systemMessages).toHaveLength(2);
+      expect(systemMessages[0].content).toBe(PLATFORM_CONTEXT);
+      expect(systemMessages[1].content).toBe(SOMATIC_STATE);
     });
   });
 
@@ -206,24 +205,19 @@ describe("Message Array Construction", () => {
       });
     });
 
-    it("should have 2 messages after hook injection (no platform/somatic)", () => {
-      expect(currentMessages).toHaveLength(2);
+    it("should have 1 message after hook injection (identity out-of-band, no platform/somatic)", () => {
+      expect(currentMessages).toHaveLength(1);
     });
 
-    it("should place identity system prompt at index 0", () => {
-      expect(currentMessages[0].role).toBe("system");
-      expect(currentMessages[0].content).toBe(OMNI_IDENTITY);
-    });
-
-    it("should place user message at index 1 with system context prepended", () => {
-      expect(currentMessages[1].role).toBe("user");
-      expect(currentMessages[1].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
-      expect(currentMessages[1].rawContent).toBe(
+    it("should place user message at index 0 with system context prepended", () => {
+      expect(currentMessages[0].role).toBe("user");
+      expect(currentMessages[0].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(currentMessages[0].rawContent).toBe(
         "What's the weather in Vancouver?",
       );
     });
 
-    it("should persist system prompt + user + assistant via finalize", () => {
+    it("should persist user + assistant via finalize", () => {
       currentMessages.push({
         role: "assistant",
         content: "Let me check the weather for you.",
@@ -237,9 +231,8 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      expect(newTurnMessages).toHaveLength(3);
+      expect(newTurnMessages).toHaveLength(2);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
-        "system",
         "user",
         "assistant",
       ]);
@@ -281,9 +274,11 @@ describe("Message Array Construction", () => {
       });
     });
 
-    it("should update the existing system prompt in place", () => {
+    it("should NOT overwrite the existing system prompt from history", () => {
+      // The hook no longer touches messages[0] — it remains the previous
+      // system prompt from the database history unchanged
       expect(currentMessages[0].role).toBe("system");
-      expect(currentMessages[0].content).toBe(LUPOS_IDENTITY);
+      expect(currentMessages[0].content).toBe("Previous system prompt");
     });
 
     it("should interleave platform context before the last user message (before somatic)", () => {
@@ -379,9 +374,10 @@ describe("Message Array Construction", () => {
         selfContextMessage: SOMATIC_STATE,
       });
 
-      // Identity prompt must be at index 0, NOT overwriting the old somatic at index 2
-      expect(currentMessages[0].role).toBe("system");
-      expect(currentMessages[0].content).toBe(LUPOS_IDENTITY);
+      // Identity prompt is NOT in the messages array (it's out-of-band)
+      // messages[0] should still be the original user message (unchanged)
+      expect(currentMessages[0].role).toBe("user");
+      expect(currentMessages[0].content).toBe("hey lupos");
 
       // Platform context must be interleaved before the last user message (before somatic)
       const lastUserIndex = currentMessages.reduce(
@@ -392,7 +388,7 @@ describe("Message Array Construction", () => {
       expect(currentMessages[lastUserIndex - 2].role).toBe("system");
       expect(currentMessages[lastUserIndex - 2].content).toBe(PLATFORM_CONTEXT);
 
-      // The old somatic state from history should still exist (shifted right)
+      // The old somatic state from history should still exist
       const oldSomaticMessage = currentMessages.find(
         (message) =>
           message.role === "system" && message.content?.includes("bored"),
@@ -485,38 +481,33 @@ describe("Message Array Construction", () => {
         selfContextMessage: SOMATIC_STATE,
       });
 
-      // Full expected order:
-      // [0] system: identity (unshifted)
-      // [1] user: "hey"
-      // [2] assistant: "sup"
-      // [3] system: platform context (interleaved before last user)
-      // [4] system: somatic state (interleaved before last user)
-      // [5] user: "draw me a wolf" (with [System Context])
-      expect(currentMessages).toHaveLength(6);
-      expect(currentMessages[0]).toMatchObject({
-        role: "system",
-        content: LUPOS_IDENTITY,
-      });
-      expect(currentMessages[1]).toMatchObject({ role: "user" });
-      expect(currentMessages[1].content).toBe("hey");
-      expect(currentMessages[2]).toMatchObject({
+      // Identity is OUT-OF-BAND, so full expected order:
+      // [0] user: "hey"
+      // [1] assistant: "sup"
+      // [2] system: platform context (interleaved before last user)
+      // [3] system: somatic state (interleaved before last user)
+      // [4] user: "draw me a wolf" (with [System Context])
+      expect(currentMessages).toHaveLength(5);
+      expect(currentMessages[0]).toMatchObject({ role: "user" });
+      expect(currentMessages[0].content).toBe("hey");
+      expect(currentMessages[1]).toMatchObject({
         role: "assistant",
         content: "sup",
       });
-      expect(currentMessages[3]).toMatchObject({
+      expect(currentMessages[2]).toMatchObject({
         role: "system",
         content: PLATFORM_CONTEXT,
       });
-      expect(currentMessages[4]).toMatchObject({
+      expect(currentMessages[3]).toMatchObject({
         role: "system",
         content: SOMATIC_STATE,
       });
-      expect(currentMessages[5].role).toBe("user");
-      expect(currentMessages[5].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
-      expect(currentMessages[5].content).toContain("draw me a wolf");
+      expect(currentMessages[4].role).toBe("user");
+      expect(currentMessages[4].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(currentMessages[4].content).toContain("draw me a wolf");
     });
 
-    it("should not create duplicate identity prompts when history already has one at index 0", () => {
+    it("should not have identity prompt in messages when history already has a system message at index 0", () => {
       const originalMessages: HarnessPayload[] = [
         { role: "system", content: "Old identity" },
         { role: "user", content: "hey" },
@@ -531,16 +522,14 @@ describe("Message Array Construction", () => {
         selfContextMessage: SOMATIC_STATE,
       });
 
-      // Index 0 should be replaced, not duplicated
-      const systemMessages = currentMessages.filter(
-        (message) => message.role === "system",
-      );
-      const identityMessages = systemMessages.filter(
+      // Identity is out-of-band — messages[0] keeps the old identity from history
+      expect(currentMessages[0].content).toBe("Old identity");
+      // Identity prompt is NOT in the messages array
+      const identityMessages = currentMessages.filter(
         (message) => message.content === LUPOS_IDENTITY,
       );
-      expect(identityMessages).toHaveLength(1);
-      expect(currentMessages[0].content).toBe(LUPOS_IDENTITY);
-      // Platform context is now interleaved before the last user message
+      expect(identityMessages).toHaveLength(0);
+      // Platform context is interleaved before the last user message
       const lastUserIndex = currentMessages.reduce(
         (lastIndex, message, index) =>
           message.role === "user" ? index : lastIndex,
@@ -655,9 +644,8 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      expect(newTurnMessages).toHaveLength(5);
+      expect(newTurnMessages).toHaveLength(4);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
-        "system", // identity prompt
         "user", // user message with [System Context]
         "assistant", // tool call iteration
         "tool", // tool result
@@ -743,7 +731,7 @@ describe("Message Array Construction", () => {
   // volatile somatic state near the bottom
   // ────────────────────────────────────────────────────────────
   describe("Recency-optimal message ordering", () => {
-    it("should maintain recency-optimal ordering: identity → history → platform → somatic → user", () => {
+    it("should maintain recency-optimal ordering: history → platform → somatic → user", () => {
       const originalMessages: HarnessPayload[] = [
         { role: "system", content: "Old identity" },
         { role: "system", content: "Old platform context" },
@@ -759,14 +747,13 @@ describe("Message Array Construction", () => {
         selfContextMessage: "Updated somatic state",
       });
 
-      // Verify ordering: identity is at top (static, cacheable),
-      // then history, then platform context and somatic state
-      // (both interleaved before the last user message for recency bias)
+      // Identity is out-of-band — messages[0] keeps the old identity from history.
+      // Platform context and somatic state are interleaved before the last user message.
       const lastUserIndex = currentMessages.length - 1;
       const somaticIndex = lastUserIndex - 1;
       const platformIndex = lastUserIndex - 2;
 
-      expect(currentMessages[0].content).toBe("Updated Lupos identity");
+      expect(currentMessages[0].content).toBe("Old identity");
       expect(currentMessages[platformIndex].content).toBe(
         "Updated platform context",
       );
@@ -867,10 +854,9 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      // Should have: system(identity) + system(platform) + system(somatic) + user + assistant(tool) + tool + assistant(final)
-      expect(newTurnMessages).toHaveLength(7);
+      // Should have: system(platform) + system(somatic) + user + assistant(tool) + tool + assistant(final)
+      expect(newTurnMessages).toHaveLength(6);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
-        "system", // identity
         "system", // platform context
         "system", // somatic state
         "user", // user message
@@ -880,9 +866,8 @@ describe("Message Array Construction", () => {
       ]);
 
       // Verify system messages contain the correct content
-      expect(newTurnMessages[0].content).toContain("Lupos");
-      expect(newTurnMessages[1].content).toContain("Discord");
-      expect(newTurnMessages[2].content).toContain("Somatic State");
+      expect(newTurnMessages[0].content).toContain("Discord");
+      expect(newTurnMessages[1].content).toContain("Somatic State");
     });
   });
 
@@ -924,7 +909,7 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      expect(newTurnMessages).toHaveLength(3);
+      expect(newTurnMessages).toHaveLength(2);
       const assistantMessage = newTurnMessages.find(
         (message) => message.role === "assistant",
       )!;
@@ -992,7 +977,7 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      expect(newTurnMessages).toHaveLength(5);
+      expect(newTurnMessages).toHaveLength(4);
 
       // First assistant message (tool call iteration) should have thinking + signature
       const toolCallAssistant = newTurnMessages.find(
@@ -1070,16 +1055,15 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      expect(newTurnMessages).toHaveLength(4);
+      expect(newTurnMessages).toHaveLength(3);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
-        "system",
         "user",
         "assistant",
         "assistant",
       ]);
 
       // Verify parallel tool calls are preserved on the first assistant message
-      const toolCallMessage = newTurnMessages[2];
+      const toolCallMessage = newTurnMessages[1];
       expect(toolCallMessage.toolCalls).toHaveLength(2);
       expect(toolCallMessage.toolCalls![0].name).toBe("get_weather");
       expect(toolCallMessage.toolCalls![0].args.city).toBe("Tokyo");
@@ -1156,7 +1140,7 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      expect(newTurnMessages).toHaveLength(7);
+      expect(newTurnMessages).toHaveLength(6);
 
       // Verify each assistant message has its own thinking
       const assistantMessages = newTurnMessages.filter(
@@ -1360,8 +1344,8 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      // Should include: system(prompt) + user + assistant(buggy) + system(validation) + assistant(fix) + assistant(final)
-      expect(newTurnMessages).toHaveLength(6);
+      // Should include: user + assistant(buggy) + system(validation) + assistant(fix) + assistant(final)
+      expect(newTurnMessages).toHaveLength(5);
 
       const validationMessage = newTurnMessages.find(
         (message) =>
@@ -1436,10 +1420,9 @@ describe("Message Array Construction", () => {
         (message) => message._isPlanningInjection !== true,
       );
 
-      // Only system prompt, user message, and final assistant should survive
-      expect(sanitizedMessages).toHaveLength(3);
+      // Only user message and final assistant should survive
+      expect(sanitizedMessages).toHaveLength(2);
       expect(sanitizedMessages.map((message) => message.role)).toEqual([
-        "system",
         "user",
         "assistant",
       ]);
@@ -1494,8 +1477,8 @@ describe("Message Array Construction", () => {
         return true;
       });
 
-      // Only system, original user, and assistant should survive
-      expect(sanitizedMessages).toHaveLength(3);
+      // Only original user and assistant should survive
+      expect(sanitizedMessages).toHaveLength(2);
       const compactionMessages = sanitizedMessages.filter(
         (message) =>
           typeof message.content === "string" &&
@@ -2046,10 +2029,9 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      // Expected: system(identity) + system(platform) + system(somatic) + user + assistant(img tool) + assistant(tts tool) + assistant(final)
-      expect(newTurnMessages).toHaveLength(7);
+      // Expected: system(platform) + system(somatic) + user + assistant(img tool) + assistant(tts tool) + assistant(final)
+      expect(newTurnMessages).toHaveLength(6);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
-        "system", // identity prompt
         "system", // platform context
         "system", // somatic state
         "user", // user message with memories injected
@@ -2059,14 +2041,13 @@ describe("Message Array Construction", () => {
       ]);
 
       // Verify system messages
-      expect(newTurnMessages[0].content).toContain("Lupos");
-      expect(newTurnMessages[1].content).toContain("Guild ID: 123456789");
-      expect(newTurnMessages[2].content).toContain("current_emotion: inspired");
+      expect(newTurnMessages[0].content).toContain("Guild ID: 123456789");
+      expect(newTurnMessages[1].content).toContain("current_emotion: inspired");
 
       // Verify user message has memories injected
-      expect(newTurnMessages[3].content).toContain(PROMPT_DELIMITERS.AGENT_MEMORY);
-      expect(newTurnMessages[3].content).toContain("epic fantasy art");
-      expect(newTurnMessages[3].rawContent).toBe(
+      expect(newTurnMessages[2].content).toContain(PROMPT_DELIMITERS.AGENT_MEMORY);
+      expect(newTurnMessages[2].content).toContain("epic fantasy art");
+      expect(newTurnMessages[2].rawContent).toBe(
         "draw me as a wolf warrior and say something epic",
       );
 
@@ -2284,7 +2265,6 @@ describe("Message Array Construction", () => {
 
       // Verify the full chain is preserved
       expect(newTurnMessages.map((message) => message.role)).toEqual([
-        "system", // identity prompt
         "user", // user message
         "assistant", // search_tools call
         "system", // <tool-update> nudge
@@ -2465,9 +2445,8 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      expect(newTurnMessages).toHaveLength(5);
+      expect(newTurnMessages).toHaveLength(4);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
-        "system", // identity prompt
         "user", // user message
         "assistant", // truncated partial output
         "system", // continuation prompt
@@ -2485,7 +2464,7 @@ describe("Message Array Construction", () => {
       expect(continuationMessage!.content).toContain("Do NOT repeat");
 
       // Verify truncated output is preserved with thinking
-      const truncatedAssistant = newTurnMessages[2];
+      const truncatedAssistant = newTurnMessages[1];
       expect(truncatedAssistant.content).toContain("Chapter 1");
       expect(truncatedAssistant.thinking).toContain("long guide");
     });
@@ -3238,8 +3217,8 @@ describe("Message Array Construction", () => {
           message.content.includes("cut short"),
       );
 
-      // Identity prompt + 2 tool updates + 1 validation error + 1 continuation = 5 system messages
-      expect(systemMessages).toHaveLength(5);
+      // 2 tool updates + 1 validation error + 1 continuation = 4 system messages
+      expect(systemMessages).toHaveLength(4);
       expect(toolUpdates).toHaveLength(2);
       expect(validationErrors).toHaveLength(1);
       expect(continuationPrompts).toHaveLength(1);
@@ -3337,9 +3316,9 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      // Verify identity is first
+      // Identity is out-of-band — first message is platform context
       expect(newTurnMessages[0].role).toBe("system");
-      expect(newTurnMessages[0].content).toBe("You are Lupos.");
+      expect(newTurnMessages[0].content).toContain("Platform: Discord");
 
       // Find platform context and somatic state — both should be
       // interleaved near the end (before the user message), not at top.
@@ -3421,13 +3400,15 @@ describe("Message Array Construction", () => {
       });
     });
 
-    it("should have 3 messages after hook injection (no platform context)", () => {
-      expect(currentMessages).toHaveLength(3);
+    it("should have 2 messages after hook injection (identity out-of-band, no platform context)", () => {
+      expect(currentMessages).toHaveLength(2);
     });
 
-    it("should place identity system prompt at index 0", () => {
-      expect(currentMessages[0].role).toBe("system");
-      expect(currentMessages[0].content).toBe(LUPOS_IDENTITY);
+    it("should NOT have identity system prompt in messages array", () => {
+      const identityMessage = currentMessages.find(
+        (message) => message.content === LUPOS_IDENTITY,
+      );
+      expect(identityMessage).toBeUndefined();
     });
 
     it("should NOT have platform context (prism-client sends no agentContext)", () => {
@@ -3441,14 +3422,14 @@ describe("Message Array Construction", () => {
     });
 
     it("should still inject somatic state as interleaved system message", () => {
-      expect(currentMessages[1].role).toBe("system");
-      expect(currentMessages[1].content).toBe(SOMATIC_STATE);
+      expect(currentMessages[0].role).toBe("system");
+      expect(currentMessages[0].content).toBe(SOMATIC_STATE);
     });
 
     it("should place user message last with system context prepended", () => {
-      expect(currentMessages[2].role).toBe("user");
-      expect(currentMessages[2].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
-      expect(currentMessages[2].rawContent).toBe("hey lupos, what's up?");
+      expect(currentMessages[1].role).toBe("user");
+      expect(currentMessages[1].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(currentMessages[1].rawContent).toBe("hey lupos, what's up?");
     });
 
     it("should persist somatic state + user + assistant (no platform context)", () => {
@@ -3465,10 +3446,9 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      expect(newTurnMessages).toHaveLength(4);
+      expect(newTurnMessages).toHaveLength(3);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
-        "system", // identity
-        "system", // somatic state (NO platform context between them)
+        "system", // somatic state (NO platform context)
         "user", // user message
         "assistant", // response
       ]);
@@ -3496,42 +3476,22 @@ describe("Message Array Construction", () => {
       });
     });
 
-    it("should set _isIdentityPrompt: true on the identity system message at index 0", () => {
-      expect(currentMessages[0]._isIdentityPrompt).toBe(true);
-    });
-
-    it("should NOT set _isIdentityPrompt on platform context message", () => {
-      const platformMessage = currentMessages.find(
-        (message) =>
-          message.role === "system" &&
-          typeof message.content === "string" &&
-          message.content.includes("Platform: Discord"),
+    it("should NOT set _isIdentityPrompt on any message (identity is out-of-band)", () => {
+      const messagesWithFlag = currentMessages.filter(
+        (message) => message._isIdentityPrompt === true,
       );
-      expect(platformMessage!._isIdentityPrompt).toBeUndefined();
+      expect(messagesWithFlag).toHaveLength(0);
     });
 
-    it("should NOT set _isIdentityPrompt on somatic state message", () => {
-      const somaticMessage = currentMessages.find(
-        (message) =>
-          message.role === "system" &&
-          typeof message.content === "string" &&
-          message.content.includes("Somatic State"),
-      );
-      expect(somaticMessage!._isIdentityPrompt).toBeUndefined();
-    });
-
-    it("should find identity prompt via _isIdentityPrompt tag even if other system messages exist", () => {
+    it("should NOT have identity prompt in messages array", () => {
       const identityMessage = currentMessages.find(
         (message) =>
-          message.role === "system" && message._isIdentityPrompt === true,
+          message.role === "system" && message.content === LUPOS_IDENTITY,
       );
-      expect(identityMessage).toBeDefined();
-      expect(identityMessage!.content).toBe(LUPOS_IDENTITY);
+      expect(identityMessage).toBeUndefined();
     });
 
-    it("should prefer _isIdentityPrompt-tagged message over first system message for conversationMeta capture", () => {
-      // Simulate a scenario where a validation error system message gets prepended
-      // (this could happen in edge cases with compaction or error injection)
+    it("should prefer _isIdentityPrompt-tagged message over first system message for conversationMeta capture (legacy compat)", () => {
       const messagesWithErrorFirst: HarnessPayload[] = [
         { role: "system", content: "[VALIDATION ERROR] Some lint error..." },
         { role: "system", content: LUPOS_IDENTITY, _isIdentityPrompt: true },
@@ -3539,7 +3499,6 @@ describe("Message Array Construction", () => {
         { role: "user", content: "test" },
       ];
 
-      // Simulate the harness capture logic
       const capturedMessage =
         messagesWithErrorFirst.find(
           (message) =>
@@ -3569,10 +3528,10 @@ describe("Message Array Construction", () => {
   });
 
   // ────────────────────────────────────────────────────────────
-  // Scenario: conversationMeta.systemPrompt captures identity, not somatic
+  // Scenario: conversationMeta.systemPrompt is captured from hook context
   // ────────────────────────────────────────────────────────────
-  describe("conversationMeta.systemPrompt — captures identity not somatic state", () => {
-    it("should capture identity prompt when all three system message types exist", () => {
+  describe("conversationMeta.systemPrompt — captured from hookContext._assembledSystemPrompt", () => {
+    it("should capture identity prompt from hook context, not from messages array", () => {
       const LUPOS_IDENTITY = "You are Lupos...";
       const PLATFORM_CONTEXT = "Platform: Discord\nServer: Rod's Lab";
       const SOMATIC_STATE =
@@ -3588,16 +3547,18 @@ describe("Message Array Construction", () => {
         selfContextMessage: SOMATIC_STATE,
       });
 
-      // Simulate the harness capture logic (same as ReActHarness line 174-185)
-      const assembledSystemMessage =
-        currentMessages.find(
-          (message) =>
-            message.role === "system" && message._isIdentityPrompt === true,
-        ) || currentMessages.find((message) => message.role === "system");
+      // Identity is NOT in the messages array
+      const identityInArray = currentMessages.find(
+        (message) => message.content === LUPOS_IDENTITY,
+      );
+      expect(identityInArray).toBeUndefined();
 
+      // In production, conversationMeta.systemPrompt comes from
+      // hookContext._assembledSystemPrompt, not from the messages array.
+      const mockHookContext = { _assembledSystemPrompt: LUPOS_IDENTITY };
       const conversationMeta: Record<string, unknown> = {};
-      if (assembledSystemMessage?.content) {
-        conversationMeta.systemPrompt = assembledSystemMessage.content;
+      if (mockHookContext._assembledSystemPrompt) {
+        conversationMeta.systemPrompt = mockHookContext._assembledSystemPrompt;
       }
 
       expect(conversationMeta.systemPrompt).toBe(LUPOS_IDENTITY);
@@ -3605,7 +3566,7 @@ describe("Message Array Construction", () => {
       expect(conversationMeta.systemPrompt).not.toContain("Platform: Discord");
     });
 
-    it("should capture identity even when only somatic state + identity exist (prism-client)", () => {
+    it("should capture identity from hook context even when somatic exists in messages", () => {
       const LUPOS_IDENTITY = "You are Lupos...";
       const SOMATIC_STATE = `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: happy`;
 
@@ -3619,13 +3580,25 @@ describe("Message Array Construction", () => {
         selfContextMessage: SOMATIC_STATE,
       });
 
-      const assembledSystemMessage =
-        currentMessages.find(
-          (message) =>
-            message.role === "system" && message._isIdentityPrompt === true,
-        ) || currentMessages.find((message) => message.role === "system");
+      // Identity NOT in messages
+      const identityInArray = currentMessages.find(
+        (message) => message.content === LUPOS_IDENTITY,
+      );
+      expect(identityInArray).toBeUndefined();
 
-      expect(assembledSystemMessage!.content).toBe(LUPOS_IDENTITY);
+      // But somatic IS in messages
+      const somaticInArray = currentMessages.find(
+        (message) =>
+          message.role === "system" &&
+          typeof message.content === "string" &&
+          message.content.includes("Somatic State"),
+      );
+      expect(somaticInArray).toBeDefined();
+
+      // Identity comes from hook context
+      const mockHookContext = { _assembledSystemPrompt: LUPOS_IDENTITY };
+      expect(mockHookContext._assembledSystemPrompt).toBe(LUPOS_IDENTITY);
     });
   });
 });
+

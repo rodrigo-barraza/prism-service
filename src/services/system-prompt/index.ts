@@ -508,9 +508,9 @@ export default class SystemPromptAssembler {
         if (!systemPrompt) return;
 
         context._injectedSkills = skillNames;
+        context._assembledSystemPrompt = systemPrompt;
 
         injectSystemPromptContext(context.messages!, {
-          systemPrompt,
           platformContextMessage,
           selfContextMessage,
           skillsText,
@@ -543,7 +543,7 @@ export function injectSystemPromptContext(
     [key: string]: unknown;
   }>,
   options: {
-    systemPrompt: string;
+    systemPrompt?: string;
     platformContextMessage?: string | null;
     selfContextMessage?: string | null;
     skillsText?: string;
@@ -562,24 +562,8 @@ export function injectSystemPromptContext(
     localTimeText,
   } = options;
 
-  // ── 1. Insert main system prompt as messages[0] ─────────────
-  // Always place the identity system prompt at index 0.
-  // On subsequent turns, the history may contain mid-conversation
-  // system messages (somatic state, validation errors) — we must
-  // NOT overwrite those. Instead, always target index 0 specifically.
-  if (messages.length > 0 && messages[0].role === "system") {
-    messages[0].content = systemPrompt;
-    messages[0]._isIdentityPrompt = true;
-  } else {
-    messages.unshift({
-      role: "system",
-      content: systemPrompt,
-      _isIdentityPrompt: true,
-    });
-  }
-
-  // ── 2. Interleave platform context before the last user message ──
-  // Inserted first so that when somatic state is also spliced in (step 3),
+  // ── 1. Interleave platform context before the last user message ──
+  // Inserted first so that when somatic state is also spliced in (step 2),
   // the final order is: ...history → platform → somatic → last user msg.
   if (platformContextMessage) {
     const lastUserMessageIndex = messages.reduce(
@@ -595,9 +579,9 @@ export function injectSystemPromptContext(
     }
   }
 
-  // ── 3. Interleave self context before the last user message ───
+  // ── 2. Interleave self context before the last user message ───
   // Re-scans for the last user message (which may have shifted after
-  // step 2), so somatic state always sits directly before the user input.
+  // step 1), so somatic state always sits directly before the user input.
   if (selfContextMessage) {
     const lastUserMessageIndex = messages.reduce(
       (lastIndex: number, message: { role: string }, index: number) =>
@@ -612,7 +596,7 @@ export function injectSystemPromptContext(
     }
   }
 
-  // ── 4. Prepend [System Context] to last user message ───
+  // ── 3. Prepend [System Context] to last user message ───
   const userMessages = messages.filter((message) => message.role === "user");
   const lastUserMessage = userMessages[userMessages.length - 1];
   if (lastUserMessage && typeof lastUserMessage.content === "string") {
