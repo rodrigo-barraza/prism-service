@@ -784,21 +784,26 @@ describe("SystemPromptAssembler", () => {
   // ──────────────────────────────────────────────────────────
 
   describe("createHook message mutation", () => {
-    it("populates _assembledSystemPrompt instead of injecting into messages array", async () => {
+    it("populates _assembledSystemPrompt and injects context as system message", async () => {
       const assembler = createAssembler();
       const hook = assembler.createHook();
 
       const context = {
         agent: "CODING",
         project: "prism-chat",
-        messages: [{ role: "user", content: "Hello" }] as Array<{ role: string; content?: string; rawContent?: string }>,
+        messages: [{ role: "user", content: "Hello" }] as Array<{ role: string; content?: string; rawContent?: string; _isInjectedContext?: boolean }>,
         _assembledSystemPrompt: undefined as string | undefined,
       };
 
       await hook(context);
 
-      const systemMessage = context.messages.find((message) => message.role === "system");
-      expect(systemMessage).toBeUndefined();
+      // Injected context system message should be present
+      const injectedContextMessage = context.messages.find(
+        (message) => (message as Record<string, unknown>)._isInjectedContext === true,
+      );
+      expect(injectedContextMessage).toBeDefined();
+      expect(injectedContextMessage?.role).toBe("system");
+      expect(injectedContextMessage?.content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
 
       expect(context._assembledSystemPrompt).toBeTruthy();
       expect(context._assembledSystemPrompt).toContain("coding agent");
@@ -814,40 +819,47 @@ describe("SystemPromptAssembler", () => {
         messages: [
           { role: "system", content: "old system prompt" },
           { role: "user", content: "Hello" },
-        ] as Array<{ role: string; content?: string; rawContent?: string }>,
+        ] as Array<{ role: string; content?: string; rawContent?: string; _isInjectedContext?: boolean }>,
         _assembledSystemPrompt: undefined as string | undefined,
       };
 
       await hook(context);
 
+      // Old system message preserved + new injected context = 2 system messages
       const systemMessages = context.messages.filter((message) => message.role === "system");
-      expect(systemMessages).toHaveLength(1);
+      expect(systemMessages).toHaveLength(2);
       expect(systemMessages[0].content).toBe("old system prompt");
+      expect((systemMessages[1] as Record<string, unknown>)._isInjectedContext).toBe(true);
 
       expect(context._assembledSystemPrompt).toBeTruthy();
       expect(context._assembledSystemPrompt).toContain("coding agent");
     });
 
-    it("injects system context into last user message", async () => {
+    it("injects system context as a dedicated system message before the user message", async () => {
       const assembler = createAssembler();
       const hook = assembler.createHook();
 
       const context = {
         agent: "CODING",
         project: "prism-chat",
-        messages: [{ role: "user", content: "Hello world" }] as Array<{ role: string; content?: string; rawContent?: string }>,
+        messages: [{ role: "user", content: "Hello world" }] as Array<{ role: string; content?: string; rawContent?: string; _isInjectedContext?: boolean }>,
       };
 
       await hook(context);
 
+      // System context is in a dedicated system message, not the user message
+      const injectedMessage = context.messages.find(
+        (message) => (message as Record<string, unknown>)._isInjectedContext === true,
+      );
+      expect(injectedMessage?.content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(injectedMessage?.content).toContain("Local Time:");
+
+      // User message stays clean
       const userMessage = context.messages.find((message) => message.role === "user");
-      expect(userMessage?.content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
-      expect(userMessage?.content).toContain("Local Time:");
-      expect(userMessage?.content).toContain(PROMPT_DELIMITERS.USER_MESSAGE);
-      expect(userMessage?.content).toContain("Hello world");
+      expect(userMessage?.content).toBe("Hello world");
     });
 
-    it("preserves raw content on user message after injection", async () => {
+    it("user message has no rawContent after injection (content stays clean)", async () => {
       const assembler = createAssembler();
       const hook = assembler.createHook();
 
@@ -860,7 +872,8 @@ describe("SystemPromptAssembler", () => {
       await hook(context);
 
       const userMessage = context.messages.find((message) => message.role === "user");
-      expect(userMessage?.rawContent).toBe("Hello world");
+      expect(userMessage?.content).toBe("Hello world");
+      expect(userMessage?.rawContent).toBeUndefined();
     });
 
     it("does not double-inject system context if already present", async () => {

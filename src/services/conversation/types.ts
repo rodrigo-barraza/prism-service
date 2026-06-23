@@ -57,6 +57,7 @@ export interface MessagePayload {
   toolCalls?: ToolCallPayload[];
   thinking?: string;
   isCompactSummary?: boolean;
+  _isInjectedContext?: boolean;
   _isPlanningInjection?: boolean;
   _alreadyPersisted?: boolean;
   [key: string]: unknown;
