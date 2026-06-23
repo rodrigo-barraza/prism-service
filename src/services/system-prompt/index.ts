@@ -600,8 +600,8 @@ export function injectSystemPromptContext(
   // Local time, skills, memories, and workflows are system-injected metadata,
   // not user input. They belong in a system message so the LLM treats them as
   // authoritative grounding context rather than conversational user intent.
-  // The _isInjectedContext marker lets the Finalizer strip them before DB
-  // persistence (they're ephemeral — regenerated fresh each turn).
+  // The _isInjectedContext marker prevents double-injection on the same turn
+  // and is cleaned from the payload before persistence to MongoDB.
   const userMessages = messages.filter((message) => message.role === "user");
   const lastUserMessage = userMessages[userMessages.length - 1];
   if (lastUserMessage) {

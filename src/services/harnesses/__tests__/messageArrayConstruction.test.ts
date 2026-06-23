@@ -58,8 +58,9 @@ function computeNewTurnMessages(
     currentMessages,
     originalMessageCount,
   ) as HarnessPayload[];
-  // Mirror production: sanitize strips ephemeral messages (_isInjectedContext,
-  // _isIdentityPrompt, _isPlanningInjection) and swaps content/rawContent.
+  // Mirror production: sanitize strips ephemeral messages (_isIdentityPrompt,
+  // _isPlanningInjection) and swaps content/rawContent. System context messages
+  // (_isInjectedContext) are preserved for conversation history visibility.
   return sanitizeMessagesForPersistence(sliced) as HarnessPayload[];
 }
 
@@ -148,12 +149,13 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      // Identity prompt is out-of-band → 4 messages (platform, somatic, user, assistant)
-      expect(newTurnMessages).toHaveLength(4);
+      // Identity prompt is out-of-band → 5 messages (platform, somatic, injected context, user, assistant)
+      expect(newTurnMessages).toHaveLength(5);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
         "system", // platform context
         "system", // somatic state
-        "user", // user message with [System Context]
+        "system", // injected context (skills, memories, local time)
+        "user", // user message (clean)
         "assistant", // response
       ]);
     });
@@ -175,9 +177,10 @@ describe("Message Array Construction", () => {
       const systemMessages = newTurnMessages.filter(
         (message) => message.role === "system",
       );
-      expect(systemMessages).toHaveLength(2);
+      expect(systemMessages).toHaveLength(3);
       expect(systemMessages[0].content).toBe(PLATFORM_CONTEXT);
       expect(systemMessages[1].content).toBe(SOMATIC_STATE);
+      expect(systemMessages[2].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
     });
   });
 
@@ -236,8 +239,9 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      expect(newTurnMessages).toHaveLength(2);
+      expect(newTurnMessages).toHaveLength(3);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
+        "system", // injected context (skills, memories, local time)
         "user",
         "assistant",
       ]);
@@ -656,9 +660,10 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      expect(newTurnMessages).toHaveLength(4);
+      expect(newTurnMessages).toHaveLength(5);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
-        "user", // user message with [System Context]
+        "system", // injected context (skills, memories, local time)
+        "user", // user message (clean)
         "assistant", // tool call iteration
         "tool", // tool result
         "assistant", // final response
@@ -874,11 +879,12 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      // Should have: system(platform) + system(somatic) + user + assistant(tool) + tool + assistant(final)
-      expect(newTurnMessages).toHaveLength(6);
+      // Should have: system(platform) + system(somatic) + system(injected context) + user + assistant(tool) + tool + assistant(final)
+      expect(newTurnMessages).toHaveLength(7);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
         "system", // platform context
         "system", // somatic state
+        "system", // injected context (skills, memories, local time)
         "user", // user message
         "assistant", // tool call
         "tool", // tool result
@@ -888,6 +894,7 @@ describe("Message Array Construction", () => {
       // Verify system messages contain the correct content
       expect(newTurnMessages[0].content).toContain("Discord");
       expect(newTurnMessages[1].content).toContain("Somatic State");
+      expect(newTurnMessages[2].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
     });
   });
 
@@ -929,7 +936,7 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      expect(newTurnMessages).toHaveLength(2);
+      expect(newTurnMessages).toHaveLength(3);
       const assistantMessage = newTurnMessages.find(
         (message) => message.role === "assistant",
       )!;
@@ -997,7 +1004,7 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      expect(newTurnMessages).toHaveLength(4);
+      expect(newTurnMessages).toHaveLength(5);
 
       // First assistant message (tool call iteration) should have thinking + signature
       const toolCallAssistant = newTurnMessages.find(
@@ -1075,15 +1082,16 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      expect(newTurnMessages).toHaveLength(3);
+      expect(newTurnMessages).toHaveLength(4);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
+        "system", // injected context (skills, memories, local time)
         "user",
         "assistant",
         "assistant",
       ]);
 
       // Verify parallel tool calls are preserved on the first assistant message
-      const toolCallMessage = newTurnMessages[1];
+      const toolCallMessage = newTurnMessages[2];
       expect(toolCallMessage.toolCalls).toHaveLength(2);
       expect(toolCallMessage.toolCalls![0].name).toBe("get_weather");
       expect(toolCallMessage.toolCalls![0].args.city).toBe("Tokyo");
@@ -1160,7 +1168,7 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      expect(newTurnMessages).toHaveLength(6);
+      expect(newTurnMessages).toHaveLength(7);
 
       // Verify each assistant message has its own thinking
       const assistantMessages = newTurnMessages.filter(
@@ -1364,8 +1372,8 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      // Should include: user + assistant(buggy) + system(validation) + assistant(fix) + assistant(final)
-      expect(newTurnMessages).toHaveLength(5);
+      // Should include: system(injected context) + user + assistant(buggy) + system(validation) + assistant(fix) + assistant(final)
+      expect(newTurnMessages).toHaveLength(6);
 
       const validationMessage = newTurnMessages.find(
         (message) =>
@@ -1440,9 +1448,10 @@ describe("Message Array Construction", () => {
         (message) => message._isPlanningInjection !== true,
       );
 
-      // Only user message and final assistant should survive
-      expect(sanitizedMessages).toHaveLength(2);
+      // System context + user message + final assistant should survive
+      expect(sanitizedMessages).toHaveLength(3);
       expect(sanitizedMessages.map((message) => message.role)).toEqual([
+        "system", // injected context (skills, memories, local time)
         "user",
         "assistant",
       ]);
@@ -1497,8 +1506,8 @@ describe("Message Array Construction", () => {
         return true;
       });
 
-      // Only original user and assistant should survive
-      expect(sanitizedMessages).toHaveLength(2);
+      // System context + original user + assistant should survive
+      expect(sanitizedMessages).toHaveLength(3);
       const compactionMessages = sanitizedMessages.filter(
         (message) =>
           typeof message.content === "string" &&
@@ -2049,12 +2058,13 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      // Expected: system(platform) + system(somatic) + user + assistant(img tool) + assistant(tts tool) + assistant(final)
-      expect(newTurnMessages).toHaveLength(6);
+      // Expected: system(platform) + system(somatic) + system(injected context) + user + assistant(img tool) + assistant(tts tool) + assistant(final)
+      expect(newTurnMessages).toHaveLength(7);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
         "system", // platform context
         "system", // somatic state
-        "user", // user message with memories injected
+        "system", // injected context (skills, memories, local time)
+        "user", // user message (clean)
         "assistant", // image generation iteration
         "assistant", // speech synthesis iteration
         "assistant", // final response
@@ -2063,10 +2073,10 @@ describe("Message Array Construction", () => {
       // Verify system messages
       expect(newTurnMessages[0].content).toContain("Guild ID: 123456789");
       expect(newTurnMessages[1].content).toContain("current_emotion: inspired");
+      expect(newTurnMessages[2].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
 
-      // User message is now clean — memories are in the injected context
-      // system message which is filtered out by sanitizeMessagesForPersistence
-      expect(newTurnMessages[2].content).toBe(
+      // User message is now clean — memories are in the injected context system message
+      expect(newTurnMessages[3].content).toBe(
         "draw me as a wolf warrior and say something epic",
       );
 
@@ -2286,6 +2296,7 @@ describe("Message Array Construction", () => {
 
       // Verify the full chain is preserved
       expect(newTurnMessages.map((message) => message.role)).toEqual([
+        "system", // injected context (skills, memories, local time)
         "user", // user message
         "assistant", // search_tools call
         "system", // <tool-update> nudge
@@ -2466,8 +2477,9 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      expect(newTurnMessages).toHaveLength(4);
+      expect(newTurnMessages).toHaveLength(5);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
+        "system", // injected context (skills, memories, local time)
         "user", // user message
         "assistant", // truncated partial output
         "system", // continuation prompt
@@ -2485,7 +2497,7 @@ describe("Message Array Construction", () => {
       expect(continuationMessage!.content).toContain("Do NOT repeat");
 
       // Verify truncated output is preserved with thinking
-      const truncatedAssistant = newTurnMessages[1];
+      const truncatedAssistant = newTurnMessages[2];
       expect(truncatedAssistant.content).toContain("Chapter 1");
       expect(truncatedAssistant.thinking).toContain("long guide");
     });
@@ -3238,8 +3250,8 @@ describe("Message Array Construction", () => {
           message.content.includes("cut short"),
       );
 
-      // 2 tool updates + 1 validation error + 1 continuation = 4 system messages
-      expect(systemMessages).toHaveLength(4);
+      // 1 injected context + 2 tool updates + 1 validation error + 1 continuation = 5 system messages
+      expect(systemMessages).toHaveLength(5);
       expect(toolUpdates).toHaveLength(2);
       expect(validationErrors).toHaveLength(1);
       expect(continuationPrompts).toHaveLength(1);
@@ -3470,9 +3482,10 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      expect(newTurnMessages).toHaveLength(3);
+      expect(newTurnMessages).toHaveLength(4);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
         "system", // somatic state (NO platform context)
+        "system", // injected context (skills, memories, local time)
         "user", // user message
         "assistant", // response
       ]);
@@ -3685,10 +3698,12 @@ describe("Message Array Construction", () => {
       expect(newTurnMessages[0].role).toBe("system");
       expect(newTurnMessages[0].content).toBe(SUB_AGENT_OPERATIONAL_CONTEXT);
 
-      // User message and assistant response should follow
-      expect(newTurnMessages[1].role).toBe("user");
-      expect(newTurnMessages[2].role).toBe("assistant");
-      expect(newTurnMessages).toHaveLength(3);
+      // Injected context, user message and assistant response should follow
+      expect(newTurnMessages[1].role).toBe("system"); // injected context
+      expect(newTurnMessages[1].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(newTurnMessages[2].role).toBe("user");
+      expect(newTurnMessages[3].role).toBe("assistant");
+      expect(newTurnMessages).toHaveLength(4);
     });
 
     it("should persist operational context when sub-agent uses tools", () => {
@@ -3740,9 +3755,10 @@ describe("Message Array Construction", () => {
       expect(newTurnMessages[0].role).toBe("system");
       expect(newTurnMessages[0].content).toContain("sub-agent in a multi-agent system");
 
-      // Full sequence: system(ops) → user → assistant(tool) → tool → assistant(final)
+      // Full sequence: system(ops) → system(injected context) → user → assistant(tool) → tool → assistant(final)
       expect(newTurnMessages.map((message) => message.role)).toEqual([
-        "system",
+        "system",    // operational context
+        "system",    // injected context
         "user",
         "assistant",
         "tool",
@@ -3833,10 +3849,12 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      // First message should be the user message (no system context for top-level)
-      expect(newTurnMessages[0].role).toBe("user");
-      expect(newTurnMessages[1].role).toBe("assistant");
-      expect(newTurnMessages).toHaveLength(2);
+      // First message should be the injected context, then user message
+      expect(newTurnMessages[0].role).toBe("system"); // injected context
+      expect(newTurnMessages[0].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(newTurnMessages[1].role).toBe("user");
+      expect(newTurnMessages[2].role).toBe("assistant");
+      expect(newTurnMessages).toHaveLength(3);
     });
 
     it("should NOT regress multi-turn conversations with _alreadyPersisted messages", () => {
@@ -3866,11 +3884,13 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      // Should only include the new user message + assistant response (not prior persisted turns)
-      expect(newTurnMessages[0].role).toBe("user");
-      expect(newTurnMessages[0].content).toContain("weather");
-      expect(newTurnMessages[1].role).toBe("assistant");
-      expect(newTurnMessages).toHaveLength(2);
+      // Should include injected context + new user message + assistant response (not prior persisted turns)
+      expect(newTurnMessages[0].role).toBe("system"); // injected context
+      expect(newTurnMessages[0].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(newTurnMessages[1].role).toBe("user");
+      expect(newTurnMessages[1].content).toContain("weather");
+      expect(newTurnMessages[2].role).toBe("assistant");
+      expect(newTurnMessages).toHaveLength(3);
     });
 
     it("should handle send_message follow-up to a sub-agent (mixed persisted + new)", () => {
@@ -3902,12 +3922,14 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      // Only the new follow-up user message + assistant should be persisted
+      // Injected context + new follow-up user message + assistant should be persisted
       // The operational context was already persisted in the first turn
-      expect(newTurnMessages[0].role).toBe("user");
-      expect(newTurnMessages[0].content).toContain("update the tests");
-      expect(newTurnMessages[1].role).toBe("assistant");
-      expect(newTurnMessages).toHaveLength(2);
+      expect(newTurnMessages[0].role).toBe("system"); // injected context
+      expect(newTurnMessages[0].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(newTurnMessages[1].role).toBe("user");
+      expect(newTurnMessages[1].content).toContain("update the tests");
+      expect(newTurnMessages[2].role).toBe("assistant");
+      expect(newTurnMessages).toHaveLength(3);
     });
 
     it("should handle recursive sub-agents (coordinator with delegation metadata)", () => {
@@ -3974,9 +3996,10 @@ describe("Message Array Construction", () => {
       expect(newTurnMessages[0].content).toContain("Coordinator");
       expect(newTurnMessages[0].content).toContain("recursive spawning");
 
-      // Full sequence preserved
+      // Full sequence preserved (with injected context)
       expect(newTurnMessages.map((message) => message.role)).toEqual([
         "system",    // operational context
+        "system",    // injected context (skills, memories, local time)
         "user",      // task prompt
         "assistant", // tool call (create_team)
         "tool",      // tool result

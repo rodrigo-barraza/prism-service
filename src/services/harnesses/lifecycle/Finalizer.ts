@@ -513,7 +513,9 @@ export { getCollectionOpts };
  * applies content/rawContent swapping, strips runtime-only tags,
  * and filters out synthetic compaction artifacts that should never
  * reach the database (context notes, compaction summaries, planning
- * injections, eagerly-persisted stubs).
+ * injections, eagerly-persisted stubs). System context messages
+ * (_isInjectedContext) are preserved for conversation history visibility;
+ * only the internal marker flag is cleaned from the persisted payload.
  *
  * Shared between production finalizer and test assertion suites.
  */
@@ -523,7 +525,7 @@ export function sanitizeMessagesForPersistence(
   return messagesToAppend
     .filter((message) => {
       if (message._isIdentityPrompt === true) return false;
-      if (message._isInjectedContext === true) return false;
+
       if (message.role === "user" && typeof message.content === "string") {
         if (message.content.startsWith(PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX))
           return false;
