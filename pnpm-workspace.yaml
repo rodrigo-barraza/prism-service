@@ -1,3 +1,4 @@
+blockExoticSubdeps: false
 allowBuilds:
   sharp: true
   '@google/genai': true
