@@ -232,6 +232,9 @@ export default class OrchestratorService {
       minContextLength,
       workspaceRoot: orchestratorWorkspaceRoot,
       enabledTools,
+      thinkingEnabled,
+      reasoningEffort,
+      thinkingBudget,
     } = orchestratorContext;
 
     // ── Recursion depth tracking ──────────────────────────────
@@ -463,6 +466,9 @@ export default class OrchestratorService {
       round,
       totalRounds,
       recursionDepth: currentRecursionDepth + 1,
+      thinkingEnabled,
+      reasoningEffort,
+      thinkingBudget,
     };
 
     activeSubAgents.set(agentId, subAgentState);
@@ -1544,6 +1550,15 @@ export default class OrchestratorService {
           maxTokens: 8192,
           ...(subAgent.minContextLength && {
             minContextLength: subAgent.minContextLength,
+          }),
+          ...(subAgent.thinkingEnabled !== undefined && {
+            thinkingEnabled: subAgent.thinkingEnabled,
+          }),
+          ...(subAgent.reasoningEffort !== undefined && {
+            reasoningEffort: subAgent.reasoningEffort,
+          }),
+          ...(subAgent.thinkingBudget !== undefined && {
+            thinkingBudget: subAgent.thinkingBudget,
           }),
         },
         agentConversationId: subAgent.subAgentConversationId,

@@ -53,6 +53,9 @@ export interface SubAgentState {
   round?: number;
   totalRounds?: number;
   recursionDepth?: number;
+  thinkingEnabled?: boolean;
+  reasoningEffort?: string;
+  thinkingBudget?: number;
 }
 
 export interface WorktreeDiff {
@@ -162,6 +165,12 @@ export interface OrchestratorContext {
   recursionDepth?: number;
   /** Maximum allowed recursion depth for this session. 0 = sub-agents cannot spawn (default). */
   maxRecursionDepth?: number;
+  /** Inherit parent's thinking/extended-thinking toggle. */
+  thinkingEnabled?: boolean;
+  /** Inherit parent's reasoning effort level (e.g. "low", "medium", "high"). */
+  reasoningEffort?: string;
+  /** Inherit parent's thinking token budget. */
+  thinkingBudget?: number;
   [key: string]: unknown;
 }
 

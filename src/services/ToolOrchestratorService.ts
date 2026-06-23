@@ -83,6 +83,9 @@ interface ToolExecutionContext {
   _topology?: string;
   _recursionDepth?: number;
   _maxRecursionDepth?: number;
+  _thinkingEnabled?: boolean;
+  _reasoningEffort?: string;
+  _thinkingBudget?: number;
   clientIp?: string | null;
   _toolState?: unknown;
 }
@@ -1443,6 +1446,11 @@ export default class ToolOrchestratorService {
       // Recursive spawning depth tracking — propagated from parent context
       recursionDepth: context._recursionDepth ?? 0,
       maxRecursionDepth: context._maxRecursionDepth,
+
+      // Inherit parent's thinking/reasoning settings so sub-agents use the same mode
+      thinkingEnabled: context._thinkingEnabled,
+      reasoningEffort: context._reasoningEffort,
+      thinkingBudget: context._thinkingBudget,
     };
 
     switch (name) {
