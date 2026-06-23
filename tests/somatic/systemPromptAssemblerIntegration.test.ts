@@ -329,7 +329,7 @@ describe("SystemPromptAssembler.createHook — message interleaving", () => {
     );
 
     const platformMessageIndex = messages.findIndex((message) => message.role === "system" && (message.content as string).includes("Discord server"));
-    expect(platformMessageIndex).toBe(lastUserMessageIndex - 1);
+    expect(platformMessageIndex).toBe(lastUserMessageIndex - 2);
   });
 
   it("self context (somatic) is interleaved before the last user message", async () => {
@@ -354,7 +354,7 @@ describe("SystemPromptAssembler.createHook — message interleaving", () => {
 
     expect(selfContextIndex).toBeGreaterThan(-1);
     expect(selfContextIndex).toBeLessThan(lastUserMessageIndex);
-    expect(selfContextIndex).toBe(lastUserMessageIndex - 1);
+    expect(selfContextIndex).toBe(lastUserMessageIndex - 2);
   });
 
   it("previous messages in the conversation are NOT mutated", async () => {
