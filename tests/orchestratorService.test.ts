@@ -507,8 +507,8 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       const firstAgentCallArgs = mockRunAgenticLoop.mock.calls[0][0];
       const secondAgentCallArgs = mockRunAgenticLoop.mock.calls[1][0];
 
-      const firstAgentUserMessage = firstAgentCallArgs.messages[0].content;
-      const secondAgentUserMessage = secondAgentCallArgs.messages[0].content;
+      const firstAgentUserMessage = firstAgentCallArgs.messages[1].content;
+      const secondAgentUserMessage = secondAgentCallArgs.messages[1].content;
 
       // The first agent (agent-0) should see its task and identity
       expect(firstAgentUserMessage).toContain("Research Pac-Man gameplay mechanics");
