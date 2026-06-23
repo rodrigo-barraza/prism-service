@@ -10,7 +10,7 @@ vi.mock('../config.ts', () => ({
     OPENAI_API_KEY: 'fake',
     OPENAI_TRANSCRIPTION_MODEL: 'whisper-1',
     ANTHROPIC_API_KEY: 'fake',
-    GOOGLE_API_KEY: 'fake',
+    GOOGLE_CLOUD_GEMINI_API_KEY: 'fake',
     ELEVENLABS_API_KEY: 'fake',
     INWORLD_BASIC: 'fake',
     PROVIDER_LM_STUDIO: [],

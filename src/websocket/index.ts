@@ -11,7 +11,7 @@ import {
   EndSensitivity,
   Session,
 } from "@google/genai";
-import { GOOGLE_API_KEY, LIVE_AUDIO_MODEL } from "../../config.ts";
+import { GOOGLE_CLOUD_GEMINI_API_KEY, LIVE_AUDIO_MODEL } from "../../config.ts";
 import crypto from "crypto";
 import logger from "../utils/logger.ts";
 import RequestLogger from "../services/RequestLogger.ts";
@@ -468,7 +468,7 @@ function handleWebsocketLive(
       activeConfig = liveConfig;
 
       try {
-        const client = new GoogleGenAI({ apiKey: GOOGLE_API_KEY });
+        const client = new GoogleGenAI({ apiKey: GOOGLE_CLOUD_GEMINI_API_KEY });
         liveSession = await client.live.connect({
           model,
           config: liveConfig as Record<string, unknown>,

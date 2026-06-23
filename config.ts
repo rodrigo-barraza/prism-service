@@ -43,7 +43,7 @@ export const PRISM_SERVICE_PORT = process.env.PRISM_SERVICE_PORT || 7777;
 // ── AI Provider API Keys ───────────────────────────────────────
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 export const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-export const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+export const GOOGLE_CLOUD_GEMINI_API_KEY = process.env.GOOGLE_CLOUD_GEMINI_API_KEY;
 export const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 export const INWORLD_BASIC = process.env.INWORLD_BASIC;
 

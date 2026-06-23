@@ -3,8 +3,8 @@ import fs from "fs";
 // Load keys directly from projects.json so they are definitely present
 const projectsData = JSON.parse(fs.readFileSync("/home/rodrigo/development/vault-service/projects.json", "utf-8"));
 const secrets = projectsData.config || {};
-if (secrets.GOOGLE_API_KEY) {
-  process.env.GOOGLE_API_KEY = secrets.GOOGLE_API_KEY;
+if (secrets.GOOGLE_CLOUD_GEMINI_API_KEY) {
+  process.env.GOOGLE_CLOUD_GEMINI_API_KEY = secrets.GOOGLE_CLOUD_GEMINI_API_KEY;
 }
 
 // Also try loading other env if needed
