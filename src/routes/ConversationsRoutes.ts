@@ -116,18 +116,61 @@ router.get(
           .limit(limit + 1)
           .toArray();
 
-      const fetchAgentConversations = () => {
+      const fetchAgentConversations = async () => {
         const agentFilter = { ...filter };
         if (agent) {
           agentFilter.agent = agent;
         }
-        return db
+        const directMatches = await db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
           .find(agentFilter)
           .project(CONVERSATION_LIST_PROJECTION)
           .sort({ updatedAt: -1 })
           .limit(limit + 1)
           .toArray();
+
+        // When filtering by agent, also discover sub-agent conversations
+        // spawned by the matched orchestrator conversations — these may
+        // have a different `agent` persona but belong to the same tree.
+        if (agent && directMatches.length > 0) {
+          const directMatchIds = directMatches
+            .map((document) => (document as Record<string, unknown>).id as string)
+            .filter(Boolean);
+
+          // Iteratively walk the parentConversationId chain to find all
+          // descendant sub-agent conversations (multi-level nesting).
+          const allDiscoveredIds = new Set(directMatchIds);
+          let frontier = directMatchIds;
+          const maxDepthIterations = 5;
+
+          for (let depth = 0; depth < maxDepthIterations && frontier.length > 0; depth++) {
+            const childConversations = await db
+              .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+              .find({
+                parentConversationId: { $in: frontier },
+                project: filter.project,
+                username: filter.username,
+                ...(cursor ? { updatedAt: filter.updatedAt } : {}),
+              })
+              .project(CONVERSATION_LIST_PROJECTION)
+              .sort({ updatedAt: -1 })
+              .toArray();
+
+            const newFrontier: string[] = [];
+            for (const childConversation of childConversations) {
+              const childRecord = childConversation as Record<string, unknown>;
+              const childId = childRecord.id as string;
+              if (childId && !allDiscoveredIds.has(childId)) {
+                allDiscoveredIds.add(childId);
+                directMatches.push(childConversation);
+                newFrontier.push(childId);
+              }
+            }
+            frontier = newFrontier;
+          }
+        }
+
+        return directMatches;
       };
 
       if (type === "all") {
