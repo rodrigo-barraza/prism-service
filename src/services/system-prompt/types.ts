@@ -52,6 +52,7 @@ export interface AssemblerContext {
   agentContext?: AgentContext;
   traceId?: string | null;
   agentConversationId?: string | null;
+  parentAgentConversationId?: string | null;
   clientIp?: string | null;
   requestId?: string;
   options?: Record<string, unknown>;

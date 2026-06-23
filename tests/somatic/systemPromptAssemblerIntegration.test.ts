@@ -85,10 +85,22 @@ vi.mock("../../src/services/system-prompt/ToolDocFormatter.ts", () => ({
   },
 }));
 
+const mockFetchMemories = vi.fn().mockResolvedValue(null);
+const mockFetchSkills = vi.fn().mockResolvedValue({ text: null, skillNames: [] });
+
 vi.mock("../../src/services/system-prompt/SkillMemoryScorer.ts", () => ({
   SkillMemoryScorer: class {
-    fetchSkills() { return Promise.resolve({ text: null, skillNames: [] }); }
-    fetchMemories() { return Promise.resolve(null); }
+    fetchSkills(...arguments_: unknown[]) { return mockFetchSkills(...arguments_); }
+    fetchMemories(...arguments_: unknown[]) { return mockFetchMemories(...arguments_); }
+  },
+}));
+
+const mockRetrieveRelevantWorkflows = vi.fn().mockResolvedValue(null);
+
+vi.mock("../../src/services/WorkflowMemoryService.ts", () => ({
+  default: {
+    retrieveRelevantWorkflows: (...arguments_: unknown[]) => mockRetrieveRelevantWorkflows(...arguments_),
+    createHook: () => vi.fn(),
   },
 }));
 
@@ -510,5 +522,125 @@ describe("SystemPromptAssembler — adaptation targets latest user message", () 
 
     await assembler.assemble(context);
     expect(mockAdaptFromMessage).not.toHaveBeenCalled();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Assembler — Sub-Agent Memory Isolation
+// Sub-agents (detected via parentAgentConversationId) should NOT
+// receive long-term memories, workflow memories, or somatic state.
+// ═══════════════════════════════════════════════════════════════
+
+describe("Sub-agent memory isolation", () => {
+  let assembler: SystemPromptAssembler;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPersonas.clear();
+    assembler = new SystemPromptAssembler({ workspaceRoot: "/test" });
+  });
+
+  it("does not fetch memories for sub-agents", async () => {
+    mockPersonas.set("CODING", createCodingPersona());
+    mockFetchMemories.mockResolvedValue("[project] Some memory about user preferences");
+
+    const context = createContext({
+      agent: "CODING",
+      project: "prism",
+      parentAgentConversationId: "parent-conv-abc-123",
+      messages: [
+        { role: "system", content: "You are a sub-agent." },
+        { role: "user", content: "Refactor the auth module" },
+      ],
+      agentContext: undefined,
+    });
+
+    const result = await assembler.assemble(context);
+
+    expect(mockFetchMemories).not.toHaveBeenCalled();
+    expect(result.memoriesText).toBe("");
+  });
+
+  it("does not fetch workflow memories for sub-agents", async () => {
+    mockPersonas.set("CODING", createCodingPersona());
+    mockRetrieveRelevantWorkflows.mockResolvedValue("Past Workflow: some steps");
+
+    const context = createContext({
+      agent: "CODING",
+      project: "prism",
+      parentAgentConversationId: "parent-conv-abc-123",
+      messages: [
+        { role: "system", content: "" },
+        { role: "user", content: "Fix the login bug" },
+      ],
+      agentContext: undefined,
+    });
+
+    const result = await assembler.assemble(context);
+
+    expect(mockRetrieveRelevantWorkflows).not.toHaveBeenCalled();
+    expect(result.workflowsText).toBe("");
+  });
+
+  it("does not trigger somatic state for sub-agents", async () => {
+    mockPersonas.set("LUPOS", createLuposPersona());
+    mockRenderSystemMessage.mockResolvedValue("[Somatic State] emotional data");
+
+    const context = createContext({
+      agent: "LUPOS",
+      parentAgentConversationId: "parent-conv-abc-123",
+      messages: [
+        { role: "system", content: "" },
+        { role: "user", content: "Draw something cool" },
+      ],
+    });
+
+    await assembler.assemble(context);
+
+    expect(mockAdaptFromMessage).not.toHaveBeenCalled();
+    expect(mockRenderSystemMessage).not.toHaveBeenCalled();
+  });
+
+  it("fetches memories and workflows for top-level agents (no parentAgentConversationId)", async () => {
+    mockPersonas.set("CODING", createCodingPersona());
+    mockFetchMemories.mockResolvedValue("[project] User prefers TypeScript");
+    mockRetrieveRelevantWorkflows.mockResolvedValue("Past Workflow: npm test steps");
+
+    const context = createContext({
+      agent: "CODING",
+      project: "prism",
+      parentAgentConversationId: null,
+      messages: [
+        { role: "system", content: "" },
+        { role: "user", content: "Add a new endpoint" },
+      ],
+      agentContext: undefined,
+    });
+
+    const result = await assembler.assemble(context);
+
+    expect(mockFetchMemories).toHaveBeenCalled();
+    expect(mockRetrieveRelevantWorkflows).toHaveBeenCalled();
+    expect(result.memoriesText).toContain("User prefers TypeScript");
+    expect(result.workflowsText).toContain("npm test steps");
+  });
+
+  it("fetches somatic state for top-level Lupos (no parentAgentConversationId)", async () => {
+    mockPersonas.set("LUPOS", createLuposPersona());
+    mockRenderSystemMessage.mockResolvedValue("[Somatic State] calm");
+
+    const context = createContext({
+      agent: "LUPOS",
+      parentAgentConversationId: undefined,
+      messages: [
+        { role: "system", content: "" },
+        { role: "user", content: "Hey Lupos" },
+      ],
+    });
+
+    await assembler.assemble(context);
+
+    expect(mockAdaptFromMessage).toHaveBeenCalled();
+    expect(mockRenderSystemMessage).toHaveBeenCalledWith("LUPOS");
   });
 });

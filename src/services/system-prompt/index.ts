@@ -70,6 +70,7 @@ export default class SystemPromptAssembler {
     const isDirectMode = !context.agent;
     const agentId = context.agent || AGENT_IDS.CODING;
     const persona = isDirectMode ? null : AgentPersonaRegistry.get(agentId);
+    const isSubAgent = !!context.parentAgentConversationId;
 
     const codingFallback =
       !isDirectMode && (!persona || persona.id === AGENT_IDS.CODING);
@@ -178,7 +179,9 @@ export default class SystemPromptAssembler {
     // agent with hasSomaticState, regardless of whether agentContext
     // is present. This ensures prism-client Lupos gets somatic state
     // even though only Discord sends agentContext.
-    if (persona?.hasSomaticState && agentId) {
+    // Sub-agents are ephemeral workers — they don't maintain emotional
+    // continuity, so somatic adaptation is skipped entirely.
+    if (persona?.hasSomaticState && agentId && !isSubAgent) {
       const userMessages =
         context.messages?.filter((message) => message.role === "user") || [];
       const latestUserMessage = userMessages[userMessages.length - 1];
@@ -425,10 +428,15 @@ export default class SystemPromptAssembler {
     }
 
     // ── 9. Conversation Memory (embedding search) ────────────────────
+    // Sub-agents are ephemeral workers with isolated context windows.
+    // They receive only the task prompt from the orchestrator — injecting
+    // the parent user's long-term memory would add irrelevant noise and
+    // waste tokens. This aligns with the industry-standard pattern used
+    // by LangGraph, CrewAI, AutoGen, Google ADK, and OpenAI Agents SDK.
     const memoryQuery = queryText || context.project || "";
     let memoriesText = "";
 
-    if (memoryQuery) {
+    if (memoryQuery && !isSubAgent) {
       const agentContextForMemory = context.agentContext || {};
       const memoryGuildId = agentContextForMemory.guildId;
       const memoryUserIds = agentContextForMemory.participantUserIds;
@@ -452,8 +460,10 @@ export default class SystemPromptAssembler {
     }
 
     // ── 10. Workflow Memory (cross-conversation procedural learning) ──
+    // Same rationale as Step 9 — sub-agents don't need cross-conversation
+    // procedural workflows. They execute a single task and are destroyed.
     let workflowsText = "";
-    if (memoryQuery && !isDirectMode) {
+    if (memoryQuery && !isDirectMode && !isSubAgent) {
       try {
         const workflows = await WorkflowMemoryService.retrieveRelevantWorkflows(
           agentId,
