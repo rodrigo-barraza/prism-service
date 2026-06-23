@@ -312,8 +312,11 @@ describe("SystemPromptAssembler.createHook — message interleaving", () => {
     await hook(context);
 
     const messages = context.messages!;
+    expect(context._assembledSystemPrompt).toBeTruthy();
+    expect(context._assembledSystemPrompt).toContain("Lupos");
+
     const systemMessageIndex = messages.findIndex((message) => message.role === "system" && (message.content as string).includes("Lupos"));
-    expect(systemMessageIndex).toBe(0);
+    expect(systemMessageIndex).toBe(-1);
 
     const lastUserMessageIndex = messages.reduce(
       (lastIndex: number, message: { role: string }, index: number) =>

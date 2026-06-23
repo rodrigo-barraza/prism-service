@@ -784,7 +784,7 @@ describe("SystemPromptAssembler", () => {
   // ──────────────────────────────────────────────────────────
 
   describe("createHook message mutation", () => {
-    it("injects system message into messages array", async () => {
+    it("populates _assembledSystemPrompt instead of injecting into messages array", async () => {
       const assembler = createAssembler();
       const hook = assembler.createHook();
 
@@ -792,16 +792,19 @@ describe("SystemPromptAssembler", () => {
         agent: "CODING",
         project: "prism-chat",
         messages: [{ role: "user", content: "Hello" }] as Array<{ role: string; content?: string; rawContent?: string }>,
+        _assembledSystemPrompt: undefined as string | undefined,
       };
 
       await hook(context);
 
       const systemMessage = context.messages.find((message) => message.role === "system");
-      expect(systemMessage).toBeTruthy();
-      expect(systemMessage?.content).toContain("coding agent");
+      expect(systemMessage).toBeUndefined();
+
+      expect(context._assembledSystemPrompt).toBeTruthy();
+      expect(context._assembledSystemPrompt).toContain("coding agent");
     });
 
-    it("replaces existing system message rather than duplicating", async () => {
+    it("preserves existing system message in messages array", async () => {
       const assembler = createAssembler();
       const hook = assembler.createHook();
 
@@ -812,14 +815,17 @@ describe("SystemPromptAssembler", () => {
           { role: "system", content: "old system prompt" },
           { role: "user", content: "Hello" },
         ] as Array<{ role: string; content?: string; rawContent?: string }>,
+        _assembledSystemPrompt: undefined as string | undefined,
       };
 
       await hook(context);
 
       const systemMessages = context.messages.filter((message) => message.role === "system");
       expect(systemMessages).toHaveLength(1);
-      expect(systemMessages[0].content).not.toBe("old system prompt");
-      expect(systemMessages[0].content).toContain("coding agent");
+      expect(systemMessages[0].content).toBe("old system prompt");
+
+      expect(context._assembledSystemPrompt).toBeTruthy();
+      expect(context._assembledSystemPrompt).toContain("coding agent");
     });
 
     it("injects system context into last user message", async () => {
