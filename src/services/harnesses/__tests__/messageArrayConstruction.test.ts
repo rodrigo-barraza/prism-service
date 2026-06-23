@@ -3600,5 +3600,365 @@ describe("Message Array Construction", () => {
       expect(mockHookContext._assembledSystemPrompt).toBe(LUPOS_IDENTITY);
     });
   });
+
+  // ────────────────────────────────────────────────────────────
+  // SUB-AGENT PERSISTENCE SCENARIOS
+  // These test the exact message shape produced by
+  // OrchestratorService._runSubAgentLoop — [system(operational), user(prompt)]
+  // — and verify that the operational context system message at messages[0]
+  // survives through computeNewTurnMessages into persistence.
+  // ────────────────────────────────────────────────────────────
+
+  describe("Sub-agent: operational context system message persistence", () => {
+    const SUB_AGENT_OPERATIONAL_CONTEXT = [
+      "You are a sub-agent in a multi-agent system.",
+      "Sub-agent topology type: hierarchical",
+      "Sub-agent topology name: Hierarchical (Parallel)",
+      "Sub-agent topology description: All sub-agents run in parallel, each independently working on their own task.",
+      "Agent: 1 of 3",
+      "Your workspace is: /tmp/worktrees/abc123",
+      "",
+      "Operational constraints:",
+      "- Only modify files within your workspace",
+      "- Commit your changes when done and report what you accomplished",
+      "- Focus on the specific task described above",
+    ].join("\n");
+
+    const SUB_AGENT_TASK_PROMPT =
+      "Refactor the authentication middleware to use JWT RS256 instead of HS256. " +
+      "Files to modify: src/middleware/auth.ts, src/config.ts";
+
+    it("should persist the operational context system message at messages[0]", () => {
+      // OrchestratorService._runSubAgentLoop builds:
+      // [...(subAgent.messages || []), { role: "system", content: ops }, { role: "user", content: prompt }]
+      const originalMessages: HarnessPayload[] = [
+        { role: "system", content: SUB_AGENT_OPERATIONAL_CONTEXT },
+        { role: "user", content: SUB_AGENT_TASK_PROMPT },
+      ];
+      const originalMessageCount = originalMessages.length;
+      const currentMessages: HarnessPayload[] = [...originalMessages];
+
+      // beforePrompt hook runs — no platform/somatic for sub-agents typically
+      simulateBeforePromptHook(currentMessages, {
+        systemPrompt: "You are the Omni Agent...",
+      });
+
+      // Sub-agent produces a response
+      currentMessages.push({
+        role: "assistant",
+        content: "I'll refactor the auth middleware now.",
+        model: "gemini-2.5-pro",
+        provider: "google",
+      });
+
+      const newTurnMessages = computeNewTurnMessages(
+        originalMessages,
+        currentMessages,
+        originalMessageCount,
+      );
+
+      // The system message at index 0 MUST survive into persistence
+      expect(newTurnMessages[0].role).toBe("system");
+      expect(newTurnMessages[0].content).toBe(SUB_AGENT_OPERATIONAL_CONTEXT);
+
+      // User message and assistant response should follow
+      expect(newTurnMessages[1].role).toBe("user");
+      expect(newTurnMessages[2].role).toBe("assistant");
+      expect(newTurnMessages).toHaveLength(3);
+    });
+
+    it("should persist operational context when sub-agent uses tools", () => {
+      const originalMessages: HarnessPayload[] = [
+        { role: "system", content: SUB_AGENT_OPERATIONAL_CONTEXT },
+        { role: "user", content: SUB_AGENT_TASK_PROMPT },
+      ];
+      const originalMessageCount = originalMessages.length;
+      const currentMessages: HarnessPayload[] = [...originalMessages];
+
+      simulateBeforePromptHook(currentMessages, {
+        systemPrompt: "You are the Omni Agent...",
+      });
+
+      // Iteration 1: assistant reads a file
+      currentMessages.push({
+        role: "assistant",
+        content: "Let me read the auth middleware first.",
+        toolCalls: [
+          {
+            id: "call_read_1",
+            name: "read_file",
+            args: { path: "/tmp/worktrees/abc123/src/middleware/auth.ts" },
+          },
+        ],
+      });
+
+      // Tool result
+      currentMessages.push({
+        role: "tool",
+        content: "export const authMiddleware = ...",
+      });
+
+      // Iteration 2: assistant writes the fix
+      currentMessages.push({
+        role: "assistant",
+        content: "I've updated the auth middleware to use RS256.",
+        model: "gemini-2.5-pro",
+        provider: "google",
+      });
+
+      const newTurnMessages = computeNewTurnMessages(
+        originalMessages,
+        currentMessages,
+        originalMessageCount,
+      );
+
+      // Operational context at index 0 must survive
+      expect(newTurnMessages[0].role).toBe("system");
+      expect(newTurnMessages[0].content).toContain("sub-agent in a multi-agent system");
+
+      // Full sequence: system(ops) → user → assistant(tool) → tool → assistant(final)
+      expect(newTurnMessages.map((message) => message.role)).toEqual([
+        "system",
+        "user",
+        "assistant",
+        "tool",
+        "assistant",
+      ]);
+    });
+
+    it("should persist operational context alongside hook-injected platform and somatic context", () => {
+      const originalMessages: HarnessPayload[] = [
+        { role: "system", content: SUB_AGENT_OPERATIONAL_CONTEXT },
+        { role: "user", content: SUB_AGENT_TASK_PROMPT },
+      ];
+      const originalMessageCount = originalMessages.length;
+      const currentMessages: HarnessPayload[] = [...originalMessages];
+
+      // Sub-agent with Discord platform context and somatic state
+      simulateBeforePromptHook(currentMessages, {
+        systemPrompt: "You are Lupos, an artist wolf king...",
+        platformContextMessage: "Platform: Discord\nServer: Rod's Lab\nChannel: #dev",
+        selfContextMessage: `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: focused\narousal: 0.7`,
+      });
+
+      currentMessages.push({
+        role: "assistant",
+        content: "Done with the refactor.",
+        model: "gpt-4.1",
+        provider: "openai",
+      });
+
+      const newTurnMessages = computeNewTurnMessages(
+        originalMessages,
+        currentMessages,
+        originalMessageCount,
+      );
+
+      // Operational context must be first
+      expect(newTurnMessages[0].role).toBe("system");
+      expect(newTurnMessages[0].content).toContain("sub-agent in a multi-agent system");
+
+      // Platform and somatic context should also be present (injected by hook)
+      const platformMessage = newTurnMessages.find(
+        (message) =>
+          message.role === "system" &&
+          typeof message.content === "string" &&
+          message.content.includes("Platform: Discord"),
+      );
+      const somaticMessage = newTurnMessages.find(
+        (message) =>
+          message.role === "system" &&
+          typeof message.content === "string" &&
+          message.content.includes("Somatic State"),
+      );
+      expect(platformMessage).toBeDefined();
+      expect(somaticMessage).toBeDefined();
+
+      // Verify order: operational → platform → somatic → user → assistant
+      const operationalIndex = newTurnMessages.indexOf(newTurnMessages[0]);
+      const platformIndex = newTurnMessages.indexOf(platformMessage!);
+      const somaticIndex = newTurnMessages.indexOf(somaticMessage!);
+      const userIndex = newTurnMessages.findIndex((message) => message.role === "user");
+      expect(operationalIndex).toBeLessThan(platformIndex);
+      expect(platformIndex).toBeLessThan(somaticIndex);
+      expect(somaticIndex).toBeLessThan(userIndex);
+    });
+
+    it("should NOT regress normal first-turn conversations (single user message origin)", () => {
+      // Normal top-level conversation: just a user message
+      const originalMessages: HarnessPayload[] = [
+        { role: "user", content: "Hello, what's the weather?" },
+      ];
+      const originalMessageCount = originalMessages.length;
+      const currentMessages: HarnessPayload[] = [...originalMessages];
+
+      simulateBeforePromptHook(currentMessages, {
+        systemPrompt: "You are the Omni Agent...",
+      });
+
+      currentMessages.push({
+        role: "assistant",
+        content: "Let me check the weather for you.",
+        model: "gemini-2.5-pro",
+        provider: "google",
+      });
+
+      const newTurnMessages = computeNewTurnMessages(
+        originalMessages,
+        currentMessages,
+        originalMessageCount,
+      );
+
+      // First message should be the user message (no system context for top-level)
+      expect(newTurnMessages[0].role).toBe("user");
+      expect(newTurnMessages[1].role).toBe("assistant");
+      expect(newTurnMessages).toHaveLength(2);
+    });
+
+    it("should NOT regress multi-turn conversations with _alreadyPersisted messages", () => {
+      // Simulates a second turn where prior messages are loaded from MongoDB
+      const originalMessages: HarnessPayload[] = [
+        { role: "user", content: "Hello", _alreadyPersisted: true } as HarnessPayload,
+        { role: "assistant", content: "Hi there!", _alreadyPersisted: true } as HarnessPayload,
+        { role: "user", content: "What's the weather?" },
+      ];
+      const originalMessageCount = originalMessages.length;
+      const currentMessages: HarnessPayload[] = [...originalMessages];
+
+      simulateBeforePromptHook(currentMessages, {
+        systemPrompt: "You are the Omni Agent...",
+      });
+
+      currentMessages.push({
+        role: "assistant",
+        content: "It's sunny today.",
+        model: "gemini-2.5-pro",
+        provider: "google",
+      });
+
+      const newTurnMessages = computeNewTurnMessages(
+        originalMessages,
+        currentMessages,
+        originalMessageCount,
+      );
+
+      // Should only include the new user message + assistant response (not prior persisted turns)
+      expect(newTurnMessages[0].role).toBe("user");
+      expect(newTurnMessages[0].content).toContain("weather");
+      expect(newTurnMessages[1].role).toBe("assistant");
+      expect(newTurnMessages).toHaveLength(2);
+    });
+
+    it("should handle send_message follow-up to a sub-agent (mixed persisted + new)", () => {
+      // After a sub-agent completes its first turn, send_message adds a new user message.
+      // The prior messages from the first turn are now _alreadyPersisted.
+      const originalMessages: HarnessPayload[] = [
+        { role: "system", content: SUB_AGENT_OPERATIONAL_CONTEXT, _alreadyPersisted: true } as HarnessPayload,
+        { role: "user", content: SUB_AGENT_TASK_PROMPT, _alreadyPersisted: true } as HarnessPayload,
+        { role: "assistant", content: "Done with the refactor.", _alreadyPersisted: true } as HarnessPayload,
+        { role: "user", content: "Now also update the tests in tests/auth.test.ts" },
+      ];
+      const originalMessageCount = originalMessages.length;
+      const currentMessages: HarnessPayload[] = [...originalMessages];
+
+      simulateBeforePromptHook(currentMessages, {
+        systemPrompt: "You are the Omni Agent...",
+      });
+
+      currentMessages.push({
+        role: "assistant",
+        content: "I'll update the auth tests now.",
+        model: "gemini-2.5-pro",
+        provider: "google",
+      });
+
+      const newTurnMessages = computeNewTurnMessages(
+        originalMessages,
+        currentMessages,
+        originalMessageCount,
+      );
+
+      // Only the new follow-up user message + assistant should be persisted
+      // The operational context was already persisted in the first turn
+      expect(newTurnMessages[0].role).toBe("user");
+      expect(newTurnMessages[0].content).toContain("update the tests");
+      expect(newTurnMessages[1].role).toBe("assistant");
+      expect(newTurnMessages).toHaveLength(2);
+    });
+
+    it("should handle recursive sub-agents (coordinator with delegation metadata)", () => {
+      const coordinatorContext = [
+        "You are a sub-agent in a multi-agent system.",
+        "Sub-agent topology type: hierarchical",
+        "",
+        "## Recursive Delegation",
+        "You are a **Coordinator** sub-agent with recursive spawning capabilities.",
+        "- Current depth: 1 of 3 (2 levels remaining)",
+        "- You have access to `create_team` and can spawn your own sub-teams",
+      ].join("\n");
+
+      const originalMessages: HarnessPayload[] = [
+        { role: "system", content: coordinatorContext },
+        { role: "user", content: "Build the entire authentication system." },
+      ];
+      const originalMessageCount = originalMessages.length;
+      const currentMessages: HarnessPayload[] = [...originalMessages];
+
+      simulateBeforePromptHook(currentMessages, {
+        systemPrompt: "You are the Omni Agent...",
+      });
+
+      // Coordinator spawns a sub-team
+      currentMessages.push({
+        role: "assistant",
+        content: "I'll delegate this to specialized sub-agents.",
+        toolCalls: [
+          {
+            id: "call_team_1",
+            name: "create_team",
+            args: {
+              name: "auth-team",
+              members: [
+                { label: "JWT", prompt: "Implement JWT signing..." },
+                { label: "RBAC", prompt: "Implement role-based access..." },
+              ],
+            },
+          },
+        ],
+      });
+
+      currentMessages.push({
+        role: "tool",
+        content: '{"agents": ["jwt-agent", "rbac-agent"], "status": "running"}',
+      });
+
+      currentMessages.push({
+        role: "assistant",
+        content: "Both sub-agents completed successfully. Here's the summary...",
+        model: "gemini-2.5-pro",
+        provider: "google",
+      });
+
+      const newTurnMessages = computeNewTurnMessages(
+        originalMessages,
+        currentMessages,
+        originalMessageCount,
+      );
+
+      // Coordinator operational context must survive
+      expect(newTurnMessages[0].role).toBe("system");
+      expect(newTurnMessages[0].content).toContain("Coordinator");
+      expect(newTurnMessages[0].content).toContain("recursive spawning");
+
+      // Full sequence preserved
+      expect(newTurnMessages.map((message) => message.role)).toEqual([
+        "system",    // operational context
+        "user",      // task prompt
+        "assistant", // tool call (create_team)
+        "tool",      // tool result
+        "assistant", // final synthesis
+      ]);
+    });
+  });
 });
 
