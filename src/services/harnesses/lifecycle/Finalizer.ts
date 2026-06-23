@@ -523,6 +523,7 @@ export function sanitizeMessagesForPersistence(
   return messagesToAppend
     .filter((message) => {
       if (message._isIdentityPrompt === true) return false;
+      if (message._isInjectedContext === true) return false;
       if (message.role === "user" && typeof message.content === "string") {
         if (message.content.startsWith(PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX))
           return false;
@@ -538,6 +539,7 @@ export function sanitizeMessagesForPersistence(
       const cloned = { ...message };
       swapMessageContent(cloned);
       delete cloned._isIdentityPrompt;
+      delete cloned._isInjectedContext;
       return cloned;
     });
 }

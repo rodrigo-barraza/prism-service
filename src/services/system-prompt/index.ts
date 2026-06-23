@@ -596,10 +596,15 @@ export function injectSystemPromptContext(
     }
   }
 
-  // ── 3. Prepend [System Context] to last user message ───
+  // ── 3. Inject system-originated context as a dedicated system message ──
+  // Local time, skills, memories, and workflows are system-injected metadata,
+  // not user input. They belong in a system message so the LLM treats them as
+  // authoritative grounding context rather than conversational user intent.
+  // The _isInjectedContext marker lets the Finalizer strip them before DB
+  // persistence (they're ephemeral — regenerated fresh each turn).
   const userMessages = messages.filter((message) => message.role === "user");
   const lastUserMessage = userMessages[userMessages.length - 1];
-  if (lastUserMessage && typeof lastUserMessage.content === "string") {
+  if (lastUserMessage) {
     const timeText =
       localTimeText ||
       new Date().toLocaleString("en-US", {
@@ -609,31 +614,31 @@ export function injectSystemPromptContext(
 
     const contextLines = [`- Local Time: ${timeText}`];
 
-    let systemContextBlock = `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\n${contextLines.join("\n")}\n\n`;
+    let systemContextBlock = `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\n${contextLines.join("\n")}`;
 
     if (skillsText) {
-      systemContextBlock += `${skillsText}\n\n`;
+      systemContextBlock += `\n\n${skillsText}`;
     }
 
     if (memoriesText) {
-      systemContextBlock += `${memoriesText}\n\n`;
+      systemContextBlock += `\n\n${memoriesText}`;
     }
 
     if (workflowsText) {
-      systemContextBlock += `${workflowsText}\n\n`;
+      systemContextBlock += `\n\n${workflowsText}`;
     }
 
-    if (!lastUserMessage.content.startsWith(PROMPT_DELIMITERS.SYSTEM_CONTEXT)) {
-      const messageIndex = messages.indexOf(lastUserMessage);
-      if (messageIndex !== -1) {
-        const originalContent = lastUserMessage.content;
-        messages[messageIndex] = {
-          ...lastUserMessage,
-          rawContent: originalContent,
-          content:
-            systemContextBlock +
-            `${PROMPT_DELIMITERS.USER_MESSAGE}\n${originalContent}`,
-        };
+    const messageIndex = messages.indexOf(lastUserMessage);
+    if (messageIndex !== -1) {
+      // Check if an injected context message already exists immediately before
+      // the user message (guard against double-injection on the same turn)
+      const preceding = messages[messageIndex - 1];
+      if (preceding?._isInjectedContext !== true) {
+        messages.splice(messageIndex, 0, {
+          role: "system",
+          content: systemContextBlock,
+          _isInjectedContext: true,
+        });
       }
     }
   }
