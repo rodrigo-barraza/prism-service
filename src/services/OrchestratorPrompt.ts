@@ -79,7 +79,7 @@ When calling create_team:
 - For aggregation, set \`topology: "hierarchical_aggregation"\` — parallel execution with a synthesis merge pass
 - For pipelines, set \`topology: "sequential"\` — each member's output feeds into the next
 - For debates or reviews, set \`topology: "peer_to_peer"\` — members take turns on a shared discussion board
-- The \`agent\` parameter in \`create_team\` members is for the persona type (like "Lupos" or "Coding"), not for the speaker ID. Leave it blank or undefined unless you want a specialized persona. Do not set \`agent: "agent-0"\` or similar.
+- The \`agent\` parameter in \`create_team\` members is for the persona type, not for the speaker ID. Leave it blank or undefined unless you want a specialized persona. The available persona names are listed in the \`agent\` parameter's description. Do not set \`agent: "agent-0"\` or similar.
 - Sub-agents use 0-based naming (agent-0, agent-1, agent-2, ...) matching standard programming conventions. Use these names in speaker identity lines and tags.
 - Do not use one sub-agent to check on another. You receive results directly.
 - Do not use sub-agents for trivial tasks. Give them higher-level, substantive work.

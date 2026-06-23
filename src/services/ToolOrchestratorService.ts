@@ -1,5 +1,6 @@
 import { TOOLS_SERVICE_URL } from "../../config.ts";
 import MCPClientService from "./MCPClientService.ts";
+import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import logger from "../utils/logger.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import { ORCHESTRATOR_ONLY_TOOLS } from "./OrchestratorPrompt.ts";
@@ -494,6 +495,33 @@ async function fetchJsonWithBody(
 // Orchestrator Tool Schemas — Prism-local, not routed to tools-api
 // ────────────────────────────────────────────────────────────
 
+/**
+ * Dynamically builds the `agent` parameter description for the
+ * create_team schema by reading all registered persona IDs from
+ * the AgentPersonaRegistry. This avoids hard-coding persona names
+ * like "Lupos" or "Coding" which caused the LLM to misuse the field.
+ */
+function buildAgentParameterDescription(): string {
+  const registeredAgents = AgentPersonaRegistry.list();
+  const agentNames = registeredAgents
+    .map((entry) => `'${entry.name}'`)
+    .join(", ");
+
+  if (agentNames) {
+    return (
+      `Optional: the agent type/persona to spawn (available: ${agentNames}). ` +
+      "Defaults to the parent agent's type. " +
+      "Do not set this to a speaker ID like 'agent-0'."
+    );
+  }
+
+  return (
+    "Optional: the agent type/persona to spawn. " +
+    "Defaults to the parent agent's type. " +
+    "Do not set this to a speaker ID like 'agent-0'."
+  );
+}
+
 function getOrchestratorToolSchemas(
   defaultTopology: string = DEFAULT_TOPOLOGY,
 ) {
@@ -670,8 +698,7 @@ function getOrchestratorToolSchemas(
                 },
                 agent: {
                   type: "string",
-                  description:
-                    "Optional: the agent type/persona to spawn (e.g. 'Lupos', 'Coding'). Defaults to the parent agent's type.",
+                  description: buildAgentParameterDescription(),
                 },
               },
               required: ["description", "prompt"],
