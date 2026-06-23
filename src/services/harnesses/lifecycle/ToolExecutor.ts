@@ -119,6 +119,9 @@ export async function executeToolBatch(
               : typeof context.options?.maxRecursionDepth === "number"
                 ? context.options.maxRecursionDepth
                 : undefined,
+          _thinkingEnabled: context.options?.thinkingEnabled,
+          _reasoningEffort: context.options?.reasoningEffort,
+          _thinkingBudget: context.options?.thinkingBudget,
         },
       );
       const durationMs = Date.now() - startTime;
