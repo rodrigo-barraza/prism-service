@@ -92,9 +92,13 @@ vi.mock("../../src/services/system-prompt/SkillMemoryScorer.ts", () => ({
   },
 }));
 
-vi.mock("../../../config.ts", () => ({
-  MONGO_DB_NAME: "prism_test",
-}));
+vi.mock("../../src/config.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/config.ts")>();
+  return {
+    ...actual,
+    MONGO_DB_NAME: "prism_test",
+  };
+});
 
 vi.mock("../../src/wrappers/MongoWrapper.ts", () => ({
   default: {

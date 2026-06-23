@@ -109,7 +109,7 @@ function shouldTestModel(modelId: string) {
 /**
  * Detect model capabilities from its ID.
  */
-function detectCapabilities(modelId: string) {
+function detectLiveModelCapabilities(modelId: string) {
   const lower = modelId.toLowerCase();
   return {
     isVision:
@@ -249,7 +249,7 @@ beforeAll(async () => {
   console.log("  ╠═══════════════════════════════════════════════════════╣");
   console.log("  ║  Models to test:                                     ║");
   for (const m of modelsToTest) {
-    const caps = detectCapabilities(m);
+    const caps = detectLiveModelCapabilities(m);
     const tags = [
       caps.isVision ? "👁" : "",
       caps.isReasoning ? "🧠" : "",
@@ -346,7 +346,7 @@ describe("LM Studio — Model Compatibility", () => {
 
   it("reasoning models produce thinking content", async () => {
     const reasoningModels = modelsToTest.filter(
-      (m) => detectCapabilities(m).isReasoning,
+      (m) => detectLiveModelCapabilities(m).isReasoning,
     );
     if (reasoningModels.length === 0) return;
 

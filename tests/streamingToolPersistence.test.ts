@@ -28,10 +28,14 @@ vi.mock("../src/utils/logger.ts", () => ({
 }));
 
 // ── Mock config ────────────────────────────────────────────────
-vi.mock("../../config.ts", () => ({
-  TOOLS_SERVICE_URL: "http://localhost:5590",
-  MONGO_DB_NAME: "prism-test",
-}));
+vi.mock("../src/config.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/config.ts")>();
+  return {
+    ...actual,
+    TOOLS_SERVICE_URL: "http://localhost:5590",
+    MONGO_DB_NAME: "prism-test",
+  };
+});
 
 // ── Mock dependencies ──────────────────────────────────────────
 vi.mock("../src/services/MCPClientService.ts", () => ({

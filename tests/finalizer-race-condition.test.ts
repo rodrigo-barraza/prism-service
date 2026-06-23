@@ -36,7 +36,7 @@ type TestAssemblyInput = Omit<FinalizerInput, "text" | "thinking" | "audioRefere
  * Convenience wrapper around the production assembleMessagesToAppend + sanitize.
  * Maps test-friendly field names to the canonical production parameter names.
  */
-function assembleMessagesToAppend(input: TestAssemblyInput): TestPayload[] {
+function assembleTestMessagesToAppend(input: TestAssemblyInput): TestPayload[] {
   const messages = assembleMessagesToAppendReal({
     ...input,
     text: input.finalText,
@@ -72,7 +72,7 @@ describe("Finalizer message assembly", () => {
       },
     ];
 
-    const messagesToAppend = assembleMessagesToAppend({
+    const messagesToAppend = assembleTestMessagesToAppend({
       overrideMessagesToAppend: newTurnMessages,
       finalText: "Here's your song! I hope you enjoy it.",
       finalThinking: "",
@@ -95,7 +95,7 @@ describe("Finalizer message assembly", () => {
   });
 
   it("does NOT duplicate toolCalls when hasIntermediateToolMessages is true", () => {
-    const result = assembleMessagesToAppend({
+    const result = assembleTestMessagesToAppend({
       overrideMessagesToAppend: [
         { role: "user", content: "search and make audio" },
         {
@@ -143,7 +143,7 @@ describe("Finalizer message assembly", () => {
 
   it("DOES include toolCalls on final message when no intermediate tool messages", () => {
     // This happens with native MCP tool calls that bypass the standard loop
-    const result = assembleMessagesToAppend({
+    const result = assembleTestMessagesToAppend({
       overrideMessagesToAppend: [
         { role: "user", content: "query the database" },
       ],
@@ -166,7 +166,7 @@ describe("Finalizer message assembly", () => {
   });
 
   it("filters out compaction summary user messages from append", () => {
-    const result = assembleMessagesToAppend({
+    const result = assembleTestMessagesToAppend({
       overrideMessagesToAppend: [
         {
           role: "user",
@@ -752,7 +752,7 @@ describe("End-to-end DB state after generate_audio flow", () => {
       },
     ];
 
-    const turn2AppendMessages = assembleMessagesToAppend({
+    const turn2AppendMessages = assembleTestMessagesToAppend({
       overrideMessagesToAppend: turn2NewTurnMessages,
       finalText: "Here's your song! I created 'Echoes of War' — a powerful piece.",
       finalThinking: "",

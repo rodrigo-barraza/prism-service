@@ -27,9 +27,13 @@ vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
   },
 }));
 
-vi.mock("../../config.ts", () => ({
-  MONGO_DB_NAME: "prism-test",
-}));
+vi.mock("../src/config.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/config.ts")>();
+  return {
+    ...actual,
+    MONGO_DB_NAME: "prism-test",
+  };
+});
 
 import ToolContext from "../src/services/ToolContext.ts";
 

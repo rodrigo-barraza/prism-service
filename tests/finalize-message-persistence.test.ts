@@ -24,7 +24,10 @@ function extractNewTurnMessages(
   currentMessages: TestMessage[],
   originalMessageCount: number,
 ): TestMessage[] {
-  const messagesAsPayload = currentMessages as unknown as MessagePayload[];
+  const messagesAsPayload = currentMessages.map((message, index) => ({
+    ...message,
+    _alreadyPersisted: index < originalMessageCount - 1 ? true : message._alreadyPersisted,
+  })) as unknown as MessagePayload[];
   return computeNewTurnMessages(messagesAsPayload, messagesAsPayload, originalMessageCount) as unknown as TestMessage[];
 }
 

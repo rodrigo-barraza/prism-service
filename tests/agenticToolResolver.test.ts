@@ -128,10 +128,14 @@ vi.mock("../src/wrappers/MongoWrapper.ts", () => ({
   },
 }));
 
-vi.mock("../../config.ts", () => ({
-  MONGO_DB_NAME: "prism-test",
-  TYPES,
-}));
+vi.mock("../src/config.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/config.ts")>();
+  return {
+    ...actual,
+    MONGO_DB_NAME: "prism-test",
+    TYPES,
+  };
+});
 
 vi.mock("../config.ts", () => ({
   MONGO_DB_NAME: "prism-test",

@@ -1476,7 +1476,10 @@ export default class OrchestratorService {
     );
 
     const subAgentMessages: ConversationMessage[] = [
-      ...(subAgent.messages || []),
+      ...(subAgent.messages || []).map((message) => ({
+        ...message,
+        _alreadyPersisted: true,
+      })),
       {
         role: "system",
         content: operationalContextParts.join("\n"),
