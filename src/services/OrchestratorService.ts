@@ -1444,28 +1444,46 @@ export default class OrchestratorService {
       recursionBlock = "";
     }
 
+    // Sub-agent operational context — identity, topology, delegation rules,
+    // and workspace constraints — belongs in a system message so the LLM
+    // treats it as authoritative behavioral directives rather than
+    // conversational user input. The SystemPromptAssembler will prepend the
+    // persona identity system message at [0], pushing this to [1].
+    const operationalContextParts = [
+      `You are a sub-agent in a multi-agent system.`,
+      `Sub-agent topology type: ${activeTopology}`,
+      `Sub-agent topology name: ${resolvedTopologyMetadata.name}`,
+      `Sub-agent topology description: ${resolvedTopologyMetadata.description}`,
+    ];
+
+    if (agentPositionLine) operationalContextParts.push(agentPositionLine.trimEnd());
+    if (roundLine) operationalContextParts.push(roundLine.trimEnd());
+    if (recursionBlock) operationalContextParts.push(recursionBlock.trimEnd());
+
+    if (workspaceIntroLine) operationalContextParts.push(workspaceIntroLine.trimEnd());
+    if (subAgent.files?.length) {
+      operationalContextParts.push(`Focus on files: ${subAgent.files.join(", ")}`);
+    }
+
+    const constraintLines: string[] = [];
+    if (workspaceConstraintInstruction) constraintLines.push(workspaceConstraintInstruction.replace(/^- /, "").trimEnd());
+    constraintLines.push(commitInstructions.replace(/^- /, "").trimEnd());
+    constraintLines.push(`Focus on the specific task described above`);
+
+    operationalContextParts.push(
+      `\nOperational constraints:\n` +
+      constraintLines.map((line) => `- ${line}`).join("\n"),
+    );
+
     const subAgentMessages: ConversationMessage[] = [
       ...(subAgent.messages || []),
       {
+        role: "system",
+        content: operationalContextParts.join("\n"),
+      },
+      {
         role: "user",
-        content:
-          `You are a sub-agent in a multi-agent system.\n` +
-          `Sub-agent topology type: ${activeTopology}\n` +
-          `Sub-agent topology name: ${resolvedTopologyMetadata.name}\n` +
-          `Sub-agent topology description: ${resolvedTopologyMetadata.description}\n` +
-          agentPositionLine +
-          roundLine +
-          recursionBlock +
-          `\n` +
-          workspaceIntroLine +
-          (subAgent.files?.length
-            ? `Focus on files: ${subAgent.files.join(", ")}\n`
-            : "") +
-          `\nTask:\n${prompt}\n\n` +
-          `Important:\n` +
-          workspaceConstraintInstruction +
-          `${commitInstructions}\n` +
-          `- Focus on the specific task described above`,
+        content: prompt,
       },
     ];
 
