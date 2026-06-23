@@ -71,6 +71,14 @@ export default class AgenticLoopService {
       ToolContext.set(resolvedAgentConversationId, "dynamicEnabledTools", initialNames);
     }
 
+    // If this is a top-level agent request, all messages except the last one (the triggering input)
+    // are already persisted in the database.
+    if (!options.isSubAgent && messages.length > 0) {
+      for (let i = 0; i < messages.length - 1; i++) {
+        (messages[i] as any)._alreadyPersisted = true;
+      }
+    }
+
     // 2. Initialize shared state
     const state = new AgenticLoopState({
       originalMessageCount: messages.length,

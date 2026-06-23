@@ -31,9 +31,13 @@ const TYPES = {
   EMBEDDING: CONST_TYPES.EMBEDDING,
 };
 
-vi.mock('../../config.ts', () => ({
-  TYPES,
-}));
+vi.mock('../src/config.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/config.ts')>();
+  return {
+    ...actual,
+    TYPES,
+  };
+});
 
 import type { ModelEntry } from '../src/services/local-provider/types.ts';
 
