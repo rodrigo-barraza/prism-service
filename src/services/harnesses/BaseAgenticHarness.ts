@@ -980,9 +980,9 @@ export default class BaseAgenticHarness {
       try {
         const { default: OrchestratorService } =
           await import("../OrchestratorService.js");
-        const activeSubAgentsList = OrchestratorService.listSubAgents({
-          parentConversationId: conversationId,
-        });
+        const activeSubAgentsList = OrchestratorService.listAllDescendantSubAgents(
+          conversationId,
+        );
         if (activeSubAgentsList.length > 0) {
           const collection = MongoWrapper.getCollection(
             MONGO_DB_NAME,

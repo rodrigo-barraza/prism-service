@@ -201,7 +201,8 @@ const ConversationService: ConversationServiceInterface = {
       collection = DEFAULT_COLLECTION,
       agent,
       title,
-    }: { collection?: string; agent?: string; title?: string } = {},
+      agentConversationId,
+    }: { collection?: string; agent?: string; title?: string; agentConversationId?: string } = {},
   ): Promise<void> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) return;
@@ -212,7 +213,11 @@ const ConversationService: ConversationServiceInterface = {
       await db.collection(collection).updateOne(
         { id: conversationId, project, username },
         {
-          $set: { isGenerating: true, updatedAt: now },
+          $set: {
+            isGenerating: true,
+            updatedAt: now,
+            ...(agentConversationId && { agentConversationId }),
+          },
           $setOnInsert: {
             title: title || DEFAULT_CONVERSATION_TITLE,
             messages: [],
