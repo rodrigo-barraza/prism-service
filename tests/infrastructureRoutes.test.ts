@@ -9,6 +9,8 @@ import FileService from '../src/services/FileService.ts';
 import SettingsService from '../src/services/SettingsService.ts';
 import * as providersModule from '../src/providers/index.ts';
 import { errorHandler } from '../src/utils/errors.ts';
+import * as instanceRegistryModule from '../src/providers/instance-registry.ts';
+import LocalProviderGateway from '../src/services/local-provider/index.ts';
 
 // Import the infrastructure routers
 import benchmarkRouter from '../src/routes/BenchmarkRoutes.ts';
@@ -180,8 +182,31 @@ describe('Infrastructure Routes Integration Tests', () => {
 
     vi.spyOn(MongoWrapper, 'getDb').mockReturnValue(mockDb as any);
 
+    vi.spyOn(instanceRegistryModule, 'isInstance').mockImplementation((id) => {
+      return id === 'lm-studio' || id === 'ollama' || id === 'lm-studio-model' || id === 'ollama-model';
+    });
+
+    vi.spyOn(LocalProviderGateway, 'estimateVRAM').mockReturnValue({
+      totalRequiredMemoryBytes: 1024 * 1024 * 1024,
+      fitsInVram: true,
+      offloadPossible: true,
+      layersToOffload: 32,
+      totalLayers: 32,
+      memoryBreakdown: {
+        modelWeightsBytes: 800 * 1024 * 1024,
+        kvCacheBytes: 200 * 1024 * 1024,
+        activationBytes: 24 * 1024 * 1024
+      }
+    });
+
     vi.spyOn(providersModule, 'getProvider').mockImplementation((providerName) => {
-      const baseProvider = originalGetProvider(providerName);
+      const lookupName = providerName.startsWith('lm-studio') ? 'lm-studio' :
+                         providerName.startsWith('ollama') ? 'ollama' :
+                         providerName;
+      const baseProvider = providersModule.providers[lookupName as keyof typeof providersModule.providers];
+      if (!baseProvider) {
+        throw new Error(`Unknown provider "${providerName}"`);
+      }
       return {
         ...baseProvider,
         listModels: vi.fn().mockResolvedValue({
