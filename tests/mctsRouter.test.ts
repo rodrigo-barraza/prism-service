@@ -883,8 +883,7 @@ describe("MCTSRouter.execute() - Main Orchestration Loop", () => {
     };
 
     // Temporarily mock getProvider to return undefined for this test
-    const providerSpy = vi.spyOn(await import("../src/providers/index.ts"), "getProvider");
-    providerSpy.mockReturnValueOnce(undefined as any);
+    vi.mocked(getProvider).mockReturnValueOnce(undefined as any);
 
     const router = new MCTSRouter();
     const results = await router.execute(
@@ -895,7 +894,6 @@ describe("MCTSRouter.execute() - Main Orchestration Loop", () => {
     );
 
     expect(results).toEqual([{ error: 'Provider "nonexistent" not found' }]);
-    providerSpy.mockRestore();
   });
 
   it("should handle request logging failure gracefully", async () => {
