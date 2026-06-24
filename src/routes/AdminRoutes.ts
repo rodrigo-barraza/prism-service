@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Router } from "express";
 import requestRoutes from "./admin/AdminRequestRoutes.ts";
 import statsRoutes from "./admin/AdminStatsRoutes.ts";
 import conversationRoutes from "./admin/AdminConversationRoutes.ts";
@@ -11,7 +11,7 @@ import {
 import systemRoutes from "./admin/AdminSystemRoutes.ts";
 import lmStudioRoutes from "./admin/AdminLmStudioRoutes.ts";
 
-const router = express.Router();
+const router: Router = express.Router();
 
 router.use("/requests", requestRoutes);
 router.use("/stats", statsRoutes);

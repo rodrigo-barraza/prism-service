@@ -576,13 +576,11 @@ const RequestLogger = {
         : { error: errorMessage },
     });
   },
-  /**
-   * Insert a minimal "pending" request skeleton into MongoDB immediately
-   * when an agentic iteration starts. This triggers a Change Stream insert
-   * event so the graph view can spawn the node before the LLM responds.
-   *
-   * Returns the inserted MongoDB `_id` for later completion via completePending().
-   */
+  // Insert a minimal "pending" request skeleton into MongoDB immediately
+  // when an agentic iteration starts. This triggers a Change Stream insert
+  // event so the graph view can spawn the node before the LLM responds.
+  //
+  // Returns the inserted MongoDB `_id` for later completion via completePending().
   async insertPending({
     requestId,
     endpoint = null,
@@ -639,13 +637,11 @@ const RequestLogger = {
       return null;
     }
   },
-  /**
-   * Update a previously inserted pending request document with full
-   * telemetry, payload, and timing data. Sets status to "completed".
-   *
-   * If the pending document is not found (e.g. was cleaned up), falls
-   * back to a standard full insert via log().
-   */
+  // Update a previously inserted pending request document with full
+  // telemetry, payload, and timing data. Sets status to "completed".
+  //
+  // If the pending document is not found (e.g. was cleaned up), falls
+  // back to a standard full insert via log().
   async completePending(
     pendingDocumentId: ObjectId,
     fullPayload: LogParams,
