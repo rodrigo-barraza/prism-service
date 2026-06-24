@@ -222,162 +222,115 @@ setupWebSocket(wss);
   try {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (db) {
-      await Promise.all([
+      const indexDefinitions: Array<{
+        collection: string;
+        keys: Record<string, number>;
+        options?: { unique: boolean };
+      }> = [
         // requests — primary lookup by requestId (admin detail view)
-        db
-          .collection(COLLECTIONS.REQUESTS)
-          .createIndex({ requestId: 1 }, { unique: true }),
+        { collection: COLLECTIONS.REQUESTS, keys: { requestId: 1 }, options: { unique: true } },
         // requests — used by $lookup from conversations and agent conversation joins
-        db.collection(COLLECTIONS.REQUESTS).createIndex({ conversationId: 1 }),
-        db.collection(COLLECTIONS.REQUESTS).createIndex({ traceId: 1 }),
-        db.collection(COLLECTIONS.REQUESTS).createIndex({ timestamp: -1 }),
-        db
-          .collection(COLLECTIONS.REQUESTS)
-          .createIndex({ project: 1, timestamp: -1 }),
+        { collection: COLLECTIONS.REQUESTS, keys: { conversationId: 1 } },
+        { collection: COLLECTIONS.REQUESTS, keys: { traceId: 1 } },
+        { collection: COLLECTIONS.REQUESTS, keys: { timestamp: -1 } },
+        { collection: COLLECTIONS.REQUESTS, keys: { project: 1, timestamp: -1 } },
         // requests — agent conversation joins (admin traces, conversation detail)
-        db.collection(COLLECTIONS.REQUESTS).createIndex({ agentConversationId: 1 }),
+        { collection: COLLECTIONS.REQUESTS, keys: { agentConversationId: 1 } },
         // requests — parent agent conversation hierarchy traversal (7+ query sites use $in on this field)
-        db
-          .collection(COLLECTIONS.REQUESTS)
-          .createIndex({ parentAgentConversationId: 1 }),
+        { collection: COLLECTIONS.REQUESTS, keys: { parentAgentConversationId: 1 } },
         // requests — per-user stats aggregation
-        db
-          .collection(COLLECTIONS.REQUESTS)
-          .createIndex({ username: 1, timestamp: -1 }),
+        { collection: COLLECTIONS.REQUESTS, keys: { username: 1, timestamp: -1 } },
         // requests — tool stats aggregation (multikey on array field)
-        db.collection(COLLECTIONS.REQUESTS).createIndex({ toolApiNames: 1 }),
+        { collection: COLLECTIONS.REQUESTS, keys: { toolApiNames: 1 } },
         // requests — model/provider breakdown aggregation
-        db
-          .collection(COLLECTIONS.REQUESTS)
-          .createIndex({ model: 1, provider: 1 }),
+        { collection: COLLECTIONS.REQUESTS, keys: { model: 1, provider: 1 } },
         // requests — endpoint breakdown aggregation
-        db.collection(COLLECTIONS.REQUESTS).createIndex({ endpoint: 1 }),
+        { collection: COLLECTIONS.REQUESTS, keys: { endpoint: 1 } },
         // requests — success/failure filtering with time range
-        db
-          .collection(COLLECTIONS.REQUESTS)
-          .createIndex({ success: 1, timestamp: -1 }),
+        { collection: COLLECTIONS.REQUESTS, keys: { success: 1, timestamp: -1 } },
         // conversations — used by findOne lookups and list queries
-        db
-          .collection(COLLECTIONS.MODEL_CONVERSATIONS)
-          .createIndex({ id: 1 }, { unique: true }),
-        db
-          .collection(COLLECTIONS.MODEL_CONVERSATIONS)
-          .createIndex({ updatedAt: -1 }),
-        db
-          .collection(COLLECTIONS.MODEL_CONVERSATIONS)
-          .createIndex({ project: 1, username: 1, updatedAt: -1 }),
-        db
-          .collection(COLLECTIONS.MODEL_CONVERSATIONS)
-          .createIndex({ traceId: 1 }),
+        { collection: COLLECTIONS.MODEL_CONVERSATIONS, keys: { id: 1 }, options: { unique: true } },
+        { collection: COLLECTIONS.MODEL_CONVERSATIONS, keys: { updatedAt: -1 } },
+        { collection: COLLECTIONS.MODEL_CONVERSATIONS, keys: { project: 1, username: 1, updatedAt: -1 } },
+        { collection: COLLECTIONS.MODEL_CONVERSATIONS, keys: { traceId: 1 } },
         // conversations — admin workspace filter
-        db
-          .collection(COLLECTIONS.MODEL_CONVERSATIONS)
-          .createIndex({ workspaceRoot: 1 }),
+        { collection: COLLECTIONS.MODEL_CONVERSATIONS, keys: { workspaceRoot: 1 } },
         // conversations — stale isGenerating cleanup + stats count
-        db
-          .collection(COLLECTIONS.MODEL_CONVERSATIONS)
-          .createIndex({ isGenerating: 1, updatedAt: -1 }),
-
+        { collection: COLLECTIONS.MODEL_CONVERSATIONS, keys: { isGenerating: 1, updatedAt: -1 } },
         // agent_conversations — same indexes as conversations
-        db
-          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-          .createIndex({ id: 1 }, { unique: true }),
-        db
-          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-          .createIndex({ updatedAt: -1 }),
-        db
-          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-          .createIndex({ project: 1, username: 1, updatedAt: -1 }),
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS, keys: { id: 1 }, options: { unique: true } },
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS, keys: { updatedAt: -1 } },
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS, keys: { project: 1, username: 1, updatedAt: -1 } },
         // agent_conversations — admin workspace filter
-        db
-          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-          .createIndex({ workspaceRoot: 1 }),
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS, keys: { workspaceRoot: 1 } },
         // agent_conversations — stale isGenerating cleanup + stats count
-        db
-          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-          .createIndex({ isGenerating: 1, updatedAt: -1 }),
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS, keys: { isGenerating: 1, updatedAt: -1 } },
         // agent_conversations — sub-agent parent linkage (tree grouping in UI)
-        db
-          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-          .createIndex({ parentConversationId: 1 }),
-
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS, keys: { parentConversationId: 1 } },
         // workflows — used by conversationIds lookup
-        db
-          .collection(COLLECTIONS.WORKFLOWS)
-          .createIndex({ id: 1 }, { unique: true }),
+        { collection: COLLECTIONS.WORKFLOWS, keys: { id: 1 }, options: { unique: true } },
         // benchmarks
-        db
-          .collection(COLLECTIONS.BENCHMARKS)
-          .createIndex({ id: 1 }, { unique: true }),
-        db
-          .collection(COLLECTIONS.BENCHMARKS)
-          .createIndex({ project: 1, updatedAt: -1 }),
-        db
-          .collection(COLLECTIONS.BENCHMARK_RUNS)
-          .createIndex({ id: 1 }, { unique: true }),
-        db
-          .collection(COLLECTIONS.BENCHMARK_RUNS)
-          .createIndex({ benchmarkId: 1, project: 1, startedAt: -1 }),
+        { collection: COLLECTIONS.BENCHMARKS, keys: { id: 1 }, options: { unique: true } },
+        { collection: COLLECTIONS.BENCHMARKS, keys: { project: 1, updatedAt: -1 } },
+        { collection: COLLECTIONS.BENCHMARK_RUNS, keys: { id: 1 }, options: { unique: true } },
+        { collection: COLLECTIONS.BENCHMARK_RUNS, keys: { benchmarkId: 1, project: 1, startedAt: -1 } },
         // synthesis
-        db
-          .collection(COLLECTIONS.SYNTHESIS)
-          .createIndex({ id: 1 }, { unique: true }),
-        db
-          .collection(COLLECTIONS.SYNTHESIS)
-          .createIndex({ project: 1, username: 1, updatedAt: -1 }),
-        db
-          .collection(COLLECTIONS.AGENT_SKILLS)
-          .createIndex({ project: 1, username: 1 }),
+        { collection: COLLECTIONS.SYNTHESIS, keys: { id: 1 }, options: { unique: true } },
+        { collection: COLLECTIONS.SYNTHESIS, keys: { project: 1, username: 1, updatedAt: -1 } },
+        { collection: COLLECTIONS.AGENT_SKILLS, keys: { project: 1, username: 1 } },
         // agent_rules
-        db
-          .collection(COLLECTIONS.AGENT_RULES)
-          .createIndex({ project: 1, username: 1, agent: 1 }),
+        { collection: COLLECTIONS.AGENT_RULES, keys: { project: 1, username: 1, agent: 1 } },
         // mcp_servers
-        db
-          .collection(COLLECTIONS.MCP_SERVERS)
-          .createIndex({ project: 1, username: 1 }),
+        { collection: COLLECTIONS.MCP_SERVERS, keys: { project: 1, username: 1 } },
         // mcp_servers — compound for enabled filter (5+ query sites)
-        db
-          .collection(COLLECTIONS.MCP_SERVERS)
-          .createIndex({ project: 1, username: 1, enabled: 1 }),
+        { collection: COLLECTIONS.MCP_SERVERS, keys: { project: 1, username: 1, enabled: 1 } },
         // workspaces
-        db
-          .collection(COLLECTIONS.WORKSPACES)
-          .createIndex({ project: 1, username: 1 }),
-        db
-          .collection(COLLECTIONS.WORKSPACES)
-          .createIndex({ id: 1 }, { unique: true }),
+        { collection: COLLECTIONS.WORKSPACES, keys: { project: 1, username: 1 } },
+        { collection: COLLECTIONS.WORKSPACES, keys: { id: 1 }, options: { unique: true } },
         // prompts
-        db
-          .collection(COLLECTIONS.PROMPTS)
-          .createIndex({ project: 1, username: 1, updatedAt: -1 }),
-        db
-          .collection(COLLECTIONS.PROMPTS)
-          .createIndex({ id: 1 }, { unique: true }),
+        { collection: COLLECTIONS.PROMPTS, keys: { project: 1, username: 1, updatedAt: -1 } },
+        { collection: COLLECTIONS.PROMPTS, keys: { id: 1 }, options: { unique: true } },
         // webhook_subscriptions
-        db
-          .collection(COLLECTIONS.WEBHOOK_SUBSCRIPTIONS)
-          .createIndex({ id: 1 }, { unique: true }),
-        db
-          .collection(COLLECTIONS.WEBHOOK_SUBSCRIPTIONS)
-          .createIndex({ enabled: 1 }),
+        { collection: COLLECTIONS.WEBHOOK_SUBSCRIPTIONS, keys: { id: 1 }, options: { unique: true } },
+        { collection: COLLECTIONS.WEBHOOK_SUBSCRIPTIONS, keys: { enabled: 1 } },
         // somatic_state — unique per agent
-        db
-          .collection(COLLECTIONS.SOMATIC_STATE)
-          .createIndex({ agentId: 1 }, { unique: true }),
+        { collection: COLLECTIONS.SOMATIC_STATE, keys: { agentId: 1 }, options: { unique: true } },
         // workflow_memories — retrieval query index
-        db
-          .collection(COLLECTIONS.WORKFLOW_MEMORIES)
-          .createIndex({ agent: 1, project: 1, createdAt: -1 }),
+        { collection: COLLECTIONS.WORKFLOW_MEMORIES, keys: { agent: 1, project: 1, createdAt: -1 } },
         // workflow_memories — uniqueness per agent conversation
-        db
-          .collection(COLLECTIONS.WORKFLOW_MEMORIES)
-          .createIndex(
-            { conversationId: 1, agentConversationId: 1 },
-            { unique: true },
-          ),
-      ]);
-      logger.success("Database indexes ensured");
+        { collection: COLLECTIONS.WORKFLOW_MEMORIES, keys: { conversationId: 1, agentConversationId: 1 }, options: { unique: true } },
+      ];
+
+      const indexResults = await Promise.allSettled(
+        indexDefinitions.map((definition) =>
+          db
+            .collection(definition.collection)
+            .createIndex(definition.keys, definition.options ?? {})
+            .then(() => ({ collection: definition.collection, keys: definition.keys })),
+        ),
+      );
+
+      const failedIndexes = indexResults.filter(
+        (result): result is PromiseRejectedResult => result.status === "rejected",
+      );
+
+      if (failedIndexes.length > 0) {
+        for (const [indexPosition, failedResult] of failedIndexes.entries()) {
+          const failedDefinition = indexDefinitions[
+            indexResults.indexOf(failedResult)
+          ];
+          logger.error(
+            `Index creation failed for ${failedDefinition.collection} ` +
+            `${JSON.stringify(failedDefinition.keys)}: ${failedResult.reason}`,
+          );
+        }
+        logger.warn(
+          `${failedIndexes.length}/${indexDefinitions.length} indexes failed to create`,
+        );
+      }
+
+      const succeededCount = indexResults.length - failedIndexes.length;
+      logger.success(`Database indexes ensured (${succeededCount}/${indexDefinitions.length})`);
     }
   } catch (error: unknown) {
     logger.error(`Failed to ensure indexes: ${errorMessage(error)}`);

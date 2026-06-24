@@ -75,6 +75,8 @@ vi.mock("../src/services/RequestLogger.ts", () => ({
   default: {
     log: vi.fn().mockResolvedValue(undefined),
     logChatGeneration: vi.fn().mockResolvedValue(undefined),
+    insertPending: vi.fn().mockResolvedValue("mock-pending-id"),
+    completePending: vi.fn().mockResolvedValue(undefined),
   },
 }));
 

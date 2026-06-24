@@ -47,6 +47,9 @@ vi.mock('../src/services/WebhookEventBus.ts', () => ({
 vi.mock('../src/services/RequestLogger.ts', () => ({
   default: {
     logChatGeneration: vi.fn(),
+    insertPending: vi.fn().mockResolvedValue('mock-pending-id'),
+    completePending: vi.fn().mockResolvedValue(undefined),
+    log: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -717,9 +720,11 @@ describe('BaseAgenticHarness Helper Methods', () => {
   });
 
   describe('logIteration', () => {
-    it('should log a chat generation request with correct metadata', () => {
+    it('should log a chat generation request with correct metadata via legacy path', () => {
       const harness = createTestHarness();
       const passState = harness.exposeCreatePassState({ temperature: 0.7 });
+      // Simulate the pending insert not resolving (null pendingRequestDocumentId)
+      passState.pendingRequestDocumentId = null;
       passState.requestId = 'pass-req-1';
       passState.firstTokenTime = passState.start + 100;
       passState.generationEnd = passState.start + 500;
@@ -745,6 +750,153 @@ describe('BaseAgenticHarness Helper Methods', () => {
           agenticIteration: 1,
         }),
       );
+      // Should NOT call completePending when there is no pending doc
+      expect(RequestLogger.completePending).not.toHaveBeenCalled();
+    });
+
+    it('should call completePending instead of logChatGeneration when a pending document exists', () => {
+      const harness = createTestHarness();
+      const passState = harness.exposeCreatePassState({ temperature: 0.5 });
+      passState.pendingRequestDocumentId = 'mock-mongo-object-id' as any;
+      passState.requestId = 'pass-req-2';
+      passState.firstTokenTime = passState.start + 200;
+      passState.generationEnd = passState.start + 800;
+      passState.usage.inputTokens = 250;
+      passState.usage.outputTokens = 120;
+      passState.outputCharacters = 400;
+      passState.streamedText = 'Generated response text.';
+
+      const currentMessages: ConversationMessage[] = [
+        { role: 'user', content: 'Write code' },
+        { role: 'assistant', content: 'Sure, here is the code.' },
+      ];
+
+      harness.getState().iterations = 2;
+      harness.logIteration(passState, currentMessages);
+
+      // Should use completePending path
+      expect(RequestLogger.completePending).toHaveBeenCalledWith(
+        'mock-mongo-object-id',
+        expect.objectContaining({
+          requestId: 'req-abc-2',
+          endpoint: '/agent',
+          operation: 'agent:iteration',
+          provider: PROVIDERS.GOOGLE,
+          model: 'gemini-3-flash',
+          success: true,
+          inputTokens: 250,
+          outputTokens: 120,
+          outputCharacters: 400,
+        }),
+      );
+
+      // Should NOT call logChatGeneration (the legacy path)
+      expect(RequestLogger.logChatGeneration).not.toHaveBeenCalled();
+    });
+
+    it('should include tool display names in the completePending payload when tools were used', () => {
+      const harness = createTestHarness();
+      const passState = harness.exposeCreatePassState({});
+      passState.pendingRequestDocumentId = 'mock-with-tools' as any;
+      passState.pendingToolCalls = [
+        { name: 'read_file', id: 'call-1', args: { path: 'test.txt' } } as any,
+        { name: 'write_file', id: 'call-2', args: { path: 'out.txt', content: 'data' } } as any,
+      ];
+      passState.usage.inputTokens = 100;
+      passState.usage.outputTokens = 50;
+
+      harness.getState().iterations = 1;
+      harness.logIteration(passState, []);
+
+      const completePendingPayload = (RequestLogger.completePending as any).mock.calls[0][1];
+      expect(completePendingPayload.toolsUsed).toBe(true);
+      expect(completePendingPayload.toolDisplayNames).toEqual(
+        expect.arrayContaining(['read_file', 'write_file']),
+      );
+      expect(completePendingPayload.toolApiNames).toEqual(
+        expect.arrayContaining(['read_file', 'write_file']),
+      );
+    });
+  });
+
+  describe('createPassState — two-phase pending insertion', () => {
+    it('should fire insertPending with correct context parameters', async () => {
+      const harness = createTestHarness({
+        requestId: 'req-pending-test',
+        resolvedModel: 'gemini-3-flash',
+        providerName: PROVIDERS.GOOGLE,
+        project: 'test-project',
+        username: 'test-user',
+        conversationId: 'conv-456',
+        agentConversationId: 'agent-conv-123',
+        traceId: 'trace-789',
+      });
+
+      harness.getState().iterations = 0;
+      harness.exposeCreatePassState({ temperature: 0.7 });
+
+      expect(RequestLogger.insertPending).toHaveBeenCalledTimes(1);
+      expect(RequestLogger.insertPending).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestId: 'req-pending-test-1',
+          endpoint: '/agent',
+          operation: 'agent:iteration',
+          project: 'test-project',
+          username: 'test-user',
+          provider: PROVIDERS.GOOGLE,
+          model: 'gemini-3-flash',
+          conversationId: 'conv-456',
+          agentConversationId: 'agent-conv-123',
+          traceId: 'trace-789',
+          agenticIteration: 1,
+        }),
+      );
+    });
+
+    it('should initialize pendingRequestDocumentId as null before async resolution', () => {
+      const harness = createTestHarness();
+      const passState = harness.exposeCreatePassState({});
+
+      // Synchronously, the value is null (the async insertPending resolves later)
+      expect(passState.pendingRequestDocumentId).toBeNull();
+    });
+
+    it('should set pendingRequestDocumentId after the insertPending promise resolves', async () => {
+      (RequestLogger.insertPending as any).mockResolvedValueOnce('resolved-pending-id');
+
+      const harness = createTestHarness();
+      const passState = harness.exposeCreatePassState({});
+
+      // Wait for the fire-and-forget promise to resolve
+      await vi.waitFor(() => {
+        expect(passState.pendingRequestDocumentId).toBe('resolved-pending-id');
+      });
+    });
+
+    it('should leave pendingRequestDocumentId null if insertPending returns null', async () => {
+      (RequestLogger.insertPending as any).mockResolvedValueOnce(null);
+
+      const harness = createTestHarness();
+      const passState = harness.exposeCreatePassState({});
+
+      // Wait for the promise to settle
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(passState.pendingRequestDocumentId).toBeNull();
+    });
+
+    it('should not throw if insertPending rejects', async () => {
+      (RequestLogger.insertPending as any).mockRejectedValueOnce(
+        new Error('MongoDB connection lost'),
+      );
+
+      const harness = createTestHarness();
+
+      // Should not throw synchronously
+      expect(() => harness.exposeCreatePassState({})).not.toThrow();
+
+      // Wait for the rejection to be handled
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
   });
 

@@ -177,6 +177,54 @@ describe("ChangeStreamService", () => {
     await ChangeStreamService.close();
   });
 
+  it("should enrich request update events with conversationId (two-phase lifecycle)", async () => {
+    const mockTestStream = new MockChangeStream();
+    const mockConversationsStream = new MockChangeStream();
+    const mockAgentsStream = new MockChangeStream();
+    const mockRequestsStream = new MockChangeStream();
+
+    mockWatch
+      .mockReturnValueOnce(mockTestStream)
+      .mockReturnValueOnce(mockConversationsStream)
+      .mockReturnValueOnce(mockAgentsStream)
+      .mockReturnValueOnce(mockRequestsStream);
+
+    await ChangeStreamService.init();
+
+    const receivedPayloads: any[] = [];
+    const callback = (payload: any) => {
+      receivedPayloads.push(payload);
+    };
+
+    ChangeStreamService.subscribe(callback);
+
+    // Simulate a completePending update event (two-phase lifecycle)
+    const updateChangeEvent = {
+      operationType: "update",
+      documentKey: { _id: "pending-request-id-789" },
+      fullDocument: {
+        conversationId: "conversation-456",
+        status: "completed",
+        provider: "google",
+        model: "gemini-3.5-flash",
+      },
+      updateDescription: {
+        updatedFields: { status: "completed", inputTokens: 500, outputTokens: 200 },
+      },
+    };
+
+    mockRequestsStream.emit("change", updateChangeEvent);
+
+    expect(receivedPayloads).toHaveLength(1);
+    expect(receivedPayloads[0].operationType).toBe("update");
+    expect(receivedPayloads[0].documentId).toBe("pending-request-id-789");
+    // Key assertion: conversationId enrichment works for updates too
+    expect(receivedPayloads[0].conversationId).toBe("conversation-456");
+
+    ChangeStreamService.unsubscribe(callback);
+    await ChangeStreamService.close();
+  });
+
   it("should reconnect after stream error after delay", async () => {
     const mockTestStream = new MockChangeStream();
     const mockConversationsStream = new MockChangeStream();
