@@ -228,6 +228,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             agent,
             traceId,
             agentConversationId,
+            parentAgentConversationId: context.parentAgentConversationId,
             agentContext: options.agentContext,
             enabledTools: this.tools.resolvedEnabledTools,
             resolvedToolNames: this.tools.finalTools.map(

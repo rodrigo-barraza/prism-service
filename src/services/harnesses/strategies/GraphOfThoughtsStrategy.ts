@@ -181,6 +181,7 @@ export async function runGraphOfThoughts(
     agent,
     traceId,
     agentConversationId: resolvedAgentConversationId,
+    parentAgentConversationId: context.parentAgentConversationId,
     agentContext: options.agentContext,
     enabledTools: tools.resolvedEnabledTools,
     resolvedToolNames: tools.finalTools.map(
