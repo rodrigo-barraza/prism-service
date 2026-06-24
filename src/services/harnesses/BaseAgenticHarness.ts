@@ -1,4 +1,5 @@
 import { expandMessagesForFunctionCall } from "../../utils/FunctionCallingUtilities.ts";
+import { roundMilliseconds } from "@rodrigo-barraza/utilities-library";
 import {
   mergeUsage,
   createUsageAccumulator,
@@ -837,6 +838,91 @@ export default class BaseAgenticHarness {
     );
     const passEstimatedCost = calculateTextCost(pass.usage, pricing);
 
+    // Two-phase completion: if we pre-inserted a pending skeleton on
+    // iteration start, update it in-place instead of inserting a new doc.
+    if (pass.pendingRequestDocumentId) {
+      const fullPayload: import("../RequestLogger.ts").LogParams = {
+        requestId: `${this.context.requestId}-${state.iterations}`,
+        endpoint: "/agent",
+        operation: "agent:iteration",
+        project,
+        username,
+        clientIp: this.context.clientIp,
+        agent: agent || null,
+        provider: providerName,
+        model: resolvedModel,
+        conversationId,
+        agentConversationId,
+        parentAgentConversationId: parentAgentConversationId || null,
+        traceId: traceId || null,
+        toolsUsed: pass.pendingToolCalls.length > 0,
+        toolDisplayNames: pass.pendingToolCalls.length > 0
+          ? [...new Set(pass.pendingToolCalls.map((toolCall) => toolCall.name))]
+          : [],
+        toolApiNames: pass.pendingToolCalls.length > 0
+          ? [...new Set(pass.pendingToolCalls.map((toolCall) => toolCall.name))]
+          : [],
+        success: true,
+        inputTokens: Number(pass.usage.inputTokens) || 0,
+        outputTokens: Number(pass.usage.outputTokens) || 0,
+        cacheReadInputTokens: Number(pass.usage.cacheReadInputTokens) || 0,
+        cacheCreationInputTokens: Number(pass.usage.cacheCreationInputTokens) || 0,
+        reasoningOutputTokens: Number(pass.usage.reasoningOutputTokens) || 0,
+        estimatedCost: passEstimatedCost,
+        tokensPerSec: passTokensPerSec,
+        temperature: (pass.options?.temperature as number) ?? null,
+        maxTokens: (pass.options?.maxTokens as number) ?? null,
+        topP: (pass.options?.topP as number) ?? null,
+        topK: (pass.options?.topK as number) ?? null,
+        frequencyPenalty: (pass.options?.frequencyPenalty as number) ?? null,
+        presencePenalty: (pass.options?.presencePenalty as number) ?? null,
+        stopSequences: (pass.options?.stopSequences as string[]) ?? null,
+        messageCount: currentMessages?.length ?? 0,
+        inputCharacters: currentMessages?.reduce(
+          (sum, message) =>
+            sum + (typeof message.content === "string" ? message.content.length : 0),
+          0,
+        ) ?? 0,
+        outputCharacters: pass.outputCharacters,
+        timeToGeneration: pass.firstTokenTime
+          ? roundMilliseconds((pass.firstTokenTime - pass.start) / 1000)
+          : null,
+        generationTime: passGenerationSec !== null ? roundMilliseconds(passGenerationSec) : null,
+        totalTime: roundMilliseconds(passTotalSec),
+        requestPayload: {
+          messages: currentMessages?.map((message) => ({
+            role: (message as Record<string, unknown>).role,
+            content: (message as Record<string, unknown>).content,
+          })) ?? [],
+          agenticIteration: state.iterations,
+        },
+        responsePayload: {
+          text: pass.streamedText || null,
+          thinking: pass.streamedThinking || null,
+          ...(pass.streamedImages.length > 0 ? { images: pass.streamedImages } : {}),
+          toolCalls: pass.pendingToolCalls.length > 0
+            ? pass.pendingToolCalls.map((toolCall) => ({
+                name: toolCall.name,
+                id: toolCall.id,
+                args: toolCall.args,
+              }))
+            : null,
+          usage: pass.usage,
+        },
+      };
+
+      RequestLogger.completePending(
+        pass.pendingRequestDocumentId,
+        fullPayload,
+      ).catch((error: unknown) =>
+        logger.error(
+          `[AgenticLoopService] Failed to complete pending request: ${errorMessage(error)}`,
+        ),
+      );
+      return;
+    }
+
+    // Legacy path: no pending document — insert a new completed request.
     RequestLogger.logChatGeneration({
       requestId: `${this.context.requestId}-${state.iterations}`,
       endpoint: "/agent",
@@ -879,7 +965,7 @@ export default class BaseAgenticHarness {
 
   /** Create a fresh per-iteration pass state object. */
   createPassState(passOptions: AgenticOptions): PassState {
-    return {
+    const passState: PassState = {
       streamedText: "",
       finalStreamedText: "",
       streamedThinking: "",
@@ -893,7 +979,48 @@ export default class BaseAgenticHarness {
       usage: createUsageAccumulator(),
       options: passOptions,
       requestId: null, // set after tracker registration
+      pendingRequestDocumentId: null,
     };
+
+    // Fire-and-forget: insert a pending skeleton into MongoDB so the
+    // Change Stream triggers immediately and the graph view can spawn
+    // the request node before the LLM responds.
+    const {
+      resolvedModel,
+      providerName,
+      project,
+      username,
+      agent,
+      conversationId,
+      agentConversationId,
+      parentAgentConversationId,
+      traceId,
+      requestId,
+    } = this.context;
+
+    RequestLogger.insertPending({
+      requestId: `${requestId}-${this.state.iterations + 1}`,
+      endpoint: "/agent",
+      operation: "agent:iteration",
+      project,
+      username,
+      clientIp: this.context.clientIp,
+      agent: agent || null,
+      harness: (passOptions?.harness as string) || null,
+      provider: providerName,
+      model: resolvedModel,
+      conversationId,
+      traceId: traceId || null,
+      agentConversationId: agentConversationId || null,
+      parentAgentConversationId: parentAgentConversationId || null,
+      agenticIteration: this.state.iterations + 1,
+    }).then((insertedId) => {
+      passState.pendingRequestDocumentId = insertedId;
+    }).catch((error: unknown) => {
+      logger.error(`[BaseAgenticHarness] Failed to insert pending request: ${errorMessage(error)}`);
+    });
+
+    return passState;
   }
 
   // ── Finalization ──────────────────────────────────────────

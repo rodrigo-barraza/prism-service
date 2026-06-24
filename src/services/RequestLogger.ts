@@ -1,4 +1,5 @@
 import { roundMilliseconds } from "@rodrigo-barraza/utilities-library";
+import type { ObjectId } from "mongodb";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
@@ -135,6 +136,24 @@ export interface LogBackgroundLlmCallParams extends LogParams {
   extraResponsePayload?: Record<string, unknown>;
 }
 
+export interface InsertPendingRequestParams {
+  requestId: string;
+  endpoint?: string | null;
+  operation?: string | null;
+  project?: string | null;
+  username?: string | null;
+  clientIp?: string | null;
+  agent?: string | null;
+  harness?: string | null;
+  provider?: string | null;
+  model?: string | null;
+  conversationId?: string | null;
+  traceId?: string | null;
+  agentConversationId?: string | null;
+  parentAgentConversationId?: string | null;
+  agenticIteration?: number | null;
+}
+
 function sanitizeMessage(message: MessagePayload) {
   const sanitizeString = (s: unknown) =>
     typeof s === "string" && s.startsWith("data:") ? `[base64 data]` : s;
@@ -262,6 +281,7 @@ const RequestLogger = {
         ...(contextLength != null && { contextLength }),
         ...(evalBatchSize != null && { evalBatchSize }),
         ...(physicalBatchSize != null && { physicalBatchSize }),
+        status: "completed",
       };
       await db.collection(COLLECTION).insertOne(document);
 
@@ -555,6 +575,212 @@ const RequestLogger = {
           }
         : { error: errorMessage },
     });
+  },
+  /**
+   * Insert a minimal "pending" request skeleton into MongoDB immediately
+   * when an agentic iteration starts. This triggers a Change Stream insert
+   * event so the graph view can spawn the node before the LLM responds.
+   *
+   * Returns the inserted MongoDB `_id` for later completion via completePending().
+   */
+  async insertPending({
+    requestId,
+    endpoint = null,
+    operation = null,
+    project = null,
+    username = null,
+    clientIp = null,
+    agent = null,
+    harness = null,
+    provider = null,
+    model = null,
+    conversationId = null,
+    traceId = null,
+    agentConversationId = null,
+    parentAgentConversationId = null,
+    agenticIteration = null,
+  }: InsertPendingRequestParams): Promise<ObjectId | null> {
+    try {
+      const db = MongoWrapper.getDb(MONGO_DB_NAME);
+      if (!db) {
+        logger.error("RequestLogger: MongoDB client not available (insertPending)");
+        return null;
+      }
+      const pendingDocument = {
+        requestId,
+        timestamp: new Date().toISOString(),
+        endpoint: endpoint || null,
+        operation: operation || null,
+        project: project || null,
+        username: username || null,
+        clientIp: clientIp || null,
+        agent: agent || null,
+        harness: harness || null,
+        provider: provider || null,
+        model: model || null,
+        conversationId: conversationId || null,
+        traceId: traceId || null,
+        ...(agentConversationId && { agentConversationId }),
+        ...(parentAgentConversationId && { parentAgentConversationId }),
+        ...(agenticIteration !== null && { agenticIteration }),
+        status: "pending",
+        inputTokens: 0,
+        outputTokens: 0,
+        estimatedCost: null,
+        success: null,
+      };
+      const insertResult = await db.collection(COLLECTION).insertOne(pendingDocument);
+      return insertResult.insertedId;
+    } catch (error: unknown) {
+      logger.error(
+        "RequestLogger: failed to insert pending request",
+        getErrorMessage(error),
+      );
+      return null;
+    }
+  },
+  /**
+   * Update a previously inserted pending request document with full
+   * telemetry, payload, and timing data. Sets status to "completed".
+   *
+   * If the pending document is not found (e.g. was cleaned up), falls
+   * back to a standard full insert via log().
+   */
+  async completePending(
+    pendingDocumentId: ObjectId,
+    fullPayload: LogParams,
+  ): Promise<void> {
+    try {
+      const db = MongoWrapper.getDb(MONGO_DB_NAME);
+      if (!db) {
+        logger.error("RequestLogger: MongoDB client not available (completePending)");
+        return;
+      }
+      const {
+        requestId,
+        endpoint,
+        operation,
+        project,
+        username,
+        clientIp,
+        agent,
+        harness,
+        provider,
+        model,
+        conversationId,
+        traceId,
+        agentConversationId,
+        parentAgentConversationId,
+        toolsUsed,
+        toolDisplayNames,
+        toolApiNames,
+        success,
+        errorMessage: errorMsg,
+        inputTokens,
+        outputTokens,
+        cacheReadInputTokens,
+        cacheCreationInputTokens,
+        reasoningOutputTokens,
+        estimatedCost,
+        tokensPerSec,
+        temperature,
+        maxTokens,
+        topP,
+        topK,
+        frequencyPenalty,
+        presencePenalty,
+        stopSequences,
+        messageCount,
+        inputCharacters,
+        outputCharacters,
+        timeToGeneration,
+        generationTime,
+        totalTime,
+        requestPayload,
+        responsePayload,
+        modalities,
+        rateLimits,
+        contextLength,
+        evalBatchSize,
+        physicalBatchSize,
+      } = fullPayload;
+
+      const updateFields: Record<string, unknown> = {
+        status: "completed",
+        requestId,
+        endpoint,
+        operation: operation || null,
+        project,
+        username,
+        clientIp,
+        agent: agent || null,
+        harness: harness || null,
+        provider,
+        model,
+        conversationId,
+        traceId,
+        toolsUsed,
+        toolDisplayNames,
+        toolApiNames,
+        success,
+        errorMessage: errorMsg,
+        inputTokens,
+        outputTokens,
+        estimatedCost,
+        tokensPerSec,
+        temperature,
+        maxTokens,
+        topP,
+        topK,
+        frequencyPenalty,
+        presencePenalty,
+        stopSequences,
+        messageCount,
+        inputCharacters,
+        outputCharacters,
+        timeToGeneration,
+        generationTime,
+        totalTime,
+        requestPayload,
+        responsePayload,
+        modalities,
+        rateLimits,
+      };
+
+      if (agentConversationId) updateFields.agentConversationId = agentConversationId;
+      if (parentAgentConversationId) updateFields.parentAgentConversationId = parentAgentConversationId;
+      if (Number(cacheReadInputTokens) > 0) updateFields.cacheReadInputTokens = Number(cacheReadInputTokens);
+      if (Number(cacheCreationInputTokens) > 0) updateFields.cacheCreationInputTokens = Number(cacheCreationInputTokens);
+      if (Number(reasoningOutputTokens) > 0) updateFields.reasoningOutputTokens = Number(reasoningOutputTokens);
+      if (contextLength != null) updateFields.contextLength = contextLength;
+      if (evalBatchSize != null) updateFields.evalBatchSize = evalBatchSize;
+      if (physicalBatchSize != null) updateFields.physicalBatchSize = physicalBatchSize;
+
+      const updateResult = await db.collection(COLLECTION).updateOne(
+        { _id: pendingDocumentId },
+        { $set: updateFields },
+      );
+
+      if (updateResult.matchedCount === 0) {
+        // Pending document was not found — fall back to standard insert
+        logger.warn("RequestLogger: pending document not found, falling back to full insert");
+        await this.log(fullPayload);
+        return;
+      }
+
+      WebhookEventBus.emit("request.completed", { _id: pendingDocumentId, ...updateFields });
+    } catch (error: unknown) {
+      logger.error(
+        "RequestLogger: failed to complete pending request",
+        getErrorMessage(error),
+      );
+      // Best-effort fallback: try to insert the full document
+      try {
+        await this.log(fullPayload);
+      } catch {
+        // Already logged the error above
+      }
+    }
   },
 };
 export default RequestLogger;

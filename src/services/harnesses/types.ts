@@ -241,6 +241,8 @@ export interface PassState {
   usage: UsageAccumulator;
   options: AgenticOptions;
   requestId: string | null;
+  /** MongoDB _id of the pending request document inserted at iteration start. */
+  pendingRequestDocumentId: import("mongodb").ObjectId | null;
   /** Provider stop reason — "length"/"max_tokens" when output was truncated by token budget. */
   stopReason?: string;
 }
