@@ -1,3 +1,4 @@
+import { ObjectId } from "mongodb";
 import { DEFAULT_WORKFLOW_TITLE } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
@@ -121,9 +122,16 @@ router.get(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const document = await req.db
+      const requestIdentifier = req.params.id as string;
+      // Try by requestId field first, then fall back to MongoDB _id
+      let document = await req.db
         .collection(REQUESTS_COLLECTION)
-        .findOne({ requestId: req.params.id });
+        .findOne({ requestId: requestIdentifier });
+      if (!document && ObjectId.isValid(requestIdentifier)) {
+        document = await req.db
+          .collection(REQUESTS_COLLECTION)
+          .findOne({ _id: new ObjectId(requestIdentifier) });
+      }
       if (!document)
         return res.status(404).json({ error: "Request not found" });
 

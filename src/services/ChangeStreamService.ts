@@ -102,7 +102,8 @@ function openStream(db: Db, collectionName: string) {
         }
       }
 
-      // Enrich requests with conversationId for session-scoped live updates
+      // Enrich requests with conversationId for session-scoped live updates.
+      // Covers both insert (pending skeleton) and update (completion) phases.
       if (
         collectionName === COLLECTIONS.REQUESTS &&
         fullDocument?.conversationId
