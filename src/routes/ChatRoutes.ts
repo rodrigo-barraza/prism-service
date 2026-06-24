@@ -761,6 +761,7 @@ export async function handleAgent(
   markGenerating(conversationId, project, username, true, {
     ...getCollectionOpts(project, agent),
     agent: agent ?? undefined,
+    agentConversationId: resolvedAgentConversationId,
     title:
       typeof conversationMeta?.title === "string"
         ? conversationMeta.title

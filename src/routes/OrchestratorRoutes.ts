@@ -56,7 +56,7 @@ router.get(
 
         const rootConversationDocument = await collection.findOne(
           { id: conversationIdentifier },
-          { projection: { subAgents: 1 } },
+          { projection: { subAgents: 1, agentConversationId: 1 } },
         );
         if (rootConversationDocument && rootConversationDocument.subAgents) {
           if (rootConversationDocument.subAgents.length > 0) {
@@ -65,12 +65,29 @@ router.get(
         }
 
         // Recursively discover all descendant sub-agents by traversing the
-        // parentAgentConversationId chain in the AGENT_CONVERSATIONS collection.
+        // parentAgentConversationId / parentConversationId chain in AGENT_CONVERSATIONS.
         // Each sub-agent conversation may itself have a subAgents array if it
         // spawned its own workers (recursive sub-agent delegation).
+        //
+        // The root conversation's document `id` differs from the in-memory
+        // `agentConversationId` used by the agentic loop. Child conversations
+        // store `parentConversationId` → parent's `id`, and
+        // `parentAgentConversationId` → parent's `agentConversationId`.
+        // Seed the frontier with both IDs and query with $or at every hop.
         const MAX_DESCENDANT_DEPTH = 10;
-        let frontier = [conversationIdentifier];
+        let frontier: string[] = [conversationIdentifier];
         const visitedConversationIds = new Set<string>([conversationIdentifier]);
+
+        // Include the root's agentConversationId (if different from id)
+        const rootAgentConversationId =
+          rootConversationDocument?.agentConversationId as string | undefined;
+        if (
+          rootAgentConversationId &&
+          rootAgentConversationId !== conversationIdentifier
+        ) {
+          frontier.push(rootAgentConversationId);
+          visitedConversationIds.add(rootAgentConversationId);
+        }
 
         for (
           let depth = 0;
@@ -79,8 +96,13 @@ router.get(
         ) {
           const childConversationDocuments = await collection
             .find(
-              { parentAgentConversationId: { $in: frontier } },
-              { projection: { id: 1, subAgents: 1 } },
+              {
+                $or: [
+                  { parentAgentConversationId: { $in: frontier } },
+                  { parentConversationId: { $in: frontier } },
+                ],
+              },
+              { projection: { id: 1, agentConversationId: 1, subAgents: 1 } },
             )
             .toArray();
 
@@ -92,6 +114,19 @@ router.get(
             if (visitedConversationIds.has(childConversationId)) continue;
             visitedConversationIds.add(childConversationId);
             nextFrontier.push(childConversationId);
+
+            // Also track the agentConversationId (if stored and different from id)
+            // so that grandchildren linked via parentAgentConversationId are found.
+            const childAgentConversationId =
+              childDocument.agentConversationId as string | undefined;
+            if (
+              childAgentConversationId &&
+              childAgentConversationId !== childConversationId &&
+              !visitedConversationIds.has(childAgentConversationId)
+            ) {
+              visitedConversationIds.add(childAgentConversationId);
+              nextFrontier.push(childAgentConversationId);
+            }
 
             if (
               Array.isArray(childDocument.subAgents) &&
