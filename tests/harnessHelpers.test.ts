@@ -720,11 +720,11 @@ describe('BaseAgenticHarness Helper Methods', () => {
   });
 
   describe('logIteration', () => {
-    it('should log a chat generation request with correct metadata via legacy path', () => {
+    it('should log a chat generation request with correct metadata via legacy path', async () => {
       const harness = createTestHarness();
       const passState = harness.exposeCreatePassState({ temperature: 0.7 });
-      // Simulate the pending insert not resolving (null pendingRequestDocumentId)
-      passState.pendingRequestDocumentId = null;
+      // Simulate the pending insert not resolving (null pendingRequestDocumentIdPromise)
+      passState.pendingRequestDocumentIdPromise = Promise.resolve(null);
       passState.requestId = 'pass-req-1';
       passState.firstTokenTime = passState.start + 100;
       passState.generationEnd = passState.start + 500;
@@ -738,26 +738,28 @@ describe('BaseAgenticHarness Helper Methods', () => {
       harness.getState().iterations = 1;
       harness.logIteration(passState, currentMessages);
 
-      expect(RequestLogger.logChatGeneration).toHaveBeenCalledWith(
-        expect.objectContaining({
-          endpoint: '/agent',
-          operation: 'agent:iteration',
-          provider: PROVIDERS.GOOGLE,
-          model: 'gemini-3-flash',
-          project: 'test-project',
-          username: 'test-user',
-          success: true,
-          agenticIteration: 1,
-        }),
-      );
+      await vi.waitFor(() => {
+        expect(RequestLogger.logChatGeneration).toHaveBeenCalledWith(
+          expect.objectContaining({
+            endpoint: '/agent',
+            operation: 'agent:iteration',
+            provider: PROVIDERS.GOOGLE,
+            model: 'gemini-3-flash',
+            project: 'test-project',
+            username: 'test-user',
+            success: true,
+            agenticIteration: 1,
+          }),
+        );
+      });
       // Should NOT call completePending when there is no pending doc
       expect(RequestLogger.completePending).not.toHaveBeenCalled();
     });
 
-    it('should call completePending instead of logChatGeneration when a pending document exists', () => {
+    it('should call completePending instead of logChatGeneration when a pending document exists', async () => {
       const harness = createTestHarness();
       const passState = harness.exposeCreatePassState({ temperature: 0.5 });
-      passState.pendingRequestDocumentId = 'mock-mongo-object-id' as any;
+      passState.pendingRequestDocumentIdPromise = Promise.resolve('mock-mongo-object-id' as any);
       passState.requestId = 'pass-req-2';
       passState.firstTokenTime = passState.start + 200;
       passState.generationEnd = passState.start + 800;
@@ -774,30 +776,32 @@ describe('BaseAgenticHarness Helper Methods', () => {
       harness.getState().iterations = 2;
       harness.logIteration(passState, currentMessages);
 
-      // Should use completePending path
-      expect(RequestLogger.completePending).toHaveBeenCalledWith(
-        'mock-mongo-object-id',
-        expect.objectContaining({
-          requestId: 'req-abc-2',
-          endpoint: '/agent',
-          operation: 'agent:iteration',
-          provider: PROVIDERS.GOOGLE,
-          model: 'gemini-3-flash',
-          success: true,
-          inputTokens: 250,
-          outputTokens: 120,
-          outputCharacters: 400,
-        }),
-      );
+      await vi.waitFor(() => {
+        // Should use completePending path
+        expect(RequestLogger.completePending).toHaveBeenCalledWith(
+          'mock-mongo-object-id',
+          expect.objectContaining({
+            requestId: 'req-abc-2',
+            endpoint: '/agent',
+            operation: 'agent:iteration',
+            provider: PROVIDERS.GOOGLE,
+            model: 'gemini-3-flash',
+            success: true,
+            inputTokens: 250,
+            outputTokens: 120,
+            outputCharacters: 400,
+          }),
+        );
+      });
 
       // Should NOT call logChatGeneration (the legacy path)
       expect(RequestLogger.logChatGeneration).not.toHaveBeenCalled();
     });
 
-    it('should include tool display names in the completePending payload when tools were used', () => {
+    it('should include tool display names in the completePending payload when tools were used', async () => {
       const harness = createTestHarness();
       const passState = harness.exposeCreatePassState({});
-      passState.pendingRequestDocumentId = 'mock-with-tools' as any;
+      passState.pendingRequestDocumentIdPromise = Promise.resolve('mock-with-tools' as any);
       passState.pendingToolCalls = [
         { name: 'read_file', id: 'call-1', args: { path: 'test.txt' } } as any,
         { name: 'write_file', id: 'call-2', args: { path: 'out.txt', content: 'data' } } as any,
@@ -807,6 +811,10 @@ describe('BaseAgenticHarness Helper Methods', () => {
 
       harness.getState().iterations = 1;
       harness.logIteration(passState, []);
+
+      await vi.waitFor(() => {
+        expect(RequestLogger.completePending).toHaveBeenCalledTimes(1);
+      });
 
       const completePendingPayload = (RequestLogger.completePending as any).mock.calls[0][1];
       expect(completePendingPayload.toolsUsed).toBe(true);
@@ -832,7 +840,7 @@ describe('BaseAgenticHarness Helper Methods', () => {
         traceId: 'trace-789',
       });
 
-      harness.getState().iterations = 0;
+      harness.getState().iterations = 1;
       harness.exposeCreatePassState({ temperature: 0.7 });
 
       expect(RequestLogger.insertPending).toHaveBeenCalledTimes(1);
@@ -853,50 +861,46 @@ describe('BaseAgenticHarness Helper Methods', () => {
       );
     });
 
-    it('should initialize pendingRequestDocumentId as null before async resolution', () => {
+    it('should initialize pendingRequestDocumentIdPromise as a Promise', () => {
       const harness = createTestHarness();
       const passState = harness.exposeCreatePassState({});
 
-      // Synchronously, the value is null (the async insertPending resolves later)
-      expect(passState.pendingRequestDocumentId).toBeNull();
+      expect(passState.pendingRequestDocumentIdPromise).toBeInstanceOf(Promise);
     });
 
-    it('should set pendingRequestDocumentId after the insertPending promise resolves', async () => {
+    it('should resolve pendingRequestDocumentIdPromise to the expected ID', async () => {
       (RequestLogger.insertPending as any).mockResolvedValueOnce('resolved-pending-id');
 
       const harness = createTestHarness();
       const passState = harness.exposeCreatePassState({});
 
-      // Wait for the fire-and-forget promise to resolve
-      await vi.waitFor(() => {
-        expect(passState.pendingRequestDocumentId).toBe('resolved-pending-id');
-      });
+      const resolved = await passState.pendingRequestDocumentIdPromise;
+      expect(resolved).toBe('resolved-pending-id');
     });
 
-    it('should leave pendingRequestDocumentId null if insertPending returns null', async () => {
+    it('should resolve pendingRequestDocumentIdPromise to null if insertPending returns null', async () => {
       (RequestLogger.insertPending as any).mockResolvedValueOnce(null);
 
       const harness = createTestHarness();
       const passState = harness.exposeCreatePassState({});
 
-      // Wait for the promise to settle
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      expect(passState.pendingRequestDocumentId).toBeNull();
+      const resolved = await passState.pendingRequestDocumentIdPromise;
+      expect(resolved).toBeNull();
     });
 
-    it('should not throw if insertPending rejects', async () => {
+    it('should not throw if insertPending rejects and resolve to null', async () => {
       (RequestLogger.insertPending as any).mockRejectedValueOnce(
         new Error('MongoDB connection lost'),
       );
 
       const harness = createTestHarness();
+      let passState: any;
+      expect(() => {
+        passState = harness.exposeCreatePassState({});
+      }).not.toThrow();
 
-      // Should not throw synchronously
-      expect(() => harness.exposeCreatePassState({})).not.toThrow();
-
-      // Wait for the rejection to be handled
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      const resolved = await passState.pendingRequestDocumentIdPromise;
+      expect(resolved).toBeNull();
     });
   });
 

@@ -148,9 +148,15 @@ router.get(
   "/:id/associations",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const request = await req.db
+      const requestIdentifier = req.params.id as string;
+      let request = await req.db
         .collection(REQUESTS_COLLECTION)
-        .findOne({ requestId: req.params.id });
+        .findOne({ requestId: requestIdentifier });
+      if (!request && ObjectId.isValid(requestIdentifier)) {
+        request = await req.db
+          .collection(REQUESTS_COLLECTION)
+          .findOne({ _id: new ObjectId(requestIdentifier) });
+      }
       if (!request) return res.status(404).json({ error: "Request not found" });
 
       let conversations: Record<string, unknown>[] = [];

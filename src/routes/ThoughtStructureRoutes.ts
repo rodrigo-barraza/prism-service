@@ -4,7 +4,7 @@ import {
   getThoughtStructureById,
 } from "../services/harnesses/strategies/ThoughtStructureRegistry.ts";
 
-const router = Router();
+const router: Router = Router();
 
 router.get("/", (_request: Request, response: Response) => {
   response.json(THOUGHT_STRUCTURE_DEFINITIONS);
