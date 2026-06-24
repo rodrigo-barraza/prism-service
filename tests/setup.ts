@@ -256,16 +256,18 @@ vi.mock('../src/providers/index.ts', () => {
         vllm: mockProviderTextOnly,
     };
 
+    const getProviderMock = vi.fn().mockImplementation((name: string) => {
+        const p = providers[name as keyof typeof providers];
+        if (!p) {
+            throw new Error(
+                `Unknown provider "${name}". Available: ${Object.keys(providers).join(', ')}`,
+            );
+        }
+        return p;
+    });
+
     return {
-        getProvider: (name: string) => {
-            const p = providers[name as keyof typeof providers];
-            if (!p) {
-                throw new Error(
-                    `Unknown provider "${name}". Available: ${Object.keys(providers).join(', ')}`,
-                );
-            }
-            return p;
-        },
+        getProvider: getProviderMock,
         listProviders: () => Object.keys(providers),
         providers,
     };

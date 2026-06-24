@@ -303,7 +303,7 @@ function buildUrlFromEndpoint(
   return `${TOOLS_SERVICE_URL}${path}${queryString ? `?${queryString}` : ""}`;
 }
 
-const ARG_REMAPS = {
+export const ARG_REMAPS: Record<string, Record<string, string>> = {
   search_events: { query: "q" },
   search_products: { query: "q" },
 };

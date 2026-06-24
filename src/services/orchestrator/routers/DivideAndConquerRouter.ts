@@ -21,7 +21,7 @@ const DEFAULT_MAXIMUM_RECURSION_DEPTH = 1;
 const MAXIMUM_ALLOWED_RECURSION_DEPTH = 3;
 const DEFAULT_RECURSION_COMPLEXITY_THRESHOLD = 300;
 
-interface DecomposedSubtask {
+export interface DecomposedSubtask {
   description: string;
   prompt: string;
   dependsOn?: number[];
@@ -33,7 +33,7 @@ function truncateResultOutput(output: string, maximumCharacters: number): string
   return `${truncatedOutput}\n\n[... truncated — output exceeded ${maximumCharacters.toLocaleString()} character budget]`;
 }
 
-function buildDecompositionPrompt(
+export function buildDecompositionPrompt(
   originalTask: string,
   memberCount: number,
   maximumSubtaskCount: number = MAXIMUM_SUBTASKS,
@@ -78,7 +78,7 @@ function buildDecompositionPrompt(
   ].join("\n");
 }
 
-function parseDecompositionResponse(responseText: string, maximumSubtaskCount: number = MAXIMUM_SUBTASKS): DecomposedSubtask[] {
+export function parseDecompositionResponse(responseText: string, maximumSubtaskCount: number = MAXIMUM_SUBTASKS): DecomposedSubtask[] {
   // Strip markdown code fences if present
   let cleanedResponse = responseText.trim();
   cleanedResponse = cleanedResponse.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
@@ -140,7 +140,7 @@ function parseDecompositionResponse(responseText: string, maximumSubtaskCount: n
   }
 }
 
-function buildSynthesisPrompt(
+export function buildSynthesisPrompt(
   originalTask: string,
   subtaskResults: (SubAgentResult | { error: string })[],
   subtaskDescriptions: string[],
@@ -193,7 +193,7 @@ function buildSynthesisPrompt(
  * whose dependencies are all in Tier 0, and so on.
  * Falls back to a single tier (all parallel) if no dependencies exist.
  */
-function buildExecutionTiers(subtasks: DecomposedSubtask[]): number[][] {
+export function buildExecutionTiers(subtasks: DecomposedSubtask[]): number[][] {
   const hasDependencies = subtasks.some(
     (subtask) => subtask.dependsOn && subtask.dependsOn.length > 0,
   );
@@ -258,7 +258,7 @@ function buildExecutionTiers(subtasks: DecomposedSubtask[]): number[][] {
   return tiers;
 }
 
-function buildDependencyContextPrefix(
+export function buildDependencyContextPrefix(
   completedResults: Map<number, SubAgentResult | { error: string }>,
   dependencyIndices: number[],
   subtaskDescriptions: string[],

@@ -251,6 +251,12 @@ export default class OrchestratorService {
       };
     }
 
+    if (currentRecursionDepth >= maxRecursionDepth) {
+      return {
+        error: `Sub-agent spawning limit reached. Current depth ${currentRecursionDepth} exceeds or matches max depth ${maxRecursionDepth}.`,
+      };
+    }
+
     // Resolve max sub-agent iterations: 0 = unlimited (Infinity), positive = clamped 1-100, default = constant
     // Scope attenuation: reduce iterations at each recursion depth hop
     const baseMaxIterations =

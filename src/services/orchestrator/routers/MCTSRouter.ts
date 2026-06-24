@@ -20,7 +20,7 @@ const DEFAULT_BRANCH_FACTOR = 3;
 const MAXIMUM_EVALUATION_CHARACTERS = 100_000;
 const DEFAULT_EXPLORATION_WEIGHT = 1.41;
 
-interface MCTSTreeNode {
+export interface MCTSTreeNode {
   nodeIndex: number;
   depth: number;
   branchIndex: number;
@@ -39,7 +39,7 @@ function truncateResultOutput(output: string, maximumCharacters: number): string
   return `${truncatedOutput}\n\n[... truncated — output exceeded ${maximumCharacters.toLocaleString()} character budget]`;
 }
 
-function buildEvaluationPrompt(
+export function buildEvaluationPrompt(
   originalTask: string,
   candidateResults: { branchIndex: number; output: string }[],
   currentDepth: number,
@@ -91,7 +91,7 @@ function buildEvaluationPrompt(
   ].join("\n");
 }
 
-interface EvaluationResult {
+export interface EvaluationResult {
   scores: number[];
   bestBranchIndex: number;
   isComplete: boolean;
@@ -99,7 +99,7 @@ interface EvaluationResult {
   branchFeedback: string[];
 }
 
-function parseEvaluationResponse(responseText: string, branchCount: number): EvaluationResult {
+export function parseEvaluationResponse(responseText: string, branchCount: number): EvaluationResult {
   let cleanedResponse = responseText.trim();
   cleanedResponse = cleanedResponse.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
 
@@ -160,7 +160,7 @@ function parseEvaluationResponse(responseText: string, branchCount: number): Eva
  * (high-scoring nodes) with exploration (under-visited nodes).
  * Formula: V(s) + w * sqrt(ln(N(parent)) / N(s))
  */
-function computeUpperConfidenceBound(
+export function computeUpperConfidenceBound(
   nodeScore: number,
   nodeVisitCount: number,
   parentVisitCount: number,
@@ -176,7 +176,7 @@ function computeUpperConfidenceBound(
  * Walks up the parent chain from a leaf node, updating each ancestor's
  * score with a running average: V(s) = (V_old * (N-1) + reward) / N
  */
-function backpropagateScores(
+export function backpropagateScores(
   allTreeNodes: MCTSTreeNode[],
   leafNodeIndex: number,
   reward: number,
@@ -198,7 +198,7 @@ function backpropagateScores(
  * depth limits, it is returned. If fully expanded, descends into its
  * children. Falls back to siblings when a subtree is exhausted.
  */
-function selectNodeToExpand(
+export function selectNodeToExpand(
   allTreeNodes: MCTSTreeNode[],
   candidateIndices: number[],
   explorationWeight: number,
@@ -243,7 +243,7 @@ function selectNodeToExpand(
   return null;
 }
 
-function buildRefinementPrompt(
+export function buildRefinementPrompt(
   originalTask: string,
   previousBestOutput: string,
   evaluationFeedback: string,
@@ -276,7 +276,7 @@ function buildRefinementPrompt(
   ].join("\n");
 }
 
-function extractNodeOutput(result: SubAgentResult): string {
+export function extractNodeOutput(result: SubAgentResult): string {
   return result.result
     || buildToolCallFallbackSummary(result)
     || result.summary;
