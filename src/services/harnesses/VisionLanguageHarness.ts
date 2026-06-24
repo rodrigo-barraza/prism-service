@@ -178,6 +178,7 @@ Use these images to observe the environment, notice changes, animations, or user
             agent,
             traceId,
             agentConversationId: agentConversationId || "",
+            parentAgentConversationId: context.parentAgentConversationId,
             agentContext: options.agentContext,
             enabledTools: this.tools.resolvedEnabledTools,
             resolvedToolNames: this.tools.finalTools.map(
