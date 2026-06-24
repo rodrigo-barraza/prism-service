@@ -1044,6 +1044,10 @@ async function executeWorkflow(
 const WorkflowExecutionService = {
   executeWorkflow,
   topologicalSort,
+  resolveMinioRefToUrl,
+  resolveToDataUrl,
+  resolveEndpoint,
+  executeModelNode,
 };
 
 export default WorkflowExecutionService;

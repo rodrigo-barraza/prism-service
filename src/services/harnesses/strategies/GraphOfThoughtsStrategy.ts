@@ -86,6 +86,8 @@ interface IterationPassOptions extends AgenticOptions {
 
 const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
 const DEFAULT_BRANCH_COUNT = 3;
+const DEFAULT_VALUE_THRESHOLD = 5.0;
+const MAX_PROACTIVE_BACKTRACKS = 3;
 
 interface ScoredBranch {
   branchIndex: number;
@@ -145,6 +147,7 @@ export async function runGraphOfThoughts(
     Math.max(1, options.branchCount || DEFAULT_BRANCH_COUNT),
     5,
   );
+  const valueThreshold = options.valueThreshold ?? DEFAULT_VALUE_THRESHOLD;
 
   const clientMaxIterations = options.maxIterations;
   const resolvedMaxIterations =
@@ -334,6 +337,56 @@ export async function runGraphOfThoughts(
           `scores: [${scoredBranches.map((branch) => branch.score.toFixed(1)).join(", ")}]`,
       );
 
+      // ── Proactive value-threshold pruning & filtering ──
+      const activeBranches = scoredBranches.filter(
+        (branch) => branch.score >= valueThreshold,
+      );
+
+      if (
+        activeBranches.length === 0 &&
+        state.iterations > 1 &&
+        state.proactiveBacktracks < MAX_PROACTIVE_BACKTRACKS
+      ) {
+        state.proactiveBacktracks++;
+        state.branchesBacktracked++;
+
+        emit({
+          type: SERVER_SENT_EVENT_TYPES.STATUS,
+          message: STATUS_MESSAGES.BRANCH_BACKTRACKED,
+          branchIndex: -1,
+          reason: "proactive_value_threshold",
+          bestScore: scoredBranches[0]?.score ?? 0,
+          threshold: valueThreshold,
+          proactiveBacktracks: state.proactiveBacktracks,
+          maxProactiveBacktracks: MAX_PROACTIVE_BACKTRACKS,
+        });
+
+        logger.info(
+          `[GraphOfThoughts] Proactive backtrack — best score ${(scoredBranches[0]?.score ?? 0).toFixed(1)} ` +
+            `< threshold ${valueThreshold}. Re-branching (${state.proactiveBacktracks}/${MAX_PROACTIVE_BACKTRACKS}).`,
+        );
+
+        currentMessages.push({
+          role: "system",
+          content:
+            `[PROACTIVE BACKTRACK — ALL BRANCHES SCORED BELOW THRESHOLD ` +
+            `(best: ${(scoredBranches[0]?.score ?? 0).toFixed(1)}/${valueThreshold})]` +
+            `\n\nAll candidate approaches scored poorly on the multi-criteria evaluation. ` +
+            `The current trajectory appears unpromising.\n\n` +
+            `Before retrying, reconsider the problem from a higher level:\n` +
+            `1. Is the current approach fundamentally flawed?\n` +
+            `2. What alternative strategy would be more robust?\n` +
+            `3. Are there simpler, safer paths to the same goal?\n\n` +
+            `Take a DIFFERENT approach on the next attempt.`,
+        });
+
+        continue;
+      }
+
+      const branchesToSynthesize = activeBranches.length > 0
+        ? activeBranches
+        : [scoredBranches[0]];
+
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
       //  PHASE 3: Synthesize branches into merged output
       //  (GoT differentiator — aggregation instead of pick-winner)
@@ -341,7 +394,7 @@ export async function runGraphOfThoughts(
 
       const synthesizedPass = await synthesizeBranches(
         harness,
-        scoredBranches,
+        branchesToSynthesize,
         currentMessages,
         passOptions,
         allowedToolNames,
@@ -354,7 +407,7 @@ export async function runGraphOfThoughts(
 
       finalizePassTracker(synthesizedPass, synthesizedPass.requestId || "");
 
-      for (const branch of scoredBranches) {
+      for (const branch of branchesToSynthesize) {
         if (branch.pass.requestId) {
           finalizePassTracker(branch.pass, branch.pass.requestId);
           harness.logIteration(branch.pass, currentMessages);
