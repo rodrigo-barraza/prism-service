@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import ConversationService from "../src/services/ConversationService.ts";
 
 // ── Mock ChatRoutes & AudioRoutes ─────────────────────────────────────
 const mockHandleConversation = vi.fn();
@@ -1140,6 +1141,351 @@ describe("WebSocket Handler Suite", () => {
           })
         );
       });
+    });
+  });
+
+  describe("Connection Metadata Extraction & Guards", () => {
+    it("should handle IPv4-mapped IPv6 normalization and comma-separated X-Forwarded-For headers", async () => {
+      setupWebSocket(mockWss);
+      const mockSocket = new MockWebSocket();
+      const mockRequest = {
+        url: "/ws/chat",
+        headers: {
+          host: "localhost",
+          "x-forwarded-for": "::ffff:1.2.3.4, 5.6.7.8",
+          "x-project": "headers-project",
+          "x-username": "headers-user",
+          "x-agent": "headers-agent",
+        },
+        socket: { remoteAddress: "127.0.0.1" },
+      };
+
+      mockWss.emitConnection(mockSocket, mockRequest);
+
+      mockSocket.emit("message", Buffer.from(JSON.stringify({ type: "ping" })));
+
+      await vi.waitFor(() => {
+        expect(mockHandleConversation).toHaveBeenCalledWith(
+          expect.objectContaining({
+            clientIp: "1.2.3.4",
+            project: "headers-project",
+            username: "headers-user",
+            agent: "headers-agent",
+          }),
+          expect.any(Function)
+        );
+      });
+    });
+
+    it("should handle array-form X-Forwarded-For headers", async () => {
+      setupWebSocket(mockWss);
+      const mockSocket = new MockWebSocket();
+      const mockRequest = {
+        url: "/ws/chat",
+        headers: {
+          host: "localhost",
+          "x-forwarded-for": ["::ffff:9.8.7.6", "1.1.1.1"],
+        },
+        socket: { remoteAddress: "127.0.0.1" },
+      };
+
+      mockWss.emitConnection(mockSocket, mockRequest);
+      mockSocket.emit("message", Buffer.from(JSON.stringify({ type: "ping" })));
+
+      await vi.waitFor(() => {
+        expect(mockHandleConversation).toHaveBeenCalledWith(
+          expect.objectContaining({
+            clientIp: "9.8.7.6",
+          }),
+          expect.any(Function)
+        );
+      });
+    });
+
+    it("should drop message silently in chat handler when socket is not open", async () => {
+      setupWebSocket(mockWss);
+      const mockSocket = new MockWebSocket();
+      mockSocket.readyState = 2; // CLOSED
+      const mockRequest = {
+        url: "/ws/chat",
+        headers: { host: "localhost" },
+        socket: { remoteAddress: "127.0.0.1" },
+      };
+
+      mockWss.emitConnection(mockSocket, mockRequest);
+
+      mockHandleConversation.mockImplementationOnce((params, emit) => {
+        emit({ type: "chunk", content: "hello" });
+        return Promise.resolve();
+      });
+
+      mockSocket.emit("message", Buffer.from(JSON.stringify({ type: "ping" })));
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(mockSocket.send).not.toHaveBeenCalled();
+    });
+
+    it("should drop message silently in voice handler when socket is not open", async () => {
+      setupWebSocket(mockWss);
+      const mockSocket = new MockWebSocket();
+      mockSocket.readyState = 2; // CLOSED
+      const mockRequest = {
+        url: "/ws/text-to-audio",
+        headers: { host: "localhost" },
+        socket: { remoteAddress: "127.0.0.1" },
+      };
+
+      mockWss.emitConnection(mockSocket, mockRequest);
+
+      mockHandleVoice.mockImplementationOnce((params, sendBinary, sendJson) => {
+        sendBinary(Buffer.from("audio"));
+        sendJson({ type: "done" });
+        return Promise.resolve();
+      });
+
+      mockSocket.emit("message", Buffer.from(JSON.stringify({ type: "ping" })));
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(mockSocket.send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Live Session Lifecycle and Replacement", () => {
+    it("should close previous session when receiving a new setup message", async () => {
+      setupWebSocket(mockWss);
+      const mockSocket = new MockWebSocket();
+      const mockRequest = {
+        url: "/ws/live",
+        headers: { host: "localhost" },
+        socket: { remoteAddress: "127.0.0.1" },
+      };
+
+      mockWss.emitConnection(mockSocket, mockRequest);
+
+      mockSocket.emit("message", Buffer.from(JSON.stringify({ type: "setup" })));
+
+      await vi.waitFor(() => {
+        expect(mockSocket.send).toHaveBeenCalledWith(
+          expect.stringContaining("setupComplete")
+        );
+      });
+
+      mockSocket.emit("message", Buffer.from(JSON.stringify({ type: "setup" })));
+
+      await vi.waitFor(() => {
+        expect(mockLiveSession.close).toHaveBeenCalled();
+      });
+    });
+
+    it("should set/clear isGenerating flag on session lifecycle (open, close, error, disconnect)", async () => {
+      setupWebSocket(mockWss);
+      const mockSocket = new MockWebSocket();
+      const mockRequest = {
+        url: "/ws/live",
+        headers: { host: "localhost" },
+        socket: { remoteAddress: "127.0.0.1" },
+      };
+
+      mockWss.emitConnection(mockSocket, mockRequest);
+
+      mockSocket.emit("message", Buffer.from(JSON.stringify({
+        type: "setup",
+        conversationId: "conv-lifecycle-123"
+      })));
+
+      await vi.waitFor(() => {
+        expect(ConversationService.setGenerating).toHaveBeenCalledWith(
+          "conv-lifecycle-123",
+          "any",
+          "anonymous",
+          true,
+          expect.any(Object)
+        );
+      });
+
+      vi.mocked(ConversationService.setGenerating).mockClear();
+
+      const oncloseCallback = mockConnect.mock.calls[0][0].callbacks.onclose;
+      oncloseCallback();
+
+      await vi.waitFor(() => {
+        expect(ConversationService.setGenerating).toHaveBeenCalledWith(
+          "conv-lifecycle-123",
+          "any",
+          "anonymous",
+          false
+        );
+      });
+
+      vi.mocked(ConversationService.setGenerating).mockClear();
+      mockSocket.emit("close");
+
+      await vi.waitFor(() => {
+        expect(ConversationService.setGenerating).toHaveBeenCalledWith(
+          "conv-lifecycle-123",
+          "any",
+          "anonymous",
+          false
+        );
+      });
+    });
+  });
+
+  describe("Live Session Edge Cases", () => {
+    it("should handle invalid JSON message gracefully", async () => {
+      setupWebSocket(mockWss);
+      const mockSocket = new MockWebSocket();
+      const mockRequest = {
+        url: "/ws/live",
+        headers: { host: "localhost" },
+        socket: { remoteAddress: "127.0.0.1" },
+      };
+
+      mockWss.emitConnection(mockSocket, mockRequest);
+
+      mockSocket.emit("message", "{invalid-json");
+
+      await vi.waitFor(() => {
+        expect(mockSocket.send).toHaveBeenCalledWith(
+          JSON.stringify({ type: "error", message: "Invalid JSON" })
+        );
+      });
+    });
+
+    it("should handle buildAndUploadAudio failure gracefully when FileService throws", async () => {
+      mockUploadFile.mockRejectedValueOnce(new Error("Upload failed"));
+
+      setupWebSocket(mockWss);
+      const mockSocket = new MockWebSocket();
+      const mockRequest = {
+        url: "/ws/live",
+        headers: { host: "localhost" },
+        socket: { remoteAddress: "127.0.0.1" },
+      };
+
+      mockWss.emitConnection(mockSocket, mockRequest);
+
+      mockSocket.emit("message", Buffer.from(JSON.stringify({ type: "setup" })));
+
+      await vi.waitFor(() => {
+        expect(mockSocket.send).toHaveBeenCalledWith(
+          expect.stringContaining("setupComplete")
+        );
+      });
+
+      mockSocket.emit("message", Buffer.from(JSON.stringify({
+        type: "audio",
+        data: Buffer.alloc(16000).toString("base64"),
+      })));
+
+      const onmessageCallback = mockConnect.mock.calls[0][0].callbacks.onmessage;
+      onmessageCallback({
+        serverContent: {
+          modelTurn: {
+            parts: [{ text: "response content" }]
+          }
+        }
+      });
+
+      await vi.waitFor(() => {
+        expect(mockUploadFile).toHaveBeenCalled();
+      });
+    });
+
+    it("should accumulate usage metadata and text across turns", async () => {
+      setupWebSocket(mockWss);
+      const mockSocket = new MockWebSocket();
+      const mockRequest = {
+        url: "/ws/live",
+        headers: { host: "localhost" },
+        socket: { remoteAddress: "127.0.0.1" },
+      };
+
+      mockWss.emitConnection(mockSocket, mockRequest);
+
+      mockSocket.emit("message", Buffer.from(JSON.stringify({ type: "setup", conversationId: "conv-accumulate" })));
+
+      await vi.waitFor(() => {
+        expect(mockSocket.send).toHaveBeenCalledWith(
+          expect.stringContaining("setupComplete")
+        );
+      });
+
+      mockSocket.emit("message", Buffer.from(JSON.stringify({ type: "text", text: "First text" })));
+      mockSocket.emit("message", Buffer.from(JSON.stringify({ type: "text", text: "Second text" })));
+
+      const onmessageCallback = mockConnect.mock.calls[0][0].callbacks.onmessage;
+
+      onmessageCallback({
+        serverContent: {
+          outputTranscription: { text: "Turn output part 1" }
+        },
+        usageMetadata: { promptTokenCount: 15, candidatesTokenCount: 25 }
+      });
+
+      onmessageCallback({
+        serverContent: {
+          outputTranscription: { text: " part 2" }
+        },
+        usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 20 }
+      });
+
+      onmessageCallback({
+        serverContent: {
+          turnComplete: true
+        }
+      });
+
+      await vi.waitFor(() => {
+        expect(mockLogChatGeneration).toHaveBeenCalledWith(
+          expect.objectContaining({
+            messages: [
+              expect.objectContaining({
+                content: "First text\nSecond text"
+              })
+            ],
+            text: "Turn output part 1 part 2",
+            usage: {
+              inputTokens: 25,
+              outputTokens: 45
+            }
+          })
+        );
+      });
+    });
+
+    it("should handle session closed before tool response is sent", async () => {
+      setupWebSocket(mockWss);
+      const mockSocket = new MockWebSocket();
+      const mockRequest = {
+        url: "/ws/live",
+        headers: { host: "localhost" },
+        socket: { remoteAddress: "127.0.0.1" },
+      };
+
+      mockWss.emitConnection(mockSocket, mockRequest);
+
+      mockSocket.emit("message", Buffer.from(JSON.stringify({ type: "setup" })));
+
+      await vi.waitFor(() => {
+        expect(mockSocket.send).toHaveBeenCalledWith(
+          expect.stringContaining("setupComplete")
+        );
+      });
+
+      mockExecuteTool.mockImplementationOnce(() => new Promise((resolve) => setTimeout(() => resolve({ ok: true }), 50)));
+
+      const onmessageCallback = mockConnect.mock.calls[0][0].callbacks.onmessage;
+      onmessageCallback({
+        toolCall: {
+          functionCalls: [{ id: "call-async", name: "test_tool", args: {} }]
+        }
+      });
+
+      mockSocket.emit("message", Buffer.from(JSON.stringify({ type: "close" })));
+
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      expect(mockLiveSession.sendToolResponse).not.toHaveBeenCalled();
     });
   });
 });
