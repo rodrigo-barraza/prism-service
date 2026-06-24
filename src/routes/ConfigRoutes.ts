@@ -24,6 +24,7 @@ import { ARENA_SCORES } from "../arrays.ts";
 import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
 import AgentPersonaRegistry from "../services/AgentPersonaRegistry.ts";
 import SettingsService from "../services/SettingsService.ts";
+import SystemPromptAssembler from "../services/system-prompt/index.ts";
 import rateLimitStore from "../services/RateLimitStore.ts";
 import MinioWrapper from "../wrappers/MinioWrapper.ts";
 import LocalProviderGateway from "../services/local-provider/index.ts";
@@ -563,5 +564,97 @@ router.post(
 router.get("/rate-limits", (_req: Request, res: Response) => {
   res.json(rateLimitStore.getAll());
 });
+
+/**
+ * POST /config/system-prompt-preview
+ * Assembles the full system prompt that would be sent to the LLM, given the
+ * current agent, tool, and workspace configuration. Returns the assembled
+ * text without making any LLM calls. Used by the Raw view in prism-client
+ * to display a live preview of the system prompt on new conversations.
+ */
+router.post(
+  "/system-prompt-preview",
+  asyncHandler(async (req: Request, res: Response) => {
+    try {
+      const {
+        agent,
+        disabledTools,
+        workspaceEnabled,
+        systemPrompt: userSystemPrompt,
+      } = req.body as {
+        agent?: string;
+        disabledTools?: string[];
+        workspaceEnabled?: boolean;
+        systemPrompt?: string;
+      };
+
+      const agentSettings = await SettingsService.getSection("agents");
+      const defaultTopology = agentSettings?.topology || DEFAULT_TOPOLOGY;
+
+      const allSchemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
+      const disabledSet = new Set(disabledTools || []);
+      const enabledToolNames = allSchemas
+        .map((tool: { name: string }) => tool.name)
+        .filter((name: string) => !disabledSet.has(name));
+
+      const resolvedToolNames = ToolOrchestratorService.getToolSchemas(defaultTopology)
+        .map((tool: { name: string }) => tool.name)
+        .filter((name: string) => !disabledSet.has(name));
+
+      const assembler = new SystemPromptAssembler({
+        workspaceRoot: req.workspaceRoot || undefined,
+      });
+
+      const placeholderSystemMessage = { role: "system" as const, content: "" };
+      const placeholderUserMessage = { role: "user" as const, content: "(preview)" };
+
+      const assemblerContext = {
+        agent: agent || null,
+        project: req.project || null,
+        username: req.username || undefined,
+        messages: [placeholderSystemMessage, placeholderUserMessage],
+        enabledTools: enabledToolNames,
+        resolvedToolNames,
+        workspaceEnabled: workspaceEnabled !== false,
+      };
+
+      const result = await assembler.assemble(assemblerContext);
+
+      const sections: string[] = [];
+
+      if (result.prompt) {
+        sections.push(result.prompt);
+      }
+
+      if (userSystemPrompt) {
+        sections.push(
+          `## User System Instruction\n${userSystemPrompt}`,
+        );
+      }
+
+      if (result.skillsText) {
+        sections.push(result.skillsText);
+      }
+
+      if (result.memoriesText) {
+        sections.push(result.memoriesText);
+      }
+
+      if (result.workflowsText) {
+        sections.push(result.workflowsText);
+      }
+
+      const fullPrompt = sections.join("\n\n");
+
+      res.json({
+        prompt: fullPrompt,
+        characterCount: fullPrompt.length,
+        estimatedTokens: Math.ceil(fullPrompt.length / 4),
+      });
+    } catch (error: unknown) {
+      res.status(500).json({ error: errorMessage(error) });
+    }
+  }),
+);
 
 export default router;
