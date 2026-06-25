@@ -51,28 +51,9 @@ import type {
   ToolSchema,
   ToolResult,
   AgenticOptions,
+  BeforePromptHookContext,
 } from "./types.ts";
 
-/**
- * Context object passed to the beforePrompt lifecycle hook.
- * Carries all the data the hook pipeline needs to assemble the system prompt,
- * inject skills, and mutate the message array before the first LLM call.
- */
-interface BeforePromptHookContext {
-  messages: ConversationMessage[];
-  project: string;
-  username: string;
-  agent?: string | null;
-  traceId?: string | null;
-  conversationId: string;
-  agentConversationId: string;
-  agentContext?: unknown;
-  enabledTools: string[] | null;
-  resolvedToolNames: string[];
-  workspaceRoot?: string;
-  _injectedSkills?: string[];
-  [key: string]: unknown;
-}
 
 /**
  * Per-iteration pass options combining the user's AgenticOptions with

@@ -11,6 +11,12 @@
  *   failure, fall back to the next frontier candidate before
  *   re-branching.
  *
+ *   Note on BFS Frontier Fallback: BFS frontier fallback (switching to the next-best
+ *   pre-scored candidate upon validation failure) requires sandbox execution to be active
+ *   (options.enableSandbox === true) to safely roll back any file changes from the failed branch
+ *   before executing the next sibling. Without a sandbox, frontier fallback is bypassed to avoid
+ *   running siblings on a dirty filesystem.
+ *
  *   DFS (Algorithm 2): Explore siblings sequentially — generate
  *   one branch, score it, accept if above threshold. If below,
  *   try the next sibling. Accept best available after exhausting
@@ -33,6 +39,7 @@ import type {
   ToolResult,
   AgenticOptions,
   PassState,
+  BeforePromptHookContext,
 } from "../types.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
@@ -75,22 +82,6 @@ import { maybeInjectSystemReminder, cleanupReminderCache } from "../lifecycle/Sy
 import { checkCostBudget } from "../lifecycle/CostBudgetEnforcer.ts";
 import { createSandboxCheckpoint, restoreSandboxCheckpoint } from "../lifecycle/SandboxExecutor.ts";
 import PlanningModeService from "../../PlanningModeService.ts";
-
-interface BeforePromptHookContext {
-  messages: ConversationMessage[];
-  project: string;
-  username: string;
-  agent?: string | null;
-  traceId?: string | null;
-  conversationId: string;
-  agentConversationId: string;
-  agentContext?: unknown;
-  enabledTools: string[] | null;
-  resolvedToolNames: string[];
-  workspaceRoot?: string;
-  _injectedSkills?: string[];
-  [key: string]: unknown;
-}
 
 interface IterationPassOptions extends AgenticOptions {
   project: string;
