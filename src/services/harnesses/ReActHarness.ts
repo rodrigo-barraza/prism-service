@@ -64,6 +64,7 @@ interface BeforePromptHookContext {
   username: string;
   agent?: string | null;
   traceId?: string | null;
+  conversationId: string;
   agentConversationId: string;
   agentContext?: unknown;
   enabledTools: string[] | null;
@@ -157,6 +158,7 @@ export default class ReActHarness extends BaseAgenticHarness {
     const state = this.state;
     const {
       options,
+      conversationId,
       agentConversationId,
       traceId,
       project,
@@ -227,6 +229,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             username,
             agent,
             traceId,
+            conversationId,
             agentConversationId,
             parentAgentConversationId: context.parentAgentConversationId,
             agentContext: options.agentContext,

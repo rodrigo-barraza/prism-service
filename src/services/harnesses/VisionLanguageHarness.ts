@@ -55,6 +55,7 @@ interface BeforePromptHookContext {
   username: string;
   agent?: string | null;
   traceId?: string | null;
+  conversationId: string;
   agentConversationId: string;
   agentContext?: unknown;
   enabledTools: string[] | null;
@@ -93,6 +94,7 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
     const state = this.state;
     const {
       options,
+      conversationId,
       agentConversationId,
       traceId,
       project,
@@ -177,6 +179,7 @@ Use these images to observe the environment, notice changes, animations, or user
             username,
             agent,
             traceId,
+            conversationId,
             agentConversationId: agentConversationId || "",
             parentAgentConversationId: context.parentAgentConversationId,
             agentContext: options.agentContext,

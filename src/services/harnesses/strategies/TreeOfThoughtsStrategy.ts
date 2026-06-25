@@ -82,6 +82,7 @@ interface BeforePromptHookContext {
   username: string;
   agent?: string | null;
   traceId?: string | null;
+  conversationId: string;
   agentConversationId: string;
   agentContext?: unknown;
   enabledTools: string[] | null;
@@ -148,6 +149,7 @@ export async function runTreeOfThoughts(
   const tools = harness["tools"];
   const {
     options,
+    conversationId,
     agentConversationId,
     traceId,
     project,
@@ -204,6 +206,7 @@ export async function runTreeOfThoughts(
     username,
     agent,
     traceId,
+    conversationId,
     agentConversationId: resolvedAgentConversationId,
     parentAgentConversationId: context.parentAgentConversationId,
     agentContext: options.agentContext,
