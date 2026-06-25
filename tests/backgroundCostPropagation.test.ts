@@ -9,7 +9,7 @@
  *
  * These tests verify that:
  *   1. MemoryExtractor emits estimatedCost in both usage_update events
- *      (memory:extract and embed:memory)
+ *      (memory:extract and memory:embed)
  *   2. MemoryConsolidationService emits estimatedCost in the
  *      memory:consolidate usage_update event
  *   3. Cost values are computed correctly using calculateTextCost
@@ -204,7 +204,7 @@ describe("Background Cost Propagation", () => {
       expect(extractEvent.usage.estimatedCost).toBeCloseTo(expectedCost as number, 8);
     });
 
-    it("should emit estimatedCost in embed:memory usage_update", async () => {
+    it("should emit estimatedCost in memory:embed usage_update", async () => {
       const emittedEvents: any[] = [];
       const emit = (event: any) => emittedEvents.push(event);
 
@@ -226,9 +226,9 @@ describe("Background Cost Propagation", () => {
         emit,
       });
 
-      // Find the embed:memory usage_update event
+      // Find the memory:embed usage_update event
       const embedEvent = emittedEvents.find(
-        (e) => e.type === SERVER_SENT_EVENT_TYPES.USAGE_UPDATE && e.operation === "embed:memory",
+        (e) => e.type === SERVER_SENT_EVENT_TYPES.USAGE_UPDATE && e.operation === "memory:embed",
       );
 
       expect(embedEvent).toBeDefined();
@@ -266,9 +266,9 @@ describe("Background Cost Propagation", () => {
       expect(extractEvent).toBeDefined();
       expect(extractEvent.usage.estimatedCost).toBeGreaterThan(0);
 
-      // But embed:memory should NOT emit (no memories to embed)
+      // But memory:embed should NOT emit (no memories to embed)
       const embedEvent = emittedEvents.find(
-        (e) => e.type === SERVER_SENT_EVENT_TYPES.USAGE_UPDATE && e.operation === "embed:memory",
+        (e) => e.type === SERVER_SENT_EVENT_TYPES.USAGE_UPDATE && e.operation === "memory:embed",
       );
       expect(embedEvent).toBeUndefined();
     });
@@ -360,7 +360,7 @@ describe("Background Cost Propagation", () => {
       expect(bg.cost).toBeCloseTo(0.000250, 8);
       expect(bg.requests).toBe(1);
 
-      // Simulate embed:memory event (4 memories stored)
+      // Simulate memory:embed event (4 memories stored)
       bg = accumulateBackgroundUsage(bg, {
         requests: 4,
         inputTokens: 200,

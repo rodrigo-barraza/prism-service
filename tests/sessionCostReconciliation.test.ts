@@ -199,7 +199,7 @@ describe("Session Cost Reconciliation", () => {
         { estimatedCost: 0.04361, operation: "agent:iteration" },
         { estimatedCost: 0.01851, operation: "agent:iteration" },
         { estimatedCost: 0.00025, operation: "memory:extract" },
-        { estimatedCost: 0.00001, operation: "embed:memory" },
+        { estimatedCost: 0.00001, operation: "memory:embed" },
       ];
 
       const requestLogTotal = requestLogs.reduce(

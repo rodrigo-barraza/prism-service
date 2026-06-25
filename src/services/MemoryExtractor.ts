@@ -441,7 +441,7 @@ export default class MemoryExtractor {
             : null;
           emit({
             type: "usage_update",
-            operation: "embed:memory",
+            operation: "memory:embed",
             usage: {
               requests: stored.length,
               inputTokens: embedTokens,

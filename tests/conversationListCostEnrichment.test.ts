@@ -225,7 +225,7 @@ describe("Conversation List Cost Enrichment", () => {
       const requestLogCosts = [
         { estimatedCost: 0.001 },    // chat request
         { estimatedCost: 0.00025 },  // memory:extract
-        { estimatedCost: 0.00001 },  // embed:memory
+        { estimatedCost: 0.00001 },  // memory:embed
       ];
       const requestLogTotalCost = requestLogCosts.reduce(
         (sum, requestLogEntry) => sum + requestLogEntry.estimatedCost, 0,
