@@ -314,4 +314,43 @@ router.post(
     }
   }),
 );
+/**
+ * GET /lm-studio/server-props
+ * Retrieve rich runtime metadata from a llama.cpp server:
+ * context configuration, slot utilization, sampling defaults,
+ * model path, chat template, and modality flags.
+ *
+ * Query: ?instance=llama-cpp (or llama-cpp-2, etc.)
+ *
+ * Only available for llama-cpp provider instances — returns 404
+ * for lm-studio, ollama, and vllm providers.
+ */
+router.get(
+  "/server-props",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const instanceId = resolveInstanceId(req);
+      const provider = getProvider(instanceId);
+      const providerWithProps = provider as unknown as
+        | { getServerProps?: () => Promise<unknown> }
+        | undefined;
+      if (
+        !providerWithProps ||
+        typeof providerWithProps.getServerProps !== "function"
+      ) {
+        return res.status(404).json({
+          error:
+            "Server props only available for llama-cpp provider instances",
+        });
+      }
+      const serverProps = await providerWithProps.getServerProps();
+      res.json(serverProps);
+    } catch (error: unknown) {
+      logger.error(
+        `GET /lm-studio/server-props error: ${getErrorMessage(error)}`,
+      );
+      next(error);
+    }
+  }),
+);
 export default router;
