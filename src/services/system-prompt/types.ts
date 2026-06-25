@@ -65,6 +65,7 @@ export interface AssemblerContext {
 export interface MemoryFetchOptions {
   traceId?: string | null;
   agentConversationId?: string | null;
+  conversationId?: string | null;
   endpoint?: string;
   _username?: string;
   guildId?: string;

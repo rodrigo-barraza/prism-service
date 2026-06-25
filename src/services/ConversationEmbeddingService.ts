@@ -187,6 +187,7 @@ const ConversationEmbeddingService = {
       project,
       endpoint: endpoint || "/agent",
       traceId,
+      conversationId,
       agentConversationId: agentConversationId || "",
       agent,
     });

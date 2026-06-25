@@ -267,6 +267,7 @@ const WorkflowMemoryService = {
     options: {
       traceId?: string | null;
       agentConversationId?: string | null;
+      conversationId?: string | null;
       endpoint?: string | null;
       username?: string;
       maximumResults?: number;
@@ -293,6 +294,7 @@ const WorkflowMemoryService = {
       project,
       endpoint: options.endpoint || "/agent",
       traceId: options.traceId,
+      conversationId: options.conversationId,
       agentConversationId: options.agentConversationId,
       agent,
     });

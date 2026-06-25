@@ -69,6 +69,7 @@ export interface MemorySearchParams {
   userIds?: string[];
   queryText: string;
   limit?: number;
+  conversationId?: string;
   traceId?: string;
   agentConversationId?: string;
   endpoint?: string;
@@ -94,6 +95,7 @@ export interface MemoryUpdateParams {
 export interface EmbedOptions {
   source?: string;
   project?: string | null;
+  conversationId?: string;
   traceId?: string;
   agentConversationId?: string;
   endpoint?: string;
@@ -284,6 +286,7 @@ const MemoryService = {
     // Generate embedding if not provided
     if (!embedding) {
       const embedOpts: EmbedOptions = { project };
+      if (conversationId) embedOpts.conversationId = conversationId;
       if (traceId) embedOpts.traceId = traceId;
       if (agentConversationId) embedOpts.agentConversationId = agentConversationId;
       if (endpoint) embedOpts.endpoint = endpoint;
@@ -422,6 +425,7 @@ const MemoryService = {
     userIds,
     queryText,
     limit = 10,
+    conversationId,
     traceId,
     agentConversationId,
     endpoint,
@@ -432,6 +436,7 @@ const MemoryService = {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
     // Generate embedding for the search query
     const embeddingOpts: EmbedOptions = {};
+    if (conversationId) embeddingOpts.conversationId = conversationId;
     if (traceId) embeddingOpts.traceId = traceId;
     if (agentConversationId) embeddingOpts.agentConversationId = agentConversationId;
     if (project) embeddingOpts.project = project;
