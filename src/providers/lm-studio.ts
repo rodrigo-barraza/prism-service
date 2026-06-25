@@ -885,6 +885,24 @@ export function createLmStudioProvider(
                 /* ignore */
               }
 
+              // Detect silent context capping: if load succeeded but the
+              // actual loaded context is smaller than what was requested,
+              // record this as the GPU-constrained ceiling so subsequent
+              // needsReload checks don't trigger an infinite unload/reload.
+              if (
+                options._loadedContextLength &&
+                loadOpts.context_length &&
+                (options._loadedContextLength as number) < loadOpts.context_length
+              ) {
+                logger.info(
+                  `[LM-Studio] Model loaded successfully but context was silently capped from ${loadOpts.context_length} to ${options._loadedContextLength}. Recording GPU ceiling.`,
+                );
+                _gpuConstrainedContextLength.set(
+                  model,
+                  options._loadedContextLength as number,
+                );
+              }
+
               resolveInflight!();
               break;
             } catch (error) {
@@ -1495,6 +1513,25 @@ export function createLmStudioProvider(
           if (signal?.aborted)
             return { alreadyLoaded: false, contextLength: null };
 
+          // Cap load request against known GPU ceiling to avoid pointless
+          // over-requests that will just be silently capped again.
+          if (
+            loadOptions.context_length &&
+            typeof loadOptions.context_length === "number"
+          ) {
+            const gpuCeilingForEnsure =
+              _gpuConstrainedContextLength.get(modelKey);
+            if (
+              gpuCeilingForEnsure &&
+              loadOptions.context_length > gpuCeilingForEnsure
+            ) {
+              logger.info(
+                `[LM-Studio] ensureModelLoaded: capping context_length from ${loadOptions.context_length} to GPU ceiling ${gpuCeilingForEnsure}`,
+              );
+              loadOptions.context_length = gpuCeilingForEnsure;
+            }
+          }
+
           logger.info(`[LM-Studio] Loading model ${modelKey}`);
           onStatus?.("Loading model… 0%");
           await this.loadModel(modelKey, loadOptions, signal);
@@ -1506,6 +1543,20 @@ export function createLmStudioProvider(
           );
           const contextLength =
             entry?.loaded_instances?.[0]?.config?.context_length || null;
+
+          // Detect silent context capping and record GPU ceiling
+          if (
+            contextLength &&
+            loadOptions.context_length &&
+            typeof loadOptions.context_length === "number" &&
+            contextLength < loadOptions.context_length
+          ) {
+            logger.info(
+              `[LM-Studio] ensureModelLoaded: context silently capped from ${loadOptions.context_length} to ${contextLength}. Recording GPU ceiling.`,
+            );
+            _gpuConstrainedContextLength.set(modelKey, contextLength);
+          }
+
           resolveInflight!();
           return { alreadyLoaded: false, contextLength };
         } catch (error) {
