@@ -46,24 +46,9 @@ import type {
   ToolSchema,
   ToolResult,
   AgenticOptions,
+  BeforePromptHookContext,
 } from "./types.ts";
 
-/** Context passed to the beforePrompt lifecycle hook. */
-interface BeforePromptHookContext {
-  messages: ConversationMessage[];
-  project: string;
-  username: string;
-  agent?: string | null;
-  traceId?: string | null;
-  conversationId: string;
-  agentConversationId: string;
-  agentContext?: unknown;
-  enabledTools: string[] | null;
-  resolvedToolNames: string[];
-  workspaceRoot?: string;
-  _injectedSkills?: string[];
-  [key: string]: unknown;
-}
 
 /** Per-iteration pass options with runtime context fields. */
 interface IterationPassOptions extends AgenticOptions {

@@ -20,6 +20,7 @@ import type {
   ToolResult,
   AgenticOptions,
   PassState,
+  BeforePromptHookContext,
 } from "../types.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
@@ -63,21 +64,7 @@ import { checkCostBudget } from "../lifecycle/CostBudgetEnforcer.ts";
 import { createSandboxCheckpoint, restoreSandboxCheckpoint } from "../lifecycle/SandboxExecutor.ts";
 import PlanningModeService from "../../PlanningModeService.ts";
 
-interface BeforePromptHookContext {
-  messages: ConversationMessage[];
-  project: string;
-  username: string;
-  agent?: string | null;
-  traceId?: string | null;
-  conversationId: string;
-  agentConversationId: string;
-  agentContext?: unknown;
-  enabledTools: string[] | null;
-  resolvedToolNames: string[];
-  workspaceRoot?: string;
-  _injectedSkills?: string[];
-  [key: string]: unknown;
-}
+
 
 interface IterationPassOptions extends AgenticOptions {
   project: string;
