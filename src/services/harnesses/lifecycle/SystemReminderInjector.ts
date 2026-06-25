@@ -83,6 +83,7 @@ export async function maybeInjectSystemReminder(
         agent: context.agent || null,
         providerName: context.providerName,
         traceId: context.traceId || null,
+        conversationId: (context.conversationId as string) || null,
         agentConversationId: context.agentConversationId || null,
         requestId: context.requestId,
       },

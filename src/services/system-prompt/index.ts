@@ -448,6 +448,7 @@ export default class SystemPromptAssembler {
         {
           traceId: context.traceId,
           agentConversationId: context.agentConversationId,
+          conversationId: context.conversationId as string | null,
           endpoint: "/agent",
           _username: context.username,
           guildId: memoryGuildId,
@@ -472,6 +473,7 @@ export default class SystemPromptAssembler {
           {
             traceId: context.traceId,
             agentConversationId: context.agentConversationId,
+            conversationId: context.conversationId as string | null,
             endpoint: "/agent",
             username: context.username,
           },

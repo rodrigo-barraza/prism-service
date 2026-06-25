@@ -23,6 +23,7 @@ export class SkillMemoryScorer {
     {
       traceId,
       agentConversationId,
+      conversationId,
       endpoint,
       _username,
       guildId,
@@ -35,6 +36,7 @@ export class SkillMemoryScorer {
         project,
         queryText,
         limit: 10,
+        conversationId: conversationId || undefined,
         traceId: traceId || undefined,
         agentConversationId: agentConversationId || undefined,
         endpoint: endpoint || "/agent",

@@ -284,6 +284,7 @@ export default class MemoryExtractor {
           provider: extractionProvider,
           model: extractionModel,
           traceId: traceId || null,
+          conversationId: conversationId || null,
           agentConversationId: agentConversationId || null,
           aiMessages: aiMessages as MessagePayload[],
           resultText: result?.text || "",
@@ -293,7 +294,6 @@ export default class MemoryExtractor {
           requestStartMs: requestStart,
           extraRequestPayload: {
             messageCount: messages.length,
-            conversationId: conversationId || null,
           },
         });
 

@@ -165,6 +165,7 @@ export default class CriticGate {
       provider: context.providerName,
       model: activeModel,
       traceId: context.traceId || null,
+      conversationId: (context.conversationId as string) || null,
       agentConversationId: context.agentConversationId || null,
       aiMessages: criticMessages as Parameters<typeof RequestLogger.logBackgroundLlmCall>[0]["aiMessages"],
       resultText: responseText,

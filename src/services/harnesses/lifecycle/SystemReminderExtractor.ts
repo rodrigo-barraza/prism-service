@@ -73,6 +73,7 @@ export async function extractReminderViaLLM(
     agent?: string | null;
     providerName?: string;
     traceId?: string | null;
+    conversationId?: string | null;
     agentConversationId?: string | null;
     requestId?: string;
   },
@@ -119,6 +120,7 @@ export async function extractReminderViaLLM(
         provider: loggingContext.providerName || "unknown",
         model,
         traceId: loggingContext.traceId || null,
+        conversationId: (loggingContext.conversationId as string) || null,
         agentConversationId: loggingContext.agentConversationId || null,
         aiMessages: extractionMessages as Parameters<typeof RequestLogger.logBackgroundLlmCall>[0]["aiMessages"],
         resultText: responseText,
