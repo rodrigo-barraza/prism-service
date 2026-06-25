@@ -34,6 +34,8 @@ export interface LmStudioLoadConfig {
   flash_attention?: boolean;
   offload_kv_cache_to_gpu?: boolean;
   eval_batch_size?: number;
+  parallel?: number;
+  unified_kv_cache?: boolean;
 }
 
 export interface LmStudioModelMeta {

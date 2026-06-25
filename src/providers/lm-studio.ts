@@ -1602,6 +1602,10 @@ export function createLmStudioProvider(
             payload.offload_kv_cache_to_gpu = options.offload_kv_cache_to_gpu;
           if (options.eval_batch_size != null)
             payload.eval_batch_size = options.eval_batch_size;
+          if (options.parallel != null)
+            payload.parallel = options.parallel;
+          if (options.unified_kv_cache != null)
+            payload.unified_kv_cache = options.unified_kv_cache;
 
           const response = await fetch(`${baseUrl}/api/v1/models/load`, {
             method: "POST",
