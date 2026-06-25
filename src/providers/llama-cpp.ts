@@ -345,6 +345,9 @@ export function createLlamaCppProvider(
                 usage: {
                   inputTokens: chunk.usage.inputTokens || 0,
                   outputTokens: chunk.usage.outputTokens || 0,
+                  ...(chunk.usage.tokensPerSec != null && {
+                    tokensPerSec: chunk.usage.tokensPerSec,
+                  }),
                 },
               };
             } else if (chunk.type === "toolCall") {

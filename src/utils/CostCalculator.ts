@@ -86,6 +86,9 @@ export function mergeUsage(
     (source.cacheCreationInputTokens || 0);
   target.reasoningOutputTokens =
     (target.reasoningOutputTokens ?? 0) + (source.reasoningOutputTokens || 0);
+  if (source.tokensPerSec != null) {
+    target.tokensPerSec = source.tokensPerSec;
+  }
   return target;
 }
 

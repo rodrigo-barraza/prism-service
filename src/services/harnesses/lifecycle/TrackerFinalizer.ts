@@ -25,9 +25,14 @@ export function finalizePassTracker(
   pass: PassState,
   passRequestId: string,
 ): { finalInputTokens: number } {
-  if (pass.usage.outputTokens > 0) {
+  if (pass.usage.outputTokens > 0 || pass.usage.tokensPerSec) {
     ConversationGenerationTracker.update(passRequestId, {
-      outputTokens: pass.usage.outputTokens,
+      ...(pass.usage.outputTokens > 0 && {
+        outputTokens: pass.usage.outputTokens,
+      }),
+      ...(pass.usage.tokensPerSec != null && pass.usage.tokensPerSec > 0 && {
+        providerTokPerSec: pass.usage.tokensPerSec,
+      }),
     });
   }
 

@@ -86,7 +86,7 @@ export interface StreamToolCallChunk {
 
 export interface StreamUsageChunk {
   type: "usage";
-  usage: { inputTokens: number; outputTokens: number };
+  usage: { inputTokens: number; outputTokens: number; tokensPerSec?: number };
   safetyBlock?: boolean;
 }
 

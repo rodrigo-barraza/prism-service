@@ -487,12 +487,19 @@ export default class BaseAgenticHarness {
       mergeUsage(state.overallUsage, usageChunk);
       mergeUsage(pass.usage, usageChunk);
       const rawUsage = streamChunk.usage as Record<string, number> | undefined;
-      const reportedInput =
-        usageChunk?.inputTokens || rawUsage?.promptTokens || 0;
-      if (reportedInput > 0 && pass.requestId) {
-        ConversationGenerationTracker.update(pass.requestId, {
-          inputTokens: reportedInput,
-        });
+      if (pass.requestId) {
+        const reportedInput =
+          usageChunk?.inputTokens || rawUsage?.promptTokens || 0;
+        const reportedOutput = usageChunk?.outputTokens || 0;
+        const trackerUpdate: Record<string, number> = {};
+        if (reportedInput > 0) trackerUpdate.inputTokens = reportedInput;
+        if (reportedOutput > 0) trackerUpdate.outputTokens = reportedOutput;
+        if (usageChunk?.tokensPerSec != null && usageChunk.tokensPerSec > 0) {
+          trackerUpdate.providerTokPerSec = usageChunk.tokensPerSec;
+        }
+        if (Object.keys(trackerUpdate).length > 0) {
+          ConversationGenerationTracker.update(pass.requestId, trackerUpdate);
+        }
       }
       return { action: "continue" };
     }
