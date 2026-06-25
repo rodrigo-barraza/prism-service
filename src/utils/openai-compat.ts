@@ -589,6 +589,14 @@ export async function* parseSSEStream(
   let partialReasoningCharacters = 0;
   let usageYielded = false;
 
+  // Reactive abort: when the signal fires, cancel the reader immediately
+  // so the pending reader.read() resolves with { done: true } instead of
+  // blocking until the next chunk arrives from the upstream server.
+  // Without this, llama.cpp keeps generating until the loop-top poll fires.
+  const abortHandler = () => reader.cancel();
+  if (options.signal && !options.signal.aborted) {
+    options.signal.addEventListener("abort", abortHandler, { once: true });
+  }
   try {
     while (true) {
       if (options.signal?.aborted) {
@@ -767,6 +775,8 @@ export async function* parseSSEStream(
     }
     throw streamError;
   } finally {
+    // Clean up the reactive abort listener
+    options.signal?.removeEventListener("abort", abortHandler);
     // Happy path: yield final usage if stream completed normally
     if (!usageYielded) {
       usageYielded = true;

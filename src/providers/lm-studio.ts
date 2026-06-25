@@ -63,6 +63,13 @@ async function* parseNativeSSEStream(
   // Accumulate tool call arguments for streaming tool events
   let currentToolCall = null;
   let usageYielded = false;
+  // Reactive abort: when the signal fires, cancel the reader immediately
+  // so the pending reader.read() resolves with { done: true } instead of
+  // blocking until the next chunk arrives from the upstream server.
+  const abortHandler = () => reader.cancel();
+  if (options.signal && !options.signal.aborted) {
+    options.signal.addEventListener("abort", abortHandler, { once: true });
+  }
   try {
     while (true) {
       if (options.signal?.aborted) {
@@ -267,6 +274,8 @@ async function* parseNativeSSEStream(
     }
     throw streamError;
   } finally {
+    // Clean up the reactive abort listener
+    options.signal?.removeEventListener("abort", abortHandler);
     // Happy path: yield usage if the stream completed normally without error.
     if (!usageYielded) {
       usageYielded = true;
@@ -1127,6 +1136,9 @@ export function createLmStudioProvider(
                 usage: {
                   inputTokens: chunk.usage.inputTokens || 0,
                   outputTokens: chunk.usage.outputTokens || 0,
+                  ...(chunk.usage.tokensPerSec != null && {
+                    tokensPerSec: chunk.usage.tokensPerSec,
+                  }),
                 },
               };
             } else if (chunk.type === "toolCall") {
@@ -1280,6 +1292,9 @@ export function createLmStudioProvider(
               usage: {
                 inputTokens: chunk.usage.inputTokens || 0,
                 outputTokens: chunk.usage.outputTokens || 0,
+                ...(chunk.usage.tokensPerSec != null && {
+                  tokensPerSec: chunk.usage.tokensPerSec,
+                }),
               },
             };
           } else if (chunk.type === "toolCall") {

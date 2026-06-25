@@ -47,6 +47,7 @@ interface ActiveRequest {
   model: string;
   source: string;
   subAgentId: string | null;
+  providerTokPerSec: number | null;
 }
 
 interface ConversationAccumulator {
@@ -67,6 +68,7 @@ interface UpdateParams {
   outputTokens?: number;
   inputTokens?: number;
   ttft?: number;
+  providerTokPerSec?: number;
 }
 
 interface ConversationGenerationStats {
@@ -128,6 +130,7 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
       model: model || "any",
       source,
       subAgentId: subAgentId ?? null,
+      providerTokPerSec: null,
     };
 
     activeRequests.set(requestId, entry);
@@ -155,7 +158,7 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
    */
   update(
     requestId: string,
-    { outputTokens, inputTokens, ttft }: UpdateParams = {},
+    { outputTokens, inputTokens, ttft, providerTokPerSec }: UpdateParams = {},
   ) {
     const entry = activeRequests.get(requestId);
     if (!entry) return;
@@ -172,6 +175,9 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
     }
     if (ttft != null) {
       entry.ttft = ttft;
+    }
+    if (providerTokPerSec != null) {
+      entry.providerTokPerSec = providerTokPerSec;
     }
   },
 
@@ -218,7 +224,9 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
     // Compute this request's tok/s from the effective token count and
     // the timing window captured during streaming.
     let requestTokPerSec: number | null = null;
-    if (
+    if (entry.providerTokPerSec != null && entry.providerTokPerSec > 0) {
+      requestTokPerSec = entry.providerTokPerSec;
+    } else if (
       effectiveOutputTokens > 0 &&
       entry.firstTokenTime &&
       entry.lastTokenTime
@@ -333,10 +341,15 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
         request.lastTokenTime &&
         effectiveTokens >= MIN_TOKENS_FOR_RATE
       ) {
-        const elapsed = (request.lastTokenTime - request.firstTokenTime) / 1000;
-        if (elapsed >= MIN_ELAPSED_SEC) {
-          totalTokPerSec += effectiveTokens / elapsed;
+        if (request.providerTokPerSec != null && request.providerTokPerSec > 0) {
+          totalTokPerSec += request.providerTokPerSec;
           generatingCount++;
+        } else {
+          const elapsed = (request.lastTokenTime - request.firstTokenTime) / 1000;
+          if (elapsed >= MIN_ELAPSED_SEC) {
+            totalTokPerSec += effectiveTokens / elapsed;
+            generatingCount++;
+          }
         }
       }
     }
