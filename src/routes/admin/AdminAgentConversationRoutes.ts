@@ -193,6 +193,7 @@ conversationStatsRouter.get(
           parentAgentConversationId: 1,
           traceId: 1,
           agent: 1,
+          username: 1,
         })
         .sort({ timestamp: 1 })
         .toArray();
