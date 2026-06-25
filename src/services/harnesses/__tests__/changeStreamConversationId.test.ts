@@ -6,7 +6,7 @@
  * the ChangeStreamService correctly enriches SSE events with the
  * `conversationId` for request-type change events.
  *
- * Regression coverage for the bug where embed:memory and embed:workflow-query
+ * Regression coverage for the bug where memory:embed and workflow-query:embed
  * requests were created with `conversationId: null`, making them invisible
  * to the graph's SSE filter (`changeEvent.conversationId === conversationId`).
  *
@@ -177,7 +177,7 @@ describe("ChangeStreamService — conversationId enrichment", () => {
   it("enriches payload with conversationId when the request document has one", () => {
     const payload = simulateChangeStreamEnrichment("requests", {
       conversationId: "conv-abc-123",
-      operation: "embed:memory",
+      operation: "memory:embed",
       username: "system",
     });
 
@@ -187,7 +187,7 @@ describe("ChangeStreamService — conversationId enrichment", () => {
   it("does NOT enrich payload when conversationId is null (the original bug)", () => {
     const payload = simulateChangeStreamEnrichment("requests", {
       conversationId: null,
-      operation: "embed:memory",
+      operation: "memory:embed",
       username: "system",
     });
 
@@ -196,7 +196,7 @@ describe("ChangeStreamService — conversationId enrichment", () => {
 
   it("does NOT enrich payload when conversationId is missing entirely", () => {
     const payload = simulateChangeStreamEnrichment("requests", {
-      operation: "embed:memory",
+      operation: "memory:embed",
       username: "system",
     });
 
@@ -306,7 +306,7 @@ describe("Graph buildFromConversation — user node filtering", () => {
    * preventing a spurious "system" user bubble in the graph visualization.
    *
    * The 'system' username appears on background embedding operations
-   * (embed:memory, embed:workflow-query) which are infrastructure requests,
+   * (memory:embed, workflow-query:embed) which are infrastructure requests,
    * not user-initiated actions.
    */
 
@@ -345,7 +345,7 @@ describe("End-to-end scenario — all request types should produce visible SSE e
   /**
    * Simulates the full pipeline for a single user turn:
    *
-   *   1. beforePrompt hook runs → embed:memory + embed:workflow-query created
+   *   1. beforePrompt hook runs → memory:embed + workflow-query:embed created
    *   2. agent:iteration pending insert → then completed
    *   3. afterResponse hooks → embed:conversation-..., memory:extract
    *
@@ -371,7 +371,7 @@ describe("End-to-end scenario — all request types should produce visible SSE e
       operation,
       conversationId: conversationIdFromHook || null,
       agentConversationId: AGENT_CONVERSATION_ID,
-      username: operation.startsWith("embed:") ? "system" : "rodrigo",
+      username: operation.endsWith(":embed") ? "system" : "rodrigo",
     };
   }
 
@@ -390,10 +390,10 @@ describe("End-to-end scenario — all request types should produce visible SSE e
 
   it("all 5 request types produce visible SSE events when conversationId is set (after fix)", () => {
     const operations = [
-      "embed:memory",
-      "embed:workflow-query",
+      "memory:embed",
+      "workflow-query:embed",
       "agent:iteration",
-      "embed:conversation-summary",
+      "conversation-summary:embed",
       "memory:extract",
     ];
 
@@ -411,7 +411,7 @@ describe("End-to-end scenario — all request types should produce visible SSE e
   });
 
   it("embed requests are invisible when conversationId is undefined (before fix)", () => {
-    const embedOperations = ["embed:memory", "embed:workflow-query"];
+    const embedOperations = ["memory:embed", "workflow-query:embed"];
 
     for (const operation of embedOperations) {
       const requestDocument = createRequestDocument(operation, undefined);
@@ -428,10 +428,10 @@ describe("End-to-end scenario — all request types should produce visible SSE e
 
   it("all request types should have the same conversationId", () => {
     const operations = [
-      "embed:memory",
-      "embed:workflow-query",
+      "memory:embed",
+      "workflow-query:embed",
       "agent:iteration",
-      "embed:conversation-summary",
+      "conversation-summary:embed",
       "memory:extract",
     ];
 
@@ -449,10 +449,10 @@ describe("End-to-end scenario — all request types should produce visible SSE e
 
   it("user node filtering excludes system-username embedding requests", () => {
     const operations = [
-      "embed:memory",
-      "embed:workflow-query",
+      "memory:embed",
+      "workflow-query:embed",
       "agent:iteration",
-      "embed:conversation-summary",
+      "conversation-summary:embed",
       "memory:extract",
     ];
 

@@ -117,7 +117,7 @@ const EmbeddingService = {
       RequestLogger.log({
         requestId,
         endpoint: options.endpoint || null,
-        operation: `embed:${source}`,
+        operation: `${source}:embed`,
         project: options.project || null,
         username: options.username || "system",
         clientIp: options.clientIp || null,
