@@ -117,6 +117,8 @@ export interface ProviderOptions {
   flash_attention?: boolean;
   offload_kv_cache_to_gpu?: boolean;
   eval_batch_size?: number;
+  parallel?: number;
+  unified_kv_cache?: boolean;
   // Image generation
   forceImageGeneration?: boolean;
   imageCount?: number;

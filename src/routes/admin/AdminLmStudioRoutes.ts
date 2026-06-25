@@ -36,6 +36,9 @@ router.post(
         context_length,
         flash_attention,
         offload_kv_cache_to_gpu,
+        eval_batch_size,
+        parallel,
+        unified_kv_cache,
       } = req.body;
       if (!model) {
         return res
@@ -51,6 +54,11 @@ router.post(
         loadOptions.flash_attention = flash_attention;
       if (offload_kv_cache_to_gpu != null)
         loadOptions.offload_kv_cache_to_gpu = offload_kv_cache_to_gpu;
+      if (eval_batch_size != null)
+        loadOptions.eval_batch_size = eval_batch_size;
+      if (parallel != null) loadOptions.parallel = parallel;
+      if (unified_kv_cache != null)
+        loadOptions.unified_kv_cache = unified_kv_cache;
 
       const { alreadyLoaded } = await provider.ensureModelLoaded(
         model,

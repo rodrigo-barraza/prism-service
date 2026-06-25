@@ -54,6 +54,8 @@ router.post(
         flash_attention,
         offload_kv_cache_to_gpu,
         eval_batch_size,
+        parallel,
+        unified_kv_cache,
       } = req.body;
       if (!model) {
         return res
@@ -71,6 +73,9 @@ router.post(
         loadOptions.offload_kv_cache_to_gpu = offload_kv_cache_to_gpu;
       if (eval_batch_size != null)
         loadOptions.eval_batch_size = eval_batch_size;
+      if (parallel != null) loadOptions.parallel = parallel;
+      if (unified_kv_cache != null)
+        loadOptions.unified_kv_cache = unified_kv_cache;
       // ensureModelLoaded handles: skip if already loaded, unload others, then load
       const { alreadyLoaded } = await provider.ensureModelLoaded(
         model,
@@ -110,6 +115,8 @@ router.post(
       flash_attention,
       offload_kv_cache_to_gpu,
       eval_batch_size,
+      parallel,
+      unified_kv_cache,
     } = req.body;
     if (!model) {
       return res.status(400).json({ error: "Missing 'model' in request body" });
@@ -139,6 +146,9 @@ router.post(
         loadOptions.offload_kv_cache_to_gpu = offload_kv_cache_to_gpu;
       if (eval_batch_size != null)
         loadOptions.eval_batch_size = eval_batch_size;
+      if (parallel != null) loadOptions.parallel = parallel;
+      if (unified_kv_cache != null)
+        loadOptions.unified_kv_cache = unified_kv_cache;
       if (aborted) return res.end();
       // Check if model is already loaded and unload others if needed
       // (non-streaming part — quick check + unload)
