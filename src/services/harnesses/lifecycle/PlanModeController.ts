@@ -1,5 +1,6 @@
 import PlanningModeService from "../../PlanningModeService.ts";
 import { pendingApprovals } from "../../ApprovalRegistry.ts";
+import PromptLocaleService from "../../PromptLocaleService.ts";
 import logger from "../../../utils/logger.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
@@ -80,7 +81,7 @@ export function blockUnauthorizedToolCalls(
 
     currentMessages.push({
       role: "system",
-      content: `You are in PLANNING MODE. Your tool call(s) [${blockedToolNames}] were blocked because only exit_plan_mode is available during planning. You MUST call exit_plan_mode to present your plan for approval before any other tools can be used.`,
+      content: PromptLocaleService.get("en", "harness.planningMode.blocked", { blockedNames: blockedToolNames }),
     });
 
     return { allBlocked: true };

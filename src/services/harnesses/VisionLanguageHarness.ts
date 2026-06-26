@@ -7,6 +7,7 @@ import {
   MAX_TOOL_ITERATIONS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import LiveFrameService from "../LiveFrameService.ts";
+import PromptLocaleService from "../PromptLocaleService.ts";
 
 import { createStandardHooks } from "./lifecycle/HookInitializer.ts";
 import { executeToolBatch } from "./lifecycle/ToolExecutor.ts";
@@ -125,12 +126,7 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
     const systemMessage = currentMessages.find(
       (message) => message.role === "system",
     );
-    const visionInstruction = `
-
-## 🎥 LIVE VISION FEED ACTIVE
-You are equipped with a live visual feed (webcam or screen stream). The last 3 frames of this feed are automatically captured and attached to the user's latest message (ordered from oldest to newest).
-Use these images to observe the environment, notice changes, animations, or user gestures, and refer to them naturally in your conversation.
-`;
+    const visionInstruction = PromptLocaleService.get("en", "harness.visionFeed.instruction");
     if (systemMessage) {
       if (!systemMessage.content?.includes("LIVE VISION FEED ACTIVE")) {
         systemMessage.content =

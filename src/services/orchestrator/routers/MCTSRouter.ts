@@ -13,6 +13,7 @@ import { getProvider } from "../../../providers/index.ts";
 import logger from "../../../utils/logger.ts";
 import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 import RequestLogger from "../../RequestLogger.ts";
+import PromptLocaleService from "../../PromptLocaleService.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 
 const DEFAULT_MAXIMUM_DEPTH = 3;
@@ -55,7 +56,7 @@ export function buildEvaluationPrompt(
   });
 
   return [
-    `You are an evaluator in a Monte Carlo Tree Search (MCTS) for agent reasoning.`,
+    PromptLocaleService.get("en", "routers.mcts.evaluator"),
     `This is depth ${currentDepth} of ${maximumDepth}.`,
     "",
     "## Original Task",
@@ -77,7 +78,7 @@ export function buildEvaluationPrompt(
     "Also determine if the BEST candidate is a complete solution (no further iterations needed).",
     "Provide per-branch feedback explaining each branch's strengths and weaknesses.",
     "",
-    "Respond with ONLY a JSON object. No markdown fences, no explanations outside the JSON.",
+    PromptLocaleService.get("en", "routers.mcts.responseFormat"),
     "",
     "```json",
     "{",
@@ -251,7 +252,7 @@ export function buildRefinementPrompt(
   maximumDepth: number,
 ): string {
   return [
-    `You are continuing work on a task. A previous attempt was evaluated and selected as the best approach, but it needs refinement.`,
+    PromptLocaleService.get("en", "routers.mcts.refinementContext"),
     `This is iteration ${currentDepth} of ${maximumDepth}.`,
     "",
     "## Original Task",

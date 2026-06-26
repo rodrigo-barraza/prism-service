@@ -29,6 +29,7 @@ import {
   MAX_TOOL_ITERATIONS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import logger from "../../../utils/logger.ts";
+import PromptLocaleService from "../../PromptLocaleService.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 import RequestLogger from "../../RequestLogger.ts";
 import { createStandardHooks } from "../lifecycle/HookInitializer.ts";
@@ -1034,10 +1035,7 @@ async function runPlanningPhase(
       }
       currentMessages.push({
         role: "system",
-        content:
-          `You are in PLANNING MODE. Tool call(s) [${blockedNames}] were blocked — ` +
-          `only exit_plan_mode is available. Write your complete plan as text output, ` +
-          `then call exit_plan_mode to submit it for user approval.`,
+        content: PromptLocaleService.get("en", "harness.planningMode.blocked", { blockedNames }),
       });
       continue;
     }

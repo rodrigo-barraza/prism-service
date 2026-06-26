@@ -13,6 +13,7 @@ import { getProvider } from "../../../providers/index.ts";
 import logger from "../../../utils/logger.ts";
 import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 import RequestLogger from "../../RequestLogger.ts";
+import PromptLocaleService from "../../PromptLocaleService.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 
 const MAXIMUM_SUBTASKS = 6;
@@ -41,8 +42,8 @@ export function buildDecompositionPrompt(
   const maximumSubtasks = Math.min(maximumSubtaskCount, Math.max(memberCount, 3));
 
   return [
-    `You are a task decomposition planner.`,
-    `Your job is to break down a complex task into subtasks that can be executed by separate sub-agents.`,
+    PromptLocaleService.get("en", "routers.divideAndConquer.planner"),
+    PromptLocaleService.get("en", "routers.divideAndConquer.planInstruction"),
     "",
     "## Original Task",
     "",
@@ -60,7 +61,7 @@ export function buildDecompositionPrompt(
     "",
     "## Output Format",
     "",
-    "Respond with ONLY a JSON array of subtask objects. No markdown fences, no explanations outside the JSON.",
+    PromptLocaleService.get("en", "routers.divideAndConquer.planFormat"),
     "",
     "```json",
     "[",
@@ -165,7 +166,7 @@ export function buildSynthesisPrompt(
   });
 
   return [
-    `You are a synthesis agent for a divide-and-conquer execution.`,
+    PromptLocaleService.get("en", "routers.divideAndConquer.synthesizer"),
     `The original task was decomposed into ${subtaskResults.length} independent subtasks. Each was executed by a separate sub-agent.`,
     "",
     "## Original Task",
@@ -178,8 +179,7 @@ export function buildSynthesisPrompt(
     "",
     "## Instructions",
     "",
-    "1. Analyze all subtask results above.",
-    "2. Verify that the original task has been fully addressed across all subtasks.",
+    PromptLocaleService.get("en", "routers.divideAndConquer.synthesizeInstruction"),
     "3. Identify any gaps — subtasks that failed or areas that weren't covered.",
     "4. Produce a single, coherent synthesis that combines all subtask results.",
     "5. If any subtasks failed, note what remains to be done.",

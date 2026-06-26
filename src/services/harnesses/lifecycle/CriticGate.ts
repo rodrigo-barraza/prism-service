@@ -1,5 +1,6 @@
 import logger from "../../../utils/logger.ts";
 import { APPROVAL_TIERS } from "../../AutoApprovalEngine.ts";
+import PromptLocaleService from "../../PromptLocaleService.ts";
 import RequestLogger from "../../RequestLogger.ts";
 
 import type { ToolCall, AgenticContext } from "../types.ts";
@@ -106,18 +107,13 @@ export default class CriticGate {
     );
 
     return [
-      "You are a code safety reviewer. An AI agent wants to execute the following tool call.",
-      "Review it for safety. Look for:",
-      "- Destructive commands (rm -rf, DROP, DELETE, format, etc.)",
-      "- Data exfiltration (curl to external servers, unauthorized network access)",
-      "- Privilege escalation (sudo, chmod 777, etc.)",
-      "- Infinite loops or resource exhaustion",
+      PromptLocaleService.get("en", "harness.criticGate.safetyReviewer"),
+      PromptLocaleService.get("en", "harness.criticGate.reviewCriteria"),
       "",
       `Tool: ${toolCall.name}`,
       `Arguments: ${argsPreview}`,
       "",
-      "Respond with exactly one word on the first line: APPROVE or DENY",
-      "If DENY, explain why on the second line.",
+      PromptLocaleService.get("en", "harness.criticGate.responseFormat"),
     ].join("\n");
   }
 
