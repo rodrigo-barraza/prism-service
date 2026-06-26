@@ -47,7 +47,7 @@ export default class PlanningModeService {
 
     const settings = await SettingsService.getSection("agents");
     const locale = settings?.locale || PromptLocaleService.getDefaultLocale();
-    const planningInstruction = PromptLocaleService.get(locale, "planning.planningInstruction");
+    const planningInstruction = PromptLocaleService.get(locale, "harness.planningMode.planningInstruction");
 
     // Insert AFTER the system message but BEFORE any user messages
     const systemIndex = messages.findIndex(
