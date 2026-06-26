@@ -216,7 +216,7 @@ describe("TreeOfThoughtsStrategy", () => {
     abortController.abort();
 
     const result = await runTreeOfThoughts(mockHarnessInstance as any);
-    expect(result.messages.length).toBe(1); // Unchanged
+    expect(result.messages.length).toBe(2); // Injected context message + user message
     expect(mockAgenticLoopState.iterations).toBe(1);
   });
 

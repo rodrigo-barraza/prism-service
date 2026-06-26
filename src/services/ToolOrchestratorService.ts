@@ -152,15 +152,21 @@ const activeWorktrees = new Map<string, WorktreeState>();
  * Fetch tool schemas from tools-api and populate caches.
  * Called eagerly at module load — non-blocking, graceful fallback.
  */
+let cachedSchemaLocale = "";
+
 async function fetchSchemas() {
   try {
+    const settings = await SettingsService.getSection("agents");
+    const locale = settings?.locale || "en";
+    cachedSchemaLocale = locale;
     const controller = createAbortController();
     const timeout = setTimeout(
       () => controller.abort(),
       TOOL_SCHEMA_FETCH_TIMEOUT_MS,
     );
 
-    const response = await fetch(`${TOOLS_SERVICE_URL}/admin/tool-schemas`, {
+    const localeParam = locale !== "en" ? `?locale=${encodeURIComponent(locale)}` : "";
+    const response = await fetch(`${TOOLS_SERVICE_URL}/admin/tool-schemas${localeParam}`, {
       signal: controller.signal,
     });
     clearTimeout(timeout);

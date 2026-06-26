@@ -217,7 +217,7 @@ describe("GraphOfThoughtsStrategy", () => {
     abortController.abort();
 
     const result = await runGraphOfThoughts(mockHarnessInstance as any);
-    expect(result.messages.length).toBe(1);
+    expect(result.messages.length).toBe(2);
     expect(mockAgenticLoopState.iterations).toBe(1);
   });
 

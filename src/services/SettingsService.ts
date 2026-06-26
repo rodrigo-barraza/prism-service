@@ -109,24 +109,33 @@ const SettingsService = {
   async get(): Promise<SettingsData> {
     if (_cache) return _cache;
 
-    const collection = MongoWrapper.getCollection(
-      MONGO_DB_NAME,
-      COLLECTIONS.SETTINGS,
-    );
-    if (!collection) return { ...DEFAULTS };
+    try {
+      const collection = MongoWrapper.getCollection(
+        MONGO_DB_NAME,
+        COLLECTIONS.SETTINGS,
+      );
+      if (!collection) return { ...DEFAULTS };
 
-    const document = await collection.findOne({ _key: "global" });
-    if (!document) {
-      _cache = { ...DEFAULTS };
+      const document = await collection.findOne({ _key: "global" });
+      if (!document) {
+        _cache = { ...DEFAULTS };
+        return _cache;
+      }
+
+      // Deep merge: defaults ← stored
+      _cache = deepMerge(
+        DEFAULTS as Record<string, unknown>,
+        (document.data || {}) as Record<string, unknown>,
+      ) as SettingsData;
       return _cache;
+    } catch (error) {
+      logger.warn(
+        `[SettingsService] Failed to load settings from database: ${
+          error instanceof Error ? error.message : String(error)
+        }. Falling back to defaults.`
+      );
+      return { ...DEFAULTS };
     }
-
-    // Deep merge: defaults ← stored
-    _cache = deepMerge(
-      DEFAULTS as Record<string, unknown>,
-      (document.data || {}) as Record<string, unknown>,
-    ) as SettingsData;
-    return _cache;
   },
   async getSection<K extends keyof SettingsData>(
     section: K,

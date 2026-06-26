@@ -376,12 +376,12 @@ describe("PlanModeController", () => {
   });
 
   describe("checkForPlanModeEntry", () => {
-    it("should activate plan mode when enter_plan_mode is in tool calls", () => {
+    it("should activate plan mode when enter_plan_mode is in tool calls", async () => {
       const mockEmit = vi.fn();
       const state = { planModeActive: false, planModeText: "" };
       const currentMessages: any[] = [];
 
-      checkForPlanModeEntry(
+      await checkForPlanModeEntry(
         [{ name: "enter_plan_mode", id: "toolCall-1", args: {} }],
         currentMessages,
         state as any,
@@ -396,12 +396,12 @@ describe("PlanModeController", () => {
       });
     });
 
-    it("should not activate plan mode for unrelated tool calls", () => {
+    it("should not activate plan mode for unrelated tool calls", async () => {
       const mockEmit = vi.fn();
       const state = { planModeActive: false, planModeText: "" };
       const currentMessages: any[] = [];
 
-      checkForPlanModeEntry(
+      await checkForPlanModeEntry(
         [{ name: "read_file", id: "toolCall-1", args: {} }],
         currentMessages,
         state as any,

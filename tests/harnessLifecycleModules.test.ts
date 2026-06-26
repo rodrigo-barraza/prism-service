@@ -762,10 +762,10 @@ describe("Harness Lifecycle Modules", () => {
       expect(currentMessages[1].content).toContain("You are in PLANNING MODE");
     });
 
-    it("should enter plan mode when enter_plan_mode is encountered", () => {
+    it("should enter plan mode when enter_plan_mode is encountered", async () => {
       const state = { planModeActive: false, planModeText: "" };
       const emitSpy = vi.fn();
-      checkForPlanModeEntry([{ name: "enter_plan_mode" }] as any, [], state as any, emitSpy);
+      await checkForPlanModeEntry([{ name: "enter_plan_mode" }] as any, [], state as any, emitSpy);
       expect(state.planModeActive).toBe(true);
       expect(emitSpy).toHaveBeenCalled();
     });
