@@ -1587,16 +1587,16 @@ export default class ToolOrchestratorService {
       total: existingTotal + indexResults.length,
       ...(hasDisabledMcpMatches &&
         !toolsApiResult.action_required &&
-        !toolsApiResult.actionRequired && {
-          actionRequired:
-            "IMPORTANT: Some discovered tools are NOT currently enabled (isEnabled: false). " +
-            "You MUST call enable_tools with the tool names you need before you can use them. " +
-            "After enabling, the tools become available on your next iteration.",
-          action_required:
-            "IMPORTANT: Some discovered tools are NOT currently enabled (isEnabled: false). " +
-            "You MUST call enable_tools with the tool names you need before you can use them. " +
-            "After enabling, the tools become available on your next iteration.",
-        }),
+        !toolsApiResult.actionRequired && (() => {
+          const nudgeText = PromptLocaleService.get(
+            PromptLocaleService.getDefaultLocale(),
+            "internal-tools-runtime.shared.searchActionNudgeDisabled",
+          );
+          return {
+            actionRequired: nudgeText,
+            action_required: nudgeText,
+          };
+        })()),
     };
   }
 

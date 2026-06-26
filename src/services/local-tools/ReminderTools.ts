@@ -1,4 +1,5 @@
 import logger from "../../utils/logger.ts";
+import PromptLocaleService from "../PromptLocaleService.ts";
 import {
   TOOL_NAMES,
   DOMAINS,
@@ -73,11 +74,11 @@ const setTimer = {
     const username = context.username || DEFAULT_USERNAME;
 
     if (!conversationId) {
-      return { error: "No active agent session / conversation ID in context." };
+      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.set_timer.noConversation") };
     }
 
     if (!prompt || typeof prompt !== "string") {
-      return { error: "'prompt' is a required string parameter." };
+      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.set_timer.noPrompt") };
     }
 
     if (
@@ -86,9 +87,7 @@ const setTimer = {
       durationSeconds > TIMER_MAXIMUM_SECONDS
     ) {
       return {
-        error:
-          `'durationSeconds' must be between ${TIMER_MINIMUM_SECONDS} and ${TIMER_MAXIMUM_SECONDS} seconds. ` +
-          `For longer scheduled reminders or recurring events, use create_cron_job instead.`,
+        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.set_timer.invalidDuration", { min: String(TIMER_MINIMUM_SECONDS), max: String(TIMER_MAXIMUM_SECONDS) }),
       };
     }
 
@@ -147,7 +146,7 @@ const listTimers = {
     const username = context.username || DEFAULT_USERNAME;
 
     if (!conversationId) {
-      return { error: "No active agent session / conversation ID in context." };
+      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.list_timers.noConversation") };
     }
 
     try {
@@ -215,7 +214,7 @@ const cancelTimer = {
     const username = context.username || DEFAULT_USERNAME;
 
     if (!timerId || typeof timerId !== "string") {
-      return { error: "'timerId' is a required string parameter." };
+      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.cancel_timer.noTimerId") };
     }
 
     try {
@@ -230,13 +229,13 @@ const cancelTimer = {
       if (!wasCancelled) {
         return {
           success: false,
-          message: `No active timer found with ID ${timerId}.`,
+          message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.cancel_timer.notFound", { timerId }),
         };
       }
 
       return {
         success: true,
-        message: `Successfully cancelled timer ${timerId}.`,
+        message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.cancel_timer.success", { timerId }),
       };
     } catch (error: unknown) {
       return { error: `Failed to cancel timer: ${getErrorMessage(error)}` };

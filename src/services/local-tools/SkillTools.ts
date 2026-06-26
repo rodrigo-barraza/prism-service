@@ -1,4 +1,5 @@
 import logger from "../../utils/logger.ts";
+import PromptLocaleService from "../PromptLocaleService.ts";
 import {
   TOOL_NAMES,
   DOMAINS,
@@ -120,7 +121,7 @@ const createSkill = {
           : undefined,
     };
     if (!createArgs.name || !createArgs.prompt)
-      return { error: "name and prompt are required" };
+      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.create_skill.missingFields") };
     const { default: SkillService } = await import("../SkillService.js");
     return SkillService.create(createArgs);
   },
@@ -163,7 +164,7 @@ const executeSkill = {
       toolArguments.variables && typeof toolArguments.variables === "object"
         ? (toolArguments.variables as Record<string, unknown>)
         : {};
-    if (!skillId) return { error: "skillId is required" };
+    if (!skillId) return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.execute_skill.missingSkillId") };
 
     const { default: SkillService } = await import("../SkillService.js");
     const prepared = await SkillService.prepare(skillId, variables);
@@ -247,7 +248,7 @@ const deleteSkill = {
   ) {
     const skillId =
       typeof toolArguments.skillId === "string" ? toolArguments.skillId : "";
-    if (!skillId) return { error: "skillId is required" };
+    if (!skillId) return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.delete_skill.missingSkillId") };
     const { default: SkillService } = await import("../SkillService.js");
     return SkillService.delete(skillId);
   },

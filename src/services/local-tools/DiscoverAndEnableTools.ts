@@ -111,7 +111,7 @@ const discoverAndEnableTools = {
   ) {
     const agentConversationId = context.agentConversationId;
     if (!agentConversationId) {
-      return { error: "No active agent conversation ID in context." };
+      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.shared.noConversation") };
     }
 
     const query =
@@ -122,15 +122,13 @@ const discoverAndEnableTools = {
         : undefined;
 
     if (!query && !domain) {
-      return { error: "At least one of 'query' or 'domain' is required." };
+      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.discover_and_enable_tools.noQueryOrDomain") };
     }
 
     const agentSettings = await SettingsService.getSection("agents");
     if (agentSettings?.dynamicToolActivation === false) {
       return {
-        error:
-          "Dynamic tool activation is disabled in settings. " +
-          "An administrator can enable it in Settings → Agent Defaults.",
+        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.shared.dynamicToolActivationDisabled"),
       };
     }
 
@@ -158,7 +156,7 @@ const discoverAndEnableTools = {
       return {
         ...searchResult,
         auto_enabled: [],
-        message: "No matching tools found.",
+        message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.discover_and_enable_tools.noMatches"),
       };
     }
 
@@ -195,8 +193,8 @@ const discoverAndEnableTools = {
       auto_enabled: newlyActivatedTools,
       message:
         newlyActivatedTools.length > 0
-          ? `Found ${matches.length} tool(s) and auto-enabled ${newlyActivatedTools.length}. They are available on the next iteration — call them directly.`
-          : `Found ${matches.length} tool(s), all were already enabled — call them directly.`,
+          ? PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.discover_and_enable_tools.foundAndEnabled", { matchCount: String(matches.length), enabledCount: String(newlyActivatedTools.length) })
+          : PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.discover_and_enable_tools.foundAlreadyEnabled", { matchCount: String(matches.length) }),
     };
   },
 };

@@ -1,4 +1,5 @@
 import logger from "../../utils/logger.ts";
+import PromptLocaleService from "../PromptLocaleService.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
@@ -76,21 +77,20 @@ const enterWorktree = {
     const agentConversationId = context.agentConversationId;
     if (!agentConversationId) {
       return {
-        error:
-          "No agent conversation — worktree isolation requires an active conversation",
+        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.enter_worktree.noConversation"),
       };
     }
 
     const worktreeState = ToolOrchestratorService.getWorktreeState(agentConversationId);
     if (worktreeState) {
       return {
-        error: `Already in a worktree (branch: ${worktreeState.branchName}). Call exit_worktree first.`,
+        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.enter_worktree.alreadyInWorktree", { branch: String(worktreeState.branchName) }),
       };
     }
 
     const workspaceRoot = ToolOrchestratorService.getWorkspaceRoot();
     if (!workspaceRoot) {
-      return { error: "No workspace root configured" };
+      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.enter_worktree.noWorkspace") };
     }
 
     const repoPath = existsSync(resolve(workspaceRoot, ".git"))
@@ -136,7 +136,7 @@ const enterWorktree = {
       branch: branchName,
       worktreePath: createResult.worktreePath,
       reason: enterArgs.reason || null,
-      message: `Now working in isolated worktree. All file operations are redirected to ${createResult.worktreePath}. Call exit_worktree with action 'merge' or 'discard' when done.`,
+      message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.enter_worktree.success", { path: createResult.worktreePath! }),
     };
   },
 };
@@ -184,7 +184,7 @@ const exitWorktree = {
     const worktreeState = ToolOrchestratorService.getWorktreeState(agentConversationId);
     if (!agentConversationId || !worktreeState) {
       return {
-        error: "Not currently in a worktree. Call enter_worktree first.",
+        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.exit_worktree.notInWorktree"),
       };
     }
 
@@ -211,7 +211,7 @@ const exitWorktree = {
 
       if (mergeResult.error) {
         return {
-          error: `Merge failed: ${mergeResult.error}. Worktree preserved at ${worktreeState.worktreePath}. Resolve conflicts and try again, or exit_worktree with action 'discard'.`,
+          error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.exit_worktree.mergeFailed", { error: mergeResult.error, path: worktreeState.worktreePath }),
         };
       }
 
@@ -249,8 +249,8 @@ const exitWorktree = {
       merged: action === "merge" ? mergeResult : undefined,
       message:
         action === "merge"
-          ? `Changes from ${worktreeState.branchName} merged into main branch. Workspace restored.`
-          : `Worktree ${worktreeState.branchName} discarded. All changes removed. Workspace restored.`,
+          ? PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.exit_worktree.merged", { branch: String(worktreeState.branchName) })
+          : PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.exit_worktree.discarded", { branch: String(worktreeState.branchName) }),
     };
   },
 };

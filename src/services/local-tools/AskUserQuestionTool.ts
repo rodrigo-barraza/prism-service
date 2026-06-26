@@ -1,4 +1,5 @@
 import logger from "../../utils/logger.ts";
+import PromptLocaleService from "../PromptLocaleService.ts";
 import {
   TOOL_NAMES,
   DOMAINS,
@@ -139,7 +140,7 @@ export default {
 
     if (!questions || !Array.isArray(questions) || questions.length === 0) {
       return {
-        error: "The 'questions' array is required and must not be empty",
+        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.ask_user.questionsRequired"),
       };
     }
 
@@ -151,13 +152,12 @@ export default {
         typeof questionInput.question !== "string"
       ) {
         return {
-          error:
-            "Each question in the 'questions' array must have a non-empty 'question' string",
+          error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.ask_user.invalidQuestion"),
         };
       }
       if (seen.has(questionInput.question)) {
         return {
-          error: `Duplicate question text: "${questionInput.question.slice(0, 60)}"`,
+          error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.ask_user.duplicateQuestion", { preview: questionInput.question.slice(0, 60) }),
         };
       }
       seen.add(questionInput.question);
@@ -168,7 +168,7 @@ export default {
         for (const option of questionOptions) {
           if (labelsSeen.has(option.label)) {
             return {
-              error: `Duplicate option label "${option.label}" in question "${questionInput.question.slice(0, 40)}"`,
+              error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.ask_user.duplicateOption", { label: option.label, question: questionInput.question.slice(0, 40) }),
             };
           }
           labelsSeen.add(option.label);
@@ -176,7 +176,7 @@ export default {
       }
     }
     if (questions.length > 4) {
-      return { error: "Maximum 4 questions per call" };
+      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.ask_user.tooManyQuestions") };
     }
     const normalizedQuestions: NormalizedQuestion[] = questions.map(
       (questionInput) => ({
@@ -193,7 +193,7 @@ export default {
     const agentConversationId = context.agentConversationId;
     if (!agentConversationId) {
       return {
-        error: "No conversation — ask_user_question requires an active conversation",
+        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.ask_user.noConversation"),
       };
     }
 
@@ -237,7 +237,7 @@ export default {
       return {
         answers: null,
         timedOut: true,
-        message: "The user did not respond within 5 minutes.",
+        message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.ask_user.timedOut"),
       };
     }
 

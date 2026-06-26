@@ -831,23 +831,26 @@ const SomaticStateService = {
       )
       .join("\n");
 
-    let block = `# ⚡ ACTIVE MOOD STATE — THIS IS YOUR PRIMARY DIRECTIVE ⚡
-## Your current mood is: ${dominantEmotion.dominant.toUpperCase()} at ${intensityBracket} intensity (${Math.round(dominantEmotion.intensity)}/100)
-## THIS MOOD COMPLETELY DEFINES HOW YOU SPEAK, THINK, AND BEHAVE RIGHT NOW.
-## Every word you say MUST be filtered through this emotional lens.
+    const locale = PromptLocaleService.getDefaultLocale();
+    const moodHeader = PromptLocaleService.get(locale, "somatic.moodTemplate.header");
+    const currentMood = PromptLocaleService.get(locale, "somatic.moodTemplate.currentMood", {
+      emotion: dominantEmotion.dominant.toUpperCase(),
+      intensityBracket,
+      intensity: String(Math.round(dominantEmotion.intensity)),
+    });
+    const moodDirective = PromptLocaleService.get(locale, "somatic.moodTemplate.directive");
+    const moodFilter = PromptLocaleService.get(locale, "somatic.moodTemplate.filter");
+    const spectrumHeader = PromptLocaleService.get(locale, "somatic.moodTemplate.spectrumHeader");
+    const intensityRulesHeader = PromptLocaleService.get(locale, "somatic.moodTemplate.intensityRulesHeader");
+    const intensityMild = PromptLocaleService.get(locale, "somatic.moodTemplate.intensityMild");
+    const intensityModerate = PromptLocaleService.get(locale, "somatic.moodTemplate.intensityModerate");
+    const intensityStrong = PromptLocaleService.get(locale, "somatic.moodTemplate.intensityStrong");
+    const intensityOverwhelming = PromptLocaleService.get(locale, "somatic.moodTemplate.intensityOverwhelming");
+    const physicalStateHeader = PromptLocaleService.get(locale, "somatic.moodTemplate.physicalStateHeader");
 
-${behaviorPrompt}
+    let block = `${moodHeader}\n${currentMood}\n${moodDirective}\n${moodFilter}\n\n${behaviorPrompt}\n\n${spectrumHeader}\n${emotionDetailsLines}\n\n${intensityRulesHeader}\n${intensityMild}\n${intensityModerate}\n${intensityStrong}\n${intensityOverwhelming}`;
 
-## Emotional Spectrum (your full internal state):
-${emotionDetailsLines}
-
-## Mood Intensity Rules:
-- At MILD intensity (0-25): The mood colors your default personality with an emotional lean.
-- At MODERATE intensity (25-50): The mood is clearly affecting you. Tone, word choice, and behavior shift noticeably.
-- At STRONG intensity (50-75): The mood DOMINATES. You can barely contain it. It bleeds into every sentence.
-- At OVERWHELMING intensity (75-100): You ARE this emotion. Nothing else exists. Fully consumed.`;
-
-    block += `\n\n# Your Current Physical State`;
+    block += `\n\n${physicalStateHeader}`;
 
     const physicalStats: [string, SomaticStatEntry, number][] = [
       ["Hunger", snapshot.hunger, STAT_MAX_VALUES.hunger],

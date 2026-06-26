@@ -1,4 +1,5 @@
 import logger from "../../utils/logger.ts";
+import PromptLocaleService from "../PromptLocaleService.ts";
 import {
   TOOL_NAMES,
   DOMAINS,
@@ -40,15 +41,7 @@ export default {
       acknowledged: true,
       mode: "plan",
       reason: args.reason || null,
-      message:
-        "Entered plan mode. You should now focus on exploring the codebase and designing an implementation approach.\n\n" +
-        "In plan mode, you should:\n" +
-        "1. Thoroughly explore the codebase to understand existing patterns\n" +
-        "2. Identify similar features and architectural approaches\n" +
-        "3. Consider multiple approaches and their trade-offs\n" +
-        "4. Design a concrete implementation strategy\n" +
-        "5. When ready, call exit_plan_mode to present your plan for approval\n\n" +
-        "Remember: DO NOT write or edit any files yet. This is a read-only exploration and planning phase.",
+      message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "harness.planModeEntry.message"),
     };
   },
 };

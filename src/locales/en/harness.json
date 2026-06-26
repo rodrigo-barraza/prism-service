@@ -21,5 +21,13 @@
   },
   "planModeEntry": {
     "message": "Entered plan mode. You should now focus on exploring the codebase and designing an implementation approach.\n\nIn plan mode, you should:\n1. Thoroughly explore the codebase to understand existing patterns\n2. Identify similar features and architectural approaches\n3. Consider multiple approaches and their trade-offs\n4. Design a concrete implementation strategy\n5. When ready, call exit_plan_mode to present your plan for approval\n\nRemember: DO NOT write or edit any files yet. This is a read-only exploration and planning phase."
+  },
+  "toolDiscoveryNudge": {
+    "autoEnabled": "Your search found {{count}} tool(s): {{toolNames}}. They have been automatically enabled and are available now — call them directly.",
+    "enableRequired": "Your search found {{count}} tool(s) that are not yet enabled: {{toolNames}}. Call enable_tools with these tool names now. TIP: Next time, use discover_and_enable_tools instead of search_tools — it searches AND enables in a single step, saving an iteration."
+  },
+  "toolRetryGuidance": {
+    "header": "[TOOL RETRY GUIDANCE] {{count}} tool call(s) failed:",
+    "analyzeSteps": "Before retrying, analyze:\n1. Which specific argument(s) caused the failure?\n2. What value(s) should be corrected or adjusted?\n3. Is there a prerequisite step needed before this tool call can succeed?\n\nRetry with corrected arguments, or take a different approach if the tool is not appropriate for this task."
   }
 }

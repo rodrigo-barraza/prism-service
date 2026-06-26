@@ -1,4 +1,5 @@
 import logger from "../../../utils/logger.ts";
+import PromptLocaleService from "../../PromptLocaleService.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
@@ -119,16 +120,18 @@ export function buildToolRetryGuidance(
     })
     .join("\n\n");
 
+  const locale = PromptLocaleService.getDefaultLocale();
+  const headerText = PromptLocaleService.get(locale, "harness.toolRetryGuidance.header", {
+    count: String(failedToolCalls.length),
+  });
+  const analyzeSteps = PromptLocaleService.get(locale, "harness.toolRetryGuidance.analyzeSteps");
+
   const retryMessage: ConversationMessage = {
     role: "system",
     content:
-      `[TOOL RETRY GUIDANCE] ${failedToolCalls.length} tool call(s) failed:\n\n` +
+      `${headerText}\n\n` +
       `${retryGuidanceBlocks}\n\n` +
-      `Before retrying, analyze:\n` +
-      `1. Which specific argument(s) caused the failure?\n` +
-      `2. What value(s) should be corrected or adjusted?\n` +
-      `3. Is there a prerequisite step needed before this tool call can succeed?\n\n` +
-      `Retry with corrected arguments, or take a different approach if the tool is not appropriate for this task.`,
+      analyzeSteps,
   };
 
   logger.info(
