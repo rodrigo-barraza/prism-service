@@ -21,6 +21,7 @@ import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import { FILE_CATEGORIES } from "../constants.ts";
 import { getModelByName, MODELS } from "../config.ts";
 import { calculateTokensPerSec } from "../utils/math.ts";
+import PromptLocaleService from "../services/PromptLocaleService.ts";
 import type { WebSocket } from "ws";
 import type { IncomingMessage } from "http";
 import type { WebSocketServer } from "ws";
@@ -434,8 +435,8 @@ function handleWebsocketLive(
         // Always include a base system instruction with language hint to anchor
         // the input transcription model (which has no languageCode field)
         systemInstruction: clientConfig.systemInstruction
-          ? `${clientConfig.systemInstruction}\n\nAlways respond in the same language the user speaks. The user's primary language is English.`
-          : "Always respond in the same language the user speaks. The user's primary language is English.",
+          ? `${clientConfig.systemInstruction}\n\n${PromptLocaleService.get("en", "system-prompt.liveApiLanguageHint")}`
+          : PromptLocaleService.get("en", "system-prompt.liveApiLanguageHint"),
         ...(clientConfig.temperature !== undefined && {
           temperature: clientConfig.temperature,
         }),

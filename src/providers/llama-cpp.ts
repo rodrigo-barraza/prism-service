@@ -74,6 +74,10 @@ interface LlamaCppModelsResponse {
   data: LlamaCppModel[];
 }
 
+interface LlamaCppEmbeddingResponse {
+  data?: Array<{ embedding?: number[] }>;
+}
+
 interface HealthResponse {
   status: string;
   slots_idle?: number;
@@ -429,6 +433,52 @@ export function createLlamaCppProvider(
             inputTokens: usage.inputTokens || 0,
             outputTokens: usage.outputTokens || 0,
           },
+        };
+      } catch (error: unknown) {
+        if (error instanceof ProviderError) throw error;
+        throw new ProviderError(
+          "llama-cpp",
+          getErrorMessage(error),
+          500,
+          error,
+        );
+      }
+    },
+
+    // ── Embedding Generation ─────────────────────────────────
+    // POST /v1/embeddings — requires llama-server started with --embedding
+
+    async generateEmbedding(
+      content: string | string[],
+      model: string,
+      options: ProviderOptions = {},
+    ) {
+      const baseUrl = getBaseUrl();
+      logger.provider(
+        "llama.cpp",
+        `generateEmbedding model=${model} baseUrl=${baseUrl}`,
+      );
+      try {
+        const payload: Record<string, unknown> = {
+          model,
+          input: content,
+        };
+        if (options.dimensions) payload.dimensions = options.dimensions;
+
+        const response = await fetchOpenAICompat(
+          `${baseUrl}/v1/embeddings`,
+          payload,
+        );
+        const data = (await response.json()) as LlamaCppEmbeddingResponse;
+
+        const embedding = data.data?.[0]?.embedding;
+        if (!embedding) {
+          throw new Error("No embedding data in llama.cpp response");
+        }
+
+        return {
+          embedding,
+          dimensions: embedding.length,
         };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;

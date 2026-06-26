@@ -11,5 +11,6 @@
   "localTimeLabel": "- Local Time: {{time}}",
   "discordIdsHeader": "# Discord IDs",
   "discordGuildIdLine": "- Guild ID: {{guildId}}",
-  "discordChannelIdLine": "\n- Channel ID: {{channelId}}"
+  "discordChannelIdLine": "\n- Channel ID: {{channelId}}",
+  "liveApiLanguageHint": "Always respond in the same language the user speaks. The user's primary language is English."
 }

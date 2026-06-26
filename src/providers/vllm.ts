@@ -374,13 +374,32 @@ export function createVllmProvider(
       }
     },
 
+    // ── Health Check ─────────────────────────────────────────
+    // GET /health — lightweight readiness probe
+
+    async checkHealth() {
+      const baseUrl = getBaseUrl();
+      logger.provider("vLLM", "checkHealth");
+      try {
+        const response = await fetch(`${baseUrl}/health`, {
+          method: "GET",
+          signal: AbortSignal.timeout(3000),
+        });
+        return {
+          ok: response.ok,
+          status: response.ok ? "ok" : "error",
+        };
+      } catch (error: unknown) {
+        return {
+          ok: false,
+          status: "unreachable",
+          error: getErrorMessage(error),
+        };
+      }
+    },
+
     // ── Model Listing ────────────────────────────────────────
 
-    /**
-     * List all models available from the vLLM server.
-     * Uses the OpenAI-standard GET /v1/models endpoint.
-     * Returns { models: [...] } normalized format.
-     */
     async listModels() {
       const baseUrl = getBaseUrl();
       logger.provider("vLLM", "listModels");

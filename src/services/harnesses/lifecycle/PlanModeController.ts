@@ -149,7 +149,7 @@ export async function handleExitPlanMode(
   if (!planApproved || signal?.aborted) {
     emit({
       type: SERVER_SENT_EVENT_TYPES.STATUS,
-      message: "Plan rejected — execution cancelled.",
+      message: PromptLocaleService.get("en", "harness.planningMode.rejectionStatus"),
     });
     emit({
       type: SERVER_SENT_EVENT_TYPES.DONE,
@@ -170,7 +170,7 @@ export async function handleExitPlanMode(
   if (exitResult) {
     exitResult.result = {
       isApproved: true,
-      message: `User has approved your plan. You can now start coding. Start with updating your todo list if applicable.\n\n${planText}`,
+      message: `${PromptLocaleService.get("en", "harness.planningMode.approvalResult")}\n\n${planText}`,
     };
   }
 

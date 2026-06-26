@@ -20,12 +20,27 @@ export const CONVERSATIONAL_CONSOLIDATION_PROMPT = PromptLocaleService.get("en",
 
 export function formatMemoryEntry(memory: MemoryDoc): string {
   const age = daysSince(memory.createdAt);
-  return `- **ID**: ${memory.id}\n  **Type**: ${memory.type}\n  **Title**: ${memory.title || (memory.content ? memory.content.substring(0, 60) : "untitled")}\n  **Content**: ${memory.content}\n  **Age**: ${age} days`;
+  return PromptLocaleService.get("en", "memory.formatting.memoryEntry", {
+    id: memory.id,
+    type: memory.type,
+    title: memory.title || (memory.content ? memory.content.substring(0, 60) : "untitled"),
+    content: memory.content,
+    age: String(age),
+  });
 }
 
 export function formatConversationalMemoryEntry(memory: MemoryDoc): string {
   const age = daysSince(memory.createdAt);
-  return `- **ID**: ${memory.id}\n  **Category**: ${memory.type}\n  **About**: ${memory.aboutUsername || "any"} (${memory.aboutUserId || "?"})\n  **Source**: ${memory.sourceUsername || "any"} (${memory.sourceUserId || "?"})\n  **Content**: ${memory.content}\n  **Age**: ${age} days`;
+  return PromptLocaleService.get("en", "memory.formatting.conversationalMemoryEntry", {
+    id: memory.id,
+    category: memory.type,
+    aboutUsername: memory.aboutUsername || "any",
+    aboutUserId: memory.aboutUserId || "?",
+    sourceUsername: memory.sourceUsername || "any",
+    sourceUserId: memory.sourceUserId || "?",
+    content: memory.content,
+    age: String(age),
+  });
 }
 
 // ─── Batch Input Builders ───────────────────────────────────
@@ -38,21 +53,30 @@ export function buildConversationalBatchInput(
   const sections: string[] = [];
 
   if (partitionMeta) {
-    sections.push(`## Attribution Context`);
+    sections.push(PromptLocaleService.get("en", "memory.formatting.attributionContextHeader"));
     sections.push(
-      `- **About user**: ${partitionMeta.aboutUsername} (ID: ${partitionMeta.aboutUserId})`,
+      PromptLocaleService.get("en", "memory.formatting.aboutUserLine", {
+        aboutUsername: partitionMeta.aboutUsername,
+        aboutUserId: partitionMeta.aboutUserId,
+      }),
     );
     sections.push(
-      `- **Observed by**: ${partitionMeta.sourceUsername} (ID: ${partitionMeta.sourceUserId})`,
+      PromptLocaleService.get("en", "memory.formatting.observedByLine", {
+        sourceUsername: partitionMeta.sourceUsername,
+        sourceUserId: partitionMeta.sourceUserId,
+      }),
     );
     sections.push("");
   }
 
   if (clusterBatch.length > 0) {
-    sections.push("## Clusters of Similar Facts\n");
+    sections.push(`${PromptLocaleService.get("en", "memory.formatting.clustersOfSimilarFacts")}\n`);
     clusterBatch.forEach((cluster, clusterIndex) => {
       sections.push(
-        `### Cluster ${clusterIndex + 1} (${cluster.length} facts, likely overlap):`,
+        PromptLocaleService.get("en", "memory.formatting.clusterFactHeader", {
+          index: String(clusterIndex + 1),
+          count: String(cluster.length),
+        }),
       );
       cluster.forEach((memory) => {
         sections.push(formatConversationalMemoryEntry(memory));
@@ -61,7 +85,7 @@ export function buildConversationalBatchInput(
     });
   }
   if (staleBatch.length > 0) {
-    sections.push("## Potentially Stale Facts\n");
+    sections.push(`${PromptLocaleService.get("en", "memory.formatting.potentiallyStaleFacts")}\n`);
     staleBatch.forEach((memory) => {
       sections.push(formatConversationalMemoryEntry(memory));
     });
@@ -82,10 +106,13 @@ export function buildBatchInput(
 ): string | null {
   const sections: string[] = [];
   if (clusterBatch.length > 0) {
-    sections.push("## Clusters of Similar Memories\n");
+    sections.push(`${PromptLocaleService.get("en", "memory.formatting.clustersOfSimilarMemories")}\n`);
     clusterBatch.forEach((cluster, clusterIndex) => {
       sections.push(
-        `### Cluster ${clusterIndex + 1} (${cluster.length} memories, likely overlap):`,
+        PromptLocaleService.get("en", "memory.formatting.clusterMemoryHeader", {
+          index: String(clusterIndex + 1),
+          count: String(cluster.length),
+        }),
       );
       cluster.forEach((memory) => {
         sections.push(formatMemoryEntry(memory));
@@ -95,7 +122,7 @@ export function buildBatchInput(
   }
   if (staleBatch.length > 0) {
     sections.push(
-      "## Potentially Stale Memories (>30 days old, ephemeral types)\n",
+      `${PromptLocaleService.get("en", "memory.formatting.potentiallyStaleMemories")}\n`,
     );
     staleBatch.forEach((memory) => {
       sections.push(formatMemoryEntry(memory));
