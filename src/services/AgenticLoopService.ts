@@ -71,9 +71,11 @@ export default class AgenticLoopService {
       ToolContext.set(resolvedAgentConversationId, "dynamicEnabledTools", initialNames);
     }
 
-    // If this is a top-level agent request, all messages except the last one (the triggering input)
-    // are already persisted in the database.
-    if (!options.isSubAgent && messages.length > 0) {
+    // If this is a top-level agent request with an existing conversation,
+    // all messages except the last one (the triggering input) are already
+    // persisted in the database. For new conversations (e.g. Discord channel
+    // history passed as ephemeral context), nothing has been persisted yet.
+    if (!options.isSubAgent && !context.isNewConversation && messages.length > 0) {
       for (let i = 0; i < messages.length - 1; i++) {
         (messages[i] as any)._alreadyPersisted = true;
       }

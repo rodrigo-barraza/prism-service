@@ -4007,5 +4007,360 @@ describe("Message Array Construction", () => {
       ]);
     });
   });
+
+  // ────────────────────────────────────────────────────────────
+  // isNewConversation flag — ephemeral platform history persistence
+  //
+  // When a caller (e.g. Discord bot) creates a brand-new conversation
+  // without an existing conversationId, all incoming messages are
+  // ephemeral platform context that has NEVER been persisted to MongoDB.
+  // AgenticLoopService must NOT mark them as _alreadyPersisted so
+  // computeNewTurnMessages includes the full history in the persist slice.
+  // ────────────────────────────────────────────────────────────
+  describe("isNewConversation — ephemeral platform history persistence", () => {
+    /**
+     * Simulates the _alreadyPersisted marking logic from AgenticLoopService.runAgenticLoop
+     * (lines 74-80). This is the exact code path that caused the Discord truncation bug.
+     */
+    function simulateAgenticLoopPersistenceMarking(
+      messages: HarnessPayload[],
+      { isSubAgent = false, isNewConversation = false }: { isSubAgent?: boolean; isNewConversation?: boolean },
+    ): void {
+      if (!isSubAgent && !isNewConversation && messages.length > 0) {
+        for (let index = 0; index < messages.length - 1; index++) {
+          (messages[index] as any)._alreadyPersisted = true;
+        }
+      }
+    }
+
+    describe("new conversation (Discord ephemeral history)", () => {
+      it("should NOT mark any messages as _alreadyPersisted when isNewConversation is true", () => {
+        const messages: HarnessPayload[] = [
+          { role: "user", content: "i love you lupos!", name: "rodrigo" },
+          { role: "assistant", content: "Hehehe, you incredible Nitro-boosting hero" },
+          { role: "user", content: "how have you been?", name: "rodrigo" },
+          { role: "assistant", content: "Between us, this agonizing tolerance break..." },
+          { role: "user", content: "hey bro", name: "rodrigo" },
+        ];
+
+        simulateAgenticLoopPersistenceMarking(messages, { isNewConversation: true });
+
+        const markedMessages = messages.filter((message) => (message as any)._alreadyPersisted);
+        expect(markedMessages).toHaveLength(0);
+      });
+
+      it("should persist ALL messages (full Discord history) via computeNewTurnMessages", () => {
+        const originalMessages: HarnessPayload[] = [
+          { role: "user", content: "i love you lupos!", name: "rodrigo" },
+          { role: "assistant", content: "Hehehe, you incredible Nitro-boosting hero" },
+          { role: "user", content: "how have you been?", name: "rodrigo" },
+          { role: "assistant", content: "Between us, this agonizing tolerance break..." },
+          { role: "user", content: "hey bro", name: "rodrigo" },
+        ];
+        const originalMessageCount = originalMessages.length;
+
+        simulateAgenticLoopPersistenceMarking(originalMessages, { isNewConversation: true });
+
+        const currentMessages: HarnessPayload[] = [...originalMessages];
+
+        simulateBeforePromptHook(currentMessages, {
+          systemPrompt: "You are Lupos, an insane recovering-drug-addicted artist wolf king...",
+          platformContextMessage: "Platform: Discord\nServer: Classic Whitemane\nChannel: #politics",
+          selfContextMessage: "current_emotion: dominance\narousal: 0.53",
+        });
+
+        currentMessages.push({
+          role: "assistant",
+          content: "My sober mind is a lethal weapon of absolute authority today...",
+          model: "gemini-3.5-flash",
+          provider: "google",
+        });
+
+        const newTurnMessages = computeNewTurnMessages(
+          originalMessages,
+          currentMessages,
+          originalMessageCount,
+        );
+
+        // All 5 original messages + 3 system (platform, somatic, injected context) + 1 assistant = 9
+        const userMessages = newTurnMessages.filter((message) => message.role === "user");
+        const assistantMessages = newTurnMessages.filter((message) => message.role === "assistant");
+        const systemMessages = newTurnMessages.filter((message) => message.role === "system");
+
+        expect(userMessages).toHaveLength(3);
+        expect(userMessages[0].content).toBe("i love you lupos!");
+        expect(userMessages[1].content).toBe("how have you been?");
+        expect(userMessages[2].content).toBe("hey bro");
+
+        expect(assistantMessages).toHaveLength(3);
+        expect(assistantMessages[0].content).toBe("Hehehe, you incredible Nitro-boosting hero");
+        expect(assistantMessages[1].content).toBe("Between us, this agonizing tolerance break...");
+        expect(assistantMessages[2].content).toBe("My sober mind is a lethal weapon of absolute authority today...");
+
+        expect(systemMessages.length).toBeGreaterThanOrEqual(2);
+      });
+
+      it("should persist multi-user Discord conversation history", () => {
+        const originalMessages: HarnessPayload[] = [
+          { role: "user", content: "what do you guys think about the new patch?", name: "kvz" },
+          { role: "user", content: "it's broken lol", name: "skippi" },
+          { role: "user", content: "lib flesh….", name: "skippi" },
+          { role: "user", content: "@Lupos what's your take?", name: "rodrigo" },
+        ];
+        const originalMessageCount = originalMessages.length;
+
+        simulateAgenticLoopPersistenceMarking(originalMessages, { isNewConversation: true });
+
+        const currentMessages: HarnessPayload[] = [...originalMessages];
+
+        simulateBeforePromptHook(currentMessages, {
+          systemPrompt: "You are Lupos...",
+          platformContextMessage: "Platform: Discord\nChannel: #politics",
+        });
+
+        currentMessages.push({
+          role: "assistant",
+          content: "The patch is garbage and you're all garbage for playing it.",
+          model: "gemini-3.5-flash",
+          provider: "google",
+        });
+
+        const newTurnMessages = computeNewTurnMessages(
+          originalMessages,
+          currentMessages,
+          originalMessageCount,
+        );
+
+        const userMessages = newTurnMessages.filter((message) => message.role === "user");
+        expect(userMessages).toHaveLength(4);
+        expect(userMessages[0].name).toBe("kvz");
+        expect(userMessages[1].name).toBe("skippi");
+        expect(userMessages[2].name).toBe("skippi");
+        expect(userMessages[3].name).toBe("rodrigo");
+      });
+
+      it("should persist single-message new conversation", () => {
+        const originalMessages: HarnessPayload[] = [
+          { role: "user", content: "@Lupos draw me a wolf", name: "rodrigo" },
+        ];
+        const originalMessageCount = originalMessages.length;
+
+        simulateAgenticLoopPersistenceMarking(originalMessages, { isNewConversation: true });
+
+        const currentMessages: HarnessPayload[] = [...originalMessages];
+
+        simulateBeforePromptHook(currentMessages, {
+          systemPrompt: "You are Lupos...",
+        });
+
+        currentMessages.push({
+          role: "assistant",
+          content: "Here's your pathetic wolf.",
+          model: "gemini-3.5-flash",
+          provider: "google",
+        });
+
+        const newTurnMessages = computeNewTurnMessages(
+          originalMessages,
+          currentMessages,
+          originalMessageCount,
+        );
+
+        const userMessages = newTurnMessages.filter((message) => message.role === "user");
+        const assistantMessages = newTurnMessages.filter((message) => message.role === "assistant");
+
+        expect(userMessages).toHaveLength(1);
+        expect(userMessages[0].content).toBe("@Lupos draw me a wolf");
+        expect(assistantMessages).toHaveLength(1);
+      });
+    });
+
+    describe("existing conversation (Prism client multi-turn)", () => {
+      it("SHOULD mark prior messages as _alreadyPersisted when isNewConversation is false", () => {
+        const messages: HarnessPayload[] = [
+          { role: "user", content: "Hello" },
+          { role: "assistant", content: "Hi there!" },
+          { role: "user", content: "What's the weather?" },
+        ];
+
+        simulateAgenticLoopPersistenceMarking(messages, { isNewConversation: false });
+
+        expect((messages[0] as any)._alreadyPersisted).toBe(true);
+        expect((messages[1] as any)._alreadyPersisted).toBe(true);
+        expect((messages[2] as any)._alreadyPersisted).toBeUndefined();
+      });
+
+      it("SHOULD mark prior messages as _alreadyPersisted when isNewConversation is undefined (default)", () => {
+        const messages: HarnessPayload[] = [
+          { role: "user", content: "Hello" },
+          { role: "assistant", content: "Hi!" },
+          { role: "user", content: "Follow-up question" },
+        ];
+
+        simulateAgenticLoopPersistenceMarking(messages, {});
+
+        expect((messages[0] as any)._alreadyPersisted).toBe(true);
+        expect((messages[1] as any)._alreadyPersisted).toBe(true);
+        expect((messages[2] as any)._alreadyPersisted).toBeUndefined();
+      });
+
+      it("should persist ONLY the new turn for existing conversations", () => {
+        const originalMessages: HarnessPayload[] = [
+          { role: "user", content: "Hello" },
+          { role: "assistant", content: "Hi there!" },
+          { role: "user", content: "What's the weather?" },
+        ];
+        const originalMessageCount = originalMessages.length;
+
+        simulateAgenticLoopPersistenceMarking(originalMessages, { isNewConversation: false });
+
+        const currentMessages: HarnessPayload[] = [...originalMessages];
+
+        simulateBeforePromptHook(currentMessages, {
+          systemPrompt: "You are the Omni Agent...",
+        });
+
+        currentMessages.push({
+          role: "assistant",
+          content: "It's sunny today.",
+          model: "gemini-2.5-pro",
+          provider: "google",
+        });
+
+        const newTurnMessages = computeNewTurnMessages(
+          originalMessages,
+          currentMessages,
+          originalMessageCount,
+        );
+
+        const userMessages = newTurnMessages.filter((message) => message.role === "user");
+        const assistantMessages = newTurnMessages.filter((message) => message.role === "assistant");
+
+        // Only the new turn: injected context + "What's the weather?" + assistant reply
+        expect(userMessages).toHaveLength(1);
+        expect(userMessages[0].content).toBe("What's the weather?");
+        expect(assistantMessages).toHaveLength(1);
+        expect(assistantMessages[0].content).toBe("It's sunny today.");
+      });
+    });
+
+    describe("sub-agent conversations", () => {
+      it("should NOT mark any messages as _alreadyPersisted for sub-agents regardless of isNewConversation", () => {
+        const messages: HarnessPayload[] = [
+          { role: "system", content: "You are a sub-agent." },
+          { role: "user", content: "Refactor the auth module." },
+        ];
+
+        simulateAgenticLoopPersistenceMarking(messages, { isSubAgent: true, isNewConversation: false });
+
+        const markedMessages = messages.filter((message) => (message as any)._alreadyPersisted);
+        expect(markedMessages).toHaveLength(0);
+      });
+    });
+
+    describe("adversarial edge cases", () => {
+      it("should handle empty message array for new conversation without crashing", () => {
+        const messages: HarnessPayload[] = [];
+
+        simulateAgenticLoopPersistenceMarking(messages, { isNewConversation: true });
+        expect(messages).toHaveLength(0);
+      });
+
+      it("should handle single message for existing conversation (marks nothing — only last message)", () => {
+        const messages: HarnessPayload[] = [
+          { role: "user", content: "Solo message" },
+        ];
+
+        simulateAgenticLoopPersistenceMarking(messages, { isNewConversation: false });
+
+        // Single message = the triggering input, nothing marked
+        expect((messages[0] as any)._alreadyPersisted).toBeUndefined();
+      });
+
+      it("should preserve all 20 Discord messages for new conversation with large history", () => {
+        const originalMessages: HarnessPayload[] = [];
+        for (let index = 0; index < 19; index++) {
+          originalMessages.push({
+            role: index % 2 === 0 ? "user" : "assistant",
+            content: `Message ${index}`,
+            name: index % 2 === 0 ? `user_${index % 4}` : undefined,
+          });
+        }
+        originalMessages.push({ role: "user", content: "@Lupos final message", name: "rodrigo" });
+        const originalMessageCount = originalMessages.length;
+
+        simulateAgenticLoopPersistenceMarking(originalMessages, { isNewConversation: true });
+
+        const currentMessages: HarnessPayload[] = [...originalMessages];
+
+        simulateBeforePromptHook(currentMessages, {
+          systemPrompt: "You are Lupos...",
+        });
+
+        currentMessages.push({
+          role: "assistant",
+          content: "Response to all that history.",
+          model: "gemini-3.5-flash",
+          provider: "google",
+        });
+
+        const newTurnMessages = computeNewTurnMessages(
+          originalMessages,
+          currentMessages,
+          originalMessageCount,
+        );
+
+        const userMessages = newTurnMessages.filter((message) => message.role === "user");
+        const assistantMessages = newTurnMessages.filter((message) => message.role === "assistant");
+
+        // 11 user messages (10 alternating + 1 final) + 9 from history + 1 new = 10 assistant
+        expect(userMessages).toHaveLength(11);
+        expect(assistantMessages).toHaveLength(10);
+        expect(userMessages[userMessages.length - 1].content).toBe("@Lupos final message");
+      });
+
+      it("should truncate existing conversation history correctly even with many prior turns", () => {
+        const originalMessages: HarnessPayload[] = [];
+        for (let index = 0; index < 18; index++) {
+          originalMessages.push({
+            role: index % 2 === 0 ? "user" : "assistant",
+            content: `Turn ${index}`,
+          });
+        }
+        originalMessages.push({ role: "user", content: "Latest question" });
+        const originalMessageCount = originalMessages.length;
+
+        simulateAgenticLoopPersistenceMarking(originalMessages, { isNewConversation: false });
+
+        const currentMessages: HarnessPayload[] = [...originalMessages];
+
+        simulateBeforePromptHook(currentMessages, {
+          systemPrompt: "You are the Omni Agent...",
+        });
+
+        currentMessages.push({
+          role: "assistant",
+          content: "Here's the answer.",
+          model: "gemini-2.5-pro",
+          provider: "google",
+        });
+
+        const newTurnMessages = computeNewTurnMessages(
+          originalMessages,
+          currentMessages,
+          originalMessageCount,
+        );
+
+        const userMessages = newTurnMessages.filter((message) => message.role === "user");
+        const assistantMessages = newTurnMessages.filter((message) => message.role === "assistant");
+
+        // Only the new turn persisted (injected context + latest question + answer)
+        expect(userMessages).toHaveLength(1);
+        expect(userMessages[0].content).toBe("Latest question");
+        expect(assistantMessages).toHaveLength(1);
+        expect(assistantMessages[0].content).toBe("Here's the answer.");
+      });
+    });
+  });
 });
 

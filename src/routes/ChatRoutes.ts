@@ -803,6 +803,7 @@ export async function handleAgent(
         options,
         agentConversationId: resolvedAgentConversationId,
         conversationId,
+        isNewConversation: !incomingConversationId,
         userMessage: context.userMessage as ConversationMessage | null,
         conversationMeta,
         traceId,
