@@ -13,8 +13,8 @@ export const CodingPersona: Persona = {
   project: "prism-chat",
   displayOrder: 2,
   identity: () =>
-    PromptLocaleService.get("en", "personas.coding.identity"),
-  guidelines: PromptLocaleService.get("en", "personas.coding.guidelines"),
+    PromptLocaleService.get("en", "system-prompt.codingFallbackIdentity"),
+  guidelines: "",
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy([], context),
   availableTools: CODING_AVAILABLE_TOOLS,

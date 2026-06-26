@@ -18,7 +18,7 @@ export const OmniPersona: Persona = {
 
     return sections.join("\n\n");
   },
-  guidelines: PromptLocaleService.get("en", "personas.omni.guidelines"),
+  guidelines: "",
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy([], context),
   availableTools: ["*"],
