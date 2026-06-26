@@ -7,6 +7,17 @@ import type {
   OrchestratorSpawnParams,
 } from "../src/types/orchestrator.ts";
 
+// Mock RequestLogger to avoid DB writes during router executions
+vi.mock("../src/services/RequestLogger.ts", () => ({
+  default: {
+    log: vi.fn(),
+    logChatGeneration: vi.fn().mockResolvedValue(undefined),
+    logBackgroundLlmCall: vi.fn().mockResolvedValue(undefined),
+    insertPending: vi.fn().mockResolvedValue("mock-pending-id"),
+    completePending: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 // Mock GitWorktreeHelper
 vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
   GitWorktreeHelper: {
