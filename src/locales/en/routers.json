@@ -52,8 +52,5 @@
     "judgeInstructions": "1. Evaluate each sub-agent's output on the following criteria:\n   - **Correctness** — Is the solution factually and technically correct?\n   - **Completeness** — Does it fully address the task requirements?\n   - **Quality** — Is the code/reasoning clean, well-structured, and robust?\n   - **Verification** — Did the agent verify its work (tests, typechecks)?\n2. Select the single best sub-agent result. State which sub-agent number you chose.\n3. Reproduce the winning sub-agent's output VERBATIM — do not modify, merge, or improve it.\n4. Briefly justify your selection (2-3 sentences max).",
     "judgeFormat": "Format your response as:\n**Winner:** Sub-Agent #N\n**Justification:** [brief reason]\n\n**Selected Output:**\n[reproduce the winning output verbatim]",
     "verifier": "You are a verification agent. Run the following commands and report PASS or FAIL for each:"
-  },
-  "planning": {
-    "planningModeBlocked": "You are in PLANNING MODE. Tool call(s) [{{blockedNames}}] were blocked — only exit_plan_mode is available. Write your complete plan as text output, then call exit_plan_mode to submit it for user approval."
   }
 }
