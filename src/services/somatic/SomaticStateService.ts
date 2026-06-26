@@ -691,8 +691,8 @@ const SomaticStateService = {
       ? SettingsService.getCached().agents?.locale || "en"
       : "en";
     return (
-      PromptLocaleService.get(locale, `somatic.${dominant.emotion}`) ||
-      PromptLocaleService.get(locale, "somatic.neutral")
+      PromptLocaleService.get(locale, `somatic.moods.${dominant.emotion}`) ||
+      PromptLocaleService.get(locale, "somatic.moods.neutral")
     );
   },
 
