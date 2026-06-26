@@ -25,6 +25,7 @@ import { AssemblerContext } from "./types.ts";
 import SomaticStateService from "../somatic/SomaticStateService.ts";
 import WorkflowMemoryService from "../WorkflowMemoryService.ts";
 import { PROMPT_DELIMITERS } from "../../constants.ts";
+import PromptLocaleService from "../PromptLocaleService.ts";
 
 export default class SystemPromptAssembler {
   workspaceRoot: string;
@@ -77,11 +78,12 @@ export default class SystemPromptAssembler {
 
     const settings = await SettingsService.getSection("agents");
     const defaultTopology = settings?.topology || DEFAULT_TOPOLOGY;
+    const locale = settings?.locale || PromptLocaleService.getDefaultLocale();
 
     // ── 1. Agent Identity ────────────────────────────────────────
     if (isDirectMode) {
       sections.push(
-        `You are a helpful AI assistant with access to a comprehensive suite of real-time data and utility tools. Present data clearly with relevant formatting. For questions that don't require API data, respond naturally without tool calls.`,
+        PromptLocaleService.get(locale, "system-prompt.directModeIdentity"),
       );
     } else if (persona) {
       const identityText =
@@ -91,7 +93,7 @@ export default class SystemPromptAssembler {
       sections.push(identityText);
     } else {
       sections.push(
-        `You are a highly capable coding agent with access to file system, git, command execution, and web tools.`,
+        PromptLocaleService.get(locale, "system-prompt.codingFallbackIdentity"),
       );
     }
 
@@ -308,14 +310,8 @@ export default class SystemPromptAssembler {
         sections.push(persona.guidelines);
       } else if (codingFallback || persona?.usesCodingGuidelines) {
         sections.push(
-          `## Coding Guidelines\n` +
-            `- Always read relevant files before making edits to understand context\n` +
-            `- After making changes, verify them by reading the modified section\n` +
-            `- Keep your explanations concise and technical\n` +
-            `\n## Command Execution\n` +
-            `- For dev servers and long-running processes (npm run dev, next dev, vite, nodemon, etc.), ALWAYS set run_in_background: true. These commands never terminate on their own.\n` +
-            `- You will receive the first ~2.5 seconds of output to confirm the server started correctly.\n` +
-            `- Do NOT use run_in_background for one-shot commands (npm install, npm test, git status, eslint, prettier, tsc, etc.) — let them complete normally.`,
+          PromptLocaleService.get(locale, "system-prompt.codingGuidelines") +
+          PromptLocaleService.get(locale, "system-prompt.commandExecutionGuidelines"),
         );
       }
     }
@@ -378,18 +374,24 @@ export default class SystemPromptAssembler {
             !orchestratorSet.has(toolName) && !lockedOffSet.has(toolName),
         );
         sections.push(
-          getOrchestratorPromptAddendum({ subAgentTools, defaultTopology }),
+          getOrchestratorPromptAddendum({ subAgentTools, defaultTopology, locale }),
         );
       }
     }
 
     // ── 6. Environment ───────────────────────────────────────────
     const isWorkspaceEnabled = context.workspaceEnabled !== false;
-    const environmentLines = [`- OS: Linux (WSL2)`];
+    const environmentLines = [PromptLocaleService.get(locale, "system-prompt.environmentOsLine")];
     if (isWorkspaceEnabled) {
-      environmentLines.push(`- Workspace: ${this.workspaceRoot}`);
+      environmentLines.push(
+        PromptLocaleService.get(locale, "system-prompt.environmentWorkspaceLine", {
+          workspaceRoot: this.workspaceRoot,
+        }),
+      );
     }
-    sections.push(`## Environment\n` + environmentLines.join(`\n`));
+    sections.push(
+      PromptLocaleService.get(locale, "system-prompt.environmentHeader") + `\n` + environmentLines.join(`\n`),
+    );
 
     // ── 7. Project Structure (cached) ────────────────────────────
     if (isWorkspaceEnabled && (codingFallback || persona?.usesDirectoryTree)) {

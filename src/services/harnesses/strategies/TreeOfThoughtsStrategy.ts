@@ -775,7 +775,7 @@ export async function runTreeOfThoughts(
 
         failedApproachDescriptions = [];
 
-        checkForPlanModeEntry(
+        await checkForPlanModeEntry(
           selectedPass.pendingToolCalls,
           currentMessages,
           state,
@@ -1071,7 +1071,7 @@ async function runPlanningPhase(
 
   const MAX_PLANNING_ITERATIONS = 10;
 
-  PlanningModeService.injectPlanningInstruction(currentMessages);
+  await PlanningModeService.injectPlanningInstruction(currentMessages);
 
   const planModeTools = tools.finalTools.filter(
     (tool: ToolSchema) => tool.name === TOOL_NAMES.EXIT_PLAN_MODE,

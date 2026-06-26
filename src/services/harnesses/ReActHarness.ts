@@ -250,7 +250,7 @@ export default class ReActHarness extends BaseAgenticHarness {
           }
 
           if (state.planModeActive) {
-            PlanningModeService.injectPlanningInstruction(currentMessages);
+            await PlanningModeService.injectPlanningInstruction(currentMessages);
           }
         }
 
@@ -469,7 +469,7 @@ export default class ReActHarness extends BaseAgenticHarness {
           }
 
           // ── Plan mode toggling ────────────────────────────────
-          checkForPlanModeEntry(
+          await checkForPlanModeEntry(
             pass.pendingToolCalls,
             currentMessages,
             state,

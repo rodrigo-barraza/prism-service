@@ -1,5 +1,7 @@
 import logger from "../utils/logger.ts";
 import type { ConversationMessage } from "./harnesses/types.ts";
+import PromptLocaleService from "./PromptLocaleService.ts";
+import SettingsService from "./SettingsService.ts";
 
 /**
  * Planning instruction injected as a separate message when planFirst=true.
@@ -11,22 +13,7 @@ import type { ConversationMessage } from "./harnesses/types.ts";
  * content hash across iterations, enabling prefix caching on Anthropic,
  * Gemini context caching, and OpenAI cached prompts.
  */
-const PLANNING_INSTRUCTION = `## ⚠️ PLANNING MODE ACTIVE — TOOL ACCESS RESTRICTED
 
-**IMPORTANT**: Although the system prompt above may describe various tools (create_team, execute_shell, read_file, etc.), you are in PLANNING MODE and **CANNOT use any of them**.
-
-The ONLY tools available to you right now are:
-- **exit_plan_mode** — Call this when your plan is complete to submit it for user approval
-- **think** — Use for internal reasoning
-
-Any other tool calls WILL BE BLOCKED. Do not attempt to call create_team, execute_shell, read_file, write_file, or any other tool.
-
-**What to do:**
-1. Analyze the user's request
-2. Design your implementation approach as text output
-3. Call exit_plan_mode when ready — the user will review and approve before you can execute
-
-Keep your plan concise. For simple tasks, a brief summary is sufficient.`;
 
 /**
  * PlanningModeService — implements the "Plan First" workflow using
@@ -47,7 +34,7 @@ export default class PlanningModeService {
    * of mutating the system message content. This preserves prefix cache
    * stability across all major providers (Anthropic, Gemini, OpenAI).
    */
-  static injectPlanningInstruction(messages: ConversationMessage[]) {
+  static async injectPlanningInstruction(messages: ConversationMessage[]) {
     // Idempotency: don't inject twice
     if (
       messages.some(
@@ -58,6 +45,10 @@ export default class PlanningModeService {
       return;
     }
 
+    const settings = await SettingsService.getSection("agents");
+    const locale = settings?.locale || PromptLocaleService.getDefaultLocale();
+    const planningInstruction = PromptLocaleService.get(locale, "planning.planningInstruction");
+
     // Insert AFTER the system message but BEFORE any user messages
     const systemIndex = messages.findIndex(
       (message) => message.role === "system",
@@ -66,7 +57,7 @@ export default class PlanningModeService {
 
     messages.splice(insertionIndex, 0, {
       role: "user",
-      content: PLANNING_INSTRUCTION,
+      content: planningInstruction,
       _isPlanningInjection: true,
     });
 

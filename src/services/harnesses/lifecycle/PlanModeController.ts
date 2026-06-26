@@ -185,12 +185,12 @@ export async function handleExitPlanMode(
 }
 
 /** Check if any tool calls enter plan mode and apply the transition. */
-export function checkForPlanModeEntry(
+export async function checkForPlanModeEntry(
   executedToolCalls: ToolCall[],
   currentMessages: ConversationMessage[],
   state: AgenticLoopState,
   emit: EmitFunction,
-): void {
+): Promise<void> {
   const hasEnterPlanMode = executedToolCalls.some(
     (toolCall) => toolCall.name === TOOL_NAMES.ENTER_PLAN_MODE,
   );
@@ -198,7 +198,7 @@ export function checkForPlanModeEntry(
   if (hasEnterPlanMode) {
     state.planModeActive = true;
     state.planModeText = "";
-    PlanningModeService.injectPlanningInstruction(currentMessages);
+    await PlanningModeService.injectPlanningInstruction(currentMessages);
     emit({
       type: SERVER_SENT_EVENT_TYPES.STATUS,
       message: STATUS_MESSAGES.PLAN_MODE_ENTERED,
