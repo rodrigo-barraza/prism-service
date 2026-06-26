@@ -23,6 +23,7 @@ import {
 } from "../constants.ts";
 import InternalToolRegistry from "./local-tools/InternalToolRegistry.ts";
 import SettingsService from "./SettingsService.ts";
+import PromptLocaleService from "./PromptLocaleService.ts";
 import {
   injectVoiceCatalog,
   TTS_VOICE_CATALOG_PLACEHOLDER,
@@ -510,30 +511,28 @@ async function fetchJsonWithBody(
  * the AgentPersonaRegistry. This avoids hard-coding persona names
  * like "Lupos" or "Coding" which caused the LLM to misuse the field.
  */
-function buildAgentParameterDescription(): string {
+function buildAgentParameterDescription(locale?: string): string {
+  const activeLocale = locale || PromptLocaleService.getDefaultLocale();
   const registeredAgents = AgentPersonaRegistry.list();
   const agentNames = registeredAgents
     .map((entry) => `'${entry.name}'`)
     .join(", ");
 
   if (agentNames) {
-    return (
-      `Optional: the agent type/persona to spawn (available: ${agentNames}). ` +
-      "Defaults to the parent agent's type. " +
-      "Do not set this to a speaker ID like 'agent-0'."
-    );
+    return PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.memberAgent", {
+      agentNames,
+    });
   }
 
-  return (
-    "Optional: the agent type/persona to spawn. " +
-    "Defaults to the parent agent's type. " +
-    "Do not set this to a speaker ID like 'agent-0'."
-  );
+  return PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.memberAgentDefault");
 }
 
 function getOrchestratorToolSchemas(
   defaultTopology: string = DEFAULT_TOPOLOGY,
+  locale?: string,
 ) {
+  const activeLocale = locale || PromptLocaleService.getDefaultLocale();
+
   const normalizedTopology =
     defaultTopology === TOPOLOGIES.PEER_TO_PEER
       ? TOPOLOGIES.PEER_TO_PEER
@@ -602,28 +601,22 @@ function getOrchestratorToolSchemas(
     {
       name: TOOL_NAMES.CREATE_TEAM,
       emoji: ["👥", "🤖"],
-      description:
-        "Spawn one or more sub-agents, each in an isolated git worktree. " +
-        "Sub-agents inherit the currently enabled tools and can dynamically enable more via enable_tools. " +
-        `Execution mode depends on topology: ${hierarchicalDesc} runs all members in parallel, ` +
-        `${hierarchicalAggregationDesc} runs all members in parallel then merges results via a synthesis pass, ` +
-        `${sequentialDesc} runs members one-at-a-time passing each result to the next, ` +
-        `${peerToPeerDesc} runs a turn-based discussion where members take turns seeing a shared thread, ` +
-        `${tournamentDesc} runs all members in parallel then has a judge select the best result, ` +
-        `${criticLoopDesc} runs actor-critic refinement loop (either Council of Judges or Jury mode), ` +
-        `${divideAndConquerDesc} decomposes the task into subtasks and executes in parallel then synthesizes, ` +
-        `${mctsDesc} runs Monte Carlo Tree Search guided parallel expansions and iterations. ` +
-        "For a single task, provide one member. For parallel work, provide up to 10 members. " +
-        "Returns results from all members when execution completes. " +
-        "When recursive spawning is enabled, sub-agents may themselves call create_team to further decompose complex subtasks. " +
-        "Results include subtreeMetrics with descendant counts, aggregated costs, and child summaries for full tree visibility.",
+      description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.description", {
+        hierarchicalDesc,
+        hierarchicalAggregationDesc,
+        sequentialDesc,
+        peerToPeerDesc,
+        tournamentDesc,
+        criticLoopDesc,
+        divideAndConquerDesc,
+        mctsDesc,
+      }),
       parameters: {
         type: "object",
         properties: {
           name: {
             type: "string",
-            description:
-              "Team name for identification (e.g. 'auth_refactor', 'research').",
+            description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.name"),
           },
           topology: {
             type: "string",
@@ -637,83 +630,74 @@ function getOrchestratorToolSchemas(
               TOPOLOGIES.DIVIDE_AND_CONQUER,
               TOPOLOGIES.MCTS,
             ],
-            description:
-              `Optional: execution topology. '${hierarchicalLabel}' — all members run in parallel. ` +
-              `'${hierarchicalAggregationLabel}' — all members run in parallel, then a synthesis pass merges their outputs into a unified result. ` +
-              `'${sequentialLabel}' — members run one-at-a-time, each receiving the previous member's output. ` +
-              `'${peerToPeerLabel}' — turn-based discussion where members take turns on a shared thread. ` +
-              `'${tournamentLabel}' — N actors run in parallel, judge selects best. ` +
-              `'${criticLoopLabel}' — Actor-Critic refinement. Council of Judges (1 actor + N critics) or Jury mode (N actors + judge -> critic loop on winner). Config via topologyConfig: actorCount, maxRounds. ` +
-              `'${divideAndConquerLabel}' — Task decomposition into subtasks -> parallel execution -> synthesis. Config: maxSubtasks. ` +
-              `'${mctsLabel}' — Monte Carlo Tree Search. Config: branchFactor, maxDepth. ` +
-              "Omit to use the system default.",
+            description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.topology", {
+              hierarchicalLabel,
+              hierarchicalAggregationLabel,
+              sequentialLabel,
+              peerToPeerLabel,
+              tournamentLabel,
+              criticLoopLabel,
+              divideAndConquerLabel,
+              mctsLabel,
+            }),
           },
           topologyConfig: {
             type: "object",
-            description:
-              "Optional topology configuration options depending on the topology type. " +
-              "For 'critic_loop': { actorCount: number, maxRounds: number }. " +
-              "For 'peer_to_peer': { maxRounds: number }. " +
-              "For 'mcts': { branchFactor: number, maxDepth: number }. " +
-              "For 'divide_and_conquer': { maxSubtasks: number }.",
+            description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.topologyConfig"),
             properties: {
               actorCount: {
                 type: "integer",
-                description: "Number of competing actors (for critic_loop Jury mode). Defaults to 1.",
+                description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.actorCount"),
               },
               maxRounds: {
                 type: "integer",
-                description: "Maximum evaluation/revision rounds or turns. Defaults to 3 for critic_loop, calculated based on members count for peer_to_peer.",
+                description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.maxRounds"),
               },
               branchFactor: {
                 type: "integer",
-                description: "MCTS branch factor (number of expanded branches in parallel per depth level). Defaults to 3.",
+                description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.branchFactor"),
               },
               maxDepth: {
                 type: "integer",
-                description: "MCTS max search depth. Defaults to 3.",
+                description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.maxDepth"),
               },
               maxSubtasks: {
                 type: "integer",
-                description: "Divide and conquer maximum subtasks to decompose. Defaults to 6.",
+                description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.maxSubtasks"),
               },
             },
           },
           members: {
             type: "array",
             maxItems: 10,
+            description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.members"),
             items: {
               type: "object",
               properties: {
                 description: {
                   type: "string",
-                  description: "Short label for this sub-agent (shown in UI).",
+                  description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.memberDescription"),
                 },
                 prompt: {
                   type: "string",
-                  description:
-                    "Self-contained task prompt. Include file paths, line numbers, and exact instructions. Sub-agents cannot see the orchestrator's conversation.",
+                  description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.memberPrompt"),
                 },
                 files: {
                   type: "array",
                   items: { type: "string" },
-                  description:
-                    "Optional: file paths the sub-agent should focus on.",
+                  description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.memberFiles"),
                 },
                 model: {
                   type: "string",
-                  description:
-                    "Optional: model override for this sub-agent (defaults to orchestrator's model).",
+                  description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.memberModel"),
                 },
                 agent: {
                   type: "string",
-                  description: buildAgentParameterDescription(),
+                  description: buildAgentParameterDescription(activeLocale),
                 },
               },
               required: ["description", "prompt"],
             },
-            description:
-              "Array of sub-agent definitions (max 10). Each member runs autonomously in its own worktree.",
           },
         },
         required: ["name", "members"],
@@ -722,18 +706,17 @@ function getOrchestratorToolSchemas(
     {
       name: TOOL_NAMES.SEND_MESSAGE,
       emoji: ["💬", "📤"],
-      description:
-        "Send a follow-up message to a running or completed sub-agent. Use to continue work, provide corrections, or give new instructions.",
+      description: PromptLocaleService.get(activeLocale, "orchestrator.tools.send_message.description"),
       parameters: {
         type: "object",
         properties: {
           to: {
             type: "string",
-            description: "Agent ID returned by create_team",
+            description: PromptLocaleService.get(activeLocale, "orchestrator.tools.send_message.parameters.to"),
           },
           message: {
             type: "string",
-            description: "Follow-up instructions for the sub-agent",
+            description: PromptLocaleService.get(activeLocale, "orchestrator.tools.send_message.parameters.message"),
           },
         },
         required: ["to", "message"],
@@ -742,12 +725,14 @@ function getOrchestratorToolSchemas(
     {
       name: TOOL_NAMES.STOP_AGENT,
       emoji: ["⏹️", "🤖"],
-      description:
-        "Stop a running sub-agent. The sub-agent's worktree is cleaned up.",
+      description: PromptLocaleService.get(activeLocale, "orchestrator.tools.stop_agent.description"),
       parameters: {
         type: "object",
         properties: {
-          agent_id: { type: "string", description: "Agent ID to stop" },
+          agent_id: {
+            type: "string",
+            description: PromptLocaleService.get(activeLocale, "orchestrator.tools.stop_agent.parameters.agent_id"),
+          },
         },
         required: ["agent_id"],
       },
@@ -755,17 +740,13 @@ function getOrchestratorToolSchemas(
     {
       name: TOOL_NAMES.GET_TASK_OUTPUT,
       emoji: ["📥", "🤖"],
-      description:
-        "Read the output from a previously spawned sub-agent by its agent ID. " +
-        "Use this to check on a sub-agent's result after it has completed, or to read " +
-        "partial output from a still-running sub-agent. Returns the sub-agent's final text, " +
-        "tool usage stats, diff summary, and status.",
+      description: PromptLocaleService.get(activeLocale, "orchestrator.tools.get_task_output.description"),
       parameters: {
         type: "object",
         properties: {
           agent_id: {
             type: "string",
-            description: "The agent ID returned by create_team.",
+            description: PromptLocaleService.get(activeLocale, "orchestrator.tools.get_task_output.parameters.agent_id"),
           },
         },
         required: ["agent_id"],
@@ -774,15 +755,13 @@ function getOrchestratorToolSchemas(
     {
       name: TOOL_NAMES.DELETE_TEAM,
       emoji: ["🗑️", "👥"],
-      description:
-        "Stop and remove all sub-agents in a named team. Cleans up worktrees for all members.",
+      description: PromptLocaleService.get(activeLocale, "orchestrator.tools.delete_team.description"),
       parameters: {
         type: "object",
         properties: {
           teamName: {
             type: "string",
-            description:
-              "The team name to delete (as provided to create_team).",
+            description: PromptLocaleService.get(activeLocale, "orchestrator.tools.delete_team.parameters.teamName"),
           },
         },
         required: ["teamName"],
@@ -850,10 +829,14 @@ export default class ToolOrchestratorService {
       };
     });
 
+    const activeLocale = typeof SettingsService.getCached === "function"
+      ? SettingsService.getCached().agents?.locale || "en"
+      : "en";
+
     return [
       ...resolvedSchemas,
-      ...InternalToolRegistry.getSchemas(),
-      ...getOrchestratorToolSchemas(defaultTopology),
+      ...InternalToolRegistry.getSchemas(activeLocale),
+      ...getOrchestratorToolSchemas(defaultTopology, activeLocale),
     ];
   }
 
@@ -880,9 +863,14 @@ export default class ToolOrchestratorService {
           .replace(/[^a-z0-9]+/g, "_")
           .replace(/^_|_$/g, "");
 
+      const activeLocale = typeof SettingsService.getCached === "function"
+        ? SettingsService.getCached().agents?.locale || "en"
+        : "en";
+
       // Orchestrator tools are Prism-local — add domain metadata for UI grouping
       const orchestratorClient = getOrchestratorToolSchemas(
         defaultTopology,
+        activeLocale,
       ).map((tool) => ({
         ...tool,
         domain: DOMAINS.CORE_ORCHESTRATOR.displayName,
@@ -890,7 +878,7 @@ export default class ToolOrchestratorService {
         system: true,
       }));
 
-      const internalClient = InternalToolRegistry.getClientSchemas().map(
+      const internalClient = InternalToolRegistry.getClientSchemas(activeLocale).map(
         (tool) => ({
           ...tool,
           domainKey: resolveDomainKey(

@@ -12,5 +12,14 @@
   },
   "visionFeed": {
     "instruction": "\n\n## 🎥 LIVE VISION FEED ACTIVE\nYou are equipped with a live visual feed (webcam or screen stream). The last 3 frames of this feed are automatically captured and attached to the user's latest message (ordered from oldest to newest).\nUse these images to observe the environment, notice changes, animations, or user gestures, and refer to them naturally in your conversation.\n"
+  },
+  "exhaustionRecovery": {
+    "message": "You have reached the maximum number of tool-call iterations for this turn. Summarize the progress you have made so far, report any partial results, and clearly state what remains to be done so the user knows where things stand."
+  },
+  "gotSynthesis": {
+    "instruction": "[GRAPH-OF-THOUGHTS SYNTHESIS PASS]\n\n{{branchCount}} parallel reasoning branches were generated and scored. Your task is to produce a single, optimal response that SYNTHESIZES the best aspects of all branches — combining the strongest tool calls, the safest approaches, and the most complete coverage into one unified action.\n\nRULES:\n1. Do NOT simply repeat the highest-scoring branch. Merge complementary strengths.\n2. If multiple branches propose different tool calls that are COMPLEMENTARY (non-conflicting), include all of them.\n3. If branches disagree on approach, prefer the one with highest CORRECTNESS score, then RISK score.\n4. Incorporate defensive measures (error handling, validation) from the THOROUGH branch even if using a MINIMAL branch's core approach.\n5. Produce your merged response with tool calls as if you are executing the task.\n\n── BRANCH OUTPUTS ──\n\n"
+  },
+  "planModeEntry": {
+    "message": "Entered plan mode. You should now focus on exploring the codebase and designing an implementation approach.\n\nIn plan mode, you should:\n1. Thoroughly explore the codebase to understand existing patterns\n2. Identify similar features and architectural approaches\n3. Consider multiple approaches and their trade-offs\n4. Design a concrete implementation strategy\n5. When ready, call exit_plan_mode to present your plan for approval\n\nRemember: DO NOT write or edit any files yet. This is a read-only exploration and planning phase."
   }
 }

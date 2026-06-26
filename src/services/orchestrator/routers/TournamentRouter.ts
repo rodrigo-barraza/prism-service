@@ -136,7 +136,7 @@ function buildSelectionPrompt(
 
   return [
     PromptLocaleService.get("en", "routers.tournament.judge", { teamName }),
-    `${memberResults.length} sub-agents have independently completed the same task. Your job is to evaluate their outputs and select the SINGLE BEST result.`,
+    PromptLocaleService.get("en", "routers.tournament.judgeJobDescription", { memberCount: String(memberResults.length) }),
     "",
     "## Sub-Agent Results",
     "",
@@ -144,21 +144,9 @@ function buildSelectionPrompt(
     "",
     "## Instructions",
     "",
-    "1. Evaluate each sub-agent's output on the following criteria:",
-    "   - **Correctness** — Is the solution factually and technically correct?",
-    "   - **Completeness** — Does it fully address the task requirements?",
-    "   - **Quality** — Is the code/reasoning clean, well-structured, and robust?",
-    "   - **Verification** — Did the agent verify its work (tests, typechecks)?",
-    "2. Select the single best sub-agent result. State which sub-agent number you chose.",
-    "3. Reproduce the winning sub-agent's output VERBATIM — do not modify, merge, or improve it.",
-    "4. Briefly justify your selection (2-3 sentences max).",
+    PromptLocaleService.get("en", "routers.tournament.judgeInstructions"),
     "",
-    "Format your response as:",
-    "**Winner:** Sub-Agent #N",
-    "**Justification:** [brief reason]",
-    "",
-    "**Selected Output:**",
-    "[reproduce the winning output verbatim]",
+    PromptLocaleService.get("en", "routers.tournament.judgeFormat"),
   ].join("\n");
 }
 

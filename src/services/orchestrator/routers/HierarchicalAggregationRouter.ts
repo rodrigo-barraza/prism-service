@@ -54,7 +54,7 @@ function buildSynthesisPrompt(
 
   return [
     PromptLocaleService.get("en", "routers.hierarchical.synthesizer", { teamName, layerContext }),
-    `${memberResults.length} sub-agents have completed their work. Your job is to merge their outputs into a single, unified result.`,
+    PromptLocaleService.get("en", "routers.hierarchical.mergeJobDescription", { memberCount: String(memberResults.length) }),
     "",
     "## Sub-Agent Results",
     "",
@@ -62,11 +62,7 @@ function buildSynthesisPrompt(
     "",
     "## Instructions",
     "",
-    "1. Analyze all sub-agent outputs above.",
-    "2. Identify agreements, conflicts, and complementary information.",
-    "3. Produce a single, coherent synthesis that combines the best reasoning and findings from each sub-agent.",
-    "4. If any sub-agents failed, note which ones and incorporate results from the successful ones.",
-    "5. Be concise but thorough. Do not simply concatenate the outputs — produce an integrated result.",
+    PromptLocaleService.get("en", "routers.hierarchical.mergeInstructions"),
   ].join("\n");
 }
 
