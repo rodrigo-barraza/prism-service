@@ -222,6 +222,10 @@ export interface AgenticContext {
   conversationMeta?: Record<string, unknown> | null;
   /** Injected by harnesses before tool execution for tools that need conversation history. */
   _currentMessages?: ConversationMessage[];
+  /** When true, this conversation was just created (no prior messages in DB).
+   *  Prevents marking incoming context messages as _alreadyPersisted when
+   *  they are ephemeral platform history (e.g. Discord channel messages). */
+  isNewConversation?: boolean;
   [key: string]: unknown;
 }
 
