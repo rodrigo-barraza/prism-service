@@ -1,4 +1,5 @@
 import logger from "../../../utils/logger.ts";
+import PromptLocaleService from "../../PromptLocaleService.ts";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import ToolContext from "../../ToolContext.ts";
@@ -80,9 +81,10 @@ export function injectToolDiscoveryNudge(
         role: "system",
         content:
           `<tool-update>\n` +
-          `Your search found ${disabledToolNames.length} tool(s): ` +
-          `${disabledToolNames.join(", ")}. ` +
-          `They have been automatically enabled and are available now — call them directly.` +
+          PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "harness.toolDiscoveryNudge.autoEnabled", {
+            count: String(disabledToolNames.length),
+            toolNames: disabledToolNames.join(", "),
+          }) +
           `\n</tool-update>`,
       });
       logger.info(
@@ -93,10 +95,10 @@ export function injectToolDiscoveryNudge(
         role: "system",
         content:
           `<tool-update>\n` +
-          `Your search found ${disabledToolNames.length} tool(s) that are not yet enabled: ` +
-          `${disabledToolNames.join(", ")}. ` +
-          `Call enable_tools with these tool names now. ` +
-          `TIP: Next time, use discover_and_enable_tools instead of search_tools — it searches AND enables in a single step, saving an iteration.` +
+          PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "harness.toolDiscoveryNudge.enableRequired", {
+            count: String(disabledToolNames.length),
+            toolNames: disabledToolNames.join(", "),
+          }) +
           `\n</tool-update>`,
       });
       logger.info(

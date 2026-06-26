@@ -1,4 +1,5 @@
 import logger from "../../utils/logger.ts";
+import PromptLocaleService from "../PromptLocaleService.ts";
 import {
   TOOL_NAMES,
   DOMAINS,
@@ -53,7 +54,7 @@ const listMcpResources = {
     }
     const servers = MCPClientService.getConnectedServers();
     if (servers.length === 0) {
-      return { resources: [], count: 0, message: "No MCP servers connected." };
+      return { resources: [], count: 0, message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.list_mcp_resources.noServers") };
     }
     const allResources: Record<string, unknown>[] = [];
     for (const server of servers) {
@@ -99,7 +100,7 @@ const readMcpResource = {
     const readArgs = args as unknown as ReadMcpResourceArgs;
     const { server_name, uri } = readArgs;
     if (!server_name || !uri)
-      return { error: "'server_name' and 'uri' are required" };
+      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.read_mcp_resource.missingParams") };
     logger.info(`[MCP] read_resource: ${server_name} → ${uri}`);
     return MCPClientService.readResource(server_name, uri);
   },
@@ -147,10 +148,10 @@ const mcpAuthenticate = {
       api_key_header,
       env: authEnv,
     } = authArgs;
-    if (!server_name) return { error: "'server_name' is required" };
+    if (!server_name) return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.authenticate_mcp_server.missingServerName") };
     if (!token && !api_key && !authEnv)
       return {
-        error: "At least one of 'token', 'api_key', or 'env' must be provided",
+        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.authenticate_mcp_server.noCredentials"),
       };
     logger.info(`[MCP] authenticate: ${server_name}`);
     return MCPClientService.authenticate(server_name, {

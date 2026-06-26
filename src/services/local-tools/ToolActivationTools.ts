@@ -1,4 +1,5 @@
 import logger from "../../utils/logger.ts";
+import PromptLocaleService from "../PromptLocaleService.ts";
 import {
   TOOL_NAMES,
   DOMAINS,
@@ -61,15 +62,13 @@ const enableTools = {
   ) {
     const agentConversationId = context.agentConversationId;
     if (!agentConversationId) {
-      return { error: "No active agent conversation ID in context." };
+      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.shared.noConversation") };
     }
 
     const agentSettings = await SettingsService.getSection("agents");
     if (agentSettings?.dynamicToolActivation === false) {
       return {
-        error:
-          "Dynamic tool activation is disabled in settings. " +
-          "An administrator can enable it in Settings → Agent Defaults.",
+        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.shared.dynamicToolActivationDisabled"),
       };
     }
 
@@ -79,8 +78,7 @@ const enableTools = {
       requestedToolEntries.length === 0
     ) {
       return {
-        error:
-          "'tools' must be a non-empty array of tool names or domain prefixes.",
+        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.shared.invalidToolsArray"),
       };
     }
 
@@ -92,9 +90,7 @@ const enableTools = {
 
     if (resolvedRequestedNames.size === 0) {
       return {
-        error:
-          "None of the requested entries resolved to valid tool names. " +
-          "Check spelling or use search_tools to discover available tools.",
+        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.enable_tools.noValidTools"),
       };
     }
 
@@ -112,8 +108,7 @@ const enableTools = {
     if (newlyActivatedTools.length === 0) {
       return {
         success: true,
-        message:
-          "All requested tools are already enabled and available — you can call them directly right now.",
+        message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.enable_tools.alreadyEnabled"),
         enabledToolCount: mergedToolSet.size,
       };
     }
@@ -128,7 +123,7 @@ const enableTools = {
       success: true,
       activated: newlyActivatedTools,
       totalEnabled: mergedToolSet.size,
-      message: `Activated ${newlyActivatedTools.length} tool(s). They will be available on the next iteration.`,
+      message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.enable_tools.activated", { count: String(newlyActivatedTools.length) }),
     };
   },
 };
@@ -166,15 +161,13 @@ const disableTools = {
   ) {
     const agentConversationId = context.agentConversationId;
     if (!agentConversationId) {
-      return { error: "No active agent conversation ID in context." };
+      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.shared.noConversation") };
     }
 
     const agentSettings = await SettingsService.getSection("agents");
     if (agentSettings?.dynamicToolActivation === false) {
       return {
-        error:
-          "Dynamic tool activation is disabled in settings. " +
-          "An administrator can enable it in Settings → Agent Defaults.",
+        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.shared.dynamicToolActivationDisabled"),
       };
     }
 
@@ -184,8 +177,7 @@ const disableTools = {
       requestedToolEntries.length === 0
     ) {
       return {
-        error:
-          "'tools' must be a non-empty array of tool names or domain prefixes.",
+        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.shared.invalidToolsArray"),
       };
     }
 
@@ -214,7 +206,7 @@ const disableTools = {
     if (removedTools.length === 0 && protectedToolsSkipped.length === 0) {
       return {
         success: true,
-        message: "None of the requested tools were in the active set.",
+        message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.disable_tools.noneInSet"),
         enabledToolCount: mergedToolSet.size,
       };
     }
@@ -234,9 +226,9 @@ const disableTools = {
         protectedToolsSkipped.length > 0 ? protectedToolsSkipped : undefined,
       totalEnabled: mergedToolSet.size,
       message:
-        `Disabled ${removedTools.length} tool(s).` +
+        PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.disable_tools.disabled", { count: String(removedTools.length) }) +
         (protectedToolsSkipped.length > 0
-          ? ` ${protectedToolsSkipped.length} core tool(s) were protected and cannot be disabled.`
+          ? PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.disable_tools.protectedSuffix", { count: String(protectedToolsSkipped.length) })
           : ""),
     };
   },

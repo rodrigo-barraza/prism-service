@@ -1,4 +1,5 @@
 import logger from "../../utils/logger.ts";
+import PromptLocaleService from "../PromptLocaleService.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
   TOOL_NAMES,
@@ -87,7 +88,7 @@ export default {
   async execute(toolArguments: Record<string, unknown>, context: TodoContext) {
     const items = toolArguments.items;
     if (!Array.isArray(items)) {
-      return { error: "'items' must be an array of todo objects" };
+      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.write_todo.invalidItems") };
     }
 
     const normalized: TodoItemNormalized[] = items.map((item, i) => ({

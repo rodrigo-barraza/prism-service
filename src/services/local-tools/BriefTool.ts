@@ -1,4 +1,5 @@
 import logger from "../../utils/logger.ts";
+import PromptLocaleService from "../PromptLocaleService.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
   TOOL_NAMES,
@@ -61,7 +62,7 @@ export default {
       : [];
 
     if (!summary) {
-      return { error: "'summary' is required and must be a non-empty string" };
+      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.summarize_conversation.summaryRequired") };
     }
 
     const keyFileItems = keyFiles.filter(

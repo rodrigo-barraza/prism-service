@@ -1,6 +1,7 @@
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { PersonaContext, ToolPolicySection } from "./types.ts";
 import ToolOrchestratorService from "../ToolOrchestratorService.ts";
+import PromptLocaleService from "../PromptLocaleService.ts";
 
 // ────────────────────────────────────────────────────────────
 // Tool Catalog Introspection Helpers
@@ -87,27 +88,18 @@ function buildToolDiscoveryContent(): string {
     })
     .join("\n");
 
-  return `## Tool Discovery (CRITICAL)
-You have access to ${totalToolCount} tools, but only a small subset is enabled by default. The rest span dozens of specialized domains and MUST be discovered and activated before use.
+  const locale = PromptLocaleService.getDefaultLocale();
+  const headerLine = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.header");
+  const introLine = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.intro", { totalToolCount: String(totalToolCount) });
+  const domainsHeader = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.domainsHeader");
+  const searchRule = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.searchRule");
+  const searchSteps = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.searchSteps");
+  const noFallback = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.noFallback");
+  const intentHeader = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.intentMatchingHeader");
+  const intentRules = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.intentMatchingRules");
+  const triggerHeader = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.triggerHeader");
 
-**Available Tool Domains:**
-${domainList}
-
-**RULE: When the user asks for ANY capability and you do NOT see a matching tool in your current enabled set — ALWAYS search before responding.**
-1. Call \`discover_and_enable_tools\` with a relevant query — this searches the full catalog AND enables matches in one step
-2. Alternatively, call \`search_tools\` to browse available tools, then call \`enable_tools\` to activate the ones you need
-3. After enabling, the tools become available on your next iteration — call them directly
-
-**NEVER fall back to writing raw code, scripts, or manual API calls when a dedicated tool may exist.** Always search first.
-
-**How to decide when to search — match by CAPABILITY INTENT, not just keywords:**
-- User mentions a domain, protocol, or data type you don't have a tool for → search for it
-- User asks about something that sounds like it could be a specialized API → search for it
-- User asks to "look up", "check", "scan", "analyze", "convert", "generate", or "get info about" anything beyond basic text/code → search for it
-- When in doubt, search — it costs nothing and takes one call
-
-**Trigger examples (derived from tool catalog, not exhaustive):**
-${triggerExampleLines}`;
+  return `${headerLine}\n${introLine}\n\n${domainsHeader}\n${domainList}\n\n${searchRule}\n${searchSteps}\n\n${noFallback}\n\n${intentHeader}\n${intentRules}\n\n${triggerHeader}\n${triggerExampleLines}`;
 }
 
 const TOOL_DISCOVERY_POLICY_SECTION: ToolPolicySection & {
@@ -122,24 +114,11 @@ const TOOL_DISCOVERY_POLICY_SECTION: ToolPolicySection & {
 // ────────────────────────────────────────────────────────────
 
 const GENERAL_TOOL_PRINCIPLES_SECTION: ToolPolicySection = {
-  content: `# Tool Use Principles
-- Chain tools when a question requires multiple data sources
-- Prefer specific tools over generic web search when available
-- Use the right granularity: don't use heavy tools for simple questions`,
+  content: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "tool-policy.generalPrinciples"),
 };
 
 const TASK_MANAGEMENT_POLICY_SECTION: ToolPolicySection = {
-  content: `## Task Management
-You have persistent task tools (create_task, list_tasks, update_task) that survive across conversations.
-Use them proactively:
-- At the START of a session, call list_tasks to check for in-progress or pending tasks from prior sessions
-- When starting complex multi-step work (3+ files, multi-phase refactors, migrations), create a task with create_task to track progress
-- ONLY mark a task as completed when you have FULLY accomplished it — if blocked or encountering errors, keep it as in_progress
-- Always set activeForm when creating or updating to "in_progress" — a present-continuous phrase shown as a spinner (e.g. "Running tests", "Refactoring auth module")
-- After completing a task, call list_tasks to find your next task
-- To delete a task that is no longer relevant or was created in error, set its status to "deleted" via update_task
-- Break large tasks into subtasks — use metadata to link related tasks
-- Do NOT create tasks for simple, single-step requests — only for work that benefits from tracking`,
+  content: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "tool-policy.taskManagement"),
   requires: [
     TOOL_NAMES.CREATE_TASK,
     TOOL_NAMES.LIST_TASKS,
@@ -148,35 +127,12 @@ Use them proactively:
 };
 
 const PROACTIVE_MEMORY_POLICY_SECTION: ToolPolicySection = {
-  content: `## Proactive Memory
-You have a persistent memory tool (save_memory) that stores facts across sessions.
-Use it **proactively** — do NOT wait for the user to say "remember":
-- When the user states a preference: "I like X", "I hate Y", "I prefer Z", "I always do W"
-- When the user reveals personal info: allergies, habits, identity traits, opinions
-- When the user corrects you: save the correction so you don't repeat the mistake
-- When you learn a project convention or workflow pattern worth preserving
-- **When in doubt, save it** — over-remembering is better than forgetting
-- Set type to "user" for personal preferences, "feedback" for corrections, "project" for codebase conventions`,
+  content: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "tool-policy.proactiveMemory"),
   requires: [TOOL_NAMES.SAVE_MEMORY],
 };
 
 const AUDIO_TRACKER_POLICY_SECTION: ToolPolicySection = {
-  content: `## Audio Generation (generate_audio) — Tracker Workflow
-When the user asks you to create music, multi-track compositions, songs, or any audio with multiple instruments, you MUST use the **tracker workflow** — building the composition incrementally, one step at a time:
-
-1. **\`action: "init"\`** — Create a tracker session. Returns a \`sessionId\`. Set tempo, time signature, and global options here.
-2. **\`action: "add_channel"\`** — Add one instrument/channel at a time (e.g. "melody", "bass", "drums"). Pass the \`sessionId\`. Each step auto-renders a live audio preview.
-3. **\`action: "write_pattern"\`** — Write note patterns for a single channel per call. Pass \`sessionId\` and \`channelId\`. Build up the composition one instrument at a time. Each step auto-renders a live preview so the user hears progress.
-4. **\`action: "render"\`** — Final render of the complete composition.
-
-**Between each call, briefly describe what you just added and what comes next** — so the user can follow the creative process and hear each layer being built up.
-
-**NEVER try to cram an entire multi-track composition into a single generate_audio call.** Break it into incremental steps:
-- One \`add_channel\` call per instrument
-- One \`write_pattern\` call per instrument's note sequence
-- This produces live audio previews at each step, letting the user hear the piece evolve
-
-For simple single-instrument sounds (sound effects, single melodies, presets), you may omit \`action\` and use direct single-call synthesis.`,
+  content: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "tool-policy.audioTracker"),
   requires: [TOOL_NAMES.GENERATE_AUDIO],
 };
 

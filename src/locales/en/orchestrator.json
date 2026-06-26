@@ -37,6 +37,21 @@
   "coordinatorRole": "You are a **Coordinator** sub-agent with recursive spawning capabilities.",
   "workerRole": "You are a **Worker** sub-agent at maximum recursion depth ({{childRecursionDepth}}/{{maxRecursionDepth}}).",
 
+  "delegation": {
+    "recursionHeader": "## Recursive Delegation",
+    "depthStatus": "- Current depth: {{childRecursionDepth}} of {{maxRecursionDepth}} ({{remainingDepth}} level{{plural}} remaining)",
+    "hasCreateTeam": "- You have access to `create_team` and can spawn your own sub-teams",
+    "subAgentsCanDelegate": "- Your sub-agents will also be Coordinators who can further delegate",
+    "subAgentsAreFinal": "- Your sub-agents will be Workers who cannot delegate further (final depth level)",
+    "whenToDelegate": "**When to delegate:** Only spawn sub-teams when your task is genuinely complex enough to benefit from parallel decomposition — e.g. multiple independent files, separate concerns, or subtasks that can run concurrently.",
+    "whenNotToDelegate": "**When NOT to delegate:** If your task is focused on a single file, a single concern, or can be completed in a straightforward sequence, handle it directly without spawning.",
+    "resultReporting": "**Result reporting:** Your final output MUST synthesize and summarize the results from any sub-agents you spawn. Your parent orchestrator only sees YOUR final output — not your children's raw results.",
+    "workerHeader": "## Delegation Status",
+    "noCreateTeam": "- You do NOT have access to `create_team` — you cannot spawn sub-agents",
+    "completeDirectly": "- Complete your assigned task directly using your available tools",
+    "writeSummary": "- Write a clear, complete summary of your work as your final output"
+  },
+
   "tools": {
     "create_team": {
       "description": "Spawn one or more sub-agents, each in an isolated git worktree. Sub-agents inherit the currently enabled tools and can dynamically enable more via enable_tools. Execution mode depends on topology: {{hierarchicalDesc}} runs all members in parallel, {{hierarchicalAggregationDesc}} runs all members in parallel then merges results via a synthesis pass, {{sequentialDesc}} runs members one-at-a-time passing each result to the next, {{peerToPeerDesc}} runs a turn-based discussion where members take turns seeing a shared thread, {{tournamentDesc}} runs all members in parallel then has a judge select the best result, {{criticLoopDesc}} runs actor-critic refinement loop (either Council of Judges or Jury mode), {{divideAndConquerDesc}} decomposes the task into subtasks and executes in parallel then synthesizes, {{mctsDesc}} runs Monte Carlo Tree Search guided parallel expansions and iterations. For a single task, provide one member. For parallel work, provide up to 10 members. Returns results from all members when execution completes. When recursive spawning is enabled, sub-agents may themselves call create_team to further decompose complex subtasks. Results include subtreeMetrics with descendant counts, aggregated costs, and child summaries for full tree visibility.",
