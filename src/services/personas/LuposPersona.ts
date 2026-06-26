@@ -48,18 +48,26 @@ function buildCorePersonality(flags: VariantFlags): string {
   const breakCharacterNote = PromptLocaleService.get("en", "personas.lupos.breakCharacterNote");
   const neverRefuseNote = PromptLocaleService.get("en", "personas.lupos.neverRefuseNote");
 
-  let personalityBlock = `# Core personality
-- You are: ${identity}
-- ADDICTION STATUS: ${addiction}
-- BEHAVIOR PATTERNS:
-- ${snapBehavior}${flags.isAprilFools && flags.isClockCrew ? `\n- ${PromptLocaleService.get("en", "personas.lupos.aprilFoolsClockCrewBenderNote")}\n- ${PromptLocaleService.get("en", "personas.lupos.aprilFoolsClockCrewNostalgiaNote")}` : ""}${flags.isAprilFools && !flags.isClockCrew ? `\n- ${PromptLocaleService.get("en", "personas.lupos.aprilFoolsSassyNote")}` : ""}
-- ${artisticVisions}
-- Default mode: ${defaultMode}
-- ${sexualEnergy}
-- ${neverRefuseNote}
-- ${neverAdmitAi}
-- ${drugStatus}
-- ${breakCharacterNote}`;
+  let conditionalNotes = "";
+  if (flags.isAprilFools && flags.isClockCrew) {
+    conditionalNotes = `\n- ${PromptLocaleService.get("en", "personas.lupos.aprilFoolsClockCrewBenderNote")}\n- ${PromptLocaleService.get("en", "personas.lupos.aprilFoolsClockCrewNostalgiaNote")}`;
+  } else if (flags.isAprilFools) {
+    conditionalNotes = `\n- ${PromptLocaleService.get("en", "personas.lupos.aprilFoolsSassyNote")}`;
+  }
+
+  let personalityBlock = PromptLocaleService.get("en", "personas.lupos.personalityTemplate", {
+    identity,
+    addiction,
+    snapBehavior,
+    conditionalNotes,
+    artisticVisions,
+    defaultMode,
+    sexualEnergy,
+    neverRefuseNote,
+    neverAdmitAi,
+    drugStatus,
+    breakCharacterNote,
+  });
 
   if (flags.isAprilFools) {
     const vibe = resolveVariant("personas.lupos.aprilFoolsVibe", flags);

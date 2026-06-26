@@ -1,5 +1,6 @@
 import { VOICES, DEFAULT_VOICES, getDefaultModels, TYPES } from "../config.ts";
 import { PROVIDERS } from "../constants.ts";
+import PromptLocaleService from "../services/PromptLocaleService.ts";
 
 type VoiceEntry = { name: string; gender: string; description: string };
 
@@ -35,28 +36,18 @@ function buildInworldCatalog(model?: string): string {
   const isTtsTwo = activeModel.startsWith("inworld-tts-2");
 
   if (!isTtsTwo) {
-    return `Available Inworld voices (${entries.length}): ${entries.join(", ")}.`;
+    return PromptLocaleService.get("en", "voice-catalog.catalogFormat.inworld", {
+      count: String(entries.length),
+      voices: entries.join(", "),
+    });
   }
 
-  const steeringInstructions = [
-    "This provider uses inworld-tts-2 which supports instruction tags — natural language directions in square brackets placed before the text they apply to.",
-    "Use instruction tags to match delivery to the content:",
-    "Emotion: [say excitedly], [sound sad], [sound concerned], [sound terrified]",
-    "Articulation: [say with force], [articulate clearly], [say with deliberate pauses]",
-    "Intonation: [say with a falling pitch], [say with a rising pitch]",
-    "Volume: [very quiet], [very loud]",
-    "Pitch: [say in a low tone], [say in a high pitch]",
-    "Range: [say playfully], [say with no pitch variation]",
-    "Speed: [very fast], [very slow]",
-    "Vocal style: [whisper in a hushed style], [give a nasal quality], [sing joyfully]",
-    "Non-verbals (inline): [laugh], [sigh], [clear throat], [breathe], [cough], [yawn]",
-    "For maximum control, combine qualities: [say sadly with deliberate pauses in a low voice and hushed style].",
-    "Place the tag at the start of the text it applies to. Capitalize words for emphasis: 'I told you NOT to do that.'",
-    "Include filler words (uh, um, well) for naturalness. Use contractions. Write numbers in spoken form.",
-    "Never use markdown, bullet points, emojis, or structured text — write everything as natural spoken sentences.",
-  ].join(" ");
+  const steeringInstructions = PromptLocaleService.get("en", "voice-catalog.inworldTts2Steering");
 
-  return `Available Inworld voices (${entries.length}): ${entries.join(", ")}. ${steeringInstructions}`;
+  return `${PromptLocaleService.get("en", "voice-catalog.catalogFormat.inworld", {
+    count: String(entries.length),
+    voices: entries.join(", "),
+  })} ${steeringInstructions}`;
 }
 
 function buildOpenAICatalog(): string {
@@ -78,7 +69,9 @@ function buildOpenAICatalog(): string {
   const entries = Object.entries(voiceDescriptions).map(
     ([name, description]) => `${name} (${description})`,
   );
-  return `Available OpenAI voices: ${entries.join(", ")}.`;
+  return PromptLocaleService.get("en", "voice-catalog.catalogFormat.openai", {
+    voices: entries.join(", "),
+  });
 }
 
 function buildGoogleCatalog(): string {
@@ -99,7 +92,9 @@ function buildGoogleCatalog(): string {
   const entries = Object.entries(voiceDescriptions).map(
     ([name, description]) => `${name} (${description})`,
   );
-  return `Available Google voices: ${entries.join(", ")}.`;
+  return PromptLocaleService.get("en", "voice-catalog.catalogFormat.google", {
+    voices: entries.join(", "),
+  });
 }
 
 function buildElevenLabsCatalog(): string {
@@ -115,7 +110,9 @@ function buildElevenLabsCatalog(): string {
   const entries = Object.entries(voiceDescriptions).map(
     ([name, description]) => `${name} (${description})`,
   );
-  return `Available ElevenLabs voices: ${entries.join(", ")}.`;
+  return PromptLocaleService.get("en", "voice-catalog.catalogFormat.elevenlabs", {
+    voices: entries.join(", "),
+  });
 }
 
 export function getVoiceCatalogForProvider(

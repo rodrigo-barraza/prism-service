@@ -5,7 +5,9 @@
     "responseFormat": "Respond with exactly one word on the first line: APPROVE or DENY\nIf DENY, explain why on the second line."
   },
   "planningMode": {
-    "blocked": "You are in PLANNING MODE. Tool call(s) [{{blockedNames}}] were blocked — only exit_plan_mode is available. Write your complete plan as text output, then call exit_plan_mode to submit it for user approval."
+    "blocked": "You are in PLANNING MODE. Tool call(s) [{{blockedNames}}] were blocked — only exit_plan_mode is available. Write your complete plan as text output, then call exit_plan_mode to submit it for user approval.",
+    "approvalResult": "User has approved your plan. You can now start coding. Start with updating your todo list if applicable.",
+    "rejectionStatus": "Plan rejected — execution cancelled."
   },
   "reminderExtractor": {
     "extractionPrompt": "You are analyzing a system prompt to extract its most critical behavioral rules.\n\nExtract exactly 8–12 of the most important constraints — rules the AI agent MUST follow throughout the entire session.\n\nFocus on:\n- Hard prohibitions (never do X, do not Y)\n- Mandatory behaviors (always do X, you must Y)\n- Safety and security constraints\n- Output format and code style requirements\n- Identity and persona boundaries\n- Tool usage rules and restrictions\n\nRules for your output:\n- Output ONLY a bullet-point list using `- ` prefix\n- Each bullet must be a single concise sentence (max 30 words)\n- No headers, no explanations, no numbering, no markdown formatting\n- Prioritize constraints that would cause the most damage if forgotten\n- Ignore trivial or obvious rules (e.g. 'be helpful')\n\nSystem prompt to analyze:\n<system_prompt>"
@@ -29,5 +31,13 @@
   "toolRetryGuidance": {
     "header": "[TOOL RETRY GUIDANCE] {{count}} tool call(s) failed:",
     "analyzeSteps": "Before retrying, analyze:\n1. Which specific argument(s) caused the failure?\n2. What value(s) should be corrected or adjusted?\n3. Is there a prerequisite step needed before this tool call can succeed?\n\nRetry with corrected arguments, or take a different approach if the tool is not appropriate for this task."
+  },
+  "outputTruncation": {
+    "continuationPrompt": "Your previous response was cut short because the output token limit was reached before you could finish. The truncated text has been preserved. Please continue exactly where you left off. Do NOT repeat what you already said.",
+    "exhaustedRecovery": "The model's response was cut short because the **max_tokens** limit ({{configuredMaxTokens}}) was reached, and {{maxAttempts}} automatic continuation attempt(s) also hit the limit. This typically happens with very large tool call sequences or extremely long responses. Try increasing the **Max Tokens** setting in your model configuration, or break the task into smaller steps.",
+    "providerError": "The model provider encountered an error on iteration {{iteration}}: `{{errorText}}`. The conversation history up to this point has been preserved. You can retry your request, or try a different model/provider if this persists."
+  },
+  "contextWindow": {
+    "droppedMessages": "{{droppedCount}} earlier messages were removed to fit the context window. The conversation continues below."
   }
 }

@@ -17,6 +17,7 @@
  */
 
 import logger from "../../../utils/logger.ts";
+import PromptLocaleService from "../../PromptLocaleService.ts";
 import type {
   ConversationMessage,
   PassState,
@@ -35,10 +36,7 @@ const TOKEN_ESCALATION_MULTIPLIER = 1.5;
 const DEFAULT_MAX_TOKENS = 8192;
 
 /** The continuation prompt injected as a system message after a truncated response. */
-const CONTINUATION_PROMPT =
-  "Your previous response was cut short because the output token limit " +
-  "was reached before you could finish. The truncated text has been preserved. " +
-  "Please continue exactly where you left off. Do NOT repeat what you already said.";
+const CONTINUATION_PROMPT = PromptLocaleService.get("en", "harness.outputTruncation.continuationPrompt");
 
 /**
  * Check whether a pass was truncated by the output token limit.
@@ -153,14 +151,10 @@ export function buildExhaustedRecoveryMessage(
   maxAttempts: number,
   configuredMaxTokens: number | string,
 ): string {
-  return (
-    `The model's response was cut short because the **max_tokens** limit ` +
-    `(${configuredMaxTokens}) was reached, and ${maxAttempts} automatic ` +
-    `continuation attempt(s) also hit the limit. This typically happens ` +
-    `with very large tool call sequences or extremely long responses. ` +
-    `Try increasing the **Max Tokens** setting in your model configuration, ` +
-    `or break the task into smaller steps.`
-  );
+  return PromptLocaleService.get("en", "harness.outputTruncation.exhaustedRecovery", {
+    configuredMaxTokens: String(configuredMaxTokens),
+    maxAttempts: String(maxAttempts),
+  });
 }
 
 /**
@@ -172,10 +166,8 @@ export function buildProviderErrorMessage(
   iteration: number,
 ): string {
   const errorText = errorMessage(error);
-  return (
-    `The model provider encountered an error on iteration ${iteration}: ` +
-    `\`${errorText}\`. The conversation history up to this point has been ` +
-    `preserved. You can retry your request, or try a different model/provider ` +
-    `if this persists.`
-  );
+  return PromptLocaleService.get("en", "harness.outputTruncation.providerError", {
+    errorText,
+    iteration: String(iteration),
+  });
 }

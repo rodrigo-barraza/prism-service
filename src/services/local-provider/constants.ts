@@ -17,7 +17,7 @@ export const NATIVE_MCP_TYPES = new Set<string>([PROVIDERS.LM_STUDIO, PROVIDERS.
  * When the client doesn't explicitly set thinkingEnabled, these
  * providers default to thinkingEnabled=true.
  */
-export const DEFAULT_THINKING_TYPES = new Set<string>([PROVIDERS.LM_STUDIO, PROVIDERS.LLAMA_CPP]);
+export const DEFAULT_THINKING_TYPES = new Set<string>([PROVIDERS.LM_STUDIO, PROVIDERS.LLAMA_CPP, PROVIDERS.VLLM]);
 
 /**
  * Providers that support model management (load/unload/ensure).
