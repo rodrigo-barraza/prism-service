@@ -34,10 +34,10 @@ function createBaseMessages(): ConversationMessage[] {
 
 // ═══════════════════════════════════════════════════════════════
 describe("PlanningModeService.injectPlanningInstruction", () => {
-  it("should inject planning message after the system message", () => {
+  it("should inject planning message after the system message", async () => {
     const messages = createBaseMessages();
 
-    PlanningModeService.injectPlanningInstruction(messages);
+    await PlanningModeService.injectPlanningInstruction(messages);
 
     expect(messages).toHaveLength(3);
     expect(messages[0].role).toBe("system");
@@ -48,11 +48,11 @@ describe("PlanningModeService.injectPlanningInstruction", () => {
     expect(messages[2].content).toBe("Build me a web app.");
   });
 
-  it("should be idempotent — calling twice does not inject a second time", () => {
+  it("should be idempotent — calling twice does not inject a second time", async () => {
     const messages = createBaseMessages();
 
-    PlanningModeService.injectPlanningInstruction(messages);
-    PlanningModeService.injectPlanningInstruction(messages);
+    await PlanningModeService.injectPlanningInstruction(messages);
+    await PlanningModeService.injectPlanningInstruction(messages);
 
     const injectionCount = messages.filter(
       (message) => message._isPlanningInjection === true,
@@ -61,12 +61,12 @@ describe("PlanningModeService.injectPlanningInstruction", () => {
     expect(messages).toHaveLength(3);
   });
 
-  it("should inject at index 0 when no system message exists", () => {
+  it("should inject at index 0 when no system message exists", async () => {
     const messages: ConversationMessage[] = [
       { role: "user", content: "Hello" },
     ];
 
-    PlanningModeService.injectPlanningInstruction(messages);
+    await PlanningModeService.injectPlanningInstruction(messages);
 
     expect(messages).toHaveLength(2);
     expect(messages[0].role).toBe("user");
@@ -74,19 +74,19 @@ describe("PlanningModeService.injectPlanningInstruction", () => {
     expect(messages[1].content).toBe("Hello");
   });
 
-  it("should inject into an empty messages array", () => {
+  it("should inject into an empty messages array", async () => {
     const messages: ConversationMessage[] = [];
 
-    PlanningModeService.injectPlanningInstruction(messages);
+    await PlanningModeService.injectPlanningInstruction(messages);
 
     expect(messages).toHaveLength(1);
     expect(messages[0]._isPlanningInjection).toBe(true);
   });
 
-  it("should not inject before the system message", () => {
+  it("should not inject before the system message", async () => {
     const messages = createBaseMessages();
 
-    PlanningModeService.injectPlanningInstruction(messages);
+    await PlanningModeService.injectPlanningInstruction(messages);
 
     // System message must remain at index 0
     expect(messages[0].role).toBe("system");
@@ -96,9 +96,9 @@ describe("PlanningModeService.injectPlanningInstruction", () => {
 
 // ═══════════════════════════════════════════════════════════════
 describe("PlanningModeService.stripPlanningInstruction", () => {
-  it("should remove the injected planning message", () => {
+  it("should remove the injected planning message", async () => {
     const messages = createBaseMessages();
-    PlanningModeService.injectPlanningInstruction(messages);
+    await PlanningModeService.injectPlanningInstruction(messages);
     expect(messages).toHaveLength(3);
 
     PlanningModeService.stripPlanningInstruction(messages);
@@ -119,9 +119,9 @@ describe("PlanningModeService.stripPlanningInstruction", () => {
     expect(messages).toHaveLength(originalLength);
   });
 
-  it("should preserve non-planning messages when stripping", () => {
+  it("should preserve non-planning messages when stripping", async () => {
     const messages = createBaseMessages();
-    PlanningModeService.injectPlanningInstruction(messages);
+    await PlanningModeService.injectPlanningInstruction(messages);
     PlanningModeService.stripPlanningInstruction(messages);
 
     expect(messages[0].role).toBe("system");

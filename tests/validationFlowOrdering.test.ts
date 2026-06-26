@@ -168,7 +168,7 @@ describe("Validation Flow Ordering", () => {
 
       // Even if enter_plan_mode was in the tool calls, validation errors
       // take priority — the continue statement prevents plan mode toggling.
-      checkForPlanModeEntry(
+      await checkForPlanModeEntry(
         [{ id: "call-2", name: "enter_plan_mode", args: {} }],
         [],
         planModeState as any,
@@ -218,7 +218,7 @@ describe("Validation Flow Ordering", () => {
       const planModeState = { planModeActive: false, planModeText: "" };
       const emitSpy = vi.fn();
 
-      checkForPlanModeEntry(
+      await checkForPlanModeEntry(
         [{ id: "call-2", name: "enter_plan_mode", args: {} }],
         [],
         planModeState as any,
@@ -822,7 +822,7 @@ describe("Validation Flow Ordering", () => {
       // Step 2: Plan mode toggling can proceed (since validation passed)
       const planModeState = { planModeActive: false, planModeText: "" };
       const emitSpy = vi.fn();
-      checkForPlanModeEntry(toolCalls, currentMessages, planModeState as any, emitSpy);
+      await checkForPlanModeEntry(toolCalls, currentMessages, planModeState as any, emitSpy);
       // write_file doesn't trigger plan mode, so it stays false
       expect(planModeState.planModeActive).toBe(false);
 
