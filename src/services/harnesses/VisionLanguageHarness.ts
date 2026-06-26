@@ -201,7 +201,7 @@ Use these images to observe the environment, notice changes, animations, or user
           }
 
           if (state.planModeActive) {
-            PlanningModeService.injectPlanningInstruction(currentMessages);
+            await PlanningModeService.injectPlanningInstruction(currentMessages);
           }
         }
 
@@ -418,7 +418,7 @@ Use these images to observe the environment, notice changes, animations, or user
           }
 
           // ── Plan mode toggling ────────────────────────────────
-          checkForPlanModeEntry(
+          await checkForPlanModeEntry(
             pass.pendingToolCalls,
             currentMessages,
             state,

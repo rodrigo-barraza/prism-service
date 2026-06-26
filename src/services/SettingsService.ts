@@ -30,6 +30,7 @@ export interface SettingsData {
     harness: string;
     topology: string;
     dynamicToolActivation: boolean;
+    locale: string;
     [key: string]: string | boolean;
   };
   security: {
@@ -74,6 +75,7 @@ const DEFAULTS: SettingsData = {
     harness: "standard",
     topology: DEFAULT_TOPOLOGY,
     dynamicToolActivation: true,
+    locale: "en",
   },
   security: {
     allowEnvFiles: false,
