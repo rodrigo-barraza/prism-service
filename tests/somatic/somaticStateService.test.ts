@@ -102,14 +102,22 @@ describe("EmotionalStateEngine — basic mechanics", () => {
     expect(dominant.emotion).toBe("anger");
     expect(dominant.intensity).toBeGreaterThan(0);
   });
-
-  it("decay reduces all emotion values toward 0", () => {
-    const engine = new EmotionalStateEngine();
+  it("decay reduces all emotion values toward 0 in decay mode", () => {
+    const engine = new EmotionalStateEngine({ emotionalModel: "decay" });
     engine.addEmotion("joy", 50);
     const valueBefore = engine.emotions.joy;
     engine.decay();
     expect(engine.emotions.joy).toBeLessThan(valueBefore);
   });
+
+  it("decay is a no-op in reactive mode", () => {
+    const engine = new EmotionalStateEngine({ emotionalModel: "reactive" });
+    engine.addEmotion("joy", 50);
+    const valueBefore = engine.emotions.joy;
+    engine.decay();
+    expect(engine.emotions.joy).toBe(valueBefore);
+  });
+
 
   it("reset sets all emotions back to 0", () => {
     const engine = new EmotionalStateEngine();

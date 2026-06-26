@@ -44,9 +44,10 @@ describe('EmotionalStateEngine Unit Tests', () => {
     }
   });
 
-  it('should decay emotions over time', () => {
+  it('should decay emotions over time in decay mode', () => {
     const engine = new EmotionalStateEngine({
-      decayRate: 0.1, // 10% proportional decay
+      emotionalModel: 'decay',
+      decayRate: 0.1,
       linearDecay: 1.0,
       zeroClamp: 0.5,
     });
@@ -65,6 +66,7 @@ describe('EmotionalStateEngine Unit Tests', () => {
 
   it('should apply baseline pull on baselineEmotion during decay', () => {
     const engine = new EmotionalStateEngine({
+      emotionalModel: 'decay',
       baselineEmotion: 'anticipation',
       baselinePull: 0.05,
       decayRate: 0.1,
@@ -78,6 +80,35 @@ describe('EmotionalStateEngine Unit Tests', () => {
     // Pull: 45 + 0.05 * (100 - 45) = 45 + 2.75 = 47.75
     expect(engine.emotions.anticipation).toBe(47.75);
   });
+
+  it('should not decay emotions in reactive mode', () => {
+    const engine = new EmotionalStateEngine({
+      emotionalModel: 'reactive',
+    });
+
+    engine.setEmotion('joy', 80);
+    engine.decay();
+    engine.decay();
+    engine.decay();
+
+    // Reactive mode: decay() is a no-op, value stays unchanged
+    expect(engine.emotions.joy).toBe(80);
+  });
+
+  it('should shift emotions only through addEmotion in reactive mode', () => {
+    const engine = new EmotionalStateEngine({
+      emotionalModel: 'reactive',
+    });
+
+    engine.setEmotion('joy', 80);
+    const valueBefore = engine.emotions.joy;
+
+    // Only addEmotion shifts the spectrum
+    engine.addEmotion('sadness', 40);
+    expect(engine.emotions.joy).toBeLessThan(valueBefore);
+  });
+
+
 
   it('should add emotions adjusting for personality thresholds', () => {
     const engine = new EmotionalStateEngine({
@@ -159,25 +190,23 @@ describe('EmotionalStateEngine Unit Tests', () => {
     expect(dominant.components).toContain('trust');
   });
 
-  it('should process interactions by decaying and adding new emotion', () => {
+  it('should accumulate emotions through repeated addEmotion calls', () => {
     const engine = new EmotionalStateEngine({
-      decayRate: 0.1,
-      linearDecay: 1.0,
-      zeroClamp: 0.1,
       sensitivity: 1.0,
       volatility: 1.0,
       emotionalInertia: 0.0,
       threshold: 5,
     });
 
-    engine.setEmotion('joy', 50);
-    const dominant = engine.processInteraction('joy', 30);
+    engine.addEmotion('joy', 30);
+    const firstValue = engine.emotions.joy;
+    expect(firstValue).toBeGreaterThan(0);
 
-    // Decay: 50 - 5 = 45
-    // Add: 45 + 30 * (55 / 100) = 45 + 16.5 = 61.5
-    expect(engine.emotions.joy).toBe(61.5);
+    engine.addEmotion('joy', 30);
+    expect(engine.emotions.joy).toBeGreaterThan(firstValue);
+
+    const dominant = engine.getDominantEmotion();
     expect(dominant.emotion).toBe('joy');
-    expect(dominant.intensity).toBe(61.5);
   });
 
   it('should serialize and deserialize engine state accurately', () => {

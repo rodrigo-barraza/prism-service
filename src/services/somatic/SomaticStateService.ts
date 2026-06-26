@@ -76,7 +76,6 @@ interface AgentSomaticState {
   alcohol: StatInstance;
   substance: StatInstance;
   bathroom: StatInstance;
-  decayIntervalId: ReturnType<typeof setInterval> | null;
   isDirty: boolean;
 }
 
@@ -151,14 +150,14 @@ function resolveEnergyLabel(level: number): string {
   return "Energized";
 }
 
-const DECAY_INTERVAL_MILLISECONDS = 30_000;
+const PASSIVE_DRIFT_INTERVAL_MILLISECONDS = 30_000;
 const PERSIST_INTERVAL_MILLISECONDS = 60_000;
 
 const agentStates = new Map<string, AgentSomaticState>();
 
 function createStatInstances(
   levels?: Partial<SomaticLevels>,
-): Omit<AgentSomaticState, "decayIntervalId" | "isDirty"> {
+): Omit<AgentSomaticState, "isDirty"> {
   const emotionalState = levels?.emotionalState
     ? EmotionalStateEngine.deserialize(levels.emotionalState)
     : new EmotionalStateEngine();
@@ -218,7 +217,7 @@ function getPhysicalLevelsFromState(
   };
 }
 
-function applyPassiveDecay(state: AgentSomaticState): void {
+function applyPassiveDrift(state: AgentSomaticState): void {
   state.hunger.increase();
   state.thirst.increase();
   state.energy.decrease();
@@ -228,6 +227,8 @@ function applyPassiveDecay(state: AgentSomaticState): void {
   if (state.sickness.getLevel() > 0)
     state.sickness.setLevel(state.sickness.getLevel() - 5);
 
+  // Emotional decay only runs when the engine is in 'decay' mode;
+  // in 'reactive' mode this is a no-op inside the engine.
   state.emotionalState.decay();
 
   state.isDirty = true;
@@ -316,13 +317,12 @@ async function initializeAgentState(
 
   const state: AgentSomaticState = {
     ...stats,
-    decayIntervalId: null,
     isDirty: false,
   };
 
-  state.decayIntervalId = setInterval(() => {
-    applyPassiveDecay(state);
-  }, DECAY_INTERVAL_MILLISECONDS);
+  setInterval(() => {
+    applyPassiveDrift(state);
+  }, PASSIVE_DRIFT_INTERVAL_MILLISECONDS);
 
   const loadedFrom = savedLevels ? "database" : "defaults";
   logger.info(
@@ -725,10 +725,9 @@ const SomaticStateService = {
 
     applyHomeostaticDrift(state);
 
-    // LLM-based emotion analysis — detect user emotion and feed the Plutchik wheel
-    // Uses addEmotion directly instead of processInteraction to avoid double-decay:
-    // the 30s setInterval timer already handles continuous decay, so calling
-    // decay() again on every message would suppress emotional gains.
+    // LLM-based emotion analysis — detect user emotion and feed the Plutchik wheel.
+    // In 'reactive' mode, addEmotion is the sole mechanism for emotional shifts.
+    // In 'decay' mode, the 30s passive timer also applies continuous time-based decay.
     const detectedEmotion = await analyzeEmotionFromText(
       agentId,
       extractedContent,
@@ -882,7 +881,6 @@ const SomaticStateService = {
   async destroyAgent(agentId: string): Promise<void> {
     const state = agentStates.get(agentId);
     if (state) {
-      if (state.decayIntervalId) clearInterval(state.decayIntervalId);
       await persistToDatabase(agentId, state);
       agentStates.delete(agentId);
     }

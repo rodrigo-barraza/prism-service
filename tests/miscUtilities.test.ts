@@ -628,6 +628,7 @@ describe('SomaticConstants', () => {
 
   describe('DEFAULT_EMOTION_PERSONALITY', () => {
     it('should have all required numeric fields in valid ranges', () => {
+      expect(DEFAULT_EMOTION_PERSONALITY.emotionalModel).toBe('reactive');
       expect(DEFAULT_EMOTION_PERSONALITY.decayRate).toBeGreaterThan(0);
       expect(DEFAULT_EMOTION_PERSONALITY.decayRate).toBeLessThan(1);
       expect(DEFAULT_EMOTION_PERSONALITY.linearDecay).toBeGreaterThan(0);
