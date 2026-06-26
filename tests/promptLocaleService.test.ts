@@ -145,8 +145,8 @@ describe("PromptLocaleService — Subdirectory Namespacing", () => {
     expect(englishLocaleKeys.has("personas.omni.responseGuidelines")).toBe(true);
   });
 
-  it("should resolve personas.omni.guidelines from personas/omni.json", () => {
-    expect(englishLocaleKeys.has("personas.omni.guidelines")).toBe(true);
+  it("should NOT have personas.omni.guidelines (deduplicated into system-prompt.codingGuidelines)", () => {
+    expect(englishLocaleKeys.has("personas.omni.guidelines")).toBe(false);
   });
 
   it("should resolve personas.omni.description from personas/omni.json", () => {
@@ -332,5 +332,210 @@ describe("PromptLocaleService — dist/ Production Build", () => {
     if (!fs.existsSync(DIST_LOCALES_DIRECTORY)) return;
     const distPersonasDirectory = path.join(DIST_LOCALES_DIRECTORY, "en", "personas");
     expect(fs.existsSync(distPersonasDirectory)).toBe(true);
+  });
+});
+
+describe("PromptLocaleService — Planning Mode Merge (planning.json → harness.json)", () => {
+  let englishLocaleKeys: Map<string, string>;
+
+  beforeAll(() => {
+    const englishLocaleDirectory = path.join(LOCALES_DIRECTORY, "en");
+    englishLocaleKeys = loadAllLocaleKeys(englishLocaleDirectory);
+  });
+
+  it("should NOT have a planning.json file (merged into harness.json)", () => {
+    const planningFile = path.join(LOCALES_DIRECTORY, "en", "planning.json");
+    expect(fs.existsSync(planningFile)).toBe(false);
+  });
+
+  it("should NOT resolve the old planning.planningInstruction key", () => {
+    expect(englishLocaleKeys.has("planning.planningInstruction")).toBe(false);
+  });
+
+  it("should resolve planningInstruction under harness.planningMode namespace", () => {
+    expect(englishLocaleKeys.has("harness.planningMode.planningInstruction")).toBe(true);
+    const value = englishLocaleKeys.get("harness.planningMode.planningInstruction")!;
+    expect(value).toContain("PLANNING MODE ACTIVE");
+    expect(value).toContain("exit_plan_mode");
+  });
+
+  it("should have all original harness.planningMode keys intact after merge", () => {
+    const expectedKeys = [
+      "harness.planningMode.blocked",
+      "harness.planningMode.approvalResult",
+      "harness.planningMode.rejectionStatus",
+      "harness.planningMode.planningInstruction",
+    ];
+    for (const key of expectedKeys) {
+      expect(englishLocaleKeys.has(key)).toBe(true);
+      expect(englishLocaleKeys.get(key)!.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("PromptLocaleService — Somatic Mood Nesting (moods.*)", () => {
+  let englishLocaleKeys: Map<string, string>;
+
+  beforeAll(() => {
+    const englishLocaleDirectory = path.join(LOCALES_DIRECTORY, "en");
+    englishLocaleKeys = loadAllLocaleKeys(englishLocaleDirectory);
+  });
+
+  const MOOD_KEYS = [
+    "joy", "trust", "fear", "surprise", "sadness", "disgust",
+    "anger", "anticipation", "neutral", "love", "submission",
+    "awe", "disapproval", "remorse", "contempt", "aggressiveness",
+    "optimism", "hope", "anxiety", "envy", "pride", "despair",
+    "shame", "guilt", "cynicism", "delight", "outrage",
+    "pessimism", "morbidness", "sentimentality", "curiosity",
+    "unbelief", "dominance",
+  ];
+
+  it("should NOT have mood keys at somatic root level (e.g. somatic.joy)", () => {
+    for (const mood of MOOD_KEYS) {
+      expect(englishLocaleKeys.has(`somatic.${mood}`)).toBe(false);
+    }
+  });
+
+  for (const mood of MOOD_KEYS) {
+    it(`should resolve nested mood key: somatic.moods.${mood}`, () => {
+      expect(englishLocaleKeys.has(`somatic.moods.${mood}`)).toBe(true);
+      const value = englishLocaleKeys.get(`somatic.moods.${mood}`)!;
+      expect(value.length).toBeGreaterThan(20);
+      expect(value).toContain("MOOD OVERRIDE");
+    });
+  }
+
+  it("should still have infrastructure keys at somatic root level", () => {
+    expect(englishLocaleKeys.has("somatic.classificationPrompt")).toBe(true);
+    expect(englishLocaleKeys.has("somatic.moodTemplate.header")).toBe(true);
+    expect(englishLocaleKeys.has("somatic.alcohol.suffix")).toBe(true);
+  });
+
+  it("should have all 33 mood keys under somatic.moods.*", () => {
+    const moodKeys = [...englishLocaleKeys.keys()].filter((key) =>
+      key.startsWith("somatic.moods."),
+    );
+    expect(moodKeys.length).toBe(33);
+  });
+});
+
+describe("PromptLocaleService — Voice Catalog Cleanup", () => {
+  let englishLocaleKeys: Map<string, string>;
+
+  beforeAll(() => {
+    const englishLocaleDirectory = path.join(LOCALES_DIRECTORY, "en");
+    englishLocaleKeys = loadAllLocaleKeys(englishLocaleDirectory);
+  });
+
+  it("should NOT have dead voiceDescriptions keys", () => {
+    const deadKeys = [...englishLocaleKeys.keys()].filter((key) =>
+      key.startsWith("voice-catalog.voiceDescriptions."),
+    );
+    expect(deadKeys).toEqual([]);
+  });
+
+  it("should still have catalog format keys", () => {
+    const formatKeys = [
+      "voice-catalog.catalogFormat.inworld",
+      "voice-catalog.catalogFormat.openai",
+      "voice-catalog.catalogFormat.google",
+      "voice-catalog.catalogFormat.elevenlabs",
+    ];
+    for (const key of formatKeys) {
+      expect(englishLocaleKeys.has(key)).toBe(true);
+    }
+  });
+
+  it("should still have inworldTts2Steering key", () => {
+    expect(englishLocaleKeys.has("voice-catalog.inworldTts2Steering")).toBe(true);
+    const value = englishLocaleKeys.get("voice-catalog.inworldTts2Steering")!;
+    expect(value).toContain("inworld-tts-2");
+  });
+});
+
+describe("PromptLocaleService — Persona Deduplication", () => {
+  let englishLocaleKeys: Map<string, string>;
+
+  beforeAll(() => {
+    const englishLocaleDirectory = path.join(LOCALES_DIRECTORY, "en");
+    englishLocaleKeys = loadAllLocaleKeys(englishLocaleDirectory);
+  });
+
+  it("should NOT have personas.coding.identity (deduplicated to system-prompt.codingFallbackIdentity)", () => {
+    expect(englishLocaleKeys.has("personas.coding.identity")).toBe(false);
+  });
+
+  it("should NOT have personas.coding.guidelines (deduplicated to system-prompt.codingGuidelines)", () => {
+    expect(englishLocaleKeys.has("personas.coding.guidelines")).toBe(false);
+  });
+
+  it("should still have personas.coding.description", () => {
+    expect(englishLocaleKeys.has("personas.coding.description")).toBe(true);
+  });
+
+  it("should have enriched system-prompt.codingGuidelines with tool-specific bullets", () => {
+    const guidelines = englishLocaleKeys.get("system-prompt.codingGuidelines")!;
+    expect(guidelines).toContain("replace_in_file");
+    expect(guidelines).toContain("patch_file");
+    expect(guidelines).toContain("write_file");
+  });
+
+  it("should have system-prompt.codingFallbackIdentity as the canonical identity", () => {
+    const identity = englishLocaleKeys.get("system-prompt.codingFallbackIdentity")!;
+    expect(identity).toContain("highly capable coding agent");
+  });
+});
+
+describe("PromptLocaleService — No Duplicate Values Across Personas", () => {
+  let englishLocaleKeys: Map<string, string>;
+
+  beforeAll(() => {
+    const englishLocaleDirectory = path.join(LOCALES_DIRECTORY, "en");
+    englishLocaleKeys = loadAllLocaleKeys(englishLocaleDirectory);
+  });
+
+  it("should not have any persona key whose value exactly matches system-prompt.codingFallbackIdentity", () => {
+    const canonicalIdentity = englishLocaleKeys.get("system-prompt.codingFallbackIdentity")!;
+    const duplicateKeys: string[] = [];
+    for (const [key, value] of englishLocaleKeys) {
+      if (key.startsWith("personas.") && key.endsWith(".identity") && value === canonicalIdentity) {
+        duplicateKeys.push(key);
+      }
+    }
+    expect(duplicateKeys).toEqual([]);
+  });
+
+  it("should not have any persona key whose value exactly matches system-prompt.codingGuidelines", () => {
+    const canonicalGuidelines = englishLocaleKeys.get("system-prompt.codingGuidelines")!;
+    const duplicateKeys: string[] = [];
+    for (const [key, value] of englishLocaleKeys) {
+      if (key.startsWith("personas.") && key.endsWith(".guidelines") && value === canonicalGuidelines) {
+        duplicateKeys.push(key);
+      }
+    }
+    expect(duplicateKeys).toEqual([]);
+  });
+});
+
+describe("PromptLocaleService — Harness Lifecycle Key Integrity", () => {
+  let englishLocaleKeys: Map<string, string>;
+
+  beforeAll(() => {
+    const englishLocaleDirectory = path.join(LOCALES_DIRECTORY, "en");
+    englishLocaleKeys = loadAllLocaleKeys(englishLocaleDirectory);
+  });
+
+  it("should NOT have any routers.planning.* keys (dead code removed)", () => {
+    const deadKeys = [...englishLocaleKeys.keys()].filter((key) =>
+      key.startsWith("routers.planning."),
+    );
+    expect(deadKeys).toEqual([]);
+  });
+
+  it("should have harness.planningMode.blocked with {{blockedNames}} interpolation", () => {
+    const value = englishLocaleKeys.get("harness.planningMode.blocked")!;
+    expect(value).toContain("{{blockedNames}}");
+    expect(value).toContain("PLANNING MODE");
   });
 });
