@@ -35,5 +35,53 @@
 
   "subAgentIdentity": "You are a sub-agent in a multi-agent system.",
   "coordinatorRole": "You are a **Coordinator** sub-agent with recursive spawning capabilities.",
-  "workerRole": "You are a **Worker** sub-agent at maximum recursion depth ({{childRecursionDepth}}/{{maxRecursionDepth}})."
+  "workerRole": "You are a **Worker** sub-agent at maximum recursion depth ({{childRecursionDepth}}/{{maxRecursionDepth}}).",
+
+  "tools": {
+    "create_team": {
+      "description": "Spawn one or more sub-agents, each in an isolated git worktree. Sub-agents inherit the currently enabled tools and can dynamically enable more via enable_tools. Execution mode depends on topology: {{hierarchicalDesc}} runs all members in parallel, {{hierarchicalAggregationDesc}} runs all members in parallel then merges results via a synthesis pass, {{sequentialDesc}} runs members one-at-a-time passing each result to the next, {{peerToPeerDesc}} runs a turn-based discussion where members take turns seeing a shared thread, {{tournamentDesc}} runs all members in parallel then has a judge select the best result, {{criticLoopDesc}} runs actor-critic refinement loop (either Council of Judges or Jury mode), {{divideAndConquerDesc}} decomposes the task into subtasks and executes in parallel then synthesizes, {{mctsDesc}} runs Monte Carlo Tree Search guided parallel expansions and iterations. For a single task, provide one member. For parallel work, provide up to 10 members. Returns results from all members when execution completes. When recursive spawning is enabled, sub-agents may themselves call create_team to further decompose complex subtasks. Results include subtreeMetrics with descendant counts, aggregated costs, and child summaries for full tree visibility.",
+      "parameters": {
+        "name": "Team name for identification (e.g. 'auth_refactor', 'research').",
+        "topology": "Optional: execution topology. '{{hierarchicalLabel}}' — all members run in parallel. '{{hierarchicalAggregationLabel}}' — all members run in parallel, then a synthesis pass merges their outputs into a unified result. '{{sequentialLabel}}' — members run one-at-a-time, each receiving the previous member's output. '{{peerToPeerLabel}}' — turn-based discussion where members take turns on a shared thread. '{{tournamentLabel}}' — N actors run in parallel, judge selects best. '{{criticLoopLabel}}' — Actor-Critic refinement. Council of Judges (1 actor + N critics) or Jury mode (N actors + judge -> critic loop on winner). Config via topologyConfig: actorCount, maxRounds. '{{divideAndConquerLabel}}' — Task decomposition into subtasks -> parallel execution -> synthesis. Config: maxSubtasks. '{{mctsLabel}}' — Monte Carlo Tree Search. Config: branchFactor, maxDepth. Omit to use the system default.",
+        "topologyConfig": "Optional topology configuration options depending on the topology type. For 'critic_loop': { actorCount: number, maxRounds: number }. For 'peer_to_peer': { maxRounds: number }. For 'mcts': { branchFactor: number, maxDepth: number }. For 'divide_and_conquer': { maxSubtasks: number }.",
+        "actorCount": "Number of competing actors (for critic_loop Jury mode). Defaults to 1.",
+        "maxRounds": "Maximum evaluation/revision rounds or turns. Defaults to 3 for critic_loop, calculated based on members count for peer_to_peer.",
+        "branchFactor": "MCTS branch factor (number of expanded branches in parallel per depth level). Defaults to 3.",
+        "maxDepth": "MCTS max search depth. Defaults to 3.",
+        "maxSubtasks": "Divide and conquer maximum subtasks to decompose. Defaults to 6.",
+        "members": "Array of sub-agent definitions (max 10). Each member runs autonomously in its own worktree.",
+        "memberDescription": "Short label for this sub-agent (shown in UI).",
+        "memberPrompt": "Self-contained task prompt. Include file paths, line numbers, and exact instructions. Sub-agents cannot see the orchestrator's conversation.",
+        "memberFiles": "Optional: file paths the sub-agent should focus on.",
+        "memberModel": "Optional: model override for this sub-agent (defaults to orchestrator's model).",
+        "memberAgent": "Optional: the agent type/persona to spawn (available: {{agentNames}}). Defaults to the parent agent's type. Do not set this to a speaker ID like 'agent-0'.",
+        "memberAgentDefault": "Optional: the agent type/persona to spawn. Defaults to the parent agent's type. Do not set this to a speaker ID like 'agent-0'."
+      }
+    },
+    "send_message": {
+      "description": "Send a follow-up message to a running or completed sub-agent. Use to continue work, provide corrections, or give new instructions.",
+      "parameters": {
+        "to": "Agent ID returned by create_team",
+        "message": "Follow-up instructions for the sub-agent"
+      }
+    },
+    "stop_agent": {
+      "description": "Stop a running sub-agent. The sub-agent's worktree is cleaned up.",
+      "parameters": {
+        "agent_id": "Agent ID to stop"
+      }
+    },
+    "get_task_output": {
+      "description": "Read the output from a previously spawned sub-agent by its agent ID. Use this to check on a sub-agent's result after it has completed, or to read partial output from a still-running sub-agent. Returns the sub-agent's final text, tool usage stats, diff summary, and status.",
+      "parameters": {
+        "agent_id": "The agent ID returned by create_team."
+      }
+    },
+    "delete_team": {
+      "description": "Stop and remove all sub-agents in a named team. Cleans up worktrees for all members.",
+      "parameters": {
+        "teamName": "The team name to delete (as provided to create_team)."
+      }
+    }
+  }
 }

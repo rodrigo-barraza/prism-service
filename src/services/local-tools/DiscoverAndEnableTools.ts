@@ -4,6 +4,7 @@ import {
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import SettingsService from "../SettingsService.ts";
+import PromptLocaleService from "../PromptLocaleService.ts";
 import {
   extractDiscoverableDomains,
   extractDomainKeywords,
@@ -43,7 +44,7 @@ export interface SearchToolsResult {
  * derived from the live tool catalog. Domain lists, query examples,
  * and the tool count are never hardcoded.
  */
-function buildDiscoverAndEnableSchema() {
+function buildDiscoverAndEnableSchema(locale: string) {
   const totalToolCount =
     getToolOrchestratorService().getClientToolSchemas().length;
   const discoverableDomains = extractDiscoverableDomains();
@@ -64,30 +65,28 @@ function buildDiscoverAndEnableSchema() {
   return {
     name: "discover_and_enable_tools",
     emoji: ["🔍", "🧰"],
-    description:
-      `Search the FULL tool catalog (${totalToolCount} tools) AND automatically enable matches in one step. ` +
-      "Combines search_tools and enable_tools — after calling this, discovered tools are immediately " +
-      "available on the next iteration without a separate enable_tools call. " +
-      "Use this when you know you want to use discovered tools right away. " +
-      `Covers all domains: ${domainListLowercase}. ` +
-      "Accepts the same parameters as search_tools (query, domain, limit).",
+    description: PromptLocaleService.get(locale, "internal-tools.discover_and_enable_tools.description", {
+      totalToolCount: String(totalToolCount),
+      domainListLowercase,
+    }),
     parameters: {
       type: "object",
       properties: {
         query: {
           type: "string",
-          description:
-            "Search keyword(s) to match against tool names and descriptions. " +
-            "Use capability-specific terms for best results. " +
-            `Examples: ${sampleKeywords}.`,
+          description: PromptLocaleService.get(locale, "internal-tools.discover_and_enable_tools.parameters.query", {
+            sampleKeywords,
+          }),
         },
         domain: {
           type: "string",
-          description: `Filter by tool domain. Known domains: ${domainListQuoted}.`,
+          description: PromptLocaleService.get(locale, "internal-tools.discover_and_enable_tools.parameters.domain", {
+            domainListQuoted,
+          }),
         },
         limit: {
           type: "number",
-          description: "Maximum results to return (1–50). Default: 20.",
+          description: PromptLocaleService.get(locale, "internal-tools.discover_and_enable_tools.parameters.limit"),
         },
       },
       required: [],
@@ -98,7 +97,10 @@ function buildDiscoverAndEnableSchema() {
 const discoverAndEnableTools = {
   name: "discover_and_enable_tools",
   get schema() {
-    return buildDiscoverAndEnableSchema();
+    const activeLocale = typeof SettingsService.getCached === "function"
+      ? SettingsService.getCached().agents?.locale || "en"
+      : "en";
+    return buildDiscoverAndEnableSchema(activeLocale);
   },
   domain: DOMAINS.CORE_DISCOVER.displayName,
   labels: ["tools", "discovery", "activation", "meta"],

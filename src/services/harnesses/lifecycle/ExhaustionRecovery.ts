@@ -1,5 +1,6 @@
 import { expandMessagesForFunctionCall } from "../../../utils/FunctionCallingUtilities.ts";
 import ConversationGenerationTracker from "../../ConversationGenerationTracker.ts";
+import PromptLocaleService from "../../PromptLocaleService.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
@@ -41,11 +42,7 @@ export async function runExhaustionRecoveryPass(
 
   currentMessages.push({
     role: "system",
-    content: [
-      "You have reached the maximum number of tool-call iterations for this turn.",
-      "Summarize the progress you have made so far, report any partial results,",
-      "and clearly state what remains to be done so the user knows where things stand.",
-    ].join(" "),
+    content: PromptLocaleService.get("en", "harness.exhaustionRecovery.message"),
   });
 
   const { tools: _tools, ...exhaustionOptions } = options;

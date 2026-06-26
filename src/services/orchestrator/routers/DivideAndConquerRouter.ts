@@ -51,13 +51,7 @@ export function buildDecompositionPrompt(
     "",
     "## Instructions",
     "",
-    `1. Analyze the task and identify ${maximumSubtasks} or fewer subtasks.`,
-    "2. Each subtask should be as self-contained as possible.",
-    "3. Subtasks should NOT overlap in scope — avoid two subtasks modifying the same files.",
-    "4. Each subtask must include specific file paths, function names, and exact instructions.",
-    "5. Do NOT include meta-tasks like 'review' or 'verify' — focus on implementation work.",
-    "6. If a subtask depends on the output of another subtask (e.g., 'write tests' depends on 'implement feature'),",
-    '   specify `dependsOn` as an array of 0-based subtask indices. Independent subtasks should omit this field.',
+    PromptLocaleService.get("en", "routers.divideAndConquer.plannerInstructions", { maximumSubtasks: String(maximumSubtasks) }),
     "",
     "## Output Format",
     "",
@@ -179,11 +173,7 @@ export function buildSynthesisPrompt(
     "",
     "## Instructions",
     "",
-    PromptLocaleService.get("en", "routers.divideAndConquer.synthesizeInstruction"),
-    "3. Identify any gaps — subtasks that failed or areas that weren't covered.",
-    "4. Produce a single, coherent synthesis that combines all subtask results.",
-    "5. If any subtasks failed, note what remains to be done.",
-    "6. Be concise but thorough — produce an integrated summary, not a concatenation.",
+    PromptLocaleService.get("en", "routers.divideAndConquer.synthesizeInstructions"),
   ].join("\n");
 }
 

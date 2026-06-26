@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import PromptLocaleService from "../PromptLocaleService.ts";
+import SettingsService from "../SettingsService.ts";
 import StatFactory, { type StatInstance } from "./StatFactory.ts";
 import {
   ALCOHOL_DESCRIPTIONS,
@@ -686,19 +687,25 @@ const SomaticStateService = {
 
   async getEmotionBehaviorPrompt(agentId: string): Promise<string> {
     const dominant = await this.getDominantEmotion(agentId);
+    const locale = typeof SettingsService.getCached === "function"
+      ? SettingsService.getCached().agents?.locale || "en"
+      : "en";
     return (
-      EMOTION_BEHAVIOR_PROMPTS[dominant.emotion] ||
-      EMOTION_BEHAVIOR_PROMPTS["neutral"]
+      PromptLocaleService.get(locale, `somatic.${dominant.emotion}`) ||
+      PromptLocaleService.get(locale, "somatic.neutral")
     );
   },
 
   async getAlcoholSystemPrompt(agentId: string): Promise<string> {
     const state = await ensureState(agentId);
     const level = state.alcohol.getLevel();
-    const description = ALCOHOL_DESCRIPTIONS[level];
-    if (!description) return "";
-    const alcoholSuffix = PromptLocaleService.get("en", "somatic.alcohol.suffix");
-    const levelInfo = PromptLocaleService.get("en", "somatic.alcohol.levelInfo", { level: String(level) });
+    const locale = typeof SettingsService.getCached === "function"
+      ? SettingsService.getCached().agents?.locale || "en"
+      : "en";
+    const description = PromptLocaleService.get(locale, `somatic.alcohol.${level}`);
+    if (!description || description.startsWith("[MISSING:")) return "";
+    const alcoholSuffix = PromptLocaleService.get(locale, "somatic.alcohol.suffix");
+    const levelInfo = PromptLocaleService.get(locale, "somatic.alcohol.levelInfo", { level: String(level) });
     return description + alcoholSuffix + levelInfo;
   },
 

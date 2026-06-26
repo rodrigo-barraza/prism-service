@@ -136,7 +136,11 @@ export const EMOTION_COLORS: Record<string, string> = {
   anxiety: "#aaaa77",
 };
 
-export const EMOTION_BEHAVIOR_PROMPTS: Record<string, string> = PromptLocaleService.getRecord("en", "somatic");
+const allSomaticPrompts = PromptLocaleService.getRecord("en", "somatic");
+const validSomaticKeys = new Set([...VALID_EMOTIONS, ...Object.values(PLUTCHIK_DYADS)]);
+export const EMOTION_BEHAVIOR_PROMPTS: Record<string, string> = Object.fromEntries(
+  Object.entries(allSomaticPrompts).filter(([key]) => validSomaticKeys.has(key)),
+);
 
 export const ALCOHOL_DESCRIPTIONS: Record<number, string> = Object.fromEntries(
   Object.entries(PromptLocaleService.getRecord("en", "somatic.alcohol")).map(

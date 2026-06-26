@@ -157,8 +157,8 @@ function buildActorRevisionPrompt(
     : "";
 
   return [
-    `Your previous work was reviewed by ${criticVerdicts.length} critic(s) in round ${roundNumber} and needs revision.`,
-    `${failedVerdicts.length} critic(s) FAILED your output. You must address ALL their feedback.`,
+    PromptLocaleService.get("en", "routers.critic.revisionHeader", { criticCount: String(criticVerdicts.length), roundNumber: String(roundNumber) }),
+    PromptLocaleService.get("en", "routers.critic.failedCount", { failedCount: String(failedVerdicts.length) }),
     passedSummary,
     "",
     "## Critic Feedback (FAIL verdicts)",
@@ -167,13 +167,7 @@ function buildActorRevisionPrompt(
     "",
     "## Instructions",
     "",
-    "1. Address ALL issues raised by EVERY failing critic.",
-    "2. Make the specific changes requested.",
-    "3. Do NOT regress on areas that passed — critics who passed will review again.",
-    "4. Verify your corrections (run tests, typecheck, etc.).",
-    "5. Commit and report what you changed.",
-    "",
-    "Focus on fixing the identified issues — do not restart from scratch unless the feedback requires it.",
+    PromptLocaleService.get("en", "routers.critic.revisionInstructions"),
   ].join("\n");
 }
 
@@ -182,7 +176,7 @@ function buildJuryRevisionPrompt(
   roundNumber: number,
 ): string {
   return [
-    `Your previous work was selected as the best among competing actors, but it needs revision (round ${roundNumber}).`,
+    PromptLocaleService.get("en", "routers.jury.revisionHeader", { roundNumber: String(roundNumber) }),
     "",
     "## Judge's Feedback",
     "",
@@ -190,12 +184,7 @@ function buildJuryRevisionPrompt(
     "",
     "## Instructions",
     "",
-    "1. Address ALL issues raised by the judge.",
-    "2. Make the specific changes requested.",
-    "3. Verify your corrections (run tests, typecheck, etc.).",
-    "4. Commit and report what you changed.",
-    "",
-    "Focus on fixing the identified issues — do not restart from scratch unless the feedback requires it.",
+    PromptLocaleService.get("en", "routers.jury.revisionInstructions"),
   ].join("\n");
 }
 
@@ -312,7 +301,7 @@ export class CriticLoopRouter implements TopologyRouter {
       ? members.slice(1)
       : [{
           description: `Critic for "${actorMember.description}"`,
-          prompt: "Review and evaluate the actor's output.",
+          prompt: PromptLocaleService.get("en", "routers.critic.defaultPrompt"),
           files: actorMember.files,
         }];
 

@@ -1,6 +1,7 @@
 import logger from "../../utils/logger.ts";
 import { DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
+import PromptLocaleService from "../PromptLocaleService.ts";
 
 // ────────────────────────────────────────────────────────────
 // Internal Tool Registry
@@ -116,6 +117,39 @@ try {
   );
 }
 
+function localizeSchema(schema: InternalToolSchema, locale: string): InternalToolSchema {
+  const toolName = schema.name;
+  if (toolName === "discover_and_enable_tools") {
+    return schema;
+  }
+  const localizedDescription = PromptLocaleService.get(locale, `internal-tools.${toolName}.description`);
+
+  const parameters = schema.parameters ? JSON.parse(JSON.stringify(schema.parameters)) : undefined;
+
+  if (parameters?.properties) {
+    for (const propertyName of Object.keys(parameters.properties)) {
+      const property = parameters.properties[propertyName];
+      if (property && typeof property === "object") {
+        const localizedPropDesc = PromptLocaleService.get(
+          locale,
+          `internal-tools.${toolName}.parameters.${propertyName}`,
+        );
+        if (localizedPropDesc && !localizedPropDesc.startsWith("[MISSING:")) {
+          property.description = localizedPropDesc;
+        }
+      }
+    }
+  }
+
+  return {
+    ...schema,
+    description: (localizedDescription && !localizedDescription.startsWith("[MISSING:"))
+      ? localizedDescription
+      : schema.description,
+    ...(parameters && { parameters }),
+  };
+}
+
 export default class InternalToolRegistry {
   static has(name: string) {
     return registry.has(name);
@@ -131,12 +165,14 @@ export default class InternalToolRegistry {
     }
     return tool.execute(args, context);
   }
-  static getSchemas() {
-    return [...registry.values()].map((tool) => tool.schema);
+  static getSchemas(locale?: string) {
+    const activeLocale = locale || PromptLocaleService.getDefaultLocale();
+    return [...registry.values()].map((tool) => localizeSchema(tool.schema, activeLocale));
   }
-  static getClientSchemas() {
+  static getClientSchemas(locale?: string) {
+    const activeLocale = locale || PromptLocaleService.getDefaultLocale();
     return [...registry.values()].map((tool) => ({
-      ...tool.schema,
+      ...localizeSchema(tool.schema, activeLocale),
       domain: tool.domain || DOMAINS.CORE_HARNESS.displayName,
       labels: tool.labels || ["coding"],
     }));
