@@ -1,0 +1,44 @@
+{
+  "critic": {
+    "specializedRole": "You are a specialized critic with the following focus: {{criticRole}}\n",
+    "evaluator": "You are a critic evaluating a sub-agent's work output.",
+    "roundContext": "This is evaluation round {{roundNumber}} of {{maximumRounds}}.",
+    "originalTaskHeader": "## Original Task",
+    "actorOutputHeader": "## Actor's Output",
+    "jobHeader": "## Your Job",
+    "jobInstruction": "Evaluate the actor's output rigorously against the original task requirements.\nBe adversarial — look for mistakes, missed edge cases, incomplete work, poor quality, or incorrect reasoning.",
+    "verdictInstruction": "Respond with ONE of these verdicts:",
+    "passVerdict": "**PASS** — The output fully and correctly satisfies the task. Explain briefly why it passes.",
+    "failVerdict": "**FAIL** — The output has issues that need fixing. Provide specific, actionable feedback:\n- What exactly is wrong or missing\n- What specific changes are needed\n- Reference file paths, line numbers, or code snippets where applicable",
+    "verdictFormat": "Start your response with either **PASS** or **FAIL** on the first line."
+  },
+  "jury": {
+    "judge": "You are a judge evaluating multiple competing solutions to the same task.",
+    "evaluateInstruction": "Evaluate all {{actorCount}} solutions and select the BEST one.\nScore each on: correctness, completeness, code quality, and verification.",
+    "responseFormat": "Respond with ONLY a JSON object. No markdown fences, no explanations outside the JSON.",
+    "bestActorDescription": "- `bestActorIndex`: 0-based index of the best actor\n- `verdict`: PASS if the best solution is complete, FAIL if it needs refinement\n- `feedback`: If FAIL, specific actionable feedback for improvement. If PASS, brief explanation."
+  },
+  "divideAndConquer": {
+    "planner": "You are a task decomposition planner.",
+    "planInstruction": "Break the following task into independent, parallelizable subtasks.\nEach subtask should be self-contained and can be executed by a separate agent.",
+    "planFormat": "Respond with ONLY a JSON array of subtask objects. No markdown fences, no explanations outside the JSON.",
+    "synthesizer": "You are a synthesis agent for a divide-and-conquer execution.",
+    "synthesizeInstruction": "Combine the following subtask results into a unified final answer.\nResolve any conflicts between subtask results."
+  },
+  "hierarchical": {
+    "synthesizer": "You are a synthesis agent for the team \"{{teamName}}\".{{layerContext}}"
+  },
+  "mcts": {
+    "evaluator": "You are an evaluator in a Monte Carlo Tree Search (MCTS) for agent reasoning.",
+    "evaluateInstruction": "Score this candidate response on a scale of 0.0 to 1.0.\nConsider: correctness, completeness, reasoning quality, and actionability.",
+    "responseFormat": "Respond with ONLY a JSON object. No markdown fences, no explanations outside the JSON.",
+    "refinementContext": "You are continuing work on a task. A previous attempt was evaluated and selected as the best approach, but it needs refinement."
+  },
+  "tournament": {
+    "judge": "You are a judge for the team \"{{teamName}}\".",
+    "verifier": "You are a verification agent. Run the following commands and report PASS or FAIL for each:"
+  },
+  "planning": {
+    "planningModeBlocked": "You are in PLANNING MODE. Tool call(s) [{{blockedNames}}] were blocked — only exit_plan_mode is available. Write your complete plan as text output, then call exit_plan_mode to submit it for user approval."
+  }
+}

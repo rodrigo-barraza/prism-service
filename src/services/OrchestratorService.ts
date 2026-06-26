@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import logger from "../utils/logger.ts";
+import PromptLocaleService from "./PromptLocaleService.ts";
 
 import { getProvider } from "../providers/index.ts";
 import {
@@ -1431,7 +1432,7 @@ export default class OrchestratorService {
     if (canSpawnRecursively) {
       recursionBlock =
         `\n## Recursive Delegation\n` +
-        `You are a **Coordinator** sub-agent with recursive spawning capabilities.\n` +
+        PromptLocaleService.get("en", "orchestrator.coordinatorRole") + `\n` +
         `- Current depth: ${childRecursionDepth} of ${maxRecursionDepth} (${remainingDepth} level${remainingDepth !== 1 ? "s" : ""} remaining)\n` +
         `- You have access to \`create_team\` and can spawn your own sub-teams\n` +
         `- Your sub-agents ${remainingDepth > 1 ? "will also be Coordinators who can further delegate" : "will be Workers who cannot delegate further (final depth level)"}\n` +
@@ -1442,7 +1443,7 @@ export default class OrchestratorService {
     } else if (maxRecursionDepth > 0) {
       recursionBlock =
         `\n## Delegation Status\n` +
-        `You are a **Worker** sub-agent at maximum recursion depth (${childRecursionDepth}/${maxRecursionDepth}).\n` +
+        PromptLocaleService.get("en", "orchestrator.workerRole", { childRecursionDepth: String(childRecursionDepth), maxRecursionDepth: String(maxRecursionDepth) }) + `\n` +
         `- You do NOT have access to \`create_team\` — you cannot spawn sub-agents\n` +
         `- Complete your assigned task directly using your available tools\n` +
         `- Write a clear, complete summary of your work as your final output\n\n`;
@@ -1456,7 +1457,7 @@ export default class OrchestratorService {
     // conversational user input. The SystemPromptAssembler will prepend the
     // persona identity system message at [0], pushing this to [1].
     const operationalContextParts = [
-      `You are a sub-agent in a multi-agent system.`,
+      PromptLocaleService.get("en", "orchestrator.subAgentIdentity"),
       `Sub-agent topology type: ${activeTopology}`,
       `Sub-agent topology name: ${resolvedTopologyMetadata.name}`,
       `Sub-agent topology description: ${resolvedTopologyMetadata.description}`,

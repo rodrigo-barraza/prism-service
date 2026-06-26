@@ -13,6 +13,7 @@ import { getProvider } from "../../../providers/index.ts";
 import logger from "../../../utils/logger.ts";
 import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 import RequestLogger from "../../RequestLogger.ts";
+import PromptLocaleService from "../../PromptLocaleService.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 
 const MAXIMUM_EVALUATION_CHARACTERS = 120_000;
@@ -134,7 +135,7 @@ function buildSelectionPrompt(
   });
 
   return [
-    `You are a judge for the team "${teamName}".`,
+    PromptLocaleService.get("en", "routers.tournament.judge", { teamName }),
     `${memberResults.length} sub-agents have independently completed the same task. Your job is to evaluate their outputs and select the SINGLE BEST result.`,
     "",
     "## Sub-Agent Results",
@@ -272,7 +273,7 @@ export class TournamentRouter implements TopologyRouter {
         }
 
         const verificationPrompt = [
-          `You are a verification agent. Run the following commands and report PASS or FAIL for each:`,
+          PromptLocaleService.get("en", "routers.tournament.verifier"),
           "",
           ...verificationCommands.map((command, commandIndex) => `${commandIndex + 1}. \`${command}\``),
           "",

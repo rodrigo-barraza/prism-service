@@ -13,6 +13,7 @@ import { getProvider } from "../../../providers/index.ts";
 import logger from "../../../utils/logger.ts";
 import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 import RequestLogger from "../../RequestLogger.ts";
+import PromptLocaleService from "../../PromptLocaleService.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 
 const MAXIMUM_SYNTHESIS_CHARACTERS = 120_000;
@@ -52,7 +53,7 @@ function buildSynthesisPrompt(
     : "";
 
   return [
-    `You are a synthesis agent for the team "${teamName}".${layerContext}`,
+    PromptLocaleService.get("en", "routers.hierarchical.synthesizer", { teamName, layerContext }),
     `${memberResults.length} sub-agents have completed their work. Your job is to merge their outputs into a single, unified result.`,
     "",
     "## Sub-Agent Results",

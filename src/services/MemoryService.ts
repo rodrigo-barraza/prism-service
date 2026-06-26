@@ -8,6 +8,7 @@ import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { getProvider } from "../providers/index.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import EmbeddingService from "./EmbeddingService.ts";
+import PromptLocaleService from "./PromptLocaleService.ts";
 import RequestLogger from "./RequestLogger.ts";
 import logger from "../utils/logger.ts";
 import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
@@ -168,35 +169,12 @@ async function extractFactsFromConversation(
         `${message.name || message.role}: ${message.content}`,
     )
     .join("\n");
-  const systemPrompt = `You are a memory extraction system. Analyze the conversation and extract notable personal facts about the participants. Focus on:
-- Personal information (location, occupation, hobbies, pets, family)
-- Preferences (favorite things, likes, dislikes)
-- Life events (moving, new job, relationships, achievements)
-- Notable opinions or beliefs they express about themselves
-- Information one user reveals about another user
-Do NOT extract:
-- Transient conversation topics (what they're currently discussing)
-- Greetings, jokes, or casual banter
-- Bot commands or technical requests
-- Things the AI assistant says about itself
-- Opinions about external topics (politics, movies, etc) unless they reveal something personal
-For each fact, identify which user it's about. If a user mentions something about another user, the fact is ABOUT the other user but SOURCED from the speaker.
-Respond ONLY with a JSON array. Each object must have:
-- "fact": string — the personal fact in a concise sentence
-- "aboutUserId": string — the Discord user ID this fact is about
-- "aboutUsername": string — the username of the person this fact is about
-- "sourceUserId": string — who said/revealed this (can be same as aboutUserId)
-- "sourceUsername": string — username of the source
-- "category": string — one of: "personal", "preference", "gaming", "work", "family", "hobby", "location", "relationship", "achievement", "other"
-- "confidence": number — 0.0 to 1.0, how confident this is a real personal fact
-If no facts are found, return an empty array: []
-Here are the participants:
-${participantList}`;
+  const systemPrompt = PromptLocaleService.get("en", "memory.discordExtractionPrompt", { participantList });
   const aiMessages = [
     { role: "system", content: systemPrompt },
     {
       role: "user",
-      content: `Extract personal facts from this conversation:\n\n${conversationText}`,
+      content: PromptLocaleService.get("en", "memory.discordExtractInstruction", { conversationText }),
     },
   ];
   let result: { text: string; usage?: Record<string, unknown> } | undefined;

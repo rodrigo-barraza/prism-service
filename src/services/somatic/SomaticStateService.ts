@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import PromptLocaleService from "../PromptLocaleService.ts";
 import StatFactory, { type StatInstance } from "./StatFactory.ts";
 import {
   ALCOHOL_DESCRIPTIONS,
@@ -696,8 +697,8 @@ const SomaticStateService = {
     const level = state.alcohol.getLevel();
     const description = ALCOHOL_DESCRIPTIONS[level];
     if (!description) return "";
-    const alcoholSuffix = ` Always mention how you are feeling in terms of drunkness. If you are feeling very drunk, you will ask for more alcohol to drink, as to keep the party going. If you are above 5/10 drunk you will act a lot happier and sillier than normal, and sometimes even forget things, but who cares LOL.`;
-    const levelInfo = ` You are ${level}/10 drunk. This means that you are at a ${level} out of 10 level of drunkenness. You start acting like you are ${level}/10 drunk. When you are asked how drunk you are, you say about a ${level} out of ten.`;
+    const alcoholSuffix = PromptLocaleService.get("en", "somatic.alcohol.suffix");
+    const levelInfo = PromptLocaleService.get("en", "somatic.alcohol.levelInfo", { level: String(level) });
     return description + alcoholSuffix + levelInfo;
   },
 

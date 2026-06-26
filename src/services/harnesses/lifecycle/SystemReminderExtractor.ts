@@ -1,5 +1,6 @@
 import logger from "../../../utils/logger.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
+import PromptLocaleService from "../../PromptLocaleService.ts";
 import RequestLogger from "../../RequestLogger.ts";
 
 import type { LLMProvider } from "../types.ts";
@@ -30,29 +31,7 @@ import type { LLMProvider } from "../types.ts";
 const EXTRACTION_MAX_TOKENS = 600;
 const EXTRACTION_TIMEOUT_MILLISECONDS = 15_000;
 
-const EXTRACTION_PROMPT = [
-  "You are analyzing a system prompt to extract its most critical behavioral rules.",
-  "",
-  "Extract exactly 8–12 of the most important constraints — rules the AI agent MUST follow throughout the entire session.",
-  "",
-  "Focus on:",
-  "- Hard prohibitions (never do X, do not Y)",
-  "- Mandatory behaviors (always do X, you must Y)",
-  "- Safety and security constraints",
-  "- Output format and code style requirements",
-  "- Identity and persona boundaries",
-  "- Tool usage rules and restrictions",
-  "",
-  "Rules for your output:",
-  "- Output ONLY a bullet-point list using `- ` prefix",
-  "- Each bullet must be a single concise sentence (max 30 words)",
-  "- No headers, no explanations, no numbering, no markdown formatting",
-  "- Prioritize constraints that would cause the most damage if forgotten",
-  "- Ignore trivial or obvious rules (e.g. 'be helpful')",
-  "",
-  "System prompt to analyze:",
-  "<system_prompt>",
-].join("\n");
+const EXTRACTION_PROMPT = PromptLocaleService.get("en", "harness.reminderExtractor.extractionPrompt");
 
 const EXTRACTION_SUFFIX = "\n</system_prompt>";
 

@@ -1,0 +1,16 @@
+{
+  "criticGate": {
+    "safetyReviewer": "You are a code safety reviewer. An AI agent wants to execute the following tool call.",
+    "reviewCriteria": "Review it for safety. Look for:\n- Destructive commands (rm -rf, DROP, DELETE, format, etc.)\n- Data exfiltration (curl to external servers, unauthorized network access)\n- Privilege escalation (sudo, chmod 777, etc.)\n- Infinite loops or resource exhaustion",
+    "responseFormat": "Respond with exactly one word on the first line: APPROVE or DENY\nIf DENY, explain why on the second line."
+  },
+  "planningMode": {
+    "blocked": "You are in PLANNING MODE. Tool call(s) [{{blockedNames}}] were blocked — only exit_plan_mode is available. Write your complete plan as text output, then call exit_plan_mode to submit it for user approval."
+  },
+  "reminderExtractor": {
+    "extractionPrompt": "You are analyzing a system prompt to extract its most critical behavioral rules.\n\nExtract exactly 8–12 of the most important constraints — rules the AI agent MUST follow throughout the entire session.\n\nFocus on:\n- Hard prohibitions (never do X, do not Y)\n- Mandatory behaviors (always do X, you must Y)\n- Safety and security constraints\n- Output format and code style requirements\n- Identity and persona boundaries\n- Tool usage rules and restrictions\n\nRules for your output:\n- Output ONLY a bullet-point list using `- ` prefix\n- Each bullet must be a single concise sentence (max 30 words)\n- No headers, no explanations, no numbering, no markdown formatting\n- Prioritize constraints that would cause the most damage if forgotten\n- Ignore trivial or obvious rules (e.g. 'be helpful')\n\nSystem prompt to analyze:\n<system_prompt>"
+  },
+  "visionFeed": {
+    "instruction": "\n\n## 🎥 LIVE VISION FEED ACTIVE\nYou are equipped with a live visual feed (webcam or screen stream). The last 3 frames of this feed are automatically captured and attached to the user's latest message (ordered from oldest to newest).\nUse these images to observe the environment, notice changes, animations, or user gestures, and refer to them naturally in your conversation.\n"
+  }
+}

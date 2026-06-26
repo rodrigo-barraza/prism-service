@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { getProvider } from "../providers/index.ts";
 import MemoryService, { CODING_MEMORY_TYPES } from "./MemoryService.ts";
 import MemoryConsolidationService from "./MemoryConsolidationService.ts";
+import PromptLocaleService from "./PromptLocaleService.ts";
 import RequestLogger from "./RequestLogger.ts";
 import SettingsService from "./SettingsService.ts";
 import logger from "../utils/logger.ts";
@@ -45,68 +46,7 @@ const MIN_MESSAGES_FOR_EXTRACTION = 4;
  * codebase itself (via grep, git, file reads). This is Claude Code's most
  * impactful memory quality insight — eval-validated.
  */
-const EXTRACTION_PROMPT = `You are a memory extraction agent. Analyze this coding session and extract durable memories that will be useful in future sessions.
-
-## Memory Types
-
-### user
-The user's role, goals, expertise, communication preferences, and working style.
-When to save: the user reveals something about themselves that isn't obvious from the code.
-Examples:
-- "User is a senior data scientist focused on observability infrastructure"
-- "User prefers GPU-accelerated CSS animations using transform/opacity only"
-- "User went to art university, has high CSS design standards"
-
-### feedback
-Corrections, confirmations, and learned lessons from this session.
-When to save: the user corrects an approach, confirms a good pattern, or a non-obvious debugging lesson emerges.
-Examples:
-- "Don't mock databases in tests — mock/prod divergence masked a broken migration"
-- "Bundled PR approach was confirmed as the right strategy for this repo"
-- "When debugging WebSocket drops, always check AbortController signal chain first"
-
-### project
-Non-derivable project context — things you can't figure out by reading the code.
-When to save: deadlines, incidents, architectural decisions, team agreements, deployment constraints.
-Examples:
-- "Merge freeze begins 2026-03-05 for mobile release"
-- "The staging cluster uses a different Redis config than prod — don't assume parity"
-- "Team decided to keep MemoryService as the single source of truth for all agent memories"
-
-### reference
-Pointers to external systems, dashboards, APIs, or documentation.
-When to save: the user mentions a specific external resource that would be useful to recall later.
-Examples:
-- "Project Linear board: https://linear.app/team/project-xyz"
-- "Grafana dashboard for API latency: https://grafana.internal/d/abc123"
-- "The lights API runs on port 5558 at /api/lights"
-
-## What NOT to Save
-Do NOT save any of the following, even if the user explicitly asks:
-- Code patterns, architecture, or file structure (derivable by reading the code)
-- Git history or file changes (use git log / git blame)
-- Debugging solutions (the fix is in the code itself)
-- Anything already in project configuration files (package.json, .env, etc.)
-- Ephemeral task details ("fix this bug", "add this feature")
-- Current conversation context that won't matter in future sessions
-
-If the user asks you to "remember" something that falls into the above categories, save what was SURPRISING or NON-OBVIOUS about the experience instead.
-
-## Output Format
-Respond ONLY with a JSON array of memory objects. Each object must have:
-- "type": one of "user", "feedback", "project", "reference"
-- "title": short descriptive name (used for relevance scanning)
-- "content": the full memory text — write it as if explaining to a future agent who has no context
-
-Example:
-\`\`\`json
-[
-  { "type": "feedback", "title": "No database mocks in tests", "content": "Don't mock the database in integration tests. Mock/prod divergence masked a broken migration in the auth service. All tests in /tests/integration/ must use a real DB connection." },
-  { "type": "user", "title": "CSS animation standards", "content": "User requires GPU-accelerated CSS animations. Only use transform and opacity for animations — no layout-triggering properties like width, height, top, left." }
-]
-\`\`\`
-
-If nothing worth remembering happened, return an empty array: []`;
+const EXTRACTION_PROMPT = PromptLocaleService.get("en", "memory.extractionPrompt");
 
 interface ExtractedMemory {
   type: string;

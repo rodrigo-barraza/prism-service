@@ -11,6 +11,7 @@ import {
   selectInstanceForMember,
 } from "../InstanceResolver.ts";
 import logger from "../../../utils/logger.ts";
+import PromptLocaleService from "../../PromptLocaleService.ts";
 
 const DEFAULT_MAXIMUM_ROUNDS = 3;
 const DEFAULT_ACTOR_COUNT = 1;
@@ -32,37 +33,33 @@ function buildCriticPrompt(
   criticRole?: string,
 ): string {
   const roleContext = criticRole
-    ? `You are a specialized critic with the following focus: ${criticRole}\n`
+    ? PromptLocaleService.get("en", "routers.critic.specializedRole", { criticRole })
     : "";
 
   return [
-    `You are a critic evaluating a sub-agent's work output.`,
+    PromptLocaleService.get("en", "routers.critic.evaluator"),
     roleContext,
-    `This is evaluation round ${roundNumber} of ${maximumRounds}.`,
+    PromptLocaleService.get("en", "routers.critic.roundContext", { roundNumber: String(roundNumber), maximumRounds: String(maximumRounds) }),
     "",
-    "## Original Task",
+    PromptLocaleService.get("en", "routers.critic.originalTaskHeader"),
     "",
     originalTask,
     "",
-    "## Actor's Output",
+    PromptLocaleService.get("en", "routers.critic.actorOutputHeader"),
     "",
     actorOutput,
     "",
-    "## Your Job",
+    PromptLocaleService.get("en", "routers.critic.jobHeader"),
     "",
-    "Evaluate the actor's output rigorously against the original task requirements.",
-    "Be adversarial — look for mistakes, missed edge cases, incomplete work, poor quality, or incorrect reasoning.",
+    PromptLocaleService.get("en", "routers.critic.jobInstruction"),
     "",
-    "Respond with ONE of these verdicts:",
+    PromptLocaleService.get("en", "routers.critic.verdictInstruction"),
     "",
-    "**PASS** — The output fully and correctly satisfies the task. Explain briefly why it passes.",
+    PromptLocaleService.get("en", "routers.critic.passVerdict"),
     "",
-    "**FAIL** — The output has issues that need fixing. Provide specific, actionable feedback:",
-    "- What exactly is wrong or missing",
-    "- What specific changes are needed",
-    "- Reference file paths, line numbers, or code snippets where applicable",
+    PromptLocaleService.get("en", "routers.critic.failVerdict"),
     "",
-    "Start your response with either **PASS** or **FAIL** on the first line.",
+    PromptLocaleService.get("en", "routers.critic.verdictFormat"),
   ].join("\n");
 }
 
@@ -75,9 +72,9 @@ function buildJurySelectionPrompt(
   );
 
   return [
-    `You are a judge evaluating multiple competing solutions to the same task.`,
+    PromptLocaleService.get("en", "routers.jury.judge"),
     "",
-    "## Original Task",
+    PromptLocaleService.get("en", "routers.critic.originalTaskHeader"),
     "",
     originalTask,
     "",
@@ -87,10 +84,9 @@ function buildJurySelectionPrompt(
     "",
     "## Instructions",
     "",
-    `Evaluate all ${actorOutputs.length} solutions and select the BEST one.`,
-    "Score each on: correctness, completeness, code quality, and verification.",
+    PromptLocaleService.get("en", "routers.jury.evaluateInstruction", { actorCount: String(actorOutputs.length) }),
     "",
-    "Respond with ONLY a JSON object. No markdown fences, no explanations outside the JSON.",
+    PromptLocaleService.get("en", "routers.jury.responseFormat"),
     "",
     "```json",
     "{",
@@ -100,9 +96,7 @@ function buildJurySelectionPrompt(
     "}",
     "```",
     "",
-    "- `bestActorIndex`: 0-based index of the best actor",
-    "- `verdict`: PASS if the best solution is complete, FAIL if it needs refinement",
-    "- `feedback`: If FAIL, specific actionable feedback for improvement. If PASS, brief explanation.",
+    PromptLocaleService.get("en", "routers.jury.bestActorDescription"),
   ].join("\n");
 }
 
