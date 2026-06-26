@@ -40,6 +40,8 @@ export class EmotionalStateEngine {
   }
 
   decay(): void {
+    if (this.personality.emotionalModel !== "decay") return;
+
     const { decayRate, linearDecay, zeroClamp, baselineEmotion, baselinePull } =
       this.personality;
 
@@ -131,20 +133,7 @@ export class EmotionalStateEngine {
     };
   }
 
-  processInteraction(
-    detectedEmotion: string,
-    intensity: number = 20,
-  ): DominantEmotionResult {
-    this.decay();
-    if (
-      detectedEmotion &&
-      detectedEmotion !== "neutral" &&
-      PRIMARY_EMOTIONS.includes(detectedEmotion as PrimaryEmotion)
-    ) {
-      this.addEmotion(detectedEmotion as PrimaryEmotion, intensity);
-    }
-    return this.getDominantEmotion();
-  }
+
 
   reset(): void {
     for (const emotion of PRIMARY_EMOTIONS) {

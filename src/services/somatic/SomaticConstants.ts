@@ -66,7 +66,10 @@ export const PLUTCHIK_DYADS: Record<string, string> = {
   "anticipation+fear": "anxiety",
 };
 
+export type EmotionalModel = "decay" | "reactive";
+
 export interface EmotionPersonality {
+  emotionalModel: EmotionalModel;
   decayRate: number;
   linearDecay: number;
   zeroClamp: number;
@@ -80,6 +83,7 @@ export interface EmotionPersonality {
 }
 
 export const DEFAULT_EMOTION_PERSONALITY: EmotionPersonality = {
+  emotionalModel: "reactive",
   decayRate: 0.04,
   linearDecay: 0.3,
   zeroClamp: 0.1,
