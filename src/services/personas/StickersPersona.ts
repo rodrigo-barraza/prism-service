@@ -6,10 +6,10 @@ import PromptLocaleService from "../PromptLocaleService.ts";
 
 const STICKERS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {
-    content: PromptLocaleService.get("en", "personas.stickers.toolPolicyBase"),
+    content: (locale) => PromptLocaleService.get(locale, "personas.stickers.toolPolicyBase"),
   },
   {
-    content: PromptLocaleService.get("en", "personas.stickers.toolPolicyImage"),
+    content: (locale) => PromptLocaleService.get(locale, "personas.stickers.toolPolicyImage"),
     requires: [TOOL_NAMES.GENERATE_IMAGE],
   },
 ];

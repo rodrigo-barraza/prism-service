@@ -146,6 +146,10 @@ export const EMOTION_BEHAVIOR_PROMPTS: Record<string, string> = Object.fromEntri
   Object.entries(allSomaticPrompts).filter(([key]) => validSomaticKeys.has(key)),
 );
 
+export function getEmotionBehaviorPrompt(emotion: string, locale: string): string {
+  return PromptLocaleService.get(locale, `somatic.moods.${emotion}`);
+}
+
 export const ALCOHOL_DESCRIPTIONS: Record<number, string> = Object.fromEntries(
   Object.entries(PromptLocaleService.getRecord("en", "somatic.alcohol")).map(
     ([key, value]) => [Number(key), value],

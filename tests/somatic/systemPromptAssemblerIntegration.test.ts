@@ -212,7 +212,7 @@ describe("SystemPromptAssembler — hasSomaticState gating", () => {
       project: "lupos",
       endpoint: "/agent",
     }));
-    expect(mockRenderSystemMessage).toHaveBeenCalledWith("LUPOS");
+    expect(mockRenderSystemMessage).toHaveBeenCalledWith("LUPOS", "en");
     expect(result.selfContextMessage).toContain("Your Current Physical & Emotional State");
   });
 
@@ -641,6 +641,6 @@ describe("Sub-agent memory isolation", () => {
     await assembler.assemble(context);
 
     expect(mockAdaptFromMessage).toHaveBeenCalled();
-    expect(mockRenderSystemMessage).toHaveBeenCalledWith("LUPOS");
+    expect(mockRenderSystemMessage).toHaveBeenCalledWith("LUPOS", "en");
   });
 });

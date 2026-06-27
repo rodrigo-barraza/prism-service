@@ -18,7 +18,7 @@ export interface PersonaContext {
  * When `requires` is omitted or empty, the section is always included.
  */
 export interface ToolPolicySection {
-  content: string;
+  content: string | ((locale: string) => string);
   /** Tool names or prefix globs (e.g. `"discord_*"`). Section is included when ANY match. */
   requires?: string[];
 }

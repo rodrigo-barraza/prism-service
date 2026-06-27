@@ -202,7 +202,7 @@ export default class SystemPromptAssembler {
       }
 
       const somaticMessage =
-        await SomaticStateService.renderSystemMessage(agentId);
+        await SomaticStateService.renderSystemMessage(agentId, locale);
       if (somaticMessage) {
         selfContextSections.push(somaticMessage);
       }
