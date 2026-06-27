@@ -82,6 +82,10 @@ export default class SystemPromptAssembler {
     const defaultTopology = settings?.topology || DEFAULT_TOPOLOGY;
     const locale = context.locale || settings?.locale || PromptLocaleService.getDefaultLocale();
 
+    logger.info(
+      `[SystemPromptAssembler] Locale resolution: context.locale=${JSON.stringify(context.locale)} settings.locale=${JSON.stringify(settings?.locale)} resolved=${JSON.stringify(locale)}`,
+    );
+
     // ── 1. Agent Identity ────────────────────────────────────────
     if (isDirectMode) {
       sections.push(
@@ -223,6 +227,9 @@ export default class SystemPromptAssembler {
     {
       // Guarantee locale-specific remote tool schemas are cached
       // before the synchronous buildToolDescriptions() reads them.
+      logger.info(
+        `[SystemPromptAssembler] Ensuring tool schemas for locale=${JSON.stringify(locale)}`,
+      );
       await ToolOrchestratorService.ensureSchemas(locale);
       const lockedOffToolNames = await resolveLockedOffToolNames();
       const isCompactToolDocs = persona?.compactToolDocs === true;
@@ -532,12 +539,17 @@ export default class SystemPromptAssembler {
         context._injectedSkills = skillNames;
         context._assembledSystemPrompt = systemPrompt;
 
+        const assembledLocale = context.locale || (await SettingsService.getSection("agents"))?.locale || PromptLocaleService.getDefaultLocale();
+        logger.info(
+          `[SystemPromptAssembler] injectSystemPromptContext locale=${JSON.stringify(assembledLocale)}`,
+        );
         injectSystemPromptContext(context.messages!, {
           platformContextMessage,
           selfContextMessage,
           skillsText,
           memoriesText,
           workflowsText,
+          locale: assembledLocale,
         });
 
         logger.info(
@@ -572,6 +584,7 @@ export function injectSystemPromptContext(
     memoriesText?: string;
     workflowsText?: string;
     localTimeText?: string;
+    locale?: string;
   },
 ): void {
   const {
@@ -582,6 +595,7 @@ export function injectSystemPromptContext(
     memoriesText,
     workflowsText,
     localTimeText,
+    locale,
   } = options;
 
   // ── 1. Interleave platform context before the last user message ──
@@ -634,7 +648,9 @@ export function injectSystemPromptContext(
         timeStyle: "long",
       });
 
-    const contextLines = [`- Local Time: ${timeText}`];
+    const activeLocale = locale || PromptLocaleService.getDefaultLocale();
+    const localTimeLabel = PromptLocaleService.get(activeLocale, "system-prompt.localTimeLabel", { time: timeText });
+    const contextLines = [localTimeLabel];
 
     let systemContextBlock = `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\n${contextLines.join("\n")}`;
 
