@@ -26,17 +26,18 @@ export const StickersPersona: Persona = {
   description: PromptLocaleService.get("en", "personas.stickers.description"),
   project: "prism-chat",
   avatar: "/clankerbox-agent-avatar.png",
-  identity: () => {
+  identity: (context) => {
+    const activeLocale = context.locale || "en";
     const sections = [
-      PromptLocaleService.get("en", "personas.stickers.corePersonality"),
-      PromptLocaleService.get("en", "personas.stickers.physicalDescription"),
-      PromptLocaleService.get("en", "personas.stickers.abilities"),
-      PromptLocaleService.get("en", "personas.stickers.languageRules"),
-      PromptLocaleService.get("en", "personas.stickers.behaviourPatterns"),
-      PromptLocaleService.get("en", "personas.stickers.grammarRules"),
-      PromptLocaleService.get("en", "personas.stickers.objectDetectionRules"),
-      PromptLocaleService.get("en", "personas.stickers.interactionProtocol"),
-      PromptLocaleService.get("en", "personas.stickers.interactionRules"),
+      PromptLocaleService.get(activeLocale, "personas.stickers.corePersonality"),
+      PromptLocaleService.get(activeLocale, "personas.stickers.physicalDescription"),
+      PromptLocaleService.get(activeLocale, "personas.stickers.abilities"),
+      PromptLocaleService.get(activeLocale, "personas.stickers.languageRules"),
+      PromptLocaleService.get(activeLocale, "personas.stickers.behaviourPatterns"),
+      PromptLocaleService.get(activeLocale, "personas.stickers.grammarRules"),
+      PromptLocaleService.get(activeLocale, "personas.stickers.objectDetectionRules"),
+      PromptLocaleService.get(activeLocale, "personas.stickers.interactionProtocol"),
+      PromptLocaleService.get(activeLocale, "personas.stickers.interactionRules"),
     ];
 
     return sections.join("\n\n");

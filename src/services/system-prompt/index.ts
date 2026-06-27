@@ -88,7 +88,7 @@ export default class SystemPromptAssembler {
     } else if (persona) {
       const identityText =
         typeof persona.identity === "function"
-          ? persona.identity(context)
+          ? persona.identity({ ...context, locale })
           : persona.identity;
       sections.push(identityText);
     } else {
@@ -104,7 +104,7 @@ export default class SystemPromptAssembler {
       if (platformSection) {
         const platformText =
           typeof platformSection === "function"
-            ? platformSection(context)
+            ? platformSection({ ...context, locale })
             : platformSection;
         if (platformText) sections.push(platformText);
       }
@@ -212,7 +212,7 @@ export default class SystemPromptAssembler {
     if (persona?.toolPolicy) {
       const policyText =
         typeof persona.toolPolicy === "function"
-          ? persona.toolPolicy(context)
+          ? persona.toolPolicy({ ...context, locale })
           : persona.toolPolicy;
       if (policyText) sections.push(policyText);
     }

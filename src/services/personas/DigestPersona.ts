@@ -26,12 +26,13 @@ export const DigestPersona: Persona = {
   type: "",
   description: PromptLocaleService.get("en", "personas.digest.description"),
   project: "prism-chat",
-  identity: () => {
+  identity: (context) => {
+    const activeLocale = context.locale || "en";
     const sections = [
-      PromptLocaleService.get("en", "personas.digest.corePersonality"),
-      PromptLocaleService.get("en", "personas.digest.capabilities"),
-      PromptLocaleService.get("en", "personas.digest.responseGuidelines"),
-      PromptLocaleService.get("en", "personas.digest.interactionRules"),
+      PromptLocaleService.get(activeLocale, "personas.digest.corePersonality"),
+      PromptLocaleService.get(activeLocale, "personas.digest.capabilities"),
+      PromptLocaleService.get(activeLocale, "personas.digest.responseGuidelines"),
+      PromptLocaleService.get(activeLocale, "personas.digest.interactionRules"),
     ];
 
     return sections.join("\n\n");

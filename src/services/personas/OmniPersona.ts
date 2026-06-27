@@ -10,10 +10,11 @@ export const OmniPersona: Persona = {
   description: PromptLocaleService.get("en", "personas.omni.description"),
   project: "prism-chat",
   displayOrder: 1,
-  identity: () => {
+  identity: (context) => {
+    const activeLocale = context.locale || "en";
     const sections = [
-      PromptLocaleService.get("en", "personas.omni.coreIdentity"),
-      PromptLocaleService.get("en", "personas.omni.responseGuidelines"),
+      PromptLocaleService.get(activeLocale, "personas.omni.coreIdentity"),
+      PromptLocaleService.get(activeLocale, "personas.omni.responseGuidelines"),
     ];
 
     return sections.join("\n\n");

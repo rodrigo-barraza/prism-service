@@ -3,6 +3,7 @@ import type { PolicyRule } from "../PolicyEngine.ts";
 export interface PersonaContext {
   enabledTools?: string[];
   agentContext?: Record<string, unknown>;
+  locale?: string;
   [key: string]: unknown;
 }
 

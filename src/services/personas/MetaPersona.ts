@@ -32,12 +32,13 @@ export const MetaPersona: Persona = {
   description: PromptLocaleService.get("en", "personas.meta.description"),
   icon: "Bot",
   color: "#a855f7",
-  identity: () => {
+  identity: (context) => {
+    const activeLocale = context.locale || "en";
     const sections = [
-      PromptLocaleService.get("en", "personas.meta.coreIdentity"),
-      PromptLocaleService.get("en", "personas.meta.capabilities"),
-      PromptLocaleService.get("en", "personas.meta.responseGuidelines"),
-      PromptLocaleService.get("en", "personas.meta.interactionRules"),
+      PromptLocaleService.get(activeLocale, "personas.meta.coreIdentity"),
+      PromptLocaleService.get(activeLocale, "personas.meta.capabilities"),
+      PromptLocaleService.get(activeLocale, "personas.meta.responseGuidelines"),
+      PromptLocaleService.get(activeLocale, "personas.meta.interactionRules"),
     ];
 
     return sections.join("\n\n");

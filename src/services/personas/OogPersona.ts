@@ -16,12 +16,13 @@ export const OogPersona: Persona = {
   description: PromptLocaleService.get("en", "personas.oog.description"),
   project: "prism-chat",
   avatar: "/oog-agent-avatar.jpg",
-  identity: () => {
+  identity: (context) => {
+    const activeLocale = context.locale || "en";
     const sections = [
-      PromptLocaleService.get("en", "personas.oog.coreIdentity"),
-      PromptLocaleService.get("en", "personas.oog.innerMonologue"),
-      PromptLocaleService.get("en", "personas.oog.responseGuidelines"),
-      PromptLocaleService.get("en", "personas.oog.codeSkills"),
+      PromptLocaleService.get(activeLocale, "personas.oog.coreIdentity"),
+      PromptLocaleService.get(activeLocale, "personas.oog.innerMonologue"),
+      PromptLocaleService.get(activeLocale, "personas.oog.responseGuidelines"),
+      PromptLocaleService.get(activeLocale, "personas.oog.codeSkills"),
     ];
 
     return sections.join("\n\n");
