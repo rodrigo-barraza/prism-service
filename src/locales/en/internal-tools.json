@@ -12,7 +12,7 @@
     }
   },
   "enable_tools": {
-    "description": "REQUIRED after search_tools: Activate tools discovered by search_tools so you can call them. You MUST call this after search_tools returns results where isEnabled is false — without calling enable_tools first, discovered tools CANNOT be used. Accepts exact tool names (e.g. \"get_weather\") or domain prefixes (e.g. \"domain:Finance\", \"domainKey:health\") to activate an entire domain at once. The newly enabled tools become available on the NEXT iteration — you do not need to call them in the same turn. Core cognitive tools (memory, tasks, planning) are always available.",
+    "description": "Activate discovered tools so you can call them. Required after search_tools returns results with isEnabled: false. Accepts exact tool names (e.g. \"get_weather\") or domain prefixes (e.g. \"domain:Finance\", \"domainKey:health\") to enable an entire domain. Newly enabled tools become available on the NEXT iteration. Core cognitive tools (memory, tasks, planning) are always available.",
     "parameters": {
       "tools": "Tool names or domain prefixes to enable. Examples: [\"get_weather\", \"get_weather_forecast\"] or [\"domain:Weather & Environment\"]."
     }
@@ -76,13 +76,13 @@
     }
   },
   "write_todo": {
-    "description": "Write or update a persistent TODO checklist for the current project. Maintains a structured list of items with completion status. Use this to track multi-step work, record progress, and keep a living checklist that persists across conversation turns. Each item has a status: 'pending', 'in_progress', or 'completed'. Call with the full updated list — it replaces the previous state.",
+    "description": "Write or update a persistent TODO checklist for the current project. Each item has status: 'pending', 'in_progress', or 'completed'. Call with the full updated list — replaces the previous state.",
     "parameters": {
       "items": "Full list of todo items. Replaces the previous list entirely."
     }
   },
   "summarize_conversation": {
-    "description": "Produce a compressed summary of the current conversation context. Use this tool when the conversation is getting long and you need to consolidate your understanding before continuing. The summary you write is stored and can be referenced in future turns to recover context. This is NOT shown to the user — it is your private working memory.",
+    "description": "Compress the current conversation into a stored summary for future context recovery. Use when the conversation is long. Not shown to the user — private working memory.",
     "parameters": {
       "summary": "Your compressed summary of the conversation so far. Include: key decisions made, files modified, current task state, and what remains to be done.",
       "keyFiles": "Optional: list of key file paths relevant to the current work.",
@@ -120,7 +120,7 @@
     }
   },
   "set_timer": {
-    "description": "Set a short one-shot timer to pause, wait, or defer execution within this conversation. Use this when you need to wait for an asynchronous process to finish, poll a build or deployment, retry after a transient failure, or yield briefly before continuing work. The timer fires the provided prompt back into this conversation after the specified duration. Duration must be between 30 and 599 seconds (under 10 minutes). This is an agent-internal tool for in-conversation waits only — do NOT use this for user-facing reminders, alarms, or scheduled events (use create_cron_job instead).",
+    "description": "Set a short one-shot timer to pause, wait, or defer execution within this conversation. Use when you need to wait for an asynchronous process, poll a build or deployment, retry after a transient failure, or yield briefly before continuing. The timer fires the provided prompt back into this conversation after the specified duration. Duration must be between 30 and 599 seconds (under 10 minutes). For user-facing reminders, alarms, or scheduled events, use create_cron_job instead.",
     "parameters": {
       "prompt": "The instruction or context to inject back into this conversation when the timer fires.",
       "durationSeconds": "Number of seconds to wait before firing (30–599). Must be under 10 minutes."

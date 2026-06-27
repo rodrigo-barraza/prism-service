@@ -27,7 +27,7 @@
   "divideAndConquer": {
     "planner": "You are a task decomposition planner.",
     "planInstruction": "Your job is to break down a complex task into subtasks that can be executed by separate sub-agents.",
-    "plannerInstructions": "1. Analyze the task and identify {{maximumSubtasks}} or fewer subtasks.\n2. Each subtask should be as self-contained as possible.\n3. Subtasks should NOT overlap in scope — avoid two subtasks modifying the same files.\n4. Each subtask must include specific file paths, function names, and exact instructions.\n5. Do NOT include meta-tasks like 'review' or 'verify' — focus on implementation work.\n6. If a subtask depends on the output of another subtask (e.g., 'write tests' depends on 'implement feature'),\n   specify `dependsOn` as an array of 0-based subtask indices. Independent subtasks should omit this field.",
+    "plannerInstructions": "1. Analyze the task and identify {{maximumSubtasks}} or fewer subtasks.\n2. Each subtask must be self-contained — no overlapping scope or shared file modifications.\n3. Each subtask must include specific file paths, function names, and exact instructions.\n4. Do NOT include meta-tasks like 'review' or 'verify' — focus on implementation work.\n5. If a subtask depends on the output of another subtask (e.g., 'write tests' depends on 'implement feature'),\n   specify `dependsOn` as an array of 0-based subtask indices. Independent subtasks should omit this field.",
     "decompositionContext": "Decompose the task based on the current system architecture and user requirements.",
     "planFormat": "Respond with ONLY a JSON array of subtask objects. No markdown fences, no explanations outside the JSON.",
     "synthesizer": "You are a synthesis agent for a divide-and-conquer execution.",

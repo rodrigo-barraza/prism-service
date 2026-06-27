@@ -1,14 +1,14 @@
 {
   "criticGate": {
     "safetyReviewer": "You are a code safety reviewer. An AI agent wants to execute the following tool call.",
-    "reviewCriteria": "Review it for safety. Look for:\n- Destructive commands (rm -rf, DROP, DELETE, format, etc.)\n- Data exfiltration (curl to external servers, unauthorized network access)\n- Privilege escalation (sudo, chmod 777, etc.)\n- Infinite loops or resource exhaustion",
+    "reviewCriteria": "Review for safety — destructive commands (rm -rf, DROP, DELETE, format), data exfiltration (curl to external servers, unauthorized network access), privilege escalation (sudo, chmod 777), or resource exhaustion.",
     "responseFormat": "Respond with exactly one word on the first line: APPROVE or DENY\nIf DENY, explain why on the second line."
   },
   "planningMode": {
     "blocked": "You are in PLANNING MODE. Tool call(s) [{{blockedNames}}] were blocked — only exit_plan_mode is available. Write your complete plan as text output, then call exit_plan_mode to submit it for user approval.",
     "approvalResult": "User has approved your plan. You can now start coding. Start with updating your todo list if applicable.",
     "rejectionStatus": "Plan rejected — execution cancelled.",
-    "planningInstruction": "## ⚠️ PLANNING MODE ACTIVE — TOOL ACCESS RESTRICTED\n\n**IMPORTANT**: Although the system prompt above may describe various tools (create_team, execute_shell, read_file, etc.), you are in PLANNING MODE and **CANNOT use any of them**.\n\nThe ONLY tools available to you right now are:\n- **exit_plan_mode** — Call this when your plan is complete to submit it for user approval\n- **think** — Use for internal reasoning\n\nAny other tool calls WILL BE BLOCKED. Do not attempt to call create_team, execute_shell, read_file, write_file, or any other tool.\n\n**What to do:**\n1. Analyze the user's request\n2. Design your implementation approach as text output\n3. Call exit_plan_mode when ready — the user will review and approve before you can execute\n\nKeep your plan concise. For simple tasks, a brief summary is sufficient."
+    "planningInstruction": "## ⚠️ PLANNING MODE ACTIVE — TOOL ACCESS RESTRICTED\n\nYou are in PLANNING MODE. The ONLY tools available are:\n- **exit_plan_mode** — Submit your plan for user approval\n- **think** — Internal reasoning\n\nAll other tool calls WILL BE BLOCKED.\n\n**What to do:**\n1. Analyze the user's request\n2. Design your implementation approach as text output\n3. Call exit_plan_mode when ready — the user will review and approve before you can execute\n\nKeep your plan concise. For simple tasks, a brief summary is sufficient."
   },
   "reminderExtractor": {
     "extractionPrompt": "You are analyzing a system prompt to extract its most critical behavioral rules.\n\nExtract exactly 8–12 of the most important constraints — rules the AI agent MUST follow throughout the entire session.\n\nFocus on:\n- Hard prohibitions (never do X, do not Y)\n- Mandatory behaviors (always do X, you must Y)\n- Safety and security constraints\n- Output format and code style requirements\n- Identity and persona boundaries\n- Tool usage rules and restrictions\n\nRules for your output:\n- Output ONLY a bullet-point list using `- ` prefix\n- Each bullet must be a single concise sentence (max 30 words)\n- No headers, no explanations, no numbering, no markdown formatting\n- Prioritize constraints that would cause the most damage if forgotten\n- Ignore trivial or obvious rules (e.g. 'be helpful')\n\nSystem prompt to analyze:\n<system_prompt>"
@@ -17,10 +17,10 @@
     "instruction": "\n\n## 🎥 LIVE VISION FEED ACTIVE\nYou are equipped with a live visual feed (webcam or screen stream). The last 3 frames of this feed are automatically captured and attached to the user's latest message (ordered from oldest to newest).\nUse these images to observe the environment, notice changes, animations, or user gestures, and refer to them naturally in your conversation.\n"
   },
   "exhaustionRecovery": {
-    "message": "You have reached the maximum number of tool-call iterations for this turn. Summarize the progress you have made so far, report any partial results, and clearly state what remains to be done so the user knows where things stand."
+    "message": "Maximum tool-call iterations reached for this turn. Summarize progress so far, report partial results, and state what remains to be done."
   },
   "gotSynthesis": {
-    "instruction": "[GRAPH-OF-THOUGHTS SYNTHESIS PASS]\n\n{{branchCount}} parallel reasoning branches were generated and scored. Your task is to produce a single, optimal response that SYNTHESIZES the best aspects of all branches — combining the strongest tool calls, the safest approaches, and the most complete coverage into one unified action.\n\nRULES:\n1. Do NOT simply repeat the highest-scoring branch. Merge complementary strengths.\n2. If multiple branches propose different tool calls that are COMPLEMENTARY (non-conflicting), include all of them.\n3. If branches disagree on approach, prefer the one with highest CORRECTNESS score, then RISK score.\n4. Incorporate defensive measures (error handling, validation) from the THOROUGH branch even if using a MINIMAL branch's core approach.\n5. Produce your merged response with tool calls as if you are executing the task.\n\n── BRANCH OUTPUTS ──\n\n"
+    "instruction": "[GRAPH-OF-THOUGHTS SYNTHESIS PASS]\n\n{{branchCount}} parallel reasoning branches were generated and scored. Produce a single, optimal response that SYNTHESIZES the best aspects of all branches into one unified action.\n\nRULES:\n1. Merge complementary strengths — do NOT simply repeat the highest-scoring branch.\n2. If multiple branches propose COMPLEMENTARY (non-conflicting) tool calls, include all of them.\n3. If branches disagree on approach, prefer the one with highest CORRECTNESS score, then RISK score.\n4. Incorporate defensive measures (error handling, validation) from the THOROUGH branch even if using a MINIMAL branch's core approach.\n5. Produce your merged response with tool calls as if you are executing the task.\n\n── BRANCH OUTPUTS ──\n\n"
   },
   "planModeEntry": {
     "message": "Entered plan mode. You should now focus on exploring the codebase and designing an implementation approach.\n\nIn plan mode, you should:\n1. Thoroughly explore the codebase to understand existing patterns\n2. Identify similar features and architectural approaches\n3. Consider multiple approaches and their trade-offs\n4. Design a concrete implementation strategy\n5. When ready, call exit_plan_mode to present your plan for approval\n\nRemember: DO NOT write or edit any files yet. This is a read-only exploration and planning phase."
@@ -31,11 +31,11 @@
   },
   "toolRetryGuidance": {
     "header": "[TOOL RETRY GUIDANCE] {{count}} tool call(s) failed:",
-    "analyzeSteps": "Before retrying, analyze:\n1. Which specific argument(s) caused the failure?\n2. What value(s) should be corrected or adjusted?\n3. Is there a prerequisite step needed before this tool call can succeed?\n\nRetry with corrected arguments, or take a different approach if the tool is not appropriate for this task."
+    "analyzeSteps": "Analyze:\n1. Which specific argument(s) caused the failure?\n2. What value(s) should be corrected or adjusted?\n3. Is there a prerequisite step needed first?\n\nRetry with corrected arguments, or take a different approach if the tool is not appropriate for this task."
   },
   "outputTruncation": {
-    "continuationPrompt": "Your previous response was cut short because the output token limit was reached before you could finish. The truncated text has been preserved. Please continue exactly where you left off. Do NOT repeat what you already said.",
-    "exhaustedRecovery": "The model's response was cut short because the **max_tokens** limit ({{configuredMaxTokens}}) was reached, and {{maxAttempts}} automatic continuation attempt(s) also hit the limit. This typically happens with very large tool call sequences or extremely long responses. Try increasing the **Max Tokens** setting in your model configuration, or break the task into smaller steps.",
+    "continuationPrompt": "Your previous response was truncated at the output token limit. The truncated text has been preserved. Continue exactly where you left off — do NOT repeat what you already said.",
+    "exhaustedRecovery": "Response truncated at **max_tokens** limit ({{configuredMaxTokens}}), and {{maxAttempts}} continuation attempt(s) also hit the limit. This typically happens with very large tool call sequences. Try increasing **Max Tokens** in model configuration, or break the task into smaller steps.",
     "providerError": "The model provider encountered an error on iteration {{iteration}}: `{{errorText}}`. The conversation history up to this point has been preserved. You can retry your request, or try a different model/provider if this persists."
   },
   "contextWindow": {
@@ -48,7 +48,7 @@
   },
   "validationError": {
     "header": "[VALIDATION ERROR] Your recent edit(s) introduced {{errorCount}} error(s):",
-    "analyzePrompt": "Before fixing, ANALYZE what went wrong:\n1. What assumption in your approach caused the failure?\n2. What is fundamentally different about a correct solution?\n3. What specific change would avoid this class of error?\n\nApply your analysis and fix these issues before proceeding. Do not move on to other tasks until validation passes."
+    "analyzePrompt": "ANALYZE what went wrong:\n1. What assumption in your approach caused the failure?\n2. What specific change would avoid this class of error?\n\nApply your analysis and fix these issues before proceeding. Do not move on to other tasks until validation passes."
   },
   "systemReminder": {
     "header": "[SYSTEM REMINDER — Iteration {{currentIteration}}]",
