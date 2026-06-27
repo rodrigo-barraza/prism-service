@@ -1,10 +1,5 @@
 {
-  "catalogFormat": {
-    "inworld": "Inworld voice available ({{count}}): {{voices}}.",
-    "openai": "OpenAI voice available: {{voices}}.",
-    "google": "Google voice available: {{voices}}.",
-    "elevenlabs": "ElevenLabs voice available: {{voices}}."
-  },
-
-  "inworldTts2Steering": "This voice engine uses inworld-tts-2 with instruction tag — word in square bracket before text they apply to. Use tag to match delivery to content: Emotion: [say excitedly], [sound sad], [sound concerned], [sound terrified] Delivery: [say with force], [articulate clearly], [say with deliberate pauses] Pitch: [say with a falling pitch], [say with a rising pitch] Volume: [very quiet], [very loud] Register: [say in a low tone], [say in a high pitch] Range: [say playfully], [say with no pitch variation] Speed: [very fast], [very slow] Style: [whisper in a hushed style], [give a nasal quality], [sing joyfully] Body sound (inline): [laugh], [sigh], [clear throat], [breathe], [cough], [yawn] For best control, combine: [say sadly with deliberate pauses in a low voice and hushed style]. Place tag at start of text it applies to. CAPITALIZE word for emphasis: 'I told you NOT to do that.' Use filler (uh, um, well) for natural feel. Use contraction. Write number as spoken word. Never use markdown, bullet, emoji, or structured text — write like speaking."
+  "voiceSteeringInstruction": "# Voice Steering (Text-to-Speech)\nPrepend tag in [bracket] to control TTS delivery. Every call MUST have at least one tag at START.\n\nTag type:\n- **Emotion**: [say warmly], [say angrily], [sound excited]\n- **Volume**: [whisper], [speak softly], [very loud]\n- **Pitch**: [say in deep voice], [high pitched]\n- **Speed**: [say slowly], [speak rapidly]\n- **Vocal quality**: [say with a raspy voice], [smooth and clear]\n- **Non-verbal**: [laugh], [sigh], [gasp], [scoff]\n\nCombine freely: [whisper excitedly with a slight tremor]\n\nNumber: spoken form ('twenty three' not '23').\nContraction and filler for natural feel.\nNo markdown, emoji, or bullet in speech text.\n\nExample: `[say warmly] hey there, welcome back.`\nExample: `[whisper nervously] I... don't think we should be here.`",
+  "availableVoicesHeader": "## Available voice:",
+  "voiceFormatNote": "Specify via `voice` parameter in synthesize_speech tool call."
 }
