@@ -408,6 +408,10 @@ describe("Tool Description Locale Threading", () => {
         ToolOrchestratorService,
         "getToolSchemas",
       );
+      vi.spyOn(
+        ToolOrchestratorService,
+        "ensureSchemas",
+      ).mockResolvedValue(undefined);
 
       // Return localized schemas based on the locale argument
       getClientSchemasSpy.mockImplementation((_topology?: string, locale?: string) => {
@@ -566,6 +570,10 @@ describe("Tool Description Locale Threading", () => {
         ToolOrchestratorService,
         "getToolSchemas",
       );
+      vi.spyOn(
+        ToolOrchestratorService,
+        "ensureSchemas",
+      ).mockResolvedValue(undefined);
 
       getClientSchemasSpy.mockImplementation((_topology?: string, locale?: string) => {
         const activeLocale = locale || "en";

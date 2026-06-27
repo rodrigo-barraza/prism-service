@@ -221,6 +221,9 @@ export default class SystemPromptAssembler {
 
     // ── 4. Enabled Tools (domain-grouped) ──────────────────────
     {
+      // Guarantee locale-specific remote tool schemas are cached
+      // before the synchronous buildToolDescriptions() reads them.
+      await ToolOrchestratorService.ensureSchemas(locale);
       const lockedOffToolNames = await resolveLockedOffToolNames();
       const isCompactToolDocs = persona?.compactToolDocs === true;
       const toolDescriptions = this.buildToolDescriptions(

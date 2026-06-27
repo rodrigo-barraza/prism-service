@@ -321,7 +321,6 @@ async function prefetchAllLocaleSchemas() {
 // Kick off schema fetch eagerly at module load (non-blocking).
 // If tools-api is unreachable, schemas stay empty until the first
 // consumer calls ensureSchemas(), which fetches on-demand.
-// After the default locale loads, prefetch all non-default locales.
 fetchSchemas().then(() => prefetchAllLocaleSchemas());
 
 // ────────────────────────────────────────────────────────────
@@ -849,10 +848,16 @@ export default class ToolOrchestratorService {
    * No-op if already initialized; fetches on-demand otherwise.
    * Eliminates boot-order dependency between prism and tools-api.
    */
-  static async ensureSchemas() {
+  static async ensureSchemas(locale?: string) {
     if (!initialized) {
       logger.info("[ToolOrchestrator] Schemas not loaded — fetching on-demand");
       await fetchSchemas();
+    }
+    // Ensure locale-specific remote tool schemas are cached.
+    // If the requested locale differs from the default and isn't
+    // yet in the per-locale cache, fetch it from tools-service now.
+    if (locale && locale !== "en" && !localizedClientSchemasCache.has(locale)) {
+      await fetchSchemasForLocale(locale);
     }
   }
 

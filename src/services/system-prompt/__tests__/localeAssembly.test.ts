@@ -33,6 +33,7 @@ vi.mock("../../ToolOrchestratorService.ts", () => ({
     getToolSchemas: vi.fn().mockReturnValue([]),
     getAvailableTopologies: vi.fn().mockReturnValue([]),
     isWorkspaceAgentConnected: vi.fn().mockResolvedValue(false),
+    ensureSchemas: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
