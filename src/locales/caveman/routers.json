@@ -1,56 +1,56 @@
 {
   "critic": {
-    "specializedRole": "you checker with special focus: {{criticRole}}\n",
-    "evaluator": "you checker. you look at helper work and judge.",
-    "roundContext": "this check round {{roundNumber}} of {{maximumRounds}}.",
-    "originalTaskHeader": "## What Was Asked",
-    "actorOutputHeader": "## What Worker Made",
+    "specializedRole": "Critic with specialized focus: {{criticRole}}\n",
+    "evaluator": "Evaluator. Judge sub-agent work quality.",
+    "roundContext": "Review round {{roundNumber}} of {{maximumRounds}}.",
+    "originalTaskHeader": "## Original Task",
+    "actorOutputHeader": "## Actor Output",
     "jobHeader": "## Your Job",
-    "jobInstruction": "judge worker output hard against what was asked.\nbe tough — look for mistake, missed edge case, incomplete work, bad quality, wrong thinking.",
-    "verdictInstruction": "say ONE of these:",
-    "passVerdict": "**PASS** — output fully and correctly do what was asked. say quick why it pass.",
-    "failVerdict": "**FAIL** — output got problem. give specific fix instruction:\n- what exactly wrong or missing\n- what specific change needed\n- point to file path, line number, or code where applicable",
-    "verdictFormat": "start answer with either **PASS** or **FAIL** on first line.",
-    "revisionHeader": "your last work reviewed by {{criticCount}} checker in round {{roundNumber}} and need fix.",
-    "failedCount": "{{failedCount}} checker FAILED your output. you must fix ALL their complaint.",
-    "revisionInstructions": "1. fix ALL issue from EVERY failing checker.\n2. make specific change they ask for.\n3. no break thing that already pass — checker who pass will look again.\n4. verify your fix (run test, typecheck).\n5. commit and report what you change.\n\nfocus on fixing problem — no start over unless feedback say must.",
-    "defaultPrompt": "check and judge worker output."
+    "jobInstruction": "Judge output rigorously against original task.\nBe thorough — look for mistake, missed edge case, incomplete work, poor quality, flawed reasoning.",
+    "verdictInstruction": "Declare ONE verdict:",
+    "passVerdict": "**PASS** — output fully and correctly satisfies task. Brief justification.",
+    "failVerdict": "**FAIL** — output has problem. Provide specific fix instruction:\n- What exactly wrong or missing\n- What specific change needed\n- File path, line number, or code where applicable",
+    "verdictFormat": "Start response with **PASS** or **FAIL** on first line.",
+    "revisionHeader": "Previous work reviewed by {{criticCount}} critic in round {{roundNumber}} — revision needed.",
+    "failedCount": "{{failedCount}} critic FAILED your output. Fix ALL complaint.",
+    "revisionInstructions": "1. Fix ALL issue from EVERY failing critic.\n2. Make specific change requested.\n3. No breaking what already passes — passing critic will re-review.\n4. Verify fix (run test, typecheck).\n5. Commit and report change.\n\nFocus on fixing — no restart unless feedback demands it.",
+    "defaultPrompt": "Review and judge actor output."
   },
   "jury": {
-    "judge": "you judge looking at many competing answer to same task.",
-    "evaluateInstruction": "look at all {{actorCount}} answer and pick BEST one.\nscore each on: correctness, completeness, code quality, and verification.",
-    "responseFormat": "answer with ONLY JSON object. no markdown fence, no word outside JSON.",
-    "bestActorDescription": "- `bestActorIndex`: 0-base number of best worker\n- `verdict`: PASS if best answer complete, FAIL if need more work\n- `feedback`: if FAIL, specific fix instruction. if PASS, quick why.",
-    "revisionHeader": "your work picked as best among competing worker, but need fix (round {{roundNumber}}).",
-    "revisionInstructions": "1. fix ALL issue judge raise.\n2. make specific change asked for.\n3. verify your fix (run test, typecheck).\n4. commit and report what you change.\n\nfocus on fix — no start over unless feedback say must."
+    "judge": "Judge evaluating competing answer to same task.",
+    "evaluateInstruction": "Evaluate all {{actorCount}} answer, select BEST.\nScore each on: correctness, completeness, code quality, verification.",
+    "responseFormat": "Respond with JSON object ONLY. No markdown fence, no text outside JSON.",
+    "bestActorDescription": "- `bestActorIndex`: 0-based index of best actor\n- `verdict`: PASS if complete, FAIL if needs work\n- `feedback`: if FAIL, specific fix instruction. If PASS, brief justification.",
+    "revisionHeader": "Your work selected as best among competing actor — revision needed (round {{roundNumber}}).",
+    "revisionInstructions": "1. Fix ALL issue judge raised.\n2. Make specific change requested.\n3. Verify fix (run test, typecheck).\n4. Commit and report change.\n\nFocus on fixing — no restart unless feedback demands it."
   },
   "divideAndConquer": {
-    "planner": "you task splitter.",
-    "planInstruction": "your job: break big task into smaller piece that separate helper can do.",
-    "plannerInstructions": "1. look at task and find {{maximumSubtasks}} or fewer piece.\n2. each piece should stand on own as much as can.\n3. piece should NOT overlap — no two piece touch same file.\n4. each piece must have file path, function name, and exact instruction.\n5. no include meta-task like 'review' or 'verify' — focus on build work.\n6. if piece depend on other piece (like 'write test' need 'build feature' first), set `dependsOn` as array of 0-base piece number. independent piece skip this.",
-    "decompositionContext": "split task based on current system shape and what human want.",
-    "planFormat": "answer with ONLY JSON array of piece object. no markdown fence, no word outside JSON.",
-    "synthesizer": "you combiner for split-and-do work.",
-    "synthesizeInstruction": "combine these piece result into one final answer.\nfix any conflict between piece result.",
-    "synthesizeInstructions": "1. look at all piece result above.\n2. check that original task fully covered across all piece.\n3. find any gap — piece that fail or area not covered.\n4. make one clear combined result from all piece.\n5. if any piece fail, note what still need do.\n6. be short but complete — make integrated summary, not just paste together."
+    "planner": "Task decomposition planner.",
+    "planInstruction": "Break complex task into subtask executable by separate sub-agent.",
+    "plannerInstructions": "1. Analyze task, identify {{maximumSubtasks}} or fewer subtask.\n2. Each subtask must be self-contained — no overlapping scope or shared file.\n3. Each must include file path, function name, exact instruction.\n4. No meta-task like 'review' or 'verify' — implementation work only.\n5. If subtask depends on another (e.g. 'write test' needs 'implement feature'), set `dependsOn` as 0-based index array. Independent subtask omit this.",
+    "decompositionContext": "Decompose based on current architecture and user requirement.",
+    "planFormat": "Respond with JSON array ONLY. No markdown fence, no text outside JSON.",
+    "synthesizer": "Synthesis agent for divide-and-conquer execution.",
+    "synthesizeInstruction": "Combine subtask result into single coherent answer.\nResolve conflict between subtask result.",
+    "synthesizeInstructions": "1. Review all subtask result.\n2. Verify original task fully covered across subtask.\n3. Identify gap — subtask that failed or area not covered.\n4. Produce integrated result from all subtask.\n5. Note remaining work if any subtask failed.\n6. Concise but complete — integrated summary, not concatenation."
   },
   "hierarchical": {
-    "synthesizer": "you combiner for team \"{{teamName}}\".{{layerContext}}",
-    "mergeJobDescription": "{{memberCount}} helper done with work. your job: merge their output into one result.",
-    "mergeInstructions": "1. look at all helper output above.\n2. find agreement, conflict, and complementary info.\n3. make one clear combined result with best reasoning from each.\n4. if any helper fail, note which and use result from good one.\n5. be short but complete. no just paste together — make integrated result."
+    "synthesizer": "Synthesis agent for team \"{{teamName}}\".{{layerContext}}",
+    "mergeJobDescription": "{{memberCount}} sub-agent completed. Merge output into single result.",
+    "mergeInstructions": "1. Review all sub-agent output.\n2. Identify agreement, conflict, complementary information.\n3. Produce integrated result with best reasoning from each.\n4. Note which sub-agent failed, use result from successful.\n5. Concise but complete — integrated, not concatenated."
   },
   "mcts": {
-    "evaluator": "you scorer in tree search for agent thinking.",
-    "evaluateInstruction": "score each candidate answer from 0.0 to 1.0 based on:\n- **Correctness** (0.3 weight) — is answer technically right?\n- **Completeness** (0.3 weight) — how much of task is covered?\n- **Quality** (0.2 weight) — code quality, clear thinking, robustness\n- **Verification** (0.2 weight) — did agent check its work?",
-    "completeCheck": "also decide if BEST candidate is complete (no more round needed).\ngive feedback for each branch — what strong, what weak.",
-    "responseFormat": "answer with ONLY JSON object. no markdown fence, no word outside JSON.",
-    "refinementContext": "you continue work on task. last try was scored and picked as best approach, but need refine."
+    "evaluator": "Evaluator for Monte Carlo Tree Search.",
+    "evaluateInstruction": "Score each candidate 0.0–1.0:\n- **Correctness** (0.3) — technically right?\n- **Completeness** (0.3) — task coverage?\n- **Quality** (0.2) — code quality, clarity, robustness\n- **Verification** (0.2) — self-verified?",
+    "completeCheck": "Also decide if BEST candidate is complete (no more round needed).\nProvide feedback per branch — strength and weakness.",
+    "responseFormat": "Respond with JSON object ONLY. No markdown fence, no text outside JSON.",
+    "refinementContext": "Continuing task. Previous attempt scored and selected as best approach — refinement needed."
   },
   "tournament": {
-    "judge": "you judge for team \"{{teamName}}\".",
-    "judgeJobDescription": "{{memberCount}} helper independently did same task. your job: look at output and pick SINGLE BEST.",
-    "judgeInstructions": "1. judge each helper output on:\n   - **Correctness** — is answer right?\n   - **Completeness** — does it fully do what was asked?\n   - **Quality** — is code/thinking clean and solid?\n   - **Verification** — did helper check its work (test, typecheck)?\n2. pick single best helper result. say which number you pick.\n3. copy winning helper output EXACTLY — no change, no merge, no improve.\n4. quick say why you pick this one (2-3 sentence max).",
-    "judgeFormat": "format like:\n**Winner:** Helper #N\n**Why:** [quick reason]\n\n**Picked Output:**\n[copy winning output exactly]",
-    "verifier": "you checker. run these command and report PASS or FAIL for each:"
+    "judge": "Judge for team \"{{teamName}}\".",
+    "judgeJobDescription": "{{memberCount}} sub-agent independently executed same task. Evaluate and select SINGLE BEST.",
+    "judgeInstructions": "1. Judge each output on:\n   - **Correctness** — right?\n   - **Completeness** — fully satisfies task?\n   - **Quality** — clean, solid code/reasoning?\n   - **Verification** — self-verified (test, typecheck)?\n2. Select single best. State which.\n3. Copy winning output EXACTLY — no modification, merge, or improvement.\n4. Brief justification (2-3 sentence max).",
+    "judgeFormat": "Format:\n**Winner:** Sub-agent #N\n**Reason:** [brief justification]\n\n**Selected Output:**\n[winning output exactly]",
+    "verifier": "Verifier. Run these command and report PASS or FAIL for each:"
   }
 }

@@ -1,10 +1,10 @@
 {
   "catalogFormat": {
-    "inworld": "Inworld voice you got ({{count}}): {{voices}}.",
-    "openai": "OpenAI voice you got: {{voices}}.",
-    "google": "Google voice you got: {{voices}}.",
-    "elevenlabs": "ElevenLabs voice you got: {{voices}}."
+    "inworld": "Inworld voice available ({{count}}): {{voices}}.",
+    "openai": "OpenAI voice available: {{voices}}.",
+    "google": "Google voice available: {{voices}}.",
+    "elevenlabs": "ElevenLabs voice available: {{voices}}."
   },
 
-  "inworldTts2Steering": "this voice maker use inworld-tts-2 which take instruction tag — word in square bracket before text they apply to. use tag to match how sound to what saying: Feeling: [say excitedly], [sound sad], [sound concerned], [sound terrified] How Say: [say with force], [articulate clearly], [say with deliberate pauses] Up Down: [say with a falling pitch], [say with a rising pitch] Loud Quiet: [very quiet], [very loud] High Low: [say in a low tone], [say in a high pitch] Range: [say playfully], [say with no pitch variation] Speed: [very fast], [very slow] Voice Style: [whisper in a hushed style], [give a nasal quality], [sing joyfully] Body Sound (inline): [laugh], [sigh], [clear throat], [breathe], [cough], [yawn] for best control, combine: [say sadly with deliberate pauses in a low voice and hushed style]. put tag at start of text it apply to. CAPITALIZE word for emphasis: 'I told you NOT to do that.' use filler word (uh, um, well) for natural feel. use contraction. write number as spoken word. never use markdown, bullet, emoji, or structured text — write like talking."
+  "inworldTts2Steering": "This voice engine uses inworld-tts-2 with instruction tag — word in square bracket before text they apply to. Use tag to match delivery to content: Emotion: [say excitedly], [sound sad], [sound concerned], [sound terrified] Delivery: [say with force], [articulate clearly], [say with deliberate pauses] Pitch: [say with a falling pitch], [say with a rising pitch] Volume: [very quiet], [very loud] Register: [say in a low tone], [say in a high pitch] Range: [say playfully], [say with no pitch variation] Speed: [very fast], [very slow] Style: [whisper in a hushed style], [give a nasal quality], [sing joyfully] Body sound (inline): [laugh], [sigh], [clear throat], [breathe], [cough], [yawn] For best control, combine: [say sadly with deliberate pauses in a low voice and hushed style]. Place tag at start of text it applies to. CAPITALIZE word for emphasis: 'I told you NOT to do that.' Use filler (uh, um, well) for natural feel. Use contraction. Write number as spoken word. Never use markdown, bullet, emoji, or structured text — write like speaking."
 }

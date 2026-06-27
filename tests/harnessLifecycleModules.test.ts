@@ -715,7 +715,7 @@ describe("Harness Lifecycle Modules", () => {
       );
 
       expect(currentMessages[0].role).toBe("system");
-      expect(currentMessages[0].content).toContain("maximum number of tool-call iterations");
+      expect(currentMessages[0].content).toContain("Maximum tool-call iterations");
       expect(mockProvider.generateTextStream).toHaveBeenCalled();
     });
   });

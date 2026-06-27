@@ -63,7 +63,7 @@ const CAVEMAN_ASK_USER_MARKER = "ask human one or more question";
 const ENGLISH_ASK_USER_MARKER = "Ask the user one or more questions";
 
 const CAVEMAN_SUMMARIZE_MARKER = "squish current talk";
-const ENGLISH_SUMMARIZE_MARKER = "Produce a compressed summary";
+const ENGLISH_SUMMARIZE_MARKER = "Compress the current conversation";
 
 // Required label suffix
 const CAVEMAN_REQUIRED_LABEL = "(need)";

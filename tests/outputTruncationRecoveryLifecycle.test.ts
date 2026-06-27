@@ -120,8 +120,8 @@ describe("OutputTruncationRecovery", () => {
       expect(currentMessages[0].role).toBe("assistant");
       expect(currentMessages[0].content).toBe("This was cut short...");
       expect(currentMessages[1].role).toBe("system");
-      expect(currentMessages[1].content).toContain("cut short");
-      expect(currentMessages[1].content).toContain("continue exactly where you left off");
+      expect(currentMessages[1].content).toContain("truncated");
+      expect(currentMessages[1].content).toContain("Continue exactly where you left off");
     });
 
     it("should include thinking content in assistant message when present", () => {

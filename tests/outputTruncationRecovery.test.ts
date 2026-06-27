@@ -172,8 +172,8 @@ describe("OutputTruncationRecovery", () => {
 
       const lastMessage = currentMessages[currentMessages.length - 1];
       expect(lastMessage.role).toBe("system");
-      expect(lastMessage.content).toContain("cut short");
-      expect(lastMessage.content).toContain("continue exactly where you left off");
+      expect(lastMessage.content).toContain("truncated");
+      expect(lastMessage.content).toContain("Continue exactly where you left off");
     });
 
     it("should return the escalated maxTokens value", () => {
@@ -311,7 +311,7 @@ describe("OutputTruncationRecovery", () => {
   describe("buildExhaustedRecoveryMessage", () => {
     it("should include the number of attempts", () => {
       const message = buildExhaustedRecoveryMessage(3, 8192);
-      expect(message).toContain("3 automatic");
+      expect(message).toContain("3 continuation");
     });
 
     it("should include the configured maxTokens value", () => {
@@ -433,7 +433,7 @@ describe("Recovery Flow Sequence", () => {
     const lastMessage = currentMessages[currentMessages.length - 1];
     expect(lastMessage.role).toBe("assistant");
     expect((lastMessage as any)._isErrorIndicator).toBe(true);
-    expect(lastMessage.content).toContain("3 automatic");
+    expect(lastMessage.content).toContain("3 continuation");
     expect(lastMessage.content).toContain("4096");
   });
 

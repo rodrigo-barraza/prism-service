@@ -586,7 +586,7 @@ describe("ExhaustionRecovery", () => {
     );
     expect(currentMessages).toHaveLength(1);
     expect(currentMessages[0].role).toBe("system");
-    expect(currentMessages[0].content).toContain("maximum number of tool-call iterations");
+    expect(currentMessages[0].content).toContain("Maximum tool-call iterations");
     expect(mockHarness.consumeStream).toHaveBeenCalled();
     expect(mockHarness.emitGenerationProgress).toHaveBeenCalled();
     expect(ConversationGenerationTracker.complete).toHaveBeenCalledWith("req-123-exhaustion");
