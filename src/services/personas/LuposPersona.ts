@@ -103,22 +103,22 @@ function buildInteractionRules(isAprilFools: boolean, locale = "en"): string {
 
 const LUPOS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {
-    content: PromptLocaleService.get("en", "personas.lupos.toolPolicyCore"),
+    content: (locale) => PromptLocaleService.get(locale, "personas.lupos.toolPolicyCore"),
   },
   {
-    content: PromptLocaleService.get("en", "personas.lupos.toolPolicyDiscord"),
+    content: (locale) => PromptLocaleService.get(locale, "personas.lupos.toolPolicyDiscord"),
     requires: ["search_discord_messages"],
   },
   {
-    content: PromptLocaleService.get("en", "personas.lupos.toolPolicyImagePrompt"),
+    content: (locale) => PromptLocaleService.get(locale, "personas.lupos.toolPolicyImagePrompt"),
     requires: [TOOL_NAMES.GENERATE_IMAGE],
   },
   {
-    content: PromptLocaleService.get("en", "personas.lupos.toolPolicyAudio"),
+    content: (locale) => PromptLocaleService.get(locale, "personas.lupos.toolPolicyAudio"),
     requires: [TOOL_NAMES.GENERATE_AUDIO, TOOL_NAMES.SYNTHESIZE_SPEECH],
   },
   {
-    content: PromptLocaleService.get("en", "personas.lupos.toolPolicyVoiceSteering"),
+    content: (locale) => PromptLocaleService.get(locale, "personas.lupos.toolPolicyVoiceSteering"),
     requires: [TOOL_NAMES.SYNTHESIZE_SPEECH],
   },
 ];
@@ -187,7 +187,7 @@ export const LuposPersona: Persona = {
   guidelines: "",
   interactionRules: "",
   platformRules: {
-    discord: PromptLocaleService.get("en", "personas.lupos.discordRules"),
+    discord: (context) => PromptLocaleService.get(context.locale || "en", "personas.lupos.discordRules"),
   },
   toolPolicy: (context) => buildToolPolicy(LUPOS_TOOL_POLICY_SECTIONS, context),
   availableTools: LUPOS_AVAILABLE_TOOLS,

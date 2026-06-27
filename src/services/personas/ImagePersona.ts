@@ -6,19 +6,19 @@ import PromptLocaleService from "../PromptLocaleService.ts";
 
 const IMAGE_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {
-    content: PromptLocaleService.get("en", "personas.image.toolPolicyGenerateImage"),
+    content: (locale) => PromptLocaleService.get(locale, "personas.image.toolPolicyGenerateImage"),
     requires: [TOOL_NAMES.GENERATE_IMAGE],
   },
   {
-    content: PromptLocaleService.get("en", "personas.image.toolPolicySearchWeb"),
+    content: (locale) => PromptLocaleService.get(locale, "personas.image.toolPolicySearchWeb"),
     requires: [TOOL_NAMES.SEARCH_WEB],
   },
   {
-    content: PromptLocaleService.get("en", "personas.image.toolPolicyAscii"),
+    content: (locale) => PromptLocaleService.get(locale, "personas.image.toolPolicyAscii"),
     requires: [TOOL_NAMES.CONVERT_IMAGE_TO_ASCII],
   },
   {
-    content: PromptLocaleService.get("en", "personas.image.toolPolicySaveMemory"),
+    content: (locale) => PromptLocaleService.get(locale, "personas.image.toolPolicySaveMemory"),
     requires: [TOOL_NAMES.SAVE_MEMORY],
   },
 ];

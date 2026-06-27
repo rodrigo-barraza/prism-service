@@ -73,7 +73,7 @@ export function extractDomainKeywords(maxPerDomain = 4): Map<string, string[]> {
  * Domain list, tool count, and trigger examples are all derived
  * from the live catalog — nothing is hardcoded.
  */
-function buildToolDiscoveryContent(): string {
+function buildToolDiscoveryContent(locale: string): string {
   const totalToolCount = ToolOrchestratorService.getClientToolSchemas().length;
   const discoverableDomains = extractDiscoverableDomains();
   const domainList = discoverableDomains.join(", ");
@@ -88,7 +88,6 @@ function buildToolDiscoveryContent(): string {
     })
     .join("\n");
 
-  const locale = PromptLocaleService.getDefaultLocale();
   const headerLine = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.header");
   const introLine = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.intro", { totalToolCount: String(totalToolCount) });
   const domainsHeader = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.domainsHeader");
@@ -103,7 +102,7 @@ function buildToolDiscoveryContent(): string {
 }
 
 const TOOL_DISCOVERY_POLICY_SECTION: ToolPolicySection & {
-  dynamicContent?: () => string;
+  dynamicContent?: (locale: string) => string;
 } = {
   content: "",
   dynamicContent: buildToolDiscoveryContent,
@@ -114,11 +113,11 @@ const TOOL_DISCOVERY_POLICY_SECTION: ToolPolicySection & {
 // ────────────────────────────────────────────────────────────
 
 const GENERAL_TOOL_PRINCIPLES_SECTION: ToolPolicySection = {
-  content: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "tool-policy.generalPrinciples"),
+  content: (locale) => PromptLocaleService.get(locale, "tool-policy.generalPrinciples"),
 };
 
 const TASK_MANAGEMENT_POLICY_SECTION: ToolPolicySection = {
-  content: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "tool-policy.taskManagement"),
+  content: (locale) => PromptLocaleService.get(locale, "tool-policy.taskManagement"),
   requires: [
     TOOL_NAMES.CREATE_TASK,
     TOOL_NAMES.LIST_TASKS,
@@ -127,12 +126,12 @@ const TASK_MANAGEMENT_POLICY_SECTION: ToolPolicySection = {
 };
 
 const PROACTIVE_MEMORY_POLICY_SECTION: ToolPolicySection = {
-  content: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "tool-policy.proactiveMemory"),
+  content: (locale) => PromptLocaleService.get(locale, "tool-policy.proactiveMemory"),
   requires: [TOOL_NAMES.SAVE_MEMORY],
 };
 
 const AUDIO_TRACKER_POLICY_SECTION: ToolPolicySection = {
-  content: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "tool-policy.audioTracker"),
+  content: (locale) => PromptLocaleService.get(locale, "tool-policy.audioTracker"),
   requires: [TOOL_NAMES.GENERATE_AUDIO],
 };
 
@@ -160,6 +159,7 @@ export function buildToolPolicy(
   sections: ToolPolicySection[],
   context: PersonaContext,
 ): string {
+  const locale = context.locale || "en";
   const allSections = [
     GENERAL_TOOL_PRINCIPLES_SECTION,
     TOOL_DISCOVERY_POLICY_SECTION,
@@ -185,9 +185,10 @@ export function buildToolPolicy(
   return filtered
     .map((section) => {
       const dynamicSection = section as ToolPolicySection & {
-        dynamicContent?: () => string;
+        dynamicContent?: (locale: string) => string;
       };
-      if (dynamicSection.dynamicContent) return dynamicSection.dynamicContent();
+      if (dynamicSection.dynamicContent) return dynamicSection.dynamicContent(locale);
+      if (typeof section.content === "function") return section.content(locale);
       return section.content;
     })
     .join("\n\n");
@@ -204,6 +205,7 @@ export function buildToolPolicy(
  */
 export function getToolPolicyAddendum(
   newlyEnabledToolNames: string[],
+  locale = "en",
 ): string {
   const policyOnlySections = [
     TASK_MANAGEMENT_POLICY_SECTION,
@@ -229,7 +231,12 @@ export function getToolPolicyAddendum(
   if (matchingSections.length === 0) return "";
 
   return matchingSections
-    .map((section) => section.content)
+    .map((section) => {
+      if (typeof section.content === "function") {
+        return section.content(locale);
+      }
+      return section.content;
+    })
     .join("\n\n");
 }
 

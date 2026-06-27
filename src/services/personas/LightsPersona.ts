@@ -6,15 +6,15 @@ import PromptLocaleService from "../PromptLocaleService.ts";
 
 const LIGHTS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {
-    content: PromptLocaleService.get("en", "personas.lights.toolPolicyCore"),
+    content: (locale) => PromptLocaleService.get(locale, "personas.lights.toolPolicyCore"),
     requires: ["list_lights"],
   },
   {
-    content: PromptLocaleService.get("en", "personas.lights.toolPolicyEffects"),
+    content: (locale) => PromptLocaleService.get(locale, "personas.lights.toolPolicyEffects"),
     requires: [TOOL_NAMES.LIFX_BREATHE_EFFECT, TOOL_NAMES.LIFX_PULSE_EFFECT],
   },
   {
-    content: PromptLocaleService.get("en", "personas.lights.toolPolicyNotes"),
+    content: (locale) => PromptLocaleService.get(locale, "personas.lights.toolPolicyNotes"),
     requires: ["list_lights"],
   },
 ];

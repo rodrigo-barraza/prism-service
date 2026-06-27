@@ -8,6 +8,7 @@ import {
   VALID_EMOTIONS,
   EMOTION_BEHAVIOR_PROMPTS,
   EMOTION_CLASSIFICATION_PROMPT,
+  getEmotionBehaviorPrompt,
   type PrimaryEmotion,
   type DominantEmotionResult,
 } from "./SomaticConstants.ts";
@@ -806,7 +807,10 @@ const SomaticStateService = {
     state.isDirty = true;
   },
 
-  async renderSystemMessage(agentId: string): Promise<string | null> {
+  async renderSystemMessage(
+    agentId: string,
+    locale = PromptLocaleService.getDefaultLocale(),
+  ): Promise<string | null> {
     const snapshot = await this.getSnapshot(agentId);
     const dominantEmotion = snapshot.emotion;
 
@@ -820,8 +824,8 @@ const SomaticStateService = {
             : "MILD";
 
     const behaviorPrompt =
-      EMOTION_BEHAVIOR_PROMPTS[dominantEmotion.dominant] ||
-      EMOTION_BEHAVIOR_PROMPTS["neutral"];
+      getEmotionBehaviorPrompt(dominantEmotion.dominant, locale) ||
+      getEmotionBehaviorPrompt("neutral", locale);
 
     const emotionDetailsLines = Object.entries(dominantEmotion.all)
       .map(
@@ -830,7 +834,6 @@ const SomaticStateService = {
       )
       .join("\n");
 
-    const locale = PromptLocaleService.getDefaultLocale();
     const moodHeader = PromptLocaleService.get(locale, "somatic.moodTemplate.header");
     const currentMood = PromptLocaleService.get(locale, "somatic.moodTemplate.currentMood", {
       emotion: dominantEmotion.dominant.toUpperCase(),

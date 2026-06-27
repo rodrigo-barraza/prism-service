@@ -5,7 +5,7 @@ import PromptLocaleService from "../PromptLocaleService.ts";
 
 const OOG_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {
-    content: PromptLocaleService.get("en", "personas.oog.toolPolicy"),
+    content: (locale) => PromptLocaleService.get(locale, "personas.oog.toolPolicy"),
   },
 ];
 

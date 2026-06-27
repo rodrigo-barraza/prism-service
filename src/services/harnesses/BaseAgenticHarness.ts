@@ -234,6 +234,7 @@ export default class BaseAgenticHarness {
 
         const policyAddendum = getToolPolicyAddendum(
           newlyAddedToolSchemas.map((tool) => tool.name),
+          this.context.options?.locale as string | undefined,
         );
 
         currentMessages.push({
