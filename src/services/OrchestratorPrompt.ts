@@ -25,7 +25,7 @@ export function getOrchestratorPromptAddendum({
   const subAgentToolList =
     subAgentTools.length > 0
       ? [...subAgentTools].sort().join(", ")
-      : "the currently enabled tools (sub-agents can also enable additional tools dynamically via enable_tools)";
+      : PromptLocaleService.get(locale, "orchestrator.defaultSubAgentToolList");
 
   const defHierarchical =
     defaultTopology === TOPOLOGIES.HIERARCHICAL ? " (default)" : "";

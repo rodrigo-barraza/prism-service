@@ -55,6 +55,7 @@ export default class SystemPromptAssembler {
     resolvedToolNames?: string[],
     lockedOffToolNames?: Set<string>,
     compact?: boolean,
+    locale = "en",
   ): string {
     return this.docFormatter.buildToolDescriptions(
       enabledTools,
@@ -63,6 +64,7 @@ export default class SystemPromptAssembler {
       resolvedToolNames,
       lockedOffToolNames,
       compact,
+      locale,
     );
   }
 
@@ -228,6 +230,7 @@ export default class SystemPromptAssembler {
         context.resolvedToolNames,
         lockedOffToolNames,
         isCompactToolDocs,
+        locale,
       );
       if (toolDescriptions) {
         let count: number;
@@ -300,7 +303,8 @@ export default class SystemPromptAssembler {
             count = filteredSchemas.length;
           }
         }
-        sections.push(`## Enabled Tools (${count})\n` + toolDescriptions);
+        const header = PromptLocaleService.get(locale, "system-prompt.enabledToolsHeader", { count: String(count) });
+        sections.push(header + "\n" + toolDescriptions);
       }
     }
 
@@ -397,7 +401,8 @@ export default class SystemPromptAssembler {
     if (isWorkspaceEnabled && (codingFallback || persona?.usesDirectoryTree)) {
       const dirTree = await this.fetchDirectoryTree();
       if (dirTree) {
-        sections.push(`## Project Structure\n` + dirTree);
+        const header = PromptLocaleService.get(locale, "system-prompt.projectStructureHeader");
+        sections.push(header + "\n" + dirTree);
       }
     }
 

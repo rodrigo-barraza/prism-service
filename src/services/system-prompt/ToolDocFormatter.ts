@@ -1,5 +1,6 @@
 import ToolOrchestratorService from "../ToolOrchestratorService.ts";
 import AgentPersonaRegistry from "../AgentPersonaRegistry.ts";
+import PromptLocaleService from "../PromptLocaleService.ts";
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
 import {
   CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST,
@@ -41,6 +42,7 @@ export class ToolDocFormatter {
     resolvedToolNames?: string[],
     lockedOffToolNames?: Set<string>,
     compact?: boolean,
+    locale = "en",
   ): string {
     const schemas = ToolOrchestratorService.getClientToolSchemas(
       defaultTopology,
@@ -56,7 +58,7 @@ export class ToolDocFormatter {
           (toolSchema) => !lockedOffToolNames.has(toolSchema.name),
         );
       }
-      return this._formatToolDescriptions(filteredSchemas, compact);
+      return this._formatToolDescriptions(filteredSchemas, compact, locale);
     }
 
     if (!enabledTools) {
@@ -107,12 +109,13 @@ export class ToolDocFormatter {
       );
     }
 
-    return this._formatToolDescriptions(filteredSchemas, compact);
+    return this._formatToolDescriptions(filteredSchemas, compact, locale);
   }
 
   private _formatToolDescriptions(
     filteredSchemas: ToolSchemaDescriptor[],
     compact?: boolean,
+    locale = "en",
   ): string {
     if (filteredSchemas.length === 0) return "";
 
@@ -158,7 +161,10 @@ export class ToolDocFormatter {
                 parameterDescription
               : parameterDescription;
 
-            return `  - ${parameterName}${isRequired ? " (required)" : ""}: ${truncatedDescription}`;
+            const requiredSuffix = isRequired
+              ? PromptLocaleService.get(locale, "system-prompt.requiredLabel")
+              : "";
+            return `  - ${parameterName}${requiredSuffix}: ${truncatedDescription}`;
           })
           .join("\n");
 
