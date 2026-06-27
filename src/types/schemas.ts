@@ -130,6 +130,7 @@ export const ChatRequestSchema = z
     topLogprobs: z.number().nullable().optional(),
     responseLogprobs: z.boolean().nullable().optional(),
     logprobs: z.number().nullable().optional(),
+    locale: z.string().nullable().optional(),
   })
   .passthrough(); // Support extra provider/custom parameters dynamically
 

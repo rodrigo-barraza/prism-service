@@ -32,6 +32,7 @@ import { THINKING_PATTERNS } from "../services/local-provider/constants.ts";
 import { ORCHESTRATOR_ONLY_TOOLS } from "../services/OrchestratorPrompt.ts";
 import { resolveToolEntriesToSet } from "../utils/resolveToolEntriesToSet.ts";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import PromptLocaleService from "../services/PromptLocaleService.ts";
 import {
   OPENAI_API_KEY,
   ANTHROPIC_API_KEY,
@@ -656,5 +657,34 @@ router.post(
     }
   }),
 );
+
+// ─── Available Locales ─────────────────────────────────────────
+
+const LOCALE_LABELS: Record<string, string> = {
+  en: "English",
+  es: "Español",
+  fr: "Français",
+  de: "Deutsch",
+  pt: "Português",
+  ja: "日本語",
+  ko: "한국어",
+  zh: "中文",
+  it: "Italiano",
+  ru: "Русский",
+  ar: "العربية",
+};
+
+/**
+ * GET /config/locales
+ * Returns the list of available prompt locale codes with display labels.
+ */
+router.get("/locales", (_req: Request, res: Response) => {
+  const availableLocaleCodes = PromptLocaleService.getAvailableLocales();
+  const localeOptions = availableLocaleCodes.map((code) => ({
+    value: code,
+    label: LOCALE_LABELS[code] || code.toUpperCase(),
+  }));
+  res.json(localeOptions);
+});
 
 export default router;

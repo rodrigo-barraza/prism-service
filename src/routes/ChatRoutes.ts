@@ -257,6 +257,7 @@ async function prepareGenerationContext(
     topLogprobs,
     responseLogprobs,
     logprobs,
+    locale,
     ...extraParams
   } = validatedParams;
 
@@ -317,6 +318,7 @@ async function prepareGenerationContext(
     ...(topLogprobs != null && topLogprobs > 0 && { topLogprobs }),
     ...(responseLogprobs != null && { responseLogprobs }),
     ...(logprobs != null && logprobs > 0 && { logprobs }),
+    ...(locale != null && locale !== "" && { locale }),
     ...((extraParams as Record<string, unknown>).systemPrompt
       ? { systemPrompt: (extraParams as Record<string, unknown>).systemPrompt }
       : {}),
