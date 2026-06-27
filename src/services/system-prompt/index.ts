@@ -82,10 +82,6 @@ export default class SystemPromptAssembler {
     const defaultTopology = settings?.topology || DEFAULT_TOPOLOGY;
     const locale = context.locale || settings?.locale || PromptLocaleService.getDefaultLocale();
 
-    logger.info(
-      `[SystemPromptAssembler] Locale resolution: context.locale=${JSON.stringify(context.locale)} settings.locale=${JSON.stringify(settings?.locale)} resolved=${JSON.stringify(locale)}`,
-    );
-
     // ── 1. Agent Identity ────────────────────────────────────────
     if (isDirectMode) {
       sections.push(
@@ -227,9 +223,6 @@ export default class SystemPromptAssembler {
     {
       // Guarantee locale-specific remote tool schemas are cached
       // before the synchronous buildToolDescriptions() reads them.
-      logger.info(
-        `[SystemPromptAssembler] Ensuring tool schemas for locale=${JSON.stringify(locale)}`,
-      );
       await ToolOrchestratorService.ensureSchemas(locale);
       const lockedOffToolNames = await resolveLockedOffToolNames();
       const isCompactToolDocs = persona?.compactToolDocs === true;
@@ -540,9 +533,6 @@ export default class SystemPromptAssembler {
         context._assembledSystemPrompt = systemPrompt;
 
         const assembledLocale = context.locale || (await SettingsService.getSection("agents"))?.locale || PromptLocaleService.getDefaultLocale();
-        logger.info(
-          `[SystemPromptAssembler] injectSystemPromptContext locale=${JSON.stringify(assembledLocale)}`,
-        );
         injectSystemPromptContext(context.messages!, {
           platformContextMessage,
           selfContextMessage,
