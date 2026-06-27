@@ -1,0 +1,106 @@
+{
+  "shared": {
+    "noConversation": "no active talk. need talk ID.",
+    "dynamicToolActivationDisabled": "tool switching turned off. boss person can turn on in Settings → Agent Defaults.",
+    "invalidToolsArray": "'tools' must be non-empty list of tool name or domain prefix.",
+    "searchActionNudgeDisabled": "IMPORTANT: some found tool NOT turned on (isEnabled: false). you MUST call enable_tools with tool name before can use. after turn on, tool ready next round."
+  },
+
+  "enable_tools": {
+    "noValidTools": "none of requested name match real tool. check spelling or use search_tools to find.",
+    "alreadyEnabled": "all requested tool already on and ready — use them now.",
+    "activated": "turned on {{count}} tool. ready next round."
+  },
+
+  "disable_tools": {
+    "noneInSet": "none of requested tool were in active set.",
+    "disabled": "turned off {{count}} tool.",
+    "protectedSuffix": " {{count}} core tool protected and cannot turn off."
+  },
+
+  "discover_and_enable_tools": {
+    "noQueryOrDomain": "need at least 'query' or 'domain'.",
+    "noMatches": "no matching tool found.",
+    "foundAndEnabled": "found {{matchCount}} tool and auto-turned-on {{enabledCount}}. ready next round — use them.",
+    "foundAlreadyEnabled": "found {{matchCount}} tool, all already on — use them."
+  },
+
+  "set_timer": {
+    "noConversation": "no active talk session.",
+    "noPrompt": "'prompt' is required. must be word.",
+    "invalidDuration": "'durationSeconds' must be between {{min}} and {{max}} second. for longer remind or repeat event, use create_cron_job."
+  },
+
+  "list_timers": {
+    "noConversation": "no active talk session."
+  },
+
+  "cancel_timer": {
+    "noTimerId": "'timerId' is required.",
+    "notFound": "no active timer with ID {{timerId}}.",
+    "success": "timer {{timerId}} cancelled."
+  },
+
+  "enter_worktree": {
+    "noConversation": "no talk — separate cave need active talk",
+    "alreadyInWorktree": "already in separate cave (branch: {{branch}}). call exit_worktree first.",
+    "noWorkspace": "no work cave set up",
+    "success": "now in separate cave. all file work go to {{path}}. call exit_worktree with 'merge' or 'discard' when done."
+  },
+
+  "exit_worktree": {
+    "notInWorktree": "not in separate cave. call enter_worktree first.",
+    "mergeFailed": "merge fail: {{error}}. cave kept at {{path}}. fix conflict and try again, or exit_worktree with 'discard'.",
+    "merged": "change from {{branch}} merged into main. cave restored.",
+    "discarded": "cave {{branch}} thrown away. all change gone. workspace restored."
+  },
+
+  "search_conversations": {
+    "queryRequired": "query needed",
+    "databaseUnavailable": "rock tablet not available",
+    "noEmbeddings": "no talk with brain-stamp found. talk get brain-stamp after agent session with 6+ message."
+  },
+
+  "summarize_conversation": {
+    "summaryRequired": "'summary' required and must have word in it"
+  },
+
+  "ask_user": {
+    "questionsRequired": "'questions' list required and must not be empty",
+    "invalidQuestion": "each question must have non-empty 'question' word",
+    "duplicateQuestion": "same question twice: \"{{preview}}\"",
+    "duplicateOption": "same option \"{{label}}\" in question \"{{question}}\"",
+    "tooManyQuestions": "max 4 question per call",
+    "noConversation": "no talk — ask_user need active talk",
+    "timedOut": "human not answer in 5 minute."
+  },
+
+  "list_mcp_resources": {
+    "noServers": "no MCP server connected."
+  },
+
+  "read_mcp_resource": {
+    "missingParams": "'server_name' and 'uri' needed"
+  },
+
+  "authenticate_mcp_server": {
+    "missingServerName": "'server_name' needed",
+    "noCredentials": "need at least one of 'token', 'api_key', or 'env'"
+  },
+
+  "create_skill": {
+    "missingFields": "name and prompt needed"
+  },
+
+  "execute_skill": {
+    "missingSkillId": "skillId needed"
+  },
+
+  "delete_skill": {
+    "missingSkillId": "skillId needed"
+  },
+
+  "write_todo": {
+    "invalidItems": "'items' must be list of todo thing"
+  }
+}

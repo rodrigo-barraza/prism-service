@@ -1,0 +1,145 @@
+{
+  "enter_plan_mode": {
+    "description": "go into think mode. while in think mode, no tool — only write word. use this to make plan before do change. call exit_plan_mode when ready to do. use for hard task that need think first.",
+    "parameters": {
+      "reason": "why you going to think mode (human see this)."
+    }
+  },
+  "exit_plan_mode": {
+    "description": "leave think mode and go back to using tool. call after plan made and ready to do.",
+    "parameters": {
+      "summary": "short version of plan you about to do."
+    }
+  },
+  "enable_tools": {
+    "description": "MUST DO after search_tools: turn on tool that search_tools found so you can use them. without this, found tool NO WORK. take exact tool name (like \"get_weather\") or domain name (like \"domain:Finance\") to turn on whole group at once. new tool ready NEXT round — no need call same turn.",
+    "parameters": {
+      "tools": "tool name or domain prefix to turn on. like: [\"get_weather\", \"get_weather_forecast\"] or [\"domain:Weather & Environment\"]."
+    }
+  },
+  "disable_tools": {
+    "description": "turn off tool from this talk to save brain space. take exact name or domain prefix. core brain tool (memory, task, plan, boss) cannot turn off.",
+    "parameters": {
+      "tools": "tool name or domain prefix to turn off. like: [\"get_weather\"] or [\"domain:Weather & Environment\"]."
+    }
+  },
+  "discover_and_enable_tools": {
+    "description": "search ALL tool ({{totalToolCount}} tool) AND turn on match in one step. combine search_tools and enable_tools — after call, found tool ready next round. use when you know you want use found tool right away. cover all area: {{domainListLowercase}}.",
+    "parameters": {
+      "query": "search word to match tool name and what they do. use specific word for best result. like: {{sampleKeywords}}.",
+      "domain": "filter by tool area. known area: {{domainListQuoted}}.",
+      "limit": "max result to give back (1–50). default: 20."
+    }
+  },
+  "create_skill": {
+    "description": "make reusable work recipe. skill are saved instruction with hole ({{variable}}) that can run by name. use to capture multi-step work (fix→test→commit, analyze→report) as one action. skill last across session.",
+    "parameters": {
+      "name": "unique skill name (like 'fix_and_test', 'code_review'). this is skill ID.",
+      "description": "what skill do — shown when listing.",
+      "prompt": "instruction to run. use {{variable}} for hole to fill.",
+      "steps": "optional: ordered list of step for documentation.",
+      "tools": "optional: specific tool to turn on. if skip, all tool available.",
+      "maxIterations": "optional: max loop round for skill run (1-100). default: 25.",
+      "model": "optional: different brain for skill run."
+    }
+  },
+  "execute_skill": {
+    "description": "run a skill you made before by its ID. skill instruction get filled with your variable and run. use list_skills to see what available.",
+    "parameters": {
+      "skillId": "skill ID to run.",
+      "variables": "key-value pair for {{variable}} hole in skill instruction."
+    }
+  },
+  "list_skills": {
+    "description": "show all available skill. skill are reusable recipe made with create_skill.",
+    "parameters": {
+      "project": "optional: filter by project."
+    }
+  },
+  "delete_skill": {
+    "description": "remove skill by its ID.",
+    "parameters": {
+      "skillId": "skill ID to remove."
+    }
+  },
+  "enter_worktree": {
+    "description": "go into separate work cave for this talk. make new branch and send all file/git/command tool to separate place. use for risky change, experiment, or speculative edit without mess up main branch. your talk context stay. call exit_worktree to merge or throw away when done.",
+    "parameters": {
+      "reason": "why go to separate cave (like 'risky refactor', 'try experimental approach')."
+    }
+  },
+  "exit_worktree": {
+    "description": "leave separate work cave and go back to main. pick 'merge' to keep change or 'discard' to throw away.",
+    "parameters": {
+      "action": "'merge' to keep change, 'discard' to throw away.",
+      "commitMessage": "commit message for merge (used when action is 'merge'). auto-made if not given."
+    }
+  },
+  "write_todo": {
+    "description": "write or update todo list for current project. keep list of item with done status. use to track multi-step work and keep checklist that last across turn. each item: 'pending', 'in_progress', or 'completed'. call with full updated list — replace old one.",
+    "parameters": {
+      "items": "full list of todo item. replace previous list."
+    }
+  },
+  "summarize_conversation": {
+    "description": "squish current talk into short summary. use when talk get long and need consolidate before continue. summary stored for future turn. human NOT see this — it your private brain note.",
+    "parameters": {
+      "summary": "your squished summary of talk so far. include: big decision, file changed, where task at, what remain.",
+      "keyFiles": "optional: important file path for current work.",
+      "openQuestions": "optional: unanswered question or unclear thing."
+    }
+  },
+  "ask_user": {
+    "description": "ask human one or more question and wait for answer before continue. use when need clarification, choice between option, or explicit okay before big action. agent loop pause until human answer. can batch up to 4 question in one call.",
+    "parameters": {
+      "context": "optional: extra context shown below question.",
+      "questions": "batch of question to ask human (up to 4). each item is question object."
+    }
+  },
+  "list_mcp_resources": {
+    "description": "list available resource from connected MCP server.",
+    "parameters": {
+      "server_name": "MCP server name to query. if skip, query all."
+    }
+  },
+  "read_mcp_resource": {
+    "description": "read specific resource from connected MCP server by its URI.",
+    "parameters": {
+      "server_name": "MCP server name that has the resource.",
+      "uri": "resource URI to read."
+    }
+  },
+  "authenticate_mcp_server": {
+    "description": "give credential to connected MCP server.",
+    "parameters": {
+      "server_name": "MCP server name to authenticate with.",
+      "token": "bearer token for HTTP MCP server.",
+      "api_key": "API key value.",
+      "api_key_header": "header name for API key (default: 'X-API-Key').",
+      "env": "extra environment variable to give."
+    }
+  },
+  "set_timer": {
+    "description": "set short wait timer to pause or wait inside this talk. use when need wait for async thing, check build, retry after fail, or pause before continue. timer fire your prompt back into talk after time pass. must be 30 to 599 second (under 10 minute). this for agent inside-talk wait only — NOT for human reminder or alarm (use create_cron_job for that).",
+    "parameters": {
+      "prompt": "instruction to put back in talk when timer fire.",
+      "durationSeconds": "how many second to wait (30–599). must be under 10 minute."
+    }
+  },
+  "list_timers": {
+    "description": "show all active wait timer in current talk. show short wait (30–599 second) set by set_timer. for user reminder and alarm, use list_cron_jobs."
+  },
+  "cancel_timer": {
+    "description": "cancel active wait timer in current talk. for scheduled cron job or alarm, use delete_cron_job.",
+    "parameters": {
+      "timerId": "timer ID to cancel."
+    }
+  },
+  "search_conversations": {
+    "description": "search past agent talk using natural word. find previous session by meaning match. give back title, summary, date, and linked memory count. use when human say 'remember when we...' or need context from old session.",
+    "parameters": {
+      "query": "what you looking for in plain word. like: 'MCP connection debug', 'the session where we fix WebSocket drop'.",
+      "limit": "max result to give back. default: 10."
+    }
+  }
+}
