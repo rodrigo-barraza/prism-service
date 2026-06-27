@@ -782,6 +782,7 @@ export async function runTreeOfThoughts(
           currentMessages,
           state,
           emit,
+          options?.locale as string | undefined,
         );
 
         if (state.planModeActive) {
@@ -823,6 +824,7 @@ export async function runTreeOfThoughts(
           results,
           state,
           MAX_CONSECUTIVE_TOOL_ERRORS,
+          options?.locale as string | undefined,
         );
         if (retryGuidanceMessage) {
           currentMessages.push(retryGuidanceMessage);
@@ -923,6 +925,7 @@ export async function runTreeOfThoughts(
         const exhaustionMessage = buildExhaustedRecoveryMessage(
           MAX_OUTPUT_TRUNCATION_RECOVERIES,
           configuredMaxTokens,
+          options?.locale as string | undefined,
         );
         injectErrorAsConversationMessage(
           currentMessages,
@@ -968,7 +971,7 @@ export async function runTreeOfThoughts(
 
     injectErrorAsConversationMessage(
       currentMessages,
-      buildProviderErrorMessage(loopError, state.iterations),
+      buildProviderErrorMessage(loopError, state.iterations, options?.locale as string | undefined),
       context,
     );
 
@@ -1189,7 +1192,7 @@ async function runPlanningPhase(
       }
       currentMessages.push({
         role: "system",
-        content: PromptLocaleService.get("en", "harness.planningMode.blocked", { blockedNames }),
+        content: PromptLocaleService.get((options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(), "harness.planningMode.blocked", { blockedNames }),
       });
       continue;
     }

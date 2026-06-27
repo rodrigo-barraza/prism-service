@@ -35,8 +35,10 @@ const TOKEN_ESCALATION_MULTIPLIER = 1.5;
 /** Default maxTokens if none is configured on the agent context. */
 const DEFAULT_MAX_TOKENS = 8192;
 
-/** The continuation prompt injected as a system message after a truncated response. */
-const CONTINUATION_PROMPT = PromptLocaleService.get("en", "harness.outputTruncation.continuationPrompt");
+/** Build the continuation prompt localized to the active locale. */
+function getContinuationPrompt(locale: string): string {
+  return PromptLocaleService.get(locale, "harness.outputTruncation.continuationPrompt");
+}
 
 /**
  * Check whether a pass was truncated by the output token limit.
@@ -85,9 +87,11 @@ export function injectContinuationContext(
     });
   }
 
+  const activeLocale = (context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale();
+
   currentMessages.push({
     role: "system",
-    content: CONTINUATION_PROMPT,
+    content: getContinuationPrompt(activeLocale),
   });
 
   const baseMaxTokens = context.options.maxTokens || DEFAULT_MAX_TOKENS;
@@ -150,8 +154,9 @@ export function injectErrorAsConversationMessage(
 export function buildExhaustedRecoveryMessage(
   maxAttempts: number,
   configuredMaxTokens: number | string,
+  locale?: string,
 ): string {
-  return PromptLocaleService.get("en", "harness.outputTruncation.exhaustedRecovery", {
+  return PromptLocaleService.get(locale || PromptLocaleService.getDefaultLocale(), "harness.outputTruncation.exhaustedRecovery", {
     configuredMaxTokens: String(configuredMaxTokens),
     maxAttempts: String(maxAttempts),
   });
@@ -164,9 +169,10 @@ export function buildExhaustedRecoveryMessage(
 export function buildProviderErrorMessage(
   error: unknown,
   iteration: number,
+  locale?: string,
 ): string {
   const errorText = errorMessage(error);
-  return PromptLocaleService.get("en", "harness.outputTruncation.providerError", {
+  return PromptLocaleService.get(locale || PromptLocaleService.getDefaultLocale(), "harness.outputTruncation.providerError", {
     errorText,
     iteration: String(iteration),
   });

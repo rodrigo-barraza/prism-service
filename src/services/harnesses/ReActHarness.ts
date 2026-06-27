@@ -331,6 +331,7 @@ export default class ReActHarness extends BaseAgenticHarness {
               currentMessages,
               pass,
               state,
+              this.context.options?.locale as string | undefined,
             );
             if (allBlocked) {
               this.logIteration(pass, currentMessages);
@@ -475,6 +476,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             currentMessages,
             state,
             emit,
+            this.context.options?.locale as string | undefined,
           );
 
           const exitPlanToolCall = pass.pendingToolCalls.find(
@@ -529,6 +531,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             results,
             state,
             MAX_CONSECUTIVE_TOOL_ERRORS,
+            this.context.options?.locale as string | undefined,
           );
           if (retryGuidanceMessage) {
             currentMessages.push(retryGuidanceMessage);
@@ -659,6 +662,7 @@ export default class ReActHarness extends BaseAgenticHarness {
           const exhaustionMessage = buildExhaustedRecoveryMessage(
             MAX_OUTPUT_TRUNCATION_RECOVERIES,
             configuredMaxTokens,
+            this.context.options?.locale as string | undefined,
           );
           injectErrorAsConversationMessage(
             currentMessages,
@@ -711,7 +715,7 @@ export default class ReActHarness extends BaseAgenticHarness {
 
       injectErrorAsConversationMessage(
         currentMessages,
-        buildProviderErrorMessage(loopError, state.iterations),
+        buildProviderErrorMessage(loopError, state.iterations, this.context.options?.locale as string | undefined),
         context,
       );
 

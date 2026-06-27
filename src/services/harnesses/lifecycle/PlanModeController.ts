@@ -41,6 +41,7 @@ export function blockUnauthorizedToolCalls(
   currentMessages: ConversationMessage[],
   pass: PassState,
   _state: AgenticLoopState,
+  locale?: string,
 ): { allBlocked: boolean } {
   const blockedToolCalls = pendingToolCalls.filter(
     (toolCall) => toolCall.name !== TOOL_NAMES.EXIT_PLAN_MODE,
@@ -81,7 +82,7 @@ export function blockUnauthorizedToolCalls(
 
     currentMessages.push({
       role: "system",
-      content: PromptLocaleService.get("en", "harness.planningMode.blocked", { blockedNames: blockedToolNames }),
+      content: PromptLocaleService.get(locale || PromptLocaleService.getDefaultLocale(), "harness.planningMode.blocked", { blockedNames: blockedToolNames }),
     });
 
     return { allBlocked: true };
@@ -149,7 +150,7 @@ export async function handleExitPlanMode(
   if (!planApproved || signal?.aborted) {
     emit({
       type: SERVER_SENT_EVENT_TYPES.STATUS,
-      message: PromptLocaleService.get("en", "harness.planningMode.rejectionStatus"),
+      message: PromptLocaleService.get((options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(), "harness.planningMode.rejectionStatus"),
     });
     emit({
       type: SERVER_SENT_EVENT_TYPES.DONE,
@@ -170,7 +171,7 @@ export async function handleExitPlanMode(
   if (exitResult) {
     exitResult.result = {
       isApproved: true,
-      message: `${PromptLocaleService.get("en", "harness.planningMode.approvalResult")}\n\n${planText}`,
+      message: `${PromptLocaleService.get((options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(), "harness.planningMode.approvalResult")}\n\n${planText}`,
     };
   }
 
@@ -191,6 +192,7 @@ export async function checkForPlanModeEntry(
   currentMessages: ConversationMessage[],
   state: AgenticLoopState,
   emit: EmitFunction,
+  locale?: string,
 ): Promise<void> {
   const hasEnterPlanMode = executedToolCalls.some(
     (toolCall) => toolCall.name === TOOL_NAMES.ENTER_PLAN_MODE,
@@ -199,7 +201,7 @@ export async function checkForPlanModeEntry(
   if (hasEnterPlanMode) {
     state.planModeActive = true;
     state.planModeText = "";
-    await PlanningModeService.injectPlanningInstruction(currentMessages);
+    await PlanningModeService.injectPlanningInstruction(currentMessages, locale);
     emit({
       type: SERVER_SENT_EVENT_TYPES.STATUS,
       message: STATUS_MESSAGES.PLAN_MODE_ENTERED,

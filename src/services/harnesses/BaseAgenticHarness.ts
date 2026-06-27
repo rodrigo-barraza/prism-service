@@ -372,6 +372,7 @@ export default class BaseAgenticHarness {
         maxInputTokens: modelDefinition?.maxInputTokens || 128_000,
         maxOutputTokens: options.maxTokens || 8192,
         toolCount,
+        locale: options?.locale as string | undefined,
       },
     );
     if (contextResult.truncated) {

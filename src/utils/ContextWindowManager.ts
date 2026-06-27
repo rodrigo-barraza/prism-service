@@ -41,6 +41,7 @@ interface EnforceOptions {
   maxInputTokens?: number;
   maxOutputTokens?: number;
   toolCount?: number;
+  locale?: string;
 }
 
 interface EnforceResult {
@@ -253,6 +254,7 @@ function compressOldAssistantMessages(
 function slidingWindowTruncation(
   messages: ChatMessage[],
   maxTokens: number,
+  locale?: string,
 ): ChatMessage[] {
   if (messages.length <= 3) return messages;
 
@@ -305,7 +307,7 @@ function slidingWindowTruncation(
     // Insert a context marker so the model knows history was dropped
     head.push({
       role: "user",
-      content: `${PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX} ${PromptLocaleService.get("en", "harness.contextWindow.droppedMessages", { droppedCount: String(droppedCount) })}]`,
+      content: `${PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX} ${PromptLocaleService.get(locale || PromptLocaleService.getDefaultLocale(), "harness.contextWindow.droppedMessages", { droppedCount: String(droppedCount) })}]`,
     });
   }
 
@@ -419,7 +421,7 @@ export default class ContextWindowManager {
     }
 
     // Strategy 3: Sliding window — drop middle turns
-    result = slidingWindowTruncation(result, budget);
+    result = slidingWindowTruncation(result, budget, options.locale);
     currentTokens = estimateTotalTokens(result);
 
     logger.info(
