@@ -45,5 +45,35 @@
     "header": "[NEW TOOL] {{count}} new tool turned on: {{toolNames}}",
     "availableDocumentation": "these tool ready now with full instruction:",
     "usageGuidelines": "## how use tool"
+  },
+  "validationError": {
+    "header": "[BAD EDIT] your change made {{errorCount}} mistake:",
+    "analyzePrompt": "before fix, THINK what went bad:\n1. what wrong idea cause fail?\n2. how correct answer different?\n3. what change stop this kind of mistake?\n\nthink first then fix. no move on until error gone."
+  },
+  "systemReminder": {
+    "header": "[CAVE REMINDER — round {{currentIteration}}]",
+    "preamble": "these important rule from your instruction still active:",
+    "footer": "keep follow these rule for rest of talk."
+  },
+  "codexPlanningDetector": {
+    "continuePrompt": "do next step with right tool to make plan happen. if you done everything human ask, say you done and no call tool."
+  },
+  "retryLabels": {
+    "attemptLabel": "(try {{attemptCount}})",
+    "errorLabel": "**broke:** {{errorMessage}}",
+    "originalArguments": "**what you gave it:**"
+  },
+  "errorAsContext": {
+    "wrapper": "⚠️ **broke:** {{errorDescription}}"
+  },
+  "treeOfThoughts": {
+    "proactiveBacktrack": "[GO BACK — ALL {{branchCount}} PATH SCORE BAD (best: {{bestScore}}/{{threshold}})]\n\nall try-path scored bad. this way not working.\n\nbefore try again, think bigger:\n1. is whole approach wrong?\n2. what different way work better?\n3. is there simpler, safer way to same place?\n\ndo DIFFERENT thing next try.",
+    "frontierFallback": "[SWITCH PATH — PATH {{branchIndex}} BROKE]\n\nlast way made {{errorCount}} mistake:\n\n{{errorBlock}}\n\nswitching to next-best path. no make same mistake — error listed above.",
+    "reflexion": "[THINK AGAIN — PATH {{branchIndex}} BROKE]\n\nlast way made {{errorCount}} mistake:\n\n{{errorBlock}}\n\nbefore try again, THINK what went bad:\n1. what wrong idea in last try cause fail?\n2. how correct answer different?\n3. what other way avoid this kind of mistake?\n\nthink first then do DIFFERENT thing next try.",
+    "budgetExhausted": "[BAD EDIT — NO MORE TRY LEFT]\n\n{{errorBlock}}\n\nmany way failed. just fix remaining problem direct."
+  },
+  "graphOfThoughts": {
+    "proactiveBacktrack": "[GO BACK — ALL PATH SCORE BAD (best: {{bestScore}}/{{threshold}})]\n\nall try-path scored bad. this way not working.\n\nbefore try again, think bigger:\n1. is whole approach wrong?\n2. what different way work better?\n3. is there simpler, safer way to same place?\n\ndo DIFFERENT thing next try.",
+    "synthesizedValidationError": "[BAD EDIT — MERGED RESULT]\n\nmerged approach made {{errorCount}} mistake:\n\n{{errorBlock}}\n\nmerged approach took idea from {{branchCount}} path but tool call still broke.\njust fix remaining problem — NO repeat same tool call."
   }
 }

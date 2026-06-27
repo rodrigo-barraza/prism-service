@@ -493,16 +493,15 @@ export async function runTreeOfThoughts(
 
         currentMessages.push({
           role: "system",
-          content:
-            `[PROACTIVE BACKTRACK — ALL ${scoredBranches.length} BRANCHES SCORED BELOW THRESHOLD ` +
-            `(best: ${selectedBranch.score.toFixed(1)}/${valueThreshold})]` +
-            `\n\nAll candidate approaches scored poorly on the multi-criteria evaluation. ` +
-            `The current trajectory appears unpromising.\n\n` +
-            `Before retrying, reconsider the problem from a higher level:\n` +
-            `1. Is the current approach fundamentally flawed?\n` +
-            `2. What alternative strategy would be more robust?\n` +
-            `3. Are there simpler, safer paths to the same goal?\n\n` +
-            `Take a DIFFERENT approach on the next attempt.`,
+          content: PromptLocaleService.get(
+            (options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(),
+            "harness.treeOfThoughts.proactiveBacktrack",
+            {
+              branchCount: String(scoredBranches.length),
+              bestScore: selectedBranch.score.toFixed(1),
+              threshold: String(valueThreshold),
+            },
+          ),
         });
 
         continue;
@@ -662,12 +661,15 @@ export async function runTreeOfThoughts(
 
             currentMessages.push({
               role: "system",
-              content:
-                `[FRONTIER FALLBACK — BRANCH ${selectedBranch.branchIndex + 1} FAILED VALIDATION]\n\n` +
-                `The previous approach produced ${validationFeedback.length} validation error(s):\n\n` +
-                `${errorBlock}\n\n` +
-                `Switching to the next-best pre-scored alternative approach. ` +
-                `Avoid the same mistakes — the previous branch's errors are listed above.`,
+              content: PromptLocaleService.get(
+                (options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(),
+                "harness.treeOfThoughts.frontierFallback",
+                {
+                  branchIndex: String(selectedBranch.branchIndex + 1),
+                  errorCount: String(validationFeedback.length),
+                  errorBlock,
+                },
+              ),
             });
 
             // Re-enter the main execution path with the fallback candidate's pass
@@ -717,15 +719,15 @@ export async function runTreeOfThoughts(
 
             currentMessages.push({
               role: "system",
-              content:
-                `[REFLEXION — BRANCH ${selectedBranch.branchIndex + 1} FAILED VALIDATION]\n\n` +
-                `The previous approach produced ${validationFeedback.length} validation error(s):\n\n` +
-                `${errorBlock}\n\n` +
-                `Before retrying, ANALYZE what went wrong:\n` +
-                `1. What assumption in the previous approach caused the failure?\n` +
-                `2. What is fundamentally different about a correct solution?\n` +
-                `3. What specific alternative strategy would avoid this class of error?\n\n` +
-                `Apply your analysis and take a DIFFERENT approach on the next attempt.`,
+              content: PromptLocaleService.get(
+                (options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(),
+                "harness.treeOfThoughts.reflexion",
+                {
+                  branchIndex: String(selectedBranch.branchIndex + 1),
+                  errorCount: String(validationFeedback.length),
+                  errorBlock,
+                },
+              ),
             });
           } else {
             emit({
@@ -760,10 +762,11 @@ export async function runTreeOfThoughts(
 
             currentMessages.push({
               role: "system",
-              content:
-                `[VALIDATION ERROR — BACKTRACK BUDGET EXHAUSTED]\n\n` +
-                `${errorBlock}\n\n` +
-                `Multiple approaches have failed. Fix the remaining issues directly.`,
+              content: PromptLocaleService.get(
+                (options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(),
+                "harness.treeOfThoughts.budgetExhausted",
+                { errorBlock },
+              ),
             });
           }
 

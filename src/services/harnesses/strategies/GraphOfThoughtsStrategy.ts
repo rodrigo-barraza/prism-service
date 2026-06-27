@@ -360,16 +360,14 @@ export async function runGraphOfThoughts(
 
         currentMessages.push({
           role: "system",
-          content:
-            `[PROACTIVE BACKTRACK — ALL BRANCHES SCORED BELOW THRESHOLD ` +
-            `(best: ${(scoredBranches[0]?.score ?? 0).toFixed(1)}/${valueThreshold})]` +
-            `\n\nAll candidate approaches scored poorly on the multi-criteria evaluation. ` +
-            `The current trajectory appears unpromising.\n\n` +
-            `Before retrying, reconsider the problem from a higher level:\n` +
-            `1. Is the current approach fundamentally flawed?\n` +
-            `2. What alternative strategy would be more robust?\n` +
-            `3. Are there simpler, safer paths to the same goal?\n\n` +
-            `Take a DIFFERENT approach on the next attempt.`,
+          content: PromptLocaleService.get(
+            (options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(),
+            "harness.graphOfThoughts.proactiveBacktrack",
+            {
+              bestScore: (scoredBranches[0]?.score ?? 0).toFixed(1),
+              threshold: String(valueThreshold),
+            },
+          ),
         });
 
         continue;
@@ -502,13 +500,15 @@ export async function runGraphOfThoughts(
 
           currentMessages.push({
             role: "system",
-            content:
-              `[VALIDATION ERROR — SYNTHESIZED OUTPUT]\n\n` +
-              `The merged approach produced ${validationFeedback.length} validation error(s):\n\n` +
-              `${errorBlock}\n\n` +
-              `The synthesized approach combined insights from ${scoredBranches.length} branches ` +
-              `but the merged tool calls still caused validation failures.\n` +
-              `Fix the remaining issues directly — do NOT repeat the same tool calls.`,
+            content: PromptLocaleService.get(
+              (options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(),
+              "harness.graphOfThoughts.synthesizedValidationError",
+              {
+                errorCount: String(validationFeedback.length),
+                errorBlock,
+                branchCount: String(scoredBranches.length),
+              },
+            ),
           });
 
           harness.logIteration(synthesizedPass, currentMessages);
