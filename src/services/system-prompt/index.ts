@@ -78,7 +78,7 @@ export default class SystemPromptAssembler {
 
     const settings = await SettingsService.getSection("agents");
     const defaultTopology = settings?.topology || DEFAULT_TOPOLOGY;
-    const locale = settings?.locale || PromptLocaleService.getDefaultLocale();
+    const locale = context.locale || settings?.locale || PromptLocaleService.getDefaultLocale();
 
     // ── 1. Agent Identity ────────────────────────────────────────
     if (isDirectMode) {

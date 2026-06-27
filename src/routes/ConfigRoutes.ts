@@ -582,11 +582,13 @@ router.post(
         disabledTools,
         workspaceEnabled,
         systemPrompt: userSystemPrompt,
+        locale,
       } = req.body as {
         agent?: string;
         disabledTools?: string[];
         workspaceEnabled?: boolean;
         systemPrompt?: string;
+        locale?: string;
       };
 
       const agentSettings = await SettingsService.getSection("agents");
@@ -617,6 +619,7 @@ router.post(
         enabledTools: enabledToolNames,
         resolvedToolNames,
         workspaceEnabled: workspaceEnabled !== false,
+        locale: locale || undefined,
       };
 
       const result = await assembler.assemble(assemblerContext);

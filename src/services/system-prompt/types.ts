@@ -57,6 +57,7 @@ export interface AssemblerContext {
   requestId?: string;
   options?: Record<string, unknown>;
   workspaceEnabled?: boolean;
+  locale?: string;
   _injectedSkills?: string[];
   _currentMessages?: Array<Record<string, unknown>>;
   [key: string]: unknown;
