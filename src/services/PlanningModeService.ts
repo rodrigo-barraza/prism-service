@@ -34,7 +34,7 @@ export default class PlanningModeService {
    * of mutating the system message content. This preserves prefix cache
    * stability across all major providers (Anthropic, Gemini, OpenAI).
    */
-  static async injectPlanningInstruction(messages: ConversationMessage[]) {
+  static async injectPlanningInstruction(messages: ConversationMessage[], requestLocale?: string) {
     // Idempotency: don't inject twice
     if (
       messages.some(
@@ -45,8 +45,11 @@ export default class PlanningModeService {
       return;
     }
 
-    const settings = await SettingsService.getSection("agents");
-    const locale = settings?.locale || PromptLocaleService.getDefaultLocale();
+    let locale = requestLocale;
+    if (!locale) {
+      const settings = await SettingsService.getSection("agents");
+      locale = settings?.locale || PromptLocaleService.getDefaultLocale();
+    }
     const planningInstruction = PromptLocaleService.get(locale, "harness.planningMode.planningInstruction");
 
     // Insert AFTER the system message but BEFORE any user messages

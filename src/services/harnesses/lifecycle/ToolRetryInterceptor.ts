@@ -66,6 +66,7 @@ export function buildToolRetryGuidance(
   results: ToolResult[],
   state: AgenticLoopState,
   maxConsecutiveErrors: number,
+  locale?: string,
 ): ConversationMessage | null {
   const failedToolCalls: FailedToolCallSummary[] = [];
 
@@ -120,11 +121,11 @@ export function buildToolRetryGuidance(
     })
     .join("\n\n");
 
-  const locale = PromptLocaleService.getDefaultLocale();
-  const headerText = PromptLocaleService.get(locale, "harness.toolRetryGuidance.header", {
+  const activeLocale = locale || PromptLocaleService.getDefaultLocale();
+  const headerText = PromptLocaleService.get(activeLocale, "harness.toolRetryGuidance.header", {
     count: String(failedToolCalls.length),
   });
-  const analyzeSteps = PromptLocaleService.get(locale, "harness.toolRetryGuidance.analyzeSteps");
+  const analyzeSteps = PromptLocaleService.get(activeLocale, "harness.toolRetryGuidance.analyzeSteps");
 
   const retryMessage: ConversationMessage = {
     role: "system",

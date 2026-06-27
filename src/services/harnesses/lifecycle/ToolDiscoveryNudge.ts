@@ -81,7 +81,7 @@ export function injectToolDiscoveryNudge(
         role: "system",
         content:
           `<tool-update>\n` +
-          PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "harness.toolDiscoveryNudge.autoEnabled", {
+          PromptLocaleService.get((context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(), "harness.toolDiscoveryNudge.autoEnabled", {
             count: String(disabledToolNames.length),
             toolNames: disabledToolNames.join(", "),
           }) +
@@ -95,7 +95,7 @@ export function injectToolDiscoveryNudge(
         role: "system",
         content:
           `<tool-update>\n` +
-          PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "harness.toolDiscoveryNudge.enableRequired", {
+          PromptLocaleService.get((context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(), "harness.toolDiscoveryNudge.enableRequired", {
             count: String(disabledToolNames.length),
             toolNames: disabledToolNames.join(", "),
           }) +
