@@ -44,6 +44,7 @@ import { checkCostBudget } from "./lifecycle/CostBudgetEnforcer.ts";
 import { createSandboxCheckpoint, restoreSandboxCheckpoint } from "./lifecycle/SandboxExecutor.ts";
 
 import PlanningModeService from "../PlanningModeService.ts";
+import PromptLocaleService from "../PromptLocaleService.ts";
 
 import type {
   ConversationMessage,
@@ -452,13 +453,16 @@ export default class ReActHarness extends BaseAgenticHarness {
             currentMessages.push({
               role: "system",
               content:
-                `[VALIDATION ERROR] Your recent edit(s) introduced ${validationFeedback.length} error(s):\n\n` +
-                `${errorBlock}\n\n` +
-                `Before fixing, ANALYZE what went wrong:\n` +
-                `1. What assumption in your approach caused the failure?\n` +
-                `2. What is fundamentally different about a correct solution?\n` +
-                `3. What specific change would avoid this class of error?\n\n` +
-                `Apply your analysis and fix these issues before proceeding. Do not move on to other tasks until validation passes.`,
+                PromptLocaleService.get(
+                  (this.context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(),
+                  "harness.validationError.header",
+                  { errorCount: String(validationFeedback.length) },
+                ) +
+                `\n\n${errorBlock}\n\n` +
+                PromptLocaleService.get(
+                  (this.context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(),
+                  "harness.validationError.analyzePrompt",
+                ),
             });
 
             emit({

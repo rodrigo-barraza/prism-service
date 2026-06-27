@@ -103,6 +103,8 @@ export function buildToolRetryGuidance(
 
   if (failedToolCalls.length === 0) return null;
 
+  const activeLocale = locale || PromptLocaleService.getDefaultLocale();
+
   const retryGuidanceBlocks = failedToolCalls
     .map((failedToolCall) => {
       const argumentSummary = formatArgumentSummary(
@@ -110,18 +112,17 @@ export function buildToolRetryGuidance(
       );
       const attemptLabel =
         failedToolCall.consecutiveFailureCount > 1
-          ? ` (attempt ${failedToolCall.consecutiveFailureCount})`
+          ? ` ${PromptLocaleService.get(activeLocale, "harness.retryLabels.attemptLabel", { attemptCount: String(failedToolCall.consecutiveFailureCount) })}`
           : "";
 
       return (
         `### \`${failedToolCall.toolName}\`${attemptLabel}\n` +
-        `**Error:** ${failedToolCall.errorMessage}\n` +
-        `**Original arguments:**\n${argumentSummary}`
+        `${PromptLocaleService.get(activeLocale, "harness.retryLabels.errorLabel", { errorMessage: failedToolCall.errorMessage })}\n` +
+        `${PromptLocaleService.get(activeLocale, "harness.retryLabels.originalArguments")}\n${argumentSummary}`
       );
     })
     .join("\n\n");
 
-  const activeLocale = locale || PromptLocaleService.getDefaultLocale();
   const headerText = PromptLocaleService.get(activeLocale, "harness.toolRetryGuidance.header", {
     count: String(failedToolCalls.length),
   });

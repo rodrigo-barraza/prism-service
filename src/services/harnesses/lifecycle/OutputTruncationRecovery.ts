@@ -129,9 +129,10 @@ export function injectErrorAsConversationMessage(
   errorDescription: string,
   context: AgenticContext,
 ): void {
+  const activeLocale = (context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale();
   const errorMessage: ConversationMessage = {
     role: "assistant",
-    content: `⚠️ **Error:** ${errorDescription}`,
+    content: PromptLocaleService.get(activeLocale, "harness.errorAsContext.wrapper", { errorDescription }),
     _isErrorIndicator: true,
   };
 

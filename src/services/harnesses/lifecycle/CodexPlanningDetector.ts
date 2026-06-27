@@ -1,4 +1,5 @@
 import logger from "../../../utils/logger.ts";
+import PromptLocaleService from "../../PromptLocaleService.ts";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
 import type {
@@ -79,8 +80,10 @@ export function handleCodexPlanningResponse(
 
   currentMessages.push({
     role: "system",
-    content:
-      "Please proceed with the next step using the appropriate tools to implement your plan. If you have fully completed the user's request, please output a final message stating that you are done without calling any tools.",
+    content: PromptLocaleService.get(
+      (context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(),
+      "harness.codexPlanningDetector.continuePrompt",
+    ),
   });
 
   return { shouldContinueLoop: true };

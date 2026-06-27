@@ -45,5 +45,35 @@
     "header": "[TOOL SET UPDATED] {{count}} new tool(s) have been dynamically enabled: {{toolNames}}",
     "availableDocumentation": "the following tools r now available w/ full documentation:",
     "usageGuidelines": "## tool usage guidelines"
+  },
+  "validationError": {
+    "header": "[VALIDATION ERROR] ur recent edit(s) introduced {{errorCount}} error(s):",
+    "analyzePrompt": "b4 fixing, ANALYZE what went wrong:\n1. what assumption in ur approach caused the failure?\n2. what is fundamentally diff about a correct solution?\n3. what specific change would avoid this class of error?\n\napply ur analysis & fix these issues b4 proceeding. do not move on 2 other tasks until validation passes."
+  },
+  "systemReminder": {
+    "header": "[SYS REMINDER — Iteration {{currentIteration}}]",
+    "preamble": "the following core behavioral constraints from ur sys instructions remain in effect:",
+    "footer": "continue 2 follow these constraints strictly thruout the remainder of this session."
+  },
+  "codexPlanningDetector": {
+    "continuePrompt": "pls proceed w/ the next step using the appropriate tools 2 implement ur plan. if u have fully completed the user's req, pls output a final msg stating that u r done w/o calling any tools."
+  },
+  "retryLabels": {
+    "attemptLabel": "(attempt {{attemptCount}})",
+    "errorLabel": "**Error:** {{errorMessage}}",
+    "originalArguments": "**Original args:**"
+  },
+  "errorAsContext": {
+    "wrapper": "⚠️ **Error:** {{errorDescription}}"
+  },
+  "treeOfThoughts": {
+    "proactiveBacktrack": "[PROACTIVE BACKTRACK — ALL {{branchCount}} BRANCHES SCORED BELOW THRESHOLD (best: {{bestScore}}/{{threshold}})]\n\nall candidate approaches scored poorly on the multi-criteria eval. the current trajectory appears unpromising.\n\nb4 retrying, reconsider the problem from a higher level:\n1. is the current approach fundamentally flawed?\n2. what alt strategy would b more robust?\n3. r there simpler, safer paths 2 the same goal?\n\ntake a DIFFERENT approach on the next attempt.",
+    "frontierFallback": "[FRONTIER FALLBACK — BRANCH {{branchIndex}} FAILED VALIDATION]\n\nthe prev approach produced {{errorCount}} validation error(s):\n\n{{errorBlock}}\n\nswitching 2 the next-best pre-scored alt approach. avoid the same mistakes — the prev branch's errors r listed above.",
+    "reflexion": "[REFLEXION — BRANCH {{branchIndex}} FAILED VALIDATION]\n\nthe prev approach produced {{errorCount}} validation error(s):\n\n{{errorBlock}}\n\nb4 retrying, ANALYZE what went wrong:\n1. what assumption in the prev approach caused the failure?\n2. what is fundamentally diff about a correct solution?\n3. what specific alt strategy would avoid this class of error?\n\napply ur analysis & take a DIFFERENT approach on the next attempt.",
+    "budgetExhausted": "[VALIDATION ERROR — BACKTRACK BUDGET EXHAUSTED]\n\n{{errorBlock}}\n\nmultiple approaches have failed. fix the remaining issues directly."
+  },
+  "graphOfThoughts": {
+    "proactiveBacktrack": "[PROACTIVE BACKTRACK — ALL BRANCHES SCORED BELOW THRESHOLD (best: {{bestScore}}/{{threshold}})]\n\nall candidate approaches scored poorly on the multi-criteria eval. the current trajectory appears unpromising.\n\nb4 retrying, reconsider the problem from a higher level:\n1. is the current approach fundamentally flawed?\n2. what alt strategy would b more robust?\n3. r there simpler, safer paths 2 the same goal?\n\ntake a DIFFERENT approach on the next attempt.",
+    "synthesizedValidationError": "[VALIDATION ERROR — SYNTHESIZED OUTPUT]\n\nthe merged approach produced {{errorCount}} validation error(s):\n\n{{errorBlock}}\n\nthe synthesized approach combined insights from {{branchCount}} branches but the merged tool calls still caused validation failures.\nfix the remaining issues directly — do NOT repeat the same tool calls."
   }
 }

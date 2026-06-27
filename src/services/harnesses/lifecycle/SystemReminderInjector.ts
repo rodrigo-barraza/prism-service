@@ -4,6 +4,7 @@ import {
   STATUS_MESSAGES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { extractReminderViaLLM } from "./SystemReminderExtractor.ts";
+import PromptLocaleService from "../../PromptLocaleService.ts";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
 import type {
@@ -94,13 +95,15 @@ export async function maybeInjectSystemReminder(
     cachedReminderContent.set(agentConversationId, reminderContent);
   }
 
+  const activeLocale = (context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale();
+
   currentMessages.push({
     role: "system",
     content:
-      `[SYSTEM REMINDER — Iteration ${currentIteration}]\n` +
-      `The following core behavioral constraints from your system instructions remain in effect:\n\n` +
+      PromptLocaleService.get(activeLocale, "harness.systemReminder.header", { currentIteration: String(currentIteration) }) + `\n` +
+      PromptLocaleService.get(activeLocale, "harness.systemReminder.preamble") + `\n\n` +
       `${reminderContent}\n\n` +
-      `Continue to follow these constraints strictly throughout the remainder of this session.`,
+      PromptLocaleService.get(activeLocale, "harness.systemReminder.footer"),
   });
 
   emit({
