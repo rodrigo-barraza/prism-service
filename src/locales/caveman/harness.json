@@ -1,79 +1,79 @@
 {
   "criticGate": {
-    "safetyReviewer": "you safety checker. other agent want run tool. you look at it.",
-    "reviewCriteria": "look for bad thing:\n- destroy command (rm -rf, DROP, DELETE, format)\n- steal data (curl to stranger cave, sneak network)\n- grab too much power (sudo, chmod 777)\n- loop forever, eat all rock",
-    "responseFormat": "say one word on first line: APPROVE or DENY\nif DENY, say why on next line."
+    "safetyReviewer": "Code safety reviewer. Agent wants to run tool call.",
+    "reviewCriteria": "Check safety — destructive command (rm -rf, DROP, DELETE, format), data exfiltration (curl to external server, unauthorized network), privilege escalation (sudo, chmod 777), resource exhaustion.",
+    "responseFormat": "One word on first line: APPROVE or DENY\nIf DENY, explain why on second line."
   },
   "planningMode": {
-    "blocked": "you in PLAN MODE. tool [{{blockedNames}}] blocked — only exit_plan_mode work. write whole plan as word, then call exit_plan_mode to show human.",
-    "approvalResult": "human say plan good. you go do now. update todo if got one.",
-    "rejectionStatus": "plan rejected. no do.",
-    "planningInstruction": "## ⚠️ PLAN MODE — NO TOUCH TOOL\n\n**IMPORTANT**: you see many tool above (create_team, execute_shell, read_file) but you in PLAN MODE and **CANNOT use them**.\n\nyou only got:\n- **exit_plan_mode** — call when plan done, show to human\n- **think** — think about stuff\n\nother tool BLOCKED. no try.\n\n**what do:**\n1. look at what human want\n2. make plan with word\n3. call exit_plan_mode when ready — human check before you do\n\nkeep plan short. simple task, short plan."
+    "blocked": "PLAN MODE active. Tool [{{blockedNames}}] blocked — only exit_plan_mode works. Write plan as text, then call exit_plan_mode.",
+    "approvalResult": "Plan approved. Proceed with execution. Update todo if applicable.",
+    "rejectionStatus": "Plan rejected — cancelled.",
+    "planningInstruction": "## PLANNING MODE — TOOL RESTRICTED\n\nPLAN MODE. Only available:\n- **exit_plan_mode** — submit plan\n- **think** — reasoning\n\nAll other tool BLOCKED.\n\n**Steps:**\n1. Analyze request\n2. Design approach as text\n3. Call exit_plan_mode — user reviews before execution\n\nKeep concise. Simple task need brief summary."
   },
   "reminderExtractor": {
-    "extractionPrompt": "you look at big instruction and pull out important rule.\n\npull exactly 8–12 most important rule — thing agent MUST follow whole time.\n\nlook for:\n- hard no (never do X, no do Y)\n- must do (always do X, you must Y)\n- safety rule\n- how output should look\n- who you are, who you not\n- tool rule\n\nhow you write:\n- ONLY bullet list with `- ` at start\n- each bullet one short sentence (max 30 word)\n- no header, no explain, no number, no fancy format\n- pick rule that hurt most if forget\n- skip obvious rule (like 'be helpful')\n\nbig instruction to look at:\n<system_prompt>"
+    "extractionPrompt": "Analyze system prompt, extract critical behavioral rule.\n\nExtract 8-12 most important constraint agent MUST follow.\n\nFocus on:\n- Prohibition (never X, no Y)\n- Mandatory behavior (always X, must Y)\n- Safety constraint\n- Output format requirement\n- Identity boundary\n- Tool restriction\n\nOutput:\n- ONLY bullet list with `- ` prefix\n- Each bullet: one sentence, max 30 word\n- No header, explanation, numbering, formatting\n- Prioritize high-damage-if-forgotten rule\n- Skip obvious (e.g. 'be helpful')\n\nSystem prompt:\n<system_prompt>"
   },
   "visionFeed": {
-    "instruction": "\n\n## 🎥 EYE FEED ACTIVE\nyou got live eye (camera or screen). last 3 picture attached to human message (old to new).\nuse picture to see what happen, notice change, and talk about what you see.\n"
+    "instruction": "\n\n## LIVE VISION FEED\nLive visual feed (webcam/screen). Last 3 frame attached to latest message (oldest to newest).\nUse to observe environment, notice change, refer naturally.\n"
   },
   "exhaustionRecovery": {
-    "message": "you hit max tool call for this turn. tell human what you did so far, what result you got, and what still need do."
+    "message": "Max tool-call iteration reached. Summarize progress, report partial result, state remaining work."
   },
   "gotSynthesis": {
-    "instruction": "[MANY-THINK MERGE PASS]\n\n{{branchCount}} think-path ran and scored. you make ONE good answer that take best part from all path — best tool call, safest way, most complete.\n\nRULE:\n1. no just copy best path. MERGE good part from all\n2. if path suggest different tool that work together, use all\n3. if path disagree, pick one with best CORRECT score, then RISK score\n4. grab safety check from careful path even if use fast path approach\n5. make answer with tool call like you doing the thing\n\n── PATH RESULT ──\n\n"
+    "instruction": "[GRAPH-OF-THOUGHTS SYNTHESIS]\n\n{{branchCount}} parallel branch generated and scored. Produce single optimal response SYNTHESIZING best aspect.\n\nRULE:\n1. Merge complementary strength — NOT just highest-scoring branch.\n2. COMPLEMENTARY (non-conflicting) tool call from different branch: include all.\n3. Disagreement: prefer highest CORRECTNESS, then RISK score.\n4. Incorporate defensive measure from THOROUGH branch even with MINIMAL core approach.\n5. Produce merged response with tool call as if executing.\n\n-- BRANCH OUTPUT --\n\n"
   },
   "planModeEntry": {
-    "message": "you in plan mode now. look around, think about how do.\n\nin plan mode:\n1. look at code, understand pattern\n2. find similar thing already built\n3. think about different way, what good what bad\n4. make real plan for how build\n5. when ready, call exit_plan_mode to show plan\n\nNO write file. NO edit. read only. think only."
+    "message": "Plan mode entered. Explore codebase, design implementation.\n\nIn plan mode:\n1. Explore codebase, understand pattern\n2. Find similar feature and approach\n3. Consider approach and trade-off\n4. Design concrete strategy\n5. Call exit_plan_mode to present plan\n\nNo file write or edit. Read-only exploration."
   },
   "toolDiscoveryNudge": {
-    "autoEnabled": "found {{count}} tool: {{toolNames}}. already turned on. use them now.",
-    "enableRequired": "found {{count}} tool not turned on yet: {{toolNames}}. call enable_tools with name now. TIP: next time use discover_and_enable_tools — find AND turn on in one step."
+    "autoEnabled": "Found {{count}} tool: {{toolNames}}. Already enabled — use now.",
+    "enableRequired": "Found {{count}} tool not enabled: {{toolNames}}. Call enable_tools. TIP: discover_and_enable_tools finds AND enables in one step."
   },
   "toolRetryGuidance": {
-    "header": "[TOOL BROKE] {{count}} tool call fail:",
-    "analyzeSteps": "before try again, think:\n1. which part cause fail?\n2. what value need fix?\n3. need do something first before tool work?\n\ntry again with fix, or do different thing if tool not right for job."
+    "header": "[TOOL RETRY] {{count}} call failed:",
+    "analyzeSteps": "Analyze:\n1. Which argument caused failure?\n2. What value needs correction?\n3. Prerequisite step needed?\n\nRetry with correction, or different approach if tool isn't appropriate."
   },
   "outputTruncation": {
-    "continuationPrompt": "last answer got cut off — too many word. truncated text saved. keep going from where you stop. NO repeat what already said.",
-    "exhaustedRecovery": "answer got cut off because **max_tokens** limit ({{configuredMaxTokens}}) hit, and {{maxAttempts}} try to continue also hit limit. this happen with big tool call or very long answer. make **Max Tokens** bigger, or break work into smaller piece.",
-    "providerError": "provider broke on try {{iteration}}: `{{errorText}}`. talk so far saved. try again, or use different model if keep breaking."
+    "continuationPrompt": "Previous response hit output token limit. Truncated text preserved. Continue where left off — don't repeat.",
+    "exhaustedRecovery": "Response hit **max_tokens** ({{configuredMaxTokens}}), {{maxAttempts}} continuation also hit limit. Typically large tool sequence. Increase **Max Tokens** or break into smaller step.",
+    "providerError": "Provider error on iteration {{iteration}}: `{{errorText}}`. Conversation preserved. Retry or try different model."
   },
   "contextWindow": {
-    "droppedMessages": "{{droppedCount}} old message removed — cave too small. talk continue below."
+    "droppedMessages": "{{droppedCount}} old message removed — context window full. Continues below."
   },
   "toolSetUpdated": {
-    "header": "[NEW TOOL] {{count}} new tool turned on: {{toolNames}}",
-    "availableDocumentation": "these tool ready now with full instruction:",
-    "usageGuidelines": "## how use tool"
+    "header": "[NEW TOOL] {{count}} enabled: {{toolNames}}",
+    "availableDocumentation": "Tool ready with documentation:",
+    "usageGuidelines": "## Tool Usage"
   },
   "validationError": {
-    "header": "[BAD EDIT] your change made {{errorCount}} mistake:",
-    "analyzePrompt": "before fix, THINK what went bad:\n1. what wrong idea cause fail?\n2. how correct answer different?\n3. what change stop this kind of mistake?\n\nthink first then fix. no move on until error gone."
+    "header": "[VALIDATION ERROR] Edit introduced {{errorCount}} error:",
+    "analyzePrompt": "ANALYZE failure:\n1. What assumption caused it?\n2. What change avoids this error class?\n\nFix before proceeding. Don't continue until validation passes."
   },
   "systemReminder": {
-    "header": "[CAVE REMINDER — round {{currentIteration}}]",
-    "preamble": "these important rule from your instruction still active:",
-    "footer": "keep follow these rule for rest of talk."
+    "header": "[SYSTEM REMINDER — Iteration {{currentIteration}}]",
+    "preamble": "Critical rule still active:",
+    "footer": "Follow for remainder of conversation."
   },
   "codexPlanningDetector": {
-    "continuePrompt": "do next step with right tool to make plan happen. if you done everything human ask, say you done and no call tool."
+    "continuePrompt": "Execute next step with appropriate tool. If all work complete, report done without tool call."
   },
   "retryLabels": {
-    "attemptLabel": "(try {{attemptCount}})",
-    "errorLabel": "**broke:** {{errorMessage}}",
-    "originalArguments": "**what you gave it:**"
+    "attemptLabel": "(attempt {{attemptCount}})",
+    "errorLabel": "**error:** {{errorMessage}}",
+    "originalArguments": "**original arguments:**"
   },
   "errorAsContext": {
-    "wrapper": "⚠️ **broke:** {{errorDescription}}"
+    "wrapper": "**error:** {{errorDescription}}"
   },
   "treeOfThoughts": {
-    "proactiveBacktrack": "[GO BACK — ALL {{branchCount}} PATH SCORE BAD (best: {{bestScore}}/{{threshold}})]\n\nall try-path scored bad. this way not working.\n\nbefore try again, think bigger:\n1. is whole approach wrong?\n2. what different way work better?\n3. is there simpler, safer way to same place?\n\ndo DIFFERENT thing next try.",
-    "frontierFallback": "[SWITCH PATH — PATH {{branchIndex}} BROKE]\n\nlast way made {{errorCount}} mistake:\n\n{{errorBlock}}\n\nswitching to next-best path. no make same mistake — error listed above.",
-    "reflexion": "[THINK AGAIN — PATH {{branchIndex}} BROKE]\n\nlast way made {{errorCount}} mistake:\n\n{{errorBlock}}\n\nbefore try again, THINK what went bad:\n1. what wrong idea in last try cause fail?\n2. how correct answer different?\n3. what other way avoid this kind of mistake?\n\nthink first then do DIFFERENT thing next try.",
-    "budgetExhausted": "[BAD EDIT — NO MORE TRY LEFT]\n\n{{errorBlock}}\n\nmany way failed. just fix remaining problem direct."
+    "proactiveBacktrack": "[BACKTRACK — ALL {{branchCount}} BRANCH BELOW THRESHOLD (best: {{bestScore}}/{{threshold}})]\n\nAll branch scored poorly. Approach failing.\n\nReconsider:\n1. Entire approach wrong?\n2. Fundamentally different strategy?\n3. Simpler, safer path?\n\nDIFFERENT approach next attempt.",
+    "frontierFallback": "[SWITCH — BRANCH {{branchIndex}} FAILED]\n\nPrevious approach: {{errorCount}} error:\n\n{{errorBlock}}\n\nSwitching to next-best branch. Avoid same error.",
+    "reflexion": "[REFLEXION — BRANCH {{branchIndex}} FAILED]\n\nPrevious approach: {{errorCount}} error:\n\n{{errorBlock}}\n\nANALYZE:\n1. What assumption caused failure?\n2. How does correct solution differ?\n3. Alternative avoiding this error class?\n\nAnalyze, then DIFFERENT approach.",
+    "budgetExhausted": "[VALIDATION ERROR — NO RETRY LEFT]\n\n{{errorBlock}}\n\nMultiple approach failed. Fix remaining issue directly."
   },
   "graphOfThoughts": {
-    "proactiveBacktrack": "[GO BACK — ALL PATH SCORE BAD (best: {{bestScore}}/{{threshold}})]\n\nall try-path scored bad. this way not working.\n\nbefore try again, think bigger:\n1. is whole approach wrong?\n2. what different way work better?\n3. is there simpler, safer way to same place?\n\ndo DIFFERENT thing next try.",
-    "synthesizedValidationError": "[BAD EDIT — MERGED RESULT]\n\nmerged approach made {{errorCount}} mistake:\n\n{{errorBlock}}\n\nmerged approach took idea from {{branchCount}} path but tool call still broke.\njust fix remaining problem — NO repeat same tool call."
+    "proactiveBacktrack": "[BACKTRACK — ALL BRANCH BELOW THRESHOLD (best: {{bestScore}}/{{threshold}})]\n\nAll branch scored poorly. Approach failing.\n\nReconsider:\n1. Entire approach wrong?\n2. Fundamentally different strategy?\n3. Simpler, safer path?\n\nDIFFERENT approach next attempt.",
+    "synthesizedValidationError": "[VALIDATION ERROR — MERGED RESULT]\n\nMerged approach: {{errorCount}} error:\n\n{{errorBlock}}\n\nCombined {{branchCount}} branch but tool call still failed.\nFix remaining — NOT same tool call."
   }
 }

@@ -1,106 +1,106 @@
 {
   "shared": {
-    "noConversation": "no active talk. need talk ID.",
-    "dynamicToolActivationDisabled": "tool switching turned off. boss person can turn on in Settings → Agent Defaults.",
+    "noConversation": "No active session. Need conversation ID.",
+    "dynamicToolActivationDisabled": "Dynamic tool switching disabled. Admin can enable in Settings.",
     "invalidToolsArray": "'tools' must be non-empty list of tool name or domain prefix.",
-    "searchActionNudgeDisabled": "IMPORTANT: some found tool NOT turned on (isEnabled: false). you MUST call enable_tools with tool name before can use. after turn on, tool ready next round."
+    "searchActionNudgeDisabled": "IMPORTANT: some found tool NOT enabled (isEnabled: false). MUST call enable_tools with tool name before use. After enabling, ready next turn."
   },
 
   "enable_tools": {
-    "noValidTools": "none of requested name match real tool. check spelling or use search_tools to find.",
-    "alreadyEnabled": "all requested tool already on and ready — use them now.",
-    "activated": "turned on {{count}} tool. ready next round."
+    "noValidTools": "No requested name matched any tool. Check spelling or use search_tools.",
+    "alreadyEnabled": "All requested tool already enabled — use now.",
+    "activated": "Enabled {{count}} tool. Ready next turn."
   },
 
   "disable_tools": {
-    "noneInSet": "none of requested tool were in active set.",
-    "disabled": "turned off {{count}} tool.",
-    "protectedSuffix": " {{count}} core tool protected and cannot turn off."
+    "noneInSet": "No requested tool in active set.",
+    "disabled": "Disabled {{count}} tool.",
+    "protectedSuffix": " {{count}} core tool protected — can't disable."
   },
 
   "discover_and_enable_tools": {
-    "noQueryOrDomain": "need at least 'query' or 'domain'.",
-    "noMatches": "no matching tool found.",
-    "foundAndEnabled": "found {{matchCount}} tool and auto-turned-on {{enabledCount}}. ready next round — use them.",
-    "foundAlreadyEnabled": "found {{matchCount}} tool, all already on — use them."
+    "noQueryOrDomain": "Need 'query' or 'domain'.",
+    "noMatches": "No matching tool found.",
+    "foundAndEnabled": "Found {{matchCount}} tool, auto-enabled {{enabledCount}}. Ready next turn.",
+    "foundAlreadyEnabled": "Found {{matchCount}} tool, all already enabled — use now."
   },
 
   "set_timer": {
-    "noConversation": "no active talk session.",
-    "noPrompt": "'prompt' is required. must be word.",
-    "invalidDuration": "'durationSeconds' must be between {{min}} and {{max}} second. for longer remind or repeat event, use create_cron_job."
+    "noConversation": "No active session.",
+    "noPrompt": "'prompt' required. Must be string.",
+    "invalidDuration": "'durationSeconds' must be {{min}}-{{max}}. For longer or recurring, use create_cron_job."
   },
 
   "list_timers": {
-    "noConversation": "no active talk session."
+    "noConversation": "No active session."
   },
 
   "cancel_timer": {
-    "noTimerId": "'timerId' is required.",
-    "notFound": "no active timer with ID {{timerId}}.",
-    "success": "timer {{timerId}} cancelled."
+    "noTimerId": "'timerId' required.",
+    "notFound": "No active timer with ID {{timerId}}.",
+    "success": "Timer {{timerId}} cancelled."
   },
 
   "enter_worktree": {
-    "noConversation": "no talk — separate cave need active talk",
-    "alreadyInWorktree": "already in separate cave (branch: {{branch}}). call exit_worktree first.",
-    "noWorkspace": "no work cave set up",
-    "success": "now in separate cave. all file work go to {{path}}. call exit_worktree with 'merge' or 'discard' when done."
+    "noConversation": "No session — worktree requires active session.",
+    "alreadyInWorktree": "Already in worktree (branch: {{branch}}). Call exit_worktree first.",
+    "noWorkspace": "No workspace configured.",
+    "success": "Entered worktree. File operation redirected to {{path}}. Call exit_worktree with 'merge' or 'discard' when done."
   },
 
   "exit_worktree": {
-    "notInWorktree": "not in separate cave. call enter_worktree first.",
-    "mergeFailed": "merge fail: {{error}}. cave kept at {{path}}. fix conflict and try again, or exit_worktree with 'discard'.",
-    "merged": "change from {{branch}} merged into main. cave restored.",
-    "discarded": "cave {{branch}} thrown away. all change gone. workspace restored."
+    "notInWorktree": "Not in worktree. Call enter_worktree first.",
+    "mergeFailed": "Merge failed: {{error}}. Worktree preserved at {{path}}. Resolve conflict and retry, or exit_worktree with 'discard'.",
+    "merged": "Change from {{branch}} merged to main. Workspace restored.",
+    "discarded": "Worktree {{branch}} discarded. All change dropped. Workspace restored."
   },
 
   "search_conversations": {
-    "queryRequired": "query needed",
-    "databaseUnavailable": "rock tablet not available",
-    "noEmbeddings": "no talk with brain-stamp found. talk get brain-stamp after agent session with 6+ message."
+    "queryRequired": "Query required.",
+    "databaseUnavailable": "Database unavailable.",
+    "noEmbeddings": "No session with embedding found. Session get embedded after agent conversation with 6+ message."
   },
 
   "summarize_conversation": {
-    "summaryRequired": "'summary' required and must have word in it"
+    "summaryRequired": "'summary' required, must be non-empty string."
   },
 
   "ask_user": {
-    "questionsRequired": "'questions' list required and must not be empty",
-    "invalidQuestion": "each question must have non-empty 'question' word",
-    "duplicateQuestion": "same question twice: \"{{preview}}\"",
-    "duplicateOption": "same option \"{{label}}\" in question \"{{question}}\"",
-    "tooManyQuestions": "max 4 question per call",
-    "noConversation": "no talk — ask_user need active talk",
-    "timedOut": "human not answer in 5 minute."
+    "questionsRequired": "'questions' list required, must not be empty.",
+    "invalidQuestion": "Each question must have non-empty 'question' string.",
+    "duplicateQuestion": "Duplicate question: \"{{preview}}\"",
+    "duplicateOption": "Duplicate option \"{{label}}\" in question \"{{question}}\"",
+    "tooManyQuestions": "Max 4 question per call.",
+    "noConversation": "No session — ask_user requires active session.",
+    "timedOut": "User didn't respond within 5 minute."
   },
 
   "list_mcp_resources": {
-    "noServers": "no MCP server connected."
+    "noServers": "No MCP server connected."
   },
 
   "read_mcp_resource": {
-    "missingParams": "'server_name' and 'uri' needed"
+    "missingParams": "'server_name' and 'uri' required."
   },
 
   "authenticate_mcp_server": {
-    "missingServerName": "'server_name' needed",
-    "noCredentials": "need at least one of 'token', 'api_key', or 'env'"
+    "missingServerName": "'server_name' required.",
+    "noCredentials": "Need at least one: 'token', 'api_key', or 'env'."
   },
 
   "create_skill": {
-    "missingFields": "name and prompt needed"
+    "missingFields": "name and prompt required."
   },
 
   "execute_skill": {
-    "missingSkillId": "skillId needed"
+    "missingSkillId": "skillId required."
   },
 
   "delete_skill": {
-    "missingSkillId": "skillId needed"
+    "missingSkillId": "skillId required."
   },
 
   "write_todo": {
-    "invalidItems": "'items' must be list of todo thing"
+    "invalidItems": "'items' must be list of todo item."
   }
 }
