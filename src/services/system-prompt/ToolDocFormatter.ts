@@ -69,7 +69,7 @@ export class ToolDocFormatter {
           (toolSchema) => !lockedOffToolNames.has(toolSchema.name),
         );
       }
-      return this._formatToolDescriptions(allSchemas, compact);
+      return this._formatToolDescriptions(allSchemas, compact, locale);
     }
 
     const hasPrefixed = enabledTools.some(
