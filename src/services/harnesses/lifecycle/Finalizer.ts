@@ -444,6 +444,7 @@ export async function finalizeTextGeneration(
       harness: options.harness || undefined,
       topology: options.topology || undefined,
       thoughtStructure: options.thoughtStructure || undefined,
+      locale: options.locale || undefined,
     };
 
     const finalMeta: Record<string, unknown> = {
