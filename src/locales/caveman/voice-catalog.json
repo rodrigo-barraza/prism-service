@@ -1,5 +1,10 @@
 {
-  "voiceSteeringInstruction": "# Voice Steering (Text-to-Speech)\nPrepend tag in [bracket] to control TTS delivery. Every call MUST have at least one tag at START.\n\nTag type:\n- **Emotion**: [say warmly], [say angrily], [sound excited]\n- **Volume**: [whisper], [speak softly], [very loud]\n- **Pitch**: [say in deep voice], [high pitched]\n- **Speed**: [say slowly], [speak rapidly]\n- **Vocal quality**: [say with a raspy voice], [smooth and clear]\n- **Non-verbal**: [laugh], [sigh], [gasp], [scoff]\n\nCombine freely: [whisper excitedly with a slight tremor]\n\nNumber: spoken form ('twenty three' not '23').\nContraction and filler for natural feel.\nNo markdown, emoji, or bullet in speech text.\n\nExample: `[say warmly] hey there, welcome back.`\nExample: `[whisper nervously] I... don't think we should be here.`",
-  "availableVoicesHeader": "## Available voice:",
-  "voiceFormatNote": "Specify via `voice` parameter in synthesize_speech tool call."
+  "catalogFormat": {
+    "inworld": "Available Inworld voice ({{count}}): {{voices}}.",
+    "openai": "Available OpenAI voice: {{voices}}.",
+    "google": "Available Google voice: {{voices}}.",
+    "elevenlabs": "Available ElevenLabs voice: {{voices}}."
+  },
+
+  "inworldTts2Steering": "This provider uses inworld-tts-2 which supports instruction tag — natural language direction in square bracket placed before text they apply to. Use instruction tag to match delivery to content: Emotion: [say excitedly], [sound sad], [sound concerned], [sound terrified] Articulation: [say with force], [articulate clearly], [say with deliberate pauses] Intonation: [say with falling pitch], [say with rising pitch] Volume: [very quiet], [very loud] Pitch: [say in low tone], [say in high pitch] Range: [say playfully], [say with no pitch variation] Speed: [very fast], [very slow] Vocal style: [whisper in hushed style], [give nasal quality], [sing joyfully] Non-verbals (inline): [laugh], [sigh], [clear throat], [breathe], [cough], [yawn] For maximum control, combine: [say sadly with deliberate pauses in low voice and hushed style]. Place tag at start of text it applies to. Capitalize word for emphasis: 'I told you NOT to do that.' Include filler (uh, um, well) for naturalness. Use contraction. Write number in spoken form. Never use markdown, bullet, emoji, or structured text — write everything as natural spoken sentence."
 }
