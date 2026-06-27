@@ -13,7 +13,7 @@
     "verdictFormat": "Start response with **PASS** or **FAIL** on first line.",
     "revisionHeader": "Previous work reviewed by {{criticCount}} critic in round {{roundNumber}} — revision needed.",
     "failedCount": "{{failedCount}} critic FAILED your output. Fix ALL complaint.",
-    "revisionInstructions": "1. Fix ALL issue from EVERY failing critic.\n2. Make specific change requested.\n3. No breaking what already passes — passing critic will re-review.\n4. Verify fix (run test, typecheck).\n5. Commit and report change.\n\nFocus on fixing — no restart unless feedback demands it.",
+    "revisionInstructions": "1. Fix ALL issue from EVERY failing critic.\n2. Make specific change requested.\n3. Don't break what already passes — passing critic will re-review.\n4. Verify fix (run test, typecheck).\n5. Commit and report change.\n\nFocus on fixing — don't restart unless feedback demands it.",
     "defaultPrompt": "Review and judge actor output."
   },
   "jury": {
@@ -22,7 +22,7 @@
     "responseFormat": "Respond with JSON object ONLY. No markdown fence, no text outside JSON.",
     "bestActorDescription": "- `bestActorIndex`: 0-based index of best actor\n- `verdict`: PASS if complete, FAIL if needs work\n- `feedback`: if FAIL, specific fix instruction. If PASS, brief justification.",
     "revisionHeader": "Your work selected as best among competing actor — revision needed (round {{roundNumber}}).",
-    "revisionInstructions": "1. Fix ALL issue judge raised.\n2. Make specific change requested.\n3. Verify fix (run test, typecheck).\n4. Commit and report change.\n\nFocus on fixing — no restart unless feedback demands it."
+    "revisionInstructions": "1. Fix ALL issue judge raised.\n2. Make specific change requested.\n3. Verify fix (run test, typecheck).\n4. Commit and report change.\n\nFocus on fixing — don't restart unless feedback demands it."
   },
   "divideAndConquer": {
     "planner": "Task decomposition planner.",
@@ -41,7 +41,7 @@
   },
   "mcts": {
     "evaluator": "Evaluator for Monte Carlo Tree Search.",
-    "evaluateInstruction": "Score each candidate 0.0–1.0:\n- **Correctness** (0.3) — technically right?\n- **Completeness** (0.3) — task coverage?\n- **Quality** (0.2) — code quality, clarity, robustness\n- **Verification** (0.2) — self-verified?",
+    "evaluateInstruction": "Score each candidate 0.0-1.0:\n- **Correctness** (0.3) — technically right?\n- **Completeness** (0.3) — task coverage?\n- **Quality** (0.2) — code quality, clarity, robustness\n- **Verification** (0.2) — self-verified?",
     "completeCheck": "Also decide if BEST candidate is complete (no more round needed).\nProvide feedback per branch — strength and weakness.",
     "responseFormat": "Respond with JSON object ONLY. No markdown fence, no text outside JSON.",
     "refinementContext": "Continuing task. Previous attempt scored and selected as best approach — refinement needed."
