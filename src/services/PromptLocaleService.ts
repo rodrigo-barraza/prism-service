@@ -112,6 +112,7 @@ function initialize() {
   const localeDirectories = fs
     .readdirSync(localesRootDirectory, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
+    .filter((entry) => !entry.name.startsWith("__") && !entry.name.startsWith("."))
     .map((entry) => entry.name);
 
   for (const localeName of localeDirectories) {
