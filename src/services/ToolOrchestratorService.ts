@@ -1879,6 +1879,16 @@ export default class ToolOrchestratorService {
   /** @internal */ static _clearWorktree(agentConversationId: string) {
     activeWorktrees.delete(agentConversationId);
   }
+  /** @internal */ static _resetCaches() {
+    cachedSchemas = [];
+    cachedAISchemas = [];
+    cachedClientSchemas = [];
+    localizedClientSchemasCache.clear();
+    localizedAISchemasCache.clear();
+    toolMap.clear();
+    initialized = false;
+    cachedSchemaLocale = "";
+  }
   /** @internal */ static async _proxyPost(
     path: string,
     body: Record<string, unknown>,

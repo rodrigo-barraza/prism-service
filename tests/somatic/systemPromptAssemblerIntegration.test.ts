@@ -35,11 +35,13 @@ const mockPersonas = new Map<string, Record<string, unknown>>();
 vi.mock("../../src/services/AgentPersonaRegistry.ts", () => ({
   default: {
     get: (agentId: string) => mockPersonas.get(agentId) || null,
+    list: vi.fn().mockReturnValue([]),
   },
 }));
 
 vi.mock("../../src/services/ToolOrchestratorService.ts", () => ({
   default: {
+    ensureSchemas: vi.fn().mockResolvedValue(undefined),
     getWorkspaceRoot: () => "/test",
     listToolNames: () => [],
     listToolsForAgent: () => [],

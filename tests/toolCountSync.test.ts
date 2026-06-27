@@ -214,6 +214,7 @@ vi.mock("../src/services/AgentPersonaRegistry.ts", () => ({
       if (agentId === "UNLOCKED") return mockUnlockedPersona;
       return null;
     }),
+    list: vi.fn().mockReturnValue([]),
   },
 }));
 
