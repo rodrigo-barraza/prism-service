@@ -183,6 +183,7 @@ export async function runGraphOfThoughts(
     ),
     workspaceRoot: workspaceRoot || undefined,
     workspaceEnabled: options.workspaceEnabled as boolean | undefined,
+    locale: options.locale as string | undefined,
   };
   await hooks.run("beforePrompt", hookContext);
 
