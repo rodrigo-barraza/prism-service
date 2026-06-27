@@ -126,6 +126,16 @@ let cachedAISchemas: ToolSchemaFull[] = [];
 /** @type {Array} Client-facing schemas (with domain/dataSource, without endpoint) */
 let cachedClientSchemas: ToolSchemaFull[] = [];
 
+/**
+ * Per-locale caches for remote tool schemas.
+ * The default locale populates cachedClientSchemas/cachedAISchemas directly.
+ * Non-default locales (e.g. "caveman") are stored here so that
+ * getClientToolSchemas(topology, "caveman") returns localized descriptions
+ * from the tools-service instead of the default English schemas.
+ */
+const localizedClientSchemasCache = new Map<string, ToolSchemaFull[]>();
+const localizedAISchemasCache = new Map<string, ToolSchemaFull[]>();
+
 /** @type {Map<string, ToolSchemaFull>} Tool name → full schema (for routing) */
 const toolMap = new Map<string, ToolSchemaFull>();
 
@@ -246,10 +256,73 @@ async function fetchSchemas() {
   }
 }
 
+/**
+ * Fetch localized remote tool schemas for a specific non-default locale.
+ * Populates the per-locale caches so that getClientToolSchemas(topology, locale)
+ * returns tool descriptions in the correct language.
+ */
+async function fetchSchemasForLocale(locale: string) {
+  if (locale === "en" || localizedClientSchemasCache.has(locale)) return;
+  try {
+    const localeParam = `?locale=${encodeURIComponent(locale)}`;
+    const response = await fetch(
+      `${TOOLS_SERVICE_URL}/admin/tool-schemas${localeParam}`,
+      { signal: AbortSignal.timeout(TOOL_SCHEMA_FETCH_TIMEOUT_MS) },
+    );
+    if (!response.ok) {
+      logger.warn(
+        `[ToolOrchestrator] Failed to fetch locale "${locale}" schemas: ${response.status}`,
+      );
+      return;
+    }
+    const schemas = (await response.json()) as ToolSchemaFull[];
+    if (!Array.isArray(schemas) || schemas.length === 0) return;
+
+    localizedClientSchemasCache.set(
+      locale,
+      schemas.map(({ endpoint: _endpoint, ...rest }) => rest),
+    );
+    localizedAISchemasCache.set(
+      locale,
+      schemas.map(
+        ({ endpoint: _endpoint, dataSource: _dataSource, domain: _domain, ...rest }) => rest,
+      ),
+    );
+    logger.info(
+      `[ToolOrchestrator] Loaded ${schemas.length} localized tool schemas for locale "${locale}"`,
+    );
+  } catch (error: unknown) {
+    logger.warn(
+      `[ToolOrchestrator] Could not fetch locale "${locale}" schemas: ${getErrorMessage(error)}`,
+    );
+  }
+}
+
+/**
+ * Prefetch tool schemas for all known non-default locales.
+ * Called after the initial fetchSchemas() completes so that
+ * per-conversation locale requests are served from cache.
+ */
+async function prefetchAllLocaleSchemas() {
+  const defaultLocale = PromptLocaleService.getDefaultLocale();
+  const allLocales = PromptLocaleService.getAvailableLocales();
+  const nonDefaultLocales = allLocales.filter(
+    (localeName) => localeName !== defaultLocale,
+  );
+  if (nonDefaultLocales.length === 0) return;
+  logger.info(
+    `[ToolOrchestrator] Prefetching remote tool schemas for locale(s): ${nonDefaultLocales.join(", ")}`,
+  );
+  await Promise.allSettled(
+    nonDefaultLocales.map((localeName) => fetchSchemasForLocale(localeName)),
+  );
+}
+
 // Kick off schema fetch eagerly at module load (non-blocking).
 // If tools-api is unreachable, schemas stay empty until the first
 // consumer calls ensureSchemas(), which fetches on-demand.
-fetchSchemas();
+// After the default locale loads, prefetch all non-default locales.
+fetchSchemas().then(() => prefetchAllLocaleSchemas());
 
 // ────────────────────────────────────────────────────────────
 // Generic URL Builder — uses endpoint metadata
@@ -790,7 +863,11 @@ export default class ToolOrchestratorService {
       creativeSettings?.textToSpeechProvider || "elevenlabs";
     const textToSpeechModel = creativeSettings?.textToSpeechModel || "";
 
-    const resolvedSchemas = cachedAISchemas.map((schema) => {
+    const localeAISchemas = (locale && locale !== "en" && localizedAISchemasCache.has(locale))
+      ? localizedAISchemasCache.get(locale)!
+      : cachedAISchemas;
+
+    const resolvedSchemas = localeAISchemas.map((schema) => {
       if (schema.name !== "synthesize_speech") return schema;
 
       const parameters = schema.parameters as
@@ -890,7 +967,11 @@ export default class ToolOrchestratorService {
         }),
       );
 
-      const clientSchemasEnriched = cachedClientSchemas.map((tool) => ({
+      const localeClientSchemas = (activeLocale && activeLocale !== "en" && localizedClientSchemasCache.has(activeLocale))
+        ? localizedClientSchemasCache.get(activeLocale)!
+        : cachedClientSchemas;
+
+      const clientSchemasEnriched = localeClientSchemas.map((tool) => ({
         ...tool,
         domainKey:
           (tool.domainKey as string) ||
