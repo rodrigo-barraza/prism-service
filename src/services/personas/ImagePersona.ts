@@ -41,11 +41,12 @@ export const ImagePersona: Persona = {
   description: PromptLocaleService.get("en", "personas.image.description"),
   icon: "Palette",
   color: "#ec4899",
-  identity: () => {
+  identity: (context) => {
+    const activeLocale = context.locale || "en";
     const sections = [
-      PromptLocaleService.get("en", "personas.image.coreIdentity"),
-      PromptLocaleService.get("en", "personas.image.capabilities"),
-      PromptLocaleService.get("en", "personas.image.responseGuidelines"),
+      PromptLocaleService.get(activeLocale, "personas.image.coreIdentity"),
+      PromptLocaleService.get(activeLocale, "personas.image.capabilities"),
+      PromptLocaleService.get(activeLocale, "personas.image.responseGuidelines"),
     ];
     return sections.join("\n\n");
   },

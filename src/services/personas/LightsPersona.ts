@@ -31,11 +31,12 @@ export const LightsPersona: Persona = {
   type: "home",
   description: PromptLocaleService.get("en", "personas.lights.description"),
   project: "prism-chat",
-  identity: () => {
+  identity: (context) => {
+    const activeLocale = context.locale || "en";
     const sections = [
-      PromptLocaleService.get("en", "personas.lights.coreIdentity"),
-      PromptLocaleService.get("en", "personas.lights.colorReference"),
-      PromptLocaleService.get("en", "personas.lights.responseGuidelines"),
+      PromptLocaleService.get(activeLocale, "personas.lights.coreIdentity"),
+      PromptLocaleService.get(activeLocale, "personas.lights.colorReference"),
+      PromptLocaleService.get(activeLocale, "personas.lights.responseGuidelines"),
     ];
 
     return sections.join("\n\n");

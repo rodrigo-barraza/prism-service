@@ -8,11 +8,12 @@ export const MeepoPersona: Persona = {
   type: "conversational",
   description: PromptLocaleService.get("en", "personas.meepo.description"),
   project: "prism-chat",
-  identity: () => {
+  identity: (context) => {
+    const activeLocale = context.locale || "en";
     const sections = [
-      PromptLocaleService.get("en", "personas.meepo.corePersonality"),
-      PromptLocaleService.get("en", "personas.meepo.responseGuidelines"),
-      PromptLocaleService.get("en", "personas.meepo.interactionRules"),
+      PromptLocaleService.get(activeLocale, "personas.meepo.corePersonality"),
+      PromptLocaleService.get(activeLocale, "personas.meepo.responseGuidelines"),
+      PromptLocaleService.get(activeLocale, "personas.meepo.interactionRules"),
     ];
 
     return sections.join("\n\n");

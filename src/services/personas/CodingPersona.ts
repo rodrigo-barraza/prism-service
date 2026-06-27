@@ -12,8 +12,8 @@ export const CodingPersona: Persona = {
   description: PromptLocaleService.get("en", "personas.coding.description"),
   project: "prism-chat",
   displayOrder: 2,
-  identity: () =>
-    PromptLocaleService.get("en", "system-prompt.codingFallbackIdentity"),
+  identity: (context) =>
+    PromptLocaleService.get(context.locale || "en", "system-prompt.codingFallbackIdentity"),
   guidelines: "",
   interactionRules: "",
   toolPolicy: (context) => buildToolPolicy([], context),
