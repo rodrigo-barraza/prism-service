@@ -243,7 +243,7 @@ export default class SystemPromptAssembler {
               : context.resolvedToolNames.length;
         } else {
           const schemas =
-            ToolOrchestratorService.getClientToolSchemas(defaultTopology);
+            ToolOrchestratorService.getClientToolSchemas(defaultTopology, locale);
           count =
             lockedOffToolNames.size > 0
               ? schemas.filter(
@@ -330,7 +330,7 @@ export default class SystemPromptAssembler {
         );
         if (hasPrefixed) {
           const schemas =
-            ToolOrchestratorService.getClientToolSchemas(defaultTopology);
+            ToolOrchestratorService.getClientToolSchemas(defaultTopology, locale);
           return resolveToolEntriesToSet(context.enabledTools, schemas);
         }
         return new Set(context.enabledTools);
@@ -343,7 +343,7 @@ export default class SystemPromptAssembler {
 
       if (orchestratorAvailable) {
         const allSchemas =
-          ToolOrchestratorService.getToolSchemas(defaultTopology);
+          ToolOrchestratorService.getToolSchemas(defaultTopology, locale);
         const orchestratorSet = new Set(ORCHESTRATOR_ONLY_TOOLS);
         const lockedOffSet = await resolveLockedOffToolNames();
 
@@ -359,7 +359,7 @@ export default class SystemPromptAssembler {
               entry.startsWith("domain:") || entry.startsWith("domainKey:"),
           );
           const clientSchemas =
-            ToolOrchestratorService.getClientToolSchemas(defaultTopology);
+            ToolOrchestratorService.getClientToolSchemas(defaultTopology, locale);
           const enabledSet = hasPrefixed
             ? resolveToolEntriesToSet(context.enabledTools, clientSchemas)
             : new Set(context.enabledTools);

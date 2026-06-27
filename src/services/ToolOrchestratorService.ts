@@ -784,7 +784,7 @@ export default class ToolOrchestratorService {
   }
 
   /** AI-clean schemas (no endpoint/domain/dataSource) — for LLM tool arrays */
-  static getToolSchemas(defaultTopology?: string) {
+  static getToolSchemas(defaultTopology?: string, locale?: string) {
     const creativeSettings = SettingsService.getCached().creative;
     const textToSpeechProvider =
       creativeSettings?.textToSpeechProvider || "elevenlabs";
@@ -829,9 +829,10 @@ export default class ToolOrchestratorService {
       };
     });
 
-    const activeLocale = typeof SettingsService.getCached === "function"
-      ? SettingsService.getCached().agents?.locale || "en"
-      : "en";
+    const activeLocale = locale
+      || (typeof SettingsService.getCached === "function"
+        ? SettingsService.getCached().agents?.locale || "en"
+        : "en");
 
     return [
       ...resolvedSchemas,
@@ -841,7 +842,7 @@ export default class ToolOrchestratorService {
   }
 
   /** Client-facing schemas (with domain/domainKey/dataSource, no endpoint) — for Prism Client UI */
-  static getClientToolSchemas(defaultTopology?: string): ToolSchemaFull[] {
+  static getClientToolSchemas(defaultTopology?: string, locale?: string): ToolSchemaFull[] {
     if (isResolvingClientSchemas) {
       // Break recursion cycle when internal tool getters (e.g. discover_and_enable_tools)
       // fetch schemas dynamically from this same catalog.
@@ -863,9 +864,10 @@ export default class ToolOrchestratorService {
           .replace(/[^a-z0-9]+/g, "_")
           .replace(/^_|_$/g, "");
 
-      const activeLocale = typeof SettingsService.getCached === "function"
-        ? SettingsService.getCached().agents?.locale || "en"
-        : "en";
+      const activeLocale = locale
+        || (typeof SettingsService.getCached === "function"
+          ? SettingsService.getCached().agents?.locale || "en"
+          : "en");
 
       // Orchestrator tools are Prism-local — add domain metadata for UI grouping
       const orchestratorClient = getOrchestratorToolSchemas(

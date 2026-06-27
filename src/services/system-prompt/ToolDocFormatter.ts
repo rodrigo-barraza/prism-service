@@ -46,6 +46,7 @@ export class ToolDocFormatter {
   ): string {
     const schemas = ToolOrchestratorService.getClientToolSchemas(
       defaultTopology,
+      locale,
     ) as ToolSchemaDescriptor[];
 
     if (resolvedToolNames?.length) {
