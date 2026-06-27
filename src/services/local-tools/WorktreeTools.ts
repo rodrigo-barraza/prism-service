@@ -28,14 +28,6 @@ interface WorktreeMergeResult {
   diff?: unknown;
 }
 
-interface EnterWorktreeArgs {
-  reason?: string;
-}
-
-interface ExitWorktreeArgs {
-  action: "merge" | "discard";
-  commitMessage?: string;
-}
 
 const enterWorktree = {
   name: TOOL_NAMES.ENTER_WORKTREE,
@@ -67,7 +59,7 @@ const enterWorktree = {
     toolArguments: Record<string, unknown>,
     context: WorktreeContext,
   ) {
-    const enterArgs = toolArguments as unknown as EnterWorktreeArgs;
+    const reason = typeof toolArguments.reason === "string" ? toolArguments.reason : undefined;
 
     const { default: ToolOrchestratorService } =
       await import("../ToolOrchestratorService.js");
@@ -100,11 +92,22 @@ const enterWorktree = {
     const branchName = `worktree/${agentConversationId.slice(0, 8)}-${Date.now().toString(36)}`;
 
     // Create worktree via tools-api
-    const createResult = (await ToolOrchestratorService._proxyPost(
+    const proxyResult = await ToolOrchestratorService._proxyPost(
       "/agentic/git/worktree/create",
       { path: repoPath, branch: branchName },
       context,
-    )) as WorktreeCreateResult;
+    );
+
+    const createResult: WorktreeCreateResult = {};
+    if (proxyResult && typeof proxyResult === "object" && !Array.isArray(proxyResult)) {
+      const record = proxyResult as Record<string, unknown>;
+      if (typeof record.worktreePath === "string") {
+        createResult.worktreePath = record.worktreePath;
+      }
+      if (typeof record.error === "string") {
+        createResult.error = record.error;
+      }
+    }
 
     if (createResult.error) {
       return { error: `Failed to create worktree: ${createResult.error}` };
@@ -135,7 +138,7 @@ const enterWorktree = {
       acknowledged: true,
       branch: branchName,
       worktreePath: createResult.worktreePath,
-      reason: enterArgs.reason || null,
+      reason: reason || null,
       message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.enter_worktree.success", { path: createResult.worktreePath! }),
     };
   },
@@ -175,7 +178,10 @@ const exitWorktree = {
     toolArguments: Record<string, unknown>,
     context: WorktreeContext,
   ) {
-    const exitArgs = toolArguments as unknown as ExitWorktreeArgs;
+    const action = typeof toolArguments.action === "string" && (toolArguments.action === "merge" || toolArguments.action === "discard")
+      ? toolArguments.action
+      : undefined;
+    const commitMessage = typeof toolArguments.commitMessage === "string" ? toolArguments.commitMessage : undefined;
 
     const { default: ToolOrchestratorService } =
       await import("../ToolOrchestratorService.js");
@@ -188,17 +194,27 @@ const exitWorktree = {
       };
     }
 
-    const { action, commitMessage } = exitArgs;
+    if (!action) {
+      return { error: "Missing or invalid parameter 'action'. Must be 'merge' or 'discard'." };
+    }
+
     let mergeResult: WorktreeMergeResult | null = null;
 
     if (action === "merge") {
-      const diffResult = (await ToolOrchestratorService._proxyPost(
+      const proxyDiffResult = await ToolOrchestratorService._proxyPost(
         "/agentic/git/worktree/diff",
         { path: worktreeState.repoPath, branch: worktreeState.branchName },
         context,
-      )) as { error?: string };
+      );
+      const diffResult: { error?: string; [key: string]: unknown } = {};
+      if (proxyDiffResult && typeof proxyDiffResult === "object" && !Array.isArray(proxyDiffResult)) {
+        const record = proxyDiffResult as Record<string, unknown>;
+        if (typeof record.error === "string") {
+          diffResult.error = record.error;
+        }
+      }
 
-      mergeResult = (await ToolOrchestratorService._proxyPost(
+      const proxyMergeResult = await ToolOrchestratorService._proxyPost(
         "/agentic/git/worktree/merge",
         {
           path: worktreeState.repoPath,
@@ -207,15 +223,24 @@ const exitWorktree = {
             commitMessage || `Merge worktree: ${worktreeState.branchName}`,
         },
         context,
-      )) as WorktreeMergeResult;
+      );
 
-      if (mergeResult.error) {
+      const resolvedMergeResult: WorktreeMergeResult = {};
+      if (proxyMergeResult && typeof proxyMergeResult === "object" && !Array.isArray(proxyMergeResult)) {
+        const record = proxyMergeResult as Record<string, unknown>;
+        if (typeof record.error === "string") {
+          resolvedMergeResult.error = record.error;
+        }
+      }
+
+      if (resolvedMergeResult.error) {
         return {
-          error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.exit_worktree.mergeFailed", { error: mergeResult.error, path: worktreeState.worktreePath }),
+          error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.exit_worktree.mergeFailed", { error: resolvedMergeResult.error, path: worktreeState.worktreePath }),
         };
       }
 
-      mergeResult.diff = diffResult.error ? null : diffResult;
+      resolvedMergeResult.diff = diffResult.error ? null : proxyDiffResult;
+      mergeResult = resolvedMergeResult;
     }
 
     // Remove the worktree (both merge and discard)

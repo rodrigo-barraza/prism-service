@@ -4,10 +4,6 @@ import {
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 
-interface ExitPlanModeArgs {
-  summary?: string;
-}
-
 export default {
   name: TOOL_NAMES.EXIT_PLAN_MODE,
 
@@ -32,14 +28,15 @@ export default {
   labels: ["coding"],
   domain: DOMAINS.CORE_PLAN.displayName,
 
-  async execute(args: ExitPlanModeArgs) {
-    logger.info(`[ExitPlanMode] ${args.summary || "(no summary)"}`);
+  async execute(toolArguments: Record<string, unknown>) {
+    const summary = typeof toolArguments.summary === "string" ? toolArguments.summary : undefined;
+    logger.info(`[ExitPlanMode] ${summary || "(no summary)"}`);
     // Note: AgenticLoopService overrides this result with the approved plan
     // and Claude Code-style approval message after the approval gate.
     return {
       acknowledged: true,
       mode: "execute",
-      summary: args.summary || null,
+      summary: summary || null,
     };
   },
 };

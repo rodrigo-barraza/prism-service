@@ -184,7 +184,14 @@ const executeSkill = {
           {
             description: `Skill: ${prepared.name}`,
             prompt: prepared.prompt,
-            model: (prepared.config as { model?: string })?.model || undefined,
+            model:
+              "config" in prepared &&
+              prepared.config &&
+              typeof prepared.config === "object" &&
+              "model" in prepared.config &&
+              typeof prepared.config.model === "string"
+                ? prepared.config.model
+                : undefined,
           },
         ],
       },

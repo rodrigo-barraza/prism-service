@@ -982,9 +982,9 @@ export default class BaseAgenticHarness {
       }
     }).catch((error: unknown) => {
       logger.error(`[BaseAgenticHarness] Error resolving pendingRequestDocumentIdPromise: ${errorMessage(error)}`);
-      RequestLogger.logChatGeneration(legacyPayload).catch((err: unknown) =>
+      RequestLogger.logChatGeneration(legacyPayload).catch((loggingError: unknown) =>
         logger.error(
-          `[AgenticLoopService] Failed to log intermediate request on fallback: ${errorMessage(err)}`,
+          `[AgenticLoopService] Failed to log intermediate request on fallback: ${errorMessage(loggingError)}`,
         ),
       );
     });

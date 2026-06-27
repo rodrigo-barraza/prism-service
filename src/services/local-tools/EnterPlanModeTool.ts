@@ -5,10 +5,6 @@ import {
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 
-interface EnterPlanModeArgs {
-  reason?: string;
-}
-
 export default {
   name: TOOL_NAMES.ENTER_PLAN_MODE,
 
@@ -35,12 +31,13 @@ export default {
   labels: ["coding"],
   domain: DOMAINS.CORE_PLAN.displayName,
 
-  async execute(args: EnterPlanModeArgs) {
-    logger.info(`[EnterPlanMode] ${args.reason || "(no reason given)"}`);
+  async execute(toolArguments: Record<string, unknown>) {
+    const reason = typeof toolArguments.reason === "string" ? toolArguments.reason : undefined;
+    logger.info(`[EnterPlanMode] ${reason || "(no reason given)"}`);
     return {
       acknowledged: true,
       mode: "plan",
-      reason: args.reason || null,
+      reason: reason || null,
       message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "harness.planModeEntry.message"),
     };
   },

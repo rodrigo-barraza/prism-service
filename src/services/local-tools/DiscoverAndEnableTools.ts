@@ -136,7 +136,7 @@ const discoverAndEnableTools = {
     }
 
     // Step 1: Search via the tools-api
-    const searchResult = (await getToolOrchestratorService().executeTool(
+    const rawResult = await getToolOrchestratorService().executeTool(
       TOOL_NAMES.SEARCH_TOOLS,
       {
         query,
@@ -151,7 +151,39 @@ const discoverAndEnableTools = {
         agentConversationId: agentConversationId,
         enabledTools: context.enabledTools || [],
       },
-    )) as SearchToolsResult; // Trusting the internal service return shape, but asserting safely
+    );
+
+    const searchResult: SearchToolsResult = {};
+    if (rawResult && typeof rawResult === "object" && !Array.isArray(rawResult)) {
+      const record = rawResult as Record<string, unknown>;
+      if (Array.isArray(record.matches)) {
+        searchResult.matches = record.matches.map((item) => {
+          const match = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+          return {
+            name: typeof match.name === "string" ? match.name : "",
+            isEnabled: typeof match.isEnabled === "boolean" ? match.isEnabled : undefined,
+            description: typeof match.description === "string" ? match.description : undefined,
+            emoji: Array.isArray(match.emoji) ? match.emoji.filter((e): e is string => typeof e === "string") : undefined,
+            domain: typeof match.domain === "string" ? match.domain : undefined,
+          };
+        });
+      }
+      if (typeof record.total === "number") {
+        searchResult.total = record.total;
+      }
+      if (typeof record.query === "string" || record.query === null) {
+        searchResult.query = record.query;
+      }
+      if (typeof record.domain === "string" || record.domain === null) {
+        searchResult.domain = record.domain;
+      }
+      if (typeof record.error === "string") {
+        searchResult.error = record.error;
+      }
+      if (typeof record.message === "string") {
+        searchResult.message = record.message;
+      }
+    }
 
     const matches = searchResult.matches;
 

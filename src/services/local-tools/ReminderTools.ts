@@ -140,7 +140,7 @@ const listTimers = {
   labels: ["timer", "wait"],
   domain: DOMAINS.CORE_SCHEDULE.displayName,
 
-  async execute(_args: Record<string, unknown>, context: ReminderContext) {
+  async execute(_toolArguments: Record<string, unknown>, context: ReminderContext) {
     const conversationId = context.agentConversationId;
     const project = context.project || DEFAULT_PROJECT;
     const username = context.username || DEFAULT_USERNAME;
