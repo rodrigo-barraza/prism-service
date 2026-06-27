@@ -146,10 +146,10 @@ export { THOUGHT_STRUCTURES } from "@rodrigo-barraza/utilities-library/taxonomy"
 export const PROMPT_DELIMITERS = {
   SYSTEM_CONTEXT: "[System Context]",
   SYSTEM_CONTEXT_LOCAL_TIME_PREFIX: "[System Context - Local Time:",
-  CONTEXT_NOTE_PREFIX: "[CONTEXT NOTE:",
+  CONTEXT_NOTE_PREFIX: "[Context Note:",
   USER_MESSAGE: "[User Message]",
   PROJECT_SKILLS: "[Project Skills]",
   AGENT_MEMORY: "[Agent Memory]",
-  SOMATIC_STATE: "[Somatic State",
-  CONVERSATION_SUMMARY: "[Conversation Summary",
+  SOMATIC_STATE_PREFIX: "[Somatic State",
+  CONVERSATION_SUMMARY_PREFIX: "[Conversation Summary",
 } as const;
