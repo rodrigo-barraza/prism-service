@@ -127,7 +127,7 @@ let cachedAISchemas: ToolSchemaFull[] = [];
 let cachedClientSchemas: ToolSchemaFull[] = [];
 
 /**
- * Per-locale caches for remote tool schemas.
+  * Per-locale caches for remote tool schemas.
  * The default locale populates cachedClientSchemas/cachedAISchemas directly.
  * Non-default locales (e.g. "caveman") are stored here so that
  * getClientToolSchemas(topology, "caveman") returns localized descriptions
@@ -135,6 +135,7 @@ let cachedClientSchemas: ToolSchemaFull[] = [];
  */
 const localizedClientSchemasCache = new Map<string, ToolSchemaFull[]>();
 const localizedAISchemasCache = new Map<string, ToolSchemaFull[]>();
+const attemptedLocales = new Set<string>();
 
 /** @type {Map<string, ToolSchemaFull>} Tool name → full schema (for routing) */
 const toolMap = new Map<string, ToolSchemaFull>();
@@ -147,6 +148,7 @@ let cachedStaticRoots: string[] = [];
 
 /** @type {boolean} Whether initial fetch has completed */
 let initialized = false;
+let lastFetchAttemptTime = 0;
 
 /** Recursion guard for client-facing schema resolution */
 let isResolvingClientSchemas = false;
@@ -162,22 +164,18 @@ const activeWorktrees = new Map<string, WorktreeState>();
 /**
  * Fetch tool schemas from tools-api and populate caches.
  * Called eagerly at module load — non-blocking, graceful fallback.
+ * Always fetches default English schemas to populate default caches.
  */
-let cachedSchemaLocale = "";
-
 async function fetchSchemas() {
+  lastFetchAttemptTime = Date.now();
   try {
-    const settings = await SettingsService.getSection("agents");
-    const locale = settings?.locale || "en";
-    cachedSchemaLocale = locale;
     const controller = createAbortController();
     const timeout = setTimeout(
       () => controller.abort(),
       TOOL_SCHEMA_FETCH_TIMEOUT_MS,
     );
 
-    const localeParam = locale !== "en" ? `?locale=${encodeURIComponent(locale)}` : "";
-    const response = await fetch(`${TOOLS_SERVICE_URL}/admin/tool-schemas${localeParam}`, {
+    const response = await fetch(`${TOOLS_SERVICE_URL}/admin/tool-schemas`, {
       signal: controller.signal,
     });
     clearTimeout(timeout);
@@ -262,7 +260,8 @@ async function fetchSchemas() {
  * returns tool descriptions in the correct language.
  */
 async function fetchSchemasForLocale(locale: string) {
-  if (locale === "en" || localizedClientSchemasCache.has(locale)) return;
+  if (locale === "en" || localizedClientSchemasCache.has(locale) || attemptedLocales.has(locale)) return;
+  attemptedLocales.add(locale);
   try {
     const localeParam = `?locale=${encodeURIComponent(locale)}`;
     const response = await fetch(
@@ -849,7 +848,7 @@ export default class ToolOrchestratorService {
    * Eliminates boot-order dependency between prism and tools-api.
    */
   static async ensureSchemas(locale?: string) {
-    if (!initialized) {
+    if (!initialized && Date.now() - lastFetchAttemptTime > 30000) {
       logger.info("[ToolOrchestrator] Schemas not loaded — fetching on-demand");
       await fetchSchemas();
     }
@@ -1885,9 +1884,10 @@ export default class ToolOrchestratorService {
     cachedClientSchemas = [];
     localizedClientSchemasCache.clear();
     localizedAISchemasCache.clear();
+    attemptedLocales.clear();
     toolMap.clear();
     initialized = false;
-    cachedSchemaLocale = "";
+    lastFetchAttemptTime = 0;
   }
   /** @internal */ static async _proxyPost(
     path: string,
