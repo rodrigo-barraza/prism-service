@@ -257,6 +257,7 @@ vi.mock("../src/services/AgentPersonaRegistry.ts", () => ({
       if (agentId === "OMNI") return omniPersona;
       return null;
     }),
+    list: vi.fn().mockReturnValue([]),
   },
 }));
 

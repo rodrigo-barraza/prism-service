@@ -111,7 +111,10 @@ vi.mock("../src/services/local-tools/InternalToolRegistry.ts", () => ({
 }));
 
 vi.mock("../src/services/AgentPersonaRegistry.ts", () => ({
-  default: { get: vi.fn(() => null) },
+  default: {
+    get: vi.fn(() => null),
+    list: vi.fn().mockReturnValue([]),
+  },
 }));
 
 // Mock global fetch: return search_tools schema from /admin/tool-schemas
