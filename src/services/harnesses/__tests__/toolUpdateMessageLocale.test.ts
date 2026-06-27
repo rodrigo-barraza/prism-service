@@ -58,11 +58,11 @@ const CAVEMAN_HEADER_MARKER = "[NEW TOOL]";
 const ENGLISH_HEADER_MARKER = "[TOOL SET UPDATED]";
 
 // harness.toolSetUpdated.availableDocumentation
-const CAVEMAN_AVAILABLE_MARKER = "these tool ready now with full instruction:";
+const CAVEMAN_AVAILABLE_MARKER = "Tool ready with documentation:";
 const ENGLISH_AVAILABLE_MARKER = "The following tools are now available with full documentation:";
 
 // harness.toolSetUpdated.usageGuidelines
-const CAVEMAN_GUIDELINES_MARKER = "## how use tool";
+const CAVEMAN_GUIDELINES_MARKER = "## Tool Usage";
 const ENGLISH_GUIDELINES_MARKER = "## Tool Usage Guidelines";
 
 // Tool descriptions
@@ -449,7 +449,7 @@ describe("Tool Update Message Locale", () => {
 
     it("should interpolate tool count into caveman header", () => {
       const message = assembleToolUpdateMessage("caveman");
-      expect(message).toContain("1 new tool turned on: search_events");
+      expect(message).toContain("1 enabled: search_events");
     });
 
     it("should interpolate tool count into english header", () => {
