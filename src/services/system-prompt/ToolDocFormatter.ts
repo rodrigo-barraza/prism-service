@@ -1,7 +1,6 @@
 import ToolOrchestratorService from "../ToolOrchestratorService.ts";
 import AgentPersonaRegistry from "../AgentPersonaRegistry.ts";
 import PromptLocaleService from "../PromptLocaleService.ts";
-import logger from "../../utils/logger.ts";
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
 import {
   CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST,
@@ -49,15 +48,6 @@ export class ToolDocFormatter {
       defaultTopology,
       locale,
     ) as ToolSchemaDescriptor[];
-
-    // Locale debug: check if schemas come back localized
-    if (locale !== "en" && schemas.length > 0) {
-      const sampleTool = schemas.find((tool) => tool.name === "read_url") || schemas[0];
-      const descriptionPreview = (sampleTool.description || "").slice(0, 80);
-      logger.info(
-        `[ToolDocFormatter] locale="${locale}", sample tool "${sampleTool.name}" description: "${descriptionPreview}..."`,
-      );
-    }
 
     if (resolvedToolNames?.length) {
       const resolvedSet = new Set(resolvedToolNames);
