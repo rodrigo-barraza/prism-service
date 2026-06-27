@@ -593,14 +593,17 @@ router.post(
 
       const agentSettings = await SettingsService.getSection("agents");
       const defaultTopology = agentSettings?.topology || DEFAULT_TOPOLOGY;
+      const resolvedLocale = locale || agentSettings?.locale || PromptLocaleService.getDefaultLocale();
 
-      const allSchemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology);
+      await ToolOrchestratorService.ensureSchemas(resolvedLocale);
+
+      const allSchemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology, resolvedLocale);
       const disabledSet = new Set(disabledTools || []);
       const enabledToolNames = allSchemas
         .map((tool: { name: string }) => tool.name)
         .filter((name: string) => !disabledSet.has(name));
 
-      const resolvedToolNames = ToolOrchestratorService.getToolSchemas(defaultTopology)
+      const resolvedToolNames = ToolOrchestratorService.getToolSchemas(defaultTopology, resolvedLocale)
         .map((tool: { name: string }) => tool.name)
         .filter((name: string) => !disabledSet.has(name));
 
@@ -619,7 +622,7 @@ router.post(
         enabledTools: enabledToolNames,
         resolvedToolNames,
         workspaceEnabled: workspaceEnabled !== false,
-        locale: locale || undefined,
+        locale: resolvedLocale,
       };
 
       const result = await assembler.assemble(assemblerContext);
