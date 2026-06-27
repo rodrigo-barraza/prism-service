@@ -87,7 +87,7 @@ describe("Message Array Construction", () => {
       "User: rodrigo#1234",
     ].join("\n");
     const SOMATIC_STATE = [
-      `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]`,
+      `${PROMPT_DELIMITERS.SOMATIC_STATE_PREFIX} — Lupos]`,
       "current_emotion: curious",
       "emotional_valence: 0.6",
       "arousal: 0.45",
@@ -260,7 +260,7 @@ describe("Message Array Construction", () => {
 
     const LUPOS_IDENTITY = "You are Lupos...";
     const PLATFORM_CONTEXT = "Platform: Discord\nServer: Rod's Lab";
-    const SOMATIC_STATE = `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: amused`;
+    const SOMATIC_STATE = `${PROMPT_DELIMITERS.SOMATIC_STATE_PREFIX} — Lupos]\ncurrent_emotion: amused`;
 
     beforeEach(() => {
       // History loaded from DB: system + user + assistant + platform + somatic + new user
@@ -363,7 +363,7 @@ describe("Message Array Construction", () => {
     const LUPOS_IDENTITY = "You are Lupos, an artist wolf king...";
     const PLATFORM_CONTEXT =
       "Platform: Discord\nServer: Rod's Lab\nChannel: #general";
-    const SOMATIC_STATE = `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: curious`;
+    const SOMATIC_STATE = `${PROMPT_DELIMITERS.SOMATIC_STATE_PREFIX} — Lupos]\ncurrent_emotion: curious`;
 
     it("should NOT overwrite a mid-conversation somatic system message with the identity prompt", () => {
       // History loaded from DB: the prior turn only persisted
@@ -373,7 +373,7 @@ describe("Message Array Construction", () => {
         { role: "assistant", content: "yo" },
         {
           role: "system",
-          content: `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: bored`,
+          content: `${PROMPT_DELIMITERS.SOMATIC_STATE_PREFIX} — Lupos]\ncurrent_emotion: bored`,
         },
         { role: "user", content: "tell me something" },
       ];
@@ -842,7 +842,7 @@ describe("Message Array Construction", () => {
         platformContextMessage:
           "Platform: Discord\nServer: Rod's Lab\nChannel: #art",
         selfContextMessage:
-          `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: excited\narousal: 0.8`,
+          `${PROMPT_DELIMITERS.SOMATIC_STATE_PREFIX} — Lupos]\ncurrent_emotion: excited\narousal: 0.8`,
       });
 
       // Iteration 1: assistant calls generate_image tool
@@ -1480,7 +1480,7 @@ describe("Message Array Construction", () => {
       currentMessages.push({
         role: "user",
         content:
-          `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY}] Previous 15 messages summarized: User asked about...`,
+          `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX}] Previous 15 messages summarized: User asked about...`,
         isCompactSummary: true,
       });
 
@@ -1500,7 +1500,7 @@ describe("Message Array Construction", () => {
       // Simulate Finalizer sanitization
       const sanitizedMessages = newTurnMessages.filter((message) => {
         if (message.role === "user" && typeof message.content === "string") {
-          if (message.content.startsWith(PROMPT_DELIMITERS.CONVERSATION_SUMMARY)) return false;
+          if (message.content.startsWith(PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX)) return false;
           if (message.isCompactSummary === true) return false;
         }
         return true;
@@ -1511,7 +1511,7 @@ describe("Message Array Construction", () => {
       const compactionMessages = sanitizedMessages.filter(
         (message) =>
           typeof message.content === "string" &&
-          message.content.startsWith(PROMPT_DELIMITERS.CONVERSATION_SUMMARY),
+          message.content.startsWith(PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX),
       );
       expect(compactionMessages).toHaveLength(0);
     });
@@ -1991,7 +1991,7 @@ describe("Message Array Construction", () => {
         platformContextMessage:
           "Platform: Discord\nServer: Rod's Lab\nChannel: #art\nGuild ID: 123456789\nChannel ID: 987654321",
         selfContextMessage:
-          `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: inspired\nemotional_valence: 0.85\narousal: 0.75\ndominance: 0.7`,
+          `${PROMPT_DELIMITERS.SOMATIC_STATE_PREFIX} — Lupos]\ncurrent_emotion: inspired\nemotional_valence: 0.85\narousal: 0.75\ndominance: 0.7`,
         memoriesText: `${PROMPT_DELIMITERS.AGENT_MEMORY}\nrodrigo likes epic fantasy art`,
       });
 
@@ -3274,7 +3274,7 @@ describe("Message Array Construction", () => {
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Lupos.",
         platformContextMessage: "Platform: Discord\nServer: Rod's Lab",
-        selfContextMessage: `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: curious`,
+        selfContextMessage: `${PROMPT_DELIMITERS.SOMATIC_STATE_PREFIX} — Lupos]\ncurrent_emotion: curious`,
       });
 
       // search_tools
@@ -3414,7 +3414,7 @@ describe("Message Array Construction", () => {
     const LUPOS_IDENTITY =
       "You are Lupos, an insane recovering-drug-addicted artist wolf king...";
     const SOMATIC_STATE = [
-      `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]`,
+      `${PROMPT_DELIMITERS.SOMATIC_STATE_PREFIX} — Lupos]`,
       "current_emotion: curious",
       "emotional_valence: 0.6",
       "arousal: 0.45",
@@ -3501,7 +3501,7 @@ describe("Message Array Construction", () => {
     const LUPOS_IDENTITY =
       "You are Lupos, an insane recovering-drug-addicted artist wolf king...";
     const PLATFORM_CONTEXT = "Platform: Discord\nServer: Rod's Lab";
-    const SOMATIC_STATE = `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: amused`;
+    const SOMATIC_STATE = `${PROMPT_DELIMITERS.SOMATIC_STATE_PREFIX} — Lupos]\ncurrent_emotion: amused`;
 
     beforeEach(() => {
       currentMessages = [{ role: "user", content: "hey lupos" }];
@@ -3572,7 +3572,7 @@ describe("Message Array Construction", () => {
       const LUPOS_IDENTITY = "You are Lupos...";
       const PLATFORM_CONTEXT = "Platform: Discord\nServer: Rod's Lab";
       const SOMATIC_STATE =
-        `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: melancholy`;
+        `${PROMPT_DELIMITERS.SOMATIC_STATE_PREFIX} — Lupos]\ncurrent_emotion: melancholy`;
 
       const currentMessages: HarnessPayload[] = [
         { role: "user", content: "hey" },
@@ -3605,7 +3605,7 @@ describe("Message Array Construction", () => {
 
     it("should capture identity from hook context even when somatic exists in messages", () => {
       const LUPOS_IDENTITY = "You are Lupos...";
-      const SOMATIC_STATE = `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: happy`;
+      const SOMATIC_STATE = `${PROMPT_DELIMITERS.SOMATIC_STATE_PREFIX} — Lupos]\ncurrent_emotion: happy`;
 
       const currentMessages: HarnessPayload[] = [
         { role: "user", content: "how are you?" },
@@ -3778,7 +3778,7 @@ describe("Message Array Construction", () => {
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Lupos, an artist wolf king...",
         platformContextMessage: "Platform: Discord\nServer: Rod's Lab\nChannel: #dev",
-        selfContextMessage: `${PROMPT_DELIMITERS.SOMATIC_STATE} — Lupos]\ncurrent_emotion: focused\narousal: 0.7`,
+        selfContextMessage: `${PROMPT_DELIMITERS.SOMATIC_STATE_PREFIX} — Lupos]\ncurrent_emotion: focused\narousal: 0.7`,
       });
 
       currentMessages.push({
