@@ -11,7 +11,7 @@ FROM node:26-alpine AS deps
 WORKDIR /app
 RUN npm install -g pnpm
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN apk add --no-cache git
+RUN apk add --no-cache git rsync
 RUN --mount=type=ssh \
     --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
