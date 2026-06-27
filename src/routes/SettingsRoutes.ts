@@ -1,6 +1,7 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import SettingsService from "../services/SettingsService.ts";
+import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
 import logger from "../utils/logger.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
@@ -26,6 +27,8 @@ router.get(
 /**
  * PUT /settings
  * Upsert settings. Accepts a partial object — deep-merged with existing.
+ * When the agent locale changes, re-fetches tool schemas from tools-service
+ * so remote tool descriptions are served in the correct locale.
  */
 router.put(
   "/",
@@ -38,7 +41,17 @@ router.put(
           .json({ error: "Request body must be an object" });
       }
 
+      const previousLocale = SettingsService.getCached()?.agents?.locale || "en";
       const updated = await SettingsService.update(data);
+      const currentLocale = updated?.agents?.locale || "en";
+
+      if (currentLocale !== previousLocale) {
+        logger.info(
+          `[Settings] Locale changed from "${previousLocale}" to "${currentLocale}" — refreshing tool schemas`,
+        );
+        await ToolOrchestratorService.refreshSchemas();
+      }
+
       res.json(updated);
     } catch (error: unknown) {
       logger.error(`PUT /settings error: ${getErrorMessage(error)}`);
