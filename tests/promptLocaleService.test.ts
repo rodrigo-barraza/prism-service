@@ -483,7 +483,7 @@ describe("PromptLocaleService — Persona Deduplication", () => {
 
   it("should have system-prompt.codingFallbackIdentity as the canonical identity", () => {
     const identity = englishLocaleKeys.get("system-prompt.codingFallbackIdentity")!;
-    expect(identity).toContain("highly capable coding agent");
+    expect(identity).toContain("You are a coding agent with access to");
   });
 });
 
