@@ -40,5 +40,10 @@
   },
   "contextWindow": {
     "droppedMessages": "{{droppedCount}} earlier messages were removed to fit the context window. The conversation continues below."
+  },
+  "toolSetUpdated": {
+    "header": "[TOOL SET UPDATED] {{count}} new tool(s) have been dynamically enabled: {{toolNames}}",
+    "availableDocumentation": "The following tools are now available with full documentation:",
+    "usageGuidelines": "## Tool Usage Guidelines"
   }
 }

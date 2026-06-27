@@ -40,5 +40,10 @@
   },
   "contextWindow": {
     "droppedMessages": "{{droppedCount}} earlier msgs were removed 2 fit the ctx window. the convo continues below."
+  },
+  "toolSetUpdated": {
+    "header": "[TOOL SET UPDATED] {{count}} new tool(s) have been dynamically enabled: {{toolNames}}",
+    "availableDocumentation": "the following tools r now available w/ full documentation:",
+    "usageGuidelines": "## tool usage guidelines"
   }
 }
