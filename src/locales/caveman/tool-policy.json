@@ -8,7 +8,8 @@
     "noFallback": "**NEVER write raw code or script when dedicated tool maybe exist.** always search first.",
     "intentMatchingHeader": "**when to search — match by WHAT YOU NEED, not just word:**",
     "intentMatchingRules": "- human mention domain, protocol, or data kind you no got tool for → search\n- human ask about thing that sound like special API → search\n- human say 'look up', 'check', 'scan', 'analyze', 'convert', 'generate', or 'get info about' anything beyond basic text/code → search\n- not sure? search. cost nothing. one call.",
-    "triggerHeader": "**when to search (example from tool pile, not all):**"
+    "triggerHeader": "**when to search (example from tool pile, not all):**",
+    "triggerLineTemplate": "- {{keywords}} → search {{domain}} tool"
   },
   "generalPrinciples": "# Tool Use Way\n- chain tool when question need many data source\n- use specific tool over general web search when can\n- match tool size to job: no use heavy tool for simple question",
   "taskManagement": "## Task Tracking\nyou got task tool (create_task, list_tasks, update_task) that last across talk.\nuse them:\n- at START of session, call list_tasks to check old task from before\n- when start big work (3+ file, multi-step refactor, migration), make task with create_task\n- ONLY mark task done when FULLY done — if stuck or error, keep as in_progress\n- always set activeForm when create or update to \"in_progress\" — short phrase shown as spinner (like \"fixing auth\", \"running test\")\n- after finish task, call list_tasks to find next\n- to remove bad task, set status to \"deleted\" with update_task\n- break big task into small task — use metadata to link\n- no make task for simple one-step thing",

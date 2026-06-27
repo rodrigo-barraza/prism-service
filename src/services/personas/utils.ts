@@ -84,7 +84,10 @@ function buildToolDiscoveryContent(locale: string): string {
       const quotedKeywords = keywords
         .map((keyword) => `"${keyword}"`)
         .join(", ");
-      return `- ${quotedKeywords} → search for ${domain} tools`;
+      return PromptLocaleService.get(locale, "tool-policy.toolDiscovery.triggerLineTemplate", {
+        keywords: quotedKeywords,
+        domain,
+      });
     })
     .join("\n");
 
