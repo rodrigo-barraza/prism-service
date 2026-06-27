@@ -102,6 +102,9 @@ const discoverAndEnableTools = {
       : "en";
     return buildDiscoverAndEnableSchema(activeLocale);
   },
+  buildSchema(locale: string) {
+    return buildDiscoverAndEnableSchema(locale);
+  },
   domain: DOMAINS.CORE_DISCOVER.displayName,
   labels: ["tools", "discovery", "activation", "meta"],
 

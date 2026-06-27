@@ -56,6 +56,7 @@ interface InternalTool {
   schema: InternalToolSchema;
   domain?: string;
   labels?: string[];
+  buildSchema?: (locale: string) => InternalToolSchema;
   execute: (
     args: Record<string, unknown>,
     context: InternalToolContext,
@@ -117,10 +118,10 @@ try {
   );
 }
 
-function localizeSchema(schema: InternalToolSchema, locale: string): InternalToolSchema {
+function localizeSchema(schema: InternalToolSchema, locale: string, tool?: InternalTool): InternalToolSchema {
   const toolName = schema.name;
-  if (toolName === "discover_and_enable_tools") {
-    return schema;
+  if (tool?.buildSchema) {
+    return tool.buildSchema(locale);
   }
   const localizedDescription = PromptLocaleService.get(locale, `internal-tools.${toolName}.description`);
 
@@ -167,12 +168,12 @@ export default class InternalToolRegistry {
   }
   static getSchemas(locale?: string) {
     const activeLocale = locale || PromptLocaleService.getDefaultLocale();
-    return [...registry.values()].map((tool) => localizeSchema(tool.schema, activeLocale));
+    return [...registry.values()].map((tool) => localizeSchema(tool.schema, activeLocale, tool));
   }
   static getClientSchemas(locale?: string) {
     const activeLocale = locale || PromptLocaleService.getDefaultLocale();
     return [...registry.values()].map((tool) => ({
-      ...localizeSchema(tool.schema, activeLocale),
+      ...localizeSchema(tool.schema, activeLocale, tool),
       domain: tool.domain || DOMAINS.CORE_HARNESS.displayName,
       labels: tool.labels || ["coding"],
     }));
