@@ -260,12 +260,19 @@ async function fetchSchemas() {
  * returns tool descriptions in the correct language.
  */
 async function fetchSchemasForLocale(locale: string) {
-  if (locale === "en" || localizedClientSchemasCache.has(locale) || attemptedLocales.has(locale)) return;
+  if (locale === "en" || localizedClientSchemasCache.has(locale) || attemptedLocales.has(locale)) {
+    logger.info(
+      `[ToolOrchestrator] fetchSchemasForLocale("${locale}") skipped: en=${locale === "en"}, cached=${localizedClientSchemasCache.has(locale)}, attempted=${attemptedLocales.has(locale)}`,
+    );
+    return;
+  }
   attemptedLocales.add(locale);
   try {
     const localeParam = `?locale=${encodeURIComponent(locale)}`;
+    const fetchUrl = `${TOOLS_SERVICE_URL}/admin/tool-schemas${localeParam}`;
+    logger.info(`[ToolOrchestrator] Fetching locale "${locale}" schemas from: ${fetchUrl}`);
     const response = await fetch(
-      `${TOOLS_SERVICE_URL}/admin/tool-schemas${localeParam}`,
+      fetchUrl,
       { signal: AbortSignal.timeout(TOOL_SCHEMA_FETCH_TIMEOUT_MS) },
     );
     if (!response.ok) {
@@ -287,8 +294,12 @@ async function fetchSchemasForLocale(locale: string) {
         ({ endpoint: _endpoint, dataSource: _dataSource, domain: _domain, ...rest }) => rest,
       ),
     );
+
+    // Debug: show a sample tool description to verify locale translation
+    const sampleTool = schemas.find((tool) => tool.name === "read_url") || schemas[0];
+    const sampleDescription = (sampleTool?.description || "").slice(0, 100);
     logger.info(
-      `[ToolOrchestrator] Loaded ${schemas.length} localized tool schemas for locale "${locale}"`,
+      `[ToolOrchestrator] Loaded ${schemas.length} localized tool schemas for locale "${locale}" (sample "${sampleTool?.name}": "${sampleDescription}...")`,
     );
   } catch (error: unknown) {
     logger.warn(
@@ -856,7 +867,14 @@ export default class ToolOrchestratorService {
     // If the requested locale differs from the default and isn't
     // yet in the per-locale cache, fetch it from tools-service now.
     if (locale && locale !== "en" && !localizedClientSchemasCache.has(locale)) {
+      logger.info(
+        `[ToolOrchestrator] ensureSchemas: locale="${locale}" not in cache (cached locales: ${[...localizedClientSchemasCache.keys()].join(", ") || "none"}), fetching...`,
+      );
       await fetchSchemasForLocale(locale);
+    } else if (locale && locale !== "en") {
+      logger.info(
+        `[ToolOrchestrator] ensureSchemas: locale="${locale}" already cached (${localizedClientSchemasCache.get(locale)?.length ?? 0} schemas)`,
+      );
     }
   }
 
@@ -974,6 +992,10 @@ export default class ToolOrchestratorService {
       const localeClientSchemas = (activeLocale && activeLocale !== "en" && localizedClientSchemasCache.has(activeLocale))
         ? localizedClientSchemasCache.get(activeLocale)!
         : cachedClientSchemas;
+
+      logger.info(
+        `[ToolOrchestrator] getClientToolSchemas: activeLocale="${activeLocale}", using ${activeLocale !== "en" && localizedClientSchemasCache.has(activeLocale) ? "localized" : "default"} schemas (${localeClientSchemas.length} remote tools)`,
+      );
 
       const clientSchemasEnriched = localeClientSchemas.map((tool) => ({
         ...tool,
