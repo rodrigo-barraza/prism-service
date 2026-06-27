@@ -56,41 +56,41 @@ vi.mock("../../RequestLogger.ts", () => ({
 const CAVEMAN_WRITE_TODO_MARKER = "write or update todo list";
 const ENGLISH_WRITE_TODO_MARKER = "Write or update a persistent TODO checklist";
 
-const CAVEMAN_ENTER_PLAN_MARKER = "go into think mode";
+const CAVEMAN_ENTER_PLAN_MARKER = "enter planning mode";
 const ENGLISH_ENTER_PLAN_MARKER = "Switch into planning mode";
 
-const CAVEMAN_ASK_USER_MARKER = "ask human one or more question";
+const CAVEMAN_ASK_USER_MARKER = "ask user question and wait for response";
 const ENGLISH_ASK_USER_MARKER = "Ask the user one or more questions";
 
-const CAVEMAN_SUMMARIZE_MARKER = "squish current talk";
+const CAVEMAN_SUMMARIZE_MARKER = "compress current conversation into summary";
 const ENGLISH_SUMMARIZE_MARKER = "Compress the current conversation";
 
 // Required label suffix
-const CAVEMAN_REQUIRED_LABEL = "(need)";
+const CAVEMAN_REQUIRED_LABEL = "(required)";
 const ENGLISH_REQUIRED_LABEL = "(required)";
 
 // Orchestrator tools
-const CAVEMAN_CREATE_TEAM_MARKER = "make one or more helper agent";
-const ENGLISH_CREATE_TEAM_MARKER = "Spawn one or more sub-agents";
+const CAVEMAN_CREATE_TEAM_MARKER = "spawn sub-agent, each in isolated worktree";
+const ENGLISH_CREATE_TEAM_MARKER = "Spawn one or more sub-agents, each in an isolated git worktree";
 
-const CAVEMAN_SEND_MESSAGE_MARKER = "send more word to running or done helper";
+const CAVEMAN_SEND_MESSAGE_MARKER = "send follow-up to running or completed sub-agent";
 const ENGLISH_SEND_MESSAGE_MARKER = "Send a follow-up message to a running or completed sub-agent";
 
-const CAVEMAN_STOP_AGENT_MARKER = "stop running helper";
+const CAVEMAN_STOP_AGENT_MARKER = "stop running sub-agent";
 const ENGLISH_STOP_AGENT_MARKER = "Stop a running sub-agent";
 
 // System prompt structural sections
-const CAVEMAN_TOOL_HEADER = "Tool You Got";
+const CAVEMAN_TOOL_HEADER = "Enabled Tool";
 const ENGLISH_TOOL_HEADER = "Enabled Tools";
 
-const CAVEMAN_ENVIRONMENT_HEADER = "Where You Are";
+const CAVEMAN_ENVIRONMENT_HEADER = "## Environment";
 const ENGLISH_ENVIRONMENT_HEADER = "## Environment";
 
-const CAVEMAN_CODING_GUIDELINES_MARKER = "How Code";
-const ENGLISH_CODING_GUIDELINES_MARKER = "Coding Guidelines";
+const CAVEMAN_CODING_GUIDELINES_MARKER = "Read file before editing";
+const ENGLISH_CODING_GUIDELINES_MARKER = "Always read relevant files before making edits";
 
-const CAVEMAN_COMMAND_GUIDELINES_MARKER = "Run Command";
-const ENGLISH_COMMAND_GUIDELINES_MARKER = "Command Execution";
+const CAVEMAN_COMMAND_GUIDELINES_MARKER = "Dev server, long-running process";
+const ENGLISH_COMMAND_GUIDELINES_MARKER = "For dev servers and long-running processes";
 
 // ── Tests ──────────────────────────────────────────────────
 
@@ -134,7 +134,7 @@ describe("Tool Description Locale Threading", () => {
       expect(englishDescription).toContain(ENGLISH_ENTER_PLAN_MARKER);
     });
 
-    it("should have distinct caveman vs english required labels", () => {
+    it("should have caveman and english required labels", () => {
       const cavemanRequired = PromptLocaleService.get(
         "caveman",
         "system-prompt.requiredLabel",
@@ -143,7 +143,6 @@ describe("Tool Description Locale Threading", () => {
         "en",
         "system-prompt.requiredLabel",
       );
-      expect(cavemanRequired).not.toEqual(englishRequired);
       expect(cavemanRequired).toContain(CAVEMAN_REQUIRED_LABEL);
       expect(englishRequired).toContain(ENGLISH_REQUIRED_LABEL);
     });
@@ -188,7 +187,7 @@ describe("Tool Description Locale Threading", () => {
         "internal-tools.ask_user.parameters.questions",
       );
       expect(cavemanQuestionsParam).not.toContain("[MISSING:");
-      expect(cavemanQuestionsParam.toLowerCase()).toContain("human");
+      expect(cavemanQuestionsParam.toLowerCase()).toContain("question");
     });
   });
 
@@ -329,7 +328,7 @@ describe("Tool Description Locale Threading", () => {
       expect(output).toContain(ENGLISH_ASK_USER_MARKER);
     });
 
-    it("should use caveman required label '(need)' when locale is 'caveman'", () => {
+    it("should use caveman required label '(required)' when locale is 'caveman'", () => {
       const formatter = new ToolDocFormatter();
       const output = formatter.buildToolDescriptions(
         undefined, null, undefined, undefined, undefined, false, "caveman",
@@ -337,7 +336,6 @@ describe("Tool Description Locale Threading", () => {
 
       // write_todo.items and ask_user.questions are required
       expect(output).toContain(CAVEMAN_REQUIRED_LABEL);
-      expect(output).not.toContain(ENGLISH_REQUIRED_LABEL);
     });
 
     it("should use english required label '(required)' when locale is 'en'", () => {
@@ -347,7 +345,6 @@ describe("Tool Description Locale Threading", () => {
       );
 
       expect(output).toContain(ENGLISH_REQUIRED_LABEL);
-      expect(output).not.toContain(CAVEMAN_REQUIRED_LABEL);
     });
 
     it("should forward locale even when resolvedToolNames filters the schemas", () => {
@@ -471,7 +468,6 @@ describe("Tool Description Locale Threading", () => {
       expect(result.prompt).not.toContain(ENGLISH_WRITE_TODO_MARKER);
       // Required label must also be localized
       expect(result.prompt).toContain(CAVEMAN_REQUIRED_LABEL);
-      expect(result.prompt).not.toContain(ENGLISH_REQUIRED_LABEL);
     });
 
     it("should produce caveman tool descriptions in the assembled prompt", async () => {
@@ -494,7 +490,6 @@ describe("Tool Description Locale Threading", () => {
       const result = await assembler.assemble(buildAssemblerContext("caveman"));
 
       expect(result.prompt).toContain(CAVEMAN_ENVIRONMENT_HEADER);
-      expect(result.prompt).not.toContain(ENGLISH_ENVIRONMENT_HEADER);
     });
 
     it("should produce english environment section when locale is 'en'", async () => {
@@ -533,7 +528,6 @@ describe("Tool Description Locale Threading", () => {
       const result = await assembler.assemble(buildAssemblerContext("caveman"));
 
       expect(result.prompt).toContain(CAVEMAN_REQUIRED_LABEL);
-      expect(result.prompt).not.toContain(ENGLISH_REQUIRED_LABEL);
     });
 
     it("should default to english when locale is undefined", async () => {
@@ -644,7 +638,6 @@ describe("Tool Description Locale Threading", () => {
 
       expect(result.prompt).toContain(ENGLISH_ENVIRONMENT_HEADER);
       expect(result.prompt).toContain(ENGLISH_SUMMARIZE_MARKER);
-      expect(result.prompt).not.toContain(CAVEMAN_ENVIRONMENT_HEADER);
     });
 
     it("should handle unknown locale by falling back to english via PromptLocaleService", async () => {
@@ -666,7 +659,6 @@ describe("Tool Description Locale Threading", () => {
       expect(result.prompt.toLowerCase()).toContain(CAVEMAN_SUMMARIZE_MARKER);
       expect(result.prompt).not.toContain(ENGLISH_SUMMARIZE_MARKER);
       expect(result.prompt).toContain(CAVEMAN_REQUIRED_LABEL);
-      expect(result.prompt).not.toContain(ENGLISH_REQUIRED_LABEL);
       expect(result.prompt).toContain(CAVEMAN_TOOL_HEADER);
       expect(result.prompt).not.toContain(ENGLISH_TOOL_HEADER);
     });
@@ -696,8 +688,8 @@ describe("Tool Description Locale Threading", () => {
 
       // All sections must be caveman — no english leaking through
       const cavemanMarkers = [
-        "Who You Are",
-        "How You Talk",
+        "Omni Agent — universal all-domain assistant",
+        "use tool proactively, don't ask permission",
         CAVEMAN_CODING_GUIDELINES_MARKER,
         CAVEMAN_COMMAND_GUIDELINES_MARKER,
         CAVEMAN_TOOL_HEADER,
@@ -713,7 +705,8 @@ describe("Tool Description Locale Threading", () => {
 
       // No english structural markers should appear
       const englishMarkers = [
-        ENGLISH_ENVIRONMENT_HEADER,
+        "You are the Omni Agent — a universal, all-domain AI assistant",
+        "use tools proactively rather than asking if the user wants you to",
         ENGLISH_CODING_GUIDELINES_MARKER,
         ENGLISH_COMMAND_GUIDELINES_MARKER,
         ENGLISH_TOOL_HEADER,
@@ -740,7 +733,6 @@ describe("Tool Description Locale Threading", () => {
       expect(result.prompt.toLowerCase()).toContain(CAVEMAN_SUMMARIZE_MARKER);
       expect(result.prompt).not.toContain(ENGLISH_SUMMARIZE_MARKER);
       expect(result.prompt).toContain(CAVEMAN_REQUIRED_LABEL);
-      expect(result.prompt).not.toContain(ENGLISH_REQUIRED_LABEL);
     });
   });
 });

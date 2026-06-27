@@ -58,7 +58,7 @@ const CAVEMAN_WRITE_TODO_MARKER = "write or update todo list";
 const ENGLISH_WRITE_TODO_MARKER = "Write or update a persistent TODO checklist";
 
 // disable_tools (standard localizeSchema path)
-const CAVEMAN_DISABLE_MARKER = "turn off tool from this talk";
+const CAVEMAN_DISABLE_MARKER = "deactivate tool from session";
 const ENGLISH_DISABLE_MARKER = "Dynamically disable tools from this conversation";
 
 // ── Tests ──────────────────────────────────────────────────
@@ -260,9 +260,9 @@ describe("InternalToolRegistry Locale Handling", () => {
 
       const queryParameter = discoverSchema!.parameters!.properties?.query;
       expect(queryParameter).toBeDefined();
-      // Caveman query param has "search word" vs English "Search keyword(s)"
+      // Caveman query param has "search term" vs English "Search keyword(s)"
       expect(queryParameter!.description!.toLowerCase()).toContain(
-        "search word",
+        "search term",
       );
     });
 
