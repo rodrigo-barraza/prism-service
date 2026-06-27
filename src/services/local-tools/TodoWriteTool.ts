@@ -12,9 +12,6 @@ interface TodoItemInput {
   priority?: "high" | "medium" | "low";
 }
 
-interface TodoWriteArgs {
-  items: TodoItemInput[];
-}
 
 interface TodoItemNormalized {
   id: number;
@@ -91,12 +88,15 @@ export default {
       return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.write_todo.invalidItems") };
     }
 
-    const normalized: TodoItemNormalized[] = items.map((item, i) => ({
-      id: i + 1,
-      content: item.content || "",
-      status: item.status || "pending",
-      priority: item.priority || "medium",
-    }));
+    const normalized: TodoItemNormalized[] = items.map((item, index) => {
+      const itemInput = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+      return {
+        id: index + 1,
+        content: typeof itemInput.content === "string" ? itemInput.content : "",
+        status: typeof itemInput.status === "string" && (itemInput.status === "pending" || itemInput.status === "in_progress" || itemInput.status === "completed") ? itemInput.status : "pending",
+        priority: typeof itemInput.priority === "string" && (itemInput.priority === "high" || itemInput.priority === "medium" || itemInput.priority === "low") ? itemInput.priority : "medium",
+      };
+    });
 
     const stats: TodoStats = {
       total: normalized.length,

@@ -6,23 +6,6 @@ import {
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import MCPClientService from "../MCPClientService.ts";
 
-interface ListMcpResourcesArgs {
-  server_name?: string;
-}
-
-interface ReadMcpResourceArgs {
-  server_name: string;
-  uri: string;
-}
-
-interface McpAuthenticateArgs {
-  server_name: string;
-  token?: string;
-  api_key?: string;
-  api_key_header?: string;
-  env?: Record<string, string>;
-}
-
 const listMcpResources = {
   name: TOOL_NAMES.LIST_MCP_RESOURCES,
   schema: {
@@ -42,31 +25,46 @@ const listMcpResources = {
   },
   domain: DOMAINS.MCP.displayName,
   labels: ["coding", "meta"],
-  async execute(args: Record<string, unknown>) {
-    const listArgs = args as unknown as ListMcpResourcesArgs;
-    const { server_name } = listArgs;
-    if (server_name) {
-      const result = await MCPClientService.listResources(server_name);
+  async execute(toolArguments: Record<string, unknown>) {
+    const serverName =
+      typeof toolArguments.server_name === "string"
+        ? toolArguments.server_name
+        : undefined;
+
+    if (serverName) {
+      const result = await MCPClientService.listResources(serverName);
       logger.info(
-        `[MCP] list_resources: ${server_name} → ${result.count ?? 0} resources`,
+        `[MCP] list_resources: ${serverName} → ${result.count ?? 0} resources`,
       );
       return result;
     }
+
     const servers = MCPClientService.getConnectedServers();
     if (servers.length === 0) {
-      return { resources: [], count: 0, message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.list_mcp_resources.noServers") };
+      return {
+        resources: [],
+        count: 0,
+        message: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.list_mcp_resources.noServers",
+        ),
+      };
     }
+
     const allResources: Record<string, unknown>[] = [];
     for (const server of servers) {
       const result = await MCPClientService.listResources(server.name);
       if (result.resources) {
-        for (const resource of result.resources)
+        for (const resource of result.resources) {
           allResources.push({ ...resource, server: server.name });
+        }
       }
     }
+
     logger.info(
       `[MCP] list_resources: ${servers.length} server(s) → ${allResources.length} total`,
     );
+
     return {
       resources: allResources,
       count: allResources.length,
@@ -96,13 +94,25 @@ const readMcpResource = {
   },
   domain: DOMAINS.MCP.displayName,
   labels: ["coding", "meta"],
-  async execute(args: Record<string, unknown>) {
-    const readArgs = args as unknown as ReadMcpResourceArgs;
-    const { server_name, uri } = readArgs;
-    if (!server_name || !uri)
-      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.read_mcp_resource.missingParams") };
-    logger.info(`[MCP] read_resource: ${server_name} → ${uri}`);
-    return MCPClientService.readResource(server_name, uri);
+  async execute(toolArguments: Record<string, unknown>) {
+    const serverName =
+      typeof toolArguments.server_name === "string"
+        ? toolArguments.server_name
+        : undefined;
+    const uri =
+      typeof toolArguments.uri === "string" ? toolArguments.uri : undefined;
+
+    if (!serverName || !uri) {
+      return {
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.read_mcp_resource.missingParams",
+        ),
+      };
+    }
+
+    logger.info(`[MCP] read_resource: ${serverName} → ${uri}`);
+    return MCPClientService.readResource(serverName, uri);
   },
 };
 
@@ -139,26 +149,59 @@ const mcpAuthenticate = {
   },
   domain: DOMAINS.MCP.displayName,
   labels: ["coding", "meta"],
-  async execute(args: Record<string, unknown>) {
-    const authArgs = args as unknown as McpAuthenticateArgs;
-    const {
-      server_name,
-      token,
-      api_key,
-      api_key_header,
-      env: authEnv,
-    } = authArgs;
-    if (!server_name) return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.authenticate_mcp_server.missingServerName") };
-    if (!token && !api_key && !authEnv)
+  async execute(toolArguments: Record<string, unknown>) {
+    const serverName =
+      typeof toolArguments.server_name === "string"
+        ? toolArguments.server_name
+        : undefined;
+    const token =
+      typeof toolArguments.token === "string" ? toolArguments.token : undefined;
+    const apiKey =
+      typeof toolArguments.api_key === "string"
+        ? toolArguments.api_key
+        : undefined;
+    const apiKeyHeader =
+      typeof toolArguments.api_key_header === "string"
+        ? toolArguments.api_key_header
+        : undefined;
+
+    let envObject: Record<string, string> | undefined = undefined;
+    if (
+      toolArguments.env &&
+      typeof toolArguments.env === "object" &&
+      !Array.isArray(toolArguments.env)
+    ) {
+      const records: Record<string, string> = {};
+      for (const [key, value] of Object.entries(toolArguments.env)) {
+        records[key] = String(value);
+      }
+      envObject = records;
+    }
+
+    if (!serverName) {
       return {
-        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.authenticate_mcp_server.noCredentials"),
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.authenticate_mcp_server.missingServerName",
+        ),
       };
-    logger.info(`[MCP] authenticate: ${server_name}`);
-    return MCPClientService.authenticate(server_name, {
-      token: token,
-      apiKey: api_key,
-      apiKeyHeader: api_key_header,
-      env: authEnv,
+    }
+
+    if (!token && !apiKey && !envObject) {
+      return {
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.authenticate_mcp_server.noCredentials",
+        ),
+      };
+    }
+
+    logger.info(`[MCP] authenticate: ${serverName}`);
+    return MCPClientService.authenticate(serverName, {
+      token,
+      apiKey,
+      apiKeyHeader,
+      env: envObject,
     });
   },
 };

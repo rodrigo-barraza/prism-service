@@ -301,19 +301,19 @@ describe("InternalToolRegistry Locale Handling", () => {
     });
 
     it("should return consistent results between getSchemas and getClientSchemas for same locale", () => {
-      const aiSchemas = InternalToolRegistry.getSchemas("caveman");
+      const agentSchemas = InternalToolRegistry.getSchemas("caveman");
       const clientSchemas = InternalToolRegistry.getClientSchemas("caveman");
 
-      const aiDiscover = aiSchemas.find(
+      const agentDiscover = agentSchemas.find(
         (schema) => schema.name === "discover_and_enable_tools",
       );
       const clientDiscover = clientSchemas.find(
         (schema) => schema.name === "discover_and_enable_tools",
       );
 
-      expect(aiDiscover).toBeDefined();
+      expect(agentDiscover).toBeDefined();
       expect(clientDiscover).toBeDefined();
-      expect(aiDiscover!.description).toEqual(clientDiscover!.description);
+      expect(agentDiscover!.description).toEqual(clientDiscover!.description);
     });
   });
 });

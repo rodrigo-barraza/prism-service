@@ -58,7 +58,7 @@ interface InternalTool {
   labels?: string[];
   buildSchema?: (locale: string) => InternalToolSchema;
   execute: (
-    args: Record<string, unknown>,
+    toolArguments: Record<string, unknown>,
     context: InternalToolContext,
   ) => Promise<unknown>;
 }
@@ -78,8 +78,8 @@ function register(tool: InternalTool) {
  * Initialize the registry by registering all imported tool modules.
  * Called immediately at module load — synchronous.
  */
-function init() {
-  const toolsList = [
+function initialize() {
+  const toolModulesList = [
     enterPlanModeTool,
     exitPlanModeTool,
     toolActivationTools,
@@ -94,14 +94,14 @@ function init() {
     conversationSearchTool,
   ];
 
-  for (const tools of toolsList) {
+  for (const toolOrTools of toolModulesList) {
     // Modules can export a single tool or an array of tools
-    if (Array.isArray(tools)) {
-      for (const tool of tools) {
+    if (Array.isArray(toolOrTools)) {
+      for (const tool of toolOrTools) {
         register(tool);
       }
     } else {
-      register(tools);
+      register(toolOrTools);
     }
   }
 
@@ -111,7 +111,7 @@ function init() {
 }
 
 try {
-  init();
+  initialize();
 } catch (error: unknown) {
   logger.error(
     `[InternalToolRegistry] Init failed: ${errorMessage(error)}`,
@@ -131,12 +131,12 @@ function localizeSchema(schema: InternalToolSchema, locale: string, tool?: Inter
     for (const propertyName of Object.keys(parameters.properties)) {
       const property = parameters.properties[propertyName];
       if (property && typeof property === "object") {
-        const localizedPropDesc = PromptLocaleService.get(
+        const localizedPropertyDescription = PromptLocaleService.get(
           locale,
           `internal-tools.${toolName}.parameters.${propertyName}`,
         );
-        if (localizedPropDesc && !localizedPropDesc.startsWith("[MISSING:")) {
-          property.description = localizedPropDesc;
+        if (localizedPropertyDescription && !localizedPropertyDescription.startsWith("[MISSING:")) {
+          property.description = localizedPropertyDescription;
         }
       }
     }
@@ -157,14 +157,14 @@ export default class InternalToolRegistry {
   }
   static async execute(
     name: string,
-    args: Record<string, unknown>,
+    toolArguments: Record<string, unknown>,
     context: InternalToolContext = {},
   ) {
     const tool = registry.get(name);
     if (!tool) {
       return { error: `Unknown internal tool: ${name}` };
     }
-    return tool.execute(args, context);
+    return tool.execute(toolArguments, context);
   }
   static getSchemas(locale?: string) {
     const activeLocale = locale || PromptLocaleService.getDefaultLocale();
