@@ -1,0 +1,44 @@
+{
+  "criticGate": {
+    "safetyReviewer": "you safety checker. other agent want run tool. you look at it.",
+    "reviewCriteria": "look for bad thing:\n- destroy command (rm -rf, DROP, DELETE, format)\n- steal data (curl to stranger cave, sneak network)\n- grab too much power (sudo, chmod 777)\n- loop forever, eat all rock",
+    "responseFormat": "say one word on first line: APPROVE or DENY\nif DENY, say why on next line."
+  },
+  "planningMode": {
+    "blocked": "you in PLAN MODE. tool [{{blockedNames}}] blocked — only exit_plan_mode work. write whole plan as word, then call exit_plan_mode to show human.",
+    "approvalResult": "human say plan good. you go do now. update todo if got one.",
+    "rejectionStatus": "plan rejected. no do.",
+    "planningInstruction": "## ⚠️ PLAN MODE — NO TOUCH TOOL\n\n**IMPORTANT**: you see many tool above (create_team, execute_shell, read_file) but you in PLAN MODE and **CANNOT use them**.\n\nyou only got:\n- **exit_plan_mode** — call when plan done, show to human\n- **think** — think about stuff\n\nother tool BLOCKED. no try.\n\n**what do:**\n1. look at what human want\n2. make plan with word\n3. call exit_plan_mode when ready — human check before you do\n\nkeep plan short. simple task, short plan."
+  },
+  "reminderExtractor": {
+    "extractionPrompt": "you look at big instruction and pull out important rule.\n\npull exactly 8–12 most important rule — thing agent MUST follow whole time.\n\nlook for:\n- hard no (never do X, no do Y)\n- must do (always do X, you must Y)\n- safety rule\n- how output should look\n- who you are, who you not\n- tool rule\n\nhow you write:\n- ONLY bullet list with `- ` at start\n- each bullet one short sentence (max 30 word)\n- no header, no explain, no number, no fancy format\n- pick rule that hurt most if forget\n- skip obvious rule (like 'be helpful')\n\nbig instruction to look at:\n<system_prompt>"
+  },
+  "visionFeed": {
+    "instruction": "\n\n## 🎥 EYE FEED ACTIVE\nyou got live eye (camera or screen). last 3 picture attached to human message (old to new).\nuse picture to see what happen, notice change, and talk about what you see.\n"
+  },
+  "exhaustionRecovery": {
+    "message": "you hit max tool call for this turn. tell human what you did so far, what result you got, and what still need do."
+  },
+  "gotSynthesis": {
+    "instruction": "[MANY-THINK MERGE PASS]\n\n{{branchCount}} think-path ran and scored. you make ONE good answer that take best part from all path — best tool call, safest way, most complete.\n\nRULE:\n1. no just copy best path. MERGE good part from all\n2. if path suggest different tool that work together, use all\n3. if path disagree, pick one with best CORRECT score, then RISK score\n4. grab safety check from careful path even if use fast path approach\n5. make answer with tool call like you doing the thing\n\n── PATH RESULT ──\n\n"
+  },
+  "planModeEntry": {
+    "message": "you in plan mode now. look around, think about how do.\n\nin plan mode:\n1. look at code, understand pattern\n2. find similar thing already built\n3. think about different way, what good what bad\n4. make real plan for how build\n5. when ready, call exit_plan_mode to show plan\n\nNO write file. NO edit. read only. think only."
+  },
+  "toolDiscoveryNudge": {
+    "autoEnabled": "found {{count}} tool: {{toolNames}}. already turned on. use them now.",
+    "enableRequired": "found {{count}} tool not turned on yet: {{toolNames}}. call enable_tools with name now. TIP: next time use discover_and_enable_tools — find AND turn on in one step."
+  },
+  "toolRetryGuidance": {
+    "header": "[TOOL BROKE] {{count}} tool call fail:",
+    "analyzeSteps": "before try again, think:\n1. which part cause fail?\n2. what value need fix?\n3. need do something first before tool work?\n\ntry again with fix, or do different thing if tool not right for job."
+  },
+  "outputTruncation": {
+    "continuationPrompt": "last answer got cut off — too many word. truncated text saved. keep going from where you stop. NO repeat what already said.",
+    "exhaustedRecovery": "answer got cut off because **max_tokens** limit ({{configuredMaxTokens}}) hit, and {{maxAttempts}} try to continue also hit limit. this happen with big tool call or very long answer. make **Max Tokens** bigger, or break work into smaller piece.",
+    "providerError": "provider broke on try {{iteration}}: `{{errorText}}`. talk so far saved. try again, or use different model if keep breaking."
+  },
+  "contextWindow": {
+    "droppedMessages": "{{droppedCount}} old message removed — cave too small. talk continue below."
+  }
+}
