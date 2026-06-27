@@ -38,6 +38,7 @@ import ToolOrchestratorService from "../ToolOrchestratorService.ts";
 import AgenticToolResolver from "../AgenticToolResolver.ts";
 import { ToolDocFormatter } from "../system-prompt/ToolDocFormatter.ts";
 import { getToolPolicyAddendum } from "../personas/utils.ts";
+import PromptLocaleService from "../PromptLocaleService.ts";
 import type AgenticLoopState from "../AgenticLoopState.ts";
 import type AgentHooks from "../AgentHooks.ts";
 import type { ChatMessage, TokenUsage } from "../../types/admin.ts";
@@ -219,12 +220,16 @@ export default class BaseAgenticHarness {
     );
 
     if (currentMessages && newlyAddedToolSchemas.length > 0) {
+      const activeLocale = (this.context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale();
       const addendumDocumentation =
         BaseAgenticHarness.toolDocFormatter.buildToolDescriptions(
           newlyAddedToolSchemas.map((tool) => tool.name),
           undefined,
           undefined,
           newlyAddedToolSchemas.map((tool) => tool.name),
+          undefined,
+          undefined,
+          activeLocale,
         );
 
       if (addendumDocumentation) {
@@ -234,18 +239,25 @@ export default class BaseAgenticHarness {
 
         const policyAddendum = getToolPolicyAddendum(
           newlyAddedToolSchemas.map((tool) => tool.name),
-          this.context.options?.locale as string | undefined,
+          activeLocale,
         );
+
+        const headerText = PromptLocaleService.get(activeLocale, "harness.toolSetUpdated.header", {
+          count: String(newlyAddedToolSchemas.length),
+          toolNames: toolNamesList,
+        });
+        const availableText = PromptLocaleService.get(activeLocale, "harness.toolSetUpdated.availableDocumentation");
+        const guidelinesHeader = PromptLocaleService.get(activeLocale, "harness.toolSetUpdated.usageGuidelines");
 
         currentMessages.push({
           role: "system",
           content:
             `<tool-update>\n` +
-            `[TOOL SET UPDATED] ${newlyAddedToolSchemas.length} new tool(s) have been dynamically enabled: ${toolNamesList}\n\n` +
-            `The following tools are now available with full documentation:\n\n` +
+            `${headerText}\n\n` +
+            `${availableText}\n\n` +
             addendumDocumentation +
             (policyAddendum
-              ? `\n\n## Tool Usage Guidelines\n\n${policyAddendum}`
+              ? `\n\n${guidelinesHeader}\n\n${policyAddendum}`
               : "") +
             `\n</tool-update>`,
         });

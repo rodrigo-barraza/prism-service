@@ -40,5 +40,10 @@
   },
   "contextWindow": {
     "droppedMessages": "{{droppedCount}} old message removed — cave too small. talk continue below."
+  },
+  "toolSetUpdated": {
+    "header": "[NEW TOOL] {{count}} new tool turned on: {{toolNames}}",
+    "availableDocumentation": "these tool ready now with full instruction:",
+    "usageGuidelines": "## how use tool"
   }
 }
