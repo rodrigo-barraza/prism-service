@@ -8,7 +8,7 @@
 
   "createTeamGuidance": "create_team guidance:\n- Up to **10 member** per call\n- Tune via `topologyConfig`: `create_team({ topology: \"critic_loop\", topologyConfig: { actorCount: 3, maxRounds: 5 }, members: [...] })`\n- Single task = single member\n- `agent` = persona type, not agent ID. Leave blank unless specific persona needed\n- Member use 0-based name (agent-0, agent-1)\n- Don't use sub-agent to verify another — you get result directly\n- Don't assign trivial task. Give real work",
 
-  "subAgentResults": "### Result\n`create_team` **blocks until complete**. Each member result:\n- `status` — completed/failed/stopped\n- `summary` — status description\n- `result` — final output\n- `toolUses`/`durationMs` — usage stat\n- `diff` — file change",
+  "subAgentResults": "### Result\n`create_team` is **non-blocking** — returns immediately with agent ID and `status: running`. System auto-notifies with `[SUB-AGENT TEAM COMPLETED]` when done + triggers auto-response.\n**End your turn after calling `create_team`.** Do NOT poll `get_task_output`.\n\nCompletion notification includes per-member:\n- `status` — completed/failed/stopped\n- `summary` — status description\n- `result` — final output\n- `toolUses`/`durationMs` — usage stat\n- `diff` — file change",
 
   "subAgentCapabilities": "### Capability\nSub-agent have: {{subAgentToolList}}\n\nEach in **isolated git worktree** — full repo on separate branch. Can't interfere. Change collected as diff.\n\nSub-agent **can't see conversation**. Every prompt must be self-contained.",
 
@@ -55,7 +55,7 @@
 
   "tools": {
     "create_team": {
-      "description": "Spawn sub-agent in isolated worktree. Inherit enabled tool, can enable more via enable_tools. Topology: {{hierarchicalDesc}} parallel, {{hierarchicalAggregationDesc}} parallel+merge, {{sequentialDesc}} sequential with result passing, {{peerToPeerDesc}} turn-based discussion, {{tournamentDesc}} parallel+judge, {{criticLoopDesc}} actor-critic refinement, {{divideAndConquerDesc}} decompose-execute-synthesize, {{mctsDesc}} tree search. Single task=1 member, parallel=up to 10. Returns all result when complete.",
+      "description": "Spawn sub-agent in isolated worktree. Inherit enabled tool, can enable more via enable_tools. Topology: {{hierarchicalDesc}} parallel, {{hierarchicalAggregationDesc}} parallel+merge, {{sequentialDesc}} sequential with result passing, {{peerToPeerDesc}} turn-based discussion, {{tournamentDesc}} parallel+judge, {{criticLoopDesc}} actor-critic refinement, {{divideAndConquerDesc}} decompose-execute-synthesize, {{mctsDesc}} tree search. Single task=1 member, parallel=up to 10. NON-BLOCKING: returns immediately with agent ID + status 'running'. Auto-notified with [SUB-AGENT TEAM COMPLETED] when done — end turn after calling, do NOT poll get_task_output.",
       "parameters": {
         "name": "Team name (e.g. 'auth_fix', 'research').",
         "topology": "Execution pattern. '{{hierarchicalLabel}}' parallel. '{{hierarchicalAggregationLabel}}' parallel+merge. '{{sequentialLabel}}' sequential. '{{peerToPeerLabel}}' turn-based. '{{tournamentLabel}}' competitive+judge. '{{criticLoopLabel}}' actor-critic. '{{divideAndConquerLabel}}' decompose-parallel-synthesize. '{{mctsLabel}}' tree search. Omit for default.",
@@ -88,7 +88,7 @@
       }
     },
     "get_task_output": {
-      "description": "Read sub-agent output. Check result after completion or partial from still-running.",
+      "description": "Read sub-agent output. Only use when user asks for progress on long-running agent or to inspect specific agent partial output. Do NOT poll after create_team — auto-notified on completion.",
       "parameters": {
         "agent_id": "Sub-agent ID from create_team."
       }
