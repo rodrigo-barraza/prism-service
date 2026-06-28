@@ -2105,16 +2105,43 @@ export default class OrchestratorService {
       ].join("\n");
     });
 
+    const overallStatus = routerResults.every(
+      (result) => "status" in result && result.status === "completed",
+    )
+      ? "completed"
+      : "failed";
+
+    const totalToolUses = routerResults.reduce(
+      (sum, result) => sum + ("toolUses" in result ? (result.toolUses || 0) : 0),
+      0,
+    );
+
+    const totalDurationMs = routerResults.reduce(
+      (sum, result) =>
+        sum + ("durationMs" in result ? (result.durationMs || 0) : 0),
+      0,
+    );
+
+    const teamCompletedHeader = PromptLocaleService.get(
+      locale,
+      "orchestrator.notifications.teamCompleted",
+      { teamName, topology },
+    );
+
+    // Build the detailed result body (preserved for LLM context + markdown rendering)
+    const resultBody = resultSummaries.join("\n\n");
+
     const completionMessage = {
       role: "user" as const,
       content: [
         `<task-notification>`,
-        PromptLocaleService.get(locale, "orchestrator.notifications.teamCompleted", {
-          teamName,
-          topology,
-        }),
-        ``,
-        ...resultSummaries,
+        `<status>${overallStatus}</status>`,
+        `<summary>${teamCompletedHeader}</summary>`,
+        `<tool_uses>${totalToolUses}</tool_uses>`,
+        `<duration_ms>${totalDurationMs}</duration_ms>`,
+        `<result>`,
+        resultBody,
+        `</result>`,
         `</task-notification>`,
       ].join("\n"),
       timestamp: new Date().toISOString(),
