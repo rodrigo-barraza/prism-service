@@ -152,6 +152,13 @@ export interface OrchestratorSpawnParams {
    * spawnFromTool returns immediately with status="running".
    */
   awaitCompletion?: boolean;
+  /**
+   * Fires after the agent ID is allocated and state is registered in the
+   * active sub-agents map, but BEFORE the agentic loop starts. Used by
+   * createTeam's registration barrier to capture real agent IDs for
+   * immediate return while the router continues in the background.
+   */
+  onRegistered?: (result: SubAgentResult) => void;
 }
 
 export interface OrchestratorContext {
