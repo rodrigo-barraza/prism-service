@@ -58,18 +58,18 @@ function rewriteNonLeadingSystemMessages(
 ): InputMessage[] {
   if (!requiresSystemMessageRewriteTemporaryPatch(modelName)) return messages;
 
-  let hasPassedLeadingSystemBlock = false;
+  let hasSeenFirstSystemMessage = false;
   return messages.map((message) => {
     if (message.role === "system") {
-      if (!hasPassedLeadingSystemBlock) {
+      if (!hasSeenFirstSystemMessage) {
+        hasSeenFirstSystemMessage = true;
         return message;
       }
       logger.warn(
-        `[vLLM] TEMP PATCH: Rewriting mid-conversation system message to user role for ${modelName} (vllm-qwen3.6 workaround)`,
+        `[vLLM] TEMP PATCH: Rewriting non-primary system message to user role for ${modelName} (vllm-qwen3.6 workaround)`,
       );
       return { ...message, role: "user" };
     }
-    hasPassedLeadingSystemBlock = true;
     return message;
   });
 }
