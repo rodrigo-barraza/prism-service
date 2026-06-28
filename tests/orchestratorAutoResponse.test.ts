@@ -310,6 +310,71 @@ describe("Event-Driven Auto-Response", () => {
 
       expect(mockUpdateOne).not.toHaveBeenCalled();
     });
+
+    it("should use messages.0 $exists guard to prevent creating conversation before Finalizer", async () => {
+      mockFindOne.mockResolvedValue({
+        id: "parent-conv-id",
+        isGenerating: false,
+        messages: [{ role: "user", content: "Go" }],
+        settings: { provider: PROVIDERS.GOOGLE, model: "gemini-3-flash-preview" },
+      });
+
+      await OrchestratorService._notifyParentOfRouterCompletion(
+        "guarded_team",
+        "hierarchical",
+        [{
+          agent_id: "a1", description: "Agent", status: "completed",
+          summary: "", result: "done", toolUses: 1, iterations: 1,
+          durationMs: 100, messages: [],
+        }],
+        orchestratorContext,
+      );
+
+      await waitForMockCalls(mockUpdateOne, 1);
+
+      const [query] = mockUpdateOne.mock.calls[0];
+      expect(query["messages.0"]).toEqual({ $exists: true });
+      expect(query.id).toBe("parent-conv-id");
+    });
+
+    it("should retry when parent conversation does not exist yet (race condition)", async () => {
+      // Simulate: first 2 attempts → conversation not found, third → success
+      mockUpdateOne
+        .mockResolvedValueOnce({ matchedCount: 0 })
+        .mockResolvedValueOnce({ matchedCount: 0 })
+        .mockResolvedValueOnce({ matchedCount: 1 });
+
+      mockFindOne.mockResolvedValue({
+        id: "parent-conv-id",
+        isGenerating: true,
+        messages: [],
+        settings: { provider: PROVIDERS.GOOGLE, model: "gemini-3-flash-preview" },
+      });
+
+      // Use fake timers to avoid waiting real 2s per retry
+      vi.useFakeTimers();
+
+      const completionPromise = OrchestratorService._notifyParentOfRouterCompletion(
+        "retry_team",
+        "hierarchical",
+        [{
+          agent_id: "a1", description: "Retry Agent", status: "completed",
+          summary: "", result: "retried", toolUses: 1, iterations: 1,
+          durationMs: 500, messages: [],
+        }],
+        orchestratorContext,
+      );
+
+      // Advance through 2 retry delays (2000ms each)
+      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(2000);
+
+      await completionPromise;
+
+      vi.useRealTimers();
+
+      expect(mockUpdateOne).toHaveBeenCalledTimes(3);
+    });
   });
 
   // ── _triggerParentAutoResponse ────────────────────────────────
