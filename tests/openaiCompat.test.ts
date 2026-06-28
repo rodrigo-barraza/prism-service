@@ -147,7 +147,7 @@ describe('buildPayloadParams', () => {
   it('falls back to default temperature and maxTokens when not specified', () => {
     const params = buildPayloadParams({});
     expect(params.temperature).toBe(0.7);
-    expect(params.max_tokens).toBe(-1);
+    expect(params.max_tokens).toBeUndefined();
   });
 
   it('accepts custom defaults', () => {
