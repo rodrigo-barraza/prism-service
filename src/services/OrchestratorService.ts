@@ -1000,6 +1000,12 @@ export default class OrchestratorService {
     return this.cleanupConversation(parentAgentConversationId);
   }
 
+  static clearAllActiveSubAgents(): void {
+    activeSubAgents.clear();
+    agentCountersByConversation.clear();
+    logger.info("[Orchestrator] Cleared all active sub-agents from registry");
+  }
+
   static async createTeam(
     teamCreationArguments: { name: string; members: TeamMember[]; topology?: string; topologyConfig?: Record<string, number | string | boolean> },
     orchestratorContext: OrchestratorContext,
@@ -1916,14 +1922,16 @@ export default class OrchestratorService {
     });
 
     const completionMessage = {
-      role: "tool" as const,
+      role: "user" as const,
       content: [
+        `<task-notification>`,
         `[SUB-AGENT TEAM COMPLETED] Team "${teamName}" (${topology}) finished.`,
         ``,
         ...resultSummaries,
+        `</task-notification>`,
       ].join("\n"),
-      name: "create_team",
       timestamp: new Date().toISOString(),
+      _alreadyPersisted: true,
     };
 
     try {
@@ -2039,10 +2047,18 @@ export default class OrchestratorService {
       return;
     }
 
-    const contextMessages = [
-      ...((conversation.messages as ConversationMessage[]) || []),
-      completionMessage,
-    ];
+    const hasCompletionMessage = ((conversation.messages as ConversationMessage[]) || []).some(
+      (message: ConversationMessage) =>
+        message.role === "user" &&
+        message.content === completionMessage.content,
+    );
+
+    const contextMessages = hasCompletionMessage
+      ? [...((conversation.messages as ConversationMessage[]) || [])]
+      : [
+          ...((conversation.messages as ConversationMessage[]) || []),
+          completionMessage,
+        ];
 
     const backgroundEmit = (event: { type: string; [key: string]: unknown }) => {
       logger.debug(

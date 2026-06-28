@@ -66,6 +66,7 @@ export class HierarchicalRouter implements TopologyRouter {
         agentIndex: memberIndex,
         teamSize: members.length,
         orchestratorContext,
+        awaitCompletion: true,
       });
     }
 

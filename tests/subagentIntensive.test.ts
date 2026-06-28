@@ -79,6 +79,16 @@ import type { AgenticContext } from "../src/services/harnesses/types.ts";
 import type { OrchestratorContext, SubAgentResult, SubAgentState } from "../src/types/orchestrator.ts";
 
 describe("Sub-Agent Intensive Integration Tests", () => {
+  async function waitForCondition(condition: () => boolean, timeoutMilliseconds = 2000): Promise<void> {
+    const startTime = Date.now();
+    while (!condition()) {
+      if (Date.now() - startTime > timeoutMilliseconds) {
+        throw new Error(`Timed out waiting for condition after ${timeoutMilliseconds}ms`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+  }
+
   let orchestratorContext: OrchestratorContext;
 
   beforeEach(() => {
@@ -92,6 +102,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
 
     // Reset the global orchestrator registry to guarantee test isolation
     OrchestratorService.cleanupSession("session-id-def");
+    OrchestratorService.clearAllActiveSubAgents();
     InstanceLoadBalancer.getReservations().clear();
 
     // Default mock implementation
@@ -177,8 +188,8 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       };
 
       const results = await OrchestratorService.createTeam(teamArgs, orchestratorContext);
-      // Wait for non-blocking background sub-agent loops to complete (mock uses setTimeout(50ms))
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      // Wait for non-blocking background sub-agent loops to complete
+      await waitForCondition(() => mockRunAgenticLoop.mock.calls.length === 3 && activeLoopCount === 0);
 
       expect(results).toHaveLength(3);
       expect(peakConcurrencyCount).toBe(3); // Assert all 3 executed at the same time
@@ -320,7 +331,9 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       });
 
       // Allow setup to progress
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await waitForCondition(() => OrchestratorService.listSubAgents({
+        parentConversationId: orchestratorContext.conversationId!,
+      }).length > 0);
 
       const activeList = OrchestratorService.listSubAgents({
         parentConversationId: orchestratorContext.conversationId!,
@@ -366,8 +379,8 @@ describe("Sub-Agent Intensive Integration Tests", () => {
 
       expect("status" in followUpRes && followUpRes.status).toBe("running");
 
-      // Yield event loop execution
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      // Wait for loop to be run again with the follow-up
+      await waitForCondition(() => mockRunAgenticLoop.mock.calls.length >= 1);
 
       // Verify loop was run again with the follow-up
       expect(mockRunAgenticLoop).toHaveBeenCalled();
@@ -395,7 +408,9 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       });
 
       // Give spawnFromTool a moment to register the agent and call _runSubAgentLoop
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await waitForCondition(() => OrchestratorService.listSubAgents({
+        parentConversationId: orchestratorContext.conversationId!,
+      }).some((agent) => agent.description === "Sub-agent that runs slowly"));
 
       const activeList = OrchestratorService.listSubAgents({
         parentConversationId: orchestratorContext.conversationId!,
@@ -610,7 +625,9 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       });
 
       // Give spawn calls a brief moment to run and register the sub-agents
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await waitForCondition(() => OrchestratorService.listSubAgents({
+        parentConversationId: orchestratorContext.conversationId!,
+      }).length === 2);
 
       const activeSubAgentsList = OrchestratorService.listSubAgents({
         parentConversationId: orchestratorContext.conversationId!,
@@ -661,7 +678,9 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       });
 
       // Allow registration to proceed
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await waitForCondition(() => OrchestratorService.listSubAgents({
+        parentConversationId: orchestratorContext.conversationId!,
+      }).length === 1);
 
       const activeListBeforeAbort = OrchestratorService.listSubAgents({
         parentConversationId: orchestratorContext.conversationId!,
@@ -687,6 +706,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
   // ── 9. Concurrency Limits ───────────────────────────────────────
   describe("Maximum Concurrency Constraints", () => {
     it("should prevent spawning more than the maximum limit of concurrent sub-agents", async () => {
+      console.log("BEFORE CONCURRENCY LIMITS TEST:", OrchestratorService.listSubAgents());
       const loopResolvers: Array<(value: unknown) => void> = [];
 
       mockRunAgenticLoop.mockImplementation(async () => {
@@ -710,7 +730,9 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       }
 
       // Allow all spawns to register and start running
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await waitForCondition(() => OrchestratorService.listSubAgents({
+        parentConversationId: orchestratorContext.conversationId!,
+      }).length === 10);
 
       const activeList = OrchestratorService.listSubAgents({
         parentConversationId: orchestratorContext.conversationId!,
@@ -769,7 +791,9 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       });
 
       // Allow registration to proceed
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await waitForCondition(() => OrchestratorService.listSubAgents({
+        parentConversationId: orchestratorContext.conversationId!,
+      }).length === 1);
 
       const activeList = OrchestratorService.listSubAgents({
         parentConversationId: orchestratorContext.conversationId!,

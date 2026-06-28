@@ -64,7 +64,18 @@ import OrchestratorService, {
 import AgentPersonaRegistry from "../src/services/AgentPersonaRegistry.ts";
 import { afterEach } from "vitest";
 
-const waitForAgentRegistration = () => new Promise((resolve) => setTimeout(resolve, 50));
+async function waitForCondition(condition: () => boolean, timeoutMilliseconds = 2000): Promise<void> {
+  const startTime = Date.now();
+  while (!condition()) {
+    if (Date.now() - startTime > timeoutMilliseconds) {
+      throw new Error(`Timed out waiting for condition after ${timeoutMilliseconds}ms`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
+const waitForAgentRegistration = (parentConversationId = "conv-id-789") =>
+  waitForCondition(() => OrchestratorService.listSubAgents({ parentConversationId }).length > 0);
 
 /**
  * Polls until the mock has been called at least `expectedCalls` times.
@@ -123,6 +134,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
     mockExistsSyncResult = undefined;
     resolveDeferredPromise = undefined;
     cleanAllConversations();
+    OrchestratorService.clearAllActiveSubAgents();
 
     orchestratorContext = {
       project: "test-project",
@@ -750,8 +762,8 @@ describe("OrchestratorService Spawning & Agent Types", () => {
             },
           })
         );
-        // Yield to allow the agent to progress and register in activeSubAgents
-        await new Promise((resolve) => setTimeout(resolve, 5));
+        // Wait for the agent to progress and register in activeSubAgents
+        await waitForCondition(() => OrchestratorService.listSubAgents().length === i + 1);
       }
 
       const result11 = await OrchestratorService.spawnFromTool({
@@ -1573,7 +1585,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       };
 
       await OrchestratorService.createTeam(teamArgs, contextWithoutDepth);
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await waitForMockCalls(mockRunAgenticLoop, 1);
       expect(mockRunAgenticLoop).toHaveBeenCalled();
 
       getSectionSpy.mockRestore();

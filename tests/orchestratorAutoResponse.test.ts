@@ -187,9 +187,10 @@ describe("Event-Driven Auto-Response", () => {
       expect(username).toBe("test-user");
       expect(messages).toHaveLength(1);
 
-      const completionMessage = messages[0] as { role: string; name: string; content: string };
-      expect(completionMessage.role).toBe("tool");
-      expect(completionMessage.name).toBe("create_team");
+      const completionMessage = messages[0] as { role: string; content: string };
+      expect(completionMessage.role).toBe("user");
+      expect(completionMessage.content).toContain("<task-notification>");
+      expect(completionMessage.content).toContain("</task-notification>");
       expect(completionMessage.content).toContain("[SUB-AGENT TEAM COMPLETED]");
       expect(completionMessage.content).toContain("research_team");
       expect(completionMessage.content).toContain("hierarchical");
@@ -311,10 +312,10 @@ describe("Event-Driven Auto-Response", () => {
 
   describe("_triggerParentAutoResponse", () => {
     const completionMessage = {
-      role: "tool" as const,
-      content: "[SUB-AGENT TEAM COMPLETED] Team finished.",
-      name: "create_team",
+      role: "user" as const,
+      content: "<task-notification>\n[SUB-AGENT TEAM COMPLETED] Team finished.\n</task-notification>",
       timestamp: new Date().toISOString(),
+      _alreadyPersisted: true,
     };
 
     it("should trigger an agentic loop when the parent is idle", async () => {
@@ -384,6 +385,32 @@ describe("Event-Driven Auto-Response", () => {
       expect(loopArgs.messages[2].content).toBe("Also check error handling");
       expect(loopArgs.messages[3].content).toBe("Noted, I'll include that");
       expect(loopArgs.messages[4].content).toContain("SUB-AGENT TEAM COMPLETED");
+    });
+
+    it("should not append completionMessage to contextMessages if it is already present in conversation messages", async () => {
+      mockFindOne.mockResolvedValue({
+        id: "parent-conv-id",
+        isGenerating: false,
+        messages: [
+          { role: "user", content: "Build me a feature" },
+          { role: "assistant", content: "I spawned sub-agents" },
+          completionMessage,
+        ],
+        settings: {
+          provider: PROVIDERS.GOOGLE,
+          model: "gemini-3-flash-preview",
+          agent: "CODING",
+        },
+      });
+
+      await OrchestratorService._triggerParentAutoResponse(
+        "parent-conv-id", "test-project", "test-user",
+        orchestratorContext, completionMessage,
+      );
+
+      const loopArgs = mockRunAgenticLoop.mock.calls[0][0];
+      expect(loopArgs.messages).toHaveLength(3);
+      expect(loopArgs.messages.filter((m: any) => m.content === completionMessage.content)).toHaveLength(1);
     });
 
     it("should skip auto-response when parent is currently generating", async () => {
