@@ -2156,7 +2156,15 @@ export default class OrchestratorService {
     // pushing the user's actual message to messages[1] when the
     // Finalizer runs later. Instead, use a direct $push with
     // upsert: false and retry until the conversation exists.
-    const MAXIMUM_PERSISTENCE_RETRIES = 15;
+    //
+    // CRITICAL: The query also requires `isGenerating: { $ne: true }`
+    // to prevent a message-ordering race condition. If the user is
+    // mid-conversation while sub-agents work, the $push must wait
+    // until the current turn's Finalizer has persisted its messages
+    // and cleared isGenerating. This guarantees the notification
+    // always lands at the TRUE end of the messages array — never
+    // buried between a user message and its response.
+    const MAXIMUM_PERSISTENCE_RETRIES = 60;
     const PERSISTENCE_RETRY_DELAY_MILLISECONDS = 2_000;
 
     try {
@@ -2176,6 +2184,7 @@ export default class OrchestratorService {
             project,
             username,
             "messages.0": { $exists: true },
+            isGenerating: { $ne: true },
           },
           {
             $push: { messages: completionMessage },
@@ -2192,9 +2201,23 @@ export default class OrchestratorService {
           break;
         }
 
-        logger.debug(
-          `[Orchestrator] Parent conversation ${conversationId} not ready yet (attempt ${retryAttempt + 1}/${MAXIMUM_PERSISTENCE_RETRIES}), waiting ${PERSISTENCE_RETRY_DELAY_MILLISECONDS}ms…`,
+        // Distinguish between "conversation doesn't exist yet" and
+        // "conversation exists but is currently generating"
+        const existenceCheck = await notificationCollection.findOne(
+          { id: conversationId, project, username },
+          { projection: { isGenerating: 1 } },
         );
+
+        if (existenceCheck?.isGenerating) {
+          logger.debug(
+            `[Orchestrator] Parent conversation ${conversationId} is currently generating — waiting for turn to complete (attempt ${retryAttempt + 1}/${MAXIMUM_PERSISTENCE_RETRIES})`,
+          );
+        } else {
+          logger.debug(
+            `[Orchestrator] Parent conversation ${conversationId} not ready yet (attempt ${retryAttempt + 1}/${MAXIMUM_PERSISTENCE_RETRIES}), waiting ${PERSISTENCE_RETRY_DELAY_MILLISECONDS}ms…`,
+          );
+        }
+
         await new Promise((resolve) =>
           setTimeout(resolve, PERSISTENCE_RETRY_DELAY_MILLISECONDS),
         );
@@ -2202,7 +2225,7 @@ export default class OrchestratorService {
 
       if (!persistedSuccessfully) {
         logger.warn(
-          `[Orchestrator] Parent conversation ${conversationId} never appeared after ${MAXIMUM_PERSISTENCE_RETRIES} retries — completion notification dropped`,
+          `[Orchestrator] Parent conversation ${conversationId} never became idle after ${MAXIMUM_PERSISTENCE_RETRIES} retries — completion notification dropped`,
         );
       }
     } catch (persistenceError: unknown) {
@@ -2268,13 +2291,60 @@ export default class OrchestratorService {
       return;
     }
 
-    // If the parent is currently generating, skip auto-response — the user
-    // is actively chatting and will see results in the next turn naturally.
+    // If the parent is currently generating, wait until the turn completes.
+    // The $push in _notifyParentOfRouterCompletion already waits for
+    // isGenerating to clear before inserting the notification, so by the
+    // time we reach here the notification should be persisted. This is a
+    // safety net in case the conversation entered a new generation between
+    // the $push succeeding and this auto-response check.
+    const AUTO_RESPONSE_GENERATION_WAIT_MAXIMUM_RETRIES = 30;
+    const AUTO_RESPONSE_GENERATION_WAIT_DELAY_MILLISECONDS = 2_000;
+
     if (conversation.isGenerating) {
       logger.info(
-        `[Orchestrator] Skipping auto-response for ${conversationId}: parent is currently generating`,
+        `[Orchestrator] Parent conversation ${conversationId} is generating — waiting for turn to complete before auto-response`,
       );
-      return;
+
+      let conversationBecameIdle = false;
+      for (let waitAttempt = 0; waitAttempt < AUTO_RESPONSE_GENERATION_WAIT_MAXIMUM_RETRIES; waitAttempt++) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, AUTO_RESPONSE_GENERATION_WAIT_DELAY_MILLISECONDS),
+        );
+
+        const refreshedConversation = await conversationCollection.findOne({
+          id: conversationId,
+          project,
+          username,
+        });
+
+        if (!refreshedConversation) {
+          logger.warn(
+            `[Orchestrator] Parent conversation ${conversationId} disappeared during auto-response wait`,
+          );
+          return;
+        }
+
+        if (!refreshedConversation.isGenerating) {
+          conversationBecameIdle = true;
+          // Reload the full conversation for the agentic loop below
+          Object.assign(conversation, refreshedConversation);
+          logger.info(
+            `[Orchestrator] Parent conversation ${conversationId} became idle after ${waitAttempt + 1} wait(s) — proceeding with auto-response`,
+          );
+          break;
+        }
+
+        logger.debug(
+          `[Orchestrator] Still waiting for ${conversationId} to finish generating (attempt ${waitAttempt + 1}/${AUTO_RESPONSE_GENERATION_WAIT_MAXIMUM_RETRIES})`,
+        );
+      }
+
+      if (!conversationBecameIdle) {
+        logger.warn(
+          `[Orchestrator] Parent conversation ${conversationId} never became idle after ${AUTO_RESPONSE_GENERATION_WAIT_MAXIMUM_RETRIES} retries — skipping auto-response`,
+        );
+        return;
+      }
     }
 
     logger.info(

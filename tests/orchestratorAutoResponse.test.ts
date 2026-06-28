@@ -191,6 +191,8 @@ describe("Event-Driven Auto-Response", () => {
       expect(conversationId).toBe("parent-conv-id");
       expect(project).toBe("test-project");
       expect(username).toBe("test-user");
+      // Verify the query waits for isGenerating to clear (race-condition guard)
+      expect(query.isGenerating).toEqual({ $ne: true });
       expect(messages).toHaveLength(1);
 
       const completionMessage = messages[0] as { role: string; content: string };
@@ -482,21 +484,53 @@ describe("Event-Driven Auto-Response", () => {
       expect(loopArgs.messages.filter((m: any) => m.content === completionMessage.content)).toHaveLength(1);
     });
 
-    it("should skip auto-response when parent is currently generating", async () => {
-      mockFindOne.mockResolvedValue({
-        id: "parent-conv-id",
-        isGenerating: true,
-        messages: [],
-        settings: {},
-      });
+    it("should wait for parent to finish generating before auto-response", async () => {
+      // First findOne returns isGenerating: true (initial load)
+      // Second findOne returns isGenerating: true (first poll)
+      // Third findOne returns isGenerating: false (conversation became idle)
+      vi.useFakeTimers();
 
-      await OrchestratorService._triggerParentAutoResponse(
+      const idleConversation = {
+        id: "parent-conv-id",
+        isGenerating: false,
+        messages: [],
+        settings: {
+          provider: PROVIDERS.GOOGLE,
+          model: "gemini-2.5-flash",
+        },
+      };
+
+      mockFindOne
+        .mockResolvedValueOnce({
+          id: "parent-conv-id",
+          isGenerating: true,
+          messages: [],
+          settings: {},
+        })
+        .mockResolvedValueOnce({
+          id: "parent-conv-id",
+          isGenerating: true,
+          messages: [],
+          settings: {},
+        })
+        .mockResolvedValueOnce(idleConversation);
+
+      const autoResponsePromise = OrchestratorService._triggerParentAutoResponse(
         "parent-conv-id", "test-project", "test-user",
         orchestratorContext, completionMessage,
       );
 
-      expect(mockRunAgenticLoop).not.toHaveBeenCalled();
-      expect(vi.mocked(ConversationService.setGenerating)).not.toHaveBeenCalled();
+      // Advance through the polling delays
+      await vi.advanceTimersByTimeAsync(2_000);
+      await vi.advanceTimersByTimeAsync(2_000);
+      await vi.advanceTimersByTimeAsync(2_000);
+
+      await autoResponsePromise;
+
+      // Auto-response should have eventually been called after conversation became idle
+      expect(mockRunAgenticLoop).toHaveBeenCalled();
+
+      vi.useRealTimers();
     });
 
     it("should skip auto-response when conversation is not found", async () => {
