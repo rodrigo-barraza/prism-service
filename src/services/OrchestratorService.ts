@@ -71,7 +71,7 @@ const MAX_SUB_AGENT_ITERATIONS = 15;
  * Circuit breaker to prevent exponential agent fan-out from recursive spawning.
  * Paper reference: Intelligence Entropy (arXiv:2606.18065) — disorder grows exponentially.
  */
-const MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION = 20;
+const MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION = 100;
 
 /**
  * Scope attenuation factor for maxIterations at each recursion depth hop.
