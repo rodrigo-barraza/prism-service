@@ -173,14 +173,14 @@ describe("OutputTruncationRecovery", () => {
       expect(escalatedMaxTokens).toBe(Math.ceil(4096 * Math.pow(1.5, 2)));
     });
 
-    it("should use default maxTokens (8192) when not configured", () => {
+    it("should use default maxTokens (16384) when not configured", () => {
       const currentMessages: ConversationMessage[] = [];
       const pass = createMockPass();
       const context = createMockContext({ options: {} } as any);
 
       const escalatedMaxTokens = injectContinuationContext(currentMessages, pass, context, 1);
 
-      expect(escalatedMaxTokens).toBe(Math.ceil(8192 * 1.5));
+      expect(escalatedMaxTokens).toBe(Math.ceil(16384 * 1.5));
     });
 
     it("should emit output_truncation_recovery status event", () => {

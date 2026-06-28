@@ -4,6 +4,10 @@ import type { ChatMessage, ToolCallEntry } from "../types/admin.ts";
 import MicroCompactionService from "../services/compact/MicroCompactionService.ts";
 import PromptLocaleService from "../services/PromptLocaleService.ts";
 import { PROMPT_DELIMITERS } from "../constants.ts";
+import {
+  DEFAULT_MAX_INPUT_TOKENS,
+  MIN_OUTPUT_RESERVE,
+} from "../constants/TokenBudgetDefaults.ts";
 
 // ────────────────────────────────────────────────────────────
 // ContextWindowManager — Token-Budget Truncation
@@ -28,8 +32,7 @@ const TOOL_SCHEMA_OVERHEAD_TOKENS = 2000;
 /** Fraction of context window to target (leave headroom for output + safety) */
 const TARGET_UTILIZATION = 0.8;
 
-/** Minimum tokens to reserve for the model's output */
-const MIN_OUTPUT_RESERVE = 8192;
+
 
 /** When truncating tool results aggressively, cap at this many chars */
 const AGGRESSIVE_TOOL_RESULT_CAP = 3000;
@@ -330,7 +333,7 @@ export default class ContextWindowManager {
     options: EnforceOptions = {},
   ): EnforceResult {
     const {
-      maxInputTokens = 128_000,
+      maxInputTokens = DEFAULT_MAX_INPUT_TOKENS,
       maxOutputTokens = MIN_OUTPUT_RESERVE,
       toolCount = 0,
     } = options;

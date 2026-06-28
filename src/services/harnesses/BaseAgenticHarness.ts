@@ -9,6 +9,10 @@ import { calculateTokensPerSec } from "../../utils/math.ts";
 import { getPricing, TYPES } from "../../config.ts";
 import { stripToolCallMarkup } from "../../utils/StreamChunkDispatcher.ts";
 import ContextWindowManager from "../../utils/ContextWindowManager.ts";
+import {
+  DEFAULT_MAX_INPUT_TOKENS,
+  DEFAULT_MAX_OUTPUT_TOKENS,
+} from "../../constants/TokenBudgetDefaults.ts";
 import ConversationGenerationTracker from "../ConversationGenerationTracker.ts";
 import RequestLogger from "../RequestLogger.ts";
 import FileService from "../FileService.ts";
@@ -369,8 +373,8 @@ export default class BaseAgenticHarness {
     const contextResult = ContextWindowManager.enforce(
       messages as ChatMessage[],
       {
-        maxInputTokens: modelDefinition?.maxInputTokens || 128_000,
-        maxOutputTokens: options.maxTokens || 8192,
+        maxInputTokens: modelDefinition?.maxInputTokens || DEFAULT_MAX_INPUT_TOKENS,
+        maxOutputTokens: options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS,
         toolCount,
         locale: options?.locale as string | undefined,
       },

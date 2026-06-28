@@ -6,6 +6,10 @@ import AutoCompactionTrigger from "../../compact/AutoCompactionTrigger.ts";
 import CompactionService from "../../compact/CompactionService.ts";
 import ConversationEmbeddingService from "../../ConversationEmbeddingService.ts";
 import ContextWindowManager from "../../../utils/ContextWindowManager.ts";
+import {
+  DEFAULT_MAX_INPUT_TOKENS,
+  DEFAULT_MAX_OUTPUT_TOKENS,
+} from "../../../constants/TokenBudgetDefaults.ts";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
 import type { ChatMessage } from "../../../types/admin.ts";
@@ -55,8 +59,8 @@ export async function manageContextPressure(
 ): Promise<ContextPressureResult> {
   const { emit, signal } = context;
   const contextWindowSize =
-    context.modelDefinition?.maxInputTokens || 128_000;
-  const maxOutputTokens = context.options.maxTokens || 8192;
+    context.modelDefinition?.maxInputTokens || DEFAULT_MAX_INPUT_TOKENS;
+  const maxOutputTokens = context.options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS;
   const availableInputBudget = contextWindowSize - maxOutputTokens;
 
   let messages = currentMessages;
