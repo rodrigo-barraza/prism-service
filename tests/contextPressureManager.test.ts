@@ -332,7 +332,7 @@ describe("ContextPressureManager — manageContextPressure", () => {
       expect(mockEvaluate).toHaveBeenCalledWith(5000, 128000, 8192, 5);
     });
 
-    it("should use 8192 as default maxTokens when not configured", async () => {
+    it("should use 16384 as default maxTokens when not configured", async () => {
       const contextWithoutMaxTokens = {
         ...mockContext,
         options: {},
@@ -343,7 +343,7 @@ describe("ContextPressureManager — manageContextPressure", () => {
 
       await manageContextPressure(messages, contextWithoutMaxTokens, mockState, "TestHarness");
 
-      expect(mockEvaluate).toHaveBeenCalledWith(5000, 128000, 8192, 5);
+      expect(mockEvaluate).toHaveBeenCalledWith(5000, 128000, 16384, 5);
     });
   });
 });
