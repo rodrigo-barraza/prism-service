@@ -4,6 +4,7 @@ import {
   mergeUsage,
   createUsageAccumulator,
   calculateTextCost,
+  estimateTokens,
 } from "../../utils/CostCalculator.ts";
 import { calculateTokensPerSec } from "../../utils/math.ts";
 import { getPricing, TYPES } from "../../config.ts";
@@ -12,6 +13,8 @@ import ContextWindowManager from "../../utils/ContextWindowManager.ts";
 import {
   DEFAULT_MAX_INPUT_TOKENS,
   DEFAULT_MAX_OUTPUT_TOKENS,
+  OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN,
+  MINIMUM_CLAMPED_OUTPUT_TOKENS,
 } from "../../constants/TokenBudgetDefaults.ts";
 import ConversationGenerationTracker from "../ConversationGenerationTracker.ts";
 import RequestLogger from "../RequestLogger.ts";
@@ -405,14 +408,81 @@ export default class BaseAgenticHarness {
   // ── Provider stream creation ──────────────────────────────
 
   /**
+   * Estimate total input tokens for an array of messages.
+   * Uses the same ~4 chars/token heuristic as ContextWindowManager.
+   */
+  private estimateInputTokens(messages: ConversationMessage[]): number {
+    let totalTokens = 0;
+    for (const message of messages) {
+      const content = typeof message.content === "string" ? message.content : "";
+      totalTokens += estimateTokens(content);
+      if ((message as ChatMessage).thinking) {
+        totalTokens += estimateTokens((message as ChatMessage).thinking as string);
+      }
+      if ((message as ChatMessage).tool_calls) {
+        totalTokens += estimateTokens(
+          JSON.stringify((message as ChatMessage).tool_calls),
+        );
+      }
+      if ((message as ChatMessage).images && Array.isArray((message as ChatMessage).images)) {
+        totalTokens += ((message as ChatMessage).images as unknown[]).length * 1000;
+      }
+    }
+    return totalTokens;
+  }
+
+  /**
+   * Dynamically clamp maxTokens so that input + output never exceeds
+   * the model's context window. This is the industry-standard approach
+   * (used by OpenAI SDKs, Cursor, Claude Code) to prevent 400 errors
+   * from context overflow on models with finite context windows.
+   *
+   * Returns the clamped maxTokens value. If no clamping is needed,
+   * returns the original value unchanged.
+   */
+  private clampOutputTokens(
+    messages: ConversationMessage[],
+    requestedMaxTokens: number | undefined,
+  ): number | undefined {
+    const { modelDefinition } = this.context;
+    const contextWindow = modelDefinition?.maxInputTokens;
+
+    if (!contextWindow || !requestedMaxTokens) return requestedMaxTokens;
+
+    const estimatedInputTokens = this.estimateInputTokens(messages);
+    const availableForOutput =
+      contextWindow - estimatedInputTokens - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
+
+    if (requestedMaxTokens <= availableForOutput) return requestedMaxTokens;
+
+    const clampedMaxTokens = Math.max(availableForOutput, MINIMUM_CLAMPED_OUTPUT_TOKENS);
+
+    logger.warn(
+      `[OutputTokenClamp] Clamping maxTokens from ${requestedMaxTokens} → ${clampedMaxTokens} ` +
+        `(contextWindow=${contextWindow}, estimatedInput=${estimatedInputTokens}, ` +
+        `safetyMargin=${OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN}). ` +
+        `Without clamping: ${estimatedInputTokens + requestedMaxTokens} > ${contextWindow}.`,
+    );
+
+    return clampedMaxTokens;
+  }
+
+  /**
    * Create an LLM text stream from the provider.
-   * Handles liveAPI fallback and message expansion.
+   * Handles liveAPI fallback, message expansion, and dynamic output
+   * token clamping to prevent context window overflow.
    */
   createProviderStream(
     messages: ConversationMessage[],
     passOptions: AgenticOptions,
   ): AsyncIterable<unknown> {
     const { provider, resolvedModel, modelDefinition, signal } = this.context;
+
+    const clampedMaxTokens = this.clampOutputTokens(messages, passOptions.maxTokens);
+    const clampedPassOptions = clampedMaxTokens !== passOptions.maxTokens
+      ? { ...passOptions, maxTokens: clampedMaxTokens }
+      : passOptions;
+
     const expandedMessages = expandMessagesForFunctionCall(
       messages as ChatMessage[],
       {
@@ -421,11 +491,11 @@ export default class BaseAgenticHarness {
     );
     return modelDefinition?.liveAPI && provider.generateTextStreamLive
       ? provider.generateTextStreamLive(expandedMessages, resolvedModel, {
-          ...passOptions,
+          ...clampedPassOptions,
           signal,
         })
       : provider.generateTextStream(expandedMessages, resolvedModel, {
-          ...passOptions,
+          ...clampedPassOptions,
           signal,
         });
   }
