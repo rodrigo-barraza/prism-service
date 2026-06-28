@@ -1,34 +1,34 @@
 {
   "shared": {
-    "noConversation": "No active session. Need conversation ID.",
-    "dynamicToolActivationDisabled": "Dynamic tool switching disabled. Admin can enable in Settings.",
+    "noConversation": "No active session.",
+    "dynamicToolActivationDisabled": "Dynamic tool switching disabled. Enable in Settings.",
     "invalidToolsArray": "'tools' must be non-empty list of tool name or domain prefix.",
-    "searchActionNudgeDisabled": "IMPORTANT: some found tool NOT enabled (isEnabled: false). MUST call enable_tools with tool name before use. After enabling, ready next turn."
+    "searchActionNudgeDisabled": "IMPORTANT: found tool NOT enabled (isEnabled: false). MUST call enable_tools before use. Ready next turn."
   },
 
   "enable_tools": {
-    "noValidTools": "No requested name matched any tool. Check spelling or use search_tools.",
-    "alreadyEnabled": "All requested tool already enabled — use now.",
+    "noValidTools": "No match found. Check spelling or use search_tools.",
+    "alreadyEnabled": "All requested already enabled — use now.",
     "activated": "Enabled {{count}} tool. Ready next turn."
   },
 
   "disable_tools": {
     "noneInSet": "No requested tool in active set.",
     "disabled": "Disabled {{count}} tool.",
-    "protectedSuffix": " {{count}} core tool protected — can't disable."
+    "protectedSuffix": " {{count}} core tool protected."
   },
 
   "discover_and_enable_tools": {
     "noQueryOrDomain": "Need 'query' or 'domain'.",
-    "noMatches": "No matching tool found.",
-    "foundAndEnabled": "Found {{matchCount}} tool, auto-enabled {{enabledCount}}. Ready next turn.",
-    "foundAlreadyEnabled": "Found {{matchCount}} tool, all already enabled — use now."
+    "noMatches": "No matching tool.",
+    "foundAndEnabled": "Found {{matchCount}}, enabled {{enabledCount}}. Ready next turn.",
+    "foundAlreadyEnabled": "Found {{matchCount}}, all already enabled — use now."
   },
 
   "set_timer": {
     "noConversation": "No active session.",
-    "noPrompt": "'prompt' required. Must be string.",
-    "invalidDuration": "'durationSeconds' must be {{min}}-{{max}}. For longer or recurring, use create_cron_job."
+    "noPrompt": "'prompt' required.",
+    "invalidDuration": "'durationSeconds' must be {{min}}-{{max}}. Longer/recurring: use create_cron_job."
   },
 
   "list_timers": {
@@ -37,42 +37,42 @@
 
   "cancel_timer": {
     "noTimerId": "'timerId' required.",
-    "notFound": "No active timer with ID {{timerId}}.",
+    "notFound": "No timer {{timerId}}.",
     "success": "Timer {{timerId}} cancelled."
   },
 
   "enter_worktree": {
-    "noConversation": "No session — worktree requires active session.",
-    "alreadyInWorktree": "Already in worktree (branch: {{branch}}). Call exit_worktree first.",
+    "noConversation": "No session.",
+    "alreadyInWorktree": "Already in worktree (branch: {{branch}}). exit_worktree first.",
     "noWorkspace": "No workspace configured.",
-    "success": "Entered worktree. File operation redirected to {{path}}. Call exit_worktree with 'merge' or 'discard' when done."
+    "success": "Entered worktree. File ops redirected to {{path}}. exit_worktree with 'merge' or 'discard' when done."
   },
 
   "exit_worktree": {
-    "notInWorktree": "Not in worktree. Call enter_worktree first.",
-    "mergeFailed": "Merge failed: {{error}}. Worktree preserved at {{path}}. Resolve conflict and retry, or exit_worktree with 'discard'.",
-    "merged": "Change from {{branch}} merged to main. Workspace restored.",
-    "discarded": "Worktree {{branch}} discarded. All change dropped. Workspace restored."
+    "notInWorktree": "Not in worktree. enter_worktree first.",
+    "mergeFailed": "Merge failed: {{error}}. Worktree preserved at {{path}}. Resolve conflict or exit_worktree 'discard'.",
+    "merged": "{{branch}} merged to main. Workspace restored.",
+    "discarded": "{{branch}} discarded. Change dropped. Workspace restored."
   },
 
   "search_conversations": {
     "queryRequired": "Query required.",
     "databaseUnavailable": "Database unavailable.",
-    "noEmbeddings": "No session with embedding found. Session get embedded after agent conversation with 6+ message."
+    "noEmbeddings": "No embedded session. Embedding starts after 6+ message."
   },
 
   "summarize_conversation": {
-    "summaryRequired": "'summary' required, must be non-empty string."
+    "summaryRequired": "'summary' required, non-empty string."
   },
 
   "ask_user": {
-    "questionsRequired": "'questions' list required, must not be empty.",
-    "invalidQuestion": "Each question must have non-empty 'question' string.",
-    "duplicateQuestion": "Duplicate question: \"{{preview}}\"",
-    "duplicateOption": "Duplicate option \"{{label}}\" in question \"{{question}}\"",
-    "tooManyQuestions": "Max 4 question per call.",
-    "noConversation": "No session — ask_user requires active session.",
-    "timedOut": "User didn't respond within 5 minute."
+    "questionsRequired": "'questions' list required, non-empty.",
+    "invalidQuestion": "Each question needs non-empty 'question' string.",
+    "duplicateQuestion": "Duplicate: \"{{preview}}\"",
+    "duplicateOption": "Duplicate option \"{{label}}\" in \"{{question}}\"",
+    "tooManyQuestions": "Max 4 per call.",
+    "noConversation": "No session.",
+    "timedOut": "No response within 5 min."
   },
 
   "list_mcp_resources": {
@@ -101,6 +101,6 @@
   },
 
   "write_todo": {
-    "invalidItems": "'items' must be list of todo item."
+    "invalidItems": "'items' must be list."
   }
 }

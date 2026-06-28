@@ -53,16 +53,16 @@ vi.mock("../../RequestLogger.ts", () => ({
 
 // ── Locale markers for assertions ──────────────────────────
 // Internal tools
-const CAVEMAN_WRITE_TODO_MARKER = "write or update todo list";
+const CAVEMAN_WRITE_TODO_MARKER = "write/update todo list";
 const ENGLISH_WRITE_TODO_MARKER = "Write or update a persistent TODO checklist";
 
 const CAVEMAN_ENTER_PLAN_MARKER = "enter planning mode";
 const ENGLISH_ENTER_PLAN_MARKER = "Switch into planning mode";
 
-const CAVEMAN_ASK_USER_MARKER = "ask user question and wait for response";
+const CAVEMAN_ASK_USER_MARKER = "ask user question, wait for response";
 const ENGLISH_ASK_USER_MARKER = "Ask the user one or more questions";
 
-const CAVEMAN_SUMMARIZE_MARKER = "compress current conversation into summary";
+const CAVEMAN_SUMMARIZE_MARKER = "compress conversation into summary";
 const ENGLISH_SUMMARIZE_MARKER = "Compress the current conversation";
 
 // Required label suffix
@@ -70,10 +70,10 @@ const CAVEMAN_REQUIRED_LABEL = "(required)";
 const ENGLISH_REQUIRED_LABEL = "(required)";
 
 // Orchestrator tools
-const CAVEMAN_CREATE_TEAM_MARKER = "spawn sub-agent, each in isolated worktree";
+const CAVEMAN_CREATE_TEAM_MARKER = "spawn sub-agent in isolated worktree";
 const ENGLISH_CREATE_TEAM_MARKER = "Spawn one or more sub-agents, each in an isolated git worktree";
 
-const CAVEMAN_SEND_MESSAGE_MARKER = "send follow-up to running or completed sub-agent";
+const CAVEMAN_SEND_MESSAGE_MARKER = "follow-up to running/completed sub-agent";
 const ENGLISH_SEND_MESSAGE_MARKER = "Send a follow-up message to a running or completed sub-agent";
 
 const CAVEMAN_STOP_AGENT_MARKER = "stop running sub-agent";
@@ -86,10 +86,10 @@ const ENGLISH_TOOL_HEADER = "Enabled Tools";
 const CAVEMAN_ENVIRONMENT_HEADER = "## Environment";
 const ENGLISH_ENVIRONMENT_HEADER = "## Environment";
 
-const CAVEMAN_CODING_GUIDELINES_MARKER = "Read file before editing";
+const CAVEMAN_CODING_GUIDELINES_MARKER = "read file before editing";
 const ENGLISH_CODING_GUIDELINES_MARKER = "Always read relevant files before making edits";
 
-const CAVEMAN_COMMAND_GUIDELINES_MARKER = "Dev server, long-running process";
+const CAVEMAN_COMMAND_GUIDELINES_MARKER = "dev server, long-running";
 const ENGLISH_COMMAND_GUIDELINES_MARKER = "For dev servers and long-running processes";
 
 // ── Tests ──────────────────────────────────────────────────
