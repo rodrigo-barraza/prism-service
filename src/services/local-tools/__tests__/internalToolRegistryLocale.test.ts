@@ -54,11 +54,11 @@ const CAVEMAN_DISCOVER_MARKER = "search all tool";
 const ENGLISH_DISCOVER_MARKER = "Search the FULL tool catalog";
 
 // write_todo (standard localizeSchema path)
-const CAVEMAN_WRITE_TODO_MARKER = "write or update todo list";
+const CAVEMAN_WRITE_TODO_MARKER = "write/update todo list";
 const ENGLISH_WRITE_TODO_MARKER = "Write or update a persistent TODO checklist";
 
 // disable_tools (standard localizeSchema path)
-const CAVEMAN_DISABLE_MARKER = "deactivate tool from session";
+const CAVEMAN_DISABLE_MARKER = "deactivate tool to free context";
 const ENGLISH_DISABLE_MARKER = "Dynamically disable tools from this conversation";
 
 // ── Tests ──────────────────────────────────────────────────
