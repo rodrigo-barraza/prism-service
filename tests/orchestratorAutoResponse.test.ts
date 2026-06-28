@@ -43,6 +43,7 @@ import type { OrchestratorContext, SubAgentResult } from "../src/types/orchestra
 // ── Helpers ───────────────────────────────────────────────────
 
 const mockFindOne = vi.fn();
+const mockUpdateOne = vi.fn();
 
 function cleanAllConversations() {
   for (const conversationId of [
@@ -85,12 +86,14 @@ describe("Event-Driven Auto-Response", () => {
     });
 
     mockFindOne.mockReset();
+    mockUpdateOne.mockReset();
+    mockUpdateOne.mockResolvedValue({ matchedCount: 1 });
 
     // Enable MongoWrapper mocks for auto-response (setup.ts defaults them to null)
     vi.mocked(MongoWrapper.getDb).mockReturnValue({} as any);
     vi.mocked(MongoWrapper.getCollection).mockReturnValue({
       findOne: (...args: unknown[]) => mockFindOne(...args),
-      updateOne: vi.fn().mockResolvedValue({ matchedCount: 1 }),
+      updateOne: (...args: unknown[]) => mockUpdateOne(...args),
       find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([]) }),
       insertOne: vi.fn().mockResolvedValue({ insertedId: "mock-id" }),
     } as any);
@@ -177,11 +180,14 @@ describe("Event-Driven Auto-Response", () => {
         orchestratorContext,
       );
 
-      // Wait for the appendMessages call
-      await waitForMockCalls(vi.mocked(ConversationService.appendMessages), 1);
+      // Wait for the updateOne call
+      await waitForMockCalls(mockUpdateOne, 1);
 
-      const [conversationId, project, username, messages] =
-        vi.mocked(ConversationService.appendMessages).mock.calls[0];
+      const [query, update] = mockUpdateOne.mock.calls[0];
+      const conversationId = query.id;
+      const project = query.project;
+      const username = query.username;
+      const messages = [update.$push.messages];
       expect(conversationId).toBe("parent-conv-id");
       expect(project).toBe("test-project");
       expect(username).toBe("test-user");
@@ -230,10 +236,9 @@ describe("Event-Driven Auto-Response", () => {
         orchestratorContext,
       );
 
-      await waitForMockCalls(vi.mocked(ConversationService.appendMessages), 1);
+      await waitForMockCalls(mockUpdateOne, 1);
 
-      const completionMessage =
-        vi.mocked(ConversationService.appendMessages).mock.calls[0][3][0] as { content: string };
+      const completionMessage = mockUpdateOne.mock.calls[0][1].$push.messages as { content: string };
       expect(completionMessage.content).toContain("✅");
       expect(completionMessage.content).toContain("❌");
       expect(completionMessage.content).toContain("Agent crashed: out of memory");
@@ -269,10 +274,9 @@ describe("Event-Driven Auto-Response", () => {
         orchestratorContext,
       );
 
-      await waitForMockCalls(vi.mocked(ConversationService.appendMessages), 1);
+      await waitForMockCalls(mockUpdateOne, 1);
 
-      const completionMessage =
-        vi.mocked(ConversationService.appendMessages).mock.calls[0][3][0] as { content: string };
+      const completionMessage = mockUpdateOne.mock.calls[0][1].$push.messages as { content: string };
       expect(completionMessage.content).toContain("(truncated)");
       expect(completionMessage.content.length).toBeLessThan(longOutput.length);
     });
@@ -304,7 +308,7 @@ describe("Event-Driven Auto-Response", () => {
         "team", "hierarchical", [], incompleteContext,
       );
 
-      expect(vi.mocked(ConversationService.appendMessages)).not.toHaveBeenCalled();
+      expect(mockUpdateOne).not.toHaveBeenCalled();
     });
   });
 
@@ -545,9 +549,11 @@ describe("Event-Driven Auto-Response", () => {
       await waitForMockCalls(mockRunAgenticLoop, 3);
 
       // Verify completion message was persisted
-      expect(vi.mocked(ConversationService.appendMessages)).toHaveBeenCalled();
-      const persistedMessage =
-        vi.mocked(ConversationService.appendMessages).mock.calls[0][3][0] as { content: string };
+      expect(mockUpdateOne).toHaveBeenCalled();
+      const completionCall = mockUpdateOne.mock.calls.find((call) => call[1] && call[1].$push);
+      expect(completionCall).toBeDefined();
+      if (!completionCall) throw new Error("completionCall is undefined");
+      const persistedMessage = completionCall[1].$push.messages as { content: string };
       expect(persistedMessage.content).toContain("[SUB-AGENT TEAM COMPLETED]");
 
       // Verify auto-response agentic loop includes completion context
