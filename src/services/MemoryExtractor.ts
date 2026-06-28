@@ -46,7 +46,10 @@ const MIN_MESSAGES_FOR_EXTRACTION = 4;
  * codebase itself (via grep, git, file reads). This is Claude Code's most
  * impactful memory quality insight — eval-validated.
  */
-const EXTRACTION_PROMPT = PromptLocaleService.get("en", "memory.extractionPrompt");
+const EXTRACTION_PROMPT = PromptLocaleService.get(
+  "en",
+  "memory.extractionPrompt",
+);
 
 interface ExtractedMemory {
   type: string;

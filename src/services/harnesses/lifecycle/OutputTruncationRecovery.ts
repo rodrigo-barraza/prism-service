@@ -37,7 +37,10 @@ export { MAX_OUTPUT_TRUNCATION_RECOVERIES };
 
 /** Build the continuation prompt localized to the active locale. */
 function getContinuationPrompt(locale: string): string {
-  return PromptLocaleService.get(locale, "harness.outputTruncation.continuationPrompt");
+  return PromptLocaleService.get(
+    locale,
+    "harness.outputTruncation.continuationPrompt",
+  );
 }
 
 /**
@@ -105,7 +108,9 @@ export function injectContinuationContext(
     });
   }
 
-  const activeLocale = (context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale();
+  const activeLocale =
+    (context.options?.locale as string | undefined) ||
+    PromptLocaleService.getDefaultLocale();
 
   currentMessages.push({
     role: "system",
@@ -113,7 +118,9 @@ export function injectContinuationContext(
   });
 
   const baseMaxTokens = context.options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS;
-  const maxOutputCeiling = context.modelDefinition?.maxOutputTokens as number | undefined;
+  const maxOutputCeiling = context.modelDefinition?.maxOutputTokens as
+    | number
+    | undefined;
   const escalatedMaxTokens = calculateEscalatedMaxTokens(
     baseMaxTokens,
     recoveryAttempt,
@@ -153,10 +160,16 @@ export function injectErrorAsConversationMessage(
   errorDescription: string,
   context: AgenticContext,
 ): void {
-  const activeLocale = (context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale();
+  const activeLocale =
+    (context.options?.locale as string | undefined) ||
+    PromptLocaleService.getDefaultLocale();
   const errorMessage: ConversationMessage = {
     role: "assistant",
-    content: PromptLocaleService.get(activeLocale, "harness.errorAsContext.wrapper", { errorDescription }),
+    content: PromptLocaleService.get(
+      activeLocale,
+      "harness.errorAsContext.wrapper",
+      { errorDescription },
+    ),
     _isErrorIndicator: true,
   };
 
@@ -181,10 +194,14 @@ export function buildExhaustedRecoveryMessage(
   configuredMaxTokens: number | string,
   locale?: string,
 ): string {
-  return PromptLocaleService.get(locale || PromptLocaleService.getDefaultLocale(), "harness.outputTruncation.exhaustedRecovery", {
-    configuredMaxTokens: String(configuredMaxTokens),
-    maxAttempts: String(maxAttempts),
-  });
+  return PromptLocaleService.get(
+    locale || PromptLocaleService.getDefaultLocale(),
+    "harness.outputTruncation.exhaustedRecovery",
+    {
+      configuredMaxTokens: String(configuredMaxTokens),
+      maxAttempts: String(maxAttempts),
+    },
+  );
 }
 
 /**
@@ -197,8 +214,12 @@ export function buildProviderErrorMessage(
   locale?: string,
 ): string {
   const errorText = errorMessage(error);
-  return PromptLocaleService.get(locale || PromptLocaleService.getDefaultLocale(), "harness.outputTruncation.providerError", {
-    errorText,
-    iteration: String(iteration),
-  });
+  return PromptLocaleService.get(
+    locale || PromptLocaleService.getDefaultLocale(),
+    "harness.outputTruncation.providerError",
+    {
+      errorText,
+      iteration: String(iteration),
+    },
+  );
 }

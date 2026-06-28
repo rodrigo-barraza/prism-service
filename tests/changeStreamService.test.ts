@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { EventEmitter } from "node:events";
 
 // Mock dependencies
@@ -47,6 +47,10 @@ describe("ChangeStreamService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("should warn and set available to false if database is not available during init", async () => {

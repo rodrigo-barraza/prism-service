@@ -80,8 +80,10 @@ vi.mock("../../RequestLogger.ts", () => ({
 }));
 
 // ── Distinct markers for English vs Caveman remote tools ───
-const ENGLISH_REMOTE_DESCRIPTION = "Extract structured content from any URL. Auto-detects platform and uses best extraction method.";
-const CAVEMAN_REMOTE_DESCRIPTION = "pull stuff from any URL. auto-detect platform and use best extraction way.";
+const ENGLISH_REMOTE_DESCRIPTION =
+  "Extract structured content from any URL. Auto-detects platform and uses best extraction method.";
+const CAVEMAN_REMOTE_DESCRIPTION =
+  "pull stuff from any URL. auto-detect platform and use best extraction way.";
 
 const ENGLISH_REMOTE_PARAM = "Any URL. handled platforms are auto-detected.";
 const CAVEMAN_REMOTE_PARAM = "any URL. platform auto-found.";
@@ -95,13 +97,17 @@ function buildMockToolSchemas(locale: string) {
   return [
     {
       name: "read_url",
-      description: isCaveman ? CAVEMAN_REMOTE_DESCRIPTION : ENGLISH_REMOTE_DESCRIPTION,
+      description: isCaveman
+        ? CAVEMAN_REMOTE_DESCRIPTION
+        : ENGLISH_REMOTE_DESCRIPTION,
       parameters: {
         type: "object",
         properties: {
           url: {
             type: "string",
-            description: isCaveman ? CAVEMAN_REMOTE_PARAM : ENGLISH_REMOTE_PARAM,
+            description: isCaveman
+              ? CAVEMAN_REMOTE_PARAM
+              : ENGLISH_REMOTE_PARAM,
           },
         },
         required: ["url"],
@@ -144,37 +150,49 @@ describe("ToolOrchestratorService — Per-Locale Cache Selection", () => {
     // Save original fetch and replace with mock
     originalFetch = globalThis.fetch;
 
-    globalThis.fetch = vi.fn().mockImplementation((urlInput: string | URL | Request) => {
-      const urlString = String(urlInput);
+    globalThis.fetch = vi
+      .fn()
+      .mockImplementation((urlInput: string | URL | Request) => {
+        const urlString = String(urlInput);
 
-      // Tool schemas endpoint — return locale-specific schemas
-      if (urlString.includes("/admin/tool-schemas")) {
-        const localeMatch = urlString.match(/locale=([^&]+)/);
-        const locale = localeMatch ? decodeURIComponent(localeMatch[1]) : "en";
+        // Tool schemas endpoint — return locale-specific schemas
+        if (urlString.includes("/admin/tool-schemas")) {
+          const localeMatch = urlString.match(/locale=([^&]+)/);
+          const locale = localeMatch
+            ? decodeURIComponent(localeMatch[1])
+            : "en";
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(buildMockToolSchemas(locale)),
+          });
+        }
+
+        // Config endpoint
+        if (urlString.includes("/admin/config")) {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                workspaceRoots: ["/home/test"],
+                staticRoots: [],
+              }),
+          });
+        }
+
+        // Health endpoint
+        if (urlString.includes("/admin/health")) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ status: "ok" }),
+          });
+        }
+
         return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(buildMockToolSchemas(locale)),
+          ok: false,
+          status: 404,
+          statusText: "Not Found",
         });
-      }
-
-      // Config endpoint
-      if (urlString.includes("/admin/config")) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ workspaceRoots: ["/home/test"], staticRoots: [] }),
-        });
-      }
-
-      // Health endpoint
-      if (urlString.includes("/admin/health")) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ status: "ok" }),
-        });
-      }
-
-      return Promise.resolve({ ok: false, status: 404, statusText: "Not Found" });
-    });
+      });
 
     // Dynamic import after mocks are set up
     const orchestratorModule = await import("../../ToolOrchestratorService.ts");
@@ -196,12 +214,14 @@ describe("ToolOrchestratorService — Per-Locale Cache Selection", () => {
       await ToolOrchestratorService.ensureSchemas("caveman");
 
       const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
-      const fetchCalls = fetchMock.mock.calls.map(
-        (call: unknown[]) => (typeof call[0] === "string" ? call[0] : String(call[0])),
+      const fetchCalls = fetchMock.mock.calls.map((call: unknown[]) =>
+        typeof call[0] === "string" ? call[0] : String(call[0]),
       );
 
       const cavemanSchemaCall = fetchCalls.find(
-        (callUrl: string) => callUrl.includes("tool-schemas") && callUrl.includes("locale=caveman"),
+        (callUrl: string) =>
+          callUrl.includes("tool-schemas") &&
+          callUrl.includes("locale=caveman"),
       );
       expect(
         cavemanSchemaCall,
@@ -230,8 +250,8 @@ describe("ToolOrchestratorService — Per-Locale Cache Selection", () => {
       const newCalls = fetchMock.mock.calls
         .slice(callCountBefore)
         .map((call: unknown[]) => String(call[0]));
-      const localeCall = newCalls.find(
-        (callUrl: string) => callUrl.includes("locale=en"),
+      const localeCall = newCalls.find((callUrl: string) =>
+        callUrl.includes("locale=en"),
       );
       expect(localeCall).toBeUndefined();
     });
@@ -246,7 +266,10 @@ describe("ToolOrchestratorService — Per-Locale Cache Selection", () => {
       // Populate the per-locale cache
       await ToolOrchestratorService.ensureSchemas("caveman");
 
-      const schemas = ToolOrchestratorService.getClientToolSchemas(undefined, "caveman");
+      const schemas = ToolOrchestratorService.getClientToolSchemas(
+        undefined,
+        "caveman",
+      );
       const readUrlSchema = schemas.find(
         (schema: { name: string }) => schema.name === "read_url",
       );
@@ -261,7 +284,10 @@ describe("ToolOrchestratorService — Per-Locale Cache Selection", () => {
       // which fetches without locale param (English default)
       await ToolOrchestratorService.ensureSchemas();
 
-      const schemas = ToolOrchestratorService.getClientToolSchemas(undefined, "en");
+      const schemas = ToolOrchestratorService.getClientToolSchemas(
+        undefined,
+        "en",
+      );
       const readUrlSchema = schemas.find(
         (schema: { name: string }) => schema.name === "read_url",
       );
@@ -273,8 +299,14 @@ describe("ToolOrchestratorService — Per-Locale Cache Selection", () => {
     it("should return different descriptions for 'caveman' vs 'en'", async () => {
       await ToolOrchestratorService.ensureSchemas("caveman");
 
-      const cavemanSchemas = ToolOrchestratorService.getClientToolSchemas(undefined, "caveman");
-      const englishSchemas = ToolOrchestratorService.getClientToolSchemas(undefined, "en");
+      const cavemanSchemas = ToolOrchestratorService.getClientToolSchemas(
+        undefined,
+        "caveman",
+      );
+      const englishSchemas = ToolOrchestratorService.getClientToolSchemas(
+        undefined,
+        "en",
+      );
 
       const cavemanReadUrl = cavemanSchemas.find(
         (schema: { name: string }) => schema.name === "read_url",
@@ -293,7 +325,10 @@ describe("ToolOrchestratorService — Per-Locale Cache Selection", () => {
     it("should return caveman parameter descriptions, not just top-level descriptions", async () => {
       await ToolOrchestratorService.ensureSchemas("caveman");
 
-      const schemas = ToolOrchestratorService.getClientToolSchemas(undefined, "caveman");
+      const schemas = ToolOrchestratorService.getClientToolSchemas(
+        undefined,
+        "caveman",
+      );
       const readUrlSchema = schemas.find(
         (schema: { name: string }) => schema.name === "read_url",
       );
@@ -312,27 +347,37 @@ describe("ToolOrchestratorService — Per-Locale Cache Selection", () => {
       vi.resetModules();
 
       // Override fetch: return English for default, but FAIL for caveman
-      globalThis.fetch = vi.fn().mockImplementation((urlInput: string | URL | Request) => {
-        const urlString = String(urlInput);
+      globalThis.fetch = vi
+        .fn()
+        .mockImplementation((urlInput: string | URL | Request) => {
+          const urlString = String(urlInput);
 
-        if (urlString.includes("/admin/tool-schemas")) {
-          if (urlString.includes("locale=caveman")) {
-            // Simulate tools-service failure for caveman locale
-            return Promise.resolve({ ok: false, status: 500, statusText: "Internal Server Error" });
+          if (urlString.includes("/admin/tool-schemas")) {
+            if (urlString.includes("locale=caveman")) {
+              // Simulate tools-service failure for caveman locale
+              return Promise.resolve({
+                ok: false,
+                status: 500,
+                statusText: "Internal Server Error",
+              });
+            }
+            return Promise.resolve({
+              ok: true,
+              json: () => Promise.resolve(buildMockToolSchemas("en")),
+            });
           }
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(buildMockToolSchemas("en")),
-          });
-        }
-        if (urlString.includes("/admin/config")) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({ workspaceRoots: ["/home/test"], staticRoots: [] }),
-          });
-        }
-        return Promise.resolve({ ok: false, status: 404 });
-      });
+          if (urlString.includes("/admin/config")) {
+            return Promise.resolve({
+              ok: true,
+              json: () =>
+                Promise.resolve({
+                  workspaceRoots: ["/home/test"],
+                  staticRoots: [],
+                }),
+            });
+          }
+          return Promise.resolve({ ok: false, status: 404 });
+        });
 
       const freshModule = await import("../../ToolOrchestratorService.ts");
       const freshService = freshModule.default;
@@ -353,7 +398,10 @@ describe("ToolOrchestratorService — Per-Locale Cache Selection", () => {
     it("should serve multiple remote tools from the same locale cache", async () => {
       await ToolOrchestratorService.ensureSchemas("caveman");
 
-      const schemas = ToolOrchestratorService.getClientToolSchemas(undefined, "caveman");
+      const schemas = ToolOrchestratorService.getClientToolSchemas(
+        undefined,
+        "caveman",
+      );
 
       const readUrlSchema = schemas.find(
         (schema: { name: string }) => schema.name === "read_url",
@@ -363,7 +411,9 @@ describe("ToolOrchestratorService — Per-Locale Cache Selection", () => {
       );
 
       expect(readUrlSchema?.description).toBe(CAVEMAN_REMOTE_DESCRIPTION);
-      expect(searchWebSchema?.description).toBe("search web using brave. give back result with title.");
+      expect(searchWebSchema?.description).toBe(
+        "search web using brave. give back result with title.",
+      );
     });
   });
 
@@ -375,7 +425,10 @@ describe("ToolOrchestratorService — Per-Locale Cache Selection", () => {
     it("should return caveman descriptions in AI schemas when locale is 'caveman'", async () => {
       await ToolOrchestratorService.ensureSchemas("caveman");
 
-      const schemas = ToolOrchestratorService.getToolSchemas(undefined, "caveman");
+      const schemas = ToolOrchestratorService.getToolSchemas(
+        undefined,
+        "caveman",
+      );
       const readUrlSchema = schemas.find(
         (schema: { name: string }) => schema.name === "read_url",
       );
@@ -399,7 +452,10 @@ describe("ToolOrchestratorService — Per-Locale Cache Selection", () => {
     it("should strip domain and dataSource from AI schemas but keep localized descriptions", async () => {
       await ToolOrchestratorService.ensureSchemas("caveman");
 
-      const schemas = ToolOrchestratorService.getToolSchemas(undefined, "caveman");
+      const schemas = ToolOrchestratorService.getToolSchemas(
+        undefined,
+        "caveman",
+      );
       const readUrlSchema = schemas.find(
         (schema: { name: string }) => schema.name === "read_url",
       );
@@ -423,7 +479,10 @@ describe("ToolOrchestratorService — Per-Locale Cache Selection", () => {
       await ToolOrchestratorService.ensureSchemas("caveman");
 
       // English should still be English
-      const englishSchemas = ToolOrchestratorService.getClientToolSchemas(undefined, "en");
+      const englishSchemas = ToolOrchestratorService.getClientToolSchemas(
+        undefined,
+        "en",
+      );
       const englishReadUrl = englishSchemas.find(
         (schema: { name: string }) => schema.name === "read_url",
       );
@@ -437,7 +496,10 @@ describe("ToolOrchestratorService — Per-Locale Cache Selection", () => {
       await ToolOrchestratorService.ensureSchemas("caveman");
 
       // Caveman should still be Caveman
-      const cavemanSchemas = ToolOrchestratorService.getClientToolSchemas(undefined, "caveman");
+      const cavemanSchemas = ToolOrchestratorService.getClientToolSchemas(
+        undefined,
+        "caveman",
+      );
       const cavemanReadUrl = cavemanSchemas.find(
         (schema: { name: string }) => schema.name === "read_url",
       );
@@ -451,8 +513,14 @@ describe("ToolOrchestratorService — Per-Locale Cache Selection", () => {
       await ToolOrchestratorService.ensureSchemas("caveman");
 
       // Verify isolation: getting one doesn't affect the other
-      const cavemanSchemas = ToolOrchestratorService.getClientToolSchemas(undefined, "caveman");
-      const englishSchemas = ToolOrchestratorService.getClientToolSchemas(undefined, "en");
+      const cavemanSchemas = ToolOrchestratorService.getClientToolSchemas(
+        undefined,
+        "caveman",
+      );
+      const englishSchemas = ToolOrchestratorService.getClientToolSchemas(
+        undefined,
+        "en",
+      );
 
       const cavemanReadUrl = cavemanSchemas.find(
         (schema: { name: string }) => schema.name === "read_url",

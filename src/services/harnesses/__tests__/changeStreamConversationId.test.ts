@@ -313,11 +313,7 @@ describe("Graph buildFromConversation — user node filtering", () => {
   const DEFAULT_USERNAME = "admin";
 
   function shouldCreateUserNode(username: string | undefined): boolean {
-    return (
-      !!username &&
-      username !== DEFAULT_USERNAME &&
-      username !== "system"
-    );
+    return !!username && username !== DEFAULT_USERNAME && username !== "system";
   }
 
   it("creates user node for regular usernames", () => {
@@ -400,13 +396,9 @@ describe("End-to-end scenario — all request types should produce visible SSE e
     for (const operation of operations) {
       const requestDocument = createRequestDocument(operation, CONVERSATION_ID);
 
-      expect(
-        changeStreamPayloadHasConversationId(requestDocument),
-      ).toBe(true);
+      expect(changeStreamPayloadHasConversationId(requestDocument)).toBe(true);
 
-      expect(
-        wouldPassGraphFilter(requestDocument, CONVERSATION_ID),
-      ).toBe(true);
+      expect(wouldPassGraphFilter(requestDocument, CONVERSATION_ID)).toBe(true);
     }
   });
 
@@ -416,13 +408,11 @@ describe("End-to-end scenario — all request types should produce visible SSE e
     for (const operation of embedOperations) {
       const requestDocument = createRequestDocument(operation, undefined);
 
-      expect(
-        changeStreamPayloadHasConversationId(requestDocument),
-      ).toBe(false);
+      expect(changeStreamPayloadHasConversationId(requestDocument)).toBe(false);
 
-      expect(
-        wouldPassGraphFilter(requestDocument, CONVERSATION_ID),
-      ).toBe(false);
+      expect(wouldPassGraphFilter(requestDocument, CONVERSATION_ID)).toBe(
+        false,
+      );
     }
   });
 

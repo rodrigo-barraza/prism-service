@@ -163,13 +163,17 @@ export default class CriticGate {
       traceId: context.traceId || null,
       conversationId: (context.conversationId as string) || null,
       agentConversationId: context.agentConversationId || null,
-      aiMessages: criticMessages as Parameters<typeof RequestLogger.logBackgroundLlmCall>[0]["aiMessages"],
+      aiMessages: criticMessages as Parameters<
+        typeof RequestLogger.logBackgroundLlmCall
+      >[0]["aiMessages"],
       resultText: responseText,
       success: true,
       errorMessage: null,
       requestStartMs,
       extraRequestPayload: {
-        reviewedTool: prompt.includes("Tool:") ? prompt.split("Tool: ")[1]?.split("\n")[0] : null,
+        reviewedTool: prompt.includes("Tool:")
+          ? prompt.split("Tool: ")[1]?.split("\n")[0]
+          : null,
       },
     }).catch((loggingError: unknown) =>
       logger.error(

@@ -70,7 +70,8 @@ const ConversationService: ConversationServiceInterface = {
         };
       }
       if (conversationMeta.parentAgentConversationId) {
-        setFields.parentAgentConversationId = conversationMeta.parentAgentConversationId;
+        setFields.parentAgentConversationId =
+          conversationMeta.parentAgentConversationId;
       }
       if (conversationMeta.parentConversationId) {
         setFields.parentConversationId = conversationMeta.parentConversationId;
@@ -185,7 +186,10 @@ const ConversationService: ConversationServiceInterface = {
     );
 
     // Return the doc with derived fields merged (avoids a third read)
-    return { ...conversation, ...derived } as unknown as TransformedConversation;
+    return {
+      ...conversation,
+      ...derived,
+    } as unknown as TransformedConversation;
   },
 
   /**
@@ -202,7 +206,12 @@ const ConversationService: ConversationServiceInterface = {
       agent,
       title,
       agentConversationId,
-    }: { collection?: string; agent?: string; title?: string; agentConversationId?: string } = {},
+    }: {
+      collection?: string;
+      agent?: string;
+      title?: string;
+      agentConversationId?: string;
+    } = {},
   ): Promise<void> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) return;
@@ -251,10 +260,14 @@ const ConversationService: ConversationServiceInterface = {
     if (!db) return null;
 
     // Recursively discover all descendant conversation IDs (multi-level sub-agents)
-    const allConversationIds = await discoverDescendantConversationIds(db, conversationId, {
-      project,
-      username,
-    });
+    const allConversationIds = await discoverDescendantConversationIds(
+      db,
+      conversationId,
+      {
+        project,
+        username,
+      },
+    );
 
     const requests = await db
       .collection(COLLECTIONS.REQUESTS)
@@ -328,8 +341,7 @@ const ConversationService: ConversationServiceInterface = {
     }
 
     const subAgentRequestCount = requests.filter(
-      (reservation) => 
-        reservation.agentConversationId !== conversationId,
+      (reservation) => reservation.agentConversationId !== conversationId,
     ).length;
 
     const createdAt = (requests as Record<string, unknown>[]).reduce(

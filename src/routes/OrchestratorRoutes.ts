@@ -76,7 +76,9 @@ router.get(
         // Seed the frontier with both IDs and query with $or at every hop.
         const MAX_DESCENDANT_DEPTH = 10;
         let frontier: string[] = [conversationIdentifier];
-        const visitedConversationIds = new Set<string>([conversationIdentifier]);
+        const visitedConversationIds = new Set<string>([
+          conversationIdentifier,
+        ]);
 
         // Include the root's agentConversationId (if different from id)
         const rootAgentConversationId =

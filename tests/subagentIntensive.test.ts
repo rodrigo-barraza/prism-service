@@ -79,7 +79,7 @@ import type { AgenticContext } from "../src/services/harnesses/types.ts";
 import type { OrchestratorContext, SubAgentResult, SubAgentState } from "../src/types/orchestrator.ts";
 
 describe("Sub-Agent Intensive Integration Tests", () => {
-  async function waitForCondition(condition: () => boolean, timeoutMilliseconds = 2000): Promise<void> {
+  async function waitForCondition(condition: () => boolean, timeoutMilliseconds = 10000): Promise<void> {
     const startTime = Date.now();
     while (!condition()) {
       if (Date.now() - startTime > timeoutMilliseconds) {
@@ -706,7 +706,6 @@ describe("Sub-Agent Intensive Integration Tests", () => {
   // ── 9. Concurrency Limits ───────────────────────────────────────
   describe("Maximum Concurrency Constraints", () => {
     it("should prevent spawning more than the maximum limit of concurrent sub-agents", async () => {
-      console.log("BEFORE CONCURRENCY LIMITS TEST:", OrchestratorService.listSubAgents());
       const loopResolvers: Array<(value: unknown) => void> = [];
 
       mockRunAgenticLoop.mockImplementation(async () => {

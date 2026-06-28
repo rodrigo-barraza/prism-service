@@ -43,7 +43,8 @@ export async function runExhaustionRecoveryPass(
   currentMessages.push({
     role: "system",
     content: PromptLocaleService.get(
-      (options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(),
+      (options?.locale as string | undefined) ||
+        PromptLocaleService.getDefaultLocale(),
       "harness.exhaustionRecovery.message",
     ),
   });

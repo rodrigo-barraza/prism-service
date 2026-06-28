@@ -336,4 +336,3 @@ export interface BeforePromptHookContext {
   _injectedSkills?: string[];
   [key: string]: unknown;
 }
-

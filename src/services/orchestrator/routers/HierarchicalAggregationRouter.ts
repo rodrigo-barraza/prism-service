@@ -4,7 +4,11 @@ import type {
   OrchestratorSpawnParams,
   SubAgentResult,
 } from "../../../types/orchestrator.ts";
-import type { TopologyRouter, ContinueSubAgentCallback, TopologyConfig } from "../TopologyRouter.ts";
+import type {
+  TopologyRouter,
+  ContinueSubAgentCallback,
+  TopologyConfig,
+} from "../TopologyRouter.ts";
 import {
   resolveSiblingInstances,
   selectInstanceForMember,
@@ -20,7 +24,10 @@ const MAXIMUM_SYNTHESIS_CHARACTERS = 120_000;
 const DEFAULT_LAYER_COUNT = 1;
 const MAXIMUM_LAYER_COUNT = 3;
 
-function truncateResultOutput(output: string, maximumCharacters: number): string {
+function truncateResultOutput(
+  output: string,
+  maximumCharacters: number,
+): string {
   if (output.length <= maximumCharacters) return output;
   const truncatedOutput = output.slice(0, maximumCharacters);
   return `${truncatedOutput}\n\n[... truncated — output exceeded ${maximumCharacters.toLocaleString()} character budget]`;
@@ -32,7 +39,9 @@ function buildSynthesisPrompt(
   layerIndex?: number,
   totalLayers?: number,
 ): string {
-  const characterBudgetPerMember = Math.floor(MAXIMUM_SYNTHESIS_CHARACTERS / Math.max(memberResults.length, 1));
+  const characterBudgetPerMember = Math.floor(
+    MAXIMUM_SYNTHESIS_CHARACTERS / Math.max(memberResults.length, 1),
+  );
 
   const resultSections = memberResults.map((result, resultIndex) => {
     if ("error" in result) {
@@ -40,7 +49,7 @@ function buildSynthesisPrompt(
     }
     const outputText = result.result
       ? truncateResultOutput(result.result, characterBudgetPerMember)
-      : (buildToolCallFallbackSummary(result) || result.summary);
+      : buildToolCallFallbackSummary(result) || result.summary;
     return [
       `### Sub-Agent #${resultIndex + 1}: ${result.description || "unnamed"}`,
       `**Status:** ${result.status}`,
@@ -48,13 +57,19 @@ function buildSynthesisPrompt(
     ].join("\n");
   });
 
-  const layerContext = layerIndex !== undefined && totalLayers !== undefined && totalLayers > 1
-    ? `\nThis is synthesis layer ${layerIndex + 1} of ${totalLayers}.\n`
-    : "";
+  const layerContext =
+    layerIndex !== undefined && totalLayers !== undefined && totalLayers > 1
+      ? `\nThis is synthesis layer ${layerIndex + 1} of ${totalLayers}.\n`
+      : "";
 
   return [
-    PromptLocaleService.get("en", "routers.hierarchical.synthesizer", { teamName, layerContext }),
-    PromptLocaleService.get("en", "routers.hierarchical.mergeJobDescription", { memberCount: String(memberResults.length) }),
+    PromptLocaleService.get("en", "routers.hierarchical.synthesizer", {
+      teamName,
+      layerContext,
+    }),
+    PromptLocaleService.get("en", "routers.hierarchical.mergeJobDescription", {
+      memberCount: String(memberResults.length),
+    }),
     "",
     "## Sub-Agent Results",
     "",
@@ -80,23 +95,22 @@ function buildLayerContextPrefix(previousLayerSynthesis: string): string {
   ].join("\n");
 }
 
-function checkModelDiversity(
-  assignments: OrchestratorSpawnParams[],
-): void {
+function checkModelDiversity(assignments: OrchestratorSpawnParams[]): void {
   if (assignments.length <= 1) return;
 
   const uniqueModelIdentifiers = new Set(
     assignments.map(
-      (assignment) => `${assignment.assignedProvider}:${assignment.assignedModel}`,
+      (assignment) =>
+        `${assignment.assignedProvider}:${assignment.assignedModel}`,
     ),
   );
 
   if (uniqueModelIdentifiers.size === 1) {
     logger.warn(
       `[HierarchicalAggregationRouter] All ${assignments.length} proposers resolved to the same model ` +
-      `(${assignments[0].assignedProvider}/${assignments[0].assignedModel}). ` +
-      `MoA paper (Wang et al., 2024) shows diverse models significantly outperform single-proposer configurations. ` +
-      `Consider assigning different models to team members for better synthesis quality.`,
+        `(${assignments[0].assignedProvider}/${assignments[0].assignedModel}). ` +
+        `MoA paper (Wang et al., 2024) shows diverse models significantly outperform single-proposer configurations. ` +
+        `Consider assigning different models to team members for better synthesis quality.`,
     );
   }
 }
@@ -129,7 +143,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
 
     logger.info(
       `[HierarchicalAggregationRouter] Starting MoA for team "${teamName}" ` +
-      `(${members.length} proposers, ${layerCount} layer${layerCount > 1 ? "s" : ""})...`,
+        `(${members.length} proposers, ${layerCount} layer${layerCount > 1 ? "s" : ""})...`,
     );
 
     let previousLayerSynthesis: string | null = null;
@@ -137,7 +151,8 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
 
     for (let layerIndex = 0; layerIndex < layerCount; layerIndex++) {
       const isFirstLayer = layerIndex === 0;
-      const layerLabel = layerCount > 1 ? ` [Layer ${layerIndex + 1}/${layerCount}]` : "";
+      const layerLabel =
+        layerCount > 1 ? ` [Layer ${layerIndex + 1}/${layerCount}]` : "";
 
       // ── Phase 1: Parallel execution (proposer fan-out) ────────────────
 
@@ -173,7 +188,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
           round: layerIndex + 1,
           totalRounds: layerCount,
           orchestratorContext,
-        awaitCompletion: true,
+          awaitCompletion: true,
         });
       }
 
@@ -189,7 +204,9 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
         spawnSubAgent(assignment),
       );
       const memberResults = await Promise.all(spawnPromises);
-      allLayerResults = isFirstLayer ? memberResults : [...allLayerResults, ...memberResults];
+      allLayerResults = isFirstLayer
+        ? memberResults
+        : [...allLayerResults, ...memberResults];
 
       // ── Phase 2: Synthesis pass (aggregator) ──────────────────────────
 
@@ -233,7 +250,10 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
 
         const synthesisStartTime = Date.now();
         const synthesisRequestStartMs = performance.now();
-        const synthesisMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [{ role: "user", content: synthesisPrompt }];
+        const synthesisMessages: Array<{
+          role: "user" | "assistant" | "system";
+          content: string;
+        }> = [{ role: "user", content: synthesisPrompt }];
         const synthesisResult = await provider.generateText(
           synthesisMessages,
           resolvedModel,
@@ -289,7 +309,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
 
         logger.info(
           `[HierarchicalAggregationRouter]${layerLabel} Synthesis complete in ${synthesisDurationMs}ms ` +
-          `(${inputTokens} input, ${outputTokens} output tokens)`,
+            `(${inputTokens} input, ${outputTokens} output tokens)`,
         );
 
         previousLayerSynthesis = synthesisResult.text || null;

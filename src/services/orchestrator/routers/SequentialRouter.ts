@@ -4,7 +4,11 @@ import type {
   OrchestratorSpawnParams,
   SubAgentResult,
 } from "../../../types/orchestrator.ts";
-import type { TopologyRouter, ContinueSubAgentCallback, TopologyConfig } from "../TopologyRouter.ts";
+import type {
+  TopologyRouter,
+  ContinueSubAgentCallback,
+  TopologyConfig,
+} from "../TopologyRouter.ts";
 import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 import {
   resolveSiblingInstances,
@@ -61,7 +65,6 @@ export class SequentialRouter implements TopologyRouter {
         resolvedSiblings,
         { providerName, resolvedModel },
       );
-
 
       // 2. Prepare step prompt by prepending accumulated context from all prior steps
       const basePrompt = member.prompt;
@@ -139,7 +142,10 @@ export class SequentialRouter implements TopologyRouter {
       }
 
       // 5. Accumulate text result for subsequent agents (append, not overwrite)
-      const stepOutput = spawnResult.result || buildToolCallFallbackSummary(spawnResult) || spawnResult.summary;
+      const stepOutput =
+        spawnResult.result ||
+        buildToolCallFallbackSummary(spawnResult) ||
+        spawnResult.summary;
       const stepSummaryBlock = `Step ${index + 1} (${member.description}):\n${stepOutput}`;
       accumulatedContext = accumulatedContext
         ? `${accumulatedContext}\n\n---\n\n${stepSummaryBlock}`

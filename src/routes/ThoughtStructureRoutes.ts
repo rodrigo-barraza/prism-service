@@ -18,7 +18,9 @@ router.get("/:structureId", (request: Request, response: Response) => {
 
   const structureDefinition = getThoughtStructureById(structureId);
   if (!structureDefinition) {
-    return response.status(404).json({ error: `Thought structure "${structureId}" not found` });
+    return response
+      .status(404)
+      .json({ error: `Thought structure "${structureId}" not found` });
   }
 
   response.json(structureDefinition);

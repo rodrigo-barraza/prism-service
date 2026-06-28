@@ -688,9 +688,10 @@ const SomaticStateService = {
 
   async getEmotionBehaviorPrompt(agentId: string): Promise<string> {
     const dominant = await this.getDominantEmotion(agentId);
-    const locale = typeof SettingsService.getCached === "function"
-      ? SettingsService.getCached().agents?.locale || "en"
-      : "en";
+    const locale =
+      typeof SettingsService.getCached === "function"
+        ? SettingsService.getCached().agents?.locale || "en"
+        : "en";
     return (
       PromptLocaleService.get(locale, `somatic.moods.${dominant.emotion}`) ||
       PromptLocaleService.get(locale, "somatic.moods.neutral")
@@ -700,13 +701,24 @@ const SomaticStateService = {
   async getAlcoholSystemPrompt(agentId: string): Promise<string> {
     const state = await ensureState(agentId);
     const level = state.alcohol.getLevel();
-    const locale = typeof SettingsService.getCached === "function"
-      ? SettingsService.getCached().agents?.locale || "en"
-      : "en";
-    const description = PromptLocaleService.get(locale, `somatic.alcohol.${level}`);
+    const locale =
+      typeof SettingsService.getCached === "function"
+        ? SettingsService.getCached().agents?.locale || "en"
+        : "en";
+    const description = PromptLocaleService.get(
+      locale,
+      `somatic.alcohol.${level}`,
+    );
     if (!description || description.startsWith("[MISSING:")) return "";
-    const alcoholSuffix = PromptLocaleService.get(locale, "somatic.alcohol.suffix");
-    const levelInfo = PromptLocaleService.get(locale, "somatic.alcohol.levelInfo", { level: String(level) });
+    const alcoholSuffix = PromptLocaleService.get(
+      locale,
+      "somatic.alcohol.suffix",
+    );
+    const levelInfo = PromptLocaleService.get(
+      locale,
+      "somatic.alcohol.levelInfo",
+      { level: String(level) },
+    );
     return description + alcoholSuffix + levelInfo;
   },
 
@@ -834,21 +846,55 @@ const SomaticStateService = {
       )
       .join("\n");
 
-    const moodHeader = PromptLocaleService.get(locale, "somatic.moodTemplate.header");
-    const currentMood = PromptLocaleService.get(locale, "somatic.moodTemplate.currentMood", {
-      emotion: dominantEmotion.dominant.toUpperCase(),
-      intensityBracket,
-      intensity: String(Math.round(dominantEmotion.intensity)),
-    });
-    const moodDirective = PromptLocaleService.get(locale, "somatic.moodTemplate.directive");
-    const moodFilter = PromptLocaleService.get(locale, "somatic.moodTemplate.filter");
-    const spectrumHeader = PromptLocaleService.get(locale, "somatic.moodTemplate.spectrumHeader");
-    const intensityRulesHeader = PromptLocaleService.get(locale, "somatic.moodTemplate.intensityRulesHeader");
-    const intensityMild = PromptLocaleService.get(locale, "somatic.moodTemplate.intensityMild");
-    const intensityModerate = PromptLocaleService.get(locale, "somatic.moodTemplate.intensityModerate");
-    const intensityStrong = PromptLocaleService.get(locale, "somatic.moodTemplate.intensityStrong");
-    const intensityOverwhelming = PromptLocaleService.get(locale, "somatic.moodTemplate.intensityOverwhelming");
-    const physicalStateHeader = PromptLocaleService.get(locale, "somatic.moodTemplate.physicalStateHeader");
+    const moodHeader = PromptLocaleService.get(
+      locale,
+      "somatic.moodTemplate.header",
+    );
+    const currentMood = PromptLocaleService.get(
+      locale,
+      "somatic.moodTemplate.currentMood",
+      {
+        emotion: dominantEmotion.dominant.toUpperCase(),
+        intensityBracket,
+        intensity: String(Math.round(dominantEmotion.intensity)),
+      },
+    );
+    const moodDirective = PromptLocaleService.get(
+      locale,
+      "somatic.moodTemplate.directive",
+    );
+    const moodFilter = PromptLocaleService.get(
+      locale,
+      "somatic.moodTemplate.filter",
+    );
+    const spectrumHeader = PromptLocaleService.get(
+      locale,
+      "somatic.moodTemplate.spectrumHeader",
+    );
+    const intensityRulesHeader = PromptLocaleService.get(
+      locale,
+      "somatic.moodTemplate.intensityRulesHeader",
+    );
+    const intensityMild = PromptLocaleService.get(
+      locale,
+      "somatic.moodTemplate.intensityMild",
+    );
+    const intensityModerate = PromptLocaleService.get(
+      locale,
+      "somatic.moodTemplate.intensityModerate",
+    );
+    const intensityStrong = PromptLocaleService.get(
+      locale,
+      "somatic.moodTemplate.intensityStrong",
+    );
+    const intensityOverwhelming = PromptLocaleService.get(
+      locale,
+      "somatic.moodTemplate.intensityOverwhelming",
+    );
+    const physicalStateHeader = PromptLocaleService.get(
+      locale,
+      "somatic.moodTemplate.physicalStateHeader",
+    );
 
     let block = `${moodHeader}\n${currentMood}\n${moodDirective}\n${moodFilter}\n\n${behaviorPrompt}\n\n${spectrumHeader}\n${emotionDetailsLines}\n\n${intensityRulesHeader}\n${intensityMild}\n${intensityModerate}\n${intensityStrong}\n${intensityOverwhelming}`;
 

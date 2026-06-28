@@ -29,7 +29,10 @@ export default {
   domain: DOMAINS.CORE_PLAN.displayName,
 
   async execute(toolArguments: Record<string, unknown>) {
-    const summary = typeof toolArguments.summary === "string" ? toolArguments.summary : undefined;
+    const summary =
+      typeof toolArguments.summary === "string"
+        ? toolArguments.summary
+        : undefined;
     logger.info(`[ExitPlanMode] ${summary || "(no summary)"}`);
     // Note: AgenticLoopService overrides this result with the approved plan
     // and Claude Code-style approval message after the approval gate.

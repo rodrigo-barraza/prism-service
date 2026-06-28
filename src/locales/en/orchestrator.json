@@ -99,5 +99,15 @@
         "teamName": "The team name to delete (as provided to create_team)."
       }
     }
+  },
+
+  "notifications": {
+    "teamCompleted": "[SUB-AGENT TEAM COMPLETED] Team \"{{teamName}}\" ({{topology}}) finished.",
+    "agentError": "Agent {{agentNumber}}: ❌ Error — {{errorMessage}}",
+    "agentStatus": "Agent {{agentNumber}} ({{agentDescription}}): {{agentStatus}}",
+    "agentStats": "  Duration: {{durationMs}}ms | Tools: {{toolUses}} | Iterations: {{iterations}}",
+    "agentOutput": "  Output: {{output}}",
+    "noOutput": "(no output)",
+    "truncated": "\n... (truncated)"
   }
 }

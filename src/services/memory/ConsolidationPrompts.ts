@@ -12,9 +12,15 @@ function daysSince(isoDate: string) {
 
 // ─── System Prompts ─────────────────────────────────────────
 
-export const CONSOLIDATION_PROMPT = PromptLocaleService.get("en", "memory.consolidationPrompt");
+export const CONSOLIDATION_PROMPT = PromptLocaleService.get(
+  "en",
+  "memory.consolidationPrompt",
+);
 
-export const CONVERSATIONAL_CONSOLIDATION_PROMPT = PromptLocaleService.get("en", "memory.conversationalConsolidationPrompt");
+export const CONVERSATIONAL_CONSOLIDATION_PROMPT = PromptLocaleService.get(
+  "en",
+  "memory.conversationalConsolidationPrompt",
+);
 
 // ─── Memory Formatters ──────────────────────────────────────
 
@@ -23,7 +29,9 @@ export function formatMemoryEntry(memory: MemoryDoc): string {
   return PromptLocaleService.get("en", "memory.formatting.memoryEntry", {
     id: memory.id,
     type: memory.type,
-    title: memory.title || (memory.content ? memory.content.substring(0, 60) : "untitled"),
+    title:
+      memory.title ||
+      (memory.content ? memory.content.substring(0, 60) : "untitled"),
     content: memory.content,
     age: String(age),
   });
@@ -31,16 +39,20 @@ export function formatMemoryEntry(memory: MemoryDoc): string {
 
 export function formatConversationalMemoryEntry(memory: MemoryDoc): string {
   const age = daysSince(memory.createdAt);
-  return PromptLocaleService.get("en", "memory.formatting.conversationalMemoryEntry", {
-    id: memory.id,
-    category: memory.type,
-    aboutUsername: memory.aboutUsername || "any",
-    aboutUserId: memory.aboutUserId || "?",
-    sourceUsername: memory.sourceUsername || "any",
-    sourceUserId: memory.sourceUserId || "?",
-    content: memory.content,
-    age: String(age),
-  });
+  return PromptLocaleService.get(
+    "en",
+    "memory.formatting.conversationalMemoryEntry",
+    {
+      id: memory.id,
+      category: memory.type,
+      aboutUsername: memory.aboutUsername || "any",
+      aboutUserId: memory.aboutUserId || "?",
+      sourceUsername: memory.sourceUsername || "any",
+      sourceUserId: memory.sourceUserId || "?",
+      content: memory.content,
+      age: String(age),
+    },
+  );
 }
 
 // ─── Batch Input Builders ───────────────────────────────────
@@ -53,7 +65,12 @@ export function buildConversationalBatchInput(
   const sections: string[] = [];
 
   if (partitionMeta) {
-    sections.push(PromptLocaleService.get("en", "memory.formatting.attributionContextHeader"));
+    sections.push(
+      PromptLocaleService.get(
+        "en",
+        "memory.formatting.attributionContextHeader",
+      ),
+    );
     sections.push(
       PromptLocaleService.get("en", "memory.formatting.aboutUserLine", {
         aboutUsername: partitionMeta.aboutUsername,
@@ -70,7 +87,9 @@ export function buildConversationalBatchInput(
   }
 
   if (clusterBatch.length > 0) {
-    sections.push(`${PromptLocaleService.get("en", "memory.formatting.clustersOfSimilarFacts")}\n`);
+    sections.push(
+      `${PromptLocaleService.get("en", "memory.formatting.clustersOfSimilarFacts")}\n`,
+    );
     clusterBatch.forEach((cluster, clusterIndex) => {
       sections.push(
         PromptLocaleService.get("en", "memory.formatting.clusterFactHeader", {
@@ -85,7 +104,9 @@ export function buildConversationalBatchInput(
     });
   }
   if (staleBatch.length > 0) {
-    sections.push(`${PromptLocaleService.get("en", "memory.formatting.potentiallyStaleFacts")}\n`);
+    sections.push(
+      `${PromptLocaleService.get("en", "memory.formatting.potentiallyStaleFacts")}\n`,
+    );
     staleBatch.forEach((memory) => {
       sections.push(formatConversationalMemoryEntry(memory));
     });
@@ -106,7 +127,9 @@ export function buildBatchInput(
 ): string | null {
   const sections: string[] = [];
   if (clusterBatch.length > 0) {
-    sections.push(`${PromptLocaleService.get("en", "memory.formatting.clustersOfSimilarMemories")}\n`);
+    sections.push(
+      `${PromptLocaleService.get("en", "memory.formatting.clustersOfSimilarMemories")}\n`,
+    );
     clusterBatch.forEach((cluster, clusterIndex) => {
       sections.push(
         PromptLocaleService.get("en", "memory.formatting.clusterMemoryHeader", {

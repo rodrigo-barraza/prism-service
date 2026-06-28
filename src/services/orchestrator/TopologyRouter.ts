@@ -35,4 +35,3 @@ export interface TopologyRouter {
     topologyConfig?: TopologyConfig,
   ): Promise<(SubAgentResult | { error: string })[]>;
 }
-

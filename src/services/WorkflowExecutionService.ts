@@ -617,7 +617,10 @@ async function executeModelNode(
       throw new Error("Speech generation returned no stream");
     }
     const stream = result.stream;
-    if ("pipe" in stream && typeof (stream as import("stream").Readable).pipe === "function") {
+    if (
+      "pipe" in stream &&
+      typeof (stream as import("stream").Readable).pipe === "function"
+    ) {
       const nodeStream = stream as import("stream").Readable;
       for await (const chunk of nodeStream) {
         audioChunks.push(Buffer.from(chunk as Buffer | Uint8Array));

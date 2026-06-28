@@ -4,7 +4,11 @@ import type {
   OrchestratorSpawnParams,
   SubAgentResult,
 } from "../../../types/orchestrator.ts";
-import type { TopologyRouter, ContinueSubAgentCallback, TopologyConfig } from "../TopologyRouter.ts";
+import type {
+  TopologyRouter,
+  ContinueSubAgentCallback,
+  TopologyConfig,
+} from "../TopologyRouter.ts";
 import {
   resolveSiblingInstances,
   selectInstanceForMember,
@@ -28,7 +32,10 @@ export interface DecomposedSubtask {
   dependsOn?: number[];
 }
 
-function truncateResultOutput(output: string, maximumCharacters: number): string {
+function truncateResultOutput(
+  output: string,
+  maximumCharacters: number,
+): string {
   if (output.length <= maximumCharacters) return output;
   const truncatedOutput = output.slice(0, maximumCharacters);
   return `${truncatedOutput}\n\n[... truncated — output exceeded ${maximumCharacters.toLocaleString()} character budget]`;
@@ -39,7 +46,10 @@ export function buildDecompositionPrompt(
   memberCount: number,
   maximumSubtaskCount: number = MAXIMUM_SUBTASKS,
 ): string {
-  const maximumSubtasks = Math.min(maximumSubtaskCount, Math.max(memberCount, 3));
+  const maximumSubtasks = Math.min(
+    maximumSubtaskCount,
+    Math.max(memberCount, 3),
+  );
 
   return [
     PromptLocaleService.get("en", "routers.divideAndConquer.planner"),
@@ -51,7 +61,11 @@ export function buildDecompositionPrompt(
     "",
     "## Instructions",
     "",
-    PromptLocaleService.get("en", "routers.divideAndConquer.plannerInstructions", { maximumSubtasks: String(maximumSubtasks) }),
+    PromptLocaleService.get(
+      "en",
+      "routers.divideAndConquer.plannerInstructions",
+      { maximumSubtasks: String(maximumSubtasks) },
+    ),
     "",
     "## Output Format",
     "",
@@ -59,29 +73,36 @@ export function buildDecompositionPrompt(
     "",
     "```json",
     "[",
-    '  {',
+    "  {",
     `    "description": "Define TypeScript interfaces for the feature",`,
     `    "prompt": "Create the type definitions in src/types/..."`,
-    '  },',
-    '  {',
+    "  },",
+    "  {",
     `    "description": "Implement the service using the types",`,
     `    "prompt": "Implement the service in src/services/...",`,
     `    "dependsOn": [0]`,
-    '  }',
+    "  }",
     "]",
     "```",
   ].join("\n");
 }
 
-export function parseDecompositionResponse(responseText: string, maximumSubtaskCount: number = MAXIMUM_SUBTASKS): DecomposedSubtask[] {
+export function parseDecompositionResponse(
+  responseText: string,
+  maximumSubtaskCount: number = MAXIMUM_SUBTASKS,
+): DecomposedSubtask[] {
   // Strip markdown code fences if present
   let cleanedResponse = responseText.trim();
-  cleanedResponse = cleanedResponse.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
+  cleanedResponse = cleanedResponse
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/, "");
 
   try {
     const parsed = JSON.parse(cleanedResponse);
     if (!Array.isArray(parsed)) {
-      logger.warn("[DivideAndConquerRouter] Decomposition response is not an array");
+      logger.warn(
+        "[DivideAndConquerRouter] Decomposition response is not an array",
+      );
       return [];
     }
 
@@ -100,7 +121,10 @@ export function parseDecompositionResponse(responseText: string, maximumSubtaskC
       .map((subtask) => ({
         ...subtask,
         dependsOn: Array.isArray(subtask.dependsOn)
-          ? subtask.dependsOn.filter((index: unknown): index is number => typeof index === "number" && index >= 0)
+          ? subtask.dependsOn.filter(
+              (index: unknown): index is number =>
+                typeof index === "number" && index >= 0,
+            )
           : undefined,
       }));
   } catch (parseError: unknown) {
@@ -145,13 +169,14 @@ export function buildSynthesisPrompt(
   );
 
   const resultSections = subtaskResults.map((result, resultIndex) => {
-    const subtaskDescription = subtaskDescriptions[resultIndex] || `Subtask #${resultIndex + 1}`;
+    const subtaskDescription =
+      subtaskDescriptions[resultIndex] || `Subtask #${resultIndex + 1}`;
     if ("error" in result) {
       return `### Subtask: ${subtaskDescription}\n**Status:** Error\n**Error:** ${result.error}`;
     }
     const outputText = result.result
       ? truncateResultOutput(result.result, characterBudgetPerResult)
-      : (buildToolCallFallbackSummary(result) || result.summary);
+      : buildToolCallFallbackSummary(result) || result.summary;
     return [
       `### Subtask: ${subtaskDescription}`,
       `**Status:** ${result.status}`,
@@ -173,7 +198,10 @@ export function buildSynthesisPrompt(
     "",
     "## Instructions",
     "",
-    PromptLocaleService.get("en", "routers.divideAndConquer.synthesizeInstructions"),
+    PromptLocaleService.get(
+      "en",
+      "routers.divideAndConquer.synthesizeInstructions",
+    ),
   ].join("\n");
 }
 
@@ -203,7 +231,10 @@ export function buildExecutionTiers(subtasks: DecomposedSubtask[]): number[][] {
 
       const dependencies = subtasks[subtaskIndex].dependsOn || [];
       const validDependencies = dependencies.filter(
-        (dependencyIndex) => dependencyIndex >= 0 && dependencyIndex < subtasks.length && dependencyIndex !== subtaskIndex,
+        (dependencyIndex) =>
+          dependencyIndex >= 0 &&
+          dependencyIndex < subtasks.length &&
+          dependencyIndex !== subtaskIndex,
       );
 
       if (validDependencies.length === 0) {
@@ -218,7 +249,9 @@ export function buildExecutionTiers(subtasks: DecomposedSubtask[]): number[][] {
 
       if (allDependenciesResolved) {
         const maximumDependencyTier = Math.max(
-          ...validDependencies.map((dependencyIndex) => assignedTier[dependencyIndex]),
+          ...validDependencies.map(
+            (dependencyIndex) => assignedTier[dependencyIndex],
+          ),
         );
         assignedTier[subtaskIndex] = maximumDependencyTier + 1;
         madeProgress = true;
@@ -229,7 +262,10 @@ export function buildExecutionTiers(subtasks: DecomposedSubtask[]): number[][] {
   }
 
   // Assign any unresolved (cyclic) subtasks to the final tier
-  const maximumResolvedTier = Math.max(0, ...assignedTier.filter((tier) => tier >= 0));
+  const maximumResolvedTier = Math.max(
+    0,
+    ...assignedTier.filter((tier) => tier >= 0),
+  );
   for (let subtaskIndex = 0; subtaskIndex < subtasks.length; subtaskIndex++) {
     if (assignedTier[subtaskIndex] < 0) {
       logger.warn(
@@ -257,11 +293,14 @@ export function buildDependencyContextPrefix(
     .filter((dependencyIndex) => completedResults.has(dependencyIndex))
     .map((dependencyIndex) => {
       const dependencyResult = completedResults.get(dependencyIndex)!;
-      const dependencyDescription = subtaskDescriptions[dependencyIndex] || `Subtask #${dependencyIndex + 1}`;
+      const dependencyDescription =
+        subtaskDescriptions[dependencyIndex] ||
+        `Subtask #${dependencyIndex + 1}`;
       if ("error" in dependencyResult) {
         return `### ${dependencyDescription}\n**Status:** Error — ${dependencyResult.error}`;
       }
-      const outputText = dependencyResult.result || dependencyResult.summary || "(no output)";
+      const outputText =
+        dependencyResult.result || dependencyResult.summary || "(no output)";
       return `### ${dependencyDescription}\n${outputText}`;
     });
 
@@ -306,14 +345,22 @@ export class DivideAndConquerRouter implements TopologyRouter {
       return [{ error: errorMessage }];
     }
     const originalTask = members.map((member) => member.prompt).join("\n\n");
-    const configuredMaxSubtasks = Math.max(1, Number(topologyConfig?.maxSubtasks) || MAXIMUM_SUBTASKS);
+    const configuredMaxSubtasks = Math.max(
+      1,
+      Number(topologyConfig?.maxSubtasks) || MAXIMUM_SUBTASKS,
+    );
     const maximumRecursionDepth = Math.min(
       MAXIMUM_ALLOWED_RECURSION_DEPTH,
-      Math.max(1, Number(topologyConfig?.maxRecursionDepth) || DEFAULT_MAXIMUM_RECURSION_DEPTH),
+      Math.max(
+        1,
+        Number(topologyConfig?.maxRecursionDepth) ||
+          DEFAULT_MAXIMUM_RECURSION_DEPTH,
+      ),
     );
     const recursionComplexityThreshold = Math.max(
       50,
-      Number(topologyConfig?.recursionComplexityThreshold) || DEFAULT_RECURSION_COMPLEXITY_THRESHOLD,
+      Number(topologyConfig?.recursionComplexityThreshold) ||
+        DEFAULT_RECURSION_COMPLEXITY_THRESHOLD,
     );
 
     logger.info(
@@ -326,7 +373,11 @@ export class DivideAndConquerRouter implements TopologyRouter {
       `[DivideAndConquerRouter] Phase 1: Decomposing task into subtasks...`,
     );
 
-    const decompositionPrompt = buildDecompositionPrompt(originalTask, members.length, configuredMaxSubtasks);
+    const decompositionPrompt = buildDecompositionPrompt(
+      originalTask,
+      members.length,
+      configuredMaxSubtasks,
+    );
     const provider = getProvider(providerName);
 
     if (!provider) {
@@ -339,13 +390,18 @@ export class DivideAndConquerRouter implements TopologyRouter {
 
     try {
       const decompositionStartMs = performance.now();
-      const decompositionMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [{ role: "user", content: decompositionPrompt }];
+      const decompositionMessages: Array<{
+        role: "user" | "assistant" | "system";
+        content: string;
+      }> = [{ role: "user", content: decompositionPrompt }];
       const decompositionResult = await provider.generateText(
         decompositionMessages,
         resolvedModel,
         { maxTokens: 4096 },
       );
-      const decompositionDurationMs = Math.round(performance.now() - decompositionStartMs);
+      const decompositionDurationMs = Math.round(
+        performance.now() - decompositionStartMs,
+      );
 
       RequestLogger.logBackgroundLlmCall({
         requestId: `${orchestratorContext.conversationId || "unknown"}-decompose-${teamName}`,
@@ -371,7 +427,10 @@ export class DivideAndConquerRouter implements TopologyRouter {
         ),
       );
 
-      subtasks = parseDecompositionResponse(decompositionResult.text || "", configuredMaxSubtasks);
+      subtasks = parseDecompositionResponse(
+        decompositionResult.text || "",
+        configuredMaxSubtasks,
+      );
 
       logger.info(
         `[DivideAndConquerRouter] Decomposed into ${subtasks.length} subtask(s) in ${decompositionDurationMs}ms`,
@@ -387,7 +446,9 @@ export class DivideAndConquerRouter implements TopologyRouter {
         `[DivideAndConquerRouter] Decomposition produced 0 subtasks — falling back to direct execution`,
       );
       // Fall back: execute the original task as-is with one sub-agent
-      subtasks = [{ description: members[0].description, prompt: originalTask }];
+      subtasks = [
+        { description: members[0].description, prompt: originalTask },
+      ];
     }
 
     // ── Phase 2: Tier-Based Subtask Execution (Dependency-Aware) ─────────
@@ -410,7 +471,10 @@ export class DivideAndConquerRouter implements TopologyRouter {
       { length: subtasks.length },
       () => ({ error: "not executed" }),
     );
-    const completedResults = new Map<number, SubAgentResult | { error: string }>();
+    const completedResults = new Map<
+      number,
+      SubAgentResult | { error: string }
+    >();
 
     for (let tierIndex = 0; tierIndex < tierCount; tierIndex++) {
       const tierSubtaskIndices = executionTiers[tierIndex];
@@ -421,7 +485,10 @@ export class DivideAndConquerRouter implements TopologyRouter {
         );
       }
 
-      const tierAssignments: { subtaskIndex: number; assignment: OrchestratorSpawnParams }[] = [];
+      const tierAssignments: {
+        subtaskIndex: number;
+        assignment: OrchestratorSpawnParams;
+      }[] = [];
 
       for (const subtaskIndex of tierSubtaskIndices) {
         const subtask = subtasks[subtaskIndex];
@@ -431,9 +498,14 @@ export class DivideAndConquerRouter implements TopologyRouter {
           { providerName, resolvedModel },
         );
 
-        const dependencyContext = subtask.dependsOn && subtask.dependsOn.length > 0
-          ? buildDependencyContextPrefix(completedResults, subtask.dependsOn, subtaskDescriptions)
-          : "";
+        const dependencyContext =
+          subtask.dependsOn && subtask.dependsOn.length > 0
+            ? buildDependencyContextPrefix(
+                completedResults,
+                subtask.dependsOn,
+                subtaskDescriptions,
+              )
+            : "";
 
         tierAssignments.push({
           subtaskIndex,
@@ -469,7 +541,11 @@ export class DivideAndConquerRouter implements TopologyRouter {
       );
       const tierResults = await Promise.all(tierPromises);
 
-      for (let resultOffset = 0; resultOffset < tierAssignments.length; resultOffset++) {
+      for (
+        let resultOffset = 0;
+        resultOffset < tierAssignments.length;
+        resultOffset++
+      ) {
         const originalIndex = tierAssignments[resultOffset].subtaskIndex;
         subtaskResults[originalIndex] = tierResults[resultOffset];
         completedResults.set(originalIndex, tierResults[resultOffset]);
@@ -501,7 +577,9 @@ export class DivideAndConquerRouter implements TopologyRouter {
     );
 
     try {
-      const subtaskDescriptions = subtasks.map((subtask) => subtask.description);
+      const subtaskDescriptions = subtasks.map(
+        (subtask) => subtask.description,
+      );
       const synthesisPrompt = buildSynthesisPrompt(
         originalTask,
         subtaskResults,
@@ -509,13 +587,18 @@ export class DivideAndConquerRouter implements TopologyRouter {
       );
 
       const synthesisStartMs = performance.now();
-      const synthesisMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [{ role: "user", content: synthesisPrompt }];
+      const synthesisMessages: Array<{
+        role: "user" | "assistant" | "system";
+        content: string;
+      }> = [{ role: "user", content: synthesisPrompt }];
       const synthesisResult = await provider.generateText(
         synthesisMessages,
         resolvedModel,
         { maxTokens: 8192 },
       );
-      const synthesisDurationMs = Math.round(performance.now() - synthesisStartMs);
+      const synthesisDurationMs = Math.round(
+        performance.now() - synthesisStartMs,
+      );
 
       RequestLogger.logBackgroundLlmCall({
         requestId: `${orchestratorContext.conversationId || "unknown"}-synthesis-${teamName}`,
@@ -574,7 +657,9 @@ export class DivideAndConquerRouter implements TopologyRouter {
 
   private async executeSubtaskWithRecursion(
     assignment: OrchestratorSpawnParams,
-    spawnSubAgent: (assignment: OrchestratorSpawnParams) => Promise<SubAgentResult | { error: string }>,
+    spawnSubAgent: (
+      assignment: OrchestratorSpawnParams,
+    ) => Promise<SubAgentResult | { error: string }>,
     provider: ReturnType<typeof getProvider>,
     orchestratorContext: OrchestratorContext,
     referenceMember: TeamMember,
@@ -585,8 +670,9 @@ export class DivideAndConquerRouter implements TopologyRouter {
     currentDepth: number,
   ): Promise<SubAgentResult | { error: string }> {
     const promptLength = assignment.prompt.length;
-    const shouldRecurse = currentDepth < maximumRecursionDepth
-      && promptLength > recursionComplexityThreshold;
+    const shouldRecurse =
+      currentDepth < maximumRecursionDepth &&
+      promptLength > recursionComplexityThreshold;
 
     if (!shouldRecurse) {
       return spawnSubAgent(assignment);
@@ -597,7 +683,9 @@ export class DivideAndConquerRouter implements TopologyRouter {
     );
 
     if (!provider) {
-      logger.warn(`[DivideAndConquerRouter] No provider for recursive decomposition — falling back to direct execution`);
+      logger.warn(
+        `[DivideAndConquerRouter] No provider for recursive decomposition — falling back to direct execution`,
+      );
       return spawnSubAgent(assignment);
     }
 
@@ -608,9 +696,10 @@ export class DivideAndConquerRouter implements TopologyRouter {
         Math.min(configuredMaxSubtasks, 4),
       );
 
-      const recursiveDecompositionMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [
-        { role: "user", content: recursiveDecompositionPrompt },
-      ];
+      const recursiveDecompositionMessages: Array<{
+        role: "user" | "assistant" | "system";
+        content: string;
+      }> = [{ role: "user", content: recursiveDecompositionPrompt }];
       const recursiveDecompositionResult = await provider.generateText(
         recursiveDecompositionMessages,
         orchestratorContext.resolvedModel,
@@ -634,60 +723,82 @@ export class DivideAndConquerRouter implements TopologyRouter {
       );
 
       const recursiveTiers = buildExecutionTiers(recursiveSubtasks);
-      const recursiveResults: (SubAgentResult | { error: string })[] = Array.from(
-        { length: recursiveSubtasks.length },
-        () => ({ error: "not executed" }),
+      const recursiveResults: (SubAgentResult | { error: string })[] =
+        Array.from({ length: recursiveSubtasks.length }, () => ({
+          error: "not executed",
+        }));
+      const recursiveCompletedResults = new Map<
+        number,
+        SubAgentResult | { error: string }
+      >();
+      const recursiveSubtaskDescriptions = recursiveSubtasks.map(
+        (subtask) => subtask.description,
       );
-      const recursiveCompletedResults = new Map<number, SubAgentResult | { error: string }>();
-      const recursiveSubtaskDescriptions = recursiveSubtasks.map((subtask) => subtask.description);
 
       for (const recursiveTierIndices of recursiveTiers) {
-        const recursiveTierPromises = recursiveTierIndices.map((subtaskIndex) => {
-          const subtask = recursiveSubtasks[subtaskIndex];
-          const { assignedProvider, assignedModel } = selectInstanceForMember(
-            referenceMember,
-            resolvedSiblings,
-            { providerName: orchestratorContext.providerName, resolvedModel: orchestratorContext.resolvedModel },
-          );
+        const recursiveTierPromises = recursiveTierIndices.map(
+          (subtaskIndex) => {
+            const subtask = recursiveSubtasks[subtaskIndex];
+            const { assignedProvider, assignedModel } = selectInstanceForMember(
+              referenceMember,
+              resolvedSiblings,
+              {
+                providerName: orchestratorContext.providerName,
+                resolvedModel: orchestratorContext.resolvedModel,
+              },
+            );
 
-          const dependencyContext = subtask.dependsOn && subtask.dependsOn.length > 0
-            ? buildDependencyContextPrefix(recursiveCompletedResults, subtask.dependsOn, recursiveSubtaskDescriptions)
-            : "";
+            const dependencyContext =
+              subtask.dependsOn && subtask.dependsOn.length > 0
+                ? buildDependencyContextPrefix(
+                    recursiveCompletedResults,
+                    subtask.dependsOn,
+                    recursiveSubtaskDescriptions,
+                  )
+                : "";
 
-          const recursiveAssignment: OrchestratorSpawnParams = {
-            description: subtask.description,
-            prompt: dependencyContext + subtask.prompt,
-            files: referenceMember.files,
-            model: referenceMember.model,
-            agent: referenceMember.agent,
-            assignedProvider,
-            assignedModel,
-            agentIndex: subtaskIndex,
-            teamSize: recursiveSubtasks.length,
-            orchestratorContext,
-            awaitCompletion: true,
-          };
+            const recursiveAssignment: OrchestratorSpawnParams = {
+              description: subtask.description,
+              prompt: dependencyContext + subtask.prompt,
+              files: referenceMember.files,
+              model: referenceMember.model,
+              agent: referenceMember.agent,
+              assignedProvider,
+              assignedModel,
+              agentIndex: subtaskIndex,
+              teamSize: recursiveSubtasks.length,
+              orchestratorContext,
+              awaitCompletion: true,
+            };
 
-          return this.executeSubtaskWithRecursion(
-            recursiveAssignment,
-            spawnSubAgent,
-            provider,
-            orchestratorContext,
-            referenceMember,
-            resolvedSiblings,
-            configuredMaxSubtasks,
-            maximumRecursionDepth,
-            recursionComplexityThreshold,
-            currentDepth + 1,
-          );
-        });
+            return this.executeSubtaskWithRecursion(
+              recursiveAssignment,
+              spawnSubAgent,
+              provider,
+              orchestratorContext,
+              referenceMember,
+              resolvedSiblings,
+              configuredMaxSubtasks,
+              maximumRecursionDepth,
+              recursionComplexityThreshold,
+              currentDepth + 1,
+            );
+          },
+        );
 
         const recursiveTierResults = await Promise.all(recursiveTierPromises);
 
-        for (let resultOffset = 0; resultOffset < recursiveTierIndices.length; resultOffset++) {
+        for (
+          let resultOffset = 0;
+          resultOffset < recursiveTierIndices.length;
+          resultOffset++
+        ) {
           const originalIndex = recursiveTierIndices[resultOffset];
           recursiveResults[originalIndex] = recursiveTierResults[resultOffset];
-          recursiveCompletedResults.set(originalIndex, recursiveTierResults[resultOffset]);
+          recursiveCompletedResults.set(
+            originalIndex,
+            recursiveTierResults[resultOffset],
+          );
         }
       }
 
@@ -702,7 +813,10 @@ export class DivideAndConquerRouter implements TopologyRouter {
         return spawnSubAgent(assignment);
       }
 
-      if (recursiveSuccessfulResults.length === 1 && recursiveSubtasks.length === 1) {
+      if (
+        recursiveSuccessfulResults.length === 1 &&
+        recursiveSubtasks.length === 1
+      ) {
         return recursiveResults[0];
       }
 
@@ -713,15 +827,18 @@ export class DivideAndConquerRouter implements TopologyRouter {
       );
 
       const recursiveSynthesisStartMs = performance.now();
-      const recursiveSynthesisMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [
-        { role: "user", content: recursiveSynthesisPrompt },
-      ];
+      const recursiveSynthesisMessages: Array<{
+        role: "user" | "assistant" | "system";
+        content: string;
+      }> = [{ role: "user", content: recursiveSynthesisPrompt }];
       const recursiveSynthesisResult = await provider.generateText(
         recursiveSynthesisMessages,
         orchestratorContext.resolvedModel,
         { maxTokens: 8192 },
       );
-      const recursiveSynthesisDurationMs = Math.round(performance.now() - recursiveSynthesisStartMs);
+      const recursiveSynthesisDurationMs = Math.round(
+        performance.now() - recursiveSynthesisStartMs,
+      );
 
       const recursiveSynthesizedResult: SubAgentResult = {
         agent_id: `recursive-synthesis-depth${currentDepth}-${Date.now()}`,

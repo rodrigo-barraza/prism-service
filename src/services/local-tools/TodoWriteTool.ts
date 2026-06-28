@@ -12,7 +12,6 @@ interface TodoItemInput {
   priority?: "high" | "medium" | "low";
 }
 
-
 interface TodoItemNormalized {
   id: number;
   content: string;
@@ -85,16 +84,36 @@ export default {
   async execute(toolArguments: Record<string, unknown>, context: TodoContext) {
     const items = toolArguments.items;
     if (!Array.isArray(items)) {
-      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.write_todo.invalidItems") };
+      return {
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.write_todo.invalidItems",
+        ),
+      };
     }
 
     const normalized: TodoItemNormalized[] = items.map((item, index) => {
-      const itemInput = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+      const itemInput =
+        item && typeof item === "object"
+          ? (item as Record<string, unknown>)
+          : {};
       return {
         id: index + 1,
         content: typeof itemInput.content === "string" ? itemInput.content : "",
-        status: typeof itemInput.status === "string" && (itemInput.status === "pending" || itemInput.status === "in_progress" || itemInput.status === "completed") ? itemInput.status : "pending",
-        priority: typeof itemInput.priority === "string" && (itemInput.priority === "high" || itemInput.priority === "medium" || itemInput.priority === "low") ? itemInput.priority : "medium",
+        status:
+          typeof itemInput.status === "string" &&
+          (itemInput.status === "pending" ||
+            itemInput.status === "in_progress" ||
+            itemInput.status === "completed")
+            ? itemInput.status
+            : "pending",
+        priority:
+          typeof itemInput.priority === "string" &&
+          (itemInput.priority === "high" ||
+            itemInput.priority === "medium" ||
+            itemInput.priority === "low")
+            ? itemInput.priority
+            : "medium",
       };
     });
 

@@ -71,7 +71,9 @@ async function persistToMongo(
 }
 
 /** Load state from MongoDB into memory (read-through, first access only). */
-async function loadFromMongo(conversationId: string): Promise<Map<string, unknown>> {
+async function loadFromMongo(
+  conversationId: string,
+): Promise<Map<string, unknown>> {
   try {
     const collection = getCollection();
     if (!collection) return new Map();
@@ -211,8 +213,6 @@ export default class ToolContext {
   static get activeConversationCount(): number {
     return conversations.size;
   }
-
-
 
   /**
    * Get a snapshot of all state keys for a conversation (for diagnostics).

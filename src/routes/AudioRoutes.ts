@@ -133,7 +133,10 @@ export async function handleVoice(
       throw new Error("Speech generation returned no stream");
     }
     const stream = result.stream;
-    if ("pipe" in stream && typeof (stream as import("stream").Readable).pipe === "function") {
+    if (
+      "pipe" in stream &&
+      typeof (stream as import("stream").Readable).pipe === "function"
+    ) {
       // Node.js readable stream
       const nodeStream = stream as import("stream").Readable;
       if (audioChunks) {
@@ -242,7 +245,9 @@ export async function handleVoice(
         username,
         false,
       ).catch((error: unknown) =>
-        logger.error(`Failed to clear isGenerating on error: ${getErrorMessage(error)}`),
+        logger.error(
+          `Failed to clear isGenerating on error: ${getErrorMessage(error)}`,
+        ),
       );
     }
     const totalSec = (performance.now() - requestStart) / 1000;

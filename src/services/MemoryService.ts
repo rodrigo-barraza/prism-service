@@ -169,12 +169,20 @@ async function extractFactsFromConversation(
         `${message.name || message.role}: ${message.content}`,
     )
     .join("\n");
-  const systemPrompt = PromptLocaleService.get("en", "memory.discordExtractionPrompt", { participantList });
+  const systemPrompt = PromptLocaleService.get(
+    "en",
+    "memory.discordExtractionPrompt",
+    { participantList },
+  );
   const aiMessages = [
     { role: "system", content: systemPrompt },
     {
       role: "user",
-      content: PromptLocaleService.get("en", "memory.discordExtractInstruction", { conversationText }),
+      content: PromptLocaleService.get(
+        "en",
+        "memory.discordExtractInstruction",
+        { conversationText },
+      ),
     },
   ];
   let result: { text: string; usage?: Record<string, unknown> } | undefined;
@@ -266,7 +274,8 @@ const MemoryService = {
       const embedOpts: EmbedOptions = { project };
       if (conversationId) embedOpts.conversationId = conversationId;
       if (traceId) embedOpts.traceId = traceId;
-      if (agentConversationId) embedOpts.agentConversationId = agentConversationId;
+      if (agentConversationId)
+        embedOpts.agentConversationId = agentConversationId;
       if (endpoint) embedOpts.endpoint = endpoint;
       if (agent) embedOpts.agent = agent;
       if (username) embedOpts.username = username;
@@ -416,7 +425,8 @@ const MemoryService = {
     const embeddingOpts: EmbedOptions = {};
     if (conversationId) embeddingOpts.conversationId = conversationId;
     if (traceId) embeddingOpts.traceId = traceId;
-    if (agentConversationId) embeddingOpts.agentConversationId = agentConversationId;
+    if (agentConversationId)
+      embeddingOpts.agentConversationId = agentConversationId;
     if (project) embeddingOpts.project = project;
     if (endpoint) embeddingOpts.endpoint = endpoint;
     if (agent) embeddingOpts.agent = agent;

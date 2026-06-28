@@ -140,7 +140,10 @@ export default {
 
     if (!questions || !Array.isArray(questions) || questions.length === 0) {
       return {
-        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.ask_user.questionsRequired"),
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.ask_user.questionsRequired",
+        ),
       };
     }
 
@@ -152,12 +155,19 @@ export default {
         typeof questionInput.question !== "string"
       ) {
         return {
-          error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.ask_user.invalidQuestion"),
+          error: PromptLocaleService.get(
+            PromptLocaleService.getDefaultLocale(),
+            "internal-tools-runtime.ask_user.invalidQuestion",
+          ),
         };
       }
       if (seen.has(questionInput.question)) {
         return {
-          error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.ask_user.duplicateQuestion", { preview: questionInput.question.slice(0, 60) }),
+          error: PromptLocaleService.get(
+            PromptLocaleService.getDefaultLocale(),
+            "internal-tools-runtime.ask_user.duplicateQuestion",
+            { preview: questionInput.question.slice(0, 60) },
+          ),
         };
       }
       seen.add(questionInput.question);
@@ -168,7 +178,14 @@ export default {
         for (const option of questionOptions) {
           if (labelsSeen.has(option.label)) {
             return {
-              error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.ask_user.duplicateOption", { label: option.label, question: questionInput.question.slice(0, 40) }),
+              error: PromptLocaleService.get(
+                PromptLocaleService.getDefaultLocale(),
+                "internal-tools-runtime.ask_user.duplicateOption",
+                {
+                  label: option.label,
+                  question: questionInput.question.slice(0, 40),
+                },
+              ),
             };
           }
           labelsSeen.add(option.label);
@@ -176,7 +193,12 @@ export default {
       }
     }
     if (questions.length > 4) {
-      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.ask_user.tooManyQuestions") };
+      return {
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.ask_user.tooManyQuestions",
+        ),
+      };
     }
     const normalizedQuestions: NormalizedQuestion[] = questions.map(
       (questionInput) => ({
@@ -193,7 +215,10 @@ export default {
     const agentConversationId = context.agentConversationId;
     if (!agentConversationId) {
       return {
-        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.ask_user.noConversation"),
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.ask_user.noConversation",
+        ),
       };
     }
 
@@ -237,7 +262,10 @@ export default {
       return {
         answers: null,
         timedOut: true,
-        message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.ask_user.timedOut"),
+        message: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.ask_user.timedOut",
+        ),
       };
     }
 

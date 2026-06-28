@@ -4,7 +4,11 @@ import type {
   OrchestratorSpawnParams,
   SubAgentResult,
 } from "../../../types/orchestrator.ts";
-import type { TopologyRouter, ContinueSubAgentCallback, TopologyConfig } from "../TopologyRouter.ts";
+import type {
+  TopologyRouter,
+  ContinueSubAgentCallback,
+  TopologyConfig,
+} from "../TopologyRouter.ts";
 import {
   resolveSiblingInstances,
   selectInstanceForMember,
@@ -19,7 +23,10 @@ import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 const MAXIMUM_EVALUATION_CHARACTERS = 120_000;
 const DEFAULT_VERIFICATION_COMMANDS = ["tsc --noEmit", "npm test"];
 
-function truncateResultOutput(output: string, maximumCharacters: number): string {
+function truncateResultOutput(
+  output: string,
+  maximumCharacters: number,
+): string {
   if (output.length <= maximumCharacters) return output;
   const truncatedOutput = output.slice(0, maximumCharacters);
   return `${truncatedOutput}\n\n[... truncated — output exceeded ${maximumCharacters.toLocaleString()} character budget]`;
@@ -36,7 +43,9 @@ function parseVerificationResponse(
   commands: string[],
 ): { command: string; isPassing: boolean; output: string }[] {
   let cleanedResponse = responseText.trim();
-  cleanedResponse = cleanedResponse.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
+  cleanedResponse = cleanedResponse
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/, "");
 
   try {
     let parsed: unknown;
@@ -53,15 +62,25 @@ function parseVerificationResponse(
       const resultsMap = new Map<string, { pass: boolean; output: string }>();
       for (const item of parsed) {
         if (item && typeof item === "object" && "command" in item) {
-          const cmd = String((item as Record<string, unknown>).command).trim().toLowerCase();
-          const pass = "pass" in item ? Boolean((item as Record<string, unknown>).pass) : false;
-          const out = "output" in item ? String((item as Record<string, unknown>).output) : "";
+          const cmd = String((item as Record<string, unknown>).command)
+            .trim()
+            .toLowerCase();
+          const pass =
+            "pass" in item
+              ? Boolean((item as Record<string, unknown>).pass)
+              : false;
+          const out =
+            "output" in item
+              ? String((item as Record<string, unknown>).output)
+              : "";
           resultsMap.set(cmd, { pass, output: out });
         }
       }
 
       // Check if all requested commands are in the parsed results
-      const allFound = commands.every((cmd) => resultsMap.has(cmd.trim().toLowerCase()));
+      const allFound = commands.every((cmd) =>
+        resultsMap.has(cmd.trim().toLowerCase()),
+      );
       if (allFound) {
         return commands.map((cmd) => {
           const entry = resultsMap.get(cmd.trim().toLowerCase())!;
@@ -74,22 +93,33 @@ function parseVerificationResponse(
       }
     }
   } catch (error) {
-    logger.warn(`[TournamentRouter] Failed to parse verification JSON: ${getErrorMessage(error)}. Falling back to heuristic parsing.`);
+    logger.warn(
+      `[TournamentRouter] Failed to parse verification JSON: ${getErrorMessage(error)}. Falling back to heuristic parsing.`,
+    );
   }
 
   // Fallback heuristic parsing (line-by-line)
   const lines = responseText.split("\n");
   return commands.map((command) => {
     const lowerCommand = command.toLowerCase();
-    
+
     // Find a line that contains the command
-    const matchingLine = lines.find((line) => line.toLowerCase().includes(lowerCommand));
+    const matchingLine = lines.find((line) =>
+      line.toLowerCase().includes(lowerCommand),
+    );
     let isPassing = false;
 
     if (matchingLine) {
       const lowerLine = matchingLine.toLowerCase();
-      const hasPass = lowerLine.includes("pass") || lowerLine.includes("ok") || lowerLine.includes("success") || lowerLine.includes("true");
-      const hasFail = lowerLine.includes("fail") || lowerLine.includes("error") || lowerLine.includes("false");
+      const hasPass =
+        lowerLine.includes("pass") ||
+        lowerLine.includes("ok") ||
+        lowerLine.includes("success") ||
+        lowerLine.includes("true");
+      const hasFail =
+        lowerLine.includes("fail") ||
+        lowerLine.includes("error") ||
+        lowerLine.includes("false");
       isPassing = hasPass && !hasFail;
     } else {
       const lowerOutput = responseText.toLowerCase();
@@ -104,13 +134,14 @@ function parseVerificationResponse(
   });
 }
 
-
 function buildSelectionPrompt(
   teamName: string,
   memberResults: (SubAgentResult | { error: string })[],
   verificationOutcomes?: Map<number, VerificationOutcome>,
 ): string {
-  const characterBudgetPerMember = Math.floor(MAXIMUM_EVALUATION_CHARACTERS / Math.max(memberResults.length, 1));
+  const characterBudgetPerMember = Math.floor(
+    MAXIMUM_EVALUATION_CHARACTERS / Math.max(memberResults.length, 1),
+  );
 
   const resultSections = memberResults.map((result, resultIndex) => {
     if ("error" in result) {
@@ -118,25 +149,32 @@ function buildSelectionPrompt(
     }
     const outputText = result.result
       ? truncateResultOutput(result.result, characterBudgetPerMember)
-      : (buildToolCallFallbackSummary(result) || result.summary);
+      : buildToolCallFallbackSummary(result) || result.summary;
     return [
       `### Sub-Agent #${resultIndex + 1}: ${result.description || "unnamed"}`,
       `**Status:** ${result.status}`,
       `**Tool Uses:** ${result.toolUses}`,
       `**Duration:** ${result.durationMs}ms`,
-      ...(verificationOutcomes?.has(resultIndex) ? [
-        `**Verification:**`,
-        ...verificationOutcomes.get(resultIndex)!.commandResults.map((commandResult) =>
-          `  ${commandResult.isPassing ? "✅" : "❌"} \`${commandResult.command}\`: ${commandResult.isPassing ? "PASS" : `FAIL — ${commandResult.output.slice(0, 500)}`}`,
-        ),
-      ] : []),
+      ...(verificationOutcomes?.has(resultIndex)
+        ? [
+            `**Verification:**`,
+            ...verificationOutcomes
+              .get(resultIndex)!
+              .commandResults.map(
+                (commandResult) =>
+                  `  ${commandResult.isPassing ? "✅" : "❌"} \`${commandResult.command}\`: ${commandResult.isPassing ? "PASS" : `FAIL — ${commandResult.output.slice(0, 500)}`}`,
+              ),
+          ]
+        : []),
       `**Output:**\n${outputText}`,
     ].join("\n");
   });
 
   return [
     PromptLocaleService.get("en", "routers.tournament.judge", { teamName }),
-    PromptLocaleService.get("en", "routers.tournament.judgeJobDescription", { memberCount: String(memberResults.length) }),
+    PromptLocaleService.get("en", "routers.tournament.judgeJobDescription", {
+      memberCount: String(memberResults.length),
+    }),
     "",
     "## Sub-Agent Results",
     "",
@@ -172,8 +210,12 @@ export class TournamentRouter implements TopologyRouter {
   ): Promise<(SubAgentResult | { error: string })[]> {
     const { providerName, resolvedModel } = orchestratorContext;
     const isVerificationEnabled = topologyConfig?.enableVerification === true;
-    const verificationCommands: string[] = Array.isArray(topologyConfig?.verificationCommands)
-      ? (topologyConfig.verificationCommands as string[]).filter((command) => typeof command === "string")
+    const verificationCommands: string[] = Array.isArray(
+      topologyConfig?.verificationCommands,
+    )
+      ? (topologyConfig.verificationCommands as string[]).filter(
+          (command) => typeof command === "string",
+        )
       : DEFAULT_VERIFICATION_COMMANDS;
 
     logger.info(
@@ -248,86 +290,120 @@ export class TournamentRouter implements TopologyRouter {
 
       verificationOutcomes = new Map();
 
-      const verificationPromises = memberResults.map(async (result, resultIndex) => {
-        if ("error" in result || result.status !== "completed") return;
+      const verificationPromises = memberResults.map(
+        async (result, resultIndex) => {
+          if ("error" in result || result.status !== "completed") return;
 
-        const hasFileChanges = result.diff && (result.diff.additions > 0 || result.diff.deletions > 0);
-        if (!hasFileChanges) {
-          verificationOutcomes!.set(resultIndex, {
-            candidateIndex: resultIndex,
-            isPassing: true,
-            commandResults: [{ command: "(no file changes)", isPassing: true, output: "Skipped — no file modifications" }],
-          });
-          return;
-        }
-
-        const verificationPrompt = [
-          PromptLocaleService.get("en", "routers.tournament.verifier"),
-          "",
-          ...verificationCommands.map((command, commandIndex) => `${commandIndex + 1}. \`${command}\``),
-          "",
-          "Report your results as a JSON array:",
-          '```json',
-          JSON.stringify(verificationCommands.map((command) => ({ command, pass: true, output: "" })), null, 2),
-          '```',
-          "",
-          "Set pass=false and include the error output if a command fails.",
-        ].join("\n");
-
-        try {
-          const { assignedProvider, assignedModel } = selectInstanceForMember(
-            members[0],
-            resolvedSiblings,
-            { providerName, resolvedModel },
-          );
-
-          const verificationResult = await spawnSubAgent({
-            description: `Verification for candidate #${resultIndex + 1}`,
-            prompt: verificationPrompt,
-            files: members[0].files,
-            model: members[0].model,
-            agent: members[0].agent,
-            assignedProvider,
-            assignedModel,
-            agentIndex: resultIndex,
-            teamSize: members.length,
-            orchestratorContext,
-        awaitCompletion: true,
-          });
-
-          if ("error" in verificationResult) {
+          const hasFileChanges =
+            result.diff &&
+            (result.diff.additions > 0 || result.diff.deletions > 0);
+          if (!hasFileChanges) {
             verificationOutcomes!.set(resultIndex, {
               candidateIndex: resultIndex,
-              isPassing: false,
-              commandResults: [{ command: "verification", isPassing: false, output: (verificationResult as { error: string }).error }],
+              isPassing: true,
+              commandResults: [
+                {
+                  command: "(no file changes)",
+                  isPassing: true,
+                  output: "Skipped — no file modifications",
+                },
+              ],
             });
             return;
           }
 
-          const commandResults = parseVerificationResponse(
-            verificationResult.result || "",
-            verificationCommands,
-          );
+          const verificationPrompt = [
+            PromptLocaleService.get("en", "routers.tournament.verifier"),
+            "",
+            ...verificationCommands.map(
+              (command, commandIndex) => `${commandIndex + 1}. \`${command}\``,
+            ),
+            "",
+            "Report your results as a JSON array:",
+            "```json",
+            JSON.stringify(
+              verificationCommands.map((command) => ({
+                command,
+                pass: true,
+                output: "",
+              })),
+              null,
+              2,
+            ),
+            "```",
+            "",
+            "Set pass=false and include the error output if a command fails.",
+          ].join("\n");
 
-          verificationOutcomes!.set(resultIndex, {
-            candidateIndex: resultIndex,
-            isPassing: commandResults.every((commandResult) => commandResult.isPassing),
-            commandResults,
-          });
-        } catch (verificationError: unknown) {
-          verificationOutcomes!.set(resultIndex, {
-            candidateIndex: resultIndex,
-            isPassing: false,
-            commandResults: [{ command: "verification", isPassing: false, output: getErrorMessage(verificationError) }],
-          });
-        }
-      });
+          try {
+            const { assignedProvider, assignedModel } = selectInstanceForMember(
+              members[0],
+              resolvedSiblings,
+              { providerName, resolvedModel },
+            );
+
+            const verificationResult = await spawnSubAgent({
+              description: `Verification for candidate #${resultIndex + 1}`,
+              prompt: verificationPrompt,
+              files: members[0].files,
+              model: members[0].model,
+              agent: members[0].agent,
+              assignedProvider,
+              assignedModel,
+              agentIndex: resultIndex,
+              teamSize: members.length,
+              orchestratorContext,
+              awaitCompletion: true,
+            });
+
+            if ("error" in verificationResult) {
+              verificationOutcomes!.set(resultIndex, {
+                candidateIndex: resultIndex,
+                isPassing: false,
+                commandResults: [
+                  {
+                    command: "verification",
+                    isPassing: false,
+                    output: (verificationResult as { error: string }).error,
+                  },
+                ],
+              });
+              return;
+            }
+
+            const commandResults = parseVerificationResponse(
+              verificationResult.result || "",
+              verificationCommands,
+            );
+
+            verificationOutcomes!.set(resultIndex, {
+              candidateIndex: resultIndex,
+              isPassing: commandResults.every(
+                (commandResult) => commandResult.isPassing,
+              ),
+              commandResults,
+            });
+          } catch (verificationError: unknown) {
+            verificationOutcomes!.set(resultIndex, {
+              candidateIndex: resultIndex,
+              isPassing: false,
+              commandResults: [
+                {
+                  command: "verification",
+                  isPassing: false,
+                  output: getErrorMessage(verificationError),
+                },
+              ],
+            });
+          }
+        },
+      );
 
       await Promise.all(verificationPromises);
 
-      const passingCandidateCount = Array.from(verificationOutcomes.values()).filter(
-        (outcome) => outcome.isPassing,
-      ).length;
+      const passingCandidateCount = Array.from(
+        verificationOutcomes.values(),
+      ).filter((outcome) => outcome.isPassing).length;
 
       logger.info(
         `[TournamentRouter] Verification complete: ${passingCandidateCount}/${verificationOutcomes.size} candidates passed`,
@@ -339,7 +415,11 @@ export class TournamentRouter implements TopologyRouter {
     );
 
     try {
-      const selectionPrompt = buildSelectionPrompt(teamName, memberResults, verificationOutcomes);
+      const selectionPrompt = buildSelectionPrompt(
+        teamName,
+        memberResults,
+        verificationOutcomes,
+      );
       const provider = getProvider(providerName);
 
       if (!provider) {
@@ -351,7 +431,10 @@ export class TournamentRouter implements TopologyRouter {
 
       const selectionStartTime = Date.now();
       const selectionRequestStartMs = performance.now();
-      const selectionMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [{ role: "user", content: selectionPrompt }];
+      const selectionMessages: Array<{
+        role: "user" | "assistant" | "system";
+        content: string;
+      }> = [{ role: "user", content: selectionPrompt }];
       const selectionResult = await provider.generateText(
         selectionMessages,
         resolvedModel,
@@ -410,12 +493,8 @@ export class TournamentRouter implements TopologyRouter {
       return [...memberResults, judgeSubAgentResult];
     } catch (judgeError: unknown) {
       const errorMessage =
-        judgeError instanceof Error
-          ? judgeError.message
-          : String(judgeError);
-      logger.error(
-        `[TournamentRouter] Judge pass failed: ${errorMessage}`,
-      );
+        judgeError instanceof Error ? judgeError.message : String(judgeError);
+      logger.error(`[TournamentRouter] Judge pass failed: ${errorMessage}`);
       return memberResults;
     }
   }

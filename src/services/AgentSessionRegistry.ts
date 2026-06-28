@@ -54,9 +54,7 @@ const AgentSessionRegistry = {
     if (!session) return false;
     if (!session.stopController.signal.aborted) {
       session.stopController.abort();
-      logger.info(
-        `[AgentSessionRegistry] Stopped session ${conversationId}`,
-      );
+      logger.info(`[AgentSessionRegistry] Stopped session ${conversationId}`);
     }
     return true;
   },

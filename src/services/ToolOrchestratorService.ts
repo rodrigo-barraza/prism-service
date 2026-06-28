@@ -127,7 +127,7 @@ let cachedAISchemas: ToolSchemaFull[] = [];
 let cachedClientSchemas: ToolSchemaFull[] = [];
 
 /**
-  * Per-locale caches for remote tool schemas.
+ * Per-locale caches for remote tool schemas.
  * The default locale populates cachedClientSchemas/cachedAISchemas directly.
  * Non-default locales (e.g. "caveman") are stored here so that
  * getClientToolSchemas(topology, "caveman") returns localized descriptions
@@ -260,7 +260,12 @@ async function fetchSchemas() {
  * returns tool descriptions in the correct language.
  */
 async function fetchSchemasForLocale(locale: string) {
-  if (locale === "en" || localizedClientSchemasCache.has(locale) || attemptedLocales.has(locale)) return;
+  if (
+    locale === "en" ||
+    localizedClientSchemasCache.has(locale) ||
+    attemptedLocales.has(locale)
+  )
+    return;
   attemptedLocales.add(locale);
   try {
     const localeParam = `?locale=${encodeURIComponent(locale)}`;
@@ -284,7 +289,12 @@ async function fetchSchemasForLocale(locale: string) {
     localizedAISchemasCache.set(
       locale,
       schemas.map(
-        ({ endpoint: _endpoint, dataSource: _dataSource, domain: _domain, ...rest }) => rest,
+        ({
+          endpoint: _endpoint,
+          dataSource: _dataSource,
+          domain: _domain,
+          ...rest
+        }) => rest,
       ),
     );
     logger.info(
@@ -427,7 +437,10 @@ async function executeToolGeneric(
 
     // Worktree path rewriting — redirect file paths to the worktree directory
     // when the session has an active worktree.
-    if (context.agentConversationId && activeWorktrees.has(context.agentConversationId)) {
+    if (
+      context.agentConversationId &&
+      activeWorktrees.has(context.agentConversationId)
+    ) {
       const worktreeState = activeWorktrees.get(context.agentConversationId)!;
       const rewritePath = (provider: unknown): unknown => {
         if (typeof provider !== "string") return provider;
@@ -590,12 +603,19 @@ function buildAgentParameterDescription(locale?: string): string {
     .join(", ");
 
   if (agentNames) {
-    return PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.memberAgent", {
-      agentNames,
-    });
+    return PromptLocaleService.get(
+      activeLocale,
+      "orchestrator.tools.create_team.parameters.memberAgent",
+      {
+        agentNames,
+      },
+    );
   }
 
-  return PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.memberAgentDefault");
+  return PromptLocaleService.get(
+    activeLocale,
+    "orchestrator.tools.create_team.parameters.memberAgentDefault",
+  );
 }
 
 function getOrchestratorToolSchemas(
@@ -614,7 +634,8 @@ function getOrchestratorToolSchemas(
           : TOPOLOGIES.HIERARCHICAL;
 
   const isHierarchical = normalizedTopology === TOPOLOGIES.HIERARCHICAL;
-  const isHierarchicalAggregation = normalizedTopology === TOPOLOGIES.HIERARCHICAL_AGGREGATION;
+  const isHierarchicalAggregation =
+    normalizedTopology === TOPOLOGIES.HIERARCHICAL_AGGREGATION;
   const isSequential = normalizedTopology === TOPOLOGIES.SEQUENTIAL;
   const isPeerToPeer = normalizedTopology === TOPOLOGIES.PEER_TO_PEER;
 
@@ -630,18 +651,22 @@ function getOrchestratorToolSchemas(
   const peerToPeerLabel = isPeerToPeer
     ? `${TOPOLOGIES.PEER_TO_PEER} (default)`
     : TOPOLOGIES.PEER_TO_PEER;
-  const tournamentLabel = defaultTopology === TOPOLOGIES.TOURNAMENT
-    ? `${TOPOLOGIES.TOURNAMENT} (default)`
-    : TOPOLOGIES.TOURNAMENT;
-  const criticLoopLabel = defaultTopology === TOPOLOGIES.CRITIC_LOOP
-    ? `${TOPOLOGIES.CRITIC_LOOP} (default)`
-    : TOPOLOGIES.CRITIC_LOOP;
-  const divideAndConquerLabel = defaultTopology === TOPOLOGIES.DIVIDE_AND_CONQUER
-    ? `${TOPOLOGIES.DIVIDE_AND_CONQUER} (default)`
-    : TOPOLOGIES.DIVIDE_AND_CONQUER;
-  const mctsLabel = defaultTopology === TOPOLOGIES.MCTS
-    ? `${TOPOLOGIES.MCTS} (default)`
-    : TOPOLOGIES.MCTS;
+  const tournamentLabel =
+    defaultTopology === TOPOLOGIES.TOURNAMENT
+      ? `${TOPOLOGIES.TOURNAMENT} (default)`
+      : TOPOLOGIES.TOURNAMENT;
+  const criticLoopLabel =
+    defaultTopology === TOPOLOGIES.CRITIC_LOOP
+      ? `${TOPOLOGIES.CRITIC_LOOP} (default)`
+      : TOPOLOGIES.CRITIC_LOOP;
+  const divideAndConquerLabel =
+    defaultTopology === TOPOLOGIES.DIVIDE_AND_CONQUER
+      ? `${TOPOLOGIES.DIVIDE_AND_CONQUER} (default)`
+      : TOPOLOGIES.DIVIDE_AND_CONQUER;
+  const mctsLabel =
+    defaultTopology === TOPOLOGIES.MCTS
+      ? `${TOPOLOGIES.MCTS} (default)`
+      : TOPOLOGIES.MCTS;
 
   const hierarchicalDesc = isHierarchical
     ? "'hierarchical' (default)"
@@ -655,39 +680,48 @@ function getOrchestratorToolSchemas(
   const peerToPeerDesc = isPeerToPeer
     ? "'peer_to_peer' (default)"
     : "'peer_to_peer'";
-  const tournamentDesc = defaultTopology === TOPOLOGIES.TOURNAMENT
-    ? "'tournament' (default)"
-    : "'tournament'";
-  const criticLoopDesc = defaultTopology === TOPOLOGIES.CRITIC_LOOP
-    ? "'critic_loop' (default)"
-    : "'critic_loop'";
-  const divideAndConquerDesc = defaultTopology === TOPOLOGIES.DIVIDE_AND_CONQUER
-    ? "'divide_and_conquer' (default)"
-    : "'divide_and_conquer'";
-  const mctsDesc = defaultTopology === TOPOLOGIES.MCTS
-    ? "'mcts' (default)"
-    : "'mcts'";
+  const tournamentDesc =
+    defaultTopology === TOPOLOGIES.TOURNAMENT
+      ? "'tournament' (default)"
+      : "'tournament'";
+  const criticLoopDesc =
+    defaultTopology === TOPOLOGIES.CRITIC_LOOP
+      ? "'critic_loop' (default)"
+      : "'critic_loop'";
+  const divideAndConquerDesc =
+    defaultTopology === TOPOLOGIES.DIVIDE_AND_CONQUER
+      ? "'divide_and_conquer' (default)"
+      : "'divide_and_conquer'";
+  const mctsDesc =
+    defaultTopology === TOPOLOGIES.MCTS ? "'mcts' (default)" : "'mcts'";
 
   return [
     {
       name: TOOL_NAMES.CREATE_TEAM,
       emoji: ["👥", "🤖"],
-      description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.description", {
-        hierarchicalDesc,
-        hierarchicalAggregationDesc,
-        sequentialDesc,
-        peerToPeerDesc,
-        tournamentDesc,
-        criticLoopDesc,
-        divideAndConquerDesc,
-        mctsDesc,
-      }),
+      description: PromptLocaleService.get(
+        activeLocale,
+        "orchestrator.tools.create_team.description",
+        {
+          hierarchicalDesc,
+          hierarchicalAggregationDesc,
+          sequentialDesc,
+          peerToPeerDesc,
+          tournamentDesc,
+          criticLoopDesc,
+          divideAndConquerDesc,
+          mctsDesc,
+        },
+      ),
       parameters: {
         type: "object",
         properties: {
           name: {
             type: "string",
-            description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.name"),
+            description: PromptLocaleService.get(
+              activeLocale,
+              "orchestrator.tools.create_team.parameters.name",
+            ),
           },
           topology: {
             type: "string",
@@ -701,66 +735,103 @@ function getOrchestratorToolSchemas(
               TOPOLOGIES.DIVIDE_AND_CONQUER,
               TOPOLOGIES.MCTS,
             ],
-            description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.topology", {
-              hierarchicalLabel,
-              hierarchicalAggregationLabel,
-              sequentialLabel,
-              peerToPeerLabel,
-              tournamentLabel,
-              criticLoopLabel,
-              divideAndConquerLabel,
-              mctsLabel,
-            }),
+            description: PromptLocaleService.get(
+              activeLocale,
+              "orchestrator.tools.create_team.parameters.topology",
+              {
+                hierarchicalLabel,
+                hierarchicalAggregationLabel,
+                sequentialLabel,
+                peerToPeerLabel,
+                tournamentLabel,
+                criticLoopLabel,
+                divideAndConquerLabel,
+                mctsLabel,
+              },
+            ),
           },
           topologyConfig: {
             type: "object",
-            description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.topologyConfig"),
+            description: PromptLocaleService.get(
+              activeLocale,
+              "orchestrator.tools.create_team.parameters.topologyConfig",
+            ),
             properties: {
               actorCount: {
                 type: "integer",
-                description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.actorCount"),
+                description: PromptLocaleService.get(
+                  activeLocale,
+                  "orchestrator.tools.create_team.parameters.actorCount",
+                ),
               },
               maxRounds: {
                 type: "integer",
-                description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.maxRounds"),
+                description: PromptLocaleService.get(
+                  activeLocale,
+                  "orchestrator.tools.create_team.parameters.maxRounds",
+                ),
               },
               branchFactor: {
                 type: "integer",
-                description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.branchFactor"),
+                description: PromptLocaleService.get(
+                  activeLocale,
+                  "orchestrator.tools.create_team.parameters.branchFactor",
+                ),
               },
               maxDepth: {
                 type: "integer",
-                description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.maxDepth"),
+                description: PromptLocaleService.get(
+                  activeLocale,
+                  "orchestrator.tools.create_team.parameters.maxDepth",
+                ),
               },
               maxSubtasks: {
                 type: "integer",
-                description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.maxSubtasks"),
+                description: PromptLocaleService.get(
+                  activeLocale,
+                  "orchestrator.tools.create_team.parameters.maxSubtasks",
+                ),
               },
             },
           },
           members: {
             type: "array",
             maxItems: 10,
-            description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.members"),
+            description: PromptLocaleService.get(
+              activeLocale,
+              "orchestrator.tools.create_team.parameters.members",
+            ),
             items: {
               type: "object",
               properties: {
                 description: {
                   type: "string",
-                  description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.memberDescription"),
+                  description: PromptLocaleService.get(
+                    activeLocale,
+                    "orchestrator.tools.create_team.parameters.memberDescription",
+                  ),
                 },
                 prompt: {
                   type: "string",
-                  description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.memberPrompt"),
+                  description: PromptLocaleService.get(
+                    activeLocale,
+                    "orchestrator.tools.create_team.parameters.memberPrompt",
+                  ),
                 },
                 files: {
                   type: "array",
                   items: { type: "string" },
-                  description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.memberFiles"),
+                  description: PromptLocaleService.get(
+                    activeLocale,
+                    "orchestrator.tools.create_team.parameters.memberFiles",
+                  ),
                 },
                 model: {
                   type: "string",
-                  description: PromptLocaleService.get(activeLocale, "orchestrator.tools.create_team.parameters.memberModel"),
+                  description: PromptLocaleService.get(
+                    activeLocale,
+                    "orchestrator.tools.create_team.parameters.memberModel",
+                  ),
                 },
                 agent: {
                   type: "string",
@@ -777,17 +848,26 @@ function getOrchestratorToolSchemas(
     {
       name: TOOL_NAMES.SEND_MESSAGE,
       emoji: ["💬", "📤"],
-      description: PromptLocaleService.get(activeLocale, "orchestrator.tools.send_message.description"),
+      description: PromptLocaleService.get(
+        activeLocale,
+        "orchestrator.tools.send_message.description",
+      ),
       parameters: {
         type: "object",
         properties: {
           to: {
             type: "string",
-            description: PromptLocaleService.get(activeLocale, "orchestrator.tools.send_message.parameters.to"),
+            description: PromptLocaleService.get(
+              activeLocale,
+              "orchestrator.tools.send_message.parameters.to",
+            ),
           },
           message: {
             type: "string",
-            description: PromptLocaleService.get(activeLocale, "orchestrator.tools.send_message.parameters.message"),
+            description: PromptLocaleService.get(
+              activeLocale,
+              "orchestrator.tools.send_message.parameters.message",
+            ),
           },
         },
         required: ["to", "message"],
@@ -796,13 +876,19 @@ function getOrchestratorToolSchemas(
     {
       name: TOOL_NAMES.STOP_AGENT,
       emoji: ["⏹️", "🤖"],
-      description: PromptLocaleService.get(activeLocale, "orchestrator.tools.stop_agent.description"),
+      description: PromptLocaleService.get(
+        activeLocale,
+        "orchestrator.tools.stop_agent.description",
+      ),
       parameters: {
         type: "object",
         properties: {
           agent_id: {
             type: "string",
-            description: PromptLocaleService.get(activeLocale, "orchestrator.tools.stop_agent.parameters.agent_id"),
+            description: PromptLocaleService.get(
+              activeLocale,
+              "orchestrator.tools.stop_agent.parameters.agent_id",
+            ),
           },
         },
         required: ["agent_id"],
@@ -811,13 +897,19 @@ function getOrchestratorToolSchemas(
     {
       name: TOOL_NAMES.GET_TASK_OUTPUT,
       emoji: ["📥", "🤖"],
-      description: PromptLocaleService.get(activeLocale, "orchestrator.tools.get_task_output.description"),
+      description: PromptLocaleService.get(
+        activeLocale,
+        "orchestrator.tools.get_task_output.description",
+      ),
       parameters: {
         type: "object",
         properties: {
           agent_id: {
             type: "string",
-            description: PromptLocaleService.get(activeLocale, "orchestrator.tools.get_task_output.parameters.agent_id"),
+            description: PromptLocaleService.get(
+              activeLocale,
+              "orchestrator.tools.get_task_output.parameters.agent_id",
+            ),
           },
         },
         required: ["agent_id"],
@@ -826,13 +918,19 @@ function getOrchestratorToolSchemas(
     {
       name: TOOL_NAMES.DELETE_TEAM,
       emoji: ["🗑️", "👥"],
-      description: PromptLocaleService.get(activeLocale, "orchestrator.tools.delete_team.description"),
+      description: PromptLocaleService.get(
+        activeLocale,
+        "orchestrator.tools.delete_team.description",
+      ),
       parameters: {
         type: "object",
         properties: {
           teamName: {
             type: "string",
-            description: PromptLocaleService.get(activeLocale, "orchestrator.tools.delete_team.parameters.teamName"),
+            description: PromptLocaleService.get(
+              activeLocale,
+              "orchestrator.tools.delete_team.parameters.teamName",
+            ),
           },
         },
         required: ["teamName"],
@@ -864,9 +962,10 @@ export default class ToolOrchestratorService {
       creativeSettings?.textToSpeechProvider || "elevenlabs";
     const textToSpeechModel = creativeSettings?.textToSpeechModel || "";
 
-    const localeAISchemas = (locale && locale !== "en" && localizedAISchemasCache.has(locale))
-      ? localizedAISchemasCache.get(locale)!
-      : cachedAISchemas;
+    const localeAISchemas =
+      locale && locale !== "en" && localizedAISchemasCache.has(locale)
+        ? localizedAISchemasCache.get(locale)!
+        : cachedAISchemas;
 
     const resolvedSchemas = localeAISchemas.map((schema) => {
       if (schema.name !== "synthesize_speech") return schema;
@@ -907,8 +1006,9 @@ export default class ToolOrchestratorService {
       };
     });
 
-    const activeLocale = locale
-      || (typeof SettingsService.getCached === "function"
+    const activeLocale =
+      locale ||
+      (typeof SettingsService.getCached === "function"
         ? SettingsService.getCached().agents?.locale || "en"
         : "en");
 
@@ -920,7 +1020,10 @@ export default class ToolOrchestratorService {
   }
 
   /** Client-facing schemas (with domain/domainKey/dataSource, no endpoint) — for Prism Client UI */
-  static getClientToolSchemas(defaultTopology?: string, locale?: string): ToolSchemaFull[] {
+  static getClientToolSchemas(
+    defaultTopology?: string,
+    locale?: string,
+  ): ToolSchemaFull[] {
     if (isResolvingClientSchemas) {
       // Break recursion cycle when internal tool getters (e.g. discover_and_enable_tools)
       // fetch schemas dynamically from this same catalog.
@@ -942,8 +1045,9 @@ export default class ToolOrchestratorService {
           .replace(/[^a-z0-9]+/g, "_")
           .replace(/^_|_$/g, "");
 
-      const activeLocale = locale
-        || (typeof SettingsService.getCached === "function"
+      const activeLocale =
+        locale ||
+        (typeof SettingsService.getCached === "function"
           ? SettingsService.getCached().agents?.locale || "en"
           : "en");
 
@@ -958,19 +1062,22 @@ export default class ToolOrchestratorService {
         system: true,
       }));
 
-      const internalClient = InternalToolRegistry.getClientSchemas(activeLocale).map(
-        (tool) => ({
-          ...tool,
-          domainKey: resolveDomainKey(
-            tool.domain || DOMAINS.CORE_HARNESS.displayName,
-          ),
-          system: isCoreDomain(tool.domain || DOMAINS.CORE_HARNESS.displayName),
-        }),
-      );
+      const internalClient = InternalToolRegistry.getClientSchemas(
+        activeLocale,
+      ).map((tool) => ({
+        ...tool,
+        domainKey: resolveDomainKey(
+          tool.domain || DOMAINS.CORE_HARNESS.displayName,
+        ),
+        system: isCoreDomain(tool.domain || DOMAINS.CORE_HARNESS.displayName),
+      }));
 
-      const localeClientSchemas = (activeLocale && activeLocale !== "en" && localizedClientSchemasCache.has(activeLocale))
-        ? localizedClientSchemasCache.get(activeLocale)!
-        : cachedClientSchemas;
+      const localeClientSchemas =
+        activeLocale &&
+        activeLocale !== "en" &&
+        localizedClientSchemasCache.has(activeLocale)
+          ? localizedClientSchemasCache.get(activeLocale)!
+          : cachedClientSchemas;
 
       const clientSchemasEnriched = localeClientSchemas.map((tool) => ({
         ...tool,
@@ -1110,7 +1217,9 @@ export default class ToolOrchestratorService {
 
 
    */
-  static getEffectiveWorkspaceRoot(agentConversationId: string | null | undefined) {
+  static getEffectiveWorkspaceRoot(
+    agentConversationId: string | null | undefined,
+  ) {
     if (agentConversationId && activeWorktrees.has(agentConversationId)) {
       return activeWorktrees.get(agentConversationId)!.worktreePath;
     }
@@ -1599,8 +1708,7 @@ export default class ToolOrchestratorService {
     const mcpSchemas = MCPClientService.getToolSchemas();
     if (mcpSchemas.length === 0) return toolsApiResult;
 
-    const queryText =
-      typeof args.query === "string" ? args.query.trim() : "";
+    const queryText = typeof args.query === "string" ? args.query.trim() : "";
     const domainFilter =
       typeof args.domain === "string" ? args.domain.toLowerCase() : null;
     const limit =
@@ -1671,7 +1779,8 @@ export default class ToolOrchestratorService {
       total: existingTotal + indexResults.length,
       ...(hasDisabledMcpMatches &&
         !toolsApiResult.action_required &&
-        !toolsApiResult.actionRequired && (() => {
+        !toolsApiResult.actionRequired &&
+        (() => {
           const nudgeText = PromptLocaleService.get(
             PromptLocaleService.getDefaultLocale(),
             "internal-tools-runtime.shared.searchActionNudgeDisabled",

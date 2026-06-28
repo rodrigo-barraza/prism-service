@@ -83,7 +83,12 @@ export default class AgenticLoopState {
   branchesBacktracked: number;
   proactiveBacktracks: number;
   selectedBranchScores: number[];
-  frontierCandidates: Array<{ pass: PassState; score: number; branchIndex: number; criteriaScores: CriteriaScores }>;
+  frontierCandidates: Array<{
+    pass: PassState;
+    score: number;
+    branchIndex: number;
+    criteriaScores: CriteriaScores;
+  }>;
 
   // ── High-water marks ────────────────────────────────────
   // Token counts emitted to the frontend must be monotonically

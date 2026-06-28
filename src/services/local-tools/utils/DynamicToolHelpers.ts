@@ -15,6 +15,10 @@ export function persistDynamicTools(
   agentConversationId: string,
   toolNames: string[],
 ): void {
-  ToolContext.set(agentConversationId, TOOL_CONTEXT_KEY_DYNAMIC_ENABLED, toolNames);
+  ToolContext.set(
+    agentConversationId,
+    TOOL_CONTEXT_KEY_DYNAMIC_ENABLED,
+    toolNames,
+  );
   ToolContext.set(agentConversationId, TOOL_CONTEXT_KEY_DIRTY_FLAG, true);
 }

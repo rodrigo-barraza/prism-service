@@ -84,22 +84,54 @@ function buildToolDiscoveryContent(locale: string): string {
       const quotedKeywords = keywords
         .map((keyword) => `"${keyword}"`)
         .join(", ");
-      return PromptLocaleService.get(locale, "tool-policy.toolDiscovery.triggerLineTemplate", {
-        keywords: quotedKeywords,
-        domain,
-      });
+      return PromptLocaleService.get(
+        locale,
+        "tool-policy.toolDiscovery.triggerLineTemplate",
+        {
+          keywords: quotedKeywords,
+          domain,
+        },
+      );
     })
     .join("\n");
 
-  const headerLine = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.header");
-  const introLine = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.intro", { totalToolCount: String(totalToolCount) });
-  const domainsHeader = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.domainsHeader");
-  const searchRule = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.searchRule");
-  const searchSteps = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.searchSteps");
-  const noFallback = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.noFallback");
-  const intentHeader = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.intentMatchingHeader");
-  const intentRules = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.intentMatchingRules");
-  const triggerHeader = PromptLocaleService.get(locale, "tool-policy.toolDiscovery.triggerHeader");
+  const headerLine = PromptLocaleService.get(
+    locale,
+    "tool-policy.toolDiscovery.header",
+  );
+  const introLine = PromptLocaleService.get(
+    locale,
+    "tool-policy.toolDiscovery.intro",
+    { totalToolCount: String(totalToolCount) },
+  );
+  const domainsHeader = PromptLocaleService.get(
+    locale,
+    "tool-policy.toolDiscovery.domainsHeader",
+  );
+  const searchRule = PromptLocaleService.get(
+    locale,
+    "tool-policy.toolDiscovery.searchRule",
+  );
+  const searchSteps = PromptLocaleService.get(
+    locale,
+    "tool-policy.toolDiscovery.searchSteps",
+  );
+  const noFallback = PromptLocaleService.get(
+    locale,
+    "tool-policy.toolDiscovery.noFallback",
+  );
+  const intentHeader = PromptLocaleService.get(
+    locale,
+    "tool-policy.toolDiscovery.intentMatchingHeader",
+  );
+  const intentRules = PromptLocaleService.get(
+    locale,
+    "tool-policy.toolDiscovery.intentMatchingRules",
+  );
+  const triggerHeader = PromptLocaleService.get(
+    locale,
+    "tool-policy.toolDiscovery.triggerHeader",
+  );
 
   return `${headerLine}\n${introLine}\n\n${domainsHeader}\n${domainList}\n\n${searchRule}\n${searchSteps}\n\n${noFallback}\n\n${intentHeader}\n${intentRules}\n\n${triggerHeader}\n${triggerExampleLines}`;
 }
@@ -116,11 +148,13 @@ const TOOL_DISCOVERY_POLICY_SECTION: ToolPolicySection & {
 // ────────────────────────────────────────────────────────────
 
 const GENERAL_TOOL_PRINCIPLES_SECTION: ToolPolicySection = {
-  content: (locale) => PromptLocaleService.get(locale, "tool-policy.generalPrinciples"),
+  content: (locale) =>
+    PromptLocaleService.get(locale, "tool-policy.generalPrinciples"),
 };
 
 const TASK_MANAGEMENT_POLICY_SECTION: ToolPolicySection = {
-  content: (locale) => PromptLocaleService.get(locale, "tool-policy.taskManagement"),
+  content: (locale) =>
+    PromptLocaleService.get(locale, "tool-policy.taskManagement"),
   requires: [
     TOOL_NAMES.CREATE_TASK,
     TOOL_NAMES.LIST_TASKS,
@@ -129,12 +163,14 @@ const TASK_MANAGEMENT_POLICY_SECTION: ToolPolicySection = {
 };
 
 const PROACTIVE_MEMORY_POLICY_SECTION: ToolPolicySection = {
-  content: (locale) => PromptLocaleService.get(locale, "tool-policy.proactiveMemory"),
+  content: (locale) =>
+    PromptLocaleService.get(locale, "tool-policy.proactiveMemory"),
   requires: [TOOL_NAMES.SAVE_MEMORY],
 };
 
 const AUDIO_TRACKER_POLICY_SECTION: ToolPolicySection = {
-  content: (locale) => PromptLocaleService.get(locale, "tool-policy.audioTracker"),
+  content: (locale) =>
+    PromptLocaleService.get(locale, "tool-policy.audioTracker"),
   requires: [TOOL_NAMES.GENERATE_AUDIO],
 };
 
@@ -190,7 +226,8 @@ export function buildToolPolicy(
       const dynamicSection = section as ToolPolicySection & {
         dynamicContent?: (locale: string) => string;
       };
-      if (dynamicSection.dynamicContent) return dynamicSection.dynamicContent(locale);
+      if (dynamicSection.dynamicContent)
+        return dynamicSection.dynamicContent(locale);
       if (typeof section.content === "function") return section.content(locale);
       return section.content;
     })
@@ -242,4 +279,3 @@ export function getToolPolicyAddendum(
     })
     .join("\n\n");
 }
-

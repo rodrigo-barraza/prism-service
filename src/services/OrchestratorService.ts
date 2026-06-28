@@ -149,7 +149,10 @@ registerCleanup(async () => {
   const cleanups = running
     .filter((subAgent) => subAgent.isolated && subAgent.worktreePath)
     .map((subAgent) =>
-      GitWorktreeHelper.removeWorktree(subAgent.repositoryPath, subAgent.worktreePath!)
+      GitWorktreeHelper.removeWorktree(
+        subAgent.repositoryPath,
+        subAgent.worktreePath!,
+      )
         .then(() => {
           subAgent.worktreePath = null;
         })
@@ -272,7 +275,14 @@ export default class OrchestratorService {
 
     const resolvedMaxSubAgentIterations =
       currentRecursionDepth > 0 && baseMaxIterations !== Infinity
-        ? Math.max(5, Math.round(baseMaxIterations * (1 - RECURSION_SCOPE_ATTENUATION_FACTOR * currentRecursionDepth)))
+        ? Math.max(
+            5,
+            Math.round(
+              baseMaxIterations *
+                (1 -
+                  RECURSION_SCOPE_ATTENUATION_FACTOR * currentRecursionDepth),
+            ),
+          )
         : baseMaxIterations;
 
     // Check concurrency limit (global)
@@ -287,11 +297,19 @@ export default class OrchestratorService {
 
     // Circuit breaker: cap total agents per conversation across all recursion depths
     if (parentConversationId) {
-      const rootConversationId = OrchestratorService.getRootConversationId(parentConversationId);
-      const conversationAgentCount = Array.from(activeSubAgents.values()).filter(
-        (subAgent) => OrchestratorService.getRootConversationId(subAgent.parentConversationId || "") === rootConversationId,
+      const rootConversationId =
+        OrchestratorService.getRootConversationId(parentConversationId);
+      const conversationAgentCount = Array.from(
+        activeSubAgents.values(),
+      ).filter(
+        (subAgent) =>
+          OrchestratorService.getRootConversationId(
+            subAgent.parentConversationId || "",
+          ) === rootConversationId,
       ).length;
-      if (conversationAgentCount >= MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION) {
+      if (
+        conversationAgentCount >= MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION
+      ) {
         logger.warn(
           `[Orchestrator] Circuit breaker: conversation ${rootConversationId} has reached total agent ceiling of ${conversationAgentCount} (max ${MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}). Recursive spawning blocked.`,
         );
@@ -383,9 +401,14 @@ export default class OrchestratorService {
       }
     }
 
-    const conversationCounterKey = parentConversationId || parentAgentConversationId || "global";
-    const currentConversationCount = (agentCountersByConversation.get(conversationCounterKey) || 0) + 1;
-    agentCountersByConversation.set(conversationCounterKey, currentConversationCount);
+    const conversationCounterKey =
+      parentConversationId || parentAgentConversationId || "global";
+    const currentConversationCount =
+      (agentCountersByConversation.get(conversationCounterKey) || 0) + 1;
+    agentCountersByConversation.set(
+      conversationCounterKey,
+      currentConversationCount,
+    );
     const agentId = `agent-${currentConversationCount.toString(36)}-${crypto.randomUUID().slice(0, 4)}`;
     const branchName = `orchestrator/${agentId}`;
     const workspaceRoot = GitWorktreeHelper.getDefaultWorkspaceRoot(
@@ -890,9 +913,7 @@ export default class OrchestratorService {
     });
   }
 
-  static listAllDescendantSubAgents(
-    rootConversationId: string,
-  ): Array<{
+  static listAllDescendantSubAgents(rootConversationId: string): Array<{
     agentId: string;
     description: string;
     status: string;
@@ -962,9 +983,13 @@ export default class OrchestratorService {
         });
         if (
           subAgentState.subAgentConversationId &&
-          !visitedParentConversationIds.has(subAgentState.subAgentConversationId)
+          !visitedParentConversationIds.has(
+            subAgentState.subAgentConversationId,
+          )
         ) {
-          visitedParentConversationIds.add(subAgentState.subAgentConversationId);
+          visitedParentConversationIds.add(
+            subAgentState.subAgentConversationId,
+          );
           nextFrontier.push(subAgentState.subAgentConversationId);
         }
       }
@@ -978,7 +1003,9 @@ export default class OrchestratorService {
     const keys = [];
     const conversationIdsToClean = new Set<string>();
     for (const [key, subAgentState] of activeSubAgents.entries()) {
-      if (subAgentState.parentAgentConversationId === parentAgentConversationId) {
+      if (
+        subAgentState.parentAgentConversationId === parentAgentConversationId
+      ) {
         keys.push(key);
         if (subAgentState.parentConversationId) {
           conversationIdsToClean.add(subAgentState.parentConversationId);
@@ -1007,7 +1034,12 @@ export default class OrchestratorService {
   }
 
   static async createTeam(
-    teamCreationArguments: { name: string; members: TeamMember[]; topology?: string; topologyConfig?: Record<string, number | string | boolean> },
+    teamCreationArguments: {
+      name: string;
+      members: TeamMember[];
+      topology?: string;
+      topologyConfig?: Record<string, number | string | boolean>;
+    },
     orchestratorContext: OrchestratorContext,
   ): Promise<(SubAgentResult | { error: string })[]> {
     // Warm up/preload AgenticLoopService to avoid ESM concurrent dynamic import race conditions in Vitest
@@ -1047,7 +1079,10 @@ export default class OrchestratorService {
       const settingsRecursionDepth = settings?.maxRecursionDepth;
       orchestratorContext.maxRecursionDepth =
         typeof settingsRecursionDepth === "number"
-          ? Math.min(MAXIMUM_RECURSIVE_SPAWNING_DEPTH, Math.max(0, settingsRecursionDepth))
+          ? Math.min(
+              MAXIMUM_RECURSIVE_SPAWNING_DEPTH,
+              Math.max(0, settingsRecursionDepth),
+            )
           : DEFAULT_RECURSIVE_SPAWNING_DEPTH;
     }
 
@@ -1056,12 +1091,19 @@ export default class OrchestratorService {
       logger.info(
         `[Orchestrator] createTeam: sub-agent spawning disabled (maxRecursionDepth = 0)`,
       );
-      return [{
-        error: "Sub-agent spawning is disabled (recursion depth is set to 0). Complete the task directly without delegating to sub-agents.",
-      }];
+      return [
+        {
+          error:
+            "Sub-agent spawning is disabled (recursion depth is set to 0). Complete the task directly without delegating to sub-agents.",
+        },
+      ];
     }
 
-    if (!teamCreationArguments || !teamCreationArguments.members || !Array.isArray(teamCreationArguments.members)) {
+    if (
+      !teamCreationArguments ||
+      !teamCreationArguments.members ||
+      !Array.isArray(teamCreationArguments.members)
+    ) {
       const errorMessage =
         "Invalid or missing 'members' array in createTeam arguments.";
       logger.error(`[Orchestrator] createTeam: ${errorMessage}`);
@@ -1181,23 +1223,28 @@ export default class OrchestratorService {
     // Completion fires SSE events; results are retrievable via get_task_output.
     const spawnedAgentIds: string[] = [];
 
-    router.execute(
-      teamCreationArguments.name,
-      teamCreationArguments.members,
-      orchestratorContext,
-      (assignment: OrchestratorSpawnParams) => {
-        const spawnPromise = OrchestratorService.spawnFromTool(assignment);
-        spawnPromise.then((result) => {
-          if ("agent_id" in result) {
-            spawnedAgentIds.push(result.agent_id);
-          }
-        });
-        return spawnPromise;
-      },
-      (agentId: string, prompt: string, context: OrchestratorContext, round?: number) =>
-        OrchestratorService.continueAgent(agentId, prompt, context, round),
-      teamCreationArguments.topologyConfig,
-    )
+    router
+      .execute(
+        teamCreationArguments.name,
+        teamCreationArguments.members,
+        orchestratorContext,
+        (assignment: OrchestratorSpawnParams) => {
+          const spawnPromise = OrchestratorService.spawnFromTool(assignment);
+          spawnPromise.then((result) => {
+            if ("agent_id" in result) {
+              spawnedAgentIds.push(result.agent_id);
+            }
+          });
+          return spawnPromise;
+        },
+        (
+          agentId: string,
+          prompt: string,
+          context: OrchestratorContext,
+          round?: number,
+        ) => OrchestratorService.continueAgent(agentId, prompt, context, round),
+        teamCreationArguments.topologyConfig,
+      )
       .then((routerResults) => {
         logger.info(
           `[Orchestrator] Router "${topology}" completed for team "${teamCreationArguments.name}" — ${routerResults.length} result(s)`,
@@ -1236,17 +1283,20 @@ export default class OrchestratorService {
     );
 
     // Return immediately — router is executing in background
-    return teamCreationArguments.members.map((member, memberIndex) => ({
-      agent_id: `pending-${memberIndex}`,
-      description: member.description,
-      status: "running",
-      summary: "",
-      result: null,
-      toolUses: 0,
-      iterations: 0,
-      durationMs: 0,
-      messages: [],
-    } as SubAgentResult));
+    return teamCreationArguments.members.map(
+      (member, memberIndex) =>
+        ({
+          agent_id: `pending-${memberIndex}`,
+          description: member.description,
+          status: "running",
+          summary: "",
+          result: null,
+          toolUses: 0,
+          iterations: 0,
+          durationMs: 0,
+          messages: [],
+        }) as SubAgentResult,
+    );
   }
 
   static async deleteTeam(
@@ -1472,7 +1522,8 @@ export default class OrchestratorService {
       });
     }
 
-    const shouldShowWorkspaceConstraint = hasWorkspaceSetup && isWorkspaceAvailable;
+    const shouldShowWorkspaceConstraint =
+      hasWorkspaceSetup && isWorkspaceAvailable;
     const workspaceConstraintInstruction = shouldShowWorkspaceConstraint
       ? `- Only modify files within your workspace\n`
       : "";
@@ -1498,38 +1549,49 @@ export default class OrchestratorService {
 
     const activeTopology = orchestratorContext.topology || DEFAULT_TOPOLOGY;
 
-    const topologyMetadata: Record<string, { name: string; description: string }> = {
+    const topologyMetadata: Record<
+      string,
+      { name: string; description: string }
+    > = {
       [TOPOLOGIES.HIERARCHICAL]: {
         name: "Hierarchical (Parallel)",
-        description: "All sub-agents run in parallel, each independently working on their own task. No shared state between agents.",
+        description:
+          "All sub-agents run in parallel, each independently working on their own task. No shared state between agents.",
       },
       [TOPOLOGIES.HIERARCHICAL_AGGREGATION]: {
         name: "Hierarchical Aggregation (Parallel + Synthesis)",
-        description: "All sub-agents run in parallel, then a final synthesis pass merges their outputs into a unified result.",
+        description:
+          "All sub-agents run in parallel, then a final synthesis pass merges their outputs into a unified result.",
       },
       [TOPOLOGIES.SEQUENTIAL]: {
         name: "Sequential (Pipeline)",
-        description: "Sub-agents run one at a time in order, each receiving the previous agent's output as context before starting.",
+        description:
+          "Sub-agents run one at a time in order, each receiving the previous agent's output as context before starting.",
       },
       [TOPOLOGIES.PEER_TO_PEER]: {
         name: "Peer-to-Peer (Mesh / MAD)",
-        description: "Turn-based discussion where agents take turns on a shared thread. Each agent reads all prior contributions before responding.",
+        description:
+          "Turn-based discussion where agents take turns on a shared thread. Each agent reads all prior contributions before responding.",
       },
       [TOPOLOGIES.TOURNAMENT]: {
         name: "Tournament (Best-of-N)",
-        description: "All sub-agents run in parallel, then a judge evaluates and selects the single best result. Compete to produce the highest quality output.",
+        description:
+          "All sub-agents run in parallel, then a judge evaluates and selects the single best result. Compete to produce the highest quality output.",
       },
       [TOPOLOGIES.CRITIC_LOOP]: {
         name: "Critic Loop (Actor-Critic)",
-        description: "Actor produces output, critic evaluates and provides pass/fail feedback. If failed, actor revises. Iterates until critic approves or max rounds reached.",
+        description:
+          "Actor produces output, critic evaluates and provides pass/fail feedback. If failed, actor revises. Iterates until critic approves or max rounds reached.",
       },
       [TOPOLOGIES.DIVIDE_AND_CONQUER]: {
         name: "Divide & Conquer (GoT)",
-        description: "A planner decomposes the task into independent subtasks, each dispatched to a sub-agent in parallel, then synthesized into a unified result.",
+        description:
+          "A planner decomposes the task into independent subtasks, each dispatched to a sub-agent in parallel, then synthesized into a unified result.",
       },
       [TOPOLOGIES.MCTS]: {
         name: "MCTS-Guided Search (LATS)",
-        description: "Monte Carlo Tree Search — expands N branches in parallel, evaluates and scores each, selects the best, and refines iteratively until complete.",
+        description:
+          "Monte Carlo Tree Search — expands N branches in parallel, evaluates and scores each, selects the best, and refines iteratively until complete.",
       },
     };
 
@@ -1544,7 +1606,8 @@ export default class OrchestratorService {
         : "";
 
     const roundLine =
-      subAgent.round != null && (subAgent.totalRounds == null || subAgent.totalRounds > 1)
+      subAgent.round != null &&
+      (subAgent.totalRounds == null || subAgent.totalRounds > 1)
         ? `Round: ${subAgent.round}\n`
         : "";
 
@@ -1555,24 +1618,51 @@ export default class OrchestratorService {
     let recursionBlock: string;
 
     if (canSpawnRecursively) {
-      const delegationHeader = PromptLocaleService.get("en", "orchestrator.delegation.recursionHeader");
-      const depthStatus = PromptLocaleService.get("en", "orchestrator.delegation.depthStatus", {
-        childRecursionDepth: String(childRecursionDepth),
-        maxRecursionDepth: String(maxRecursionDepth),
-        remainingDepth: String(remainingDepth),
-        plural: remainingDepth !== 1 ? "s" : "",
-      });
-      const hasCreateTeam = PromptLocaleService.get("en", "orchestrator.delegation.hasCreateTeam");
-      const subAgentLine = remainingDepth > 1
-        ? PromptLocaleService.get("en", "orchestrator.delegation.subAgentsCanDelegate")
-        : PromptLocaleService.get("en", "orchestrator.delegation.subAgentsAreFinal");
-      const whenToDelegate = PromptLocaleService.get("en", "orchestrator.delegation.whenToDelegate");
-      const whenNotToDelegate = PromptLocaleService.get("en", "orchestrator.delegation.whenNotToDelegate");
-      const resultReporting = PromptLocaleService.get("en", "orchestrator.delegation.resultReporting");
+      const delegationHeader = PromptLocaleService.get(
+        "en",
+        "orchestrator.delegation.recursionHeader",
+      );
+      const depthStatus = PromptLocaleService.get(
+        "en",
+        "orchestrator.delegation.depthStatus",
+        {
+          childRecursionDepth: String(childRecursionDepth),
+          maxRecursionDepth: String(maxRecursionDepth),
+          remainingDepth: String(remainingDepth),
+          plural: remainingDepth !== 1 ? "s" : "",
+        },
+      );
+      const hasCreateTeam = PromptLocaleService.get(
+        "en",
+        "orchestrator.delegation.hasCreateTeam",
+      );
+      const subAgentLine =
+        remainingDepth > 1
+          ? PromptLocaleService.get(
+              "en",
+              "orchestrator.delegation.subAgentsCanDelegate",
+            )
+          : PromptLocaleService.get(
+              "en",
+              "orchestrator.delegation.subAgentsAreFinal",
+            );
+      const whenToDelegate = PromptLocaleService.get(
+        "en",
+        "orchestrator.delegation.whenToDelegate",
+      );
+      const whenNotToDelegate = PromptLocaleService.get(
+        "en",
+        "orchestrator.delegation.whenNotToDelegate",
+      );
+      const resultReporting = PromptLocaleService.get(
+        "en",
+        "orchestrator.delegation.resultReporting",
+      );
 
       recursionBlock =
         `\n${delegationHeader}\n` +
-        PromptLocaleService.get("en", "orchestrator.coordinatorRole") + `\n` +
+        PromptLocaleService.get("en", "orchestrator.coordinatorRole") +
+        `\n` +
         `${depthStatus}\n` +
         `${hasCreateTeam}\n` +
         `${subAgentLine}\n` +
@@ -1581,14 +1671,30 @@ export default class OrchestratorService {
         `${whenNotToDelegate}\n` +
         `${resultReporting}\n\n`;
     } else if (maxRecursionDepth > 0) {
-      const workerHeader = PromptLocaleService.get("en", "orchestrator.delegation.workerHeader");
-      const noCreateTeam = PromptLocaleService.get("en", "orchestrator.delegation.noCreateTeam");
-      const completeDirectly = PromptLocaleService.get("en", "orchestrator.delegation.completeDirectly");
-      const writeSummary = PromptLocaleService.get("en", "orchestrator.delegation.writeSummary");
+      const workerHeader = PromptLocaleService.get(
+        "en",
+        "orchestrator.delegation.workerHeader",
+      );
+      const noCreateTeam = PromptLocaleService.get(
+        "en",
+        "orchestrator.delegation.noCreateTeam",
+      );
+      const completeDirectly = PromptLocaleService.get(
+        "en",
+        "orchestrator.delegation.completeDirectly",
+      );
+      const writeSummary = PromptLocaleService.get(
+        "en",
+        "orchestrator.delegation.writeSummary",
+      );
 
       recursionBlock =
         `\n${workerHeader}\n` +
-        PromptLocaleService.get("en", "orchestrator.workerRole", { childRecursionDepth: String(childRecursionDepth), maxRecursionDepth: String(maxRecursionDepth) }) + `\n` +
+        PromptLocaleService.get("en", "orchestrator.workerRole", {
+          childRecursionDepth: String(childRecursionDepth),
+          maxRecursionDepth: String(maxRecursionDepth),
+        }) +
+        `\n` +
         `${noCreateTeam}\n` +
         `${completeDirectly}\n` +
         `${writeSummary}\n\n`;
@@ -1608,23 +1714,30 @@ export default class OrchestratorService {
       `Sub-agent topology description: ${resolvedTopologyMetadata.description}`,
     ];
 
-    if (agentPositionLine) operationalContextParts.push(agentPositionLine.trimEnd());
+    if (agentPositionLine)
+      operationalContextParts.push(agentPositionLine.trimEnd());
     if (roundLine) operationalContextParts.push(roundLine.trimEnd());
     if (recursionBlock) operationalContextParts.push(recursionBlock.trimEnd());
 
-    if (workspaceIntroLine) operationalContextParts.push(workspaceIntroLine.trimEnd());
+    if (workspaceIntroLine)
+      operationalContextParts.push(workspaceIntroLine.trimEnd());
     if (subAgent.files?.length) {
-      operationalContextParts.push(`Focus on files: ${subAgent.files.join(", ")}`);
+      operationalContextParts.push(
+        `Focus on files: ${subAgent.files.join(", ")}`,
+      );
     }
 
     const constraintLines: string[] = [];
-    if (workspaceConstraintInstruction) constraintLines.push(workspaceConstraintInstruction.replace(/^- /, "").trimEnd());
+    if (workspaceConstraintInstruction)
+      constraintLines.push(
+        workspaceConstraintInstruction.replace(/^- /, "").trimEnd(),
+      );
     constraintLines.push(commitInstructions.replace(/^- /, "").trimEnd());
     constraintLines.push(`Focus on the specific task described above`);
 
     operationalContextParts.push(
       `\nOperational constraints:\n` +
-      constraintLines.map((line) => `- ${line}`).join("\n"),
+        constraintLines.map((line) => `- ${line}`).join("\n"),
     );
 
     const subAgentMessages: ConversationMessage[] = [
@@ -1690,7 +1803,9 @@ export default class OrchestratorService {
         ToolOrchestratorService.getToolSchemas(defaultTopology);
 
       if (canSpawnRecursively) {
-        subAgentEnabledTools = allToolSchemas.map((toolSchema) => toolSchema.name);
+        subAgentEnabledTools = allToolSchemas.map(
+          (toolSchema) => toolSchema.name,
+        );
       } else {
         const orchestratorToolNames = new Set(ORCHESTRATOR_ONLY_TOOLS);
         subAgentEnabledTools = allToolSchemas
@@ -1761,7 +1876,9 @@ export default class OrchestratorService {
         subAgent.status = "stopped";
       } else {
         if (!preserveWorktree && subAgent.isolated) {
-          ToolOrchestratorService._clearWorktree(subAgent.subAgentConversationId);
+          ToolOrchestratorService._clearWorktree(
+            subAgent.subAgentConversationId,
+          );
         }
         throw error;
       }
@@ -1903,21 +2020,44 @@ export default class OrchestratorService {
     const { conversationId, project, username } = orchestratorContext;
     if (!conversationId || !project || !username) return;
 
+    const locale = PromptLocaleService.getDefaultLocale();
+
     const resultSummaries = routerResults.map((result, resultIndex) => {
+      const agentNumber = String(resultIndex + 1);
+
       if ("error" in result) {
-        return `Agent ${resultIndex + 1}: ❌ Error — ${result.error}`;
+        return PromptLocaleService.get(locale, "orchestrator.notifications.agentError", {
+          agentNumber,
+          errorMessage: String(result.error),
+        });
       }
-      const agentStatus = result.status === "completed" ? "✅" : `⚠️ ${result.status}`;
+      const agentStatus =
+        result.status === "completed" ? "✅" : `⚠️ ${result.status}`;
+      const noOutputFallback = PromptLocaleService.get(locale, "orchestrator.notifications.noOutput");
       const agentOutput = result.result
-        ? (typeof result.result === "string" ? result.result : JSON.stringify(result.result))
-        : "(no output)";
-      const truncatedOutput = agentOutput.length > 2000
-        ? agentOutput.slice(0, 2000) + "\n... (truncated)"
-        : agentOutput;
+        ? typeof result.result === "string"
+          ? result.result
+          : JSON.stringify(result.result)
+        : noOutputFallback;
+      const truncationSuffix = PromptLocaleService.get(locale, "orchestrator.notifications.truncated");
+      const truncatedOutput =
+        agentOutput.length > 2000
+          ? agentOutput.slice(0, 2000) + truncationSuffix
+          : agentOutput;
       return [
-        `Agent ${resultIndex + 1} (${result.description || result.agent_id}): ${agentStatus}`,
-        `  Duration: ${result.durationMs}ms | Tools: ${result.toolUses} | Iterations: ${result.iterations}`,
-        `  Output: ${truncatedOutput}`,
+        PromptLocaleService.get(locale, "orchestrator.notifications.agentStatus", {
+          agentNumber,
+          agentDescription: result.description || result.agent_id,
+          agentStatus,
+        }),
+        PromptLocaleService.get(locale, "orchestrator.notifications.agentStats", {
+          durationMs: String(result.durationMs),
+          toolUses: String(result.toolUses),
+          iterations: String(result.iterations),
+        }),
+        PromptLocaleService.get(locale, "orchestrator.notifications.agentOutput", {
+          output: truncatedOutput,
+        }),
       ].join("\n");
     });
 
@@ -1925,7 +2065,10 @@ export default class OrchestratorService {
       role: "user" as const,
       content: [
         `<task-notification>`,
-        `[SUB-AGENT TEAM COMPLETED] Team "${teamName}" (${topology}) finished.`,
+        PromptLocaleService.get(locale, "orchestrator.notifications.teamCompleted", {
+          teamName,
+          topology,
+        }),
         ``,
         ...resultSummaries,
         `</task-notification>`,
@@ -1979,8 +2122,7 @@ export default class OrchestratorService {
     orchestratorContext: OrchestratorContext,
     completionMessage: ConversationMessage,
   ): Promise<void> {
-    const MongoWrapper = (await import("../wrappers/MongoWrapper.ts"))
-      .default;
+    const MongoWrapper = (await import("../wrappers/MongoWrapper.ts")).default;
     const { MONGO_DB_NAME: databaseName } = await import("../../config.ts");
 
     const database = MongoWrapper.getDb(databaseName);
@@ -2024,10 +2166,16 @@ export default class OrchestratorService {
     );
 
     const settings = (conversation.settings || {}) as Record<string, unknown>;
-    const providerName = (settings.provider as string) || orchestratorContext.providerName;
-    const resolvedModel = (settings.model as string) || orchestratorContext.resolvedModel;
-    const agent = (settings.agent as string | null) || orchestratorContext.agent;
-    const workspaceRoot = (settings.workspaceRoot as string | null) || orchestratorContext.workspaceRoot || null;
+    const providerName =
+      (settings.provider as string) || orchestratorContext.providerName;
+    const resolvedModel =
+      (settings.model as string) || orchestratorContext.resolvedModel;
+    const agent =
+      (settings.agent as string | null) || orchestratorContext.agent;
+    const workspaceRoot =
+      (settings.workspaceRoot as string | null) ||
+      orchestratorContext.workspaceRoot ||
+      null;
 
     if (!providerName || !resolvedModel) {
       logger.warn(
@@ -2047,7 +2195,9 @@ export default class OrchestratorService {
       return;
     }
 
-    const hasCompletionMessage = ((conversation.messages as ConversationMessage[]) || []).some(
+    const hasCompletionMessage = (
+      (conversation.messages as ConversationMessage[]) || []
+    ).some(
       (message: ConversationMessage) =>
         message.role === "user" &&
         message.content === completionMessage.content,
@@ -2060,7 +2210,10 @@ export default class OrchestratorService {
           completionMessage,
         ];
 
-    const backgroundEmit = (event: { type: string; [key: string]: unknown }) => {
+    const backgroundEmit = (event: {
+      type: string;
+      [key: string]: unknown;
+    }) => {
       logger.debug(
         `[Orchestrator][AutoResponse][${conversationId}][Event] type=${event.type}`,
       );
@@ -2072,10 +2225,14 @@ export default class OrchestratorService {
       project,
       username,
       true,
-      { collection: COLLECTIONS.AGENT_CONVERSATIONS, agent: agent || undefined },
+      {
+        collection: COLLECTIONS.AGENT_CONVERSATIONS,
+        agent: agent || undefined,
+      },
     );
 
-    const { default: AgenticLoopService } = await import("./AgenticLoopService.ts");
+    const { default: AgenticLoopService } =
+      await import("./AgenticLoopService.ts");
 
     try {
       await AgenticLoopService.runAgenticLoop({
@@ -2091,10 +2248,13 @@ export default class OrchestratorService {
           planFirst: false,
           autoApprove: true,
           minContextLength: 120_000,
-          ...(typeof settings.toolConfig === "object" && settings.toolConfig !== null
+          ...(typeof settings.toolConfig === "object" &&
+          settings.toolConfig !== null
             ? {
-                enabledTools: (settings.toolConfig as Record<string, unknown>).enabledTools as string[] | undefined,
-                disabledTools: (settings.toolConfig as Record<string, unknown>).disabledTools as string[] | undefined,
+                enabledTools: (settings.toolConfig as Record<string, unknown>)
+                  .enabledTools as string[] | undefined,
+                disabledTools: (settings.toolConfig as Record<string, unknown>)
+                  .disabledTools as string[] | undefined,
               }
             : {}),
         },

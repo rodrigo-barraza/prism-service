@@ -47,7 +47,11 @@ import ConversationGenerationTracker from "../services/ConversationGenerationTra
 import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
 import localModelQueue from "../services/LocalModelQueue.ts";
 import LocalProviderGateway from "../services/local-provider/index.ts";
-import { getInstancesByType, getInstanceType, getInstance } from "../providers/instance-registry.ts";
+import {
+  getInstancesByType,
+  getInstanceType,
+  getInstance,
+} from "../providers/instance-registry.ts";
 import { resolveModelForInstances } from "../utils/ModelResolution.ts";
 import {
   markGenerating,
@@ -343,7 +347,8 @@ async function prepareGenerationContext(
   // Agent sessions benefit from deterministic, high-output defaults
   // (e.g., temperature=0, maxTokens=16384, reasoningEffort="high").
   if (agent) {
-    const { default: AgentPersonaRegistry } = await import("../services/AgentPersonaRegistry.ts");
+    const { default: AgentPersonaRegistry } =
+      await import("../services/AgentPersonaRegistry.ts");
     if (!AgentPersonaRegistry.has(agent)) {
       throw new ProviderError("server", `Unknown agent: "${agent}"`, 400);
     }
@@ -390,7 +395,8 @@ async function prepareGenerationContext(
     getDefaultModels(TYPES.TEXT, TYPES.TEXT)[providerName as string];
   if (localModelQueue.isLocal(providerName)) {
     const pinnedInstanceType = getInstanceType(providerName);
-    const isInstancePinned = pinnedInstanceType !== null && pinnedInstanceType !== providerName;
+    const isInstancePinned =
+      pinnedInstanceType !== null && pinnedInstanceType !== providerName;
 
     if (isInstancePinned) {
       // ── Instance pinning (bypass load balancing) ──────────────
@@ -455,7 +461,8 @@ async function prepareGenerationContext(
           const load = queueState.totalInflight / inst.concurrency;
           if (
             load < lowestLoad ||
-            (load === lowestLoad && inst.concurrency > (getInstance(bestId)?.concurrency || 0))
+            (load === lowestLoad &&
+              inst.concurrency > (getInstance(bestId)?.concurrency || 0))
           ) {
             lowestLoad = load;
             bestId = inst.id;
@@ -752,7 +759,8 @@ export async function handleAgent(
     localRelease,
   } = context;
   // ── Agent conversation identity ─────────────────────────────────
-  const resolvedAgentConversationId = agentConversationId || crypto.randomUUID();
+  const resolvedAgentConversationId =
+    agentConversationId || crypto.randomUUID();
   const conversationId = incomingConversationId || crypto.randomUUID();
   const traceId = incomingTraceId || null;
   const conversationMeta = incomingConversationMeta || null;
@@ -1102,10 +1110,14 @@ async function handleStreamingText(context: GenerationContext) {
   const stream =
     (modelDefinition as Record<string, unknown> | null)?.liveAPI &&
     provider.generateTextStreamLive
-      ? provider.generateTextStreamLive(messages as ChatMessage[], resolvedModel, {
-          ...options,
-          signal,
-        })
+      ? provider.generateTextStreamLive(
+          messages as ChatMessage[],
+          resolvedModel,
+          {
+            ...options,
+            signal,
+          },
+        )
       : provider.generateTextStream(messages as ChatMessage[], resolvedModel, {
           ...options,
           signal,
@@ -1398,11 +1410,15 @@ async function handleNonStreamingText(context: GenerationContext) {
     ? `sub-${context.requestId || crypto.randomUUID()}`
     : null;
   if (subRequestId && context.agentConversationId) {
-    ConversationGenerationTracker.register(context.agentConversationId, subRequestId, {
-      provider: context.providerName,
-      model: resolvedModel,
-      source: "tool-sub-request",
-    });
+    ConversationGenerationTracker.register(
+      context.agentConversationId,
+      subRequestId,
+      {
+        provider: context.providerName,
+        model: resolvedModel,
+        source: "tool-sub-request",
+      },
+    );
   }
   const generationStart = performance.now();
   const genResult = await provider.generateText(

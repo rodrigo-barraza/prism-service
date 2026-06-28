@@ -42,7 +42,10 @@ export function getLastAssistantText(messages: ConversationMessage[]): string {
     }
     // Fallback: harnesses store segmented output in textFragments when content
     // is split across interleaved tool-call turns. Join them as a last resort.
-    if (Array.isArray(message.textFragments) && message.textFragments.length > 0) {
+    if (
+      Array.isArray(message.textFragments) &&
+      message.textFragments.length > 0
+    ) {
       const joined = message.textFragments
         .filter((fragment): fragment is string => typeof fragment === "string")
         .join("\n")
@@ -128,7 +131,11 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
   if (subAgent.error) {
     result.error = subAgent.error;
   } else if (status === "completed" && !hasResult) {
-    result.error = buildEmptyResultDiagnostic(toolCallCount, iterationCount, subAgent.durationMs || 0);
+    result.error = buildEmptyResultDiagnostic(
+      toolCallCount,
+      iterationCount,
+      subAgent.durationMs || 0,
+    );
   }
 
   if (typeof subAgent.recursionDepth === "number") {
@@ -267,9 +274,9 @@ function isSerializedSubAgentResult(
   }
   const candidate = value as Record<string, unknown>;
   const hasAgentId =
-    typeof candidate['agent_id'] === "string" ||
-    typeof candidate['agent_id'] === "number";
-  const hasStatus = typeof candidate['status'] === "string";
+    typeof candidate["agent_id"] === "string" ||
+    typeof candidate["agent_id"] === "number";
+  const hasStatus = typeof candidate["status"] === "string";
   return hasAgentId && hasStatus;
 }
 
@@ -340,7 +347,8 @@ export function extractSubtreeMetrics(
   for (const message of messages) {
     // Pass 1: Anthropic-style separate tool_result messages (JSON string content)
     if (message.role === "tool" || message.role === "tool_result") {
-      const content = typeof message.content === "string" ? message.content : "";
+      const content =
+        typeof message.content === "string" ? message.content : "";
       if (!content.includes("agent_id")) continue;
 
       let parsed: unknown;

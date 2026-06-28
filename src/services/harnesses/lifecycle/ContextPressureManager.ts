@@ -60,7 +60,8 @@ export async function manageContextPressure(
   const { emit, signal } = context;
   const contextWindowSize =
     context.modelDefinition?.maxInputTokens || DEFAULT_MAX_INPUT_TOKENS;
-  const maxOutputTokens = context.options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS;
+  const maxOutputTokens =
+    context.options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS;
   const availableInputBudget = contextWindowSize - maxOutputTokens;
 
   let messages = currentMessages;
@@ -74,18 +75,14 @@ export async function manageContextPressure(
   // middle of the prompt prefix, invalidating the LLM's KV cache
   // and forcing a full re-prefill on subsequent iterations.
   const contextPressureRatio =
-    availableInputBudget > 0
-      ? currentTokenEstimate / availableInputBudget
-      : 0;
+    availableInputBudget > 0 ? currentTokenEstimate / availableInputBudget : 0;
 
   if (contextPressureRatio > CONTEXT_PRESSURE_THRESHOLD) {
-    const microCompactionResult =
-      MicroCompactionService.microcompactMessages(
-        messages as ChatMessage[],
-      );
+    const microCompactionResult = MicroCompactionService.microcompactMessages(
+      messages as ChatMessage[],
+    );
     if (microCompactionResult.clearedResultCount > 0) {
-      messages =
-        microCompactionResult.messages as ConversationMessage[];
+      messages = microCompactionResult.messages as ConversationMessage[];
       currentTokenEstimate = ContextWindowManager.estimateTokens(
         messages as ChatMessage[],
       );
@@ -122,13 +119,11 @@ export async function manageContextPressure(
     );
 
     if (compactionResult) {
-      messages =
-        compactionResult.compactedMessages as ConversationMessage[];
+      messages = compactionResult.compactedMessages as ConversationMessage[];
       state.originalMessageCount = messages.length;
       state.compactionPerformed = true;
       state.preCompactTokenCount = compactionResult.preCompactTokenCount;
-      state.postCompactTokenCount =
-        compactionResult.postCompactTokenCount;
+      state.postCompactTokenCount = compactionResult.postCompactTokenCount;
 
       currentTokenEstimate = ContextWindowManager.estimateTokens(
         messages as ChatMessage[],

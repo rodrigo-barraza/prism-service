@@ -64,7 +64,9 @@ router.get(
             .toArray(),
         ]);
         const convIds = convDocs.map((document) => document.id);
-        const agentConversationIds = agentConvDocs.map((document) => document.id);
+        const agentConversationIds = agentConvDocs.map(
+          (document) => document.id,
+        );
         filter.$or = [
           { conversationId: { $in: convIds } },
           { agentConversationId: { $in: agentConversationIds } },

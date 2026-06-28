@@ -74,11 +74,21 @@ const setTimer = {
     const username = context.username || DEFAULT_USERNAME;
 
     if (!conversationId) {
-      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.set_timer.noConversation") };
+      return {
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.set_timer.noConversation",
+        ),
+      };
     }
 
     if (!prompt || typeof prompt !== "string") {
-      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.set_timer.noPrompt") };
+      return {
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.set_timer.noPrompt",
+        ),
+      };
     }
 
     if (
@@ -87,7 +97,14 @@ const setTimer = {
       durationSeconds > TIMER_MAXIMUM_SECONDS
     ) {
       return {
-        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.set_timer.invalidDuration", { min: String(TIMER_MINIMUM_SECONDS), max: String(TIMER_MAXIMUM_SECONDS) }),
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.set_timer.invalidDuration",
+          {
+            min: String(TIMER_MINIMUM_SECONDS),
+            max: String(TIMER_MAXIMUM_SECONDS),
+          },
+        ),
       };
     }
 
@@ -140,13 +157,21 @@ const listTimers = {
   labels: ["timer", "wait"],
   domain: DOMAINS.CORE_SCHEDULE.displayName,
 
-  async execute(_toolArguments: Record<string, unknown>, context: ReminderContext) {
+  async execute(
+    _toolArguments: Record<string, unknown>,
+    context: ReminderContext,
+  ) {
     const conversationId = context.agentConversationId;
     const project = context.project || DEFAULT_PROJECT;
     const username = context.username || DEFAULT_USERNAME;
 
     if (!conversationId) {
-      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.list_timers.noConversation") };
+      return {
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.list_timers.noConversation",
+        ),
+      };
     }
 
     try {
@@ -214,7 +239,12 @@ const cancelTimer = {
     const username = context.username || DEFAULT_USERNAME;
 
     if (!timerId || typeof timerId !== "string") {
-      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.cancel_timer.noTimerId") };
+      return {
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.cancel_timer.noTimerId",
+        ),
+      };
     }
 
     try {
@@ -229,13 +259,21 @@ const cancelTimer = {
       if (!wasCancelled) {
         return {
           success: false,
-          message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.cancel_timer.notFound", { timerId }),
+          message: PromptLocaleService.get(
+            PromptLocaleService.getDefaultLocale(),
+            "internal-tools-runtime.cancel_timer.notFound",
+            { timerId },
+          ),
         };
       }
 
       return {
         success: true,
-        message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.cancel_timer.success", { timerId }),
+        message: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.cancel_timer.success",
+          { timerId },
+        ),
       };
     } catch (error: unknown) {
       return { error: `Failed to cancel timer: ${getErrorMessage(error)}` };

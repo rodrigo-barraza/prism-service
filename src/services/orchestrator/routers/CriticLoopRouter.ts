@@ -4,7 +4,11 @@ import type {
   OrchestratorSpawnParams,
   SubAgentResult,
 } from "../../../types/orchestrator.ts";
-import type { TopologyRouter, ContinueSubAgentCallback, TopologyConfig } from "../TopologyRouter.ts";
+import type {
+  TopologyRouter,
+  ContinueSubAgentCallback,
+  TopologyConfig,
+} from "../TopologyRouter.ts";
 import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 import {
   resolveSiblingInstances,
@@ -33,13 +37,18 @@ function buildCriticPrompt(
   criticRole?: string,
 ): string {
   const roleContext = criticRole
-    ? PromptLocaleService.get("en", "routers.critic.specializedRole", { criticRole })
+    ? PromptLocaleService.get("en", "routers.critic.specializedRole", {
+        criticRole,
+      })
     : "";
 
   return [
     PromptLocaleService.get("en", "routers.critic.evaluator"),
     roleContext,
-    PromptLocaleService.get("en", "routers.critic.roundContext", { roundNumber: String(roundNumber), maximumRounds: String(maximumRounds) }),
+    PromptLocaleService.get("en", "routers.critic.roundContext", {
+      roundNumber: String(roundNumber),
+      maximumRounds: String(maximumRounds),
+    }),
     "",
     PromptLocaleService.get("en", "routers.critic.originalTaskHeader"),
     "",
@@ -67,8 +76,9 @@ function buildJurySelectionPrompt(
   originalTask: string,
   actorOutputs: { actorIndex: number; description: string; output: string }[],
 ): string {
-  const actorSections = actorOutputs.map((actor) =>
-    `### Actor ${actor.actorIndex + 1}: ${actor.description}\n${actor.output}`,
+  const actorSections = actorOutputs.map(
+    (actor) =>
+      `### Actor ${actor.actorIndex + 1}: ${actor.description}\n${actor.output}`,
   );
 
   return [
@@ -84,7 +94,9 @@ function buildJurySelectionPrompt(
     "",
     "## Instructions",
     "",
-    PromptLocaleService.get("en", "routers.jury.evaluateInstruction", { actorCount: String(actorOutputs.length) }),
+    PromptLocaleService.get("en", "routers.jury.evaluateInstruction", {
+      actorCount: String(actorOutputs.length),
+    }),
     "",
     PromptLocaleService.get("en", "routers.jury.responseFormat"),
     "",
@@ -106,15 +118,25 @@ interface JurySelectionResult {
   feedback: string;
 }
 
-function parseJurySelectionResponse(responseText: string, actorCount: number): JurySelectionResult {
+function parseJurySelectionResponse(
+  responseText: string,
+  actorCount: number,
+): JurySelectionResult {
   let cleanedResponse = responseText.trim();
-  cleanedResponse = cleanedResponse.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
+  cleanedResponse = cleanedResponse
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/, "");
 
   try {
     const parsed = JSON.parse(cleanedResponse);
     return {
-      bestActorIndex: Math.max(0, Math.min(actorCount - 1, Number(parsed.bestActorIndex) || 0)),
-      verdict: PASS_VERDICT_PATTERN.test(String(parsed.verdict)) ? "PASS" : "FAIL",
+      bestActorIndex: Math.max(
+        0,
+        Math.min(actorCount - 1, Number(parsed.bestActorIndex) || 0),
+      ),
+      verdict: PASS_VERDICT_PATTERN.test(String(parsed.verdict))
+        ? "PASS"
+        : "FAIL",
       feedback: typeof parsed.feedback === "string" ? parsed.feedback : "",
     };
   } catch {
@@ -124,16 +146,24 @@ function parseJurySelectionResponse(responseText: string, actorCount: number): J
       try {
         const extracted = JSON.parse(jsonMatch[0]);
         return {
-          bestActorIndex: Math.max(0, Math.min(actorCount - 1, Number(extracted.bestActorIndex) || 0)),
-          verdict: PASS_VERDICT_PATTERN.test(String(extracted.verdict)) ? "PASS" : "FAIL",
-          feedback: typeof extracted.feedback === "string" ? extracted.feedback : "",
+          bestActorIndex: Math.max(
+            0,
+            Math.min(actorCount - 1, Number(extracted.bestActorIndex) || 0),
+          ),
+          verdict: PASS_VERDICT_PATTERN.test(String(extracted.verdict))
+            ? "PASS"
+            : "FAIL",
+          feedback:
+            typeof extracted.feedback === "string" ? extracted.feedback : "",
         };
       } catch {
         // Fallback exhausted
       }
     }
 
-    logger.warn("[CriticLoopRouter] Failed to parse jury selection JSON — defaulting to actor 0");
+    logger.warn(
+      "[CriticLoopRouter] Failed to parse jury selection JSON — defaulting to actor 0",
+    );
     return { bestActorIndex: 0, verdict: "FAIL", feedback: responseText };
   }
 }
@@ -146,19 +176,24 @@ function buildActorRevisionPrompt(
   const passedVerdicts = criticVerdicts.filter((verdict) => verdict.isPassing);
 
   const feedbackSections = failedVerdicts.map((verdict) => {
-    return [
-      `### Critic: ${verdict.criticDescription}`,
-      verdict.feedback,
-    ].join("\n");
+    return [`### Critic: ${verdict.criticDescription}`, verdict.feedback].join(
+      "\n",
+    );
   });
 
-  const passedSummary = passedVerdicts.length > 0
-    ? `\n\nThe following critics PASSED your work (do not regress on their areas):\n${passedVerdicts.map((verdict) => `- ✅ ${verdict.criticDescription}`).join("\n")}`
-    : "";
+  const passedSummary =
+    passedVerdicts.length > 0
+      ? `\n\nThe following critics PASSED your work (do not regress on their areas):\n${passedVerdicts.map((verdict) => `- ✅ ${verdict.criticDescription}`).join("\n")}`
+      : "";
 
   return [
-    PromptLocaleService.get("en", "routers.critic.revisionHeader", { criticCount: String(criticVerdicts.length), roundNumber: String(roundNumber) }),
-    PromptLocaleService.get("en", "routers.critic.failedCount", { failedCount: String(failedVerdicts.length) }),
+    PromptLocaleService.get("en", "routers.critic.revisionHeader", {
+      criticCount: String(criticVerdicts.length),
+      roundNumber: String(roundNumber),
+    }),
+    PromptLocaleService.get("en", "routers.critic.failedCount", {
+      failedCount: String(failedVerdicts.length),
+    }),
     passedSummary,
     "",
     "## Critic Feedback (FAIL verdicts)",
@@ -176,7 +211,9 @@ function buildJuryRevisionPrompt(
   roundNumber: number,
 ): string {
   return [
-    PromptLocaleService.get("en", "routers.jury.revisionHeader", { roundNumber: String(roundNumber) }),
+    PromptLocaleService.get("en", "routers.jury.revisionHeader", {
+      roundNumber: String(roundNumber),
+    }),
     "",
     "## Judge's Feedback",
     "",
@@ -189,12 +226,17 @@ function buildJuryRevisionPrompt(
 }
 
 function extractActorOutputText(spawnResult: SubAgentResult): string {
-  return spawnResult.result
-    || buildToolCallFallbackSummary(spawnResult)
-    || spawnResult.summary;
+  return (
+    spawnResult.result ||
+    buildToolCallFallbackSummary(spawnResult) ||
+    spawnResult.summary
+  );
 }
 
-function parseVerdict(criticOutput: string): { isPassing: boolean; feedback: string } {
+function parseVerdict(criticOutput: string): {
+  isPassing: boolean;
+  feedback: string;
+} {
   const firstLine = criticOutput.trim().split("\n")[0];
 
   if (PASS_VERDICT_PATTERN.test(firstLine)) {
@@ -219,18 +261,33 @@ function detectDegenerationOfThought(
 ): boolean {
   if (!previousFeedback) return false;
 
-  const normalizedPrevious = previousFeedback.trim().toLowerCase().replace(/\s+/g, " ");
-  const normalizedCurrent = currentFeedback.trim().toLowerCase().replace(/\s+/g, " ");
+  const normalizedPrevious = previousFeedback
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+  const normalizedCurrent = currentFeedback
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
 
   // If >80% of the content is identical, the critic panel is repeating itself
   // indicating Degeneration-of-Thought (DoT)
-  const shorterLength = Math.min(normalizedPrevious.length, normalizedCurrent.length);
+  const shorterLength = Math.min(
+    normalizedPrevious.length,
+    normalizedCurrent.length,
+  );
   if (shorterLength === 0) return false;
 
   let matchingCharacters = 0;
   const comparisonLength = Math.min(shorterLength, 500);
-  for (let characterIndex = 0; characterIndex < comparisonLength; characterIndex++) {
-    if (normalizedPrevious[characterIndex] === normalizedCurrent[characterIndex]) {
+  for (
+    let characterIndex = 0;
+    characterIndex < comparisonLength;
+    characterIndex++
+  ) {
+    if (
+      normalizedPrevious[characterIndex] === normalizedCurrent[characterIndex]
+    ) {
       matchingCharacters++;
     }
   }
@@ -260,26 +317,40 @@ export class CriticLoopRouter implements TopologyRouter {
     topologyConfig?: TopologyConfig,
   ): Promise<(SubAgentResult | { error: string })[]> {
     const { providerName, resolvedModel } = orchestratorContext;
-    const actorCount = Math.max(1, Number(topologyConfig?.actorCount) || DEFAULT_ACTOR_COUNT);
-    const maximumRounds = Math.max(1, Number(topologyConfig?.maxRounds) || DEFAULT_MAXIMUM_ROUNDS);
+    const actorCount = Math.max(
+      1,
+      Number(topologyConfig?.actorCount) || DEFAULT_ACTOR_COUNT,
+    );
+    const maximumRounds = Math.max(
+      1,
+      Number(topologyConfig?.maxRounds) || DEFAULT_MAXIMUM_ROUNDS,
+    );
 
     if (members.length === 0) {
-      const errorMessage = "Critic Loop topology requires at least 1 member (the actor).";
+      const errorMessage =
+        "Critic Loop topology requires at least 1 member (the actor).";
       logger.error(`[CriticLoopRouter] ${errorMessage}`);
       return [{ error: errorMessage }];
     }
 
     if (actorCount > 1) {
       return this.executeJuryMode(
-        teamName, members, orchestratorContext,
-        spawnSubAgent, continueSubAgent,
-        actorCount, maximumRounds,
+        teamName,
+        members,
+        orchestratorContext,
+        spawnSubAgent,
+        continueSubAgent,
+        actorCount,
+        maximumRounds,
       );
     }
 
     return this.executeCouncilMode(
-      teamName, members, orchestratorContext,
-      spawnSubAgent, continueSubAgent,
+      teamName,
+      members,
+      orchestratorContext,
+      spawnSubAgent,
+      continueSubAgent,
       maximumRounds,
     );
   }
@@ -290,20 +361,28 @@ export class CriticLoopRouter implements TopologyRouter {
     teamName: string,
     members: TeamMember[],
     orchestratorContext: OrchestratorContext,
-    spawnSubAgent: (assignment: OrchestratorSpawnParams) => Promise<SubAgentResult | { error: string }>,
+    spawnSubAgent: (
+      assignment: OrchestratorSpawnParams,
+    ) => Promise<SubAgentResult | { error: string }>,
     continueSubAgent?: ContinueSubAgentCallback,
     maximumRounds = DEFAULT_MAXIMUM_ROUNDS,
   ): Promise<(SubAgentResult | { error: string })[]> {
     const { providerName, resolvedModel } = orchestratorContext;
     const actorMember = members[0];
 
-    const criticMembers: TeamMember[] = members.length > 1
-      ? members.slice(1)
-      : [{
-          description: `Critic for "${actorMember.description}"`,
-          prompt: PromptLocaleService.get("en", "routers.critic.defaultPrompt"),
-          files: actorMember.files,
-        }];
+    const criticMembers: TeamMember[] =
+      members.length > 1
+        ? members.slice(1)
+        : [
+            {
+              description: `Critic for "${actorMember.description}"`,
+              prompt: PromptLocaleService.get(
+                "en",
+                "routers.critic.defaultPrompt",
+              ),
+              files: actorMember.files,
+            },
+          ];
 
     const criticCount = criticMembers.length;
     const totalTeamSize = 1 + criticCount;
@@ -323,11 +402,10 @@ export class CriticLoopRouter implements TopologyRouter {
     );
 
     const { assignedProvider: actorProvider, assignedModel: actorModel } =
-      selectInstanceForMember(
-        actorMember,
-        resolvedSiblings,
-        { providerName, resolvedModel },
-      );
+      selectInstanceForMember(actorMember, resolvedSiblings, {
+        providerName,
+        resolvedModel,
+      });
 
     const actorAssignment: OrchestratorSpawnParams = {
       description: `${actorMember.description} (Actor, Round 1)`,
@@ -342,7 +420,7 @@ export class CriticLoopRouter implements TopologyRouter {
       round: 1,
       totalRounds: maximumRounds,
       orchestratorContext,
-            awaitCompletion: true,
+      awaitCompletion: true,
       preserveWorktree: true,
     };
 
@@ -383,12 +461,13 @@ export class CriticLoopRouter implements TopologyRouter {
 
       const criticSpawnPromises: Promise<SubAgentResult | { error: string }>[] =
         criticMembers.map((criticMember, criticMemberIndex) => {
-          const { assignedProvider: criticProvider, assignedModel: criticModel } =
-            selectInstanceForMember(
-              criticMember,
-              resolvedSiblings,
-              { providerName, resolvedModel },
-            );
+          const {
+            assignedProvider: criticProvider,
+            assignedModel: criticModel,
+          } = selectInstanceForMember(criticMember, resolvedSiblings, {
+            providerName,
+            resolvedModel,
+          });
 
           const criticPromptText = buildCriticPrompt(
             actorOutputText,
@@ -422,7 +501,11 @@ export class CriticLoopRouter implements TopologyRouter {
 
       const verdicts: CriticVerdict[] = [];
 
-      for (let criticResultIndex = 0; criticResultIndex < criticResults.length; criticResultIndex++) {
+      for (
+        let criticResultIndex = 0;
+        criticResultIndex < criticResults.length;
+        criticResultIndex++
+      ) {
         const criticResult = criticResults[criticResultIndex];
         const criticMember = criticMembers[criticResultIndex];
 
@@ -486,7 +569,12 @@ export class CriticLoopRouter implements TopologyRouter {
         .map((verdict) => `[${verdict.criticDescription}]: ${verdict.feedback}`)
         .join("\n\n");
 
-      if (detectDegenerationOfThought(previousAggregatedFeedback, aggregatedFeedback)) {
+      if (
+        detectDegenerationOfThought(
+          previousAggregatedFeedback,
+          aggregatedFeedback,
+        )
+      ) {
         logger.warn(
           `[CriticLoopRouter] Degeneration-of-Thought detected — critic panel is repeating the same aggregated feedback. Force-terminating loop.`,
         );
@@ -555,7 +643,9 @@ export class CriticLoopRouter implements TopologyRouter {
     teamName: string,
     members: TeamMember[],
     orchestratorContext: OrchestratorContext,
-    spawnSubAgent: (assignment: OrchestratorSpawnParams) => Promise<SubAgentResult | { error: string }>,
+    spawnSubAgent: (
+      assignment: OrchestratorSpawnParams,
+    ) => Promise<SubAgentResult | { error: string }>,
     continueSubAgent?: ContinueSubAgentCallback,
     actorCount = 2,
     maximumRounds = DEFAULT_MAXIMUM_ROUNDS,
@@ -615,7 +705,8 @@ export class CriticLoopRouter implements TopologyRouter {
     );
     allResults.push(...actorResults);
 
-    const successfulActors: { actorIndex: number; result: SubAgentResult }[] = [];
+    const successfulActors: { actorIndex: number; result: SubAgentResult }[] =
+      [];
     for (let actorIndex = 0; actorIndex < actorResults.length; actorIndex++) {
       const actorResult = actorResults[actorIndex];
       if (!("error" in actorResult) && actorResult.status === "completed") {
@@ -624,7 +715,9 @@ export class CriticLoopRouter implements TopologyRouter {
     }
 
     if (successfulActors.length === 0) {
-      logger.error(`[CriticLoopRouter] All ${actualActorCount} actors failed in Jury mode. Aborting.`);
+      logger.error(
+        `[CriticLoopRouter] All ${actualActorCount} actors failed in Jury mode. Aborting.`,
+      );
       return allResults;
     }
 
@@ -634,7 +727,9 @@ export class CriticLoopRouter implements TopologyRouter {
     const provider = getProvider(providerName);
 
     if (!provider) {
-      logger.error(`[CriticLoopRouter] Provider "${providerName}" not found for jury selection`);
+      logger.error(
+        `[CriticLoopRouter] Provider "${providerName}" not found for jury selection`,
+      );
       return allResults;
     }
 
@@ -643,7 +738,9 @@ export class CriticLoopRouter implements TopologyRouter {
 
     const actorOutputs = successfulActors.map((actor) => ({
       actorIndex: actor.actorIndex,
-      description: actorMembers[actor.actorIndex]?.description || `Actor ${actor.actorIndex + 1}`,
+      description:
+        actorMembers[actor.actorIndex]?.description ||
+        `Actor ${actor.actorIndex + 1}`,
       output: extractActorOutputText(actor.result),
     }));
 
@@ -652,18 +749,28 @@ export class CriticLoopRouter implements TopologyRouter {
 
     let juryResponse;
     try {
-      juryResponse = await provider.generateText(juryMessages, resolvedModel, { maxTokens: 4096 });
+      juryResponse = await provider.generateText(juryMessages, resolvedModel, {
+        maxTokens: 4096,
+      });
     } catch (juryError: unknown) {
-      logger.error(`[CriticLoopRouter] Jury selection failed: ${String(juryError)}`);
+      logger.error(
+        `[CriticLoopRouter] Jury selection failed: ${String(juryError)}`,
+      );
       return allResults;
     }
 
-    let selection = parseJurySelectionResponse(juryResponse.text || "", successfulActors.length);
-    const winnerActorIndex = successfulActors[selection.bestActorIndex]?.actorIndex ?? 0;
+    let selection = parseJurySelectionResponse(
+      juryResponse.text || "",
+      successfulActors.length,
+    );
+    const winnerActorIndex =
+      successfulActors[selection.bestActorIndex]?.actorIndex ?? 0;
     let winnerResult = successfulActors[selection.bestActorIndex]?.result;
 
     if (!winnerResult) {
-      logger.error(`[CriticLoopRouter] Jury selected invalid actor index. Aborting.`);
+      logger.error(
+        `[CriticLoopRouter] Jury selected invalid actor index. Aborting.`,
+      );
       return allResults;
     }
 
@@ -672,7 +779,9 @@ export class CriticLoopRouter implements TopologyRouter {
     );
 
     if (selection.verdict === "PASS") {
-      logger.info(`[CriticLoopRouter] Jury PASSED Actor ${winnerActorIndex + 1}. Done.`);
+      logger.info(
+        `[CriticLoopRouter] Jury PASSED Actor ${winnerActorIndex + 1}. Done.`,
+      );
       return allResults;
     }
 
@@ -696,7 +805,10 @@ export class CriticLoopRouter implements TopologyRouter {
       }
       previousFeedback = selection.feedback;
 
-      const revisionPrompt = buildJuryRevisionPrompt(selection.feedback, roundNumber);
+      const revisionPrompt = buildJuryRevisionPrompt(
+        selection.feedback,
+        roundNumber,
+      );
 
       logger.info(
         `[CriticLoopRouter] Jury Round ${roundNumber}: Continuing winner (Actor ${winnerActorIndex + 1}) with judge feedback...`,
@@ -711,23 +823,31 @@ export class CriticLoopRouter implements TopologyRouter {
       allResults.push(revisedResult);
 
       if ("error" in revisedResult) {
-        logger.error(`[CriticLoopRouter] Winner revision failed in round ${roundNumber}: ${revisedResult.error}`);
+        logger.error(
+          `[CriticLoopRouter] Winner revision failed in round ${roundNumber}: ${revisedResult.error}`,
+        );
         return allResults;
       }
 
       if (revisedResult.status !== "completed") {
-        logger.warn(`[CriticLoopRouter] Winner did not complete revision in round ${roundNumber}.`);
+        logger.warn(
+          `[CriticLoopRouter] Winner did not complete revision in round ${roundNumber}.`,
+        );
         return allResults;
       }
 
       winnerResult = revisedResult;
 
       const revisedOutput = extractActorOutputText(revisedResult);
-      const reevaluationPrompt = buildJurySelectionPrompt(originalTask, [{
-        actorIndex: winnerActorIndex,
-        description: actorMembers[winnerActorIndex]?.description || `Actor ${winnerActorIndex + 1}`,
-        output: revisedOutput,
-      }]);
+      const reevaluationPrompt = buildJurySelectionPrompt(originalTask, [
+        {
+          actorIndex: winnerActorIndex,
+          description:
+            actorMembers[winnerActorIndex]?.description ||
+            `Actor ${winnerActorIndex + 1}`,
+          output: revisedOutput,
+        },
+      ]);
 
       try {
         const reevaluationResponse = await provider.generateText(
@@ -735,9 +855,14 @@ export class CriticLoopRouter implements TopologyRouter {
           resolvedModel,
           { maxTokens: 4096 },
         );
-        selection = parseJurySelectionResponse(reevaluationResponse.text || "", 1);
+        selection = parseJurySelectionResponse(
+          reevaluationResponse.text || "",
+          1,
+        );
       } catch {
-        logger.warn(`[CriticLoopRouter] Re-evaluation failed in round ${roundNumber}. Returning current results.`);
+        logger.warn(
+          `[CriticLoopRouter] Re-evaluation failed in round ${roundNumber}. Returning current results.`,
+        );
         return allResults;
       }
 

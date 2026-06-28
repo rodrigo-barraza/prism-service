@@ -901,7 +901,8 @@ export function createLmStudioProvider(
               if (
                 options._loadedContextLength &&
                 loadOpts.context_length &&
-                (options._loadedContextLength as number) < loadOpts.context_length
+                (options._loadedContextLength as number) <
+                  loadOpts.context_length
               ) {
                 logger.info(
                   `[LM-Studio] Model loaded successfully but context was silently capped from ${loadOpts.context_length} to ${options._loadedContextLength}. Recording GPU ceiling.`,
@@ -1668,8 +1669,7 @@ export function createLmStudioProvider(
             payload.offload_kv_cache_to_gpu = options.offload_kv_cache_to_gpu;
           if (options.eval_batch_size != null)
             payload.eval_batch_size = options.eval_batch_size;
-          if (options.parallel != null)
-            payload.parallel = options.parallel;
+          if (options.parallel != null) payload.parallel = options.parallel;
           if (options.unified_kv_cache != null)
             payload.unified_kv_cache = options.unified_kv_cache;
 

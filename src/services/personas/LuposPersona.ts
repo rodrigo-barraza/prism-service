@@ -18,7 +18,10 @@ function resolveVariant(
   locale = "en",
 ): string {
   if (isAprilFools && isClockCrew) {
-    const value = PromptLocaleService.get(locale, `${baseKey}.aprilFoolsClockCrew`);
+    const value = PromptLocaleService.get(
+      locale,
+      `${baseKey}.aprilFoolsClockCrew`,
+    );
     if (!value.startsWith("[MISSING:")) return value;
   }
   if (isAprilFools) {
@@ -39,14 +42,40 @@ function resolveVariant(
 function buildCorePersonality(flags: VariantFlags, locale = "en"): string {
   const identity = resolveVariant("personas.lupos.identity", flags, locale);
   const addiction = resolveVariant("personas.lupos.addiction", flags, locale);
-  const snapBehavior = resolveVariant("personas.lupos.snapBehavior", flags, locale);
-  const artisticVisions = resolveVariant("personas.lupos.artisticVisions", flags, locale);
-  const defaultMode = resolveVariant("personas.lupos.defaultMode", flags, locale);
-  const sexualEnergy = resolveVariant("personas.lupos.sexualEnergy", flags, locale);
-  const neverAdmitAi = resolveVariant("personas.lupos.neverAdmitAi", flags, locale);
+  const snapBehavior = resolveVariant(
+    "personas.lupos.snapBehavior",
+    flags,
+    locale,
+  );
+  const artisticVisions = resolveVariant(
+    "personas.lupos.artisticVisions",
+    flags,
+    locale,
+  );
+  const defaultMode = resolveVariant(
+    "personas.lupos.defaultMode",
+    flags,
+    locale,
+  );
+  const sexualEnergy = resolveVariant(
+    "personas.lupos.sexualEnergy",
+    flags,
+    locale,
+  );
+  const neverAdmitAi = resolveVariant(
+    "personas.lupos.neverAdmitAi",
+    flags,
+    locale,
+  );
   const drugStatus = resolveVariant("personas.lupos.drugStatus", flags, locale);
-  const breakCharacterNote = PromptLocaleService.get(locale, "personas.lupos.breakCharacterNote");
-  const neverRefuseNote = PromptLocaleService.get(locale, "personas.lupos.neverRefuseNote");
+  const breakCharacterNote = PromptLocaleService.get(
+    locale,
+    "personas.lupos.breakCharacterNote",
+  );
+  const neverRefuseNote = PromptLocaleService.get(
+    locale,
+    "personas.lupos.neverRefuseNote",
+  );
 
   let conditionalNotes = "";
   if (flags.isAprilFools && flags.isClockCrew) {
@@ -55,23 +84,30 @@ function buildCorePersonality(flags: VariantFlags, locale = "en"): string {
     conditionalNotes = `\n- ${PromptLocaleService.get(locale, "personas.lupos.aprilFoolsSassyNote")}`;
   }
 
-  let personalityBlock = PromptLocaleService.get(locale, "personas.lupos.personalityTemplate", {
-    identity,
-    addiction,
-    snapBehavior,
-    conditionalNotes,
-    artisticVisions,
-    defaultMode,
-    sexualEnergy,
-    neverRefuseNote,
-    neverAdmitAi,
-    drugStatus,
-    breakCharacterNote,
-  });
+  let personalityBlock = PromptLocaleService.get(
+    locale,
+    "personas.lupos.personalityTemplate",
+    {
+      identity,
+      addiction,
+      snapBehavior,
+      conditionalNotes,
+      artisticVisions,
+      defaultMode,
+      sexualEnergy,
+      neverRefuseNote,
+      neverAdmitAi,
+      drugStatus,
+      breakCharacterNote,
+    },
+  );
 
   if (flags.isAprilFools) {
     const vibe = resolveVariant("personas.lupos.aprilFoolsVibe", flags, locale);
-    const catRoleplay = PromptLocaleService.get(locale, "personas.lupos.aprilFoolsCatRoleplay");
+    const catRoleplay = PromptLocaleService.get(
+      locale,
+      "personas.lupos.aprilFoolsCatRoleplay",
+    );
     personalityBlock += `\n- ${vibe}\n- ${catRoleplay}`;
   }
 
@@ -79,22 +115,46 @@ function buildCorePersonality(flags: VariantFlags, locale = "en"): string {
 }
 
 function buildResponseGuidelines(isAprilFools: boolean, locale = "en"): string {
-  const header = PromptLocaleService.get(locale, "personas.lupos.responseGuidelines.header");
+  const header = PromptLocaleService.get(
+    locale,
+    "personas.lupos.responseGuidelines.header",
+  );
   const listLimit = isAprilFools
-    ? PromptLocaleService.get(locale, "personas.lupos.responseGuidelines.listLimitAprilFools")
-    : PromptLocaleService.get(locale, "personas.lupos.responseGuidelines.listLimitDefault");
+    ? PromptLocaleService.get(
+        locale,
+        "personas.lupos.responseGuidelines.listLimitAprilFools",
+      )
+    : PromptLocaleService.get(
+        locale,
+        "personas.lupos.responseGuidelines.listLimitDefault",
+      );
   const tone = isAprilFools
-    ? PromptLocaleService.get(locale, "personas.lupos.responseGuidelines.toneAprilFools")
-    : PromptLocaleService.get(locale, "personas.lupos.responseGuidelines.toneDefault");
-  const footer = PromptLocaleService.get(locale, "personas.lupos.responseGuidelines.footer");
+    ? PromptLocaleService.get(
+        locale,
+        "personas.lupos.responseGuidelines.toneAprilFools",
+      )
+    : PromptLocaleService.get(
+        locale,
+        "personas.lupos.responseGuidelines.toneDefault",
+      );
+  const footer = PromptLocaleService.get(
+    locale,
+    "personas.lupos.responseGuidelines.footer",
+  );
 
   return `${header}\n- ${listLimit}\n${tone}\n${footer}`;
 }
 
 function buildInteractionRules(isAprilFools: boolean, locale = "en"): string {
   return isAprilFools
-    ? PromptLocaleService.get(locale, "personas.lupos.interactionRules.aprilFools")
-    : PromptLocaleService.get(locale, "personas.lupos.interactionRules.default");
+    ? PromptLocaleService.get(
+        locale,
+        "personas.lupos.interactionRules.aprilFools",
+      )
+    : PromptLocaleService.get(
+        locale,
+        "personas.lupos.interactionRules.default",
+      );
 }
 
 // ────────────────────────────────────────────────────────────
@@ -103,22 +163,27 @@ function buildInteractionRules(isAprilFools: boolean, locale = "en"): string {
 
 const LUPOS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {
-    content: (locale) => PromptLocaleService.get(locale, "personas.lupos.toolPolicyCore"),
+    content: (locale) =>
+      PromptLocaleService.get(locale, "personas.lupos.toolPolicyCore"),
   },
   {
-    content: (locale) => PromptLocaleService.get(locale, "personas.lupos.toolPolicyDiscord"),
+    content: (locale) =>
+      PromptLocaleService.get(locale, "personas.lupos.toolPolicyDiscord"),
     requires: ["search_discord_messages"],
   },
   {
-    content: (locale) => PromptLocaleService.get(locale, "personas.lupos.toolPolicyImagePrompt"),
+    content: (locale) =>
+      PromptLocaleService.get(locale, "personas.lupos.toolPolicyImagePrompt"),
     requires: [TOOL_NAMES.GENERATE_IMAGE],
   },
   {
-    content: (locale) => PromptLocaleService.get(locale, "personas.lupos.toolPolicyAudio"),
+    content: (locale) =>
+      PromptLocaleService.get(locale, "personas.lupos.toolPolicyAudio"),
     requires: [TOOL_NAMES.GENERATE_AUDIO, TOOL_NAMES.SYNTHESIZE_SPEECH],
   },
   {
-    content: (locale) => PromptLocaleService.get(locale, "personas.lupos.toolPolicyVoiceSteering"),
+    content: (locale) =>
+      PromptLocaleService.get(locale, "personas.lupos.toolPolicyVoiceSteering"),
     requires: [TOOL_NAMES.SYNTHESIZE_SPEECH],
   },
 ];
@@ -171,23 +236,37 @@ export const LuposPersona: Persona = {
     const sections = [
       buildCorePersonality({ isClockCrew, isAprilFools }, activeLocale),
       PromptLocaleService.get(activeLocale, "personas.lupos.aiInformation"),
-      PromptLocaleService.get(activeLocale, "personas.lupos.generativeCapabilities"),
+      PromptLocaleService.get(
+        activeLocale,
+        "personas.lupos.generativeCapabilities",
+      ),
       buildResponseGuidelines(isAprilFools, activeLocale),
       buildInteractionRules(isAprilFools, activeLocale),
     ];
 
     if (!isClockCrew) {
-      sections.push(PromptLocaleService.get(activeLocale, "personas.lupos.politicalBeliefs"));
+      sections.push(
+        PromptLocaleService.get(
+          activeLocale,
+          "personas.lupos.politicalBeliefs",
+        ),
+      );
     }
 
-    sections.push(PromptLocaleService.get(activeLocale, "personas.lupos.sleeperAgent"));
+    sections.push(
+      PromptLocaleService.get(activeLocale, "personas.lupos.sleeperAgent"),
+    );
 
     return sections.join("\n\n");
   },
   guidelines: "",
   interactionRules: "",
   platformRules: {
-    discord: (context) => PromptLocaleService.get(context.locale || "en", "personas.lupos.discordRules"),
+    discord: (context) =>
+      PromptLocaleService.get(
+        context.locale || "en",
+        "personas.lupos.discordRules",
+      ),
   },
   toolPolicy: (context) => buildToolPolicy(LUPOS_TOOL_POLICY_SECTIONS, context),
   availableTools: LUPOS_AVAILABLE_TOOLS,

@@ -113,19 +113,26 @@ function initialize() {
 try {
   initialize();
 } catch (error: unknown) {
-  logger.error(
-    `[InternalToolRegistry] Init failed: ${errorMessage(error)}`,
-  );
+  logger.error(`[InternalToolRegistry] Init failed: ${errorMessage(error)}`);
 }
 
-function localizeSchema(schema: InternalToolSchema, locale: string, tool?: InternalTool): InternalToolSchema {
+function localizeSchema(
+  schema: InternalToolSchema,
+  locale: string,
+  tool?: InternalTool,
+): InternalToolSchema {
   const toolName = schema.name;
   if (tool?.buildSchema) {
     return tool.buildSchema(locale);
   }
-  const localizedDescription = PromptLocaleService.get(locale, `internal-tools.${toolName}.description`);
+  const localizedDescription = PromptLocaleService.get(
+    locale,
+    `internal-tools.${toolName}.description`,
+  );
 
-  const parameters = schema.parameters ? JSON.parse(JSON.stringify(schema.parameters)) : undefined;
+  const parameters = schema.parameters
+    ? JSON.parse(JSON.stringify(schema.parameters))
+    : undefined;
 
   if (parameters?.properties) {
     for (const propertyName of Object.keys(parameters.properties)) {
@@ -135,7 +142,10 @@ function localizeSchema(schema: InternalToolSchema, locale: string, tool?: Inter
           locale,
           `internal-tools.${toolName}.parameters.${propertyName}`,
         );
-        if (localizedPropertyDescription && !localizedPropertyDescription.startsWith("[MISSING:")) {
+        if (
+          localizedPropertyDescription &&
+          !localizedPropertyDescription.startsWith("[MISSING:")
+        ) {
           property.description = localizedPropertyDescription;
         }
       }
@@ -144,9 +154,10 @@ function localizeSchema(schema: InternalToolSchema, locale: string, tool?: Inter
 
   return {
     ...schema,
-    description: (localizedDescription && !localizedDescription.startsWith("[MISSING:"))
-      ? localizedDescription
-      : schema.description,
+    description:
+      localizedDescription && !localizedDescription.startsWith("[MISSING:")
+        ? localizedDescription
+        : schema.description,
     ...(parameters && { parameters }),
   };
 }
@@ -168,7 +179,9 @@ export default class InternalToolRegistry {
   }
   static getSchemas(locale?: string) {
     const activeLocale = locale || PromptLocaleService.getDefaultLocale();
-    return [...registry.values()].map((tool) => localizeSchema(tool.schema, activeLocale, tool));
+    return [...registry.values()].map((tool) =>
+      localizeSchema(tool.schema, activeLocale, tool),
+    );
   }
   static getClientSchemas(locale?: string) {
     const activeLocale = locale || PromptLocaleService.getDefaultLocale();

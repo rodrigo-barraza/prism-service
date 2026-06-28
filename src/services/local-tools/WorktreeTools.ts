@@ -28,7 +28,6 @@ interface WorktreeMergeResult {
   diff?: unknown;
 }
 
-
 const enterWorktree = {
   name: TOOL_NAMES.ENTER_WORKTREE,
   schema: {
@@ -59,7 +58,10 @@ const enterWorktree = {
     toolArguments: Record<string, unknown>,
     context: WorktreeContext,
   ) {
-    const reason = typeof toolArguments.reason === "string" ? toolArguments.reason : undefined;
+    const reason =
+      typeof toolArguments.reason === "string"
+        ? toolArguments.reason
+        : undefined;
 
     const { default: ToolOrchestratorService } =
       await import("../ToolOrchestratorService.js");
@@ -69,20 +71,33 @@ const enterWorktree = {
     const agentConversationId = context.agentConversationId;
     if (!agentConversationId) {
       return {
-        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.enter_worktree.noConversation"),
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.enter_worktree.noConversation",
+        ),
       };
     }
 
-    const worktreeState = ToolOrchestratorService.getWorktreeState(agentConversationId);
+    const worktreeState =
+      ToolOrchestratorService.getWorktreeState(agentConversationId);
     if (worktreeState) {
       return {
-        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.enter_worktree.alreadyInWorktree", { branch: String(worktreeState.branchName) }),
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.enter_worktree.alreadyInWorktree",
+          { branch: String(worktreeState.branchName) },
+        ),
       };
     }
 
     const workspaceRoot = ToolOrchestratorService.getWorkspaceRoot();
     if (!workspaceRoot) {
-      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.enter_worktree.noWorkspace") };
+      return {
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.enter_worktree.noWorkspace",
+        ),
+      };
     }
 
     const repoPath = existsSync(resolve(workspaceRoot, ".git"))
@@ -99,7 +114,11 @@ const enterWorktree = {
     );
 
     const createResult: WorktreeCreateResult = {};
-    if (proxyResult && typeof proxyResult === "object" && !Array.isArray(proxyResult)) {
+    if (
+      proxyResult &&
+      typeof proxyResult === "object" &&
+      !Array.isArray(proxyResult)
+    ) {
       const record = proxyResult as Record<string, unknown>;
       if (typeof record.worktreePath === "string") {
         createResult.worktreePath = record.worktreePath;
@@ -139,7 +158,11 @@ const enterWorktree = {
       branch: branchName,
       worktreePath: createResult.worktreePath,
       reason: reason || null,
-      message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.enter_worktree.success", { path: createResult.worktreePath! }),
+      message: PromptLocaleService.get(
+        PromptLocaleService.getDefaultLocale(),
+        "internal-tools-runtime.enter_worktree.success",
+        { path: createResult.worktreePath! },
+      ),
     };
   },
 };
@@ -178,24 +201,36 @@ const exitWorktree = {
     toolArguments: Record<string, unknown>,
     context: WorktreeContext,
   ) {
-    const action = typeof toolArguments.action === "string" && (toolArguments.action === "merge" || toolArguments.action === "discard")
-      ? toolArguments.action
-      : undefined;
-    const commitMessage = typeof toolArguments.commitMessage === "string" ? toolArguments.commitMessage : undefined;
+    const action =
+      typeof toolArguments.action === "string" &&
+      (toolArguments.action === "merge" || toolArguments.action === "discard")
+        ? toolArguments.action
+        : undefined;
+    const commitMessage =
+      typeof toolArguments.commitMessage === "string"
+        ? toolArguments.commitMessage
+        : undefined;
 
     const { default: ToolOrchestratorService } =
       await import("../ToolOrchestratorService.js");
 
     const agentConversationId = context.agentConversationId;
-    const worktreeState = ToolOrchestratorService.getWorktreeState(agentConversationId);
+    const worktreeState =
+      ToolOrchestratorService.getWorktreeState(agentConversationId);
     if (!agentConversationId || !worktreeState) {
       return {
-        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.exit_worktree.notInWorktree"),
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.exit_worktree.notInWorktree",
+        ),
       };
     }
 
     if (!action) {
-      return { error: "Missing or invalid parameter 'action'. Must be 'merge' or 'discard'." };
+      return {
+        error:
+          "Missing or invalid parameter 'action'. Must be 'merge' or 'discard'.",
+      };
     }
 
     let mergeResult: WorktreeMergeResult | null = null;
@@ -207,7 +242,11 @@ const exitWorktree = {
         context,
       );
       const diffResult: { error?: string; [key: string]: unknown } = {};
-      if (proxyDiffResult && typeof proxyDiffResult === "object" && !Array.isArray(proxyDiffResult)) {
+      if (
+        proxyDiffResult &&
+        typeof proxyDiffResult === "object" &&
+        !Array.isArray(proxyDiffResult)
+      ) {
         const record = proxyDiffResult as Record<string, unknown>;
         if (typeof record.error === "string") {
           diffResult.error = record.error;
@@ -226,7 +265,11 @@ const exitWorktree = {
       );
 
       const resolvedMergeResult: WorktreeMergeResult = {};
-      if (proxyMergeResult && typeof proxyMergeResult === "object" && !Array.isArray(proxyMergeResult)) {
+      if (
+        proxyMergeResult &&
+        typeof proxyMergeResult === "object" &&
+        !Array.isArray(proxyMergeResult)
+      ) {
         const record = proxyMergeResult as Record<string, unknown>;
         if (typeof record.error === "string") {
           resolvedMergeResult.error = record.error;
@@ -235,7 +278,14 @@ const exitWorktree = {
 
       if (resolvedMergeResult.error) {
         return {
-          error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.exit_worktree.mergeFailed", { error: resolvedMergeResult.error, path: worktreeState.worktreePath }),
+          error: PromptLocaleService.get(
+            PromptLocaleService.getDefaultLocale(),
+            "internal-tools-runtime.exit_worktree.mergeFailed",
+            {
+              error: resolvedMergeResult.error,
+              path: worktreeState.worktreePath,
+            },
+          ),
         };
       }
 
@@ -274,8 +324,16 @@ const exitWorktree = {
       merged: action === "merge" ? mergeResult : undefined,
       message:
         action === "merge"
-          ? PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.exit_worktree.merged", { branch: String(worktreeState.branchName) })
-          : PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.exit_worktree.discarded", { branch: String(worktreeState.branchName) }),
+          ? PromptLocaleService.get(
+              PromptLocaleService.getDefaultLocale(),
+              "internal-tools-runtime.exit_worktree.merged",
+              { branch: String(worktreeState.branchName) },
+            )
+          : PromptLocaleService.get(
+              PromptLocaleService.getDefaultLocale(),
+              "internal-tools-runtime.exit_worktree.discarded",
+              { branch: String(worktreeState.branchName) },
+            ),
     };
   },
 };

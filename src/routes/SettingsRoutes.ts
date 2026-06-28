@@ -41,7 +41,8 @@ router.put(
           .json({ error: "Request body must be an object" });
       }
 
-      const previousLocale = SettingsService.getCached()?.agents?.locale || "en";
+      const previousLocale =
+        SettingsService.getCached()?.agents?.locale || "en";
       const updated = await SettingsService.update(data);
       const currentLocale = updated?.agents?.locale || "en";
 

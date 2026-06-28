@@ -182,8 +182,14 @@ router.get(
       };
 
       const merged = [
-        ...directConversations.map((item) => ({ ...item, type: "direct" as const })),
-        ...agentConversations.map((session) => ({ ...session, type: "agent" as const })),
+        ...directConversations.map((item) => ({
+          ...item,
+          type: "direct" as const,
+        })),
+        ...agentConversations.map((session) => ({
+          ...session,
+          type: "agent" as const,
+        })),
       ].sort((firstItem, secondItem) => {
         const valueA = getSortValue(firstItem as Record<string, unknown>);
         const valueB = getSortValue(secondItem as Record<string, unknown>);
@@ -352,16 +358,23 @@ router.get(
   "/filters",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const [conversationProjects, requestProjects, usernames, models, providers] =
-        await Promise.all([
-          req.db.collection(CONVERSATIONS_COLLECTION).distinct("project"),
-          req.db.collection(REQUESTS_COLLECTION).distinct("project"),
-          req.db.collection(CONVERSATIONS_COLLECTION).distinct("username"),
-          req.db.collection(REQUESTS_COLLECTION).distinct("model"),
-          req.db.collection(REQUESTS_COLLECTION).distinct("provider"),
-        ]);
+      const [
+        conversationProjects,
+        requestProjects,
+        usernames,
+        models,
+        providers,
+      ] = await Promise.all([
+        req.db.collection(CONVERSATIONS_COLLECTION).distinct("project"),
+        req.db.collection(REQUESTS_COLLECTION).distinct("project"),
+        req.db.collection(CONVERSATIONS_COLLECTION).distinct("username"),
+        req.db.collection(REQUESTS_COLLECTION).distinct("model"),
+        req.db.collection(REQUESTS_COLLECTION).distinct("provider"),
+      ]);
 
-      const projects = [...new Set([...conversationProjects, ...requestProjects])];
+      const projects = [
+        ...new Set([...conversationProjects, ...requestProjects]),
+      ];
       const workspaceRoots = ToolOrchestratorService.getWorkspaceRoots();
       const agentPersonas = AgentPersonaRegistry.list().map((persona) => ({
         id: persona.id,

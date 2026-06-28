@@ -133,8 +133,6 @@ export class EmotionalStateEngine {
     };
   }
 
-
-
   reset(): void {
     for (const emotion of PRIMARY_EMOTIONS) {
       this.emotions[emotion] = 0;

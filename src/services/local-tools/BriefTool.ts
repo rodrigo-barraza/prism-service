@@ -62,7 +62,12 @@ export default {
       : [];
 
     if (!summary) {
-      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.summarize_conversation.summaryRequired") };
+      return {
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.summarize_conversation.summaryRequired",
+        ),
+      };
     }
 
     const keyFileItems = keyFiles.filter(

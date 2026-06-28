@@ -1,4 +1,7 @@
-import { DEFAULT_TOPOLOGY, DEFAULT_THOUGHT_STRUCTURE } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  DEFAULT_TOPOLOGY,
+  DEFAULT_THOUGHT_STRUCTURE,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import AgenticToolResolver from "./AgenticToolResolver.ts";
 import AgenticLoopState from "./AgenticLoopState.ts";
 import HarnessRegistry from "./harnesses/HarnessRegistry.ts";
@@ -68,14 +71,22 @@ export default class AgenticLoopService {
       const initialNames =
         resolvedTools.resolvedEnabledTools ||
         resolvedTools.finalTools.map((tool) => tool.name);
-      ToolContext.set(resolvedAgentConversationId, "dynamicEnabledTools", initialNames);
+      ToolContext.set(
+        resolvedAgentConversationId,
+        "dynamicEnabledTools",
+        initialNames,
+      );
     }
 
     // If this is a top-level agent request with an existing conversation,
     // all messages except the last one (the triggering input) are already
     // persisted in the database. For new conversations (e.g. Discord channel
     // history passed as ephemeral context), nothing has been persisted yet.
-    if (!options.isSubAgent && !context.isNewConversation && messages.length > 0) {
+    if (
+      !options.isSubAgent &&
+      !context.isNewConversation &&
+      messages.length > 0
+    ) {
       for (let i = 0; i < messages.length - 1; i++) {
         (messages[i] as any)._alreadyPersisted = true;
       }
@@ -91,7 +102,12 @@ export default class AgenticLoopService {
     let harnessId = options.harness;
     let topologyId = options.topology;
     let thoughtStructure = options.thoughtStructure;
-    if (!harnessId || !topologyId || !thoughtStructure || options.enableCriticGate === undefined) {
+    if (
+      !harnessId ||
+      !topologyId ||
+      !thoughtStructure ||
+      options.enableCriticGate === undefined
+    ) {
       try {
         const { default: SettingsService } =
           await import("./SettingsService.js");
@@ -100,7 +116,9 @@ export default class AgenticLoopService {
         if (!topologyId)
           topologyId = agentSettings?.topology || DEFAULT_TOPOLOGY;
         if (!thoughtStructure)
-          thoughtStructure = (agentSettings?.thoughtStructure as string) || DEFAULT_THOUGHT_STRUCTURE;
+          thoughtStructure =
+            (agentSettings?.thoughtStructure as string) ||
+            DEFAULT_THOUGHT_STRUCTURE;
 
         // CriticGate: auto-enable from settings when a critic model is configured
         // and the request didn't explicitly set enableCriticGate.
@@ -118,7 +136,8 @@ export default class AgenticLoopService {
           options.reminderModel =
             (options.reminderModel as string) || agentSettings.reminderModel;
           options.reminderProvider =
-            (options.reminderProvider as string) || agentSettings.reminderProvider;
+            (options.reminderProvider as string) ||
+            agentSettings.reminderProvider;
         }
       } catch {
         if (!harnessId) harnessId = "standard";

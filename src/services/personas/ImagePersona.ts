@@ -6,19 +6,23 @@ import PromptLocaleService from "../PromptLocaleService.ts";
 
 const IMAGE_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {
-    content: (locale) => PromptLocaleService.get(locale, "personas.image.toolPolicyGenerateImage"),
+    content: (locale) =>
+      PromptLocaleService.get(locale, "personas.image.toolPolicyGenerateImage"),
     requires: [TOOL_NAMES.GENERATE_IMAGE],
   },
   {
-    content: (locale) => PromptLocaleService.get(locale, "personas.image.toolPolicySearchWeb"),
+    content: (locale) =>
+      PromptLocaleService.get(locale, "personas.image.toolPolicySearchWeb"),
     requires: [TOOL_NAMES.SEARCH_WEB],
   },
   {
-    content: (locale) => PromptLocaleService.get(locale, "personas.image.toolPolicyAscii"),
+    content: (locale) =>
+      PromptLocaleService.get(locale, "personas.image.toolPolicyAscii"),
     requires: [TOOL_NAMES.CONVERT_IMAGE_TO_ASCII],
   },
   {
-    content: (locale) => PromptLocaleService.get(locale, "personas.image.toolPolicySaveMemory"),
+    content: (locale) =>
+      PromptLocaleService.get(locale, "personas.image.toolPolicySaveMemory"),
     requires: [TOOL_NAMES.SAVE_MEMORY],
   },
 ];
@@ -46,7 +50,10 @@ export const ImagePersona: Persona = {
     const sections = [
       PromptLocaleService.get(activeLocale, "personas.image.coreIdentity"),
       PromptLocaleService.get(activeLocale, "personas.image.capabilities"),
-      PromptLocaleService.get(activeLocale, "personas.image.responseGuidelines"),
+      PromptLocaleService.get(
+        activeLocale,
+        "personas.image.responseGuidelines",
+      ),
     ];
     return sections.join("\n\n");
   },

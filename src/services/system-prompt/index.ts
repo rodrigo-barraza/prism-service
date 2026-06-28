@@ -80,7 +80,10 @@ export default class SystemPromptAssembler {
 
     const settings = await SettingsService.getSection("agents");
     const defaultTopology = settings?.topology || DEFAULT_TOPOLOGY;
-    const locale = context.locale || settings?.locale || PromptLocaleService.getDefaultLocale();
+    const locale =
+      context.locale ||
+      settings?.locale ||
+      PromptLocaleService.getDefaultLocale();
 
     // ── 1. Agent Identity ────────────────────────────────────────
     if (isDirectMode) {
@@ -203,8 +206,10 @@ export default class SystemPromptAssembler {
         );
       }
 
-      const somaticMessage =
-        await SomaticStateService.renderSystemMessage(agentId, locale);
+      const somaticMessage = await SomaticStateService.renderSystemMessage(
+        agentId,
+        locale,
+      );
       if (somaticMessage) {
         selfContextSections.push(somaticMessage);
       }
@@ -245,8 +250,10 @@ export default class SystemPromptAssembler {
                 ).length
               : context.resolvedToolNames.length;
         } else {
-          const schemas =
-            ToolOrchestratorService.getClientToolSchemas(defaultTopology, locale);
+          const schemas = ToolOrchestratorService.getClientToolSchemas(
+            defaultTopology,
+            locale,
+          );
           count =
             lockedOffToolNames.size > 0
               ? schemas.filter(
@@ -306,7 +313,11 @@ export default class SystemPromptAssembler {
             count = filteredSchemas.length;
           }
         }
-        const header = PromptLocaleService.get(locale, "system-prompt.enabledToolsHeader", { count: String(count) });
+        const header = PromptLocaleService.get(
+          locale,
+          "system-prompt.enabledToolsHeader",
+          { count: String(count) },
+        );
         sections.push(header + "\n" + toolDescriptions);
       }
     }
@@ -318,7 +329,10 @@ export default class SystemPromptAssembler {
       } else if (codingFallback || persona?.usesCodingGuidelines) {
         sections.push(
           PromptLocaleService.get(locale, "system-prompt.codingGuidelines") +
-          PromptLocaleService.get(locale, "system-prompt.commandExecutionGuidelines"),
+            PromptLocaleService.get(
+              locale,
+              "system-prompt.commandExecutionGuidelines",
+            ),
         );
       }
     }
@@ -332,8 +346,10 @@ export default class SystemPromptAssembler {
             entry.startsWith("domain:") || entry.startsWith("domainKey:"),
         );
         if (hasPrefixed) {
-          const schemas =
-            ToolOrchestratorService.getClientToolSchemas(defaultTopology, locale);
+          const schemas = ToolOrchestratorService.getClientToolSchemas(
+            defaultTopology,
+            locale,
+          );
           return resolveToolEntriesToSet(context.enabledTools, schemas);
         }
         return new Set(context.enabledTools);
@@ -345,8 +361,10 @@ export default class SystemPromptAssembler {
         : true;
 
       if (orchestratorAvailable) {
-        const allSchemas =
-          ToolOrchestratorService.getToolSchemas(defaultTopology, locale);
+        const allSchemas = ToolOrchestratorService.getToolSchemas(
+          defaultTopology,
+          locale,
+        );
         const orchestratorSet = new Set(ORCHESTRATOR_ONLY_TOOLS);
         const lockedOffSet = await resolveLockedOffToolNames();
 
@@ -361,8 +379,10 @@ export default class SystemPromptAssembler {
             (entry) =>
               entry.startsWith("domain:") || entry.startsWith("domainKey:"),
           );
-          const clientSchemas =
-            ToolOrchestratorService.getClientToolSchemas(defaultTopology, locale);
+          const clientSchemas = ToolOrchestratorService.getClientToolSchemas(
+            defaultTopology,
+            locale,
+          );
           const enabledSet = hasPrefixed
             ? resolveToolEntriesToSet(context.enabledTools, clientSchemas)
             : new Set(context.enabledTools);
@@ -381,30 +401,45 @@ export default class SystemPromptAssembler {
             !orchestratorSet.has(toolName) && !lockedOffSet.has(toolName),
         );
         sections.push(
-          getOrchestratorPromptAddendum({ subAgentTools, defaultTopology, locale }),
+          getOrchestratorPromptAddendum({
+            subAgentTools,
+            defaultTopology,
+            locale,
+          }),
         );
       }
     }
 
     // ── 6. Environment ───────────────────────────────────────────
     const isWorkspaceEnabled = context.workspaceEnabled !== false;
-    const environmentLines = [PromptLocaleService.get(locale, "system-prompt.environmentOsLine")];
+    const environmentLines = [
+      PromptLocaleService.get(locale, "system-prompt.environmentOsLine"),
+    ];
     if (isWorkspaceEnabled) {
       environmentLines.push(
-        PromptLocaleService.get(locale, "system-prompt.environmentWorkspaceLine", {
-          workspaceRoot: this.workspaceRoot,
-        }),
+        PromptLocaleService.get(
+          locale,
+          "system-prompt.environmentWorkspaceLine",
+          {
+            workspaceRoot: this.workspaceRoot,
+          },
+        ),
       );
     }
     sections.push(
-      PromptLocaleService.get(locale, "system-prompt.environmentHeader") + `\n` + environmentLines.join(`\n`),
+      PromptLocaleService.get(locale, "system-prompt.environmentHeader") +
+        `\n` +
+        environmentLines.join(`\n`),
     );
 
     // ── 7. Project Structure (cached) ────────────────────────────
     if (isWorkspaceEnabled && (codingFallback || persona?.usesDirectoryTree)) {
       const dirTree = await this.fetchDirectoryTree();
       if (dirTree) {
-        const header = PromptLocaleService.get(locale, "system-prompt.projectStructureHeader");
+        const header = PromptLocaleService.get(
+          locale,
+          "system-prompt.projectStructureHeader",
+        );
         sections.push(header + "\n" + dirTree);
       }
     }
@@ -532,7 +567,10 @@ export default class SystemPromptAssembler {
         context._injectedSkills = skillNames;
         context._assembledSystemPrompt = systemPrompt;
 
-        const assembledLocale = context.locale || (await SettingsService.getSection("agents"))?.locale || PromptLocaleService.getDefaultLocale();
+        const assembledLocale =
+          context.locale ||
+          (await SettingsService.getSection("agents"))?.locale ||
+          PromptLocaleService.getDefaultLocale();
         injectSystemPromptContext(context.messages!, {
           platformContextMessage,
           selfContextMessage,
@@ -639,7 +677,11 @@ export function injectSystemPromptContext(
       });
 
     const activeLocale = locale || PromptLocaleService.getDefaultLocale();
-    const localTimeLabel = PromptLocaleService.get(activeLocale, "system-prompt.localTimeLabel", { time: timeText });
+    const localTimeLabel = PromptLocaleService.get(
+      activeLocale,
+      "system-prompt.localTimeLabel",
+      { time: timeText },
+    );
     const contextLines = [localTimeLabel];
 
     let systemContextBlock = `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\n${contextLines.join("\n")}`;

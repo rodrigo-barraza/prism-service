@@ -43,11 +43,7 @@ function deepFlattenObject(
   for (const [key, value] of Object.entries(source)) {
     const flatKey = prefix ? `${prefix}.${key}` : key;
 
-    if (
-      value !== null &&
-      typeof value === "object" &&
-      !Array.isArray(value)
-    ) {
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
       Object.assign(
         result,
         deepFlattenObject(value as Record<string, unknown>, flatKey),
@@ -79,7 +75,10 @@ function loadLocaleFromDirectory(localeDirectory: string): LocaleData {
 
         try {
           const rawContent = fs.readFileSync(fullPath, "utf-8");
-          const parsedContent = JSON.parse(rawContent) as Record<string, unknown>;
+          const parsedContent = JSON.parse(rawContent) as Record<
+            string,
+            unknown
+          >;
           const flattenedContent = deepFlattenObject(parsedContent, filePrefix);
           Object.assign(mergedData, flattenedContent);
         } catch (error) {
@@ -112,7 +111,9 @@ function initialize() {
   const localeDirectories = fs
     .readdirSync(localesRootDirectory, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
-    .filter((entry) => !entry.name.startsWith("__") && !entry.name.startsWith("."))
+    .filter(
+      (entry) => !entry.name.startsWith("__") && !entry.name.startsWith("."),
+    )
     .map((entry) => entry.name);
 
   for (const localeName of localeDirectories) {
@@ -150,17 +151,12 @@ function interpolateTemplate(
 }
 
 const PromptLocaleService = {
-  get(
-    locale: string,
-    key: string,
-    variables?: Record<string, string>,
-  ): string {
+  get(locale: string, key: string, variables?: Record<string, string>): string {
     initialize();
 
     const localeData = localeCache.get(locale);
-    const fallbackData = locale !== DEFAULT_LOCALE
-      ? localeCache.get(DEFAULT_LOCALE)
-      : undefined;
+    const fallbackData =
+      locale !== DEFAULT_LOCALE ? localeCache.get(DEFAULT_LOCALE) : undefined;
 
     const rawValue =
       (localeData?.[key] as string | undefined) ??
@@ -176,19 +172,15 @@ const PromptLocaleService = {
     return interpolateTemplate(String(rawValue), variables);
   },
 
-  getRecord(
-    locale: string,
-    keyPrefix: string,
-  ): Record<string, string> {
+  getRecord(locale: string, keyPrefix: string): Record<string, string> {
     initialize();
 
     const result: Record<string, string> = {};
     const searchPrefix = `${keyPrefix}.`;
 
     const localeData = localeCache.get(locale);
-    const fallbackData = locale !== DEFAULT_LOCALE
-      ? localeCache.get(DEFAULT_LOCALE)
-      : undefined;
+    const fallbackData =
+      locale !== DEFAULT_LOCALE ? localeCache.get(DEFAULT_LOCALE) : undefined;
 
     const mergedEntries = new Map<string, string>();
 
