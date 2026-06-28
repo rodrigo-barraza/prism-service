@@ -58,7 +58,9 @@ vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
 }));
 
 import type { OrchestratorContext } from "../src/types/orchestrator.ts";
-import OrchestratorService from "../src/services/OrchestratorService.ts";
+import OrchestratorService, {
+  MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION,
+} from "../src/services/OrchestratorService.ts";
 import AgentPersonaRegistry from "../src/services/AgentPersonaRegistry.ts";
 import { afterEach } from "vitest";
 
@@ -71,10 +73,9 @@ function cleanAllConversations() {
   OrchestratorService.cleanupConversation("root-conv");
   OrchestratorService.cleanupConversation("custom-parent-conv-abc");
   OrchestratorService.cleanupConversation("conv-id-789");
-  for (let i = 0; i < 25; i++) {
+  for (let i = 0; i < MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION + 5; i++) {
     OrchestratorService.cleanupConversation(`session-id-456-${i}`);
     OrchestratorService.cleanupConversation(`session-id-cb-${i}`);
-    OrchestratorService.cleanupConversation(`session-id-cb-21`);
   }
 }
 
@@ -845,7 +846,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
 
       const parentConversationId = "conv-id-789";
       
-      for (let i = 0; i < 20; i++) {
+      for (let i = 0; i < MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION; i++) {
         await OrchestratorService.spawnFromTool({
           description: `CB Agent ${i}`,
           prompt: "Do work",
@@ -857,19 +858,19 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         });
       }
 
-      const result21 = await OrchestratorService.spawnFromTool({
-        description: "CB Agent 21",
+      const resultExceeded = await OrchestratorService.spawnFromTool({
+        description: `CB Agent ${MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}`,
         prompt: "Do work",
         orchestratorContext: {
           ...orchestratorContext,
-          agentConversationId: "session-id-cb-21",
+          agentConversationId: `session-id-cb-${MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}`,
           conversationId: parentConversationId,
         },
       });
 
-      expect(result21).toBeDefined();
-      expect("error" in result21).toBe(true);
-      expect((result21 as any).error).toContain("Circuit breaker: maximum concurrent agents per conversation");
+      expect(resultExceeded).toBeDefined();
+      expect("error" in resultExceeded).toBe(true);
+      expect((resultExceeded as any).error).toContain("Circuit breaker: maximum concurrent agents per conversation");
     });
   });
 
