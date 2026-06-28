@@ -35,6 +35,14 @@ describe('ConversationsRoutes Integration', () => {
             if (query && query.id) {
               list = list.filter(c => c.id === query.id);
             }
+            if (query && query.parentConversationId) {
+              if (query.parentConversationId.$in) {
+                const frontierIds = query.parentConversationId.$in;
+                list = list.filter(c => frontierIds.includes(c.parentConversationId));
+              } else {
+                list = list.filter(c => c.parentConversationId === query.parentConversationId);
+              }
+            }
             return createMockQuery(list);
           },
           findOne: async (query: any) => {
@@ -54,6 +62,23 @@ describe('ConversationsRoutes Integration', () => {
             mockConversations.splice(index, 1);
             return { deletedCount: 1 };
           },
+          deleteMany: async (query: any) => {
+            let deletedCount = 0;
+            if (query && query.id && query.id.$in) {
+              const idsToDelete = query.id.$in;
+              const originalLength = mockConversations.length;
+              mockConversations = mockConversations.filter(c => !idsToDelete.includes(c.id));
+              deletedCount = originalLength - mockConversations.length;
+            } else if (query && query.id) {
+              const originalLength = mockConversations.length;
+              mockConversations = mockConversations.filter(c => c.id !== query.id);
+              deletedCount = originalLength - mockConversations.length;
+            } else {
+              deletedCount = mockConversations.length;
+              mockConversations = [];
+            }
+            return { deletedCount };
+          },
           countDocuments: async (query: any) => {
             return mockConversations.filter(c => c.id === query.id).length;
           },
@@ -65,6 +90,14 @@ describe('ConversationsRoutes Integration', () => {
             let list = [...mockAgentConversations];
             if (query && query.id) {
               list = list.filter(c => c.id === query.id);
+            }
+            if (query && query.parentConversationId) {
+              if (query.parentConversationId.$in) {
+                const frontierIds = query.parentConversationId.$in;
+                list = list.filter(c => frontierIds.includes(c.parentConversationId));
+              } else {
+                list = list.filter(c => c.parentConversationId === query.parentConversationId);
+              }
             }
             return createMockQuery(list);
           },
@@ -84,6 +117,23 @@ describe('ConversationsRoutes Integration', () => {
             if (index === -1) return { deletedCount: 0 };
             mockAgentConversations.splice(index, 1);
             return { deletedCount: 1 };
+          },
+          deleteMany: async (query: any) => {
+            let deletedCount = 0;
+            if (query && query.id && query.id.$in) {
+              const idsToDelete = query.id.$in;
+              const originalLength = mockAgentConversations.length;
+              mockAgentConversations = mockAgentConversations.filter(c => !idsToDelete.includes(c.id));
+              deletedCount = originalLength - mockAgentConversations.length;
+            } else if (query && query.id) {
+              const originalLength = mockAgentConversations.length;
+              mockAgentConversations = mockAgentConversations.filter(c => c.id !== query.id);
+              deletedCount = originalLength - mockAgentConversations.length;
+            } else {
+              deletedCount = mockAgentConversations.length;
+              mockAgentConversations = [];
+            }
+            return { deletedCount };
           },
           countDocuments: async (query: any) => {
             return mockAgentConversations.filter(c => c.id === query.id).length;
@@ -230,6 +280,59 @@ describe('ConversationsRoutes Integration', () => {
         .set('x-project', 'test')
         .set('x-username', 'testuser')
         .expect(404);
+    });
+
+    it('should delete a parent conversation and cascade delete its descendants', async () => {
+      mockConversations = [
+        {
+          id: 'conv-1',
+          project: 'test',
+          username: 'testuser',
+          title: 'Parent',
+          updatedAt: new Date().toISOString(),
+          messages: [],
+        },
+        {
+          id: 'conv-child-1',
+          parentConversationId: 'conv-1',
+          project: 'test',
+          username: 'testuser',
+          title: 'Child Model',
+          updatedAt: new Date().toISOString(),
+          messages: [],
+        }
+      ];
+
+      mockAgentConversations = [
+        {
+          id: 'agent-conv-child-2',
+          parentConversationId: 'conv-1',
+          project: 'test',
+          username: 'testuser',
+          title: 'Child Agent',
+          updatedAt: new Date().toISOString(),
+          messages: [],
+        },
+        {
+          id: 'agent-conv-grandchild-3',
+          parentConversationId: 'agent-conv-child-2',
+          project: 'test',
+          username: 'testuser',
+          title: 'Grandchild Agent',
+          updatedAt: new Date().toISOString(),
+          messages: [],
+        }
+      ];
+
+      const response = await agent
+        .delete('/conversations/conv-1')
+        .set('x-project', 'test')
+        .set('x-username', 'testuser')
+        .expect(200);
+
+      expect(response.body.descendantsDeleted).toBe(3);
+      expect(mockConversations).toHaveLength(0);
+      expect(mockAgentConversations).toHaveLength(0);
     });
   });
 
