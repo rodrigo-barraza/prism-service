@@ -194,7 +194,7 @@ describe("Event-Driven Auto-Response", () => {
       expect(messages).toHaveLength(1);
 
       const completionMessage = messages[0] as { role: string; content: string };
-      expect(completionMessage.role).toBe("user");
+      expect(completionMessage.role).toBe("system");
       expect(completionMessage.content).toContain("<task-notification>");
       expect(completionMessage.content).toContain("</task-notification>");
       expect(completionMessage.content).toContain("[SUB-AGENT TEAM COMPLETED]");
@@ -381,7 +381,7 @@ describe("Event-Driven Auto-Response", () => {
 
   describe("_triggerParentAutoResponse", () => {
     const completionMessage = {
-      role: "user" as const,
+      role: "system" as const,
       content: "<task-notification>\n[SUB-AGENT TEAM COMPLETED] Team finished.\n</task-notification>",
       timestamp: new Date().toISOString(),
       _alreadyPersisted: true,
