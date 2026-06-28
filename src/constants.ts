@@ -100,7 +100,10 @@ export const AVG_TOKENS_PER_SEC_EXPR = {
 
 // ─── Provider & Modality Constants (re-exported from utilities-library) ──
 
-export { PROVIDERS, PROVIDER_LIST } from "@rodrigo-barraza/utilities-library/taxonomy";
+export {
+  PROVIDERS,
+  PROVIDER_LIST,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 
 export const TYPES = {
   TEXT: "text",

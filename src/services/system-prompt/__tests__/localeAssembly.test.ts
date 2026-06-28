@@ -54,10 +54,13 @@ vi.mock("../../RequestLogger.ts", () => ({
 
 // ── Shared fixtures ────────────────────────────────────────
 const CAVEMAN_IDENTITY_MARKER = "Omni Agent — universal all-domain assistant";
-const ENGLISH_IDENTITY_MARKER = "You are the Omni Agent — a universal, all-domain AI assistant";
+const ENGLISH_IDENTITY_MARKER =
+  "You are the Omni Agent — a universal, all-domain AI assistant";
 
-const CAVEMAN_RESPONSE_GUIDELINES_MARKER = "use tool proactively, don't ask permission";
-const ENGLISH_RESPONSE_GUIDELINES_MARKER = "use tools proactively rather than asking if the user wants you to";
+const CAVEMAN_RESPONSE_GUIDELINES_MARKER =
+  "use tool proactively, don't ask permission";
+const ENGLISH_RESPONSE_GUIDELINES_MARKER =
+  "use tools proactively rather than asking if the user wants you to";
 
 function buildMinimalAssemblerContext(
   overrides: Partial<AssemblerContext> = {},
@@ -170,8 +173,9 @@ describe("Locale Assembly", () => {
       const hook = assembler.createHook();
 
       const hookContext: AssemblerContext & Record<string, unknown> =
-        buildMinimalAssemblerContext({ locale: "caveman" }) as AssemblerContext &
-          Record<string, unknown>;
+        buildMinimalAssemblerContext({
+          locale: "caveman",
+        }) as AssemblerContext & Record<string, unknown>;
       await hook(hookContext);
 
       const assembledPrompt = hookContext._assembledSystemPrompt as string;
@@ -186,8 +190,9 @@ describe("Locale Assembly", () => {
       const hook = assembler.createHook();
 
       const hookContext: AssemblerContext & Record<string, unknown> =
-        buildMinimalAssemblerContext({ locale: undefined }) as AssemblerContext &
-          Record<string, unknown>;
+        buildMinimalAssemblerContext({
+          locale: undefined,
+        }) as AssemblerContext & Record<string, unknown>;
       await hook(hookContext);
 
       const assembledPrompt = hookContext._assembledSystemPrompt as string;
@@ -201,8 +206,9 @@ describe("Locale Assembly", () => {
       const hook = assembler.createHook();
 
       const hookContext: AssemblerContext & Record<string, unknown> =
-        buildMinimalAssemblerContext({ locale: "caveman" }) as AssemblerContext &
-          Record<string, unknown>;
+        buildMinimalAssemblerContext({
+          locale: "caveman",
+        }) as AssemblerContext & Record<string, unknown>;
       await hook(hookContext);
 
       const assembledPrompt = hookContext._assembledSystemPrompt as string;

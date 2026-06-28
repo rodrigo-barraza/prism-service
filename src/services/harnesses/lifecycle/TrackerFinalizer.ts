@@ -30,9 +30,10 @@ export function finalizePassTracker(
       ...(pass.usage.outputTokens > 0 && {
         outputTokens: pass.usage.outputTokens,
       }),
-      ...(pass.usage.tokensPerSec != null && pass.usage.tokensPerSec > 0 && {
-        providerTokPerSec: pass.usage.tokensPerSec,
-      }),
+      ...(pass.usage.tokensPerSec != null &&
+        pass.usage.tokensPerSec > 0 && {
+          providerTokPerSec: pass.usage.tokensPerSec,
+        }),
     });
   }
 

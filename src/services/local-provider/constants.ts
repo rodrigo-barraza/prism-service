@@ -10,23 +10,27 @@ export { THINKING_PATTERNS } from "@rodrigo-barraza/utilities-library/taxonomy";
  * These providers only need tools on the first pass — subsequent
  * passes should omit tools to force an eventual text response.
  */
-export const NATIVE_MCP_TYPES = new Set<string>([PROVIDERS.LM_STUDIO, PROVIDERS.OLLAMA]);
+export const NATIVE_MCP_TYPES = new Set<string>([
+  PROVIDERS.LM_STUDIO,
+  PROVIDERS.OLLAMA,
+]);
 
 /**
  * Providers that emit thinking tokens (<think> tags) by default.
  * When the client doesn't explicitly set thinkingEnabled, these
  * providers default to thinkingEnabled=true.
  */
-export const DEFAULT_THINKING_TYPES = new Set<string>([PROVIDERS.LM_STUDIO, PROVIDERS.LLAMA_CPP, PROVIDERS.VLLM]);
+export const DEFAULT_THINKING_TYPES = new Set<string>([
+  PROVIDERS.LM_STUDIO,
+  PROVIDERS.LLAMA_CPP,
+  PROVIDERS.VLLM,
+]);
 
 /**
  * Providers that support model management (load/unload/ensure).
  * Only applicable to servers that can hot-swap models.
  */
 export const MODEL_MANAGEMENT_TYPES = new Set<string>([PROVIDERS.LM_STUDIO]);
-
-
-
 
 /**
  * Models trained for function calling / tool use.

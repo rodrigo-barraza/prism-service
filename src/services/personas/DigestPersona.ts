@@ -6,7 +6,8 @@ import PromptLocaleService from "../PromptLocaleService.ts";
 
 const DIGEST_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {
-    content: (locale) => PromptLocaleService.get(locale, "personas.digest.toolPolicy"),
+    content: (locale) =>
+      PromptLocaleService.get(locale, "personas.digest.toolPolicy"),
     requires: [TOOL_NAMES.CALCULATE_CALORIC_NEEDS, TOOL_NAMES.BUILD_MEAL_PLAN],
   },
 ];
@@ -31,7 +32,10 @@ export const DigestPersona: Persona = {
     const sections = [
       PromptLocaleService.get(activeLocale, "personas.digest.corePersonality"),
       PromptLocaleService.get(activeLocale, "personas.digest.capabilities"),
-      PromptLocaleService.get(activeLocale, "personas.digest.responseGuidelines"),
+      PromptLocaleService.get(
+        activeLocale,
+        "personas.digest.responseGuidelines",
+      ),
       PromptLocaleService.get(activeLocale, "personas.digest.interactionRules"),
     ];
 

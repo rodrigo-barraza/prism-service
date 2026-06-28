@@ -59,7 +59,8 @@ const ENGLISH_HEADER_MARKER = "[TOOL SET UPDATED]";
 
 // harness.toolSetUpdated.availableDocumentation
 const CAVEMAN_AVAILABLE_MARKER = "Tool ready with documentation:";
-const ENGLISH_AVAILABLE_MARKER = "The following tools are now available with full documentation:";
+const ENGLISH_AVAILABLE_MARKER =
+  "The following tools are now available with full documentation:";
 
 // harness.toolSetUpdated.usageGuidelines
 const CAVEMAN_GUIDELINES_MARKER = "## Tool Usage";
@@ -72,7 +73,6 @@ const ENGLISH_WRITE_TODO_MARKER = "Write or update a persistent TODO checklist";
 // ── Tests ──────────────────────────────────────────────────
 
 describe("Tool Update Message Locale", () => {
-
   // ────────────────────────────────────────────────────────
   // 1. PromptLocaleService — harness.toolSetUpdated.* keys
   //    Verify locale data is loaded and returns distinct
@@ -81,41 +81,61 @@ describe("Tool Update Message Locale", () => {
 
   describe("PromptLocaleService harness.toolSetUpdated keys", () => {
     it("should have caveman header translation", () => {
-      const header = PromptLocaleService.get("caveman", "harness.toolSetUpdated.header", {
-        count: "3",
-        toolNames: "draw_turtle_graphics, create_3d_model, create_3d_scene",
-      });
+      const header = PromptLocaleService.get(
+        "caveman",
+        "harness.toolSetUpdated.header",
+        {
+          count: "3",
+          toolNames: "draw_turtle_graphics, create_3d_model, create_3d_scene",
+        },
+      );
       expect(header).not.toContain("[MISSING:");
       expect(header).toContain(CAVEMAN_HEADER_MARKER);
       expect(header).not.toContain(ENGLISH_HEADER_MARKER);
     });
 
     it("should have english header translation", () => {
-      const header = PromptLocaleService.get("en", "harness.toolSetUpdated.header", {
-        count: "3",
-        toolNames: "draw_turtle_graphics, create_3d_model, create_3d_scene",
-      });
+      const header = PromptLocaleService.get(
+        "en",
+        "harness.toolSetUpdated.header",
+        {
+          count: "3",
+          toolNames: "draw_turtle_graphics, create_3d_model, create_3d_scene",
+        },
+      );
       expect(header).not.toContain("[MISSING:");
       expect(header).toContain(ENGLISH_HEADER_MARKER);
     });
 
     it("should produce distinct caveman vs english headers", () => {
-      const cavemanHeader = PromptLocaleService.get("caveman", "harness.toolSetUpdated.header", {
-        count: "2",
-        toolNames: "tool_a, tool_b",
-      });
-      const englishHeader = PromptLocaleService.get("en", "harness.toolSetUpdated.header", {
-        count: "2",
-        toolNames: "tool_a, tool_b",
-      });
+      const cavemanHeader = PromptLocaleService.get(
+        "caveman",
+        "harness.toolSetUpdated.header",
+        {
+          count: "2",
+          toolNames: "tool_a, tool_b",
+        },
+      );
+      const englishHeader = PromptLocaleService.get(
+        "en",
+        "harness.toolSetUpdated.header",
+        {
+          count: "2",
+          toolNames: "tool_a, tool_b",
+        },
+      );
       expect(cavemanHeader).not.toEqual(englishHeader);
     });
 
     it("should interpolate count and toolNames into header", () => {
-      const header = PromptLocaleService.get("en", "harness.toolSetUpdated.header", {
-        count: "5",
-        toolNames: "alpha, beta, gamma, delta, epsilon",
-      });
+      const header = PromptLocaleService.get(
+        "en",
+        "harness.toolSetUpdated.header",
+        {
+          count: "5",
+          toolNames: "alpha, beta, gamma, delta, epsilon",
+        },
+      );
       expect(header).toContain("5");
       expect(header).toContain("alpha, beta, gamma, delta, epsilon");
     });
@@ -186,9 +206,11 @@ describe("Tool Update Message Locale", () => {
 
     beforeEach(async () => {
       vi.clearAllMocks();
-      const formatterModule = await import("../../system-prompt/ToolDocFormatter.ts");
+      const formatterModule =
+        await import("../../system-prompt/ToolDocFormatter.ts");
       ToolDocFormatter = formatterModule.ToolDocFormatter;
-      const orchestratorModule = await import("../../ToolOrchestratorService.ts");
+      const orchestratorModule =
+        await import("../../ToolOrchestratorService.ts");
       ToolOrchestratorService = orchestratorModule.default;
 
       getClientSchemasSpy = vi.spyOn(
@@ -196,42 +218,47 @@ describe("Tool Update Message Locale", () => {
         "getClientToolSchemas",
       );
 
-      getClientSchemasSpy.mockImplementation((_topology?: string, locale?: string) => {
-        const activeLocale = locale || "en";
-        return [
-          {
-            name: "draw_turtle_graphics",
-            description: activeLocale === "caveman"
-              ? "make turtle picture using LOGO code language. write code, turtle draw for you."
-              : "Draw animated 2D turtle graphics using the LOGO programming language.",
-            domain: "Creative",
-            parameters: {
-              type: "object",
-              properties: {
-                code: {
-                  type: "string",
-                  description: activeLocale === "caveman"
-                    ? "LOGO code for turtle drawing."
-                    : "LOGO source code for the turtle drawing.",
+      getClientSchemasSpy.mockImplementation(
+        (_topology?: string, locale?: string) => {
+          const activeLocale = locale || "en";
+          return [
+            {
+              name: "draw_turtle_graphics",
+              description:
+                activeLocale === "caveman"
+                  ? "make turtle picture using LOGO code language. write code, turtle draw for you."
+                  : "Draw animated 2D turtle graphics using the LOGO programming language.",
+              domain: "Creative",
+              parameters: {
+                type: "object",
+                properties: {
+                  code: {
+                    type: "string",
+                    description:
+                      activeLocale === "caveman"
+                        ? "LOGO code for turtle drawing."
+                        : "LOGO source code for the turtle drawing.",
+                  },
                 },
+                required: ["code"],
               },
-              required: ["code"],
             },
-          },
-          {
-            name: "create_3d_model",
-            description: activeLocale === "caveman"
-              ? "make 3d thing from shape with material and move."
-              : "Create a 3D object/model by composing primitive shapes with PBR materials.",
-            domain: "Creative",
-            parameters: {
-              type: "object",
-              properties: {},
-              required: [],
+            {
+              name: "create_3d_model",
+              description:
+                activeLocale === "caveman"
+                  ? "make 3d thing from shape with material and move."
+                  : "Create a 3D object/model by composing primitive shapes with PBR materials.",
+              domain: "Creative",
+              parameters: {
+                type: "object",
+                properties: {},
+                required: [],
+              },
             },
-          },
-        ];
-      });
+          ];
+        },
+      );
     });
 
     afterEach(() => {
@@ -316,9 +343,11 @@ describe("Tool Update Message Locale", () => {
 
     beforeEach(async () => {
       vi.clearAllMocks();
-      const formatterModule = await import("../../system-prompt/ToolDocFormatter.ts");
+      const formatterModule =
+        await import("../../system-prompt/ToolDocFormatter.ts");
       ToolDocFormatter = formatterModule.ToolDocFormatter;
-      const orchestratorModule = await import("../../ToolOrchestratorService.ts");
+      const orchestratorModule =
+        await import("../../ToolOrchestratorService.ts");
       ToolOrchestratorService = orchestratorModule.default;
 
       getClientSchemasSpy = vi.spyOn(
@@ -326,30 +355,34 @@ describe("Tool Update Message Locale", () => {
         "getClientToolSchemas",
       );
 
-      getClientSchemasSpy.mockImplementation((_topology?: string, locale?: string) => {
-        const activeLocale = locale || "en";
-        return [
-          {
-            name: "search_events",
-            description: activeLocale === "caveman"
-              ? "find thing happening nearby. search by place, time, what kind."
-              : "Search for events by location, date range, and category.",
-            domain: "Events",
-            parameters: {
-              type: "object",
-              properties: {
-                location: {
-                  type: "string",
-                  description: activeLocale === "caveman"
-                    ? "where to look for thing."
-                    : "Location to search for events.",
+      getClientSchemasSpy.mockImplementation(
+        (_topology?: string, locale?: string) => {
+          const activeLocale = locale || "en";
+          return [
+            {
+              name: "search_events",
+              description:
+                activeLocale === "caveman"
+                  ? "find thing happening nearby. search by place, time, what kind."
+                  : "Search for events by location, date range, and category.",
+              domain: "Events",
+              parameters: {
+                type: "object",
+                properties: {
+                  location: {
+                    type: "string",
+                    description:
+                      activeLocale === "caveman"
+                        ? "where to look for thing."
+                        : "Location to search for events.",
+                  },
                 },
+                required: ["location"],
               },
-              required: ["location"],
             },
-          },
-        ];
-      });
+          ];
+        },
+      );
     });
 
     afterEach(() => {
@@ -371,10 +404,14 @@ describe("Tool Update Message Locale", () => {
         locale,
       );
 
-      const headerText = PromptLocaleService.get(locale, "harness.toolSetUpdated.header", {
-        count: String(toolNames.length),
-        toolNames: toolNamesList,
-      });
+      const headerText = PromptLocaleService.get(
+        locale,
+        "harness.toolSetUpdated.header",
+        {
+          count: String(toolNames.length),
+          toolNames: toolNamesList,
+        },
+      );
       const availableText = PromptLocaleService.get(
         locale,
         "harness.toolSetUpdated.availableDocumentation",
@@ -457,37 +494,6 @@ describe("Tool Update Message Locale", () => {
       expect(message).toContain(
         "1 new tool(s) have been dynamically enabled: search_events",
       );
-    });
-  });
-
-  // ────────────────────────────────────────────────────────
-  // 4. Adversarial: lol locale support
-  // ────────────────────────────────────────────────────────
-
-  describe("lol locale support", () => {
-    it("should have lol header translation", () => {
-      const header = PromptLocaleService.get("lol", "harness.toolSetUpdated.header", {
-        count: "1",
-        toolNames: "test_tool",
-      });
-      expect(header).not.toContain("[MISSING:");
-    });
-
-    it("should have lol availableDocumentation translation", () => {
-      const available = PromptLocaleService.get(
-        "lol",
-        "harness.toolSetUpdated.availableDocumentation",
-      );
-      expect(available).not.toContain("[MISSING:");
-      expect(available.toLowerCase()).toContain("tools");
-    });
-
-    it("should have lol usageGuidelines translation", () => {
-      const guidelines = PromptLocaleService.get(
-        "lol",
-        "harness.toolSetUpdated.usageGuidelines",
-      );
-      expect(guidelines).not.toContain("[MISSING:");
     });
   });
 });

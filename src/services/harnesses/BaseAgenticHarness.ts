@@ -186,19 +186,17 @@ export default class BaseAgenticHarness {
       this.context.options?.thinkingEnabled as boolean | undefined,
     );
 
-    const filteredTools = allSchemas.filter(
-      (tool) => {
-        if (hasNativeThinking && tool.name === TOOL_NAMES.THINK) return false;
-        return (
-          dynamicEnabledSet.has(tool.name) ||
-          tool.name.startsWith("mcp__") ||
-          BaseAgenticHarness.CORE_AGENTIC_SET.has(tool.name) ||
-          (!isSubAgent &&
-            BaseAgenticHarness.CORE_ORCHESTRATOR_SET.has(tool.name)) ||
-          InternalToolRegistry.has(tool.name)
-        );
-      },
-    ) as unknown as ResolvedTools["finalTools"];
+    const filteredTools = allSchemas.filter((tool) => {
+      if (hasNativeThinking && tool.name === TOOL_NAMES.THINK) return false;
+      return (
+        dynamicEnabledSet.has(tool.name) ||
+        tool.name.startsWith("mcp__") ||
+        BaseAgenticHarness.CORE_AGENTIC_SET.has(tool.name) ||
+        (!isSubAgent &&
+          BaseAgenticHarness.CORE_ORCHESTRATOR_SET.has(tool.name)) ||
+        InternalToolRegistry.has(tool.name)
+      );
+    }) as unknown as ResolvedTools["finalTools"];
 
     this.tools = {
       finalTools: filteredTools,
@@ -227,7 +225,9 @@ export default class BaseAgenticHarness {
     );
 
     if (currentMessages && newlyAddedToolSchemas.length > 0) {
-      const activeLocale = (this.context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale();
+      const activeLocale =
+        (this.context.options?.locale as string | undefined) ||
+        PromptLocaleService.getDefaultLocale();
       const addendumDocumentation =
         BaseAgenticHarness.toolDocFormatter.buildToolDescriptions(
           newlyAddedToolSchemas.map((tool) => tool.name),
@@ -249,12 +249,22 @@ export default class BaseAgenticHarness {
           activeLocale,
         );
 
-        const headerText = PromptLocaleService.get(activeLocale, "harness.toolSetUpdated.header", {
-          count: String(newlyAddedToolSchemas.length),
-          toolNames: toolNamesList,
-        });
-        const availableText = PromptLocaleService.get(activeLocale, "harness.toolSetUpdated.availableDocumentation");
-        const guidelinesHeader = PromptLocaleService.get(activeLocale, "harness.toolSetUpdated.usageGuidelines");
+        const headerText = PromptLocaleService.get(
+          activeLocale,
+          "harness.toolSetUpdated.header",
+          {
+            count: String(newlyAddedToolSchemas.length),
+            toolNames: toolNamesList,
+          },
+        );
+        const availableText = PromptLocaleService.get(
+          activeLocale,
+          "harness.toolSetUpdated.availableDocumentation",
+        );
+        const guidelinesHeader = PromptLocaleService.get(
+          activeLocale,
+          "harness.toolSetUpdated.usageGuidelines",
+        );
 
         currentMessages.push({
           role: "system",
@@ -271,9 +281,7 @@ export default class BaseAgenticHarness {
 
         logger.info(
           `[BaseAgenticHarness] Injected documentation addendum for ${newlyAddedToolSchemas.length} newly activated tools: [${toolNamesList}]` +
-            (policyAddendum
-              ? ` (with policy guidance)`
-              : ""),
+            (policyAddendum ? ` (with policy guidance)` : ""),
         );
       }
     }
@@ -376,7 +384,8 @@ export default class BaseAgenticHarness {
     const contextResult = ContextWindowManager.enforce(
       messages as ChatMessage[],
       {
-        maxInputTokens: modelDefinition?.maxInputTokens || DEFAULT_MAX_INPUT_TOKENS,
+        maxInputTokens:
+          modelDefinition?.maxInputTokens || DEFAULT_MAX_INPUT_TOKENS,
         maxOutputTokens: options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS,
         toolCount,
         locale: options?.locale as string | undefined,
@@ -422,15 +431,22 @@ export default class BaseAgenticHarness {
             : "";
       totalTokens += estimateTokens(content);
       if ((message as ChatMessage).thinking) {
-        totalTokens += estimateTokens((message as ChatMessage).thinking as string);
+        totalTokens += estimateTokens(
+          (message as ChatMessage).thinking as string,
+        );
       }
       const toolCalls =
-        (message as ChatMessage).toolCalls || (message as ChatMessage).tool_calls;
+        (message as ChatMessage).toolCalls ||
+        (message as ChatMessage).tool_calls;
       if (toolCalls) {
         totalTokens += estimateTokens(JSON.stringify(toolCalls));
       }
-      if ((message as ChatMessage).images && Array.isArray((message as ChatMessage).images)) {
-        totalTokens += ((message as ChatMessage).images as unknown[]).length * 1000;
+      if (
+        (message as ChatMessage).images &&
+        Array.isArray((message as ChatMessage).images)
+      ) {
+        totalTokens +=
+          ((message as ChatMessage).images as unknown[]).length * 1000;
       }
     }
     return totalTokens;
@@ -460,7 +476,10 @@ export default class BaseAgenticHarness {
 
     if (requestedMaxTokens <= availableForOutput) return requestedMaxTokens;
 
-    const clampedMaxTokens = Math.max(availableForOutput, MINIMUM_CLAMPED_OUTPUT_TOKENS);
+    const clampedMaxTokens = Math.max(
+      availableForOutput,
+      MINIMUM_CLAMPED_OUTPUT_TOKENS,
+    );
 
     logger.warn(
       `[OutputTokenClamp] Clamping maxTokens from ${requestedMaxTokens} → ${clampedMaxTokens} ` +
@@ -483,10 +502,14 @@ export default class BaseAgenticHarness {
   ): AsyncIterable<unknown> {
     const { provider, resolvedModel, modelDefinition, signal } = this.context;
 
-    const clampedMaxTokens = this.clampOutputTokens(messages, passOptions.maxTokens);
-    const clampedPassOptions = clampedMaxTokens !== passOptions.maxTokens
-      ? { ...passOptions, maxTokens: clampedMaxTokens }
-      : passOptions;
+    const clampedMaxTokens = this.clampOutputTokens(
+      messages,
+      passOptions.maxTokens,
+    );
+    const clampedPassOptions =
+      clampedMaxTokens !== passOptions.maxTokens
+        ? { ...passOptions, maxTokens: clampedMaxTokens }
+        : passOptions;
 
     const expandedMessages = expandMessagesForFunctionCall(
       messages as ChatMessage[],
@@ -543,12 +566,16 @@ export default class BaseAgenticHarness {
     } = this.context;
     const resolvedParent = parentAgentConversationId;
     const resolvedAgent = agentConversationId;
-    ConversationGenerationTracker.register(this.trackerConversationId, passRequestId, {
-      provider: providerName,
-      model: resolvedModel,
-      source: resolvedParent ? "sub-agent" : "orchestrator",
-      subAgentId: resolvedParent ? (resolvedAgent as string) : null,
-    });
+    ConversationGenerationTracker.register(
+      this.trackerConversationId,
+      passRequestId,
+      {
+        provider: providerName,
+        model: resolvedModel,
+        source: resolvedParent ? "sub-agent" : "orchestrator",
+        subAgentId: resolvedParent ? (resolvedAgent as string) : null,
+      },
+    );
   }
 
   // ── Stream chunk processing ───────────────────────────────
@@ -615,11 +642,14 @@ export default class BaseAgenticHarness {
       this._recordTiming(pass);
       state.streamedThinking += streamChunk.content || "";
       pass.streamedThinking += streamChunk.content || "";
-      if (state.displayThinkingFragments.length === 0 || state.lastDisplaySegType !== "thinking") {
+      if (
+        state.displayThinkingFragments.length === 0 ||
+        state.lastDisplaySegType !== "thinking"
+      ) {
         logger.debug(
           `[Harness:Thinking] NEW thinking segment on iteration ${state.iterations}, ` +
-          `fragments=${state.displayThinkingFragments.length}, lastSegType=${state.lastDisplaySegType}, ` +
-          `contentLen=${(streamChunk.content || "").length}ch`,
+            `fragments=${state.displayThinkingFragments.length}, lastSegType=${state.lastDisplaySegType}, ` +
+            `contentLen=${(streamChunk.content || "").length}ch`,
         );
       }
       // Display segment tracking
@@ -988,17 +1018,20 @@ export default class BaseAgenticHarness {
       parentAgentConversationId: parentAgentConversationId || null,
       traceId: traceId || null,
       toolsUsed: pass.pendingToolCalls.length > 0,
-      toolDisplayNames: pass.pendingToolCalls.length > 0
-        ? [...new Set(pass.pendingToolCalls.map((toolCall) => toolCall.name))]
-        : [],
-      toolApiNames: pass.pendingToolCalls.length > 0
-        ? [...new Set(pass.pendingToolCalls.map((toolCall) => toolCall.name))]
-        : [],
+      toolDisplayNames:
+        pass.pendingToolCalls.length > 0
+          ? [...new Set(pass.pendingToolCalls.map((toolCall) => toolCall.name))]
+          : [],
+      toolApiNames:
+        pass.pendingToolCalls.length > 0
+          ? [...new Set(pass.pendingToolCalls.map((toolCall) => toolCall.name))]
+          : [],
       success: true,
       inputTokens: Number(pass.usage.inputTokens) || 0,
       outputTokens: Number(pass.usage.outputTokens) || 0,
       cacheReadInputTokens: Number(pass.usage.cacheReadInputTokens) || 0,
-      cacheCreationInputTokens: Number(pass.usage.cacheCreationInputTokens) || 0,
+      cacheCreationInputTokens:
+        Number(pass.usage.cacheCreationInputTokens) || 0,
       reasoningOutputTokens: Number(pass.usage.reasoningOutputTokens) || 0,
       estimatedCost: passEstimatedCost,
       tokensPerSec: passTokensPerSec,
@@ -1010,64 +1043,79 @@ export default class BaseAgenticHarness {
       presencePenalty: (pass.options?.presencePenalty as number) ?? null,
       stopSequences: (pass.options?.stopSequences as string[]) ?? null,
       messageCount: currentMessages?.length ?? 0,
-      inputCharacters: currentMessages?.reduce(
-        (sum, message) =>
-          sum + (typeof message.content === "string" ? message.content.length : 0),
-        0,
-      ) ?? 0,
+      inputCharacters:
+        currentMessages?.reduce(
+          (sum, message) =>
+            sum +
+            (typeof message.content === "string" ? message.content.length : 0),
+          0,
+        ) ?? 0,
       outputCharacters: pass.outputCharacters,
       timeToGeneration: pass.firstTokenTime
         ? roundMilliseconds((pass.firstTokenTime - pass.start) / 1000)
         : null,
-      generationTime: passGenerationSec !== null ? roundMilliseconds(passGenerationSec) : null,
+      generationTime:
+        passGenerationSec !== null
+          ? roundMilliseconds(passGenerationSec)
+          : null,
       totalTime: roundMilliseconds(passTotalSec),
       requestPayload: {
-        messages: currentMessages?.map((message) => ({
-          role: (message as Record<string, unknown>).role,
-          content: (message as Record<string, unknown>).content,
-        })) ?? [],
+        messages:
+          currentMessages?.map((message) => ({
+            role: (message as Record<string, unknown>).role,
+            content: (message as Record<string, unknown>).content,
+          })) ?? [],
         agenticIteration: state.iterations,
       },
       responsePayload: {
         text: pass.streamedText || null,
         thinking: pass.streamedThinking || null,
-        ...(pass.streamedImages.length > 0 ? { images: pass.streamedImages } : {}),
-        toolCalls: pass.pendingToolCalls.length > 0
-          ? pass.pendingToolCalls.map((toolCall) => ({
-              name: toolCall.name,
-              id: toolCall.id,
-              args: toolCall.args,
-            }))
-          : null,
+        ...(pass.streamedImages.length > 0
+          ? { images: pass.streamedImages }
+          : {}),
+        toolCalls:
+          pass.pendingToolCalls.length > 0
+            ? pass.pendingToolCalls.map((toolCall) => ({
+                name: toolCall.name,
+                id: toolCall.id,
+                args: toolCall.args,
+              }))
+            : null,
         usage: pass.usage,
       },
     };
 
-    pass.pendingRequestDocumentIdPromise.then((pendingRequestDocumentId) => {
-      if (pendingRequestDocumentId) {
-        RequestLogger.completePending(
-          pendingRequestDocumentId,
-          fullPayload,
-        ).catch((error: unknown) =>
-          logger.error(
-            `[AgenticLoopService] Failed to complete pending request: ${errorMessage(error)}`,
-          ),
-        );
-      } else {
-        RequestLogger.logChatGeneration(legacyPayload).catch((error: unknown) =>
-          logger.error(
-            `[AgenticLoopService] Failed to log intermediate request: ${errorMessage(error)}`,
-          ),
-        );
-      }
-    }).catch((error: unknown) => {
-      logger.error(`[BaseAgenticHarness] Error resolving pendingRequestDocumentIdPromise: ${errorMessage(error)}`);
-      RequestLogger.logChatGeneration(legacyPayload).catch((loggingError: unknown) =>
+    pass.pendingRequestDocumentIdPromise
+      .then((pendingRequestDocumentId) => {
+        if (pendingRequestDocumentId) {
+          RequestLogger.completePending(
+            pendingRequestDocumentId,
+            fullPayload,
+          ).catch((error: unknown) =>
+            logger.error(
+              `[AgenticLoopService] Failed to complete pending request: ${errorMessage(error)}`,
+            ),
+          );
+        } else {
+          RequestLogger.logChatGeneration(legacyPayload).catch(
+            (error: unknown) =>
+              logger.error(
+                `[AgenticLoopService] Failed to log intermediate request: ${errorMessage(error)}`,
+              ),
+          );
+        }
+      })
+      .catch((error: unknown) => {
         logger.error(
-          `[AgenticLoopService] Failed to log intermediate request on fallback: ${errorMessage(loggingError)}`,
-        ),
-      );
-    });
+          `[BaseAgenticHarness] Error resolving pendingRequestDocumentIdPromise: ${errorMessage(error)}`,
+        );
+        RequestLogger.logChatGeneration(legacyPayload).catch(
+          (loggingError: unknown) =>
+            logger.error(
+              `[AgenticLoopService] Failed to log intermediate request on fallback: ${errorMessage(loggingError)}`,
+            ),
+        );
+      });
   }
 
   // ── Per-iteration pass state factory ──────────────────────
@@ -1104,7 +1152,9 @@ export default class BaseAgenticHarness {
       parentAgentConversationId: parentAgentConversationId || null,
       agenticIteration: this.state.iterations,
     }).catch((error: unknown) => {
-      logger.error(`[BaseAgenticHarness] Failed to insert pending request: ${errorMessage(error)}`);
+      logger.error(
+        `[BaseAgenticHarness] Failed to insert pending request: ${errorMessage(error)}`,
+      );
       return null;
     });
 
@@ -1212,9 +1262,8 @@ export default class BaseAgenticHarness {
       try {
         const { default: OrchestratorService } =
           await import("../OrchestratorService.js");
-        const activeSubAgentsList = OrchestratorService.listAllDescendantSubAgents(
-          conversationId,
-        );
+        const activeSubAgentsList =
+          OrchestratorService.listAllDescendantSubAgents(conversationId);
         if (activeSubAgentsList.length > 0) {
           const collection = MongoWrapper.getCollection(
             MONGO_DB_NAME,

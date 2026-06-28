@@ -16,7 +16,12 @@ export function markGenerating(
   project: string,
   username: string,
   generating: boolean,
-  opts: { collection?: string; agent?: string; title?: string; agentConversationId?: string } = {},
+  opts: {
+    collection?: string;
+    agent?: string;
+    title?: string;
+    agentConversationId?: string;
+  } = {},
 ): void {
   if (!conversationId) return;
   ConversationService.setGenerating(

@@ -530,7 +530,11 @@ export function sanitizeMessagesForPersistence(
       if (message.role === "user" && typeof message.content === "string") {
         if (message.content.startsWith(PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX))
           return false;
-        if (message.content.startsWith(PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX))
+        if (
+          message.content.startsWith(
+            PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX,
+          )
+        )
           return false;
         if (message.isCompactSummary === true) return false;
       }

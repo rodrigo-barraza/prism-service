@@ -4,7 +4,11 @@ import type {
   OrchestratorSpawnParams,
   SubAgentResult,
 } from "../../../types/orchestrator.ts";
-import type { TopologyRouter, ContinueSubAgentCallback, TopologyConfig } from "../TopologyRouter.ts";
+import type {
+  TopologyRouter,
+  ContinueSubAgentCallback,
+  TopologyConfig,
+} from "../TopologyRouter.ts";
 import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 import {
   resolveSiblingInstances,
@@ -48,9 +52,13 @@ function stripEchoedDiscussionMarkers(responseText: string): string {
 
     // Check for a YOUR TASK section after the last board marker — if present,
     // content after it is the echoed member prompt, not the agent's contribution.
-    const yourTaskInTail = YOUR_TASK_MARKER_PATTERN.exec(contentAfterLastMarker);
+    const yourTaskInTail = YOUR_TASK_MARKER_PATTERN.exec(
+      contentAfterLastMarker,
+    );
     if (yourTaskInTail && yourTaskInTail.index != null) {
-      cleanedText = contentAfterLastMarker.slice(0, yourTaskInTail.index).trim();
+      cleanedText = contentAfterLastMarker
+        .slice(0, yourTaskInTail.index)
+        .trim();
     } else {
       cleanedText = contentAfterLastMarker;
     }
@@ -69,7 +77,8 @@ function stripEchoedDiscussionMarkers(responseText: string): string {
   // ── Pass 4: Strip "Task Completion Report" boilerplate ────────────────
   // Agents often append a meta-section summarizing what they did. This is
   // noise for the shared board — other agents don't need "I have completed…"
-  const taskReportPattern = /\n---\n\*\*Task Completion Report[:\s]*\*\*[\s\S]*$/i;
+  const taskReportPattern =
+    /\n---\n\*\*Task Completion Report[:\s]*\*\*[\s\S]*$/i;
   cleanedText = cleanedText.replace(taskReportPattern, "").trim();
 
   // ── Pass 5: Strip echoed prior-agent content with omission notes ──────
@@ -164,9 +173,10 @@ export class PeerToPeerRouter implements TopologyRouter {
 
     // Compute max turns from topologyConfig.maxRounds or default (2 rounds, capped at 10)
     const configuredMaxRounds = Number(topologyConfig?.maxRounds) || 0;
-    const maxTurnsCount = configuredMaxRounds > 0
-      ? Math.min(configuredMaxRounds * members.length, 20)
-      : Math.max(members.length, Math.min(10, members.length * 2));
+    const maxTurnsCount =
+      configuredMaxRounds > 0
+        ? Math.min(configuredMaxRounds * members.length, 20)
+        : Math.max(members.length, Math.min(10, members.length * 2));
     const totalRoundsCount = Math.ceil(maxTurnsCount / members.length);
 
     for (let turnIndex = 0; turnIndex < maxTurnsCount; turnIndex++) {
@@ -216,7 +226,7 @@ export class PeerToPeerRouter implements TopologyRouter {
           round: currentRound,
           totalRounds: totalRoundsCount,
           orchestratorContext,
-            awaitCompletion: true,
+          awaitCompletion: true,
           preserveWorktree: true,
         };
 
@@ -236,8 +246,7 @@ export class PeerToPeerRouter implements TopologyRouter {
             `[PeerToPeerRouter] continueSubAgent callback not provided — cannot reuse session for "${speakerName}"`,
           );
           spawnResult = {
-            error:
-              "continueSubAgent callback not available for session reuse",
+            error: "continueSubAgent callback not available for session reuse",
           };
         } else {
           spawnResult = await continueSubAgent(
@@ -312,8 +321,7 @@ export class PeerToPeerRouter implements TopologyRouter {
         spawnResult.result ||
         buildToolCallFallbackSummary(spawnResult) ||
         spawnResult.summary;
-      const cleanedResponseText =
-        stripEchoedDiscussionMarkers(rawResponseText);
+      const cleanedResponseText = stripEchoedDiscussionMarkers(rawResponseText);
       sharedDiscussion.push(`[${speakerName}]: ${cleanedResponseText}`);
 
       // Early exit check: if an agent signs off with [DONE] or all tasks are finished

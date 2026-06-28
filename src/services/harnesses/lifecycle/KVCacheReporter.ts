@@ -27,8 +27,7 @@ export function logKVCacheHitRate(
   iteration: number,
   harnessLabel: string,
 ): void {
-  const finalInputTokens =
-    passUsage.inputTokens || passUsage.promptTokens || 0;
+  const finalInputTokens = passUsage.inputTokens || passUsage.promptTokens || 0;
   const cachedInputTokens = passUsage.cacheReadInputTokens || 0;
   const totalPromptTokens = finalInputTokens + cachedInputTokens;
 

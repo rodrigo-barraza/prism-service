@@ -123,17 +123,21 @@ export function buildToolRetryGuidance(
     })
     .join("\n\n");
 
-  const headerText = PromptLocaleService.get(activeLocale, "harness.toolRetryGuidance.header", {
-    count: String(failedToolCalls.length),
-  });
-  const analyzeSteps = PromptLocaleService.get(activeLocale, "harness.toolRetryGuidance.analyzeSteps");
+  const headerText = PromptLocaleService.get(
+    activeLocale,
+    "harness.toolRetryGuidance.header",
+    {
+      count: String(failedToolCalls.length),
+    },
+  );
+  const analyzeSteps = PromptLocaleService.get(
+    activeLocale,
+    "harness.toolRetryGuidance.analyzeSteps",
+  );
 
   const retryMessage: ConversationMessage = {
     role: "system",
-    content:
-      `${headerText}\n\n` +
-      `${retryGuidanceBlocks}\n\n` +
-      analyzeSteps,
+    content: `${headerText}\n\n` + `${retryGuidanceBlocks}\n\n` + analyzeSteps,
   };
 
   logger.info(

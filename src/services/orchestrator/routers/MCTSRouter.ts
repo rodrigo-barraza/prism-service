@@ -4,7 +4,11 @@ import type {
   OrchestratorSpawnParams,
   SubAgentResult,
 } from "../../../types/orchestrator.ts";
-import type { TopologyRouter, ContinueSubAgentCallback, TopologyConfig } from "../TopologyRouter.ts";
+import type {
+  TopologyRouter,
+  ContinueSubAgentCallback,
+  TopologyConfig,
+} from "../TopologyRouter.ts";
 import {
   resolveSiblingInstances,
   selectInstanceForMember,
@@ -34,7 +38,10 @@ export interface MCTSTreeNode {
   evaluationFeedback: string;
 }
 
-function truncateResultOutput(output: string, maximumCharacters: number): string {
+function truncateResultOutput(
+  output: string,
+  maximumCharacters: number,
+): string {
   if (output.length <= maximumCharacters) return output;
   const truncatedOutput = output.slice(0, maximumCharacters);
   return `${truncatedOutput}\n\n[... truncated — output exceeded ${maximumCharacters.toLocaleString()} character budget]`;
@@ -51,7 +58,10 @@ export function buildEvaluationPrompt(
   );
 
   const candidateSections = candidateResults.map((candidate) => {
-    const truncatedOutput = truncateResultOutput(candidate.output, characterBudgetPerCandidate);
+    const truncatedOutput = truncateResultOutput(
+      candidate.output,
+      characterBudgetPerCandidate,
+    );
     return `### Branch ${candidate.branchIndex + 1}\n${truncatedOutput}`;
   });
 
@@ -95,9 +105,14 @@ export interface EvaluationResult {
   branchFeedback: string[];
 }
 
-export function parseEvaluationResponse(responseText: string, branchCount: number): EvaluationResult {
+export function parseEvaluationResponse(
+  responseText: string,
+  branchCount: number,
+): EvaluationResult {
   let cleanedResponse = responseText.trim();
-  cleanedResponse = cleanedResponse.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
+  cleanedResponse = cleanedResponse
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/, "");
 
   const defaultResult: EvaluationResult = {
     scores: new Array(branchCount).fill(0.5),
@@ -107,20 +122,27 @@ export function parseEvaluationResponse(responseText: string, branchCount: numbe
     branchFeedback: new Array(branchCount).fill(""),
   };
 
-  function extractFromParsed(parsed: Record<string, unknown>): EvaluationResult {
+  function extractFromParsed(
+    parsed: Record<string, unknown>,
+  ): EvaluationResult {
     const scores = Array.isArray(parsed.scores)
-      ? (parsed.scores as unknown[]).map((score: unknown) => Math.max(0, Math.min(1, Number(score) || 0)))
+      ? (parsed.scores as unknown[]).map((score: unknown) =>
+          Math.max(0, Math.min(1, Number(score) || 0)),
+        )
       : new Array(branchCount).fill(0.5);
 
-    const bestBranchIndex = typeof parsed.bestBranchIndex === "number"
-      ? Math.max(0, Math.min(branchCount - 1, parsed.bestBranchIndex))
-      : scores.indexOf(Math.max(...scores));
+    const bestBranchIndex =
+      typeof parsed.bestBranchIndex === "number"
+        ? Math.max(0, Math.min(branchCount - 1, parsed.bestBranchIndex))
+        : scores.indexOf(Math.max(...scores));
 
     const branchFeedback = Array.isArray(parsed.branchFeedback)
       ? (parsed.branchFeedback as unknown[]).map((feedbackItem: unknown) =>
-        typeof feedbackItem === "string" ? feedbackItem : "",
-      )
-      : new Array(branchCount).fill(typeof parsed.feedback === "string" ? parsed.feedback : "");
+          typeof feedbackItem === "string" ? feedbackItem : "",
+        )
+      : new Array(branchCount).fill(
+          typeof parsed.feedback === "string" ? parsed.feedback : "",
+        );
 
     return {
       scores,
@@ -135,7 +157,9 @@ export function parseEvaluationResponse(responseText: string, branchCount: numbe
     const parsed = JSON.parse(cleanedResponse) as Record<string, unknown>;
     return extractFromParsed(parsed);
   } catch {
-    logger.warn("[MCTSRouter] Failed to parse evaluation JSON — attempting extraction");
+    logger.warn(
+      "[MCTSRouter] Failed to parse evaluation JSON — attempting extraction",
+    );
 
     const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
@@ -163,8 +187,9 @@ export function computeUpperConfidenceBound(
   explorationWeight: number,
 ): number {
   if (nodeVisitCount === 0) return Infinity;
-  return nodeScore + explorationWeight * Math.sqrt(
-    Math.log(parentVisitCount) / nodeVisitCount,
+  return (
+    nodeScore +
+    explorationWeight * Math.sqrt(Math.log(parentVisitCount) / nodeVisitCount)
   );
 }
 
@@ -179,10 +204,16 @@ export function backpropagateScores(
 ): void {
   let currentIndex: number | null = leafNodeIndex;
 
-  while (currentIndex !== null && currentIndex >= 0 && currentIndex < allTreeNodes.length) {
+  while (
+    currentIndex !== null &&
+    currentIndex >= 0 &&
+    currentIndex < allTreeNodes.length
+  ) {
     const currentNode: MCTSTreeNode = allTreeNodes[currentIndex];
     currentNode.visitCount += 1;
-    currentNode.score = (currentNode.score * (currentNode.visitCount - 1) + reward) / currentNode.visitCount;
+    currentNode.score =
+      (currentNode.score * (currentNode.visitCount - 1) + reward) /
+      currentNode.visitCount;
     currentIndex = currentNode.parentNodeIndex;
   }
 }
@@ -203,7 +234,8 @@ export function selectNodeToExpand(
   if (candidateIndices.length === 0) return null;
 
   const totalSiblingVisits = candidateIndices.reduce(
-    (sum, nodeIndex) => sum + allTreeNodes[nodeIndex].visitCount, 0,
+    (sum, nodeIndex) => sum + allTreeNodes[nodeIndex].visitCount,
+    0,
   );
 
   const rankedCandidates = [...candidateIndices]
@@ -216,7 +248,9 @@ export function selectNodeToExpand(
         explorationWeight,
       ),
     }))
-    .sort((candidateA, candidateB) => candidateB.ucbScore - candidateA.ucbScore);
+    .sort(
+      (candidateA, candidateB) => candidateB.ucbScore - candidateA.ucbScore,
+    );
 
   for (const candidate of rankedCandidates) {
     const node = allTreeNodes[candidate.nodeIndex];
@@ -273,9 +307,9 @@ export function buildRefinementPrompt(
 }
 
 export function extractNodeOutput(result: SubAgentResult): string {
-  return result.result
-    || buildToolCallFallbackSummary(result)
-    || result.summary;
+  return (
+    result.result || buildToolCallFallbackSummary(result) || result.summary
+  );
 }
 
 /**
@@ -307,16 +341,28 @@ export class MCTSRouter implements TopologyRouter {
     const { providerName, resolvedModel } = orchestratorContext;
     const originalTask = members[0]?.prompt || "";
     const branchFactor = Math.min(
-      Math.max(1, Number(topologyConfig?.branchFactor) || DEFAULT_BRANCH_FACTOR),
+      Math.max(
+        1,
+        Number(topologyConfig?.branchFactor) || DEFAULT_BRANCH_FACTOR,
+      ),
       Math.max(members.length, 2),
     );
-    const maximumDepth = Math.max(1, Number(topologyConfig?.maxDepth) || DEFAULT_MAXIMUM_DEPTH);
-    const explorationWeight = Math.max(0, Number(topologyConfig?.explorationWeight) || DEFAULT_EXPLORATION_WEIGHT);
-    const searchIterations = Math.max(1, Number(topologyConfig?.searchIterations) || maximumDepth);
+    const maximumDepth = Math.max(
+      1,
+      Number(topologyConfig?.maxDepth) || DEFAULT_MAXIMUM_DEPTH,
+    );
+    const explorationWeight = Math.max(
+      0,
+      Number(topologyConfig?.explorationWeight) || DEFAULT_EXPLORATION_WEIGHT,
+    );
+    const searchIterations = Math.max(
+      1,
+      Number(topologyConfig?.searchIterations) || maximumDepth,
+    );
 
     logger.info(
       `[MCTSRouter] Starting MCTS search for team "${teamName}" ` +
-      `(branch factor: ${branchFactor}, max depth: ${maximumDepth}, iterations: ${searchIterations})...`,
+        `(branch factor: ${branchFactor}, max depth: ${maximumDepth}, iterations: ${searchIterations})...`,
     );
 
     const provider = getProvider(providerName);
@@ -377,7 +423,7 @@ export class MCTSRouter implements TopologyRouter {
 
         logger.info(
           `[MCTSRouter] Iteration ${iteration}/${searchIterations}: UCB1 selected node ${selectedIndex} ` +
-          `(depth ${nodeToExpand.depth}, score: ${nodeToExpand.score.toFixed(2)}) → expanding to depth ${expansionDepth}`,
+            `(depth ${nodeToExpand.depth}, score: ${nodeToExpand.score.toFixed(2)}) → expanding to depth ${expansionDepth}`,
         );
       }
 
@@ -411,7 +457,7 @@ export class MCTSRouter implements TopologyRouter {
           round: iteration,
           totalRounds: searchIterations,
           orchestratorContext,
-        awaitCompletion: true,
+          awaitCompletion: true,
         });
       }
 
@@ -421,8 +467,15 @@ export class MCTSRouter implements TopologyRouter {
       const branchResults = await Promise.all(branchPromises);
       allResults.push(...branchResults);
 
-      const successfulBranches: { branchIndex: number; result: SubAgentResult }[] = [];
-      for (let branchIndex = 0; branchIndex < branchResults.length; branchIndex++) {
+      const successfulBranches: {
+        branchIndex: number;
+        result: SubAgentResult;
+      }[] = [];
+      for (
+        let branchIndex = 0;
+        branchIndex < branchResults.length;
+        branchIndex++
+      ) {
         const branchResult = branchResults[branchIndex];
         if (!("error" in branchResult) && branchResult.status === "completed") {
           successfulBranches.push({ branchIndex, result: branchResult });
@@ -432,7 +485,7 @@ export class MCTSRouter implements TopologyRouter {
       if (successfulBranches.length === 0) {
         logger.warn(
           `[MCTSRouter] All ${branchFactor} branches failed at iteration ${iteration} — ` +
-          `${iteration === 1 ? "aborting search" : "marking node as expanded (dead end)"}`,
+            `${iteration === 1 ? "aborting search" : "marking node as expanded (dead end)"}`,
         );
         if (nodeToExpand) {
           nodeToExpand.isExpanded = true;
@@ -463,7 +516,10 @@ export class MCTSRouter implements TopologyRouter {
 
       try {
         const evaluationStartMs = performance.now();
-        const evaluationMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [{ role: "user", content: evaluationPrompt }];
+        const evaluationMessages: Array<{
+          role: "user" | "assistant" | "system";
+          content: string;
+        }> = [{ role: "user", content: evaluationPrompt }];
         const evaluationResponse = await provider.generateText(
           evaluationMessages,
           resolvedModel,
@@ -522,13 +578,18 @@ export class MCTSRouter implements TopologyRouter {
       const parentIndex = nodeToExpand?.nodeIndex ?? null;
       const newChildIndices: number[] = [];
 
-      for (let branchOffset = 0; branchOffset < successfulBranches.length; branchOffset++) {
+      for (
+        let branchOffset = 0;
+        branchOffset < successfulBranches.length;
+        branchOffset++
+      ) {
         const branch = successfulBranches[branchOffset];
         const nodeIndex = allTreeNodes.length;
 
-        const perBranchFeedback = evaluationResult.branchFeedback[branchOffset]
-          || evaluationResult.feedback
-          || "";
+        const perBranchFeedback =
+          evaluationResult.branchFeedback[branchOffset] ||
+          evaluationResult.feedback ||
+          "";
 
         allTreeNodes.push({
           nodeIndex,
@@ -544,7 +605,11 @@ export class MCTSRouter implements TopologyRouter {
         });
 
         newChildIndices.push(nodeIndex);
-        backpropagateScores(allTreeNodes, nodeIndex, evaluationResult.scores[branchOffset] ?? 0.5);
+        backpropagateScores(
+          allTreeNodes,
+          nodeIndex,
+          evaluationResult.scores[branchOffset] ?? 0.5,
+        );
       }
 
       // Link children to parent (or register as root children)
@@ -557,13 +622,16 @@ export class MCTSRouter implements TopologyRouter {
 
       // ── Log selection info ──────────────────────────────────────────
 
-      const bestBranch = successfulBranches[evaluationResult.bestBranchIndex] ?? successfulBranches[0];
-      const bestScore = evaluationResult.scores[evaluationResult.bestBranchIndex] ?? 0.5;
+      const bestBranch =
+        successfulBranches[evaluationResult.bestBranchIndex] ??
+        successfulBranches[0];
+      const bestScore =
+        evaluationResult.scores[evaluationResult.bestBranchIndex] ?? 0.5;
 
       logger.info(
         `[MCTSRouter] Iteration ${iteration}: Best branch ${bestBranch.branchIndex + 1} ` +
-        `(score: ${bestScore.toFixed(2)})` +
-        `${evaluationResult.isComplete ? " — COMPLETE" : ""}`,
+          `(score: ${bestScore.toFixed(2)})` +
+          `${evaluationResult.isComplete ? " — COMPLETE" : ""}`,
       );
 
       if (evaluationResult.isComplete) {
@@ -583,8 +651,12 @@ export class MCTSRouter implements TopologyRouter {
         currentNode.score > bestNode.score ? currentNode : bestNode,
       );
 
-      const treeDepthReached = Math.max(...allTreeNodes.map((node) => node.depth));
-      const expandedNodeCount = allTreeNodes.filter((node) => node.isExpanded).length;
+      const treeDepthReached = Math.max(
+        ...allTreeNodes.map((node) => node.depth),
+      );
+      const expandedNodeCount = allTreeNodes.filter(
+        (node) => node.isExpanded,
+      ).length;
 
       const searchSummary: SubAgentResult = {
         agent_id: `mcts-search-${teamName}-${Date.now()}`,

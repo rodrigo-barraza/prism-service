@@ -6,7 +6,8 @@ import PromptLocaleService from "../PromptLocaleService.ts";
 
 const META_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {
-    content: (locale) => PromptLocaleService.get(locale, "personas.meta.toolPolicy"),
+    content: (locale) =>
+      PromptLocaleService.get(locale, "personas.meta.toolPolicy"),
     requires: [
       TOOL_NAMES.CREATE_CUSTOM_AGENT,
       TOOL_NAMES.LIST_CUSTOM_AGENTS,

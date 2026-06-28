@@ -132,7 +132,7 @@ const SettingsService = {
       logger.warn(
         `[SettingsService] Failed to load settings from database: ${
           error instanceof Error ? error.message : String(error)
-        }. Falling back to defaults.`
+        }. Falling back to defaults.`,
       );
       return { ...DEFAULTS };
     }

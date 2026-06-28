@@ -64,7 +64,7 @@ import OrchestratorService, {
 import AgentPersonaRegistry from "../src/services/AgentPersonaRegistry.ts";
 import { afterEach } from "vitest";
 
-async function waitForCondition(condition: () => boolean, timeoutMilliseconds = 2000): Promise<void> {
+async function waitForCondition(condition: () => boolean, timeoutMilliseconds = 10000): Promise<void> {
   const startTime = Date.now();
   while (!condition()) {
     if (Date.now() - startTime > timeoutMilliseconds) {

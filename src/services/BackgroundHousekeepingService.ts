@@ -106,7 +106,9 @@ async function clearStaleConversations(): Promise<HousekeepingConversationResult
   const db = MongoWrapper.getDb(MONGO_DB_NAME);
   if (!db) return { conversationsCleared: 0, agentConversationsCleared: 0 };
 
-  const cutoff = new Date(Date.now() - STALE_CONVERSATION_CUTOFF_MS).toISOString();
+  const cutoff = new Date(
+    Date.now() - STALE_CONVERSATION_CUTOFF_MS,
+  ).toISOString();
 
   const [convResult, agentConvResult] = await Promise.all([
     db
@@ -281,7 +283,8 @@ const BackgroundHousekeepingService = {
       const conversationsCleanup = await clearStaleConversations();
       results.staleConversations = conversationsCleanup;
       const total =
-        conversationsCleanup.conversationsCleared + conversationsCleanup.agentConversationsCleared;
+        conversationsCleanup.conversationsCleared +
+        conversationsCleanup.agentConversationsCleared;
       if (total > 0) {
         logger.info(
           `[Housekeeping] Cleared ${total} stale isGenerating flag(s)`,

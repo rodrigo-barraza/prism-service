@@ -593,17 +593,26 @@ router.post(
 
       const agentSettings = await SettingsService.getSection("agents");
       const defaultTopology = agentSettings?.topology || DEFAULT_TOPOLOGY;
-      const resolvedLocale = locale || agentSettings?.locale || PromptLocaleService.getDefaultLocale();
+      const resolvedLocale =
+        locale ||
+        agentSettings?.locale ||
+        PromptLocaleService.getDefaultLocale();
 
       await ToolOrchestratorService.ensureSchemas(resolvedLocale);
 
-      const allSchemas = ToolOrchestratorService.getClientToolSchemas(defaultTopology, resolvedLocale);
+      const allSchemas = ToolOrchestratorService.getClientToolSchemas(
+        defaultTopology,
+        resolvedLocale,
+      );
       const disabledSet = new Set(disabledTools || []);
       const enabledToolNames = allSchemas
         .map((tool: { name: string }) => tool.name)
         .filter((name: string) => !disabledSet.has(name));
 
-      const resolvedToolNames = ToolOrchestratorService.getToolSchemas(defaultTopology, resolvedLocale)
+      const resolvedToolNames = ToolOrchestratorService.getToolSchemas(
+        defaultTopology,
+        resolvedLocale,
+      )
         .map((tool: { name: string }) => tool.name)
         .filter((name: string) => !disabledSet.has(name));
 
@@ -612,7 +621,10 @@ router.post(
       });
 
       const placeholderSystemMessage = { role: "system" as const, content: "" };
-      const placeholderUserMessage = { role: "user" as const, content: "(preview)" };
+      const placeholderUserMessage = {
+        role: "user" as const,
+        content: "(preview)",
+      };
 
       const assemblerContext = {
         agent: agent || null,
@@ -634,9 +646,7 @@ router.post(
       }
 
       if (userSystemPrompt) {
-        sections.push(
-          `## User System Instruction\n${userSystemPrompt}`,
-        );
+        sections.push(`## User System Instruction\n${userSystemPrompt}`);
       }
 
       if (result.skillsText) {

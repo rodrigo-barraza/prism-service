@@ -32,7 +32,7 @@ conversationStatsRouter.get(
       const requests = await req.db
         .collection(REQUESTS_COLLECTION)
         .find({
-          agentConversationId: { $in: [...allConversationIds] }
+          agentConversationId: { $in: [...allConversationIds] },
         })
         .project({
           estimatedCost: 1,
@@ -166,7 +166,7 @@ conversationStatsRouter.get(
       const requests = await req.db
         .collection(REQUESTS_COLLECTION)
         .find({
-          agentConversationId: { $in: [...allConversationIds] }
+          agentConversationId: { $in: [...allConversationIds] },
         })
         .project({
           requestId: 1,
@@ -249,24 +249,28 @@ agentConversationRouter.get(
         "updatedAt",
       );
 
-      const [conversationDocuments, totalConversationsCount] = await Promise.all([
-        req.db
-          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-          .find(queryFilter, {
-            projection: { messages: 0 },
-          })
-          .sort({ [sort as string]: sortDirection })
-          .skip(skip)
-          .limit(limit)
-          .toArray(),
-        req.db
-          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-          .countDocuments(queryFilter),
-      ]);
+      const [conversationDocuments, totalConversationsCount] =
+        await Promise.all([
+          req.db
+            .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+            .find(queryFilter, {
+              projection: { messages: 0 },
+            })
+            .sort({ [sort as string]: sortDirection })
+            .skip(skip)
+            .limit(limit)
+            .toArray(),
+          req.db
+            .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+            .countDocuments(queryFilter),
+        ]);
 
       if (conversationDocuments.length > 0) {
         const conversationIds = conversationDocuments
-          .map((conversation) => (conversation as Record<string, unknown>).id as string)
+          .map(
+            (conversation) =>
+              (conversation as Record<string, unknown>).id as string,
+          )
           .filter(Boolean);
 
         if (conversationIds.length > 0) {
@@ -290,11 +294,18 @@ agentConversationRouter.get(
                         {
                           $and: [
                             { $ne: ["$parentAgentConversationId", null] },
-                            { $in: ["$parentAgentConversationId", conversationIds] },
+                            {
+                              $in: [
+                                "$parentAgentConversationId",
+                                conversationIds,
+                              ],
+                            },
                           ],
                         },
                         "$parentAgentConversationId",
-                        { $ifNull: ["$conversationId", "$agentConversationId"] },
+                        {
+                          $ifNull: ["$conversationId", "$agentConversationId"],
+                        },
                       ],
                     },
                     totalCost: { $sum: { $ifNull: ["$estimatedCost", 0] } },
@@ -315,10 +326,11 @@ agentConversationRouter.get(
                   .id as string;
                 const requestLogCost = costMap.get(conversationId);
                 if (requestLogCost !== undefined && requestLogCost > 0) {
-                  (conversation as Record<string, unknown>).totalCost = Math.max(
-                    (conversation.totalCost as number) || 0,
-                    requestLogCost,
-                  );
+                  (conversation as Record<string, unknown>).totalCost =
+                    Math.max(
+                      (conversation.totalCost as number) || 0,
+                      requestLogCost,
+                    );
                 }
               }
             }
@@ -341,7 +353,9 @@ agentConversationRouter.get(
         limit,
       });
     } catch (error: unknown) {
-      logger.error(`Admin /agent-conversations error: ${getErrorMessage(error)}`);
+      logger.error(
+        `Admin /agent-conversations error: ${getErrorMessage(error)}`,
+      );
       next(error);
     }
   }),

@@ -61,12 +61,16 @@ import { logKVCacheHitRate } from "../lifecycle/KVCacheReporter.ts";
 import { injectToolDiscoveryNudge } from "../lifecycle/ToolDiscoveryNudge.ts";
 import { finalizePassTracker } from "../lifecycle/TrackerFinalizer.ts";
 import { handleCodexPlanningResponse } from "../lifecycle/CodexPlanningDetector.ts";
-import { maybeInjectSystemReminder, cleanupReminderCache } from "../lifecycle/SystemReminderInjector.ts";
+import {
+  maybeInjectSystemReminder,
+  cleanupReminderCache,
+} from "../lifecycle/SystemReminderInjector.ts";
 import { checkCostBudget } from "../lifecycle/CostBudgetEnforcer.ts";
-import { createSandboxCheckpoint, restoreSandboxCheckpoint } from "../lifecycle/SandboxExecutor.ts";
+import {
+  createSandboxCheckpoint,
+  restoreSandboxCheckpoint,
+} from "../lifecycle/SandboxExecutor.ts";
 import PlanningModeService from "../../PlanningModeService.ts";
-
-
 
 interface IterationPassOptions extends AgenticOptions {
   project: string;
@@ -119,20 +123,20 @@ export async function runGraphOfThoughts(
   const context = harness["context"];
   const state: AgenticLoopState = harness["state"];
   const tools = harness["tools"];
-    const {
-      options,
-      conversationId,
-      agentConversationId,
-      traceId,
-      project,
-      username,
-      agent,
-      workspaceRoot,
-      emit,
-      signal,
-    } = context;
+  const {
+    options,
+    conversationId,
+    agentConversationId,
+    traceId,
+    project,
+    username,
+    agent,
+    workspaceRoot,
+    emit,
+    signal,
+  } = context;
 
-    const resolvedAgentConversationId = agentConversationId || "";
+  const resolvedAgentConversationId = agentConversationId || "";
 
   const initialBranchCount = Math.min(
     Math.max(1, options.branchCount || DEFAULT_BRANCH_COUNT),
@@ -179,9 +183,7 @@ export async function runGraphOfThoughts(
     parentAgentConversationId: context.parentAgentConversationId,
     agentContext: options.agentContext,
     enabledTools: tools.resolvedEnabledTools,
-    resolvedToolNames: tools.finalTools.map(
-      (tool: ToolSchema) => tool.name,
-    ),
+    resolvedToolNames: tools.finalTools.map((tool: ToolSchema) => tool.name),
     workspaceRoot: workspaceRoot || undefined,
     workspaceEnabled: options.workspaceEnabled as boolean | undefined,
     locale: options.locale as string | undefined,
@@ -236,11 +238,7 @@ export async function runGraphOfThoughts(
       });
 
       // ── Instruction fade-out countermeasure ─────────────────
-      await maybeInjectSystemReminder(
-        currentMessages,
-        state,
-        context,
-      );
+      await maybeInjectSystemReminder(currentMessages, state, context);
 
       const passOptions: IterationPassOptions = {
         ...options,
@@ -307,9 +305,7 @@ export async function runGraphOfThoughts(
         currentMessages,
       );
 
-      scoredBranches.sort(
-        (branchA, branchB) => branchB.score - branchA.score,
-      );
+      scoredBranches.sort((branchA, branchB) => branchB.score - branchA.score);
 
       state.selectedBranchScores.push(scoredBranches[0]?.score ?? 0);
 
@@ -362,7 +358,8 @@ export async function runGraphOfThoughts(
         currentMessages.push({
           role: "system",
           content: PromptLocaleService.get(
-            (options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(),
+            (options?.locale as string | undefined) ||
+              PromptLocaleService.getDefaultLocale(),
             "harness.graphOfThoughts.proactiveBacktrack",
             {
               bestScore: (scoredBranches[0]?.score ?? 0).toFixed(1),
@@ -374,9 +371,8 @@ export async function runGraphOfThoughts(
         continue;
       }
 
-      const branchesToSynthesize = activeBranches.length > 0
-        ? activeBranches
-        : [scoredBranches[0]];
+      const branchesToSynthesize =
+        activeBranches.length > 0 ? activeBranches : [scoredBranches[0]];
 
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
       //  PHASE 3: Synthesize branches into merged output
@@ -405,23 +401,33 @@ export async function runGraphOfThoughts(
         }
       }
 
-      logKVCacheHitRate(synthesizedPass.usage, state.iterations, "GraphOfThoughts");
+      logKVCacheHitRate(
+        synthesizedPass.usage,
+        state.iterations,
+        "GraphOfThoughts",
+      );
       harness.emitGenerationProgress();
       harness.emitUsageUpdate();
 
       // ── Cost budget enforcement ────────────────────────────
-      if (checkCostBudget(state, context.resolvedModel, options.maxCostDollars, emit)) {
+      if (
+        checkCostBudget(
+          state,
+          context.resolvedModel,
+          options.maxCostDollars,
+          emit,
+        )
+      ) {
         break;
       }
 
       // ── Tool execution from synthesized output ──────────────
       if (synthesizedPass.pendingToolCalls.length > 0) {
-        const { isApproved, shouldApproveAll } =
-          await checkAndWaitForApproval(
-            synthesizedPass.pendingToolCalls,
-            context,
-            approvalEngine,
-          );
+        const { isApproved, shouldApproveAll } = await checkAndWaitForApproval(
+          synthesizedPass.pendingToolCalls,
+          context,
+          approvalEngine,
+        );
 
         let results: ToolResult[] = [];
         let sandboxCheckpointReference: string | null = null;
@@ -496,13 +502,18 @@ export async function runGraphOfThoughts(
 
           // Restore sandbox checkpoint on validation failure
           if (sandboxCheckpointReference) {
-            restoreSandboxCheckpoint(workspaceRoot, sandboxCheckpointReference, emit);
+            restoreSandboxCheckpoint(
+              workspaceRoot,
+              sandboxCheckpointReference,
+              emit,
+            );
           }
 
           currentMessages.push({
             role: "system",
             content: PromptLocaleService.get(
-              (options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(),
+              (options?.locale as string | undefined) ||
+                PromptLocaleService.getDefaultLocale(),
               "harness.graphOfThoughts.synthesizedValidationError",
               {
                 errorCount: String(validationFeedback.length),
@@ -528,7 +539,10 @@ export async function runGraphOfThoughts(
         );
 
         if (state.planModeActive) {
-          const { planApproved } = await runPlanningPhase(harness, currentMessages);
+          const { planApproved } = await runPlanningPhase(
+            harness,
+            currentMessages,
+          );
           if (!planApproved) return { messages: currentMessages };
         }
 
@@ -614,7 +628,10 @@ export async function runGraphOfThoughts(
         break;
       }
 
-      if (!synthesizedPass.streamedText && synthesizedPass.streamedThinking.trim()) {
+      if (
+        !synthesizedPass.streamedText &&
+        synthesizedPass.streamedThinking.trim()
+      ) {
         logger.warn(
           `[GraphOfThoughts] Thinking-only response on iteration ${state.iterations} — ` +
             `thinking=${synthesizedPass.streamedThinking.length}chars, text=0. ` +
@@ -647,16 +664,22 @@ export async function runGraphOfThoughts(
       if (isOutputTruncated(synthesizedPass)) {
         truncationRecoveryCount++;
         const configuredMaxTokens = context.options.maxTokens || "default";
-        const modelOutputCeiling = context.modelDefinition?.maxOutputTokens as number | undefined;
+        const modelOutputCeiling = context.modelDefinition?.maxOutputTokens as
+          | number
+          | undefined;
         logger.warn(
           `[GraphOfThoughts] Max tokens truncation detected on iteration ${state.iterations} — ` +
             `Recovery attempt ${truncationRecoveryCount}/${MAX_OUTPUT_TRUNCATION_RECOVERIES}.`,
         );
 
-        const alreadyAtCeiling = typeof configuredMaxTokens === "number" &&
+        const alreadyAtCeiling =
+          typeof configuredMaxTokens === "number" &&
           isAtOutputCeiling(configuredMaxTokens, modelOutputCeiling);
 
-        if (!alreadyAtCeiling && truncationRecoveryCount <= MAX_OUTPUT_TRUNCATION_RECOVERIES) {
+        if (
+          !alreadyAtCeiling &&
+          truncationRecoveryCount <= MAX_OUTPUT_TRUNCATION_RECOVERIES
+        ) {
           const escalatedMaxTokens = injectContinuationContext(
             currentMessages,
             synthesizedPass,
@@ -722,7 +745,11 @@ export async function runGraphOfThoughts(
 
     injectErrorAsConversationMessage(
       currentMessages,
-      buildProviderErrorMessage(loopError, state.iterations, options?.locale as string | undefined),
+      buildProviderErrorMessage(
+        loopError,
+        state.iterations,
+        options?.locale as string | undefined,
+      ),
       context,
     );
 
@@ -775,9 +802,7 @@ async function generateBranch(
   const { agentConversationId } = context;
   const resolvedAgentConversationId = agentConversationId || "";
   const requestIdBase =
-    context.requestId ||
-    resolvedAgentConversationId ||
-    crypto.randomUUID();
+    context.requestId || resolvedAgentConversationId || crypto.randomUUID();
   const passRequestId = `${requestIdBase}-iter-${state.iterations}-branch-${branchIndex}`;
   pass.requestId = passRequestId;
   harness.registerTrackerRequest(passRequestId);
@@ -832,9 +857,10 @@ async function synthesizeBranches(
         .trim();
       const toolCallDescriptions = branch.pass.pendingToolCalls
         .map((toolCall) => {
-          const argumentsSummary = typeof toolCall.args === "string"
-            ? (toolCall.args as string).slice(0, 300)
-            : JSON.stringify(toolCall.args).slice(0, 300);
+          const argumentsSummary =
+            typeof toolCall.args === "string"
+              ? (toolCall.args as string).slice(0, 300)
+              : JSON.stringify(toolCall.args).slice(0, 300);
           return `  - ${toolCall.name}(${argumentsSummary})`;
         })
         .join("\n");
@@ -875,10 +901,7 @@ async function synthesizeBranches(
       branchSummaries,
   };
 
-  const synthesisMessages = [
-    ...currentMessages,
-    synthesisInstruction,
-  ];
+  const synthesisMessages = [...currentMessages, synthesisInstruction];
 
   emit({
     type: SERVER_SENT_EVENT_TYPES.STATUS,
@@ -895,14 +918,15 @@ async function synthesizeBranches(
   const { agentConversationId } = context;
   const resolvedAgentConversationId = agentConversationId || "";
   const requestIdBase =
-    context.requestId ||
-    resolvedAgentConversationId ||
-    crypto.randomUUID();
+    context.requestId || resolvedAgentConversationId || crypto.randomUUID();
   const passRequestId = `${requestIdBase}-iter-${state.iterations}-synthesis`;
   synthesisPass.requestId = passRequestId;
   harness.registerTrackerRequest(passRequestId);
 
-  const synthesisStream = harness.createProviderStream(synthesisMessages, passOptions);
+  const synthesisStream = harness.createProviderStream(
+    synthesisMessages,
+    passOptions,
+  );
   await harness.consumeStream(synthesisStream, synthesisPass, allowedToolNames);
 
   logger.info(
@@ -967,7 +991,10 @@ async function runPlanningPhase(
     pass.requestId = passRequestId;
     harness.registerTrackerRequest(passRequestId);
 
-    const stream = harness.createProviderStream(currentMessages, planPassOptions);
+    const stream = harness.createProviderStream(
+      currentMessages,
+      planPassOptions,
+    );
     await harness.consumeStream(stream, pass, allowedPlanToolNames);
 
     finalizePassTracker(pass, passRequestId);
@@ -1050,7 +1077,12 @@ async function runPlanningPhase(
       }
       currentMessages.push({
         role: "system",
-        content: PromptLocaleService.get((options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(), "harness.planningMode.blocked", { blockedNames }),
+        content: PromptLocaleService.get(
+          (options?.locale as string | undefined) ||
+            PromptLocaleService.getDefaultLocale(),
+          "harness.planningMode.blocked",
+          { blockedNames },
+        ),
       });
       continue;
     }
@@ -1137,9 +1169,7 @@ async function scoreBranchesMultiCriteria(
       candidateSummaries,
     ].join("\n");
 
-    const scoringMessages = [
-      { role: "user" as const, content: scoringPrompt },
-    ];
+    const scoringMessages = [{ role: "user" as const, content: scoringPrompt }];
 
     const scoringOptions = {
       maxTokens: 200,
@@ -1172,7 +1202,9 @@ async function scoreBranchesMultiCriteria(
       model: context.resolvedModel,
       traceId: context.traceId || null,
       agentConversationId: context.agentConversationId || null,
-      aiMessages: scoringMessages as Parameters<typeof RequestLogger.logBackgroundLlmCall>[0]["aiMessages"],
+      aiMessages: scoringMessages as Parameters<
+        typeof RequestLogger.logBackgroundLlmCall
+      >[0]["aiMessages"],
       resultText: scoreResponseText,
       success: true,
       errorMessage: null,

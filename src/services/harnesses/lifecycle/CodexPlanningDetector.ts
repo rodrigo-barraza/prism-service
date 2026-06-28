@@ -46,9 +46,7 @@ export function handleCodexPlanningResponse(
   availableTools: ToolSchema[],
   harnessLabel: string,
 ): CodexDetectionResult {
-  const isCodexModel = context.resolvedModel
-    ?.toLowerCase()
-    .includes("codex");
+  const isCodexModel = context.resolvedModel?.toLowerCase().includes("codex");
   const hasToolsAvailable = availableTools && availableTools.length > 0;
 
   if (!isCodexModel || !hasToolsAvailable) {
@@ -81,7 +79,8 @@ export function handleCodexPlanningResponse(
   currentMessages.push({
     role: "system",
     content: PromptLocaleService.get(
-      (context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(),
+      (context.options?.locale as string | undefined) ||
+        PromptLocaleService.getDefaultLocale(),
       "harness.codexPlanningDetector.continuePrompt",
     ),
   });

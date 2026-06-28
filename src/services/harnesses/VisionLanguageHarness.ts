@@ -51,7 +51,6 @@ import type {
   BeforePromptHookContext,
 } from "./types.ts";
 
-
 /** Per-iteration pass options with runtime context fields. */
 interface IterationPassOptions extends AgenticOptions {
   project: string;
@@ -128,7 +127,8 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
       (message) => message.role === "system",
     );
     const visionInstruction = PromptLocaleService.get(
-      (this.context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(),
+      (this.context.options?.locale as string | undefined) ||
+        PromptLocaleService.getDefaultLocale(),
       "harness.visionFeed.instruction",
     );
     if (systemMessage) {
@@ -180,7 +180,8 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
 
           // ── Persist assembled system prompt to conversationMeta ──
           if (hookContext._assembledSystemPrompt) {
-            const assembledPrompt = hookContext._assembledSystemPrompt as string;
+            const assembledPrompt =
+              hookContext._assembledSystemPrompt as string;
             context.conversationMeta = {
               ...(context.conversationMeta || {}),
               systemPrompt: assembledPrompt,
@@ -202,7 +203,9 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
           }
 
           if (state.planModeActive) {
-            await PlanningModeService.injectPlanningInstruction(currentMessages);
+            await PlanningModeService.injectPlanningInstruction(
+              currentMessages,
+            );
           }
         }
 
@@ -266,7 +269,9 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
         // ── Create per-iteration pass state ────────────────────
         const pass = this.createPassState(passOptions);
         const requestIdBase =
-          context.requestId || resolvedAgentConversationId || crypto.randomUUID();
+          context.requestId ||
+          resolvedAgentConversationId ||
+          crypto.randomUUID();
         const passRequestId = `${requestIdBase}-iter-${state.iterations}`;
         pass.requestId = passRequestId;
 
@@ -278,7 +283,11 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
 
         // ── Finalize tracker for this pass ─────────────────────
         finalizePassTracker(pass, passRequestId);
-        logKVCacheHitRate(pass.usage, state.iterations, "VisionLanguageHarness");
+        logKVCacheHitRate(
+          pass.usage,
+          state.iterations,
+          "VisionLanguageHarness",
+        );
         this.emitGenerationProgress();
 
         if (signal?.aborted) break;
@@ -402,13 +411,15 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
               role: "system",
               content:
                 PromptLocaleService.get(
-                  (this.context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(),
+                  (this.context.options?.locale as string | undefined) ||
+                    PromptLocaleService.getDefaultLocale(),
                   "harness.validationError.header",
                   { errorCount: String(validationFeedback.length) },
                 ) +
                 `\n\n${errorBlock}\n\n` +
                 PromptLocaleService.get(
-                  (this.context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(),
+                  (this.context.options?.locale as string | undefined) ||
+                    PromptLocaleService.getDefaultLocale(),
                   "harness.validationError.analyzePrompt",
                 ),
             });
@@ -582,16 +593,21 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
         if (isOutputTruncated(pass)) {
           truncationRecoveryCount++;
           const configuredMaxTokens = context.options.maxTokens || "default";
-          const modelOutputCeiling = context.modelDefinition?.maxOutputTokens as number | undefined;
+          const modelOutputCeiling = context.modelDefinition
+            ?.maxOutputTokens as number | undefined;
           logger.warn(
             `[VisionLanguageHarness] Max tokens truncation detected on iteration ${state.iterations} — ` +
               `Recovery attempt ${truncationRecoveryCount}/${MAX_OUTPUT_TRUNCATION_RECOVERIES}.`,
           );
 
-          const alreadyAtCeiling = typeof configuredMaxTokens === "number" &&
+          const alreadyAtCeiling =
+            typeof configuredMaxTokens === "number" &&
             isAtOutputCeiling(configuredMaxTokens, modelOutputCeiling);
 
-          if (!alreadyAtCeiling && truncationRecoveryCount <= MAX_OUTPUT_TRUNCATION_RECOVERIES) {
+          if (
+            !alreadyAtCeiling &&
+            truncationRecoveryCount <= MAX_OUTPUT_TRUNCATION_RECOVERIES
+          ) {
             const escalatedMaxTokens = injectContinuationContext(
               currentMessages,
               pass,
@@ -655,7 +671,11 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
 
       injectErrorAsConversationMessage(
         currentMessages,
-        buildProviderErrorMessage(loopError, state.iterations, this.context.options?.locale as string | undefined),
+        buildProviderErrorMessage(
+          loopError,
+          state.iterations,
+          this.context.options?.locale as string | undefined,
+        ),
         context,
       );
 

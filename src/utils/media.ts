@@ -59,7 +59,10 @@ export async function compressImageForSizeLimit(
 ) {
   try {
     // Step 0: enforce pixel dimension limits first (avoids sending oversized pixels)
-    const dimensionResult = await constrainImageDimensions(base64Data, mediaType);
+    const dimensionResult = await constrainImageDimensions(
+      base64Data,
+      mediaType,
+    );
     base64Data = dimensionResult.data;
     mediaType = dimensionResult.mediaType;
 

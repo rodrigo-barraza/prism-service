@@ -12,7 +12,10 @@ export const MeepoPersona: Persona = {
     const activeLocale = context.locale || "en";
     const sections = [
       PromptLocaleService.get(activeLocale, "personas.meepo.corePersonality"),
-      PromptLocaleService.get(activeLocale, "personas.meepo.responseGuidelines"),
+      PromptLocaleService.get(
+        activeLocale,
+        "personas.meepo.responseGuidelines",
+      ),
       PromptLocaleService.get(activeLocale, "personas.meepo.interactionRules"),
     ];
 

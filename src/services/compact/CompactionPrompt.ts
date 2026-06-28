@@ -14,12 +14,25 @@
 
 import PromptLocaleService from "../PromptLocaleService.ts";
 
-export const COMPACTION_SYSTEM_PROMPT = PromptLocaleService.get("en", "compaction.systemPrompt");
+export const COMPACTION_SYSTEM_PROMPT = PromptLocaleService.get(
+  "en",
+  "compaction.systemPrompt",
+);
 
-export const COMPACTION_USER_PROMPT = PromptLocaleService.get("en", "compaction.userPrompt", {
-  noToolsPreamble: PromptLocaleService.get("en", "compaction.noToolsPreamble"),
-  detailedAnalysisInstruction: PromptLocaleService.get("en", "compaction.detailedAnalysisInstruction"),
-});
+export const COMPACTION_USER_PROMPT = PromptLocaleService.get(
+  "en",
+  "compaction.userPrompt",
+  {
+    noToolsPreamble: PromptLocaleService.get(
+      "en",
+      "compaction.noToolsPreamble",
+    ),
+    detailedAnalysisInstruction: PromptLocaleService.get(
+      "en",
+      "compaction.detailedAnalysisInstruction",
+    ),
+  },
+);
 
 /**
  * Extract only the <summary> content from the LLM's compaction response.

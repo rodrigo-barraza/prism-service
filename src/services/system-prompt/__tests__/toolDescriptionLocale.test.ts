@@ -71,10 +71,12 @@ const ENGLISH_REQUIRED_LABEL = "(required)";
 
 // Orchestrator tools
 const CAVEMAN_CREATE_TEAM_MARKER = "spawn sub-agent in isolated worktree";
-const ENGLISH_CREATE_TEAM_MARKER = "Spawn one or more sub-agents, each in an isolated git worktree";
+const ENGLISH_CREATE_TEAM_MARKER =
+  "Spawn one or more sub-agents, each in an isolated git worktree";
 
 const CAVEMAN_SEND_MESSAGE_MARKER = "follow-up to running/completed sub-agent";
-const ENGLISH_SEND_MESSAGE_MARKER = "Send a follow-up message to a running or completed sub-agent";
+const ENGLISH_SEND_MESSAGE_MARKER =
+  "Send a follow-up message to a running or completed sub-agent";
 
 const CAVEMAN_STOP_AGENT_MARKER = "stop running sub-agent";
 const ENGLISH_STOP_AGENT_MARKER = "Stop a running sub-agent";
@@ -87,15 +89,16 @@ const CAVEMAN_ENVIRONMENT_HEADER = "## Environment";
 const ENGLISH_ENVIRONMENT_HEADER = "## Environment";
 
 const CAVEMAN_CODING_GUIDELINES_MARKER = "read file before editing";
-const ENGLISH_CODING_GUIDELINES_MARKER = "Always read relevant files before making edits";
+const ENGLISH_CODING_GUIDELINES_MARKER =
+  "Always read relevant files before making edits";
 
 const CAVEMAN_COMMAND_GUIDELINES_MARKER = "dev server, long-running";
-const ENGLISH_COMMAND_GUIDELINES_MARKER = "For dev servers and long-running processes";
+const ENGLISH_COMMAND_GUIDELINES_MARKER =
+  "For dev servers and long-running processes";
 
 // ── Tests ──────────────────────────────────────────────────
 
 describe("Tool Description Locale Threading", () => {
-
   // ────────────────────────────────────────────────────────
   // 1. PromptLocaleService — Verify locale data is loaded
   //    and returns distinct content per locale
@@ -108,7 +111,9 @@ describe("Tool Description Locale Threading", () => {
         "internal-tools.write_todo.description",
       );
       expect(cavemanWriteTodo).not.toContain("[MISSING:");
-      expect(cavemanWriteTodo.toLowerCase()).toContain(CAVEMAN_WRITE_TODO_MARKER);
+      expect(cavemanWriteTodo.toLowerCase()).toContain(
+        CAVEMAN_WRITE_TODO_MARKER,
+      );
     });
 
     it("should have english internal-tools translations loaded", () => {
@@ -130,7 +135,9 @@ describe("Tool Description Locale Threading", () => {
         "internal-tools.enter_plan_mode.description",
       );
       expect(cavemanDescription).not.toEqual(englishDescription);
-      expect(cavemanDescription.toLowerCase()).toContain(CAVEMAN_ENTER_PLAN_MARKER);
+      expect(cavemanDescription.toLowerCase()).toContain(
+        CAVEMAN_ENTER_PLAN_MARKER,
+      );
       expect(englishDescription).toContain(ENGLISH_ENTER_PLAN_MARKER);
     });
 
@@ -177,7 +184,9 @@ describe("Tool Description Locale Threading", () => {
         },
       );
       expect(cavemanCreateTeam).not.toEqual(englishCreateTeam);
-      expect(cavemanCreateTeam.toLowerCase()).toContain(CAVEMAN_CREATE_TEAM_MARKER);
+      expect(cavemanCreateTeam.toLowerCase()).toContain(
+        CAVEMAN_CREATE_TEAM_MARKER,
+      );
       expect(englishCreateTeam).toContain(ENGLISH_CREATE_TEAM_MARKER);
     });
 
@@ -205,7 +214,8 @@ describe("Tool Description Locale Threading", () => {
       vi.clearAllMocks();
       const formatterModule = await import("../ToolDocFormatter.ts");
       ToolDocFormatter = formatterModule.ToolDocFormatter;
-      const orchestratorModule = await import("../../ToolOrchestratorService.ts");
+      const orchestratorModule =
+        await import("../../ToolOrchestratorService.ts");
       ToolOrchestratorService = orchestratorModule.default;
 
       getClientSchemasSpy = vi.spyOn(
@@ -214,65 +224,76 @@ describe("Tool Description Locale Threading", () => {
       );
 
       // Return a realistic internal tool schema that would be localized
-      getClientSchemasSpy.mockImplementation((_topology?: string, locale?: string) => {
-        const activeLocale = locale || "en";
-        return [
-          {
-            name: "write_todo",
-            description: PromptLocaleService.get(activeLocale, "internal-tools.write_todo.description"),
-            domain: "Core Harness Tools",
-            parameters: {
-              type: "object",
-              properties: {
-                items: {
-                  type: "array",
-                  description: PromptLocaleService.get(
-                    activeLocale,
-                    "internal-tools.write_todo.parameters.items",
-                  ),
+      getClientSchemasSpy.mockImplementation(
+        (_topology?: string, locale?: string) => {
+          const activeLocale = locale || "en";
+          return [
+            {
+              name: "write_todo",
+              description: PromptLocaleService.get(
+                activeLocale,
+                "internal-tools.write_todo.description",
+              ),
+              domain: "Core Harness Tools",
+              parameters: {
+                type: "object",
+                properties: {
+                  items: {
+                    type: "array",
+                    description: PromptLocaleService.get(
+                      activeLocale,
+                      "internal-tools.write_todo.parameters.items",
+                    ),
+                  },
                 },
+                required: ["items"],
               },
-              required: ["items"],
             },
-          },
-          {
-            name: "enter_plan_mode",
-            description: PromptLocaleService.get(activeLocale, "internal-tools.enter_plan_mode.description"),
-            domain: "Core Plan Tools",
-            parameters: {
-              type: "object",
-              properties: {
-                reason: {
-                  type: "string",
-                  description: PromptLocaleService.get(
-                    activeLocale,
-                    "internal-tools.enter_plan_mode.parameters.reason",
-                  ),
+            {
+              name: "enter_plan_mode",
+              description: PromptLocaleService.get(
+                activeLocale,
+                "internal-tools.enter_plan_mode.description",
+              ),
+              domain: "Core Plan Tools",
+              parameters: {
+                type: "object",
+                properties: {
+                  reason: {
+                    type: "string",
+                    description: PromptLocaleService.get(
+                      activeLocale,
+                      "internal-tools.enter_plan_mode.parameters.reason",
+                    ),
+                  },
                 },
+                required: [],
               },
-              required: [],
             },
-          },
-          {
-            name: "ask_user",
-            description: PromptLocaleService.get(activeLocale, "internal-tools.ask_user.description"),
-            domain: "Core User Tools",
-            parameters: {
-              type: "object",
-              properties: {
-                questions: {
-                  type: "array",
-                  description: PromptLocaleService.get(
-                    activeLocale,
-                    "internal-tools.ask_user.parameters.questions",
-                  ),
+            {
+              name: "ask_user",
+              description: PromptLocaleService.get(
+                activeLocale,
+                "internal-tools.ask_user.description",
+              ),
+              domain: "Core User Tools",
+              parameters: {
+                type: "object",
+                properties: {
+                  questions: {
+                    type: "array",
+                    description: PromptLocaleService.get(
+                      activeLocale,
+                      "internal-tools.ask_user.parameters.questions",
+                    ),
+                  },
                 },
+                required: ["questions"],
               },
-              required: ["questions"],
             },
-          },
-        ];
-      });
+          ];
+        },
+      );
     });
 
     afterEach(() => {
@@ -282,31 +303,43 @@ describe("Tool Description Locale Threading", () => {
     it("should forward 'caveman' locale to getClientToolSchemas", () => {
       const formatter = new ToolDocFormatter();
       formatter.buildToolDescriptions(
-        undefined, null, undefined, undefined, undefined, false, "caveman",
-      );
-
-      expect(getClientSchemasSpy).toHaveBeenCalledWith(
         undefined,
+        null,
+        undefined,
+        undefined,
+        undefined,
+        false,
         "caveman",
       );
+
+      expect(getClientSchemasSpy).toHaveBeenCalledWith(undefined, "caveman");
     });
 
     it("should forward 'en' locale to getClientToolSchemas", () => {
       const formatter = new ToolDocFormatter();
       formatter.buildToolDescriptions(
-        undefined, null, undefined, undefined, undefined, false, "en",
-      );
-
-      expect(getClientSchemasSpy).toHaveBeenCalledWith(
         undefined,
+        null,
+        undefined,
+        undefined,
+        undefined,
+        false,
         "en",
       );
+
+      expect(getClientSchemasSpy).toHaveBeenCalledWith(undefined, "en");
     });
 
     it("should produce caveman tool descriptions when locale is 'caveman'", () => {
       const formatter = new ToolDocFormatter();
       const output = formatter.buildToolDescriptions(
-        undefined, null, undefined, undefined, undefined, false, "caveman",
+        undefined,
+        null,
+        undefined,
+        undefined,
+        undefined,
+        false,
+        "caveman",
       );
 
       expect(output.toLowerCase()).toContain(CAVEMAN_WRITE_TODO_MARKER);
@@ -320,7 +353,13 @@ describe("Tool Description Locale Threading", () => {
     it("should produce english tool descriptions when locale is 'en'", () => {
       const formatter = new ToolDocFormatter();
       const output = formatter.buildToolDescriptions(
-        undefined, null, undefined, undefined, undefined, false, "en",
+        undefined,
+        null,
+        undefined,
+        undefined,
+        undefined,
+        false,
+        "en",
       );
 
       expect(output).toContain(ENGLISH_WRITE_TODO_MARKER);
@@ -331,7 +370,13 @@ describe("Tool Description Locale Threading", () => {
     it("should use caveman required label '(required)' when locale is 'caveman'", () => {
       const formatter = new ToolDocFormatter();
       const output = formatter.buildToolDescriptions(
-        undefined, null, undefined, undefined, undefined, false, "caveman",
+        undefined,
+        null,
+        undefined,
+        undefined,
+        undefined,
+        false,
+        "caveman",
       );
 
       // write_todo.items and ask_user.questions are required
@@ -341,7 +386,13 @@ describe("Tool Description Locale Threading", () => {
     it("should use english required label '(required)' when locale is 'en'", () => {
       const formatter = new ToolDocFormatter();
       const output = formatter.buildToolDescriptions(
-        undefined, null, undefined, undefined, undefined, false, "en",
+        undefined,
+        null,
+        undefined,
+        undefined,
+        undefined,
+        false,
+        "en",
       );
 
       expect(output).toContain(ENGLISH_REQUIRED_LABEL);
@@ -369,7 +420,12 @@ describe("Tool Description Locale Threading", () => {
       const formatter = new ToolDocFormatter();
       // Call without locale (uses default parameter value "en")
       const output = formatter.buildToolDescriptions(
-        undefined, null, undefined, undefined, undefined, false,
+        undefined,
+        null,
+        undefined,
+        undefined,
+        undefined,
+        false,
       );
 
       expect(getClientSchemasSpy).toHaveBeenCalledWith(undefined, "en");
@@ -394,47 +450,54 @@ describe("Tool Description Locale Threading", () => {
       vi.clearAllMocks();
       const assemblerModule = await import("../index.ts");
       SystemPromptAssembler = assemblerModule.default;
-      const orchestratorModule = await import("../../ToolOrchestratorService.ts");
+      const orchestratorModule =
+        await import("../../ToolOrchestratorService.ts");
       ToolOrchestratorService = orchestratorModule.default;
 
       getClientSchemasSpy = vi.spyOn(
         ToolOrchestratorService,
         "getClientToolSchemas",
       );
-      getToolSchemasSpy = vi.spyOn(
-        ToolOrchestratorService,
-        "getToolSchemas",
+      getToolSchemasSpy = vi.spyOn(ToolOrchestratorService, "getToolSchemas");
+      vi.spyOn(ToolOrchestratorService, "ensureSchemas").mockResolvedValue(
+        undefined,
       );
-      vi.spyOn(
-        ToolOrchestratorService,
-        "ensureSchemas",
-      ).mockResolvedValue(undefined);
 
       // Return localized schemas based on the locale argument
-      getClientSchemasSpy.mockImplementation((_topology?: string, locale?: string) => {
-        const activeLocale = locale || "en";
-        return [
-          {
-            name: "write_todo",
-            description: PromptLocaleService.get(activeLocale, "internal-tools.write_todo.description"),
-            domain: "Core Harness Tools",
-            parameters: {
-              type: "object",
-              properties: {
-                items: {
-                  type: "array",
-                  description: PromptLocaleService.get(activeLocale, "internal-tools.write_todo.parameters.items"),
+      getClientSchemasSpy.mockImplementation(
+        (_topology?: string, locale?: string) => {
+          const activeLocale = locale || "en";
+          return [
+            {
+              name: "write_todo",
+              description: PromptLocaleService.get(
+                activeLocale,
+                "internal-tools.write_todo.description",
+              ),
+              domain: "Core Harness Tools",
+              parameters: {
+                type: "object",
+                properties: {
+                  items: {
+                    type: "array",
+                    description: PromptLocaleService.get(
+                      activeLocale,
+                      "internal-tools.write_todo.parameters.items",
+                    ),
+                  },
                 },
+                required: ["items"],
               },
-              required: ["items"],
             },
-          },
-        ];
-      });
+          ];
+        },
+      );
 
-      getToolSchemasSpy.mockImplementation((_topology?: string, _locale?: string) => [
-        { name: "write_todo", description: "test", parameters: {} },
-      ]);
+      getToolSchemasSpy.mockImplementation(
+        (_topology?: string, _locale?: string) => [
+          { name: "write_todo", description: "test", parameters: {} },
+        ],
+      );
     });
 
     afterEach(() => {
@@ -553,45 +616,47 @@ describe("Tool Description Locale Threading", () => {
       vi.clearAllMocks();
       const assemblerModule = await import("../index.ts");
       SystemPromptAssembler = assemblerModule.default;
-      const orchestratorModule = await import("../../ToolOrchestratorService.ts");
+      const orchestratorModule =
+        await import("../../ToolOrchestratorService.ts");
       ToolOrchestratorService = orchestratorModule.default;
 
       getClientSchemasSpy = vi.spyOn(
         ToolOrchestratorService,
         "getClientToolSchemas",
       );
-      getToolSchemasSpy = vi.spyOn(
-        ToolOrchestratorService,
-        "getToolSchemas",
+      getToolSchemasSpy = vi.spyOn(ToolOrchestratorService, "getToolSchemas");
+      vi.spyOn(ToolOrchestratorService, "ensureSchemas").mockResolvedValue(
+        undefined,
       );
-      vi.spyOn(
-        ToolOrchestratorService,
-        "ensureSchemas",
-      ).mockResolvedValue(undefined);
 
-      getClientSchemasSpy.mockImplementation((_topology?: string, locale?: string) => {
-        const activeLocale = locale || "en";
-        return [
-          {
-            name: "summarize_conversation",
-            description: PromptLocaleService.get(activeLocale, "internal-tools.summarize_conversation.description"),
-            domain: "Core Harness Tools",
-            parameters: {
-              type: "object",
-              properties: {
-                summary: {
-                  type: "string",
-                  description: PromptLocaleService.get(
-                    activeLocale,
-                    "internal-tools.summarize_conversation.parameters.summary",
-                  ),
+      getClientSchemasSpy.mockImplementation(
+        (_topology?: string, locale?: string) => {
+          const activeLocale = locale || "en";
+          return [
+            {
+              name: "summarize_conversation",
+              description: PromptLocaleService.get(
+                activeLocale,
+                "internal-tools.summarize_conversation.description",
+              ),
+              domain: "Core Harness Tools",
+              parameters: {
+                type: "object",
+                properties: {
+                  summary: {
+                    type: "string",
+                    description: PromptLocaleService.get(
+                      activeLocale,
+                      "internal-tools.summarize_conversation.parameters.summary",
+                    ),
+                  },
                 },
+                required: ["summary"],
               },
-              required: ["summary"],
             },
-          },
-        ];
-      });
+          ];
+        },
+      );
 
       getToolSchemasSpy.mockReturnValue([
         { name: "summarize_conversation", description: "test", parameters: {} },

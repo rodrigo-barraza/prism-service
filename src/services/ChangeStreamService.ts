@@ -116,7 +116,8 @@ function openStream(db: Db, collectionName: string) {
         collectionName === COLLECTIONS.REQUESTS &&
         fullDocument?.parentAgentConversationId
       ) {
-        payload.parentAgentConversationId = fullDocument.parentAgentConversationId as string;
+        payload.parentAgentConversationId =
+          fullDocument.parentAgentConversationId as string;
       }
 
       // Broadcast to all registered listeners

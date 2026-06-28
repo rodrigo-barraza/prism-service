@@ -339,8 +339,7 @@ router.get(
         typeof providerWithProps.getServerProps !== "function"
       ) {
         return res.status(404).json({
-          error:
-            "Server props only available for llama-cpp provider instances",
+          error: "Server props only available for llama-cpp provider instances",
         });
       }
       const serverProps = await providerWithProps.getServerProps();

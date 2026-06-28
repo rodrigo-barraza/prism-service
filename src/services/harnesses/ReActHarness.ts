@@ -40,9 +40,15 @@ import { logKVCacheHitRate } from "./lifecycle/KVCacheReporter.ts";
 import { injectToolDiscoveryNudge } from "./lifecycle/ToolDiscoveryNudge.ts";
 import { finalizePassTracker } from "./lifecycle/TrackerFinalizer.ts";
 import { handleCodexPlanningResponse } from "./lifecycle/CodexPlanningDetector.ts";
-import { maybeInjectSystemReminder, cleanupReminderCache } from "./lifecycle/SystemReminderInjector.ts";
+import {
+  maybeInjectSystemReminder,
+  cleanupReminderCache,
+} from "./lifecycle/SystemReminderInjector.ts";
 import { checkCostBudget } from "./lifecycle/CostBudgetEnforcer.ts";
-import { createSandboxCheckpoint, restoreSandboxCheckpoint } from "./lifecycle/SandboxExecutor.ts";
+import {
+  createSandboxCheckpoint,
+  restoreSandboxCheckpoint,
+} from "./lifecycle/SandboxExecutor.ts";
 
 import PlanningModeService from "../PlanningModeService.ts";
 import PromptLocaleService from "../PromptLocaleService.ts";
@@ -55,7 +61,6 @@ import type {
   AgenticOptions,
   BeforePromptHookContext,
 } from "./types.ts";
-
 
 /**
  * Per-iteration pass options combining the user's AgenticOptions with
@@ -198,11 +203,7 @@ export default class ReActHarness extends BaseAgenticHarness {
         });
 
         // ── Instruction fade-out countermeasure ─────────────────
-        await maybeInjectSystemReminder(
-          currentMessages,
-          state,
-          context,
-        );
+        await maybeInjectSystemReminder(currentMessages, state, context);
 
         // ── beforePrompt hook (iteration 1 only) ──────────────
         if (state.iterations === 1) {
@@ -228,7 +229,8 @@ export default class ReActHarness extends BaseAgenticHarness {
 
           // ── Persist assembled system prompt to conversationMeta ──
           if (hookContext._assembledSystemPrompt) {
-            const assembledPrompt = hookContext._assembledSystemPrompt as string;
+            const assembledPrompt =
+              hookContext._assembledSystemPrompt as string;
             context.conversationMeta = {
               ...(context.conversationMeta || {}),
               systemPrompt: assembledPrompt,
@@ -253,7 +255,9 @@ export default class ReActHarness extends BaseAgenticHarness {
           }
 
           if (state.planModeActive) {
-            await PlanningModeService.injectPlanningInstruction(currentMessages);
+            await PlanningModeService.injectPlanningInstruction(
+              currentMessages,
+            );
           }
         }
 
@@ -320,7 +324,14 @@ export default class ReActHarness extends BaseAgenticHarness {
         this.emitUsageUpdate();
 
         // ── Cost budget enforcement ────────────────────────────
-        if (checkCostBudget(state, context.resolvedModel, options.maxCostDollars, emit)) {
+        if (
+          checkCostBudget(
+            state,
+            context.resolvedModel,
+            options.maxCostDollars,
+            emit,
+          )
+        ) {
           break;
         }
 
@@ -448,20 +459,26 @@ export default class ReActHarness extends BaseAgenticHarness {
 
             // Restore sandbox checkpoint on validation failure
             if (sandboxCheckpointReference) {
-              restoreSandboxCheckpoint(workspaceRoot, sandboxCheckpointReference, emit);
+              restoreSandboxCheckpoint(
+                workspaceRoot,
+                sandboxCheckpointReference,
+                emit,
+              );
             }
 
             currentMessages.push({
               role: "system",
               content:
                 PromptLocaleService.get(
-                  (this.context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(),
+                  (this.context.options?.locale as string | undefined) ||
+                    PromptLocaleService.getDefaultLocale(),
                   "harness.validationError.header",
                   { errorCount: String(validationFeedback.length) },
                 ) +
                 `\n\n${errorBlock}\n\n` +
                 PromptLocaleService.get(
-                  (this.context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(),
+                  (this.context.options?.locale as string | undefined) ||
+                    PromptLocaleService.getDefaultLocale(),
                   "harness.validationError.analyzePrompt",
                 ),
             });
@@ -645,7 +662,8 @@ export default class ReActHarness extends BaseAgenticHarness {
         if (isOutputTruncated(pass)) {
           truncationRecoveryCount++;
           const configuredMaxTokens = context.options.maxTokens || "default";
-          const modelOutputCeiling = context.modelDefinition?.maxOutputTokens as number | undefined;
+          const modelOutputCeiling = context.modelDefinition
+            ?.maxOutputTokens as number | undefined;
           logger.warn(
             `[AgenticLoop] Max tokens truncation detected on iteration ${state.iterations} — ` +
               `stopReason=${pass.stopReason}, maxTokens=${configuredMaxTokens}` +
@@ -654,10 +672,14 @@ export default class ReActHarness extends BaseAgenticHarness {
           );
 
           // Skip recovery if already at the model's physical output ceiling
-          const alreadyAtCeiling = typeof configuredMaxTokens === "number" &&
+          const alreadyAtCeiling =
+            typeof configuredMaxTokens === "number" &&
             isAtOutputCeiling(configuredMaxTokens, modelOutputCeiling);
 
-          if (!alreadyAtCeiling && truncationRecoveryCount <= MAX_OUTPUT_TRUNCATION_RECOVERIES) {
+          if (
+            !alreadyAtCeiling &&
+            truncationRecoveryCount <= MAX_OUTPUT_TRUNCATION_RECOVERIES
+          ) {
             const escalatedMaxTokens = injectContinuationContext(
               currentMessages,
               pass,
@@ -732,7 +754,11 @@ export default class ReActHarness extends BaseAgenticHarness {
 
       injectErrorAsConversationMessage(
         currentMessages,
-        buildProviderErrorMessage(loopError, state.iterations, this.context.options?.locale as string | undefined),
+        buildProviderErrorMessage(
+          loopError,
+          state.iterations,
+          this.context.options?.locale as string | undefined,
+        ),
         context,
       );
 

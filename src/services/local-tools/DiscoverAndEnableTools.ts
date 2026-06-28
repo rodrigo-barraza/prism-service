@@ -65,28 +65,43 @@ function buildDiscoverAndEnableSchema(locale: string) {
   return {
     name: "discover_and_enable_tools",
     emoji: ["🔍", "🧰"],
-    description: PromptLocaleService.get(locale, "internal-tools.discover_and_enable_tools.description", {
-      totalToolCount: String(totalToolCount),
-      domainListLowercase,
-    }),
+    description: PromptLocaleService.get(
+      locale,
+      "internal-tools.discover_and_enable_tools.description",
+      {
+        totalToolCount: String(totalToolCount),
+        domainListLowercase,
+      },
+    ),
     parameters: {
       type: "object",
       properties: {
         query: {
           type: "string",
-          description: PromptLocaleService.get(locale, "internal-tools.discover_and_enable_tools.parameters.query", {
-            sampleKeywords,
-          }),
+          description: PromptLocaleService.get(
+            locale,
+            "internal-tools.discover_and_enable_tools.parameters.query",
+            {
+              sampleKeywords,
+            },
+          ),
         },
         domain: {
           type: "string",
-          description: PromptLocaleService.get(locale, "internal-tools.discover_and_enable_tools.parameters.domain", {
-            domainListQuoted,
-          }),
+          description: PromptLocaleService.get(
+            locale,
+            "internal-tools.discover_and_enable_tools.parameters.domain",
+            {
+              domainListQuoted,
+            },
+          ),
         },
         limit: {
           type: "number",
-          description: PromptLocaleService.get(locale, "internal-tools.discover_and_enable_tools.parameters.limit"),
+          description: PromptLocaleService.get(
+            locale,
+            "internal-tools.discover_and_enable_tools.parameters.limit",
+          ),
         },
       },
       required: [],
@@ -97,9 +112,10 @@ function buildDiscoverAndEnableSchema(locale: string) {
 const discoverAndEnableTools = {
   name: "discover_and_enable_tools",
   get schema() {
-    const activeLocale = typeof SettingsService.getCached === "function"
-      ? SettingsService.getCached().agents?.locale || "en"
-      : "en";
+    const activeLocale =
+      typeof SettingsService.getCached === "function"
+        ? SettingsService.getCached().agents?.locale || "en"
+        : "en";
     return buildDiscoverAndEnableSchema(activeLocale);
   },
   buildSchema(locale: string) {
@@ -114,7 +130,12 @@ const discoverAndEnableTools = {
   ) {
     const agentConversationId = context.agentConversationId;
     if (!agentConversationId) {
-      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.shared.noConversation") };
+      return {
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.shared.noConversation",
+        ),
+      };
     }
 
     const query =
@@ -125,13 +146,21 @@ const discoverAndEnableTools = {
         : undefined;
 
     if (!query && !domain) {
-      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.discover_and_enable_tools.noQueryOrDomain") };
+      return {
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.discover_and_enable_tools.noQueryOrDomain",
+        ),
+      };
     }
 
     const agentSettings = await SettingsService.getSection("agents");
     if (agentSettings?.dynamicToolActivation === false) {
       return {
-        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.shared.dynamicToolActivationDisabled"),
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.shared.dynamicToolActivationDisabled",
+        ),
       };
     }
 
@@ -154,16 +183,31 @@ const discoverAndEnableTools = {
     );
 
     const searchResult: SearchToolsResult = {};
-    if (rawResult && typeof rawResult === "object" && !Array.isArray(rawResult)) {
+    if (
+      rawResult &&
+      typeof rawResult === "object" &&
+      !Array.isArray(rawResult)
+    ) {
       const record = rawResult as Record<string, unknown>;
       if (Array.isArray(record.matches)) {
         searchResult.matches = record.matches.map((item) => {
-          const match = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+          const match =
+            item && typeof item === "object"
+              ? (item as Record<string, unknown>)
+              : {};
           return {
             name: typeof match.name === "string" ? match.name : "",
-            isEnabled: typeof match.isEnabled === "boolean" ? match.isEnabled : undefined,
-            description: typeof match.description === "string" ? match.description : undefined,
-            emoji: Array.isArray(match.emoji) ? match.emoji.filter((e): e is string => typeof e === "string") : undefined,
+            isEnabled:
+              typeof match.isEnabled === "boolean"
+                ? match.isEnabled
+                : undefined,
+            description:
+              typeof match.description === "string"
+                ? match.description
+                : undefined,
+            emoji: Array.isArray(match.emoji)
+              ? match.emoji.filter((e): e is string => typeof e === "string")
+              : undefined,
             domain: typeof match.domain === "string" ? match.domain : undefined,
           };
         });
@@ -191,7 +235,10 @@ const discoverAndEnableTools = {
       return {
         ...searchResult,
         auto_enabled: [],
-        message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.discover_and_enable_tools.noMatches"),
+        message: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.discover_and_enable_tools.noMatches",
+        ),
       };
     }
 
@@ -228,8 +275,19 @@ const discoverAndEnableTools = {
       auto_enabled: newlyActivatedTools,
       message:
         newlyActivatedTools.length > 0
-          ? PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.discover_and_enable_tools.foundAndEnabled", { matchCount: String(matches.length), enabledCount: String(newlyActivatedTools.length) })
-          : PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.discover_and_enable_tools.foundAlreadyEnabled", { matchCount: String(matches.length) }),
+          ? PromptLocaleService.get(
+              PromptLocaleService.getDefaultLocale(),
+              "internal-tools-runtime.discover_and_enable_tools.foundAndEnabled",
+              {
+                matchCount: String(matches.length),
+                enabledCount: String(newlyActivatedTools.length),
+              },
+            )
+          : PromptLocaleService.get(
+              PromptLocaleService.getDefaultLocale(),
+              "internal-tools-runtime.discover_and_enable_tools.foundAlreadyEnabled",
+              { matchCount: String(matches.length) },
+            ),
     };
   },
 };

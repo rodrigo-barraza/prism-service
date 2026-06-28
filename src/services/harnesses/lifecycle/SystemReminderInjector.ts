@@ -7,10 +7,7 @@ import { extractReminderViaLLM } from "./SystemReminderExtractor.ts";
 import PromptLocaleService from "../../PromptLocaleService.ts";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
-import type {
-  ConversationMessage,
-  AgenticContext,
-} from "../types.ts";
+import type { ConversationMessage, AgenticContext } from "../types.ts";
 
 /**
  * SystemReminderInjector — counteracts instruction fade-out in long sessions.
@@ -55,7 +52,8 @@ export async function maybeInjectSystemReminder(
   const reminderModel = options.reminderModel as string | undefined;
   if (!reminderModel) return;
 
-  const resolvedInterval = options.reminderInterval || DEFAULT_REMINDER_INTERVAL;
+  const resolvedInterval =
+    options.reminderInterval || DEFAULT_REMINDER_INTERVAL;
   const currentIteration = state.iterations;
 
   if (currentIteration < MINIMUM_ITERATIONS_BEFORE_FIRST_REMINDER) return;
@@ -73,35 +71,42 @@ export async function maybeInjectSystemReminder(
 
     if (!systemMessage || typeof systemMessage.content !== "string") return;
 
-    reminderContent = await extractReminderViaLLM(
-      systemMessage.content,
-      provider,
-      reminderModel,
-      signal || undefined,
-      {
-        project: context.project,
-        username: context.username,
-        agent: context.agent || null,
-        providerName: context.providerName,
-        traceId: context.traceId || null,
-        conversationId: (context.conversationId as string) || null,
-        agentConversationId: context.agentConversationId || null,
-        requestId: context.requestId,
-      },
-    ) || undefined;
+    reminderContent =
+      (await extractReminderViaLLM(
+        systemMessage.content,
+        provider,
+        reminderModel,
+        signal || undefined,
+        {
+          project: context.project,
+          username: context.username,
+          agent: context.agent || null,
+          providerName: context.providerName,
+          traceId: context.traceId || null,
+          conversationId: (context.conversationId as string) || null,
+          agentConversationId: context.agentConversationId || null,
+          requestId: context.requestId,
+        },
+      )) || undefined;
 
     if (!reminderContent) return;
 
     cachedReminderContent.set(agentConversationId, reminderContent);
   }
 
-  const activeLocale = (context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale();
+  const activeLocale =
+    (context.options?.locale as string | undefined) ||
+    PromptLocaleService.getDefaultLocale();
 
   currentMessages.push({
     role: "system",
     content:
-      PromptLocaleService.get(activeLocale, "harness.systemReminder.header", { currentIteration: String(currentIteration) }) + `\n` +
-      PromptLocaleService.get(activeLocale, "harness.systemReminder.preamble") + `\n\n` +
+      PromptLocaleService.get(activeLocale, "harness.systemReminder.header", {
+        currentIteration: String(currentIteration),
+      }) +
+      `\n` +
+      PromptLocaleService.get(activeLocale, "harness.systemReminder.preamble") +
+      `\n\n` +
       `${reminderContent}\n\n` +
       PromptLocaleService.get(activeLocale, "harness.systemReminder.footer"),
   });

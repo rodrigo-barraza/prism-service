@@ -31,7 +31,10 @@ import type { LLMProvider } from "../types.ts";
 const EXTRACTION_MAX_TOKENS = 600;
 const EXTRACTION_TIMEOUT_MILLISECONDS = 15_000;
 
-const EXTRACTION_PROMPT = PromptLocaleService.get("en", "harness.reminderExtractor.extractionPrompt");
+const EXTRACTION_PROMPT = PromptLocaleService.get(
+  "en",
+  "harness.reminderExtractor.extractionPrompt",
+);
 
 const EXTRACTION_SUFFIX = "\n</system_prompt>";
 
@@ -101,7 +104,9 @@ export async function extractReminderViaLLM(
         traceId: loggingContext.traceId || null,
         conversationId: (loggingContext.conversationId as string) || null,
         agentConversationId: loggingContext.agentConversationId || null,
-        aiMessages: extractionMessages as Parameters<typeof RequestLogger.logBackgroundLlmCall>[0]["aiMessages"],
+        aiMessages: extractionMessages as Parameters<
+          typeof RequestLogger.logBackgroundLlmCall
+        >[0]["aiMessages"],
         resultText: responseText,
         success: true,
         errorMessage: null,

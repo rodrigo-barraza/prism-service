@@ -62,13 +62,21 @@ const enableTools = {
   ) {
     const agentConversationId = context.agentConversationId;
     if (!agentConversationId) {
-      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.shared.noConversation") };
+      return {
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.shared.noConversation",
+        ),
+      };
     }
 
     const agentSettings = await SettingsService.getSection("agents");
     if (agentSettings?.dynamicToolActivation === false) {
       return {
-        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.shared.dynamicToolActivationDisabled"),
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.shared.dynamicToolActivationDisabled",
+        ),
       };
     }
 
@@ -78,7 +86,10 @@ const enableTools = {
       requestedToolEntries.length === 0
     ) {
       return {
-        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.shared.invalidToolsArray"),
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.shared.invalidToolsArray",
+        ),
       };
     }
 
@@ -90,7 +101,10 @@ const enableTools = {
 
     if (resolvedRequestedNames.size === 0) {
       return {
-        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.enable_tools.noValidTools"),
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.enable_tools.noValidTools",
+        ),
       };
     }
 
@@ -108,7 +122,10 @@ const enableTools = {
     if (newlyActivatedTools.length === 0) {
       return {
         success: true,
-        message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.enable_tools.alreadyEnabled"),
+        message: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.enable_tools.alreadyEnabled",
+        ),
         enabledToolCount: mergedToolSet.size,
       };
     }
@@ -123,7 +140,11 @@ const enableTools = {
       success: true,
       activated: newlyActivatedTools,
       totalEnabled: mergedToolSet.size,
-      message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.enable_tools.activated", { count: String(newlyActivatedTools.length) }),
+      message: PromptLocaleService.get(
+        PromptLocaleService.getDefaultLocale(),
+        "internal-tools-runtime.enable_tools.activated",
+        { count: String(newlyActivatedTools.length) },
+      ),
     };
   },
 };
@@ -161,13 +182,21 @@ const disableTools = {
   ) {
     const agentConversationId = context.agentConversationId;
     if (!agentConversationId) {
-      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.shared.noConversation") };
+      return {
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.shared.noConversation",
+        ),
+      };
     }
 
     const agentSettings = await SettingsService.getSection("agents");
     if (agentSettings?.dynamicToolActivation === false) {
       return {
-        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.shared.dynamicToolActivationDisabled"),
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.shared.dynamicToolActivationDisabled",
+        ),
       };
     }
 
@@ -177,7 +206,10 @@ const disableTools = {
       requestedToolEntries.length === 0
     ) {
       return {
-        error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.shared.invalidToolsArray"),
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.shared.invalidToolsArray",
+        ),
       };
     }
 
@@ -206,7 +238,10 @@ const disableTools = {
     if (removedTools.length === 0 && protectedToolsSkipped.length === 0) {
       return {
         success: true,
-        message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.disable_tools.noneInSet"),
+        message: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.disable_tools.noneInSet",
+        ),
         enabledToolCount: mergedToolSet.size,
       };
     }
@@ -226,9 +261,17 @@ const disableTools = {
         protectedToolsSkipped.length > 0 ? protectedToolsSkipped : undefined,
       totalEnabled: mergedToolSet.size,
       message:
-        PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.disable_tools.disabled", { count: String(removedTools.length) }) +
+        PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.disable_tools.disabled",
+          { count: String(removedTools.length) },
+        ) +
         (protectedToolsSkipped.length > 0
-          ? PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.disable_tools.protectedSuffix", { count: String(protectedToolsSkipped.length) })
+          ? PromptLocaleService.get(
+              PromptLocaleService.getDefaultLocale(),
+              "internal-tools-runtime.disable_tools.protectedSuffix",
+              { count: String(protectedToolsSkipped.length) },
+            )
           : ""),
     };
   },

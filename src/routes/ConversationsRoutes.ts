@@ -80,7 +80,14 @@ router.get(
         return res.status(400).json({ error: parsed.error.format() });
       }
 
-      const { limit, cursor, agent, type = "all", taskId, project: queryProject } = parsed.data;
+      const {
+        limit,
+        cursor,
+        agent,
+        type = "all",
+        taskId,
+        project: queryProject,
+      } = parsed.data;
       const project = queryProject || req.project || "any";
 
       // Include conversations created under DEFAULT_USERNAME ("anonymous")
@@ -134,7 +141,9 @@ router.get(
         // have a different `agent` persona but belong to the same tree.
         if (agent && directMatches.length > 0) {
           const directMatchIds = directMatches
-            .map((document) => (document as Record<string, unknown>).id as string)
+            .map(
+              (document) => (document as Record<string, unknown>).id as string,
+            )
             .filter(Boolean);
 
           // Iteratively walk the parentConversationId chain to find all
@@ -143,7 +152,11 @@ router.get(
           let frontier = directMatchIds;
           const maxDepthIterations = 5;
 
-          for (let depth = 0; depth < maxDepthIterations && frontier.length > 0; depth++) {
+          for (
+            let depth = 0;
+            depth < maxDepthIterations && frontier.length > 0;
+            depth++
+          ) {
             const childConversations = await db
               .collection(COLLECTIONS.AGENT_CONVERSATIONS)
               .find({
@@ -199,7 +212,10 @@ router.get(
       ) => {
         if (conversations.length === 0) return;
         const conversationIds = conversations
-          .map((conversation) => (conversation as Record<string, unknown>).id as string)
+          .map(
+            (conversation) =>
+              (conversation as Record<string, unknown>).id as string,
+          )
           .filter(Boolean);
         if (conversationIds.length === 0) return;
 
@@ -275,7 +291,10 @@ router.get(
       ) => {
         if (conversations.length === 0) return;
         const conversationIds = conversations
-          .map((conversation) => (conversation as Record<string, unknown>).id as string)
+          .map(
+            (conversation) =>
+              (conversation as Record<string, unknown>).id as string,
+          )
           .filter(Boolean);
         if (conversationIds.length === 0) return;
 
@@ -307,7 +326,10 @@ router.get(
 
           if (parentIdSet.size > 0) {
             for (const conversation of conversations) {
-              const conversationRecord = conversation as Record<string, unknown>;
+              const conversationRecord = conversation as Record<
+                string,
+                unknown
+              >;
               if (parentIdSet.has(conversationRecord.id as string)) {
                 conversationRecord.hasSubAgents = true;
               }
@@ -374,7 +396,9 @@ router.get(
 
       res.json({ items, nextCursor, hasMore });
     } catch (error: unknown) {
-      logger.error(`Error fetching unified conversations: ${errorMessage(error)}`);
+      logger.error(
+        `Error fetching unified conversations: ${errorMessage(error)}`,
+      );
       next(error);
     }
   }),
@@ -495,7 +519,9 @@ router.get(
 
       res.status(404).json({ error: "Conversation not found" });
     } catch (error: unknown) {
-      logger.error(`Error fetching specific conversation: ${errorMessage(error)}`);
+      logger.error(
+        `Error fetching specific conversation: ${errorMessage(error)}`,
+      );
       next(error);
     }
   }),
@@ -520,7 +546,9 @@ router.get(
 
       res.json(workflows);
     } catch (error: unknown) {
-      logger.error(`Error fetching conversation workflows: ${errorMessage(error)}`);
+      logger.error(
+        `Error fetching conversation workflows: ${errorMessage(error)}`,
+      );
       next(error);
     }
   }),
@@ -555,12 +583,20 @@ router.post(
       let isAgent = false;
       const directExists = await db
         .collection(COLLECTIONS.MODEL_CONVERSATIONS)
-        .countDocuments({ id: conversationId, project, username: usernameFilter });
+        .countDocuments({
+          id: conversationId,
+          project,
+          username: usernameFilter,
+        });
 
       if (directExists === 0) {
         const agentExists = await db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-          .countDocuments({ id: conversationId, project, username: usernameFilter });
+          .countDocuments({
+            id: conversationId,
+            project,
+            username: usernameFilter,
+          });
         if (agentExists > 0) {
           isAgent = true;
         } else {
@@ -579,7 +615,9 @@ router.post(
 
       res.json({ ...conversation, type: isAgent ? "agent" : "direct" });
     } catch (error: unknown) {
-      logger.error(`Error appending messages to conversation: ${errorMessage(error)}`);
+      logger.error(
+        `Error appending messages to conversation: ${errorMessage(error)}`,
+      );
       next(error);
     }
   }),
@@ -750,8 +788,7 @@ router.delete(
         ]);
 
         descendantDeletedCount +=
-          (agentDeletion.deletedCount || 0) +
-          (modelDeletion.deletedCount || 0);
+          (agentDeletion.deletedCount || 0) + (modelDeletion.deletedCount || 0);
         frontier = childIds;
       }
 

@@ -151,8 +151,7 @@ describe("Micro-Compaction Context Pressure Gating", () => {
 
       // Verify tool results are completely untouched
       const assistantWithTools = messages.filter(
-        (message) =>
-          message.role === "assistant" && message.toolCalls?.length,
+        (message) => message.role === "assistant" && message.toolCalls?.length,
       );
       for (const assistantMessage of assistantWithTools) {
         for (const toolCall of assistantMessage.toolCalls!) {
@@ -240,17 +239,14 @@ describe("Micro-Compaction Context Pressure Gating", () => {
       );
 
       const compactedAssistantMessages = result.messages.filter(
-        (message) =>
-          message.role === "assistant" && message.toolCalls?.length,
+        (message) => message.role === "assistant" && message.toolCalls?.length,
       );
 
       // At least some old tool results should be cleared
-      const clearedResults = compactedAssistantMessages.flatMap(
-        (message) =>
-          message.toolCalls!.filter(
-            (toolCall) =>
-              toolCall.result === "[Old tool result content cleared]",
-          ),
+      const clearedResults = compactedAssistantMessages.flatMap((message) =>
+        message.toolCalls!.filter(
+          (toolCall) => toolCall.result === "[Old tool result content cleared]",
+        ),
       );
 
       expect(clearedResults.length).toBeGreaterThan(0);
@@ -301,8 +297,7 @@ describe("Micro-Compaction Context Pressure Gating", () => {
       // Solve: tokenEstimate / (contextWindowSize - maxOutputTokens) = 0.7
       // contextWindowSize = (tokenEstimate / 0.7) + maxOutputTokens
       const exactBoundaryContextWindow =
-        Math.ceil(tokenEstimate / CONTEXT_PRESSURE_THRESHOLD) +
-        maxOutputTokens;
+        Math.ceil(tokenEstimate / CONTEXT_PRESSURE_THRESHOLD) + maxOutputTokens;
 
       const result = applyGatedMicroCompaction(
         messages,

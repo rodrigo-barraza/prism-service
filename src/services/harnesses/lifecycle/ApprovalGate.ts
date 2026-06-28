@@ -57,7 +57,10 @@ export async function checkAndWaitForApproval(
 
     const existingApproval = pendingApprovals.get(conversationId);
     if (existingApproval) {
-      existingApproval.resolve({ isApproved: false, reason: "superseded" } as never);
+      existingApproval.resolve({
+        isApproved: false,
+        reason: "superseded",
+      } as never);
       pendingApprovals.delete(conversationId);
     }
 

@@ -36,18 +36,29 @@ function buildInworldCatalog(model?: string): string {
   const isTtsTwo = activeModel.startsWith("inworld-tts-2");
 
   if (!isTtsTwo) {
-    return PromptLocaleService.get("en", "voice-catalog.catalogFormat.inworld", {
-      count: String(entries.length),
-      voices: entries.join(", "),
-    });
+    return PromptLocaleService.get(
+      "en",
+      "voice-catalog.catalogFormat.inworld",
+      {
+        count: String(entries.length),
+        voices: entries.join(", "),
+      },
+    );
   }
 
-  const steeringInstructions = PromptLocaleService.get("en", "voice-catalog.inworldTts2Steering");
+  const steeringInstructions = PromptLocaleService.get(
+    "en",
+    "voice-catalog.inworldTts2Steering",
+  );
 
-  return `${PromptLocaleService.get("en", "voice-catalog.catalogFormat.inworld", {
-    count: String(entries.length),
-    voices: entries.join(", "),
-  })} ${steeringInstructions}`;
+  return `${PromptLocaleService.get(
+    "en",
+    "voice-catalog.catalogFormat.inworld",
+    {
+      count: String(entries.length),
+      voices: entries.join(", "),
+    },
+  )} ${steeringInstructions}`;
 }
 
 function buildOpenAICatalog(): string {
@@ -110,9 +121,13 @@ function buildElevenLabsCatalog(): string {
   const entries = Object.entries(voiceDescriptions).map(
     ([name, description]) => `${name} (${description})`,
   );
-  return PromptLocaleService.get("en", "voice-catalog.catalogFormat.elevenlabs", {
-    voices: entries.join(", "),
-  });
+  return PromptLocaleService.get(
+    "en",
+    "voice-catalog.catalogFormat.elevenlabs",
+    {
+      voices: entries.join(", "),
+    },
+  );
 }
 
 export function getVoiceCatalogForProvider(

@@ -42,9 +42,7 @@ export function injectToolDiscoveryNudge(
   for (const toolCall of toolCalls) {
     if (toolCall.name !== TOOL_NAMES.SEARCH_TOOLS) continue;
 
-    const matchingResult = results.find(
-      (result) => result.id === toolCall.id,
-    );
+    const matchingResult = results.find((result) => result.id === toolCall.id);
     const toolResultData = matchingResult?.result as
       | Record<string, unknown>
       | undefined;
@@ -81,10 +79,15 @@ export function injectToolDiscoveryNudge(
         role: "system",
         content:
           `<tool-update>\n` +
-          PromptLocaleService.get((context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(), "harness.toolDiscoveryNudge.autoEnabled", {
-            count: String(disabledToolNames.length),
-            toolNames: disabledToolNames.join(", "),
-          }) +
+          PromptLocaleService.get(
+            (context.options?.locale as string | undefined) ||
+              PromptLocaleService.getDefaultLocale(),
+            "harness.toolDiscoveryNudge.autoEnabled",
+            {
+              count: String(disabledToolNames.length),
+              toolNames: disabledToolNames.join(", "),
+            },
+          ) +
           `\n</tool-update>`,
       });
       logger.info(
@@ -95,10 +98,15 @@ export function injectToolDiscoveryNudge(
         role: "system",
         content:
           `<tool-update>\n` +
-          PromptLocaleService.get((context.options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(), "harness.toolDiscoveryNudge.enableRequired", {
-            count: String(disabledToolNames.length),
-            toolNames: disabledToolNames.join(", "),
-          }) +
+          PromptLocaleService.get(
+            (context.options?.locale as string | undefined) ||
+              PromptLocaleService.getDefaultLocale(),
+            "harness.toolDiscoveryNudge.enableRequired",
+            {
+              count: String(disabledToolNames.length),
+              toolNames: disabledToolNames.join(", "),
+            },
+          ) +
           `\n</tool-update>`,
       });
       logger.info(

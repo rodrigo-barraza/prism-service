@@ -94,7 +94,8 @@ export function buildJsonResponseFromEvents(
 
   const toolCalls = events
     .filter(
-      (event: SseEvent) => event.type === "tool_execution" && event.status === "calling",
+      (event: SseEvent) =>
+        event.type === "tool_execution" && event.status === "calling",
     )
     .map((event: SseEvent) => ({
       name: event.tool?.name,
@@ -142,7 +143,6 @@ export function buildJsonResponseFromEvents(
     },
   };
 }
-
 
 /**
  * Options for SSE request handling.
@@ -200,7 +200,9 @@ export async function handleSseRequest(
   // in the session registry so POST /agent/stop can abort it explicitly.
   // For non-persistent sessions (/chat), reuse the connection controller
   // as the stop signal (legacy behavior: disconnect = abort).
-  const conversationId = (params as Record<string, unknown>).conversationId as string | undefined;
+  const conversationId = (params as Record<string, unknown>).conversationId as
+    | string
+    | undefined;
   let stopController: AbortController;
 
   if (persistOnDisconnect && conversationId) {

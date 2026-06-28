@@ -31,11 +31,7 @@ function deepFlattenKeys(
   for (const [key, value] of Object.entries(source)) {
     const flatKey = prefix ? `${prefix}.${key}` : key;
 
-    if (
-      value !== null &&
-      typeof value === "object" &&
-      !Array.isArray(value)
-    ) {
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
       flattenedKeys.push(
         ...deepFlattenKeys(value as Record<string, unknown>, flatKey),
       );
@@ -61,7 +57,9 @@ function discoverLocaleDirectories(): string[] {
   return fs
     .readdirSync(localesRootDirectory, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
-    .filter((entry) => !entry.name.startsWith("__") && !entry.name.startsWith("."))
+    .filter(
+      (entry) => !entry.name.startsWith("__") && !entry.name.startsWith("."),
+    )
     .map((entry) => entry.name)
     .sort();
 }
@@ -225,9 +223,7 @@ describe("PromptLocaleService — Key Parity", () => {
               errorLines.push(`    + ${key}`);
             }
             if (extraInLocale.length > 25) {
-              errorLines.push(
-                `    ... and ${extraInLocale.length - 25} more`,
-              );
+              errorLines.push(`    ... and ${extraInLocale.length - 25} more`);
             }
           }
 

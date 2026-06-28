@@ -72,10 +72,10 @@ export class InstanceLoadBalancer {
 
       if (
         load < lowestLoad ||
-        (load === lowestLoad && (
-          (isOrchestrator && !isBestOrchestrator) ||
-          (isOrchestrator === isBestOrchestrator && instance.concurrency > (bestInstance?.concurrency || 0))
-        ))
+        (load === lowestLoad &&
+          ((isOrchestrator && !isBestOrchestrator) ||
+            (isOrchestrator === isBestOrchestrator &&
+              instance.concurrency > (bestInstance?.concurrency || 0))))
       ) {
         lowestLoad = load;
         bestInstance = instance;
@@ -83,7 +83,8 @@ export class InstanceLoadBalancer {
     }
 
     const bestAvailable = bestInstance
-      ? bestInstance.concurrency - InstanceLoadBalancer.getActiveOn(bestInstance.id, activeSubAgents)
+      ? bestInstance.concurrency -
+        InstanceLoadBalancer.getActiveOn(bestInstance.id, activeSubAgents)
       : -Infinity;
 
     if (bestInstance && bestAvailable <= 0) {

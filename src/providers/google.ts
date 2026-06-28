@@ -106,7 +106,11 @@ let client: GoogleGenAI | null = null;
 function getClient(): GoogleGenAI {
   if (!client) {
     if (!GOOGLE_CLOUD_GEMINI_API_KEY) {
-      throw new ProviderError("google", "GOOGLE_CLOUD_GEMINI_API_KEY is not set", 401);
+      throw new ProviderError(
+        "google",
+        "GOOGLE_CLOUD_GEMINI_API_KEY is not set",
+        401,
+      );
     }
     client = new GoogleGenAI({ apiKey: GOOGLE_CLOUD_GEMINI_API_KEY });
   }

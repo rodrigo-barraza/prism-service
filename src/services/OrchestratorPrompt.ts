@@ -34,17 +34,14 @@ export function getOrchestratorPromptAddendum({
   const defSequential =
     defaultTopology === TOPOLOGIES.SEQUENTIAL ? " (default)" : "";
   const defPeerToPeer =
-    defaultTopology === TOPOLOGIES.PEER_TO_PEER
-      ? " (default)"
-      : "";
+    defaultTopology === TOPOLOGIES.PEER_TO_PEER ? " (default)" : "";
   const defTournament =
     defaultTopology === TOPOLOGIES.TOURNAMENT ? " (default)" : "";
   const defCriticLoop =
     defaultTopology === TOPOLOGIES.CRITIC_LOOP ? " (default)" : "";
   const defDivideAndConquer =
     defaultTopology === TOPOLOGIES.DIVIDE_AND_CONQUER ? " (default)" : "";
-  const defMcts =
-    defaultTopology === TOPOLOGIES.MCTS ? " (default)" : "";
+  const defMcts = defaultTopology === TOPOLOGIES.MCTS ? " (default)" : "";
 
   const templateVariables: Record<string, string> = {
     subAgentToolList,
@@ -82,7 +79,6 @@ export function getOrchestratorPromptAddendum({
     .map((key) => PromptLocaleService.get(locale, key, templateVariables))
     .join("\n\n");
 }
-
 
 /*
  * Orchestrator-only tool names derived from the canonical taxonomy constant.

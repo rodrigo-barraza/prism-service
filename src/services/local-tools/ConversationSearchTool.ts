@@ -69,7 +69,13 @@ const searchConversations = {
         ? Math.min(Math.max(1, toolArguments.limit), 25)
         : DEFAULT_SEARCH_LIMIT;
 
-    if (!query) return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.search_conversations.queryRequired") };
+    if (!query)
+      return {
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.search_conversations.queryRequired",
+        ),
+      };
 
     const { default: EmbeddingService } =
       await import("../EmbeddingService.js");
@@ -80,7 +86,12 @@ const searchConversations = {
 
     const database = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!database) {
-      return { error: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.search_conversations.databaseUnavailable") };
+      return {
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.search_conversations.databaseUnavailable",
+        ),
+      };
     }
 
     // Generate query embedding
@@ -121,7 +132,10 @@ const searchConversations = {
       return {
         count: 0,
         conversations: [],
-        message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "internal-tools-runtime.search_conversations.noEmbeddings"),
+        message: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.search_conversations.noEmbeddings",
+        ),
       };
     }
 

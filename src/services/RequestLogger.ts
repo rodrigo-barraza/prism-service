@@ -603,7 +603,9 @@ const RequestLogger = {
     try {
       const db = MongoWrapper.getDb(MONGO_DB_NAME);
       if (!db) {
-        logger.error("RequestLogger: MongoDB client not available (insertPending)");
+        logger.error(
+          "RequestLogger: MongoDB client not available (insertPending)",
+        );
         return null;
       }
       const pendingDocument = {
@@ -629,7 +631,9 @@ const RequestLogger = {
         estimatedCost: null,
         success: null,
       };
-      const insertResult = await db.collection(COLLECTION).insertOne(pendingDocument);
+      const insertResult = await db
+        .collection(COLLECTION)
+        .insertOne(pendingDocument);
       return insertResult.insertedId;
     } catch (error: unknown) {
       logger.error(
@@ -651,7 +655,9 @@ const RequestLogger = {
     try {
       const db = MongoWrapper.getDb(MONGO_DB_NAME);
       if (!db) {
-        logger.error("RequestLogger: MongoDB client not available (completePending)");
+        logger.error(
+          "RequestLogger: MongoDB client not available (completePending)",
+        );
         return;
       }
       const {
@@ -745,28 +751,40 @@ const RequestLogger = {
         rateLimits,
       };
 
-      if (agentConversationId) updateFields.agentConversationId = agentConversationId;
-      if (parentAgentConversationId) updateFields.parentAgentConversationId = parentAgentConversationId;
-      if (Number(cacheReadInputTokens) > 0) updateFields.cacheReadInputTokens = Number(cacheReadInputTokens);
-      if (Number(cacheCreationInputTokens) > 0) updateFields.cacheCreationInputTokens = Number(cacheCreationInputTokens);
-      if (Number(reasoningOutputTokens) > 0) updateFields.reasoningOutputTokens = Number(reasoningOutputTokens);
+      if (agentConversationId)
+        updateFields.agentConversationId = agentConversationId;
+      if (parentAgentConversationId)
+        updateFields.parentAgentConversationId = parentAgentConversationId;
+      if (Number(cacheReadInputTokens) > 0)
+        updateFields.cacheReadInputTokens = Number(cacheReadInputTokens);
+      if (Number(cacheCreationInputTokens) > 0)
+        updateFields.cacheCreationInputTokens = Number(
+          cacheCreationInputTokens,
+        );
+      if (Number(reasoningOutputTokens) > 0)
+        updateFields.reasoningOutputTokens = Number(reasoningOutputTokens);
       if (contextLength != null) updateFields.contextLength = contextLength;
       if (evalBatchSize != null) updateFields.evalBatchSize = evalBatchSize;
-      if (physicalBatchSize != null) updateFields.physicalBatchSize = physicalBatchSize;
+      if (physicalBatchSize != null)
+        updateFields.physicalBatchSize = physicalBatchSize;
 
-      const updateResult = await db.collection(COLLECTION).updateOne(
-        { _id: pendingDocumentId },
-        { $set: updateFields },
-      );
+      const updateResult = await db
+        .collection(COLLECTION)
+        .updateOne({ _id: pendingDocumentId }, { $set: updateFields });
 
       if (updateResult.matchedCount === 0) {
         // Pending document was not found — fall back to standard insert
-        logger.warn("RequestLogger: pending document not found, falling back to full insert");
+        logger.warn(
+          "RequestLogger: pending document not found, falling back to full insert",
+        );
         await this.log(fullPayload);
         return;
       }
 
-      WebhookEventBus.emit("request.completed", { _id: pendingDocumentId, ...updateFields });
+      WebhookEventBus.emit("request.completed", {
+        _id: pendingDocumentId,
+        ...updateFields,
+      });
     } catch (error: unknown) {
       logger.error(
         "RequestLogger: failed to complete pending request",

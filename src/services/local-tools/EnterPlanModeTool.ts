@@ -32,13 +32,19 @@ export default {
   domain: DOMAINS.CORE_PLAN.displayName,
 
   async execute(toolArguments: Record<string, unknown>) {
-    const reason = typeof toolArguments.reason === "string" ? toolArguments.reason : undefined;
+    const reason =
+      typeof toolArguments.reason === "string"
+        ? toolArguments.reason
+        : undefined;
     logger.info(`[EnterPlanMode] ${reason || "(no reason given)"}`);
     return {
       acknowledged: true,
       mode: "plan",
       reason: reason || null,
-      message: PromptLocaleService.get(PromptLocaleService.getDefaultLocale(), "harness.planModeEntry.message"),
+      message: PromptLocaleService.get(
+        PromptLocaleService.getDefaultLocale(),
+        "harness.planModeEntry.message",
+      ),
     };
   },
 };

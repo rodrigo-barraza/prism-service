@@ -15,10 +15,12 @@ const sanitizedString = () =>
     .string()
     .transform((value) => value.replace(/\x00/g, ""))
     .pipe(
-      z.string().refine(
-        (value) => !DISALLOWED_IDENTIFIER_PATTERN.test(value),
-        { message: "String contains disallowed characters (null bytes or path traversal)" },
-      ),
+      z
+        .string()
+        .refine((value) => !DISALLOWED_IDENTIFIER_PATTERN.test(value), {
+          message:
+            "String contains disallowed characters (null bytes or path traversal)",
+        }),
     );
 
 export const ToolSchemaSchema = z.object({

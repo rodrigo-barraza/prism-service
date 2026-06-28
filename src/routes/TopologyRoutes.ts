@@ -18,7 +18,9 @@ router.get("/:topologyId", (request: Request, response: Response) => {
 
   const topologyDefinition = getTopologyById(topologyId);
   if (!topologyDefinition) {
-    return response.status(404).json({ error: `Topology "${topologyId}" not found` });
+    return response
+      .status(404)
+      .json({ error: `Topology "${topologyId}" not found` });
   }
 
   response.json(topologyDefinition);

@@ -59,7 +59,8 @@ const ENGLISH_WRITE_TODO_MARKER = "Write or update a persistent TODO checklist";
 
 // disable_tools (standard localizeSchema path)
 const CAVEMAN_DISABLE_MARKER = "deactivate tool to free context";
-const ENGLISH_DISABLE_MARKER = "Dynamically disable tools from this conversation";
+const ENGLISH_DISABLE_MARKER =
+  "Dynamically disable tools from this conversation";
 
 // ── Tests ──────────────────────────────────────────────────
 
@@ -99,9 +100,7 @@ describe("InternalToolRegistry Locale Handling", () => {
       );
 
       expect(writeTodoSchema).toBeDefined();
-      expect(writeTodoSchema!.description).toContain(
-        ENGLISH_WRITE_TODO_MARKER,
-      );
+      expect(writeTodoSchema!.description).toContain(ENGLISH_WRITE_TODO_MARKER);
     });
 
     it("should produce caveman description for discover_and_enable_tools via buildSchema delegation", () => {
@@ -126,9 +125,7 @@ describe("InternalToolRegistry Locale Handling", () => {
       );
 
       expect(discoverSchema).toBeDefined();
-      expect(discoverSchema!.description).toContain(
-        ENGLISH_DISCOVER_MARKER,
-      );
+      expect(discoverSchema!.description).toContain(ENGLISH_DISCOVER_MARKER);
     });
 
     it("should produce distinct caveman vs english for discover_and_enable_tools", () => {
@@ -244,9 +241,7 @@ describe("InternalToolRegistry Locale Handling", () => {
       );
 
       expect(writeTodoSchema).toBeDefined();
-      expect(writeTodoSchema!.description).toContain(
-        ENGLISH_WRITE_TODO_MARKER,
-      );
+      expect(writeTodoSchema!.description).toContain(ENGLISH_WRITE_TODO_MARKER);
     });
 
     it("should localize discover_and_enable_tools parameter descriptions for caveman", () => {

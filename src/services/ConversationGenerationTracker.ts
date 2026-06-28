@@ -89,7 +89,9 @@ interface ConversationGenerationTrackerInterface {
   update(requestId: string, params?: UpdateParams): void;
   recordChunkTiming(requestId: string, charCount?: number): void;
   complete(requestId: string): void;
-  getConversationStats(agentConversationId: string): ConversationGenerationStats;
+  getConversationStats(
+    agentConversationId: string,
+  ): ConversationGenerationStats;
   getSessionStats(agentConversationId: string): ConversationGenerationStats;
   cleanup(agentConversationId: string): void;
   hasActiveRequests(agentConversationId: string): boolean;
@@ -256,7 +258,8 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
     const conversationSet = conversationIndex.get(entry.agentConversationId);
     if (conversationSet) {
       conversationSet.delete(requestId);
-      if (conversationSet.size === 0) conversationIndex.delete(entry.agentConversationId);
+      if (conversationSet.size === 0)
+        conversationIndex.delete(entry.agentConversationId);
     }
   },
 
@@ -268,7 +271,9 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
    * at least MIN_ELAPSED_SEC seconds. This prevents anomalous spikes
    * from single large chunks arriving in near-zero elapsed time.
    */
-  getConversationStats(agentConversationId: string): ConversationGenerationStats {
+  getConversationStats(
+    agentConversationId: string,
+  ): ConversationGenerationStats {
     const requestIds = conversationIndex.get(agentConversationId);
     const accumulator = conversationAccumulators.get(agentConversationId);
     const completedOutputTokens = accumulator?.completedOutputTokens || 0;
@@ -341,11 +346,15 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
         request.lastTokenTime &&
         effectiveTokens >= MIN_TOKENS_FOR_RATE
       ) {
-        if (request.providerTokPerSec != null && request.providerTokPerSec > 0) {
+        if (
+          request.providerTokPerSec != null &&
+          request.providerTokPerSec > 0
+        ) {
           totalTokPerSec += request.providerTokPerSec;
           generatingCount++;
         } else {
-          const elapsed = (request.lastTokenTime - request.firstTokenTime) / 1000;
+          const elapsed =
+            (request.lastTokenTime - request.firstTokenTime) / 1000;
           if (elapsed >= MIN_ELAPSED_SEC) {
             totalTokPerSec += effectiveTokens / elapsed;
             generatingCount++;

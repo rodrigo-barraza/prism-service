@@ -6,10 +6,12 @@ import PromptLocaleService from "../PromptLocaleService.ts";
 
 const STICKERS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {
-    content: (locale) => PromptLocaleService.get(locale, "personas.stickers.toolPolicyBase"),
+    content: (locale) =>
+      PromptLocaleService.get(locale, "personas.stickers.toolPolicyBase"),
   },
   {
-    content: (locale) => PromptLocaleService.get(locale, "personas.stickers.toolPolicyImage"),
+    content: (locale) =>
+      PromptLocaleService.get(locale, "personas.stickers.toolPolicyImage"),
     requires: [TOOL_NAMES.GENERATE_IMAGE],
   },
 ];
@@ -29,15 +31,33 @@ export const StickersPersona: Persona = {
   identity: (context) => {
     const activeLocale = context.locale || "en";
     const sections = [
-      PromptLocaleService.get(activeLocale, "personas.stickers.corePersonality"),
-      PromptLocaleService.get(activeLocale, "personas.stickers.physicalDescription"),
+      PromptLocaleService.get(
+        activeLocale,
+        "personas.stickers.corePersonality",
+      ),
+      PromptLocaleService.get(
+        activeLocale,
+        "personas.stickers.physicalDescription",
+      ),
       PromptLocaleService.get(activeLocale, "personas.stickers.abilities"),
       PromptLocaleService.get(activeLocale, "personas.stickers.languageRules"),
-      PromptLocaleService.get(activeLocale, "personas.stickers.behaviourPatterns"),
+      PromptLocaleService.get(
+        activeLocale,
+        "personas.stickers.behaviourPatterns",
+      ),
       PromptLocaleService.get(activeLocale, "personas.stickers.grammarRules"),
-      PromptLocaleService.get(activeLocale, "personas.stickers.objectDetectionRules"),
-      PromptLocaleService.get(activeLocale, "personas.stickers.interactionProtocol"),
-      PromptLocaleService.get(activeLocale, "personas.stickers.interactionRules"),
+      PromptLocaleService.get(
+        activeLocale,
+        "personas.stickers.objectDetectionRules",
+      ),
+      PromptLocaleService.get(
+        activeLocale,
+        "personas.stickers.interactionProtocol",
+      ),
+      PromptLocaleService.get(
+        activeLocale,
+        "personas.stickers.interactionRules",
+      ),
     ];
 
     return sections.join("\n\n");

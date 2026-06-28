@@ -76,12 +76,8 @@ export function selectInstanceForMember(
   context: InstanceResolutionContext,
 ): ResolvedInstance {
   const { providerName, resolvedModel } = context;
-  const {
-    isLocal,
-    siblings,
-    instanceModelOverrides,
-    orchestratorFallback,
-  } = resolvedSiblings;
+  const { isLocal, siblings, instanceModelOverrides, orchestratorFallback } =
+    resolvedSiblings;
 
   let assignedProvider = providerName;
   let assignedModel = member.model || resolvedModel;

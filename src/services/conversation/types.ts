@@ -123,7 +123,12 @@ export interface ConversationServiceInterface {
     project: string,
     username: string,
     generating: boolean,
-    options?: { collection?: string; agent?: string; title?: string; agentConversationId?: string },
+    options?: {
+      collection?: string;
+      agent?: string;
+      title?: string;
+      agentConversationId?: string;
+    },
   ): Promise<void>;
   getConversationStats(
     conversationId: string,

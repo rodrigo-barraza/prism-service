@@ -47,19 +47,45 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
     abbreviation: "SP",
     description:
       "Sub-agents execute one at a time in a linear chain. Each agent receives the accumulated output from all prior agents as context, forming a serial pipeline. Worktree merges between steps ensure file changes propagate sequentially. If any step fails, the pipeline aborts immediately. Inspired by Chain-of-Thought prompting — but operates at the multi-agent orchestration level rather than single-prompt reasoning.",
-    paperTitle: "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
+    paperTitle:
+      "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
     paperAuthors: "Wei et al.",
     paperYear: 2022,
     paperUrl: "https://arxiv.org/abs/2201.11903",
     implementationFile: "SequentialRouter.ts",
     categoryLabel: "Serial Execution",
-    phases: ["Dispatch Step", "Accumulate Output", "Merge Worktree", "Next Step"],
+    phases: [
+      "Dispatch Step",
+      "Accumulate Output",
+      "Merge Worktree",
+      "Next Step",
+    ],
     configOptions: [],
     alignment: [
-      { component: "Sequential reasoning", status: "aligned", detail: "Each step builds on prior outputs, mirroring CoT's step-by-step decomposition" },
-      { component: "Context accumulation", status: "aligned", detail: "Prior step outputs are prepended as context, analogous to intermediate reasoning traces" },
-      { component: "Single-prompt scope (paper)", status: "extended", detail: "Paper describes single-prompt reasoning; this extends to multi-agent orchestration across separate LLM calls" },
-      { component: "Few-shot exemplars (paper)", status: "simplified", detail: "Not implemented — paper uses few-shot chain exemplars; this uses direct task prompts" },
+      {
+        component: "Sequential reasoning",
+        status: "aligned",
+        detail:
+          "Each step builds on prior outputs, mirroring CoT's step-by-step decomposition",
+      },
+      {
+        component: "Context accumulation",
+        status: "aligned",
+        detail:
+          "Prior step outputs are prepended as context, analogous to intermediate reasoning traces",
+      },
+      {
+        component: "Single-prompt scope (paper)",
+        status: "extended",
+        detail:
+          "Paper describes single-prompt reasoning; this extends to multi-agent orchestration across separate LLM calls",
+      },
+      {
+        component: "Few-shot exemplars (paper)",
+        status: "simplified",
+        detail:
+          "Not implemented — paper uses few-shot chain exemplars; this uses direct task prompts",
+      },
     ],
     flowDescription: "[A] → [B] → [C] serial accumulation",
   },
@@ -69,7 +95,8 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
     abbreviation: "HP",
     description:
       "Sub-agents execute in full parallel with no inter-agent communication. The orchestrator dispatches all members simultaneously and returns all results. This is the default topology — branches never merge, and each agent works independently on the same task. Conceptually related to Tree-of-Thoughts branching, but without evaluation, backtracking, or branch selection.",
-    paperTitle: "Tree of Thoughts: Deliberate Problem Solving with Large Language Models",
+    paperTitle:
+      "Tree of Thoughts: Deliberate Problem Solving with Large Language Models",
     paperAuthors: "Yao et al.",
     paperYear: 2023,
     paperUrl: "https://arxiv.org/abs/2305.10601",
@@ -78,10 +105,30 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
     phases: ["Fan-out", "Execute Parallel", "Return All"],
     configOptions: [],
     alignment: [
-      { component: "Parallel branching", status: "aligned", detail: "Multiple agents explore the task space simultaneously, analogous to ToT's thought generation" },
-      { component: "Evaluation / scoring (paper)", status: "simplified", detail: "Not implemented — paper scores each thought via deliberate evaluation; this returns all results without ranking" },
-      { component: "Backtracking (paper)", status: "simplified", detail: "Not implemented — paper uses BFS/DFS with backtracking; branches are independent and never revisited" },
-      { component: "Search algorithm (paper)", status: "simplified", detail: "Not implemented — paper uses structured BFS/DFS traversal; this is a single-depth fan-out with no tree structure" },
+      {
+        component: "Parallel branching",
+        status: "aligned",
+        detail:
+          "Multiple agents explore the task space simultaneously, analogous to ToT's thought generation",
+      },
+      {
+        component: "Evaluation / scoring (paper)",
+        status: "simplified",
+        detail:
+          "Not implemented — paper scores each thought via deliberate evaluation; this returns all results without ranking",
+      },
+      {
+        component: "Backtracking (paper)",
+        status: "simplified",
+        detail:
+          "Not implemented — paper uses BFS/DFS with backtracking; branches are independent and never revisited",
+      },
+      {
+        component: "Search algorithm (paper)",
+        status: "simplified",
+        detail:
+          "Not implemented — paper uses structured BFS/DFS traversal; this is a single-depth fan-out with no tree structure",
+      },
     ],
     flowDescription: "[A] [B] [C] → return all",
   },
@@ -97,21 +144,47 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
     paperUrl: "https://arxiv.org/abs/2406.04692",
     implementationFile: "HierarchicalAggregationRouter.ts",
     categoryLabel: "Synthesis",
-    phases: ["Fan-out Proposers", "Execute Parallel", "Aggregation Synthesis", "Layer Stack (optional)"],
+    phases: [
+      "Fan-out Proposers",
+      "Execute Parallel",
+      "Aggregation Synthesis",
+      "Layer Stack (optional)",
+    ],
     configOptions: [
       {
         name: "layerCount",
         type: "number",
         defaultValue: "1",
-        description: "Number of propose→aggregate layers to stack. Each subsequent layer receives the previous layer's synthesis as additional context.",
+        description:
+          "Number of propose→aggregate layers to stack. Each subsequent layer receives the previous layer's synthesis as additional context.",
       },
     ],
     alignment: [
-      { component: "Layered architecture", status: "aligned", detail: "Multi-layer stacking via layerCount config" },
-      { component: "Proposer/Aggregator roles", status: "aligned", detail: "Members are proposers, synthesis LLM is the aggregator" },
-      { component: "Collaborativeness", status: "aligned", detail: "Aggregator sees all proposer outputs as auxiliary information" },
-      { component: "Model diversity", status: "aligned", detail: "Warning logged when all proposers share same model" },
-      { component: "Iterative refinement", status: "aligned", detail: "Each layer's synthesis feeds into next layer as context" },
+      {
+        component: "Layered architecture",
+        status: "aligned",
+        detail: "Multi-layer stacking via layerCount config",
+      },
+      {
+        component: "Proposer/Aggregator roles",
+        status: "aligned",
+        detail: "Members are proposers, synthesis LLM is the aggregator",
+      },
+      {
+        component: "Collaborativeness",
+        status: "aligned",
+        detail: "Aggregator sees all proposer outputs as auxiliary information",
+      },
+      {
+        component: "Model diversity",
+        status: "aligned",
+        detail: "Warning logged when all proposers share same model",
+      },
+      {
+        component: "Iterative refinement",
+        status: "aligned",
+        detail: "Each layer's synthesis feeds into next layer as context",
+      },
     ],
     flowDescription: "[A] [B] [C] → [Σ] merge",
   },
@@ -127,22 +200,53 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
     paperUrl: "https://arxiv.org/abs/2305.14325",
     implementationFile: "PeerToPeerRouter.ts",
     categoryLabel: "Multi-Agent Debate",
-    phases: ["Initialize Agents", "Round-Robin Turns", "Stall Detection", "Final Merge"],
+    phases: [
+      "Initialize Agents",
+      "Round-Robin Turns",
+      "Stall Detection",
+      "Final Merge",
+    ],
     configOptions: [
       {
         name: "rounds",
         type: "number",
         defaultValue: "3",
-        description: "Number of full round-robin discussion cycles before concluding.",
+        description:
+          "Number of full round-robin discussion cycles before concluding.",
       },
     ],
     alignment: [
-      { component: "Multiple agents", status: "aligned", detail: "Multiple agents with configurable models/prompts" },
-      { component: "Multi-round debate", status: "aligned", detail: "Turn-based mesh with shared discussion thread" },
-      { component: "Convergence", status: "aligned", detail: "Stall detection terminates early when agents stop contributing" },
-      { component: "Symmetric design", status: "aligned", detail: "All agents are equal participants in the mesh" },
-      { component: "Stateless agents", status: "extended", detail: "Stateful session reuse via continueSubAgent" },
-      { component: "Worktree merging", status: "extended", detail: "Agents can edit files and see each other's edits" },
+      {
+        component: "Multiple agents",
+        status: "aligned",
+        detail: "Multiple agents with configurable models/prompts",
+      },
+      {
+        component: "Multi-round debate",
+        status: "aligned",
+        detail: "Turn-based mesh with shared discussion thread",
+      },
+      {
+        component: "Convergence",
+        status: "aligned",
+        detail:
+          "Stall detection terminates early when agents stop contributing",
+      },
+      {
+        component: "Symmetric design",
+        status: "aligned",
+        detail: "All agents are equal participants in the mesh",
+      },
+      {
+        component: "Stateless agents",
+        status: "extended",
+        detail: "Stateful session reuse via continueSubAgent",
+      },
+      {
+        component: "Worktree merging",
+        status: "extended",
+        detail: "Agents can edit files and see each other's edits",
+      },
     ],
     flowDescription: "[A] ↔ [B] ↔ [C] round-robin shared board",
   },
@@ -152,32 +256,59 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
     abbreviation: "BoN",
     description:
       "Best-of-N selection where multiple sub-agents solve the same task independently in parallel, then an LLM judge evaluates all outputs and selects the single best result verbatim. Coverage scales log-linearly with sample count per the Large Language Monkeys paper.",
-    paperTitle: "Large Language Monkeys: Scaling Inference Compute with Repeated Sampling",
+    paperTitle:
+      "Large Language Monkeys: Scaling Inference Compute with Repeated Sampling",
     paperAuthors: "Brown et al.",
     paperYear: 2024,
     paperUrl: "https://arxiv.org/abs/2407.21787",
     implementationFile: "TournamentRouter.ts",
     categoryLabel: "Selection",
-    phases: ["Fan-out Candidates", "Execute Parallel", "Automated Verification (optional)", "Judge Evaluation", "Select Winner"],
+    phases: [
+      "Fan-out Candidates",
+      "Execute Parallel",
+      "Automated Verification (optional)",
+      "Judge Evaluation",
+      "Select Winner",
+    ],
     configOptions: [
       {
         name: "enableVerification",
         type: "boolean",
         defaultValue: "false",
-        description: "Enable automated verification (tsc, tests) on each candidate before judge evaluation.",
+        description:
+          "Enable automated verification (tsc, tests) on each candidate before judge evaluation.",
       },
       {
         name: "verificationCommands",
         type: "string",
         defaultValue: "tsc --noEmit,npm test",
-        description: "Comma-separated list of shell commands to run for automated verification.",
+        description:
+          "Comma-separated list of shell commands to run for automated verification.",
       },
     ],
     alignment: [
-      { component: "Repeated sampling", status: "aligned", detail: "Fan-out N sub-agents in parallel" },
-      { component: "Verification", status: "aligned", detail: "Automated verifiers (tsc, tests) run on each candidate when enabled; falls back to LLM judge" },
-      { component: "Coverage scaling", status: "aligned", detail: "Theoretical finding — N/A for implementation" },
-      { component: "Selection", status: "aligned", detail: "Judge selects best result verbatim, informed by verification outcomes" },
+      {
+        component: "Repeated sampling",
+        status: "aligned",
+        detail: "Fan-out N sub-agents in parallel",
+      },
+      {
+        component: "Verification",
+        status: "aligned",
+        detail:
+          "Automated verifiers (tsc, tests) run on each candidate when enabled; falls back to LLM judge",
+      },
+      {
+        component: "Coverage scaling",
+        status: "aligned",
+        detail: "Theoretical finding — N/A for implementation",
+      },
+      {
+        component: "Selection",
+        status: "aligned",
+        detail:
+          "Judge selects best result verbatim, informed by verification outcomes",
+      },
     ],
     flowDescription: "[A] [B] [C] → [✔ Verify] → [Judge] pick best",
   },
@@ -193,19 +324,26 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
     paperUrl: "https://arxiv.org/abs/2303.17651",
     implementationFile: "CriticLoopRouter.ts",
     categoryLabel: "Iterative Refinement",
-    phases: ["Actor Generate", "Critic Evaluate", "Feedback Loop", "Unanimous Pass"],
+    phases: [
+      "Actor Generate",
+      "Critic Evaluate",
+      "Feedback Loop",
+      "Unanimous Pass",
+    ],
     configOptions: [
       {
         name: "maxRounds",
         type: "number",
         defaultValue: "3",
-        description: "Maximum number of actor→critic refinement iterations before force-passing.",
+        description:
+          "Maximum number of actor→critic refinement iterations before force-passing.",
       },
       {
         name: "criticMode",
         type: "string",
         defaultValue: "solo",
-        description: "Critic panel configuration: 'solo' (single critic), 'council' (multiple critics, majority vote), or 'jury' (unanimous consensus required).",
+        description:
+          "Critic panel configuration: 'solo' (single critic), 'council' (multiple critics, majority vote), or 'jury' (unanimous consensus required).",
       },
       {
         name: "criticCount",
@@ -215,12 +353,36 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
       },
     ],
     alignment: [
-      { component: "Generate (initial output)", status: "aligned", detail: "Actor agent produces initial output" },
-      { component: "Feedback (critic)", status: "extended", detail: "Separate critic agent(s), not same-LLM self-critique" },
-      { component: "Refine (incorporate)", status: "aligned", detail: "Actor continues with aggregated critic feedback" },
-      { component: "Iterative loop", status: "aligned", detail: "Loops until unanimous PASS or maxRounds" },
-      { component: "Single-LLM (paper)", status: "extended", detail: "Extended to multi-agent: separate actor + critic roles/models" },
-      { component: "Council / Jury modes", status: "extended", detail: "Original extensions beyond paper scope" },
+      {
+        component: "Generate (initial output)",
+        status: "aligned",
+        detail: "Actor agent produces initial output",
+      },
+      {
+        component: "Feedback (critic)",
+        status: "extended",
+        detail: "Separate critic agent(s), not same-LLM self-critique",
+      },
+      {
+        component: "Refine (incorporate)",
+        status: "aligned",
+        detail: "Actor continues with aggregated critic feedback",
+      },
+      {
+        component: "Iterative loop",
+        status: "aligned",
+        detail: "Loops until unanimous PASS or maxRounds",
+      },
+      {
+        component: "Single-LLM (paper)",
+        status: "extended",
+        detail: "Extended to multi-agent: separate actor + critic roles/models",
+      },
+      {
+        component: "Council / Jury modes",
+        status: "extended",
+        detail: "Original extensions beyond paper scope",
+      },
     ],
     flowDescription: "[Actor] → [Critic] → [Actor] → … until pass",
   },
@@ -230,39 +392,71 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
     abbreviation: "GoT",
     description:
       "A recursive decompose→solve→merge framework where the LLM planner breaks complex tasks into subtasks with optional dependency ordering. Subtasks are grouped into execution tiers via topological sort — each tier runs in parallel, with dependent subtasks receiving prerequisite outputs as context. A final synthesis pass merges all subtask results into a unified output.",
-    paperTitle: "Recursive Decomposition with Dependencies for Generic Divide-and-Conquer Reasoning",
+    paperTitle:
+      "Recursive Decomposition with Dependencies for Generic Divide-and-Conquer Reasoning",
     paperAuthors: "Boussioux et al.",
     paperYear: 2025,
     paperUrl: "https://arxiv.org/abs/2505.02576",
     implementationFile: "DivideAndConquerRouter.ts",
     categoryLabel: "Task Decomposition",
-    phases: ["LLM Planning", "Topological Sort", "Tier-Parallel Execution", "Recursive Sub-Decomposition (optional)", "Synthesis Merge"],
+    phases: [
+      "LLM Planning",
+      "Topological Sort",
+      "Tier-Parallel Execution",
+      "Recursive Sub-Decomposition (optional)",
+      "Synthesis Merge",
+    ],
     configOptions: [
       {
         name: "maxSubtasks",
         type: "number",
         defaultValue: "6",
-        description: "Maximum number of subtasks the planner can generate per decomposition level.",
+        description:
+          "Maximum number of subtasks the planner can generate per decomposition level.",
       },
       {
         name: "maxRecursionDepth",
         type: "number",
         defaultValue: "1",
-        description: "Maximum recursion depth for sub-decomposition. 1 = single-level (default). Max: 3.",
+        description:
+          "Maximum recursion depth for sub-decomposition. 1 = single-level (default). Max: 3.",
       },
       {
         name: "recursionComplexityThreshold",
         type: "number",
         defaultValue: "300",
-        description: "Minimum prompt character length for a subtask to be considered for recursive decomposition.",
+        description:
+          "Minimum prompt character length for a subtask to be considered for recursive decomposition.",
       },
     ],
     alignment: [
-      { component: "Recursive decomposition", status: "aligned", detail: "LLM planner decomposes task into subtasks" },
-      { component: "Dependency DAG", status: "aligned", detail: "Planner outputs dependsOn indices; topological sort groups into tiers" },
-      { component: "Sub-task execution", status: "aligned", detail: "Each subtask dispatched to a sub-agent (tier-parallel)" },
-      { component: "Recomposition", status: "aligned", detail: "Synthesis pass merges all subtask results" },
-      { component: "Recursive depth", status: "aligned", detail: "Subtasks exceeding complexity threshold are recursively decomposed (configurable depth, max 3)" },
+      {
+        component: "Recursive decomposition",
+        status: "aligned",
+        detail: "LLM planner decomposes task into subtasks",
+      },
+      {
+        component: "Dependency DAG",
+        status: "aligned",
+        detail:
+          "Planner outputs dependsOn indices; topological sort groups into tiers",
+      },
+      {
+        component: "Sub-task execution",
+        status: "aligned",
+        detail: "Each subtask dispatched to a sub-agent (tier-parallel)",
+      },
+      {
+        component: "Recomposition",
+        status: "aligned",
+        detail: "Synthesis pass merges all subtask results",
+      },
+      {
+        component: "Recursive depth",
+        status: "aligned",
+        detail:
+          "Subtasks exceeding complexity threshold are recursively decomposed (configurable depth, max 3)",
+      },
     ],
     flowDescription: "[Planner] → [T₁] [T₂] [T₃] → [Synth] → Result",
   },
@@ -278,13 +472,20 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
     paperUrl: "https://arxiv.org/abs/2310.04406",
     implementationFile: "MCTSRouter.ts",
     categoryLabel: "Tree Search",
-    phases: ["UCB1 Select Leaf", "Expand Branches", "LLM Evaluate", "Backpropagate", "Iterate or Terminate"],
+    phases: [
+      "UCB1 Select Leaf",
+      "Expand Branches",
+      "LLM Evaluate",
+      "Backpropagate",
+      "Iterate or Terminate",
+    ],
     configOptions: [
       {
         name: "maxDepth",
         type: "number",
         defaultValue: "3",
-        description: "Maximum depth of the search tree. Limits how deep expansion can go.",
+        description:
+          "Maximum depth of the search tree. Limits how deep expansion can go.",
       },
       {
         name: "branchFactor",
@@ -296,28 +497,69 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
         name: "explorationWeight",
         type: "number",
         defaultValue: "1.414",
-        description: "UCB1 exploration constant (C). Higher values favor exploration over exploitation.",
+        description:
+          "UCB1 exploration constant (C). Higher values favor exploration over exploitation.",
       },
       {
         name: "searchIterations",
         type: "number",
         defaultValue: "maxDepth",
-        description: "Number of select→expand→evaluate→backpropagate cycles. Defaults to maxDepth for cost parity. Increase for broader tree exploration.",
+        description:
+          "Number of select→expand→evaluate→backpropagate cycles. Defaults to maxDepth for cost parity. Increase for broader tree exploration.",
       },
     ],
     alignment: [
-      { component: "Selection (UCB1)", status: "aligned", detail: "Recursive UCB1 tree walk selects most promising unexpanded leaf" },
-      { component: "Expansion", status: "aligned", detail: "Spawns branchFactor sub-agents in parallel from selected leaf" },
-      { component: "Evaluation", status: "aligned", detail: "LLM judge scores branches on correctness/completeness/quality with per-branch feedback" },
-      { component: "Simulation (rollout)", status: "aligned", detail: "LATS paper replaces classical rollouts with LLM value-function evaluation — implemented as specified" },
-      { component: "Backpropagation", status: "aligned", detail: "Running-average V(s) update along parent chain after each expansion" },
-      { component: "Reflection", status: "aligned", detail: "Per-branch evaluator feedback stored on nodes and fed into refinement prompts" },
-      { component: "Tree structure", status: "aligned", detail: "Full tree maintained with UCB1-guided re-visitation of unexplored siblings" },
+      {
+        component: "Selection (UCB1)",
+        status: "aligned",
+        detail:
+          "Recursive UCB1 tree walk selects most promising unexpanded leaf",
+      },
+      {
+        component: "Expansion",
+        status: "aligned",
+        detail: "Spawns branchFactor sub-agents in parallel from selected leaf",
+      },
+      {
+        component: "Evaluation",
+        status: "aligned",
+        detail:
+          "LLM judge scores branches on correctness/completeness/quality with per-branch feedback",
+      },
+      {
+        component: "Simulation (rollout)",
+        status: "aligned",
+        detail:
+          "LATS paper replaces classical rollouts with LLM value-function evaluation — implemented as specified",
+      },
+      {
+        component: "Backpropagation",
+        status: "aligned",
+        detail:
+          "Running-average V(s) update along parent chain after each expansion",
+      },
+      {
+        component: "Reflection",
+        status: "aligned",
+        detail:
+          "Per-branch evaluator feedback stored on nodes and fed into refinement prompts",
+      },
+      {
+        component: "Tree structure",
+        status: "aligned",
+        detail:
+          "Full tree maintained with UCB1-guided re-visitation of unexplored siblings",
+      },
     ],
-    flowDescription: "[UCB1 Select] → [B₁ B₂ B₃] → [Eval] → [Backprop] → [UCB1 Select] → …",
+    flowDescription:
+      "[UCB1 Select] → [B₁ B₂ B₃] → [Eval] → [Backprop] → [UCB1 Select] → …",
   },
 ];
 
-export function getTopologyById(topologyId: string): TopologyDefinition | undefined {
-  return TOPOLOGY_DEFINITIONS.find((definition) => definition.id === topologyId);
+export function getTopologyById(
+  topologyId: string,
+): TopologyDefinition | undefined {
+  return TOPOLOGY_DEFINITIONS.find(
+    (definition) => definition.id === topologyId,
+  );
 }

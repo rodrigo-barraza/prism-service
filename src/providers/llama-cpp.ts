@@ -570,29 +570,31 @@ export function createLlamaCppProvider(
       logger.provider("llama.cpp", "getServerProps");
 
       // Fetch /props and /slots in parallel with independent timeouts
-      const [propsResult, slotsResult, healthResult] = await Promise.allSettled([
-        fetch(`${baseUrl}/props`, {
-          method: "GET",
-          signal: AbortSignal.timeout(3000),
-        }).then((response) => {
-          if (!response.ok) return null;
-          return response.json() as Promise<LlamaCppPropsResponse>;
-        }),
-        fetch(`${baseUrl}/slots`, {
-          method: "GET",
-          signal: AbortSignal.timeout(3000),
-        }).then((response) => {
-          if (!response.ok) return null;
-          return response.json() as Promise<LlamaCppSlotEntry[]>;
-        }),
-        fetch(`${baseUrl}/health`, {
-          method: "GET",
-          signal: AbortSignal.timeout(3000),
-        }).then((response) => {
-          if (!response.ok) return null;
-          return response.json() as Promise<HealthResponse>;
-        }),
-      ]);
+      const [propsResult, slotsResult, healthResult] = await Promise.allSettled(
+        [
+          fetch(`${baseUrl}/props`, {
+            method: "GET",
+            signal: AbortSignal.timeout(3000),
+          }).then((response) => {
+            if (!response.ok) return null;
+            return response.json() as Promise<LlamaCppPropsResponse>;
+          }),
+          fetch(`${baseUrl}/slots`, {
+            method: "GET",
+            signal: AbortSignal.timeout(3000),
+          }).then((response) => {
+            if (!response.ok) return null;
+            return response.json() as Promise<LlamaCppSlotEntry[]>;
+          }),
+          fetch(`${baseUrl}/health`, {
+            method: "GET",
+            signal: AbortSignal.timeout(3000),
+          }).then((response) => {
+            if (!response.ok) return null;
+            return response.json() as Promise<HealthResponse>;
+          }),
+        ],
+      );
 
       const propsData =
         propsResult.status === "fulfilled" ? propsResult.value : null;

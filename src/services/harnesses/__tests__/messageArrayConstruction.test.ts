@@ -21,7 +21,16 @@ import {
 } from "../lifecycle/Finalizer.ts";
 import { PROMPT_DELIMITERS } from "../../../constants.ts";
 
-interface HarnessPayload extends HarnessBasePayload, Pick<MessagePayload, "rawContent" | "isCompactSummary" | "_alreadyPersisted" | "_isInjectedContext"> {
+interface HarnessPayload
+  extends
+    HarnessBasePayload,
+    Pick<
+      MessagePayload,
+      | "rawContent"
+      | "isCompactSummary"
+      | "_alreadyPersisted"
+      | "_isInjectedContext"
+    > {
   _isErrorIndicator?: boolean;
 }
 
@@ -125,7 +134,9 @@ describe("Message Array Construction", () => {
     it("should place injected context at index 2 and user message at index 3 (clean, no system context)", () => {
       expect(currentMessages[2].role).toBe("system");
       expect(currentMessages[2]._isInjectedContext).toBe(true);
-      expect(currentMessages[2].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(currentMessages[2].content).toContain(
+        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+      );
 
       expect(currentMessages[3].role).toBe("user");
       expect(currentMessages[3].content).toBe(
@@ -180,7 +191,9 @@ describe("Message Array Construction", () => {
       expect(systemMessages).toHaveLength(3);
       expect(systemMessages[0].content).toBe(PLATFORM_CONTEXT);
       expect(systemMessages[1].content).toBe(SOMATIC_STATE);
-      expect(systemMessages[2].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(systemMessages[2].content).toContain(
+        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+      );
     });
   });
 
@@ -217,7 +230,9 @@ describe("Message Array Construction", () => {
     it("should place injected context at index 0 and user message at index 1 (clean)", () => {
       expect(currentMessages[0].role).toBe("system");
       expect(currentMessages[0]._isInjectedContext).toBe(true);
-      expect(currentMessages[0].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(currentMessages[0].content).toContain(
+        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+      );
 
       expect(currentMessages[1].role).toBe("user");
       expect(currentMessages[1].content).toBe(
@@ -517,7 +532,9 @@ describe("Message Array Construction", () => {
       });
       expect(currentMessages[4].role).toBe("system");
       expect(currentMessages[4]._isInjectedContext).toBe(true);
-      expect(currentMessages[4].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(currentMessages[4].content).toContain(
+        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+      );
       expect(currentMessages[5].role).toBe("user");
       expect(currentMessages[5].content).toBe("draw me a wolf");
     });
@@ -779,7 +796,9 @@ describe("Message Array Construction", () => {
       expect(currentMessages[somaticIndex].content).toBe(
         "Updated somatic state",
       );
-      expect(currentMessages[injectedContextIndex]._isInjectedContext).toBe(true);
+      expect(currentMessages[injectedContextIndex]._isInjectedContext).toBe(
+        true,
+      );
       expect(currentMessages[lastUserIndex].role).toBe("user");
 
       // Platform should come right before somatic, both before last user
@@ -802,8 +821,7 @@ describe("Message Array Construction", () => {
         systemPrompt: "You are a coding agent.",
         platformContextMessage: null,
         selfContextMessage: null,
-        skillsText:
-          `${PROMPT_DELIMITERS.PROJECT_SKILLS}\n### deploy.sh\nRun deploy script with --env flag`,
+        skillsText: `${PROMPT_DELIMITERS.PROJECT_SKILLS}\n### deploy.sh\nRun deploy script with --env flag`,
         memoriesText: `${PROMPT_DELIMITERS.AGENT_MEMORY}\nUser prefers blue-green deployments`,
       });
 
@@ -816,9 +834,15 @@ describe("Message Array Construction", () => {
         (message) => message._isInjectedContext === true,
       )!;
 
-      expect(injectedContextMessage.content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
-      expect(injectedContextMessage.content).toContain(PROMPT_DELIMITERS.PROJECT_SKILLS);
-      expect(injectedContextMessage.content).toContain(PROMPT_DELIMITERS.AGENT_MEMORY);
+      expect(injectedContextMessage.content).toContain(
+        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+      );
+      expect(injectedContextMessage.content).toContain(
+        PROMPT_DELIMITERS.PROJECT_SKILLS,
+      );
+      expect(injectedContextMessage.content).toContain(
+        PROMPT_DELIMITERS.AGENT_MEMORY,
+      );
 
       // User message stays clean
       expect(userMessage.content).toBe("deploy the project");
@@ -841,8 +865,7 @@ describe("Message Array Construction", () => {
         systemPrompt: "You are Lupos, an artist wolf king...",
         platformContextMessage:
           "Platform: Discord\nServer: Rod's Lab\nChannel: #art",
-        selfContextMessage:
-          `${PROMPT_DELIMITERS.SOMATIC_STATE_PREFIX} — Lupos]\ncurrent_emotion: excited\narousal: 0.8`,
+        selfContextMessage: `${PROMPT_DELIMITERS.SOMATIC_STATE_PREFIX} — Lupos]\ncurrent_emotion: excited\narousal: 0.8`,
       });
 
       // Iteration 1: assistant calls generate_image tool
@@ -894,7 +917,9 @@ describe("Message Array Construction", () => {
       // Verify system messages contain the correct content
       expect(newTurnMessages[0].content).toContain("Discord");
       expect(newTurnMessages[1].content).toContain("Somatic State");
-      expect(newTurnMessages[2].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(newTurnMessages[2].content).toContain(
+        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+      );
     });
   });
 
@@ -1479,8 +1504,7 @@ describe("Message Array Construction", () => {
       // Context compaction (injected by ExhaustionRecovery)
       currentMessages.push({
         role: "user",
-        content:
-          `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX}] Previous 15 messages summarized: User asked about...`,
+        content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX}] Previous 15 messages summarized: User asked about...`,
         isCompactSummary: true,
       });
 
@@ -1500,7 +1524,12 @@ describe("Message Array Construction", () => {
       // Simulate Finalizer sanitization
       const sanitizedMessages = newTurnMessages.filter((message) => {
         if (message.role === "user" && typeof message.content === "string") {
-          if (message.content.startsWith(PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX)) return false;
+          if (
+            message.content.startsWith(
+              PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX,
+            )
+          )
+            return false;
           if (message.isCompactSummary === true) return false;
         }
         return true;
@@ -1511,7 +1540,9 @@ describe("Message Array Construction", () => {
       const compactionMessages = sanitizedMessages.filter(
         (message) =>
           typeof message.content === "string" &&
-          message.content.startsWith(PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX),
+          message.content.startsWith(
+            PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX,
+          ),
       );
       expect(compactionMessages).toHaveLength(0);
     });
@@ -1990,8 +2021,7 @@ describe("Message Array Construction", () => {
           "You are Lupos, an insane recovering-drug-addicted artist wolf king...",
         platformContextMessage:
           "Platform: Discord\nServer: Rod's Lab\nChannel: #art\nGuild ID: 123456789\nChannel ID: 987654321",
-        selfContextMessage:
-          `${PROMPT_DELIMITERS.SOMATIC_STATE_PREFIX} — Lupos]\ncurrent_emotion: inspired\nemotional_valence: 0.85\narousal: 0.75\ndominance: 0.7`,
+        selfContextMessage: `${PROMPT_DELIMITERS.SOMATIC_STATE_PREFIX} — Lupos]\ncurrent_emotion: inspired\nemotional_valence: 0.85\narousal: 0.75\ndominance: 0.7`,
         memoriesText: `${PROMPT_DELIMITERS.AGENT_MEMORY}\nrodrigo likes epic fantasy art`,
       });
 
@@ -2073,7 +2103,9 @@ describe("Message Array Construction", () => {
       // Verify system messages
       expect(newTurnMessages[0].content).toContain("Guild ID: 123456789");
       expect(newTurnMessages[1].content).toContain("current_emotion: inspired");
-      expect(newTurnMessages[2].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(newTurnMessages[2].content).toContain(
+        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+      );
 
       // User message is now clean — memories are in the injected context system message
       expect(newTurnMessages[3].content).toBe(
@@ -2116,8 +2148,6 @@ describe("Message Array Construction", () => {
   // [System Context] version in rawContent
   // ────────────────────────────────────────────────────────────
   describe("rawContent / content swap (Finalizer behavior)", () => {
-
-
     it("should persist clean user message (no rawContent swap needed with new format)", () => {
       const originalMessages: HarnessPayload[] = [
         { role: "user", content: "what time is it?" },
@@ -2133,7 +2163,9 @@ describe("Message Array Construction", () => {
       // After hook: [injected_context_system, user_clean]
       expect(currentMessages).toHaveLength(2);
       expect(currentMessages[0]._isInjectedContext).toBe(true);
-      expect(currentMessages[0].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(currentMessages[0].content).toContain(
+        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+      );
       expect(currentMessages[1].role).toBe("user");
       expect(currentMessages[1].content).toBe("what time is it?");
       expect(currentMessages[1].rawContent).toBeUndefined();
@@ -2163,8 +2195,7 @@ describe("Message Array Construction", () => {
       const alreadySwapped: HarnessPayload = {
         role: "user",
         content: "what time is it?",
-        rawContent:
-          `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\n- Local Time: Sunday\n\n${PROMPT_DELIMITERS.USER_MESSAGE}\nwhat time is it?`,
+        rawContent: `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\n- Local Time: Sunday\n\n${PROMPT_DELIMITERS.USER_MESSAGE}\nwhat time is it?`,
       };
 
       const cloned = { ...alreadySwapped };
@@ -2178,14 +2209,15 @@ describe("Message Array Construction", () => {
     it("should handle legacy messages without rawContent by parsing [System Context] block", () => {
       const legacyMessage: HarnessPayload = {
         role: "user",
-        content:
-          `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\n- Local Time: Sunday\n\n${PROMPT_DELIMITERS.USER_MESSAGE}\nlegacy question here`,
+        content: `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\n- Local Time: Sunday\n\n${PROMPT_DELIMITERS.USER_MESSAGE}\nlegacy question here`,
       };
 
       swapMessageContent(legacyMessage);
 
       expect(legacyMessage.content).toBe("legacy question here");
-      expect(legacyMessage.rawContent).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(legacyMessage.rawContent).toContain(
+        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+      );
     });
   });
 
@@ -3462,7 +3494,9 @@ describe("Message Array Construction", () => {
     it("should place injected context and user message last (clean, no system context prepended)", () => {
       expect(currentMessages[1].role).toBe("system");
       expect(currentMessages[1]._isInjectedContext).toBe(true);
-      expect(currentMessages[1].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(currentMessages[1].content).toContain(
+        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+      );
 
       expect(currentMessages[2].role).toBe("user");
       expect(currentMessages[2].content).toBe("hey lupos, what's up?");
@@ -3571,8 +3605,7 @@ describe("Message Array Construction", () => {
     it("should capture identity prompt from hook context, not from messages array", () => {
       const LUPOS_IDENTITY = "You are Lupos...";
       const PLATFORM_CONTEXT = "Platform: Discord\nServer: Rod's Lab";
-      const SOMATIC_STATE =
-        `${PROMPT_DELIMITERS.SOMATIC_STATE_PREFIX} — Lupos]\ncurrent_emotion: melancholy`;
+      const SOMATIC_STATE = `${PROMPT_DELIMITERS.SOMATIC_STATE_PREFIX} — Lupos]\ncurrent_emotion: melancholy`;
 
       const currentMessages: HarnessPayload[] = [
         { role: "user", content: "hey" },
@@ -3700,7 +3733,9 @@ describe("Message Array Construction", () => {
 
       // Injected context, user message and assistant response should follow
       expect(newTurnMessages[1].role).toBe("system"); // injected context
-      expect(newTurnMessages[1].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(newTurnMessages[1].content).toContain(
+        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+      );
       expect(newTurnMessages[2].role).toBe("user");
       expect(newTurnMessages[3].role).toBe("assistant");
       expect(newTurnMessages).toHaveLength(4);
@@ -3753,12 +3788,14 @@ describe("Message Array Construction", () => {
 
       // Operational context at index 0 must survive
       expect(newTurnMessages[0].role).toBe("system");
-      expect(newTurnMessages[0].content).toContain("sub-agent in a multi-agent system");
+      expect(newTurnMessages[0].content).toContain(
+        "sub-agent in a multi-agent system",
+      );
 
       // Full sequence: system(ops) → system(injected context) → user → assistant(tool) → tool → assistant(final)
       expect(newTurnMessages.map((message) => message.role)).toEqual([
-        "system",    // operational context
-        "system",    // injected context
+        "system", // operational context
+        "system", // injected context
         "user",
         "assistant",
         "tool",
@@ -3777,7 +3814,8 @@ describe("Message Array Construction", () => {
       // Sub-agent with Discord platform context and somatic state
       simulateBeforePromptHook(currentMessages, {
         systemPrompt: "You are Lupos, an artist wolf king...",
-        platformContextMessage: "Platform: Discord\nServer: Rod's Lab\nChannel: #dev",
+        platformContextMessage:
+          "Platform: Discord\nServer: Rod's Lab\nChannel: #dev",
         selfContextMessage: `${PROMPT_DELIMITERS.SOMATIC_STATE_PREFIX} — Lupos]\ncurrent_emotion: focused\narousal: 0.7`,
       });
 
@@ -3796,7 +3834,9 @@ describe("Message Array Construction", () => {
 
       // Operational context must be first
       expect(newTurnMessages[0].role).toBe("system");
-      expect(newTurnMessages[0].content).toContain("sub-agent in a multi-agent system");
+      expect(newTurnMessages[0].content).toContain(
+        "sub-agent in a multi-agent system",
+      );
 
       // Platform and somatic context should also be present (injected by hook)
       const platformMessage = newTurnMessages.find(
@@ -3818,7 +3858,9 @@ describe("Message Array Construction", () => {
       const operationalIndex = newTurnMessages.indexOf(newTurnMessages[0]);
       const platformIndex = newTurnMessages.indexOf(platformMessage!);
       const somaticIndex = newTurnMessages.indexOf(somaticMessage!);
-      const userIndex = newTurnMessages.findIndex((message) => message.role === "user");
+      const userIndex = newTurnMessages.findIndex(
+        (message) => message.role === "user",
+      );
       expect(operationalIndex).toBeLessThan(platformIndex);
       expect(platformIndex).toBeLessThan(somaticIndex);
       expect(somaticIndex).toBeLessThan(userIndex);
@@ -3851,7 +3893,9 @@ describe("Message Array Construction", () => {
 
       // First message should be the injected context, then user message
       expect(newTurnMessages[0].role).toBe("system"); // injected context
-      expect(newTurnMessages[0].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(newTurnMessages[0].content).toContain(
+        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+      );
       expect(newTurnMessages[1].role).toBe("user");
       expect(newTurnMessages[2].role).toBe("assistant");
       expect(newTurnMessages).toHaveLength(3);
@@ -3860,8 +3904,16 @@ describe("Message Array Construction", () => {
     it("should NOT regress multi-turn conversations with _alreadyPersisted messages", () => {
       // Simulates a second turn where prior messages are loaded from MongoDB
       const originalMessages: HarnessPayload[] = [
-        { role: "user", content: "Hello", _alreadyPersisted: true } as HarnessPayload,
-        { role: "assistant", content: "Hi there!", _alreadyPersisted: true } as HarnessPayload,
+        {
+          role: "user",
+          content: "Hello",
+          _alreadyPersisted: true,
+        } as HarnessPayload,
+        {
+          role: "assistant",
+          content: "Hi there!",
+          _alreadyPersisted: true,
+        } as HarnessPayload,
         { role: "user", content: "What's the weather?" },
       ];
       const originalMessageCount = originalMessages.length;
@@ -3886,7 +3938,9 @@ describe("Message Array Construction", () => {
 
       // Should include injected context + new user message + assistant response (not prior persisted turns)
       expect(newTurnMessages[0].role).toBe("system"); // injected context
-      expect(newTurnMessages[0].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(newTurnMessages[0].content).toContain(
+        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+      );
       expect(newTurnMessages[1].role).toBe("user");
       expect(newTurnMessages[1].content).toContain("weather");
       expect(newTurnMessages[2].role).toBe("assistant");
@@ -3897,10 +3951,25 @@ describe("Message Array Construction", () => {
       // After a sub-agent completes its first turn, send_message adds a new user message.
       // The prior messages from the first turn are now _alreadyPersisted.
       const originalMessages: HarnessPayload[] = [
-        { role: "system", content: SUB_AGENT_OPERATIONAL_CONTEXT, _alreadyPersisted: true } as HarnessPayload,
-        { role: "user", content: SUB_AGENT_TASK_PROMPT, _alreadyPersisted: true } as HarnessPayload,
-        { role: "assistant", content: "Done with the refactor.", _alreadyPersisted: true } as HarnessPayload,
-        { role: "user", content: "Now also update the tests in tests/auth.test.ts" },
+        {
+          role: "system",
+          content: SUB_AGENT_OPERATIONAL_CONTEXT,
+          _alreadyPersisted: true,
+        } as HarnessPayload,
+        {
+          role: "user",
+          content: SUB_AGENT_TASK_PROMPT,
+          _alreadyPersisted: true,
+        } as HarnessPayload,
+        {
+          role: "assistant",
+          content: "Done with the refactor.",
+          _alreadyPersisted: true,
+        } as HarnessPayload,
+        {
+          role: "user",
+          content: "Now also update the tests in tests/auth.test.ts",
+        },
       ];
       const originalMessageCount = originalMessages.length;
       const currentMessages: HarnessPayload[] = [...originalMessages];
@@ -3925,7 +3994,9 @@ describe("Message Array Construction", () => {
       // Injected context + new follow-up user message + assistant should be persisted
       // The operational context was already persisted in the first turn
       expect(newTurnMessages[0].role).toBe("system"); // injected context
-      expect(newTurnMessages[0].content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(newTurnMessages[0].content).toContain(
+        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+      );
       expect(newTurnMessages[1].role).toBe("user");
       expect(newTurnMessages[1].content).toContain("update the tests");
       expect(newTurnMessages[2].role).toBe("assistant");
@@ -3980,7 +4051,8 @@ describe("Message Array Construction", () => {
 
       currentMessages.push({
         role: "assistant",
-        content: "Both sub-agents completed successfully. Here's the summary...",
+        content:
+          "Both sub-agents completed successfully. Here's the summary...",
         model: "gemini-2.5-pro",
         provider: "google",
       });
@@ -3998,11 +4070,11 @@ describe("Message Array Construction", () => {
 
       // Full sequence preserved (with injected context)
       expect(newTurnMessages.map((message) => message.role)).toEqual([
-        "system",    // operational context
-        "system",    // injected context (skills, memories, local time)
-        "user",      // task prompt
+        "system", // operational context
+        "system", // injected context (skills, memories, local time)
+        "user", // task prompt
         "assistant", // tool call (create_team)
-        "tool",      // tool result
+        "tool", // tool result
         "assistant", // final synthesis
       ]);
     });
@@ -4024,7 +4096,10 @@ describe("Message Array Construction", () => {
      */
     function simulateAgenticLoopPersistenceMarking(
       messages: HarnessPayload[],
-      { isSubAgent = false, isNewConversation = false }: { isSubAgent?: boolean; isNewConversation?: boolean },
+      {
+        isSubAgent = false,
+        isNewConversation = false,
+      }: { isSubAgent?: boolean; isNewConversation?: boolean },
     ): void {
       if (!isSubAgent && !isNewConversation && messages.length > 0) {
         for (let index = 0; index < messages.length - 1; index++) {
@@ -4037,41 +4112,62 @@ describe("Message Array Construction", () => {
       it("should NOT mark any messages as _alreadyPersisted when isNewConversation is true", () => {
         const messages: HarnessPayload[] = [
           { role: "user", content: "i love you lupos!", name: "rodrigo" },
-          { role: "assistant", content: "Hehehe, you incredible Nitro-boosting hero" },
+          {
+            role: "assistant",
+            content: "Hehehe, you incredible Nitro-boosting hero",
+          },
           { role: "user", content: "how have you been?", name: "rodrigo" },
-          { role: "assistant", content: "Between us, this agonizing tolerance break..." },
+          {
+            role: "assistant",
+            content: "Between us, this agonizing tolerance break...",
+          },
           { role: "user", content: "hey bro", name: "rodrigo" },
         ];
 
-        simulateAgenticLoopPersistenceMarking(messages, { isNewConversation: true });
+        simulateAgenticLoopPersistenceMarking(messages, {
+          isNewConversation: true,
+        });
 
-        const markedMessages = messages.filter((message) => (message as any)._alreadyPersisted);
+        const markedMessages = messages.filter(
+          (message) => (message as any)._alreadyPersisted,
+        );
         expect(markedMessages).toHaveLength(0);
       });
 
       it("should persist ALL messages (full Discord history) via computeNewTurnMessages", () => {
         const originalMessages: HarnessPayload[] = [
           { role: "user", content: "i love you lupos!", name: "rodrigo" },
-          { role: "assistant", content: "Hehehe, you incredible Nitro-boosting hero" },
+          {
+            role: "assistant",
+            content: "Hehehe, you incredible Nitro-boosting hero",
+          },
           { role: "user", content: "how have you been?", name: "rodrigo" },
-          { role: "assistant", content: "Between us, this agonizing tolerance break..." },
+          {
+            role: "assistant",
+            content: "Between us, this agonizing tolerance break...",
+          },
           { role: "user", content: "hey bro", name: "rodrigo" },
         ];
         const originalMessageCount = originalMessages.length;
 
-        simulateAgenticLoopPersistenceMarking(originalMessages, { isNewConversation: true });
+        simulateAgenticLoopPersistenceMarking(originalMessages, {
+          isNewConversation: true,
+        });
 
         const currentMessages: HarnessPayload[] = [...originalMessages];
 
         simulateBeforePromptHook(currentMessages, {
-          systemPrompt: "You are Lupos, an insane recovering-drug-addicted artist wolf king...",
-          platformContextMessage: "Platform: Discord\nServer: Classic Whitemane\nChannel: #politics",
+          systemPrompt:
+            "You are Lupos, an insane recovering-drug-addicted artist wolf king...",
+          platformContextMessage:
+            "Platform: Discord\nServer: Classic Whitemane\nChannel: #politics",
           selfContextMessage: "current_emotion: dominance\narousal: 0.53",
         });
 
         currentMessages.push({
           role: "assistant",
-          content: "My sober mind is a lethal weapon of absolute authority today...",
+          content:
+            "My sober mind is a lethal weapon of absolute authority today...",
           model: "gemini-3.5-flash",
           provider: "google",
         });
@@ -4083,9 +4179,15 @@ describe("Message Array Construction", () => {
         );
 
         // All 5 original messages + 3 system (platform, somatic, injected context) + 1 assistant = 9
-        const userMessages = newTurnMessages.filter((message) => message.role === "user");
-        const assistantMessages = newTurnMessages.filter((message) => message.role === "assistant");
-        const systemMessages = newTurnMessages.filter((message) => message.role === "system");
+        const userMessages = newTurnMessages.filter(
+          (message) => message.role === "user",
+        );
+        const assistantMessages = newTurnMessages.filter(
+          (message) => message.role === "assistant",
+        );
+        const systemMessages = newTurnMessages.filter(
+          (message) => message.role === "system",
+        );
 
         expect(userMessages).toHaveLength(3);
         expect(userMessages[0].content).toBe("i love you lupos!");
@@ -4093,23 +4195,39 @@ describe("Message Array Construction", () => {
         expect(userMessages[2].content).toBe("hey bro");
 
         expect(assistantMessages).toHaveLength(3);
-        expect(assistantMessages[0].content).toBe("Hehehe, you incredible Nitro-boosting hero");
-        expect(assistantMessages[1].content).toBe("Between us, this agonizing tolerance break...");
-        expect(assistantMessages[2].content).toBe("My sober mind is a lethal weapon of absolute authority today...");
+        expect(assistantMessages[0].content).toBe(
+          "Hehehe, you incredible Nitro-boosting hero",
+        );
+        expect(assistantMessages[1].content).toBe(
+          "Between us, this agonizing tolerance break...",
+        );
+        expect(assistantMessages[2].content).toBe(
+          "My sober mind is a lethal weapon of absolute authority today...",
+        );
 
         expect(systemMessages.length).toBeGreaterThanOrEqual(2);
       });
 
       it("should persist multi-user Discord conversation history", () => {
         const originalMessages: HarnessPayload[] = [
-          { role: "user", content: "what do you guys think about the new patch?", name: "kvz" },
+          {
+            role: "user",
+            content: "what do you guys think about the new patch?",
+            name: "kvz",
+          },
           { role: "user", content: "it's broken lol", name: "skippi" },
           { role: "user", content: "lib flesh….", name: "skippi" },
-          { role: "user", content: "@Lupos what's your take?", name: "rodrigo" },
+          {
+            role: "user",
+            content: "@Lupos what's your take?",
+            name: "rodrigo",
+          },
         ];
         const originalMessageCount = originalMessages.length;
 
-        simulateAgenticLoopPersistenceMarking(originalMessages, { isNewConversation: true });
+        simulateAgenticLoopPersistenceMarking(originalMessages, {
+          isNewConversation: true,
+        });
 
         const currentMessages: HarnessPayload[] = [...originalMessages];
 
@@ -4120,7 +4238,8 @@ describe("Message Array Construction", () => {
 
         currentMessages.push({
           role: "assistant",
-          content: "The patch is garbage and you're all garbage for playing it.",
+          content:
+            "The patch is garbage and you're all garbage for playing it.",
           model: "gemini-3.5-flash",
           provider: "google",
         });
@@ -4131,7 +4250,9 @@ describe("Message Array Construction", () => {
           originalMessageCount,
         );
 
-        const userMessages = newTurnMessages.filter((message) => message.role === "user");
+        const userMessages = newTurnMessages.filter(
+          (message) => message.role === "user",
+        );
         expect(userMessages).toHaveLength(4);
         expect(userMessages[0].name).toBe("kvz");
         expect(userMessages[1].name).toBe("skippi");
@@ -4145,7 +4266,9 @@ describe("Message Array Construction", () => {
         ];
         const originalMessageCount = originalMessages.length;
 
-        simulateAgenticLoopPersistenceMarking(originalMessages, { isNewConversation: true });
+        simulateAgenticLoopPersistenceMarking(originalMessages, {
+          isNewConversation: true,
+        });
 
         const currentMessages: HarnessPayload[] = [...originalMessages];
 
@@ -4166,8 +4289,12 @@ describe("Message Array Construction", () => {
           originalMessageCount,
         );
 
-        const userMessages = newTurnMessages.filter((message) => message.role === "user");
-        const assistantMessages = newTurnMessages.filter((message) => message.role === "assistant");
+        const userMessages = newTurnMessages.filter(
+          (message) => message.role === "user",
+        );
+        const assistantMessages = newTurnMessages.filter(
+          (message) => message.role === "assistant",
+        );
 
         expect(userMessages).toHaveLength(1);
         expect(userMessages[0].content).toBe("@Lupos draw me a wolf");
@@ -4183,7 +4310,9 @@ describe("Message Array Construction", () => {
           { role: "user", content: "What's the weather?" },
         ];
 
-        simulateAgenticLoopPersistenceMarking(messages, { isNewConversation: false });
+        simulateAgenticLoopPersistenceMarking(messages, {
+          isNewConversation: false,
+        });
 
         expect((messages[0] as any)._alreadyPersisted).toBe(true);
         expect((messages[1] as any)._alreadyPersisted).toBe(true);
@@ -4212,7 +4341,9 @@ describe("Message Array Construction", () => {
         ];
         const originalMessageCount = originalMessages.length;
 
-        simulateAgenticLoopPersistenceMarking(originalMessages, { isNewConversation: false });
+        simulateAgenticLoopPersistenceMarking(originalMessages, {
+          isNewConversation: false,
+        });
 
         const currentMessages: HarnessPayload[] = [...originalMessages];
 
@@ -4233,8 +4364,12 @@ describe("Message Array Construction", () => {
           originalMessageCount,
         );
 
-        const userMessages = newTurnMessages.filter((message) => message.role === "user");
-        const assistantMessages = newTurnMessages.filter((message) => message.role === "assistant");
+        const userMessages = newTurnMessages.filter(
+          (message) => message.role === "user",
+        );
+        const assistantMessages = newTurnMessages.filter(
+          (message) => message.role === "assistant",
+        );
 
         // Only the new turn: injected context + "What's the weather?" + assistant reply
         expect(userMessages).toHaveLength(1);
@@ -4251,9 +4386,14 @@ describe("Message Array Construction", () => {
           { role: "user", content: "Refactor the auth module." },
         ];
 
-        simulateAgenticLoopPersistenceMarking(messages, { isSubAgent: true, isNewConversation: false });
+        simulateAgenticLoopPersistenceMarking(messages, {
+          isSubAgent: true,
+          isNewConversation: false,
+        });
 
-        const markedMessages = messages.filter((message) => (message as any)._alreadyPersisted);
+        const markedMessages = messages.filter(
+          (message) => (message as any)._alreadyPersisted,
+        );
         expect(markedMessages).toHaveLength(0);
       });
     });
@@ -4262,7 +4402,9 @@ describe("Message Array Construction", () => {
       it("should handle empty message array for new conversation without crashing", () => {
         const messages: HarnessPayload[] = [];
 
-        simulateAgenticLoopPersistenceMarking(messages, { isNewConversation: true });
+        simulateAgenticLoopPersistenceMarking(messages, {
+          isNewConversation: true,
+        });
         expect(messages).toHaveLength(0);
       });
 
@@ -4271,7 +4413,9 @@ describe("Message Array Construction", () => {
           { role: "user", content: "Solo message" },
         ];
 
-        simulateAgenticLoopPersistenceMarking(messages, { isNewConversation: false });
+        simulateAgenticLoopPersistenceMarking(messages, {
+          isNewConversation: false,
+        });
 
         // Single message = the triggering input, nothing marked
         expect((messages[0] as any)._alreadyPersisted).toBeUndefined();
@@ -4286,10 +4430,16 @@ describe("Message Array Construction", () => {
             name: index % 2 === 0 ? `user_${index % 4}` : undefined,
           });
         }
-        originalMessages.push({ role: "user", content: "@Lupos final message", name: "rodrigo" });
+        originalMessages.push({
+          role: "user",
+          content: "@Lupos final message",
+          name: "rodrigo",
+        });
         const originalMessageCount = originalMessages.length;
 
-        simulateAgenticLoopPersistenceMarking(originalMessages, { isNewConversation: true });
+        simulateAgenticLoopPersistenceMarking(originalMessages, {
+          isNewConversation: true,
+        });
 
         const currentMessages: HarnessPayload[] = [...originalMessages];
 
@@ -4310,13 +4460,19 @@ describe("Message Array Construction", () => {
           originalMessageCount,
         );
 
-        const userMessages = newTurnMessages.filter((message) => message.role === "user");
-        const assistantMessages = newTurnMessages.filter((message) => message.role === "assistant");
+        const userMessages = newTurnMessages.filter(
+          (message) => message.role === "user",
+        );
+        const assistantMessages = newTurnMessages.filter(
+          (message) => message.role === "assistant",
+        );
 
         // 11 user messages (10 alternating + 1 final) + 9 from history + 1 new = 10 assistant
         expect(userMessages).toHaveLength(11);
         expect(assistantMessages).toHaveLength(10);
-        expect(userMessages[userMessages.length - 1].content).toBe("@Lupos final message");
+        expect(userMessages[userMessages.length - 1].content).toBe(
+          "@Lupos final message",
+        );
       });
 
       it("should truncate existing conversation history correctly even with many prior turns", () => {
@@ -4330,7 +4486,9 @@ describe("Message Array Construction", () => {
         originalMessages.push({ role: "user", content: "Latest question" });
         const originalMessageCount = originalMessages.length;
 
-        simulateAgenticLoopPersistenceMarking(originalMessages, { isNewConversation: false });
+        simulateAgenticLoopPersistenceMarking(originalMessages, {
+          isNewConversation: false,
+        });
 
         const currentMessages: HarnessPayload[] = [...originalMessages];
 
@@ -4351,8 +4509,12 @@ describe("Message Array Construction", () => {
           originalMessageCount,
         );
 
-        const userMessages = newTurnMessages.filter((message) => message.role === "user");
-        const assistantMessages = newTurnMessages.filter((message) => message.role === "assistant");
+        const userMessages = newTurnMessages.filter(
+          (message) => message.role === "user",
+        );
+        const assistantMessages = newTurnMessages.filter(
+          (message) => message.role === "assistant",
+        );
 
         // Only the new turn persisted (injected context + latest question + answer)
         expect(userMessages).toHaveLength(1);
@@ -4363,4 +4525,3 @@ describe("Message Array Construction", () => {
     });
   });
 });
-
