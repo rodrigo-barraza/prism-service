@@ -305,7 +305,6 @@ export function createVllmProvider(
             messages,
             model,
             temperature: 0.7,
-            max_tokens: -1,
             stream: false,
           },
         );

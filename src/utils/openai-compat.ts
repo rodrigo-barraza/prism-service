@@ -207,7 +207,10 @@ export function buildPayloadParams(
         : undefined,
     stop:
       options.stopSequences !== undefined ? options.stopSequences : undefined,
-    max_tokens: options.maxTokens || maxTokens,
+    max_tokens:
+      (options.maxTokens || maxTokens) > 0
+        ? options.maxTokens || maxTokens
+        : undefined,
     // Reproducibility seed — supported by OpenAI-compat servers (vLLM, LM Studio, llama.cpp)
     ...(options.seed !== undefined &&
       options.seed !== "" && { seed: Number(options.seed) }),
