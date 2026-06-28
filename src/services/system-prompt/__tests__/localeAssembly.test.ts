@@ -7,7 +7,7 @@
  * path (ConfigRoutes /system-prompt-preview) correctly localized the prompt,
  * but the agent chat path (ReActHarness → beforePrompt hook) did not.
  *
- * Symptom: Selecting "Caveman 🪨" locale in the chat sidebar produces a
+ * Symptom: Selecting "Caveman" locale in the chat sidebar produces a
  * correctly localized preview ("Who You Are"), but after sending a message,
  * the persisted system prompt reverts to English ("Identity").
  */

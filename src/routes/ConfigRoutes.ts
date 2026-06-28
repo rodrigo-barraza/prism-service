@@ -678,7 +678,7 @@ const LOCALE_LABELS: Record<string, string> = {
   it: "Italiano",
   ru: "Русский",
   ar: "العربية",
-  caveman: "Caveman 🪨",
+  caveman: "Caveman",
 };
 
 /**
