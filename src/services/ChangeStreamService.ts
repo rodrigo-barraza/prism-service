@@ -30,6 +30,7 @@ export interface ChangeStreamEventPayload {
   timestamp: string;
   isGenerating?: boolean;
   conversationId?: string | null;
+  parentAgentConversationId?: string | null;
 }
 
 export type ChangeStreamCallback = (payload: ChangeStreamEventPayload) => void;
@@ -102,13 +103,20 @@ function openStream(db: Db, collectionName: string) {
         }
       }
 
-      // Enrich requests with conversationId for session-scoped live updates.
-      // Covers both insert (pending skeleton) and update (completion) phases.
       if (
         collectionName === COLLECTIONS.REQUESTS &&
         fullDocument?.conversationId
       ) {
         payload.conversationId = fullDocument.conversationId as string;
+      }
+
+      // Enrich requests with parentAgentConversationId so the client can
+      // match sub-agent request events by walking up the agent hierarchy.
+      if (
+        collectionName === COLLECTIONS.REQUESTS &&
+        fullDocument?.parentAgentConversationId
+      ) {
+        payload.parentAgentConversationId = fullDocument.parentAgentConversationId as string;
       }
 
       // Broadcast to all registered listeners
