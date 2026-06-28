@@ -414,15 +414,20 @@ export default class BaseAgenticHarness {
   private estimateInputTokens(messages: ConversationMessage[]): number {
     let totalTokens = 0;
     for (const message of messages) {
-      const content = typeof message.content === "string" ? message.content : "";
+      const content =
+        typeof message.content === "string"
+          ? message.content
+          : message.content
+            ? JSON.stringify(message.content)
+            : "";
       totalTokens += estimateTokens(content);
       if ((message as ChatMessage).thinking) {
         totalTokens += estimateTokens((message as ChatMessage).thinking as string);
       }
-      if ((message as ChatMessage).tool_calls) {
-        totalTokens += estimateTokens(
-          JSON.stringify((message as ChatMessage).tool_calls),
-        );
+      const toolCalls =
+        (message as ChatMessage).toolCalls || (message as ChatMessage).tool_calls;
+      if (toolCalls) {
+        totalTokens += estimateTokens(JSON.stringify(toolCalls));
       }
       if ((message as ChatMessage).images && Array.isArray((message as ChatMessage).images)) {
         totalTokens += ((message as ChatMessage).images as unknown[]).length * 1000;
