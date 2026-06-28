@@ -65,6 +65,22 @@ import AgentPersonaRegistry from "../src/services/AgentPersonaRegistry.ts";
 import { afterEach } from "vitest";
 
 const waitForAgentRegistration = () => new Promise((resolve) => setTimeout(resolve, 50));
+
+/**
+ * Polls until the mock has been called at least `expectedCalls` times.
+ * Used for non-blocking createTeam tests where background promises
+ * resolve asynchronously.
+ */
+async function waitForMockCalls(mock: ReturnType<typeof vi.fn>, expectedCalls: number, timeoutMs = 2000): Promise<void> {
+  const startTime = Date.now();
+  while (mock.mock.calls.length < expectedCalls) {
+    if (Date.now() - startTime > timeoutMs) {
+      throw new Error(`Timed out waiting for mock to be called ${expectedCalls} times (got ${mock.mock.calls.length})`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
 let resolveDeferredPromise: ((value: any) => void) | undefined = undefined;
 
 function cleanAllConversations() {
@@ -138,6 +154,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       prompt: "Do default stuff",
       files: [],
       orchestratorContext,
+      awaitCompletion: true,
     });
 
     expect(result).toBeDefined();
@@ -168,6 +185,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       agent: "Lupos",
       files: [],
       orchestratorContext,
+      awaitCompletion: true,
     });
 
     expect(result).toBeDefined();
@@ -206,6 +224,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
     mockRunAgenticLoop.mockClear();
 
     const results = await OrchestratorService.createTeam(teamArgs, orchestratorContext);
+    await waitForMockCalls(mockRunAgenticLoop, 2);
 
     expect(results).toHaveLength(2);
     expect(mockRunAgenticLoop).toHaveBeenCalledTimes(2);
@@ -314,6 +333,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       prompt: "Perform task",
       files: [],
       orchestratorContext,
+      awaitCompletion: true,
     });
 
     expect(mockRunAgenticLoop).toHaveBeenCalled();
@@ -334,6 +354,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       prompt: "Perform task",
       files: [],
       orchestratorContext,
+      awaitCompletion: true,
     });
 
     expect(mockRunAgenticLoop).toHaveBeenCalled();
@@ -354,6 +375,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       prompt: "Perform task",
       files: [],
       orchestratorContext,
+      awaitCompletion: true,
     });
 
     expect(mockRunAgenticLoop).toHaveBeenCalled();
@@ -380,6 +402,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         prompt: "Do work",
         files: [],
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       expect(mockUpdateOne).toHaveBeenCalledWith(
@@ -412,7 +435,8 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Sub-agent with custom parent",
         prompt: "Do work",
         files: [],
-        orchestratorContext: customContext,
+        awaitCompletion: true,
+      orchestratorContext: customContext,
       });
 
       const hasSubAgentsCall = mockUpdateOne.mock.calls.find(
@@ -440,6 +464,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         prompt: "Do work",
         files: [],
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       const collectionCalls = getCollectionSpy.mock.calls;
@@ -463,6 +488,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         prompt: "Do work",
         files: [],
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       expect(result).toBeDefined();
@@ -485,6 +511,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         prompt: "Do work",
         files: [],
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       expect(result).toBeDefined();
@@ -511,6 +538,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       };
 
       await OrchestratorService.createTeam(teamArgs, orchestratorContext);
+      await waitForMockCalls(mockRunAgenticLoop, 2);
 
       const hasSubAgentsCalls = mockUpdateOne.mock.calls.filter(
         (call: unknown[]) =>
@@ -552,6 +580,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       };
 
       const results = await OrchestratorService.createTeam(teamArgs, orchestratorContext);
+      await waitForMockCalls(mockRunAgenticLoop, 2);
       expect(results).toHaveLength(2);
 
       expect(mockRunAgenticLoop).toHaveBeenCalledTimes(2);
@@ -581,6 +610,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         prompt: "Run task",
         files: [],
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       expect(result).toBeDefined();
@@ -608,7 +638,8 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Verify worktree creation",
         prompt: "Run task",
         files: ["/path/to/repo/file.ts"],
-        orchestratorContext: contextWithWorkspace,
+        awaitCompletion: true,
+      orchestratorContext: contextWithWorkspace,
       });
 
       expect(GitWorktreeHelper.createWorktree).toHaveBeenCalled();
@@ -636,7 +667,8 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Verify diff collection",
         prompt: "Run task",
         files: ["/path/to/repo/file.ts"],
-        orchestratorContext: contextWithWorkspace,
+        awaitCompletion: true,
+      orchestratorContext: contextWithWorkspace,
       });
 
       expect(GitWorktreeHelper.getWorktreeDiff).toHaveBeenCalled();
@@ -663,7 +695,8 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Verify worktree cleanup",
         prompt: "Run task",
         files: ["/path/to/repo/file.ts"],
-        orchestratorContext: contextWithWorkspace,
+        awaitCompletion: true,
+      orchestratorContext: contextWithWorkspace,
       });
 
       expect(GitWorktreeHelper.removeWorktree).toHaveBeenCalledWith("/workspace", "/path/to/repo/worktree-abc123");
@@ -683,7 +716,8 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Verify worktree preservation",
         prompt: "Run task",
         files: ["/path/to/repo/file.ts"],
-        orchestratorContext: contextWithWorkspace,
+        awaitCompletion: true,
+      orchestratorContext: contextWithWorkspace,
         preserveWorktree: true,
       });
 
@@ -707,8 +741,10 @@ describe("OrchestratorService Spawning & Agent Types", () => {
             description: `Agent ${i}`,
             prompt: "Do work",
             files: [],
-            orchestratorContext: {
+            awaitCompletion: true,
+      orchestratorContext: {
               ...orchestratorContext,
+      awaitCompletion: true,
               agentConversationId: `session-id-456-${i}`,
               conversationId: `conv-id-789-${i}`,
             },
@@ -723,6 +759,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         prompt: "Do work",
         files: [],
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       expect(result11).toBeDefined();
@@ -747,16 +784,19 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Seq 1",
         prompt: "Prompt 1",
         orchestratorContext,
+      awaitCompletion: true,
       });
       const res2 = await OrchestratorService.spawnFromTool({
         description: "Seq 2",
         prompt: "Prompt 2",
         orchestratorContext,
+      awaitCompletion: true,
       });
       const res3 = await OrchestratorService.spawnFromTool({
         description: "Seq 3",
         prompt: "Prompt 3",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       expect(res1).toBeDefined();
@@ -778,7 +818,8 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       const result = await OrchestratorService.spawnFromTool({
         description: "Depth 0 test",
         prompt: "Do work",
-        orchestratorContext: contextWithZeroDepth,
+        awaitCompletion: true,
+      orchestratorContext: contextWithZeroDepth,
       });
 
       expect(result).toBeDefined();
@@ -796,7 +837,8 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       const result = await OrchestratorService.spawnFromTool({
         description: "Exceeded depth test",
         prompt: "Do work",
-        orchestratorContext: contextWithExceededDepth,
+        awaitCompletion: true,
+      orchestratorContext: contextWithExceededDepth,
       });
 
       expect(result).toBeDefined();
@@ -815,7 +857,8 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       await OrchestratorService.spawnFromTool({
         description: "Attenuation test",
         prompt: "Do work",
-        orchestratorContext: contextWithAttenuation,
+        awaitCompletion: true,
+      orchestratorContext: contextWithAttenuation,
       });
 
       const lastCall = mockRunAgenticLoop.mock.calls[mockRunAgenticLoop.mock.calls.length - 1][0];
@@ -832,7 +875,8 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       await OrchestratorService.spawnFromTool({
         description: "Depth increment test",
         prompt: "Do work",
-        orchestratorContext: context,
+        awaitCompletion: true,
+      orchestratorContext: context,
       });
 
       const lastCall = mockRunAgenticLoop.mock.calls[mockRunAgenticLoop.mock.calls.length - 1][0];
@@ -850,8 +894,10 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         await OrchestratorService.spawnFromTool({
           description: `CB Agent ${i}`,
           prompt: "Do work",
-          orchestratorContext: {
+          awaitCompletion: true,
+      orchestratorContext: {
             ...orchestratorContext,
+      awaitCompletion: true,
             agentConversationId: `session-id-cb-${i}`,
             conversationId: parentConversationId,
           },
@@ -861,8 +907,10 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       const resultExceeded = await OrchestratorService.spawnFromTool({
         description: `CB Agent ${MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}`,
         prompt: "Do work",
-        orchestratorContext: {
+        awaitCompletion: true,
+      orchestratorContext: {
           ...orchestratorContext,
+      awaitCompletion: true,
           agentConversationId: `session-id-cb-${MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}`,
           conversationId: parentConversationId,
         },
@@ -887,6 +935,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Running agent",
         prompt: "Prompt",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       await waitForAgentRegistration();
@@ -919,6 +968,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Completed agent",
         prompt: "Prompt",
         orchestratorContext,
+      awaitCompletion: true,
       });
       const agentId = (spawnResult as any).agent_id;
 
@@ -937,6 +987,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Completish agent",
         prompt: "Prompt",
         orchestratorContext,
+      awaitCompletion: true,
       });
       const agentId = (spawnResult as any).agent_id;
 
@@ -961,6 +1012,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "To be stopped",
         prompt: "Prompt",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       await waitForAgentRegistration();
@@ -1004,6 +1056,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Output agent",
         prompt: "Do something",
         orchestratorContext,
+      awaitCompletion: true,
       });
       const agentId = (spawnResult as any).agent_id;
 
@@ -1024,6 +1077,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Running output agent",
         prompt: "Do something",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       await waitForAgentRegistration();
@@ -1054,6 +1108,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Team agent",
         prompt: "Prompt",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       await waitForAgentRegistration();
@@ -1088,8 +1143,10 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         const resA = await OrchestratorService.spawnFromTool({
           description: "Agent A",
           prompt: "Prompt A",
-          orchestratorContext: {
+          awaitCompletion: true,
+      orchestratorContext: {
             ...orchestratorContext,
+      awaitCompletion: true,
             conversationId: "root-conv",
             agentConversationId: "session-root",
           },
@@ -1105,8 +1162,10 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         const resB = await OrchestratorService.spawnFromTool({
           description: "Agent B",
           prompt: "Prompt B",
-          orchestratorContext: {
+          awaitCompletion: true,
+      orchestratorContext: {
             ...orchestratorContext,
+      awaitCompletion: true,
             conversationId: "2-uuid-val-2",
             agentConversationId: agentAId,
           },
@@ -1137,6 +1196,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Cleanup agent",
         prompt: "Prompt",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       await waitForAgentRegistration();
@@ -1167,6 +1227,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Failing cleanup agent",
         prompt: "Prompt",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       await waitForAgentRegistration();
@@ -1198,8 +1259,10 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       await OrchestratorService.spawnFromTool({
         description: "Fallback test",
         prompt: "Do work",
-        orchestratorContext: {
+        awaitCompletion: true,
+      orchestratorContext: {
           ...orchestratorContext,
+      awaitCompletion: true,
           providerName: "google",
         },
       });
@@ -1222,8 +1285,10 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       await OrchestratorService.spawnFromTool({
         description: "Queue fallback test",
         prompt: "Do work",
-        orchestratorContext: {
+        awaitCompletion: true,
+      orchestratorContext: {
           ...orchestratorContext,
+      awaitCompletion: true,
           providerName: "google",
         },
       });
@@ -1245,8 +1310,10 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       await OrchestratorService.spawnFromTool({
         description: "Error fallback test",
         prompt: "Do work",
-        orchestratorContext: {
+        awaitCompletion: true,
+      orchestratorContext: {
           ...orchestratorContext,
+      awaitCompletion: true,
           providerName: "google",
         },
       });
@@ -1270,6 +1337,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "To abort",
         prompt: "Prompt",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       await waitForAgentRegistration();
@@ -1313,6 +1381,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Running to continue",
         prompt: "Prompt",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       await waitForAgentRegistration();
@@ -1337,6 +1406,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Failing continuation agent",
         prompt: "Prompt",
         orchestratorContext,
+      awaitCompletion: true,
       });
       const agentId = (spawnResult as any).agent_id;
 
@@ -1363,7 +1433,8 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Failed worktree agent",
         prompt: "Run task",
         files: ["/parent/workspace/root/file.ts"],
-        orchestratorContext: contextWithWorkspace,
+        awaitCompletion: true,
+      orchestratorContext: contextWithWorkspace,
       });
 
       const lastCall = mockRunAgenticLoop.mock.calls[mockRunAgenticLoop.mock.calls.length - 1][0];
@@ -1376,6 +1447,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         prompt: "Do work",
         agent: "NON_EXISTENT_PERSONA_ABC",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       const lastCall = mockRunAgenticLoop.mock.calls[mockRunAgenticLoop.mock.calls.length - 1][0];
@@ -1396,6 +1468,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         prompt: "Do work",
         files: [],
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       expect(mockUpdateOne).toHaveBeenCalled();
@@ -1409,6 +1482,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Failed loop agent",
         prompt: "Prompt",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       expect(result).toBeDefined();
@@ -1428,6 +1502,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Filesystem error agent",
         prompt: "Prompt",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       expect(mockRunAgenticLoop).toHaveBeenCalled();
@@ -1498,6 +1573,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       };
 
       await OrchestratorService.createTeam(teamArgs, contextWithoutDepth);
+      await new Promise((resolve) => setTimeout(resolve, 0));
       expect(mockRunAgenticLoop).toHaveBeenCalled();
 
       getSectionSpy.mockRestore();
@@ -1512,7 +1588,8 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       const result = await OrchestratorService.spawnFromTool({
         description: "Invalid provider agent",
         prompt: "Prompt",
-        orchestratorContext: invalidContext,
+        awaitCompletion: true,
+      orchestratorContext: invalidContext,
       });
 
       expect(result).toBeDefined();
@@ -1530,7 +1607,8 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       await OrchestratorService.spawnFromTool({
         description: "Max recursion depth agent",
         prompt: "Prompt",
-        orchestratorContext: contextAtMaxDepth,
+        awaitCompletion: true,
+      orchestratorContext: contextAtMaxDepth,
       });
 
       expect(mockRunAgenticLoop).toHaveBeenCalled();
@@ -1552,7 +1630,8 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       await OrchestratorService.spawnFromTool({
         description: "Max recursion depth schema tools agent",
         prompt: "Prompt",
-        orchestratorContext: contextAtMaxDepth,
+        awaitCompletion: true,
+      orchestratorContext: contextAtMaxDepth,
       });
 
       expect(mockRunAgenticLoop).toHaveBeenCalled();
@@ -1569,6 +1648,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Spawning complete agent",
         prompt: "Do task",
         orchestratorContext,
+      awaitCompletion: true,
       });
       const agentId = (spawnResult as any).agent_id;
 
@@ -1602,6 +1682,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         description: "Failing worktree delete",
         prompt: "Prompt",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       await waitForAgentRegistration();

@@ -411,6 +411,7 @@ export class MCTSRouter implements TopologyRouter {
           round: iteration,
           totalRounds: searchIterations,
           orchestratorContext,
+        awaitCompletion: true,
         });
       }
 

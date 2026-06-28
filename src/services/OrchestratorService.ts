@@ -47,6 +47,8 @@ import type {
 
 import type { ConversationMessage, LLMProvider } from "./harnesses/types.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import ConversationService from "./ConversationService.ts";
+import { COLLECTIONS } from "../constants.ts";
 
 type AgenticLoopServiceModule = typeof import("./AgenticLoopService.ts");
 
@@ -219,6 +221,7 @@ export default class OrchestratorService {
     totalRounds,
     orchestratorContext,
     preserveWorktree,
+    awaitCompletion = false,
   }: OrchestratorSpawnParams): Promise<SubAgentResult | { error: string }> {
     const {
       project,
@@ -530,61 +533,130 @@ export default class OrchestratorService {
         provider: subAgentProvider,
       });
     }
-    // Run the sub-agent loop — blocks until the sub-agent completes.
-    // When multiple team_create calls appear in the same model response,
-    // the agentic loop's Promise.all executes them concurrently.
-    try {
-      await OrchestratorService._runSubAgentLoop(
-        subAgentState,
-        prompt,
-        orchestratorContext,
-        preserveWorktree,
-      );
-    } catch (error: unknown) {
-      logger.error(
-        `[Orchestrator] Sub-agent ${agentId} loop error: ${getErrorMessage(error)}`,
-      );
-      subAgentState.status = "failed";
-      subAgentState.error = getErrorMessage(error);
-      subAgentState.durationMs = Date.now() - subAgentState.startedAt;
+    // ── Sub-agent dispatch ───────────────────────────────────────
+    // awaitCompletion=true:  Block until the sub-agent finishes.
+    //                        Used by sequential/dependent routers
+    //                        (SequentialRouter, CriticLoopRouter, etc.)
+    // awaitCompletion=false: Fire-and-forget — parent continues immediately.
+    //                        Used by parallel routers (HierarchicalRouter, etc.)
+    //                        Results are retrieved later via get_task_output.
 
-      // Clean up worktree on failure to prevent orphaned branches
-      if (subAgentState.isolated && subAgentState.worktreePath) {
-        await GitWorktreeHelper.removeWorktree(
-          subAgentState.repositoryPath,
-          subAgentState.worktreePath,
-        ).catch((cleanupError: unknown) =>
-          logger.warn(
-            `[Orchestrator] Worktree cleanup failed for ${agentId}: ${getErrorMessage(cleanupError)}`,
-          ),
+    if (awaitCompletion) {
+      // ── Blocking mode (for sequential/dependent topologies) ────
+      try {
+        await OrchestratorService._runSubAgentLoop(
+          subAgentState,
+          prompt,
+          orchestratorContext,
+          preserveWorktree,
         );
+      } catch (error: unknown) {
+        logger.error(
+          `[Orchestrator] Sub-agent ${agentId} loop error: ${getErrorMessage(error)}`,
+        );
+        subAgentState.status = "failed";
+        subAgentState.error = getErrorMessage(error);
+        subAgentState.durationMs = Date.now() - subAgentState.startedAt;
+
+        if (subAgentState.isolated && subAgentState.worktreePath) {
+          await GitWorktreeHelper.removeWorktree(
+            subAgentState.repositoryPath,
+            subAgentState.worktreePath,
+          ).catch((cleanupError: unknown) =>
+            logger.warn(
+              `[Orchestrator] Worktree cleanup failed for ${agentId}: ${getErrorMessage(cleanupError)}`,
+            ),
+          );
+        }
+
+        if (orchestratorContext.emit) {
+          orchestratorContext.emit({
+            type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
+            subAgentId: agentId,
+            message: "failed",
+            error: getErrorMessage(error),
+          });
+        }
       }
 
-      // Notify frontend immediately so the StatusBar stops showing "Generating..."
       if (orchestratorContext.emit) {
         orchestratorContext.emit({
-          type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
-          subAgentId: agentId,
-          message: "failed",
-          error: getErrorMessage(error),
+          type: SERVER_SENT_EVENT_TYPES.STATUS,
+          message: STATUS_MESSAGES.SUB_AGENTS_UPDATED,
         });
       }
+
+      const subAgentResult = buildSubAgentResult(subAgentState);
+      subAgentState.messages = null;
+      logger.info(
+        `[Orchestrator] Sub-agent ${agentId} result (blocking): status=${subAgentResult.status} toolUses=${subAgentResult.toolUses} durationMs=${subAgentResult.durationMs}`,
+      );
+      return subAgentResult;
     }
 
-    // Notify UI that sub-agent state changed
-    if (orchestratorContext.emit) {
-      orchestratorContext.emit({
-        type: SERVER_SENT_EVENT_TYPES.STATUS,
-        message: STATUS_MESSAGES.SUB_AGENTS_UPDATED,
+    // ── Non-blocking mode (default — for parallel topologies) ────
+    // Launch the sub-agent loop as a detached background promise.
+    // spawnFromTool returns immediately so the parent's agentic loop
+    // is free to continue. Completion/failure emits SSE events, and
+    // results are retrievable via get_task_output.
+    OrchestratorService._runSubAgentLoop(
+      subAgentState,
+      prompt,
+      orchestratorContext,
+      preserveWorktree,
+    )
+      .then(() => {
+        if (orchestratorContext.emit) {
+          orchestratorContext.emit({
+            type: SERVER_SENT_EVENT_TYPES.STATUS,
+            message: STATUS_MESSAGES.SUB_AGENTS_UPDATED,
+          });
+        }
+
+        const completedResult = buildSubAgentResult(subAgentState);
+        subAgentState.messages = null;
+        logger.info(
+          `[Orchestrator] Sub-agent ${agentId} completed: status=${completedResult.status} toolUses=${completedResult.toolUses} durationMs=${completedResult.durationMs}`,
+        );
+      })
+      .catch((error: unknown) => {
+        logger.error(
+          `[Orchestrator] Sub-agent ${agentId} loop error: ${getErrorMessage(error)}`,
+        );
+        subAgentState.status = "failed";
+        subAgentState.error = getErrorMessage(error);
+        subAgentState.durationMs = Date.now() - subAgentState.startedAt;
+
+        if (subAgentState.isolated && subAgentState.worktreePath) {
+          GitWorktreeHelper.removeWorktree(
+            subAgentState.repositoryPath,
+            subAgentState.worktreePath,
+          ).catch((cleanupError: unknown) =>
+            logger.warn(
+              `[Orchestrator] Worktree cleanup failed for ${agentId}: ${getErrorMessage(cleanupError)}`,
+            ),
+          );
+        }
+
+        if (orchestratorContext.emit) {
+          orchestratorContext.emit({
+            type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
+            subAgentId: agentId,
+            message: "failed",
+            error: getErrorMessage(error),
+          });
+          orchestratorContext.emit({
+            type: SERVER_SENT_EVENT_TYPES.STATUS,
+            message: STATUS_MESSAGES.SUB_AGENTS_UPDATED,
+          });
+        }
       });
-    }
 
-    const subAgentResult = buildSubAgentResult(subAgentState);
-    subAgentState.messages = null; // Release heavy message data from RAM after copying to result
+    const inProgressResult = buildSubAgentResult(subAgentState);
     logger.info(
-      `[Orchestrator] Sub-agent ${agentId} result: status=${subAgentResult.status} toolUses=${subAgentResult.toolUses} durationMs=${subAgentResult.durationMs}`,
+      `[Orchestrator] Sub-agent ${agentId} dispatched (non-blocking): status=${inProgressResult.status}`,
     );
-    return subAgentResult;
+    return inProgressResult;
   }
 
   static async sendMessage(
@@ -1095,33 +1167,80 @@ export default class OrchestratorService {
       router = new HierarchicalRouter();
     }
 
-    const spawnResults = await router.execute(
+    // ── Event-driven dispatch: router runs in the background ────
+    // The router.execute() runs as a detached promise. createTeam()
+    // returns immediately so the parent's agentic loop continues.
+    // Routers internally still await their children (awaitCompletion: true)
+    // since they need results between steps — but the PARENT doesn't block.
+    // Completion fires SSE events; results are retrievable via get_task_output.
+    const spawnedAgentIds: string[] = [];
+
+    router.execute(
       teamCreationArguments.name,
       teamCreationArguments.members,
       orchestratorContext,
-      (assignment: OrchestratorSpawnParams) =>
-        OrchestratorService.spawnFromTool(assignment),
+      (assignment: OrchestratorSpawnParams) => {
+        const spawnPromise = OrchestratorService.spawnFromTool(assignment);
+        spawnPromise.then((result) => {
+          if ("agent_id" in result) {
+            spawnedAgentIds.push(result.agent_id);
+          }
+        });
+        return spawnPromise;
+      },
       (agentId: string, prompt: string, context: OrchestratorContext, round?: number) =>
         OrchestratorService.continueAgent(agentId, prompt, context, round),
       teamCreationArguments.topologyConfig,
-    );
-
-    const agentIds = spawnResults
-      .map((result: SubAgentResult | { error: string }) =>
-        "agent_id" in result ? result.agent_id : undefined,
-      )
-      .filter((agentId): agentId is string => typeof agentId === "string");
-
-    const teamEntry = {
-      agentIds,
-      createdAt: Date.now(),
-    };
+    )
+      .then((routerResults) => {
+        logger.info(
+          `[Orchestrator] Router "${topology}" completed for team "${teamCreationArguments.name}" — ${routerResults.length} result(s)`,
+        );
+        if (orchestratorContext.emit) {
+          orchestratorContext.emit({
+            type: SERVER_SENT_EVENT_TYPES.STATUS,
+            message: STATUS_MESSAGES.SUB_AGENTS_UPDATED,
+          });
+        }
+        OrchestratorService._notifyParentOfRouterCompletion(
+          teamCreationArguments.name,
+          topology,
+          routerResults,
+          orchestratorContext,
+        ).catch((notificationError: unknown) => {
+          logger.warn(
+            `[Orchestrator] Failed to notify parent of router completion: ${getErrorMessage(notificationError)}`,
+          );
+        });
+      })
+      .catch((routerError: unknown) => {
+        logger.error(
+          `[Orchestrator] Router "${topology}" failed for team "${teamCreationArguments.name}": ${getErrorMessage(routerError)}`,
+        );
+        if (orchestratorContext.emit) {
+          orchestratorContext.emit({
+            type: SERVER_SENT_EVENT_TYPES.STATUS,
+            message: STATUS_MESSAGES.SUB_AGENTS_UPDATED,
+          });
+        }
+      });
 
     logger.info(
-      `[Orchestrator] createTeam complete: created ${teamEntry.agentIds.length} agents via topology "${topology}"`,
+      `[Orchestrator] createTeam dispatched (non-blocking): team "${teamCreationArguments.name}" via topology "${topology}" with ${teamCreationArguments.members.length} member(s)`,
     );
 
-    return spawnResults;
+    // Return immediately — router is executing in background
+    return teamCreationArguments.members.map((member, memberIndex) => ({
+      agent_id: `pending-${memberIndex}`,
+      description: member.description,
+      status: "running",
+      summary: "",
+      result: null,
+      toolUses: 0,
+      iterations: 0,
+      durationMs: 0,
+      messages: [],
+    } as SubAgentResult));
   }
 
   static async deleteTeam(
@@ -1764,5 +1883,239 @@ export default class OrchestratorService {
       orchestratorContext.providerName,
       activeSubAgents,
     );
+  }
+
+  // ── Router Completion Notification ──────────────────────────
+  // Persists sub-agent results into the parent conversation so the
+  // parent LLM has full context on the next user interaction.
+  static async _notifyParentOfRouterCompletion(
+    teamName: string,
+    topology: string,
+    routerResults: (SubAgentResult | { error: string })[],
+    orchestratorContext: OrchestratorContext,
+  ): Promise<void> {
+    const { conversationId, project, username } = orchestratorContext;
+    if (!conversationId || !project || !username) return;
+
+    const resultSummaries = routerResults.map((result, resultIndex) => {
+      if ("error" in result) {
+        return `Agent ${resultIndex + 1}: ❌ Error — ${result.error}`;
+      }
+      const agentStatus = result.status === "completed" ? "✅" : `⚠️ ${result.status}`;
+      const agentOutput = result.result
+        ? (typeof result.result === "string" ? result.result : JSON.stringify(result.result))
+        : "(no output)";
+      const truncatedOutput = agentOutput.length > 2000
+        ? agentOutput.slice(0, 2000) + "\n... (truncated)"
+        : agentOutput;
+      return [
+        `Agent ${resultIndex + 1} (${result.description || result.agent_id}): ${agentStatus}`,
+        `  Duration: ${result.durationMs}ms | Tools: ${result.toolUses} | Iterations: ${result.iterations}`,
+        `  Output: ${truncatedOutput}`,
+      ].join("\n");
+    });
+
+    const completionMessage = {
+      role: "tool" as const,
+      content: [
+        `[SUB-AGENT TEAM COMPLETED] Team "${teamName}" (${topology}) finished.`,
+        ``,
+        ...resultSummaries,
+      ].join("\n"),
+      name: "create_team",
+      timestamp: new Date().toISOString(),
+    };
+
+    try {
+      await ConversationService.appendMessages(
+        conversationId,
+        project,
+        username,
+        [completionMessage],
+        null,
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS },
+      );
+      logger.info(
+        `[Orchestrator] Injected router completion notification into parent conversation ${conversationId}`,
+      );
+    } catch (persistenceError: unknown) {
+      logger.warn(
+        `[Orchestrator] Failed to persist router completion message: ${getErrorMessage(persistenceError)}`,
+      );
+    }
+
+    // Trigger a background agentic loop so the parent LLM processes
+    // the sub-agent results and auto-responds in the conversation.
+    OrchestratorService._triggerParentAutoResponse(
+      conversationId,
+      project,
+      username,
+      orchestratorContext,
+      completionMessage as ConversationMessage,
+    ).catch((autoResponseError: unknown) => {
+      logger.warn(
+        `[Orchestrator] Parent auto-response failed for conversation ${conversationId}: ${getErrorMessage(autoResponseError)}`,
+      );
+    });
+  }
+
+  // ── Parent Auto-Response ─────────────────────────────────────
+  // Triggers a headless agentic loop on the parent conversation so
+  // the LLM processes the sub-agent completion results and generates
+  // a response without requiring user input.
+  // Follows the ConversationTimerService.executeAgenticLoop pattern.
+  static async _triggerParentAutoResponse(
+    conversationId: string,
+    project: string,
+    username: string,
+    orchestratorContext: OrchestratorContext,
+    completionMessage: ConversationMessage,
+  ): Promise<void> {
+    const MongoWrapper = (await import("../wrappers/MongoWrapper.ts"))
+      .default;
+    const { MONGO_DB_NAME: databaseName } = await import("../../config.ts");
+
+    const database = MongoWrapper.getDb(databaseName);
+    if (!database) {
+      logger.warn(
+        `[Orchestrator] Cannot trigger auto-response: database not connected`,
+      );
+      return;
+    }
+
+    // Check if the parent conversation is currently generating (user is mid-conversation)
+    const conversationCollection = MongoWrapper.getCollection(
+      databaseName,
+      COLLECTIONS.AGENT_CONVERSATIONS,
+    );
+    if (!conversationCollection) return;
+
+    const conversation = await conversationCollection.findOne({
+      id: conversationId,
+      project,
+      username,
+    });
+    if (!conversation) {
+      logger.warn(
+        `[Orchestrator] Cannot trigger auto-response: conversation ${conversationId} not found`,
+      );
+      return;
+    }
+
+    // If the parent is currently generating, skip auto-response — the user
+    // is actively chatting and will see results in the next turn naturally.
+    if (conversation.isGenerating) {
+      logger.info(
+        `[Orchestrator] Skipping auto-response for ${conversationId}: parent is currently generating`,
+      );
+      return;
+    }
+
+    logger.info(
+      `[Orchestrator] Triggering parent auto-response for conversation ${conversationId}`,
+    );
+
+    const settings = (conversation.settings || {}) as Record<string, unknown>;
+    const providerName = (settings.provider as string) || orchestratorContext.providerName;
+    const resolvedModel = (settings.model as string) || orchestratorContext.resolvedModel;
+    const agent = (settings.agent as string | null) || orchestratorContext.agent;
+    const workspaceRoot = (settings.workspaceRoot as string | null) || orchestratorContext.workspaceRoot || null;
+
+    if (!providerName || !resolvedModel) {
+      logger.warn(
+        `[Orchestrator] Cannot trigger auto-response: missing provider/model settings`,
+      );
+      return;
+    }
+
+    const provider = getProvider(providerName);
+    const { getModelByName } = await import("../config.js");
+    const modelDefinition = getModelByName(resolvedModel);
+
+    if (!provider) {
+      logger.warn(
+        `[Orchestrator] Cannot trigger auto-response: provider ${providerName} unavailable`,
+      );
+      return;
+    }
+
+    const contextMessages = [
+      ...((conversation.messages as ConversationMessage[]) || []),
+      completionMessage,
+    ];
+
+    const backgroundEmit = (event: { type: string; [key: string]: unknown }) => {
+      logger.debug(
+        `[Orchestrator][AutoResponse][${conversationId}][Event] type=${event.type}`,
+      );
+    };
+
+    // Mark conversation as generating so the client shows the typing indicator
+    await ConversationService.setGenerating(
+      conversationId,
+      project,
+      username,
+      true,
+      { collection: COLLECTIONS.AGENT_CONVERSATIONS, agent: agent || undefined },
+    );
+
+    const { default: AgenticLoopService } = await import("./AgenticLoopService.ts");
+
+    try {
+      await AgenticLoopService.runAgenticLoop({
+        provider: provider as unknown as LLMProvider,
+        providerName,
+        resolvedModel,
+        modelDefinition,
+        messages: contextMessages,
+        originalMessages: contextMessages,
+        options: {
+          agenticLoopEnabled: true,
+          functionCallingEnabled: true,
+          planFirst: false,
+          autoApprove: true,
+          minContextLength: 120_000,
+          ...(typeof settings.toolConfig === "object" && settings.toolConfig !== null
+            ? {
+                enabledTools: (settings.toolConfig as Record<string, unknown>).enabledTools as string[] | undefined,
+                disabledTools: (settings.toolConfig as Record<string, unknown>).disabledTools as string[] | undefined,
+              }
+            : {}),
+        },
+        agentConversationId: crypto.randomUUID(),
+        conversationId,
+        userMessage: completionMessage,
+        conversationMeta: {
+          title: (conversation.title as string) || "Sub-Agent Auto-Response",
+          settings,
+        },
+        traceId: (conversation.traceId as string) || crypto.randomUUID(),
+        project,
+        username,
+        clientIp: "127.0.0.1",
+        agent,
+        workspaceRoot,
+        requestId: crypto.randomUUID(),
+        requestStart: performance.now(),
+        emit: backgroundEmit,
+      });
+
+      logger.success(
+        `[Orchestrator] Parent auto-response completed for conversation ${conversationId}`,
+      );
+    } catch (autoResponseError: unknown) {
+      logger.error(
+        `[Orchestrator] Parent auto-response error for conversation ${conversationId}: ${getErrorMessage(autoResponseError)}`,
+      );
+      throw autoResponseError;
+    } finally {
+      await ConversationService.setGenerating(
+        conversationId,
+        project,
+        username,
+        false,
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS },
+      ).catch(() => {});
+    }
   }
 }

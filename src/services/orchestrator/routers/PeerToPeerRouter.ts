@@ -216,6 +216,7 @@ export class PeerToPeerRouter implements TopologyRouter {
           round: currentRound,
           totalRounds: totalRoundsCount,
           orchestratorContext,
+            awaitCompletion: true,
           preserveWorktree: true,
         };
 
