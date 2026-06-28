@@ -342,14 +342,20 @@ describe("OrchestratorService Spawning & Agent Types", () => {
 
     await OrchestratorService.spawnFromTool({
       description: "Test sub-agent prompt without workspace setup",
-      prompt: "Perform task",
+      prompt: "Perform task without workspace setup",
       files: [],
       orchestratorContext,
       awaitCompletion: true,
     });
 
     expect(mockRunAgenticLoop).toHaveBeenCalled();
-    const runArguments = mockRunAgenticLoop.mock.calls[0][0];
+    const runArgumentsCall = mockRunAgenticLoop.mock.calls.find(call => {
+      const messages = call[0].messages;
+      const userMsg = messages[messages.length - 1];
+      return userMsg && userMsg.content === "Perform task without workspace setup";
+    });
+    expect(runArgumentsCall).toBeDefined();
+    const runArguments = runArgumentsCall![0];
     const userMessageContent = runArguments.messages[0].content;
 
     expect(userMessageContent).not.toContain("Only modify files within your workspace");
@@ -363,14 +369,20 @@ describe("OrchestratorService Spawning & Agent Types", () => {
 
     await OrchestratorService.spawnFromTool({
       description: "Test sub-agent prompt with unavailable workspace",
-      prompt: "Perform task",
+      prompt: "Perform task with unavailable workspace",
       files: [],
       orchestratorContext,
       awaitCompletion: true,
     });
 
     expect(mockRunAgenticLoop).toHaveBeenCalled();
-    const runArguments = mockRunAgenticLoop.mock.calls[0][0];
+    const runArgumentsCall = mockRunAgenticLoop.mock.calls.find(call => {
+      const messages = call[0].messages;
+      const userMsg = messages[messages.length - 1];
+      return userMsg && userMsg.content === "Perform task with unavailable workspace";
+    });
+    expect(runArgumentsCall).toBeDefined();
+    const runArguments = runArgumentsCall![0];
     const userMessageContent = runArguments.messages[0].content;
 
     expect(userMessageContent).not.toContain("Only modify files within your workspace");
@@ -384,14 +396,20 @@ describe("OrchestratorService Spawning & Agent Types", () => {
 
     await OrchestratorService.spawnFromTool({
       description: "Test sub-agent prompt with available workspace",
-      prompt: "Perform task",
+      prompt: "Perform task with available workspace",
       files: [],
       orchestratorContext,
       awaitCompletion: true,
     });
 
     expect(mockRunAgenticLoop).toHaveBeenCalled();
-    const runArguments = mockRunAgenticLoop.mock.calls[0][0];
+    const runArgumentsCall = mockRunAgenticLoop.mock.calls.find(call => {
+      const messages = call[0].messages;
+      const userMsg = messages[messages.length - 1];
+      return userMsg && userMsg.content === "Perform task with available workspace";
+    });
+    expect(runArgumentsCall).toBeDefined();
+    const runArguments = runArgumentsCall![0];
     const userMessageContent = runArguments.messages[0].content;
 
     expect(userMessageContent).toContain("Only modify files within your workspace");
