@@ -2132,7 +2132,7 @@ export default class OrchestratorService {
     const resultBody = resultSummaries.join("\n\n");
 
     const completionMessage = {
-      role: "system" as const,
+      role: "user" as const,
       content: [
         `<task-notification>`,
         `<status>${overallStatus}</status>`,
@@ -2315,7 +2315,7 @@ export default class OrchestratorService {
       (conversation.messages as ConversationMessage[]) || []
     ).some(
       (message: ConversationMessage) =>
-        message.role === "system" &&
+        message.role === "user" &&
         message.content === completionMessage.content,
     );
 
