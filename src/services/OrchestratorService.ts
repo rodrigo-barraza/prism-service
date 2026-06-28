@@ -1009,27 +1009,50 @@ export default class OrchestratorService {
   }
 
   static cleanupConversation(parentAgentConversationId: string): void {
-    const keys = [];
+    const keysToRemove: string[] = [];
+    const keysPreserved: string[] = [];
     const conversationIdsToClean = new Set<string>();
     for (const [key, subAgentState] of activeSubAgents.entries()) {
       if (
         subAgentState.parentAgentConversationId === parentAgentConversationId
       ) {
-        keys.push(key);
+        // Preserve sub-agents that are still running (non-blocking dispatch).
+        // They will be cleaned up when they complete or are explicitly stopped.
+        if (subAgentState.status === "running") {
+          keysPreserved.push(key);
+          continue;
+        }
+        keysToRemove.push(key);
         if (subAgentState.parentConversationId) {
           conversationIdsToClean.add(subAgentState.parentConversationId);
         }
       }
     }
-    for (const key of keys) {
+    for (const key of keysToRemove) {
       activeSubAgents.delete(key);
     }
+    // Only clean conversation counters when no running agents remain for that conversation
     for (const conversationId of conversationIdsToClean) {
-      agentCountersByConversation.delete(conversationId);
+      const hasRunningAgentsForConversation = Array.from(
+        activeSubAgents.values(),
+      ).some(
+        (subAgent) =>
+          subAgent.parentConversationId === conversationId &&
+          subAgent.status === "running",
+      );
+      if (!hasRunningAgentsForConversation) {
+        agentCountersByConversation.delete(conversationId);
+      }
     }
-    logger.info(
-      `[Orchestrator] Cleaned up conversation ${parentAgentConversationId} from active registry`,
-    );
+    if (keysPreserved.length > 0) {
+      logger.info(
+        `[Orchestrator] Cleaned up conversation ${parentAgentConversationId}: removed ${keysToRemove.length}, preserved ${keysPreserved.length} running agent(s)`,
+      );
+    } else {
+      logger.info(
+        `[Orchestrator] Cleaned up conversation ${parentAgentConversationId} from active registry`,
+      );
+    }
   }
 
   static cleanupSession(parentAgentConversationId: string): void {
