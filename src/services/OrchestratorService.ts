@@ -225,6 +225,7 @@ export default class OrchestratorService {
     orchestratorContext,
     preserveWorktree,
     awaitCompletion = false,
+    onRegistered,
   }: OrchestratorSpawnParams): Promise<SubAgentResult | { error: string }> {
     const {
       project,
@@ -556,6 +557,14 @@ export default class OrchestratorService {
         provider: subAgentProvider,
       });
     }
+
+    // ── Registration callback ─────────────────────────────────────
+    // Fires BEFORE the agentic loop starts, so createTeam's barrier
+    // can capture the real agent ID and return it immediately.
+    if (onRegistered) {
+      onRegistered(buildSubAgentResult(subAgentState));
+    }
+
     // ── Sub-agent dispatch ───────────────────────────────────────
     // awaitCompletion=true:  Block until the sub-agent finishes.
     //                        Used by sequential/dependent routers
@@ -1215,28 +1224,50 @@ export default class OrchestratorService {
       router = new HierarchicalRouter();
     }
 
-    // ── Event-driven dispatch: router runs in the background ────
-    // The router.execute() runs as a detached promise. createTeam()
-    // returns immediately so the parent's agentic loop continues.
-    // Routers internally still await their children (awaitCompletion: true)
-    // since they need results between steps — but the PARENT doesn't block.
-    // Completion fires SSE events; results are retrievable via get_task_output.
-    const spawnedAgentIds: string[] = [];
+    // ── Non-blocking dispatch with registration barrier ──────────
+    // The router runs in the background (detached promise). createTeam()
+    // returns immediately after all initial sub-agents have registered
+    // (real agent IDs allocated, worktrees created) — but BEFORE their
+    // agentic loops finish. SSE events stream progress to the client.
+    // When the router completes, _notifyParentOfRouterCompletion fires
+    // the auto-response.
+    //
+    // The onRegistered callback fires inside spawnFromTool after agent
+    // ID allocation and state registration but BEFORE the agentic loop
+    // starts (even with awaitCompletion: true). This ensures the barrier
+    // resolves as soon as IDs are known, not when agents finish.
+    const registeredResults: (SubAgentResult | { error: string })[] = [];
+    const memberCount = teamCreationArguments.members.length;
 
+    let resolveRegistrationBarrier: () => void;
+    const registrationBarrier = new Promise<void>((resolve) => {
+      resolveRegistrationBarrier = resolve;
+    });
+    let registrationCount = 0;
+
+    // Wrap the spawn callback to inject onRegistered into each assignment
+    const spawnWithRegistration = (
+      assignment: OrchestratorSpawnParams,
+    ): Promise<SubAgentResult | { error: string }> => {
+      return OrchestratorService.spawnFromTool({
+        ...assignment,
+        onRegistered: (registeredResult) => {
+          registeredResults.push(registeredResult);
+          registrationCount++;
+          if (registrationCount >= memberCount) {
+            resolveRegistrationBarrier();
+          }
+        },
+      });
+    };
+
+    // Fire the router as a detached promise — it runs in the background
     router
       .execute(
         teamCreationArguments.name,
         teamCreationArguments.members,
         orchestratorContext,
-        (assignment: OrchestratorSpawnParams) => {
-          const spawnPromise = OrchestratorService.spawnFromTool(assignment);
-          spawnPromise.then((result) => {
-            if ("agent_id" in result) {
-              spawnedAgentIds.push(result.agent_id);
-            }
-          });
-          return spawnPromise;
-        },
+        spawnWithRegistration,
         (
           agentId: string,
           prompt: string,
@@ -1278,25 +1309,15 @@ export default class OrchestratorService {
         }
       });
 
+    // Wait only for agent registration (fast: ID + worktree allocation),
+    // NOT for the agentic loops to finish. This unblocks the parent LLM.
+    await registrationBarrier;
+
     logger.info(
-      `[Orchestrator] createTeam dispatched (non-blocking): team "${teamCreationArguments.name}" via topology "${topology}" with ${teamCreationArguments.members.length} member(s)`,
+      `[Orchestrator] createTeam dispatched (non-blocking): team "${teamCreationArguments.name}" via topology "${topology}" — ${registeredResults.length} agent(s) registered`,
     );
 
-    // Return immediately — router is executing in background
-    return teamCreationArguments.members.map(
-      (member, memberIndex) =>
-        ({
-          agent_id: `pending-${memberIndex}`,
-          description: member.description,
-          status: "running",
-          summary: "",
-          result: null,
-          toolUses: 0,
-          iterations: 0,
-          durationMs: 0,
-          messages: [],
-        }) as SubAgentResult,
-    );
+    return registeredResults;
   }
 
   static async deleteTeam(

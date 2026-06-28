@@ -531,14 +531,17 @@ describe("Event-Driven Auto-Response", () => {
         ],
       };
 
-      // createTeam returns immediately (non-blocking)
+      // createTeam returns immediately with real agent IDs (non-blocking)
       const results = await OrchestratorService.createTeam(teamArgs, orchestratorContext);
       expect(results).toHaveLength(2);
       for (const result of results) {
-        expect("status" in result && result.status).toBe("running");
+        expect("agent_id" in result).toBe(true);
+        if ("status" in result) {
+          expect(result.status).toBe("running");
+        }
       }
 
-      // Wait for background chain: sub-agent spawns (2) + parent auto-response (1) = 3
+      // Wait for background chain: sub-agent loops (2) + parent auto-response (1) = 3
       await waitForMockCalls(mockRunAgenticLoop, 3);
 
       // Verify completion message was persisted
