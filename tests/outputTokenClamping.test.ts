@@ -266,6 +266,37 @@ describe("Dynamic Output Token Clamping", () => {
       expect(estimated).toBe(Math.ceil(toolCallsJson.length / 4));
     });
 
+    it("should include toolCalls JSON in the estimate (camelCase)", () => {
+      harness = createMinimalHarness();
+
+      const toolCallsJson = JSON.stringify([{ name: "test", arguments: { query: "hello" } }]);
+      const messages = [{
+        role: "assistant",
+        content: "",
+        toolCalls: [{ name: "test", arguments: { query: "hello" } }],
+      }] as unknown as ConversationMessage[];
+      const estimated = (harness as any).estimateInputTokens(messages);
+
+      expect(estimated).toBe(Math.ceil(toolCallsJson.length / 4));
+    });
+
+    it("should estimate non-string structured content by stringifying it", () => {
+      harness = createMinimalHarness();
+
+      const structuredContent = [
+        { type: "text", text: "Describe this image:" },
+        { type: "image_url", image_url: { url: "data:image/png;base64,abc" } },
+      ];
+      const contentJson = JSON.stringify(structuredContent);
+      const messages = [{
+        role: "user",
+        content: structuredContent as any,
+      }] as unknown as ConversationMessage[];
+      const estimated = (harness as any).estimateInputTokens(messages);
+
+      expect(estimated).toBe(Math.ceil(contentJson.length / 4));
+    });
+
     it("should add 1000 tokens per image", () => {
       harness = createMinimalHarness();
 
