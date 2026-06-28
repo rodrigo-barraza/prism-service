@@ -154,7 +154,87 @@ After`;
     expect(result).toContain("After");
     expect(result).not.toContain("read_file");
   });
+
+  // ── Gemma 4 channel/thought tag stripping ─────────────────────
+
+  it("should strip complete <|channel>thought ... <channel|> reasoning blocks", () => {
+    const input = "Here is the answer<|channel>thought\nLet me reason about this\n<channel|> and the visible response.";
+
+    const result = stripToolCallMarkup(input);
+
+    expect(result).toBe("Here is the answer and the visible response.");
+  });
+
+  it("should strip multiple consecutive channel/thought reasoning blocks", () => {
+    const input = "<|channel>thought\nfirst reasoning block\n<channel|>Visible text<|channel>thought\nsecond reasoning block\n<channel|> more visible.";
+
+    const result = stripToolCallMarkup(input);
+
+    expect(result).toBe("Visible text more visible.");
+  });
+
+  it("should strip empty channel blocks (non-thought content)", () => {
+    const input = "Before<|channel><channel|>After";
+
+    const result = stripToolCallMarkup(input);
+
+    expect(result).toBe("BeforeAfter");
+  });
+
+  it("should strip stray orphan <channel|> closing tags", () => {
+    const input = "Some output<channel|> continued text<channel|> end.";
+
+    const result = stripToolCallMarkup(input);
+
+    expect(result).toBe("Some output continued text end.");
+  });
+
+  it("should strip incomplete trailing <|channel>thought at end of stream", () => {
+    const input = "Visible text <|channel>thought\nIncomplete reasoning that hasn't closed yet";
+
+    const result = stripToolCallMarkup(input);
+
+    expect(result).toBe("Visible text ");
+  });
+
+  it("should strip incomplete trailing <|channel> (non-thought) at end of stream", () => {
+    const input = "Visible text <|channel>something partial";
+
+    const result = stripToolCallMarkup(input);
+
+    expect(result).toBe("Visible text ");
+  });
+
+  it("should strip the exact pattern seen in the screenshot: repeated <|channel>thought <channel|>", () => {
+    const input = "<|channel>thought <channel|><|channel>thought <channel|><|channel>thought <channel|>";
+
+    const result = stripToolCallMarkup(input);
+
+    expect(result).toBe("");
+  });
+
+  it("should handle mixed channel tags and tool_call markup in one string", () => {
+    const input = "<|channel>thought\nreasoning\n<channel|>Answer text <tool_call>{\"name\":\"test\"}</tool_call> end<channel|>";
+
+    const result = stripToolCallMarkup(input);
+
+    expect(result).toBe("Answer text  end");
+  });
+
+  it("should handle channel tags with newlines in thought content", () => {
+    const input = `Content before<|channel>thought
+I need to analyze this step by step:
+1. First consideration
+2. Second consideration
+3. Conclusion
+<channel|>Here is the final answer.`;
+
+    const result = stripToolCallMarkup(input);
+
+    expect(result).toBe("Content beforeHere is the final answer.");
+  });
 });
+
 
 // ═══════════════════════════════════════════════════════════════
 describe("dispatchChunk", () => {

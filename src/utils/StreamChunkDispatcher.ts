@@ -96,16 +96,31 @@ interface ImageChunkInput {
  *
  * Handles both completed tags (matched pairs) and incomplete tags at the
  * end of a streaming buffer (closing tag hasn't arrived yet).
+ *
+ * Also strips Gemma 4 channel/thought tokens (`<|channel>thought ... <channel|>`)
+ * that bypass llama.cpp's PEG parser when using LM Studio or raw completions.
  */
 export function stripToolCallMarkup(text: string): string {
   return (
     text
+      // ── Gemma 4 channel/thought reasoning blocks ──
+      // Complete reasoning blocks: <|channel>thought ... <channel|>
+      .replace(/<\|channel>thought[\s\S]*?<channel\|>/gi, "")
+      // Empty channel blocks: <|channel> followed by non-thought content up to <channel|>
+      .replace(/<\|channel>[\s\S]*?<channel\|>/gi, "")
+      // Stray closing channel tags (model emits orphan <channel|>)
+      .replace(/<channel\|>/gi, "")
+
+      // ── Tool call / response / result tags ──
       // Completed tag pairs
       .replace(/<\|?tool_call\|?>[\s\S]*?<\/?\|?tool_call\|?>/gi, "")
       .replace(/<\|?tool_response\|?>[\s\S]*?<\/?\|?tool_response\|?>/gi, "")
       .replace(/<\|?result\|?>[\s\S]*?<\/?\|?result\|?>/gi, "")
       .replace(/\[END_TOOL_REQUEST\]/gi, "")
-      // Incomplete tags at end of stream (closing tag hasn't arrived yet)
+
+      // ── Incomplete trailing tags (closing tag hasn't arrived yet) ──
+      .replace(/<\|channel>thought[\s\S]*$/gi, "")
+      .replace(/<\|channel>[\s\S]*$/gi, "")
       .replace(/<\|?tool_call\|?>[\s\S]*$/gi, "")
       .replace(/<\|?tool_response\|?>[\s\S]*$/gi, "")
       .replace(/<\|?result\|?>[\s\S]*$/gi, "")
