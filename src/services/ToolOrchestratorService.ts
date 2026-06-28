@@ -1641,11 +1641,30 @@ export default class ToolOrchestratorService {
     };
 
     switch (name) {
-      case TOOL_NAMES.CREATE_TEAM:
-        return OrchestratorService.createTeam(
+      case TOOL_NAMES.CREATE_TEAM: {
+        const createTeamResults = await OrchestratorService.createTeam(
           args as { name: string; members: TeamMember[]; topology?: string },
           orchestratorContext as OrchestratorContext,
         );
+
+        // Check if all results are errors (validation failures, depth limit, etc.)
+        // In that case, return the raw errors without the non-blocking directive.
+        const hasRunningAgents = Array.isArray(createTeamResults) && createTeamResults.some(
+          (agentResult) => "status" in agentResult && agentResult.status === "running",
+        );
+
+        if (!hasRunningAgents) {
+          return createTeamResults;
+        }
+
+        // Wrap with a stop directive so the LLM knows to end its turn
+        // instead of polling get_task_output in a loop.
+        return {
+          _directive: "NON_BLOCKING_DISPATCH",
+          instruction: "Sub-agents are running in the background. You will be automatically notified with a [SUB-AGENT TEAM COMPLETED] message when they finish. END YOUR TURN NOW — do not call get_task_output or delay_execution. Simply respond to the user that the sub-agents have been dispatched and you will report back when they complete.",
+          agents: createTeamResults,
+        };
+      }
 
       case TOOL_NAMES.SEND_MESSAGE:
         return OrchestratorService.sendMessage(
