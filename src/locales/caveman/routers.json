@@ -1,56 +1,56 @@
 {
   "critic": {
-    "specializedRole": "Critic with specialized focus: {{criticRole}}\n",
+    "specializedRole": "Critic with focus: {{criticRole}}\n",
     "evaluator": "Evaluator. Judge sub-agent work quality.",
-    "roundContext": "Review round {{roundNumber}} of {{maximumRounds}}.",
+    "roundContext": "Round {{roundNumber}}/{{maximumRounds}}.",
     "originalTaskHeader": "## Original Task",
     "actorOutputHeader": "## Actor Output",
-    "jobHeader": "## Your Job",
-    "jobInstruction": "Judge output rigorously against original task.\nBe thorough — look for mistake, missed edge case, incomplete work, poor quality, flawed reasoning.",
-    "verdictInstruction": "Declare ONE verdict:",
-    "passVerdict": "**PASS** — output fully and correctly satisfies task. Brief justification.",
-    "failVerdict": "**FAIL** — output has problem. Provide specific fix instruction:\n- What exactly wrong or missing\n- What specific change needed\n- File path, line number, or code where applicable",
-    "verdictFormat": "Start response with **PASS** or **FAIL** on first line.",
-    "revisionHeader": "Previous work reviewed by {{criticCount}} critic in round {{roundNumber}} — revision needed.",
-    "failedCount": "{{failedCount}} critic FAILED your output. Fix ALL complaint.",
-    "revisionInstructions": "1. Fix ALL issue from EVERY failing critic.\n2. Make specific change requested.\n3. Don't break what already passes — passing critic will re-review.\n4. Verify fix (run test, typecheck).\n5. Commit and report change.\n\nFocus on fixing — don't restart unless feedback demands it.",
+    "jobHeader": "## Job",
+    "jobInstruction": "Judge output rigorously against task.\nLook for: mistake, missed edge case, incomplete work, poor quality, flawed reasoning.",
+    "verdictInstruction": "ONE verdict:",
+    "passVerdict": "**PASS** — fully satisfies task. Brief justification.",
+    "failVerdict": "**FAIL** — has problem. Specific fix:\n- What wrong or missing\n- What change needed\n- File path, line, code where applicable",
+    "verdictFormat": "First line: **PASS** or **FAIL**.",
+    "revisionHeader": "Reviewed by {{criticCount}} critic in round {{roundNumber}} — revision needed.",
+    "failedCount": "{{failedCount}} critic FAILED. Fix ALL complaint.",
+    "revisionInstructions": "1. Fix ALL issue from EVERY failing critic\n2. Make specific change requested\n3. Don't break passing — critic will re-review\n4. Verify fix (test, typecheck)\n5. Commit and report\n\nFix — don't restart unless feedback demands.",
     "defaultPrompt": "Review and judge actor output."
   },
   "jury": {
-    "judge": "Judge evaluating competing answer to same task.",
-    "evaluateInstruction": "Evaluate all {{actorCount}} answer, select BEST.\nScore each on: correctness, completeness, code quality, verification.",
-    "responseFormat": "Respond with JSON object ONLY. No markdown fence, no text outside JSON.",
-    "bestActorDescription": "- `bestActorIndex`: 0-based index of best actor\n- `verdict`: PASS if complete, FAIL if needs work\n- `feedback`: if FAIL, specific fix instruction. If PASS, brief justification.",
-    "revisionHeader": "Your work selected as best among competing actor — revision needed (round {{roundNumber}}).",
-    "revisionInstructions": "1. Fix ALL issue judge raised.\n2. Make specific change requested.\n3. Verify fix (run test, typecheck).\n4. Commit and report change.\n\nFocus on fixing — don't restart unless feedback demands it."
+    "judge": "Judge evaluating competing answer.",
+    "evaluateInstruction": "Evaluate all {{actorCount}} answer, select BEST.\nScore: correctness, completeness, code quality, verification.",
+    "responseFormat": "JSON object ONLY. No markdown fence, no text outside JSON.",
+    "bestActorDescription": "- `bestActorIndex`: 0-based index of best\n- `verdict`: PASS if complete, FAIL if needs work\n- `feedback`: FAIL→specific fix. PASS→brief justification.",
+    "revisionHeader": "Selected as best — revision needed (round {{roundNumber}}).",
+    "revisionInstructions": "1. Fix ALL issue judge raised\n2. Make specific change\n3. Verify (test, typecheck)\n4. Commit and report\n\nFix — don't restart unless feedback demands."
   },
   "divideAndConquer": {
     "planner": "Task decomposition planner.",
-    "planInstruction": "Break complex task into subtask executable by separate sub-agent.",
-    "plannerInstructions": "1. Analyze task, identify {{maximumSubtasks}} or fewer subtask.\n2. Each subtask must be self-contained — no overlapping scope or shared file.\n3. Each must include file path, function name, exact instruction.\n4. No meta-task like 'review' or 'verify' — implementation work only.\n5. If subtask depends on another (e.g. 'write test' needs 'implement feature'), set `dependsOn` as 0-based index array. Independent subtask omit this.",
-    "decompositionContext": "Decompose based on current architecture and user requirement.",
-    "planFormat": "Respond with JSON array ONLY. No markdown fence, no text outside JSON.",
-    "synthesizer": "Synthesis agent for divide-and-conquer execution.",
-    "synthesizeInstruction": "Combine subtask result into single coherent answer.\nResolve conflict between subtask result.",
-    "synthesizeInstructions": "1. Review all subtask result.\n2. Verify original task fully covered across subtask.\n3. Identify gap — subtask that failed or area not covered.\n4. Produce integrated result from all subtask.\n5. Note remaining work if any subtask failed.\n6. Concise but complete — integrated summary, not concatenation."
+    "planInstruction": "Break task into subtask for separate sub-agent.",
+    "plannerInstructions": "1. Identify {{maximumSubtasks}} or fewer subtask\n2. Each self-contained — no overlap or shared file\n3. Include file path, function, exact instruction\n4. No meta-task (review, verify) — implementation only\n5. Dependent subtask: set `dependsOn` as 0-based index array",
+    "decompositionContext": "Decompose based on architecture and requirement.",
+    "planFormat": "JSON array ONLY. No markdown fence, no text outside JSON.",
+    "synthesizer": "Synthesis agent for divide-and-conquer.",
+    "synthesizeInstruction": "Combine subtask result into single answer.\nResolve conflict between result.",
+    "synthesizeInstructions": "1. Review all subtask result\n2. Verify task fully covered\n3. Identify gap — failed subtask or uncovered area\n4. Produce integrated result\n5. Note remaining work if any failed\n6. Concise but complete — integrated, not concatenated"
   },
   "hierarchical": {
     "synthesizer": "Synthesis agent for team \"{{teamName}}\".{{layerContext}}",
-    "mergeJobDescription": "{{memberCount}} sub-agent completed. Merge output into single result.",
-    "mergeInstructions": "1. Review all sub-agent output.\n2. Identify agreement, conflict, complementary information.\n3. Produce integrated result with best reasoning from each.\n4. Note which sub-agent failed, use result from successful.\n5. Concise but complete — integrated, not concatenated."
+    "mergeJobDescription": "{{memberCount}} sub-agent completed. Merge into single result.",
+    "mergeInstructions": "1. Review all output\n2. Identify agreement, conflict, complement\n3. Produce integrated result with best reasoning\n4. Note failed sub-agent, use successful result\n5. Concise — integrated, not concatenated"
   },
   "mcts": {
-    "evaluator": "Evaluator for Monte Carlo Tree Search.",
-    "evaluateInstruction": "Score each candidate 0.0-1.0:\n- **Correctness** (0.3) — technically right?\n- **Completeness** (0.3) — task coverage?\n- **Quality** (0.2) — code quality, clarity, robustness\n- **Verification** (0.2) — self-verified?",
-    "completeCheck": "Also decide if BEST candidate is complete (no more round needed).\nProvide feedback per branch — strength and weakness.",
-    "responseFormat": "Respond with JSON object ONLY. No markdown fence, no text outside JSON.",
-    "refinementContext": "Continuing task. Previous attempt scored and selected as best approach — refinement needed."
+    "evaluator": "MCTS evaluator.",
+    "evaluateInstruction": "Score each 0.0-1.0:\n- **Correctness** (0.3)\n- **Completeness** (0.3)\n- **Quality** (0.2)\n- **Verification** (0.2)",
+    "completeCheck": "Decide if BEST is complete (no more round needed).\nFeedback per branch — strength and weakness.",
+    "responseFormat": "JSON object ONLY. No markdown fence, no text outside JSON.",
+    "refinementContext": "Previous attempt scored and selected — refinement needed."
   },
   "tournament": {
     "judge": "Judge for team \"{{teamName}}\".",
-    "judgeJobDescription": "{{memberCount}} sub-agent independently executed same task. Evaluate and select SINGLE BEST.",
-    "judgeInstructions": "1. Judge each output on:\n   - **Correctness** — right?\n   - **Completeness** — fully satisfies task?\n   - **Quality** — clean, solid code/reasoning?\n   - **Verification** — self-verified (test, typecheck)?\n2. Select single best. State which.\n3. Copy winning output EXACTLY — no modification, merge, or improvement.\n4. Brief justification (2-3 sentence max).",
-    "judgeFormat": "Format:\n**Winner:** Sub-agent #N\n**Reason:** [brief justification]\n\n**Selected Output:**\n[winning output exactly]",
-    "verifier": "Verifier. Run these command and report PASS or FAIL for each:"
+    "judgeJobDescription": "{{memberCount}} sub-agent independently executed same task. Evaluate, select BEST.",
+    "judgeInstructions": "1. Judge each:\n   - **Correctness** — right?\n   - **Completeness** — fully satisfies?\n   - **Quality** — clean, solid?\n   - **Verification** — self-verified?\n2. Select single best\n3. Copy winning output EXACTLY — no modification\n4. Brief justification (2-3 sentence)",
+    "judgeFormat": "Format:\n**Winner:** Sub-agent #N\n**Reason:** [justification]\n\n**Selected Output:**\n[winning output exactly]",
+    "verifier": "Verifier. Run command, report PASS or FAIL:"
   }
 }

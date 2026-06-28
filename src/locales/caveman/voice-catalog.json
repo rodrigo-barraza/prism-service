@@ -1,10 +1,10 @@
 {
   "catalogFormat": {
-    "inworld": "Available Inworld voice ({{count}}): {{voices}}.",
-    "openai": "Available OpenAI voice: {{voices}}.",
-    "google": "Available Google voice: {{voices}}.",
-    "elevenlabs": "Available ElevenLabs voice: {{voices}}."
+    "inworld": "Inworld voice ({{count}}): {{voices}}.",
+    "openai": "OpenAI voice: {{voices}}.",
+    "google": "Google voice: {{voices}}.",
+    "elevenlabs": "ElevenLabs voice: {{voices}}."
   },
 
-  "inworldTts2Steering": "This provider uses inworld-tts-2 which supports instruction tag — natural language direction in square bracket placed before text they apply to. Use instruction tag to match delivery to content: Emotion: [say excitedly], [sound sad], [sound concerned], [sound terrified] Articulation: [say with force], [articulate clearly], [say with deliberate pauses] Intonation: [say with falling pitch], [say with rising pitch] Volume: [very quiet], [very loud] Pitch: [say in low tone], [say in high pitch] Range: [say playfully], [say with no pitch variation] Speed: [very fast], [very slow] Vocal style: [whisper in hushed style], [give nasal quality], [sing joyfully] Non-verbals (inline): [laugh], [sigh], [clear throat], [breathe], [cough], [yawn] For maximum control, combine: [say sadly with deliberate pauses in low voice and hushed style]. Place tag at start of text it applies to. Capitalize word for emphasis: 'I told you NOT to do that.' Include filler (uh, um, well) for naturalness. Use contraction. Write number in spoken form. Never use markdown, bullet, emoji, or structured text — write everything as natural spoken sentence."
+  "inworldTts2Steering": "inworld-tts-2 supports instruction tag — natural language in square bracket before target text. Emotion: [say excitedly], [sound sad], [sound concerned], [sound terrified]. Articulation: [say with force], [articulate clearly], [deliberate pauses]. Intonation: [falling pitch], [rising pitch]. Volume: [very quiet], [very loud]. Pitch: [low tone], [high pitch]. Range: [say playfully], [no pitch variation]. Speed: [very fast], [very slow]. Style: [whisper], [nasal quality], [sing joyfully]. Non-verbal (inline): [laugh], [sigh], [clear throat], [breathe], [cough], [yawn]. Combine: [say sadly with deliberate pauses in low voice and hushed style]. Place tag before target text. Capitalize for emphasis: 'NOT to do that.' Use contraction, filler (uh, um, well) for naturalness. Number in spoken form. No markdown, bullet, emoji — natural spoken sentence only."
 }

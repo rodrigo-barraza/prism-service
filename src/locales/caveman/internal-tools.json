@@ -1,57 +1,57 @@
 {
   "enter_plan_mode": {
-    "description": "Enter planning mode. No tool access — text only. Design approach before making change. Call exit_plan_mode when ready.",
+    "description": "Enter planning mode. No tool — text only. Design approach, then exit_plan_mode.",
     "parameters": {
-      "reason": "Why entering plan mode (user-visible)."
+      "reason": "Why entering plan mode."
     }
   },
   "exit_plan_mode": {
-    "description": "Leave planning mode, resume tool access. Call after plan designed.",
+    "description": "Leave planning mode, resume tool access.",
     "parameters": {
-      "summary": "Brief summary of plan to execute."
+      "summary": "Brief plan summary."
     }
   },
   "enable_tools": {
-    "description": "REQUIRED after search_tools: activate found tool for use. Without this, found tool UNAVAILABLE. Accept exact tool name (e.g. \"get_weather\") or domain prefix (e.g. \"domain:Finance\") to enable entire group. Enabled tool ready NEXT turn.",
+    "description": "REQUIRED after search_tools: activate found tool. Without this, found tool UNAVAILABLE. Accept exact name (e.g. \"get_weather\") or domain prefix (e.g. \"domain:Finance\"). Ready NEXT turn.",
     "parameters": {
-      "tools": "Tool name or domain prefix to enable. e.g. [\"get_weather\", \"get_weather_forecast\"] or [\"domain:Weather & Environment\"]."
+      "tools": "Tool name or domain prefix to enable."
     }
   },
   "disable_tools": {
-    "description": "Deactivate tool from session to free context. Accept exact name or domain prefix. Core tool (memory, task, plan, orchestration) can't be disabled.",
+    "description": "Deactivate tool to free context. Accept name or domain prefix. Core tool can't be disabled.",
     "parameters": {
-      "tools": "Tool name or domain prefix to disable. e.g. [\"get_weather\"] or [\"domain:Weather & Environment\"]."
+      "tools": "Tool name or domain prefix to disable."
     }
   },
   "discover_and_enable_tools": {
-    "description": "Search ALL tool ({{totalToolCount}}) AND enable match in one step. Combines search_tools + enable_tools — found tool ready next turn. Covers: {{domainListLowercase}}.",
+    "description": "Search ALL tool ({{totalToolCount}}) AND enable match in one step. Found tool ready next turn. Covers: {{domainListLowercase}}.",
     "parameters": {
-      "query": "Search term to match tool name and description. Use specific term. e.g. {{sampleKeywords}}.",
-      "domain": "Filter by domain. Known domain: {{domainListQuoted}}.",
+      "query": "Search term for tool name/description. e.g. {{sampleKeywords}}.",
+      "domain": "Filter by domain: {{domainListQuoted}}.",
       "limit": "Max result (1-50). Default: 20."
     }
   },
   "create_skill": {
-    "description": "Create reusable workflow recipe. Skill = saved instruction with placeholder ({{variable}}) callable by name. Capture multi-step workflow (fix->test->commit, analyze->report) as single action. Persists across session.",
+    "description": "Create reusable workflow recipe. Skill = saved instruction with {{variable}} placeholder. Capture multi-step workflow as single action. Persists across session.",
     "parameters": {
-      "name": "Unique skill name (e.g. 'fix_and_test', 'code_review'). Serves as ID.",
-      "description": "What skill does — shown when listing.",
+      "name": "Unique skill name. Serves as ID.",
+      "description": "What skill does.",
       "prompt": "Instruction to execute. Use {{variable}} for placeholder.",
-      "steps": "Optional: ordered step list for documentation.",
-      "tools": "Optional: specific tool to enable. If omitted, all available.",
-      "maxIterations": "Optional: max iteration for skill execution (1-100). Default: 25.",
-      "model": "Optional: different model for skill execution."
+      "steps": "Optional: ordered step list.",
+      "tools": "Optional: specific tool to enable.",
+      "maxIterations": "Optional: max iteration (1-100). Default: 25.",
+      "model": "Optional: different model."
     }
   },
   "execute_skill": {
-    "description": "Run previously created skill by ID. Instruction populated with variable and executed. Use list_skills to see available.",
+    "description": "Run skill by ID. Instruction populated with variable and executed.",
     "parameters": {
-      "skillId": "Skill ID to run.",
-      "variables": "Key-value pair for {{variable}} placeholder in skill instruction."
+      "skillId": "Skill ID.",
+      "variables": "Key-value for {{variable}} placeholder."
     }
   },
   "list_skills": {
-    "description": "List all available skill created with create_skill.",
+    "description": "List all available skill.",
     "parameters": {
       "project": "Optional: filter by project."
     }
@@ -59,86 +59,86 @@
   "delete_skill": {
     "description": "Delete skill by ID.",
     "parameters": {
-      "skillId": "Skill ID to delete."
+      "skillId": "Skill ID."
     }
   },
   "enter_worktree": {
-    "description": "Enter isolated worktree for this session. Creates branch, redirects file/git/command tool to separate directory. Use for risky change, experiment, or speculative edit without affecting main branch. Call exit_worktree to merge or discard.",
+    "description": "Enter isolated worktree. Creates branch, redirects tool to separate directory. For risky change or experiment. exit_worktree to merge/discard.",
     "parameters": {
-      "reason": "Why entering worktree (e.g. 'risky refactor', 'experimental approach')."
+      "reason": "Why entering worktree."
     }
   },
   "exit_worktree": {
-    "description": "Leave worktree, return to main. Choose 'merge' to keep change or 'discard' to drop.",
+    "description": "Leave worktree. 'merge' to keep, 'discard' to drop.",
     "parameters": {
-      "action": "'merge' to keep, 'discard' to drop.",
+      "action": "'merge' or 'discard'.",
       "commitMessage": "Commit message for merge. Auto-generated if omitted."
     }
   },
   "write_todo": {
-    "description": "Write or update todo list for current project. Track multi-step work with persistent checklist. Each item: 'pending', 'in_progress', or 'completed'. Call with full updated list — replaces previous.",
+    "description": "Write/update todo list. Track multi-step work with persistent checklist. Call with full updated list — replaces previous.",
     "parameters": {
       "items": "Full todo list. Replaces previous."
     }
   },
   "summarize_conversation": {
-    "description": "Compress current conversation into summary. Use when conversation grows long. Summary stored for future turn — not user-visible.",
+    "description": "Compress conversation into summary. Use when conversation long. Stored for future turn.",
     "parameters": {
-      "summary": "Compressed summary. Include: key decision, file changed, task status, remaining work.",
-      "keyFiles": "Optional: important file path for current work.",
-      "openQuestions": "Optional: unanswered question or ambiguity."
+      "summary": "Compressed summary: key decision, file changed, task status, remaining.",
+      "keyFiles": "Optional: important file path.",
+      "openQuestions": "Optional: unanswered question."
     }
   },
   "ask_user": {
-    "description": "Ask user question and wait for response. Use for clarification, choice, or confirmation before major action. Agent loop pauses until answered. Batch up to 4 question per call.",
+    "description": "Ask user question, wait for response. For clarification or confirmation before major action. Loop pauses until answered. Up to 4 question per call.",
     "parameters": {
-      "context": "Optional: extra context shown below question.",
-      "questions": "Question batch (up to 4). Each item is question object."
+      "context": "Optional: extra context.",
+      "questions": "Question batch (up to 4)."
     }
   },
   "list_mcp_resources": {
-    "description": "List available resource from connected MCP server.",
+    "description": "List resource from connected MCP server.",
     "parameters": {
-      "server_name": "MCP server name. If omitted, query all."
+      "server_name": "MCP server name. Omit for all."
     }
   },
   "read_mcp_resource": {
-    "description": "Read specific resource from MCP server by URI.",
+    "description": "Read resource from MCP server by URI.",
     "parameters": {
-      "server_name": "MCP server hosting resource.",
-      "uri": "Resource URI to read."
+      "server_name": "MCP server.",
+      "uri": "Resource URI."
     }
   },
   "authenticate_mcp_server": {
     "description": "Provide credential to MCP server.",
     "parameters": {
-      "server_name": "MCP server to authenticate.",
-      "token": "Bearer token for HTTP MCP server.",
-      "api_key": "API key value.",
-      "api_key_header": "Header name for API key (default: 'X-API-Key').",
-      "env": "Additional environment variable."
+      "server_name": "MCP server.",
+      "token": "Bearer token for HTTP.",
+      "api_key": "API key.",
+      "api_key_header": "Header name (default: 'X-API-Key').",
+      "env": "Additional env variable."
     }
   },
   "set_timer": {
-    "description": "Set short wait timer for in-session pause. Use when waiting for async operation, checking build, retrying after failure. Timer fires prompt back into conversation after duration. Must be 30-599 second (under 10 min). For user reminder or alarm, use create_cron_job instead.",
+    "description": "Set wait timer for in-session pause. For async op, build check, retry. Fires prompt back after duration. 30-599s. For reminder/alarm: use create_cron_job.",
     "parameters": {
-      "prompt": "Instruction fired back when timer triggers.",
-      "durationSeconds": "Wait duration in second (30-599)."
+      "prompt": "Instruction fired when timer triggers.",
+      "durationSeconds": "Wait duration (30-599s)."
     }
   },
   "list_timers": {
-    "description": "List active wait timer in current session. For user reminder, use list_cron_jobs."
+    "description": "List active timer. For reminder: list_cron_jobs."
   },
   "cancel_timer": {
-    "description": "Cancel active wait timer. For cron job, use delete_cron_job.",
+    "description": "Cancel active timer. For cron: delete_cron_job.",
     "parameters": {
-      "timerId": "Timer ID to cancel."
+      "timerId": "Timer ID."
     }
   },
   "search_conversations": {
-    "description": "Search past session using natural language. Semantic match returns title, summary, date, linked memory count. Use when user says 'remember when...' or needs prior session context.",
+    "description": "Search past session using natural language. Semantic match returns title, summary, date, memory count. Use for 'remember when...' or prior context.",
     "parameters": {
-      "query": "Search term in plain language. e.g. 'MCP connection debug', 'session where we fixed WebSocket drop'.",
+      "query": "Search term. e.g. 'MCP debug', 'WebSocket drop fix'.",
       "limit": "Max result. Default: 10."
     }
   }

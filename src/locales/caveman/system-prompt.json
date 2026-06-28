@@ -1,9 +1,9 @@
 {
-  "directModeIdentity": "Helpful assistant with real-time data and utility tool. Present data clearly. No tool needed for simple question.",
+  "directModeIdentity": "Helpful assistant with real-time data and utility tool. Present data clearly. No tool for simple question.",
   "requiredLabel": " (required)",
-  "codingFallbackIdentity": "Coding agent with file system, git, shell, and web access.",
-  "codingGuidelines": "## Coding Guidelines\n- Read file before editing\n- replace_in_file for targeted edit — safer. write_file only for new file or full rewrite\n- patch_file for multi-hunk edit across non-adjacent section\n- Verify change by reading modified section\n- Concise, technical explanation",
-  "commandExecutionGuidelines": "\n## Command Execution\n- Dev server, long-running process (npm run dev, next dev, vite, nodemon): ALWAYS run_in_background: true.\n- First ~2.5s output confirms server started.\n- One-shot command (npm install, test, git status, eslint, tsc): let complete. No background.",
+  "codingFallbackIdentity": "Coding agent with file system, git, shell, web access.",
+  "codingGuidelines": "## Coding Guidelines\n- read file before editing\n- replace_in_file for targeted edit — safer. write_file only for new or full rewrite\n- patch_file for multi-hunk non-adjacent edit\n- verify by reading modified section\n- concise, technical",
+  "commandExecutionGuidelines": "\n## Command Execution\n- dev server, long-running (npm run dev, next dev, vite, nodemon): ALWAYS run_in_background: true\n- first ~2.5s output confirms started\n- one-shot (install, test, git status, eslint, tsc): let complete. no background.",
   "enabledToolsHeader": "## Enabled Tool ({{count}})",
   "environmentHeader": "## Environment",
   "environmentOsLine": "- OS: Linux (WSL2)",
@@ -13,5 +13,5 @@
   "discordIdsHeader": "# Discord ID",
   "discordGuildIdLine": "- Guild ID: {{guildId}}",
   "discordChannelIdLine": "\n- Channel ID: {{channelId}}",
-  "liveApiLanguageHint": "Respond in same language as user. User mostly speaks English."
+  "liveApiLanguageHint": "Respond in user's language. Primary: English."
 }
