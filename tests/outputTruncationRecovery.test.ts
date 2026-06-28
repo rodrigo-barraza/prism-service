@@ -51,7 +51,7 @@ function createMockPassState(overrides: Partial<PassState> = {}): PassState {
     options: {},
     requestId: null,
     ...overrides,
-  };
+  } as unknown as PassState;
 }
 
 // ── Helper: create a minimal AgenticContext ───────────────────────────
@@ -227,7 +227,7 @@ describe("OutputTruncationRecovery", () => {
       expect(assistantMessage?.thinkingSignature).toBe("sig-123");
     });
 
-    it("should use default maxTokens (8192) when context.options.maxTokens is not set", () => {
+    it("should use default maxTokens (16384) when context.options.maxTokens is not set", () => {
       mockContext.options.maxTokens = undefined;
       const pass = createMockPassState({ streamedText: "x", stopReason: "length" });
 
@@ -238,7 +238,7 @@ describe("OutputTruncationRecovery", () => {
         1,
       );
 
-      expect(escalatedMaxTokens).toBe(Math.ceil(8192 * 1.5));
+      expect(escalatedMaxTokens).toBe(Math.ceil(16384 * 1.5));
     });
 
     it("should not inject an empty assistant message when there is no text", () => {
