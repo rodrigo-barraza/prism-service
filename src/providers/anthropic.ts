@@ -6,6 +6,7 @@ import { compressImageForSizeLimit } from "../utils/media.ts";
 import { EMPTY_USAGE } from "../utils/openai-compat.ts";
 import { ANTHROPIC_API_KEY } from "../../config.ts";
 import { TYPES, getDefaultModels, getModelByName } from "../config.ts";
+import { DEFAULT_MAX_OUTPUT_TOKENS } from "../constants/TokenBudgetDefaults.ts";
 import { sleep } from "@rodrigo-barraza/utilities-library";
 
 import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
@@ -564,7 +565,7 @@ const anthropicProvider = {
       system: prepared.systemMessage,
       model,
       messages: prepared.messages,
-      max_tokens: options.maxTokens || 1000,
+      max_tokens: options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS,
       temperature:
         options.temperature !== undefined
           ? Math.min(options.temperature, 1)
@@ -793,7 +794,7 @@ const anthropicProvider = {
         system: prepared.systemMessage,
         model,
         messages: prepared.messages,
-        max_tokens: options.maxTokens || 1000,
+        max_tokens: options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS,
         temperature:
           options.temperature !== undefined
             ? Math.min(options.temperature, 1)

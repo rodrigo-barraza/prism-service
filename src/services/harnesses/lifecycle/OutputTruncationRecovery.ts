@@ -10,6 +10,8 @@
  *     resume where it left off.
  *   - This is retried up to MAX_OUTPUT_TRUNCATION_RECOVERIES times
  *     with escalated token limits before giving up.
+ *   - Escalation is clamped to the model's physical maxOutputTokens
+ *     ceiling when known, preventing pointless retries at the API limit.
  *
  * If all recovery attempts are exhausted, an error message is injected
  * into the conversation as an assistant message so the LLM can see
@@ -18,6 +20,11 @@
 
 import logger from "../../../utils/logger.ts";
 import PromptLocaleService from "../../PromptLocaleService.ts";
+import {
+  DEFAULT_MAX_OUTPUT_TOKENS,
+  TOKEN_ESCALATION_MULTIPLIER,
+  MAX_OUTPUT_TRUNCATION_RECOVERIES,
+} from "../../../constants/TokenBudgetDefaults.ts";
 import type {
   ConversationMessage,
   PassState,
@@ -26,14 +33,7 @@ import type {
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 
-/** Maximum number of auto-continuation attempts before giving up. */
-export const MAX_OUTPUT_TRUNCATION_RECOVERIES = 3;
-
-/** Token escalation multiplier applied to maxTokens on each recovery attempt. */
-const TOKEN_ESCALATION_MULTIPLIER = 1.5;
-
-/** Default maxTokens if none is configured on the agent context. */
-const DEFAULT_MAX_TOKENS = 8192;
+export { MAX_OUTPUT_TRUNCATION_RECOVERIES };
 
 /** Build the continuation prompt localized to the active locale. */
 function getContinuationPrompt(locale: string): string {
@@ -48,15 +48,33 @@ export function isOutputTruncated(pass: PassState): boolean {
 }
 
 /**
+ * Check whether escalation would be pointless because the current
+ * maxTokens is already at or above the model's physical output ceiling.
+ */
+export function isAtOutputCeiling(
+  currentMaxTokens: number,
+  modelMaxOutputTokens: number | undefined,
+): boolean {
+  if (!modelMaxOutputTokens) return false;
+  return currentMaxTokens >= modelMaxOutputTokens;
+}
+
+/**
  * Build the escalated maxTokens value for the next recovery attempt.
+ * Clamps to the model's maxOutputTokens ceiling when provided.
  */
 export function calculateEscalatedMaxTokens(
   currentMaxTokens: number,
   recoveryAttempt: number,
+  maxOutputCeiling?: number,
 ): number {
-  return Math.ceil(
+  const escalated = Math.ceil(
     currentMaxTokens * Math.pow(TOKEN_ESCALATION_MULTIPLIER, recoveryAttempt),
   );
+  if (maxOutputCeiling && escalated > maxOutputCeiling) {
+    return maxOutputCeiling;
+  }
+  return escalated;
 }
 
 /**
@@ -64,7 +82,7 @@ export function calculateEscalatedMaxTokens(
  * the conversation so the model can resume on the next iteration.
  *
  * Returns the escalated maxTokens value that should be used for the
- * next provider call.
+ * next provider call, clamped to the model's output ceiling.
  */
 export function injectContinuationContext(
   currentMessages: ConversationMessage[],
@@ -94,15 +112,21 @@ export function injectContinuationContext(
     content: getContinuationPrompt(activeLocale),
   });
 
-  const baseMaxTokens = context.options.maxTokens || DEFAULT_MAX_TOKENS;
+  const baseMaxTokens = context.options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS;
+  const maxOutputCeiling = context.modelDefinition?.maxOutputTokens as number | undefined;
   const escalatedMaxTokens = calculateEscalatedMaxTokens(
     baseMaxTokens,
     recoveryAttempt,
+    maxOutputCeiling,
   );
+
+  const ceilingNote = maxOutputCeiling
+    ? ` (model ceiling: ${maxOutputCeiling})`
+    : " (no model ceiling known)";
 
   logger.info(
     `[OutputTruncationRecovery] Recovery attempt ${recoveryAttempt}/${MAX_OUTPUT_TRUNCATION_RECOVERIES}: ` +
-      `escalating maxTokens from ${baseMaxTokens} → ${escalatedMaxTokens}. ` +
+      `escalating maxTokens from ${baseMaxTokens} → ${escalatedMaxTokens}${ceilingNote}. ` +
       `Preserved ${truncatedContent.length} chars of truncated output.`,
   );
 

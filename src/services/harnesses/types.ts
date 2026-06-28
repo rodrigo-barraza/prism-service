@@ -134,6 +134,7 @@ export interface LLMProvider {
 
 export interface ModelDefinition {
   maxInputTokens?: number;
+  maxOutputTokens?: number;
   liveAPI?: boolean;
   pricing?: Record<string, number>;
   outputTypes?: string[];

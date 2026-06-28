@@ -28,6 +28,7 @@ import { validateAfterToolExecution } from "./lifecycle/ValidationInterceptor.ts
 import { buildToolRetryGuidance } from "./lifecycle/ToolRetryInterceptor.ts";
 import {
   isOutputTruncated,
+  isAtOutputCeiling,
   injectContinuationContext,
   injectErrorAsConversationMessage,
   buildExhaustedRecoveryMessage,
@@ -644,13 +645,19 @@ export default class ReActHarness extends BaseAgenticHarness {
         if (isOutputTruncated(pass)) {
           truncationRecoveryCount++;
           const configuredMaxTokens = context.options.maxTokens || "default";
+          const modelOutputCeiling = context.modelDefinition?.maxOutputTokens as number | undefined;
           logger.warn(
             `[AgenticLoop] Max tokens truncation detected on iteration ${state.iterations} — ` +
-              `stopReason=${pass.stopReason}, maxTokens=${configuredMaxTokens}. ` +
+              `stopReason=${pass.stopReason}, maxTokens=${configuredMaxTokens}` +
+              `${modelOutputCeiling ? `, modelCeiling=${modelOutputCeiling}` : ""}. ` +
               `Recovery attempt ${truncationRecoveryCount}/${MAX_OUTPUT_TRUNCATION_RECOVERIES}.`,
           );
 
-          if (truncationRecoveryCount <= MAX_OUTPUT_TRUNCATION_RECOVERIES) {
+          // Skip recovery if already at the model's physical output ceiling
+          const alreadyAtCeiling = typeof configuredMaxTokens === "number" &&
+            isAtOutputCeiling(configuredMaxTokens, modelOutputCeiling);
+
+          if (!alreadyAtCeiling && truncationRecoveryCount <= MAX_OUTPUT_TRUNCATION_RECOVERIES) {
             const escalatedMaxTokens = injectContinuationContext(
               currentMessages,
               pass,
@@ -662,9 +669,15 @@ export default class ReActHarness extends BaseAgenticHarness {
             continue;
           }
 
-          // All recovery attempts exhausted — inject error as conversation context
+          // All recovery attempts exhausted or at ceiling — inject error as conversation context
+          if (alreadyAtCeiling) {
+            logger.warn(
+              `[AgenticLoop] Skipping truncation recovery — maxTokens (${configuredMaxTokens}) ` +
+                `is already at or above model ceiling (${modelOutputCeiling}). Escalation would be pointless.`,
+            );
+          }
           const exhaustionMessage = buildExhaustedRecoveryMessage(
-            MAX_OUTPUT_TRUNCATION_RECOVERIES,
+            alreadyAtCeiling ? 0 : MAX_OUTPUT_TRUNCATION_RECOVERIES,
             configuredMaxTokens,
             this.context.options?.locale as string | undefined,
           );

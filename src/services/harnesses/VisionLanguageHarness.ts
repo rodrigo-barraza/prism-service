@@ -27,6 +27,7 @@ import { validateAfterToolExecution } from "./lifecycle/ValidationInterceptor.ts
 import { buildToolRetryGuidance } from "./lifecycle/ToolRetryInterceptor.ts";
 import {
   isOutputTruncated,
+  isAtOutputCeiling,
   injectContinuationContext,
   injectErrorAsConversationMessage,
   buildExhaustedRecoveryMessage,
@@ -581,12 +582,16 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
         if (isOutputTruncated(pass)) {
           truncationRecoveryCount++;
           const configuredMaxTokens = context.options.maxTokens || "default";
+          const modelOutputCeiling = context.modelDefinition?.maxOutputTokens as number | undefined;
           logger.warn(
             `[VisionLanguageHarness] Max tokens truncation detected on iteration ${state.iterations} — ` +
               `Recovery attempt ${truncationRecoveryCount}/${MAX_OUTPUT_TRUNCATION_RECOVERIES}.`,
           );
 
-          if (truncationRecoveryCount <= MAX_OUTPUT_TRUNCATION_RECOVERIES) {
+          const alreadyAtCeiling = typeof configuredMaxTokens === "number" &&
+            isAtOutputCeiling(configuredMaxTokens, modelOutputCeiling);
+
+          if (!alreadyAtCeiling && truncationRecoveryCount <= MAX_OUTPUT_TRUNCATION_RECOVERIES) {
             const escalatedMaxTokens = injectContinuationContext(
               currentMessages,
               pass,
@@ -598,8 +603,14 @@ export default class VisionLanguageHarness extends BaseAgenticHarness {
             continue;
           }
 
+          if (alreadyAtCeiling) {
+            logger.warn(
+              `[VisionLanguageHarness] Skipping truncation recovery — maxTokens (${configuredMaxTokens}) ` +
+                `is already at or above model ceiling (${modelOutputCeiling}). Escalation would be pointless.`,
+            );
+          }
           const exhaustionMessage = buildExhaustedRecoveryMessage(
-            MAX_OUTPUT_TRUNCATION_RECOVERIES,
+            alreadyAtCeiling ? 0 : MAX_OUTPUT_TRUNCATION_RECOVERIES,
             configuredMaxTokens,
             this.context.options?.locale as string | undefined,
           );
