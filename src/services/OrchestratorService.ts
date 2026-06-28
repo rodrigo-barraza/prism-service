@@ -2148,18 +2148,63 @@ export default class OrchestratorService {
       _alreadyPersisted: true,
     };
 
+    // ── Race-safe persistence ────────────────────────────────────
+    // The non-blocking router can complete before the main loop's
+    // Finalizer persists the conversation. Using ConversationService
+    // .appendMessages (which does upsert: true) would create the
+    // conversation with ONLY the task-notification as messages[0],
+    // pushing the user's actual message to messages[1] when the
+    // Finalizer runs later. Instead, use a direct $push with
+    // upsert: false and retry until the conversation exists.
+    const MAXIMUM_PERSISTENCE_RETRIES = 15;
+    const PERSISTENCE_RETRY_DELAY_MILLISECONDS = 2_000;
+
     try {
-      await ConversationService.appendMessages(
-        conversationId,
-        project,
-        username,
-        [completionMessage],
-        null,
-        { collection: COLLECTIONS.AGENT_CONVERSATIONS },
+      const MongoWrapper = (await import("../wrappers/MongoWrapper.ts")).default;
+      const { MONGO_DB_NAME: databaseName } = await import("../../config.ts");
+      const notificationCollection = MongoWrapper.getCollection(
+        databaseName,
+        COLLECTIONS.AGENT_CONVERSATIONS,
       );
-      logger.info(
-        `[Orchestrator] Injected router completion notification into parent conversation ${conversationId}`,
-      );
+
+      let persistedSuccessfully = false;
+
+      for (let retryAttempt = 0; retryAttempt < MAXIMUM_PERSISTENCE_RETRIES; retryAttempt++) {
+        const updateResult = await notificationCollection.updateOne(
+          {
+            id: conversationId,
+            project,
+            username,
+            "messages.0": { $exists: true },
+          },
+          {
+            $push: { messages: completionMessage },
+            $set: { updatedAt: new Date().toISOString() },
+          } as import("mongodb").Document,
+        );
+
+        if (updateResult.matchedCount > 0) {
+          persistedSuccessfully = true;
+          logger.info(
+            `[Orchestrator] Injected router completion notification into parent conversation ${conversationId}` +
+              (retryAttempt > 0 ? ` (after ${retryAttempt} retries)` : ""),
+          );
+          break;
+        }
+
+        logger.debug(
+          `[Orchestrator] Parent conversation ${conversationId} not ready yet (attempt ${retryAttempt + 1}/${MAXIMUM_PERSISTENCE_RETRIES}), waiting ${PERSISTENCE_RETRY_DELAY_MILLISECONDS}ms…`,
+        );
+        await new Promise((resolve) =>
+          setTimeout(resolve, PERSISTENCE_RETRY_DELAY_MILLISECONDS),
+        );
+      }
+
+      if (!persistedSuccessfully) {
+        logger.warn(
+          `[Orchestrator] Parent conversation ${conversationId} never appeared after ${MAXIMUM_PERSISTENCE_RETRIES} retries — completion notification dropped`,
+        );
+      }
     } catch (persistenceError: unknown) {
       logger.warn(
         `[Orchestrator] Failed to persist router completion message: ${getErrorMessage(persistenceError)}`,
