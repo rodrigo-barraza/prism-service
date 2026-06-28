@@ -208,6 +208,7 @@ export class TournamentRouter implements TopologyRouter {
         agentIndex: memberIndex,
         teamSize: members.length,
         orchestratorContext,
+        awaitCompletion: true,
       });
     }
 
@@ -291,6 +292,7 @@ export class TournamentRouter implements TopologyRouter {
             agentIndex: resultIndex,
             teamSize: members.length,
             orchestratorContext,
+        awaitCompletion: true,
           });
 
           if ("error" in verificationResult) {

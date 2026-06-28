@@ -173,6 +173,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
           round: layerIndex + 1,
           totalRounds: layerCount,
           orchestratorContext,
+        awaitCompletion: true,
         });
       }
 

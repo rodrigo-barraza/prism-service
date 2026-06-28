@@ -144,6 +144,14 @@ export interface OrchestratorSpawnParams {
   preserveWorktree?: boolean;
   /** Current recursion depth inherited from parent context. Incremented at each spawning hop. */
   recursionDepth?: number;
+  /**
+   * When true, spawnFromTool blocks until the sub-agent completes and
+   * returns the full result (for sequential/dependent routers like
+   * SequentialRouter, CriticLoopRouter, TournamentRouter).
+   * When false (default), the sub-agent runs in the background and
+   * spawnFromTool returns immediately with status="running".
+   */
+  awaitCompletion?: boolean;
 }
 
 export interface OrchestratorContext {

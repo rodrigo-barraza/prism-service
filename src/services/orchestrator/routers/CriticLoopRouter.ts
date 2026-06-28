@@ -342,6 +342,7 @@ export class CriticLoopRouter implements TopologyRouter {
       round: 1,
       totalRounds: maximumRounds,
       orchestratorContext,
+            awaitCompletion: true,
       preserveWorktree: true,
     };
 
@@ -410,6 +411,7 @@ export class CriticLoopRouter implements TopologyRouter {
             round: roundNumber,
             totalRounds: maximumRounds,
             orchestratorContext,
+            awaitCompletion: true,
           };
 
           return spawnSubAgent(criticAssignment);
@@ -598,6 +600,7 @@ export class CriticLoopRouter implements TopologyRouter {
           round: 1,
           totalRounds: maximumRounds,
           orchestratorContext,
+          awaitCompletion: true,
           preserveWorktree: true,
         };
       },

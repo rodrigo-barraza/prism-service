@@ -448,6 +448,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
             agentIndex: subtaskIndex,
             teamSize: subtasks.length,
             orchestratorContext,
+            awaitCompletion: true,
           },
         });
       }
@@ -664,6 +665,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
             agentIndex: subtaskIndex,
             teamSize: recursiveSubtasks.length,
             orchestratorContext,
+            awaitCompletion: true,
           };
 
           return this.executeSubtaskWithRecursion(

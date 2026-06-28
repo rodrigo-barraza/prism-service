@@ -80,6 +80,7 @@ export class SequentialRouter implements TopologyRouter {
         agentIndex: index,
         teamSize: members.length,
         orchestratorContext,
+        awaitCompletion: true,
       };
 
       // 3. Spawn and wait for this sub-agent to finish

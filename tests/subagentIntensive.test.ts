@@ -177,13 +177,16 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       };
 
       const results = await OrchestratorService.createTeam(teamArgs, orchestratorContext);
+      // Wait for non-blocking background sub-agent loops to complete (mock uses setTimeout(50ms))
+      await new Promise((resolve) => setTimeout(resolve, 150));
 
       expect(results).toHaveLength(3);
       expect(peakConcurrencyCount).toBe(3); // Assert all 3 executed at the same time
       expect(mockRunAgenticLoop).toHaveBeenCalledTimes(3);
 
       for (const result of results) {
-        expect("status" in result && result.status).toBe("completed");
+        // Non-blocking spawns return status="running" immediately
+        expect("status" in result && result.status).toBe("running");
       }
     });
   });
@@ -276,6 +279,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
         description: "Normal sub-agent",
         prompt: "Run success route",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       expect(result.error).toBeUndefined();
@@ -289,6 +293,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
         description: "Failing sub-agent",
         prompt: "Throw error route",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       expect("status" in result && result.status).toBe("failed");
@@ -311,6 +316,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
         description: "Running sub-agent to be stopped",
         prompt: "Infinite run",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       // Allow setup to progress
@@ -342,6 +348,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
         description: "Original subagent",
         prompt: "Original prompt",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       const agentId = (result as SubAgentResult).agent_id;
@@ -384,6 +391,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
         description: "Sub-agent that runs slowly",
         prompt: "Slow prompt",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       // Give spawnFromTool a moment to register the agent and call _runSubAgentLoop
@@ -591,12 +599,14 @@ describe("Sub-Agent Intensive Integration Tests", () => {
         description: "Team member one",
         prompt: "Task one",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       const secondSpawnPromise = OrchestratorService.spawnFromTool({
         description: "Team member two",
         prompt: "Task two",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       // Give spawn calls a brief moment to run and register the sub-agents
@@ -647,6 +657,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
         description: "Conversation sub-agent",
         prompt: "Running tasks",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       // Allow registration to proceed
@@ -693,6 +704,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
             description: `Concurrent Agent ${index}`,
             prompt: `Task ${index}`,
             orchestratorContext,
+      awaitCompletion: true,
           })
         );
       }
@@ -713,6 +725,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
         description: "Over the limit agent",
         prompt: "This should fail",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       expect(overflowSpawnResult).toEqual({
@@ -752,6 +765,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
         description: "Task output tester",
         prompt: "Output test prompt",
         orchestratorContext,
+      awaitCompletion: true,
       });
 
       // Allow registration to proceed
