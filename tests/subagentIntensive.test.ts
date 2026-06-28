@@ -729,9 +729,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       }
 
       // Allow all spawns to register and start running
-      await waitForCondition(() => OrchestratorService.listSubAgents({
-        parentConversationId: orchestratorContext.conversationId!,
-      }).length === 10);
+      await waitForCondition(() => loopResolvers.length === 10);
 
       const activeList = OrchestratorService.listSubAgents({
         parentConversationId: orchestratorContext.conversationId!,
