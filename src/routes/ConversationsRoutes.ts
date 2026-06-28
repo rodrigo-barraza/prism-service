@@ -657,6 +657,8 @@ router.patch(
 /**
  * DELETE /conversations/:id
  * Delete a specific conversation or agent conversation.
+ * Cascading: iteratively deletes all descendant sub-agent conversations
+ * linked via `parentConversationId` across both collections.
  */
 router.delete(
   "/:id",
@@ -677,20 +679,94 @@ router.delete(
         .collection(COLLECTIONS.MODEL_CONVERSATIONS)
         .deleteOne({ id: conversationId, project, username: usernameFilter });
 
+      let deletedType: string | null = null;
       if (result.deletedCount > 0) {
-        return res.json({ success: true, id: conversationId, type: "direct" });
+        deletedType = "direct";
+      } else {
+        // Try deleting from agent conversations next
+        result = await db
+          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+          .deleteOne({ id: conversationId, project, username: usernameFilter });
+
+        if (result.deletedCount > 0) {
+          deletedType = "agent";
+        }
       }
 
-      // Try deleting from agent conversations next
-      result = await db
-        .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-        .deleteOne({ id: conversationId, project, username: usernameFilter });
-
-      if (result.deletedCount > 0) {
-        return res.json({ success: true, id: conversationId, type: "agent" });
+      if (!deletedType) {
+        return res.status(404).json({ error: "Conversation not found" });
       }
 
-      res.status(404).json({ error: "Conversation not found" });
+      // Cascading deletion: iteratively discover and delete all descendant
+      // conversations linked via parentConversationId (BFS traversal).
+      const MAX_CASCADE_DEPTH = 10;
+      const ownershipFilter = { project, username: usernameFilter };
+      let descendantDeletedCount = 0;
+      let frontier = [conversationId];
+
+      for (
+        let depth = 0;
+        depth < MAX_CASCADE_DEPTH && frontier.length > 0;
+        depth++
+      ) {
+        const parentFilter = {
+          parentConversationId: { $in: frontier },
+          ...ownershipFilter,
+        };
+
+        // Discover child IDs from both collections before deleting
+        const [agentChildren, modelChildren] = await Promise.all([
+          db
+            .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+            .find(parentFilter)
+            .project({ id: 1 })
+            .toArray(),
+          db
+            .collection(COLLECTIONS.MODEL_CONVERSATIONS)
+            .find(parentFilter)
+            .project({ id: 1 })
+            .toArray(),
+        ]);
+
+        const childIds = [
+          ...agentChildren.map(
+            (document) => (document as Record<string, unknown>).id as string,
+          ),
+          ...modelChildren.map(
+            (document) => (document as Record<string, unknown>).id as string,
+          ),
+        ].filter(Boolean);
+
+        if (childIds.length === 0) break;
+
+        // Bulk-delete children from both collections
+        const [agentDeletion, modelDeletion] = await Promise.all([
+          db
+            .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+            .deleteMany({ id: { $in: childIds }, ...ownershipFilter }),
+          db
+            .collection(COLLECTIONS.MODEL_CONVERSATIONS)
+            .deleteMany({ id: { $in: childIds }, ...ownershipFilter }),
+        ]);
+
+        descendantDeletedCount +=
+          (agentDeletion.deletedCount || 0) +
+          (modelDeletion.deletedCount || 0);
+        frontier = childIds;
+      }
+
+      if (descendantDeletedCount > 0) {
+        logger.info(
+          `Cascade-deleted ${descendantDeletedCount} descendant conversation(s) for ${conversationId}`,
+        );
+      }
+
+      return res.json({
+        success: true,
+        id: conversationId,
+        type: deletedType,
+        descendantsDeleted: descendantDeletedCount,
+      });
     } catch (error: unknown) {
       logger.error(`Error deleting conversation: ${errorMessage(error)}`);
       next(error);

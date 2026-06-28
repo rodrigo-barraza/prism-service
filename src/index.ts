@@ -257,6 +257,8 @@ setupWebSocket(wss);
         { collection: COLLECTIONS.MODEL_CONVERSATIONS, keys: { workspaceRoot: 1 } },
         // conversations — stale isGenerating cleanup + stats count
         { collection: COLLECTIONS.MODEL_CONVERSATIONS, keys: { isGenerating: 1, updatedAt: -1 } },
+        // conversations — sub-agent parent linkage (cascading deletion)
+        { collection: COLLECTIONS.MODEL_CONVERSATIONS, keys: { parentConversationId: 1 } },
         // agent_conversations — same indexes as conversations
         { collection: COLLECTIONS.AGENT_CONVERSATIONS, keys: { id: 1 }, options: { unique: true } },
         { collection: COLLECTIONS.AGENT_CONVERSATIONS, keys: { updatedAt: -1 } },
