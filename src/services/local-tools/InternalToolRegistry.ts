@@ -26,6 +26,7 @@ import askUserQuestionTool from "./AskUserQuestionTool.ts";
 import mcpTools from "./McpTools.ts";
 import reminderTools from "./ReminderTools.ts";
 import conversationSearchTool from "./ConversationSearchTool.ts";
+import asyncTaskTools from "./AsyncTaskTools.ts";
 
 export interface InternalToolSchemaParameters {
   type?: string;
@@ -92,6 +93,7 @@ function initialize() {
     mcpTools,
     reminderTools,
     conversationSearchTool,
+    asyncTaskTools,
   ];
 
   for (const toolOrTools of toolModulesList) {
