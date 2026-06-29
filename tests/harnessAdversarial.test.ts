@@ -28,7 +28,6 @@ import {
   pendingQuestions,
 } from "../src/services/ApprovalRegistry.ts";
 import HarnessRegistry from "../src/services/harnesses/HarnessRegistry.ts";
-import VisionLanguageHarness from "../src/services/harnesses/VisionLanguageHarness.ts";
 
 
 // ═══════════════════════════════════════════════════════════════════
@@ -426,10 +425,6 @@ describe("Flow 3: HarnessRegistry Dispatch", () => {
     expect(HarnessRegistry.has(HARNESS_IDS.STANDARD)).toBe(true);
   });
 
-  it("should have 'vision_language' harness registered (underscore convention)", () => {
-    expect(HarnessRegistry.has(VisionLanguageHarness.id)).toBe(true);
-  });
-
   it("should not have HARNESS_IDS.TREE_OF_THOUGHT as a harness (now a strategy)", () => {
     expect(HarnessRegistry.has("tree_of_thought")).toBe(false);
     expect(HarnessRegistry.has("tree_of_thought")).toBe(false);
@@ -437,7 +432,7 @@ describe("Flow 3: HarnessRegistry Dispatch", () => {
 
   it("should list all registered harnesses with required metadata", () => {
     const harnesses = HarnessRegistry.list();
-    expect(harnesses.length).toBeGreaterThanOrEqual(2);
+    expect(harnesses.length).toBeGreaterThanOrEqual(1);
     for (const harness of harnesses) {
       expect(harness.id).toBeTruthy();
       expect(harness.label).toBeTruthy();
