@@ -23,7 +23,7 @@ import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 const MAXIMUM_SUBTASKS = 6;
 const MAXIMUM_SYNTHESIS_CHARACTERS = 120_000;
 const DEFAULT_MAXIMUM_RECURSION_DEPTH = 1;
-const MAXIMUM_ALLOWED_RECURSION_DEPTH = 3;
+const MAXIMUM_ALLOWED_RECURSION_DEPTH = 10;
 const DEFAULT_RECURSION_COMPLEXITY_THRESHOLD = 300;
 
 export interface DecomposedSubtask {

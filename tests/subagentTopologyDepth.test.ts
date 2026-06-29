@@ -810,7 +810,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
         { maxRecursionDepth: 3, recursionComplexityThreshold: 100 },
       );
 
-      // The tree must be bounded despite maxRecursionDepth=3 (capped at MAXIMUM_ALLOWED = 3)
+      // The tree must be bounded at maxRecursionDepth=3 (configured limit)
       expect(spawnSubAgentMock.mock.calls.length).toBeLessThanOrEqual(50);
       expect(decompositionCallCount).toBeGreaterThanOrEqual(4);
     });
