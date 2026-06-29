@@ -809,7 +809,7 @@ describe("ToolOrchestratorService", () => {
   });
 
   describe("executeOrchestratorTool", () => {
-    it("dispatches create_team with correct orchestratorContext", async () => {
+    it("dispatches create_subagents with correct orchestratorContext", async () => {
       vi.mocked(OrchestratorService.createTeam).mockResolvedValue({ success: true } as any);
       const context = {
         project: "test-proj",
@@ -835,7 +835,7 @@ describe("ToolOrchestratorService", () => {
 
       const args = { name: "team-1", members: [] };
       const result = await ToolOrchestratorService.executeOrchestratorTool(
-        TOOL_NAMES.CREATE_TEAM,
+        TOOL_NAMES.CREATE_SUBAGENTS,
         args,
         context
       );
@@ -864,12 +864,12 @@ describe("ToolOrchestratorService", () => {
       });
     });
 
-    it("dispatches send_message", async () => {
+    it("dispatches send_subagent_message", async () => {
       vi.mocked(OrchestratorService.sendMessage).mockResolvedValue({ delivered: true } as any);
       const context = { project: "p" };
       const args = { to: "agent-1", message: "hello" };
       const result = await ToolOrchestratorService.executeOrchestratorTool(
-        TOOL_NAMES.SEND_MESSAGE,
+        TOOL_NAMES.SEND_SUBAGENT_MESSAGE,
         args,
         context
       );
@@ -881,34 +881,34 @@ describe("ToolOrchestratorService", () => {
       );
     });
 
-    it("dispatches stop_agent", async () => {
+    it("dispatches stop_subagent", async () => {
       vi.mocked(OrchestratorService.stopAgent).mockResolvedValue({ stopped: true } as any);
       const args = { agent_id: "agent-1" };
       const result = await ToolOrchestratorService.executeOrchestratorTool(
-        TOOL_NAMES.STOP_AGENT,
+        TOOL_NAMES.STOP_SUBAGENT,
         args
       );
       expect(result).toEqual({ stopped: true });
       expect(OrchestratorService.stopAgent).toHaveBeenCalledWith("agent-1");
     });
 
-    it("dispatches get_task_output", async () => {
+    it("dispatches get_subagent_output", async () => {
       vi.mocked(OrchestratorService.getTaskOutput).mockResolvedValue({ output: "done" } as any);
       const args = { agent_id: "agent-1" };
       const result = await ToolOrchestratorService.executeOrchestratorTool(
-        TOOL_NAMES.GET_TASK_OUTPUT,
+        TOOL_NAMES.GET_SUBAGENT_OUTPUT,
         args
       );
       expect(result).toEqual({ output: "done" });
       expect(OrchestratorService.getTaskOutput).toHaveBeenCalledWith("agent-1");
     });
 
-    it("dispatches delete_team", async () => {
+    it("dispatches delete_subagents", async () => {
       vi.mocked(OrchestratorService.deleteTeam).mockResolvedValue({ deleted: true } as any);
       const context = { project: "p" };
       const args = { teamName: "team-1" };
       const result = await ToolOrchestratorService.executeOrchestratorTool(
-        TOOL_NAMES.DELETE_TEAM,
+        TOOL_NAMES.DELETE_SUBAGENTS,
         args,
         context
       );
@@ -1837,8 +1837,8 @@ describe("ToolOrchestratorService", () => {
 
     it("includes internal and orchestrator tool schemas", () => {
       const aiSchemas = ToolOrchestratorService.getToolSchemas();
-      const createTeamSchema = aiSchemas.find((s) => s.name === TOOL_NAMES.CREATE_TEAM);
-      expect(createTeamSchema).toBeDefined();
+      const createSubagentsSchema = aiSchemas.find((s) => s.name === TOOL_NAMES.CREATE_SUBAGENTS);
+      expect(createSubagentsSchema).toBeDefined();
     });
   });
 
