@@ -13,9 +13,6 @@
   "reminderExtractor": {
     "extractionPrompt": "Analyze system prompt, extract critical behavioral rule.\n\nExtract 8-12 most important constraint agent MUST follow.\n\nFocus on:\n- Prohibition (never X, no Y)\n- Mandatory behavior (always X, must Y)\n- Safety constraint\n- Output format requirement\n- Identity boundary\n- Tool restriction\n\nOutput:\n- ONLY bullet list with `- ` prefix\n- Each bullet: one sentence, max 30 word\n- No header, explanation, numbering, formatting\n- Prioritize high-damage-if-forgotten rule\n- Skip obvious (e.g. 'be helpful')\n\nSystem prompt:\n<system_prompt>"
   },
-  "visionFeed": {
-    "instruction": "\n\n## LIVE VISION FEED\nLive visual feed (webcam/screen). Last 3 frame attached to latest message (oldest→newest).\nUse to observe, notice change, refer naturally.\n"
-  },
   "exhaustionRecovery": {
     "message": "Max iteration reached. Summarize progress, report partial result, state remaining work."
   },

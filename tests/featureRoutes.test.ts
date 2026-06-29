@@ -119,12 +119,6 @@ vi.mock('../src/services/AgenticLoopService.ts', () => ({
   }
 }));
 
-vi.mock('../src/services/LiveFrameService.ts', () => ({
-  default: {
-    pushFrame: vi.fn(),
-  }
-}));
-
 vi.mock('../src/utils/SseUtilities.ts', () => ({
   handleSseRequest: vi.fn().mockImplementation(async (req, res, params, handler) => {
     res.writeHead(200, { 'Content-Type': 'text/event-stream' });
@@ -624,15 +618,6 @@ describe('Feature Routes Integration Tests', () => {
       const response = await request(app)
         .post('/agent-test/answer')
         .send({ conversationId: 'conv-123', answer: 'my answer' })
-        .expect(200);
-
-      expect(response.body).toHaveProperty('ok', true);
-    });
-
-    it('Frame endpoint', async () => {
-      const response = await request(app)
-        .post('/agent-test/conversation/conv-123/frame')
-        .send({ frameDataUrl: 'data:image/jpeg;base64,123' })
         .expect(200);
 
       expect(response.body).toHaveProperty('ok', true);

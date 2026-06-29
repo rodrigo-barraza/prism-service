@@ -13,9 +13,6 @@
   "reminderExtractor": {
     "extractionPrompt": "You are analyzing a system prompt to extract its most critical behavioral rules.\n\nExtract exactly 8–12 of the most important constraints — rules the AI agent MUST follow throughout the entire session.\n\nFocus on:\n- Hard prohibitions (never do X, do not Y)\n- Mandatory behaviors (always do X, you must Y)\n- Safety and security constraints\n- Output format and code style requirements\n- Identity and persona boundaries\n- Tool usage rules and restrictions\n\nRules for your output:\n- Output ONLY a bullet-point list using `- ` prefix\n- Each bullet must be a single concise sentence (max 30 words)\n- No headers, no explanations, no numbering, no markdown formatting\n- Prioritize constraints that would cause the most damage if forgotten\n- Ignore trivial or obvious rules (e.g. 'be helpful')\n\nSystem prompt to analyze:\n<system_prompt>"
   },
-  "visionFeed": {
-    "instruction": "\n\n## 🎥 LIVE VISION FEED ACTIVE\nYou are equipped with a live visual feed (webcam or screen stream). The last 3 frames of this feed are automatically captured and attached to the user's latest message (ordered from oldest to newest).\nUse these images to observe the environment, notice changes, animations, or user gestures, and refer to them naturally in your conversation.\n"
-  },
   "exhaustionRecovery": {
     "message": "Maximum tool-call iterations reached for this turn. Summarize progress so far, report partial results, and state what remains to be done."
   },

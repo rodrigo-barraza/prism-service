@@ -9,8 +9,8 @@ import type { PassState } from "../types.ts";
  *   2. Report input token count (with promptTokens fallback)
  *   3. Mark the request as complete
  *
- * This ~15-line block was duplicated identically across ReActHarness,
- * VisionLanguageHarness, and TreeOfThoughtsStrategy.
+ * This ~15-line block was duplicated identically across ReActHarness
+ * and TreeOfThoughtsStrategy.
  *
  * Returns `finalInputTokens` so callers can pass it to KVCacheReporter.
  */
