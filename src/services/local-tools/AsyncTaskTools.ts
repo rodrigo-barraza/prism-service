@@ -30,6 +30,7 @@ const DISALLOWED_ASYNC_TOOL_NAMES = new Set([
   "stop_agent",
   "get_task_output",
   "delete_team",
+  "resume_agent",
 
   // Interactive tools that block on user input
   "ask_user",

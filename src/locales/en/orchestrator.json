@@ -98,11 +98,19 @@
       "parameters": {
         "teamName": "The team name to delete (as provided to create_team)."
       }
+    },
+    "resume_agent": {
+      "description": "Resume a completed sub-agent's session with a new follow-up task. Reuses the agent's full conversation history, worktree state, and context — no need to re-explain prior work. Use this when a sub-agent finished its initial task and you need it to do additional work in the same context (e.g., add tests after implementing a feature, fix review comments, extend the scope). The agent runs in the background and you will be notified when it completes.",
+      "parameters": {
+        "agent_id": "The ID of the completed sub-agent to resume (e.g., 'agent-1-abc1').",
+        "prompt": "The new task or follow-up instructions for the agent. The agent already has its full prior conversation history — reference prior work directly."
+      }
     }
   },
 
   "notifications": {
     "teamCompleted": "[SUB-AGENT TEAM COMPLETED] Team \"{{teamName}}\" ({{topology}}) finished.",
+    "resumedAgentCompleted": "[SUB-AGENT RESUMED COMPLETED] Agent \"{{agentId}}\" ({{description}}) has {{status}} after resumption.",
     "agentError": "Agent {{agentNumber}}: ❌ Error — {{errorMessage}}",
     "agentStatus": "Agent {{agentNumber}} ({{agentDescription}}): {{agentStatus}}",
     "agentStats": "  Duration: {{duration}} | Tools: {{toolUses}} | Iterations: {{iterations}}",

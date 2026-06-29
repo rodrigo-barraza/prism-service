@@ -1553,6 +1553,210 @@ export default class OrchestratorService {
   }
 
   /**
+   * Resume a completed sub-agent's session with a new follow-up task.
+   *
+   * Unlike `sendMessage` (fire-and-forget), this method:
+   * 1. Returns `NON_BLOCKING_DISPATCH` so the harness exits the loop
+   * 2. Triggers `_triggerParentAutoResponse` when the resumed agent completes
+   * 3. Preserves the worktree so the agent continues with its file state
+   *
+   * Unlike `continueAgent` (blocking, used by PeerToPeerRouter), this is
+   * LLM-facing and follows the same non-blocking + auto-response pattern
+   * as `create_team`.
+   *
+   * Equivalent of Antigravity's `ReusedSubagentId` pattern.
+   */
+  static async resumeAgent(
+    agentId: string,
+    prompt: string,
+    orchestratorContext: OrchestratorContext,
+  ): Promise<SubAgentResult | { _directive: string; instruction: string; agent: Record<string, unknown> } | { error: string }> {
+    const subAgent = activeSubAgents.get(agentId);
+    if (!subAgent) {
+      return { error: `Sub-agent "${agentId}" not found. It may have been cleaned up or expired.` };
+    }
+
+    if (subAgent.status === "running") {
+      return {
+        error: `Sub-agent "${agentId}" is currently running. Use send_message to queue a follow-up, or stop_agent to abort it first.`,
+      };
+    }
+
+    if (subAgent.status !== "complete" && subAgent.status !== "idle") {
+      return {
+        error: `Sub-agent "${agentId}" is in "${subAgent.status}" state and cannot be resumed. Only completed or idle agents can be resumed.`,
+      };
+    }
+
+    // At recursion depth > 0 (sub-agent calling resume_agent), block until completion
+    // — same pattern as create_team at depth > 0.
+    const callerRecursionDepth = orchestratorContext.recursionDepth ?? 0;
+    if (callerRecursionDepth > 0) {
+      return OrchestratorService.continueAgent(agentId, prompt, orchestratorContext);
+    }
+
+    // Reset for the new session
+    subAgent.status = "running";
+    subAgent.startedAt = Date.now();
+    subAgent.abortController = createAbortController();
+    subAgent.error = null;
+
+    logger.info(
+      `[Orchestrator] Resuming sub-agent ${agentId} with new prompt (non-blocking)`,
+    );
+
+    if (orchestratorContext.emit) {
+      orchestratorContext.emit({
+        type: "sub_agent_status",
+        subAgentId: agentId,
+        message: "spawned",
+        description: subAgent.description,
+        conversationId: subAgent.subAgentConversationId,
+        parentConversationId: subAgent.parentConversationId || null,
+        model: subAgent.resolvedModel,
+        provider: subAgent.providerName,
+      });
+    }
+
+    // Fire detached background promise — same pattern as non-blocking spawnFromTool
+    OrchestratorService._runSubAgentLoop(
+      subAgent,
+      prompt,
+      orchestratorContext,
+      true, // preserveWorktree — keep file state alive for potential further resumptions
+    )
+      .then(() => {
+        if (orchestratorContext.emit) {
+          orchestratorContext.emit({
+            type: SERVER_SENT_EVENT_TYPES.STATUS,
+            message: STATUS_MESSAGES.SUB_AGENTS_UPDATED,
+          });
+        }
+
+        const completedResult = buildSubAgentResult(subAgent);
+        subAgent.messages = null;
+        logger.info(
+          `[Orchestrator] Resumed sub-agent ${agentId} completed: status=${completedResult.status} toolUses=${completedResult.toolUses} durationMs=${completedResult.durationMs}`,
+        );
+
+        // Trigger auto-response so the parent LLM processes the result
+        OrchestratorService._notifyParentOfResumedAgentCompletion(
+          agentId,
+          completedResult,
+          orchestratorContext,
+        ).catch((autoResponseError: unknown) => {
+          logger.warn(
+            `[Orchestrator] Auto-response failed for resumed agent ${agentId}: ${getErrorMessage(autoResponseError)}`,
+          );
+        });
+      })
+      .catch((error: unknown) => {
+        logger.error(
+          `[Orchestrator] Resumed sub-agent ${agentId} error: ${getErrorMessage(error)}`,
+        );
+        subAgent.status = "failed";
+        subAgent.error = getErrorMessage(error);
+        subAgent.durationMs = Date.now() - subAgent.startedAt;
+
+        if (orchestratorContext.emit) {
+          orchestratorContext.emit({
+            type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
+            subAgentId: agentId,
+            message: "failed",
+            error: getErrorMessage(error),
+          });
+          orchestratorContext.emit({
+            type: SERVER_SENT_EVENT_TYPES.STATUS,
+            message: STATUS_MESSAGES.SUB_AGENTS_UPDATED,
+          });
+        }
+
+        // Still trigger auto-response on failure so the LLM knows
+        const failedResult = buildSubAgentResult(subAgent);
+        OrchestratorService._notifyParentOfResumedAgentCompletion(
+          agentId,
+          failedResult,
+          orchestratorContext,
+        ).catch((autoResponseError: unknown) => {
+          logger.warn(
+            `[Orchestrator] Auto-response failed for resumed agent ${agentId} (error path): ${getErrorMessage(autoResponseError)}`,
+          );
+        });
+      });
+
+    return {
+      _directive: "NON_BLOCKING_DISPATCH",
+      instruction:
+        "A sub-agent has been resumed in the background. You will be automatically notified with a [SUB-AGENT RESUMED COMPLETED] message when it finishes. " +
+        "END YOUR TURN NOW — do not poll or loop. Simply inform the user that the agent has been resumed and you will report back when it completes.",
+      agent: {
+        agent_id: agentId,
+        description: subAgent.description,
+        status: "running",
+        previousToolUses: subAgent.toolCalls?.length || 0,
+      },
+    };
+  }
+
+  /**
+   * Notify the parent conversation when a resumed sub-agent completes.
+   * Follows the same pattern as _notifyParentOfRouterCompletion but for
+   * a single agent resumption.
+   */
+  static async _notifyParentOfResumedAgentCompletion(
+    agentId: string,
+    agentResult: SubAgentResult,
+    orchestratorContext: OrchestratorContext,
+  ): Promise<void> {
+    const { conversationId, project, username } = orchestratorContext;
+    if (!conversationId || !project || !username) return;
+
+    const locale = PromptLocaleService.getDefaultLocale();
+
+    const agentStatusEmoji = agentResult.status === "completed" ? "✅" : "❌";
+    const noOutputFallback = PromptLocaleService.get(locale, "orchestrator.notifications.noOutput");
+    const agentOutput = agentResult.result
+      ? typeof agentResult.result === "string"
+        ? agentResult.result
+        : JSON.stringify(agentResult.result)
+      : noOutputFallback;
+
+    const truncatedOutput =
+      agentOutput.length > 4000
+        ? agentOutput.slice(0, 4000) + "\n... (truncated)"
+        : agentOutput;
+
+    const completionMessage = {
+      role: "user" as const,
+      content: [
+        `<task-notification>`,
+        `<status>${agentStatusEmoji} ${agentResult.status}</status>`,
+        `<summary>[SUB-AGENT RESUMED COMPLETED] Agent "${agentId}" (${agentResult.description}) has ${agentResult.status} after resumption.</summary>`,
+        `<tool_uses>${agentResult.toolUses}</tool_uses>`,
+        `<duration_ms>${agentResult.durationMs}</duration_ms>`,
+        `<result>`,
+        truncatedOutput,
+        `</result>`,
+        `</task-notification>`,
+      ].join("\n"),
+      timestamp: new Date().toISOString(),
+      _alreadyPersisted: true,
+    };
+
+    OrchestratorService._triggerParentAutoResponse(
+      conversationId,
+      project,
+      username,
+      orchestratorContext,
+      completionMessage as ConversationMessage,
+    ).catch((autoResponseError: unknown) => {
+      logger.warn(
+        `[Orchestrator] Parent auto-response failed for resumed agent ${agentId}: ${getErrorMessage(autoResponseError)}`,
+      );
+    });
+  }
+
+  /**
    * Run the sub-agent's agentic loop in its isolated worktree.
    *
    * @param preserveWorktree When true, the worktree is NOT removed on completion.
