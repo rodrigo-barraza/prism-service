@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
-import { COLLECTIONS } from "../constants.ts";
+import { COLLECTIONS, TIMER_MODES, TIMER_STATUSES } from "../constants.ts";
 import logger from "../utils/logger.ts";
 import AgenticLoopService from "./AgenticLoopService.ts";
 import ConversationService from "./ConversationService.ts";
@@ -10,8 +10,9 @@ import { getModelByName } from "../config.ts";
 import { matchCron } from "./ScheduledTaskService.ts";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import type { ConversationMessage } from "./harnesses/types.ts";
-
+import type { ConversationMessage, LLMProvider } from "./harnesses/types.ts";
+import type { TransformedConversation, ConversationSettings } from "./conversation/types.ts";
+import type { ChatMessage } from "../types/admin.ts";
 import type { SseEvent } from "../types/SseTypes.ts";
 
 export interface ConversationTimer {
@@ -20,19 +21,19 @@ export interface ConversationTimer {
   project: string;
   username: string;
   prompt: string;
-  mode: "one_shot" | "recurring";
+  mode: typeof TIMER_MODES[keyof typeof TIMER_MODES];
   durationSeconds?: number;
   cronExpression?: string;
   maxIterations?: number;
   iterationCount: number;
   firesAt: string; // ISO timestamp for one-shot next fire time
   lastFiredMinuteKey?: string; // "YYYY-MM-DDTHH:mm" for preventing cron double-fires
-  status: "active" | "fired" | "cancelled" | "expired";
+  status: typeof TIMER_STATUSES[keyof typeof TIMER_STATUSES];
   createdAt: string;
   updatedAt: string;
 }
 
-interface ConversationSettings {
+interface TimerConversationSettings extends ConversationSettings {
   provider?: string;
   model?: string;
   agent?: string | null;
@@ -43,6 +44,22 @@ interface ConversationSettings {
   };
 }
 
+export interface TimerConversationContext {
+  id: string;
+  project: string;
+  username: string;
+  title?: string;
+  messages?: Array<ChatMessage | ConversationMessage>;
+  settings?: ConversationSettings;
+  traceId?: string | null;
+}
+
+// ── File-level Constants ──────────────────────────────────────
+const BACKGROUND_DAEMON_INTERVAL_MILLISECONDS = 1000;
+const ONE_SHOT_MAXIMUM_DURATION_SECONDS = 86400;
+const ONE_MINUTE_IN_MILLISECONDS = 60 * 1000;
+const MINIMUM_CONTEXT_LENGTH = 120_000;
+
 let tickerInterval: ReturnType<typeof setInterval> | null = null;
 let isTickInProgress = false;
 
@@ -50,7 +67,7 @@ const ConversationTimerService = {
   /**
    * Initialize the timer daemon. Checks for due timers every 1 second.
    */
-  async init(): Promise<void> {
+  async initialize(): Promise<void> {
     if (tickerInterval) {
       clearInterval(tickerInterval);
     }
@@ -71,7 +88,7 @@ const ConversationTimerService = {
         .finally(() => {
           isTickInProgress = false;
         });
-    }, 1000);
+    }, BACKGROUND_DAEMON_INTERVAL_MILLISECONDS);
 
     logger.success("[ConversationTimers] Background timer daemon active.");
   },
@@ -104,20 +121,20 @@ const ConversationTimerService = {
       throw new Error("Database connection unavailable");
     }
 
-    const now = new Date();
-    const mode = data.cronExpression ? "recurring" : "one_shot";
-    const timestamp = now.toISOString();
+    const currentTimestamp = new Date();
+    const mode = data.cronExpression ? TIMER_MODES.RECURRING : TIMER_MODES.ONE_SHOT;
+    const timestampString = currentTimestamp.toISOString();
 
     // Input validation
-    let firesAt = timestamp;
-    if (mode === "one_shot") {
+    let firesAt = timestampString;
+    if (mode === TIMER_MODES.ONE_SHOT) {
       const seconds = data.durationSeconds ?? 0;
-      if (seconds <= 0 || seconds > 86400) {
+      if (seconds <= 0 || seconds > ONE_SHOT_MAXIMUM_DURATION_SECONDS) {
         throw new Error(
-          "One-shot duration must be between 1 and 86400 seconds (24 hours).",
+          `One-shot duration must be between 1 and ${ONE_SHOT_MAXIMUM_DURATION_SECONDS} seconds (24 hours).`,
         );
       }
-      firesAt = new Date(now.getTime() + seconds * 1000).toISOString();
+      firesAt = new Date(currentTimestamp.getTime() + seconds * 1000).toISOString();
     } else {
       // For recurring timers, check cron pattern syntax
       if (
@@ -129,7 +146,7 @@ const ConversationTimerService = {
         );
       }
       // Calculate first fire time as next minute boundary
-      const nextMinute = new Date(now.getTime() + 60 * 1000);
+      const nextMinute = new Date(currentTimestamp.getTime() + ONE_MINUTE_IN_MILLISECONDS);
       nextMinute.setSeconds(0, 0);
       firesAt = nextMinute.toISOString();
     }
@@ -146,16 +163,14 @@ const ConversationTimerService = {
       maxIterations: data.maxIterations,
       iterationCount: 0,
       firesAt,
-      status: "active",
-      createdAt: timestamp,
-      updatedAt: timestamp,
+      status: TIMER_STATUSES.ACTIVE,
+      createdAt: timestampString,
+      updatedAt: timestampString,
     };
 
-    await database
-      .collection(COLLECTIONS.CONVERSATION_TIMERS)
-      .insertOne(
-        timer as unknown as import("mongodb").OptionalUnlessRequiredId<ConversationTimer>,
-      );
+    const timerCollection = database.collection<ConversationTimer>(COLLECTIONS.CONVERSATION_TIMERS);
+    await timerCollection.insertOne(timer);
+
     logger.info(
       `[ConversationTimers] Scheduled ${mode} timer ${timer.id} for conversation ${timer.conversationId}`,
     );
@@ -176,12 +191,11 @@ const ConversationTimerService = {
       throw new Error("Database connection unavailable");
     }
 
-    const result = await database
-      .collection(COLLECTIONS.CONVERSATION_TIMERS)
-      .updateOne(
-        { id: timerId, project, username, status: "active" },
-        { $set: { status: "cancelled", updatedAt: new Date().toISOString() } },
-      );
+    const timerCollection = database.collection<ConversationTimer>(COLLECTIONS.CONVERSATION_TIMERS);
+    const result = await timerCollection.updateOne(
+      { id: timerId, project, username, status: TIMER_STATUSES.ACTIVE },
+      { $set: { status: TIMER_STATUSES.CANCELLED, updatedAt: new Date().toISOString() } },
+    );
 
     const isCancelled = (result.modifiedCount ?? 0) > 0;
     if (isCancelled) {
@@ -201,11 +215,11 @@ const ConversationTimerService = {
     const database = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!database) return [];
 
-    return (await database
-      .collection(COLLECTIONS.CONVERSATION_TIMERS)
-      .find({ conversationId, project, username, status: "active" })
+    const timerCollection = database.collection<ConversationTimer>(COLLECTIONS.CONVERSATION_TIMERS);
+    return await timerCollection
+      .find({ conversationId, project, username, status: TIMER_STATUSES.ACTIVE })
       .sort({ createdAt: 1 })
-      .toArray()) as unknown as ConversationTimer[];
+      .toArray();
   },
 
   /**
@@ -216,14 +230,15 @@ const ConversationTimerService = {
     const database = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!database) return;
 
-    const now = new Date();
-    const nowTimestamp = now.toISOString();
+    const currentTimestamp = new Date();
+    const nowTimestamp = currentTimestamp.toISOString();
+
+    const timerCollection = database.collection<ConversationTimer>(COLLECTIONS.CONVERSATION_TIMERS);
 
     // Query active timers whose firesAt time is due
-    const dueTimers = (await database
-      .collection(COLLECTIONS.CONVERSATION_TIMERS)
-      .find({ status: "active", firesAt: { $lte: nowTimestamp } })
-      .toArray()) as unknown as ConversationTimer[];
+    const dueTimers = await timerCollection
+      .find({ status: TIMER_STATUSES.ACTIVE, firesAt: { $lte: nowTimestamp } })
+      .toArray();
 
     if (dueTimers.length === 0) return;
 
@@ -232,7 +247,10 @@ const ConversationTimerService = {
         // Fetch target conversation to check its current status.
         // Check agent_conversations first, then fallback to model_conversations.
         let collection = COLLECTIONS.AGENT_CONVERSATIONS;
-        let conversation = await database.collection(collection).findOne({
+        const agentConversationsCollection = database.collection<TransformedConversation>(COLLECTIONS.AGENT_CONVERSATIONS);
+        const modelConversationsCollection = database.collection<TransformedConversation>(COLLECTIONS.MODEL_CONVERSATIONS);
+
+        let conversation = await agentConversationsCollection.findOne({
           id: timer.conversationId,
           project: timer.project,
           username: timer.username,
@@ -240,7 +258,7 @@ const ConversationTimerService = {
 
         if (!conversation) {
           collection = COLLECTIONS.MODEL_CONVERSATIONS;
-          conversation = await database.collection(collection).findOne({
+          conversation = await modelConversationsCollection.findOne({
             id: timer.conversationId,
             project: timer.project,
             username: timer.username,
@@ -251,12 +269,10 @@ const ConversationTimerService = {
           logger.warn(
             `[ConversationTimers] Conversation ${timer.conversationId} not found in agent or model collections. Expiring timer.`,
           );
-          await database
-            .collection(COLLECTIONS.CONVERSATION_TIMERS)
-            .updateOne(
-              { id: timer.id },
-              { $set: { status: "expired", updatedAt: nowTimestamp } },
-            );
+          await timerCollection.updateOne(
+            { id: timer.id },
+            { $set: { status: TIMER_STATUSES.EXPIRED, updatedAt: nowTimestamp } },
+          );
           continue;
         }
 
@@ -274,29 +290,27 @@ const ConversationTimerService = {
         );
 
         // Compute current minute key (to avoid cron double-fires in the same minute)
-        const currentMinuteKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}T${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+        const currentMinuteKey = `${currentTimestamp.getFullYear()}-${String(currentTimestamp.getMonth() + 1).padStart(2, "0")}-${String(currentTimestamp.getDate()).padStart(2, "0")}T${String(currentTimestamp.getHours()).padStart(2, "0")}:${String(currentTimestamp.getMinutes()).padStart(2, "0")}`;
 
-        if (timer.mode === "recurring" && timer.cronExpression) {
+        if (timer.mode === TIMER_MODES.RECURRING && timer.cronExpression) {
           // Check if date matches cron
-          const isCronDue = matchCron(timer.cronExpression, now);
+          const isCronDue = matchCron(timer.cronExpression, currentTimestamp);
           const hasAlreadyRunThisMinute =
             timer.lastFiredMinuteKey === currentMinuteKey;
 
           if (!isCronDue || hasAlreadyRunThisMinute) {
             // If it's not due for cron matching, or already run this minute, update firesAt to next minute boundary
-            const nextMinute = new Date(now.getTime() + 60 * 1000);
+            const nextMinute = new Date(currentTimestamp.getTime() + ONE_MINUTE_IN_MILLISECONDS);
             nextMinute.setSeconds(0, 0);
-            await database
-              .collection(COLLECTIONS.CONVERSATION_TIMERS)
-              .updateOne(
-                { id: timer.id },
-                {
-                  $set: {
-                    firesAt: nextMinute.toISOString(),
-                    updatedAt: nowTimestamp,
-                  },
+            await timerCollection.updateOne(
+              { id: timer.id },
+              {
+                $set: {
+                  firesAt: nextMinute.toISOString(),
+                  updatedAt: nowTimestamp,
                 },
-              );
+              },
+            );
             continue;
           }
         }
@@ -305,39 +319,37 @@ const ConversationTimerService = {
         // findOneAndUpdate ensures only one tick can transition the timer's state.
         const newIterationCount = timer.iterationCount + 1;
         const isRecurringExpired =
-          timer.mode === "recurring" &&
+          timer.mode === TIMER_MODES.RECURRING &&
           timer.maxIterations !== undefined &&
           newIterationCount >= timer.maxIterations;
 
-        const updates: Record<string, unknown> = {
+        const timerUpdates: Partial<ConversationTimer> = {
           iterationCount: newIterationCount,
           updatedAt: nowTimestamp,
         };
 
-        if (timer.mode === "one_shot") {
-          updates.status = "fired";
+        if (timer.mode === TIMER_MODES.ONE_SHOT) {
+          timerUpdates.status = TIMER_STATUSES.FIRED;
         } else if (isRecurringExpired) {
-          updates.status = "expired";
+          timerUpdates.status = TIMER_STATUSES.EXPIRED;
         } else {
           // Setup next fire time for cron timer
-          const nextMinute = new Date(now.getTime() + 60 * 1000);
+          const nextMinute = new Date(currentTimestamp.getTime() + ONE_MINUTE_IN_MILLISECONDS);
           nextMinute.setSeconds(0, 0);
-          updates.firesAt = nextMinute.toISOString();
-          updates.lastFiredMinuteKey = currentMinuteKey;
+          timerUpdates.firesAt = nextMinute.toISOString();
+          timerUpdates.lastFiredMinuteKey = currentMinuteKey;
         }
 
         // Atomic claim: only proceed if the timer is still in the expected state.
         // This prevents a second tick (or cluster node) from firing the same timer.
-        const claimedTimer = await database
-          .collection(COLLECTIONS.CONVERSATION_TIMERS)
-          .findOneAndUpdate(
-            {
-              id: timer.id,
-              status: "active",
-              iterationCount: timer.iterationCount,
-            },
-            { $set: updates },
-          );
+        const claimedTimer = await timerCollection.findOneAndUpdate(
+          {
+            id: timer.id,
+            status: TIMER_STATUSES.ACTIVE,
+            iterationCount: timer.iterationCount,
+          },
+          { $set: timerUpdates },
+        );
 
         if (!claimedTimer) {
           logger.debug(
@@ -350,21 +362,21 @@ const ConversationTimerService = {
         // When any timer fires, cancel all OTHER active one-shot timers for
         // the same conversation — they're now redundant since this conversation
         // is being woken up. Recurring crons are never auto-cancelled.
-        await database.collection(COLLECTIONS.CONVERSATION_TIMERS).updateMany(
+        await timerCollection.updateMany(
           {
             conversationId: timer.conversationId,
             project: timer.project,
             username: timer.username,
-            status: "active",
-            mode: "one_shot",
+            status: TIMER_STATUSES.ACTIVE,
+            mode: TIMER_MODES.ONE_SHOT,
             id: { $ne: timer.id },
           },
-          { $set: { status: "cancelled", updatedAt: nowTimestamp } },
+          { $set: { status: TIMER_STATUSES.CANCELLED, updatedAt: nowTimestamp } },
         );
 
         // 2. Append timer fired message to the conversation
-        const reminderMessage = {
-          role: "user" as const,
+        const reminderMessage: ConversationMessage = {
+          role: "user",
           content: `🔔 Notification: ${timer.prompt}`,
           timestamp: nowTimestamp,
           _alreadyPersisted: true,
@@ -382,7 +394,7 @@ const ConversationTimerService = {
         // 3. Trigger AgenticLoopService in the background
         this.executeAgenticLoop(
           timer,
-          conversation as unknown as Record<string, unknown>,
+          conversation,
           reminderMessage,
           collection,
         ).catch((error: Error) => {
@@ -403,7 +415,7 @@ const ConversationTimerService = {
    */
   async executeAgenticLoop(
     timer: ConversationTimer,
-    conversation: Record<string, unknown>,
+    conversation: TimerConversationContext,
     reminderMessage: ConversationMessage,
     collection: string = COLLECTIONS.AGENT_CONVERSATIONS,
   ): Promise<void> {
@@ -417,13 +429,12 @@ const ConversationTimerService = {
     // Reload the conversation from DB (source of truth) to get the freshest
     // message array, including the just-appended reminder message.
     // If not found in DB (e.g. in unit tests), fallback to the passed-in conversation.
-    const databaseConversation = await database
-      .collection(collection)
-      .findOne({
-        id: timer.conversationId,
-        project: timer.project,
-        username: timer.username,
-      });
+    const conversationsCollection = database.collection<TransformedConversation>(collection);
+    const databaseConversation = await conversationsCollection.findOne({
+      id: timer.conversationId,
+      project: timer.project,
+      username: timer.username,
+    });
 
     const updatedConversation = databaseConversation || conversation;
 
@@ -452,7 +463,7 @@ const ConversationTimerService = {
       message._alreadyPersisted = true;
     }
 
-    const settings = (updatedConversation.settings || {}) as ConversationSettings;
+    const settings = (updatedConversation.settings || {}) as TimerConversationSettings;
     const providerName = settings.provider || "";
     const resolvedModel = settings.model || "";
     const agent = settings.agent || null;
@@ -496,10 +507,11 @@ const ConversationTimerService = {
       { collection, agent: agent || undefined },
     );
 
+    const toolConfiguration = settings.toolConfig;
+
     try {
       await AgenticLoopService.runAgenticLoop({
-        provider:
-          provider as unknown as import("./harnesses/types.ts").LLMProvider,
+        provider: provider as LLMProvider,
         providerName,
         resolvedModel,
         modelDefinition,
@@ -510,12 +522,12 @@ const ConversationTimerService = {
           functionCallingEnabled: true,
           planFirst: false,
           autoApprove: true,
-          minContextLength: 120_000,
-          ...(settings.toolConfig?.enabledTools && {
-            enabledTools: settings.toolConfig.enabledTools,
+          minContextLength: MINIMUM_CONTEXT_LENGTH,
+          ...(toolConfiguration?.enabledTools && {
+            enabledTools: toolConfiguration.enabledTools,
           }),
-          ...(settings.toolConfig?.disabledTools && {
-            disabledTools: settings.toolConfig.disabledTools,
+          ...(toolConfiguration?.disabledTools && {
+            disabledTools: toolConfiguration.disabledTools,
           }),
         },
         agentConversationId: crypto.randomUUID(),

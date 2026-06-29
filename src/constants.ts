@@ -59,6 +59,18 @@ export const COLLECTIONS = {
   WORKFLOW_MEMORIES: "workflow_memories",
 };
 
+export const TIMER_MODES = {
+  ONE_SHOT: "one_shot",
+  RECURRING: "recurring",
+} as const;
+
+export const TIMER_STATUSES = {
+  ACTIVE: "active",
+  FIRED: "fired",
+  CANCELLED: "cancelled",
+  EXPIRED: "expired",
+} as const;
+
 /**
  * Reusable MongoDB $group aggregation expression for summing estimated costs.
  * Sums the per-request `estimatedCost` field (USD, nullable).
