@@ -108,7 +108,9 @@ export function parseDecompositionResponse(
 
     return parsed
       .filter(
-        (subtask: unknown): subtask is DecomposedSubtask =>
+        (
+          subtask: string | number | boolean | object | null | undefined | symbol,
+        ): subtask is DecomposedSubtask =>
           typeof subtask === "object" &&
           subtask !== null &&
           "description" in subtask &&
@@ -122,7 +124,9 @@ export function parseDecompositionResponse(
         ...subtask,
         dependsOn: Array.isArray(subtask.dependsOn)
           ? subtask.dependsOn.filter(
-              (index: unknown): index is number =>
+              (
+                index: string | number | boolean | object | null | undefined | symbol,
+              ): index is number =>
                 typeof index === "number" && index >= 0,
             )
           : undefined,
@@ -140,7 +144,9 @@ export function parseDecompositionResponse(
         if (Array.isArray(extracted)) {
           return extracted
             .filter(
-              (subtask: unknown): subtask is DecomposedSubtask =>
+              (
+                subtask: string | number | boolean | object | null | undefined | symbol,
+              ): subtask is DecomposedSubtask =>
                 typeof subtask === "object" &&
                 subtask !== null &&
                 "description" in subtask &&

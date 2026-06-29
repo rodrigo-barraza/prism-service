@@ -78,16 +78,30 @@ function computeToolCallFingerprint(toolCall: ToolCall): string {
  * recursively. This ensures identical arguments produce identical
  * hashes regardless of property insertion order.
  */
-function stableStringify(value: unknown): string {
+function stableStringify(
+  value: string | number | boolean | object | null | undefined | symbol,
+): string {
   if (value === null || value === undefined) return "null";
   if (typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) {
     return "[" + value.map((item) => stableStringify(item)).join(",") + "]";
   }
-  const sortedKeys = Object.keys(value as Record<string, unknown>).sort();
+  const sortedKeys = Object.keys(
+    value as Record<
+      string,
+      string | number | boolean | object | null | undefined | symbol
+    >,
+  ).sort();
   const entries = sortedKeys.map(
     (key) =>
-      `${JSON.stringify(key)}:${stableStringify((value as Record<string, unknown>)[key])}`,
+      `${JSON.stringify(key)}:${stableStringify(
+        (
+          value as Record<
+            string,
+            string | number | boolean | object | null | undefined | symbol
+          >
+        )[key],
+      )}`,
   );
   return "{" + entries.join(",") + "}";
 }

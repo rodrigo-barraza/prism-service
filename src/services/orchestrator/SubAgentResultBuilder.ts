@@ -269,12 +269,15 @@ interface SerializedSubAgentResult {
 }
 
 function isSerializedSubAgentResult(
-  value: unknown,
+  value: string | number | boolean | object | null | undefined | symbol,
 ): value is SerializedSubAgentResult {
   if (typeof value !== "object" || value === null) {
     return false;
   }
-  const candidate = value as Record<string, unknown>;
+  const candidate = value as Record<
+    string,
+    string | number | boolean | object | null | undefined | symbol
+  >;
   const hasAgentId =
     typeof candidate["agent_id"] === "string" ||
     typeof candidate["agent_id"] === "number";
@@ -287,10 +290,28 @@ function isSerializedSubAgentResult(
  * Used by both scan passes in extractSubtreeMetrics.
  */
 function collectChildSummariesFromPayload(
-  payload: unknown,
+  payload: string | number | boolean | object | null | undefined | symbol,
   childSummaries: SubAgentChildSummary[],
 ): void {
-  const resultsArray: unknown[] = Array.isArray(payload) ? payload : [payload];
+  const resultsArray: (
+    | string
+    | number
+    | boolean
+    | object
+    | null
+    | undefined
+    | symbol
+  )[] = Array.isArray(payload)
+    ? (payload as (
+        | string
+        | number
+        | boolean
+        | object
+        | null
+        | undefined
+        | symbol
+      )[])
+    : [payload];
   const MAX_RESULT_LENGTH_FOR_PROPAGATION = 2000;
 
   for (const entry of resultsArray) {
@@ -353,7 +374,7 @@ export function extractSubtreeMetrics(
         typeof message.content === "string" ? message.content : "";
       if (!content.includes("agent_id")) continue;
 
-      let parsed: unknown;
+      let parsed: string | number | boolean | object | null | undefined | symbol;
       try {
         parsed = JSON.parse(content);
       } catch {
@@ -373,7 +394,17 @@ export function extractSubtreeMetrics(
 
         // toolCall.result is the raw return value from OrchestratorService.createTeam(),
         // which is SubAgentResult[] — already a parsed object, not a JSON string.
-        collectChildSummariesFromPayload(toolCall.result, childSummaries);
+        collectChildSummariesFromPayload(
+          toolCall.result as
+            | string
+            | number
+            | boolean
+            | object
+            | null
+            | undefined
+            | symbol,
+          childSummaries,
+        );
       }
     }
   }

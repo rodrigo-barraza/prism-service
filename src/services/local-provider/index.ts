@@ -605,7 +605,7 @@ class LocalProviderGateway {
     modelKey: string,
     options: Record<string, unknown> = {},
     signal?: AbortSignal,
-    onStatus?: (status: unknown) => void,
+    onStatus?: (status: string | object | null | undefined) => void,
   ): Promise<unknown> {
     const provider = getProvider(instanceId) as GenericProvider | undefined;
     if (!provider?.ensureModelLoaded) {
