@@ -4,7 +4,7 @@ import { Readable } from 'node:stream';
 import { app, MOCK_GENERATE_SPEECH } from './setup.ts';
 import audioRouter from '../src/routes/AudioRoutes.ts';
 import { getProvider } from '../src/providers/index.ts';
-import { PROVIDERS } from "../src/constants";
+import { PROVIDERS } from "../src/constants.ts";
 
 // Mount /audio-to-text local route (since setup.ts only mounts /text-to-audio)
 app.use('/audio-to-text', audioRouter);

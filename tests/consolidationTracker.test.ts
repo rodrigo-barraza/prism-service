@@ -10,7 +10,7 @@ import {
   SESSIONS_BETWEEN_RUNS,
   DAILY_MAX_CONSOLIDATIONS
 } from '../src/services/memory/ConsolidationTracker.ts';
-import { COLLECTIONS } from "../src/constants";
+import { COLLECTIONS } from "../src/constants.ts";
 
 describe('Memory Consolidation Tracker Unit Tests', () => {
   let mockRuns: Array<{ project: string; sessionsSinceLastRun: number; lastConsolidatedAt?: string }> = [];

@@ -12,7 +12,7 @@ vi.mock('../src/config.ts', () => ({
 }));
 
 import { matchesAny, detectCapabilities } from '../src/services/local-provider/detectCapabilities.ts';
-import { TYPES, MODEL_TYPES } from "../src/constants";
+import { TYPES, MODEL_TYPES } from "../src/constants.ts";
 
 describe('detectCapabilities', () => {
   describe('matchesAny', () => {

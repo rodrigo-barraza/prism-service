@@ -87,6 +87,15 @@ export class SubAgentTelemetryEmitter {
     this.recursionDepth = config.recursionDepth ?? 0;
   }
 
+  /**
+   * Re-wire the parent SSE emit function.
+   * Called when a new SSE stream opens (user sends a follow-up message)
+   * so that still-running sub-agents emit through the new stream.
+   */
+  updateParentEmit(emit: EmitFunction | null | undefined): void {
+    this.parentEmit = emit;
+  }
+
   /** Build the generation_progress payload for the frontend. */
   private buildProgress() {
     const burstTokens = estimateTokens(this.burstOutputCharacters);

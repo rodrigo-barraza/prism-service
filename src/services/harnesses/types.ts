@@ -95,6 +95,8 @@ export interface ConversationMessage {
   textFragments?: string[];
   thinkingFragments?: string[];
   generationSettings?: Record<string, unknown>;
+  /** Internal marker — message already persisted to database, skip double persistence. */
+  _alreadyPersisted?: boolean;
   /** Internal marker — planning injection message, stripped on plan exit and DB persistence. */
   _isPlanningInjection?: boolean;
   [key: string]: unknown;

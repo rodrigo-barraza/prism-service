@@ -88,7 +88,7 @@ export default class AgenticLoopService {
       messages.length > 0
     ) {
       for (let i = 0; i < messages.length - 1; i++) {
-        (messages[i] as any)._alreadyPersisted = true;
+        messages[i]._alreadyPersisted = true;
       }
     }
 

@@ -292,7 +292,7 @@ describe("Harness Lifecycle Modules", () => {
         options: {},
       };
 
-      const reviewResult = await criticGate.review(toolCall, contextMinimal as any);
+      const reviewResult = await criticGate.review(toolCall as any, contextMinimal as any);
       expect(reviewResult.isApproved).toBe(true);
       expect(reviewResult.reason).toBe("critic_approved");
     });

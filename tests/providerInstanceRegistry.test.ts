@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { PROVIDERS } from "../src/constants";
+import { PROVIDERS } from "../src/constants.ts";
 
 const mockLmStudioProvider = { name: 'lm-studio-mock' };
 const mockOllamaProvider = { name: 'ollama-mock' };

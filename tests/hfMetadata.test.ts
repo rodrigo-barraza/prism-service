@@ -20,7 +20,7 @@ vi.mock('../src/services/local-provider/nameParsers.ts', () => ({
   }),
 }));
 
-import { TYPES as CONST_TYPES, MODEL_TYPES } from "../src/constants";
+import { TYPES as CONST_TYPES, MODEL_TYPES } from "../src/constants.ts";
 
 const TYPES = {
   TEXT: CONST_TYPES.TEXT,

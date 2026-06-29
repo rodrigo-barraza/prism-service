@@ -10,7 +10,7 @@ import {
   MEDIA_STRATEGIES,
 } from '../src/utils/openai-compat.ts';
 import type { InputMessage } from '../src/utils/openai-compat.ts';
-import { TYPES } from "../src/constants";
+import { TYPES } from "../src/constants.ts";
 
 vi.mock('../src/utils/logger.ts', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },

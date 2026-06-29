@@ -15,7 +15,7 @@ import {
 } from "../src/utils/FunctionCallingUtilities.ts";
 // ── Types ──────────────────────────────────────────────────────
 import type { ChatMessage as TestMessage } from "../src/types/admin.ts";
-import { TYPES } from "../src/constants";
+import { TYPES } from "../src/constants.ts";
 
 // ═══════════════════════════════════════════════════════════════
 describe("truncateToolResult", () => {

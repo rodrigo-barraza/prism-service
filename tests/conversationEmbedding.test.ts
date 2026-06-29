@@ -115,7 +115,7 @@ describe("ConversationEmbeddingService & ConversationSearchTool", () => {
     });
 
     it("should embed and persist when cooldown passed or null", async () => {
-      const embedSpy = vi.spyOn(EmbeddingService, MODEL_TYPES.EMBED).mockResolvedValue([0.5, 0.6, 0.7]);
+      const embedSpy = vi.spyOn(EmbeddingService, "embed").mockResolvedValue([0.5, 0.6, 0.7]);
 
       await ConversationEmbeddingService.generateAndPersist({
         conversationId: "conv-1",
@@ -161,7 +161,7 @@ describe("ConversationEmbeddingService & ConversationSearchTool", () => {
 
   describe("ConversationSearchTool", () => {
     it("should execute search and return matches sorted by similarity", async () => {
-      const embedSpy = vi.spyOn(EmbeddingService, MODEL_TYPES.EMBED).mockResolvedValue([0.1, 0.2, 0.3]);
+      const embedSpy = vi.spyOn(EmbeddingService, "embed").mockResolvedValue([0.1, 0.2, 0.3]);
       
       mockFind.mockReturnValueOnce({
         sort: vi.fn().mockReturnThis(),

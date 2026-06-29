@@ -49,11 +49,18 @@ describe("CostBudgetEnforcer", () => {
   });
 
   function createLoopState(overrides?: Partial<AgenticLoopState>): AgenticLoopState {
+    const defaultUsage = {
+      inputTokens: 50000,
+      outputTokens: 20000,
+      cacheReadInputTokens: 0,
+      cacheCreationInputTokens: 0,
+      reasoningOutputTokens: 0,
+    };
     return {
       iterations: overrides?.iterations ?? 5,
-      overallUsage: overrides?.overallUsage ?? {
-        inputTokens: 50000,
-        outputTokens: 20000,
+      overallUsage: {
+        ...defaultUsage,
+        ...(overrides?.overallUsage || {}),
       },
       ...overrides,
     } as AgenticLoopState;
@@ -156,13 +163,23 @@ describe("CostBudgetEnforcer", () => {
       vi.mocked(calculateTextCost).mockReturnValue(0.10);
       const state = createLoopState({
         iterations: 7,
-        overallUsage: { inputTokens: 100000, outputTokens: 45000 },
+        overallUsage: {
+          inputTokens: 100000,
+          outputTokens: 45000,
+          cacheReadInputTokens: 0,
+          cacheCreationInputTokens: 0,
+          reasoningOutputTokens: 0,
+        },
       });
 
       checkCostBudget(state, "gemini-3.5-flash", 5.0, emitMock);
 
       expect(calculateTextCost).toHaveBeenCalledWith(
-        { inputTokens: 100000, outputTokens: 45000, requests: 7 },
+        expect.objectContaining({
+          inputTokens: 100000,
+          outputTokens: 45000,
+          requests: 7,
+        }),
         expect.anything(),
       );
     });
@@ -173,7 +190,13 @@ describe("CostBudgetEnforcer", () => {
       vi.mocked(calculateTextCost).mockReturnValue(0);
       const state = createLoopState({
         iterations: 0,
-        overallUsage: { inputTokens: 0, outputTokens: 0 },
+        overallUsage: {
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadInputTokens: 0,
+          cacheCreationInputTokens: 0,
+          reasoningOutputTokens: 0,
+        },
       });
 
       const result = checkCostBudget(state, "gemini-3.5-flash", 0.01, emitMock);

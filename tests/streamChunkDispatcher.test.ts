@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { TYPES, MODEL_TYPES } from "../src/constants";
+import { TYPES, MODEL_TYPES } from "../src/constants.ts";
 
 vi.mock("../src/services/FileService.ts", () => ({
   default: {

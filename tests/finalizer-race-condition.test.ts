@@ -170,7 +170,7 @@ describe("Finalizer message assembly", () => {
       overrideMessagesToAppend: [
         {
           role: "user",
-          content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY}\nPrevious context summary.`,
+          content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX}\nPrevious context summary.`,
           isCompactSummary: true,
         },
         { role: "user", content: "make a song" },

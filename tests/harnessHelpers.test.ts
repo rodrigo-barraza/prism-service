@@ -54,7 +54,7 @@ vi.mock('../src/services/RequestLogger.ts', () => ({
 }));
 
 import RequestLogger from '../src/services/RequestLogger.ts';
-import { PROVIDERS, TYPES, MODEL_TYPES } from "../src/constants";
+import { PROVIDERS, TYPES, MODEL_TYPES } from "../src/constants.ts";
 
 class TestHarness extends BaseAgenticHarness {
   public getContext() { return this.context; }

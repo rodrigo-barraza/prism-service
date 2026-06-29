@@ -56,6 +56,8 @@ export interface SubAgentState {
   thinkingEnabled?: boolean;
   reasoningEffort?: string;
   thinkingBudget?: number;
+  /** Reference to the live telemetry emitter — used to re-wire parentEmit when a new SSE stream starts. */
+  telemetryEmitter?: { updateParentEmit: (emit: EmitFunction | null | undefined) => void } | null;
 }
 
 export interface WorktreeDiff {

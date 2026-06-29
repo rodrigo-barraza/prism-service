@@ -1,0 +1,1073 @@
+[
+  {
+    "file": "src/index.ts",
+    "line": 682,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/index.ts",
+    "line": 692,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/anthropic.ts",
+    "line": 74,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/anthropic.ts",
+    "line": 784,
+    "name": "generateTextStream",
+    "type": "return-type",
+    "error": "Avoid using Record<string, any/unknown> as return type. Use custom Transformed[Entity] interface."
+  },
+  {
+    "file": "src/providers/google.ts",
+    "line": 98,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/google.ts",
+    "line": 126,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/google.ts",
+    "line": 193,
+    "name": "schema",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/google.ts",
+    "line": 198,
+    "name": "item",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/google.ts",
+    "line": 775,
+    "name": "done",
+    "type": "variable",
+    "error": "Boolean or state variable \"done\" must read as an assertion (e.g. isActive, isLoading, isDone)"
+  },
+  {
+    "file": "src/providers/google.ts",
+    "line": 888,
+    "name": "e",
+    "type": "parameter",
+    "error": "Single-letter variable \"e\" is not allowed outside catch blocks or inline single-line event handlers"
+  },
+  {
+    "file": "src/providers/google.ts",
+    "line": 888,
+    "name": "e",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/google.ts",
+    "line": 1265,
+    "name": "content",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/index.ts",
+    "line": 56,
+    "name": "receiver",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/inworld.ts",
+    "line": 30,
+    "name": "done",
+    "type": "binding",
+    "error": "Boolean or state variable \"done\" must read as an assertion (e.g. isActive, isLoading, isDone)"
+  },
+  {
+    "file": "src/providers/lm-studio.ts",
+    "line": 79,
+    "name": "done",
+    "type": "binding",
+    "error": "Boolean or state variable \"done\" must read as an assertion (e.g. isActive, isLoading, isDone)"
+  },
+  {
+    "file": "src/providers/lm-studio.ts",
+    "line": 290,
+    "name": "serializedString",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/lm-studio.ts",
+    "line": 561,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/lm-studio.ts",
+    "line": 734,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/lm-studio.ts",
+    "line": 751,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/lm-studio.ts",
+    "line": 778,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/lm-studio.ts",
+    "line": 1321,
+    "name": "content",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/lm-studio.ts",
+    "line": 1485,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/ollama.ts",
+    "line": 225,
+    "name": "done",
+    "type": "binding",
+    "error": "Boolean or state variable \"done\" must read as an assertion (e.g. isActive, isLoading, isDone)"
+  },
+  {
+    "file": "src/providers/ollama.ts",
+    "line": 429,
+    "name": "value",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/openai.ts",
+    "line": 157,
+    "name": "schema",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/openai.ts",
+    "line": 163,
+    "name": "item",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/openai.ts",
+    "line": 196,
+    "name": "branch",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/openai.ts",
+    "line": 324,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/providers/openai.ts",
+    "line": 351,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/routes/AudioRoutes.ts",
+    "line": 122,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/routes/AudioRoutes.ts",
+    "line": 153,
+    "name": "done",
+    "type": "binding",
+    "error": "Boolean or state variable \"done\" must read as an assertion (e.g. isActive, isLoading, isDone)"
+  },
+  {
+    "file": "src/routes/AudioRoutes.ts",
+    "line": 232,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/routes/AudioRoutes.ts",
+    "line": 247,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/routes/AudioRoutes.ts",
+    "line": 403,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/routes/AudioRoutes.ts",
+    "line": 527,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/routes/AudioRoutes.ts",
+    "line": 548,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/routes/WorkflowsRoutes.ts",
+    "line": 35,
+    "name": "value",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/routes/WorkflowsRoutes.ts",
+    "line": 217,
+    "name": "value",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/routes/WorkflowsRoutes.ts",
+    "line": 255,
+    "name": "item",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/routes/WorkflowsRoutes.ts",
+    "line": 304,
+    "name": "item",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/routes/WorkspacesRoutes.ts",
+    "line": 405,
+    "name": "done",
+    "type": "binding",
+    "error": "Boolean or state variable \"done\" must read as an assertion (e.g. isActive, isLoading, isDone)"
+  },
+  {
+    "file": "src/routes/WorkspacesRoutes.ts",
+    "line": 480,
+    "name": "done",
+    "type": "binding",
+    "error": "Boolean or state variable \"done\" must read as an assertion (e.g. isActive, isLoading, isDone)"
+  },
+  {
+    "file": "src/routes/admin/AdminRequestRoutes.ts",
+    "line": 77,
+    "name": "value",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/routes/admin/AdminStatsRoutes.ts",
+    "line": 30,
+    "name": "buildMatchFilter",
+    "type": "return-type",
+    "error": "Avoid using Record<string, any/unknown> as return type. Use custom Transformed[Entity] interface."
+  },
+  {
+    "file": "src/services/AgentHooks.ts",
+    "line": 101,
+    "name": "run",
+    "type": "return-type",
+    "error": "Avoid using Record<string, any/unknown> as return type. Use custom Transformed[Entity] interface."
+  },
+  {
+    "file": "src/services/AgentHooks.ts",
+    "line": 166,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/AgenticLoopService.ts",
+    "line": 91,
+    "name": "as any",
+    "type": "cast",
+    "error": "Avoid using \"as any\" type-safety escape"
+  },
+  {
+    "file": "src/services/AgenticToolResolver.ts",
+    "line": 386,
+    "name": "as any",
+    "type": "cast",
+    "error": "Avoid using \"as any\" type-safety escape"
+  },
+  {
+    "file": "src/services/BenchmarkService.ts",
+    "line": 494,
+    "name": "e",
+    "type": "parameter",
+    "error": "Single-letter variable \"e\" is not allowed outside catch blocks or inline single-line event handlers"
+  },
+  {
+    "file": "src/services/BenchmarkService.ts",
+    "line": 498,
+    "name": "e",
+    "type": "parameter",
+    "error": "Single-letter variable \"e\" is not allowed outside catch blocks or inline single-line event handlers"
+  },
+  {
+    "file": "src/services/ConversationEmbeddingService.ts",
+    "line": 56,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/ConversationTimerService.ts",
+    "line": 66,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/ConversationTimerService.ts",
+    "line": 388,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/FileService.ts",
+    "line": 54,
+    "name": "ref",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/FileService.ts",
+    "line": 147,
+    "name": "ref",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/LocalModelQueue.ts",
+    "line": 87,
+    "name": "as any",
+    "type": "cast",
+    "error": "Avoid using \"as any\" type-safety escape"
+  },
+  {
+    "file": "src/services/MCPClientService.ts",
+    "line": 304,
+    "name": "callTool",
+    "type": "return-type",
+    "error": "Avoid using Record<string, any/unknown> as return type. Use custom Transformed[Entity] interface."
+  },
+  {
+    "file": "src/services/MemoryConsolidationService.ts",
+    "line": 664,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/MemoryExtractor.ts",
+    "line": 462,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/OrchestratorService.ts",
+    "line": 161,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/OrchestratorService.ts",
+    "line": 599,
+    "name": "cleanupError",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/OrchestratorService.ts",
+    "line": 656,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/OrchestratorService.ts",
+    "line": 668,
+    "name": "cleanupError",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/OrchestratorService.ts",
+    "line": 737,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/OrchestratorService.ts",
+    "line": 848,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/OrchestratorService.ts",
+    "line": 1354,
+    "name": "notificationError",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/OrchestratorService.ts",
+    "line": 1360,
+    "name": "routerError",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/OrchestratorService.ts",
+    "line": 1439,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/OrchestratorService.ts",
+    "line": 2048,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/OrchestratorService.ts",
+    "line": 2213,
+    "name": "autoResponseError",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/PromptLocaleService.ts",
+    "line": 37,
+    "name": "deepFlattenObject",
+    "type": "return-type",
+    "error": "Avoid using Record<string, any/unknown> as return type. Use custom Transformed[Entity] interface."
+  },
+  {
+    "file": "src/services/RequestLogger.ts",
+    "line": 158,
+    "name": "s",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/RequestLogger.ts",
+    "line": 160,
+    "name": "value",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/ScheduledTaskService.ts",
+    "line": 111,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/ScheduledTaskService.ts",
+    "line": 118,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/ScheduledTaskService.ts",
+    "line": 247,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/ScheduledTaskService.ts",
+    "line": 417,
+    "name": "cleanupError",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/ScheduledTaskService.ts",
+    "line": 454,
+    "name": "_getQueryFilter",
+    "type": "return-type",
+    "error": "Avoid using Record<string, any/unknown> as return type. Use custom Transformed[Entity] interface."
+  },
+  {
+    "file": "src/services/ScheduledTaskService.ts",
+    "line": 621,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/ToolContext.ts",
+    "line": 141,
+    "name": "value",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/ToolContext.ts",
+    "line": 197,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/ToolOrchestratorService.ts",
+    "line": 445,
+    "name": "provider",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/ToolOrchestratorService.ts",
+    "line": 1725,
+    "name": "executeSearchToolsWithMCP",
+    "type": "return-type",
+    "error": "Avoid using Record<string, any/unknown> as return type. Use custom Transformed[Entity] interface."
+  },
+  {
+    "file": "src/services/ToolOrchestratorService.ts",
+    "line": 1928,
+    "name": "done",
+    "type": "binding",
+    "error": "Boolean or state variable \"done\" must read as an assertion (e.g. isActive, isLoading, isDone)"
+  },
+  {
+    "file": "src/services/WebhookDispatcher.ts",
+    "line": 125,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/WorkflowExecutionService.ts",
+    "line": 111,
+    "name": "value",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/WorkflowExecutionService.ts",
+    "line": 123,
+    "name": "ref",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/WorkflowExecutionService.ts",
+    "line": 632,
+    "name": "done",
+    "type": "binding",
+    "error": "Boolean or state variable \"done\" must read as an assertion (e.g. isActive, isLoading, isDone)"
+  },
+  {
+    "file": "src/services/WorkflowMemoryService.ts",
+    "line": 152,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/compact/MicroCompactionService.ts",
+    "line": 61,
+    "name": "result",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/harnesses/BaseAgenticHarness.ts",
+    "line": 606,
+    "name": "chunk",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/harnesses/BaseAgenticHarness.ts",
+    "line": 1134,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/harnesses/BaseAgenticHarness.ts",
+    "line": 1141,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/harnesses/BaseAgenticHarness.ts",
+    "line": 1148,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/harnesses/BaseAgenticHarness.ts",
+    "line": 1153,
+    "name": "loggingError",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/harnesses/BaseAgenticHarness.ts",
+    "line": 1194,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/harnesses/BaseAgenticHarness.ts",
+    "line": 1354,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/harnesses/lifecycle/ContextPressureManager.ts",
+    "line": 141,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/harnesses/lifecycle/CriticGate.ts",
+    "line": 178,
+    "name": "loggingError",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/harnesses/lifecycle/OutputTruncationRecovery.ts",
+    "line": 212,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/harnesses/lifecycle/SemanticStallDetector.ts",
+    "line": 81,
+    "name": "value",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/harnesses/lifecycle/SystemReminderExtractor.ts",
+    "line": 114,
+    "name": "loggingError",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/harnesses/strategies/GraphOfThoughtsStrategy.ts",
+    "line": 1212,
+    "name": "scoringLogError",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/harnesses/strategies/TreeOfThoughtsStrategy.ts",
+    "line": 1384,
+    "name": "scoringLogError",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/local-provider/index.ts",
+    "line": 46,
+    "name": "as any",
+    "type": "cast",
+    "error": "Avoid using \"as any\" type-safety escape"
+  },
+  {
+    "file": "src/services/local-provider/index.ts",
+    "line": 93,
+    "name": "as any",
+    "type": "cast",
+    "error": "Avoid using \"as any\" type-safety escape"
+  },
+  {
+    "file": "src/services/local-provider/index.ts",
+    "line": 457,
+    "name": "checkHealth",
+    "type": "return-type",
+    "error": "Avoid using Record<string, any/unknown> as return type. Use custom Transformed[Entity] interface."
+  },
+  {
+    "file": "src/services/local-provider/index.ts",
+    "line": 543,
+    "name": "estimateVRAM",
+    "type": "return-type",
+    "error": "Avoid using Record<string, any/unknown> as return type. Use custom Transformed[Entity] interface."
+  },
+  {
+    "file": "src/services/local-provider/index.ts",
+    "line": 561,
+    "name": "estimateVRAMForModel",
+    "type": "return-type",
+    "error": "Avoid using Record<string, any/unknown> as return type. Use custom Transformed[Entity] interface."
+  },
+  {
+    "file": "src/services/local-provider/index.ts",
+    "line": 604,
+    "name": "status",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/local-provider/index.ts",
+    "line": 637,
+    "name": "applyLocalDefaults",
+    "type": "return-type",
+    "error": "Avoid using Record<string, any/unknown> as return type. Use custom Transformed[Entity] interface."
+  },
+  {
+    "file": "src/services/local-provider/index.ts",
+    "line": 663,
+    "name": "messages",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/local-provider/index.ts",
+    "line": 680,
+    "name": "messages",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/local-provider/index.ts",
+    "line": 706,
+    "name": "images",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/local-provider/index.ts",
+    "line": 707,
+    "name": "prompt",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/local-provider/index.ts",
+    "line": 709,
+    "name": "systemPrompt",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/local-provider/types.ts",
+    "line": 85,
+    "name": "status",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/local-provider/types.ts",
+    "line": 88,
+    "name": "messages",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/local-provider/types.ts",
+    "line": 93,
+    "name": "messages",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/local-provider/types.ts",
+    "line": 103,
+    "name": "images",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/local-provider/types.ts",
+    "line": 104,
+    "name": "prompt",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/local-provider/types.ts",
+    "line": 106,
+    "name": "systemPrompt",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/local-provider/vramEstimation.ts",
+    "line": 9,
+    "name": "estimateVRAM",
+    "type": "return-type",
+    "error": "Avoid using Record<string, any/unknown> as return type. Use custom Transformed[Entity] interface."
+  },
+  {
+    "file": "src/services/local-provider/vramEstimation.ts",
+    "line": 57,
+    "name": "estimateVRAMForModel",
+    "type": "return-type",
+    "error": "Avoid using Record<string, any/unknown> as return type. Use custom Transformed[Entity] interface."
+  },
+  {
+    "file": "src/services/orchestrator/InstanceLoadBalancer.ts",
+    "line": 40,
+    "name": "active",
+    "type": "variable",
+    "error": "Boolean or state variable \"active\" must read as an assertion (e.g. isActive, isLoading, isDone)"
+  },
+  {
+    "file": "src/services/orchestrator/InstanceLoadBalancer.ts",
+    "line": 64,
+    "name": "active",
+    "type": "variable",
+    "error": "Boolean or state variable \"active\" must read as an assertion (e.g. isActive, isLoading, isDone)"
+  },
+  {
+    "file": "src/services/orchestrator/SubAgentResultBuilder.ts",
+    "line": 272,
+    "name": "value",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/orchestrator/SubAgentResultBuilder.ts",
+    "line": 290,
+    "name": "payload",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/orchestrator/SubAgentTelemetryEmitter.ts",
+    "line": 22,
+    "name": "value",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/orchestrator/SubAgentTelemetryEmitter.ts",
+    "line": 30,
+    "name": "value",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/orchestrator/VramEvictionPolicy.ts",
+    "line": 45,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/orchestrator/routers/DivideAndConquerRouter.ts",
+    "line": 111,
+    "name": "subtask",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/orchestrator/routers/DivideAndConquerRouter.ts",
+    "line": 125,
+    "name": "index",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/orchestrator/routers/DivideAndConquerRouter.ts",
+    "line": 143,
+    "name": "subtask",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/orchestrator/routers/DivideAndConquerRouter.ts",
+    "line": 424,
+    "name": "loggingError",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/orchestrator/routers/DivideAndConquerRouter.ts",
+    "line": 626,
+    "name": "loggingError",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/orchestrator/routers/HierarchicalAggregationRouter.ts",
+    "line": 288,
+    "name": "loggingError",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/orchestrator/routers/MCTSRouter.ts",
+    "line": 129,
+    "name": "score",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/orchestrator/routers/MCTSRouter.ts",
+    "line": 140,
+    "name": "feedbackItem",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/orchestrator/routers/MCTSRouter.ts",
+    "line": 553,
+    "name": "loggingError",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/services/orchestrator/routers/TournamentRouter.ts",
+    "line": 467,
+    "name": "loggingError",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/utils/ConversationUtilities.ts",
+    "line": 33,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/utils/ErrorHelpers.ts",
+    "line": 5,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/utils/FunctionCallingUtilities.ts",
+    "line": 25,
+    "name": "value",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/utils/errors.ts",
+    "line": 14,
+    "name": "originalError",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/utils/openai-compat.ts",
+    "line": 609,
+    "name": "done",
+    "type": "binding",
+    "error": "Boolean or state variable \"done\" must read as an assertion (e.g. isActive, isLoading, isDone)"
+  },
+  {
+    "file": "src/websocket/index.ts",
+    "line": 489,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/websocket/index.ts",
+    "line": 497,
+    "name": "messageRaw",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/websocket/index.ts",
+    "line": 770,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/websocket/index.ts",
+    "line": 803,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/websocket/index.ts",
+    "line": 825,
+    "name": "e",
+    "type": "parameter",
+    "error": "Single-letter variable \"e\" is not allowed outside catch blocks or inline single-line event handlers"
+  },
+  {
+    "file": "src/websocket/index.ts",
+    "line": 855,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  },
+  {
+    "file": "src/websocket/index.ts",
+    "line": 965,
+    "name": "error",
+    "type": "parameter-unknown",
+    "error": "Parameter typed as unknown"
+  }
+]

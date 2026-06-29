@@ -5,7 +5,7 @@ import openaiProvider, {
   prepareResponsesInput,
 } from "../src/providers/openai.ts";
 import { OpenAIMessage } from "../src/providers/openai.ts";
-import { PROVIDERS, TYPES } from "../src/constants";
+import { PROVIDERS, TYPES } from "../src/constants.ts";
 
 const mockChatCreate = vi.fn();
 const mockResponsesCreate = vi.fn();

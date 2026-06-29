@@ -7,7 +7,6 @@
  * restored sessions render incorrectly.
  */
 import { describe, it, expect, vi } from "vitest";
-import { TYPES } from "../src/constants";
 
 vi.mock("../src/utils/CostCalculator.ts", () => ({
   createUsageAccumulator: () => ({
@@ -29,9 +28,9 @@ describe("AgenticLoopState.getCleanDisplayData", () => {
     const state = new AgenticLoopState();
     state.displayTextFragments = ["Hello", "  ", "World"];
     state.displaySegments = [
-      { type: TYPES.TEXT, fragmentIndex: 0 },
-      { type: TYPES.TEXT, fragmentIndex: 1 }, // empty after trim
-      { type: TYPES.TEXT, fragmentIndex: 2 },
+      { type: "text", fragmentIndex: 0 },
+      { type: "text", fragmentIndex: 1 }, // empty after trim
+      { type: "text", fragmentIndex: 2 },
     ];
 
     const { cleanSegments, cleanTextFragments } = state.getCleanDisplayData();
@@ -61,7 +60,7 @@ describe("AgenticLoopState.getCleanDisplayData", () => {
     state.displayThinkingFragments = ["  Thinking deeply  "];
     state.displaySegments = [
       { type: "thinking", fragmentIndex: 0 },
-      { type: TYPES.TEXT, fragmentIndex: 0 },
+      { type: "text", fragmentIndex: 0 },
     ];
 
     const { cleanTextFragments, cleanThinkingFragments } = state.getCleanDisplayData();
@@ -86,18 +85,18 @@ describe("AgenticLoopState.getCleanDisplayData", () => {
     const state = new AgenticLoopState();
     state.displayTextFragments = ["", "Valid text", "", "More text"];
     state.displaySegments = [
-      { type: TYPES.TEXT, fragmentIndex: 0 }, // empty — filtered
-      { type: TYPES.TEXT, fragmentIndex: 1 }, // kept → new index 0
-      { type: TYPES.TEXT, fragmentIndex: 2 }, // empty — filtered
-      { type: TYPES.TEXT, fragmentIndex: 3 }, // kept → new index 1
+      { type: "text", fragmentIndex: 0 }, // empty — filtered
+      { type: "text", fragmentIndex: 1 }, // kept → new index 0
+      { type: "text", fragmentIndex: 2 }, // empty — filtered
+      { type: "text", fragmentIndex: 3 }, // kept → new index 1
     ];
 
     const { cleanSegments, cleanTextFragments } = state.getCleanDisplayData();
 
     expect(cleanTextFragments).toEqual(["Valid text", "More text"]);
     expect(cleanSegments).toHaveLength(2);
-    expect(cleanSegments[0]).toEqual({ type: TYPES.TEXT, fragmentIndex: 0 });
-    expect(cleanSegments[1]).toEqual({ type: TYPES.TEXT, fragmentIndex: 1 });
+    expect(cleanSegments[0]).toEqual({ type: "text", fragmentIndex: 0 });
+    expect(cleanSegments[1]).toEqual({ type: "text", fragmentIndex: 1 });
   });
 
   it("should handle interleaved thinking, text, and tools segments", () => {
@@ -107,7 +106,7 @@ describe("AgenticLoopState.getCleanDisplayData", () => {
     state.displaySegments = [
       { type: "thinking", fragmentIndex: 0 },
       { type: "tools", toolIds: ["call-1"] },
-      { type: TYPES.TEXT, fragmentIndex: 0 },
+      { type: "text", fragmentIndex: 0 },
     ];
 
     const { cleanSegments, cleanTextFragments, cleanThinkingFragments } =
@@ -118,7 +117,7 @@ describe("AgenticLoopState.getCleanDisplayData", () => {
     expect(cleanSegments).toHaveLength(3);
     expect(cleanSegments[0].type).toBe("thinking");
     expect(cleanSegments[1].type).toBe("tools");
-    expect(cleanSegments[2].type).toBe(TYPES.TEXT);
+    expect(cleanSegments[2].type).toBe("text");
   });
 
   it("should return empty arrays for state with no segments", () => {
@@ -137,7 +136,7 @@ describe("AgenticLoopState.getCleanDisplayData", () => {
     // Fragment arrays are shorter than segment references
     state.displayTextFragments = [];
     state.displaySegments = [
-      { type: TYPES.TEXT, fragmentIndex: 5 }, // out of bounds
+      { type: "text", fragmentIndex: 5 }, // out of bounds
     ];
 
     const { cleanSegments, cleanTextFragments } = state.getCleanDisplayData();
@@ -200,7 +199,7 @@ describe('AgenticLoopState adversarial', () => {
   it('should produce correct clean display data when fragments array is empty', () => {
     const state = new AgenticLoopState();
     // Push a segment that references fragmentIndex 0, but no fragments exist
-    state.displaySegments.push({ type: TYPES.TEXT, fragmentIndex: 0 });
+    state.displaySegments.push({ type: "text", fragmentIndex: 0 });
     const { cleanSegments, cleanTextFragments } = state.getCleanDisplayData();
     // Should filter out the segment because the fragment is undefined → trimmed to falsy
     expect(cleanSegments.length).toBe(0);
@@ -209,7 +208,7 @@ describe('AgenticLoopState adversarial', () => {
 
   it('should produce correct clean display data when fragment is whitespace-only', () => {
     const state = new AgenticLoopState();
-    state.displaySegments.push({ type: TYPES.TEXT, fragmentIndex: 0 });
+    state.displaySegments.push({ type: "text", fragmentIndex: 0 });
     state.displayTextFragments.push('   \n\t  ');
     const { cleanSegments, cleanTextFragments } = state.getCleanDisplayData();
     // Whitespace-only should be trimmed to empty → filtered out

@@ -227,6 +227,7 @@ function insertScheduledTask(scheduledTaskData: Partial<any>) {
     enabled: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    lastRunMinute: undefined as string | undefined,
     ...scheduledTaskData,
   };
   mockDatabase._collections.scheduled_tasks.push(newScheduledTask);
