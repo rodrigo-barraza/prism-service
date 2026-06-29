@@ -43,6 +43,7 @@ function createMockPassState(overrides: Partial<PassState> = {}): PassState {
     usage: createUsageAccumulator(),
     options: {},
     requestId: 'test-request-1',
+    pendingRequestDocumentIdPromise: Promise.resolve(null),
     ...overrides,
   };
 }
@@ -611,7 +612,7 @@ describe('AgenticLoopState concurrent operations — idempotency', () => {
 // ────────────────────────────────────────────────────────────────
 
 import ToolContext from '../src/services/ToolContext.ts';
-import { TYPES } from "../src/constants";
+import { TYPES } from "../src/constants.ts";
 
 describe('checkAndApplyToolSetChanges — dynamic tool activation doc sync', () => {
   let BaseAgenticHarness: any;

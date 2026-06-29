@@ -1,7 +1,7 @@
 import "./setup.ts";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import ToolOrchestratorService, { ARG_REMAPS } from "../src/services/ToolOrchestratorService.ts";
-import { TYPES, MODEL_TYPES, FILE_CATEGORIES } from "../src/constants";
+import { TYPES, MODEL_TYPES, FILE_CATEGORIES } from "../src/constants.ts";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { TOOLS_SERVICE_URL } from "../config.ts";
 import { TTS_VOICE_CATALOG_PLACEHOLDER } from "../src/utils/VoiceCatalog.ts";
@@ -2084,7 +2084,7 @@ describe("ToolOrchestratorService", () => {
       await ToolOrchestratorService.refreshSchemas();
 
       const result = await ToolOrchestratorService.executeTool("simple_tool");
-      expect(result.error).toContain("Failed to reach API: DNS lookup failure");
+      expect((result as any).error).toContain("Failed to reach API: DNS lookup failure");
     });
   });
 

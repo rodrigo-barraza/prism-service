@@ -191,7 +191,7 @@ describe("newTurnMessages slice — compaction mid-loop (BUG SCENARIO)", () => {
       { role: "system", content: "You are helpful." },
       {
         role: "user",
-        content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY}\nUser greeted the assistant.`,
+        content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX}\nUser greeted the assistant.`,
         isCompactSummary: true,
       },
       { role: "user", content: "hey whats up" },
@@ -254,7 +254,7 @@ describe("newTurnMessages slice — compaction mid-loop (BUG SCENARIO)", () => {
       { role: "system", content: "You are helpful." },
       {
         role: "user",
-        content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY}\nEntire history compacted.`,
+        content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX}\nEntire history compacted.`,
         isCompactSummary: true,
       },
       {
@@ -448,7 +448,7 @@ describe("newTurnMessages slice — edge cases", () => {
       { role: "system", content: "System" },
       {
         role: "user",
-        content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY}\nSummary`,
+        content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX}\nSummary`,
         isCompactSummary: true,
       },
     ];
@@ -552,7 +552,7 @@ describe("Generate Audio tool flow — second turn message persistence", () => {
       { role: "system", content: "Massive system prompt with tools..." },
       {
         role: "user",
-        content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY}\nPrevious context.`,
+        content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX}\nPrevious context.`,
         isCompactSummary: true,
       },
       { role: "user", content: "hey whats up" },
@@ -604,7 +604,7 @@ describe("Generate Audio tool flow — second turn message persistence", () => {
       { role: "system", content: "System" },
       {
         role: "user",
-        content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY}\nAll history.`,
+        content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX}\nAll history.`,
         isCompactSummary: true,
       },
       { role: "user", content: "make me a song" },

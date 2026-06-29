@@ -32,7 +32,7 @@ describe("SubAgentTelemetryEmitter", () => {
     return new SubAgentTelemetryEmitter({
       subAgentId: overrides?.subAgentId ?? "sub-agent-test-1",
       subAgentDescription: overrides?.subAgentDescription ?? "Test sub-agent",
-      parentEmit: overrides?.parentEmit ?? parentEmitMock,
+      parentEmit: (overrides?.parentEmit ?? parentEmitMock) as any,
       parentConversationId: overrides?.parentConversationId ?? "parent-conv-1",
       recursionDepth: overrides?.recursionDepth ?? 0,
     });
@@ -71,8 +71,8 @@ describe("SubAgentTelemetryEmitter", () => {
         (call: unknown[]) => (call[0] as Record<string, unknown>).message === "generation_progress",
       );
       expect(progressEvent).toBeDefined();
-      expect(progressEvent[0].type).toBe("sub_agent_status");
-      expect(progressEvent[0].subAgentId).toBe("sub-agent-test-1");
+      expect(progressEvent![0].type).toBe("sub_agent_status");
+      expect(progressEvent![0].subAgentId).toBe("sub-agent-test-1");
     });
 
     it("should handle non-string content in chunk events gracefully", () => {
@@ -178,8 +178,8 @@ describe("SubAgentTelemetryEmitter", () => {
         (call: unknown[]) => (call[0] as Record<string, unknown>).type === "sub_agent_tool_execution",
       );
       expect(toolExecEvent).toBeDefined();
-      expect(toolExecEvent[0].subAgentId).toBe("sub-agent-test-1");
-      expect(toolExecEvent[0].subAgentDescription).toBe("Test sub-agent");
+      expect(toolExecEvent![0].subAgentId).toBe("sub-agent-test-1");
+      expect(toolExecEvent![0].subAgentDescription).toBe("Test sub-agent");
     });
 
     it("should flush generation progress before tool execution when in generating phase", () => {
@@ -244,8 +244,8 @@ describe("SubAgentTelemetryEmitter", () => {
         (call: unknown[]) => (call[0] as Record<string, unknown>).type === "sub_agent_tool_output",
       );
       expect(toolOutputEvent).toBeDefined();
-      expect(toolOutputEvent[0].subAgentId).toBe("sub-agent-test-1");
-      expect(toolOutputEvent[0].name).toBe("read_file");
+      expect(toolOutputEvent![0].subAgentId).toBe("sub-agent-test-1");
+      expect(toolOutputEvent![0].name).toBe("read_file");
     });
   });
 
@@ -267,7 +267,7 @@ describe("SubAgentTelemetryEmitter", () => {
           (call[0] as Record<string, unknown>).message === "iteration_progress",
       );
       expect(statusEvent).toBeDefined();
-      expect(statusEvent[0].iteration).toBe(3);
+      expect(statusEvent![0].iteration).toBe(3);
       expect(emitter.iterations).toBe(3);
     });
 
@@ -287,7 +287,7 @@ describe("SubAgentTelemetryEmitter", () => {
           (call[0] as Record<string, unknown>).message === "generation_started",
       );
       expect(startedEvent).toBeDefined();
-      expect(startedEvent[0].timeToFirstToken).toBe(250);
+      expect(startedEvent![0].timeToFirstToken).toBe(250);
     });
 
     it("should forward phase status events with progress", () => {
@@ -307,7 +307,7 @@ describe("SubAgentTelemetryEmitter", () => {
           (call[0] as Record<string, unknown>).phase === "tool_execution",
       );
       expect(phaseStatusEvent).toBeDefined();
-      expect(phaseStatusEvent[0].progress).toBe(0.5);
+      expect(phaseStatusEvent![0].progress).toBe(0.5);
     });
   });
 
@@ -382,7 +382,7 @@ describe("SubAgentTelemetryEmitter", () => {
           (call[0] as Record<string, unknown>).subAgentId === "grandchild-1",
       );
       expect(forwardedEvent).toBeDefined();
-      expect(forwardedEvent[0]).toEqual(grandchildEvent);
+      expect(forwardedEvent![0]).toEqual(grandchildEvent);
     });
 
     it("should forward sub_agent_tool_execution events from grandchildren", () => {
@@ -475,10 +475,10 @@ describe("SubAgentTelemetryEmitter", () => {
           (call[0] as Record<string, unknown>).message === "complete",
       );
       expect(completionEvent).toBeDefined();
-      expect(completionEvent[0].durationMs).toBe(5000);
-      expect(completionEvent[0].toolCount).toBe(2);
-      expect(completionEvent[0].usage).toEqual({ inputTokens: 800, outputTokens: 300 });
-      expect(completionEvent[0].estimatedCost).toBe(0.065);
+      expect(completionEvent![0].durationMs).toBe(5000);
+      expect(completionEvent![0].toolCount).toBe(2);
+      expect(completionEvent![0].usage).toEqual({ inputTokens: 800, outputTokens: 300 });
+      expect(completionEvent![0].estimatedCost).toBe(0.065);
     });
 
     it("should handle null usage and cost in completion", () => {
@@ -491,8 +491,8 @@ describe("SubAgentTelemetryEmitter", () => {
           (call[0] as Record<string, unknown>).message === "complete",
       );
       expect(completionEvent).toBeDefined();
-      expect(completionEvent[0].usage).toBeNull();
-      expect(completionEvent[0].estimatedCost).toBeNull();
+      expect(completionEvent![0].usage).toBeNull();
+      expect(completionEvent![0].estimatedCost).toBeNull();
     });
   });
 

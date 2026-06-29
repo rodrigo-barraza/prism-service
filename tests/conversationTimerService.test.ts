@@ -174,10 +174,10 @@ vi.mocked(MongoWrapper.getDb).mockImplementation(() => {
 });
 
 // ── Import AFTER mocks are wired ───────────────────────────────
-import ConversationTimerService from "../src/services/ConversationTimerService.ts";
+import ConversationTimerService, { type ConversationTimer } from "../src/services/ConversationTimerService.ts";
 
 // ── Test fixtures ──────────────────────────────────────────────
-const TIMER_FIXTURE = {
+const TIMER_FIXTURE: ConversationTimer = {
   id: "timer-test-001",
   conversationId: "session-abc-123",
   project: "coding",
@@ -598,7 +598,7 @@ describe("ConversationTimerService", () => {
       const now = new Date();
       const currentMinuteKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}T${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
-      const recurringTimer = {
+      const recurringTimer: ConversationTimer = {
         id: "timer-recurring-1",
         conversationId: "session-abc-123",
         project: "coding",
@@ -609,6 +609,8 @@ describe("ConversationTimerService", () => {
         iterationCount: 0,
         firesAt: new Date(Date.now() - 10000).toISOString(),
         status: "active" as const,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
 
       mockGetDocuments(COLLECTIONS.CONVERSATION_TIMERS).push(recurringTimer);

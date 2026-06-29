@@ -4,7 +4,7 @@ import adminRouter from '../src/routes/AdminRoutes.ts';
 import MongoWrapper from '../src/wrappers/MongoWrapper.ts';
 import * as providersModule from '../src/providers/index.ts';
 import request from 'supertest';
-import { PROVIDERS, COLLECTIONS } from "../src/constants";
+import { PROVIDERS, COLLECTIONS } from "../src/constants.ts";
 
 // Mount the admin router
 app.use('/admin', adminRouter);

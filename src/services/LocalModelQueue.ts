@@ -84,7 +84,7 @@ class LocalModelQueue {
    * Checks both base provider types and instance IDs.
    */
   isLocal(provider: string): boolean {
-    if (LOCAL_PROVIDERS.has(provider as any)) return true;
+    if ((LOCAL_PROVIDERS as Set<string>).has(provider)) return true;
     // Check if it's a multi-instance ID (e.g. "lm-studio-2")
     if (isInstance(provider)) return true;
     return false;

@@ -74,7 +74,7 @@ vi.mock("@rodrigo-barraza/utilities-library", () => ({
 }));
 
 import LocalProviderGateway from "../src/services/local-provider/index.ts";
-import { PROVIDERS, TYPES, MODEL_TYPES } from "../src/constants";
+import { PROVIDERS, TYPES, MODEL_TYPES } from "../src/constants.ts";
 
 describe("LocalProviderGateway Unit Tests", () => {
   beforeEach(() => {

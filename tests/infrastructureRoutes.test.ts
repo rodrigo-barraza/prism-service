@@ -23,7 +23,7 @@ import filesRouter from '../src/routes/FilesRoutes.ts';
 import statsRouter from '../src/routes/StatsRoutes.ts';
 import settingsRouter from '../src/routes/SettingsRoutes.ts';
 import ollamaRouter from '../src/routes/OllamaRoutes.ts';
-import { PROVIDERS, COLLECTIONS } from "../src/constants";
+import { PROVIDERS, COLLECTIONS } from "../src/constants.ts";
 
 // Mount routers on app
 app.use('/benchmark', benchmarkRouter);

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { extractThinkTags, ThinkTagParser } from "../src/utils/ThinkTagParser.ts";
-import { TYPES } from "../src/constants";
+import { TYPES } from "../src/constants.ts";
 
 describe("ThinkTagParser", () => {
   describe("extractThinkTags", () => {

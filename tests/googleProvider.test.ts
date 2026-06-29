@@ -4,7 +4,7 @@ import googleProvider, { convertToolsToGoogle } from "../src/providers/google.ts
 import { ConversationMessage } from "../src/providers/google.ts";
 import { ProviderError } from "../src/utils/errors.ts";
 import { Readable } from "stream";
-import { MODEL_TYPES } from "../src/constants";
+import { MODEL_TYPES } from "../src/constants.ts";
 
 const mockGenerateContent = vi.fn();
 const mockGenerateContentStream = vi.fn();

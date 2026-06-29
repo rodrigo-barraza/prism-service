@@ -46,7 +46,7 @@ vi.mock('@modelcontextprotocol/sdk/client/sse.js', () => {
 });
 
 import MCPClientService from '../src/services/MCPClientService.ts';
-import { TYPES } from "../src/constants";
+import { TYPES } from "../src/constants.ts";
 
 describe('MCPClientService Unit Tests', () => {
   beforeEach(() => {

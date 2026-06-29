@@ -42,7 +42,7 @@ function createMockToolCall(overrides?: Partial<ToolCall>): ToolCall {
     id: "tc-1",
     name: overrides?.name ?? "execute_shell",
     args: overrides?.args ?? { command: "ls -la" },
-    _approval: overrides?._approval ?? { tier: APPROVAL_TIERS.DANGER },
+    _approval: overrides?._approval ?? { tier: APPROVAL_TIERS.DANGER as any, tierLabel: "danger" },
     ...overrides,
   } as ToolCall;
 }
@@ -57,7 +57,7 @@ describe("CriticGate", () => {
       const gate = new CriticGate();
       const toolCall = createMockToolCall({
         name: "read_file",
-        _approval: { tier: APPROVAL_TIERS.SAFE },
+        _approval: { tier: APPROVAL_TIERS.AUTO as any, tierLabel: "auto" },
       });
       const context = createMockContext();
 
@@ -71,7 +71,7 @@ describe("CriticGate", () => {
       const gate = new CriticGate();
       const toolCall = createMockToolCall({
         name: "write_file",
-        _approval: { tier: APPROVAL_TIERS.WRITE },
+        _approval: { tier: APPROVAL_TIERS.WRITE as any, tierLabel: "write" },
       });
       const context = createMockContext();
 
@@ -369,7 +369,7 @@ describe("CriticGate", () => {
 
       const toolCall = createMockToolCall({
         name: "read_file",
-        _approval: { tier: APPROVAL_TIERS.SAFE },
+        _approval: { tier: APPROVAL_TIERS.AUTO as any, tierLabel: "auto" },
       });
       const context = createMockContext();
 

@@ -132,7 +132,7 @@ describe('SkillService Unit Tests', () => {
     it('should return a list of skills', async () => {
       const response = await SkillService.list();
       expect(response!.skills).toHaveLength(1);
-      expect(response!.skills[0].skillId).toBe('test_skill');
+      expect(response!.skills[0]!.skillId).toBe('test_skill');
       expect(response!.total).toBe(1);
     });
 

@@ -2,7 +2,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import './setup.ts';
 import anthropicProvider from '../src/providers/anthropic.ts';
 import { ChatMessage } from '../src/types/ProviderTypes.ts';
-import { TYPES } from "../src/constants";
+import { TYPES } from "../src/constants.ts";
 
 const mockMessagesCreate = vi.fn();
 const mockMessagesStream = vi.fn();

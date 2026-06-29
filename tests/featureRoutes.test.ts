@@ -16,7 +16,7 @@ import agentMemoriesRouter from '../src/routes/AgentMemoriesRoutes.ts';
 import rulesRouter from '../src/routes/RulesRoutes.ts';
 import memoryRouter from '../src/routes/MemoryRoutes.ts';
 import customAgentsRouter from '../src/routes/CustomAgentsRoutes.ts';
-import { COLLECTIONS, PROVIDERS } from "../src/constants";
+import { COLLECTIONS, PROVIDERS } from "../src/constants.ts";
 
 // Mount all routers
 app.use('/config-test', configRouter);

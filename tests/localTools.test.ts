@@ -150,7 +150,7 @@ vi.mock("../src/types/GlobalToolOrchestratorRegistry.ts", () => ({
 }));
 
 import InternalToolRegistry from "../src/services/local-tools/InternalToolRegistry.ts";
-import { PROVIDERS } from "../src/constants";
+import { PROVIDERS } from "../src/constants.ts";
 
 describe("Local Tools Unit Tests Suite", () => {
   beforeEach(() => {

@@ -553,7 +553,7 @@ import {
   EMOTION_CLASSIFICATION_PROMPT,
   type PrimaryEmotion,
 } from '../src/services/somatic/SomaticConstants.ts';
-import { PROVIDERS } from "../src/constants";
+import { PROVIDERS } from "../src/constants.ts";
 
 describe('SomaticConstants', () => {
   describe('PRIMARY_EMOTIONS', () => {
