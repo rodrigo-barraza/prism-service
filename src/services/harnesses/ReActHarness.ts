@@ -183,6 +183,7 @@ export default class ReActHarness extends BaseAgenticHarness {
     let currentMessages: ConversationMessage[] = [...context.messages];
     let truncationRecoveryCount = 0;
     let hasCleanTextBreak = false;
+    let hasNonBlockingDispatchBreak = false;
 
     // ── Semantic stall detector ──────────────────────────────
     const semanticStallDetector = new SemanticStallDetector();
@@ -766,6 +767,7 @@ export default class ReActHarness extends BaseAgenticHarness {
               `[ReActHarness] NON_BLOCKING_DISPATCH detected — exiting loop (no filler text generation)`,
             );
             hasCleanTextBreak = true;
+            hasNonBlockingDispatchBreak = true;
             break;
           }
 
@@ -935,6 +937,26 @@ export default class ReActHarness extends BaseAgenticHarness {
       // ── Finalization (happy path) ──────────────────────────────
       cleanupReminderCache(agentConversationId);
       await this.finalize(currentMessages, hooks);
+
+      // ── Await non-blocking dispatches ──────────────────────────
+      // When the loop exited due to NON_BLOCKING_DISPATCH, keep the
+      // SSE stream alive by awaiting all pending router promises.
+      // This allows sub-agent status events (phase, tok/s, completion)
+      // to flow to the client in real-time.
+      if (hasNonBlockingDispatchBreak && agentConversationId) {
+        try {
+          const { default: OrchestratorService } =
+            await import("../OrchestratorService.js");
+          await OrchestratorService.awaitPendingDispatches(
+            agentConversationId,
+          );
+        } catch (awaitError: unknown) {
+          logger.warn(
+            `[ReActHarness] Failed to await pending dispatches: ${awaitError instanceof Error ? awaitError.message : String(awaitError)}`,
+          );
+        }
+      }
+
       return { messages: currentMessages };
     } catch (loopError: unknown) {
       // ── Error-path persistence ─────────────────────────────

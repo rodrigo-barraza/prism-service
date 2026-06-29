@@ -132,6 +132,14 @@ const activeSubAgents = new Map<string, SubAgentState>();
 /** Per-conversation counters for generating sequential agent IDs relative to each conversation */
 const agentCountersByConversation = new Map<string, number>();
 
+/**
+ * Pending non-blocking router promises keyed by agentConversationId.
+ * When createTeam fires a router in non-blocking mode, the promise is
+ * tracked here so the harness can await all dispatches before returning
+ * — keeping the SSE stream open for sub-agent status events.
+ */
+const pendingRouterDispatches = new Map<string, Promise<void>[]>();
+
 // Register shutdown cleanup — abort all running sub-agents and remove worktrees
 registerCleanup(async () => {
   const running = [...activeSubAgents.values()].filter(
@@ -1056,15 +1064,38 @@ export default class OrchestratorService {
         `[Orchestrator] Cleaned up conversation ${parentAgentConversationId} from active registry`,
       );
     }
+    // Clean up pending router dispatch tracking
+    pendingRouterDispatches.delete(parentAgentConversationId);
   }
 
   static cleanupSession(parentAgentConversationId: string): void {
     return this.cleanupConversation(parentAgentConversationId);
   }
 
+  /**
+   * Await all pending non-blocking router dispatches for a conversation.
+   * Called by the harness after the loop breaks on NON_BLOCKING_DISPATCH
+   * to keep the SSE stream alive until sub-agents finish.
+   */
+  static async awaitPendingDispatches(
+    agentConversationId: string,
+  ): Promise<void> {
+    const pending = pendingRouterDispatches.get(agentConversationId);
+    if (!pending || pending.length === 0) return;
+    logger.info(
+      `[Orchestrator] Awaiting ${pending.length} pending router dispatch(es) for conversation ${agentConversationId}`,
+    );
+    await Promise.allSettled(pending);
+    pendingRouterDispatches.delete(agentConversationId);
+    logger.info(
+      `[Orchestrator] All pending dispatches settled for conversation ${agentConversationId}`,
+    );
+  }
+
   static clearAllActiveSubAgents(): void {
     activeSubAgents.clear();
     agentCountersByConversation.clear();
+    pendingRouterDispatches.clear();
     logger.info("[Orchestrator] Cleared all active sub-agents from registry");
   }
 
@@ -1340,7 +1371,10 @@ export default class OrchestratorService {
     // BEFORE their agentic loops finish. SSE events stream progress to
     // the client. When the router completes, _notifyParentOfRouterCompletion
     // fires the auto-response.
-    routerPromise
+    // Track the router promise so the harness can keep the SSE stream
+    // alive until all sub-agents finish.
+    const parentAgentConversationId = orchestratorContext.agentConversationId;
+    const wrappedRouterPromise = routerPromise
       .then((routerResults) => {
         logger.info(
           `[Orchestrator] Router "${topology}" completed for team "${teamCreationArguments.name}" — ${routerResults.length} result(s)`,
@@ -1373,6 +1407,12 @@ export default class OrchestratorService {
           });
         }
       });
+
+    if (parentAgentConversationId) {
+      const existing = pendingRouterDispatches.get(parentAgentConversationId) || [];
+      existing.push(wrappedRouterPromise);
+      pendingRouterDispatches.set(parentAgentConversationId, existing);
+    }
 
     // Wait only for agent registration (fast: ID + worktree allocation),
     // NOT for the agentic loops to finish. This unblocks the parent LLM.
