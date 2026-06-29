@@ -644,7 +644,7 @@ setupWebSocket(wss);
   try {
     const { default: ConversationTimerService } =
       await import("./services/ConversationTimerService.ts");
-    await ConversationTimerService.init();
+    await ConversationTimerService.initialize();
     registerCleanup(async () => ConversationTimerService.destroy());
   } catch (error: unknown) {
     logger.error(

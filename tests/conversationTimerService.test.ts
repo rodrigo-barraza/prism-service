@@ -40,11 +40,12 @@ vi.mock("../src/services/AgenticLoopService.ts", () => ({
   },
 }));
 
-// ── Mock MongoWrapper Implementation Override ──────────────────
-const mockDocumentsMap = new Map<string, any[]>();
+type MockDbDocument = Record<string, any>;
+
+const mockDocumentsMap = new Map<string, Array<MockDbDocument>>();
 let mockDbUnavailable = false;
 
-function mockGetDocuments(collectionName: string): any[] {
+function mockGetDocuments(collectionName: string): Array<MockDbDocument> {
   if (!mockDocumentsMap.has(collectionName)) {
     mockDocumentsMap.set(collectionName, []);
   }
@@ -59,10 +60,10 @@ const mockFindDocuments = vi.fn();
 const mockInsertOne = vi.fn();
 
 vi.mocked(MongoWrapper.getDb).mockImplementation(() => {
-  if (mockDbUnavailable) return null as any;
+  if (mockDbUnavailable) return null as unknown as import("mongodb").Db;
   return {
-    collection: vi.fn().mockImplementation((name) => ({
-      findOne: vi.fn().mockImplementation(async (query) => {
+    collection: vi.fn().mockImplementation((name: string) => ({
+      findOne: vi.fn().mockImplementation(async (query: Record<string, unknown>) => {
         const spyResult = await mockFindOne(query);
         if (spyResult !== undefined) return spyResult;
 
@@ -71,7 +72,7 @@ vi.mocked(MongoWrapper.getDb).mockImplementation(() => {
           return Object.entries(query).every(([key, value]) => document[key] === value);
         }) || null;
       }),
-      updateOne: vi.fn().mockImplementation(async (query, update) => {
+      updateOne: vi.fn().mockImplementation(async (query: Record<string, unknown>, update: Record<string, any>) => {
         const spyResult = await mockUpdateOne(query, update);
         if (spyResult !== undefined) return spyResult;
 
@@ -85,7 +86,7 @@ vi.mocked(MongoWrapper.getDb).mockImplementation(() => {
         }
         return { modifiedCount: 0 };
       }),
-      updateMany: vi.fn().mockImplementation(async (query, update) => {
+      updateMany: vi.fn().mockImplementation(async (query: Record<string, unknown>, update: Record<string, any>) => {
         const spyResult = await mockUpdateMany(query, update);
         if (spyResult !== undefined) return spyResult;
 
@@ -95,7 +96,7 @@ vi.mocked(MongoWrapper.getDb).mockImplementation(() => {
           return Object.entries(query).every(([key, value]) => {
             if (value && typeof value === "object") {
               if ("$ne" in value) {
-                return doc[key] !== (value as any).$ne;
+                return doc[key] !== (value as { $ne: unknown }).$ne;
               }
             }
             return doc[key] === value;
@@ -110,7 +111,7 @@ vi.mocked(MongoWrapper.getDb).mockImplementation(() => {
         }
         return { modifiedCount };
       }),
-      findOneAndUpdate: vi.fn().mockImplementation(async (query, update) => {
+      findOneAndUpdate: vi.fn().mockImplementation(async (query: Record<string, unknown>, update: Record<string, any>) => {
         const spyResult = await mockFindOneAndUpdate(query, update);
         if (spyResult !== undefined) return spyResult;
 
@@ -119,7 +120,7 @@ vi.mocked(MongoWrapper.getDb).mockImplementation(() => {
           return Object.entries(query).every(([key, value]) => {
             if (value && typeof value === "object") {
               if ("$ne" in value) {
-                return doc[key] !== (value as any).$ne;
+                return doc[key] !== (value as { $ne: unknown }).$ne;
               }
             }
             return doc[key] === value;
@@ -136,7 +137,7 @@ vi.mocked(MongoWrapper.getDb).mockImplementation(() => {
         }
         return document;
       }),
-      find: vi.fn().mockImplementation((query) => {
+      find: vi.fn().mockImplementation((query: Record<string, unknown>) => {
         const spyResult = mockFindDocuments(query);
         if (spyResult !== undefined) return spyResult;
 
@@ -146,10 +147,10 @@ vi.mocked(MongoWrapper.getDb).mockImplementation(() => {
             return Object.entries(query).every(([key, value]) => {
               if (value && typeof value === "object") {
                 if ("$lte" in value) {
-                  return doc[key] <= (value as any).$lte;
+                  return (doc[key] as string) <= (value as { $lte: string }).$lte;
                 }
                 if ("$ne" in value) {
-                  return doc[key] !== (value as any).$ne;
+                  return doc[key] !== (value as { $ne: unknown }).$ne;
                 }
               }
               return doc[key] === value;
@@ -161,16 +162,16 @@ vi.mocked(MongoWrapper.getDb).mockImplementation(() => {
           toArray,
         };
       }),
-      insertOne: vi.fn().mockImplementation(async (document) => {
+      insertOne: vi.fn().mockImplementation(async (document: any) => {
         const spyResult = await mockInsertOne(document);
         if (spyResult !== undefined) return spyResult;
 
         const list = mockGetDocuments(name);
         list.push(document);
-        return { insertedId: document.id || "test-id" };
+        return { insertedId: (document.id as string) || "test-id" };
       }),
     })),
-  } as any;
+  } as unknown as import("mongodb").Db;
 });
 
 // ── Import AFTER mocks are wired ───────────────────────────────
@@ -250,13 +251,13 @@ describe("ConversationTimerService", () => {
     });
 
     it("should start interval on init", async () => {
-      await ConversationTimerService.init();
+      await ConversationTimerService.initialize();
       expect(setInterval).toHaveBeenCalledWith(expect.any(Function), 1000);
       ConversationTimerService.destroy();
     });
 
     it("should clear interval on destroy", async () => {
-      await ConversationTimerService.init();
+      await ConversationTimerService.initialize();
       ConversationTimerService.destroy();
       expect(clearInterval).toHaveBeenCalled();
     });
@@ -270,7 +271,7 @@ describe("ConversationTimerService", () => {
 
     it("should execute tick on interval trigger", async () => {
       const tickSpy = vi.spyOn(ConversationTimerService, "tick").mockResolvedValue(undefined);
-      await ConversationTimerService.init();
+      await ConversationTimerService.initialize();
 
       await vi.advanceTimersByTimeAsync(1000);
 
@@ -280,7 +281,7 @@ describe("ConversationTimerService", () => {
 
     it("should handle error in ticker interval tick execution", async () => {
       const tickSpy = vi.spyOn(ConversationTimerService, "tick").mockRejectedValue(new Error("Tick failure"));
-      await ConversationTimerService.init();
+      await ConversationTimerService.initialize();
 
       await vi.advanceTimersByTimeAsync(1000);
 
@@ -326,7 +327,7 @@ describe("ConversationTimerService", () => {
       expect(Math.abs(actualTime - expectedTime)).toBeLessThan(1000);
 
       const inserted = mockGetDocuments(COLLECTIONS.CONVERSATION_TIMERS).find(
-        (t) => t.id === timer.id
+        (timerItem) => timerItem.id === timer.id
       );
       expect(inserted).toBeDefined();
     });
@@ -441,7 +442,7 @@ describe("ConversationTimerService", () => {
 
       const list = await ConversationTimerService.listActiveTimers("session-abc-123", "coding", "testuser");
       expect(list).toHaveLength(2);
-      expect(list.map((t) => t.id)).toEqual(["t1", "t2"]);
+      expect(list.map((timerItem) => timerItem.id)).toEqual(["t1", "t2"]);
     });
 
     it("should return an empty array when database is unavailable", async () => {
