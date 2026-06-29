@@ -579,6 +579,26 @@ export default class ReActHarness extends BaseAgenticHarness {
           this.checkAndApplyToolSetChanges(currentMessages);
 
           this.logIteration(pass, currentMessages);
+
+          // ── Non-blocking dispatch exit ──────────────────────────
+          // When any tool returns NON_BLOCKING_DISPATCH, background work
+          // has been dispatched. Break immediately to avoid a wasteful
+          // next iteration where the LLM generates filler text like
+          // "I've dispatched sub-agents!". The completion handler will
+          // trigger an auto-response with the real results later.
+          const hasNonBlockingDispatch = results.some((toolResult) => {
+            const resultData = toolResult.result as Record<string, unknown> | null;
+            return resultData?._directive === "NON_BLOCKING_DISPATCH";
+          });
+
+          if (hasNonBlockingDispatch) {
+            logger.info(
+              `[ReActHarness] NON_BLOCKING_DISPATCH detected — exiting loop (no filler text generation)`,
+            );
+            hasCleanTextBreak = true;
+            break;
+          }
+
           continue;
         }
 

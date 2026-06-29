@@ -132,7 +132,7 @@ describe("Event-Driven Auto-Response", () => {
   // ── _notifyParentOfRouterCompletion ──────────────────────────
 
   describe("_notifyParentOfRouterCompletion", () => {
-    it("should persist a completion message into the parent conversation", async () => {
+    it("should build a completion message and trigger auto-response with ephemeral context", async () => {
       const routerResults: SubAgentResult[] = [
         {
           agent_id: "agent-1",
@@ -180,35 +180,32 @@ describe("Event-Driven Auto-Response", () => {
         orchestratorContext,
       );
 
-      // Wait for the updateOne call
-      await waitForMockCalls(mockUpdateOne, 1);
+      // Wait for auto-response agentic loop to be invoked
+      await waitForMockCalls(mockRunAgenticLoop, 1);
 
-      const [query, update] = mockUpdateOne.mock.calls[0];
-      const conversationId = query.id;
-      const project = query.project;
-      const username = query.username;
-      const messages = [update.$push.messages];
-      expect(conversationId).toBe("parent-conv-id");
-      expect(project).toBe("test-project");
-      expect(username).toBe("test-user");
-      // Verify the query waits for isGenerating to clear (race-condition guard)
-      expect(query.isGenerating).toEqual({ $ne: true });
-      expect(messages).toHaveLength(1);
+      // Notification is NOT persisted to DB via $push — it's ephemeral
+      const hasPushCall = mockUpdateOne.mock.calls.some(
+        (call) => call[1] && call[1].$push?.messages,
+      );
+      expect(hasPushCall).toBe(false);
 
-      const completionMessage = messages[0] as { role: string; content: string };
-      expect(completionMessage.role).toBe("user");
-      expect(completionMessage.content).toContain("<task-notification>");
-      expect(completionMessage.content).toContain("</task-notification>");
-      expect(completionMessage.content).toContain("[SUB-AGENT TEAM COMPLETED]");
-      expect(completionMessage.content).toContain("research_team");
-      expect(completionMessage.content).toContain("hierarchical");
-      expect(completionMessage.content).toContain("Research agent");
-      expect(completionMessage.content).toContain("Paper A, Paper B, Paper C");
-      expect(completionMessage.content).toContain("Coding agent");
-      expect(completionMessage.content).toContain("Feature implemented successfully");
+      // Verify auto-response received the completion message as ephemeral context
+      const loopArgs = mockRunAgenticLoop.mock.calls[0][0];
+      const lastMessage = loopArgs.messages.at(-1);
+      expect(lastMessage.role).toBe("user");
+      expect(lastMessage.content).toContain("<task-notification>");
+      expect(lastMessage.content).toContain("</task-notification>");
+      expect(lastMessage.content).toContain("[SUB-AGENT TEAM COMPLETED]");
+      expect(lastMessage.content).toContain("research_team");
+      expect(lastMessage.content).toContain("hierarchical");
+      expect(lastMessage.content).toContain("Research agent");
+      expect(lastMessage.content).toContain("Paper A, Paper B, Paper C");
+      expect(lastMessage.content).toContain("Coding agent");
+      expect(lastMessage.content).toContain("Feature implemented successfully");
+      expect(lastMessage._alreadyPersisted).toBe(true);
     });
 
-    it("should include error details for failed sub-agents", async () => {
+    it("should include error details for failed sub-agents in ephemeral context", async () => {
       const routerResults: (SubAgentResult | { error: string })[] = [
         {
           agent_id: "agent-1",
@@ -238,12 +235,13 @@ describe("Event-Driven Auto-Response", () => {
         orchestratorContext,
       );
 
-      await waitForMockCalls(mockUpdateOne, 1);
+      await waitForMockCalls(mockRunAgenticLoop, 1);
 
-      const completionMessage = mockUpdateOne.mock.calls[0][1].$push.messages as { content: string };
-      expect(completionMessage.content).toContain("✅");
-      expect(completionMessage.content).toContain("❌");
-      expect(completionMessage.content).toContain("Agent crashed: out of memory");
+      const loopArgs = mockRunAgenticLoop.mock.calls[0][0];
+      const lastMessage = loopArgs.messages.at(-1);
+      expect(lastMessage.content).toContain("✅");
+      expect(lastMessage.content).toContain("❌");
+      expect(lastMessage.content).toContain("Agent crashed: out of memory");
     });
 
     it("should truncate very long sub-agent output to prevent context bloat", async () => {
@@ -276,17 +274,15 @@ describe("Event-Driven Auto-Response", () => {
         orchestratorContext,
       );
 
-      await waitForMockCalls(mockUpdateOne, 1);
+      await waitForMockCalls(mockRunAgenticLoop, 1);
 
-      const completionMessage = mockUpdateOne.mock.calls[0][1].$push.messages as { content: string };
-      expect(completionMessage.content).toContain("(truncated)");
-      expect(completionMessage.content.length).toBeLessThan(longOutput.length);
+      const loopArgs = mockRunAgenticLoop.mock.calls[0][0];
+      const lastMessage = loopArgs.messages.at(-1);
+      expect(lastMessage.content).toContain("(truncated)");
+      expect(lastMessage.content.length).toBeLessThan(longOutput.length);
     });
 
-    it("should gracefully handle appendMessages failure without crashing", async () => {
-      vi.mocked(ConversationService.appendMessages).mockRejectedValueOnce(
-        new Error("MongoDB down"),
-      );
+    it("should not crash when auto-response fails", async () => {
       mockFindOne.mockResolvedValue(null);
 
       await expect(
@@ -310,72 +306,7 @@ describe("Event-Driven Auto-Response", () => {
         "team", "hierarchical", [], incompleteContext,
       );
 
-      expect(mockUpdateOne).not.toHaveBeenCalled();
-    });
-
-    it("should use messages.0 $exists guard to prevent creating conversation before Finalizer", async () => {
-      mockFindOne.mockResolvedValue({
-        id: "parent-conv-id",
-        isGenerating: false,
-        messages: [{ role: "user", content: "Go" }],
-        settings: { provider: PROVIDERS.GOOGLE, model: "gemini-3-flash-preview" },
-      });
-
-      await OrchestratorService._notifyParentOfRouterCompletion(
-        "guarded_team",
-        "hierarchical",
-        [{
-          agent_id: "a1", description: "Agent", status: "completed",
-          summary: "", result: "done", toolUses: 1, iterations: 1,
-          durationMs: 100, messages: [],
-        }],
-        orchestratorContext,
-      );
-
-      await waitForMockCalls(mockUpdateOne, 1);
-
-      const [query] = mockUpdateOne.mock.calls[0];
-      expect(query["messages.0"]).toEqual({ $exists: true });
-      expect(query.id).toBe("parent-conv-id");
-    });
-
-    it("should retry when parent conversation does not exist yet (race condition)", async () => {
-      // Simulate: first 2 attempts → conversation not found, third → success
-      mockUpdateOne
-        .mockResolvedValueOnce({ matchedCount: 0 })
-        .mockResolvedValueOnce({ matchedCount: 0 })
-        .mockResolvedValueOnce({ matchedCount: 1 });
-
-      mockFindOne.mockResolvedValue({
-        id: "parent-conv-id",
-        isGenerating: true,
-        messages: [],
-        settings: { provider: PROVIDERS.GOOGLE, model: "gemini-3-flash-preview" },
-      });
-
-      // Use fake timers to avoid waiting real 2s per retry
-      vi.useFakeTimers();
-
-      const completionPromise = OrchestratorService._notifyParentOfRouterCompletion(
-        "retry_team",
-        "hierarchical",
-        [{
-          agent_id: "a1", description: "Retry Agent", status: "completed",
-          summary: "", result: "retried", toolUses: 1, iterations: 1,
-          durationMs: 500, messages: [],
-        }],
-        orchestratorContext,
-      );
-
-      // Advance through 2 retry delays (2000ms each)
-      await vi.advanceTimersByTimeAsync(2000);
-      await vi.advanceTimersByTimeAsync(2000);
-
-      await completionPromise;
-
-      vi.useRealTimers();
-
-      expect(mockUpdateOne).toHaveBeenCalledTimes(3);
+      expect(mockRunAgenticLoop).not.toHaveBeenCalled();
     });
   });
 
@@ -458,14 +389,13 @@ describe("Event-Driven Auto-Response", () => {
       expect(loopArgs.messages[4].content).toContain("SUB-AGENT TEAM COMPLETED");
     });
 
-    it("should not append completionMessage to contextMessages if it is already present in conversation messages", async () => {
+    it("should always append ephemeral completion message to context since it is never in DB", async () => {
       mockFindOne.mockResolvedValue({
         id: "parent-conv-id",
         isGenerating: false,
         messages: [
           { role: "user", content: "Build me a feature" },
           { role: "assistant", content: "I spawned sub-agents" },
-          completionMessage,
         ],
         settings: {
           provider: PROVIDERS.GOOGLE,
@@ -480,8 +410,10 @@ describe("Event-Driven Auto-Response", () => {
       );
 
       const loopArgs = mockRunAgenticLoop.mock.calls[0][0];
+      // 2 DB messages + 1 ephemeral completion
       expect(loopArgs.messages).toHaveLength(3);
-      expect(loopArgs.messages.filter((m: any) => m.content === completionMessage.content)).toHaveLength(1);
+      expect(loopArgs.messages.at(-1).content).toContain("SUB-AGENT TEAM COMPLETED");
+      expect(loopArgs.messages.at(-1)._alreadyPersisted).toBe(true);
     });
 
     it("should wait for parent to finish generating before auto-response", async () => {
@@ -672,7 +604,7 @@ describe("Event-Driven Auto-Response", () => {
   // ── End-to-End ────────────────────────────────────────────────
 
   describe("End-to-End: createTeam triggers auto-response on completion", () => {
-    it("should dispatch router, persist completion, and trigger auto-response", async () => {
+    it("should dispatch router and trigger auto-response with ephemeral completion context", async () => {
       mockFindOne.mockResolvedValue({
         id: "parent-conv-id",
         isGenerating: false,
@@ -705,18 +637,17 @@ describe("Event-Driven Auto-Response", () => {
       // Wait for background chain: sub-agent loops (2) + parent auto-response (1) = 3
       await waitForMockCalls(mockRunAgenticLoop, 3);
 
-      // Verify completion message was persisted
-      expect(mockUpdateOne).toHaveBeenCalled();
-      const completionCall = mockUpdateOne.mock.calls.find((call) => call[1] && call[1].$push);
-      expect(completionCall).toBeDefined();
-      if (!completionCall) throw new Error("completionCall is undefined");
-      const persistedMessage = completionCall[1].$push.messages as { content: string };
-      expect(persistedMessage.content).toContain("[SUB-AGENT TEAM COMPLETED]");
+      // Completion message should NOT be persisted to DB via $push
+      const hasPushCall = mockUpdateOne.mock.calls.some(
+        (call) => call[1] && call[1].$push?.messages,
+      );
+      expect(hasPushCall).toBe(false);
 
-      // Verify auto-response agentic loop includes completion context
+      // Verify auto-response agentic loop includes ephemeral completion context
       const autoResponseCall = mockRunAgenticLoop.mock.calls[2][0];
       expect(autoResponseCall.conversationId).toBe("parent-conv-id");
       expect(autoResponseCall.messages.at(-1).content).toContain("SUB-AGENT TEAM COMPLETED");
+      expect(autoResponseCall.messages.at(-1)._alreadyPersisted).toBe(true);
     });
   });
 });
