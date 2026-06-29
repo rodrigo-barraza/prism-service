@@ -2,7 +2,6 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import AgenticLoopService from "../services/AgenticLoopService.ts";
 import AgentSessionRegistry from "../services/AgentSessionRegistry.ts";
-import LiveFrameService from "../services/LiveFrameService.ts";
 import { handleAgent } from "./ChatRoutes.ts";
 import logger from "../utils/logger.ts";
 import { handleSseRequest, handleJsonRequest } from "../utils/SseUtilities.ts";
@@ -109,36 +108,6 @@ router.post(
   }),
 );
 
-// ─── live vision frame streaming ────────────────────────────
-
-/**
- * POST /agent/conversation/:conversationId/frame
- *
- * Body:
- *   { frameDataUrl: string } // base64 JPEG data URL
- *
- * Receives the latest frame for a conversation and adds it to the rolling buffer.
- */
-router.post(
-  "/conversation/:conversationId/frame",
-  asyncHandler(async (request: Request, response: Response) => {
-    const { conversationId } = request.params;
-    const { frameDataUrl } = request.body;
-
-    if (!conversationId) {
-      return response.status(400).json({ error: "Missing conversationId" });
-    }
-    if (!frameDataUrl) {
-      return response.status(400).json({ error: "Missing frameDataUrl" });
-    }
-
-    LiveFrameService.pushFrame(
-      conversationId as string,
-      frameDataUrl as string,
-    );
-    response.json({ ok: true });
-  }),
-);
 
 // ─── explicit session stop ──────────────────────────────────
 
