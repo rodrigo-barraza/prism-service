@@ -26,6 +26,7 @@ import type { WebSocket } from "ws";
 import type { IncomingMessage } from "http";
 import type { WebSocketServer } from "ws";
 import type { GoogleToolConfigEntry } from "../providers/google.ts";
+import WebSocketConnectionRegistry from "./WebSocketConnectionRegistry.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -161,6 +162,12 @@ function handleWebsocketChat(
   clientIp: string,
   agent: string | null,
 ) {
+  const emitFunction = (event: Record<string, unknown>) => {
+    if (websocket.readyState === websocket.OPEN) {
+      websocket.send(JSON.stringify(event));
+    }
+  };
+
   websocket.on("message", async (rawData: Buffer | string) => {
     let data: Record<string, unknown>;
     try {
@@ -172,16 +179,27 @@ function handleWebsocketChat(
       return;
     }
 
+    // Register this WebSocket for auto-response streaming so background
+    // sub-agent completion notifications can stream directly to the client
+    // (Antigravity reactive wake-up pattern).
+    const conversationId = data.conversationId as string | undefined;
+    if (conversationId) {
+      WebSocketConnectionRegistry.register(
+        conversationId, websocket, emitFunction,
+      );
+    }
+
     await handleConversation(
       { ...data, project, username, clientIp, agent },
-      (event: Record<string, unknown>) => {
-        if (websocket.readyState === websocket.OPEN) {
-          websocket.send(JSON.stringify(event));
-        }
-      },
+      emitFunction,
     );
   });
+
+  websocket.on("close", () => {
+    WebSocketConnectionRegistry.deregisterByWebSocket(websocket);
+  });
 }
+
 
 /**
  * WebSocket voice handler — delegates to shared handleVoice() from voice.js.
