@@ -98,11 +98,19 @@
       "parameters": {
         "teamName": "Team name to remove."
       }
+    },
+    "resume_agent": {
+      "description": "Resume completed sub-agent session with new instruction. Keep conversation history and worktree. Use when sub-agent done but need more work (e.g. add test, fix review, expand scope). Runs in background, notified when done.",
+      "parameters": {
+        "agent_id": "Completed sub-agent ID.",
+        "prompt": "New instruction or follow-up task."
+      }
     }
   },
 
   "notifications": {
     "teamCompleted": "[TEAM DONE] Team \"{{teamName}}\" ({{topology}}) finished.",
+    "resumedAgentCompleted": "[RESUMED DONE] Agent \"{{agentId}}\" ({{description}}) has {{status}} after resumption.",
     "agentError": "Agent {{agentNumber}}: ❌ Error — {{errorMessage}}",
     "agentStatus": "Agent {{agentNumber}} ({{agentDescription}}): {{agentStatus}}",
     "agentStats": "  Time: {{duration}} | Tool: {{toolUses}} | Iteration: {{iterations}}",
