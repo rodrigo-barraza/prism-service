@@ -777,7 +777,7 @@ describe("DivideAndConquerRouter Tests", () => {
       expect(spawnSubAgentMock).toHaveBeenCalledTimes(1);
     });
 
-    it("clamps maxRecursionDepth to MAXIMUM_ALLOWED (3)", async () => {
+    it("clamps maxRecursionDepth to MAXIMUM_ALLOWED (10)", async () => {
       const router = new DivideAndConquerRouter();
       const mockSubtasks = [
         { description: "Complex subtask", prompt: "A".repeat(500) },
@@ -818,7 +818,7 @@ describe("DivideAndConquerRouter Tests", () => {
       });
 
       await router.execute("test-team", mockMembers, orchestratorContext, spawnSubAgentMock, undefined, {
-        maxRecursionDepth: 10, // will clamp to 3
+        maxRecursionDepth: 20, // will clamp to 10
         recursionComplexityThreshold: 100,
       });
 
