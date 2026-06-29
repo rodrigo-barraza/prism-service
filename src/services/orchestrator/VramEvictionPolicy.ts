@@ -42,7 +42,7 @@ export async function evictIdleSecondaryModel(
         );
         await provider
           .unloadModelByKey(completedSubAgent.resolvedModel)
-          .catch((error: unknown) =>
+          .catch((error: Error) =>
             logger.warn(
               `[Orchestrator] VRAM eviction failed on ${subAgentInstanceId}: ${getErrorMessage(error)}`,
             ),

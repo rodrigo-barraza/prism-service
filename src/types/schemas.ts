@@ -8,16 +8,17 @@ import { z } from "zod";
  * unsafe manual assertions and explicit 'any' parsing.
  */
 
-const DISALLOWED_IDENTIFIER_PATTERN = /[\x00]|\.\.\/|\.\.\\/;
+const isDisallowedIdentifier = (value: string): boolean =>
+  value.includes("\0") || value.includes("../") || value.includes("..\\");
 
 const sanitizedString = () =>
   z
     .string()
-    .transform((value) => value.replace(/\x00/g, ""))
+    .transform((value) => value.split("\0").join(""))
     .pipe(
       z
         .string()
-        .refine((value) => !DISALLOWED_IDENTIFIER_PATTERN.test(value), {
+        .refine((value) => !isDisallowedIdentifier(value), {
           message:
             "String contains disallowed characters (null bytes or path traversal)",
         }),

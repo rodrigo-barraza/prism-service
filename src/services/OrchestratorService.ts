@@ -45,6 +45,7 @@ import type {
   OrchestratorContext,
   TeamMember,
   SubAgentResult,
+  ResumedAgentResult,
 } from "../types/orchestrator.ts";
 
 import type { ConversationMessage, LLMProvider } from "./harnesses/types.ts";
@@ -158,7 +159,7 @@ registerCleanup(async () => {
         .then(() => {
           subAgent.worktreePath = null;
         })
-        .catch((error: unknown) =>
+        .catch((error: Error) =>
           logger.warn(
             `[Orchestrator] Shutdown worktree cleanup failed for ${subAgent.agentId}: ${getErrorMessage(error)}`,
           ),
@@ -596,7 +597,7 @@ export default class OrchestratorService {
           await GitWorktreeHelper.removeWorktree(
             subAgentState.repositoryPath,
             subAgentState.worktreePath,
-          ).catch((cleanupError: unknown) =>
+          ).catch((cleanupError: Error) =>
             logger.warn(
               `[Orchestrator] Worktree cleanup failed for ${agentId}: ${getErrorMessage(cleanupError)}`,
             ),
@@ -653,7 +654,7 @@ export default class OrchestratorService {
           `[Orchestrator] Sub-agent ${agentId} completed: status=${completedResult.status} toolUses=${completedResult.toolUses} durationMs=${completedResult.durationMs}`,
         );
       })
-      .catch((error: unknown) => {
+      .catch((error: Error) => {
         logger.error(
           `[Orchestrator] Sub-agent ${agentId} loop error: ${getErrorMessage(error)}`,
         );
@@ -665,7 +666,7 @@ export default class OrchestratorService {
           GitWorktreeHelper.removeWorktree(
             subAgentState.repositoryPath,
             subAgentState.worktreePath,
-          ).catch((cleanupError: unknown) =>
+          ).catch((cleanupError: Error) =>
             logger.warn(
               `[Orchestrator] Worktree cleanup failed for ${agentId}: ${getErrorMessage(cleanupError)}`,
             ),
@@ -734,7 +735,7 @@ export default class OrchestratorService {
       subAgent,
       message,
       orchestratorContext,
-    ).catch((error: unknown) => {
+    ).catch((error: Error) => {
       logger.error(
         `[Orchestrator] Sub-agent ${agentId} continuation error: ${getErrorMessage(error)}`,
       );
@@ -845,7 +846,7 @@ export default class OrchestratorService {
               .then(() => {
                 subAgent.worktreePath = null;
               })
-              .catch((error: unknown) =>
+              .catch((error: Error) =>
                 logger.warn(
                   `[Orchestrator] Worktree cleanup failed for ${subAgent.agentId}: ${getErrorMessage(error)}`,
                 ),
@@ -1355,13 +1356,13 @@ export default class OrchestratorService {
           topology,
           routerResults,
           orchestratorContext,
-        ).catch((notificationError: unknown) => {
+        ).catch((notificationError: Error) => {
           logger.warn(
             `[Orchestrator] Failed to notify parent of router completion: ${getErrorMessage(notificationError)}`,
           );
         });
       })
-      .catch((routerError: unknown) => {
+      .catch((routerError: Error) => {
         logger.error(
           `[Orchestrator] Router "${topology}" failed for team "${teamCreationArguments.name}": ${getErrorMessage(routerError)}`,
         );
@@ -1440,7 +1441,7 @@ export default class OrchestratorService {
             .then(() => {
               subAgent.worktreePath = null;
             })
-            .catch((error: unknown) =>
+            .catch((error: Error) =>
               logger.warn(
                 `[Orchestrator] deleteTeam worktree cleanup failed for ${subAgentId}: ${getErrorMessage(error)}`,
               ),
@@ -1574,7 +1575,7 @@ export default class OrchestratorService {
     agentId: string,
     prompt: string,
     orchestratorContext: OrchestratorContext,
-  ): Promise<SubAgentResult | { _directive: string; instruction: string; agent: Record<string, unknown> } | { error: string }> {
+  ): Promise<SubAgentResult | ResumedAgentResult | { error: string }> {
     const subAgent = activeSubAgents.get(agentId);
     if (!subAgent) {
       return { error: `Sub-agent "${agentId}" not found. It may have been cleaned up or expired.` };
@@ -1648,13 +1649,13 @@ export default class OrchestratorService {
           agentId,
           completedResult,
           orchestratorContext,
-        ).catch((autoResponseError: unknown) => {
+        ).catch((autoResponseError: Error) => {
           logger.warn(
             `[Orchestrator] Auto-response failed for resumed agent ${agentId}: ${getErrorMessage(autoResponseError)}`,
           );
         });
       })
-      .catch((error: unknown) => {
+      .catch((error: Error) => {
         logger.error(
           `[Orchestrator] Resumed sub-agent ${agentId} error: ${getErrorMessage(error)}`,
         );
@@ -1681,7 +1682,7 @@ export default class OrchestratorService {
           agentId,
           failedResult,
           orchestratorContext,
-        ).catch((autoResponseError: unknown) => {
+        ).catch((autoResponseError: Error) => {
           logger.warn(
             `[Orchestrator] Auto-response failed for resumed agent ${agentId} (error path): ${getErrorMessage(autoResponseError)}`,
           );
@@ -1790,7 +1791,7 @@ export default class OrchestratorService {
       username,
       orchestratorContext,
       completionMessage as ConversationMessage,
-    ).catch((autoResponseError: unknown) => {
+    ).catch((autoResponseError: Error) => {
       logger.warn(
         `[Orchestrator] Parent auto-response failed for conversation ${conversationId}: ${getErrorMessage(autoResponseError)}`,
       );
@@ -2290,7 +2291,7 @@ export default class OrchestratorService {
       await GitWorktreeHelper.removeWorktree(
         subAgent.repositoryPath,
         subAgent.worktreePath,
-      ).catch((error: unknown) =>
+      ).catch((error: Error) =>
         logger.warn(
           `[Orchestrator] Post-completion worktree cleanup failed for ${subAgent.agentId}: ${getErrorMessage(error)}`,
         ),

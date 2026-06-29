@@ -108,7 +108,9 @@ interface ExecutionContext {
 
 // ── Helpers ──────────────────────────────────────────────────
 
-function resolveMinioRefToUrl(value: unknown): string | null {
+function resolveMinioRefToUrl(
+  value: string | number | boolean | object | null | undefined,
+): string | null {
   if (typeof value !== "string") return null;
   if (value.startsWith("minio://")) {
     const key = value.replace("minio://", "");
@@ -120,7 +122,9 @@ function resolveMinioRefToUrl(value: unknown): string | null {
   return null;
 }
 
-async function resolveToDataUrl(ref: unknown): Promise<string | null> {
+async function resolveToDataUrl(
+  ref: string | number | boolean | object | null | undefined,
+): Promise<string | null> {
   if (!ref) return null;
 
   if (typeof ref === "object" && ref !== null) {

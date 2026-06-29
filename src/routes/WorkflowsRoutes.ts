@@ -244,18 +244,18 @@ function resolveWorkflowFileRefs(
   if (Array.isArray(workflow.nodes)) {
     for (const node of workflow.nodes) {
       if (!node || typeof node !== "object") continue;
-      const nodeObj = node as TransformedWorkflowNode;
+      const workflowNode = node as TransformedWorkflowNode;
       // Node-level content (asset input nodes)
-      if (typeof nodeObj.content === "string") {
-        nodeObj.content = resolveMinioRef(
-          nodeObj.content,
+      if (typeof workflowNode.content === "string") {
+        workflowNode.content = resolveMinioRef(
+          workflowNode.content,
           baseUrl,
         ) as string;
       }
 
       // Messages array (conversation / model nodes)
-      if (Array.isArray(nodeObj.messages)) {
-        for (const message of nodeObj.messages as TransformedWorkflowNode[]) {
+      if (Array.isArray(workflowNode.messages)) {
+        for (const message of workflowNode.messages as TransformedWorkflowNode[]) {
           if (!message) continue;
           for (const field of MEDIA_FIELDS) {
             const value = message[field];
@@ -275,10 +275,10 @@ function resolveWorkflowFileRefs(
 
       // Viewer receivedOutputs
       if (
-        nodeObj.receivedOutputs &&
-        typeof nodeObj.receivedOutputs === "object"
+        workflowNode.receivedOutputs &&
+        typeof workflowNode.receivedOutputs === "object"
       ) {
-        const outputs = nodeObj.receivedOutputs;
+        const outputs = workflowNode.receivedOutputs;
         if (Array.isArray(outputs)) {
           for (const outputsItem of outputs as TransformedWorkflowNode[]) {
             resolveWorkflowNodeOutputs(outputsItem, baseUrl);

@@ -175,7 +175,7 @@ export default class CriticGate {
           ? prompt.split("Tool: ")[1]?.split("\n")[0]
           : null,
       },
-    }).catch((loggingError: unknown) =>
+    }).catch((loggingError: Error) =>
       logger.error(
         `[CriticGate] Failed to log critic review request: ${getErrorMessage(loggingError)}`,
       ),

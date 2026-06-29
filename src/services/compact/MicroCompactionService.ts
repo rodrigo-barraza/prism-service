@@ -58,7 +58,9 @@ export interface MicroCompactionResult {
 /**
  * Estimate token count for a tool result value.
  */
-function estimateToolResultTokens(result: unknown): number {
+function estimateToolResultTokens(
+  result: string | number | boolean | object | null | undefined | symbol,
+): number {
   if (!result) return 0;
   const resultText =
     typeof result === "string" ? result : JSON.stringify(result);

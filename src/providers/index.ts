@@ -53,7 +53,7 @@ async function* wrapAsyncGenerator(
  */
 function wrapProvider(provider: Provider): Provider {
   return new Proxy(provider, {
-    get(target: Provider, prop: string | symbol, receiver: unknown): unknown {
+    get(target: Provider, prop: string | symbol, receiver: Provider): unknown {
       const value = Reflect.get(target, prop, receiver);
       if (typeof value !== "function" || !isTrackedMethod(prop)) {
         return value;

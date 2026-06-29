@@ -18,6 +18,7 @@ import {
   normalizeUsage,
 } from "../utils/openai-compat.ts";
 import type { TokenUsage } from "../types/admin.ts";
+import type { JsonValue } from "../types/index.ts";
 import {
   getDataUrlMimeType,
   getUrlType,
@@ -154,17 +155,20 @@ const OPENAI_ALLOWED_SCHEMA_KEYWORDS = new Set([
  * - `anyOf` branches must each be independently valid
  */
 function sanitizeSchemaForOpenAI(
-  schema: unknown,
+  schema: JsonValue | undefined,
   isInsidePropertiesMap = false,
-): unknown {
+): JsonValue | undefined {
+  if (schema === undefined) return undefined;
   if (!schema || typeof schema !== "object") return schema;
 
   if (Array.isArray(schema)) {
-    return schema.map((item: unknown) => sanitizeSchemaForOpenAI(item));
+    return (schema as JsonValue[]).map((item: JsonValue) =>
+      sanitizeSchemaForOpenAI(item),
+    ) as JsonValue[];
   }
 
-  const source = schema as Record<string, unknown>;
-  const cleaned: Record<string, unknown> = {};
+  const source = schema as { [key: string]: JsonValue };
+  const cleaned: { [key: string]: JsonValue } = {};
 
   for (const [key, value] of Object.entries(source)) {
     // Inside a `properties` map, keys are user-defined field names (e.g. "count", "name"),
@@ -185,16 +189,16 @@ function sanitizeSchemaForOpenAI(
       typeof value === "object" &&
       !Array.isArray(value)
     ) {
-      cleaned[key] = sanitizeSchemaForOpenAI(value, true);
+      cleaned[key] = sanitizeSchemaForOpenAI(value, true) as JsonValue;
     } else {
-      cleaned[key] = sanitizeSchemaForOpenAI(value);
+      cleaned[key] = sanitizeSchemaForOpenAI(value) as JsonValue;
     }
   }
 
   // Sanitize anyOf branches (each must be a valid strict-mode schema)
   if (Array.isArray(cleaned.anyOf)) {
-    cleaned.anyOf = (cleaned.anyOf as unknown[]).map((branch: unknown) =>
-      sanitizeSchemaForOpenAI(branch),
+    cleaned.anyOf = (cleaned.anyOf as JsonValue[]).map((branch: JsonValue) =>
+      sanitizeSchemaForOpenAI(branch) as JsonValue,
     );
   }
 
@@ -212,7 +216,7 @@ function sanitizeSchemaForOpenAI(
       cleaned.properties = {};
       cleaned.required = [];
     } else {
-      const propertiesMap = cleaned.properties as Record<string, unknown>;
+      const propertiesMap = cleaned.properties as { [key: string]: JsonValue };
       const propertyKeys = Object.keys(propertiesMap);
       const originalRequired = Array.isArray(cleaned.required)
         ? (cleaned.required as string[])
@@ -230,10 +234,9 @@ function sanitizeSchemaForOpenAI(
             typeof propertySchema === "object" &&
             !Array.isArray(propertySchema)
           ) {
-            const typedPropertySchema = propertySchema as Record<
-              string,
-              unknown
-            >;
+            const typedPropertySchema = propertySchema as {
+              [key: string]: JsonValue;
+            };
 
             // Skip if it already has anyOf (it's already a union type)
             if (!typedPropertySchema.anyOf) {
@@ -297,6 +300,7 @@ function sanitizeSchemaForOpenAI(
   return cleaned;
 }
 
+
 /**
  * Convert generic tool schemas to OpenAI Responses API format.
  * Input:  [{ name, description, parameters }]
@@ -311,17 +315,26 @@ function convertToolsToResponsesAPI(
       type: "function" as const,
       name: tool.name,
       description: tool.description || "",
-      parameters: sanitizeSchemaForOpenAI(tool.parameters || {}) as Record<
-        string,
-        unknown
-      >,
+      parameters: sanitizeSchemaForOpenAI(
+        (tool.parameters || {}) as unknown as JsonValue,
+      ) as Record<string, unknown>,
       strict: true,
     }),
   );
 }
 
 /** Narrow any errors into ProviderError for all catch blocks. */
-function toProviderError(error: object | string | number | boolean | null | undefined | symbol | Function): never {
+function toProviderError(
+  error:
+    | object
+    | string
+    | number
+    | boolean
+    | null
+    | undefined
+    | symbol
+    | ((...argumentsList: unknown[]) => unknown),
+): never {
   let message = String(error);
   let status = 500;
   if (error && typeof error === "object") {
@@ -348,7 +361,17 @@ interface ErrorRecord {
 }
 
 /** Narrow any catch to a typed error record for retry logic. */
-function asErrorRecord(error: unknown): ErrorRecord {
+function asErrorRecord(
+  error:
+    | object
+    | string
+    | number
+    | boolean
+    | null
+    | undefined
+    | symbol
+    | ((...argumentsList: unknown[]) => unknown),
+): ErrorRecord {
   return error as ErrorRecord;
 }
 export function normalizeResponsesUsage(
@@ -1026,9 +1049,8 @@ const openaiProvider = {
         });
       }
       if (rateLimits) result.rateLimits = rateLimits;
-      return result;
     } catch (error: unknown) {
-      const errorObject = asErrorRecord(error);
+      const errorObject = asErrorRecord(error as object);
       // Retry once after stripping unsupported parameters (e.g. gpt-5-nano rejects temperature)
       if (
         errorObject.status === 400 &&
@@ -1481,7 +1503,7 @@ const openaiProvider = {
       stream = streamData;
       rateLimits = extractOpenAIRateLimits(rawStreamResponse, model);
     } catch (error: unknown) {
-      const errorObject = asErrorRecord(error);
+      const errorObject = asErrorRecord(error as object);
       // Retry once after stripping unsupported parameters (e.g. gpt-5-nano rejects temperature)
       if (
         errorObject.status === 400 &&

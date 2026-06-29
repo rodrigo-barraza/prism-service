@@ -464,7 +464,7 @@ export class TournamentRouter implements TopologyRouter {
           memberCount: members.length,
           successfulCount: successfulResults.length,
         },
-      }).catch((loggingError: unknown) =>
+      }).catch((loggingError: Error) =>
         logger.error(
           `[TournamentRouter] Failed to log tournament judge request: ${getErrorMessage(loggingError)}`,
         ),

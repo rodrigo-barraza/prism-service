@@ -785,7 +785,7 @@ function handleWebsocketLive(
                     toolCalls: turnToolCalls,
                     outputCharacters: turnText.length,
                     ...(audioRef ? { audioRef } : {}),
-                  }).catch((error: unknown) =>
+                  }).catch((error: Error) =>
                     logger.error(
                       `[Live API] Failed to log ${eventType} request: ${getErrorMessage(error)}`,
                     ),
@@ -980,7 +980,7 @@ function handleWebsocketLive(
         project,
         username,
         false,
-      ).catch((error: unknown) =>
+      ).catch((error: Error) =>
         logger.error(
           `[Live API] Failed to clear isGenerating on disconnect: ${getErrorMessage(error)}`,
         ),

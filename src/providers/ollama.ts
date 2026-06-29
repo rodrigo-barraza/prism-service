@@ -409,7 +409,7 @@ export function createOllamaProvider(
         }
 
         const responseData = await response.json();
-        const models = (responseData as Record<string, unknown[]>).models || [];
+        const models = (responseData as Record<string, Record<string, unknown>[]>).models || [];
 
         let running: Record<string, unknown>[] = [];
         try {
@@ -426,8 +426,8 @@ export function createOllamaProvider(
           );
         }
 
-        const mappedModelsList = models.map((value: unknown) => {
-          const modelItem = value as Record<string, unknown>;
+        const mappedModelsList = models.map((value: Record<string, unknown>) => {
+          const modelItem = value;
           const tagName = (modelItem.model || modelItem.name || "") as string;
           const matchedRunningModel = running.find((runningModel) => {
             const runningName = (runningModel.model ||

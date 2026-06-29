@@ -459,7 +459,7 @@ export default class MemoryExtractor {
             agentConversationId: context.agentConversationId || null,
           });
         })
-        .catch((error: unknown) =>
+        .catch((error: Error) =>
           logger.error(
             `[MemoryExtractor] Background extraction failed: ${errorMessage(error)}`,
           ),

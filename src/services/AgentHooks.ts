@@ -168,7 +168,7 @@ export default class AgentHooks {
           maybePromise &&
           typeof (maybePromise as Promise<unknown>).catch === "function"
         ) {
-          (maybePromise as Promise<unknown>).catch((error: unknown) => {
+          (maybePromise as Promise<unknown>).catch((error: Error) => {
             logger.warn(
               `[AgentHooks] Inspect hook "${name}" on "${event}" failed (non-blocking): ${errorMessage(error)}`,
             );

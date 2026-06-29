@@ -225,3 +225,9 @@ export interface TeamMemberResult {
   error?: string;
   [key: string]: unknown;
 }
+
+export interface ResumedAgentResult {
+  _directive: string;
+  instruction: string;
+  agent: Record<string, unknown>;
+}

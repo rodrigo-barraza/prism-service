@@ -661,7 +661,7 @@ const MemoryConsolidationService = {
           endpoint: endpoint || "/agent",
           traceId: traceId || null,
           agentConversationId: agentConversationId || null,
-        }).catch((error: unknown) =>
+        }).catch((error: Error) =>
           logger.error(
             `[MemoryConsolidation] Background consolidation failed: ${getErrorMessage(error)}`,
           ),

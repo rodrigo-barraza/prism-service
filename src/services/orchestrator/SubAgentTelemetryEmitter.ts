@@ -32,7 +32,7 @@ function isUsageRecord(value: object | null | undefined): value is Record<string
     return false;
   }
   const candidate = value as Record<string, number | string | boolean | object | null | undefined>;
-  return Object.values(candidate).every((val) => typeof val === "number");
+  return Object.values(candidate).every((entryValue) => typeof entryValue === "number");
 }
 
 /**

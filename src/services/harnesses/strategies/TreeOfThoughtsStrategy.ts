@@ -1381,7 +1381,7 @@ async function scoreBranchesMultiCriteria(
       success: true,
       errorMessage: null,
       requestStartMs: scoringRequestStartMs,
-    }).catch((scoringLogError: unknown) =>
+    }).catch((scoringLogError: Error) =>
       logger.error(
         `[TreeOfThoughts] Failed to log scoring request: ${getErrorMessage(scoringLogError)}`,
       ),

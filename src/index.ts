@@ -441,7 +441,7 @@ setupWebSocket(wss);
       );
 
       if (failedIndexes.length > 0) {
-        for (const [indexPosition, failedResult] of failedIndexes.entries()) {
+        for (const failedResult of failedIndexes) {
           const failedDefinition =
             indexDefinitions[indexResults.indexOf(failedResult)];
           logger.error(
@@ -676,24 +676,27 @@ setupWebSocket(wss);
     );
   }
 
-  // ── Background Housekeeping ────────────────────────────────
   // Boot-time run: clean up orphans from previous crashes
-  BackgroundHousekeepingService.run({ trigger: "boot" }).catch(
-    (error: unknown) =>
+  (async () => {
+    try {
+      await BackgroundHousekeepingService.run({ trigger: "boot" });
+    } catch (error: unknown) {
       logger.error(
         `[Housekeeping] Boot-time run failed: ${errorMessage(error)}`,
-      ),
-  );
+      );
+    }
+  })();
 
   // Scheduled run: every 6h (independent of consolidation interval)
   const HOUSEKEEPING_INTERVAL_MS = hours(6);
-  const housekeepingInterval = setInterval(() => {
-    BackgroundHousekeepingService.run({ trigger: "scheduled" }).catch(
-      (error: unknown) =>
-        logger.error(
-          `[Housekeeping] Scheduled run failed: ${errorMessage(error)}`,
-        ),
-    );
+  const housekeepingInterval = setInterval(async () => {
+    try {
+      await BackgroundHousekeepingService.run({ trigger: "scheduled" });
+    } catch (error: unknown) {
+      logger.error(
+        `[Housekeeping] Scheduled run failed: ${errorMessage(error)}`,
+      );
+    }
   }, HOUSEKEEPING_INTERVAL_MS);
   registerCleanup(async () => clearInterval(housekeepingInterval));
   logger.info(

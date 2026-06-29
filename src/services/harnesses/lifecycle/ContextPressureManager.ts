@@ -138,7 +138,7 @@ export async function manageContextPressure(
           context.project || "",
           context.username || "",
           compactionResult.summaryText,
-        ).catch((error: unknown) =>
+        ).catch((error: Error) =>
           logger.error(
             `[${harnessLabel}] Failed to persist compaction summary: ${errorMessage(error)}`,
           ),

@@ -1,5 +1,6 @@
 import { ProviderOptions } from "../types/ProviderTypes.ts";
 import type { GenerateTextResult } from "../types/provider.ts";
+import type { JsonValue } from "../types/index.ts";
 import {
   GoogleGenAI,
   Modality,
@@ -189,7 +190,6 @@ const GOOGLE_UNSUPPORTED_KEYS = new Set([
   "title",
 ]);
 
-type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
 
 function sanitizeSchemaForGoogle(
   schema: JsonValue | undefined,

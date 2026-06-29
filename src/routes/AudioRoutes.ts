@@ -119,7 +119,7 @@ export async function handleVoice(
               ? conversationMeta.title
               : undefined,
         },
-      ).catch((error: unknown) =>
+      ).catch((error: Error) =>
         logger.error(`Failed to set isGenerating: ${getErrorMessage(error)}`),
       );
     }
@@ -229,7 +229,7 @@ export async function handleVoice(
             false,
           ),
         )
-        .catch((error: unknown) =>
+        .catch((error: Error) =>
           logger.error(
             `Failed to append messages to conversation ${conversationId}: ${getErrorMessage(error)}`,
           ),
@@ -244,7 +244,7 @@ export async function handleVoice(
         project,
         username,
         false,
-      ).catch((error: unknown) =>
+      ).catch((error: Error) =>
         logger.error(
           `Failed to clear isGenerating on error: ${getErrorMessage(error)}`,
         ),
@@ -400,7 +400,7 @@ router.post(
                 ? conversationMeta.title
                 : undefined,
           },
-        ).catch((error: unknown) =>
+        ).catch((error: Error) =>
           logger.error(`Failed to set isGenerating: ${getErrorMessage(error)}`),
         );
       }
@@ -524,7 +524,7 @@ router.post(
               false,
             ),
           )
-          .catch((error: unknown) =>
+          .catch((error: Error) =>
             logger.error(
               `Failed to append messages to conversation ${conversationId}: ${getErrorMessage(error)}`,
             ),
@@ -545,7 +545,7 @@ router.post(
           req.project || "any",
           req.username || "any",
           false,
-        ).catch((error: unknown) =>
+        ).catch((error: Error) =>
           logger.error(
             `Failed to clear isGenerating on error: ${getErrorMessage(error)}`,
           ),
