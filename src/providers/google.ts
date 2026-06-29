@@ -95,9 +95,9 @@ interface PartWithThoughtSignature extends Part {
 }
 
 /** Safely extract HTTP status from Google GenAI error objects. */
-function getErrorStatus(error: unknown): number {
-  if (error instanceof Error && "status" in error) {
-    return (error as Error & { status: number }).status;
+function getErrorStatus(error: Error | object | null | undefined): number {
+  if (error && typeof error === "object" && "status" in error) {
+    return (error as { status: number }).status;
   }
   return 500;
 }
@@ -123,7 +123,7 @@ function getClient(): GoogleGenAI {
  * Returns true for errors that should be handled gracefully (empty result)
  * rather than propagated as 500 server errors.
  */
-function isSafetyBlockError(error: unknown): boolean {
+function isSafetyBlockError(error: Error | string | number | boolean | null | undefined | object): boolean {
   const message = getErrorMessage(error).toLowerCase();
   return (
     message.includes("prohibited_content") ||
@@ -189,16 +189,19 @@ const GOOGLE_UNSUPPORTED_KEYS = new Set([
   "title",
 ]);
 
+type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
+
 function sanitizeSchemaForGoogle(
-  schema: unknown,
+  schema: JsonValue | undefined,
   isPropertyMap: boolean = false,
-): unknown {
+): JsonValue | undefined {
+  if (schema === undefined) return undefined;
   if (!schema || typeof schema !== "object") return schema;
   if (Array.isArray(schema))
-    return schema.map((item: unknown) => sanitizeSchemaForGoogle(item, false));
+    return (schema as JsonValue[]).map((item) => sanitizeSchemaForGoogle(item, false)) as JsonValue[];
 
-  const source = schema as Record<string, unknown>;
-  const cleaned: Record<string, unknown> = {};
+  const source = schema as { [key: string]: JsonValue };
+  const cleaned: { [key: string]: JsonValue } = {};
   for (const [key, value] of Object.entries(source)) {
     // Convert `const` → single-value `enum`
     if (key === "const" && !isPropertyMap) {
@@ -210,7 +213,7 @@ function sanitizeSchemaForGoogle(
     // (e.g. properties.title is a field called "title", not the JSON Schema title keyword)
     if (!isPropertyMap && GOOGLE_UNSUPPORTED_KEYS.has(key)) continue;
     // When we hit a "properties" key, its children are a map of field names → schemas
-    cleaned[key] = sanitizeSchemaForGoogle(value, key === "properties");
+    cleaned[key] = sanitizeSchemaForGoogle(value, key === "properties") as JsonValue;
   }
   return cleaned;
 }
@@ -236,7 +239,7 @@ export function convertToolsToGoogle(
       functionDeclarations: tools.map((tool) => ({
         name: tool.name,
         description: tool.description || "",
-        parameters: sanitizeSchemaForGoogle(tool.parameters || {}) as Record<
+        parameters: sanitizeSchemaForGoogle(tool.parameters as unknown as JsonValue) as Record<
           string,
           unknown
         >,
@@ -536,7 +539,7 @@ const googleProvider = {
       // Content safety blocks (PROHIBITED_CONTENT, SAFETY, IMAGE_SAFETY)
       // should return an empty result, not a 500. This lets consumers
       // handle "no image generated" gracefully and preserves the conversation.
-      if (isSafetyBlockError(error)) {
+      if (isSafetyBlockError(error as Error)) {
         logger.error(
           `[Google] Content safety block: ${getErrorMessage(error)}`,
         );
@@ -667,7 +670,7 @@ const googleProvider = {
       }
     } catch (error: unknown) {
       if (error instanceof Error && error.name === "AbortError") return;
-      if (isSafetyBlockError(error)) {
+      if (isSafetyBlockError(error as Error)) {
         logger.error(
           `[Google] Content safety block (stream): ${getErrorMessage(error)}`,
         );
@@ -772,8 +775,8 @@ const googleProvider = {
       }
       const queue: LiveQueueItem[] = [];
       let resolver: ((item: LiveQueueItem) => void) | null = null;
-      let done = false;
-      let setupComplete = false;
+      let isDone = false;
+      let isSetupComplete = false;
 
       function enqueue(item: LiveQueueItem) {
         if (resolver) {
@@ -805,7 +808,7 @@ const googleProvider = {
           onmessage: (message: LiveServerMessage) => {
             // Setup complete — signal we can send messages
             if (message.setupComplete !== undefined) {
-              setupComplete = true;
+              isSetupComplete = true;
               enqueue({ type: "setupComplete" });
               return;
             }
@@ -881,22 +884,17 @@ const googleProvider = {
 
             // Turn complete — signal we're done
             if (message.serverContent?.turnComplete) {
-              done = true;
+              isDone = true;
               enqueue({ type: "done" });
             }
           },
-          onerror: (e: unknown) => {
-            const errorObject = e as Record<string, unknown> | null;
-            const innerError = (errorObject?.error ?? null) as Record<
-              string,
-              unknown
-            > | null;
+          onerror: (errorEvent: { message?: string; error?: { message?: string } } | null | undefined) => {
             const errorMessage =
-              (innerError?.message as string) ||
-              (errorObject?.message as string) ||
+              errorEvent?.error?.message ||
+              errorEvent?.message ||
               "unknown error";
             logger.error(`[Google Live API] Error: ${errorMessage}`);
-            done = true;
+            isDone = true;
             enqueue({
               type: "error",
               message: errorMessage,
@@ -904,14 +902,14 @@ const googleProvider = {
           },
           onclose: () => {
             logger.provider("Google", "Live API session closed");
-            done = true;
+            isDone = true;
             enqueue({ type: "done" });
           },
         },
       });
 
       // ── Wait for setupComplete before sending ─────────────────────
-      while (!setupComplete) {
+      while (!isSetupComplete) {
         const item = await dequeue();
         if (item?.type === "setupComplete") break;
         if (item?.type === "error")
@@ -966,7 +964,7 @@ const googleProvider = {
       }
 
       // ── Yield chunks from the queue ───────────────────────────────
-      while (!done || queue.length > 0) {
+      while (!isDone || queue.length > 0) {
         if (options.signal?.aborted) break;
 
         const item = await dequeue();
@@ -1262,7 +1260,7 @@ const googleProvider = {
   },
 
   async generateEmbedding(
-    content: unknown,
+    content: string | string[] | object | null | undefined,
     model?: string,
     options: ProviderOptions = {},
   ) {
@@ -1324,7 +1322,7 @@ const googleProvider = {
       throw new ProviderError(
         "google",
         getErrorMessage(error),
-        getErrorStatus(error),
+        getErrorStatus(error as Error),
         error,
       );
     }

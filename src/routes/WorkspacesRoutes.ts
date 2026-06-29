@@ -402,8 +402,8 @@ router.get(
 
       const pump = async () => {
         while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+          const { done: isDone, value } = await reader.read();
+          if (isDone) break;
           res.write(value);
         }
         res.end();
@@ -477,8 +477,8 @@ router.get(
 
       const pump = async () => {
         while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+          const { done: isDone, value } = await reader.read();
+          if (isDone) break;
           res.write(value);
         }
         res.end();

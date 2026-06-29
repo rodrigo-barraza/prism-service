@@ -91,6 +91,18 @@ interface ToolExecutionContext {
   _toolState?: unknown;
 }
 
+export interface TransformedSearchToolsResult {
+  matches: Array<{
+    name: string;
+    description?: string;
+    domain: string;
+    parameters: unknown;
+    isEnabled?: boolean;
+  }>;
+  total?: number;
+  [key: string]: unknown;
+}
+
 /** Worktree session state */
 interface WorktreeState {
   originalRoot: string;
@@ -1725,12 +1737,12 @@ export default class ToolOrchestratorService {
   static async executeSearchToolsWithMCP(
     args: Record<string, unknown>,
     context: ToolExecutionContext,
-  ): Promise<Record<string, unknown>> {
+  ): Promise<TransformedSearchToolsResult> {
     const toolsApiResult = (await executeToolGeneric(
       TOOL_NAMES.SEARCH_TOOLS,
       args,
       context,
-    )) as Record<string, unknown>;
+    )) as unknown as TransformedSearchToolsResult;
 
     const mcpSchemas = MCPClientService.getToolSchemas();
     if (mcpSchemas.length === 0) return toolsApiResult;
@@ -1786,9 +1798,8 @@ export default class ToolOrchestratorService {
       }),
     }));
 
-    // Merge with tools-api results
     const existingMatches = Array.isArray(toolsApiResult.matches)
-      ? (toolsApiResult.matches as Record<string, unknown>[])
+      ? (toolsApiResult.matches as TransformedSearchToolsResult["matches"])
       : [];
     const existingTotal =
       typeof toolsApiResult.total === "number"
@@ -1925,8 +1936,8 @@ export default class ToolOrchestratorService {
       const stderrChunks: string[] = [];
 
       while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        const { done: isDone, value } = await reader.read();
+        if (isDone) break;
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");

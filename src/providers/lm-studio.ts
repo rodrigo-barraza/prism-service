@@ -76,8 +76,8 @@ async function* parseNativeSSEStream(
         reader.cancel();
         break;
       }
-      const { done, value } = await reader.read();
-      if (done) break;
+      const { done: isDone, value } = await reader.read();
+      if (isDone) break;
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
       buffer = lines.pop() || "";
@@ -287,7 +287,7 @@ async function* parseNativeSSEStream(
     }
   }
 }
-function safeParseJSON(serializedString: unknown) {
+function safeParseJSON(serializedString: string | null | undefined) {
   try {
     return JSON.parse(String(serializedString));
   } catch {
@@ -558,7 +558,7 @@ export function createLmStudioProvider(
 
             // Register synchronously BEFORE any async check
             let resolveInflight: (() => void) | undefined = undefined;
-            let rejectInflight: ((error: unknown) => void) | undefined =
+            let rejectInflight: ((error: Error | null | undefined) => void) | undefined =
               undefined;
             let isPromiseSettled = false;
             const inflightPromise = new Promise<void>((resolve, reject) => {
@@ -722,7 +722,7 @@ export function createLmStudioProvider(
               }
 
               let loadDone = false;
-              let loadError: unknown = null;
+              let loadError: Error | null = null;
               const loadPromise = this.loadModel(
                 model,
                 loadOpts,
@@ -731,7 +731,7 @@ export function createLmStudioProvider(
                 .then(() => {
                   loadDone = true;
                 })
-                .catch((error: unknown) => {
+                .catch((error: Error) => {
                   loadDone = true;
                   if (
                     (error instanceof Error ? error.name : "") !== "AbortError"
@@ -748,7 +748,7 @@ export function createLmStudioProvider(
                   logger.info(
                     `[LM-Studio] Aborted during model load for ${model}`,
                   );
-                  this.unloadModelByKey(model).catch((error: unknown) =>
+                  this.unloadModelByKey(model).catch((error: Error) =>
                     logger.warn(
                       `[LM-Studio] Failed to unload ${model} after abort: ${getErrorMessage(error)}`,
                     ),
@@ -775,7 +775,7 @@ export function createLmStudioProvider(
                 logger.info(
                   `[LM-Studio] Model ${model} loaded but benchmark aborted — unloading`,
                 );
-                this.unloadModelByKey(model).catch((error: unknown) =>
+                this.unloadModelByKey(model).catch((error: Error) =>
                   logger.warn(
                     `[LM-Studio] Failed to unload ${model} after abort: ${getErrorMessage(error)}`,
                   ),
@@ -916,7 +916,7 @@ export function createLmStudioProvider(
               resolveInflight!();
               break;
             } catch (error) {
-              rejectInflight!(error);
+              rejectInflight!(error as Error);
               throw error;
             } finally {
               if (!isPromiseSettled) {
@@ -1318,7 +1318,7 @@ export function createLmStudioProvider(
      * nomic-embed, etc.).
      */
     async generateEmbedding(
-      content: unknown,
+      content: string | string[] | object | null | undefined,
       model: string,
       options: ProviderOptions = {},
     ) {
@@ -1482,7 +1482,7 @@ export function createLmStudioProvider(
 
         // Register synchronously
         let resolveInflight: (() => void) | undefined = undefined;
-        let rejectInflight: ((error: unknown) => void) | undefined = undefined;
+        let rejectInflight: ((error: Error | null | undefined) => void) | undefined = undefined;
         let isPromiseSettled = false;
         const inflightPromise = new Promise<void>((resolve, reject) => {
           resolveInflight = () => {
@@ -1576,7 +1576,7 @@ export function createLmStudioProvider(
           resolveInflight!();
           return { alreadyLoaded: false, contextLength };
         } catch (error) {
-          rejectInflight!(error);
+          rejectInflight!(error as Error);
           throw error;
         } finally {
           if (!isPromiseSettled) {

@@ -1,4 +1,5 @@
-import { InstanceEntry } from "../../types/ProviderTypes.ts";
+import { InstanceEntry, ChatMessage } from "../../types/ProviderTypes.ts";
+import { ArchParams } from "../../utils/gguf-arch.ts";
 
 export interface ModelEntry {
   name: string;
@@ -82,15 +83,15 @@ export interface GenericProvider {
     modelKey: string,
     options?: Record<string, unknown>,
     signal?: AbortSignal,
-    onStatus?: (status: unknown) => void,
+    onStatus?: (status: string | object | null | undefined) => void,
   ) => Promise<unknown>;
   generateText?: (
-    messages: unknown,
+    messages: ChatMessage[],
     model: string,
     options?: Record<string, unknown>,
   ) => Promise<unknown>;
   generateTextStream?: (
-    messages: unknown,
+    messages: ChatMessage[],
     model: string,
     options?: Record<string, unknown>,
   ) => AsyncGenerator<unknown>;
@@ -100,10 +101,10 @@ export interface GenericProvider {
     options?: Record<string, unknown>,
   ) => Promise<unknown>;
   captionImage?: (
-    images: unknown,
-    prompt: unknown,
+    images: string | string[] | object,
+    prompt: string | object,
     model: string,
-    systemPrompt?: unknown,
+    systemPrompt?: string | object,
   ) => Promise<unknown>;
 }
 
@@ -116,4 +117,21 @@ export interface HuggingFaceMetadata {
   totalParams: number | null;
   totalSize: number | null;
   paramsByDtype: Record<string, number> | null;
+}
+
+export interface TransformedVramEstimate {
+  gpuGiB: number;
+  totalGiB: number;
+  cpuOffloaded: boolean;
+  archParams: ArchParams | null;
+  totalLayers: number;
+}
+
+export interface TransformedHealthStatusMap {
+  [instanceId: string]: unknown;
+}
+
+export interface TransformedLocalProviderOptions {
+  thinkingEnabled?: boolean;
+  [key: string]: unknown;
 }

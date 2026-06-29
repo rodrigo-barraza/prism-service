@@ -95,26 +95,26 @@ interface ToolResult {
  *   /ws/text-to-audio  — Streaming TTS (binary audio frames)
  *   /ws/live   — Persistent Live API session (audio/text bidirectional)
  */
-export function setupWebSocket(wss: WebSocketServer) {
-  wss.on("connection", (websocket: WebSocket, req: IncomingMessage) => {
-    const url = new URL(req.url || "/", `http://${req.headers.host}`);
+export function setupWebSocket(webSocketServer: WebSocketServer) {
+  webSocketServer.on("connection", (websocket: WebSocket, request: IncomingMessage) => {
+    const url = new URL(request.url || "/", `http://${request.headers.host}`);
     const pathname = url.pathname;
 
     const project =
-      (req.headers["x-project"] as string) ||
+      (request.headers["x-project"] as string) ||
       url.searchParams.get("project") ||
       "any";
-    const xfwd = req.headers["x-forwarded-for"];
+    const xForwardedFor = request.headers["x-forwarded-for"];
     const rawIp =
-      (Array.isArray(xfwd) ? xfwd[0] : xfwd)?.split(",")[0]?.trim() ||
-      req.socket.remoteAddress;
+      (Array.isArray(xForwardedFor) ? xForwardedFor[0] : xForwardedFor)?.split(",")[0]?.trim() ||
+      request.socket.remoteAddress;
     // Normalize IPv4-mapped IPv6 (::ffff:127.0.0.1 → 127.0.0.1)
     const clientIp = rawIp?.replace(/^::ffff:/, "") || rawIp;
     const username =
-      (req.headers["x-username"] as string) ||
+      (request.headers["x-username"] as string) ||
       url.searchParams.get("username") ||
       DEFAULT_USERNAME;
-    const agent = (req.headers["x-agent"] as string) || null;
+    const agent = (request.headers["x-agent"] as string) || null;
     logger.info(
       `WebSocket connection on ${pathname} (project: ${project}, user: ${username})`,
     );
@@ -295,7 +295,7 @@ function handleWebsocketLive(
   ) {
     if (chunks.length === 0) return null;
     try {
-      const pcmBuffers = chunks.map((b64) => Buffer.from(b64, "base64"));
+      const pcmBuffers = chunks.map((base64Chunk) => Buffer.from(base64Chunk, "base64"));
       const pcmData = Buffer.concat(pcmBuffers);
 
       const numberChannels = 1;
@@ -486,7 +486,7 @@ function handleWebsocketLive(
                   username,
                   true,
                   { title: activeConversationTitle },
-                ).catch((error: unknown) =>
+                ).catch((error: Error) =>
                   logger.error(
                     `[Live API] Failed to set isGenerating: ${getErrorMessage(error)}`,
                   ),
@@ -494,8 +494,8 @@ function handleWebsocketLive(
               }
               emit({ type: "setupComplete" });
             },
-            onmessage: (messageRaw: unknown) => {
-              const serverMessage = messageRaw as LiveServerMessage;
+            onmessage: (messageRaw: import("@google/genai").LiveServerMessage) => {
+              const serverMessage = messageRaw as unknown as LiveServerMessage;
               // Model turn parts (audio data, text, function calls)
               if (serverMessage.serverContent?.modelTurn?.parts) {
                 if (!passFirstTokenTime) {
@@ -508,7 +508,7 @@ function handleWebsocketLive(
                       username,
                       true,
                       { title: activeConversationTitle },
-                    ).catch(() => {});
+                    ).catch((error: Error) => {});
                   }
                 }
 
@@ -697,12 +697,12 @@ function handleWebsocketLive(
                   turnUsage.outputTokens === 0 &&
                   turnAudioChunks.length > 0
                 ) {
-                  const totalPcmBytes = turnAudioChunks.reduce(
-                    (sum, b64) => sum + Buffer.from(b64, "base64").length,
-                    0,
-                  );
+                  const contentBytes = turnAudioChunks.reduce(
+                  (sum, base64Chunk) => sum + Buffer.from(base64Chunk, "base64").length,
+                  0,
+                );
                   // 16-bit mono → 2 bytes per sample
-                  const durationSeconds = totalPcmBytes / (audioSampleRate * 2);
+                  const durationSeconds = contentBytes / (audioSampleRate * 2);
                   turnUsage.outputTokens = Math.ceil(durationSeconds * 32);
                 }
               }
@@ -800,7 +800,7 @@ function handleWebsocketLive(
                       project,
                       username,
                       false,
-                    ).catch((error: unknown) =>
+                    ).catch((error: Error) =>
                       logger.error(
                         `[Live API] Failed to clear isGenerating on ${eventType}: ${getErrorMessage(error)}`,
                       ),
@@ -822,10 +822,10 @@ function handleWebsocketLive(
               }
             },
             onerror: (
-              e: Event & { error?: { message?: string }; message?: string },
+              errorEvent: Event & { error?: { message?: string }; message?: string },
             ) => {
               const errorMessage =
-                e?.error?.message || e?.message || "Live API error";
+                errorEvent?.error?.message || errorEvent?.message || "Live API error";
               logger.error(
                 `[Live API] Error (${project}/${username}): ${errorMessage}`,
               );
@@ -852,9 +852,9 @@ function handleWebsocketLive(
                   project,
                   username,
                   false,
-                ).catch((error: unknown) =>
+                ).catch((error: Error) =>
                   logger.error(
-                    `[Live API] Failed to clear isGenerating on close: ${getErrorMessage(error)}`,
+                    `[Live API] Failed to clear isGenerating on turn output close: ${getErrorMessage(error)}`,
                   ),
                 );
               }
