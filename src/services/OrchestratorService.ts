@@ -2598,15 +2598,29 @@ export default class OrchestratorService {
       { collection: COLLECTIONS.AGENT_CONVERSATIONS },
     );
 
-    // Build the context messages from the existing conversation + the
-    // in-memory completion message. Do NOT reload from DB — the round-trip
-    // strips the _alreadyPersisted flag, causing the Finalizer to persist
-    // the completion message a second time (duplicate message bug).
-    // Follows the ConversationTimerService.executeAgenticLoop pattern.
-    const contextMessages = [
-      ...((conversation.messages as ConversationMessage[]) || []),
-      completionMessage,
-    ];
+    // Reload the conversation from DB (source of truth) to get the freshest
+    // message array, including any messages added during the isGenerating wait.
+    const updatedConversation = await conversationCollection.findOne({
+      id: conversationId,
+      project,
+      username,
+    });
+
+    if (!updatedConversation) {
+      logger.warn(
+        `[Orchestrator] Conversation ${conversationId} disappeared after appending completion message`,
+      );
+      return;
+    }
+
+    // Reconstruct transient _alreadyPersisted flag: every message loaded
+    // from MongoDB is by definition already persisted. Without this, the
+    // Finalizer re-persists the completion message (it's the last message
+    // in the array, so AgenticLoopService's [0..n-2] marking skips it).
+    const freshMessages = (updatedConversation.messages || []) as ConversationMessage[];
+    for (const message of freshMessages) {
+      message._alreadyPersisted = true;
+    }
 
     // Resolve emit from WebSocketConnectionRegistry (Antigravity reactive
     // wake-up pattern). Falls back to debug logging for headless/API mode.
@@ -2641,7 +2655,7 @@ export default class OrchestratorService {
     const autoResponseParams = {
       provider: providerName,
       model: resolvedModel,
-      messages: contextMessages,
+      messages: freshMessages,
       conversationId,
       agent,
       project,

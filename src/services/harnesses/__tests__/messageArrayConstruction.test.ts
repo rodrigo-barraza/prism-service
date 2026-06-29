@@ -4538,9 +4538,9 @@ describe("Message Array Construction", () => {
     //    escapes the marking
     // 5. The Finalizer persists it AGAIN → duplicate message in the DB
     //
-    // Fix: follow the ConversationTimerService pattern — use existing
-    // conversation.messages + the in-memory completion message (which
-    // retains _alreadyPersisted: true) instead of reloading from DB.
+    // Fix: after reloading from DB, reconstruct the transient
+    // _alreadyPersisted flag on ALL loaded messages — every message
+    // from MongoDB is by definition already persisted.
     // ────────────────────────────────────────────────────────────
     describe("sub-agent auto-response — completion message duplication", () => {
       const COMPLETION_MESSAGE_CONTENT = [
@@ -4625,33 +4625,35 @@ describe("Message Array Construction", () => {
         expect(taskNotificationMessages).toHaveLength(1);
       });
 
-      it("should NOT persist completion message when in-memory _alreadyPersisted is preserved (FIXED path)", () => {
-        // Simulate the CORRECT path: use existing conversation.messages +
-        // append the in-memory completion message (retains _alreadyPersisted).
+      it("should NOT persist completion message when _alreadyPersisted is reconstructed after DB reload (FIXED path)", () => {
+        // Simulate the CORRECT path: reload from DB then reconstruct
+        // _alreadyPersisted on ALL loaded messages — everything from
+        // MongoDB is by definition already persisted.
         const existingMessages: HarnessPayload[] = [
           {
             role: "user",
             content: "Analyze the TCG market",
-            _alreadyPersisted: true,
           } as HarnessPayload,
           {
             role: "assistant",
             content: "I'll create a team of sub-agents...",
-            _alreadyPersisted: true,
           } as HarnessPayload,
           {
             role: "assistant",
             content: "Sub-agents dispatched.",
-            _alreadyPersisted: true,
           } as HarnessPayload,
-          // The completion message — in-memory object, WITH _alreadyPersisted
+          // The completion message — reloaded from DB, NO _alreadyPersisted
           {
             role: "user",
             content: COMPLETION_MESSAGE_CONTENT,
             timestamp: "2026-06-29T16:27:35.142Z",
-            _alreadyPersisted: true,
-          } as HarnessPayload,
+          },
         ];
+
+        // Reconstruct transient flag on all DB-loaded messages (the fix)
+        for (const message of existingMessages) {
+          (message as any)._alreadyPersisted = true;
+        }
 
         const originalMessageCount = existingMessages.length;
         const currentMessages: HarnessPayload[] = [...existingMessages];
