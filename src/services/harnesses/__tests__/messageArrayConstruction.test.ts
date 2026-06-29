@@ -4697,5 +4697,271 @@ describe("Message Array Construction", () => {
         );
       });
     });
+
+    // ────────────────────────────────────────────────────────────
+    // Timer notification auto-response — same duplication pattern
+    // as sub-agent completion. ConversationTimerService appends a
+    // reminder message then triggers an agentic loop. Without
+    // reconstructing _alreadyPersisted on DB-loaded messages, the
+    // Finalizer re-persists the reminder message.
+    // ────────────────────────────────────────────────────────────
+    describe("timer notification auto-response — reminder message duplication", () => {
+      it("should NOT persist reminder message twice when DB reload loses _alreadyPersisted (BUG reproduction)", () => {
+        const existingMessages: HarnessPayload[] = [
+          {
+            role: "user",
+            content: "Set a timer for 5 minutes",
+          } as HarnessPayload,
+          {
+            role: "assistant",
+            content: "Timer set for 5 minutes.",
+          } as HarnessPayload,
+          // The reminder message — reloaded from DB, NO _alreadyPersisted
+          {
+            role: "user",
+            content: "🔔 Notification: Check the deployment status",
+            timestamp: "2026-06-29T16:32:00.000Z",
+          },
+        ];
+
+        // AgenticLoopService marks [0..n-2] as _alreadyPersisted
+        simulateAgenticLoopPersistenceMarking(existingMessages, {
+          isNewConversation: false,
+        });
+
+        // Verify bug condition: reminder (last) is NOT marked
+        expect(
+          (existingMessages[2] as any)._alreadyPersisted,
+        ).toBeUndefined();
+
+        const originalMessageCount = existingMessages.length;
+        const currentMessages: HarnessPayload[] = [...existingMessages];
+
+        simulateBeforePromptHook(currentMessages, {
+          systemPrompt: "You are the Omni Agent...",
+        });
+
+        currentMessages.push({
+          role: "assistant",
+          content: "I'll check the deployment status now...",
+          model: "gemini-2.5-pro",
+          provider: "google",
+        });
+
+        const newTurnMessages = computeNewTurnMessages(
+          existingMessages,
+          currentMessages,
+          originalMessageCount,
+        );
+
+        const reminderMessages = newTurnMessages.filter(
+          (message) =>
+            message.role === "user" &&
+            typeof message.content === "string" &&
+            message.content.includes("🔔 Notification:"),
+        );
+
+        // BUG: reminder message IS in the persist set
+        expect(reminderMessages).toHaveLength(1);
+      });
+
+      it("should NOT persist reminder message when _alreadyPersisted is reconstructed after DB reload (FIXED path)", () => {
+        const existingMessages: HarnessPayload[] = [
+          {
+            role: "user",
+            content: "Set a timer for 5 minutes",
+          } as HarnessPayload,
+          {
+            role: "assistant",
+            content: "Timer set for 5 minutes.",
+          } as HarnessPayload,
+          // The reminder message — reloaded from DB, NO _alreadyPersisted
+          {
+            role: "user",
+            content: "🔔 Notification: Check the deployment status",
+            timestamp: "2026-06-29T16:32:00.000Z",
+          },
+        ];
+
+        // Reconstruct transient flag on all DB-loaded messages (the fix)
+        for (const message of existingMessages) {
+          (message as any)._alreadyPersisted = true;
+        }
+
+        const originalMessageCount = existingMessages.length;
+        const currentMessages: HarnessPayload[] = [...existingMessages];
+
+        simulateBeforePromptHook(currentMessages, {
+          systemPrompt: "You are the Omni Agent...",
+        });
+
+        currentMessages.push({
+          role: "assistant",
+          content: "I'll check the deployment status now...",
+          model: "gemini-2.5-pro",
+          provider: "google",
+        });
+
+        const newTurnMessages = computeNewTurnMessages(
+          existingMessages,
+          currentMessages,
+          originalMessageCount,
+        );
+
+        const reminderMessages = newTurnMessages.filter(
+          (message) =>
+            message.role === "user" &&
+            typeof message.content === "string" &&
+            message.content.includes("🔔 Notification:"),
+        );
+
+        expect(reminderMessages).toHaveLength(0);
+
+        const assistantMessages = newTurnMessages.filter(
+          (message) => message.role === "assistant",
+        );
+        expect(assistantMessages).toHaveLength(1);
+        expect(assistantMessages[0].content).toBe(
+          "I'll check the deployment status now...",
+        );
+      });
+    });
+
+    // ────────────────────────────────────────────────────────────
+    // Async task completion auto-response — same pattern as
+    // sub-agent and timer. AsyncTaskTools appends a task-notification
+    // completion message then triggers handleAgent.
+    // ────────────────────────────────────────────────────────────
+    describe("async task auto-response — task completion message duplication", () => {
+      const ASYNC_TASK_COMPLETION_CONTENT = [
+        `<task-notification>`,
+        `<status>✅ completed</status>`,
+        `<summary>[ASYNC TASK COMPLETED] Tool "web_search" (task abc-123) has completed.</summary>`,
+        `<duration_ms>15230</duration_ms>`,
+        `<result>`,
+        `Found 42 relevant results for "TypeScript best practices"`,
+        `</result>`,
+        `</task-notification>`,
+      ].join("\n");
+
+      it("should NOT persist task completion message twice when DB reload loses _alreadyPersisted (BUG reproduction)", () => {
+        const existingMessages: HarnessPayload[] = [
+          {
+            role: "user",
+            content: "Search for TypeScript best practices",
+          } as HarnessPayload,
+          {
+            role: "assistant",
+            content: "I'll run a web search in the background...",
+          } as HarnessPayload,
+          // The task completion — reloaded from DB, NO _alreadyPersisted
+          {
+            role: "user",
+            content: ASYNC_TASK_COMPLETION_CONTENT,
+            timestamp: "2026-06-29T16:35:00.000Z",
+          },
+        ];
+
+        simulateAgenticLoopPersistenceMarking(existingMessages, {
+          isNewConversation: false,
+        });
+
+        // Verify bug condition: task completion (last) is NOT marked
+        expect(
+          (existingMessages[2] as any)._alreadyPersisted,
+        ).toBeUndefined();
+
+        const originalMessageCount = existingMessages.length;
+        const currentMessages: HarnessPayload[] = [...existingMessages];
+
+        simulateBeforePromptHook(currentMessages, {
+          systemPrompt: "You are the Omni Agent...",
+        });
+
+        currentMessages.push({
+          role: "assistant",
+          content: "Here are the TypeScript best practices I found...",
+          model: "gemini-2.5-pro",
+          provider: "google",
+        });
+
+        const newTurnMessages = computeNewTurnMessages(
+          existingMessages,
+          currentMessages,
+          originalMessageCount,
+        );
+
+        const taskCompletionMessages = newTurnMessages.filter(
+          (message) =>
+            message.role === "user" &&
+            typeof message.content === "string" &&
+            message.content.includes("[ASYNC TASK COMPLETED]"),
+        );
+
+        // BUG: task completion message IS in the persist set
+        expect(taskCompletionMessages).toHaveLength(1);
+      });
+
+      it("should NOT persist task completion message when _alreadyPersisted is reconstructed after DB reload (FIXED path)", () => {
+        const existingMessages: HarnessPayload[] = [
+          {
+            role: "user",
+            content: "Search for TypeScript best practices",
+          } as HarnessPayload,
+          {
+            role: "assistant",
+            content: "I'll run a web search in the background...",
+          } as HarnessPayload,
+          // The task completion — reloaded from DB, NO _alreadyPersisted
+          {
+            role: "user",
+            content: ASYNC_TASK_COMPLETION_CONTENT,
+            timestamp: "2026-06-29T16:35:00.000Z",
+          },
+        ];
+
+        // Reconstruct transient flag on all DB-loaded messages (the fix)
+        for (const message of existingMessages) {
+          (message as any)._alreadyPersisted = true;
+        }
+
+        const originalMessageCount = existingMessages.length;
+        const currentMessages: HarnessPayload[] = [...existingMessages];
+
+        simulateBeforePromptHook(currentMessages, {
+          systemPrompt: "You are the Omni Agent...",
+        });
+
+        currentMessages.push({
+          role: "assistant",
+          content: "Here are the TypeScript best practices I found...",
+          model: "gemini-2.5-pro",
+          provider: "google",
+        });
+
+        const newTurnMessages = computeNewTurnMessages(
+          existingMessages,
+          currentMessages,
+          originalMessageCount,
+        );
+
+        const taskCompletionMessages = newTurnMessages.filter(
+          (message) =>
+            message.role === "user" &&
+            typeof message.content === "string" &&
+            message.content.includes("[ASYNC TASK COMPLETED]"),
+        );
+
+        expect(taskCompletionMessages).toHaveLength(0);
+
+        const assistantMessages = newTurnMessages.filter(
+          (message) => message.role === "assistant",
+        );
+        expect(assistantMessages).toHaveLength(1);
+        expect(assistantMessages[0].content).toBe(
+          "Here are the TypeScript best practices I found...",
+        );
+      });
+    });
   });
 });

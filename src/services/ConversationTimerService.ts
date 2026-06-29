@@ -414,7 +414,45 @@ const ConversationTimerService = {
       `[ConversationTimers] Spawning background agent loop for session: ${timer.conversationId}`,
     );
 
-    const settings = (conversation.settings || {}) as ConversationSettings;
+    // Reload the conversation from DB (source of truth) to get the freshest
+    // message array, including the just-appended reminder message.
+    // If not found in DB (e.g. in unit tests), fallback to the passed-in conversation.
+    const databaseConversation = await database
+      .collection(collection)
+      .findOne({
+        id: timer.conversationId,
+        project: timer.project,
+        username: timer.username,
+      });
+
+    const updatedConversation = databaseConversation || conversation;
+
+    if (!updatedConversation) {
+      logger.warn(
+        `[ConversationTimers] Conversation ${timer.conversationId} disappeared after appending reminder message`,
+      );
+      return;
+    }
+
+    // Reconstruct transient _alreadyPersisted flag: every message loaded
+    // from MongoDB is by definition already persisted. Without this, the
+    // Finalizer re-persists the reminder message (it's the last message
+    // in the array, so AgenticLoopService's [0..n-2] marking skips it).
+    let freshMessages: ConversationMessage[];
+    if (databaseConversation) {
+      freshMessages = (databaseConversation.messages || []) as ConversationMessage[];
+    } else {
+      freshMessages = [
+        ...((conversation.messages as ConversationMessage[]) || []),
+        reminderMessage,
+      ];
+    }
+
+    for (const message of freshMessages) {
+      message._alreadyPersisted = true;
+    }
+
+    const settings = (updatedConversation.settings || {}) as ConversationSettings;
     const providerName = settings.provider || "";
     const resolvedModel = settings.model || "";
     const agent = settings.agent || null;
@@ -434,14 +472,13 @@ const ConversationTimerService = {
     }
 
     const traceId =
-      (conversation.traceId as string | undefined) || crypto.randomUUID();
+      (updatedConversation.traceId as string | undefined) || crypto.randomUUID();
     const requestId = crypto.randomUUID();
 
-    // Reconstruct the message list for the agentic harness
-    const contextMessages = [
-      ...((conversation.messages as ConversationMessage[]) || []),
-      reminderMessage,
-    ];
+    // The last user message in the array is the reminder (just appended)
+    const userMessage = freshMessages
+      .filter((message) => message.role === "user")
+      .pop() || reminderMessage;
 
     // Standard logging emitter for background execution
     const mockEmit = (event: SseEvent) => {
@@ -466,8 +503,8 @@ const ConversationTimerService = {
         providerName,
         resolvedModel,
         modelDefinition,
-        messages: contextMessages,
-        originalMessages: contextMessages,
+        messages: freshMessages,
+        originalMessages: freshMessages,
         options: {
           agenticLoopEnabled: true,
           functionCallingEnabled: true,
@@ -483,9 +520,9 @@ const ConversationTimerService = {
         },
         agentConversationId: crypto.randomUUID(),
         conversationId: timer.conversationId,
-        userMessage: reminderMessage,
+        userMessage: userMessage as ConversationMessage | null,
         conversationMeta: {
-          title: (conversation.title as string) || "Background Agent",
+          title: (updatedConversation.title as string) || "Background Agent",
           settings,
         },
         traceId,
