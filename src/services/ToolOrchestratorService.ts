@@ -1647,6 +1647,14 @@ export default class ToolOrchestratorService {
           orchestratorContext as OrchestratorContext,
         );
 
+        // Sub-agents (recursionDepth > 0) use blocking create_team — the
+        // results are already complete, so return them directly without
+        // the non-blocking directive.
+        const callerRecursionDepth = orchestratorContext.recursionDepth ?? 0;
+        if (callerRecursionDepth > 0) {
+          return createTeamResults;
+        }
+
         // Check if all results are errors (validation failures, depth limit, etc.)
         // In that case, return the raw errors without the non-blocking directive.
         const hasRunningAgents = Array.isArray(createTeamResults) && createTeamResults.some(
