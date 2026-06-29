@@ -98,12 +98,12 @@ const MOCK_INTERNAL_NAMES: Set<string> = new Set(MOCK_INTERNAL_TOOL_SCHEMAS.map(
 
 // ── Mock orchestrator tool schemas ──────────────────────────
 const MOCK_ORCHESTRATOR_SCHEMAS = [
-  { name: TOOL_NAMES.CREATE_TEAM, description: "Spawn sub-agents", parameters: { type: "object", properties: {} } },
-  { name: TOOL_NAMES.SEND_MESSAGE, description: "Send message", parameters: { type: "object", properties: {} } },
-  { name: TOOL_NAMES.STOP_AGENT, description: "Stop agent", parameters: { type: "object", properties: {} } },
-  { name: TOOL_NAMES.GET_TASK_OUTPUT, description: "Get task output", parameters: { type: "object", properties: {} } },
-  { name: TOOL_NAMES.DELETE_TEAM, description: "Delete team", parameters: { type: "object", properties: {} } },
-  { name: TOOL_NAMES.RESUME_AGENT, description: "Resume agent", parameters: { type: "object", properties: {} } },
+  { name: TOOL_NAMES.CREATE_SUBAGENTS, description: "Spawn sub-agents", parameters: { type: "object", properties: {} } },
+  { name: TOOL_NAMES.SEND_SUBAGENT_MESSAGE, description: "Send message", parameters: { type: "object", properties: {} } },
+  { name: TOOL_NAMES.STOP_SUBAGENT, description: "Stop agent", parameters: { type: "object", properties: {} } },
+  { name: TOOL_NAMES.GET_SUBAGENT_OUTPUT, description: "Get task output", parameters: { type: "object", properties: {} } },
+  { name: TOOL_NAMES.DELETE_SUBAGENTS, description: "Delete team", parameters: { type: "object", properties: {} } },
+  { name: TOOL_NAMES.RESUME_SUBAGENT, description: "Resume agent", parameters: { type: "object", properties: {} } },
 ];
 
 // ── Mock dependencies ────────────────────────────────────────
