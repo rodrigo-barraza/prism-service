@@ -19,8 +19,9 @@ import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 import RequestLogger from "../../RequestLogger.ts";
 import PromptLocaleService from "../../PromptLocaleService.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
+import { ORCHESTRATOR } from "../../../constants.ts";
 
-const MAXIMUM_EVALUATION_CHARACTERS = 120_000;
+const MAXIMUM_EVALUATION_CHARACTERS = ORCHESTRATOR.MAXIMUM_SYNTHESIS_CHARACTERS;
 const DEFAULT_VERIFICATION_COMMANDS = ["tsc --noEmit", "npm test"];
 
 function truncateResultOutput(
@@ -129,7 +130,7 @@ function parseVerificationResponse(
     return {
       command,
       isPassing,
-      output: responseText.slice(0, 500),
+      output: responseText.slice(0, ORCHESTRATOR.OUTPUT_PREVIEW_CHARACTERS),
     };
   });
 }
@@ -162,7 +163,7 @@ function buildSelectionPrompt(
               .get(resultIndex)!
               .commandResults.map(
                 (commandResult) =>
-                  `  ${commandResult.isPassing ? "✅" : "❌"} \`${commandResult.command}\`: ${commandResult.isPassing ? "PASS" : `FAIL — ${commandResult.output.slice(0, 500)}`}`,
+                  `  ${commandResult.isPassing ? "✅" : "❌"} \`${commandResult.command}\`: ${commandResult.isPassing ? "PASS" : `FAIL — ${commandResult.output.slice(0, ORCHESTRATOR.OUTPUT_PREVIEW_CHARACTERS)}`}`,
               ),
           ]
         : []),
@@ -414,6 +415,26 @@ export class TournamentRouter implements TopologyRouter {
       `[TournamentRouter] Running judge selection over ${successfulResults.length} successful sub-agent results...`,
     );
 
+    // ── Synthesis telemetry: emit virtual sub-agent events so the client's
+    // StatusBar remains visible during the headless judge LLM call.
+    const synthesisSubAgentId = `synthesis-tournament-${teamName}`;
+    const parentEmit = orchestratorContext.emit;
+
+    if (parentEmit) {
+      parentEmit({
+        type: "sub_agent_status",
+        subAgentId: synthesisSubAgentId,
+        message: "spawned",
+        description: `Tournament judge for team "${teamName}"`,
+      });
+      parentEmit({
+        type: "sub_agent_status",
+        subAgentId: synthesisSubAgentId,
+        message: "phase",
+        phase: "synthesizing",
+      });
+    }
+
     try {
       const selectionPrompt = buildSelectionPrompt(
         teamName,
@@ -426,6 +447,15 @@ export class TournamentRouter implements TopologyRouter {
         logger.error(
           `[TournamentRouter] Provider "${providerName}" not found for judge pass`,
         );
+        if (parentEmit) {
+          parentEmit({
+            type: "sub_agent_status",
+            subAgentId: synthesisSubAgentId,
+            message: "complete",
+            durationMs: 0,
+            toolCount: 0,
+          });
+        }
         return memberResults;
       }
 
@@ -438,7 +468,7 @@ export class TournamentRouter implements TopologyRouter {
       const selectionResult = await provider.generateText(
         selectionMessages,
         resolvedModel,
-        { maxTokens: 8192 },
+        { maxTokens: ORCHESTRATOR.SYNTHESIS_MAX_TOKENS },
       );
       const selectionDurationMs = Date.now() - selectionStartTime;
 
@@ -490,11 +520,32 @@ export class TournamentRouter implements TopologyRouter {
         `[TournamentRouter] Judge selection complete in ${selectionDurationMs}ms (${inputTokens} input, ${outputTokens} output tokens)`,
       );
 
+      // ── Synthesis telemetry: mark virtual sub-agent as complete
+      if (parentEmit) {
+        parentEmit({
+          type: "sub_agent_status",
+          subAgentId: synthesisSubAgentId,
+          message: "complete",
+          durationMs: selectionDurationMs,
+          toolCount: 0,
+        });
+      }
+
       return [...memberResults, judgeSubAgentResult];
     } catch (judgeError: unknown) {
       const errorMessage =
         judgeError instanceof Error ? judgeError.message : String(judgeError);
       logger.error(`[TournamentRouter] Judge pass failed: ${errorMessage}`);
+      // ── Synthesis telemetry: mark virtual sub-agent as failed
+      if (parentEmit) {
+        parentEmit({
+          type: "sub_agent_status",
+          subAgentId: synthesisSubAgentId,
+          message: "complete",
+          durationMs: 0,
+          toolCount: 0,
+        });
+      }
       return memberResults;
     }
   }

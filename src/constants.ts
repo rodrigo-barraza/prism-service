@@ -181,6 +181,9 @@ export const ORCHESTRATOR = {
   /** Upper clamp for user-configured sub-agent iterations. */
   MAX_SUB_AGENT_ITERATIONS_CLAMP: 100,
 
+  /** Minimum iterations floor after scope attenuation at deeper recursion depths. */
+  MIN_ATTENUATED_ITERATIONS: 5,
+
   /**
    * Max total concurrent sub-agents across all recursion depths for a single conversation.
    * Circuit breaker to prevent exponential agent fan-out from recursive spawning.
@@ -204,12 +207,43 @@ export const ORCHESTRATOR = {
   /** Maximum BFS depth when discovering nested sub-agent trees. */
   AGENT_TREE_DISCOVERY_MAX_DEPTH: 10,
 
-  /** Max output tokens for the synthesis/aggregation agent pass. */
-  SYNTHESIS_MAX_TOKENS: 8192,
+  /** Number of UUID hex characters used for agent ID suffix uniqueness. */
+  AGENT_ID_SUFFIX_LENGTH: 4,
+
+  /** Max characters of sub-agent result text propagated in tool-call fallback summaries. */
+  MAX_RESULT_LENGTH_FOR_PROPAGATION: 2000,
 
   /** Max retries waiting for a parent conversation to become idle before auto-responding. */
   AUTO_RESPONSE_GENERATION_WAIT_MAXIMUM_RETRIES: 30,
 
   /** Delay between retries when waiting for parent generation to finish (ms). */
   AUTO_RESPONSE_GENERATION_WAIT_DELAY_MILLISECONDS: 2_000,
+
+  // ─── Router Shared Token Limits ─────────────────────────────
+
+  /** Max output tokens for synthesis/aggregation LLM passes (used by HierarchicalAgg, DnC, Tournament, main orchestrator). */
+  SYNTHESIS_MAX_TOKENS: 8192,
+
+  /** Max output tokens for evaluation/decomposition/critic LLM passes (used by CriticLoop, DnC). */
+  EVALUATION_MAX_TOKENS: 4096,
+
+  /** Max output tokens for lightweight scoring LLM passes (used by MCTS). */
+  SCORING_MAX_TOKENS: 2048,
+
+  // ─── Router Shared Character Limits ─────────────────────────
+
+  /** Max characters of combined agent output fed into synthesis prompts (DnC, HierarchicalAgg, Tournament). */
+  MAXIMUM_SYNTHESIS_CHARACTERS: 120_000,
+
+  /** Max characters of combined agent output fed into MCTS evaluation prompts. */
+  MAXIMUM_EVALUATION_CHARACTERS: 100_000,
+
+  /** Max characters of output preview used in evaluation/comparison contexts (CriticLoop, Tournament). */
+  OUTPUT_PREVIEW_CHARACTERS: 500,
+
+  /** Min substantive response length to count as a real contribution in peer-to-peer debate. */
+  MINIMUM_SUBSTANTIVE_RESPONSE_LENGTH: 80,
+
+  /** Max similarity comparison characters for stall detection in critic loops. */
+  STALL_COMPARISON_CHARACTERS: 500,
 } as const;
