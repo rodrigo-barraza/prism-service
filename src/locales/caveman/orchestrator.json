@@ -105,7 +105,7 @@
     "teamCompleted": "[TEAM DONE] Team \"{{teamName}}\" ({{topology}}) finished.",
     "agentError": "Agent {{agentNumber}}: ❌ Error — {{errorMessage}}",
     "agentStatus": "Agent {{agentNumber}} ({{agentDescription}}): {{agentStatus}}",
-    "agentStats": "  Time: {{durationMs}}ms | Tool: {{toolUses}} | Iteration: {{iterations}}",
+    "agentStats": "  Time: {{duration}} | Tool: {{toolUses}} | Iteration: {{iterations}}",
     "agentOutput": "  Output: {{output}}",
     "noOutput": "(no output)",
     "truncated": "\n... (truncated)"

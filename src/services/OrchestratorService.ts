@@ -16,6 +16,7 @@ import {
   MAXIMUM_RECURSIVE_SPAWNING_DEPTH,
   DEFAULT_RECURSIVE_SPAWNING_DEPTH,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { formatDuration } from "@rodrigo-barraza/utilities-library";
 import localModelQueue from "./LocalModelQueue.ts";
 import ToolOrchestratorService from "./ToolOrchestratorService.ts";
 import { ORCHESTRATOR_ONLY_TOOLS } from "./OrchestratorPrompt.ts";
@@ -2095,7 +2096,7 @@ export default class OrchestratorService {
           agentStatus,
         }),
         PromptLocaleService.get(locale, "orchestrator.notifications.agentStats", {
-          durationMs: String(result.durationMs),
+          duration: formatDuration(result.durationMs),
           toolUses: String(result.toolUses),
           iterations: String(result.iterations),
         }),
