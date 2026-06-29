@@ -60,7 +60,7 @@ export const ChatMessageSchema = z.object({
     .optional(),
   thinking: z.string().optional(),
   thinkingSignature: z.string().optional(),
-});
+}).passthrough(); // Preserve transient metadata (_alreadyPersisted, timestamp, etc.)
 
 export const ChatRequestSchema = z
   .object({
