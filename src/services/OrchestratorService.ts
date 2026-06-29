@@ -51,7 +51,7 @@ import type {
 import type { ConversationMessage, LLMProvider } from "./harnesses/types.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import ConversationService from "./ConversationService.ts";
-import { COLLECTIONS } from "../constants.ts";
+import { COLLECTIONS, ORCHESTRATOR } from "../constants.ts";
 
 type AgenticLoopServiceModule = typeof import("./AgenticLoopService.ts");
 
@@ -65,25 +65,6 @@ type AgenticLoopServiceModule = typeof import("./AgenticLoopService.ts");
 // Called when the LLM invokes create_team / send_message / stop_agent
 // ────────────────────────────────────────────────────────────
 
-/** Max parallel sub-agents */
-const MAX_SUB_AGENTS = 10;
-
-/** Max iterations per sub-agent agentic loop */
-const MAX_SUB_AGENT_ITERATIONS = 15;
-
-/**
- * Max total concurrent sub-agents across all recursion depths for a single conversation.
- * Circuit breaker to prevent exponential agent fan-out from recursive spawning.
- * Paper reference: Intelligence Entropy (arXiv:2606.18065) — disorder grows exponentially.
- */
-export const MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION = 100;
-
-/**
- * Scope attenuation factor for maxIterations at each recursion depth hop.
- * Each level gets (1 - FACTOR) of the parent's iterations.
- * Paper reference: arXiv:2606.03518 — permissions must shrink at every delegation hop.
- */
-const RECURSION_SCOPE_ATTENUATION_FACTOR = 0.4;
 
 /**
  * Resolve the user-configured sub-agent provider/model from settings.
@@ -276,14 +257,14 @@ export default class OrchestratorService {
       };
     }
 
-    // Resolve max sub-agent iterations: 0 = unlimited (Infinity), positive = clamped 1-100, default = constant
+    // Resolve max sub-agent iterations: 0 = unlimited (Infinity), positive = clamped, default = constant
     // Scope attenuation: reduce iterations at each recursion depth hop
     const baseMaxIterations =
       clientMaxSubAgentIterations === 0
         ? Infinity
         : clientMaxSubAgentIterations
-          ? Math.min(100, Math.max(1, clientMaxSubAgentIterations))
-          : MAX_SUB_AGENT_ITERATIONS;
+          ? Math.min(ORCHESTRATOR.MAX_SUB_AGENT_ITERATIONS_CLAMP, Math.max(1, clientMaxSubAgentIterations))
+          : ORCHESTRATOR.MAX_SUB_AGENT_ITERATIONS;
 
     const resolvedMaxSubAgentIterations =
       currentRecursionDepth > 0 && baseMaxIterations !== Infinity
@@ -292,7 +273,7 @@ export default class OrchestratorService {
             Math.round(
               baseMaxIterations *
                 (1 -
-                  RECURSION_SCOPE_ATTENUATION_FACTOR * currentRecursionDepth),
+                  ORCHESTRATOR.RECURSION_SCOPE_ATTENUATION_FACTOR * currentRecursionDepth),
             ),
           )
         : baseMaxIterations;
@@ -301,9 +282,9 @@ export default class OrchestratorService {
     const runningCount = Array.from(activeSubAgents.values()).filter(
       (subAgent) => subAgent.status === "running",
     ).length;
-    if (runningCount >= MAX_SUB_AGENTS) {
+    if (runningCount >= ORCHESTRATOR.MAX_SUB_AGENTS) {
       return {
-        error: `Maximum concurrent sub-agents (${MAX_SUB_AGENTS}) reached. Wait for a sub-agent to complete or stop one.`,
+        error: `Maximum concurrent sub-agents (${ORCHESTRATOR.MAX_SUB_AGENTS}) reached. Wait for a sub-agent to complete or stop one.`,
       };
     }
 
@@ -320,13 +301,13 @@ export default class OrchestratorService {
           ) === rootConversationId,
       ).length;
       if (
-        conversationAgentCount >= MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION
+        conversationAgentCount >= ORCHESTRATOR.MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION
       ) {
         logger.warn(
-          `[Orchestrator] Circuit breaker: conversation ${rootConversationId} has reached total agent ceiling of ${conversationAgentCount} (max ${MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}). Recursive spawning blocked.`,
+          `[Orchestrator] Circuit breaker: conversation ${rootConversationId} has reached total agent ceiling of ${conversationAgentCount} (max ${ORCHESTRATOR.MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}). Recursive spawning blocked.`,
         );
         return {
-          error: `Circuit breaker: maximum concurrent agents per conversation (${MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}) reached. This limit prevents exponential agent fan-out from recursive spawning.`,
+          error: `Circuit breaker: maximum concurrent agents per conversation (${ORCHESTRATOR.MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}) reached. This limit prevents exponential agent fan-out from recursive spawning.`,
         };
       }
     }
@@ -814,7 +795,7 @@ export default class OrchestratorService {
         agent_id: agentId,
         description: subAgent.description,
         status: "running",
-        partialOutput: stripToolCallMarkup((subAgent.output || "").slice(-2000)) || null,
+        partialOutput: stripToolCallMarkup((subAgent.output || "").slice(-ORCHESTRATOR.PARTIAL_OUTPUT_TAIL_CHARACTERS)) || null,
         toolUses: subAgent.toolCalls?.length || 0,
       };
     }
@@ -969,9 +950,7 @@ export default class OrchestratorService {
 
     let frontier = [rootConversationId];
     const visitedParentConversationIds = new Set<string>([rootConversationId]);
-    const maxDepth = 10;
-
-    for (let depth = 0; depth < maxDepth && frontier.length > 0; depth++) {
+    for (let depth = 0; depth < ORCHESTRATOR.AGENT_TREE_DISCOVERY_MAX_DEPTH && frontier.length > 0; depth++) {
       const nextFrontier: string[] = [];
       for (const subAgentState of activeSubAgents.values()) {
         if (
@@ -1765,8 +1744,8 @@ export default class OrchestratorService {
 
     const truncationSuffix = PromptLocaleService.get(locale, "orchestrator.notifications.truncated");
     const truncatedOutput =
-      agentOutput.length > 8000
-        ? agentOutput.slice(0, 8000) + truncationSuffix
+      agentOutput.length > ORCHESTRATOR.AGENT_OUTPUT_TRUNCATION_LIMIT
+        ? agentOutput.slice(0, ORCHESTRATOR.AGENT_OUTPUT_TRUNCATION_LIMIT) + truncationSuffix
         : agentOutput;
 
     const resumedAgentCompletedSummary = PromptLocaleService.get(
@@ -2202,7 +2181,7 @@ export default class OrchestratorService {
           isSubAgent: true,
           enabledTools: subAgentEnabledTools,
           maxIterations: subAgent.maxIterations,
-          maxTokens: 8192,
+          maxTokens: ORCHESTRATOR.SYNTHESIS_MAX_TOKENS,
           ...(subAgent.minContextLength && {
             minContextLength: subAgent.minContextLength,
           }),
@@ -2408,8 +2387,8 @@ export default class OrchestratorService {
         : noOutputFallback;
       const truncationSuffix = PromptLocaleService.get(locale, "orchestrator.notifications.truncated");
       const truncatedOutput =
-        agentOutput.length > 8000
-          ? agentOutput.slice(0, 8000) + truncationSuffix
+        agentOutput.length > ORCHESTRATOR.AGENT_OUTPUT_TRUNCATION_LIMIT
+          ? agentOutput.slice(0, ORCHESTRATOR.AGENT_OUTPUT_TRUNCATION_LIMIT) + truncationSuffix
           : agentOutput;
       return [
         PromptLocaleService.get(locale, "orchestrator.notifications.agentStatus", {
@@ -2514,8 +2493,7 @@ export default class OrchestratorService {
     // time we reach here the notification should be persisted. This is a
     // safety net in case the conversation entered a new generation between
     // the $push succeeding and this auto-response check.
-    const AUTO_RESPONSE_GENERATION_WAIT_MAXIMUM_RETRIES = 30;
-    const AUTO_RESPONSE_GENERATION_WAIT_DELAY_MILLISECONDS = 2_000;
+    const { AUTO_RESPONSE_GENERATION_WAIT_MAXIMUM_RETRIES, AUTO_RESPONSE_GENERATION_WAIT_DELAY_MILLISECONDS } = ORCHESTRATOR;
 
     if (conversation.isGenerating) {
       logger.info(
