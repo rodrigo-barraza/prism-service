@@ -948,6 +948,34 @@ function getOrchestratorToolSchemas(
         required: ["teamName"],
       },
     },
+    {
+      name: TOOL_NAMES.RESUME_AGENT,
+      emoji: ["🔄", "🤖"],
+      description: PromptLocaleService.get(
+        activeLocale,
+        "orchestrator.tools.resume_agent.description",
+      ),
+      parameters: {
+        type: "object",
+        properties: {
+          agent_id: {
+            type: "string",
+            description: PromptLocaleService.get(
+              activeLocale,
+              "orchestrator.tools.resume_agent.parameters.agent_id",
+            ),
+          },
+          prompt: {
+            type: "string",
+            description: PromptLocaleService.get(
+              activeLocale,
+              "orchestrator.tools.resume_agent.parameters.prompt",
+            ),
+          },
+        },
+        required: ["agent_id", "prompt"],
+      },
+    },
   ];
 }
 
@@ -1273,6 +1301,7 @@ export default class ToolOrchestratorService {
       stop_agent: ["⏹️", "🤖"],
       get_task_output: ["📥", "🤖"],
       delete_team: ["🗑️", "👥"],
+      resume_agent: ["🔄", "🤖"],
       run_async_task: ["⚡", "🔄"],
       list_async_tasks: ["📋", "🔄"],
       cancel_async_task: ["⏹️", "🔄"],
@@ -1705,6 +1734,13 @@ export default class ToolOrchestratorService {
       case TOOL_NAMES.DELETE_TEAM:
         return OrchestratorService.deleteTeam(
           args.teamName as string,
+          orchestratorContext as OrchestratorContext,
+        );
+
+      case TOOL_NAMES.RESUME_AGENT:
+        return OrchestratorService.resumeAgent(
+          args.agent_id as string,
+          args.prompt as string,
           orchestratorContext as OrchestratorContext,
         );
 
