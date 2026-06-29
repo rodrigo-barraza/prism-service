@@ -2351,20 +2351,38 @@ export default class OrchestratorService {
 
     // The completion message is ephemeral (never persisted to DB), so it's
     // always appended to the context for this auto-response invocation.
-    // _alreadyPersisted: true ensures the Finalizer won't persist it.
-    const contextMessages = [
-      ...((conversation.messages as ConversationMessage[]) || []),
-      completionMessage,
-    ];
+    // Attempt to find a live WebSocket connection for this conversation
+    // so the auto-response streams directly to the client (Antigravity
+    // reactive wake-up pattern). Falls back to debug logging when no
+    // active connection exists (headless/API mode).
+    const { default: WebSocketConnectionRegistry } =
+      await import("../websocket/WebSocketConnectionRegistry.ts");
+    const registeredEmit = WebSocketConnectionRegistry.getEmitFunction(conversationId);
 
-    const backgroundEmit = (event: {
+    const backgroundEmit = registeredEmit || ((event: {
       type: string;
       [key: string]: unknown;
     }) => {
       logger.debug(
         `[Orchestrator][AutoResponse][${conversationId}][Event] type=${event.type}`,
       );
-    };
+    });
+
+    if (registeredEmit) {
+      logger.info(
+        `[Orchestrator] Auto-response will stream to live WebSocket for conversation ${conversationId}`,
+      );
+    } else {
+      logger.info(
+        `[Orchestrator] No live WebSocket for conversation ${conversationId} — auto-response will run headlessly`,
+      );
+    }
+
+    // _alreadyPersisted: true ensures the Finalizer won't persist it.
+    const contextMessages = [
+      ...((conversation.messages as ConversationMessage[]) || []),
+      completionMessage,
+    ];
 
     // Mark conversation as generating so the client shows the typing indicator
     await ConversationService.setGenerating(

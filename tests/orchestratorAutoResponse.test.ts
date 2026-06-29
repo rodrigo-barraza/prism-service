@@ -599,9 +599,85 @@ describe("Event-Driven Auto-Response", () => {
       expect(loopArgs.options.reasoningEffort).toBeUndefined();
       expect(loopArgs.options.thinkingBudget).toBeUndefined();
     });
+
+    it("should use live WebSocket emit when a connection is registered for the conversation", async () => {
+      const WebSocketConnectionRegistry = (
+        await import("../src/websocket/WebSocketConnectionRegistry.ts")
+      ).default;
+
+      const mockWebSocketEmit = vi.fn();
+      const mockWebSocket = { readyState: 1, OPEN: 1, send: vi.fn() };
+
+      WebSocketConnectionRegistry.register(
+        "parent-conv-id",
+        mockWebSocket as unknown as import("ws").WebSocket,
+        mockWebSocketEmit,
+      );
+
+      mockFindOne.mockResolvedValue({
+        id: "parent-conv-id",
+        isGenerating: false,
+        messages: [
+          { role: "user", content: "Build me a feature" },
+          { role: "assistant", content: "I spawned sub-agents" },
+        ],
+        settings: {
+          provider: PROVIDERS.GOOGLE,
+          model: "gemini-3-flash-preview",
+          agent: "CODING",
+        },
+      });
+
+      await OrchestratorService._triggerParentAutoResponse(
+        "parent-conv-id", "test-project", "test-user",
+        orchestratorContext, completionMessage,
+      );
+
+      // The agentic loop should receive the registered emit (not the debug logger)
+      const loopArgs = mockRunAgenticLoop.mock.calls[0][0];
+      expect(typeof loopArgs.emit).toBe("function");
+
+      // Emit a test event through the loop's emit and verify it reaches the WebSocket
+      loopArgs.emit({ type: "test_streaming_event", data: "live" });
+      expect(mockWebSocketEmit).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "test_streaming_event", data: "live" }),
+      );
+
+      WebSocketConnectionRegistry.clear();
+    });
+
+    it("should fall back to debug logger when no WebSocket connection is registered", async () => {
+      const WebSocketConnectionRegistry = (
+        await import("../src/websocket/WebSocketConnectionRegistry.ts")
+      ).default;
+
+      WebSocketConnectionRegistry.clear();
+
+      mockFindOne.mockResolvedValue({
+        id: "parent-conv-id",
+        isGenerating: false,
+        messages: [],
+        settings: {
+          provider: PROVIDERS.GOOGLE,
+          model: "gemini-3-flash-preview",
+          agent: "CODING",
+        },
+      });
+
+      await OrchestratorService._triggerParentAutoResponse(
+        "parent-conv-id", "test-project", "test-user",
+        orchestratorContext, completionMessage,
+      );
+
+      // The agentic loop should still have an emit function (the fallback logger)
+      const loopArgs = mockRunAgenticLoop.mock.calls[0][0];
+      expect(typeof loopArgs.emit).toBe("function");
+
+      // Calling it should not throw (it's the debug logger)
+      expect(() => loopArgs.emit({ type: "debug_event" })).not.toThrow();
+    });
   });
 
-  // ── End-to-End ────────────────────────────────────────────────
 
   describe("End-to-End: createTeam triggers auto-response on completion", () => {
     it("should dispatch router and trigger auto-response with ephemeral completion context", async () => {
