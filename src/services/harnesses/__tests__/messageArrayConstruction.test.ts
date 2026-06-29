@@ -4523,5 +4523,177 @@ describe("Message Array Construction", () => {
         expect(assistantMessages[0].content).toBe("Here's the answer.");
       });
     });
+
+    // ────────────────────────────────────────────────────────────
+    // Sub-agent / async task auto-response — completion message
+    // duplication regression test.
+    //
+    // When a sub-agent team or async task completes:
+    // 1. The completion message (task-notification) is persisted via
+    //    ConversationService.appendMessages with _alreadyPersisted: true
+    // 2. The conversation is reloaded from MongoDB for the auto-response
+    // 3. MongoDB does NOT store _alreadyPersisted — the flag is lost
+    // 4. AgenticLoopService marks messages[0..n-2] as _alreadyPersisted,
+    //    but the completion message is messages[n-1] (the last one) — it
+    //    escapes the marking
+    // 5. The Finalizer persists it AGAIN → duplicate message in the DB
+    //
+    // Fix: follow the ConversationTimerService pattern — use existing
+    // conversation.messages + the in-memory completion message (which
+    // retains _alreadyPersisted: true) instead of reloading from DB.
+    // ────────────────────────────────────────────────────────────
+    describe("sub-agent auto-response — completion message duplication", () => {
+      const COMPLETION_MESSAGE_CONTENT = [
+        `<task-notification>`,
+        `<status>completed</status>`,
+        `<summary>[SUB-AGENT TEAM COMPLETED] Team "Analysis_Team" (hierarchical) finished.</summary>`,
+        `<tool_uses>3</tool_uses>`,
+        `<duration_ms>521545</duration_ms>`,
+        `<result>`,
+        `Agent 1 (Established TCG Market Specialist): ✅`,
+        `</result>`,
+        `</task-notification>`,
+      ].join("\n");
+
+      it("should NOT persist completion message twice when DB reload loses _alreadyPersisted (BUG reproduction)", () => {
+        // Simulate the BUGGY path: conversation reloaded from DB after
+        // appendMessages — the completion message loses _alreadyPersisted.
+        const existingMessages: HarnessPayload[] = [
+          {
+            role: "user",
+            content: "Analyze the TCG market",
+          } as HarnessPayload,
+          {
+            role: "assistant",
+            content: "I'll create a team of sub-agents...",
+          } as HarnessPayload,
+          {
+            role: "assistant",
+            content: "Sub-agents dispatched.",
+          } as HarnessPayload,
+          // The completion message — reloaded from DB, NO _alreadyPersisted flag
+          {
+            role: "user",
+            content: COMPLETION_MESSAGE_CONTENT,
+            timestamp: "2026-06-29T16:27:35.142Z",
+            // NOTE: _alreadyPersisted is MISSING after DB round-trip
+          },
+        ];
+
+        // AgenticLoopService marks [0..n-2] as _alreadyPersisted
+        simulateAgenticLoopPersistenceMarking(existingMessages, {
+          isNewConversation: false,
+        });
+
+        // Verify the bug condition: completion message (last) is NOT marked
+        expect(
+          (existingMessages[3] as any)._alreadyPersisted,
+        ).toBeUndefined();
+
+        const originalMessageCount = existingMessages.length;
+        const currentMessages: HarnessPayload[] = [...existingMessages];
+
+        // Harness injects system context
+        simulateBeforePromptHook(currentMessages, {
+          systemPrompt: "You are the Omni Agent...",
+        });
+
+        // LLM generates response to the completion notification
+        currentMessages.push({
+          role: "assistant",
+          content: "The TCG market analysis is complete...",
+          model: "gemini-2.5-pro",
+          provider: "google",
+        });
+
+        const newTurnMessages = computeNewTurnMessages(
+          existingMessages,
+          currentMessages,
+          originalMessageCount,
+        );
+
+        // BUG: the completion message appears in newTurnMessages because it
+        // was NOT marked _alreadyPersisted — it will be persisted AGAIN.
+        const taskNotificationMessages = newTurnMessages.filter(
+          (message) =>
+            message.role === "user" &&
+            typeof message.content === "string" &&
+            message.content.includes("<task-notification>"),
+        );
+
+        // This EXPOSES the bug: the completion message IS in the persist set
+        expect(taskNotificationMessages).toHaveLength(1);
+      });
+
+      it("should NOT persist completion message when in-memory _alreadyPersisted is preserved (FIXED path)", () => {
+        // Simulate the CORRECT path: use existing conversation.messages +
+        // append the in-memory completion message (retains _alreadyPersisted).
+        const existingMessages: HarnessPayload[] = [
+          {
+            role: "user",
+            content: "Analyze the TCG market",
+            _alreadyPersisted: true,
+          } as HarnessPayload,
+          {
+            role: "assistant",
+            content: "I'll create a team of sub-agents...",
+            _alreadyPersisted: true,
+          } as HarnessPayload,
+          {
+            role: "assistant",
+            content: "Sub-agents dispatched.",
+            _alreadyPersisted: true,
+          } as HarnessPayload,
+          // The completion message — in-memory object, WITH _alreadyPersisted
+          {
+            role: "user",
+            content: COMPLETION_MESSAGE_CONTENT,
+            timestamp: "2026-06-29T16:27:35.142Z",
+            _alreadyPersisted: true,
+          } as HarnessPayload,
+        ];
+
+        const originalMessageCount = existingMessages.length;
+        const currentMessages: HarnessPayload[] = [...existingMessages];
+
+        // Harness injects system context
+        simulateBeforePromptHook(currentMessages, {
+          systemPrompt: "You are the Omni Agent...",
+        });
+
+        // LLM generates response to the completion notification
+        currentMessages.push({
+          role: "assistant",
+          content: "The TCG market analysis is complete...",
+          model: "gemini-2.5-pro",
+          provider: "google",
+        });
+
+        const newTurnMessages = computeNewTurnMessages(
+          existingMessages,
+          currentMessages,
+          originalMessageCount,
+        );
+
+        // FIXED: completion message has _alreadyPersisted, excluded from persist set
+        const taskNotificationMessages = newTurnMessages.filter(
+          (message) =>
+            message.role === "user" &&
+            typeof message.content === "string" &&
+            message.content.includes("<task-notification>"),
+        );
+
+        expect(taskNotificationMessages).toHaveLength(0);
+
+        // Only the assistant response should be persisted
+        const assistantMessages = newTurnMessages.filter(
+          (message) => message.role === "assistant",
+        );
+        expect(assistantMessages).toHaveLength(1);
+        expect(assistantMessages[0].content).toBe(
+          "The TCG market analysis is complete...",
+        );
+      });
+    });
   });
 });

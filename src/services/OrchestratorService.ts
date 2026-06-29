@@ -2588,8 +2588,7 @@ export default class OrchestratorService {
     }
 
     // Persist the completion message to the conversation so it appears in
-    // the message history (audit trail) and handleAgent reads it as the
-    // last user message in the array.
+    // the message history (audit trail).
     await ConversationService.appendMessages(
       conversationId,
       project,
@@ -2599,19 +2598,15 @@ export default class OrchestratorService {
       { collection: COLLECTIONS.AGENT_CONVERSATIONS },
     );
 
-    // Reload the conversation to get the updated message array
-    const updatedConversation = await conversationCollection.findOne({
-      id: conversationId,
-      project,
-      username,
-    });
-
-    if (!updatedConversation) {
-      logger.warn(
-        `[Orchestrator] Conversation ${conversationId} disappeared after appending completion message`,
-      );
-      return;
-    }
+    // Build the context messages from the existing conversation + the
+    // in-memory completion message. Do NOT reload from DB — the round-trip
+    // strips the _alreadyPersisted flag, causing the Finalizer to persist
+    // the completion message a second time (duplicate message bug).
+    // Follows the ConversationTimerService.executeAgenticLoop pattern.
+    const contextMessages = [
+      ...((conversation.messages as ConversationMessage[]) || []),
+      completionMessage,
+    ];
 
     // Resolve emit from WebSocketConnectionRegistry (Antigravity reactive
     // wake-up pattern). Falls back to debug logging for headless/API mode.
@@ -2646,7 +2641,7 @@ export default class OrchestratorService {
     const autoResponseParams = {
       provider: providerName,
       model: resolvedModel,
-      messages: updatedConversation.messages || [],
+      messages: contextMessages,
       conversationId,
       agent,
       project,

@@ -534,14 +534,15 @@ async function triggerAsyncTaskAutoResponse(
     { collection: collectionNames.AGENT_CONVERSATIONS },
   );
 
-  // Reload conversation to get updated messages
-  const updatedConversation = await conversationCollection.findOne({
-    id: conversationId,
-    project,
-    username,
-  });
-
-  if (!updatedConversation) return;
+  // Build the context messages from the existing conversation + the
+  // in-memory completion message. Do NOT reload from DB — the round-trip
+  // strips the _alreadyPersisted flag, causing the Finalizer to persist
+  // the completion message a second time (duplicate message bug).
+  // Follows the ConversationTimerService.executeAgenticLoop pattern.
+  const contextMessages = [
+    ...((conversation.messages as Array<Record<string, unknown>>) || []),
+    completionMessage,
+  ];
 
   // Resolve emit from WebSocketConnectionRegistry
   const registeredEmit = WebSocketConnectionRegistry.getEmitFunction(conversationId);
@@ -561,7 +562,7 @@ async function triggerAsyncTaskAutoResponse(
   }
 
   // Resolve provider/model from conversation settings
-  const settings = (updatedConversation.settings || {}) as Record<string, unknown>;
+  const settings = (conversation.settings || {}) as Record<string, unknown>;
   const providerName = settings.provider as string;
   const resolvedModel = settings.model as string;
   const agent = settings.agent as string | null;
@@ -583,7 +584,7 @@ async function triggerAsyncTaskAutoResponse(
       {
         provider: providerName,
         model: resolvedModel,
-        messages: updatedConversation.messages || [],
+        messages: contextMessages,
         conversationId,
         agent,
         project,
