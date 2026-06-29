@@ -5,6 +5,7 @@ import { TOOLS_SERVICE_URL } from "../../../config.ts";
 import {
   DIRECTORY_CACHE_TTL_MS,
   DIRECTORY_FETCH_TIMEOUT_MS,
+  DIRECTORY_TREE_CHILD_LIMIT,
 } from "../../constants.ts";
 import { DirectoryData } from "./types.ts";
 
@@ -74,12 +75,12 @@ export class DirectoryTreeFormatter {
 
       // Include first-level children for directories
       if (entry.children && Array.isArray(entry.children)) {
-        for (const child of entry.children.slice(0, 20)) {
+        for (const child of entry.children.slice(0, DIRECTORY_TREE_CHILD_LIMIT)) {
           const childPrefix = child.type === "directory" ? "📁" : "📄";
           lines.push(`  ${childPrefix} ${child.name || child.path}`);
         }
-        if (entry.children.length > 20) {
-          lines.push(`  ... and ${entry.children.length - 20} more`);
+        if (entry.children.length > DIRECTORY_TREE_CHILD_LIMIT) {
+          lines.push(`  ... and ${entry.children.length - DIRECTORY_TREE_CHILD_LIMIT} more`);
         }
       }
     }

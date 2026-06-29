@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
-import { COLLECTIONS, TIMER_MODES, TIMER_STATUSES } from "../constants.ts";
+import { COLLECTIONS, TIMER_MODES, TIMER_STATUSES, TIMERS } from "../constants.ts";
 import logger from "../utils/logger.ts";
 import AgenticLoopService from "./AgenticLoopService.ts";
 import ConversationService from "./ConversationService.ts";
@@ -55,10 +55,10 @@ export interface TimerConversationContext {
 }
 
 // ── File-level Constants ──────────────────────────────────────
-const BACKGROUND_DAEMON_INTERVAL_MILLISECONDS = 1000;
-const ONE_SHOT_MAXIMUM_DURATION_SECONDS = 86400;
+const BACKGROUND_DAEMON_INTERVAL_MILLISECONDS = TIMERS.BACKGROUND_DAEMON_INTERVAL_MS;
+const ONE_SHOT_MAXIMUM_DURATION_SECONDS = TIMERS.ONE_SHOT_MAXIMUM_DURATION_SECONDS;
 const ONE_MINUTE_IN_MILLISECONDS = 60 * 1000;
-const MINIMUM_CONTEXT_LENGTH = 120_000;
+const MINIMUM_CONTEXT_LENGTH = TIMERS.MINIMUM_CONTEXT_LENGTH;
 
 let tickerInterval: ReturnType<typeof setInterval> | null = null;
 let isTickInProgress = false;

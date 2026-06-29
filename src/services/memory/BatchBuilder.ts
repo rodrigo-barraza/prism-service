@@ -6,15 +6,16 @@
 import { estimateTokens } from "../../utils/CostCalculator.ts";
 import { formatMemoryEntry } from "./ConsolidationPrompts.ts";
 import type { MemoryDoc, ConsolidationBatch } from "./types.ts";
+import { MEMORY } from "../../constants.ts";
 
 /** Max clusters per LLM batch — keeps input well under context window limits */
-export const BATCH_MAX_CLUSTERS = 5;
+export const BATCH_MAX_CLUSTERS = MEMORY.BATCH_MAX_CLUSTERS;
 
 /** Max stale memories per LLM batch */
-export const BATCH_MAX_STALE = 10;
+export const BATCH_MAX_STALE = MEMORY.BATCH_MAX_STALE;
 
 /** Soft token budget for the user message portion of a batch (leaves room for system prompt + output) */
-export const BATCH_INPUT_TOKEN_BUDGET = 12_000;
+export const BATCH_INPUT_TOKEN_BUDGET = MEMORY.BATCH_INPUT_TOKEN_BUDGET;
 
 /**
  * Partition clusters and stale memories into batches that stay within

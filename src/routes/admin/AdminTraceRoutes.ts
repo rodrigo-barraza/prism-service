@@ -1,7 +1,7 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
-import { COLLECTIONS, COST_SUM_EXPR } from "../../constants.ts";
+import { COLLECTIONS, COST_SUM_EXPR, AGGREGATE_MAX_TIME_MS } from "../../constants.ts";
 import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 import {
@@ -18,7 +18,7 @@ router.use(requireDb);
 // ─── GET /traces — paginated trace list (derived from requests) ─
 // Lightweight summary-only aggregate: no $push of full documents.
 // Full request details are fetched lazily via GET /traces/:id.
-const AGGREGATE_MAX_TIME_MS = 30_000;
+// AGGREGATE_MAX_TIME_MS imported from constants.ts
 
 router.get(
   "/",

@@ -3,7 +3,7 @@ import WebhookEventBus from "./WebhookEventBus.ts";
 import type { WebhookEvent } from "./WebhookEventBus.ts";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
-import { COLLECTIONS } from "../constants.ts";
+import { COLLECTIONS, WEBHOOK } from "../constants.ts";
 import logger from "../utils/logger.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
@@ -17,10 +17,10 @@ interface WebhookSubscription {
   enabled: boolean;
 }
 
-const DISPATCH_TIMEOUT_MS = 10_000;
-const MAX_RETRY_ATTEMPTS = 3;
-const RETRY_BASE_DELAY_MS = 1000;
-const SUBSCRIPTION_REFRESH_INTERVAL_MS = 30_000;
+const DISPATCH_TIMEOUT_MS = WEBHOOK.DISPATCH_TIMEOUT_MS;
+const MAX_RETRY_ATTEMPTS = WEBHOOK.MAX_RETRY_ATTEMPTS;
+const RETRY_BASE_DELAY_MS = WEBHOOK.RETRY_BASE_DELAY_MS;
+const SUBSCRIPTION_REFRESH_INTERVAL_MS = WEBHOOK.SUBSCRIPTION_REFRESH_INTERVAL_MS;
 
 let cachedSubscriptions: WebhookSubscription[] = [];
 let refreshInterval: ReturnType<typeof setInterval> | null = null;

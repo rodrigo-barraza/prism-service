@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import logger from "../utils/logger.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
+import { WEBHOOK } from "../constants.ts";
 
 export interface WebhookEvent {
   webhookEventId: string;
@@ -11,7 +12,7 @@ export interface WebhookEvent {
 
 export type WebhookEventCallback = (event: WebhookEvent) => void;
 
-const REPLAY_BUFFER_CAPACITY = 200;
+const REPLAY_BUFFER_CAPACITY = WEBHOOK.REPLAY_BUFFER_CAPACITY;
 
 const listeners = new Set<WebhookEventCallback>();
 const replayBuffer: WebhookEvent[] = [];

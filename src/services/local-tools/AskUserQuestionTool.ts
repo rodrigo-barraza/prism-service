@@ -5,6 +5,7 @@ import {
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
+import { LOG_PREVIEW } from "../../constants.ts";
 import type { QuestionDefinition } from "../ApprovalRegistry.ts";
 
 interface QuestionOption {
@@ -166,7 +167,7 @@ export default {
           error: PromptLocaleService.get(
             PromptLocaleService.getDefaultLocale(),
             "internal-tools-runtime.ask_user.duplicateQuestion",
-            { preview: questionInput.question.slice(0, 60) },
+            { preview: questionInput.question.slice(0, LOG_PREVIEW.SHORT) },
           ),
         };
       }
@@ -229,7 +230,7 @@ export default {
     logger.info(
       `[AskUserQuestion] ${normalizedQuestions.length} question(s), ` +
         `${totalOptions} total options — ` +
-        `"${normalizedQuestions[0].question.slice(0, 60)}${normalizedQuestions[0].question.length > 60 ? "..." : ""}"`,
+        `"${normalizedQuestions[0].question.slice(0, LOG_PREVIEW.SHORT)}${normalizedQuestions[0].question.length > LOG_PREVIEW.SHORT ? "..." : ""}"`,
     );
 
     // Emit the SSE event with the full questions array
@@ -270,7 +271,7 @@ export default {
     }
 
     logger.info(
-      `[AskUserQuestion] Answered: ${JSON.stringify(result.answers).slice(0, 200)}`,
+      `[AskUserQuestion] Answered: ${JSON.stringify(result.answers).slice(0, LOG_PREVIEW.MEDIUM)}`,
     );
 
     // Return structured response

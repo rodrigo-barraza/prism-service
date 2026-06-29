@@ -22,8 +22,8 @@ import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 import { ORCHESTRATOR } from "../../../constants.ts";
 
 const MAXIMUM_SYNTHESIS_CHARACTERS = ORCHESTRATOR.MAXIMUM_SYNTHESIS_CHARACTERS;
-const DEFAULT_LAYER_COUNT = 1;
-const MAXIMUM_LAYER_COUNT = 3;
+const DEFAULT_LAYER_COUNT = ORCHESTRATOR.ROUTERS.DEFAULT_LAYER_COUNT;
+const MAXIMUM_LAYER_COUNT = ORCHESTRATOR.ROUTERS.MAXIMUM_LAYER_COUNT;
 
 function truncateResultOutput(
   output: string,

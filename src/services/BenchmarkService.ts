@@ -9,7 +9,7 @@ import { isInstance } from "../providers/instance-registry.ts";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
-import { COLLECTIONS } from "../constants.ts";
+import { COLLECTIONS, BENCHMARK } from "../constants.ts";
 import type { SseEvent } from "../types/SseTypes.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
@@ -375,7 +375,7 @@ async function runSingleModel(
         model: model.model,
         messages,
         temperature: benchmark.temperature ?? 0,
-        maxTokens: Math.max(benchmark.maxTokens ?? 2048, 2048),
+        maxTokens: Math.max(benchmark.maxTokens ?? BENCHMARK.DEFAULT_MAX_TOKENS, BENCHMARK.DEFAULT_MAX_TOKENS),
         project,
         username,
         skipConversation: true,
@@ -633,7 +633,7 @@ const BenchmarkService = {
     // Local providers: models are bucketed per instance (e.g. lm-studio,
     // lm-studio-2), and each instance runs up to its concurrency limit.
     // Two instances means two concurrent local inference streams.
-    const INTRA_PROVIDER_DELAY_MS = 100;
+    const INTRA_PROVIDER_DELAY_MS = BENCHMARK.INTRA_PROVIDER_DELAY_MS;
     // Group models by provider; local providers use their instance ID as key
     const buckets = new Map<string, ModelEntry[]>();
     for (const model of models) {

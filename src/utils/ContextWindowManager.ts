@@ -3,7 +3,7 @@ import { estimateTokens } from "./CostCalculator.ts";
 import type { ChatMessage, ToolCallEntry } from "../types/admin.ts";
 import MicroCompactionService from "../services/compact/MicroCompactionService.ts";
 import PromptLocaleService from "../services/PromptLocaleService.ts";
-import { PROMPT_DELIMITERS, CONTEXT_WINDOW, COMPACTION } from "../constants.ts";
+import { PROMPT_DELIMITERS, CONTEXT_WINDOW, COMPACTION, LOG_PREVIEW } from "../constants.ts";
 import {
   DEFAULT_MAX_INPUT_TOKENS,
   MIN_OUTPUT_RESERVE,
@@ -216,7 +216,7 @@ function compressOldAssistantMessages(
           .join(", ") || "";
       const contentString =
         typeof message.content === "string" ? message.content : "";
-      const contentPreview = contentString.slice(0, 200);
+      const contentPreview = contentString.slice(0, LOG_PREVIEW.MEDIUM);
 
       compressed.content = `[Earlier response${toolNames ? ` — used: ${toolNames}` : ""}]${contentPreview ? `\n${contentPreview}...` : ""}`;
       compressed.thinking = undefined;

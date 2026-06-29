@@ -1,6 +1,6 @@
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
-import { COLLECTIONS } from "../constants.ts";
+import { COLLECTIONS, WORKFLOW_MEMORY, LOG_PREVIEW } from "../constants.ts";
 import EmbeddingService from "./EmbeddingService.ts";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import logger from "../utils/logger.ts";
@@ -36,11 +36,11 @@ import type {
 //      top-K most relevant as procedural context.
 // ────────────────────────────────────────────────────────────
 
-const MINIMUM_TOOL_CALLS_FOR_WORKFLOW = 3;
-const MAXIMUM_WORKFLOW_STEPS = 30;
-const MAXIMUM_WORKFLOWS_PER_QUERY = 3;
-const WORKFLOW_TEXT_MAXIMUM_CHARACTERS = 1500;
-const WORKFLOW_COOLDOWN_MILLISECONDS = 60 * 1000;
+const MINIMUM_TOOL_CALLS_FOR_WORKFLOW = WORKFLOW_MEMORY.MINIMUM_TOOL_CALLS;
+const MAXIMUM_WORKFLOW_STEPS = WORKFLOW_MEMORY.MAXIMUM_STEPS;
+const MAXIMUM_WORKFLOWS_PER_QUERY = WORKFLOW_MEMORY.MAXIMUM_PER_QUERY;
+const WORKFLOW_TEXT_MAXIMUM_CHARACTERS = WORKFLOW_MEMORY.TEXT_MAXIMUM_CHARACTERS;
+const WORKFLOW_COOLDOWN_MILLISECONDS = WORKFLOW_MEMORY.COOLDOWN_MS;
 
 interface WorkflowStep {
   toolName: string;
@@ -130,7 +130,7 @@ function extractWorkflowTrajectory(
   });
 
   const summary =
-    `Task: ${userRequest.slice(0, 200)}\n` +
+    `Task: ${userRequest.slice(0, LOG_PREVIEW.MEDIUM)}\n` +
     `Steps (${successfulSteps.length} succeeded, ${failedSteps.length} failed):\n` +
     stepSummaryLines.join("\n");
 
@@ -215,7 +215,7 @@ const WorkflowMemoryService = {
       }
     }
 
-    const embeddingSourceText = trajectory.summary.slice(0, 2000);
+    const embeddingSourceText = trajectory.summary.slice(0, WORKFLOW_MEMORY.EMBEDDING_SOURCE_MAX_CHARACTERS);
     const embedding = await EmbeddingService.embed(embeddingSourceText, {
       source: "workflow-memory",
       project,

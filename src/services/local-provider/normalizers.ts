@@ -159,13 +159,13 @@ export function normalizeVllmModel(raw: OpenAICompatRawModel): ModelEntry {
     entry.tools.push("Tool Calling");
   }
 
-  // Set maximum output token capacity for vLLM models to 50,000
-  entry.maxOutputTokens = 50000;
+  // Set maximum output token capacity for vLLM models
+  entry.maxOutputTokens = LOCAL_PROVIDER.VLLM_MAX_OUTPUT_TOKENS;
 
   return entry;
 }
 
-import { PROVIDERS } from "../../constants.ts";
+import { PROVIDERS, LOCAL_PROVIDER } from "../../constants.ts";
 
 export type NormalizerFunction = (
   raw: LmStudioRawModel & OllamaRawModel & OpenAICompatRawModel,

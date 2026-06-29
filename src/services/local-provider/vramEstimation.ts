@@ -1,6 +1,7 @@
 import { resolveArchParams, estimateMemory } from "../../utils/gguf-arch.ts";
 import { getProvider } from "../../providers/index.ts";
 import { LmStudioRawModel, GenericProvider, TransformedVramEstimate } from "./types.ts";
+import { LOCAL_PROVIDER } from "../../constants.ts";
 
 /**
  * Estimate VRAM usage for a GGUF model served by a local provider.
@@ -35,7 +36,7 @@ export function estimateVRAM(
     sizeBytes,
     archParams,
     gpuLayers: options.gpuLayers ?? totalLayers,
-    contextLength: options.contextLength ?? 4096,
+    contextLength: options.contextLength ?? LOCAL_PROVIDER.DEFAULT_CONTEXT_LENGTH,
     offloadKvCache: options.offloadKvCache ?? true,
     flashAttention: options.flashAttention ?? true,
     vision: !!modelData.capabilities?.vision,

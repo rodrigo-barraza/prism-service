@@ -19,6 +19,7 @@ import {
   COLLECTIONS,
   FILE_CATEGORIES,
   PROMPT_DELIMITERS,
+  MEDIA,
 } from "../../../constants.ts";
 import logger from "../../../utils/logger.ts";
 import {
@@ -160,7 +161,7 @@ export async function finalizeTextGeneration(
     images = [],
     toolCalls = [],
     audioChunks = [],
-    audioSampleRate = 16000,
+    audioSampleRate = MEDIA.DEFAULT_AUDIO_SAMPLE_RATE_HZ,
     usage,
     outputCharacters = 0,
     timeToGenerationSec,

@@ -5,6 +5,7 @@ import {
   GenerateTextResult,
   StreamChunk,
 } from "../types/provider.ts";
+import { TOOL_API_HEALTH_TIMEOUT_MS } from "../constants.ts";
 // ─────────────────────────────────────────────────────────────
 // llama.cpp Provider (llama-server)
 // ─────────────────────────────────────────────────────────────
@@ -542,7 +543,7 @@ export function createLlamaCppProvider(
       try {
         const response = await fetch(`${baseUrl}/health`, {
           method: "GET",
-          signal: AbortSignal.timeout(3000),
+          signal: AbortSignal.timeout(TOOL_API_HEALTH_TIMEOUT_MS),
         });
         const data = (await response.json()) as HealthResponse;
         return {
@@ -574,21 +575,21 @@ export function createLlamaCppProvider(
         [
           fetch(`${baseUrl}/props`, {
             method: "GET",
-            signal: AbortSignal.timeout(3000),
+            signal: AbortSignal.timeout(TOOL_API_HEALTH_TIMEOUT_MS),
           }).then((response) => {
             if (!response.ok) return null;
             return response.json() as Promise<LlamaCppPropsResponse>;
           }),
           fetch(`${baseUrl}/slots`, {
             method: "GET",
-            signal: AbortSignal.timeout(3000),
+            signal: AbortSignal.timeout(TOOL_API_HEALTH_TIMEOUT_MS),
           }).then((response) => {
             if (!response.ok) return null;
             return response.json() as Promise<LlamaCppSlotEntry[]>;
           }),
           fetch(`${baseUrl}/health`, {
             method: "GET",
-            signal: AbortSignal.timeout(3000),
+            signal: AbortSignal.timeout(TOOL_API_HEALTH_TIMEOUT_MS),
           }).then((response) => {
             if (!response.ok) return null;
             return response.json() as Promise<HealthResponse>;

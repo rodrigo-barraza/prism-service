@@ -6,6 +6,7 @@ import {
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
 import type { InternalToolContext } from "./InternalToolRegistry.ts";
+import { MEMORY, LOG_PREVIEW } from "../../constants.ts";
 
 // Use the taxonomy constant when available, fall back to string literal
 // until prism-service refreshes its utilities-library dependency.
@@ -24,9 +25,9 @@ const SEARCH_CONVERSATIONS_NAME =
 // these in its response or use memory backlinks to dive deeper.
 // ────────────────────────────────────────────────────────────
 
-const RELEVANCE_THRESHOLD = 0.3;
-const DEFAULT_SEARCH_LIMIT = 10;
-const MAXIMUM_CANDIDATES = 200;
+const RELEVANCE_THRESHOLD = MEMORY.SEARCH_RELEVANCE_THRESHOLD;
+const DEFAULT_SEARCH_LIMIT = MEMORY.DEFAULT_SEARCH_LIMIT;
+const MAXIMUM_CANDIDATES = MEMORY.MAXIMUM_CANDIDATES;
 
 const searchConversations = {
   name: SEARCH_CONVERSATIONS_NAME,
@@ -181,7 +182,7 @@ const searchConversations = {
 
     logger.info(
       `[ConversationSearchTool] Found ${enrichedResults.length}/${candidates.length} ` +
-        `conversations for query "${query.slice(0, 60)}"`,
+        `conversations for query "${query.slice(0, LOG_PREVIEW.SHORT)}"`,
     );
 
     return {

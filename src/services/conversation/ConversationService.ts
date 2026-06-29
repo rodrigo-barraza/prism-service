@@ -2,7 +2,7 @@ import { DEFAULT_CONVERSATION_TITLE } from "@rodrigo-barraza/utilities-library/t
 import MongoWrapper from "../../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../../config.ts";
 
-import { COLLECTIONS } from "../../constants.ts";
+import { COLLECTIONS, DERIVED_CONVERSATION_TITLE_MAX_LENGTH } from "../../constants.ts";
 import type { ChatMessage } from "../../types/admin.ts";
 import { discoverDescendantConversationIds } from "../../utils/ConversationDiscovery.ts";
 import type {
@@ -172,7 +172,7 @@ const ConversationService: ConversationServiceInterface = {
         (chatMessage) => chatMessage.role === "user",
       );
       if (firstUserMessage?.content) {
-        const titleSnippet = firstUserMessage.content.slice(0, 100).trim();
+        const titleSnippet = firstUserMessage.content.slice(0, DERIVED_CONVERSATION_TITLE_MAX_LENGTH).trim();
         if (titleSnippet) {
           derived.title = titleSnippet;
           conversation.title = titleSnippet; // Update local memory representation

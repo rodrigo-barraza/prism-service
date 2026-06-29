@@ -2,12 +2,13 @@ import { formatBytes } from "@rodrigo-barraza/utilities-library";
 import { TYPES } from "../../config.ts";
 import { HuggingFaceMetadata, ModelEntry } from "./types.ts";
 import { formatParams } from "./nameParsers.ts";
+import { LOCAL_PROVIDER } from "../../constants.ts";
 
 const _hfCache = new Map<
   string,
   { data: HuggingFaceMetadata | null; timestamp: number }
 >();
-const HF_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const HF_CACHE_TTL_MS = LOCAL_PROVIDER.HF_CACHE_TTL_MS;
 
 /**
  * Fetch model metadata from HuggingFace Hub API.

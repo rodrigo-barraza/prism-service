@@ -67,7 +67,7 @@ import type {
 } from "../services/harnesses/types.ts";
 import type { ChatMessage } from "../types/ProviderTypes.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import { PROVIDERS, FILE_CATEGORIES } from "../constants.ts";
+import { PROVIDERS, FILE_CATEGORIES, MAX_FUNCTION_CALL_ITERATIONS } from "../constants.ts";
 
 interface ToolSchemaWithDomain extends ToolSchema {
   domain?: string;
@@ -1145,7 +1145,7 @@ async function handleStreamingText(context: GenerationContext) {
   // execute returned tool calls via ToolOrchestratorService and re-call
   // the provider with tool results. Lightweight loop — no approval
   // engine, no context manager, just direct execution.
-  const MAX_FUNCTIONCALL_ITERATIONS = 10;
+  const MAX_FUNCTIONCALL_ITERATIONS = MAX_FUNCTION_CALL_ITERATIONS;
   let functionCallIteration = 0;
   while (
     options.functionCallingEnabled &&

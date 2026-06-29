@@ -19,7 +19,7 @@ import {
 import MongoWrapper from "../../wrappers/MongoWrapper.ts";
 import RequestLogger from "../RequestLogger.ts";
 import { MONGO_DB_NAME } from "../../../config.ts";
-import { COLLECTIONS } from "../../constants.ts";
+import { COLLECTIONS, SOMATIC, LOG_PREVIEW } from "../../constants.ts";
 import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 
@@ -151,8 +151,8 @@ function resolveEnergyLabel(level: number): string {
   return "Energized";
 }
 
-const PASSIVE_DRIFT_INTERVAL_MILLISECONDS = 30_000;
-const PERSIST_INTERVAL_MILLISECONDS = 60_000;
+const PASSIVE_DRIFT_INTERVAL_MILLISECONDS = SOMATIC.PASSIVE_DRIFT_INTERVAL_MS;
+const PERSIST_INTERVAL_MILLISECONDS = SOMATIC.PERSIST_INTERVAL_MS;
 
 const agentStates = new Map<string, AgentSomaticState>();
 
@@ -469,7 +469,7 @@ async function analyzeEmotionFromText(
     requestStartMs: requestStart,
     extraRequestPayload: {
       inputTextLength: text.length,
-      textPreview: text.slice(0, 200),
+      textPreview: text.slice(0, LOG_PREVIEW.MEDIUM),
     },
     extraResponsePayload: success ? { detectedEmotion } : undefined,
   });
