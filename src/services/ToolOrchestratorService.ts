@@ -1273,6 +1273,9 @@ export default class ToolOrchestratorService {
       stop_agent: ["⏹️", "🤖"],
       get_task_output: ["📥", "🤖"],
       delete_team: ["🗑️", "👥"],
+      run_async_task: ["⚡", "🔄"],
+      list_async_tasks: ["📋", "🔄"],
+      cancel_async_task: ["⏹️", "🔄"],
     };
     const emojiValue = localEmojis[toolName];
     if (emojiValue) {

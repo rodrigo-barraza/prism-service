@@ -102,5 +102,23 @@
 
   "write_todo": {
     "invalidItems": "'items' must be an array of todo objects"
+  },
+
+  "run_async_task": {
+    "noConversation": "Cannot dispatch async task: no conversation context available.",
+    "noToolName": "Missing required parameter 'toolName'. Specify which tool to run asynchronously.",
+    "concurrencyLimit": "Maximum concurrent async tasks ({{max}}) reached for this conversation. Wait for a task to complete or cancel one.",
+    "disallowedTool": "Tool \"{{toolName}}\" cannot be dispatched asynchronously. It is either interactive, already async, or manages async state itself."
+  },
+
+  "cancel_async_task": {
+    "noTaskId": "Missing required parameter 'taskId'. Use list_async_tasks to find the task ID.",
+    "notFound": "Task \"{{taskId}}\" not found. It may have expired or been cleaned up.",
+    "alreadyTerminal": "Task \"{{taskId}}\" is already in \"{{status}}\" state and cannot be cancelled.",
+    "success": "Task \"{{taskId}}\" has been cancelled."
+  },
+
+  "list_async_tasks": {
+    "noConversation": "Cannot list async tasks: no conversation context available."
   }
 }
