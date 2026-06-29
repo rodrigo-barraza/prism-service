@@ -709,7 +709,7 @@ const anthropicProvider = {
           "anthropic",
           getErrorMessage(error),
           (error as AnthropicSdkError)?.status || 500,
-          error,
+          error as Error,
         );
       }
     }
@@ -718,7 +718,7 @@ const anthropicProvider = {
       "anthropic",
       lastError instanceof Error ? lastError.message : "Max retries exceeded",
       (lastError as AnthropicSdkError)?.status || 500,
-      lastError,
+      lastError as Error,
     );
   },
   async captionImage(
@@ -794,7 +794,7 @@ const anthropicProvider = {
         "anthropic",
         getErrorMessage(error),
         (error as AnthropicSdkError)?.status || 500,
-        error,
+        error as Error,
       );
     }
   },
@@ -1167,7 +1167,7 @@ const anthropicProvider = {
         "anthropic",
         getErrorMessage(error),
         (error as AnthropicSdkError)?.status || 500,
-        error,
+        error as Error,
       );
     }
   },

@@ -271,7 +271,7 @@ export function createLlamaCppProvider(
           "llama-cpp",
           getErrorMessage(error),
           500,
-          error,
+          error as Error,
         );
       }
     },
@@ -373,7 +373,7 @@ export function createLlamaCppProvider(
           "llama-cpp",
           getErrorMessage(error),
           500,
-          error,
+          error as Error,
         );
       }
     },
@@ -440,7 +440,7 @@ export function createLlamaCppProvider(
           "llama-cpp",
           getErrorMessage(error),
           500,
-          error,
+          error as Error,
         );
       }
     },
@@ -486,7 +486,7 @@ export function createLlamaCppProvider(
           "llama-cpp",
           getErrorMessage(error),
           500,
-          error,
+          error as Error,
         );
       }
     },
@@ -528,7 +528,7 @@ export function createLlamaCppProvider(
           "llama-cpp",
           getErrorMessage(error),
           500,
-          error,
+          error as Error,
         );
       }
     },

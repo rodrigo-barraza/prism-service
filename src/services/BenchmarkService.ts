@@ -491,16 +491,16 @@ async function runSingleModel(
       }));
     const agenticToolCalls: ToolCallResult[] = events
       .filter(
-        (e) =>
-          e.type === "tool_execution" &&
-          (e.status === "done" || e.status === "error"),
+        (eventItem) =>
+          eventItem.type === "tool_execution" &&
+          (eventItem.status === "done" || eventItem.status === "error"),
       )
-      .map((e) => ({
-        id: e.tool?.id,
-        name: e.tool?.name,
-        args: e.tool?.args,
-        result: e.tool?.result,
-        status: e.status || "done",
+      .map((eventItem) => ({
+        id: eventItem.tool?.id,
+        name: eventItem.tool?.name,
+        args: eventItem.tool?.args,
+        result: eventItem.tool?.result,
+        status: eventItem.status || "done",
       }));
     const toolCalls = [...nativeToolCalls, ...agenticToolCalls];
     const toolCallsResult = toolCalls.length > 0 ? toolCalls : null;

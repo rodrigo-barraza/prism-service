@@ -507,7 +507,7 @@ export function createLmStudioProvider(
           PROVIDERS.LM_STUDIO,
           getErrorMessage(error),
           500,
-          error,
+          error as Error,
         );
       } finally {
         if (isRequestActive) {
@@ -1177,7 +1177,7 @@ export function createLmStudioProvider(
           PROVIDERS.LM_STUDIO,
           diagnosticParts.join(", "),
           500,
-          error,
+          error as Error,
         );
       } finally {
         if (isRequestActive) {
@@ -1352,7 +1352,7 @@ export function createLmStudioProvider(
           PROVIDERS.LM_STUDIO,
           getErrorMessage(error),
           500,
-          error,
+          error as Error,
         );
       }
     },
@@ -1420,7 +1420,7 @@ export function createLmStudioProvider(
           PROVIDERS.LM_STUDIO,
           getErrorMessage(error),
           500,
-          error,
+          error as Error,
         );
       }
     },
@@ -1634,7 +1634,7 @@ export function createLmStudioProvider(
           PROVIDERS.LM_STUDIO,
           getErrorMessage(error),
           500,
-          error,
+          error as Error,
         );
       }
     },
@@ -1692,7 +1692,7 @@ export function createLmStudioProvider(
             PROVIDERS.LM_STUDIO,
             getErrorMessage(error),
             500,
-            error,
+            error as Error,
           );
         }
       })();
@@ -1746,7 +1746,7 @@ export function createLmStudioProvider(
           PROVIDERS.LM_STUDIO,
           getErrorMessage(error),
           500,
-          error,
+          error as Error,
         );
       }
     },

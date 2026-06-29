@@ -35,6 +35,11 @@ import { errorMessage } from "@rodrigo-barraza/utilities-library";
  *   await hooks.run("beforePrompt", ctx);
  */
 
+export interface TransformedHookResult {
+  isApproved?: boolean;
+  [key: string]: unknown;
+}
+
 type HookEvent =
   | "beforePrompt"
   | "beforeToolCall"
@@ -101,9 +106,9 @@ export default class AgentHooks {
   async run(
     event: HookEvent,
     ...args: unknown[]
-  ): Promise<Record<string, unknown> | undefined> {
+  ): Promise<TransformedHookResult | undefined> {
     const hooks = this._hooks.get(event) || [];
-    let result: Record<string, unknown> | undefined;
+    let result: TransformedHookResult | undefined;
 
     // Partition by category
     const decideHooks = hooks.filter((h) => h.category === "decide");

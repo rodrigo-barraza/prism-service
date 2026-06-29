@@ -4,14 +4,14 @@ import logger from "./logger.ts";
 export class ProviderError extends Error {
   provider: string;
   statusCode: number;
-  originalError: unknown;
+  originalError: Error | object | null | undefined;
   errorType: string | null;
 
   constructor(
     provider: string,
     message: string,
     statusCode: number = 500,
-    originalError: unknown = null,
+    originalError: Error | object | null | undefined = null,
   ) {
     super(message);
     this.name = "ProviderError";

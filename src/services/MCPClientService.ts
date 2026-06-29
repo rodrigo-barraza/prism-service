@@ -20,6 +20,12 @@ export interface MCPToolSchema {
   labels?: string[];
 }
 
+export interface TransformedMCPToolResult {
+  error?: string;
+  result?: string;
+  [key: string]: unknown;
+}
+
 interface MCPRawTool {
   name: string;
   description?: string;
@@ -305,7 +311,7 @@ const MCPClientService = {
     serverName: string,
     toolName: string,
     args: Record<string, unknown> = {},
-  ): Promise<Record<string, unknown>> {
+  ): Promise<TransformedMCPToolResult> {
     const conn = connections.get(serverName);
     if (!conn) {
       return { error: `MCP server "${serverName}" is not connected` };

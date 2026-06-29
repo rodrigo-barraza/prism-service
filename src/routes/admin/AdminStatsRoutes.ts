@@ -18,6 +18,16 @@ import {
 import requireDb from "../../middleware/RequireDbMiddleware.ts";
 import { hours as hoursToMs } from "@rodrigo-barraza/utilities-library";
 
+export interface TransformedStatsMatchFilter {
+  project?: unknown;
+  agent?: unknown;
+  provider?: unknown;
+  model?: unknown;
+  timestamp?: { $gte?: Date; $lte?: Date };
+  workspaceId?: unknown;
+  [key: string]: unknown;
+}
+
 const router = express.Router();
 const {
   REQUESTS: REQUESTS_COLLECTION,
@@ -29,9 +39,9 @@ router.use(requireDb);
 
 async function buildMatchFilter(
   req: Request,
-): Promise<Record<string, unknown>> {
+): Promise<TransformedStatsMatchFilter> {
   const { from, to, project, agent, provider, model, workspace } = req.query;
-  const match: Record<string, unknown> = {};
+  const match: TransformedStatsMatchFilter = {};
 
   if (project) {
     match.project = project;

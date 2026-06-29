@@ -32,7 +32,7 @@ const MEDIA_FIELDS = ["images", "audio", "video", "pdf"];
  * Non-data-URL strings (minio://, http://, etc.) pass through unchanged.
  */
 async function uploadIfDataUrl(
-  value: unknown,
+  value: string | object | number | boolean | null | undefined,
   category = FILE_CATEGORIES.UPLOADS,
   project: string | null = null,
   username: string | null = null,
@@ -214,7 +214,10 @@ async function extractNodeResultFiles(
  * Convert a minio:// ref to an HTTP /files/ URL.
  * Non-minio strings (data URLs, http URLs, etc.) pass through unchanged.
  */
-function resolveMinioRef(value: unknown, baseUrl: string) {
+function resolveMinioRef(
+  value: string | object | number | boolean | null | undefined,
+  baseUrl: string,
+) {
   if (typeof value === "string" && value.startsWith("minio://")) {
     const key = value.replace("minio://", "");
     // Use direct MinIO URL when available, otherwise proxy through Prism
@@ -225,37 +228,43 @@ function resolveMinioRef(value: unknown, baseUrl: string) {
   return value;
 }
 
+type TransformedWorkflowNode = {
+  [key: string]: string | number | boolean | null | object | undefined;
+};
+
 /**
  * Walk a workflow document and replace all minio:// refs with HTTP /files/ URLs
  * so the frontend receives browser-renderable URLs directly.
  */
 function resolveWorkflowFileRefs(
-  workflow: Record<string, unknown>,
+  workflow: TransformedWorkflowNode,
   baseUrl: string,
 ) {
   // Resolve nodes
   if (Array.isArray(workflow.nodes)) {
     for (const node of workflow.nodes) {
+      if (!node || typeof node !== "object") continue;
+      const nodeObj = node as TransformedWorkflowNode;
       // Node-level content (asset input nodes)
-      if (typeof (node as Record<string, unknown>).content === "string") {
-        (node as Record<string, unknown>).content = resolveMinioRef(
-          (node as Record<string, unknown>).content,
+      if (typeof nodeObj.content === "string") {
+        nodeObj.content = resolveMinioRef(
+          nodeObj.content,
           baseUrl,
-        );
+        ) as string;
       }
 
       // Messages array (conversation / model nodes)
-      if (Array.isArray((node as Record<string, unknown>).messages)) {
-        for (const message of (node as Record<string, unknown>)
-          .messages as Record<string, unknown>[]) {
+      if (Array.isArray(nodeObj.messages)) {
+        for (const message of nodeObj.messages as TransformedWorkflowNode[]) {
+          if (!message) continue;
           for (const field of MEDIA_FIELDS) {
-            const value = (message as Record<string, unknown>)[field];
+            const value = message[field];
             if (Array.isArray(value)) {
-              (message as Record<string, unknown>)[field] = value.map(
-                (item: unknown) => resolveMinioRef(item, baseUrl),
+              message[field] = value.map(
+                (item: string | object | number | boolean | null | undefined) => resolveMinioRef(item, baseUrl),
               );
             } else if (typeof value === "string") {
-              (message as Record<string, unknown>)[field] = resolveMinioRef(
+              message[field] = resolveMinioRef(
                 value,
                 baseUrl,
               );
@@ -266,21 +275,16 @@ function resolveWorkflowFileRefs(
 
       // Viewer receivedOutputs
       if (
-        (node as Record<string, unknown>).receivedOutputs &&
-        typeof (node as Record<string, unknown>).receivedOutputs === "object"
+        nodeObj.receivedOutputs &&
+        typeof nodeObj.receivedOutputs === "object"
       ) {
-        for (const [modality, data] of Object.entries(
-          (node as Record<string, unknown>).receivedOutputs as Record<
-            string,
-            unknown
-          >,
-        )) {
-          (
-            (node as Record<string, unknown>).receivedOutputs as Record<
-              string,
-              unknown
-            >
-          )[modality] = resolveMinioRef(data, baseUrl);
+        const outputs = nodeObj.receivedOutputs;
+        if (Array.isArray(outputs)) {
+          for (const outputsItem of outputs as TransformedWorkflowNode[]) {
+            resolveWorkflowNodeOutputs(outputsItem, baseUrl);
+          }
+        } else if (outputs && typeof outputs === "object") {
+          resolveWorkflowNodeOutputs(outputs as TransformedWorkflowNode, baseUrl);
         }
       }
     }
@@ -288,40 +292,47 @@ function resolveWorkflowFileRefs(
 
   // Resolve nodeResults: { [nodeId]: { [modality]: value | messagesArray } }
   if (workflow.nodeResults && typeof workflow.nodeResults === "object") {
-    for (const outputs of Object.values(workflow.nodeResults) as Record<
-      string,
-      unknown
-    >[]) {
+    const results = workflow.nodeResults as Record<string, unknown>;
+    for (const outputs of Object.values(results)) {
       if (!outputs || typeof outputs !== "object") continue;
-      for (const [modality, data] of Object.entries(outputs)) {
-        // conversation modality is an array of message objects with nested media
-        if (modality === "conversation" && Array.isArray(data)) {
-          for (const message of data) {
-            for (const field of MEDIA_FIELDS) {
-              const value = (message as Record<string, unknown>)[field];
-              if (Array.isArray(value)) {
-                (message as Record<string, unknown>)[field] = value.map(
-                  (item: unknown) => resolveMinioRef(item, baseUrl),
-                );
-              } else if (typeof value === "string") {
-                (message as Record<string, unknown>)[field] = resolveMinioRef(
-                  value,
-                  baseUrl,
-                );
-              }
-            }
-          }
-        } else {
-          (outputs as Record<string, unknown>)[modality] = resolveMinioRef(
-            data,
-            baseUrl,
-          );
-        }
-      }
+      resolveWorkflowNodeOutputs(outputs as TransformedWorkflowNode, baseUrl);
     }
   }
 
   return workflow;
+}
+
+function resolveWorkflowNodeOutputs(
+  outputs: TransformedWorkflowNode,
+  baseUrl: string,
+) {
+  if (!outputs || typeof outputs !== "object") return;
+  for (const [modality, data] of Object.entries(outputs)) {
+    // conversation modality is an array of message objects with nested media
+    if (modality === "conversation" && Array.isArray(data)) {
+      for (const message of data as TransformedWorkflowNode[]) {
+        if (!message) continue;
+        for (const field of MEDIA_FIELDS) {
+          const value = message[field];
+          if (Array.isArray(value)) {
+            message[field] = value.map(
+              (item: string | object | number | boolean | null | undefined) => resolveMinioRef(item, baseUrl),
+            );
+          } else if (typeof value === "string") {
+            message[field] = resolveMinioRef(
+              value,
+              baseUrl,
+            );
+          }
+        }
+      }
+    } else {
+      outputs[modality] = resolveMinioRef(
+        data,
+        baseUrl,
+      );
+    }
+  }
 }
 
 function getBaseUrl(req: Request) {

@@ -549,7 +549,7 @@ const googleProvider = {
           safetyBlock: true,
         };
       }
-      throw new ProviderError("google", getErrorMessage(error), 500, error);
+      throw new ProviderError("google", getErrorMessage(error), 500, error as Error);
     }
   },
 
@@ -681,7 +681,7 @@ const googleProvider = {
         };
         return;
       }
-      throw new ProviderError("google", getErrorMessage(error), 500, error);
+      throw new ProviderError("google", getErrorMessage(error), 500, error as Error);
     }
   },
 
@@ -999,7 +999,7 @@ const googleProvider = {
     } catch (error: unknown) {
       if (error instanceof Error && error.name === "AbortError") return;
       if (error instanceof ProviderError) throw error;
-      throw new ProviderError("google", getErrorMessage(error), 500, error);
+      throw new ProviderError("google", getErrorMessage(error), 500, error as Error);
     } finally {
       if (session) {
         try {
@@ -1073,7 +1073,7 @@ const googleProvider = {
       };
       return { text: response.text, usage };
     } catch (error: unknown) {
-      throw new ProviderError("google", getErrorMessage(error), 500, error);
+      throw new ProviderError("google", getErrorMessage(error), 500, error as Error);
     }
   },
 
@@ -1143,7 +1143,7 @@ const googleProvider = {
       throw new Error("No image data received from Google AI");
     } catch (error: unknown) {
       if (error instanceof ProviderError) throw error;
-      throw new ProviderError("google", getErrorMessage(error), 500, error);
+      throw new ProviderError("google", getErrorMessage(error), 500, error as Error);
     }
   },
 
@@ -1203,7 +1203,7 @@ const googleProvider = {
       }
     } catch (error: unknown) {
       if (error instanceof ProviderError) throw error;
-      throw new ProviderError("google", getErrorMessage(error), 500, error);
+      throw new ProviderError("google", getErrorMessage(error), 500, error as Error);
     }
   },
 
@@ -1255,7 +1255,7 @@ const googleProvider = {
         },
       };
     } catch (error: unknown) {
-      throw new ProviderError("google", getErrorMessage(error), 500, error);
+      throw new ProviderError("google", getErrorMessage(error), 500, error as Error);
     }
   },
 
@@ -1323,7 +1323,7 @@ const googleProvider = {
         "google",
         getErrorMessage(error),
         getErrorStatus(error as Error),
-        error,
+        error as Error,
       );
     }
   },

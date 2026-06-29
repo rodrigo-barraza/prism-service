@@ -19,20 +19,20 @@ interface SubAgentTelemetryConfig {
   recursionDepth?: number;
 }
 
-function isToolCall(value: unknown): value is ToolCall {
+function isToolCall(value: object | null | undefined): value is ToolCall {
   if (typeof value !== "object" || value === null) {
     return false;
   }
-  const candidate = value as Record<string, unknown>;
+  const candidate = value as Partial<ToolCall>;
   return typeof candidate.name === "string";
 }
 
-function isUsageRecord(value: unknown): value is Record<string, number> {
+function isUsageRecord(value: object | null | undefined): value is Record<string, number> {
   if (typeof value !== "object" || value === null) {
     return false;
   }
-  const candidate = value as Record<string, unknown>;
-  return Object.values(candidate).every((value) => typeof value === "number");
+  const candidate = value as Record<string, number | string | boolean | object | null | undefined>;
+  return Object.values(candidate).every((val) => typeof val === "number");
 }
 
 /**
@@ -245,11 +245,12 @@ export class SubAgentTelemetryEmitter {
           this.emitAggregateProgress();
         }
       } else if (event.type === "tool_execution") {
-        if (event.status === "calling" && isToolCall(event.tool)) {
+        const tool = event.tool as Partial<ToolCall> | null | undefined;
+        if (event.status === "calling" && isToolCall(tool)) {
           this.toolCalls.push({
-            id: event.tool.id ?? null,
-            name: event.tool.name,
-            args: event.tool.args,
+            id: tool.id ?? null,
+            name: tool.name!,
+            args: tool.args,
           });
         }
         // Flush generation progress before tool execution pauses generation
@@ -344,13 +345,14 @@ export class SubAgentTelemetryEmitter {
     // Capture cost and usage from finalizeTextGeneration
     this.totalCost =
       typeof event.estimatedCost === "number" ? event.estimatedCost : null;
-    this.usage = isUsageRecord(event.usage) ? event.usage : null;
+    const usage = event.usage as Record<string, number> | null | undefined;
+    this.usage = isUsageRecord(usage) ? usage : null;
 
-    if (this.parentEmit && isUsageRecord(event.usage)) {
+    if (this.parentEmit && isUsageRecord(usage)) {
       const finalTokPerSec =
         typeof event.tokensPerSec === "number" ? event.tokensPerSec : null;
       const estimatedOutput = estimateTokens(this.cumulativeOutputCharacters);
-      const finalOutputTokens = event.usage.outputTokens || estimatedOutput;
+      const finalOutputTokens = usage.outputTokens || estimatedOutput;
       const burstTokens = estimateTokens(this.burstOutputCharacters);
       this.parentEmit({
         type: "sub_agent_status",

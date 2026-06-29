@@ -23,6 +23,10 @@ import logger from "../utils/logger.ts";
 
 const DEFAULT_LOCALE = "en";
 
+export interface TransformedLocaleFlatObject {
+  [key: string]: unknown;
+}
+
 type LocaleData = Record<string, unknown>;
 
 const localeCache = new Map<string, LocaleData>();
@@ -37,8 +41,8 @@ function getLocalesDirectory(): string {
 function deepFlattenObject(
   source: Record<string, unknown>,
   prefix = "",
-): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
+): TransformedLocaleFlatObject {
+  const result: TransformedLocaleFlatObject = {};
 
   for (const [key, value] of Object.entries(source)) {
     const flatKey = prefix ? `${prefix}.${key}` : key;

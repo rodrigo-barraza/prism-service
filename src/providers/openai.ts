@@ -321,7 +321,7 @@ function convertToolsToResponsesAPI(
 }
 
 /** Narrow any errors into ProviderError for all catch blocks. */
-function toProviderError(error: unknown): never {
+function toProviderError(error: object | string | number | boolean | null | undefined | symbol | Function): never {
   let message = String(error);
   let status = 500;
   if (error && typeof error === "object") {
@@ -338,7 +338,7 @@ function toProviderError(error: unknown): never {
       status = (error as { status: number }).status;
     }
   }
-  throw new ProviderError("openai", message, status, error);
+  throw new ProviderError("openai", message, status, error as Error);
 }
 
 interface ErrorRecord {
@@ -725,7 +725,7 @@ const openaiProvider = {
       }
       return await this._generateTextChatCompletions(messages, model, options);
     } catch (error: unknown) {
-      toProviderError(error);
+      toProviderError(error as Error);
     }
   },
   async _generateTextResponses(
@@ -1089,7 +1089,7 @@ const openaiProvider = {
         error.name === "AbortError"
       )
         return;
-      toProviderError(error);
+      toProviderError(error as Error);
     }
   },
   async *_streamResponses(
@@ -1644,7 +1644,7 @@ const openaiProvider = {
       const response = await getClient().audio.speech.create(payload);
       return { stream: response.body, contentType: "audio/mpeg" };
     } catch (error: unknown) {
-      toProviderError(error);
+      toProviderError(error as Error);
     }
   },
 
@@ -1721,7 +1721,7 @@ const openaiProvider = {
         text: response.data?.[0]?.revised_prompt || "",
       };
     } catch (error: unknown) {
-      toProviderError(error);
+      toProviderError(error as Error);
     }
   },
 
@@ -1755,7 +1755,7 @@ const openaiProvider = {
       const usage = normalizeUsage(response.usage);
       return { text: response.choices[0].message.content, usage };
     } catch (error: unknown) {
-      toProviderError(error);
+      toProviderError(error as Error);
     }
   },
 
@@ -1771,7 +1771,7 @@ const openaiProvider = {
       });
       return { embedding: response.data[0].embedding };
     } catch (error: unknown) {
-      toProviderError(error);
+      toProviderError(error as Error);
     }
   },
 
@@ -1814,7 +1814,7 @@ const openaiProvider = {
         usage,
       };
     } catch (error: unknown) {
-      toProviderError(error);
+      toProviderError(error as Error);
     }
   },
 };
