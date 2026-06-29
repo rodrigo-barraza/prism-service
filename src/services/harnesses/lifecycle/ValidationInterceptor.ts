@@ -12,6 +12,7 @@ import type {
   ValidationFeedback,
 } from "../types.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
+import { HARNESS } from "../../../constants.ts";
 
 /**
  * ValidationInterceptor — automatic linter/AST feedback loop.
@@ -45,7 +46,7 @@ const EXTENSION_VALIDATORS: Record<string, ValidatorConfig> = {
   ".json": { command: null, type: "json-parse" },
 };
 
-const VALIDATION_TIMEOUT_MS = 15_000;
+const VALIDATION_TIMEOUT_MS = HARNESS.VALIDATION_TIMEOUT_MS;
 
 /**
  * Extract the file path from a tool call's arguments.

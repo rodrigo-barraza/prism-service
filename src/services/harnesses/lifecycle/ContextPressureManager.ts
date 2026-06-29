@@ -10,6 +10,7 @@ import {
   DEFAULT_MAX_INPUT_TOKENS,
   DEFAULT_MAX_OUTPUT_TOKENS,
 } from "../../../constants/TokenBudgetDefaults.ts";
+import { HARNESS } from "../../../constants.ts";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
 import type { ChatMessage } from "../../../types/admin.ts";
@@ -38,7 +39,7 @@ import type { ConversationMessage, AgenticContext } from "../types.ts";
  * of duplicated inline code across all harness implementations.
  */
 
-const CONTEXT_PRESSURE_THRESHOLD = 0.7;
+const CONTEXT_PRESSURE_THRESHOLD = HARNESS.CONTEXT_PRESSURE_THRESHOLD;
 
 interface ContextPressureResult {
   messages: ConversationMessage[];

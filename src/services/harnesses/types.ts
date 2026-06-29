@@ -99,6 +99,12 @@ export interface ConversationMessage {
   _alreadyPersisted?: boolean;
   /** Internal marker — planning injection message, stripped on plan exit and DB persistence. */
   _isPlanningInjection?: boolean;
+  /** Notification origin — identifies system-generated messages for deterministic detection.
+   *  Values: "orchestrator" | "timer" | "async-task". Absent on real user messages. */
+  _notificationSource?: string;
+  /** Idempotency key — prevents duplicate notification persistence during race conditions.
+   *  Format: "<source>:<identifier>:<timestamp>". Used by deduplication guards. */
+  _notificationId?: string;
   [key: string]: unknown;
 }
 

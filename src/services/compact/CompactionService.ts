@@ -4,7 +4,7 @@ import SettingsService from "../SettingsService.ts";
 import RequestLogger from "../RequestLogger.ts";
 import logger from "../../utils/logger.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import { PROMPT_DELIMITERS } from "../../constants.ts";
+import { PROMPT_DELIMITERS, COMPACTION } from "../../constants.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
@@ -47,7 +47,7 @@ import type { EmitFunction } from "../harnesses/types.ts";
 //   MAX_CONSECUTIVE_AUTOCOMPACT_FAILURES = 3
 // ────────────────────────────────────────────────────────────
 
-const COMPACT_MAX_OUTPUT_TOKENS = 16_384;
+const COMPACT_MAX_OUTPUT_TOKENS = COMPACTION.COMPACT_MAX_OUTPUT_TOKENS;
 
 /**
  * Circuit breaker: stop retrying after this many consecutive failures.
@@ -56,7 +56,7 @@ const COMPACT_MAX_OUTPUT_TOKENS = 16_384;
  *   "BQ 2026-03-10: 1,279 sessions had 50+ consecutive failures
  *    (up to 3,272) in a single session, wasting ~250K API calls/day globally."
  */
-const MAX_CONSECUTIVE_COMPACT_FAILURES = 3;
+const MAX_CONSECUTIVE_COMPACT_FAILURES = COMPACTION.MAX_CONSECUTIVE_COMPACT_FAILURES;
 
 export interface CompactionResult {
   compactedMessages: AdminChatMessage[];
@@ -375,7 +375,7 @@ export default class CompactionService {
  * Claude Code equivalent: the "messagesToKeep" logic in compact.ts
  * which preserves the last N turns after compaction.
  */
-const RECENT_TAIL_TURN_COUNT = 3;
+const RECENT_TAIL_TURN_COUNT = COMPACTION.RECENT_TAIL_TURN_COUNT;
 
 function extractRecentTail(messages: AdminChatMessage[]): AdminChatMessage[] {
   // Walk backwards counting user turns

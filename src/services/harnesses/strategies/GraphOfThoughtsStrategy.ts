@@ -71,6 +71,7 @@ import {
   restoreSandboxCheckpoint,
 } from "../lifecycle/SandboxExecutor.ts";
 import PlanningModeService from "../../PlanningModeService.ts";
+import { HARNESS } from "../../../constants.ts";
 
 interface IterationPassOptions extends AgenticOptions {
   project: string;
@@ -78,10 +79,12 @@ interface IterationPassOptions extends AgenticOptions {
   username: string;
 }
 
-const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
-const DEFAULT_BRANCH_COUNT = 3;
-const DEFAULT_VALUE_THRESHOLD = 5.0;
-const MAX_PROACTIVE_BACKTRACKS = 3;
+const {
+  MAX_CONSECUTIVE_TOOL_ERRORS,
+  DEFAULT_BRANCH_COUNT,
+  DEFAULT_VALUE_THRESHOLD,
+  MAX_PROACTIVE_BACKTRACKS,
+} = HARNESS;
 
 interface ScoredBranch {
   branchIndex: number;
@@ -956,7 +959,7 @@ async function runPlanningPhase(
   const tools = harness["tools"];
   const { options, project, agent, username, signal } = context;
 
-  const MAX_PLANNING_ITERATIONS = 10;
+  const MAX_PLANNING_ITERATIONS = HARNESS.MAX_PLANNING_ITERATIONS;
 
   await PlanningModeService.injectPlanningInstruction(currentMessages);
 

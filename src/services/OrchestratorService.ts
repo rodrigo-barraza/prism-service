@@ -1787,6 +1787,7 @@ export default class OrchestratorService {
     const { conversationId, project, username } = orchestratorContext;
     if (!conversationId || !project || !username) return;
 
+    const notificationTimestamp = new Date().toISOString();
     const completionMessage = {
       role: "user" as const,
       content: [
@@ -1800,8 +1801,10 @@ export default class OrchestratorService {
         `</result>`,
         `</task-notification>`,
       ].join("\n"),
-      timestamp: new Date().toISOString(),
+      timestamp: notificationTimestamp,
       _alreadyPersisted: true,
+      _notificationSource: "orchestrator",
+      _notificationId: `orchestrator:${options.summary}:${notificationTimestamp}`,
     };
 
     OrchestratorService._triggerParentAutoResponse(

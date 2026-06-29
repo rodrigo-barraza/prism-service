@@ -1,4 +1,5 @@
 import logger from "../../utils/logger.ts";
+import { COMPACTION } from "../../constants.ts";
 
 // ────────────────────────────────────────────────────────────
 // AutoCompactionTrigger — Threshold-Based Auto-Compact
@@ -21,17 +22,9 @@ import logger from "../../utils/logger.ts";
 //   autoCompactThreshold = effectiveWindow - 13_000
 // ────────────────────────────────────────────────────────────
 
-/** Buffer tokens reserved for the compaction summary output. */
-const MAX_OUTPUT_TOKENS_FOR_SUMMARY = 20_000;
-
-/**
- * Buffer between the effective context window and the auto-compact trigger.
- * Matches Claude Code's AUTOCOMPACT_BUFFER_TOKENS constant.
- */
-const AUTOCOMPACT_BUFFER_TOKENS = 13_000;
-
-/** Minimum messages required before auto-compaction can trigger. */
-const MINIMUM_MESSAGES_FOR_COMPACTION = 6;
+const MAX_OUTPUT_TOKENS_FOR_SUMMARY = COMPACTION.MAX_OUTPUT_TOKENS_FOR_SUMMARY;
+const AUTOCOMPACT_BUFFER_TOKENS = COMPACTION.AUTOCOMPACT_BUFFER_TOKENS;
+const MINIMUM_MESSAGES_FOR_COMPACTION = COMPACTION.MINIMUM_MESSAGES_FOR_COMPACTION;
 
 export interface AutoCompactThresholdResult {
   threshold: number;

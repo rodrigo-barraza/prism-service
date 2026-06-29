@@ -3,6 +3,7 @@ import { Router, Request, Response } from "express";
 import OrchestratorService from "../services/OrchestratorService.ts";
 import logger from "../utils/logger.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { ORCHESTRATOR } from "../constants.ts";
 
 interface SubAgentSummary {
   agentId: string;
@@ -74,7 +75,7 @@ router.get(
         // store `parentConversationId` → parent's `id`, and
         // `parentAgentConversationId` → parent's `agentConversationId`.
         // Seed the frontier with both IDs and query with $or at every hop.
-        const MAX_DESCENDANT_DEPTH = 10;
+        const MAX_DESCENDANT_DEPTH = ORCHESTRATOR.AGENT_TREE_DISCOVERY_MAX_DEPTH;
         let frontier: string[] = [conversationIdentifier];
         const visitedConversationIds = new Set<string>([
           conversationIdentifier,

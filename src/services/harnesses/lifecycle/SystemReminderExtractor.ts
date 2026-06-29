@@ -2,6 +2,7 @@ import logger from "../../../utils/logger.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
 import PromptLocaleService from "../../PromptLocaleService.ts";
 import RequestLogger from "../../RequestLogger.ts";
+import { HARNESS } from "../../../constants.ts";
 
 import type { LLMProvider } from "../types.ts";
 
@@ -28,8 +29,8 @@ import type { LLMProvider } from "../types.ts";
  *   - Fails silently (returns null) on any error
  */
 
-const EXTRACTION_MAX_TOKENS = 600;
-const EXTRACTION_TIMEOUT_MILLISECONDS = 15_000;
+const EXTRACTION_MAX_TOKENS = HARNESS.EXTRACTION_MAX_TOKENS;
+const EXTRACTION_TIMEOUT_MILLISECONDS = HARNESS.EXTRACTION_TIMEOUT_MS;
 
 const EXTRACTION_PROMPT = PromptLocaleService.get(
   "en",

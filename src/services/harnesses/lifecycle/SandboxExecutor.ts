@@ -6,6 +6,7 @@ import {
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import type { EmitFunction } from "../types.ts";
+import { HARNESS } from "../../../constants.ts";
 
 /**
  * SandboxExecutor — git-based filesystem checkpointing and rollback.
@@ -35,7 +36,7 @@ import type { EmitFunction } from "../types.ts";
  *   - Fails open (logs warning, doesn't block execution)
  */
 
-const COMMAND_TIMEOUT_MILLISECONDS = 15_000;
+const COMMAND_TIMEOUT_MILLISECONDS = HARNESS.COMMAND_TIMEOUT_MS;
 
 /**
  * Create a filesystem checkpoint before destructive tool execution.

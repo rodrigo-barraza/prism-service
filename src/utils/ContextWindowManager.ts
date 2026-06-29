@@ -3,7 +3,7 @@ import { estimateTokens } from "./CostCalculator.ts";
 import type { ChatMessage, ToolCallEntry } from "../types/admin.ts";
 import MicroCompactionService from "../services/compact/MicroCompactionService.ts";
 import PromptLocaleService from "../services/PromptLocaleService.ts";
-import { PROMPT_DELIMITERS } from "../constants.ts";
+import { PROMPT_DELIMITERS, CONTEXT_WINDOW, COMPACTION } from "../constants.ts";
 import {
   DEFAULT_MAX_INPUT_TOKENS,
   MIN_OUTPUT_RESERVE,
@@ -27,16 +27,16 @@ import {
 // ────────────────────────────────────────────────────────────
 
 /** Default overhead for tool schemas, internal formatting, etc. */
-const TOOL_SCHEMA_OVERHEAD_TOKENS = 2000;
+const TOOL_SCHEMA_OVERHEAD_TOKENS = CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS;
 
 /** Fraction of context window to target (leave headroom for output + safety) */
-const TARGET_UTILIZATION = 0.8;
+const TARGET_UTILIZATION = CONTEXT_WINDOW.TARGET_UTILIZATION;
 
 /** When truncating tool results aggressively, cap at this many chars */
-const AGGRESSIVE_TOOL_RESULT_CAP = 3000;
+const AGGRESSIVE_TOOL_RESULT_CAP = CONTEXT_WINDOW.AGGRESSIVE_TOOL_RESULT_CAP;
 
 /** Number of recent turns to always preserve (never compress) */
-const PROTECTED_RECENT_TURNS = 4;
+const PROTECTED_RECENT_TURNS = COMPACTION.PROTECTED_RECENT_TURNS;
 
 interface EnforceOptions {
   maxInputTokens?: number;
