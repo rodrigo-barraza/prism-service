@@ -534,15 +534,24 @@ async function triggerAsyncTaskAutoResponse(
     { collection: collectionNames.AGENT_CONVERSATIONS },
   );
 
-  // Build the context messages from the existing conversation + the
-  // in-memory completion message. Do NOT reload from DB — the round-trip
-  // strips the _alreadyPersisted flag, causing the Finalizer to persist
-  // the completion message a second time (duplicate message bug).
-  // Follows the ConversationTimerService.executeAgenticLoop pattern.
-  const contextMessages = [
-    ...((conversation.messages as Array<Record<string, unknown>>) || []),
-    completionMessage,
-  ];
+  // Reload the conversation from DB (source of truth) to get the freshest
+  // message array, including any messages added concurrently.
+  const updatedConversation = await conversationCollection.findOne({
+    id: conversationId,
+    project,
+    username,
+  });
+
+  if (!updatedConversation) return;
+
+  // Reconstruct transient _alreadyPersisted flag: every message loaded
+  // from MongoDB is by definition already persisted. Without this, the
+  // Finalizer re-persists the completion message (it's the last message
+  // in the array, so AgenticLoopService's [0..n-2] marking skips it).
+  const freshMessages = (updatedConversation.messages || []) as Array<Record<string, unknown>>;
+  for (const message of freshMessages) {
+    message._alreadyPersisted = true;
+  }
 
   // Resolve emit from WebSocketConnectionRegistry
   const registeredEmit = WebSocketConnectionRegistry.getEmitFunction(conversationId);
@@ -562,7 +571,7 @@ async function triggerAsyncTaskAutoResponse(
   }
 
   // Resolve provider/model from conversation settings
-  const settings = (conversation.settings || {}) as Record<string, unknown>;
+  const settings = (updatedConversation.settings || {}) as Record<string, unknown>;
   const providerName = settings.provider as string;
   const resolvedModel = settings.model as string;
   const agent = settings.agent as string | null;
@@ -584,7 +593,7 @@ async function triggerAsyncTaskAutoResponse(
       {
         provider: providerName,
         model: resolvedModel,
-        messages: contextMessages,
+        messages: freshMessages,
         conversationId,
         agent,
         project,
