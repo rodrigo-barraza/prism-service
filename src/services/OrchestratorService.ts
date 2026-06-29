@@ -2338,28 +2338,39 @@ export default class OrchestratorService {
       return;
     }
 
-    const provider = getProvider(providerName);
-    const { getModelByName } = await import("../config.js");
-    const modelDefinition = getModelByName(resolvedModel);
+    // Persist the completion message to the conversation so it appears in
+    // the message history (audit trail) and handleAgent reads it as the
+    // last user message in the array.
+    await ConversationService.appendMessages(
+      conversationId,
+      project,
+      username,
+      [completionMessage],
+      null,
+      { collection: COLLECTIONS.AGENT_CONVERSATIONS },
+    );
 
-    if (!provider) {
+    // Reload the conversation to get the updated message array
+    const updatedConversation = await conversationCollection.findOne({
+      id: conversationId,
+      project,
+      username,
+    });
+
+    if (!updatedConversation) {
       logger.warn(
-        `[Orchestrator] Cannot trigger auto-response: provider ${providerName} unavailable`,
+        `[Orchestrator] Conversation ${conversationId} disappeared after appending completion message`,
       );
       return;
     }
 
-    // The completion message is ephemeral (never persisted to DB), so it's
-    // always appended to the context for this auto-response invocation.
-    // Attempt to find a live WebSocket connection for this conversation
-    // so the auto-response streams directly to the client (Antigravity
-    // reactive wake-up pattern). Falls back to debug logging when no
-    // active connection exists (headless/API mode).
+    // Resolve emit from WebSocketConnectionRegistry (Antigravity reactive
+    // wake-up pattern). Falls back to debug logging for headless/API mode.
     const { default: WebSocketConnectionRegistry } =
       await import("../websocket/WebSocketConnectionRegistry.ts");
     const registeredEmit = WebSocketConnectionRegistry.getEmitFunction(conversationId);
 
-    const backgroundEmit = registeredEmit || ((event: {
+    const autoResponseEmit = registeredEmit || ((event: {
       type: string;
       [key: string]: unknown;
     }) => {
@@ -2378,77 +2389,51 @@ export default class OrchestratorService {
       );
     }
 
-    // _alreadyPersisted: true ensures the Finalizer won't persist it.
-    const contextMessages = [
-      ...((conversation.messages as ConversationMessage[]) || []),
-      completionMessage,
-    ];
+    // Route through the full handleAgent pipeline — same path as a real
+    // user-triggered agent message. This gives us SSE framing, request
+    // logging, cost tracking, persona injection, and proper error handling.
+    const { handleAgent } = await import("../routes/ChatRoutes.ts");
 
-    // Mark conversation as generating so the client shows the typing indicator
-    await ConversationService.setGenerating(
+    const autoResponseParams = {
+      provider: providerName,
+      model: resolvedModel,
+      messages: updatedConversation.messages || [],
       conversationId,
+      agent,
       project,
       username,
-      true,
-      {
-        collection: COLLECTIONS.AGENT_CONVERSATIONS,
-        agent: agent || undefined,
-      },
-    );
-
-    const { default: AgenticLoopService } =
-      await import("./AgenticLoopService.ts");
+      clientIp: "auto-response",
+      agenticLoopEnabled: true,
+      functionCallingEnabled: true,
+      autoApprove: true,
+      planFirst: false,
+      minContextLength: 120_000,
+      ...(workspaceRoot ? { workspaceRoot } : {}),
+      ...(orchestratorContext.thinkingEnabled !== undefined && {
+        thinkingEnabled: orchestratorContext.thinkingEnabled,
+      }),
+      ...(orchestratorContext.reasoningEffort !== undefined && {
+        reasoningEffort: orchestratorContext.reasoningEffort,
+      }),
+      ...(orchestratorContext.thinkingBudget !== undefined && {
+        thinkingBudget: orchestratorContext.thinkingBudget,
+      }),
+      ...(typeof settings.toolConfig === "object" &&
+      settings.toolConfig !== null
+        ? {
+            enabledTools: (settings.toolConfig as Record<string, unknown>)
+              .enabledTools as string[] | undefined,
+            disabledTools: (settings.toolConfig as Record<string, unknown>)
+              .disabledTools as string[] | undefined,
+          }
+        : {}),
+    };
 
     try {
-      await AgenticLoopService.runAgenticLoop({
-        provider: provider as unknown as LLMProvider,
-        providerName,
-        resolvedModel,
-        modelDefinition,
-        messages: contextMessages,
-        originalMessages: contextMessages,
-        options: {
-          agenticLoopEnabled: true,
-          functionCallingEnabled: true,
-          planFirst: false,
-          autoApprove: true,
-          minContextLength: 120_000,
-          ...(orchestratorContext.thinkingEnabled !== undefined && {
-            thinkingEnabled: orchestratorContext.thinkingEnabled,
-          }),
-          ...(orchestratorContext.reasoningEffort !== undefined && {
-            reasoningEffort: orchestratorContext.reasoningEffort,
-          }),
-          ...(orchestratorContext.thinkingBudget !== undefined && {
-            thinkingBudget: orchestratorContext.thinkingBudget,
-          }),
-          ...(typeof settings.toolConfig === "object" &&
-          settings.toolConfig !== null
-            ? {
-                enabledTools: (settings.toolConfig as Record<string, unknown>)
-                  .enabledTools as string[] | undefined,
-                disabledTools: (settings.toolConfig as Record<string, unknown>)
-                  .disabledTools as string[] | undefined,
-              }
-            : {}),
-        },
-        agentConversationId: crypto.randomUUID(),
-        conversationId,
-        userMessage: completionMessage,
-        conversationMeta: {
-          title: (conversation.title as string) || "Sub-Agent Auto-Response",
-          settings,
-        },
-        traceId: (conversation.traceId as string) || crypto.randomUUID(),
-        project,
-        username,
-        clientIp: "127.0.0.1",
-        agent,
-        workspaceRoot,
-        requestId: crypto.randomUUID(),
-        requestStart: performance.now(),
-        emit: backgroundEmit,
-      });
+      await handleAgent(
+        autoResponseParams as Record<string, unknown>,
+        autoResponseEmit as unknown as (event: import("../types/SseTypes.ts").SseEvent) => void,
+      );
 
       logger.success(
         `[Orchestrator] Parent auto-response completed for conversation ${conversationId}`,
@@ -2458,14 +2443,6 @@ export default class OrchestratorService {
         `[Orchestrator] Parent auto-response error for conversation ${conversationId}: ${getErrorMessage(autoResponseError)}`,
       );
       throw autoResponseError;
-    } finally {
-      await ConversationService.setGenerating(
-        conversationId,
-        project,
-        username,
-        false,
-        { collection: COLLECTIONS.AGENT_CONVERSATIONS },
-      ).catch(() => {});
     }
   }
 }

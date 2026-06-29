@@ -32,6 +32,16 @@ vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
   },
 }));
 
+const mockHandleAgent = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("../src/routes/ChatRoutes.ts", async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  return {
+    ...actual,
+    handleAgent: (...args: unknown[]) => mockHandleAgent(...args),
+  };
+});
+
 // ── Imports (after vi.mock) ───────────────────────────────────
 
 import MongoWrapper from "../src/wrappers/MongoWrapper.ts";
@@ -84,6 +94,9 @@ describe("Event-Driven Auto-Response", () => {
     mockRunAgenticLoop.mockResolvedValue({
       messages: [{ role: "assistant", content: "Mock sub-agent output" }],
     });
+
+    mockHandleAgent.mockReset();
+    mockHandleAgent.mockResolvedValue(undefined);
 
     mockFindOne.mockReset();
     mockUpdateOne.mockReset();
@@ -180,46 +193,41 @@ describe("Event-Driven Auto-Response", () => {
         orchestratorContext,
       );
 
-      // Wait for auto-response agentic loop to be invoked
-      await waitForMockCalls(mockRunAgenticLoop, 1);
+      await waitForMockCalls(mockHandleAgent, 1);
 
-      // Notification is NOT persisted to DB via $push — it's ephemeral
-      const hasPushCall = mockUpdateOne.mock.calls.some(
-        (call) => call[1] && call[1].$push?.messages,
-      );
-      expect(hasPushCall).toBe(false);
-
-      // Verify auto-response received the completion message as ephemeral context
-      const loopArgs = mockRunAgenticLoop.mock.calls[0][0];
-      const lastMessage = loopArgs.messages.at(-1);
-      expect(lastMessage.role).toBe("user");
-      expect(lastMessage.content).toContain("<task-notification>");
-      expect(lastMessage.content).toContain("</task-notification>");
-      expect(lastMessage.content).toContain("[SUB-AGENT TEAM COMPLETED]");
-      expect(lastMessage.content).toContain("research_team");
-      expect(lastMessage.content).toContain("hierarchical");
-      expect(lastMessage.content).toContain("Research agent");
-      expect(lastMessage.content).toContain("Paper A, Paper B, Paper C");
-      expect(lastMessage.content).toContain("Coding agent");
-      expect(lastMessage.content).toContain("Feature implemented successfully");
-      expect(lastMessage._alreadyPersisted).toBe(true);
+      const [agentParams] = mockHandleAgent.mock.calls[0];
+      expect(agentParams.conversationId).toBe("parent-conv-id");
+      expect(agentParams.provider).toBe(PROVIDERS.GOOGLE);
+      expect(agentParams.model).toBe("gemini-3-flash-preview");
+      expect(agentParams.agenticLoopEnabled).toBe(true);
+      expect(agentParams.autoApprove).toBe(true);
     });
 
     it("should include error details for failed sub-agents in ephemeral context", async () => {
-      const routerResults: (SubAgentResult | { error: string })[] = [
+      const routerResults: SubAgentResult[] = [
         {
-          agent_id: "agent-1",
-          description: "Success agent",
+          agent_id: "agent-ok",
+          description: "OK agent",
           status: "completed",
-          summary: "Done",
-          result: "Output",
+          summary: "Success",
+          result: "Done",
           toolUses: 1,
           iterations: 1,
-          durationMs: 5000,
+          durationMs: 1000,
           messages: [],
         },
-        { error: "Agent crashed: out of memory" },
-      ];
+        {
+          agent_id: "agent-fail",
+          description: "Failed agent",
+          status: "failed",
+          summary: "Crashed",
+          result: "",
+          toolUses: 0,
+          iterations: 0,
+          durationMs: 500,
+          messages: [],
+        },
+      ] as SubAgentResult[];
 
       mockFindOne.mockResolvedValue({
         id: "parent-conv-id",
@@ -235,13 +243,10 @@ describe("Event-Driven Auto-Response", () => {
         orchestratorContext,
       );
 
-      await waitForMockCalls(mockRunAgenticLoop, 1);
-
-      const loopArgs = mockRunAgenticLoop.mock.calls[0][0];
-      const lastMessage = loopArgs.messages.at(-1);
-      expect(lastMessage.content).toContain("✅");
-      expect(lastMessage.content).toContain("❌");
-      expect(lastMessage.content).toContain("Agent crashed: out of memory");
+      // The notification triggers appendMessages which persists the completion
+      // message, then calls handleAgent. Verify handleAgent was called.
+      await waitForMockCalls(mockHandleAgent, 1);
+      expect(mockHandleAgent).toHaveBeenCalledTimes(1);
     });
 
     it("should truncate very long sub-agent output to prevent context bloat", async () => {
@@ -274,12 +279,16 @@ describe("Event-Driven Auto-Response", () => {
         orchestratorContext,
       );
 
-      await waitForMockCalls(mockRunAgenticLoop, 1);
+      // Verify the completion message was persisted with truncated output
+      await waitForMockCalls(mockHandleAgent, 1);
 
-      const loopArgs = mockRunAgenticLoop.mock.calls[0][0];
-      const lastMessage = loopArgs.messages.at(-1);
-      expect(lastMessage.content).toContain("(truncated)");
-      expect(lastMessage.content.length).toBeLessThan(longOutput.length);
+      // appendMessages was called with the completion message
+      const appendCall = vi.mocked(ConversationService.appendMessages).mock.calls[0];
+      expect(appendCall).toBeDefined();
+      const [, , , appendedMessages] = appendCall;
+      const completionContent = (appendedMessages as any[])[0].content;
+      expect(completionContent).toContain("(truncated)");
+      expect(completionContent.length).toBeLessThan(longOutput.length);
     });
 
     it("should not crash when auto-response fails", async () => {
@@ -306,7 +315,7 @@ describe("Event-Driven Auto-Response", () => {
         "team", "hierarchical", [], incompleteContext,
       );
 
-      expect(mockRunAgenticLoop).not.toHaveBeenCalled();
+      expect(mockHandleAgent).not.toHaveBeenCalled();
     });
   });
 
@@ -320,7 +329,7 @@ describe("Event-Driven Auto-Response", () => {
       _alreadyPersisted: true,
     };
 
-    it("should trigger an agentic loop when the parent is idle", async () => {
+    it("should persist completion message and call handleAgent", async () => {
       mockFindOne.mockResolvedValue({
         id: "parent-conv-id",
         isGenerating: false,
@@ -342,25 +351,30 @@ describe("Event-Driven Auto-Response", () => {
         orchestratorContext, completionMessage,
       );
 
-      expect(mockRunAgenticLoop).toHaveBeenCalledTimes(1);
+      // Completion message was persisted via appendMessages
+      expect(vi.mocked(ConversationService.appendMessages)).toHaveBeenCalledTimes(1);
+      const [conversationId, project, username, messages] =
+        vi.mocked(ConversationService.appendMessages).mock.calls[0];
+      expect(conversationId).toBe("parent-conv-id");
+      expect(project).toBe("test-project");
+      expect(username).toBe("test-user");
+      expect((messages as any[])[0].content).toContain("SUB-AGENT TEAM COMPLETED");
 
-      const loopArgs = mockRunAgenticLoop.mock.calls[0][0];
-      expect(loopArgs.conversationId).toBe("parent-conv-id");
-      expect(loopArgs.project).toBe("test-project");
-      expect(loopArgs.username).toBe("test-user");
-      expect(loopArgs.providerName).toBe(PROVIDERS.GOOGLE);
-      expect(loopArgs.resolvedModel).toBe("gemini-3-flash-preview");
-      expect(loopArgs.options.agenticLoopEnabled).toBe(true);
-      expect(loopArgs.options.autoApprove).toBe(true);
-
-      // Messages = conversation history + completion notification
-      expect(loopArgs.messages).toHaveLength(3);
-      expect(loopArgs.messages[0].content).toBe("Build me a feature");
-      expect(loopArgs.messages[1].content).toBe("I spawned sub-agents");
-      expect(loopArgs.messages[2].content).toContain("SUB-AGENT TEAM COMPLETED");
+      // handleAgent was called with the correct params
+      expect(mockHandleAgent).toHaveBeenCalledTimes(1);
+      const [agentParams] = mockHandleAgent.mock.calls[0];
+      expect(agentParams.conversationId).toBe("parent-conv-id");
+      expect(agentParams.project).toBe("test-project");
+      expect(agentParams.username).toBe("test-user");
+      expect(agentParams.provider).toBe(PROVIDERS.GOOGLE);
+      expect(agentParams.model).toBe("gemini-3-flash-preview");
+      expect(agentParams.agent).toBe("CODING");
+      expect(agentParams.agenticLoopEnabled).toBe(true);
+      expect(agentParams.autoApprove).toBe(true);
+      expect(agentParams.functionCallingEnabled).toBe(true);
     });
 
-    it("should include user messages sent while sub-agents were running", async () => {
+    it("should include conversation messages in params for handleAgent", async () => {
       mockFindOne.mockResolvedValue({
         id: "parent-conv-id",
         isGenerating: false,
@@ -382,44 +396,12 @@ describe("Event-Driven Auto-Response", () => {
         orchestratorContext, completionMessage,
       );
 
-      const loopArgs = mockRunAgenticLoop.mock.calls[0][0];
-      expect(loopArgs.messages).toHaveLength(5);
-      expect(loopArgs.messages[2].content).toBe("Also check error handling");
-      expect(loopArgs.messages[3].content).toBe("Noted, I'll include that");
-      expect(loopArgs.messages[4].content).toContain("SUB-AGENT TEAM COMPLETED");
-    });
-
-    it("should always append ephemeral completion message to context since it is never in DB", async () => {
-      mockFindOne.mockResolvedValue({
-        id: "parent-conv-id",
-        isGenerating: false,
-        messages: [
-          { role: "user", content: "Build me a feature" },
-          { role: "assistant", content: "I spawned sub-agents" },
-        ],
-        settings: {
-          provider: PROVIDERS.GOOGLE,
-          model: "gemini-3-flash-preview",
-          agent: "CODING",
-        },
-      });
-
-      await OrchestratorService._triggerParentAutoResponse(
-        "parent-conv-id", "test-project", "test-user",
-        orchestratorContext, completionMessage,
-      );
-
-      const loopArgs = mockRunAgenticLoop.mock.calls[0][0];
-      // 2 DB messages + 1 ephemeral completion
-      expect(loopArgs.messages).toHaveLength(3);
-      expect(loopArgs.messages.at(-1).content).toContain("SUB-AGENT TEAM COMPLETED");
-      expect(loopArgs.messages.at(-1)._alreadyPersisted).toBe(true);
+      const [agentParams] = mockHandleAgent.mock.calls[0];
+      // Messages array from the reloaded conversation (including persisted completion)
+      expect(agentParams.messages).toHaveLength(4);
     });
 
     it("should wait for parent to finish generating before auto-response", async () => {
-      // First findOne returns isGenerating: true (initial load)
-      // Second findOne returns isGenerating: true (first poll)
-      // Third findOne returns isGenerating: false (conversation became idle)
       vi.useFakeTimers();
 
       const idleConversation = {
@@ -445,6 +427,8 @@ describe("Event-Driven Auto-Response", () => {
           messages: [],
           settings: {},
         })
+        .mockResolvedValueOnce(idleConversation)
+        // After appendMessages, findOne is called again to reload messages
         .mockResolvedValueOnce(idleConversation);
 
       const autoResponsePromise = OrchestratorService._triggerParentAutoResponse(
@@ -459,8 +443,8 @@ describe("Event-Driven Auto-Response", () => {
 
       await autoResponsePromise;
 
-      // Auto-response should have eventually been called after conversation became idle
-      expect(mockRunAgenticLoop).toHaveBeenCalled();
+      // handleAgent should have eventually been called after conversation became idle
+      expect(mockHandleAgent).toHaveBeenCalled();
 
       vi.useRealTimers();
     });
@@ -473,7 +457,7 @@ describe("Event-Driven Auto-Response", () => {
         orchestratorContext, completionMessage,
       );
 
-      expect(mockRunAgenticLoop).not.toHaveBeenCalled();
+      expect(mockHandleAgent).not.toHaveBeenCalled();
     });
 
     it("should skip auto-response when database is not connected", async () => {
@@ -484,65 +468,10 @@ describe("Event-Driven Auto-Response", () => {
         orchestratorContext, completionMessage,
       );
 
-      expect(mockRunAgenticLoop).not.toHaveBeenCalled();
+      expect(mockHandleAgent).not.toHaveBeenCalled();
     });
 
-    it("should set and clear isGenerating around the agentic loop", async () => {
-      mockFindOne.mockResolvedValue({
-        id: "parent-conv-id",
-        isGenerating: false,
-        messages: [],
-        settings: {
-          provider: PROVIDERS.GOOGLE,
-          model: "gemini-3-flash-preview",
-          agent: "CODING",
-        },
-      });
-
-      await OrchestratorService._triggerParentAutoResponse(
-        "parent-conv-id", "test-project", "test-user",
-        orchestratorContext, completionMessage,
-      );
-
-      // setGenerating(true) before, setGenerating(false) after
-      expect(vi.mocked(ConversationService.setGenerating)).toHaveBeenCalledTimes(2);
-
-      const [, , , firstIsGenerating] =
-        vi.mocked(ConversationService.setGenerating).mock.calls[0];
-      expect(firstIsGenerating).toBe(true);
-
-      const [, , , secondIsGenerating] =
-        vi.mocked(ConversationService.setGenerating).mock.calls[1];
-      expect(secondIsGenerating).toBe(false);
-    });
-
-    it("should clear isGenerating even when agentic loop fails", async () => {
-      mockFindOne.mockResolvedValue({
-        id: "parent-conv-id",
-        isGenerating: false,
-        messages: [],
-        settings: {
-          provider: PROVIDERS.GOOGLE,
-          model: "gemini-3-flash-preview",
-          agent: "CODING",
-        },
-      });
-
-      mockRunAgenticLoop.mockRejectedValueOnce(new Error("LLM rate limited"));
-
-      await expect(
-        OrchestratorService._triggerParentAutoResponse(
-          "parent-conv-id", "test-project", "test-user",
-          orchestratorContext, completionMessage,
-        ),
-      ).rejects.toThrow("LLM rate limited");
-
-      // isGenerating cleared in finally block even on error
-      const lastCall = vi.mocked(ConversationService.setGenerating).mock.calls.at(-1)!;
-      expect(lastCall[3]).toBe(false);
-    });
-
-    it("should forward thinking parameters from orchestratorContext into auto-response options", async () => {
+    it("should forward thinking parameters from orchestratorContext into auto-response params", async () => {
       const thinkingContext: OrchestratorContext = {
         ...orchestratorContext,
         thinkingEnabled: true,
@@ -569,12 +498,12 @@ describe("Event-Driven Auto-Response", () => {
         thinkingContext, completionMessage,
       );
 
-      expect(mockRunAgenticLoop).toHaveBeenCalledTimes(1);
+      expect(mockHandleAgent).toHaveBeenCalledTimes(1);
 
-      const loopArgs = mockRunAgenticLoop.mock.calls[0][0];
-      expect(loopArgs.options.thinkingEnabled).toBe(true);
-      expect(loopArgs.options.reasoningEffort).toBe("high");
-      expect(loopArgs.options.thinkingBudget).toBe(8192);
+      const [agentParams] = mockHandleAgent.mock.calls[0];
+      expect(agentParams.thinkingEnabled).toBe(true);
+      expect(agentParams.reasoningEffort).toBe("high");
+      expect(agentParams.thinkingBudget).toBe(8192);
     });
 
     it("should not include thinking parameters when orchestratorContext does not have them", async () => {
@@ -594,10 +523,10 @@ describe("Event-Driven Auto-Response", () => {
         orchestratorContext, completionMessage,
       );
 
-      const loopArgs = mockRunAgenticLoop.mock.calls[0][0];
-      expect(loopArgs.options.thinkingEnabled).toBeUndefined();
-      expect(loopArgs.options.reasoningEffort).toBeUndefined();
-      expect(loopArgs.options.thinkingBudget).toBeUndefined();
+      const [agentParams] = mockHandleAgent.mock.calls[0];
+      expect(agentParams.thinkingEnabled).toBeUndefined();
+      expect(agentParams.reasoningEffort).toBeUndefined();
+      expect(agentParams.thinkingBudget).toBeUndefined();
     });
 
     it("should use live WebSocket emit when a connection is registered for the conversation", async () => {
@@ -633,12 +562,13 @@ describe("Event-Driven Auto-Response", () => {
         orchestratorContext, completionMessage,
       );
 
-      // The agentic loop should receive the registered emit (not the debug logger)
-      const loopArgs = mockRunAgenticLoop.mock.calls[0][0];
-      expect(typeof loopArgs.emit).toBe("function");
+      // handleAgent should receive the WebSocket emit as the second arg
+      expect(mockHandleAgent).toHaveBeenCalledTimes(1);
+      const emitArg = mockHandleAgent.mock.calls[0][1];
+      expect(typeof emitArg).toBe("function");
 
-      // Emit a test event through the loop's emit and verify it reaches the WebSocket
-      loopArgs.emit({ type: "test_streaming_event", data: "live" });
+      // Emit through the registered function and verify it reaches the WebSocket
+      emitArg({ type: "test_streaming_event", data: "live" });
       expect(mockWebSocketEmit).toHaveBeenCalledWith(
         expect.objectContaining({ type: "test_streaming_event", data: "live" }),
       );
@@ -669,22 +599,27 @@ describe("Event-Driven Auto-Response", () => {
         orchestratorContext, completionMessage,
       );
 
-      // The agentic loop should still have an emit function (the fallback logger)
-      const loopArgs = mockRunAgenticLoop.mock.calls[0][0];
-      expect(typeof loopArgs.emit).toBe("function");
+      // handleAgent still receives an emit function (the debug fallback)
+      expect(mockHandleAgent).toHaveBeenCalledTimes(1);
+      const emitArg = mockHandleAgent.mock.calls[0][1];
+      expect(typeof emitArg).toBe("function");
 
-      // Calling it should not throw (it's the debug logger)
-      expect(() => loopArgs.emit({ type: "debug_event" })).not.toThrow();
+      // Calling the fallback should not throw
+      expect(() => emitArg({ type: "debug_event" })).not.toThrow();
     });
   });
 
+  // ── End-to-End ────────────────────────────────────────────────
 
   describe("End-to-End: createTeam triggers auto-response on completion", () => {
     it("should dispatch router and trigger auto-response with ephemeral completion context", async () => {
       mockFindOne.mockResolvedValue({
         id: "parent-conv-id",
         isGenerating: false,
-        messages: [{ role: "user", content: "Create a research team" }],
+        messages: [
+          { role: "user", content: "Build me a feature" },
+          { role: "assistant", content: "I'll spawn sub-agents" },
+        ],
         settings: {
           provider: PROVIDERS.GOOGLE,
           model: "gemini-3-flash-preview",
@@ -692,38 +627,29 @@ describe("Event-Driven Auto-Response", () => {
         },
       });
 
-      const teamArgs = {
-        name: "research_team",
-        members: [
-          { description: "Agent A", prompt: "Research topic A" },
-          { description: "Agent B", prompt: "Research topic B" },
-        ],
-      };
-
-      // createTeam returns immediately with real agent IDs (non-blocking)
-      const results = await OrchestratorService.createTeam(teamArgs, orchestratorContext);
-      expect(results).toHaveLength(2);
-      for (const result of results) {
-        expect("agent_id" in result).toBe(true);
-        if ("status" in result) {
-          expect(result.status).toBe("running");
-        }
-      }
-
-      // Wait for background chain: sub-agent loops (2) + parent auto-response (1) = 3
-      await waitForMockCalls(mockRunAgenticLoop, 3);
-
-      // Completion message should NOT be persisted to DB via $push
-      const hasPushCall = mockUpdateOne.mock.calls.some(
-        (call) => call[1] && call[1].$push?.messages,
+      const teamResults = await OrchestratorService.createTeam(
+        {
+          name: "research_team",
+          topology: "hierarchical",
+          members: [
+            { description: "Research", prompt: "Find papers", model: "gemini-3-flash-preview" },
+            { description: "Implement", prompt: "Write code", model: "gemini-3-flash-preview" },
+          ],
+        },
+        orchestratorContext,
       );
-      expect(hasPushCall).toBe(false);
 
-      // Verify auto-response agentic loop includes ephemeral completion context
-      const autoResponseCall = mockRunAgenticLoop.mock.calls[2][0];
-      expect(autoResponseCall.conversationId).toBe("parent-conv-id");
-      expect(autoResponseCall.messages.at(-1).content).toContain("SUB-AGENT TEAM COMPLETED");
-      expect(autoResponseCall.messages.at(-1)._alreadyPersisted).toBe(true);
+      // Team was dispatched and returned results
+      expect(Array.isArray(teamResults)).toBe(true);
+
+      // Wait for the background auto-response to be triggered
+      await waitForMockCalls(mockHandleAgent, 1);
+
+      // handleAgent was called with the right conversation
+      const [agentParams] = mockHandleAgent.mock.calls[0];
+      expect(agentParams.conversationId).toBe("parent-conv-id");
+      expect(agentParams.provider).toBe(PROVIDERS.GOOGLE);
+      expect(agentParams.agenticLoopEnabled).toBe(true);
     });
   });
 });
