@@ -19,6 +19,7 @@
  */
 
 import logger from "../../../utils/logger.ts";
+import { LOG_PREVIEW } from "../../../constants.ts";
 import PromptLocaleService from "../../PromptLocaleService.ts";
 import {
   DEFAULT_MAX_OUTPUT_TOKENS,
@@ -181,7 +182,7 @@ export function injectErrorAsConversationMessage(
   });
 
   logger.warn(
-    `[OutputTruncationRecovery] Injected error-as-context message: ${errorDescription.slice(0, 200)}`,
+    `[OutputTruncationRecovery] Injected error-as-context message: ${errorDescription.slice(0, LOG_PREVIEW.MEDIUM)}`,
   );
 }
 

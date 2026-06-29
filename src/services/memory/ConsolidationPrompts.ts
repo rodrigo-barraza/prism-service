@@ -5,6 +5,7 @@
 import { daysSinceIso } from "@rodrigo-barraza/utilities-library";
 import PromptLocaleService from "../PromptLocaleService.ts";
 import type { MemoryDoc, PartitionMeta } from "./types.ts";
+import { LOG_PREVIEW } from "../../constants.ts";
 
 function daysSince(isoDate: string) {
   return daysSinceIso(isoDate);
@@ -31,7 +32,7 @@ export function formatMemoryEntry(memory: MemoryDoc): string {
     type: memory.type,
     title:
       memory.title ||
-      (memory.content ? memory.content.substring(0, 60) : "untitled"),
+      (memory.content ? memory.content.substring(0, LOG_PREVIEW.SHORT) : "untitled"),
     content: memory.content,
     age: String(age),
   });

@@ -504,8 +504,8 @@ async function triggerAsyncTaskAutoResponse(
       : taskState.error || "Unknown error";
 
   const truncatedResult =
-    resultSummary.length > 4000
-      ? resultSummary.slice(0, 4000) + "\n... (truncated)"
+    resultSummary.length > ORCHESTRATOR.ASYNC_TASK_RESULT_TRUNCATION_LIMIT
+      ? resultSummary.slice(0, ORCHESTRATOR.ASYNC_TASK_RESULT_TRUNCATION_LIMIT) + "\n... (truncated)"
       : resultSummary;
 
   const notificationTimestamp = new Date().toISOString();

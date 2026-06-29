@@ -8,6 +8,7 @@ import {
 import { ProviderError } from "../utils/errors.ts";
 import logger from "../utils/logger.ts";
 import type { TokenUsage } from "../types/admin.ts";
+import { TOOL_API_HEALTH_TIMEOUT_MS } from "../constants.ts";
 
 import { TYPES, getDefaultModels } from "../config.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
@@ -382,7 +383,7 @@ export function createVllmProvider(
       try {
         const response = await fetch(`${baseUrl}/health`, {
           method: "GET",
-          signal: AbortSignal.timeout(3000),
+          signal: AbortSignal.timeout(TOOL_API_HEALTH_TIMEOUT_MS),
         });
         return {
           ok: response.ok,

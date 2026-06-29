@@ -26,6 +26,8 @@ export const TOOL_WORKSPACE_UPDATE_TIMEOUT_MS = 10000;
 export const TOOL_WORKSPACE_VALIDATE_TIMEOUT_MS = 5000;
 export const TOOL_API_HEALTH_TIMEOUT_MS = 3000;
 export const DIRECTORY_FETCH_TIMEOUT_MS = 5000;
+export const TOOL_SCHEMA_FETCH_RETRY_COOLDOWN_MS = 30_000;
+export const TOOL_PROXY_TIMEOUT_MS = 65_000;
 
 /**
  * MongoDB collection names — single source of truth.
@@ -89,11 +91,14 @@ export const TOTAL_TOKENS_EXPR = {
     $add: [{ $ifNull: ["$inputTokens", 0] }, { $ifNull: ["$outputTokens", 0] }],
   },
 };
+/** Cap — anything above this is a measurement artifact (tok/s). */
+export const MAX_TOKENS_PER_SEC = 10_000;
 
 /**
  * Reusable MongoDB $group aggregation expression for averaging tok/s.
  * Filters out null and outlier (>10k) values before averaging.
  * Usage: `avgTokensPerSec: AVG_TOKENS_PER_SEC_EXPR` inside `$group` stages.
+ * DB-side filter matches the MAX_TOKENS_PER_SEC constant threshold.
  */
 export const AVG_TOKENS_PER_SEC_EXPR = {
   $avg: {
@@ -101,7 +106,7 @@ export const AVG_TOKENS_PER_SEC_EXPR = {
       {
         $and: [
           { $ne: ["$tokensPerSec", null] },
-          { $lte: ["$tokensPerSec", 10000] },
+          { $lte: ["$tokensPerSec", MAX_TOKENS_PER_SEC] },
         ],
       },
       "$tokensPerSec",
@@ -218,6 +223,9 @@ export const ORCHESTRATOR = {
 
   /** Delay between retries when waiting for parent generation to finish (ms). */
   AUTO_RESPONSE_GENERATION_WAIT_DELAY_MILLISECONDS: 2_000,
+
+  /** Max characters of async task result included in completion notifications. */
+  ASYNC_TASK_RESULT_TRUNCATION_LIMIT: 4000,
 
   // ─── Router Shared Token Limits ─────────────────────────────
 
@@ -416,6 +424,21 @@ export const MEMORY = {
   /** Minimum cosine similarity for a memory to be considered relevant. */
   RELEVANCE_THRESHOLD: 0.3,
 
+  /** Cosine similarity above which a skill is considered relevant. */
+  SKILL_RELEVANCE_THRESHOLD: 0.3,
+
+  /** Cosine similarity threshold for semantic conversation search. */
+  SEARCH_RELEVANCE_THRESHOLD: 0.3,
+
+  /** Default number of search results returned. */
+  DEFAULT_SEARCH_LIMIT: 10,
+
+  /** Maximum number of candidate conversations evaluated for search. */
+  MAXIMUM_CANDIDATES: 200,
+
+  /** Output token limit for memory extraction LLM calls. */
+  EXTRACTION_MAX_TOKENS: 1000,
+
   /** Minimum conversation messages before memory extraction triggers. */
   MIN_MESSAGES_FOR_EXTRACTION: 4,
 
@@ -499,6 +522,12 @@ export const MEDIA = {
 
   /** Maximum pixel dimension (width or height) for images sent to providers. */
   MAX_IMAGE_DIMENSION: 2000,
+
+  /** Default audio sample rate for finalizer output (Hz). */
+  DEFAULT_AUDIO_SAMPLE_RATE_HZ: 16000,
+
+  /** Audio sample rate for agentic loop state audio chunks (Hz). */
+  LOOP_STATE_AUDIO_SAMPLE_RATE_HZ: 24000,
 } as const;
 
 // ─── Workflow Memory Constants ──────────────────────────────
@@ -518,6 +547,9 @@ export const WORKFLOW_MEMORY = {
 
   /** Cooldown between workflow extraction attempts (ms). */
   COOLDOWN_MS: 60_000,
+
+  /** Maximum characters of workflow summary sliced for embedding. */
+  EMBEDDING_SOURCE_MAX_CHARACTERS: 2000,
 } as const;
 
 // ─── Log Preview Truncation Limits ──────────────────────────
@@ -529,6 +561,63 @@ export const LOG_PREVIEW = {
   /** Medium preview — text summaries, debug output (200 chars). */
   MEDIUM: 200,
 
+  /** Large preview — JSON/text logs (300 chars). */
+  LARGE: 300,
+
   /** Long preview — consolidation snippets, content previews (500 chars). */
   LONG: 500,
 } as const;
+
+// ─── Local Provider Constants ───────────────────────────────
+
+export const LOCAL_PROVIDER = {
+  /** Default context length for local VRAM estimation. */
+  DEFAULT_CONTEXT_LENGTH: 4096,
+
+  /** Maximum output token capacity forced on vLLM models. */
+  VLLM_MAX_OUTPUT_TOKENS: 50_000,
+
+  /** Cache TTL for HuggingFace model metadata (30 minutes). */
+  HF_CACHE_TTL_MS: 30 * 60 * 1000,
+} as const;
+
+// ─── Somatic State Constants ────────────────────────────────
+
+export const SOMATIC = {
+  /** Passive drift tick interval (ms). */
+  PASSIVE_DRIFT_INTERVAL_MS: 30_000,
+
+  /** Persistence interval (ms). */
+  PERSIST_INTERVAL_MS: 60_000,
+} as const;
+
+// ─── Tool Management & Keywords Constants ───────────────────
+
+export const TOOLS = {
+  /** Maximum domain keywords included in discovery previews. */
+  MAX_KEYWORDS_PREVIEW: 25,
+} as const;
+
+// ─── Benchmark Constants ────────────────────────────────────
+
+export const BENCHMARK = {
+  /** Delay between sequentially run models within the same provider (ms). */
+  INTRA_PROVIDER_DELAY_MS: 100,
+
+  /** Default/minimum token budget for benchmark execution. */
+  DEFAULT_MAX_TOKENS: 2048,
+} as const;
+
+// ─── Miscellaneous Conversation & Routing Constants ──────────
+
+/** Maximum character length of conversation titles derived from the first user message. */
+export const DERIVED_CONVERSATION_TITLE_MAX_LENGTH = 100;
+
+/** Maximum iteration count for synchronous function calling loops on non-agentic /chat route. */
+export const MAX_FUNCTION_CALL_ITERATIONS = 10;
+
+/** Maximum number of directory tree children to display in system prompt formatting. */
+export const DIRECTORY_TREE_CHILD_LIMIT = 20;
+
+/** Maximum execution time for long-running database aggregation queries (ms). */
+export const AGGREGATE_MAX_TIME_MS = 30_000;

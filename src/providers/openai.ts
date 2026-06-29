@@ -24,6 +24,7 @@ import {
   getUrlType,
   inferMimeFromUrl,
 } from "../utils/media.ts";
+import { LOG_PREVIEW } from "../constants.ts";
 
 import type { ToolSchema } from "../services/harnesses/types.ts";
 
@@ -519,7 +520,7 @@ function prepareOpenAIMessages(
           } else {
             // Unknown ref type (e.g. minio://) — skip with warning
             logger.warn(
-              `[openai] Skipping unresolved media ref in Chat Completions input: ${mediaRef.substring(0, 60)}...`,
+              `[openai] Skipping unresolved media ref in Chat Completions input: ${mediaRef.substring(0, LOG_PREVIEW.SHORT)}...`,
             );
           }
         }
@@ -709,7 +710,7 @@ export function prepareResponsesInput(
         } else {
           // Unknown ref type (e.g. minio://) — skip with warning
           logger.warn(
-            `[openai] Skipping unresolved media ref in Responses API input: ${mediaRef.substring(0, 60)}...`,
+            `[openai] Skipping unresolved media ref in Responses API input: ${mediaRef.substring(0, LOG_PREVIEW.SHORT)}...`,
           );
         }
       }

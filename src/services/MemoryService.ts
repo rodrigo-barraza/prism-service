@@ -13,7 +13,7 @@ import RequestLogger from "./RequestLogger.ts";
 import logger from "../utils/logger.ts";
 import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
 import { parseJsonFromLargeLanguageModelResponse } from "@rodrigo-barraza/utilities-library";
-import { COLLECTIONS, MEMORY } from "../constants.ts";
+import { COLLECTIONS, MEMORY, LOG_PREVIEW } from "../constants.ts";
 import SettingsService from "./SettingsService.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -190,7 +190,7 @@ async function extractFactsFromConversation(
   let errorMessage = null;
   try {
     result = await provider.generateText(aiMessages, extractionModel, {
-      maxTokens: 1000,
+      maxTokens: MEMORY.EXTRACTION_MAX_TOKENS,
       temperature: 0.1,
     });
   } catch (error: unknown) {
@@ -303,7 +303,7 @@ const MemoryService = {
     });
     if (isDuplicate) {
       logger.info(
-        `[MemoryService] Skipping duplicate for ${agent}: "${(title || content).substring(0, 60)}"`,
+        `[MemoryService] Skipping duplicate for ${agent}: "${(title || content).substring(0, LOG_PREVIEW.SHORT)}"`,
       );
       return null;
     }
@@ -327,7 +327,7 @@ const MemoryService = {
     };
     await collection.insertOne(memory);
     logger.info(
-      `[MemoryService] Stored [${agent}/${memory.type}] "${(title || content).substring(0, 60)}"`,
+      `[MemoryService] Stored [${agent}/${memory.type}] "${(title || content).substring(0, LOG_PREVIEW.SHORT)}"`,
     );
     return memory;
   },
@@ -389,7 +389,7 @@ const MemoryService = {
         if (memory) {
           storedMemories.push(memory);
           logger.info(
-            `[MemoryService] Stored: "${fact.fact.substring(0, 60)}..." (about: ${fact.aboutUsername})`,
+            `[MemoryService] Stored: "${fact.fact.substring(0, LOG_PREVIEW.SHORT)}..." (about: ${fact.aboutUsername})`,
           );
         }
       } catch (error: unknown) {
@@ -469,7 +469,7 @@ const MemoryService = {
         title:
           memory.title ||
           (memory.content
-            ? (memory.content as string).substring(0, 60)
+            ? (memory.content as string).substring(0, LOG_PREVIEW.SHORT)
             : "untitled"),
         content: memory.content || "",
         aboutUserId: memory.aboutUserId,

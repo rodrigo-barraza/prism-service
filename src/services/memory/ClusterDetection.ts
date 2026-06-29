@@ -5,15 +5,16 @@
 
 import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
 import type { MemoryDoc } from "./types.ts";
+import { MEMORY } from "../../constants.ts";
 
 /** Cosine similarity above which two memories are clustered together */
-export const CLUSTER_THRESHOLD = 0.75;
+export const CLUSTER_THRESHOLD = MEMORY.CLUSTER_THRESHOLD;
 
 /** Conversational agents use a higher threshold — personal facts are shorter and more distinct */
-export const CONVERSATIONAL_CLUSTER_THRESHOLD = 0.8;
+export const CONVERSATIONAL_CLUSTER_THRESHOLD = MEMORY.CONVERSATIONAL_CLUSTER_THRESHOLD;
 
 /** Max memories per cluster sent to the LLM (avoid token blowup) */
-export const MAX_CLUSTER_SIZE = 8;
+export const MAX_CLUSTER_SIZE = MEMORY.MAX_CLUSTER_SIZE;
 
 /**
  * Find clusters of semantically similar memories using Union-Find.

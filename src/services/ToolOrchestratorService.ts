@@ -20,6 +20,8 @@ import {
   TOOL_WORKSPACE_VALIDATE_TIMEOUT_MS,
   TOOL_API_HEALTH_TIMEOUT_MS,
   FILE_CATEGORIES,
+  TOOL_SCHEMA_FETCH_RETRY_COOLDOWN_MS,
+  TOOL_PROXY_TIMEOUT_MS,
 } from "../constants.ts";
 import InternalToolRegistry from "./local-tools/InternalToolRegistry.ts";
 import SettingsService from "./SettingsService.ts";
@@ -988,7 +990,7 @@ export default class ToolOrchestratorService {
    * Eliminates boot-order dependency between prism and tools-api.
    */
   static async ensureSchemas(locale?: string) {
-    if (!initialized && Date.now() - lastFetchAttemptTime > 30000) {
+    if (!initialized && Date.now() - lastFetchAttemptTime > TOOL_SCHEMA_FETCH_RETRY_COOLDOWN_MS) {
       logger.info("[ToolOrchestrator] Schemas not loaded — fetching on-demand");
       await fetchSchemas();
     }
@@ -1177,7 +1179,7 @@ export default class ToolOrchestratorService {
   static async isWorkspaceAgentConnected(): Promise<boolean> {
     try {
       const configResponse = await fetch(`${TOOLS_SERVICE_URL}/admin/config`, {
-        signal: AbortSignal.timeout(3000),
+        signal: AbortSignal.timeout(TOOL_CONFIG_FETCH_TIMEOUT_MS),
       });
       if (!configResponse.ok) return false;
       const config = (await configResponse.json()) as ToolsApiConfig & {
@@ -1929,7 +1931,7 @@ export default class ToolOrchestratorService {
       // If the user cancels the session, the fetch aborts immediately.
       // If 65s elapses, the fetch aborts via timeout.
       const controller = createAbortController();
-      const timeout = setTimeout(() => controller.abort(), 65_000); // generous timeout
+      const timeout = setTimeout(() => controller.abort(), TOOL_PROXY_TIMEOUT_MS); // generous timeout
 
       // If session signal exists, abort the local controller when session aborts
       if (context.signal && !context.signal.aborted) {

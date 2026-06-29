@@ -11,6 +11,7 @@ import {
 } from "../personas/utils.ts";
 
 import { InternalToolContext } from "./InternalToolRegistry.ts";
+import { TOOLS } from "../../constants.ts";
 import {
   getCurrentDynamicTools,
   persistDynamicTools,
@@ -58,7 +59,7 @@ function buildDiscoverAndEnableSchema(locale: string) {
   const domainKeywords = extractDomainKeywords(2);
   const sampleKeywords = [...domainKeywords.values()]
     .flat()
-    .slice(0, 25)
+    .slice(0, TOOLS.MAX_KEYWORDS_PREVIEW)
     .map((keyword) => `'${keyword}'`)
     .join(", ");
 

@@ -6,14 +6,14 @@
 import MongoWrapper from "../../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../../config.ts";
 import logger from "../../utils/logger.ts";
-import { COLLECTIONS } from "../../constants.ts";
+import { COLLECTIONS, MEMORY } from "../../constants.ts";
 import type { ConsolidationAction } from "./types.ts";
 
 /** Min sessions between consolidation runs */
-export const SESSIONS_BETWEEN_RUNS = 5;
+export const SESSIONS_BETWEEN_RUNS = MEMORY.SESSIONS_BETWEEN_RUNS;
 
 /** Max consolidation runs per project per day (cost guard) */
-export const DAILY_MAX_CONSOLIDATIONS = 20;
+export const DAILY_MAX_CONSOLIDATIONS = MEMORY.DAILY_MAX_CONSOLIDATIONS;
 
 const RUNS_COLLECTION = COLLECTIONS.MEMORY_CONSOLIDATION_RUNS;
 const HISTORY_COLLECTION = COLLECTIONS.MEMORY_CONSOLIDATION_HISTORY;

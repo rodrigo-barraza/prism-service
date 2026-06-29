@@ -9,6 +9,7 @@ import {
   ValidateWorkspaceSchema,
 } from "../types/index.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { TOOL_CONFIG_FETCH_TIMEOUT_MS } from "../constants.ts";
 
 const router = express.Router();
 
@@ -101,7 +102,7 @@ router.get(
         const configApiResponse = await fetch(
           `${TOOLS_SERVICE_URL}/admin/config`,
           {
-            signal: AbortSignal.timeout(3000),
+            signal: AbortSignal.timeout(TOOL_CONFIG_FETCH_TIMEOUT_MS),
           },
         );
         if (configApiResponse.ok) {
@@ -178,7 +179,7 @@ router.get(
         const configResponse = await fetch(
           `${TOOLS_SERVICE_URL}/admin/config`,
           {
-            signal: AbortSignal.timeout(3000),
+            signal: AbortSignal.timeout(TOOL_CONFIG_FETCH_TIMEOUT_MS),
           },
         );
         if (configResponse.ok) {

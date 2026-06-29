@@ -11,7 +11,7 @@ import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
 import { parseJsonFromLargeLanguageModelResponse } from "@rodrigo-barraza/utilities-library";
-import { COLLECTIONS } from "../constants.ts";
+import { COLLECTIONS, MEMORY, LOG_PREVIEW } from "../constants.ts";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import SettingsService from "./SettingsService.ts";
 import {
@@ -65,9 +65,9 @@ async function getConsolidationConfig() {
   return SettingsService.getMemoryModelConfig("consolidation");
 }
 /** Memories older than this (days) with ephemeral types get flagged for staleness review */
-const STALENESS_DAYS = 30;
+const STALENESS_DAYS = MEMORY.STALENESS_DAYS;
 /** Output token limit per LLM call — 2000 was too low for complex merges */
-const LLM_MAX_OUTPUT_TOKENS = 4096;
+const LLM_MAX_OUTPUT_TOKENS = MEMORY.LLM_MAX_OUTPUT_TOKENS;
 
 function daysSince(isoDate: string) {
   return daysSinceIso(isoDate);
@@ -155,7 +155,7 @@ async function applyActions(
         });
         results.merged += action.sourceIds.length;
         logger.info(
-          `[MemoryConsolidation] Merged ${action.sourceIds.length} → "${action.merged.title || action.merged.content?.substring(0, 60)}" (${action.reason || ""})`,
+          `[MemoryConsolidation] Merged ${action.sourceIds.length} → "${action.merged.title || action.merged.content?.substring(0, LOG_PREVIEW.SHORT)}" (${action.reason || ""})`,
         );
       } else if (action.type === "delete" && action.id) {
         await MemoryService.remove(action.id);
@@ -314,9 +314,9 @@ async function processBatch(
   } | null;
   if (!parsed) {
     const responseLength = result.text?.length || 0;
-    const snippet = result.text?.substring(0, 300) || "(empty)";
+    const snippet = result.text?.substring(0, LOG_PREVIEW.LARGE) || "(empty)";
     const tail =
-      responseLength > 300 ? result.text.substring(responseLength - 200) : "";
+      responseLength > LOG_PREVIEW.LARGE ? result.text.substring(responseLength - LOG_PREVIEW.MEDIUM) : "";
     logger.warn(
       `[MemoryConsolidation] ${batchLabel} Failed to parse LLM response ` +
         `(${responseLength} chars, ~${outputTokens} tokens). ` +

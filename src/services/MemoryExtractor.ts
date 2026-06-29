@@ -20,7 +20,7 @@ import {
 } from "../utils/CostCalculator.ts";
 import { TYPES, getPricing } from "../config.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import { MEMORY } from "../constants.ts";
+import { MEMORY, LOG_PREVIEW } from "../constants.ts";
 import type {
   ConversationMessage,
   ToolCall,
@@ -173,7 +173,7 @@ export default class MemoryExtractor {
           const content = message.content || "";
           // Truncate very long messages to save tokens
           const truncated =
-            content.length > 500 ? content.slice(0, 500) + "..." : content;
+            content.length > LOG_PREVIEW.LONG ? content.slice(0, LOG_PREVIEW.LONG) + "..." : content;
           return `${message.role}: ${truncated}`;
         })
         .join("\n");
@@ -346,11 +346,11 @@ export default class MemoryExtractor {
               title: memoryObject.title,
             });
             logger.info(
-              `[MemoryExtractor] Stored [${type}] "${memoryObject.title.substring(0, 60)}"`,
+              `[MemoryExtractor] Stored [${type}] "${memoryObject.title.substring(0, LOG_PREVIEW.SHORT)}"`,
             );
           } else {
             logger.info(
-              `[MemoryExtractor] Skipped duplicate [${type}] "${memoryObject.title.substring(0, 60)}"`,
+              `[MemoryExtractor] Skipped duplicate [${type}] "${memoryObject.title.substring(0, LOG_PREVIEW.SHORT)}"`,
             );
           }
         } catch (error: unknown) {

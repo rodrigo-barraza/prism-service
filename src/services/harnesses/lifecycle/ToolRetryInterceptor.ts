@@ -4,7 +4,7 @@ import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-
+import { LOG_PREVIEW } from "../../../constants.ts";
 import type AgenticLoopState from "../../AgenticLoopState.ts";
 import type {
   ToolCall,
@@ -165,8 +165,8 @@ function formatArgumentSummary(
         const stringifiedValue =
           typeof value === "string" ? value : JSON.stringify(value);
         const truncatedValue =
-          stringifiedValue.length > 200
-            ? `${stringifiedValue.slice(0, 200)}…`
+          stringifiedValue.length > LOG_PREVIEW.MEDIUM
+            ? `${stringifiedValue.slice(0, LOG_PREVIEW.MEDIUM)}…`
             : stringifiedValue;
         return `  - \`${key}\`: ${truncatedValue}`;
       })

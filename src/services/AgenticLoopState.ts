@@ -6,7 +6,7 @@ import type {
   AgenticLoopStateInit,
   PassState,
 } from "./harnesses/types.ts";
-
+import { MEDIA } from "../constants.ts";
 interface CriteriaScores {
   correctness: number;
   risk: number;
@@ -120,7 +120,7 @@ export default class AgenticLoopState {
     this.streamedImages = [];
     this.streamedToolCalls = [];
     this.streamedAudioChunks = [];
-    this.audioSampleRate = 24000;
+    this.audioSampleRate = MEDIA.LOOP_STATE_AUDIO_SAMPLE_RATE_HZ;
     this.lastRateLimits = null;
 
     this.displaySegments = [];

@@ -7,6 +7,7 @@ import {
   DEFAULT_PROJECT,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
+import { TIMERS } from "../../constants.ts";
 
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 
@@ -14,9 +15,9 @@ interface ReminderContext extends InternalToolContext {
   _emit?: (event: { type: string; [key: string]: unknown }) => void;
 }
 
-const TIMER_MINIMUM_SECONDS = 30;
-const TIMER_MAXIMUM_SECONDS = 599;
-const CRON_MINIMUM_DELAY_SECONDS = 600;
+const TIMER_MINIMUM_SECONDS = TIMERS.TIMER_MINIMUM_SECONDS;
+const TIMER_MAXIMUM_SECONDS = TIMERS.TIMER_MAXIMUM_SECONDS;
+const CRON_MINIMUM_DELAY_SECONDS = TIMERS.CRON_MINIMUM_DELAY_SECONDS;
 
 // ── Set Timer Tool ─────────────────────────────────────────
 // Agent-internal one-shot wait. Fires a prompt back into the
