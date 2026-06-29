@@ -548,7 +548,7 @@ export default class BaseAgenticHarness {
 
     for await (const chunk of stream) {
       const result = await this.processStreamChunk(
-        chunk,
+        chunk as StreamChunk,
         pass,
         allowedToolNames,
       );
@@ -603,7 +603,7 @@ export default class BaseAgenticHarness {
    *   `break`    — abort signal received
    */
   processStreamChunk(
-    chunk: unknown,
+    chunk: StreamChunk,
     pass: PassState,
     allowedToolNames: Set<string>,
   ): ChunkAction | Promise<ChunkAction> {
@@ -1138,7 +1138,7 @@ export default class BaseAgenticHarness {
           );
         } else {
           RequestLogger.logChatGeneration(legacyPayload).catch(
-            (error: unknown) =>
+            (error: Error) =>
               logger.error(
                 `[AgenticLoopService] Failed to log intermediate request: ${errorMessage(error)}`,
               ),
@@ -1150,7 +1150,7 @@ export default class BaseAgenticHarness {
           `[BaseAgenticHarness] Error resolving pendingRequestDocumentIdPromise: ${errorMessage(error)}`,
         );
         RequestLogger.logChatGeneration(legacyPayload).catch(
-          (loggingError: unknown) =>
+          (loggingError: Error) =>
             logger.error(
               `[AgenticLoopService] Failed to log intermediate request on fallback: ${errorMessage(loggingError)}`,
             ),

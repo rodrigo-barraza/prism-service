@@ -126,8 +126,20 @@ export function parseEvaluationResponse(
     parsed: Record<string, unknown>,
   ): EvaluationResult {
     const scores = Array.isArray(parsed.scores)
-      ? (parsed.scores as unknown[]).map((score: unknown) =>
-          Math.max(0, Math.min(1, Number(score) || 0)),
+      ? (
+          parsed.scores as (
+            | string
+            | number
+            | boolean
+            | object
+            | null
+            | undefined
+            | symbol
+          )[]
+        ).map(
+          (
+            score: string | number | boolean | object | null | undefined | symbol,
+          ) => Math.max(0, Math.min(1, Number(score) || 0)),
         )
       : new Array(branchCount).fill(0.5);
 
@@ -137,8 +149,27 @@ export function parseEvaluationResponse(
         : scores.indexOf(Math.max(...scores));
 
     const branchFeedback = Array.isArray(parsed.branchFeedback)
-      ? (parsed.branchFeedback as unknown[]).map((feedbackItem: unknown) =>
-          typeof feedbackItem === "string" ? feedbackItem : "",
+      ? (
+          parsed.branchFeedback as (
+            | string
+            | number
+            | boolean
+            | object
+            | null
+            | undefined
+            | symbol
+          )[]
+        ).map(
+          (
+            feedbackItem:
+              | string
+              | number
+              | boolean
+              | object
+              | null
+              | undefined
+              | symbol,
+          ) => (typeof feedbackItem === "string" ? feedbackItem : ""),
         )
       : new Array(branchCount).fill(
           typeof parsed.feedback === "string" ? parsed.feedback : "",

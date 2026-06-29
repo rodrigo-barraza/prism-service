@@ -1049,6 +1049,7 @@ const openaiProvider = {
         });
       }
       if (rateLimits) result.rateLimits = rateLimits;
+      return result;
     } catch (error: unknown) {
       const errorObject = asErrorRecord(error as object);
       // Retry once after stripping unsupported parameters (e.g. gpt-5-nano rejects temperature)

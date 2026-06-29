@@ -399,7 +399,7 @@ function buildCompletionCallback(
   return (taskState) => {
     // Fire as a detached promise — don't block the registry
     triggerAsyncTaskAutoResponse(taskState, context).catch(
-      (autoResponseError: unknown) => {
+      (autoResponseError: Error) => {
         logger.warn(
           `[AsyncTaskTools] Auto-response failed for task ${taskState.taskId}: ${getErrorMessage(autoResponseError)}`,
         );

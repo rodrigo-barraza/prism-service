@@ -208,8 +208,8 @@ export function buildExhaustedRecoveryMessage(
  * Build the user-facing error description when a provider timeout
  * or network error occurs mid-loop.
  */
-export function buildProviderErrorMessage(
-  error: unknown,
+export function buildProviderErrorMessage<T>(
+  error: T,
   iteration: number,
   locale?: string,
 ): string {
