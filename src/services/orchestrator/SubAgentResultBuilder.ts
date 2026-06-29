@@ -5,6 +5,7 @@ import type {
   SubAgentChildSummary,
 } from "../../types/orchestrator.ts";
 import type { ConversationMessage } from "../harnesses/types.ts";
+import { stripToolCallMarkup } from "../../utils/StreamChunkDispatcher.ts";
 
 /*
  * Extract the text content from the last assistant message in a conversation.
@@ -71,9 +72,10 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
   // on the live messages array, then falls back to telemetry.output (streamed
   // chunks). subAgent.messages is nulled after the loop to release memory, so
   // we use subAgent.output directly as the primary text source.
-  const lastText =
+  const rawLastText =
     (subAgent.output || "").trim() ||
     getLastAssistantText(subAgent.messages || []);
+  const lastText = rawLastText ? stripToolCallMarkup(rawLastText) : "";
 
   const toolCallCount = subAgent.toolCalls?.length || 0;
   const iterationCount = subAgent.iterations || 0;

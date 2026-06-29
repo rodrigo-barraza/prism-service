@@ -25,6 +25,7 @@ import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import { createAbortController } from "../utils/AbortController.ts";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
 import { resolveModelForInstances } from "../utils/ModelResolution.ts";
+import { stripToolCallMarkup } from "../utils/StreamChunkDispatcher.ts";
 
 // Extracted Domain Helpers
 import { InstanceLoadBalancer } from "./orchestrator/InstanceLoadBalancer.ts";
@@ -804,7 +805,7 @@ export default class OrchestratorService {
         agent_id: agentId,
         description: subAgent.description,
         status: "running",
-        partialOutput: (subAgent.output || "").slice(-2000) || null,
+        partialOutput: stripToolCallMarkup((subAgent.output || "").slice(-2000)) || null,
         toolUses: subAgent.toolCalls?.length || 0,
       };
     }
@@ -1940,7 +1941,7 @@ export default class OrchestratorService {
     // 3. Empty string as last resort
     const messagesOutput = getLastAssistantText(finalMessages);
     const telemetryOutput = (telemetry.output || "").trim();
-    subAgent.output = messagesOutput || telemetryOutput;
+    subAgent.output = stripToolCallMarkup(messagesOutput || telemetryOutput);
     if (!subAgent.output && subAgent.status !== "stopped") {
       logger.warn(
         `[Orchestrator] Sub-agent ${subAgent.agentId} completed with empty output. ` +
@@ -2435,6 +2436,15 @@ export default class OrchestratorService {
           planFirst: false,
           autoApprove: true,
           minContextLength: 120_000,
+          ...(orchestratorContext.thinkingEnabled !== undefined && {
+            thinkingEnabled: orchestratorContext.thinkingEnabled,
+          }),
+          ...(orchestratorContext.reasoningEffort !== undefined && {
+            reasoningEffort: orchestratorContext.reasoningEffort,
+          }),
+          ...(orchestratorContext.thinkingBudget !== undefined && {
+            thinkingBudget: orchestratorContext.thinkingBudget,
+          }),
           ...(typeof settings.toolConfig === "object" &&
           settings.toolConfig !== null
             ? {

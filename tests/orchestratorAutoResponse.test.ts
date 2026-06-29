@@ -609,6 +609,64 @@ describe("Event-Driven Auto-Response", () => {
       const lastCall = vi.mocked(ConversationService.setGenerating).mock.calls.at(-1)!;
       expect(lastCall[3]).toBe(false);
     });
+
+    it("should forward thinking parameters from orchestratorContext into auto-response options", async () => {
+      const thinkingContext: OrchestratorContext = {
+        ...orchestratorContext,
+        thinkingEnabled: true,
+        reasoningEffort: "high",
+        thinkingBudget: 8192,
+      };
+
+      mockFindOne.mockResolvedValue({
+        id: "parent-conv-id",
+        isGenerating: false,
+        messages: [
+          { role: "user", content: "Build me a feature" },
+          { role: "assistant", content: "I spawned sub-agents" },
+        ],
+        settings: {
+          provider: PROVIDERS.GOOGLE,
+          model: "gemini-3-flash-preview",
+          agent: "CODING",
+        },
+      });
+
+      await OrchestratorService._triggerParentAutoResponse(
+        "parent-conv-id", "test-project", "test-user",
+        thinkingContext, completionMessage,
+      );
+
+      expect(mockRunAgenticLoop).toHaveBeenCalledTimes(1);
+
+      const loopArgs = mockRunAgenticLoop.mock.calls[0][0];
+      expect(loopArgs.options.thinkingEnabled).toBe(true);
+      expect(loopArgs.options.reasoningEffort).toBe("high");
+      expect(loopArgs.options.thinkingBudget).toBe(8192);
+    });
+
+    it("should not include thinking parameters when orchestratorContext does not have them", async () => {
+      mockFindOne.mockResolvedValue({
+        id: "parent-conv-id",
+        isGenerating: false,
+        messages: [],
+        settings: {
+          provider: PROVIDERS.GOOGLE,
+          model: "gemini-3-flash-preview",
+          agent: "CODING",
+        },
+      });
+
+      await OrchestratorService._triggerParentAutoResponse(
+        "parent-conv-id", "test-project", "test-user",
+        orchestratorContext, completionMessage,
+      );
+
+      const loopArgs = mockRunAgenticLoop.mock.calls[0][0];
+      expect(loopArgs.options.thinkingEnabled).toBeUndefined();
+      expect(loopArgs.options.reasoningEffort).toBeUndefined();
+      expect(loopArgs.options.thinkingBudget).toBeUndefined();
+    });
   });
 
   // ── End-to-End ────────────────────────────────────────────────

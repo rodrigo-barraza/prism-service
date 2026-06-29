@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getLastAssistantText, buildToolCallFallbackSummary } from "../src/services/orchestrator/SubAgentResultBuilder.ts";
+import { getLastAssistantText, buildSubAgentResult, buildToolCallFallbackSummary } from "../src/services/orchestrator/SubAgentResultBuilder.ts";
 import type { ConversationMessage } from "../src/services/harnesses/types.ts";
 import type { SubAgentResult } from "../src/types/orchestrator.ts";
 
@@ -506,3 +506,96 @@ describe("extractSubtreeMetrics", () => {
   });
 });
 
+describe("buildSubAgentResult — channel token stripping", () => {
+  function createSubAgentState(output: string) {
+    return {
+      agentId: "test-agent",
+      subAgentConversationId: "sub-conv-1",
+      parentAgentConversationId: "parent-conv-1",
+      description: "Test agent",
+      branchName: null,
+      worktreePath: null,
+      repositoryPath: "/workspace",
+      isolated: false,
+      status: "complete" as const,
+      output,
+      toolCalls: [],
+      diff: null,
+      error: null,
+      startedAt: Date.now() - 5000,
+      durationMs: 5000,
+      totalCost: null,
+      usage: null,
+      abortController: null,
+      messages: [],
+      files: [],
+      iterations: 1,
+      project: "test-project",
+      username: "test-user",
+      agent: null,
+      providerName: "lm-studio",
+      resolvedModel: "gemma-4-12b",
+      traceId: null,
+      maxIterations: 10,
+      minContextLength: null,
+      parentConversationId: "parent-conv",
+    };
+  }
+
+  it("should strip complete <|channel>thought ... <channel|> blocks from result", () => {
+    const outputWithChannelTokens =
+      "<|channel>thought The sub-agents have completed their tasks.<channel|>" +
+      "Here are the benchmark results.";
+
+    const subAgentState = createSubAgentState(outputWithChannelTokens);
+    const result = buildSubAgentResult(subAgentState);
+
+    expect(result.result).toBe("Here are the benchmark results.");
+    expect(result.result).not.toContain("<|channel>");
+    expect(result.result).not.toContain("<channel|>");
+  });
+
+  it("should strip orphan <channel|> closing tags", () => {
+    const outputWithOrphanTag =
+      "The results are ready.<channel|> Here is the summary.";
+
+    const subAgentState = createSubAgentState(outputWithOrphanTag);
+    const result = buildSubAgentResult(subAgentState);
+
+    expect(result.result).not.toContain("<channel|>");
+    expect(result.result).toContain("The results are ready.");
+    expect(result.result).toContain("Here is the summary.");
+  });
+
+  it("should strip multiple channel blocks from the same output", () => {
+    const outputWithMultipleBlocks =
+      "<|channel>thought First reasoning block.<channel|>" +
+      "Visible output one. " +
+      "<|channel>thought Second reasoning block.<channel|>" +
+      "Visible output two.";
+
+    const subAgentState = createSubAgentState(outputWithMultipleBlocks);
+    const result = buildSubAgentResult(subAgentState);
+
+    expect(result.result).toBe("Visible output one. Visible output two.");
+  });
+
+  it("should pass through clean text unmodified", () => {
+    const cleanOutput = "No channel tokens here. Just normal text.";
+
+    const subAgentState = createSubAgentState(cleanOutput);
+    const result = buildSubAgentResult(subAgentState);
+
+    expect(result.result).toBe(cleanOutput);
+  });
+
+  it("should return null when output is only channel tokens", () => {
+    const onlyChannelTokens =
+      "<|channel>thought This is all reasoning with no visible output.<channel|>";
+
+    const subAgentState = createSubAgentState(onlyChannelTokens);
+    const result = buildSubAgentResult(subAgentState);
+
+    expect(result.result).toBeNull();
+  });
+});
