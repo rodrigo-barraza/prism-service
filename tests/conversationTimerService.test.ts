@@ -461,6 +461,7 @@ describe("ConversationTimerService", () => {
       });
 
       await ConversationTimerService.tick();
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(mockFindOneAndUpdate).toHaveBeenCalled();
       expect(ConversationService.appendMessages).toHaveBeenCalled();
@@ -620,6 +621,7 @@ describe("ConversationTimerService", () => {
       });
 
       await ConversationTimerService.tick();
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(mockRunAgenticLoop).toHaveBeenCalled();
       expect(recurringTimer.iterationCount).toBe(1);
@@ -717,6 +719,7 @@ describe("ConversationTimerService", () => {
       });
 
       await ConversationTimerService.tick();
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(mockRunAgenticLoop).toHaveBeenCalled();
       expect(recurringTimer.iterationCount).toBe(5);
