@@ -141,5 +141,21 @@
       "query": "Search term. e.g. 'MCP debug', 'WebSocket drop fix'.",
       "limit": "Max result. Default: 10."
     }
+  },
+  "run_async_task": {
+    "description": "Run tool in background. Returns task ID immediately. Tool run behind while you work. Query with list_async_tasks, stop with cancel_async_task. System notify when done.",
+    "parameters": {
+      "toolName": "Tool name to run in background.",
+      "toolArguments": "Argument for tool, same as normal call."
+    }
+  },
+  "list_async_tasks": {
+    "description": "List background task. Show ID, tool, status, result."
+  },
+  "cancel_async_task": {
+    "description": "Cancel running background task.",
+    "parameters": {
+      "taskId": "Task ID to cancel."
+    }
   }
 }

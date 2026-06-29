@@ -1,8 +1,10 @@
 import logger from "../../utils/logger.ts";
 import { DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
-import { ASYNC_TASK_TOOL_NAMES } from "../AsyncTaskConstants.ts";
+import { ASYNC_TASK_TOOL_NAMES, MAXIMUM_CONCURRENT_ASYNC_TASKS } from "../AsyncTaskConstants.ts";
 import type { InternalToolContext } from "./InternalToolRegistry.ts";
+import PromptLocaleService from "../PromptLocaleService.ts";
+
 
 // ────────────────────────────────────────────────────────────
 // AsyncTaskTools — General-Purpose Non-Blocking Task Dispatch
@@ -100,22 +102,30 @@ const runAsyncTask = {
 
     if (!agentConversationId) {
       return {
-        error:
-          "Cannot dispatch async task: no conversation context available.",
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.run_async_task.noConversation",
+        ),
       };
     }
 
     if (!toolName) {
       return {
-        error:
-          "Missing required parameter 'toolName'. Specify which tool to run asynchronously.",
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.run_async_task.noToolName",
+        ),
       };
     }
 
     // Prevent recursive or nonsensical async dispatch
     if (DISALLOWED_ASYNC_TOOL_NAMES.has(toolName)) {
       return {
-        error: `Tool "${toolName}" cannot be dispatched asynchronously. It is either interactive, already async, or manages async state itself.`,
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.run_async_task.disallowedTool",
+          { toolName },
+        ),
       };
     }
 
@@ -178,7 +188,13 @@ const runAsyncTask = {
 
       // Check for concurrency limit error
       if ("error" in dispatchResult && typeof dispatchResult.error === "string") {
-        return dispatchResult as { error: string };
+        return {
+          error: PromptLocaleService.get(
+            PromptLocaleService.getDefaultLocale(),
+            "internal-tools-runtime.run_async_task.concurrencyLimit",
+            { max: MAXIMUM_CONCURRENT_ASYNC_TASKS.toString() },
+          ),
+        };
       }
 
       const dispatchedTask = dispatchResult as import("../AsyncTaskRegistry.ts").AsyncTaskState;
@@ -233,8 +249,10 @@ const listAsyncTasks = {
 
     if (!agentConversationId) {
       return {
-        error:
-          "Cannot list async tasks: no conversation context available.",
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.list_async_tasks.noConversation",
+        ),
       };
     }
 
@@ -311,8 +329,10 @@ const cancelAsyncTask = {
 
     if (!taskId) {
       return {
-        error:
-          "Missing required parameter 'taskId'. Use list_async_tasks to find the task ID.",
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.cancel_async_task.noTaskId",
+        ),
       };
     }
 
@@ -327,12 +347,20 @@ const cancelAsyncTask = {
         if (taskState) {
           return {
             success: false,
-            message: `Task "${taskId}" is already in "${taskState.status}" state and cannot be cancelled.`,
+            message: PromptLocaleService.get(
+              PromptLocaleService.getDefaultLocale(),
+              "internal-tools-runtime.cancel_async_task.alreadyTerminal",
+              { taskId, status: taskState.status },
+            ),
           };
         }
         return {
           success: false,
-          message: `Task "${taskId}" not found. It may have expired or been cleaned up.`,
+          message: PromptLocaleService.get(
+            PromptLocaleService.getDefaultLocale(),
+            "internal-tools-runtime.cancel_async_task.notFound",
+            { taskId },
+          ),
         };
       }
 
@@ -340,7 +368,11 @@ const cancelAsyncTask = {
 
       return {
         success: true,
-        message: `Task "${taskId}" has been cancelled.`,
+        message: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.cancel_async_task.success",
+          { taskId },
+        ),
       };
     } catch (error: unknown) {
       return {

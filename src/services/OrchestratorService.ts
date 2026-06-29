@@ -1067,6 +1067,10 @@ export default class OrchestratorService {
     logger.info("[Orchestrator] Cleared all active sub-agents from registry");
   }
 
+  static _getActiveSubAgents(): Map<string, SubAgentState> {
+    return activeSubAgents;
+  }
+
   static async createTeam(
     teamCreationArguments: {
       name: string;
@@ -1708,9 +1712,6 @@ export default class OrchestratorService {
     agentResult: SubAgentResult,
     orchestratorContext: OrchestratorContext,
   ): Promise<void> {
-    const { conversationId, project, username } = orchestratorContext;
-    if (!conversationId || !project || !username) return;
-
     const locale = PromptLocaleService.getDefaultLocale();
 
     const agentStatusEmoji = agentResult.status === "completed" ? "✅" : "❌";
@@ -1721,21 +1722,61 @@ export default class OrchestratorService {
         : JSON.stringify(agentResult.result)
       : noOutputFallback;
 
+    const truncationSuffix = PromptLocaleService.get(locale, "orchestrator.notifications.truncated");
     const truncatedOutput =
       agentOutput.length > 4000
-        ? agentOutput.slice(0, 4000) + "\n... (truncated)"
+        ? agentOutput.slice(0, 4000) + truncationSuffix
         : agentOutput;
+
+    const resumedAgentCompletedSummary = PromptLocaleService.get(
+      locale,
+      "orchestrator.notifications.resumedAgentCompleted",
+      {
+        agentId,
+        description: agentResult.description || agentId,
+        status: agentResult.status,
+      },
+    );
+
+    await OrchestratorService._sendParentCompletionNotification(
+      {
+        status: `${agentStatusEmoji} ${agentResult.status}`,
+        summary: resumedAgentCompletedSummary,
+        toolUses: agentResult.toolUses || 0,
+        durationMs: agentResult.durationMs || 0,
+        resultBody: truncatedOutput,
+      },
+      orchestratorContext,
+    );
+  }
+
+  /**
+   * Shared helper to format a completion message notification and dispatch
+   * the parent auto-response loop.
+   */
+  static async _sendParentCompletionNotification(
+    options: {
+      status: string;
+      summary: string;
+      toolUses: number;
+      durationMs: number;
+      resultBody: string;
+    },
+    orchestratorContext: OrchestratorContext,
+  ): Promise<void> {
+    const { conversationId, project, username } = orchestratorContext;
+    if (!conversationId || !project || !username) return;
 
     const completionMessage = {
       role: "user" as const,
       content: [
         `<task-notification>`,
-        `<status>${agentStatusEmoji} ${agentResult.status}</status>`,
-        `<summary>[SUB-AGENT RESUMED COMPLETED] Agent "${agentId}" (${agentResult.description}) has ${agentResult.status} after resumption.</summary>`,
-        `<tool_uses>${agentResult.toolUses}</tool_uses>`,
-        `<duration_ms>${agentResult.durationMs}</duration_ms>`,
+        `<status>${options.status}</status>`,
+        `<summary>${options.summary}</summary>`,
+        `<tool_uses>${options.toolUses}</tool_uses>`,
+        `<duration_ms>${options.durationMs}</duration_ms>`,
         `<result>`,
-        truncatedOutput,
+        options.resultBody,
         `</result>`,
         `</task-notification>`,
       ].join("\n"),
@@ -1751,7 +1792,7 @@ export default class OrchestratorService {
       completionMessage as ConversationMessage,
     ).catch((autoResponseError: unknown) => {
       logger.warn(
-        `[Orchestrator] Parent auto-response failed for resumed agent ${agentId}: ${getErrorMessage(autoResponseError)}`,
+        `[Orchestrator] Parent auto-response failed for conversation ${conversationId}: ${getErrorMessage(autoResponseError)}`,
       );
     });
   }
@@ -2372,53 +2413,16 @@ export default class OrchestratorService {
     // Build the detailed result body (preserved for LLM context + markdown rendering)
     const resultBody = resultSummaries.join("\n\n");
 
-    const completionMessage = {
-      role: "user" as const,
-      content: [
-        `<task-notification>`,
-        `<status>${overallStatus}</status>`,
-        `<summary>${teamCompletedHeader}</summary>`,
-        `<tool_uses>${totalToolUses}</tool_uses>`,
-        `<duration_ms>${totalDurationMs}</duration_ms>`,
-        `<result>`,
+    await OrchestratorService._sendParentCompletionNotification(
+      {
+        status: overallStatus,
+        summary: teamCompletedHeader,
+        toolUses: totalToolUses,
+        durationMs: totalDurationMs,
         resultBody,
-        `</result>`,
-        `</task-notification>`,
-      ].join("\n"),
-      timestamp: new Date().toISOString(),
-      _alreadyPersisted: true,
-    };
-
-    // ── Ephemeral notification (no DB persistence) ────────────────
-    // The completion message is NOT persisted to MongoDB. It exists only
-    // as ephemeral context passed to _triggerParentAutoResponse, which
-    // appends it to the contextMessages array for the auto-response
-    // agentic loop. The LLM sees the results, generates a synthesis
-    // response, and only that assistant response gets persisted by the
-    // Finalizer (because _alreadyPersisted: true on the completion
-    // message causes sanitizeMessagesForPersistence to skip it).
-    //
-    // This eliminates the fake `role: "user"` notification from the
-    // conversation history — the DB never contains it, and the user
-    // never sees a spurious notification card in the UI.
-    //
-    // The auto-response's own isGenerating wait loop handles the race
-    // condition where the parent is mid-conversation when sub-agents
-    // complete — it waits until the parent is idle before running.
-
-    // Trigger a background agentic loop so the parent LLM processes
-    // the sub-agent results and auto-responds in the conversation.
-    OrchestratorService._triggerParentAutoResponse(
-      conversationId,
-      project,
-      username,
+      },
       orchestratorContext,
-      completionMessage as ConversationMessage,
-    ).catch((autoResponseError: unknown) => {
-      logger.warn(
-        `[Orchestrator] Parent auto-response failed for conversation ${conversationId}: ${getErrorMessage(autoResponseError)}`,
-      );
-    });
+    );
   }
 
   // ── Parent Auto-Response ─────────────────────────────────────
