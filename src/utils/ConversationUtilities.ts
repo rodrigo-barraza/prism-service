@@ -30,7 +30,7 @@ export function markGenerating(
     username,
     generating,
     opts,
-  ).catch((error: unknown) =>
+  ).catch((error: Error) =>
     logger.error(
       `Failed to ${generating ? "set" : "clear"} isGenerating: ${getErrorMessage(error)}`,
     ),

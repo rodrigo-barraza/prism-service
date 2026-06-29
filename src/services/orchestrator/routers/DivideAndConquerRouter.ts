@@ -421,7 +421,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
         errorMessage: null,
         requestStartMs: decompositionStartMs,
         extraRequestPayload: { teamName, phase: "decomposition" },
-      }).catch((loggingError: unknown) =>
+      }).catch((loggingError: Error) =>
         logger.error(
           `[DivideAndConquerRouter] Failed to log decomposition request: ${getErrorMessage(loggingError)}`,
         ),
@@ -623,7 +623,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
           subtaskCount: subtasks.length,
           successfulCount: successfulResults.length,
         },
-      }).catch((loggingError: unknown) =>
+      }).catch((loggingError: Error) =>
         logger.error(
           `[DivideAndConquerRouter] Failed to log synthesis request: ${getErrorMessage(loggingError)}`,
         ),

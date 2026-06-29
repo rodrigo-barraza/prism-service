@@ -285,7 +285,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
             memberCount: members.length,
             successfulCount: successfulResults.length,
           },
-        }).catch((loggingError: unknown) =>
+        }).catch((loggingError: Error) =>
           logger.error(
             `[HierarchicalAggregationRouter]${layerLabel} Failed to log synthesis request: ${getErrorMessage(loggingError)}`,
           ),

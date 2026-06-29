@@ -550,7 +550,7 @@ export class MCTSRouter implements TopologyRouter {
             branchCount: successfulBranches.length,
             expandedNodeIndex: nodeToExpand?.nodeIndex ?? "root",
           },
-        }).catch((loggingError: unknown) =>
+        }).catch((loggingError: Error) =>
           logger.error(
             `[MCTSRouter] Failed to log evaluation request: ${getErrorMessage(loggingError)}`,
           ),

@@ -74,7 +74,7 @@ router.get(
         ];
       }
 
-      const applyCommaSeparatedFilter = (key: string, value: unknown) => {
+      const applyCommaSeparatedFilter = (key: string, value: string | string[] | object | null | undefined) => {
         if (!value) return;
         const values = String(value).split(",").filter(Boolean);
         if (values.length === 1) filter[key] = values[0];

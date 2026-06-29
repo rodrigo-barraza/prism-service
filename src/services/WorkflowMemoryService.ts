@@ -149,7 +149,7 @@ const WorkflowMemoryService = {
       output: { messages?: ConversationMessage[]; sessionOutcome?: string },
     ) => {
       WorkflowMemoryService.extractAndPersist(context, output).catch(
-        (error: unknown) =>
+        (error: Error) =>
           logger.error(
             `[WorkflowMemoryService] Background extraction failed: ${getErrorMessage(error)}`,
           ),

@@ -63,7 +63,7 @@ const ConversationTimerService = {
       if (isTickInProgress) return;
       isTickInProgress = true;
       this.tick()
-        .catch((error: unknown) => {
+        .catch((error: Error) => {
           logger.error(
             `[ConversationTimers] Daemon tick error: ${getErrorMessage(error)}`,
           );
@@ -385,7 +385,7 @@ const ConversationTimerService = {
           conversation as unknown as Record<string, unknown>,
           reminderMessage,
           collection,
-        ).catch((error: unknown) => {
+        ).catch((error: Error) => {
           logger.error(
             `[ConversationTimers] Background loop failed for timer ${timer.id}: ${getErrorMessage(error)}`,
           );

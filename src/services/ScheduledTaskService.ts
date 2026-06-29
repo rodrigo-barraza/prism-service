@@ -115,14 +115,14 @@ const ScheduledTaskService = {
     // Align tick to the next local minute boundary for timing precision
     const secondsToNextMinute = 60 - new Date().getSeconds();
     setTimeout(() => {
-      this.tick().catch((error: unknown) =>
+      this.tick().catch((error: Error) =>
         logger.error(
           `[ScheduledTasks] Initial tick error: ${getErrorMessage(error)}`,
         ),
       );
 
       tickingInterval = setInterval(() => {
-        this.tick().catch((error: unknown) =>
+        this.tick().catch((error: Error) =>
           logger.error(
             `[ScheduledTasks] Tick error: ${getErrorMessage(error)}`,
           ),
@@ -251,7 +251,7 @@ const ScheduledTaskService = {
           // Trigger execution in the background asynchronously
           this.executeTask(task, undefined, {
             username: task.username || "system",
-          }).catch((error: unknown) =>
+          }).catch((error: Error) =>
             logger.error(
               `[ScheduledTasks] Execution failed for task "${task.name}": ${getErrorMessage(error)}`,
             ),
@@ -421,7 +421,7 @@ const ScheduledTaskService = {
             $set: { isGenerating: false, updatedAt: new Date().toISOString() },
           },
         )
-        .catch((cleanupError: unknown) =>
+        .catch((cleanupError: Error) =>
           logger.warn(
             `[ScheduledTasks] Failed to reset isGenerating for conversation ${resolvedConversationId}: ${getErrorMessage(cleanupError)}`,
           ),
@@ -625,7 +625,7 @@ const ScheduledTaskService = {
     this.executeTask({ ...task, id: task.id }, payload, {
       username,
       agentConversationId,
-    }).catch((error: unknown) => {
+    }).catch((error: Error) => {
       logger.error(
         `[ScheduledTasks] Manual trigger failed for task "${task.name}": ${getErrorMessage(error)}`,
       );

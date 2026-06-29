@@ -1131,7 +1131,7 @@ export default class BaseAgenticHarness {
           RequestLogger.completePending(
             pendingRequestDocumentId,
             fullPayload,
-          ).catch((error: unknown) =>
+          ).catch((error: Error) =>
             logger.error(
               `[AgenticLoopService] Failed to complete pending request: ${errorMessage(error)}`,
             ),
@@ -1145,7 +1145,7 @@ export default class BaseAgenticHarness {
           );
         }
       })
-      .catch((error: unknown) => {
+      .catch((error: Error) => {
         logger.error(
           `[BaseAgenticHarness] Error resolving pendingRequestDocumentIdPromise: ${errorMessage(error)}`,
         );
@@ -1191,7 +1191,7 @@ export default class BaseAgenticHarness {
       agentConversationId: agentConversationId || null,
       parentAgentConversationId: parentAgentConversationId || null,
       agenticIteration: this.state.iterations,
-    }).catch((error: unknown) => {
+    }).catch((error: Error) => {
       logger.error(
         `[BaseAgenticHarness] Failed to insert pending request: ${errorMessage(error)}`,
       );
@@ -1351,7 +1351,7 @@ export default class BaseAgenticHarness {
         messages: currentMessages,
         conversationOutcome: state.conversationOutcome,
       })
-      .catch((error: unknown) =>
+      .catch((error: Error) =>
         logger.error(
           `[AgenticLoopService] afterResponse hooks failed: ${errorMessage(error)}`,
         ),

@@ -122,7 +122,7 @@ function handleEvent(event: WebhookEvent) {
     if (!matchesEventTypes(event.eventType, subscription.events)) continue;
     if (!matchesFilter(event, subscription.filter)) continue;
 
-    dispatchToSubscription(subscription, event).catch((error: unknown) => {
+    dispatchToSubscription(subscription, event).catch((error: Error) => {
       logger.error(
         `Unhandled error dispatching webhook: ${errorMessage(error)}`,
       );

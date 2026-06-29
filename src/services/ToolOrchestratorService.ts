@@ -454,15 +454,17 @@ async function executeToolGeneric(
       activeWorktrees.has(context.agentConversationId)
     ) {
       const worktreeState = activeWorktrees.get(context.agentConversationId)!;
-      const rewritePath = (provider: unknown): unknown => {
-        if (typeof provider !== "string") return provider;
-        if (provider.startsWith(worktreeState.originalRoot)) {
+      const rewritePath = (
+        targetPath: string | number | boolean | object | null | undefined,
+      ): string | number | boolean | object | null | undefined => {
+        if (typeof targetPath !== "string") return targetPath;
+        if (targetPath.startsWith(worktreeState.originalRoot)) {
           return (
             worktreeState.worktreePath +
-            provider.slice(worktreeState.originalRoot.length)
+            targetPath.slice(worktreeState.originalRoot.length)
           );
         }
-        return provider;
+        return targetPath;
       };
 
       // Rewrite common path fields used by file/git/shell tools

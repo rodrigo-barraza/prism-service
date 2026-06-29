@@ -138,7 +138,19 @@ export default class ToolContext {
   }
 
   /** Set a single value in a conversation's state (write-through to MongoDB). */
-  static set(conversationId: string, key: string, value: unknown): void {
+  static set(
+    conversationId: string,
+    key: string,
+    value:
+      | string
+      | number
+      | boolean
+      | object
+      | null
+      | undefined
+      | symbol
+      | ((...argumentsList: unknown[]) => unknown),
+  ): void {
     const store = ToolContext.getStore(conversationId);
     store.set(key, value);
     // Async write-through — don't await to keep tool execution fast
@@ -194,7 +206,7 @@ export default class ToolContext {
       // Async cleanup from MongoDB
       const collection = getCollection();
       if (collection) {
-        collection.deleteOne({ conversationId }).catch((error: unknown) => {
+        collection.deleteOne({ conversationId }).catch((error: Error) => {
           logger.warn(
             `[ToolContext] MongoDB cleanup failed for conversation ${conversationId}: ${getErrorMessage(error)}`,
           );

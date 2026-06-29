@@ -53,7 +53,7 @@ const ConversationEmbeddingService = {
         endpoint:
           ((context as Record<string, unknown>).endpoint as string | null) ||
           "/agent",
-      }).catch((error: unknown) =>
+      }).catch((error: Error) =>
         logger.error(
           `[ConversationEmbeddingService] Background embedding failed: ${getErrorMessage(error)}`,
         ),

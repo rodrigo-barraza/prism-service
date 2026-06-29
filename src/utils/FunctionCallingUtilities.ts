@@ -22,7 +22,15 @@ const TRUNCATABLE_ARRAY_KEYS = [
 ];
 
 function isTruncatableResult(
-  value: object | string | number | boolean | null | undefined | symbol | Function,
+  value:
+    | object
+    | string
+    | number
+    | boolean
+    | null
+    | undefined
+    | symbol
+    | ((...argumentsList: unknown[]) => unknown),
 ): value is object | string | number | boolean | null | undefined {
   return typeof value !== "function" && typeof value !== "symbol";
 }
@@ -165,10 +173,18 @@ export function expandMessagesForFunctionCall(
             });
           }
 
-          const val = finalResult as object | string | number | boolean | null | undefined | symbol | Function;
-          const truncatableResult = isTruncatableResult(val)
-             ? val
-             : undefined;
+          const resolvedValue = finalResult as
+            | object
+            | string
+            | number
+            | boolean
+            | null
+            | undefined
+            | symbol
+            | ((...argumentsList: unknown[]) => unknown);
+          const truncatableResult = isTruncatableResult(resolvedValue)
+            ? resolvedValue
+            : undefined;
 
           return {
             role: "tool",

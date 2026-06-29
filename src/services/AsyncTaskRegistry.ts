@@ -215,7 +215,7 @@ export default class AsyncTaskRegistry {
 
         onComplete?.(taskState);
       })
-      .catch((executionError: unknown) => {
+      .catch((executionError: Error) => {
         if (taskState.status === "cancelled") return;
 
         const isAbortError =

@@ -111,7 +111,7 @@ export async function extractReminderViaLLM(
         success: true,
         errorMessage: null,
         requestStartMs,
-      }).catch((loggingError: unknown) =>
+      }).catch((loggingError: Error) =>
         logger.error(
           `[SystemReminderExtractor] Failed to log extraction request: ${getErrorMessage(loggingError)}`,
         ),

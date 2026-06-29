@@ -80,6 +80,7 @@ export type {
   SubAgentState,
   WorktreeDiff,
   SubAgentResult,
+  ResumedAgentResult,
   InstanceInfo,
   InstanceAssignment,
   OrchestratorSpawnParams,
@@ -143,3 +144,5 @@ export type {
   WorkflowDefinition,
   ResolvedModalities,
 } from "./workflow.ts";
+
+export type { JsonValue } from "./json.ts";

@@ -51,7 +51,7 @@ export interface FileServiceInterface {
   getFile(
     key: string,
   ): Promise<{ stream: Readable; contentType: string } | null>;
-  isMinioRef(ref: unknown): ref is string;
+  isMinioRef(ref: string | number | boolean | object | null | undefined): ref is string;
   extractKey(ref: string): string;
 }
 
@@ -144,7 +144,7 @@ const FileService: FileServiceInterface = {
       return null;
     }
   },
-  isMinioRef(ref: unknown): ref is string {
+  isMinioRef(ref: string | number | boolean | object | null | undefined): ref is string {
     return typeof ref === "string" && ref.startsWith("minio://");
   },
   extractKey(ref: string): string {
