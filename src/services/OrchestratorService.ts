@@ -2150,91 +2150,22 @@ export default class OrchestratorService {
       _alreadyPersisted: true,
     };
 
-    // ── Race-safe persistence ────────────────────────────────────
-    // The non-blocking router can complete before the main loop's
-    // Finalizer persists the conversation. Using ConversationService
-    // .appendMessages (which does upsert: true) would create the
-    // conversation with ONLY the task-notification as messages[0],
-    // pushing the user's actual message to messages[1] when the
-    // Finalizer runs later. Instead, use a direct $push with
-    // upsert: false and retry until the conversation exists.
+    // ── Ephemeral notification (no DB persistence) ────────────────
+    // The completion message is NOT persisted to MongoDB. It exists only
+    // as ephemeral context passed to _triggerParentAutoResponse, which
+    // appends it to the contextMessages array for the auto-response
+    // agentic loop. The LLM sees the results, generates a synthesis
+    // response, and only that assistant response gets persisted by the
+    // Finalizer (because _alreadyPersisted: true on the completion
+    // message causes sanitizeMessagesForPersistence to skip it).
     //
-    // CRITICAL: The query also requires `isGenerating: { $ne: true }`
-    // to prevent a message-ordering race condition. If the user is
-    // mid-conversation while sub-agents work, the $push must wait
-    // until the current turn's Finalizer has persisted its messages
-    // and cleared isGenerating. This guarantees the notification
-    // always lands at the TRUE end of the messages array — never
-    // buried between a user message and its response.
-    const MAXIMUM_PERSISTENCE_RETRIES = 60;
-    const PERSISTENCE_RETRY_DELAY_MILLISECONDS = 2_000;
-
-    try {
-      const MongoWrapper = (await import("../wrappers/MongoWrapper.ts")).default;
-      const { MONGO_DB_NAME: databaseName } = await import("../../config.ts");
-      const notificationCollection = MongoWrapper.getCollection(
-        databaseName,
-        COLLECTIONS.AGENT_CONVERSATIONS,
-      );
-
-      let persistedSuccessfully = false;
-
-      for (let retryAttempt = 0; retryAttempt < MAXIMUM_PERSISTENCE_RETRIES; retryAttempt++) {
-        const updateResult = await notificationCollection.updateOne(
-          {
-            id: conversationId,
-            project,
-            username,
-            "messages.0": { $exists: true },
-            isGenerating: { $ne: true },
-          },
-          {
-            $push: { messages: completionMessage },
-            $set: { updatedAt: new Date().toISOString() },
-          } as import("mongodb").Document,
-        );
-
-        if (updateResult.matchedCount > 0) {
-          persistedSuccessfully = true;
-          logger.info(
-            `[Orchestrator] Injected router completion notification into parent conversation ${conversationId}` +
-              (retryAttempt > 0 ? ` (after ${retryAttempt} retries)` : ""),
-          );
-          break;
-        }
-
-        // Distinguish between "conversation doesn't exist yet" and
-        // "conversation exists but is currently generating"
-        const existenceCheck = await notificationCollection.findOne(
-          { id: conversationId, project, username },
-          { projection: { isGenerating: 1 } },
-        );
-
-        if (existenceCheck?.isGenerating) {
-          logger.debug(
-            `[Orchestrator] Parent conversation ${conversationId} is currently generating — waiting for turn to complete (attempt ${retryAttempt + 1}/${MAXIMUM_PERSISTENCE_RETRIES})`,
-          );
-        } else {
-          logger.debug(
-            `[Orchestrator] Parent conversation ${conversationId} not ready yet (attempt ${retryAttempt + 1}/${MAXIMUM_PERSISTENCE_RETRIES}), waiting ${PERSISTENCE_RETRY_DELAY_MILLISECONDS}ms…`,
-          );
-        }
-
-        await new Promise((resolve) =>
-          setTimeout(resolve, PERSISTENCE_RETRY_DELAY_MILLISECONDS),
-        );
-      }
-
-      if (!persistedSuccessfully) {
-        logger.warn(
-          `[Orchestrator] Parent conversation ${conversationId} never became idle after ${MAXIMUM_PERSISTENCE_RETRIES} retries — completion notification dropped`,
-        );
-      }
-    } catch (persistenceError: unknown) {
-      logger.warn(
-        `[Orchestrator] Failed to persist router completion message: ${getErrorMessage(persistenceError)}`,
-      );
-    }
+    // This eliminates the fake `role: "user"` notification from the
+    // conversation history — the DB never contains it, and the user
+    // never sees a spurious notification card in the UI.
+    //
+    // The auto-response's own isGenerating wait loop handles the race
+    // condition where the parent is mid-conversation when sub-agents
+    // complete — it waits until the parent is idle before running.
 
     // Trigger a background agentic loop so the parent LLM processes
     // the sub-agent results and auto-responds in the conversation.
@@ -2383,20 +2314,13 @@ export default class OrchestratorService {
       return;
     }
 
-    const hasCompletionMessage = (
-      (conversation.messages as ConversationMessage[]) || []
-    ).some(
-      (message: ConversationMessage) =>
-        message.role === "user" &&
-        message.content === completionMessage.content,
-    );
-
-    const contextMessages = hasCompletionMessage
-      ? [...((conversation.messages as ConversationMessage[]) || [])]
-      : [
-          ...((conversation.messages as ConversationMessage[]) || []),
-          completionMessage,
-        ];
+    // The completion message is ephemeral (never persisted to DB), so it's
+    // always appended to the context for this auto-response invocation.
+    // _alreadyPersisted: true ensures the Finalizer won't persist it.
+    const contextMessages = [
+      ...((conversation.messages as ConversationMessage[]) || []),
+      completionMessage,
+    ];
 
     const backgroundEmit = (event: {
       type: string;
