@@ -123,7 +123,7 @@ describe("Recursive Sub-Agent Spawning (Grandchildren)", () => {
       // Extract tool execution details
       const createTeamToolCalls = result.toolExecutions.filter(
         (toolEvent) =>
-          toolEvent.tool?.name === "create_team" || toolEvent.name === "create_team",
+          toolEvent.tool?.name === "create_subagents" || toolEvent.name === "create_subagents",
       );
       const subAgentToolCalls = result.toolExecutions.filter(
         (toolEvent) =>
@@ -136,7 +136,7 @@ describe("Recursive Sub-Agent Spawning (Grandchildren)", () => {
 
       // List all sub-agent tool names to check if child agents called create_team
       const subAgentCreateTeamCalls = subAgentToolCalls.filter(
-        (toolEvent) => toolEvent.tool?.name === "create_team",
+        (toolEvent) => toolEvent.tool?.name === "create_subagents",
       );
       console.log(`     create_team calls (from sub-agents): ${subAgentCreateTeamCalls.length}`);
 

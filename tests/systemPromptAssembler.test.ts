@@ -133,7 +133,7 @@ const MOCK_TOOLS_API_SCHEMAS = [
 
 const COORDINATOR_TOOL_SCHEMAS = [
   {
-    name: "create_team",
+    name: "create_subagents",
     description: "Spawn sub-agents",
     parameters: { type: "object", properties: {} },
     domain: "Core Orchestrator Tools",
@@ -141,7 +141,7 @@ const COORDINATOR_TOOL_SCHEMAS = [
     labels: ["coding", "orchestration"],
   },
   {
-    name: "send_message",
+    name: "send_subagent_message",
     description: "Send message to worker",
     parameters: { type: "object", properties: {} },
     domain: "Core Orchestrator Tools",
@@ -149,7 +149,7 @@ const COORDINATOR_TOOL_SCHEMAS = [
     labels: ["coding", "orchestration"],
   },
   {
-    name: "stop_agent",
+    name: "stop_subagent",
     description: "Stop a sub-agent",
     parameters: { type: "object", properties: {} },
     domain: "Core Orchestrator Tools",
@@ -411,7 +411,7 @@ describe("SystemPromptAssembler", () => {
         agent: "CODING",
         project: "prism-chat",
         messages: [{ role: "user", content: "Hello" }],
-        enabledTools: ["read_file", "write_file", "create_team", "send_message"],
+        enabledTools: ["read_file", "write_file", "create_subagents", "send_subagent_message"],
       });
 
       expect(prompt).toContain("Orchestrator Mode — Multi-Agent Orchestration");
@@ -485,7 +485,7 @@ describe("SystemPromptAssembler", () => {
         agent: "LUPOS",
         project: "lupos",
         messages: [{ role: "user", content: "Hello" }],
-        enabledTools: ["create_team", "send_message"],
+        enabledTools: ["create_subagents", "send_subagent_message"],
       });
 
       expect(prompt).not.toContain("Orchestrator Mode — Multi-Agent Orchestration");
@@ -507,7 +507,7 @@ describe("SystemPromptAssembler", () => {
         agent: "CODING",
         project: "prism-chat",
         messages: [{ role: "user", content: "Run the scheduled check" }],
-        enabledTools: ["read_file", "write_file", "search_web", "create_team", "send_message", "stop_agent", "think"],
+        enabledTools: ["read_file", "write_file", "search_web", "create_subagents", "send_subagent_message", "stop_subagent", "think"],
       });
 
       const parentHasOrchestrator = parentResult.prompt.includes("Orchestrator Mode — Multi-Agent Orchestration");
@@ -553,7 +553,7 @@ describe("SystemPromptAssembler", () => {
         agent: null,
         project: "test",
         messages: [{ role: "user", content: "Hello" }],
-        enabledTools: ["create_team", "send_message"],
+        enabledTools: ["create_subagents", "send_subagent_message"],
       });
 
       expect(prompt).not.toContain("Orchestrator Mode");

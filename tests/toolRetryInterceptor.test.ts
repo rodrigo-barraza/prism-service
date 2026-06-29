@@ -251,10 +251,10 @@ describe("ToolRetryInterceptor — buildToolRetryGuidance", () => {
 
     it("should stringify non-string argument values as JSON", () => {
       const toolCalls: ToolCall[] = [
-        { id: "tc-1", name: "create_team", args: { members: [{ name: "worker" }], count: 3 } },
+        { id: "tc-1", name: "create_subagents", args: { members: [{ name: "worker" }], count: 3 } },
       ];
       const results: ToolResult[] = [
-        { id: "tc-1", name: "create_team", result: { error: "Invalid topology" } },
+        { id: "tc-1", name: "create_subagents", result: { error: "Invalid topology" } },
       ];
       const state = createState();
 

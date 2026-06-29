@@ -369,7 +369,7 @@ export async function finalizeTextGeneration(
   //
   // Sub-agents share the parent's conversationId for telemetry correlation but
   // must NOT persist their messages into the parent conversation document —
-  // their output is returned via the create_team tool call result instead.
+  // their output is returned via the create_subagents tool call result instead.
   if (conversationId) {
     const messagesToAppend = assembleMessagesToAppend({
       overrideMessagesToAppend,

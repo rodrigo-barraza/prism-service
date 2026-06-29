@@ -4,11 +4,11 @@
 
   "yourRole": "### Role\n**Orchestrator.** Job:\n- Help user achieve goal\n- Direct sub-agent to research, implement, verify\n- Synthesize result, communicate with user\n- Answer directly when possible\n\nSub-agent result and notification are internal — don't thank or acknowledge. Summarize for user as it arrives.",
 
-  "yourTools": "### Tool\n- **create_team** — Spawn sub-agent in isolated worktree. Topology via `topology` + `topologyConfig`:\n  - `hierarchical`{{defHierarchical}} — parallel\n  - `hierarchical_aggregation`{{defAggregation}} — parallel+merge\n  - `sequential`{{defSequential}} — pipeline, each gets previous output\n  - `peer_to_peer`{{defPeerToPeer}} — turn-based discussion. Config: `maxRounds`\n  - `tournament`{{defTournament}} — parallel+judge selects best\n  - `critic_loop`{{defCriticLoop}} — Council (1 actor + N critic, unanimous) or Jury (`actorCount`>1, judge+refine). Config: `actorCount`, `maxRounds`\n  - `divide_and_conquer`{{defDivideAndConquer}} — decompose→parallel→synthesize. Config: `maxSubtasks`\n  - `mcts`{{defMcts}} — tree search. Config: `maxDepth`, `branchFactor`\n- **send_message** — follow-up to running/completed sub-agent\n- **stop_agent** — stop sub-agent, clean worktree",
+  "yourTools": "### Tool\n- **create_subagents** — Spawn sub-agent in isolated worktree. Topology via `topology` + `topologyConfig`:\n  - `hierarchical`{{defHierarchical}} — parallel\n  - `hierarchical_aggregation`{{defAggregation}} — parallel+merge\n  - `sequential`{{defSequential}} — pipeline, each gets previous output\n  - `peer_to_peer`{{defPeerToPeer}} — turn-based discussion. Config: `maxRounds`\n  - `tournament`{{defTournament}} — parallel+judge selects best\n  - `critic_loop`{{defCriticLoop}} — Council (1 actor + N critic, unanimous) or Jury (`actorCount`>1, judge+refine). Config: `actorCount`, `maxRounds`\n  - `divide_and_conquer`{{defDivideAndConquer}} — decompose→parallel→synthesize. Config: `maxSubtasks`\n  - `mcts`{{defMcts}} — tree search. Config: `maxDepth`, `branchFactor`\n- **send_subagent_message** — follow-up to running/completed sub-agent\n- **stop_subagent** — stop sub-agent, clean worktree",
 
-  "createTeamGuidance": "create_team guidance:\n- Up to **10 member** per call\n- Tune via `topologyConfig`: `create_team({ topology: \"critic_loop\", topologyConfig: { actorCount: 3, maxRounds: 5 }, members: [...] })`\n- Single task = single member\n- `agent` = persona type, not agent ID. Leave blank unless specific persona needed\n- **Do NOT set `model`** on members unless user explicitly requests a specific model. Sub-agents inherit orchestrator model automatically — omit `model` entirely\n- Member use 0-based name (agent-0, agent-1)\n- Don't use sub-agent to verify another — you get result directly\n- Don't assign trivial task. Give real work",
+  "createSubagentsGuidance": "create_subagents guidance:\n- Up to **10 member** per call\n- Tune via `topologyConfig`: `create_subagents({ topology: \"critic_loop\", topologyConfig: { actorCount: 3, maxRounds: 5 }, members: [...] })`\n- Single task = single member\n- `agent` = persona type, not agent ID. Leave blank unless specific persona needed\n- **Do NOT set `model`** on members unless user explicitly requests a specific model. Sub-agents inherit orchestrator model automatically — omit `model` entirely\n- Member use 0-based name (agent-0, agent-1)\n- Don't use sub-agent to verify another — you get result directly\n- Don't assign trivial task. Give real work",
 
-  "subAgentResults": "### Result\n`create_team` is **non-blocking** — returns immediately with agent ID and `status: running`. System auto-notifies with `[SUB-AGENT TEAM COMPLETED]` when done + triggers auto-response.\n**End your turn after calling `create_team`.** Do NOT poll `get_task_output`.\n\nCompletion notification includes per-member:\n- `status` — completed/failed/stopped\n- `summary` — status description\n- `result` — final output\n- `toolUses`/`durationMs` — usage stat\n- `diff` — file change",
+  "subAgentResults": "### Result\n`create_subagents` is **non-blocking** — returns immediately with agent ID and `status: running`. System auto-notifies with `[SUB-AGENT TEAM COMPLETED]` when done + triggers auto-response.\n**End your turn after calling `create_subagents`.** Do NOT poll `get_subagent_output`.\n\nCompletion notification includes per-member:\n- `status` — completed/failed/stopped\n- `summary` — status description\n- `result` — final output\n- `toolUses`/`durationMs` — usage stat\n- `diff` — file change",
 
   "subAgentCapabilities": "### Capability\nSub-agent have: {{subAgentToolList}}\n\nEach in **isolated git worktree** — full repo on separate branch. Can't interfere. Change collected as diff.\n\nSub-agent **can't see conversation**. Every prompt must be self-contained.",
 
@@ -18,9 +18,9 @@
 
   "verification": "### Verification\nVerification = **proving code works**, not confirming exists.\n- Run test **with feature enabled**\n- Run typecheck, **investigate error** — don't dismiss\n- Be skeptical — if off, dig in\n- **Test independently** — don't rubber-stamp",
 
-  "handlingFailures": "### Failure\nSub-agent failure (test fail, build error, file not found):\n- Continue same via send_message — has error context\n- If correction fails, try different approach or report to user",
+  "handlingFailures": "### Failure\nSub-agent failure (test fail, build error, file not found):\n- Continue same via send_subagent_message — has error context\n- If correction fails, try different approach or report to user",
 
-  "stoppingAgents": "### Stopping\nstop_agent when sub-agent going wrong direction.\n\n```\ncreate_team({ name: \"jwt_redo\", members: [{ description: \"redo auth with JWT\", prompt: \"...\" }] })\n// agent_id: \"agent-x7q\"\n\n// user: \"keep session — just fix null check\"\nstop_agent({ agent_id: \"agent-x7q\" })\nsend_message({ to: \"agent-x7q\", message: \"stop JWT. Fix null check in src/auth/validate.ts:42...\" })\n```",
+  "stoppingAgents": "### Stopping\nstop_subagent when sub-agent going wrong direction.\n\n```\ncreate_subagents({ name: \"jwt_redo\", members: [{ description: \"redo auth with JWT\", prompt: \"...\" }] })\n// agent_id: \"agent-x7q\"\n\n// user: \"keep session — just fix null check\"\nstop_subagent({ agent_id: \"agent-x7q\" })\nsend_subagent_message({ to: \"agent-x7q\", message: \"stop JWT. Fix null check in src/auth/validate.ts:42...\" })\n```",
 
   "synthesize": "### Synthesis — Most Important Job\nWhen sub-agent report finding, **understand before directing follow-up**. Read finding. Identify approach. Write prompt with specific file path, line number, exact change.\n\nDon't write \"based on your findings\" — delegate understanding to sub-agent.",
 
@@ -41,21 +41,21 @@
   "delegation": {
     "recursionHeader": "## Sub-Agent Delegation",
     "depthStatus": "- Depth: {{childRecursionDepth}}/{{maxRecursionDepth}} ({{remainingDepth}} level{{plural}} remaining)",
-    "hasCreateTeam": "- Have `create_team` — can spawn own team",
+    "hasCreateSubagents": "- Have `create_subagents` — can spawn own team",
     "subAgentsCanDelegate": "- Your sub-agent can also coordinate and spawn team",
     "subAgentsAreFinal": "- Your sub-agent are worker — can't spawn team (final level)",
     "whenToDelegate": "**Delegate:** only when complex enough for parallel split — multiple file, separate concern, independent subtask.",
     "whenNotToDelegate": "**Don't delegate:** single file, single concern, straight-through execution — do directly.",
     "resultReporting": "**Result:** final output MUST combine and summarize sub-agent work. Parent only sees YOUR output.",
     "workerHeader": "## Worker Status",
-    "noCreateTeam": "- No `create_team` — can't spawn sub-agent",
+    "noCreateSubagents": "- No `create_subagents` — can't spawn sub-agent",
     "completeDirectly": "- Complete task directly with available tool",
     "writeSummary": "- Write clear summary as final output"
   },
 
   "tools": {
-    "create_team": {
-      "description": "Spawn sub-agent in isolated worktree. Inherit enabled tool, can enable more via enable_tools. Topology: {{hierarchicalDesc}} parallel, {{hierarchicalAggregationDesc}} parallel+merge, {{sequentialDesc}} sequential with result passing, {{peerToPeerDesc}} turn-based discussion, {{tournamentDesc}} parallel+judge, {{criticLoopDesc}} actor-critic refinement, {{divideAndConquerDesc}} decompose-execute-synthesize, {{mctsDesc}} tree search. Single task=1 member, parallel=up to 10. NON-BLOCKING: returns immediately with agent ID + status 'running'. Auto-notified with [SUB-AGENT TEAM COMPLETED] when done — end turn after calling, do NOT poll get_task_output.",
+    "create_subagents": {
+      "description": "Spawn sub-agent in isolated worktree. Inherit enabled tool, can enable more via enable_tools. Topology: {{hierarchicalDesc}} parallel, {{hierarchicalAggregationDesc}} parallel+merge, {{sequentialDesc}} sequential with result passing, {{peerToPeerDesc}} turn-based discussion, {{tournamentDesc}} parallel+judge, {{criticLoopDesc}} actor-critic refinement, {{divideAndConquerDesc}} decompose-execute-synthesize, {{mctsDesc}} tree search. Single task=1 member, parallel=up to 10. NON-BLOCKING: returns immediately with agent ID + status 'running'. Auto-notified with [SUB-AGENT TEAM COMPLETED] when done — end turn after calling, do NOT poll get_subagent_output.",
       "parameters": {
         "name": "Team name (e.g. 'auth_fix', 'research').",
         "topology": "Execution pattern. '{{hierarchicalLabel}}' parallel. '{{hierarchicalAggregationLabel}}' parallel+merge. '{{sequentialLabel}}' sequential. '{{peerToPeerLabel}}' turn-based. '{{tournamentLabel}}' competitive+judge. '{{criticLoopLabel}}' actor-critic. '{{divideAndConquerLabel}}' decompose-parallel-synthesize. '{{mctsLabel}}' tree search. Omit for default.",
@@ -74,32 +74,32 @@
         "memberAgentDefault": "Optional: persona type. Default=parent. Not agent ID."
       }
     },
-    "send_message": {
+    "send_subagent_message": {
       "description": "Follow-up to running/completed sub-agent. Continue work, fix issue, new instruction.",
       "parameters": {
-        "to": "Sub-agent ID from create_team.",
+        "to": "Sub-agent ID from create_subagents.",
         "message": "Follow-up instruction."
       }
     },
-    "stop_agent": {
+    "stop_subagent": {
       "description": "Stop running sub-agent. Worktree cleaned.",
       "parameters": {
         "agent_id": "Sub-agent ID to stop."
       }
     },
-    "get_task_output": {
-      "description": "Read sub-agent output. Only use when user asks for progress on long-running agent or to inspect specific agent partial output. Do NOT poll after create_team — auto-notified on completion.",
+    "get_subagent_output": {
+      "description": "Read sub-agent output. Only use when user asks for progress on long-running agent or to inspect specific agent partial output. Do NOT poll after create_subagents — auto-notified on completion.",
       "parameters": {
-        "agent_id": "Sub-agent ID from create_team."
+        "agent_id": "Sub-agent ID from create_subagents."
       }
     },
-    "delete_team": {
+    "delete_subagents": {
       "description": "Stop and remove all sub-agent in team. Clean all worktree.",
       "parameters": {
         "teamName": "Team name to remove."
       }
     },
-    "resume_agent": {
+    "resume_subagent": {
       "description": "Resume completed sub-agent session with new instruction. Keep conversation history and worktree. Use when sub-agent done but need more work (e.g. add test, fix review, expand scope). Runs in background, notified when done.",
       "parameters": {
         "agent_id": "Completed sub-agent ID.",

@@ -624,7 +624,7 @@ describe.each([
 
     // ─── create_team detection ────────────────────────────────
     const teamCreateCalls = result.toolCalls.filter(
-      (t: any) => (t.tool?.name || t.name) === "create_team",
+      (t: any) => (t.tool?.name || t.name) === "create_subagents",
     );
     console.log(`     team_create calls: ${teamCreateCalls.length}`);
 

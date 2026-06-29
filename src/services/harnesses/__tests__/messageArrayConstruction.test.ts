@@ -3947,8 +3947,8 @@ describe("Message Array Construction", () => {
       expect(newTurnMessages).toHaveLength(3);
     });
 
-    it("should handle send_message follow-up to a sub-agent (mixed persisted + new)", () => {
-      // After a sub-agent completes its first turn, send_message adds a new user message.
+    it("should handle send_subagent_message follow-up to a sub-agent (mixed persisted + new)", () => {
+      // After a sub-agent completes its first turn, send_subagent_message adds a new user message.
       // The prior messages from the first turn are now _alreadyPersisted.
       const originalMessages: HarnessPayload[] = [
         {
@@ -4011,7 +4011,7 @@ describe("Message Array Construction", () => {
         "## Recursive Delegation",
         "You are a **Coordinator** sub-agent with recursive spawning capabilities.",
         "- Current depth: 1 of 3 (2 levels remaining)",
-        "- You have access to `create_team` and can spawn your own sub-teams",
+        "- You have access to `create_subagents` and can spawn your own sub-teams",
       ].join("\n");
 
       const originalMessages: HarnessPayload[] = [
@@ -4032,7 +4032,7 @@ describe("Message Array Construction", () => {
         toolCalls: [
           {
             id: "call_team_1",
-            name: "create_team",
+            name: "create_subagents",
             args: {
               name: "auth-team",
               members: [
@@ -4073,7 +4073,7 @@ describe("Message Array Construction", () => {
         "system", // operational context
         "system", // injected context (skills, memories, local time)
         "user", // task prompt
-        "assistant", // tool call (create_team)
+        "assistant", // tool call (create_subagents)
         "tool", // tool result
         "assistant", // final synthesis
       ]);

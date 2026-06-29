@@ -62,7 +62,7 @@ type AgenticLoopServiceModule = typeof import("./AgenticLoopService.ts");
 // worktrees and collects diffs when complete.
 //
 // Entry point: Chat tools — spawnFromTool() / sendMessage() / stopAgent()
-// Called when the LLM invokes create_team / send_message / stop_agent
+// Called when the LLM invokes create_subagents / send_subagent_message / stop_subagent
 // ────────────────────────────────────────────────────────────
 
 
@@ -192,7 +192,7 @@ export default class OrchestratorService {
   }
 
   // ══════════════════════════════════════════════════════════
-  // Chat-Triggered Tools (team_create / send_message / stop_agent)
+  // Chat-Triggered Tools (create_subagents / send_subagent_message / stop_subagent)
   // ══════════════════════════════════════════════════════════
 
   /**
@@ -563,7 +563,7 @@ export default class OrchestratorService {
     //                        (SequentialRouter, CriticLoopRouter, etc.)
     // awaitCompletion=false: Fire-and-forget — parent continues immediately.
     //                        Used by parallel routers (HierarchicalRouter, etc.)
-    //                        Results are retrieved later via get_task_output.
+    //                        Results are retrieved later via get_subagent_output.
 
     if (awaitCompletion) {
       // ── Blocking mode (for sequential/dependent topologies) ────
@@ -622,7 +622,7 @@ export default class OrchestratorService {
     // Launch the sub-agent loop as a detached background promise.
     // spawnFromTool returns immediately so the parent's agentic loop
     // is free to continue. Completion/failure emits SSE events, and
-    // results are retrievable via get_task_output.
+    // results are retrievable via get_subagent_output.
     OrchestratorService._runSubAgentLoop(
       subAgentState,
       prompt,
@@ -1265,7 +1265,7 @@ export default class OrchestratorService {
     }
 
     // ── Dispatch mode: blocking (sub-agent) vs non-blocking (top-level) ──
-    // Sub-agents (recursionDepth > 0) block on create_team: their agentic
+    // Sub-agents (recursionDepth > 0) block on create_subagents: their agentic
     // loop must stay alive to receive sub-sub-agent results, synthesize
     // them, and produce a final text summary for the parent router.
     // Top-level (recursionDepth === 0) is non-blocking: returns immediately
@@ -1314,7 +1314,7 @@ export default class OrchestratorService {
     );
 
     if (isBlockingDispatch) {
-      // ── Blocking mode (sub-agent calling create_team) ──────────
+      // ── Blocking mode (sub-agent calling create_subagents) ──────────
       // Await the full router execution so the sub-agent's loop stays
       // alive, receives completed results, and can synthesize a summary.
       try {
@@ -1343,7 +1343,7 @@ export default class OrchestratorService {
       }
     }
 
-    // ── Non-blocking mode (top-level create_team) ──────────────────
+    // ── Non-blocking mode (top-level create_subagents) ──────────────────
     // Fire the router as a detached promise — it runs in the background.
     // createTeam() returns immediately after all initial sub-agents have
     // registered (real agent IDs allocated, worktrees created) — but
@@ -1586,7 +1586,7 @@ export default class OrchestratorService {
    *
    * Unlike `continueAgent` (blocking, used by PeerToPeerRouter), this is
    * LLM-facing and follows the same non-blocking + auto-response pattern
-   * as `create_team`.
+   * as `create_subagents`.
    *
    * Equivalent of Antigravity's `ReusedSubagentId` pattern.
    */
@@ -1602,7 +1602,7 @@ export default class OrchestratorService {
 
     if (subAgent.status === "running") {
       return {
-        error: `Sub-agent "${agentId}" is currently running. Use send_message to queue a follow-up, or stop_agent to abort it first.`,
+        error: `Sub-agent "${agentId}" is currently running. Use send_subagent_message to queue a follow-up, or stop_subagent to abort it first.`,
       };
     }
 
@@ -1612,8 +1612,8 @@ export default class OrchestratorService {
       };
     }
 
-    // At recursion depth > 0 (sub-agent calling resume_agent), block until completion
-    // — same pattern as create_team at depth > 0.
+    // At recursion depth > 0 (sub-agent calling resume_subagent), block until completion
+    // — same pattern as create_subagents at depth > 0.
     const callerRecursionDepth = orchestratorContext.recursionDepth ?? 0;
     if (callerRecursionDepth > 0) {
       return OrchestratorService.continueAgent(agentId, prompt, orchestratorContext);
@@ -1978,9 +1978,9 @@ export default class OrchestratorService {
           plural: remainingDepth !== 1 ? "s" : "",
         },
       );
-      const hasCreateTeam = PromptLocaleService.get(
+      const hasCreateSubagents = PromptLocaleService.get(
         "en",
-        "orchestrator.delegation.hasCreateTeam",
+        "orchestrator.delegation.hasCreateSubagents",
       );
       const subAgentLine =
         remainingDepth > 1
@@ -2010,7 +2010,7 @@ export default class OrchestratorService {
         PromptLocaleService.get("en", "orchestrator.coordinatorRole") +
         `\n` +
         `${depthStatus}\n` +
-        `${hasCreateTeam}\n` +
+        `${hasCreateSubagents}\n` +
         `${subAgentLine}\n` +
         `\n` +
         `${whenToDelegate}\n` +
@@ -2021,9 +2021,9 @@ export default class OrchestratorService {
         "en",
         "orchestrator.delegation.workerHeader",
       );
-      const noCreateTeam = PromptLocaleService.get(
+      const noCreateSubagents = PromptLocaleService.get(
         "en",
-        "orchestrator.delegation.noCreateTeam",
+        "orchestrator.delegation.noCreateSubagents",
       );
       const completeDirectly = PromptLocaleService.get(
         "en",
@@ -2041,7 +2041,7 @@ export default class OrchestratorService {
           maxRecursionDepth: String(maxRecursionDepth),
         }) +
         `\n` +
-        `${noCreateTeam}\n` +
+        `${noCreateSubagents}\n` +
         `${completeDirectly}\n` +
         `${writeSummary}\n\n`;
     } else {
@@ -2117,7 +2117,7 @@ export default class OrchestratorService {
     const subAgentEmit = telemetry.createEmitFunction();
 
     // ── Recursive spawning: conditional orchestrator tool access ──────
-    // When recursion depth < max, sub-agents KEEP orchestrator tools (create_team, etc.)
+    // When recursion depth < max, sub-agents KEEP orchestrator tools (create_subagents, etc.)
     // and can spawn their own sub-teams. When depth = max, they become Worker agents
     // with orchestrator tools stripped — the existing default behavior.
     // (childRecursionDepth, maxRecursionDepth, canSpawnRecursively computed earlier)
@@ -2208,7 +2208,7 @@ export default class OrchestratorService {
         emit: subAgentEmit,
         signal: subAgent.abortController?.signal,
         workspaceRoot: subAgent.worktreePath || parentWorkspaceRoot,
-        // Recursive spawning: propagate incremented depth so child create_team
+        // Recursive spawning: propagate incremented depth so child create_subagents
         // calls know they're one level deeper. The ToolExecutor forwards these
         // to ToolOrchestratorService.executeOrchestratorTool → OrchestratorContext.
         _recursionDepth: childRecursionDepth,

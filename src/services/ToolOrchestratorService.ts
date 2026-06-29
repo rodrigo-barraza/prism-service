@@ -605,7 +605,7 @@ async function fetchJsonWithBody(
 
 /**
  * Dynamically builds the `agent` parameter description for the
- * create_team schema by reading all registered persona IDs from
+ * create_subagents schema by reading all registered persona IDs from
  * the AgentPersonaRegistry. This avoids hard-coding persona names
  * like "Lupos" or "Coding" which caused the LLM to misuse the field.
  */
@@ -619,7 +619,7 @@ function buildAgentParameterDescription(locale?: string): string {
   if (agentNames) {
     return PromptLocaleService.get(
       activeLocale,
-      "orchestrator.tools.create_team.parameters.memberAgent",
+      "orchestrator.tools.create_subagents.parameters.memberAgent",
       {
         agentNames,
       },
@@ -628,7 +628,7 @@ function buildAgentParameterDescription(locale?: string): string {
 
   return PromptLocaleService.get(
     activeLocale,
-    "orchestrator.tools.create_team.parameters.memberAgentDefault",
+    "orchestrator.tools.create_subagents.parameters.memberAgentDefault",
   );
 }
 
@@ -715,7 +715,7 @@ function getOrchestratorToolSchemas(
       emoji: ["👥", "🤖"],
       description: PromptLocaleService.get(
         activeLocale,
-        "orchestrator.tools.create_team.description",
+        "orchestrator.tools.create_subagents.description",
         {
           hierarchicalDesc,
           hierarchicalAggregationDesc,
@@ -734,7 +734,7 @@ function getOrchestratorToolSchemas(
             type: "string",
             description: PromptLocaleService.get(
               activeLocale,
-              "orchestrator.tools.create_team.parameters.name",
+              "orchestrator.tools.create_subagents.parameters.name",
             ),
           },
           topology: {
@@ -751,7 +751,7 @@ function getOrchestratorToolSchemas(
             ],
             description: PromptLocaleService.get(
               activeLocale,
-              "orchestrator.tools.create_team.parameters.topology",
+              "orchestrator.tools.create_subagents.parameters.topology",
               {
                 hierarchicalLabel,
                 hierarchicalAggregationLabel,
@@ -768,42 +768,42 @@ function getOrchestratorToolSchemas(
             type: "object",
             description: PromptLocaleService.get(
               activeLocale,
-              "orchestrator.tools.create_team.parameters.topologyConfig",
+              "orchestrator.tools.create_subagents.parameters.topologyConfig",
             ),
             properties: {
               actorCount: {
                 type: "integer",
                 description: PromptLocaleService.get(
                   activeLocale,
-                  "orchestrator.tools.create_team.parameters.actorCount",
+                  "orchestrator.tools.create_subagents.parameters.actorCount",
                 ),
               },
               maxRounds: {
                 type: "integer",
                 description: PromptLocaleService.get(
                   activeLocale,
-                  "orchestrator.tools.create_team.parameters.maxRounds",
+                  "orchestrator.tools.create_subagents.parameters.maxRounds",
                 ),
               },
               branchFactor: {
                 type: "integer",
                 description: PromptLocaleService.get(
                   activeLocale,
-                  "orchestrator.tools.create_team.parameters.branchFactor",
+                  "orchestrator.tools.create_subagents.parameters.branchFactor",
                 ),
               },
               maxDepth: {
                 type: "integer",
                 description: PromptLocaleService.get(
                   activeLocale,
-                  "orchestrator.tools.create_team.parameters.maxDepth",
+                  "orchestrator.tools.create_subagents.parameters.maxDepth",
                 ),
               },
               maxSubtasks: {
                 type: "integer",
                 description: PromptLocaleService.get(
                   activeLocale,
-                  "orchestrator.tools.create_team.parameters.maxSubtasks",
+                  "orchestrator.tools.create_subagents.parameters.maxSubtasks",
                 ),
               },
             },
@@ -813,7 +813,7 @@ function getOrchestratorToolSchemas(
             maxItems: 10,
             description: PromptLocaleService.get(
               activeLocale,
-              "orchestrator.tools.create_team.parameters.members",
+              "orchestrator.tools.create_subagents.parameters.members",
             ),
             items: {
               type: "object",
@@ -822,14 +822,14 @@ function getOrchestratorToolSchemas(
                   type: "string",
                   description: PromptLocaleService.get(
                     activeLocale,
-                    "orchestrator.tools.create_team.parameters.memberDescription",
+                    "orchestrator.tools.create_subagents.parameters.memberDescription",
                   ),
                 },
                 prompt: {
                   type: "string",
                   description: PromptLocaleService.get(
                     activeLocale,
-                    "orchestrator.tools.create_team.parameters.memberPrompt",
+                    "orchestrator.tools.create_subagents.parameters.memberPrompt",
                   ),
                 },
                 files: {
@@ -837,14 +837,14 @@ function getOrchestratorToolSchemas(
                   items: { type: "string" },
                   description: PromptLocaleService.get(
                     activeLocale,
-                    "orchestrator.tools.create_team.parameters.memberFiles",
+                    "orchestrator.tools.create_subagents.parameters.memberFiles",
                   ),
                 },
                 model: {
                   type: "string",
                   description: PromptLocaleService.get(
                     activeLocale,
-                    "orchestrator.tools.create_team.parameters.memberModel",
+                    "orchestrator.tools.create_subagents.parameters.memberModel",
                   ),
                 },
                 agent: {
@@ -864,7 +864,7 @@ function getOrchestratorToolSchemas(
       emoji: ["💬", "📤"],
       description: PromptLocaleService.get(
         activeLocale,
-        "orchestrator.tools.send_message.description",
+        "orchestrator.tools.send_subagent_message.description",
       ),
       parameters: {
         type: "object",
@@ -873,14 +873,14 @@ function getOrchestratorToolSchemas(
             type: "string",
             description: PromptLocaleService.get(
               activeLocale,
-              "orchestrator.tools.send_message.parameters.to",
+              "orchestrator.tools.send_subagent_message.parameters.to",
             ),
           },
           message: {
             type: "string",
             description: PromptLocaleService.get(
               activeLocale,
-              "orchestrator.tools.send_message.parameters.message",
+              "orchestrator.tools.send_subagent_message.parameters.message",
             ),
           },
         },
@@ -892,7 +892,7 @@ function getOrchestratorToolSchemas(
       emoji: ["⏹️", "🤖"],
       description: PromptLocaleService.get(
         activeLocale,
-        "orchestrator.tools.stop_agent.description",
+        "orchestrator.tools.stop_subagent.description",
       ),
       parameters: {
         type: "object",
@@ -901,7 +901,7 @@ function getOrchestratorToolSchemas(
             type: "string",
             description: PromptLocaleService.get(
               activeLocale,
-              "orchestrator.tools.stop_agent.parameters.agent_id",
+              "orchestrator.tools.stop_subagent.parameters.agent_id",
             ),
           },
         },
@@ -913,7 +913,7 @@ function getOrchestratorToolSchemas(
       emoji: ["📥", "🤖"],
       description: PromptLocaleService.get(
         activeLocale,
-        "orchestrator.tools.get_task_output.description",
+        "orchestrator.tools.get_subagent_output.description",
       ),
       parameters: {
         type: "object",
@@ -922,7 +922,7 @@ function getOrchestratorToolSchemas(
             type: "string",
             description: PromptLocaleService.get(
               activeLocale,
-              "orchestrator.tools.get_task_output.parameters.agent_id",
+              "orchestrator.tools.get_subagent_output.parameters.agent_id",
             ),
           },
         },
@@ -934,7 +934,7 @@ function getOrchestratorToolSchemas(
       emoji: ["🗑️", "👥"],
       description: PromptLocaleService.get(
         activeLocale,
-        "orchestrator.tools.delete_team.description",
+        "orchestrator.tools.delete_subagents.description",
       ),
       parameters: {
         type: "object",
@@ -943,7 +943,7 @@ function getOrchestratorToolSchemas(
             type: "string",
             description: PromptLocaleService.get(
               activeLocale,
-              "orchestrator.tools.delete_team.parameters.teamName",
+              "orchestrator.tools.delete_subagents.parameters.teamName",
             ),
           },
         },
@@ -955,7 +955,7 @@ function getOrchestratorToolSchemas(
       emoji: ["🔄", "🤖"],
       description: PromptLocaleService.get(
         activeLocale,
-        "orchestrator.tools.resume_agent.description",
+        "orchestrator.tools.resume_subagent.description",
       ),
       parameters: {
         type: "object",
@@ -964,14 +964,14 @@ function getOrchestratorToolSchemas(
             type: "string",
             description: PromptLocaleService.get(
               activeLocale,
-              "orchestrator.tools.resume_agent.parameters.agent_id",
+              "orchestrator.tools.resume_subagent.parameters.agent_id",
             ),
           },
           prompt: {
             type: "string",
             description: PromptLocaleService.get(
               activeLocale,
-              "orchestrator.tools.resume_agent.parameters.prompt",
+              "orchestrator.tools.resume_subagent.parameters.prompt",
             ),
           },
         },
@@ -1298,12 +1298,12 @@ export default class ToolOrchestratorService {
       create_cron_job: ["📅", "🔔"],
       list_cron_jobs: ["📅", "📋"],
       delete_cron_job: ["📅", "❌"],
-      create_team: ["👥", "🤖"],
-      send_message: ["💬", "📤"],
-      stop_agent: ["⏹️", "🤖"],
-      get_task_output: ["📥", "🤖"],
-      delete_team: ["🗑️", "👥"],
-      resume_agent: ["🔄", "🤖"],
+      create_subagents: ["👥", "🤖"],
+      send_subagent_message: ["💬", "📤"],
+      stop_subagent: ["⏹️", "🤖"],
+      get_subagent_output: ["📥", "🤖"],
+      delete_subagents: ["🗑️", "👥"],
+      resume_subagent: ["🔄", "🤖"],
       run_async_task: ["⚡", "🔄"],
       list_async_tasks: ["📋", "🔄"],
       cancel_async_task: ["⏹️", "🔄"],
@@ -1638,7 +1638,7 @@ export default class ToolOrchestratorService {
   }
 
   /**
-   * Execute a orchestrator tool (create_team, send_message, stop_agent).
+   * Execute a orchestrator tool (create_subagents, send_subagent_message, stop_subagent).
    * These are Prism-local — they dispatch to OrchestratorService in-process.
    */
   static async executeOrchestratorTool(
@@ -1693,7 +1693,7 @@ export default class ToolOrchestratorService {
           orchestratorContext as OrchestratorContext,
         );
 
-        // Sub-agents (recursionDepth > 0) use blocking create_team — the
+        // Sub-agents (recursionDepth > 0) use blocking create_subagents — the
         // results are already complete, so return them directly without
         // the non-blocking directive.
         const callerRecursionDepth = orchestratorContext.recursionDepth ?? 0;
@@ -1712,10 +1712,10 @@ export default class ToolOrchestratorService {
         }
 
         // Wrap with a stop directive so the LLM knows to end its turn
-        // instead of polling get_task_output in a loop.
+        // instead of polling get_subagent_output in a loop.
         return {
           _directive: "NON_BLOCKING_DISPATCH",
-          instruction: "Sub-agents are running in the background. You will be automatically notified with a [SUB-AGENT TEAM COMPLETED] message when they finish. END YOUR TURN NOW — do not call get_task_output or delay_execution. Simply respond to the user that the sub-agents have been dispatched and you will report back when they complete.",
+          instruction: "Sub-agents are running in the background. You will be automatically notified with a [SUB-AGENT TEAM COMPLETED] message when they finish. END YOUR TURN NOW — do not call get_subagent_output or delay_execution. Simply respond to the user that the sub-agents have been dispatched and you will report back when they complete.",
           agents: createTeamResults,
         };
       }

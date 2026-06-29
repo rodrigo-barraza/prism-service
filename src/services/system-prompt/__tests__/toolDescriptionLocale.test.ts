@@ -157,7 +157,7 @@ describe("Tool Description Locale Threading", () => {
     it("should have distinct caveman vs english orchestrator tool descriptions", () => {
       const cavemanCreateTeam = PromptLocaleService.get(
         "caveman",
-        "orchestrator.tools.create_team.description",
+        "orchestrator.tools.create_subagents.description",
         {
           hierarchicalDesc: "'hierarchical'",
           hierarchicalAggregationDesc: "'hierarchical_aggregation'",
@@ -171,7 +171,7 @@ describe("Tool Description Locale Threading", () => {
       );
       const englishCreateTeam = PromptLocaleService.get(
         "en",
-        "orchestrator.tools.create_team.description",
+        "orchestrator.tools.create_subagents.description",
         {
           hierarchicalDesc: "'hierarchical'",
           hierarchicalAggregationDesc: "'hierarchical_aggregation'",

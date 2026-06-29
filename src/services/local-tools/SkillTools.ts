@@ -181,7 +181,7 @@ const executeSkill = {
     const prepared = await SkillService.prepare(skillId, variables);
     if (prepared.error) return prepared;
 
-    // Execute via orchestrator's create_team mechanism
+    // Execute via orchestrator's create_subagents mechanism
     logger.info(
       `[SkillExecute] Executing skill "${prepared.name}" (${prepared.skillId})`,
     );

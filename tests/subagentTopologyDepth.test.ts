@@ -303,7 +303,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
           toolCalls: [
             {
               id: "tool-call-1",
-              name: "create_team",
+              name: "create_subagents",
               args: { name: "Research_Team", members: [] },
               result: [
                 {
@@ -368,7 +368,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
           toolCalls: [
             {
               id: "tool-call-2",
-              name: "create_team",
+              name: "create_subagents",
               args: { name: "Second_Team", members: [] },
               result: [
                 {
@@ -411,7 +411,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
             },
             {
               id: "tool-call-team",
-              name: "create_team",
+              name: "create_subagents",
               args: { name: "Real_Team", members: [] },
               result: [
                 {

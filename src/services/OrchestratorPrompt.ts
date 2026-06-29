@@ -2,7 +2,7 @@
 // OrchestratorPrompt — System Prompt Addendum for Orchestrator Mode
 // ────────────────────────────────────────────────────────────
 // Injected into the CODING persona's system prompt when orchestrator
-// tools (team_create, send_message, stop_agent) are available.
+// tools (create_subagents, send_subagent_message, stop_subagent) are available.
 //
 // Adapted from Claude Code's getCoordinatorSystemPrompt() with
 // modifications for our git-worktree-isolated architecture.
@@ -59,7 +59,7 @@ export function getOrchestratorPromptAddendum({
     "orchestrator.header",
     "orchestrator.yourRole",
     "orchestrator.yourTools",
-    "orchestrator.createTeamGuidance",
+    "orchestrator.createSubagentsGuidance",
     "orchestrator.subAgentResults",
     "orchestrator.subAgentCapabilities",
     "orchestrator.taskWorkflow",

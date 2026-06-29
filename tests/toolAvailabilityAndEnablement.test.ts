@@ -133,27 +133,27 @@ const MOCK_CLIENT_SCHEMAS = [
 
 const MOCK_ORCHESTRATOR_SCHEMAS = [
   {
-    name: "create_team",
+    name: "create_subagents",
     description: "Spawn one or more sub-agents, each in an isolated git worktree. Sub-agents inherit the currently enabled tools and can dynamically enable more via enable_tools. Returns results from all members when execution completes.",
     parameters: { type: "object", properties: {} }
   },
   {
-    name: "send_message",
+    name: "send_subagent_message",
     description: "Send a follow-up message to a running or completed sub-agent. Use to continue work, provide corrections, or give new instructions.",
     parameters: { type: "object", properties: {} }
   },
   {
-    name: "stop_agent",
+    name: "stop_subagent",
     description: "Stop a running sub-agent. The sub-agent's worktree is cleaned up.",
     parameters: { type: "object", properties: {} }
   },
   {
-    name: "get_task_output",
+    name: "get_subagent_output",
     description: "Read the output from a previously spawned sub-agent by its agent ID. Use this to check on a sub-agent's result after it has completed, or to read partial output from a still-running sub-agent. Returns the sub-agent's final text, tool usage stats, diff summary, and status.",
     parameters: { type: "object", properties: {} }
   },
   {
-    name: "delete_team",
+    name: "delete_subagents",
     description: "Stop and remove all sub-agents in a named team. Cleans up worktrees for all members.",
     parameters: { type: "object", properties: {} }
   },
@@ -337,7 +337,7 @@ describe("Tool Availability & Enablement", () => {
       expect(toolNames).toContain("evaluate_expression");
       expect(toolNames).toContain("generate_image");
       expect(toolNames).toContain("get_stock_price");
-      expect(toolNames).toContain("create_team");
+      expect(toolNames).toContain("create_subagents");
     });
 
     it("narrows to only enabled tools when client sends enabledTools", async () => {
@@ -551,11 +551,11 @@ describe("Tool Availability & Enablement", () => {
 
       const toolNames = extractToolNames(finalTools);
 
-      expect(toolNames).toContain("create_team");
-      expect(toolNames).toContain("send_message");
-      expect(toolNames).toContain("stop_agent");
-      expect(toolNames).toContain("get_task_output");
-      expect(toolNames).toContain("delete_team");
+      expect(toolNames).toContain("create_subagents");
+      expect(toolNames).toContain("send_subagent_message");
+      expect(toolNames).toContain("stop_subagent");
+      expect(toolNames).toContain("get_subagent_output");
+      expect(toolNames).toContain("delete_subagents");
     });
 
     it("excludes orchestrator tools when isSubAgent is true", async () => {
@@ -568,11 +568,11 @@ describe("Tool Availability & Enablement", () => {
 
       const toolNames = extractToolNames(finalTools);
 
-      expect(toolNames).not.toContain("create_team");
-      expect(toolNames).not.toContain("send_message");
-      expect(toolNames).not.toContain("stop_agent");
-      expect(toolNames).not.toContain("get_task_output");
-      expect(toolNames).not.toContain("delete_team");
+      expect(toolNames).not.toContain("create_subagents");
+      expect(toolNames).not.toContain("send_subagent_message");
+      expect(toolNames).not.toContain("stop_subagent");
+      expect(toolNames).not.toContain("get_subagent_output");
+      expect(toolNames).not.toContain("delete_subagents");
       expect(toolNames).toContain("read_file");
     });
   });
@@ -964,7 +964,7 @@ describe("Tool Availability & Enablement", () => {
       expect(toolNames).toContain("enable_tools");
 
       // Orchestrator tools still present via bypass
-      expect(toolNames).toContain("create_team");
+      expect(toolNames).toContain("create_subagents");
 
       // Prism-local tools are NOT in getToolSchemas pool — they're internal-only
       // The resolver handles tools from the pool, not from InternalToolRegistry
@@ -994,7 +994,7 @@ describe("Tool Availability & Enablement", () => {
       expect(toolNames).toContain("get_weather");
       expect(toolNames).toContain("get_stock_price");
       expect(toolNames).toContain("generate_image");
-      expect(toolNames).toContain("create_team");
+      expect(toolNames).toContain("create_subagents");
     });
 
     it("applies enabledTools filter correctly even without a persona", async () => {
