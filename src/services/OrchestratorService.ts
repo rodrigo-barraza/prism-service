@@ -1765,8 +1765,8 @@ export default class OrchestratorService {
 
     const truncationSuffix = PromptLocaleService.get(locale, "orchestrator.notifications.truncated");
     const truncatedOutput =
-      agentOutput.length > 4000
-        ? agentOutput.slice(0, 4000) + truncationSuffix
+      agentOutput.length > 8000
+        ? agentOutput.slice(0, 8000) + truncationSuffix
         : agentOutput;
 
     const resumedAgentCompletedSummary = PromptLocaleService.get(
@@ -2408,8 +2408,8 @@ export default class OrchestratorService {
         : noOutputFallback;
       const truncationSuffix = PromptLocaleService.get(locale, "orchestrator.notifications.truncated");
       const truncatedOutput =
-        agentOutput.length > 2000
-          ? agentOutput.slice(0, 2000) + truncationSuffix
+        agentOutput.length > 8000
+          ? agentOutput.slice(0, 8000) + truncationSuffix
           : agentOutput;
       return [
         PromptLocaleService.get(locale, "orchestrator.notifications.agentStatus", {
