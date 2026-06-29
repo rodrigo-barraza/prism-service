@@ -5,6 +5,7 @@ import {
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { extractReminderViaLLM } from "./SystemReminderExtractor.ts";
 import PromptLocaleService from "../../PromptLocaleService.ts";
+import { HARNESS } from "../../../constants.ts";
 
 import type AgenticLoopState from "../../AgenticLoopState.ts";
 import type { ConversationMessage, AgenticContext } from "../types.ts";
@@ -26,8 +27,8 @@ import type { ConversationMessage, AgenticContext } from "../types.ts";
  * feature is disabled — no extraction, no injection.
  */
 
-const DEFAULT_REMINDER_INTERVAL = 8;
-const MINIMUM_ITERATIONS_BEFORE_FIRST_REMINDER = 5;
+const DEFAULT_REMINDER_INTERVAL = HARNESS.DEFAULT_REMINDER_INTERVAL;
+const MINIMUM_ITERATIONS_BEFORE_FIRST_REMINDER = HARNESS.MINIMUM_ITERATIONS_BEFORE_FIRST_REMINDER;
 
 const cachedReminderContent: Map<string, string> = new Map();
 

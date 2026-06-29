@@ -20,6 +20,7 @@ import {
 } from "../utils/CostCalculator.ts";
 import { TYPES, getPricing } from "../config.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
+import { MEMORY } from "../constants.ts";
 import type {
   ConversationMessage,
   ToolCall,
@@ -31,7 +32,7 @@ import type { MessagePayload } from "./RequestLogger.ts";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const MIN_MESSAGES_FOR_EXTRACTION = 4;
+const MIN_MESSAGES_FOR_EXTRACTION = MEMORY.MIN_MESSAGES_FOR_EXTRACTION;
 
 /**
  * Extraction prompt — CC-style 4-type taxonomy with explicit negative constraints.

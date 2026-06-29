@@ -53,6 +53,7 @@ import SemanticStallDetector from "./lifecycle/SemanticStallDetector.ts";
 
 import PlanningModeService from "../PlanningModeService.ts";
 import PromptLocaleService from "../PromptLocaleService.ts";
+import { HARNESS } from "../../constants.ts";
 
 import type {
   ConversationMessage,
@@ -73,20 +74,13 @@ interface IterationPassOptions extends AgenticOptions {
   username: string;
 }
 
-const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
-
-/** Max retries when degenerate repetition is detected mid-stream.
- *  Each retry bumps temperature and repetition_penalty to perturb the output. */
-const MAX_REPETITION_RETRIES = 2;
-
-/** Temperature bump applied on each repetition retry attempt. */
-const REPETITION_TEMPERATURE_BUMP = 0.15;
-
-/** Repetition penalty applied (or incremented) on retry for local providers. */
-const REPETITION_PENALTY_BUMP = 0.1;
-
-/** Max additional stalled iterations after the first warning before hard-breaking. */
-const MAX_POST_WARNING_STALL_ITERATIONS = 2;
+const {
+  MAX_CONSECUTIVE_TOOL_ERRORS,
+  MAX_REPETITION_RETRIES,
+  REPETITION_TEMPERATURE_BUMP,
+  REPETITION_PENALTY_BUMP,
+  MAX_POST_WARNING_STALL_ITERATIONS,
+} = HARNESS;
 
 /**
  * ReActHarness — Reason→Act→Observe tool-use loop with pluggable thought structures.

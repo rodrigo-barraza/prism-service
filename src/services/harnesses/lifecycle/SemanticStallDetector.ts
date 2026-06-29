@@ -22,6 +22,7 @@
 
 import { createHash } from "crypto";
 import type { ToolCall } from "../types.ts";
+import { HARNESS } from "../../../constants.ts";
 
 export interface StallVerdict {
   isStalled: boolean;
@@ -52,10 +53,10 @@ interface SemanticStallDetectorOptions {
   textRepeatThreshold?: number;
 }
 
-const DEFAULT_EXACT_REPEAT_THRESHOLD = 3;
-const DEFAULT_CYCLICAL_THRESHOLD = 4;
-const DEFAULT_ROLLING_WINDOW_SIZE = 6;
-const DEFAULT_TEXT_REPEAT_THRESHOLD = 3;
+const DEFAULT_EXACT_REPEAT_THRESHOLD = HARNESS.DEFAULT_EXACT_REPEAT_THRESHOLD;
+const DEFAULT_CYCLICAL_THRESHOLD = HARNESS.DEFAULT_CYCLICAL_THRESHOLD;
+const DEFAULT_ROLLING_WINDOW_SIZE = HARNESS.DEFAULT_ROLLING_WINDOW_SIZE;
+const DEFAULT_TEXT_REPEAT_THRESHOLD = HARNESS.DEFAULT_TEXT_REPEAT_THRESHOLD;
 
 /** Empty tool set sentinel — iterations with no tool calls share this hash. */
 const EMPTY_TOOL_SET_HASH = "__no_tools__";

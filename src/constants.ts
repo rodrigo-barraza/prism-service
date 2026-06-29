@@ -246,4 +246,289 @@ export const ORCHESTRATOR = {
 
   /** Max similarity comparison characters for stall detection in critic loops. */
   STALL_COMPARISON_CHARACTERS: 500,
+
+  // ─── Router-Specific Defaults ──────────────────────────────
+
+  ROUTERS: {
+    /** Max subtasks a DnC decomposition can produce. */
+    MAXIMUM_SUBTASKS: 6,
+
+    /** Default recursion depth for DnC (1 = no recursion). */
+    DEFAULT_MAXIMUM_RECURSION_DEPTH: 1,
+
+    /** Hard ceiling for DnC recursion depth. */
+    MAXIMUM_ALLOWED_RECURSION_DEPTH: 10,
+
+    /** Token-count complexity threshold below which DnC skips recursive decomposition. */
+    DEFAULT_RECURSION_COMPLEXITY_THRESHOLD: 300,
+
+    /** Default layer count for hierarchical aggregation. */
+    DEFAULT_LAYER_COUNT: 1,
+
+    /** Maximum hierarchical aggregation layers. */
+    MAXIMUM_LAYER_COUNT: 3,
+
+    /** Default MCTS tree depth. */
+    DEFAULT_MCTS_DEPTH: 3,
+
+    /** Default MCTS branch factor. */
+    DEFAULT_MCTS_BRANCH_FACTOR: 3,
+
+    /** Default MCTS UCT exploration weight (√2). */
+    DEFAULT_MCTS_EXPLORATION_WEIGHT: 1.41,
+  },
+} as const;
+
+// ─── Harness Constants ──────────────────────────────────────
+
+export const HARNESS = {
+  /** Max consecutive tool execution errors before the loop gives up. */
+  MAX_CONSECUTIVE_TOOL_ERRORS: 3,
+
+  /** Max retries when degenerate repetition is detected mid-stream. */
+  MAX_REPETITION_RETRIES: 2,
+
+  /** Temperature bump applied on each repetition retry attempt. */
+  REPETITION_TEMPERATURE_BUMP: 0.15,
+
+  /** Repetition penalty applied (or incremented) on retry for local providers. */
+  REPETITION_PENALTY_BUMP: 0.1,
+
+  /** Max additional stalled iterations after the first warning before hard-breaking. */
+  MAX_POST_WARNING_STALL_ITERATIONS: 2,
+
+  // ─── Thought Structure Defaults (ToT / GoT shared) ────────
+
+  /** Default number of parallel branches for ToT / GoT exploration. */
+  DEFAULT_BRANCH_COUNT: 3,
+
+  /** Default node value threshold below which branches are pruned. */
+  DEFAULT_VALUE_THRESHOLD: 5.0,
+
+  /** Max proactive backtracks per iteration. */
+  MAX_PROACTIVE_BACKTRACKS: 3,
+
+  /** Max backtrack attempts per iteration (ToT-specific). */
+  MAX_BACKTRACK_ATTEMPTS_PER_ITERATION: 2,
+
+  /** Default beam width for BFS expansion (ToT). */
+  DEFAULT_BFS_BEAM_WIDTH: 2,
+
+  /** Max iterations during planning mode sub-loops (ToT / GoT). */
+  MAX_PLANNING_ITERATIONS: 10,
+
+  // ─── Lifecycle Gate Defaults ───────────────────────────────
+
+  /** Critic gate LLM output token limit. */
+  CRITIC_MAX_TOKENS: 200,
+
+  /** Critic gate timeout (ms). */
+  CRITIC_TIMEOUT_MS: 10_000,
+
+  /** System reminder extraction LLM output token limit. */
+  EXTRACTION_MAX_TOKENS: 600,
+
+  /** System reminder extraction timeout (ms). */
+  EXTRACTION_TIMEOUT_MS: 15_000,
+
+  /** Approval gate timeout — how long to wait for user response (ms). */
+  APPROVAL_TIMEOUT_MS: 120_000,
+
+  /** Validation interceptor timeout (ms). */
+  VALIDATION_TIMEOUT_MS: 15_000,
+
+  /** Sandbox command execution timeout (ms). */
+  COMMAND_TIMEOUT_MS: 15_000,
+
+  /** Context pressure threshold — fraction of context window triggering compaction. */
+  CONTEXT_PRESSURE_THRESHOLD: 0.7,
+
+  // ─── System Reminder Injection ─────────────────────────────
+
+  /** Iterations between system reminder injections. */
+  DEFAULT_REMINDER_INTERVAL: 8,
+
+  /** Minimum iterations before the first reminder fires. */
+  MINIMUM_ITERATIONS_BEFORE_FIRST_REMINDER: 5,
+
+  // ─── Semantic Stall Detection ──────────────────────────────
+
+  /** Consecutive exact-repeat iterations before flagging a stall. */
+  DEFAULT_EXACT_REPEAT_THRESHOLD: 3,
+
+  /** Cyclical matches in the rolling window before flagging. */
+  DEFAULT_CYCLICAL_THRESHOLD: 4,
+
+  /** Rolling window size for cyclical stall detection. */
+  DEFAULT_ROLLING_WINDOW_SIZE: 6,
+
+  /** Consecutive identical text-only iterations before flagging. */
+  DEFAULT_TEXT_REPEAT_THRESHOLD: 3,
+} as const;
+
+// ─── Compaction Constants ───────────────────────────────────
+
+export const COMPACTION = {
+  /** Max output tokens for the compaction LLM call. */
+  COMPACT_MAX_OUTPUT_TOKENS: 16_384,
+
+  /** Circuit breaker: stop retrying after this many consecutive compact failures. */
+  MAX_CONSECUTIVE_COMPACT_FAILURES: 3,
+
+  /** Recent tail turns preserved after compaction boundary. */
+  RECENT_TAIL_TURN_COUNT: 3,
+
+  /** Buffer reserved for the compaction summary output. */
+  MAX_OUTPUT_TOKENS_FOR_SUMMARY: 20_000,
+
+  /** Buffer between effective context window and auto-compact trigger. */
+  AUTOCOMPACT_BUFFER_TOKENS: 13_000,
+
+  /** Minimum messages required before auto-compaction can trigger. */
+  MINIMUM_MESSAGES_FOR_COMPACTION: 6,
+
+  /** Minimum result token count before micro-compaction applies. */
+  MINIMUM_RESULT_TOKEN_THRESHOLD: 500,
+
+  /** Number of recent turns always preserved (never compressed). */
+  PROTECTED_RECENT_TURNS: 4,
+} as const;
+
+// ─── Context Window Constants ───────────────────────────────
+
+export const CONTEXT_WINDOW = {
+  /** Default overhead for tool schemas, internal formatting, etc. */
+  TOOL_SCHEMA_OVERHEAD_TOKENS: 2000,
+
+  /** Fraction of context window to target (leave headroom for output + safety). */
+  TARGET_UTILIZATION: 0.8,
+
+  /** When truncating tool results aggressively, cap at this many chars. */
+  AGGRESSIVE_TOOL_RESULT_CAP: 3000,
+} as const;
+
+// ─── Memory Constants ───────────────────────────────────────
+
+export const MEMORY = {
+  /** Cosine similarity above which two memories are considered duplicates. */
+  DUPLICATE_THRESHOLD: 0.92,
+
+  /** Minimum cosine similarity for a memory to be considered relevant. */
+  RELEVANCE_THRESHOLD: 0.3,
+
+  /** Minimum conversation messages before memory extraction triggers. */
+  MIN_MESSAGES_FOR_EXTRACTION: 4,
+
+  /** Memories older than this (days) are considered stale for consolidation. */
+  STALENESS_DAYS: 30,
+
+  /** Output token limit for memory consolidation LLM calls. */
+  LLM_MAX_OUTPUT_TOKENS: 4096,
+
+  /** Cosine similarity threshold for memory cluster detection. */
+  CLUSTER_THRESHOLD: 0.75,
+
+  /** Cosine similarity threshold for conversational memory clustering. */
+  CONVERSATIONAL_CLUSTER_THRESHOLD: 0.8,
+
+  /** Maximum memories in a single cluster. */
+  MAX_CLUSTER_SIZE: 8,
+
+  /** Sessions between automatic consolidation runs. */
+  SESSIONS_BETWEEN_RUNS: 5,
+
+  /** Maximum consolidation runs per day. */
+  DAILY_MAX_CONSOLIDATIONS: 20,
+
+  /** Maximum clusters processed per consolidation batch. */
+  BATCH_MAX_CLUSTERS: 5,
+
+  /** Maximum stale memories per consolidation batch. */
+  BATCH_MAX_STALE: 10,
+
+  /** Input token budget per consolidation batch. */
+  BATCH_INPUT_TOKEN_BUDGET: 12_000,
+} as const;
+
+// ─── Webhook Constants ──────────────────────────────────────
+
+export const WEBHOOK = {
+  /** HTTP dispatch timeout for webhook delivery (ms). */
+  DISPATCH_TIMEOUT_MS: 10_000,
+
+  /** Maximum retry attempts for failed webhook deliveries. */
+  MAX_RETRY_ATTEMPTS: 3,
+
+  /** Base delay for exponential backoff between webhook retries (ms). */
+  RETRY_BASE_DELAY_MS: 1000,
+
+  /** Interval for refreshing cached webhook subscriptions (ms). */
+  SUBSCRIPTION_REFRESH_INTERVAL_MS: 30_000,
+
+  /** Maximum events buffered for webhook replay. */
+  REPLAY_BUFFER_CAPACITY: 200,
+} as const;
+
+// ─── Timer & Scheduler Constants ────────────────────────────
+
+export const TIMERS = {
+  /** Minimum allowed one-shot timer duration (seconds). */
+  TIMER_MINIMUM_SECONDS: 30,
+
+  /** Maximum allowed one-shot timer duration (seconds). */
+  TIMER_MAXIMUM_SECONDS: 599,
+
+  /** Minimum interval for cron jobs (seconds). */
+  CRON_MINIMUM_DELAY_SECONDS: 600,
+
+  /** Background daemon tick interval (ms). */
+  BACKGROUND_DAEMON_INTERVAL_MS: 1000,
+
+  /** One-shot timer maximum duration — 24 hours (seconds). */
+  ONE_SHOT_MAXIMUM_DURATION_SECONDS: 86400,
+
+  /** Minimum model context length for timer-triggered conversations. */
+  MINIMUM_CONTEXT_LENGTH: 120_000,
+} as const;
+
+// ─── Media Constants ────────────────────────────────────────
+
+export const MEDIA = {
+  /** Anthropic per-image inline base64 byte limit (5 MB). */
+  ANTHROPIC_IMAGE_MAX_BYTES: 5 * 1024 * 1024,
+
+  /** Maximum pixel dimension (width or height) for images sent to providers. */
+  MAX_IMAGE_DIMENSION: 2000,
+} as const;
+
+// ─── Workflow Memory Constants ──────────────────────────────
+
+export const WORKFLOW_MEMORY = {
+  /** Minimum tool calls in a session to qualify for workflow extraction. */
+  MINIMUM_TOOL_CALLS: 3,
+
+  /** Maximum steps stored per workflow trajectory. */
+  MAXIMUM_STEPS: 30,
+
+  /** Maximum workflows returned per similarity query. */
+  MAXIMUM_PER_QUERY: 3,
+
+  /** Maximum characters of workflow text embedded for similarity search. */
+  TEXT_MAXIMUM_CHARACTERS: 1500,
+
+  /** Cooldown between workflow extraction attempts (ms). */
+  COOLDOWN_MS: 60_000,
+} as const;
+
+// ─── Log Preview Truncation Limits ──────────────────────────
+
+export const LOG_PREVIEW = {
+  /** Short preview — titles, question snippets (60 chars). */
+  SHORT: 60,
+
+  /** Medium preview — text summaries, debug output (200 chars). */
+  MEDIUM: 200,
+
+  /** Long preview — consolidation snippets, content previews (500 chars). */
+  LONG: 500,
 } as const;

@@ -5,6 +5,7 @@ import RequestLogger from "../../RequestLogger.ts";
 
 import type { ToolCall, AgenticContext } from "../types.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
+import { HARNESS } from "../../../constants.ts";
 
 /**
  * CriticGate — lightweight multi-model review of high-risk tool calls.
@@ -19,8 +20,8 @@ import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
  * needs to spot obvious danger patterns.
  */
 
-const CRITIC_MAX_TOKENS = 200;
-const CRITIC_TIMEOUT_MS = 10_000;
+const CRITIC_MAX_TOKENS = HARNESS.CRITIC_MAX_TOKENS;
+const CRITIC_TIMEOUT_MS = HARNESS.CRITIC_TIMEOUT_MS;
 
 interface CriticGateOptions {
   model?: string;

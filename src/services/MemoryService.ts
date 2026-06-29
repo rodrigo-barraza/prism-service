@@ -13,7 +13,7 @@ import RequestLogger from "./RequestLogger.ts";
 import logger from "../utils/logger.ts";
 import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
 import { parseJsonFromLargeLanguageModelResponse } from "@rodrigo-barraza/utilities-library";
-import { COLLECTIONS } from "../constants.ts";
+import { COLLECTIONS, MEMORY } from "../constants.ts";
 import SettingsService from "./SettingsService.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -27,8 +27,8 @@ async function getExtractionConfig() {
  * Duplicate detection threshold — two memories with cosine similarity above
  * this are considered duplicates and the newer one is skipped.
  */
-const DUPLICATE_THRESHOLD = 0.92;
-const RELEVANCE_THRESHOLD = 0.3;
+const DUPLICATE_THRESHOLD = MEMORY.DUPLICATE_THRESHOLD;
+const RELEVANCE_THRESHOLD = MEMORY.RELEVANCE_THRESHOLD;
 /**
  * Valid memory types — inspired by Claude Code's memdir taxonomy.
  *

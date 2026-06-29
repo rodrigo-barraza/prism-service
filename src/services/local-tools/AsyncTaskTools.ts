@@ -2,6 +2,7 @@ import logger from "../../utils/logger.ts";
 import { DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 import { ASYNC_TASK_TOOL_NAMES, MAXIMUM_CONCURRENT_ASYNC_TASKS } from "../AsyncTaskConstants.ts";
+import { ORCHESTRATOR } from "../../constants.ts";
 import type { InternalToolContext } from "./InternalToolRegistry.ts";
 import PromptLocaleService from "../PromptLocaleService.ts";
 
@@ -458,8 +459,7 @@ async function triggerAsyncTaskAutoResponse(
   const username = (conversation.username || context.username) as string;
 
   // Wait if the conversation is currently generating
-  const AUTO_RESPONSE_GENERATION_WAIT_MAXIMUM_RETRIES = 30;
-  const AUTO_RESPONSE_GENERATION_WAIT_DELAY_MILLISECONDS = 2_000;
+  const { AUTO_RESPONSE_GENERATION_WAIT_MAXIMUM_RETRIES, AUTO_RESPONSE_GENERATION_WAIT_DELAY_MILLISECONDS } = ORCHESTRATOR;
 
   if (conversation.isGenerating) {
     logger.info(
@@ -508,6 +508,7 @@ async function triggerAsyncTaskAutoResponse(
       ? resultSummary.slice(0, 4000) + "\n... (truncated)"
       : resultSummary;
 
+  const notificationTimestamp = new Date().toISOString();
   const completionMessage = {
     role: "user" as const,
     content: [
@@ -520,8 +521,10 @@ async function triggerAsyncTaskAutoResponse(
       `</result>`,
       `</task-notification>`,
     ].join("\n"),
-    timestamp: new Date().toISOString(),
+    timestamp: notificationTimestamp,
     _alreadyPersisted: true,
+    _notificationSource: "async-task",
+    _notificationId: `async-task:${taskState.taskId}:${notificationTimestamp}`,
   };
 
   // Persist the completion message

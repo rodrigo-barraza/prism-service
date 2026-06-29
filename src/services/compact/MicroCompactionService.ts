@@ -2,6 +2,7 @@ import logger from "../../utils/logger.ts";
 import { estimateTokens } from "../../utils/CostCalculator.ts";
 import { TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
 import type { ChatMessage, ToolCallEntry } from "../../types/admin.ts";
+import { COMPACTION } from "../../constants.ts";
 
 // ────────────────────────────────────────────────────────────
 // MicroCompactionService — In-Memory Tool Result Clearing
@@ -23,10 +24,10 @@ import type { ChatMessage, ToolCallEntry } from "../../types/admin.ts";
 
 const CLEARED_RESULT_MARKER = "[Old tool result content cleared]";
 
-const MINIMUM_RESULT_TOKEN_THRESHOLD = 500;
+const MINIMUM_RESULT_TOKEN_THRESHOLD = COMPACTION.MINIMUM_RESULT_TOKEN_THRESHOLD;
 
 /** Number of recent user turns to never micro-compact. */
-const PROTECTED_RECENT_TURNS = 4;
+const PROTECTED_RECENT_TURNS = COMPACTION.PROTECTED_RECENT_TURNS;
 
 /**
  * Tools whose results are safe to clear during micro-compaction.

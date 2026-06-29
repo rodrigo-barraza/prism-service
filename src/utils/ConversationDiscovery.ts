@@ -1,7 +1,7 @@
 import type { Db } from "mongodb";
-import { COLLECTIONS } from "../constants.ts";
+import { COLLECTIONS, ORCHESTRATOR } from "../constants.ts";
 
-const MAX_CONVERSATION_DEPTH = 10;
+const MAX_CONVERSATION_DEPTH = ORCHESTRATOR.AGENT_TREE_DISCOVERY_MAX_DEPTH;
 
 /**
  * Recursively discover all descendant conversation IDs by walking the

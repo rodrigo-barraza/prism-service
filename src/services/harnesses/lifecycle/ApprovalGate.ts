@@ -2,6 +2,7 @@ import { pendingApprovals } from "../../ApprovalRegistry.ts";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import type { ToolCall, AgenticContext } from "../types.ts";
 import type AutoApprovalEngine from "../../AutoApprovalEngine.ts";
+import { HARNESS } from "../../../constants.ts";
 
 /**
  * ApprovalGate — extracted approval gating logic.
@@ -13,7 +14,7 @@ import type AutoApprovalEngine from "../../AutoApprovalEngine.ts";
  * Reusable by any harness that executes write/danger-tier tools.
  */
 
-const APPROVAL_TIMEOUT_MS = 120_000;
+const APPROVAL_TIMEOUT_MS = HARNESS.APPROVAL_TIMEOUT_MS;
 
 /**
  * Check a batch of tool calls against the approval engine and, if any

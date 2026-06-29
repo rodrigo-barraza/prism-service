@@ -10,7 +10,7 @@ import ConversationService, {
   enrichConversationsWithRequestCosts,
   enrichSingleConversationCost,
 } from "../services/ConversationService.ts";
-import { COLLECTIONS, COST_SUM_EXPR } from "../constants.ts";
+import { COLLECTIONS, COST_SUM_EXPR, ORCHESTRATOR } from "../constants.ts";
 import logger from "../utils/logger.ts";
 import ConversationTimerService from "../services/ConversationTimerService.ts";
 import AgenticLoopService from "../services/AgenticLoopService.ts";
@@ -737,7 +737,7 @@ router.delete(
 
       // Cascading deletion: iteratively discover and delete all descendant
       // conversations linked via parentConversationId (BFS traversal).
-      const MAX_CASCADE_DEPTH = 10;
+      const MAX_CASCADE_DEPTH = ORCHESTRATOR.AGENT_TREE_DISCOVERY_MAX_DEPTH;
       const ownershipFilter = { project, username: usernameFilter };
       let descendantDeletedCount = 0;
       let frontier = [conversationId];

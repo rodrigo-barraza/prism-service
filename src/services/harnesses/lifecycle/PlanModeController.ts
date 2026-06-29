@@ -2,6 +2,7 @@ import PlanningModeService from "../../PlanningModeService.ts";
 import { pendingApprovals } from "../../ApprovalRegistry.ts";
 import PromptLocaleService from "../../PromptLocaleService.ts";
 import logger from "../../../utils/logger.ts";
+import { HARNESS } from "../../../constants.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
@@ -30,7 +31,7 @@ import type {
  * to reuse the same plan lifecycle without duplicating the logic.
  */
 
-const PLAN_APPROVAL_TIMEOUT_MS = 120_000;
+const PLAN_APPROVAL_TIMEOUT_MS = HARNESS.APPROVAL_TIMEOUT_MS;
 
 /**
  * Filter out unauthorized tool calls during plan mode.
