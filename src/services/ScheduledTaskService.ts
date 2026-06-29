@@ -14,6 +14,13 @@ import {
 } from "../utils/RecurrenceMatcher.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
+export interface TransformedScheduledTaskFilter {
+  id?: string;
+  name?: string;
+  project?: string;
+  username?: string;
+}
+
 export interface ScheduledTask {
   id: string;
   name: string;
@@ -455,10 +462,10 @@ const ScheduledTaskService = {
     id: string,
     project: string,
     username: string,
-  ): Promise<Record<string, unknown>> {
+  ): Promise<TransformedScheduledTaskFilter> {
     const isClientProject = await this._isClientProject(project);
 
-    const filter: Record<string, unknown> = { id };
+    const filter: TransformedScheduledTaskFilter = { id };
     if (!isClientProject) {
       filter.project = project;
     }

@@ -116,7 +116,7 @@ const inworldProvider = {
       return { stream, contentType: "audio/mpeg" };
     } catch (error: unknown) {
       if (error instanceof ProviderError) throw error;
-      throw new ProviderError("inworld", getErrorMessage(error), 500, error);
+      throw new ProviderError("inworld", getErrorMessage(error), 500, error as Error);
     }
   },
 
@@ -195,7 +195,7 @@ const inworldProvider = {
     } catch (error: unknown) {
       if (error instanceof Error && error.name === "AbortError") return;
       if (error instanceof ProviderError) throw error;
-      throw new ProviderError("inworld", getErrorMessage(error), 500, error);
+      throw new ProviderError("inworld", getErrorMessage(error), 500, error as Error);
     } finally {
       controller.abort();
     }

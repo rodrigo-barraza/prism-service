@@ -37,11 +37,11 @@ export class InstanceLoadBalancer {
     // Debug: log the full instance state for tracing assignment decisions
     const stateSnapshot = siblings
       .map((sibling) => {
-        const active = InstanceLoadBalancer.getActiveOn(
+        const activeCount = InstanceLoadBalancer.getActiveOn(
           sibling.id,
           activeSubAgents,
         );
-        return `${sibling.id}(concurrency=${sibling.concurrency}, active=${active}, free=${sibling.concurrency - active})`;
+        return `${sibling.id}(concurrency=${sibling.concurrency}, active=${activeCount}, free=${sibling.concurrency - activeCount})`;
       })
       .join(", ");
     logger.info(
@@ -61,11 +61,11 @@ export class InstanceLoadBalancer {
     let bestInstance: InstanceEntry | null = null;
     let lowestLoad = Infinity;
     for (const instance of siblings) {
-      const active = InstanceLoadBalancer.getActiveOn(
+      const activeCount = InstanceLoadBalancer.getActiveOn(
         instance.id,
         activeSubAgents,
       );
-      const load = active / instance.concurrency;
+      const load = activeCount / instance.concurrency;
 
       const isOrchestrator = instance.id === orchestratorInstanceId;
       const isBestOrchestrator = bestInstance?.id === orchestratorInstanceId;

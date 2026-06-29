@@ -56,7 +56,7 @@ const elevenlabsProvider = {
       return { stream: response.body, contentType: "audio/mpeg" };
     } catch (error: unknown) {
       if (error instanceof ProviderError) throw error;
-      throw new ProviderError("elevenlabs", getErrorMessage(error), 500, error);
+      throw new ProviderError("elevenlabs", getErrorMessage(error), 500, error as Error);
     }
   },
   async *generateSpeechStream(

@@ -155,9 +155,9 @@ export interface InsertPendingRequestParams {
 }
 
 function sanitizeMessage(message: MessagePayload) {
-  const sanitizeString = (s: unknown) =>
+  const sanitizeString = (s: string | object | number | boolean | null | undefined) =>
     typeof s === "string" && s.startsWith("data:") ? `[base64 data]` : s;
-  const sanitizeMedia = (value: unknown) => {
+  const sanitizeMedia = (value: string | object | number | boolean | null | undefined) => {
     if (Array.isArray(value)) return value.map(sanitizeString);
     if (typeof value === "string") return sanitizeString(value);
     return value;

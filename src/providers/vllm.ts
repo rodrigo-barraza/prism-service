@@ -180,7 +180,7 @@ export function createVllmProvider(
         return result;
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError("vllm", getErrorMessage(error), 500, error);
+        throw new ProviderError("vllm", getErrorMessage(error), 500, error as Error);
       }
     },
 
@@ -270,7 +270,7 @@ export function createVllmProvider(
       } catch (error: unknown) {
         if (error instanceof Error && error.name === "AbortError") return; // Client disconnected
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError("vllm", getErrorMessage(error), 500, error);
+        throw new ProviderError("vllm", getErrorMessage(error), 500, error as Error);
       }
     },
 
@@ -324,7 +324,7 @@ export function createVllmProvider(
         };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError("vllm", getErrorMessage(error), 500, error);
+        throw new ProviderError("vllm", getErrorMessage(error), 500, error as Error);
       }
     },
 
@@ -369,7 +369,7 @@ export function createVllmProvider(
         };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError("vllm", getErrorMessage(error), 500, error);
+        throw new ProviderError("vllm", getErrorMessage(error), 500, error as Error);
       }
     },
 
@@ -421,7 +421,7 @@ export function createVllmProvider(
         return { models };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError("vllm", getErrorMessage(error), 500, error);
+        throw new ProviderError("vllm", getErrorMessage(error), 500, error as Error);
       }
     },
   };

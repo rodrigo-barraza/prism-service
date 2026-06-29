@@ -135,7 +135,7 @@ export function createOllamaProvider(
         return result;
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError("ollama", getErrorMessage(error), 500, error);
+        throw new ProviderError("ollama", getErrorMessage(error), 500, error as Error);
       }
     },
 
@@ -310,7 +310,7 @@ export function createOllamaProvider(
           };
         }
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError("ollama", getErrorMessage(error), 500, error);
+        throw new ProviderError("ollama", getErrorMessage(error), 500, error as Error);
       }
     },
 
@@ -377,7 +377,7 @@ export function createOllamaProvider(
         return { text, usage };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError("ollama", getErrorMessage(error), 500, error);
+        throw new ProviderError("ollama", getErrorMessage(error), 500, error as Error);
       }
     },
 
@@ -469,7 +469,7 @@ export function createOllamaProvider(
         return { models: mappedModelsList };
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
-        throw new ProviderError("ollama", getErrorMessage(error), 500, error);
+        throw new ProviderError("ollama", getErrorMessage(error), 500, error as Error);
       }
     },
   };
