@@ -91,25 +91,23 @@ describe("SemanticStallDetector", () => {
 
   describe("detects cyclical stalls", () => {
     it("flags A→B→A→B alternating pattern", () => {
+      const customDetector = new SemanticStallDetector({
+        rollingWindowSize: 8,
+        cyclicalThreshold: 4,
+      });
+
       const toolCallsA = [createToolCall("read_file", { path: "/a.ts" })];
       const toolCallsB = [createToolCall("write_file", { path: "/a.ts", content: "fix" })];
 
-      let verdict;
-
-      // A B A B A B → 4 occurrences of A pattern in window
-      detector.recordIteration(toolCallsA);
-      detector.recordIteration(toolCallsB);
-      detector.recordIteration(toolCallsA);
-      detector.recordIteration(toolCallsB);
-      detector.recordIteration(toolCallsA);
-      verdict = detector.recordIteration(toolCallsB);
-
-      // At this point, toolCallsB has appeared 3 times + current = matches
-      // toolCallsA has appeared 3 times
-      // With default window=6 and cyclicalThreshold=4, either should trigger
-      // when one reaches 4 total occurrences
-      // Let's add one more to ensure
-      verdict = detector.recordIteration(toolCallsA);
+      // A B A B A B A B → A appears 4 times, B appears 4 times in 8-item window
+      customDetector.recordIteration(toolCallsA);
+      customDetector.recordIteration(toolCallsB);
+      customDetector.recordIteration(toolCallsA);
+      customDetector.recordIteration(toolCallsB);
+      customDetector.recordIteration(toolCallsA);
+      customDetector.recordIteration(toolCallsB);
+      customDetector.recordIteration(toolCallsA);
+      const verdict = customDetector.recordIteration(toolCallsB);
 
       expect(verdict.isStalled).toBe(true);
       expect(verdict.stallType).toBe("cyclical");
