@@ -629,8 +629,8 @@ async function executeModelNode(
       const webStream = stream as ReadableStream<Uint8Array>;
       const reader = webStream.getReader();
       while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        const { done: isDone, value } = await reader.read();
+        if (isDone) break;
         if (value) audioChunks.push(Buffer.from(value));
       }
     }

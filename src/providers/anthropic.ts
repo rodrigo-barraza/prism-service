@@ -59,6 +59,21 @@ export interface AnthropicGenerateResult {
   stopDetails?: Record<string, unknown>;
 }
 
+export type TransformedStreamEvent =
+  | string
+  | { type: "toolCallStart"; id: string; name: string }
+  | { type: "codeExecutionResult"; output: string; outcome: string }
+  | { type: "webSearchResult"; results: Array<{ url?: string; title?: string; pageAge?: string }> }
+  | { type: "executableCode"; code: string; language: string }
+  | { type: "toolCall"; id: string | null; name: string | null; args: Record<string, unknown> }
+  | { type: "thinking"; content: string }
+  | { type: "thinking_signature"; signature: string }
+  | { type: "toolCallDelta"; characters: number }
+  | { type: "stopReason"; stopReason: string }
+  | { type: "stopDetails"; stopDetails: unknown }
+  | { type: "usage"; usage: TokenUsage }
+  | { type: "rateLimits"; rateLimits: ReturnType<typeof extractAnthropicRateLimits> };
+
 // Default budget tokens mapped from effort level (for non-adaptive models)
 const EFFORT_BUDGET_MAP: Record<string, number> = {
   low: 1024,
@@ -71,11 +86,11 @@ const EFFORT_BUDGET_MAP: Record<string, number> = {
 // Retry config for transient Anthropic errors (overloaded, rate limit)
 const RETRY_DELAY_MS = 10_000;
 const MAX_RETRIES = 3;
-function isRetryableError(error: unknown): boolean {
-  const errorObject = error as AnthropicSdkError;
-  const errorType = errorObject?.error?.type || errorObject?.type;
+function isRetryableError(error: AnthropicSdkError | null | undefined): boolean {
+  if (!error) return false;
+  const errorType = error.error?.type || error.type;
   if (errorType === "overloaded_error") return true;
-  if (errorObject.status === 529) return true;
+  if (error.status === 529) return true;
   return false;
 }
 
@@ -679,7 +694,11 @@ const anthropicProvider = {
         return result;
       } catch (error: unknown) {
         lastError = error;
-        if (isRetryableError(error) && attempt < MAX_RETRIES) {
+        if (
+          error instanceof Error &&
+          isRetryableError(error as AnthropicSdkError) &&
+          attempt < MAX_RETRIES
+        ) {
           logger.warn(
             `[anthropic] Overloaded on attempt ${attempt}/${MAX_RETRIES} for generateText model=${model}. Retrying in ${RETRY_DELAY_MS / 1000}s...`,
           );
@@ -780,12 +799,11 @@ const anthropicProvider = {
     }
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async *generateTextStream(
     messages: ChatMessage[],
     model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
     options: ProviderOptions = {},
-  ): AsyncGenerator<Record<string, unknown> | string> {
+  ): AsyncGenerator<TransformedStreamEvent> {
     logger.provider("Anthropic", `generateTextStream model=${model}`);
     try {
       const prepared = await prepareMessages(messages);
@@ -1130,7 +1148,7 @@ const anthropicProvider = {
     } catch (error: unknown) {
       if (error instanceof Error && error.name === "AbortError") return;
       // For streaming, retry overloaded errors with the same delay/attempts policy
-      if (isRetryableError(error)) {
+      if (error instanceof Error && isRetryableError(error as AnthropicSdkError)) {
         // Recursive retry with attempt tracking via options._retryAttempt
         const attempt = options._retryAttempt ?? 1;
         if (attempt < MAX_RETRIES) {

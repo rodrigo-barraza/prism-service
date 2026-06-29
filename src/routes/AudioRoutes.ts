@@ -150,8 +150,8 @@ export async function handleVoice(
       const webStream = stream as ReadableStream<Uint8Array>;
       const reader = webStream.getReader();
       while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        const { done: isDone, value } = await reader.read();
+        if (isDone) break;
         if (audioChunks && value) audioChunks.push(Buffer.from(value));
         emitBinary(value);
       }

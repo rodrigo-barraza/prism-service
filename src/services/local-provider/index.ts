@@ -23,7 +23,11 @@ import {
   ListModelsResponse,
   LmStudioRawModel,
   GenericProvider,
+  TransformedVramEstimate,
+  TransformedHealthStatusMap,
+  TransformedLocalProviderOptions,
 } from "./types.ts";
+import { ChatMessage } from "../../types/ProviderTypes.ts";
 import { detectCapabilities } from "./detectCapabilities.ts";
 import { enrichWithHuggingFace } from "./hfMetadata.ts";
 import { NORMALIZER_BY_TYPE, HF_ENRICHED_TYPES } from "./normalizers.ts";
@@ -43,7 +47,7 @@ class LocalProviderGateway {
    */
   isLocal(providerOrInstanceId: string | null | undefined): boolean {
     if (!providerOrInstanceId) return false;
-    if (LOCAL_PROVIDER_TYPES.has(providerOrInstanceId as any)) return true;
+    if ((LOCAL_PROVIDER_TYPES as Set<string>).has(providerOrInstanceId)) return true;
     return isInstance(providerOrInstanceId);
   }
 
@@ -90,7 +94,7 @@ class LocalProviderGateway {
     providerOrInstanceId: string | null | undefined,
   ): string | null {
     if (!providerOrInstanceId) return null;
-    if (LOCAL_PROVIDER_TYPES.has(providerOrInstanceId as any))
+    if ((LOCAL_PROVIDER_TYPES as Set<string>).has(providerOrInstanceId))
       return providerOrInstanceId;
     return getInstanceType(providerOrInstanceId);
   }
@@ -456,9 +460,9 @@ class LocalProviderGateway {
    */
   async checkHealth(
     timeoutMs: number = 3000,
-  ): Promise<Record<string, unknown>> {
+  ): Promise<TransformedHealthStatusMap> {
     const instances = listInstances();
-    const health: Record<string, unknown> = {};
+    const health: TransformedHealthStatusMap = {};
 
     const results = await Promise.allSettled(
       instances.map(async (instance: InstanceEntry) => {
@@ -550,7 +554,7 @@ class LocalProviderGateway {
       gpuTotalGiB?: number;
       gpuBaselineGiB?: number;
     } = {},
-  ): Record<string, unknown> | null {
+  ): TransformedVramEstimate | null {
     return estimateVRAM(modelData, options);
   }
 
@@ -569,7 +573,7 @@ class LocalProviderGateway {
       gpuTotalGiB?: number;
       gpuBaselineGiB?: number;
     } = {},
-  ): Promise<Record<string, unknown> | null> {
+  ): Promise<TransformedVramEstimate | null> {
     return estimateVRAMForModel(instanceId, modelKey, options);
   }
 
@@ -636,9 +640,9 @@ class LocalProviderGateway {
    */
   applyLocalDefaults(
     providerName: string,
-    options: Record<string, unknown>,
+    options: TransformedLocalProviderOptions,
     clientParams: Record<string, unknown> = {},
-  ): Record<string, unknown> {
+  ): TransformedLocalProviderOptions {
     if (!this.isLocal(providerName)) return options;
 
     // Default thinkingEnabled=true for providers that emit <think> tags,
@@ -660,7 +664,7 @@ class LocalProviderGateway {
    * Auto-resolves the provider if only a model name is given.
    */
   async generateText(
-    messages: unknown,
+    messages: ChatMessage[],
     model: string,
     options: Record<string, unknown> = {},
     instanceId?: string,
@@ -677,7 +681,7 @@ class LocalProviderGateway {
    * Auto-resolves the provider if only a model name is given.
    */
   async *generateTextStream(
-    messages: unknown,
+    messages: ChatMessage[],
     model: string,
     options: Record<string, unknown> = {},
     instanceId?: string,
@@ -703,10 +707,10 @@ class LocalProviderGateway {
   }
 
   async captionImage(
-    images: unknown,
-    prompt: unknown,
+    images: string | string[] | object,
+    prompt: string | object,
     model: string,
-    systemPrompt?: unknown,
+    systemPrompt?: string | object,
     instanceId?: string,
   ): Promise<unknown> {
     const provider = await this._getProviderForModel(model, instanceId);

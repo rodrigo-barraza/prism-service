@@ -1,6 +1,6 @@
 import { resolveArchParams, estimateMemory } from "../../utils/gguf-arch.ts";
 import { getProvider } from "../../providers/index.ts";
-import { LmStudioRawModel, GenericProvider } from "./types.ts";
+import { LmStudioRawModel, GenericProvider, TransformedVramEstimate } from "./types.ts";
 
 /**
  * Estimate VRAM usage for a GGUF model served by a local provider.
@@ -16,7 +16,7 @@ export function estimateVRAM(
     gpuTotalGiB?: number;
     gpuBaselineGiB?: number;
   } = {},
-): Record<string, unknown> | null {
+): TransformedVramEstimate | null {
   if (!modelData) return null;
 
   const sizeBytes = modelData.size_bytes || 0;
@@ -65,14 +65,14 @@ export async function estimateVRAMForModel(
     gpuTotalGiB?: number;
     gpuBaselineGiB?: number;
   } = {},
-): Promise<Record<string, unknown> | null> {
+): Promise<TransformedVramEstimate | null> {
   const provider = getProvider(instanceId) as GenericProvider | undefined;
   if (!provider?.listModels) return null;
 
   const result = await provider.listModels();
   const allModels = result?.data || result?.models || [];
   const modelData = allModels.find(
-    (modelEntry: Record<string, unknown>) =>
+    (modelEntry: { id?: string; path?: string; key?: string }) =>
       modelEntry.id === modelKey ||
       modelEntry.path === modelKey ||
       modelEntry.key === modelKey,

@@ -222,8 +222,8 @@ export function createOllamaProvider(
             reader.cancel();
             break;
           }
-          const { done, value } = await reader.read();
-          if (done) break;
+          const { done: isDone, value } = await reader.read();
+          if (isDone) break;
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
