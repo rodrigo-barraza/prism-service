@@ -1249,18 +1249,16 @@ export default class OrchestratorService {
       router = new HierarchicalRouter();
     }
 
-    // ── Non-blocking dispatch with registration barrier ──────────
-    // The router runs in the background (detached promise). createTeam()
-    // returns immediately after all initial sub-agents have registered
-    // (real agent IDs allocated, worktrees created) — but BEFORE their
-    // agentic loops finish. SSE events stream progress to the client.
-    // When the router completes, _notifyParentOfRouterCompletion fires
-    // the auto-response.
-    //
-    // The onRegistered callback fires inside spawnFromTool after agent
-    // ID allocation and state registration but BEFORE the agentic loop
-    // starts (even with awaitCompletion: true). This ensures the barrier
-    // resolves as soon as IDs are known, not when agents finish.
+    // ── Dispatch mode: blocking (sub-agent) vs non-blocking (top-level) ──
+    // Sub-agents (recursionDepth > 0) block on create_team: their agentic
+    // loop must stay alive to receive sub-sub-agent results, synthesize
+    // them, and produce a final text summary for the parent router.
+    // Top-level (recursionDepth === 0) is non-blocking: returns immediately
+    // after agent registration, with the auto-response notification chain
+    // delivering results later.
+    const currentRecursionDepth = orchestratorContext.recursionDepth ?? 0;
+    const isBlockingDispatch = currentRecursionDepth > 0;
+
     const registeredResults: (SubAgentResult | { error: string })[] = [];
     const memberCount = teamCreationArguments.members.length;
 
@@ -1286,21 +1284,58 @@ export default class OrchestratorService {
       });
     };
 
-    // Fire the router as a detached promise — it runs in the background
-    router
-      .execute(
-        teamCreationArguments.name,
-        teamCreationArguments.members,
-        orchestratorContext,
-        spawnWithRegistration,
-        (
-          agentId: string,
-          prompt: string,
-          context: OrchestratorContext,
-          round?: number,
-        ) => OrchestratorService.continueAgent(agentId, prompt, context, round),
-        teamCreationArguments.topologyConfig,
-      )
+    const routerPromise = router.execute(
+      teamCreationArguments.name,
+      teamCreationArguments.members,
+      orchestratorContext,
+      spawnWithRegistration,
+      (
+        agentId: string,
+        prompt: string,
+        context: OrchestratorContext,
+        round?: number,
+      ) => OrchestratorService.continueAgent(agentId, prompt, context, round),
+      teamCreationArguments.topologyConfig,
+    );
+
+    if (isBlockingDispatch) {
+      // ── Blocking mode (sub-agent calling create_team) ──────────
+      // Await the full router execution so the sub-agent's loop stays
+      // alive, receives completed results, and can synthesize a summary.
+      try {
+        const routerResults = await routerPromise;
+        logger.info(
+          `[Orchestrator] Router "${topology}" completed (blocking) for team "${teamCreationArguments.name}" — ${routerResults.length} result(s)`,
+        );
+        if (orchestratorContext.emit) {
+          orchestratorContext.emit({
+            type: SERVER_SENT_EVENT_TYPES.STATUS,
+            message: STATUS_MESSAGES.SUB_AGENTS_UPDATED,
+          });
+        }
+        return routerResults;
+      } catch (routerError: unknown) {
+        logger.error(
+          `[Orchestrator] Router "${topology}" failed (blocking) for team "${teamCreationArguments.name}": ${getErrorMessage(routerError)}`,
+        );
+        if (orchestratorContext.emit) {
+          orchestratorContext.emit({
+            type: SERVER_SENT_EVENT_TYPES.STATUS,
+            message: STATUS_MESSAGES.SUB_AGENTS_UPDATED,
+          });
+        }
+        return [{ error: getErrorMessage(routerError) }];
+      }
+    }
+
+    // ── Non-blocking mode (top-level create_team) ──────────────────
+    // Fire the router as a detached promise — it runs in the background.
+    // createTeam() returns immediately after all initial sub-agents have
+    // registered (real agent IDs allocated, worktrees created) — but
+    // BEFORE their agentic loops finish. SSE events stream progress to
+    // the client. When the router completes, _notifyParentOfRouterCompletion
+    // fires the auto-response.
+    routerPromise
       .then((routerResults) => {
         logger.info(
           `[Orchestrator] Router "${topology}" completed for team "${teamCreationArguments.name}" — ${routerResults.length} result(s)`,

@@ -49,6 +49,7 @@ import {
   createSandboxCheckpoint,
   restoreSandboxCheckpoint,
 } from "./lifecycle/SandboxExecutor.ts";
+import SemanticStallDetector from "./lifecycle/SemanticStallDetector.ts";
 
 import PlanningModeService from "../PlanningModeService.ts";
 import PromptLocaleService from "../PromptLocaleService.ts";
@@ -83,6 +84,9 @@ const REPETITION_TEMPERATURE_BUMP = 0.15;
 
 /** Repetition penalty applied (or incremented) on retry for local providers. */
 const REPETITION_PENALTY_BUMP = 0.1;
+
+/** Max additional stalled iterations after the first warning before hard-breaking. */
+const MAX_POST_WARNING_STALL_ITERATIONS = 2;
 
 /**
  * ReActHarness — Reason→Act→Observe tool-use loop with pluggable thought structures.
@@ -179,6 +183,9 @@ export default class ReActHarness extends BaseAgenticHarness {
     let currentMessages: ConversationMessage[] = [...context.messages];
     let truncationRecoveryCount = 0;
     let hasCleanTextBreak = false;
+
+    // ── Semantic stall detector ──────────────────────────────
+    const semanticStallDetector = new SemanticStallDetector();
 
     // ── Initialize lifecycle hooks ──────────────────────────
     const { hooks, approvalEngine } = createStandardHooks({
@@ -679,6 +686,70 @@ export default class ReActHarness extends BaseAgenticHarness {
 
           this.logIteration(pass, currentMessages);
 
+          // ── Semantic stall detection ────────────────────────────
+          const stallVerdict = semanticStallDetector.recordIteration(
+            pass.pendingToolCalls,
+          );
+
+          if (stallVerdict.isStalled) {
+            const toolList = (stallVerdict.repeatedTools || []).join(", ");
+            logger.warn(
+              `[ReActHarness] Semantic stall detected: type=${stallVerdict.stallType}, ` +
+                `consecutiveRepeats=${stallVerdict.consecutiveRepeats}, tools=[${toolList}]`,
+            );
+
+            emit({
+              type: SERVER_SENT_EVENT_TYPES.STATUS,
+              message: "semantic_stall_detected",
+              stallType: stallVerdict.stallType,
+              consecutiveRepeats: stallVerdict.consecutiveRepeats,
+              repeatedTools: stallVerdict.repeatedTools,
+              iteration: state.iterations,
+            });
+
+            if (
+              semanticStallDetector.hasWarningBeenIssued &&
+              semanticStallDetector.postWarningStalls >= MAX_POST_WARNING_STALL_ITERATIONS
+            ) {
+              // Escalation: stall persisted after warning — hard break
+              logger.error(
+                `[ReActHarness] Semantic stall persisted for ${semanticStallDetector.postWarningStalls} ` +
+                  `iterations after warning — hard-breaking loop`,
+              );
+
+              injectErrorAsConversationMessage(
+                currentMessages,
+                `The agent has been stuck in a behavioral loop, repeatedly calling the same tools ` +
+                  `(${toolList}) with identical arguments for ${stallVerdict.consecutiveRepeats} iterations. ` +
+                  `The loop has been terminated. A fundamentally different approach is needed to make progress.`,
+                context,
+              );
+              break;
+            }
+
+            // First warning: inject guidance but let the model try to self-correct
+            if (!semanticStallDetector.hasWarningBeenIssued) {
+              semanticStallDetector.markWarningIssued();
+
+              currentMessages.push({
+                role: "system",
+                content:
+                  `[STALL WARNING] You have been calling the same tools (${toolList}) with identical ` +
+                  `arguments for ${stallVerdict.consecutiveRepeats} consecutive iterations without making progress. ` +
+                  `You are stuck in a behavioral loop. You MUST try a fundamentally different approach:\n` +
+                  `- Use different tools or different arguments\n` +
+                  `- Break the problem into smaller steps\n` +
+                  `- Ask the user for clarification if you're unsure how to proceed\n` +
+                  `- If a tool keeps failing, stop calling it and explain the issue to the user\n` +
+                  `Do NOT repeat the same action again.`,
+              });
+
+              logger.info(
+                `[ReActHarness] Injected stall warning — giving model a chance to self-correct`,
+              );
+            }
+          }
+
           // ── Non-blocking dispatch exit ──────────────────────────
           // When any tool returns NON_BLOCKING_DISPATCH, background work
           // has been dispatched. Break immediately to avoid a wasteful
@@ -737,6 +808,10 @@ export default class ReActHarness extends BaseAgenticHarness {
           }
 
           this.logIteration(pass, currentMessages);
+
+          // Record text-only iteration for stall detection
+          semanticStallDetector.recordIteration([], pass.streamedText);
+
           hasCleanTextBreak = true;
           break;
         }
