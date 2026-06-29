@@ -6,6 +6,7 @@ import type {
 } from "../../types/orchestrator.ts";
 import type { ConversationMessage } from "../harnesses/types.ts";
 import { stripToolCallMarkup } from "../../utils/StreamChunkDispatcher.ts";
+import { ORCHESTRATOR } from "../../constants.ts";
 
 /*
  * Extract the text content from the last assistant message in a conversation.
@@ -312,7 +313,7 @@ function collectChildSummariesFromPayload(
         | symbol
       )[])
     : [payload];
-  const MAX_RESULT_LENGTH_FOR_PROPAGATION = 2000;
+  const { MAX_RESULT_LENGTH_FOR_PROPAGATION } = ORCHESTRATOR;
 
   for (const entry of resultsArray) {
     if (!isSerializedSubAgentResult(entry)) {

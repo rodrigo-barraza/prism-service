@@ -16,8 +16,9 @@ import {
 } from "../InstanceResolver.ts";
 import logger from "../../../utils/logger.ts";
 import { GitWorktreeHelper } from "../GitWorktreeHelper.ts";
+import { ORCHESTRATOR } from "../../../constants.ts";
 
-const MINIMUM_SUBSTANTIVE_RESPONSE_LENGTH = 80;
+const MINIMUM_SUBSTANTIVE_RESPONSE_LENGTH = ORCHESTRATOR.MINIMUM_SUBSTANTIVE_RESPONSE_LENGTH;
 
 const SHARED_BOARD_MARKER = "--- SHARED DISCUSSION BOARD ---";
 const YOUR_TASK_MARKER_PATTERN = /--- YOUR TASK \([^)]+\) ---/;

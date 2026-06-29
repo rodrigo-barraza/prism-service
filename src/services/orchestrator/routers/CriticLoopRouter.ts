@@ -16,6 +16,7 @@ import {
 } from "../InstanceResolver.ts";
 import logger from "../../../utils/logger.ts";
 import PromptLocaleService from "../../PromptLocaleService.ts";
+import { ORCHESTRATOR } from "../../../constants.ts";
 
 const DEFAULT_MAXIMUM_ROUNDS = 3;
 const DEFAULT_ACTOR_COUNT = 1;
@@ -279,7 +280,7 @@ function detectDegenerationOfThought(
   if (shorterLength === 0) return false;
 
   let matchingCharacters = 0;
-  const comparisonLength = Math.min(shorterLength, 500);
+  const comparisonLength = Math.min(shorterLength, ORCHESTRATOR.STALL_COMPARISON_CHARACTERS);
   for (
     let characterIndex = 0;
     characterIndex < comparisonLength;
@@ -747,15 +748,55 @@ export class CriticLoopRouter implements TopologyRouter {
     const juryPrompt = buildJurySelectionPrompt(originalTask, actorOutputs);
     const juryMessages = [{ role: "user", content: juryPrompt }];
 
+    // ── Synthesis telemetry: emit virtual sub-agent events so the client's
+    // StatusBar remains visible during the headless jury LLM call.
+    const synthesisSubAgentId = `synthesis-critic-${teamName}`;
+    const parentEmit = orchestratorContext.emit;
+
+    if (parentEmit) {
+      parentEmit({
+        type: "sub_agent_status",
+        subAgentId: synthesisSubAgentId,
+        message: "spawned",
+        description: `Jury evaluation for team "${teamName}"`,
+      });
+      parentEmit({
+        type: "sub_agent_status",
+        subAgentId: synthesisSubAgentId,
+        message: "phase",
+        phase: "synthesizing",
+      });
+    }
+
     let juryResponse;
     try {
       juryResponse = await provider.generateText(juryMessages, resolvedModel, {
-        maxTokens: 4096,
+        maxTokens: ORCHESTRATOR.EVALUATION_MAX_TOKENS,
       });
+
+      // ── Synthesis telemetry: mark virtual sub-agent as complete
+      if (parentEmit) {
+        parentEmit({
+          type: "sub_agent_status",
+          subAgentId: synthesisSubAgentId,
+          message: "complete",
+          durationMs: 0,
+          toolCount: 0,
+        });
+      }
     } catch (juryError: unknown) {
       logger.error(
         `[CriticLoopRouter] Jury selection failed: ${String(juryError)}`,
       );
+      if (parentEmit) {
+        parentEmit({
+          type: "sub_agent_status",
+          subAgentId: synthesisSubAgentId,
+          message: "complete",
+          durationMs: 0,
+          toolCount: 0,
+        });
+      }
       return allResults;
     }
 
@@ -849,20 +890,57 @@ export class CriticLoopRouter implements TopologyRouter {
         },
       ]);
 
+      // ── Synthesis telemetry: re-evaluation pass
+      const reevaluationSubAgentId = `synthesis-critic-reeval-${teamName}-r${roundNumber}`;
+      if (parentEmit) {
+        parentEmit({
+          type: "sub_agent_status",
+          subAgentId: reevaluationSubAgentId,
+          message: "spawned",
+          description: `Re-evaluation round ${roundNumber}`,
+        });
+        parentEmit({
+          type: "sub_agent_status",
+          subAgentId: reevaluationSubAgentId,
+          message: "phase",
+          phase: "synthesizing",
+        });
+      }
+
       try {
         const reevaluationResponse = await provider.generateText(
           [{ role: "user", content: reevaluationPrompt }],
           resolvedModel,
-          { maxTokens: 4096 },
+          { maxTokens: ORCHESTRATOR.EVALUATION_MAX_TOKENS },
         );
         selection = parseJurySelectionResponse(
           reevaluationResponse.text || "",
           1,
         );
+
+        // ── Synthesis telemetry: mark re-evaluation as complete
+        if (parentEmit) {
+          parentEmit({
+            type: "sub_agent_status",
+            subAgentId: reevaluationSubAgentId,
+            message: "complete",
+            durationMs: 0,
+            toolCount: 0,
+          });
+        }
       } catch {
         logger.warn(
           `[CriticLoopRouter] Re-evaluation failed in round ${roundNumber}. Returning current results.`,
         );
+        if (parentEmit) {
+          parentEmit({
+            type: "sub_agent_status",
+            subAgentId: reevaluationSubAgentId,
+            message: "complete",
+            durationMs: 0,
+            toolCount: 0,
+          });
+        }
         return allResults;
       }
 

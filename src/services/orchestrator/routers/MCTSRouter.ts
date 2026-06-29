@@ -19,10 +19,11 @@ import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 import RequestLogger from "../../RequestLogger.ts";
 import PromptLocaleService from "../../PromptLocaleService.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
+import { ORCHESTRATOR } from "../../../constants.ts";
 
 const DEFAULT_MAXIMUM_DEPTH = 3;
 const DEFAULT_BRANCH_FACTOR = 3;
-const MAXIMUM_EVALUATION_CHARACTERS = 100_000;
+const MAXIMUM_EVALUATION_CHARACTERS = ORCHESTRATOR.MAXIMUM_EVALUATION_CHARACTERS;
 const DEFAULT_EXPLORATION_WEIGHT = 1.41;
 
 export interface MCTSTreeNode {
@@ -543,6 +544,26 @@ export class MCTSRouter implements TopologyRouter {
         maximumDepth,
       );
 
+      // ── Synthesis telemetry: emit virtual sub-agent events so the client's
+      // StatusBar remains visible during the headless evaluation LLM call.
+      const synthesisSubAgentId = `synthesis-mcts-${teamName}-i${iteration}`;
+      const parentEmit = orchestratorContext.emit;
+
+      if (parentEmit) {
+        parentEmit({
+          type: "sub_agent_status",
+          subAgentId: synthesisSubAgentId,
+          message: "spawned",
+          description: `MCTS evaluation (iteration ${iteration})`,
+        });
+        parentEmit({
+          type: "sub_agent_status",
+          subAgentId: synthesisSubAgentId,
+          message: "phase",
+          phase: "synthesizing",
+        });
+      }
+
       let evaluationResult: EvaluationResult;
 
       try {
@@ -554,7 +575,7 @@ export class MCTSRouter implements TopologyRouter {
         const evaluationResponse = await provider.generateText(
           evaluationMessages,
           resolvedModel,
-          { maxTokens: 2048 },
+          { maxTokens: ORCHESTRATOR.SCORING_MAX_TOKENS },
         );
 
         RequestLogger.logBackgroundLlmCall({
@@ -591,10 +612,31 @@ export class MCTSRouter implements TopologyRouter {
           evaluationResponse.text || "",
           successfulBranches.length,
         );
+
+        // ── Synthesis telemetry: mark virtual sub-agent as complete
+        if (parentEmit) {
+          parentEmit({
+            type: "sub_agent_status",
+            subAgentId: synthesisSubAgentId,
+            message: "complete",
+            durationMs: Math.round(performance.now() - evaluationStartMs),
+            toolCount: 0,
+          });
+        }
       } catch (evaluationError: unknown) {
         logger.error(
           `[MCTSRouter] Evaluation failed at iteration ${iteration}: ${getErrorMessage(evaluationError)}`,
         );
+        // ── Synthesis telemetry: mark virtual sub-agent as complete on error
+        if (parentEmit) {
+          parentEmit({
+            type: "sub_agent_status",
+            subAgentId: synthesisSubAgentId,
+            message: "complete",
+            durationMs: 0,
+            toolCount: 0,
+          });
+        }
         evaluationResult = {
           scores: new Array(successfulBranches.length).fill(0.5),
           bestBranchIndex: 0,

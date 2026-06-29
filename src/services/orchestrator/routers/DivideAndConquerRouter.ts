@@ -19,9 +19,10 @@ import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 import RequestLogger from "../../RequestLogger.ts";
 import PromptLocaleService from "../../PromptLocaleService.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
+import { ORCHESTRATOR } from "../../../constants.ts";
 
 const MAXIMUM_SUBTASKS = 6;
-const MAXIMUM_SYNTHESIS_CHARACTERS = 120_000;
+const MAXIMUM_SYNTHESIS_CHARACTERS = ORCHESTRATOR.MAXIMUM_SYNTHESIS_CHARACTERS;
 const DEFAULT_MAXIMUM_RECURSION_DEPTH = 1;
 const MAXIMUM_ALLOWED_RECURSION_DEPTH = 10;
 const DEFAULT_RECURSION_COMPLEXITY_THRESHOLD = 300;
@@ -403,7 +404,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
       const decompositionResult = await provider.generateText(
         decompositionMessages,
         resolvedModel,
-        { maxTokens: 4096 },
+        { maxTokens: ORCHESTRATOR.EVALUATION_MAX_TOKENS },
       );
       const decompositionDurationMs = Math.round(
         performance.now() - decompositionStartMs,
@@ -582,6 +583,27 @@ export class DivideAndConquerRouter implements TopologyRouter {
       `[DivideAndConquerRouter] Phase 3: Synthesizing ${successfulResults.length} subtask result(s)...`,
     );
 
+    // ── Synthesis telemetry: emit virtual sub-agent events so the client's
+    // StatusBar remains visible during the headless synthesis LLM call.
+    const synthesisSubAgentId = `synthesis-dc-${teamName}`;
+    const synthesisDescription = `Divide & Conquer synthesis for team "${teamName}"`;
+    const parentEmit = orchestratorContext.emit;
+
+    if (parentEmit) {
+      parentEmit({
+        type: "sub_agent_status",
+        subAgentId: synthesisSubAgentId,
+        message: "spawned",
+        description: synthesisDescription,
+      });
+      parentEmit({
+        type: "sub_agent_status",
+        subAgentId: synthesisSubAgentId,
+        message: "phase",
+        phase: "synthesizing",
+      });
+    }
+
     try {
       const subtaskDescriptions = subtasks.map(
         (subtask) => subtask.description,
@@ -600,7 +622,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
       const synthesisResult = await provider.generateText(
         synthesisMessages,
         resolvedModel,
-        { maxTokens: 8192 },
+        { maxTokens: ORCHESTRATOR.SYNTHESIS_MAX_TOKENS },
       );
       const synthesisDurationMs = Math.round(
         performance.now() - synthesisStartMs,
@@ -652,11 +674,32 @@ export class DivideAndConquerRouter implements TopologyRouter {
         `[DivideAndConquerRouter] Synthesis complete in ${synthesisDurationMs}ms`,
       );
 
+      // ── Synthesis telemetry: mark virtual sub-agent as complete
+      if (parentEmit) {
+        parentEmit({
+          type: "sub_agent_status",
+          subAgentId: synthesisSubAgentId,
+          message: "complete",
+          durationMs: synthesisDurationMs,
+          toolCount: 0,
+        });
+      }
+
       return [...subtaskResults, synthesisSubAgentResult];
     } catch (synthesisError: unknown) {
       logger.error(
         `[DivideAndConquerRouter] Synthesis failed: ${getErrorMessage(synthesisError)}`,
       );
+      // ── Synthesis telemetry: mark virtual sub-agent as failed
+      if (parentEmit) {
+        parentEmit({
+          type: "sub_agent_status",
+          subAgentId: synthesisSubAgentId,
+          message: "complete",
+          durationMs: 0,
+          toolCount: 0,
+        });
+      }
       return subtaskResults;
     }
   }
@@ -709,7 +752,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
       const recursiveDecompositionResult = await provider.generateText(
         recursiveDecompositionMessages,
         orchestratorContext.resolvedModel,
-        { maxTokens: 4096 },
+        { maxTokens: ORCHESTRATOR.EVALUATION_MAX_TOKENS },
       );
 
       const recursiveSubtasks = parseDecompositionResponse(
@@ -826,6 +869,24 @@ export class DivideAndConquerRouter implements TopologyRouter {
         return recursiveResults[0];
       }
 
+      const recursiveSynthesisSubAgentId = `synthesis-dc-recursive-d${currentDepth}`;
+      const recursiveParentEmit = orchestratorContext.emit;
+
+      if (recursiveParentEmit) {
+        recursiveParentEmit({
+          type: "sub_agent_status",
+          subAgentId: recursiveSynthesisSubAgentId,
+          message: "spawned",
+          description: `Recursive synthesis at depth ${currentDepth}`,
+        });
+        recursiveParentEmit({
+          type: "sub_agent_status",
+          subAgentId: recursiveSynthesisSubAgentId,
+          message: "phase",
+          phase: "synthesizing",
+        });
+      }
+
       const recursiveSynthesisPrompt = buildSynthesisPrompt(
         assignment.prompt,
         recursiveResults,
@@ -840,7 +901,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
       const recursiveSynthesisResult = await provider.generateText(
         recursiveSynthesisMessages,
         orchestratorContext.resolvedModel,
-        { maxTokens: 8192 },
+        { maxTokens: ORCHESTRATOR.SYNTHESIS_MAX_TOKENS },
       );
       const recursiveSynthesisDurationMs = Math.round(
         performance.now() - recursiveSynthesisStartMs,
@@ -862,6 +923,17 @@ export class DivideAndConquerRouter implements TopologyRouter {
       logger.info(
         `[DivideAndConquerRouter] Recursive synthesis at depth ${currentDepth} complete in ${recursiveSynthesisDurationMs}ms`,
       );
+
+      // ── Synthesis telemetry: mark virtual sub-agent as complete
+      if (recursiveParentEmit) {
+        recursiveParentEmit({
+          type: "sub_agent_status",
+          subAgentId: recursiveSynthesisSubAgentId,
+          message: "complete",
+          durationMs: recursiveSynthesisDurationMs,
+          toolCount: 0,
+        });
+      }
 
       return recursiveSynthesizedResult;
     } catch (recursionError: unknown) {

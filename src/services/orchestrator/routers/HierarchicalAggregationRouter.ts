@@ -19,8 +19,9 @@ import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 import RequestLogger from "../../RequestLogger.ts";
 import PromptLocaleService from "../../PromptLocaleService.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
+import { ORCHESTRATOR } from "../../../constants.ts";
 
-const MAXIMUM_SYNTHESIS_CHARACTERS = 120_000;
+const MAXIMUM_SYNTHESIS_CHARACTERS = ORCHESTRATOR.MAXIMUM_SYNTHESIS_CHARACTERS;
 const DEFAULT_LAYER_COUNT = 1;
 const MAXIMUM_LAYER_COUNT = 3;
 
@@ -232,6 +233,27 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
         `[HierarchicalAggregationRouter]${layerLabel} Running synthesis over ${successfulResults.length} successful proposer results...`,
       );
 
+      // ── Synthesis telemetry: emit virtual sub-agent events so the client's
+      // StatusBar remains visible during the headless synthesis LLM call.
+      const synthesisSubAgentId = `synthesis-${teamName}-L${layerIndex + 1}`;
+      const synthesisDescription = `Synthesis pass for team "${teamName}"${layerLabel}`;
+      const parentEmit = orchestratorContext.emit;
+
+      if (parentEmit) {
+        parentEmit({
+          type: "sub_agent_status",
+          subAgentId: synthesisSubAgentId,
+          message: "spawned",
+          description: synthesisDescription,
+        });
+        parentEmit({
+          type: "sub_agent_status",
+          subAgentId: synthesisSubAgentId,
+          message: "phase",
+          phase: "synthesizing",
+        });
+      }
+
       try {
         const synthesisPrompt = buildSynthesisPrompt(
           teamName,
@@ -245,6 +267,15 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
           logger.error(
             `[HierarchicalAggregationRouter]${layerLabel} Provider "${providerName}" not found for synthesis`,
           );
+          if (parentEmit) {
+            parentEmit({
+              type: "sub_agent_status",
+              subAgentId: synthesisSubAgentId,
+              message: "complete",
+              durationMs: 0,
+              toolCount: 0,
+            });
+          }
           break;
         }
 
@@ -257,7 +288,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
         const synthesisResult = await provider.generateText(
           synthesisMessages,
           resolvedModel,
-          { maxTokens: 8192 },
+          { maxTokens: ORCHESTRATOR.SYNTHESIS_MAX_TOKENS },
         );
         const synthesisDurationMs = Date.now() - synthesisStartTime;
 
@@ -314,6 +345,17 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
 
         previousLayerSynthesis = synthesisResult.text || null;
         allLayerResults.push(synthesisSubAgentResult);
+
+        // ── Synthesis telemetry: mark virtual sub-agent as complete
+        if (parentEmit) {
+          parentEmit({
+            type: "sub_agent_status",
+            subAgentId: synthesisSubAgentId,
+            message: "complete",
+            durationMs: synthesisDurationMs,
+            toolCount: 0,
+          });
+        }
       } catch (synthesisError: unknown) {
         const errorMessage =
           synthesisError instanceof Error
@@ -322,6 +364,16 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
         logger.error(
           `[HierarchicalAggregationRouter]${layerLabel} Synthesis failed: ${errorMessage}`,
         );
+        // ── Synthesis telemetry: mark virtual sub-agent as failed
+        if (parentEmit) {
+          parentEmit({
+            type: "sub_agent_status",
+            subAgentId: synthesisSubAgentId,
+            message: "complete",
+            durationMs: 0,
+            toolCount: 0,
+          });
+        }
         break;
       }
     }

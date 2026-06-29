@@ -269,7 +269,7 @@ export default class OrchestratorService {
     const resolvedMaxSubAgentIterations =
       currentRecursionDepth > 0 && baseMaxIterations !== Infinity
         ? Math.max(
-            5,
+            ORCHESTRATOR.MIN_ATTENUATED_ITERATIONS,
             Math.round(
               baseMaxIterations *
                 (1 -
@@ -402,7 +402,7 @@ export default class OrchestratorService {
       conversationCounterKey,
       currentConversationCount,
     );
-    const agentId = `agent-${currentConversationCount.toString(36)}-${crypto.randomUUID().slice(0, 4)}`;
+    const agentId = `agent-${currentConversationCount.toString(36)}-${crypto.randomUUID().slice(0, ORCHESTRATOR.AGENT_ID_SUFFIX_LENGTH)}`;
     const branchName = `orchestrator/${agentId}`;
     const workspaceRoot = GitWorktreeHelper.getDefaultWorkspaceRoot(
       orchestratorWorkspaceRoot ?? undefined,
