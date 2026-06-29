@@ -74,6 +74,16 @@ interface IterationPassOptions extends AgenticOptions {
 
 const MAX_CONSECUTIVE_TOOL_ERRORS = 3;
 
+/** Max retries when degenerate repetition is detected mid-stream.
+ *  Each retry bumps temperature and repetition_penalty to perturb the output. */
+const MAX_REPETITION_RETRIES = 2;
+
+/** Temperature bump applied on each repetition retry attempt. */
+const REPETITION_TEMPERATURE_BUMP = 0.15;
+
+/** Repetition penalty applied (or incremented) on retry for local providers. */
+const REPETITION_PENALTY_BUMP = 0.1;
+
 /**
  * ReActHarness — Reason→Act→Observe tool-use loop with pluggable thought structures.
  *
@@ -313,6 +323,95 @@ export default class ReActHarness extends BaseAgenticHarness {
         // ── Stream LLM response ────────────────────────────────
         const stream = this.createProviderStream(currentMessages, passOptions);
         await this.consumeStream(stream, pass, allowedToolNames);
+
+        // ── Repetition detection recovery ──────────────────────
+        // When the streaming repetition detector flags degenerate output,
+        // discard the response and retry with perturbed sampling parameters.
+        if (pass.repetitionDetected) {
+          finalizePassTracker(pass, passRequestId);
+          this.emitGenerationProgress();
+
+          emit({
+            type: SERVER_SENT_EVENT_TYPES.STATUS,
+            message: "repetition_detected",
+            iteration: state.iterations,
+          });
+
+          // Retry loop with perturbation
+          let retrySucceeded = false;
+          for (
+            let repetitionRetry = 1;
+            repetitionRetry <= MAX_REPETITION_RETRIES;
+            repetitionRetry++
+          ) {
+            logger.warn(
+              `[ReActHarness] Repetition recovery attempt ${repetitionRetry}/${MAX_REPETITION_RETRIES} — ` +
+                `bumping temperature by +${REPETITION_TEMPERATURE_BUMP}, repeatPenalty by +${REPETITION_PENALTY_BUMP}`,
+            );
+
+            // Perturb sampling parameters
+            const perturbedPassOptions = { ...passOptions };
+            const currentTemperature =
+              typeof perturbedPassOptions.temperature === "number"
+                ? perturbedPassOptions.temperature
+                : 0.7;
+            perturbedPassOptions.temperature = Math.min(
+              1.0,
+              currentTemperature + REPETITION_TEMPERATURE_BUMP * repetitionRetry,
+            );
+            (perturbedPassOptions as Record<string, unknown>).repeatPenalty =
+              1.0 + REPETITION_PENALTY_BUMP * repetitionRetry;
+
+            const retryPass = this.createPassState(perturbedPassOptions);
+            const retryRequestId = `${requestIdBase}-iter-${state.iterations}-rep-${repetitionRetry}`;
+            retryPass.requestId = retryRequestId;
+            this.registerTrackerRequest(retryRequestId);
+
+            const retryStream = this.createProviderStream(
+              currentMessages,
+              perturbedPassOptions,
+            );
+            await this.consumeStream(retryStream, retryPass, allowedToolNames);
+
+            finalizePassTracker(retryPass, retryRequestId);
+
+            if (!retryPass.repetitionDetected) {
+              // Retry succeeded — adopt the clean pass and continue the loop
+              logger.info(
+                `[ReActHarness] Repetition recovery succeeded on attempt ${repetitionRetry}`,
+              );
+
+              // Transfer the clean pass data into the main pass reference
+              // so the rest of the loop iteration works as-if this was the original pass.
+              Object.assign(pass, retryPass);
+              pass.repetitionDetected = false;
+              retrySucceeded = true;
+              break;
+            }
+
+            logger.warn(
+              `[ReActHarness] Repetition recovery attempt ${repetitionRetry} still degenerate`,
+            );
+          }
+
+          if (!retrySucceeded) {
+            logger.error(
+              `[ReActHarness] All ${MAX_REPETITION_RETRIES} repetition recovery attempts exhausted — injecting error`,
+            );
+
+            injectErrorAsConversationMessage(
+              currentMessages,
+              `The model entered a degenerate repetition loop and ${MAX_REPETITION_RETRIES} recovery ` +
+                `attempts with perturbed sampling parameters were unsuccessful. ` +
+                `This typically occurs with smaller models under certain prompts. ` +
+                `Consider using a different model or adjusting the repetition_penalty parameter.`,
+              context,
+            );
+
+            this.logIteration(pass, currentMessages);
+            break;
+          }
+        }
 
         // ── Finalize tracker for this pass ─────────────────────
         finalizePassTracker(pass, passRequestId);

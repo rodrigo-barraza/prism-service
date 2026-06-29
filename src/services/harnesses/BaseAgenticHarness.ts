@@ -1,5 +1,7 @@
 import { expandMessagesForFunctionCall } from "../../utils/FunctionCallingUtilities.ts";
 import { roundMilliseconds } from "@rodrigo-barraza/utilities-library";
+import RepetitionDetector from "../../utils/RepetitionDetector.ts";
+import type { RepetitionVerdict } from "../../utils/RepetitionDetector.ts";
 import {
   mergeUsage,
   createUsageAccumulator,
@@ -96,6 +98,7 @@ export default class BaseAgenticHarness {
   protected state: AgenticLoopState;
   protected tools: ResolvedTools;
   protected trackerConversationId: string;
+  protected repetitionDetector: RepetitionDetector;
 
   constructor(
     context: AgenticContext,
@@ -108,6 +111,7 @@ export default class BaseAgenticHarness {
     this.trackerConversationId = (context.parentAgentConversationId ||
       context.agentConversationId ||
       "") as string;
+    this.repetitionDetector = new RepetitionDetector();
   }
 
   /** Execute the agentic loop. Subclasses MUST override. */
@@ -532,13 +536,16 @@ export default class BaseAgenticHarness {
 
   /**
    * Consume an LLM stream, routing each chunk through `processStreamChunk`.
-   * Handles abort signals and stream teardown.
+   * Handles abort signals, repetition detection, and stream teardown.
    */
   public async consumeStream(
     stream: AsyncIterable<unknown>,
     pass: PassState,
     allowedToolNames: Set<string>,
   ): Promise<void> {
+    // Reset the detector for each new stream (each LLM response is independent)
+    this.repetitionDetector.reset();
+
     for await (const chunk of stream) {
       const result = await this.processStreamChunk(
         chunk,
@@ -546,6 +553,13 @@ export default class BaseAgenticHarness {
         allowedToolNames,
       );
       if (result.action === "break") {
+        const returnable = stream as AsyncGenerator<unknown>;
+        if (typeof returnable.return === "function")
+          returnable.return(undefined);
+        break;
+      }
+      if (result.action === "repetitionDetected") {
+        pass.repetitionDetected = true;
         const returnable = stream as AsyncGenerator<unknown>;
         if (typeof returnable.return === "function")
           returnable.return(undefined);
@@ -677,6 +691,20 @@ export default class BaseAgenticHarness {
         outputCharacters: state.overallOutputCharacters,
       });
       this.maybeEmitProgress();
+
+      // ── Repetition detection on thinking stream ────────
+      const thinkingRepetitionVerdict = this.repetitionDetector.append(
+        streamChunk.content || "",
+      );
+      if (thinkingRepetitionVerdict.isDegenerate) {
+        logger.warn(
+          `[RepetitionDetector] Degenerate repetition detected in thinking stream on iteration ${state.iterations} — ` +
+            `metric=${thinkingRepetitionVerdict.metric}, confidence=${thinkingRepetitionVerdict.confidence.toFixed(2)}, ` +
+            `pattern="${(thinkingRepetitionVerdict.pattern || "").slice(0, 80)}"`,
+        );
+        return { action: "repetitionDetected", verdict: thinkingRepetitionVerdict };
+      }
+
       return { action: "continue" };
     }
 
@@ -936,6 +964,18 @@ export default class BaseAgenticHarness {
         outputCharacters: state.overallOutputCharacters,
       });
     this.maybeEmitProgress();
+
+    // ── Repetition detection on text stream ──────────────
+    const textRepetitionVerdict = this.repetitionDetector.append(rawChunkString);
+    if (textRepetitionVerdict.isDegenerate) {
+      logger.warn(
+        `[RepetitionDetector] Degenerate repetition detected in text stream on iteration ${state.iterations} — ` +
+          `metric=${textRepetitionVerdict.metric}, confidence=${textRepetitionVerdict.confidence.toFixed(2)}, ` +
+          `pattern="${(textRepetitionVerdict.pattern || "").slice(0, 80)}"`,
+      );
+      return { action: "repetitionDetected", verdict: textRepetitionVerdict };
+    }
+
     return { action: "continue" };
   }
 

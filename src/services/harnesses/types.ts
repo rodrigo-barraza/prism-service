@@ -6,6 +6,8 @@
  * AgenticLoopState, and the AgenticLoopService façade.
  */
 
+import type { RepetitionVerdict } from "../../utils/RepetitionDetector.ts";
+
 // ── Usage & Cost ────────────────────────────────────────────
 
 import type { TokenUsage } from "../RequestLogger.ts";
@@ -250,6 +252,8 @@ export interface PassState {
   pendingRequestDocumentIdPromise: Promise<import("mongodb").ObjectId | null>;
   /** Provider stop reason — "length"/"max_tokens" when output was truncated by token budget. */
   stopReason?: string;
+  /** Set by the streaming repetition detector when degenerate output is identified. */
+  repetitionDetected?: boolean;
 }
 
 // ── Stream Chunk Routing ────────────────────────────────────
@@ -258,7 +262,8 @@ export type ChunkAction =
   | { action: "continue" }
   | { action: "break" }
   | { action: "skip" }
-  | { action: "toolCall"; toolCall: ToolCall };
+  | { action: "toolCall"; toolCall: ToolCall }
+  | { action: "repetitionDetected"; verdict: RepetitionVerdict };
 
 // ── AgenticLoopState Constructor ────────────────────────────
 

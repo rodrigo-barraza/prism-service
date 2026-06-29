@@ -108,8 +108,6 @@ export function stripToolCallMarkup(text: string): string {
       .replace(/<\|channel>thought[\s\S]*?<channel\|>/gi, "")
       // Empty channel blocks: <|channel> followed by non-thought content up to <channel|>
       .replace(/<\|channel>[\s\S]*?<channel\|>/gi, "")
-      // Stray closing channel tags (model emits orphan <channel|>)
-      .replace(/<channel\|>/gi, "")
 
       // ── Tool call / response / result tags ──
       // Completed tag pairs
@@ -124,6 +122,10 @@ export function stripToolCallMarkup(text: string): string {
       .replace(/<\|?tool_call\|?>[\s\S]*$/gi, "")
       .replace(/<\|?tool_response\|?>[\s\S]*$/gi, "")
       .replace(/<\|?result\|?>[\s\S]*$/gi, "")
+
+      // ── Stray orphan delimiters (must run last) ──
+      .replace(/<\|channel>/gi, "")
+      .replace(/<channel\|>/gi, "")
   );
 }
 
