@@ -63,27 +63,27 @@ let mockMCPToolSchemas = [...MOCK_MCP_TOOL_SCHEMAS];
 
 const MOCK_ORCHESTRATOR_TOOL_SCHEMAS = [
   {
-    name: "create_team",
+    name: "create_subagents",
     description: "Spawn sub-agents",
     parameters: { type: "object", properties: {} },
   },
   {
-    name: "send_message",
+    name: "send_subagent_message",
     description: "Send follow-up to sub-agent",
     parameters: { type: "object", properties: {} },
   },
   {
-    name: "stop_agent",
+    name: "stop_subagent",
     description: "Stop a sub-agent",
     parameters: { type: "object", properties: {} },
   },
   {
-    name: "get_task_output",
+    name: "get_subagent_output",
     description: "Read output from a sub-agent",
     parameters: { type: "object", properties: {} },
   },
   {
-    name: "delete_team",
+    name: "delete_subagents",
     description: "Delete a team and abort its sub-agents",
     parameters: { type: "object", properties: {} },
   },
@@ -255,11 +255,11 @@ describe("AgenticToolResolver — tool resolution", () => {
     const toolNames = finalTools.map((tool) => tool.name);
 
     // All 5 orchestrator tools should NOT be present for sub-agents
-    expect(toolNames).not.toContain("create_team");
-    expect(toolNames).not.toContain("send_message");
-    expect(toolNames).not.toContain("stop_agent");
-    expect(toolNames).not.toContain("get_task_output");
-    expect(toolNames).not.toContain("delete_team");
+    expect(toolNames).not.toContain("create_subagents");
+    expect(toolNames).not.toContain("send_subagent_message");
+    expect(toolNames).not.toContain("stop_subagent");
+    expect(toolNames).not.toContain("get_subagent_output");
+    expect(toolNames).not.toContain("delete_subagents");
 
     // Explicitly enabled tools should still be present
     expect(toolNames).toContain("read_file");
@@ -280,11 +280,11 @@ describe("AgenticToolResolver — tool resolution", () => {
     const toolNames = finalTools.map((tool) => tool.name);
 
     // All 5 orchestrator tools should bypass the enabledTools filter for non-sub-agents
-    expect(toolNames).toContain("create_team");
-    expect(toolNames).toContain("send_message");
-    expect(toolNames).toContain("stop_agent");
-    expect(toolNames).toContain("get_task_output");
-    expect(toolNames).toContain("delete_team");
+    expect(toolNames).toContain("create_subagents");
+    expect(toolNames).toContain("send_subagent_message");
+    expect(toolNames).toContain("stop_subagent");
+    expect(toolNames).toContain("get_subagent_output");
+    expect(toolNames).toContain("delete_subagents");
     expect(toolNames).toContain("read_file");
   });
 
@@ -326,7 +326,7 @@ describe("AgenticToolResolver — tool resolution", () => {
   it("disabledTools prevents CORE_ORCHESTRATOR_TOOLS from being re-included by bypass", async () => {
     const { finalTools } = await AgenticToolResolver.resolve({
       options: {
-        disabledTools: ["create_team", "send_message"],
+        disabledTools: ["create_subagents", "send_subagent_message"],
       },
       agent: undefined,
       project: "coding",
@@ -336,9 +336,9 @@ describe("AgenticToolResolver — tool resolution", () => {
 
     const toolNames = finalTools.map((tool) => tool.name);
 
-    expect(toolNames).not.toContain("create_team");
-    expect(toolNames).not.toContain("send_message");
-    expect(toolNames).toContain("stop_agent");
+    expect(toolNames).not.toContain("create_subagents");
+    expect(toolNames).not.toContain("send_subagent_message");
+    expect(toolNames).toContain("stop_subagent");
     expect(toolNames).toContain("read_file");
   });
 

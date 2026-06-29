@@ -353,7 +353,7 @@ function collectChildSummariesFromPayload(
 }
 
 /**
- * Scan a sub-agent's conversation for create_team tool results that contain
+ * Scan a sub-agent's conversation for create_subagents tool results that contain
  * SubAgentResult payloads. When a child agent spawned grandchildren, those
  * results are propagated upward so the parent has full subtree visibility.
  *
@@ -391,7 +391,7 @@ export function extractSubtreeMetrics(
     // This is the primary format used by our ReActHarness.
     if (message.role === "assistant" && Array.isArray(message.toolCalls)) {
       for (const toolCall of message.toolCalls) {
-        if (toolCall.name !== "create_team" || !toolCall.result) continue;
+        if (toolCall.name !== "create_subagents" || !toolCall.result) continue;
 
         // toolCall.result is the raw return value from OrchestratorService.createTeam(),
         // which is SubAgentResult[] — already a parsed object, not a JSON string.

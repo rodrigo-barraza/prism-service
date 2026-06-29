@@ -27,12 +27,12 @@ const DISALLOWED_ASYNC_TOOL_NAMES = new Set([
   ASYNC_TASK_TOOL_NAMES.CANCEL_ASYNC_TASK,
 
   // Orchestrator tools (already have their own non-blocking dispatch)
-  "create_team",
-  "send_message",
-  "stop_agent",
-  "get_task_output",
-  "delete_team",
-  "resume_agent",
+  "create_subagents",
+  "send_subagent_message",
+  "stop_subagent",
+  "get_subagent_output",
+  "delete_subagents",
+  "resume_subagent",
 
   // Interactive tools that block on user input
   "ask_user",

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import "./setup.ts";
-import { PROVIDERS } from "../src/constants.ts";
+import { PROVIDERS, ORCHESTRATOR } from "../src/constants.ts";
 
 // ── vi.mock blocks (must come before imports that use them) ────────────
 
@@ -250,7 +250,7 @@ describe("Event-Driven Auto-Response", () => {
     });
 
     it("should truncate very long sub-agent output to prevent context bloat", async () => {
-      const longOutput = "A".repeat(5000);
+      const longOutput = "A".repeat(ORCHESTRATOR.AGENT_OUTPUT_TRUNCATION_LIMIT + 1000);
       const routerResults: SubAgentResult[] = [
         {
           agent_id: "agent-verbose",

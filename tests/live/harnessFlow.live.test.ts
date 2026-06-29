@@ -1969,7 +1969,7 @@ describe("Suite 15: Harness Strategies, Topologies, and Mixtures", () => {
       const teamCreateCalls = allToolEvents.filter(
         (toolEvent) =>
           (toolEvent.tool?.name || toolEvent.name) === "team_create" ||
-          (toolEvent.tool?.name || toolEvent.name) === "create_team",
+          (toolEvent.tool?.name || toolEvent.name) === "create_subagents",
       );
       expect(teamCreateCalls.length).toBeGreaterThan(0);
     }
@@ -2716,7 +2716,7 @@ describe("Suite 18: Strategy × Topology Live Combination Matrix", () => {
       const teamCreates = toolEvents.filter(
         (toolEvent) =>
           (toolEvent.tool?.name || toolEvent.name) === "team_create" ||
-          (toolEvent.tool?.name || toolEvent.name) === "create_team",
+          (toolEvent.tool?.name || toolEvent.name) === "create_subagents",
       );
 
       const spawnEvents = result.subAgentStatuses.filter(
@@ -2855,7 +2855,7 @@ describe("Suite 19: Forced Subagent Topology Execution Matrix", () => {
       const teamCreateEvents = allToolEvents.filter(
         (toolEvent) => {
           const toolName = toolEvent.tool?.name || toolEvent.name;
-          return toolName === "team_create" || toolName === "create_team";
+          return toolName === "team_create" || toolName === "create_subagents";
         },
       );
 

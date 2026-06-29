@@ -75,7 +75,7 @@ describe("PostExecutionEmitter", () => {
     });
 
     it("should emit sub_agents_updated when create_team was called", () => {
-      const executedToolCalls = [{ name: "create_team", id: "1", args: {} }];
+      const executedToolCalls = [{ name: "create_subagents", id: "1", args: {} }];
 
       emitPostExecutionStatus(executedToolCalls, mockEmit);
 
@@ -86,7 +86,7 @@ describe("PostExecutionEmitter", () => {
     });
 
     it("should emit sub_agents_updated when stop_agent was called", () => {
-      const executedToolCalls = [{ name: "stop_agent", id: "1", args: {} }];
+      const executedToolCalls = [{ name: "stop_subagent", id: "1", args: {} }];
 
       emitPostExecutionStatus(executedToolCalls, mockEmit);
 

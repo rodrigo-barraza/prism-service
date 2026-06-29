@@ -4,7 +4,7 @@
  *
  * Uses sliding window n-gram frequency analysis to detect when a model
  * has entered a degenerate repetition loop (e.g., repeating "I'll try
- * to call get_task_output for the IDs" endlessly).
+ * to call get_subagent_output for the IDs" endlessly).
  *
  * The detector operates on word-level n-grams (not character-level) to
  * avoid false positives on code and JSON output. Two n-gram sizes are

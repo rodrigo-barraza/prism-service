@@ -211,12 +211,12 @@ async function runTest() {
 
     console.log(`\n  🔧 Tool Calls:`);
     const rootCreateTeamCalls = rootToolCalls.filter(
-      (event) => event.tool?.name === "create_team" && event.status === "calling",
+      (event) => event.tool?.name === "create_subagents" && event.status === "calling",
     );
     console.log(`     Root create_team calls: ${rootCreateTeamCalls.length}`);
 
     const subAgentCreateTeamCalls = subAgentToolCalls.filter(
-      (event) => event.tool?.name === "create_team" && event.status === "calling",
+      (event) => event.tool?.name === "create_subagents" && event.status === "calling",
     );
     console.log(`     Sub-agent create_team calls: ${subAgentCreateTeamCalls.length}`);
 

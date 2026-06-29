@@ -1194,7 +1194,7 @@ export function createLmStudioProvider(
      * OpenAI-compat streaming path — used when orchestrator tools are enabled.
      * Sends a standard /v1/chat/completions request with `tools` array.
      * Tool calls yield as non-native events, so Prism's agentic loop
-     * executes them (including team_create, send_message, stop_agent).
+     * executes them (including create_subagents, send_subagent_message, stop_subagent).
      *
      * @private
      */

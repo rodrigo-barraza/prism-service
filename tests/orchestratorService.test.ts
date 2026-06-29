@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import "./setup.ts";
 import ToolOrchestratorService from "../src/services/ToolOrchestratorService.ts";
-import { COLLECTIONS, PROVIDERS } from "../src/constants.ts";
+import { COLLECTIONS, PROVIDERS, ORCHESTRATOR } from "../src/constants.ts";
 import { TOPOLOGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import SettingsService from "../src/services/SettingsService.ts";
 import localModelQueue from "../src/services/LocalModelQueue.ts";
@@ -58,9 +58,7 @@ vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
 }));
 
 import type { OrchestratorContext } from "../src/types/orchestrator.ts";
-import OrchestratorService, {
-  MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION,
-} from "../src/services/OrchestratorService.ts";
+import OrchestratorService from "../src/services/OrchestratorService.ts";
 import AgentPersonaRegistry from "../src/services/AgentPersonaRegistry.ts";
 import { afterEach } from "vitest";
 
@@ -100,7 +98,7 @@ function cleanAllConversations() {
   OrchestratorService.cleanupConversation("root-conv");
   OrchestratorService.cleanupConversation("custom-parent-conv-abc");
   OrchestratorService.cleanupConversation("conv-id-789");
-  for (let i = 0; i < MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION + 5; i++) {
+  for (let i = 0; i < ORCHESTRATOR.MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION + 5; i++) {
     OrchestratorService.cleanupConversation(`session-id-456-${i}`);
     OrchestratorService.cleanupConversation(`session-id-cb-${i}`);
   }
@@ -920,7 +918,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
 
       const parentConversationId = "conv-id-789";
       
-      for (let i = 0; i < MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION; i++) {
+      for (let i = 0; i < ORCHESTRATOR.MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION; i++) {
         await OrchestratorService.spawnFromTool({
           description: `CB Agent ${i}`,
           prompt: "Do work",
@@ -935,13 +933,13 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       }
 
       const resultExceeded = await OrchestratorService.spawnFromTool({
-        description: `CB Agent ${MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}`,
+        description: `CB Agent ${ORCHESTRATOR.MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}`,
         prompt: "Do work",
         awaitCompletion: true,
       orchestratorContext: {
           ...orchestratorContext,
       awaitCompletion: true,
-          agentConversationId: `session-id-cb-${MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}`,
+          agentConversationId: `session-id-cb-${ORCHESTRATOR.MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}`,
           conversationId: parentConversationId,
         },
       });
@@ -1644,9 +1642,9 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       expect(mockRunAgenticLoop).toHaveBeenCalled();
       const lastCall = mockRunAgenticLoop.mock.calls[mockRunAgenticLoop.mock.calls.length - 1][0];
       const tools = lastCall.options.enabledTools;
-      expect(tools).not.toContain("create_team");
-      expect(tools).not.toContain("send_message");
-      expect(tools).not.toContain("stop_agent");
+      expect(tools).not.toContain("create_subagents");
+      expect(tools).not.toContain("send_subagent_message");
+      expect(tools).not.toContain("stop_subagent");
     });
 
     it("should filter out orchestrator only tools from all tool schemas when enabledTools is not provided and canSpawnRecursively is false", async () => {
@@ -1668,7 +1666,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       const lastCall = mockRunAgenticLoop.mock.calls[mockRunAgenticLoop.mock.calls.length - 1][0];
       const tools = lastCall.options.enabledTools;
       expect(tools).toBeDefined();
-      expect(tools).not.toContain("create_team");
+      expect(tools).not.toContain("create_subagents");
     });
 
     it("should continue complete/idle sub-agent on sendMessage", async () => {

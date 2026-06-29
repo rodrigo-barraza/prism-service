@@ -195,7 +195,7 @@ describe("AsyncTaskTools", () => {
 
     it("should reject orchestrator tools", async () => {
       const result = await runAsyncTask.execute(
-        { toolName: "create_team", toolArguments: {} },
+        { toolName: "create_subagents", toolArguments: {} },
         createContext(),
       );
 
@@ -420,12 +420,12 @@ describe("AsyncTaskTools", () => {
       "run_async_task",
       "list_async_tasks",
       "cancel_async_task",
-      "create_team",
-      "send_message",
-      "stop_agent",
-      "get_task_output",
-      "delete_team",
-      "resume_agent",
+      "create_subagents",
+      "send_subagent_message",
+      "stop_subagent",
+      "get_subagent_output",
+      "delete_subagents",
+      "resume_subagent",
       "ask_user",
       "enter_plan_mode",
       "exit_plan_mode",

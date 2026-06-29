@@ -1002,7 +1002,7 @@ describe("Suite 6: Multi-Agent Orchestration", () => {
       const teamCreateCalls = allToolEvents.filter(
         (toolEvent) =>
           (toolEvent.tool?.name || toolEvent.name) === "team_create" ||
-          (toolEvent.tool?.name || toolEvent.name) === "create_team",
+          (toolEvent.tool?.name || toolEvent.name) === "create_subagents",
       );
       capabilityTracker.record(
         "6.1", CAPABILITIES.MULTI_AGENT_ORCHESTRATION, target,
@@ -1101,7 +1101,7 @@ describe("Suite 6: Multi-Agent Orchestration", () => {
       const teamCreateCalls = allToolEvents.filter(
         (toolEvent) =>
           (toolEvent.tool?.name || toolEvent.name) === "team_create" ||
-          (toolEvent.tool?.name || toolEvent.name) === "create_team",
+          (toolEvent.tool?.name || toolEvent.name) === "create_subagents",
       );
       capabilityTracker.record(
         "6.3", CAPABILITIES.MULTI_AGENT_ORCHESTRATION, target,

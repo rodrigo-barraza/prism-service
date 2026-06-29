@@ -350,7 +350,7 @@ Do NOT do the work yourself. Use create_team immediately.`;
     maxIterations: 10,
     maxWorkerIterations: 3,
     title: "Coordinator Token Test",
-    enabledTools: ["read_file", "write_file", "list_dir", "execute_command", "create_team", "send_message", "stop_agent"],
+    enabledTools: ["read_file", "write_file", "list_dir", "execute_command", "create_subagents", "send_subagent_message", "stop_subagent"],
   });
 
   const { chunkCount, thinkingChunkCount, doneEvent, usageUpdateEvents, subAgentCompleteEvents, subAgentProgressEvents: _subAgentProgressEvents, subAgentStatusEvents, maxOutputTokensFromChunks } = result;
