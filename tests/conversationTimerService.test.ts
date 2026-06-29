@@ -162,7 +162,7 @@ vi.mocked(MongoWrapper.getDb).mockImplementation(() => {
           toArray,
         };
       }),
-      insertOne: vi.fn().mockImplementation(async (document: any) => {
+      insertOne: vi.fn().mockImplementation(async (document: MockDbDocument) => {
         const spyResult = await mockInsertOne(document);
         if (spyResult !== undefined) return spyResult;
 
@@ -227,14 +227,14 @@ describe("ConversationTimerService", () => {
       name: "test-model",
       provider: "google",
       contextLength: 128_000,
-    } as any);
+    } as unknown as ReturnType<typeof configModule.getModelByName>);
 
     vi.spyOn(scheduledTaskServiceModule, "matchCron").mockReturnValue(false);
 
     vi.spyOn(providersModule, "getProvider").mockReturnValue({
       generateText: vi.fn(),
       generateTextStream: vi.fn(),
-    } as any);
+    } as unknown as ReturnType<typeof providersModule.getProvider>);
   });
 
   // ── Group 1: init() / destroy() — daemon lifecycle ──────────
@@ -901,8 +901,8 @@ describe("ConversationTimerService", () => {
       );
 
       for (const call of vi.mocked(ConversationService.setGenerating).mock.calls) {
-        const collectionOption = call[4] as any;
-        expect(collectionOption.collection).toBe(COLLECTIONS.AGENT_CONVERSATIONS);
+        const collectionOption = call[4];
+        expect(collectionOption?.collection).toBe(COLLECTIONS.AGENT_CONVERSATIONS);
       }
     });
 
@@ -933,7 +933,7 @@ describe("ConversationTimerService", () => {
         },
       };
 
-      vi.spyOn(providersModule, "getProvider").mockReturnValueOnce(undefined as any);
+      vi.spyOn(providersModule, "getProvider").mockReturnValueOnce(undefined as unknown as ReturnType<typeof providersModule.getProvider>);
 
       await expect(
         ConversationTimerService.executeAgenticLoop(
