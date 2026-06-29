@@ -168,3 +168,48 @@ export const PROMPT_DELIMITERS = {
   SOMATIC_STATE_PREFIX: "[Somatic State",
   CONVERSATION_SUMMARY_PREFIX: "[Conversation Summary",
 } as const;
+
+// ─── Orchestrator Constants ─────────────────────────────────
+
+export const ORCHESTRATOR = {
+  /** Maximum parallel sub-agents a single parent can spawn. */
+  MAX_SUB_AGENTS: 10,
+
+  /** Default max iterations per sub-agent agentic loop. */
+  MAX_SUB_AGENT_ITERATIONS: 15,
+
+  /** Upper clamp for user-configured sub-agent iterations. */
+  MAX_SUB_AGENT_ITERATIONS_CLAMP: 100,
+
+  /**
+   * Max total concurrent sub-agents across all recursion depths for a single conversation.
+   * Circuit breaker to prevent exponential agent fan-out from recursive spawning.
+   * Paper reference: Intelligence Entropy (arXiv:2606.18065) — disorder grows exponentially.
+   */
+  MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION: 100,
+
+  /**
+   * Scope attenuation factor for maxIterations at each recursion depth hop.
+   * Each level gets (1 - FACTOR) of the parent's iterations.
+   * Paper reference: arXiv:2606.03518 — permissions must shrink at every delegation hop.
+   */
+  RECURSION_SCOPE_ATTENUATION_FACTOR: 0.4,
+
+  /** Max characters of sub-agent output included in parent notifications. */
+  AGENT_OUTPUT_TRUNCATION_LIMIT: 8000,
+
+  /** Max characters of partial output returned when polling a running sub-agent. */
+  PARTIAL_OUTPUT_TAIL_CHARACTERS: 2000,
+
+  /** Maximum BFS depth when discovering nested sub-agent trees. */
+  AGENT_TREE_DISCOVERY_MAX_DEPTH: 10,
+
+  /** Max output tokens for the synthesis/aggregation agent pass. */
+  SYNTHESIS_MAX_TOKENS: 8192,
+
+  /** Max retries waiting for a parent conversation to become idle before auto-responding. */
+  AUTO_RESPONSE_GENERATION_WAIT_MAXIMUM_RETRIES: 30,
+
+  /** Delay between retries when waiting for parent generation to finish (ms). */
+  AUTO_RESPONSE_GENERATION_WAIT_DELAY_MILLISECONDS: 2_000,
+} as const;
