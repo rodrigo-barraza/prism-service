@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@rodrigo-barraza/utilities-library': link:../utilities-library
+
 importers:
 
   .:
@@ -21,8 +24,8 @@ importers:
         specifier: github:rodrigo-barraza/service-library
         version: https://codeload.github.com/rodrigo-barraza/service-library/tar.gz/aa80777cb14ae5393278261ba025112866e1a72e(express@5.2.1)(mongodb@7.3.0)
       '@rodrigo-barraza/utilities-library':
-        specifier: github:rodrigo-barraza/utilities-library
-        version: https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/4bfe89362ca921c7fd552e1c4fbaede194b12c93
+        specifier: link:../utilities-library
+        version: link:../utilities-library
       cors:
         specifier: ^2.8.6
         version: 2.8.6
@@ -607,10 +610,6 @@ packages:
     peerDependenciesMeta:
       mongodb:
         optional: true
-
-  '@rodrigo-barraza/utilities-library@https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/4bfe89362ca921c7fd552e1c4fbaede194b12c93':
-    resolution: {gitHosted: true, tarball: https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/4bfe89362ca921c7fd552e1c4fbaede194b12c93}
-    version: 0.2.0
 
   '@rolldown/binding-android-arm64@1.0.3':
     resolution: {integrity: sha512-454rs7jHngixp/NMxd5srYD57OnzSlZ/eFTETjORQHLwJG1lRtmNOJcBerZlfu4GjKqeq8aCCIQrMdHyhI51Hw==}
@@ -2503,31 +2502,10 @@ snapshots:
 
   '@rodrigo-barraza/service-library@https://codeload.github.com/rodrigo-barraza/service-library/tar.gz/aa80777cb14ae5393278261ba025112866e1a72e(express@5.2.1)(mongodb@7.3.0)':
     dependencies:
-      '@rodrigo-barraza/utilities-library': https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/4bfe89362ca921c7fd552e1c4fbaede194b12c93
+      '@rodrigo-barraza/utilities-library': link:../utilities-library
       express: 5.2.1
     optionalDependencies:
       mongodb: 7.3.0
-    transitivePeerDependencies:
-      - '@aws-sdk/credential-providers'
-      - '@mongodb-js/zstd'
-      - gcp-metadata
-      - kerberos
-      - mongodb-client-encryption
-      - snappy
-      - socks
-
-  '@rodrigo-barraza/utilities-library@https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/4bfe89362ca921c7fd552e1c4fbaede194b12c93':
-    dependencies:
-      mongodb: 7.3.0
-      zod: 4.4.3
-    transitivePeerDependencies:
-      - '@aws-sdk/credential-providers'
-      - '@mongodb-js/zstd'
-      - gcp-metadata
-      - kerberos
-      - mongodb-client-encryption
-      - snappy
-      - socks
 
   '@rolldown/binding-android-arm64@1.0.3':
     optional: true
