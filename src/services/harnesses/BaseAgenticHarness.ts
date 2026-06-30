@@ -121,14 +121,9 @@ export default class BaseAgenticHarness {
       "") as string;
     this.repetitionDetector = new RepetitionDetector();
 
-    // Initialize budget tracker when a context window is known
-    const contextWindow =
-      context.modelDefinition?.maxInputTokens ||
-      (context.options?._loadedContextLength as number | undefined) ||
-      null;
-    this.budgetTracker = contextWindow
-      ? new ContextBudgetTracker(context.emit, contextWindow)
-      : null;
+    // Budget tracker is lazily initialized when the context window
+    // first becomes available — see ensureBudgetTracker().
+    this.budgetTracker = null;
   }
 
   /** Execute the agentic loop. Subclasses MUST override. */
@@ -493,18 +488,10 @@ export default class BaseAgenticHarness {
     messages: ConversationMessage[],
     requestedMaxTokens: number | undefined,
   ): number | undefined {
-    const { modelDefinition } = this.context;
-    const contextWindow =
-      modelDefinition?.maxInputTokens ||
-      (this.context.options?._loadedContextLength as number | undefined) ||
-      null;
-
+    const contextWindow = this.resolveContextWindow();
     if (!contextWindow) return requestedMaxTokens;
 
-    // Ensure the tracker has the latest context window (may be updated at runtime)
-    if (this.budgetTracker) {
-      this.budgetTracker.updateContextWindow(contextWindow);
-    }
+    const tracker = this.ensureBudgetTracker();
 
     // 1. Conversation messages (raw heuristic, before calibration)
     const estimatedMessageTokens = this.estimateInputTokens(messages);
@@ -518,16 +505,16 @@ export default class BaseAgenticHarness {
     const toolSchemas = this.tools.finalTools;
 
     // Delegate budget computation and SSE emission to the tracker
-    if (this.budgetTracker) {
+    if (tracker) {
       const { clampedMaxTokens, adjustedInput, availableForOutput } =
-        this.budgetTracker.computeAndEmitEstimate(
+        tracker.computeAndEmitEstimate(
           estimatedMessageTokens,
           systemPromptText,
           toolSchemas,
           requestedMaxTokens,
         );
 
-      const calibrationRatio = this.budgetTracker.getCalibrationRatio();
+      const calibrationRatio = tracker.getCalibrationRatio();
 
       // ── Always log the budget breakdown for diagnostics ──
       logger.info(
@@ -552,59 +539,10 @@ export default class BaseAgenticHarness {
       return clampedMaxTokens;
     }
 
-    // Fallback: no tracker (no context window known at construction)
-    const estimatedSystemPromptTokens = estimateTokens(systemPromptText);
-    const estimatedToolSchemaTokens =
-      toolSchemas.length > 0
-        ? estimateTokens(JSON.stringify(toolSchemas))
-        : 0;
-
-    const totalEstimatedInput =
-      estimatedMessageTokens +
-      estimatedSystemPromptTokens +
-      estimatedToolSchemaTokens;
-
-    const safetyMargin = Math.ceil(
-      totalEstimatedInput * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
-    );
-    const adjustedInput = totalEstimatedInput + safetyMargin;
-    const availableForOutput = contextWindow - adjustedInput;
-
-    logger.info(
-      `[OutputTokenClamp] Budget (no tracker): contextWindow=${contextWindow}, ` +
-        `adjusted=${adjustedInput}, available=${availableForOutput}, ` +
-        `requested=${requestedMaxTokens}`,
-    );
-
-    this.context.emit({
-      type: SERVER_SENT_EVENT_TYPES.CONTEXT_BUDGET,
-      contextWindow,
-      messageTokens: estimatedMessageTokens,
-      systemPromptTokens: estimatedSystemPromptTokens,
-      toolSchemaTokens: estimatedToolSchemaTokens,
-      safetyMarginTokens: safetyMargin,
-      totalInputTokens: adjustedInput,
-      availableOutputTokens: Math.max(availableForOutput, 0),
-      requestedOutputTokens: requestedMaxTokens,
-      isClamped: requestedMaxTokens ? requestedMaxTokens > availableForOutput : false,
-      toolCount: toolSchemas.length,
-      source: "estimated",
-    });
-
-    if (!requestedMaxTokens) return requestedMaxTokens;
-    if (requestedMaxTokens <= availableForOutput) return requestedMaxTokens;
-
-    const clampedMaxTokens = Math.max(
-      availableForOutput,
-      MINIMUM_CLAMPED_OUTPUT_TOKENS,
-    );
-
-    logger.warn(
-      `[OutputTokenClamp] CLAMPING maxTokens ${requestedMaxTokens} → ${clampedMaxTokens}. ` +
-        `Without clamp: ${adjustedInput + requestedMaxTokens} > ${contextWindow}.`,
-    );
-
-    return clampedMaxTokens;
+    // Unreachable: ensureBudgetTracker always returns a tracker when
+    // contextWindow is non-null (checked at method entry). This return
+    // satisfies TypeScript's control flow analysis.
+    return requestedMaxTokens;
   }
 
   /**
@@ -729,6 +667,47 @@ export default class BaseAgenticHarness {
     );
   }
 
+  // ── Context budget tracking ───────────────────────────────
+
+  /**
+   * Resolve the model's context window from all available sources.
+   * Returns null when no source has the value yet (self-hosted cold start).
+   */
+  private resolveContextWindow(): number | null {
+    return (
+      this.context.modelDefinition?.maxInputTokens ||
+      (this.context.options?._loadedContextLength as number | undefined) ||
+      null
+    );
+  }
+
+  /**
+   * Lazily create or update the ContextBudgetTracker.
+   *
+   * The context window isn't always available at construction time:
+   *   - Cloud providers (Gemini, OpenAI): known statically from modelDefinition
+   *   - Self-hosted cached (vLLM 2nd+ req): cached in ContextLengthDiscovery
+   *   - Self-hosted cold (vLLM 1st req): discovered mid-stream by provider
+   *
+   * This method is called from both clampOutputTokens (pre-stream) and
+   * the usage handler (post-stream), so the tracker is created at
+   * whichever point the context window first becomes available.
+   */
+  private ensureBudgetTracker(): ContextBudgetTracker | null {
+    const contextWindow = this.resolveContextWindow();
+    if (!contextWindow) return null;
+
+    if (!this.budgetTracker) {
+      this.budgetTracker = new ContextBudgetTracker(
+        this.context.emit,
+        contextWindow,
+      );
+    } else {
+      this.budgetTracker.updateContextWindow(contextWindow);
+    }
+    return this.budgetTracker;
+  }
+
   // ── Stream chunk processing ───────────────────────────────
 
   /**
@@ -775,8 +754,12 @@ export default class BaseAgenticHarness {
 
       // Record real token counts on the budget tracker for calibration
       // and to re-emit a corrected context budget snapshot.
-      if (this.budgetTracker) {
-        this.budgetTracker.recordRealUsage(
+      // For self-hosted cold starts, the context window only becomes known
+      // mid-stream — ensureBudgetTracker will create the tracker now
+      // using the freshly-discovered context length.
+      const tracker = this.ensureBudgetTracker();
+      if (tracker) {
+        tracker.recordRealUsage(
           usageChunk,
           this.lastEstimatedMessageTokens,
         );
