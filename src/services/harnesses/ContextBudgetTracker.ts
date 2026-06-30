@@ -249,4 +249,63 @@ export default class ContextBudgetTracker {
       ...snapshot,
     });
   }
+
+  /**
+   * Compute a heuristic budget snapshot from raw message data.
+   *
+   * Used by REST endpoints (e.g. GET /conversations/:id) to return
+   * a budget estimate when the document doesn't have a persisted one.
+   * No SSE emission — returns a pure data snapshot.
+   */
+  static estimateFromMessages(
+    messages: Array<Record<string, unknown>>,
+    contextWindow: number,
+    systemPromptText = "",
+  ): ContextBudgetSnapshot {
+    let messageTokens = 0;
+    for (const message of messages) {
+      messageTokens += 4; // per-message overhead
+      const content =
+        typeof message.content === "string"
+          ? message.content
+          : Array.isArray(message.content)
+            ? (message.content as Array<{ text?: string }>)
+                .map((part) => part.text || "")
+                .join("")
+            : "";
+      messageTokens += estimateTokens(content);
+      if (typeof message.thinking === "string") {
+        messageTokens += estimateTokens(message.thinking);
+      }
+      if (message.toolCalls || message.tool_calls) {
+        messageTokens += estimateTokens(
+          JSON.stringify(message.toolCalls || message.tool_calls),
+        );
+      }
+      if (Array.isArray(message.images)) {
+        messageTokens += (message.images as unknown[]).length * 1000;
+      }
+    }
+
+    const systemPromptTokens = estimateTokens(systemPromptText);
+    const totalEstimatedInput = messageTokens + systemPromptTokens;
+    const safetyMargin = Math.ceil(
+      totalEstimatedInput * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
+    );
+    const adjustedInput = totalEstimatedInput + safetyMargin;
+    const availableForOutput = contextWindow - adjustedInput;
+
+    return {
+      contextWindow,
+      messageTokens,
+      systemPromptTokens,
+      toolSchemaTokens: 0,
+      safetyMarginTokens: safetyMargin,
+      totalInputTokens: adjustedInput,
+      availableOutputTokens: Math.max(availableForOutput, 0),
+      isClamped: false,
+      toolCount: 0,
+      source: "estimated",
+    };
+  }
 }
