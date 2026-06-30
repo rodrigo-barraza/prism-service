@@ -2607,29 +2607,40 @@ export default class OrchestratorService {
       message._alreadyPersisted = true;
     }
 
-    // Resolve emit from WebSocketConnectionRegistry (Antigravity reactive
-    // wake-up pattern). Falls back to debug logging for headless/API mode.
-    const { default: WebSocketConnectionRegistry } =
-      await import("../websocket/WebSocketConnectionRegistry.ts");
-    const registeredEmit = WebSocketConnectionRegistry.getEmitFunction(conversationId);
+    // Resolve emit function for the auto-response. Priority:
+    // 1. orchestratorContext.emit — the parent's live SSE stream (kept alive
+    //    by awaitPendingDispatches). This is the primary path for HTTP SSE clients.
+    // 2. WebSocketConnectionRegistry — for clients connected via WebSocket.
+    // 3. Debug logger — headless/API mode fallback.
+    const parentEmit = orchestratorContext.emit || null;
 
-    const autoResponseEmit = registeredEmit || ((event: {
-      type: string;
-      [key: string]: unknown;
-    }) => {
-      logger.debug(
-        `[Orchestrator][AutoResponse][${conversationId}][Event] type=${event.type}`,
-      );
-    });
+    let autoResponseEmit: (event: { type: string; [key: string]: unknown }) => void;
 
-    if (registeredEmit) {
+    if (parentEmit) {
+      autoResponseEmit = parentEmit;
       logger.info(
-        `[Orchestrator] Auto-response will stream to live WebSocket for conversation ${conversationId}`,
+        `[Orchestrator] Auto-response will stream through parent SSE connection for conversation ${conversationId}`,
       );
     } else {
-      logger.info(
-        `[Orchestrator] No live WebSocket for conversation ${conversationId} — auto-response will run headlessly`,
-      );
+      const { default: WebSocketConnectionRegistry } =
+        await import("../websocket/WebSocketConnectionRegistry.ts");
+      const registeredEmit = WebSocketConnectionRegistry.getEmitFunction(conversationId);
+
+      if (registeredEmit) {
+        autoResponseEmit = registeredEmit;
+        logger.info(
+          `[Orchestrator] Auto-response will stream to live WebSocket for conversation ${conversationId}`,
+        );
+      } else {
+        autoResponseEmit = (event: { type: string; [key: string]: unknown }) => {
+          logger.debug(
+            `[Orchestrator][AutoResponse][${conversationId}][Event] type=${event.type}`,
+          );
+        };
+        logger.info(
+          `[Orchestrator] No live connection for conversation ${conversationId} — auto-response will run headlessly`,
+        );
+      }
     }
 
     // Route through the full handleAgent pipeline — same path as a real
