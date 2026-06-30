@@ -44,6 +44,12 @@ export function markGenerating(
  * IMPORTANT: isGenerating is always cleared, even when appendMessages
  * fails — preventing sessions from being permanently stuck as
  * "generating" when the $push operation encounters errors.
+ *
+ * When `skipGeneratingClear` is true, messages are persisted but the
+ * isGenerating flag is NOT cleared. Used by the non-blocking sub-agent
+ * dispatch path: the initial finalize persists the orchestrator's
+ * messages while keeping the conversation marked as active until the
+ * auto-response completes and clears the flag itself.
  */
 export async function appendAndFinalize(
   conversationId: string | null | undefined,
@@ -51,7 +57,7 @@ export async function appendAndFinalize(
   username: string,
   messagesToAppend: Array<ChatMessage | MessagePayload>,
   meta: Record<string, unknown> | null | undefined,
-  opts: { collection?: string } = {},
+  opts: { collection?: string; skipGeneratingClear?: boolean } = {},
 ): Promise<void> {
   if (!conversationId) return;
 
@@ -64,13 +70,15 @@ export async function appendAndFinalize(
       meta,
       opts,
     );
-    await ConversationService.setGenerating(
-      conversationId,
-      project,
-      username,
-      false,
-      opts,
-    );
+    if (!opts.skipGeneratingClear) {
+      await ConversationService.setGenerating(
+        conversationId,
+        project,
+        username,
+        false,
+        opts,
+      );
+    }
   } catch (error: unknown) {
     logger.error(
       `Failed to append ${messagesToAppend?.length ?? 0} messages to ${conversationId} ` +
@@ -79,18 +87,21 @@ export async function appendAndFinalize(
 
     // Always clear isGenerating even on failure — prevents sessions
     // from being permanently stuck as "generating" on the next page load.
-    try {
-      await ConversationService.setGenerating(
-        conversationId,
-        project,
-        username,
-        false,
-        opts,
-      );
-    } catch (clearError: unknown) {
-      logger.error(
-        `Failed to clear isGenerating after append failure: ${getErrorMessage(clearError)}`,
-      );
+    // Exception: when skipGeneratingClear is true, the caller owns the flag lifecycle.
+    if (!opts.skipGeneratingClear) {
+      try {
+        await ConversationService.setGenerating(
+          conversationId,
+          project,
+          username,
+          false,
+          opts,
+        );
+      } catch (clearError: unknown) {
+        logger.error(
+          `Failed to clear isGenerating after append failure: ${getErrorMessage(clearError)}`,
+        );
+      }
     }
   }
 }
