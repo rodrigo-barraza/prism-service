@@ -313,11 +313,15 @@ describe("OrchestratorService Spawning & Agent Types", () => {
           description: "Sub-agent 1",
           prompt: "Do something",
         },
+        {
+          description: "Sub-agent 2",
+          prompt: "Do something else",
+        },
       ],
     };
 
     const results = await OrchestratorService.createTeam(teamArgs, orchestratorContext);
-    expect(results).toHaveLength(1);
+    expect(results).toHaveLength(2);
     expect(mockUpdateOne).toHaveBeenCalledWith(
       {
         id: "conv-id-789",
@@ -332,6 +336,26 @@ describe("OrchestratorService Spawning & Agent Types", () => {
     );
 
     getCollectionSpy.mockRestore();
+  });
+
+  it("should reject explicit topology for single-member teams", async () => {
+    const teamArgs = {
+      name: "single_member_with_topology",
+      topology: TOPOLOGIES.HIERARCHICAL,
+      members: [
+        {
+          description: "Solo agent",
+          prompt: "Do a task",
+        },
+      ],
+    };
+
+    const results = await OrchestratorService.createTeam(teamArgs, orchestratorContext);
+    expect(results).toHaveLength(1);
+    expect(results[0]).toHaveProperty("error");
+    expect((results[0] as { error: string }).error).toContain(
+      "not needed for a single sub-agent"
+    );
   });
 
   it("should not include workspace constraint when there are no workspaces currently set up", async () => {
