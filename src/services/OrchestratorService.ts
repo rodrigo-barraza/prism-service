@@ -1860,9 +1860,13 @@ export default class OrchestratorService {
     const completionMessage = {
       role: "user" as const,
       content: [
-        `[${options.summary}]`,
-        ``,
+        `<task-notification>`,
+        `<status>completed</status>`,
+        `<summary>${options.summary}</summary>`,
+        `<result>`,
         options.resultBody,
+        `</result>`,
+        `</task-notification>`,
       ].join("\n"),
       timestamp: notificationTimestamp,
       _alreadyPersisted: true,
