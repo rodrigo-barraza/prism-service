@@ -613,6 +613,14 @@ export const SOMATIC = {
 export const TOOLS = {
   /** Maximum domain keywords included in discovery previews. */
   MAX_KEYWORDS_PREVIEW: 25,
+
+  /**
+   * Maximum number of tools that can be activated in a single
+   * enable_tools or discover_and_enable_tools call. Prevents
+   * small-context models from blowing their token budget by
+   * blindly enabling every search result.
+   */
+  MAX_DYNAMIC_TOOLS_PER_ACTIVATION: 10,
 } as const;
 
 // ─── Benchmark Constants ────────────────────────────────────
