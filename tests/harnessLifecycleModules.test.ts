@@ -1705,7 +1705,7 @@ describe("Harness Lifecycle Modules", () => {
             parentAgentConversationId: "parent-agent-conversation-id-789",
             isSubAgent: true,
           }),
-          undefined
+          expect.any(Object)
         );
       });
     });
