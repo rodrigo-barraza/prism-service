@@ -1295,55 +1295,9 @@ export default class BaseAgenticHarness {
       finalizeOptions,
     );
 
-    // Persist sub-agent snapshots for orchestrator conversations
-    if (
-      state.streamedToolCalls.some(
-        (toolCall) => toolCall.name === TOOL_NAMES.CREATE_SUBAGENTS,
-      ) &&
-      conversationId
-    ) {
-      try {
-        const { default: OrchestratorService } =
-          await import("../OrchestratorService.js");
-        const activeSubAgentsList =
-          OrchestratorService.listAllDescendantSubAgents(conversationId);
-        if (activeSubAgentsList.length > 0) {
-          const collection = MongoWrapper.getCollection(
-            MONGO_DB_NAME,
-            COLLECTIONS.AGENT_CONVERSATIONS,
-          );
-          const agentSessionDocument = await collection.findOne(
-            { id: conversationId, project, username },
-            { projection: { subAgents: 1 } },
-          );
-          const existingSubAgentsList = agentSessionDocument?.subAgents || [];
-          const mergedSubAgentsMap = new Map<string, SubAgentSnapshot>();
-          for (const subAgent of existingSubAgentsList) {
-            mergedSubAgentsMap.set(subAgent.agentId, subAgent);
-          }
-          for (const subAgent of activeSubAgentsList) {
-            mergedSubAgentsMap.set(subAgent.agentId, subAgent);
-          }
-          const finalSubAgentsList = Array.from(mergedSubAgentsMap.values());
-          await collection.updateOne(
-            { id: conversationId, project, username },
-            {
-              $set: {
-                subAgents: finalSubAgentsList,
-                subAgentsUpdatedAt: new Date().toISOString(),
-              },
-            },
-          );
-          logger.info(
-            `[AgenticLoop] Persisted ${finalSubAgentsList.length} sub-agent(s) to conversation ${conversationId}`,
-          );
-        }
-      } catch (error: unknown) {
-        logger.error(
-          `[AgenticLoop] Failed to persist sub-agents: ${errorMessage(error)}`,
-        );
-      }
-    }
+    // Sub-agent snapshots are now persisted to the dedicated sub_agents
+    // collection by OrchestratorService on spawn and completion — no need
+    // to write the embedded subAgents[] array here anymore.
 
     // afterResponse hook (fire-and-forget)
     hooks

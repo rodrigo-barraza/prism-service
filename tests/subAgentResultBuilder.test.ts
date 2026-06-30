@@ -527,7 +527,7 @@ describe("buildSubAgentResult — channel token stripping", () => {
       totalCost: null,
       usage: null,
       abortController: null,
-      messages: [],
+      messages: [] as ConversationMessage[],
       files: [],
       iterations: 1,
       project: "test-project",
@@ -597,5 +597,114 @@ describe("buildSubAgentResult — channel token stripping", () => {
     const result = buildSubAgentResult(subAgentState);
 
     expect(result.result).toBeNull();
+  });
+
+  it("should sanitize channel tokens from embedded messages content", () => {
+    const subAgentState = createSubAgentState("Clean output");
+    subAgentState.messages = [
+      { role: "user", content: "Do something" },
+      {
+        role: "assistant",
+        content:
+          "<|channel>thought Let me think about this carefully.<channel|>" +
+          "I have completed the recursive task.",
+      },
+      {
+        role: "assistant",
+        content: "Here is the final summary.",
+      },
+    ];
+
+    const result = buildSubAgentResult(subAgentState);
+
+    for (const message of result.messages || []) {
+      expect(message.content).not.toContain("<|channel>");
+      expect(message.content).not.toContain("<channel|>");
+      expect(message.content).not.toContain("thought Let me think");
+    }
+
+    const assistantMessages = (result.messages || []).filter(
+      (message) => message.role === "assistant",
+    );
+    expect(assistantMessages[0].content).toBe(
+      "I have completed the recursive task.",
+    );
+    expect(assistantMessages[1].content).toBe("Here is the final summary.");
+  });
+
+  it("should sanitize orphan channel delimiters from embedded messages", () => {
+    const subAgentState = createSubAgentState("Clean output");
+    subAgentState.messages = [
+      { role: "user", content: "hello" },
+      {
+        role: "assistant",
+        content: "<|channel>thought Some leaked reasoning<channel|>\n\nActual response text",
+      },
+    ];
+
+    const result = buildSubAgentResult(subAgentState);
+
+    const assistantMessage = (result.messages || []).find(
+      (message) => message.role === "assistant",
+    );
+    expect(assistantMessage).toBeDefined();
+    expect(assistantMessage!.content).not.toContain("<|channel>");
+    expect(assistantMessage!.content).not.toContain("<channel|>");
+    expect(assistantMessage!.content).toContain("Actual response text");
+  });
+
+  it("should leave clean messages unmodified", () => {
+    const subAgentState = createSubAgentState("Clean output");
+    subAgentState.messages = [
+      { role: "user", content: "Do something" },
+      { role: "assistant", content: "Here is the result with no leaked tokens." },
+    ];
+
+    const result = buildSubAgentResult(subAgentState);
+
+    const assistantMessage = (result.messages || []).find(
+      (message) => message.role === "assistant",
+    );
+    expect(assistantMessage!.content).toBe(
+      "Here is the result with no leaked tokens.",
+    );
+  });
+
+  it("should strip tool_call XML markup from embedded messages", () => {
+    const subAgentState = createSubAgentState("Clean output");
+    subAgentState.messages = [
+      { role: "user", content: "hello" },
+      {
+        role: "assistant",
+        content:
+          "Response text <|tool_call|>{\"name\": \"search\"}</tool_call> more text",
+      },
+    ];
+
+    const result = buildSubAgentResult(subAgentState);
+
+    const assistantMessage = (result.messages || []).find(
+      (message) => message.role === "assistant",
+    );
+    expect(assistantMessage!.content).not.toContain("tool_call");
+    expect(assistantMessage!.content).toContain("Response text");
+    expect(assistantMessage!.content).toContain("more text");
+  });
+
+  it("should filter out system messages from embedded messages", () => {
+    const subAgentState = createSubAgentState("Clean output");
+    subAgentState.messages = [
+      { role: "system", content: "You are a helpful assistant." },
+      { role: "user", content: "hello" },
+      { role: "assistant", content: "Hi there!" },
+    ];
+
+    const result = buildSubAgentResult(subAgentState);
+
+    const systemMessages = (result.messages || []).filter(
+      (message) => message.role === "system",
+    );
+    expect(systemMessages).toHaveLength(0);
+    expect(result.messages).toHaveLength(2);
   });
 });

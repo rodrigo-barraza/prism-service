@@ -433,14 +433,15 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       awaitCompletion: true,
       });
 
-      expect(mockUpdateOne).toHaveBeenCalledWith(
-        {
-          id: orchestratorContext.conversationId,
-          project: orchestratorContext.project,
-          username: orchestratorContext.username,
-        },
-        { $set: { hasSubAgents: true } },
+      // The parent conversation update now includes both hasSubAgents flag
+      // and adds the child conversationId to the subAgentIds array.
+      const parentUpdateCall = mockUpdateOne.mock.calls.find(
+        (call: unknown[]) =>
+          (call[0] as Record<string, unknown>).id === orchestratorContext.conversationId &&
+          (call[1] as Record<string, Record<string, unknown>>).$set?.hasSubAgents === true &&
+          (call[1] as Record<string, Record<string, unknown>>).$addToSet?.subAgentIds != null,
       );
+      expect(parentUpdateCall).toBeDefined();
 
       getCollectionSpy.mockRestore();
     });

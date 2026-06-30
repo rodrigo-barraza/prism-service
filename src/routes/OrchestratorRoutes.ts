@@ -20,6 +20,7 @@ interface SubAgentSummary {
   toolCallCount?: number;
   recursionDepth?: number;
   toolNames?: Record<string, number>;
+  subAgentConversationId?: string;
 }
 
 const router = Router();
@@ -30,8 +31,11 @@ const router = Router();
 
 /*
  * GET /orchestrator/sub-agents
- * List all active sub-agents spawned via chat tools.
+ * List all sub-agents spawned via chat tools.
  * Optional query: ?conversationId=xxx to filter by parent conversation.
+ *
+ * Sub-agents are agent_conversations that reference themselves via subAgentIds[].
+ * BFS traverses the tree to discover all descendants.
  */
 router.get(
   "/sub-agents",
@@ -50,97 +54,102 @@ router.get(
           await import("../wrappers/MongoWrapper.js");
         const { MONGO_DB_NAME } = await import("../../config.js");
         const { COLLECTIONS } = await import("../constants.js");
-        const collection = MongoWrapper.getCollection(
+
+        const conversationCollection = MongoWrapper.getCollection(
           MONGO_DB_NAME,
           COLLECTIONS.AGENT_CONVERSATIONS,
         );
 
-        const rootConversationDocument = await collection.findOne(
+        // Fetch the root conversation's subAgentIds
+        const rootDocument = await conversationCollection.findOne(
           { id: conversationIdentifier },
-          { projection: { subAgents: 1, agentConversationId: 1 } },
+          { projection: { subAgentIds: 1, subAgents: 1 } },
         );
-        if (rootConversationDocument && rootConversationDocument.subAgents) {
-          if (rootConversationDocument.subAgents.length > 0) {
-            persistedSubAgentsList = rootConversationDocument.subAgents;
-          }
-        }
 
-        // Recursively discover all descendant sub-agents by traversing the
-        // parentAgentConversationId / parentConversationId chain in AGENT_CONVERSATIONS.
-        // Each sub-agent conversation may itself have a subAgents array if it
-        // spawned its own workers (recursive sub-agent delegation).
-        //
-        // The root conversation's document `id` differs from the in-memory
-        // `agentConversationId` used by the agentic loop. Child conversations
-        // store `parentConversationId` → parent's `id`, and
-        // `parentAgentConversationId` → parent's `agentConversationId`.
-        // Seed the frontier with both IDs and query with $or at every hop.
-        const MAX_DESCENDANT_DEPTH = ORCHESTRATOR.AGENT_TREE_DISCOVERY_MAX_DEPTH;
-        let frontier: string[] = [conversationIdentifier];
-        const visitedConversationIds = new Set<string>([
-          conversationIdentifier,
-        ]);
+        if (rootDocument && Array.isArray(rootDocument.subAgentIds) && rootDocument.subAgentIds.length > 0) {
+          // BFS: discover all descendant sub-agents through the self-referential model.
+          // Each agent_conversation with isSubAgent=true stores its own subAgent* fields.
+          const visitedConversationIds = new Set<string>([conversationIdentifier]);
+          let frontier: string[] = [...rootDocument.subAgentIds];
+          const MAX_DESCENDANT_DEPTH = ORCHESTRATOR.AGENT_TREE_DISCOVERY_MAX_DEPTH;
 
-        // Include the root's agentConversationId (if different from id)
-        const rootAgentConversationId =
-          rootConversationDocument?.agentConversationId as string | undefined;
-        if (
-          rootAgentConversationId &&
-          rootAgentConversationId !== conversationIdentifier
-        ) {
-          frontier.push(rootAgentConversationId);
-          visitedConversationIds.add(rootAgentConversationId);
-        }
+          for (
+            let depth = 0;
+            depth < MAX_DESCENDANT_DEPTH && frontier.length > 0;
+            depth++
+          ) {
+            const unvisitedIds = frontier.filter((conversationId) => !visitedConversationIds.has(conversationId));
+            if (unvisitedIds.length === 0) break;
 
-        for (
-          let depth = 0;
-          depth < MAX_DESCENDANT_DEPTH && frontier.length > 0;
-          depth++
-        ) {
-          const childConversationDocuments = await collection
-            .find(
-              {
-                $or: [
-                  { parentAgentConversationId: { $in: frontier } },
-                  { parentConversationId: { $in: frontier } },
-                ],
-              },
-              { projection: { id: 1, agentConversationId: 1, subAgents: 1 } },
-            )
-            .toArray();
-
-          if (childConversationDocuments.length === 0) break;
-
-          const nextFrontier: string[] = [];
-          for (const childDocument of childConversationDocuments) {
-            const childConversationId = childDocument.id as string;
-            if (visitedConversationIds.has(childConversationId)) continue;
-            visitedConversationIds.add(childConversationId);
-            nextFrontier.push(childConversationId);
-
-            // Also track the agentConversationId (if stored and different from id)
-            // so that grandchildren linked via parentAgentConversationId are found.
-            const childAgentConversationId =
-              childDocument.agentConversationId as string | undefined;
-            if (
-              childAgentConversationId &&
-              childAgentConversationId !== childConversationId &&
-              !visitedConversationIds.has(childAgentConversationId)
-            ) {
-              visitedConversationIds.add(childAgentConversationId);
-              nextFrontier.push(childAgentConversationId);
+            for (const conversationId of unvisitedIds) {
+              visitedConversationIds.add(conversationId);
             }
 
-            if (
-              Array.isArray(childDocument.subAgents) &&
-              childDocument.subAgents.length > 0
-            ) {
-              for (const descendantSubAgent of childDocument.subAgents) {
-                persistedSubAgentsList.push(descendantSubAgent);
+            const subAgentDocuments = await conversationCollection
+              .find(
+                { id: { $in: unvisitedIds }, isSubAgent: true },
+                {
+                  projection: {
+                    id: 1,
+                    subAgentId: 1,
+                    subAgentDescription: 1,
+                    subAgentStatus: 1,
+                    subAgentProviderName: 1,
+                    subAgentResolvedModel: 1,
+                    subAgentDurationMs: 1,
+                    subAgentToolUses: 1,
+                    subAgentHasChanges: 1,
+                    subAgentTotalCost: 1,
+                    subAgentBranchName: 1,
+                    subAgentFiles: 1,
+                    subAgentRecursionDepth: 1,
+                    subAgentToolNames: 1,
+                    subAgentIds: 1,
+                  },
+                },
+              )
+              .toArray();
+
+            if (subAgentDocuments.length === 0) break;
+
+            const nextFrontier: string[] = [];
+            for (const subAgentDocument of subAgentDocuments) {
+              persistedSubAgentsList.push({
+                agentId: (subAgentDocument.subAgentId as string) || (subAgentDocument.id as string),
+                description: (subAgentDocument.subAgentDescription as string) || "",
+                status: (subAgentDocument.subAgentStatus as string) || "unknown",
+                providerName: subAgentDocument.subAgentProviderName as string | undefined,
+                resolvedModel: subAgentDocument.subAgentResolvedModel as string | undefined,
+                durationMs: (subAgentDocument.subAgentDurationMs as number) || 0,
+                toolUses: (subAgentDocument.subAgentToolUses as number) || 0,
+                hasChanges: (subAgentDocument.subAgentHasChanges as boolean) || false,
+                totalCost: subAgentDocument.subAgentTotalCost as number | null | undefined,
+                branchName: subAgentDocument.subAgentBranchName as string | null | undefined,
+                files: subAgentDocument.subAgentFiles as string[] | undefined,
+                toolCallCount: (subAgentDocument.subAgentToolUses as number) || 0,
+                recursionDepth: subAgentDocument.subAgentRecursionDepth as number | undefined,
+                toolNames: subAgentDocument.subAgentToolNames as Record<string, number> | undefined,
+                subAgentConversationId: subAgentDocument.id as string,
+              });
+
+              // If this sub-agent itself has children, add them to the next frontier
+              const childSubAgentIds = subAgentDocument.subAgentIds as string[] | undefined;
+              if (Array.isArray(childSubAgentIds) && childSubAgentIds.length > 0) {
+                nextFrontier.push(...childSubAgentIds);
               }
             }
+            frontier = nextFrontier;
           }
-          frontier = nextFrontier;
+        }
+
+        // Backward compat: fall back to legacy embedded subAgents[] array
+        if (
+          persistedSubAgentsList.length === 0 &&
+          rootDocument &&
+          Array.isArray(rootDocument.subAgents) &&
+          rootDocument.subAgents.length > 0
+        ) {
+          persistedSubAgentsList = rootDocument.subAgents;
         }
       } catch (error: unknown) {
         logger.warn(

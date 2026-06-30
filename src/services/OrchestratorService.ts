@@ -503,8 +503,9 @@ export default class OrchestratorService {
       `[Orchestrator] Spawned sub-agent ${agentId}: "${description}" → ${subAgentProvider} (model="${subAgentModel}") in ${worktreePath}${subAgentState.isolated ? " (isolated worktree)" : " (shared workspace)"}`,
     );
 
-    // Mark the parent conversation as having sub-agents (persistent flag for the UI).
-    // Documents are keyed by conversationId — never use agentConversationId for document lookups.
+    // Mark the parent conversation as having sub-agents and register the child's
+    // conversationId in the parent's subAgentIds array. Sub-agents ARE agent_conversations
+    // — the same document type references itself via subAgentIds[].
     if (parentConversationId) {
       try {
         const { MONGO_DB_NAME: databaseName } = await import("../../config.ts");
@@ -512,25 +513,62 @@ export default class OrchestratorService {
           await import("../constants.ts");
         const MongoWrapper = (await import("../wrappers/MongoWrapper.ts"))
           .default;
-        const parentCollection = MongoWrapper.getCollection(
+        const conversationCollection = MongoWrapper.getCollection(
           databaseName,
           collectionNames.AGENT_CONVERSATIONS,
         );
 
-        if (parentCollection) {
-          const hasSubAgentsResult = await parentCollection.updateOne(
+        if (conversationCollection) {
+          // Push the child's conversationId into the parent's subAgentIds array
+          const parentUpdateResult = await conversationCollection.updateOne(
             { id: parentConversationId, project, username },
-            { $set: { hasSubAgents: true } },
+            {
+              $set: { hasSubAgents: true },
+              $addToSet: { subAgentIds: subAgentConversationId },
+            },
           );
-          if (hasSubAgentsResult.matchedCount === 0) {
+          if (parentUpdateResult.matchedCount === 0) {
             logger.warn(
-              `[Orchestrator] hasSubAgents write matched 0 documents for conversation ${parentConversationId} (project=${project}, username=${username})`,
+              `[Orchestrator] subAgentIds push matched 0 documents for parent ${parentConversationId} (project=${project}, username=${username})`,
             );
           }
+
+          // Set sub-agent metadata on the child conversation document.
+          // The child document may not exist yet (created by the Finalizer after
+          // the agentic loop starts), so we use upsert to ensure the fields
+          // are ready when the Finalizer merges them.
+          await conversationCollection.updateOne(
+            { id: subAgentConversationId },
+            {
+              $set: {
+                isSubAgent: true,
+                subAgentId: agentId,
+                subAgentDescription: description,
+                subAgentStatus: "running",
+                subAgentProviderName: subAgentProvider,
+                subAgentResolvedModel: subAgentModel,
+                subAgentRecursionDepth: currentRecursionDepth + 1,
+                subAgentBranchName: worktreeResult.error ? null : branchName,
+                subAgentFiles: files || [],
+                parentConversationId,
+                parentAgentConversationId: orchestratorContext.agentConversationId || null,
+                project,
+                username,
+              },
+              $setOnInsert: {
+                createdAt: new Date().toISOString(),
+              },
+            },
+            { upsert: true },
+          );
+
+          logger.info(
+            `[Orchestrator] Registered sub-agent ${agentId} (${subAgentConversationId}) on parent ${parentConversationId}`,
+          );
         }
       } catch (databaseError: unknown) {
         logger.warn(
-          `[Orchestrator] Failed to set hasSubAgents on parent conversation ${parentConversationId}: ${getErrorMessage(databaseError)}`,
+          `[Orchestrator] Failed to persist sub-agent spawn for ${parentConversationId}: ${getErrorMessage(databaseError)}`,
         );
       }
     }
@@ -592,6 +630,13 @@ export default class OrchestratorService {
             ),
           );
         }
+
+        // Update sub-agent metadata on the child conversation document
+        OrchestratorService._updateSubAgentDocument(subAgentState.subAgentConversationId, {
+          subAgentStatus: "failed",
+          subAgentDurationMs: subAgentState.durationMs,
+          subAgentCompletedAt: new Date().toISOString(),
+        }).catch(() => {});
 
         if (orchestratorContext.emit) {
           orchestratorContext.emit({
@@ -661,6 +706,13 @@ export default class OrchestratorService {
             ),
           );
         }
+
+        // Update sub-agent metadata on the child conversation document
+        OrchestratorService._updateSubAgentDocument(subAgentState.subAgentConversationId, {
+          subAgentStatus: "failed",
+          subAgentDurationMs: subAgentState.durationMs,
+          subAgentCompletedAt: new Date().toISOString(),
+        }).catch(() => {});
 
         if (orchestratorContext.emit) {
           orchestratorContext.emit({
@@ -1816,15 +1868,9 @@ export default class OrchestratorService {
     const completionMessage = {
       role: "user" as const,
       content: [
-        `<task-notification>`,
-        `<status>${options.status}</status>`,
-        `<summary>${options.summary}</summary>`,
-        `<tool_uses>${options.toolUses}</tool_uses>`,
-        `<duration_ms>${options.durationMs}</duration_ms>`,
-        `<result>`,
+        `[${options.summary}]`,
+        ``,
         options.resultBody,
-        `</result>`,
-        `</task-notification>`,
       ].join("\n"),
       timestamp: notificationTimestamp,
       _alreadyPersisted: true,
@@ -2372,6 +2418,30 @@ export default class OrchestratorService {
       `[Orchestrator] Sub-agent ${subAgent.agentId} completed in ${subAgent.durationMs}ms (${telemetry.toolCalls.length} tool calls)`,
     );
 
+    // Persist final sub-agent stats to the dedicated sub_agents collection
+    const toolNamesSummary = telemetry.toolCalls.length > 0
+      ? Object.entries(
+          telemetry.toolCalls.reduce<Record<string, number>>((accumulator, toolCall) => {
+            const toolName = typeof toolCall === "string" ? toolCall : (toolCall as { name?: string }).name || "unknown";
+            accumulator[toolName] = (accumulator[toolName] || 0) + 1;
+            return accumulator;
+          }, {}),
+        ).reduce<Record<string, number>>((result, [toolName, toolCallCount]) => {
+          result[toolName] = toolCallCount;
+          return result;
+        }, {})
+      : null;
+
+    OrchestratorService._updateSubAgentDocument(subAgent.subAgentConversationId, {
+      subAgentStatus: subAgent.status,
+      subAgentDurationMs: subAgent.durationMs,
+      subAgentToolUses: telemetry.toolCalls.length,
+      subAgentTotalCost: subAgent.totalCost,
+      subAgentHasChanges: subAgent.diff?.hasChanges || false,
+      subAgentToolNames: toolNamesSummary,
+      subAgentCompletedAt: new Date().toISOString(),
+    }).catch(() => {});
+
     // Release the active worktree registration if we don't want to preserve it
     if (!preserveWorktree && subAgent.isolated) {
       ToolOrchestratorService._clearWorktree(subAgent.subAgentConversationId);
@@ -2426,10 +2496,6 @@ export default class OrchestratorService {
           agentNumber,
           agentDescription: result.description || result.agent_id,
           agentStatus,
-        }),
-        PromptLocaleService.get(locale, "orchestrator.notifications.agentStats", {
-          duration: formatDuration(result.durationMs),
-          toolUses: String(result.toolUses),
           iterations: String(result.iterations),
         }),
         PromptLocaleService.get(locale, "orchestrator.notifications.agentOutput", {
@@ -2721,6 +2787,39 @@ export default class OrchestratorService {
         `[Orchestrator] Parent auto-response error for conversation ${conversationId}: ${getErrorMessage(autoResponseError)}`,
       );
       throw autoResponseError;
+    }
+  }
+
+  // ── Sub-Agent Document Update ───────────────────────────────
+  // Updates sub-agent metadata on the child's agent_conversations document.
+  // Fire-and-forget — callers should .catch() to suppress unhandled rejections.
+  static async _updateSubAgentDocument(
+    conversationId: string,
+    updateFields: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      const { MONGO_DB_NAME: databaseName } = await import("../../config.ts");
+      const MongoWrapper = (await import("../wrappers/MongoWrapper.ts")).default;
+      const conversationCollection = MongoWrapper.getCollection(
+        databaseName,
+        COLLECTIONS.AGENT_CONVERSATIONS,
+      );
+      if (!conversationCollection) return;
+
+      const updateResult = await conversationCollection.updateOne(
+        { id: conversationId },
+        { $set: updateFields },
+      );
+
+      if (updateResult.matchedCount === 0) {
+        logger.debug(
+          `[Orchestrator] Sub-agent conversation not found for update: ${conversationId}`,
+        );
+      }
+    } catch (error: unknown) {
+      logger.warn(
+        `[Orchestrator] Failed to update sub-agent conversation ${conversationId}: ${getErrorMessage(error)}`,
+      );
     }
   }
 }
