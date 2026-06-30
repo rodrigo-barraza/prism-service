@@ -63,7 +63,7 @@ router.get(
         // Fetch the root conversation's subAgentIds
         const rootDocument = await conversationCollection.findOne(
           { id: conversationIdentifier },
-          { projection: { subAgentIds: 1, subAgents: 1 } },
+          { projection: { subAgentIds: 1 } },
         );
 
         if (rootDocument && Array.isArray(rootDocument.subAgentIds) && rootDocument.subAgentIds.length > 0) {
@@ -142,15 +142,6 @@ router.get(
           }
         }
 
-        // Backward compat: fall back to legacy embedded subAgents[] array
-        if (
-          persistedSubAgentsList.length === 0 &&
-          rootDocument &&
-          Array.isArray(rootDocument.subAgents) &&
-          rootDocument.subAgents.length > 0
-        ) {
-          persistedSubAgentsList = rootDocument.subAgents;
-        }
       } catch (error: unknown) {
         logger.warn(
           `[orchestrator] Failed to load persisted sub-agents: ${getErrorMessage(error)}`,

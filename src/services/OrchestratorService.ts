@@ -16,7 +16,6 @@ import {
   MAXIMUM_RECURSIVE_SPAWNING_DEPTH,
   DEFAULT_RECURSIVE_SPAWNING_DEPTH,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { formatDuration } from "@rodrigo-barraza/utilities-library";
 import localModelQueue from "./LocalModelQueue.ts";
 import ToolOrchestratorService from "./ToolOrchestratorService.ts";
 import { ORCHESTRATOR_ONLY_TOOLS } from "./OrchestratorPrompt.ts";
@@ -1811,7 +1810,6 @@ export default class OrchestratorService {
   ): Promise<void> {
     const locale = PromptLocaleService.getDefaultLocale();
 
-    const agentStatusEmoji = agentResult.status === "completed" ? "✅" : "❌";
     const noOutputFallback = PromptLocaleService.get(locale, "orchestrator.notifications.noOutput");
     const agentOutput = agentResult.result
       ? typeof agentResult.result === "string"
@@ -1837,10 +1835,7 @@ export default class OrchestratorService {
 
     await OrchestratorService._sendParentCompletionNotification(
       {
-        status: `${agentStatusEmoji} ${agentResult.status}`,
         summary: resumedAgentCompletedSummary,
-        toolUses: agentResult.toolUses || 0,
-        durationMs: agentResult.durationMs || 0,
         resultBody: truncatedOutput,
       },
       orchestratorContext,
@@ -1853,10 +1848,7 @@ export default class OrchestratorService {
    */
   static async _sendParentCompletionNotification(
     options: {
-      status: string;
       summary: string;
-      toolUses: number;
-      durationMs: number;
       resultBody: string;
     },
     orchestratorContext: OrchestratorContext,
@@ -2418,7 +2410,7 @@ export default class OrchestratorService {
       `[Orchestrator] Sub-agent ${subAgent.agentId} completed in ${subAgent.durationMs}ms (${telemetry.toolCalls.length} tool calls)`,
     );
 
-    // Persist final sub-agent stats to the dedicated sub_agents collection
+    // Persist final sub-agent stats to the child agent_conversations document
     const toolNamesSummary = telemetry.toolCalls.length > 0
       ? Object.entries(
           telemetry.toolCalls.reduce<Record<string, number>>((accumulator, toolCall) => {
@@ -2504,23 +2496,6 @@ export default class OrchestratorService {
       ].join("\n");
     });
 
-    const overallStatus = routerResults.every(
-      (result) => "status" in result && result.status === "completed",
-    )
-      ? "completed"
-      : "failed";
-
-    const totalToolUses = routerResults.reduce(
-      (sum, result) => sum + ("toolUses" in result ? (result.toolUses || 0) : 0),
-      0,
-    );
-
-    const totalDurationMs = routerResults.reduce(
-      (sum, result) =>
-        sum + ("durationMs" in result ? (result.durationMs || 0) : 0),
-      0,
-    );
-
     const teamCompletedHeader = PromptLocaleService.get(
       locale,
       "orchestrator.notifications.teamCompleted",
@@ -2532,10 +2507,7 @@ export default class OrchestratorService {
 
     await OrchestratorService._sendParentCompletionNotification(
       {
-        status: overallStatus,
         summary: teamCompletedHeader,
-        toolUses: totalToolUses,
-        durationMs: totalDurationMs,
         resultBody,
       },
       orchestratorContext,
