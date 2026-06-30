@@ -401,52 +401,92 @@ describe("Event-Driven Auto-Response", () => {
       expect(agentParams.messages).toHaveLength(4);
     });
 
-    it("should wait for parent to finish generating before auto-response", async () => {
-      vi.useFakeTimers();
+    it("should proactively clear isGenerating before triggering auto-response (prevents deadlock)", async () => {
+      // Simulates the deferred-done scenario: the Finalizer kept isGenerating=true
+      // (skipGeneratingClear: true) and the auto-response fires inside
+      // awaitPendingDispatches. Without the proactive clear, this would deadlock.
+      mockFindOne.mockResolvedValue({
+        id: "parent-conv-id",
+        isGenerating: true,
+        messages: [],
+        settings: {
+          provider: PROVIDERS.GOOGLE,
+          model: "gemini-3-flash-preview",
+          agent: "CODING",
+        },
+      });
 
-      const idleConversation = {
+      await OrchestratorService._triggerParentAutoResponse(
+        "parent-conv-id", "test-project", "test-user",
+        orchestratorContext, completionMessage,
+      );
+
+      // The isGenerating flag should have been cleared via updateOne
+      expect(mockUpdateOne).toHaveBeenCalledWith(
+        { id: "parent-conv-id", project: "test-project", username: "test-user" },
+        { $set: { isGenerating: false } },
+      );
+
+      // handleAgent should have been called — no deadlock
+      expect(mockHandleAgent).toHaveBeenCalledTimes(1);
+      const [agentParams] = mockHandleAgent.mock.calls[0];
+      expect(agentParams.conversationId).toBe("parent-conv-id");
+      expect(agentParams.agenticLoopEnabled).toBe(true);
+    });
+
+    it("should NOT call updateOne for isGenerating when conversation is already idle", async () => {
+      mockFindOne.mockResolvedValue({
         id: "parent-conv-id",
         isGenerating: false,
         messages: [],
         settings: {
           provider: PROVIDERS.GOOGLE,
-          model: "gemini-2.5-flash",
+          model: "gemini-3-flash-preview",
+          agent: "CODING",
         },
-      };
+      });
 
-      mockFindOne
-        .mockResolvedValueOnce({
-          id: "parent-conv-id",
-          isGenerating: true,
-          messages: [],
-          settings: {},
-        })
-        .mockResolvedValueOnce({
-          id: "parent-conv-id",
-          isGenerating: true,
-          messages: [],
-          settings: {},
-        })
-        .mockResolvedValueOnce(idleConversation)
-        // After appendMessages, findOne is called again to reload messages
-        .mockResolvedValueOnce(idleConversation);
-
-      const autoResponsePromise = OrchestratorService._triggerParentAutoResponse(
+      await OrchestratorService._triggerParentAutoResponse(
         "parent-conv-id", "test-project", "test-user",
         orchestratorContext, completionMessage,
       );
 
-      // Advance through the polling delays
-      await vi.advanceTimersByTimeAsync(2_000);
-      await vi.advanceTimersByTimeAsync(2_000);
-      await vi.advanceTimersByTimeAsync(2_000);
+      // updateOne should NOT have been called to clear isGenerating
+      // (it may be called by appendMessages mock, but not with the isGenerating payload)
+      const isGeneratingClearCalls = mockUpdateOne.mock.calls.filter(
+        (callArguments: unknown[]) => {
+          const updatePayload = callArguments[1] as Record<string, unknown>;
+          return updatePayload?.$set && (updatePayload.$set as Record<string, unknown>).isGenerating === false;
+        },
+      );
+      expect(isGeneratingClearCalls).toHaveLength(0);
 
-      await autoResponsePromise;
+      // handleAgent should still proceed normally
+      expect(mockHandleAgent).toHaveBeenCalledTimes(1);
+    });
 
-      // handleAgent should have eventually been called after conversation became idle
-      expect(mockHandleAgent).toHaveBeenCalled();
+    it("should still proceed with auto-response even if isGenerating clear fails", async () => {
+      mockFindOne.mockResolvedValue({
+        id: "parent-conv-id",
+        isGenerating: true,
+        messages: [],
+        settings: {
+          provider: PROVIDERS.GOOGLE,
+          model: "gemini-3-flash-preview",
+          agent: "CODING",
+        },
+      });
 
-      vi.useRealTimers();
+      // Simulate updateOne failure for isGenerating clear
+      mockUpdateOne.mockRejectedValueOnce(new Error("MongoDB connection lost"));
+
+      await OrchestratorService._triggerParentAutoResponse(
+        "parent-conv-id", "test-project", "test-user",
+        orchestratorContext, completionMessage,
+      );
+
+      // Even though the clear failed, handleAgent should still fire
+      expect(mockHandleAgent).toHaveBeenCalledTimes(1);
     });
 
     it("should skip auto-response when conversation is not found", async () => {
@@ -705,6 +745,59 @@ describe("Event-Driven Auto-Response", () => {
       const [agentParams] = mockHandleAgent.mock.calls[0];
       expect(agentParams.conversationId).toBe("parent-conv-id");
       expect(agentParams.provider).toBe(PROVIDERS.GOOGLE);
+      expect(agentParams.agenticLoopEnabled).toBe(true);
+    });
+
+    it("should clear isGenerating and trigger auto-response when Finalizer deferred the flag (non-blocking)", async () => {
+      // This is the critical regression test for the deadlock that occurred
+      // when the Finalizer used skipGeneratingClear: true. In that scenario:
+      // 1. Finalizer keeps isGenerating=true (deferDoneEmission)
+      // 2. awaitPendingDispatches blocks → router resolves
+      // 3. _triggerParentAutoResponse fires while isGenerating is still true
+      // 4. Without the fix, it would poll for 60s and give up → conversation stuck
+      mockFindOne.mockResolvedValue({
+        id: "parent-conv-id",
+        isGenerating: true,
+        messages: [
+          { role: "user", content: "Spawn agents" },
+          { role: "assistant", content: "Creating sub-agents..." },
+        ],
+        settings: {
+          provider: PROVIDERS.GOOGLE,
+          model: "gemini-3-flash-preview",
+          agent: "CODING",
+        },
+      });
+
+      const teamResults = await OrchestratorService.createTeam(
+        {
+          name: "deferred_team",
+          topology: "hierarchical",
+          members: [
+            { description: "Agent A", prompt: "Do task A", model: "gemini-3-flash-preview" },
+          ],
+        },
+        orchestratorContext,
+      );
+
+      expect(Array.isArray(teamResults)).toBe(true);
+
+      // Wait for the background auto-response
+      await waitForMockCalls(mockHandleAgent, 1);
+
+      // The isGenerating flag should have been proactively cleared
+      const isGeneratingClearCalls = mockUpdateOne.mock.calls.filter(
+        (callArguments: unknown[]) => {
+          const updatePayload = callArguments[1] as Record<string, unknown>;
+          return updatePayload?.$set && (updatePayload.$set as Record<string, unknown>).isGenerating === false;
+        },
+      );
+      expect(isGeneratingClearCalls.length).toBeGreaterThanOrEqual(1);
+
+      // handleAgent was called — no deadlock
+      expect(mockHandleAgent).toHaveBeenCalledTimes(1);
+      const [agentParams] = mockHandleAgent.mock.calls[0];
+      expect(agentParams.conversationId).toBe("parent-conv-id");
       expect(agentParams.agenticLoopEnabled).toBe(true);
     });
   });

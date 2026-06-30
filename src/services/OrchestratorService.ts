@@ -2556,58 +2556,24 @@ export default class OrchestratorService {
       return;
     }
 
-    // If the parent is currently generating, wait until the turn completes.
-    // The $push in _notifyParentOfRouterCompletion already waits for
-    // isGenerating to clear before inserting the notification, so by the
-    // time we reach here the notification should be persisted. This is a
-    // safety net in case the conversation entered a new generation between
-    // the $push succeeding and this auto-response check.
-    const { AUTO_RESPONSE_GENERATION_WAIT_MAXIMUM_RETRIES, AUTO_RESPONSE_GENERATION_WAIT_DELAY_MILLISECONDS } = ORCHESTRATOR;
-
+    // When the orchestrator dispatches a non-blocking router, the Finalizer
+    // defers `isGenerating` clear (skipGeneratingClear: true) so the auto-response
+    // owns the flag lifecycle. The auto-response fires inside awaitPendingDispatches,
+    // meaning isGenerating is guaranteed to still be true. Clear it here so we don't
+    // deadlock waiting for a flag that only WE can clear.
     if (conversation.isGenerating) {
-      logger.info(
-        `[Orchestrator] Parent conversation ${conversationId} is generating — waiting for turn to complete before auto-response`,
-      );
-
-      let conversationBecameIdle = false;
-      for (let waitAttempt = 0; waitAttempt < AUTO_RESPONSE_GENERATION_WAIT_MAXIMUM_RETRIES; waitAttempt++) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, AUTO_RESPONSE_GENERATION_WAIT_DELAY_MILLISECONDS),
+      try {
+        await conversationCollection.updateOne(
+          { id: conversationId, project, username },
+          { $set: { isGenerating: false } },
         );
-
-        const refreshedConversation = await conversationCollection.findOne({
-          id: conversationId,
-          project,
-          username,
-        });
-
-        if (!refreshedConversation) {
-          logger.warn(
-            `[Orchestrator] Parent conversation ${conversationId} disappeared during auto-response wait`,
-          );
-          return;
-        }
-
-        if (!refreshedConversation.isGenerating) {
-          conversationBecameIdle = true;
-          // Reload the full conversation for the agentic loop below
-          Object.assign(conversation, refreshedConversation);
-          logger.info(
-            `[Orchestrator] Parent conversation ${conversationId} became idle after ${waitAttempt + 1} wait(s) — proceeding with auto-response`,
-          );
-          break;
-        }
-
-        logger.debug(
-          `[Orchestrator] Still waiting for ${conversationId} to finish generating (attempt ${waitAttempt + 1}/${AUTO_RESPONSE_GENERATION_WAIT_MAXIMUM_RETRIES})`,
+        logger.info(
+          `[Orchestrator] Cleared deferred isGenerating flag on parent ${conversationId} before auto-response`,
         );
-      }
-
-      if (!conversationBecameIdle) {
+      } catch (clearError: unknown) {
         logger.warn(
-          `[Orchestrator] Parent conversation ${conversationId} never became idle after ${AUTO_RESPONSE_GENERATION_WAIT_MAXIMUM_RETRIES} retries — skipping auto-response`,
+          `[Orchestrator] Failed to clear isGenerating on ${conversationId}: ${getErrorMessage(clearError)}`,
         );
-        return;
       }
     }
 
