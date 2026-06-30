@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
-import { COLLECTIONS, TIMER_MODES, TIMER_STATUSES, TIMERS } from "../constants.ts";
+import { COLLECTIONS, NOTIFICATION_SOURCES, TIMER_MODES, TIMER_STATUSES, TIMERS } from "../constants.ts";
 import logger from "../utils/logger.ts";
 import AgenticLoopService from "./AgenticLoopService.ts";
 import ConversationService from "./ConversationService.ts";
@@ -381,7 +381,7 @@ const ConversationTimerService = {
           content: `🔔 Notification: ${timer.prompt}`,
           timestamp: reminderTimestamp,
           _alreadyPersisted: true,
-          _notificationSource: "timer",
+          _notificationSource: NOTIFICATION_SOURCES.TIMER,
           _notificationId: `timer:${timer.id}:${reminderTimestamp}`,
         };
 

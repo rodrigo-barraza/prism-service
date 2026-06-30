@@ -50,7 +50,7 @@ import type {
 import type { ConversationMessage, LLMProvider } from "./harnesses/types.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import ConversationService from "./ConversationService.ts";
-import { COLLECTIONS, ORCHESTRATOR } from "../constants.ts";
+import { COLLECTIONS, ORCHESTRATOR, NOTIFICATION_SOURCES } from "../constants.ts";
 
 type AgenticLoopServiceModule = typeof import("./AgenticLoopService.ts");
 
@@ -1880,7 +1880,7 @@ export default class OrchestratorService {
       ].join("\n"),
       timestamp: notificationTimestamp,
       _alreadyPersisted: true,
-      _notificationSource: "orchestrator",
+      _notificationSource: NOTIFICATION_SOURCES.ORCHESTRATOR,
       _notificationId: `orchestrator:${options.summary}:${notificationTimestamp}`,
     };
 
