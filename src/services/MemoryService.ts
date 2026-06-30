@@ -555,6 +555,16 @@ const MemoryService = {
   async remove(memoryId: string) {
     return this.delete(memoryId);
   },
+  async removeAllByAgent(project: string, agent?: string) {
+    const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
+    const filter: Record<string, unknown> = { project };
+    if (agent) filter.agent = agent;
+    const result = await collection.deleteMany(filter);
+    logger.info(
+      `[MemoryService] removeAllByAgent project=${project} agent=${agent || "all"} deleted=${result.deletedCount}`,
+    );
+    return { deletedCount: result.deletedCount };
+  },
   // ── Update ─────────────────────────────────────────────────────────────────
   async update(memoryId: string, { title, content, type }: MemoryUpdateParams) {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
