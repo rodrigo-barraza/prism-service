@@ -390,7 +390,9 @@ export default class BaseAgenticHarness {
       messages as ChatMessage[],
       {
         maxInputTokens:
-          modelDefinition?.maxInputTokens || DEFAULT_MAX_INPUT_TOKENS,
+          modelDefinition?.maxInputTokens ||
+          (options._loadedContextLength as number | undefined) ||
+          DEFAULT_MAX_INPUT_TOKENS,
         maxOutputTokens: options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS,
         toolCount,
         locale: options?.locale as string | undefined,
@@ -471,7 +473,10 @@ export default class BaseAgenticHarness {
     requestedMaxTokens: number | undefined,
   ): number | undefined {
     const { modelDefinition } = this.context;
-    const contextWindow = modelDefinition?.maxInputTokens;
+    const contextWindow =
+      modelDefinition?.maxInputTokens ||
+      (this.context.options?._loadedContextLength as number | undefined) ||
+      null;
 
     if (!contextWindow || !requestedMaxTokens) return requestedMaxTokens;
 
