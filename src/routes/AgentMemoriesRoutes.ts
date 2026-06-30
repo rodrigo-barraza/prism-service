@@ -93,6 +93,33 @@ router.get(
 );
 
 /**
+ * DELETE /agent-memories/all?project=<project>&agent=<agent>
+ * Delete ALL memories for a specific project (optionally scoped to an agent).
+ */
+router.delete(
+  "/all",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const project = req.project;
+      const agent = (req.query.agent as string) || undefined;
+
+      if (!project) {
+        return res.status(400).json({ error: "project is required" });
+      }
+
+      const result = await MemoryService.removeAllByAgent(
+        project as string,
+        agent,
+      );
+      res.json({ success: true, deletedCount: result.deletedCount });
+    } catch (error: unknown) {
+      logger.error(`[agent-memories] DELETE ALL ${getErrorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+/**
  * DELETE /agent-memories/:id
  * Delete a specific agent memory.
  */
