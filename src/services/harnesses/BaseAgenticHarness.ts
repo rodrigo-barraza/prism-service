@@ -23,7 +23,7 @@ import RequestLogger from "../RequestLogger.ts";
 import FileService from "../FileService.ts";
 import MongoWrapper from "../../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../../config.ts";
-import { COLLECTIONS, FILE_CATEGORIES } from "../../constants.ts";
+import { COLLECTIONS, FILE_CATEGORIES, CONTEXT_WINDOW } from "../../constants.ts";
 import {
   finalizeTextGeneration,
   type FinalizerContext,
@@ -465,6 +465,10 @@ export default class BaseAgenticHarness {
    * (used by OpenAI SDKs, Cursor, Claude Code) to prevent 400 errors
    * from context overflow on models with finite context windows.
    *
+   * Accounts for tool schema overhead using the same formula as
+   * ContextWindowManager.enforce() to prevent discover_and_enable_tools
+   * from blowing past the context window on small-context models.
+   *
    * Returns the clamped maxTokens value. If no clamping is needed,
    * returns the original value unchanged.
    */
@@ -481,8 +485,15 @@ export default class BaseAgenticHarness {
     if (!contextWindow || !requestedMaxTokens) return requestedMaxTokens;
 
     const estimatedInputTokens = this.estimateInputTokens(messages);
+    const toolCount = this.tools.finalTools.length;
+    const toolSchemaOverhead =
+      CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS +
+      toolCount * CONTEXT_WINDOW.TOKENS_PER_TOOL_SCHEMA;
     const availableForOutput =
-      contextWindow - estimatedInputTokens - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
+      contextWindow -
+      estimatedInputTokens -
+      toolSchemaOverhead -
+      OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
 
     if (requestedMaxTokens <= availableForOutput) return requestedMaxTokens;
 
@@ -494,8 +505,9 @@ export default class BaseAgenticHarness {
     logger.warn(
       `[OutputTokenClamp] Clamping maxTokens from ${requestedMaxTokens} → ${clampedMaxTokens} ` +
         `(contextWindow=${contextWindow}, estimatedInput=${estimatedInputTokens}, ` +
+        `toolSchemaOverhead=${toolSchemaOverhead} [${toolCount} tools], ` +
         `safetyMargin=${OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN}). ` +
-        `Without clamping: ${estimatedInputTokens + requestedMaxTokens} > ${contextWindow}.`,
+        `Without clamping: ${estimatedInputTokens + toolSchemaOverhead + requestedMaxTokens} > ${contextWindow}.`,
     );
 
     return clampedMaxTokens;
