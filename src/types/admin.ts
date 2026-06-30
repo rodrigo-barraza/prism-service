@@ -287,7 +287,7 @@ export interface ToolCallEntry {
 
 export interface ChatMessage {
   role: string;
-  content?: string;
+  content?: string | null;
   name?: string;
   images?: string[];
   audio?: string | string[];

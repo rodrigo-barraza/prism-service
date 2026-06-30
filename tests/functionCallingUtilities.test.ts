@@ -12,6 +12,7 @@ import { describe, it, expect } from "vitest";
 import {
   expandMessagesForFunctionCall,
   truncateToolResult,
+  type ToolResultValue,
 } from "../src/utils/FunctionCallingUtilities.ts";
 // ── Types ──────────────────────────────────────────────────────
 import type { ChatMessage as TestMessage } from "../src/types/admin.ts";
@@ -31,7 +32,7 @@ describe("truncateToolResult", () => {
       name: `item-${index}`,
     }));
 
-    const result = truncateToolResult(largeArray) as unknown[];
+    const result = truncateToolResult(largeArray) as ToolResultValue[];
 
     expect(Array.isArray(result)).toBe(true);
     expect(result).toHaveLength(11); // 10 items + 1 truncation marker
@@ -44,7 +45,7 @@ describe("truncateToolResult", () => {
     // This converts [1, 2, 3] → { "0": 1, "1": 2, "2": 3 }
     const smallArray = [1, 2, 3, 4, 5];
 
-    const result = truncateToolResult(smallArray) as Record<string, unknown>;
+    const result = truncateToolResult(smallArray) as { [key: string]: ToolResultValue };
 
     expect(result["0"]).toBe(1);
     expect(result["4"]).toBe(5);
@@ -54,9 +55,9 @@ describe("truncateToolResult", () => {
     const result = truncateToolResult({
       events: Array.from({ length: 25 }, (_, index) => ({ id: index })),
       otherData: "preserved",
-    }) as Record<string, unknown>;
+    }) as { [key: string]: ToolResultValue };
 
-    expect((result.events as unknown[]).length).toBe(10);
+    expect((result.events as ToolResultValue[]).length).toBe(10);
     expect(result._eventsTruncated).toBe("Showing 10 of 25");
     expect(result.otherData).toBe("preserved");
   });
@@ -76,7 +77,7 @@ describe("truncateToolResult", () => {
   it("should not truncate objects within maxChars", () => {
     const smallObject = { key: "value", count: 42 };
 
-    const result = truncateToolResult(smallObject) as Record<string, unknown>;
+    const result = truncateToolResult(smallObject) as { [key: string]: ToolResultValue };
 
     expect(result).toEqual(smallObject);
   });
@@ -145,8 +146,8 @@ describe("expandMessagesForFunctionCall", () => {
 
     // The content should be truncated JSON
     expect(toolMessage).toBeDefined();
-    const parsed = JSON.parse(toolMessage!.content as string);
-    expect((parsed.events as unknown[]).length).toBe(10);
+    const parsed = JSON.parse(toolMessage!.content as string) as { [key: string]: ToolResultValue };
+    expect((parsed.events as ToolResultValue[]).length).toBe(10);
   });
 
   it("should filter out deleted messages by default", () => {
@@ -318,7 +319,7 @@ describe('FunctionCallingUtilities adversarial', () => {
       const result = truncateToolResult(hugeArray);
       if (Array.isArray(result)) {
         expect(result.length).toBe(11); // 10 items + truncation marker
-        expect(result[10]._truncated).toContain('1000');
+        expect((result[10] as { [key: string]: ToolResultValue })._truncated).toContain('1000');
       } else {
         // If the result was further truncated to a string, it should be capped
         expect(typeof result).toBe('string');
@@ -330,15 +331,15 @@ describe('FunctionCallingUtilities adversarial', () => {
       const result = truncateToolResult({
         events: Array.from({ length: 50 }, (_, index) => ({ id: index })),
         products: Array.from({ length: 100 }, (_, index) => ({ sku: `SKU-${index}` })),
-      }) as Record<string, unknown>;
+      }) as { [key: string]: ToolResultValue };
       expect(Array.isArray(result.events)).toBe(true);
-      expect((result.events as unknown[]).length).toBe(10);
-      expect(result._eventsTruncated).toContain('50');
-      expect((result.products as unknown[]).length).toBe(10);
+      expect((result.events as ToolResultValue[]).length).toBe(10);
+      expect(result._eventsTruncated as string).toContain('50');
+      expect((result.products as ToolResultValue[]).length).toBe(10);
     });
 
     it('should handle deeply nested circular-like structures gracefully (non-circular but very deep)', () => {
-      let deepObject: Record<string, unknown> = { leaf: true };
+      let deepObject: { [key: string]: ToolResultValue } = { leaf: true };
       for (let depth = 0; depth < 200; depth++) {
         deepObject = { child: deepObject };
       }
@@ -355,10 +356,10 @@ describe('FunctionCallingUtilities adversarial', () => {
     });
 
     it('should handle prototype pollution attempt in result object', () => {
-      const maliciousResult = JSON.parse('{"__proto__": {"isAdmin": true}, "data": "safe"}');
-      const result = truncateToolResult(maliciousResult) as Record<string, unknown>;
+      const maliciousResult = JSON.parse('{"__proto__": {"isAdmin": true}, "data": "safe"}') as { [key: string]: ToolResultValue };
+      const result = truncateToolResult(maliciousResult) as { [key: string]: ToolResultValue };
       // Spread operator should NOT have polluted Object.prototype
-      expect(({} as any).isAdmin).toBeUndefined();
+      expect(({} as Record<string, boolean>).isAdmin).toBeUndefined();
       expect(result.data).toBe('safe');
     });
   });
@@ -370,7 +371,7 @@ describe('FunctionCallingUtilities adversarial', () => {
     });
 
     it('should handle message with null content', () => {
-      const messages = [{ role: 'user', content: null }] as any;
+      const messages: TestMessage[] = [{ role: 'user', content: null }];
       const result = expandMessagesForFunctionCall(messages);
       expect(result.length).toBe(1);
       // Should convert null content to " " (space fallback)
@@ -378,25 +379,25 @@ describe('FunctionCallingUtilities adversarial', () => {
     });
 
     it('should handle assistant message with empty toolCalls array', () => {
-      const messages = [
+      const messages: TestMessage[] = [
         { role: 'assistant', content: TYPES.TEXT, toolCalls: [] },
-      ] as any;
+      ];
       const result = expandMessagesForFunctionCall(messages);
       // Empty toolCalls = no expansion needed, but content is valid
       expect(result.length).toBe(1);
     });
 
     it('should coalesce undefined tool result to null and produce a tool message', () => {
-      const messages = [
+      const messages: TestMessage[] = [
         {
           role: 'assistant',
           content: 'thinking...',
           toolCalls: [
-            { id: 'tc1', name: 'search', args: { query: 'test' } },
+            { id: 'tool-call-1', name: 'search', args: { query: 'test' } },
             // result is undefined — coalesced to null to avoid orphaned tool_calls
           ],
         },
-      ] as any;
+      ];
       const result = expandMessagesForFunctionCall(messages);
       // Should produce assistant + 1 tool message (undefined → null)
       const toolMessages = result.filter((message) => message.role === 'tool');
@@ -405,26 +406,26 @@ describe('FunctionCallingUtilities adversarial', () => {
     });
 
     it('should filter deleted messages when filterDeleted is true', () => {
-      const messages = [
+      const messages: TestMessage[] = [
         { role: 'user', content: 'hello' },
         { role: 'assistant', content: 'bye', deleted: true },
         { role: 'user', content: 'still here' },
-      ] as any;
+      ];
       const result = expandMessagesForFunctionCall(messages, { filterDeleted: true });
       expect(result.length).toBe(2); // deleted message removed
     });
 
     it('should keep deleted messages when filterDeleted is false', () => {
-      const messages = [
+      const messages: TestMessage[] = [
         { role: 'user', content: 'hello' },
         { role: 'assistant', content: 'bye', deleted: true },
-      ] as any;
+      ];
       const result = expandMessagesForFunctionCall(messages, { filterDeleted: false });
       expect(result.length).toBe(2);
     });
 
     it('should include tool messages when result is null', () => {
-      const messages = [
+      const messages: TestMessage[] = [
         {
           role: "assistant",
           content: "Working",
@@ -437,7 +438,7 @@ describe('FunctionCallingUtilities adversarial', () => {
             },
           ],
         },
-      ] as any;
+      ];
       const expanded = expandMessagesForFunctionCall(messages);
       const toolMessages = expanded.filter((message) => message.role === "tool");
       expect(toolMessages).toHaveLength(1);
@@ -445,7 +446,7 @@ describe('FunctionCallingUtilities adversarial', () => {
     });
 
     it('should handle multiple toolCalls with mixed results (undefined coalesced to null)', () => {
-      const messages = [
+      const messages: TestMessage[] = [
         {
           role: "assistant",
           content: "Doing both",
@@ -464,7 +465,7 @@ describe('FunctionCallingUtilities adversarial', () => {
             },
           ],
         },
-      ] as any;
+      ];
       const expanded = expandMessagesForFunctionCall(messages);
       const toolMessages = expanded.filter((message) => message.role === "tool");
       // Both tool calls produce tool messages — undefined coalesced to null
@@ -475,7 +476,7 @@ describe('FunctionCallingUtilities adversarial', () => {
     });
 
     it('should simulate the exact iteration 2 message expansion for generate_audio flow', () => {
-      const messages = [
+      const messages: TestMessage[] = [
         {
           role: "system",
           content: "You are a creative assistant with many tools available.",
@@ -503,7 +504,7 @@ describe('FunctionCallingUtilities adversarial', () => {
             },
           ],
         },
-      ] as any;
+      ];
 
       const expanded = expandMessagesForFunctionCall(messages);
 
@@ -537,7 +538,7 @@ describe('FunctionCallingUtilities adversarial', () => {
     });
 
     it('should verify tool result content is present for the model', () => {
-      const messages = [
+      const messages: TestMessage[] = [
         { role: "user", content: "make audio" },
         {
           role: "assistant",
@@ -555,13 +556,13 @@ describe('FunctionCallingUtilities adversarial', () => {
             },
           ],
         },
-      ] as any;
+      ];
 
       const expanded = expandMessagesForFunctionCall(messages);
       const toolMessage = expanded.find((message) => message.role === "tool");
 
       expect(toolMessage).toBeDefined();
-      const parsedContent = JSON.parse(toolMessage!.content as string);
+      const parsedContent = JSON.parse(toolMessage!.content as string) as { [key: string]: ToolResultValue };
       expect(parsedContent.success).toBe(true);
       expect(parsedContent.message).toBe("Audio generated successfully");
     });
