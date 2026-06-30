@@ -1354,7 +1354,7 @@ export default class OrchestratorService {
     // alive until all sub-agents finish.
     const parentAgentConversationId = orchestratorContext.agentConversationId;
     const wrappedRouterPromise = routerPromise
-      .then((routerResults) => {
+      .then(async (routerResults) => {
         logger.info(
           `[Orchestrator] Router "${topology}" completed for team "${teamCreationArguments.name}" — ${routerResults.length} result(s)`,
         );
@@ -1364,16 +1364,18 @@ export default class OrchestratorService {
             message: STATUS_MESSAGES.SUB_AGENTS_UPDATED,
           });
         }
-        OrchestratorService._notifyParentOfRouterCompletion(
-          teamCreationArguments.name,
-          topology,
-          routerResults,
-          orchestratorContext,
-        ).catch((notificationError: Error) => {
+        try {
+          await OrchestratorService._notifyParentOfRouterCompletion(
+            teamCreationArguments.name,
+            topology,
+            routerResults,
+            orchestratorContext,
+          );
+        } catch (notificationError: unknown) {
           logger.warn(
             `[Orchestrator] Failed to notify parent of router completion: ${getErrorMessage(notificationError)}`,
           );
-        });
+        }
       })
       .catch((routerError: Error) => {
         logger.error(
@@ -1807,17 +1809,19 @@ export default class OrchestratorService {
       _notificationId: `orchestrator:${options.summary}:${notificationTimestamp}`,
     };
 
-    OrchestratorService._triggerParentAutoResponse(
-      conversationId,
-      project,
-      username,
-      orchestratorContext,
-      completionMessage as ConversationMessage,
-    ).catch((autoResponseError: Error) => {
+    try {
+      await OrchestratorService._triggerParentAutoResponse(
+        conversationId,
+        project,
+        username,
+        orchestratorContext,
+        completionMessage as ConversationMessage,
+      );
+    } catch (autoResponseError: unknown) {
       logger.warn(
         `[Orchestrator] Parent auto-response failed for conversation ${conversationId}: ${getErrorMessage(autoResponseError)}`,
       );
-    });
+    }
   }
 
   /**
