@@ -290,6 +290,17 @@ export const ORCHESTRATOR = {
   },
 } as const;
 
+// ─── Notification Source Identifiers ────────────────────────
+// Used by task-notification messages to identify the origin system.
+// The client's isNotificationMessage() uses these to detect and
+// filter system-injected user-role messages from the message list.
+
+export const NOTIFICATION_SOURCES = {
+  ORCHESTRATOR: "orchestrator",
+  TIMER: "timer",
+  ASYNC_TASK: "async-task",
+} as const;
+
 // ─── Harness Constants ──────────────────────────────────────
 
 export const HARNESS = {

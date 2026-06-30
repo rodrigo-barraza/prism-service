@@ -2,7 +2,7 @@ import logger from "../../utils/logger.ts";
 import { DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 import { ASYNC_TASK_TOOL_NAMES, MAXIMUM_CONCURRENT_ASYNC_TASKS } from "../AsyncTaskConstants.ts";
-import { ORCHESTRATOR } from "../../constants.ts";
+import { ORCHESTRATOR, NOTIFICATION_SOURCES } from "../../constants.ts";
 import type { InternalToolContext } from "./InternalToolRegistry.ts";
 import PromptLocaleService from "../PromptLocaleService.ts";
 
@@ -523,7 +523,7 @@ async function triggerAsyncTaskAutoResponse(
     ].join("\n"),
     timestamp: notificationTimestamp,
     _alreadyPersisted: true,
-    _notificationSource: "async-task",
+    _notificationSource: NOTIFICATION_SOURCES.ASYNC_TASK,
     _notificationId: `async-task:${taskState.taskId}:${notificationTimestamp}`,
   };
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import "./setup.ts";
-import { PROVIDERS, ORCHESTRATOR } from "../src/constants.ts";
+import { PROVIDERS, ORCHESTRATOR, NOTIFICATION_SOURCES } from "../src/constants.ts";
 
 // ── vi.mock blocks (must come before imports that use them) ────────────
 
@@ -316,6 +316,231 @@ describe("Event-Driven Auto-Response", () => {
       );
 
       expect(mockHandleAgent).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Notification Format Contract (Regression) ────────────────
+  // These tests enforce the <task-notification> XML envelope structure
+  // that the client's parseTaskNotification() requires to render the
+  // SubAgentNotificationComponent. Commits de7c8f5 and 7c56c2f silently
+  // stripped this format, breaking the UI. These tests prevent recurrence.
+
+  describe("task-notification XML format contract", () => {
+    function createIdleParentConversation() {
+      return {
+        id: orchestratorContext.conversationId,
+        isGenerating: false,
+        messages: [
+          { role: "user", content: "Build a feature" },
+          { role: "assistant", content: "Spawning sub-agents" },
+        ],
+        settings: {
+          provider: PROVIDERS.GOOGLE,
+          model: orchestratorContext.resolvedModel,
+          agent: orchestratorContext.agent,
+        },
+      };
+    }
+
+    const REQUIRED_XML_FIELDS = [
+      "task-notification",
+      "status",
+      "summary",
+      "tool_uses",
+      "duration_ms",
+      "result",
+    ] as const;
+
+    function createSubAgentResult(overrides: Partial<SubAgentResult> = {}): SubAgentResult {
+      return {
+        agent_id: "agent-default",
+        description: "Default agent",
+        status: "completed",
+        summary: "Default summary",
+        result: "Default output text",
+        toolUses: 1,
+        iterations: 1,
+        durationMs: 1000,
+        messages: [],
+        ...overrides,
+      };
+    }
+
+    function extractPersistedNotification(): { content: string; message: Record<string, unknown> } {
+      const appendCall = vi.mocked(ConversationService.appendMessages).mock.calls[0];
+      expect(appendCall).toBeDefined();
+      const [, , , appendedMessages] = appendCall;
+      const message = (appendedMessages as any[])[0];
+      return { content: message.content as string, message };
+    }
+
+    function extractXmlField(content: string, fieldName: string): string | null {
+      const regex = new RegExp(`<${fieldName}>([\\s\\S]*?)</${fieldName}>`);
+      const match = content.match(regex);
+      return match ? match[1].trim() : null;
+    }
+
+    async function notifyAndExtract(
+      teamName: string,
+      topology: string,
+      routerResults: SubAgentResult[],
+    ): Promise<{ content: string; message: Record<string, unknown> }> {
+      mockFindOne.mockResolvedValue(createIdleParentConversation());
+
+      await OrchestratorService._notifyParentOfRouterCompletion(
+        teamName,
+        topology,
+        routerResults,
+        orchestratorContext,
+      );
+
+      await waitForMockCalls(mockHandleAgent, 1);
+      return extractPersistedNotification();
+    }
+
+    describe("_notifyParentOfRouterCompletion", () => {
+      it("should wrap completion message in <task-notification> XML envelope", async () => {
+        const { content } = await notifyAndExtract(
+          "Analysis_Team",
+          "hierarchical",
+          [createSubAgentResult({ agent_id: "agent-1", description: "Analysis agent" })],
+        );
+
+        expect(content).toContain("<task-notification>");
+        expect(content).toContain("</task-notification>");
+      });
+
+      it("should include all required XML fields: status, summary, tool_uses, duration_ms, result", async () => {
+        const { content } = await notifyAndExtract(
+          "Worker_Team",
+          "sequential",
+          [createSubAgentResult({ toolUses: 12, durationMs: 45000 })],
+        );
+
+        for (const fieldName of REQUIRED_XML_FIELDS) {
+          expect(
+            content,
+            `Missing required XML field: <${fieldName}>`,
+          ).toMatch(new RegExp(`<${fieldName}>[\\s\\S]*?</${fieldName}>`));
+        }
+      });
+
+      it("should aggregate tool_uses and duration_ms across all sub-agents", async () => {
+        const fastAgentToolUses = 3;
+        const fastAgentDurationMs = 10_000;
+        const slowAgentToolUses = 15;
+        const slowAgentDurationMs = 80_000;
+        const expectedTotalToolUses = fastAgentToolUses + slowAgentToolUses;
+        const expectedTotalDurationMs = fastAgentDurationMs + slowAgentDurationMs;
+
+        const { content } = await notifyAndExtract(
+          "Dual_Team",
+          "hierarchical",
+          [
+            createSubAgentResult({
+              agent_id: "agent-fast",
+              description: "Fast agent",
+              toolUses: fastAgentToolUses,
+              durationMs: fastAgentDurationMs,
+            }),
+            createSubAgentResult({
+              agent_id: "agent-slow",
+              description: "Slow agent",
+              toolUses: slowAgentToolUses,
+              durationMs: slowAgentDurationMs,
+            }),
+          ],
+        );
+
+        expect(content).toContain(`<tool_uses>${expectedTotalToolUses}</tool_uses>`);
+        expect(content).toContain(`<duration_ms>${expectedTotalDurationMs}</duration_ms>`);
+      });
+
+      it("should set status to 'failed' when any sub-agent fails", async () => {
+        const { content } = await notifyAndExtract(
+          "Mixed_Team",
+          "hierarchical",
+          [
+            createSubAgentResult({ agent_id: "agent-ok", description: "Good agent" }),
+            createSubAgentResult({
+              agent_id: "agent-bad",
+              description: "Bad agent",
+              status: "failed",
+              result: "",
+              toolUses: 0,
+              iterations: 0,
+              durationMs: 1000,
+            }),
+          ],
+        );
+
+        expect(content).toContain("<status>failed</status>");
+      });
+
+      it("should set status to 'completed' when all sub-agents succeed", async () => {
+        const { content } = await notifyAndExtract(
+          "Solo_Team",
+          "hierarchical",
+          [createSubAgentResult({ status: "completed" })],
+        );
+
+        expect(content).toContain("<status>completed</status>");
+      });
+
+      it("should include team name and topology in the summary field", async () => {
+        const teamName = "My_Research_Team";
+        const topology = "sequential";
+
+        const { content } = await notifyAndExtract(
+          teamName,
+          topology,
+          [createSubAgentResult()],
+        );
+
+        const summaryText = extractXmlField(content, "summary");
+        expect(summaryText).not.toBeNull();
+        expect(summaryText).toContain(teamName);
+        expect(summaryText).toContain(topology);
+      });
+
+      it("should include per-agent result bodies inside the <result> field", async () => {
+        const researchOutput = "Paper A covers quantum computing advances.";
+        const summaryOutput = "The research landscape shows rapid growth.";
+
+        const { content } = await notifyAndExtract(
+          "Research_Team",
+          "hierarchical",
+          [
+            createSubAgentResult({
+              agent_id: "agent-research",
+              description: "Research Agent",
+              result: researchOutput,
+            }),
+            createSubAgentResult({
+              agent_id: "agent-summary",
+              description: "Summary Agent",
+              result: summaryOutput,
+            }),
+          ],
+        );
+
+        const resultText = extractXmlField(content, "result");
+        expect(resultText).not.toBeNull();
+        expect(resultText).toContain(researchOutput);
+        expect(resultText).toContain(summaryOutput);
+      });
+
+      it("should set _notificationSource to NOTIFICATION_SOURCES.ORCHESTRATOR on the persisted message", async () => {
+        const { message } = await notifyAndExtract(
+          "Team",
+          "hierarchical",
+          [createSubAgentResult()],
+        );
+
+        expect(message._notificationSource).toBe(NOTIFICATION_SOURCES.ORCHESTRATOR);
+        expect(message._alreadyPersisted).toBe(true);
+        expect(message.role).toBe("user");
+      });
     });
   });
 
