@@ -2645,30 +2645,6 @@ export default class OrchestratorService {
       { collection: COLLECTIONS.AGENT_CONVERSATIONS },
     );
 
-    // Reload the conversation from DB (source of truth) to get the freshest
-    // message array, including any messages added during the isGenerating wait.
-    const updatedConversation = await conversationCollection.findOne({
-      id: conversationId,
-      project,
-      username,
-    });
-
-    if (!updatedConversation) {
-      logger.warn(
-        `[Orchestrator] Conversation ${conversationId} disappeared after appending completion message`,
-      );
-      return;
-    }
-
-    // Reconstruct transient _alreadyPersisted flag: every message loaded
-    // from MongoDB is by definition already persisted. Without this, the
-    // Finalizer re-persists the completion message (it's the last message
-    // in the array, so AgenticLoopService's [0..n-2] marking skips it).
-    const freshMessages = (updatedConversation.messages || []) as ConversationMessage[];
-    for (const message of freshMessages) {
-      message._alreadyPersisted = true;
-    }
-
     // Resolve emit function for the auto-response. Priority:
     // 1. orchestratorContext.emit — the parent's live SSE stream (kept alive
     //    by awaitPendingDispatches). This is the primary path for HTTP SSE clients.
@@ -2703,6 +2679,45 @@ export default class OrchestratorService {
           `[Orchestrator] No live connection for conversation ${conversationId} — auto-response will run headlessly`,
         );
       }
+    }
+
+    // ── Stream the notification to the client in real-time ──────────
+    // Without this, the notification message is only persisted to DB and
+    // invisible to the client until page refresh. The TASK_NOTIFICATION
+    // SSE event tells the client to:
+    // 1. Finalize the current assistant message (from the parent agent)
+    // 2. Inject the notification as a new user-role message
+    // 3. Create a new placeholder assistant message for the auto-response
+    autoResponseEmit({
+      type: "task_notification" as typeof SERVER_SENT_EVENT_TYPES.CHUNK,
+      content: completionMessage.content,
+      timestamp: completionMessage.timestamp,
+      _notificationSource: (completionMessage as Record<string, unknown>)._notificationSource,
+      _notificationId: (completionMessage as Record<string, unknown>)._notificationId,
+    });
+
+    // Reload the conversation from DB (source of truth) to get the freshest
+    // message array, including any messages added during the isGenerating wait.
+    const updatedConversation = await conversationCollection.findOne({
+      id: conversationId,
+      project,
+      username,
+    });
+
+    if (!updatedConversation) {
+      logger.warn(
+        `[Orchestrator] Conversation ${conversationId} disappeared after appending completion message`,
+      );
+      return;
+    }
+
+    // Reconstruct transient _alreadyPersisted flag: every message loaded
+    // from MongoDB is by definition already persisted. Without this, the
+    // Finalizer re-persists the completion message (it's the last message
+    // in the array, so AgenticLoopService's [0..n-2] marking skips it).
+    const freshMessages = (updatedConversation.messages || []) as ConversationMessage[];
+    for (const message of freshMessages) {
+      message._alreadyPersisted = true;
     }
 
     // Route through the full handleAgent pipeline — same path as a real
