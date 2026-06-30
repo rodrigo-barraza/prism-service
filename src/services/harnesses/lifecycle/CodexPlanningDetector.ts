@@ -70,7 +70,7 @@ export function handleCodexPlanningResponse(
 
   currentMessages.push({
     role: "assistant",
-    content: pass.streamedText,
+    content: pass.finalStreamedText || pass.streamedText,
     ...(pass.streamedThinking.trim() && {
       thinking: pass.streamedThinking.trim(),
     }),

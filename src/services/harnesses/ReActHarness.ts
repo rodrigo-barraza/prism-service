@@ -537,7 +537,7 @@ export default class ReActHarness extends BaseAgenticHarness {
 
             currentMessages.push({
               role: "assistant",
-              content: pass.streamedText || "",
+              content: pass.finalStreamedText || "",
               ...(pass.streamedThinking.trim() && {
                 thinking: pass.streamedThinking.trim(),
               }),
@@ -620,7 +620,7 @@ export default class ReActHarness extends BaseAgenticHarness {
           // ── Append to context for next pass ───────────────────
           const assistantMessage: ConversationMessage = {
             role: "assistant",
-            content: pass.streamedText || "",
+            content: pass.finalStreamedText || "",
             ...(pass.streamedThinking.trim() && {
               thinking: pass.streamedThinking.trim(),
             }),
@@ -777,7 +777,7 @@ export default class ReActHarness extends BaseAgenticHarness {
           if (state.planModeActive) {
             currentMessages.push({
               role: "assistant",
-              content: pass.streamedText,
+              content: pass.finalStreamedText || pass.streamedText,
               ...(pass.streamedThinking.trim() && {
                 thinking: pass.streamedThinking.trim(),
               }),
