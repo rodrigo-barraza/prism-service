@@ -20,13 +20,19 @@ export const TOKEN_ESCALATION_MULTIPLIER = 1.5;
 export const MAX_OUTPUT_TRUNCATION_RECOVERIES = 3;
 
 /**
- * Safety margin (in tokens) subtracted when dynamically clamping max_tokens
- * to fit within the model's context window. Accounts for token estimation
- * inaccuracies (the ~4 chars/token heuristic undershoots on code/JSON) and
- * internal provider overhead (chat template tokens, BOS/EOS, tool schema
- * formatting differences between estimated and actual tokenization).
+ * Safety margin MULTIPLIER applied when dynamically clamping max_tokens
+ * to fit within the model's context window.
+ *
+ * The ~4 chars/token heuristic systematically underestimates real tokenizer
+ * output by 5-6% (verified: estimated 24,624 vs provider-reported 26,001
+ * on Gemma 4 12B = 94.7% accuracy). A fixed margin (the old 256) doesn't
+ * scale with prompt size — a 14K system prompt + 9K messages + 2K tools
+ * produces a ~1,400 token estimation error that 256 can't absorb.
+ *
+ * Using a 10% multiplicative margin on the estimated input guarantees
+ * coverage regardless of total prompt size.
  */
-export const OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN = 256;
+export const OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER = 0.10;
 
 /**
  * Minimum output tokens to allow after clamping. If the remaining budget

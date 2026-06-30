@@ -15,7 +15,7 @@ import ContextWindowManager from "../../utils/ContextWindowManager.ts";
 import {
   DEFAULT_MAX_INPUT_TOKENS,
   DEFAULT_MAX_OUTPUT_TOKENS,
-  OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN,
+  OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
   MINIMUM_CLAMPED_OUTPUT_TOKENS,
 } from "../../constants/TokenBudgetDefaults.ts";
 import ConversationGenerationTracker from "../ConversationGenerationTracker.ts";
@@ -465,9 +465,10 @@ export default class BaseAgenticHarness {
    * (used by OpenAI SDKs, Cursor, Claude Code) to prevent 400 errors
    * from context overflow on models with finite context windows.
    *
-   * Accounts for tool schema overhead using the same formula as
-   * ContextWindowManager.enforce() to prevent discover_and_enable_tools
-   * from blowing past the context window on small-context models.
+   * Accounts for the FULL provider input budget:
+   *   1. System prompt (passed as systemInstruction, NOT in messages)
+   *   2. Conversation messages (the messages array)
+   *   3. Tool schemas (serialized function definitions in the payload)
    *
    * Returns the clamped maxTokens value. If no clamping is needed,
    * returns the original value unchanged.
@@ -484,16 +485,35 @@ export default class BaseAgenticHarness {
 
     if (!contextWindow || !requestedMaxTokens) return requestedMaxTokens;
 
-    const estimatedInputTokens = this.estimateInputTokens(messages);
-    const toolCount = this.tools.finalTools.length;
-    const toolSchemaOverhead =
-      CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS +
-      toolCount * CONTEXT_WINDOW.TOKENS_PER_TOOL_SCHEMA;
-    const availableForOutput =
-      contextWindow -
-      estimatedInputTokens -
-      toolSchemaOverhead -
-      OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
+    // 1. Conversation messages
+    const estimatedMessageTokens = this.estimateInputTokens(messages);
+
+    // 2. System prompt (sent as systemInstruction, invisible to messages)
+    const systemPromptText =
+      (this.context.options?.systemPrompt as string | undefined) || "";
+    const estimatedSystemPromptTokens = estimateTokens(systemPromptText);
+
+    // 3. Tool schemas (serialized JSON function definitions)
+    const toolSchemas = this.tools.finalTools;
+    const estimatedToolSchemaTokens =
+      toolSchemas.length > 0
+        ? estimateTokens(JSON.stringify(toolSchemas))
+        : 0;
+
+    const totalEstimatedInput =
+      estimatedMessageTokens +
+      estimatedSystemPromptTokens +
+      estimatedToolSchemaTokens;
+
+    // Apply a multiplicative safety margin to absorb the ~5-6% gap between
+    // our 4-chars/token heuristic and real tokenizer output.
+    // Verified on live Gemma 4 12B: estimate 24,624 vs provider 26,001 (94.7%).
+    const safetyMargin = Math.ceil(
+      totalEstimatedInput * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
+    );
+    const adjustedInput = totalEstimatedInput + safetyMargin;
+
+    const availableForOutput = contextWindow - adjustedInput;
 
     if (requestedMaxTokens <= availableForOutput) return requestedMaxTokens;
 
@@ -504,10 +524,12 @@ export default class BaseAgenticHarness {
 
     logger.warn(
       `[OutputTokenClamp] Clamping maxTokens from ${requestedMaxTokens} → ${clampedMaxTokens} ` +
-        `(contextWindow=${contextWindow}, estimatedInput=${estimatedInputTokens}, ` +
-        `toolSchemaOverhead=${toolSchemaOverhead} [${toolCount} tools], ` +
-        `safetyMargin=${OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN}). ` +
-        `Without clamping: ${estimatedInputTokens + toolSchemaOverhead + requestedMaxTokens} > ${contextWindow}.`,
+        `(contextWindow=${contextWindow}, messages=${estimatedMessageTokens}, ` +
+        `systemPrompt=${estimatedSystemPromptTokens}, ` +
+        `toolSchemas=${estimatedToolSchemaTokens} [${toolSchemas.length} tools], ` +
+        `totalInput=${totalEstimatedInput}, safetyMargin=${safetyMargin} (${(OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER * 100).toFixed(0)}%), ` +
+        `adjustedInput=${adjustedInput}). ` +
+        `Without clamping: ${adjustedInput + requestedMaxTokens} > ${contextWindow}.`,
     );
 
     return clampedMaxTokens;

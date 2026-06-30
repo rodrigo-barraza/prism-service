@@ -422,9 +422,6 @@ export const CONTEXT_WINDOW = {
   /** Default overhead for tool schemas, internal formatting, etc. */
   TOOL_SCHEMA_OVERHEAD_TOKENS: 2000,
 
-  /** Estimated tokens consumed per tool schema in the provider request payload. */
-  TOKENS_PER_TOOL_SCHEMA: 150,
-
   /** Fraction of context window to target (leave headroom for output + safety). */
   TARGET_UTILIZATION: 0.8,
 
