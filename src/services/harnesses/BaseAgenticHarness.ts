@@ -526,6 +526,21 @@ export default class BaseAgenticHarness {
         `willClamp=${requestedMaxTokens > availableForOutput}`,
     );
 
+    // ── Stream budget breakdown to the frontend ──
+    this.context.emit({
+      type: SERVER_SENT_EVENT_TYPES.CONTEXT_BUDGET,
+      contextWindow,
+      messageTokens: estimatedMessageTokens,
+      systemPromptTokens: estimatedSystemPromptTokens,
+      toolSchemaTokens: estimatedToolSchemaTokens,
+      safetyMarginTokens: safetyMargin,
+      totalInputTokens: adjustedInput,
+      availableOutputTokens: Math.max(availableForOutput, 0),
+      requestedOutputTokens: requestedMaxTokens,
+      isClamped: requestedMaxTokens > availableForOutput,
+      toolCount: toolSchemas.length,
+    });
+
     if (requestedMaxTokens <= availableForOutput) return requestedMaxTokens;
 
     const clampedMaxTokens = Math.max(
