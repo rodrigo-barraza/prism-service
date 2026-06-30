@@ -930,7 +930,19 @@ export default class ReActHarness extends BaseAgenticHarness {
 
       // ── Finalization (happy path) ──────────────────────────────
       cleanupReminderCache(agentConversationId);
-      await this.finalize(currentMessages, hooks);
+
+      // When the loop exits due to NON_BLOCKING_DISPATCH, defer the
+      // SSE `done` event and keep isGenerating=true in MongoDB. This
+      // prevents the client from treating the generation as complete
+      // while sub-agents are still running. The auto-response path
+      // (_triggerParentAutoResponse → handleAgent) will emit its own
+      // authoritative `done` event and clear isGenerating when the
+      // entire agentic cycle (parent + sub-agents + synthesis) completes.
+      const deferredDoneEvent = await this.finalize(
+        currentMessages,
+        hooks,
+        hasNonBlockingDispatchBreak ? { deferDoneEmission: true } : undefined,
+      );
 
       // ── Await non-blocking dispatches ──────────────────────────
       // When the loop exited due to NON_BLOCKING_DISPATCH, keep the
@@ -947,6 +959,15 @@ export default class ReActHarness extends BaseAgenticHarness {
         } catch (awaitError: unknown) {
           logger.warn(
             `[ReActHarness] Failed to await pending dispatches: ${awaitError instanceof Error ? awaitError.message : String(awaitError)}`,
+          );
+        }
+
+        // The auto-response emits its own `done` event, so the
+        // deferred one from the initial finalize is discarded.
+        // Log for observability.
+        if (deferredDoneEvent) {
+          logger.info(
+            `[ReActHarness] Discarded deferred done event — auto-response owns the terminal signal`,
           );
         }
       }

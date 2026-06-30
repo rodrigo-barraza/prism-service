@@ -152,6 +152,11 @@ export function swapMessageContent(message: MessagePayload) {
  *
  * Used by all harness implementations and the /chat streaming path.
  */
+export interface DeferredDoneEvent {
+  type: string;
+  [key: string]: unknown;
+}
+
 export async function finalizeTextGeneration(
   context: FinalizerContext,
   {
@@ -175,7 +180,8 @@ export async function finalizeTextGeneration(
     resolvedEnabledTools,
   }: FinalizerPayload,
   overrideMessagesToAppend: MessagePayload[] | null = null,
-) {
+  finalizerOptions?: { deferDoneEmission?: boolean },
+): Promise<DeferredDoneEvent | null> {
   const {
     providerName,
     resolvedModel,
@@ -478,34 +484,54 @@ export async function finalizeTextGeneration(
       username as string,
       sanitizedMessagesToAppend,
       finalMeta,
-      getCollectionOpts(project, agent),
+      {
+        ...getCollectionOpts(project, agent),
+        // When deferring the done event (non-blocking sub-agent dispatch),
+        // keep isGenerating=true in MongoDB so clients loading the conversation
+        // from the database see it as still active. The auto-response's own
+        // finalize call will clear the flag when the full cycle completes.
+        ...(finalizerOptions?.deferDoneEmission && { skipGeneratingClear: true }),
+      },
     );
   }
   // ── Emit done event ───────────────────────────────────────────
   // Emitted AFTER persistence so the client's post-stream DB fetch
   // is guaranteed to see the complete, up-to-date conversation.
+  //
+  // When deferDoneEmission is true, the done event is NOT emitted here
+  // but returned to the caller so it can be emitted later (e.g., after
+  // non-blocking sub-agent dispatches settle). This prevents the client
+  // from treating the generation as complete while sub-agents are running.
   if (!signal?.aborted) {
+    const doneEventPayload: DeferredDoneEvent = {
+      type: SERVER_SENT_EVENT_TYPES.DONE,
+      provider: providerName,
+      model: resolvedModel,
+      usage: usage || null,
+      estimatedCost,
+      tokensPerSec,
+      ...(audioRef ? { audioRef } : {}),
+      timeToGeneration:
+        timeToGenerationSec != null
+          ? roundMilliseconds(timeToGenerationSec)
+          : null,
+      generationTime:
+        generationSec != null ? roundMilliseconds(generationSec) : null,
+      totalTime: totalSec != null ? roundMilliseconds(totalSec) : null,
+      ...(traceId && { traceId }),
+      ...(conversationId && { conversationId }),
+    };
+
+    if (finalizerOptions?.deferDoneEmission) {
+      return doneEventPayload;
+    }
+
     if (emit) {
-      emit({
-        type: SERVER_SENT_EVENT_TYPES.DONE,
-        provider: providerName,
-        model: resolvedModel,
-        usage: usage || null,
-        estimatedCost,
-        tokensPerSec,
-        ...(audioRef ? { audioRef } : {}),
-        timeToGeneration:
-          timeToGenerationSec != null
-            ? roundMilliseconds(timeToGenerationSec)
-            : null,
-        generationTime:
-          generationSec != null ? roundMilliseconds(generationSec) : null,
-        totalTime: totalSec != null ? roundMilliseconds(totalSec) : null,
-        ...(traceId && { traceId }),
-        ...(conversationId && { conversationId }),
-      });
+      emit(doneEventPayload);
     }
   }
+
+  return null;
 }
 
 export { getCollectionOpts };

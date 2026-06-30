@@ -27,6 +27,7 @@ import { COLLECTIONS, FILE_CATEGORIES } from "../../constants.ts";
 import {
   finalizeTextGeneration,
   type FinalizerContext,
+  type DeferredDoneEvent,
   computeNewTurnMessages,
 } from "./lifecycle/Finalizer.ts";
 import logger from "../../utils/logger.ts";
@@ -1230,7 +1231,8 @@ export default class BaseAgenticHarness {
   protected async finalize(
     currentMessages: ConversationMessage[],
     hooks: AgentHooks,
-  ): Promise<void> {
+    finalizeOptions?: { deferDoneEmission?: boolean },
+  ): Promise<DeferredDoneEvent | null> {
     const context = this.context;
     const state = this.state;
 
@@ -1264,7 +1266,7 @@ export default class BaseAgenticHarness {
         `text=${(state.finalStreamedText || "").length}chars`,
     );
 
-    await finalizeTextGeneration(
+    const deferredDoneEvent = await finalizeTextGeneration(
       context as FinalizerContext,
       {
         text: state.finalStreamedText.trim(),
@@ -1290,6 +1292,7 @@ export default class BaseAgenticHarness {
         resolvedEnabledTools: this.tools.resolvedEnabledTools,
       },
       newTurnMessages as MessagePayload[],
+      finalizeOptions,
     );
 
     // Persist sub-agent snapshots for orchestrator conversations
@@ -1378,6 +1381,8 @@ export default class BaseAgenticHarness {
         })),
       }),
     });
+
+    return deferredDoneEvent;
   }
 
   // ── Private helpers ───────────────────────────────────────
