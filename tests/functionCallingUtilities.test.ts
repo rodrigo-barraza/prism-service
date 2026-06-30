@@ -201,9 +201,12 @@ describe("expandMessagesForFunctionCall", () => {
 
     const expanded = expandMessagesForFunctionCall(messages);
 
-    expect(expanded).toHaveLength(1);
+    // assistant + tool message (undefined result coalesced to null)
+    expect(expanded).toHaveLength(2);
     expect(expanded[0].role).toBe("assistant");
     expect(expanded[0].toolCalls).toHaveLength(1);
+    expect(expanded[1].role).toBe("tool");
+    expect(expanded[1].name).toBe("list_files");
   });
 
   it("should preserve thinking and thinkingSignature on assistant messages", () => {
@@ -246,7 +249,7 @@ describe("expandMessagesForFunctionCall", () => {
     expect(expanded[0].content).toBe(" ");
   });
 
-  it("should skip tool result messages when result is undefined", () => {
+  it("should coalesce undefined tool results to null instead of dropping them", () => {
     const messages: TestMessage[] = [
       {
         role: "assistant",
@@ -259,9 +262,12 @@ describe("expandMessagesForFunctionCall", () => {
 
     const expanded = expandMessagesForFunctionCall(messages);
 
-    // Only assistant message, no tool message (result undefined = pending)
-    expect(expanded).toHaveLength(1);
+    // Undefined results are coalesced to null — produces a tool message
+    // to prevent orphaned tool_calls structures that providers reject.
+    expect(expanded).toHaveLength(2);
     expect(expanded[0].role).toBe("assistant");
+    expect(expanded[1].role).toBe("tool");
+    expect(expanded[1].content).toBe("null");
   });
 
   it("should handle multiple toolCalls producing multiple tool messages", () => {
@@ -380,21 +386,22 @@ describe('FunctionCallingUtilities adversarial', () => {
       expect(result.length).toBe(1);
     });
 
-    it('should handle assistant message with toolCalls but undefined result', () => {
+    it('should coalesce undefined tool result to null and produce a tool message', () => {
       const messages = [
         {
           role: 'assistant',
           content: 'thinking...',
           toolCalls: [
             { id: 'tc1', name: 'search', args: { query: 'test' } },
-            // result is undefined — should be filtered out from tool messages
+            // result is undefined — coalesced to null to avoid orphaned tool_calls
           ],
         },
       ] as any;
       const result = expandMessagesForFunctionCall(messages);
-      // Should produce assistant + 0 tool messages (result is undefined)
+      // Should produce assistant + 1 tool message (undefined → null)
       const toolMessages = result.filter((message) => message.role === 'tool');
-      expect(toolMessages.length).toBe(0);
+      expect(toolMessages.length).toBe(1);
+      expect(toolMessages[0].content).toBe('null');
     });
 
     it('should filter deleted messages when filterDeleted is true', () => {
@@ -437,7 +444,7 @@ describe('FunctionCallingUtilities adversarial', () => {
       expect(toolMessages[0].content).toBe("null");
     });
 
-    it('should handle multiple toolCalls with mixed results', () => {
+    it('should handle multiple toolCalls with mixed results (undefined coalesced to null)', () => {
       const messages = [
         {
           role: "assistant",
@@ -460,8 +467,11 @@ describe('FunctionCallingUtilities adversarial', () => {
       ] as any;
       const expanded = expandMessagesForFunctionCall(messages);
       const toolMessages = expanded.filter((message) => message.role === "tool");
-      expect(toolMessages).toHaveLength(1);
+      // Both tool calls produce tool messages — undefined coalesced to null
+      expect(toolMessages).toHaveLength(2);
       expect(toolMessages[0].name).toBe("search_web");
+      expect(toolMessages[1].name).toBe("generate_audio");
+      expect(toolMessages[1].content).toBe("null");
     });
 
     it('should simulate the exact iteration 2 message expansion for generate_audio flow', () => {

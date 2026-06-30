@@ -271,6 +271,14 @@ export default class ReActHarness extends BaseAgenticHarness {
               currentMessages,
             );
           }
+
+          // ── Re-snapshot after hook mutations ────────────────────
+          // SystemPromptAssembler may splice context messages into
+          // currentMessages, shifting indices. Update originalMessageCount
+          // so computeNewTurnMessages slices from the correct boundary —
+          // without this, the assistant message with tool results can fall
+          // outside the persistence slice and tool results are lost.
+          state.originalMessageCount = currentMessages.length;
         }
 
         // ── Build pass options ─────────────────────────────────
@@ -644,6 +652,26 @@ export default class ReActHarness extends BaseAgenticHarness {
             }),
           };
           currentMessages.push(assistantMessage);
+
+          // ── Sync tool results back to state ───────────────────
+          // state.streamedToolCalls are populated during streaming but
+          // never receive tool execution results. The Finalizer's metadata
+          // message path uses state.streamedToolCalls — if results are
+          // missing, persisted tool calls have result: undefined, which
+          // breaks expandMessagesForFunctionCall on the next auto-response.
+          for (const pendingToolCall of pass.pendingToolCalls) {
+            const matchingResult = results.find(
+              (toolResult) => toolResult.id === pendingToolCall.id,
+            );
+            const stateToolCall = state.streamedToolCalls.find(
+              (streamedToolCall) =>
+                streamedToolCall.id === pendingToolCall.id,
+            );
+            if (stateToolCall && matchingResult) {
+              stateToolCall.result = matchingResult.result;
+              stateToolCall.durationMs = matchingResult.durationMs;
+            }
+          }
 
           // ── Structured retry guidance on tool failure ──────────
           // When tool calls fail, inject a system message prompting the
