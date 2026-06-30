@@ -529,7 +529,57 @@ describe("Event-Driven Auto-Response", () => {
       expect(agentParams.thinkingBudget).toBeUndefined();
     });
 
-    it("should use live WebSocket emit when a connection is registered for the conversation", async () => {
+    it("should use parent SSE emit from orchestratorContext when available (primary path)", async () => {
+      const parentSseEmit = vi.fn();
+      const contextWithEmit = { ...orchestratorContext, emit: parentSseEmit };
+
+      // Even register a WebSocket — it should NOT be used because SSE takes priority
+      const WebSocketConnectionRegistry = (
+        await import("../src/websocket/WebSocketConnectionRegistry.ts")
+      ).default;
+      const mockWebSocketEmit = vi.fn();
+      const mockWebSocket = { readyState: 1, OPEN: 1, send: vi.fn() };
+      WebSocketConnectionRegistry.register(
+        "parent-conv-id",
+        mockWebSocket as unknown as import("ws").WebSocket,
+        mockWebSocketEmit,
+      );
+
+      mockFindOne.mockResolvedValue({
+        id: "parent-conv-id",
+        isGenerating: false,
+        messages: [
+          { role: "user", content: "Build me a feature" },
+          { role: "assistant", content: "I spawned sub-agents" },
+        ],
+        settings: {
+          provider: PROVIDERS.GOOGLE,
+          model: "gemini-3-flash-preview",
+          agent: "CODING",
+        },
+      });
+
+      await OrchestratorService._triggerParentAutoResponse(
+        "parent-conv-id", "test-project", "test-user",
+        contextWithEmit, completionMessage,
+      );
+
+      // handleAgent should receive the parent SSE emit
+      expect(mockHandleAgent).toHaveBeenCalledTimes(1);
+      const emitArg = mockHandleAgent.mock.calls[0][1];
+      expect(typeof emitArg).toBe("function");
+
+      // Emit through and verify it reaches the parent SSE emit, NOT WebSocket
+      emitArg({ type: "test_streaming_event", data: "live" });
+      expect(parentSseEmit).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "test_streaming_event", data: "live" }),
+      );
+      expect(mockWebSocketEmit).not.toHaveBeenCalled();
+
+      WebSocketConnectionRegistry.clear();
+    });
+
+    it("should fall back to WebSocket emit when orchestratorContext has no emit function", async () => {
       const WebSocketConnectionRegistry = (
         await import("../src/websocket/WebSocketConnectionRegistry.ts")
       ).default;
@@ -557,9 +607,12 @@ describe("Event-Driven Auto-Response", () => {
         },
       });
 
+      // Context without emit — forces WebSocket fallback
+      const contextWithoutEmit = { ...orchestratorContext, emit: undefined };
+
       await OrchestratorService._triggerParentAutoResponse(
         "parent-conv-id", "test-project", "test-user",
-        orchestratorContext, completionMessage,
+        contextWithoutEmit, completionMessage,
       );
 
       // handleAgent should receive the WebSocket emit as the second arg
@@ -576,7 +629,7 @@ describe("Event-Driven Auto-Response", () => {
       WebSocketConnectionRegistry.clear();
     });
 
-    it("should fall back to debug logger when no WebSocket connection is registered", async () => {
+    it("should fall back to debug logger when no emit source is available", async () => {
       const WebSocketConnectionRegistry = (
         await import("../src/websocket/WebSocketConnectionRegistry.ts")
       ).default;
@@ -594,9 +647,12 @@ describe("Event-Driven Auto-Response", () => {
         },
       });
 
+      // Context without emit AND no WebSocket — forces debug fallback
+      const contextWithoutEmit = { ...orchestratorContext, emit: undefined };
+
       await OrchestratorService._triggerParentAutoResponse(
         "parent-conv-id", "test-project", "test-user",
-        orchestratorContext, completionMessage,
+        contextWithoutEmit, completionMessage,
       );
 
       // handleAgent still receives an emit function (the debug fallback)
