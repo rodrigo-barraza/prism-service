@@ -60,7 +60,9 @@ export async function manageContextPressure(
 ): Promise<ContextPressureResult> {
   const { emit, signal } = context;
   const contextWindowSize =
-    context.modelDefinition?.maxInputTokens || DEFAULT_MAX_INPUT_TOKENS;
+    context.modelDefinition?.maxInputTokens ||
+    (context.options?._loadedContextLength as number | undefined) ||
+    DEFAULT_MAX_INPUT_TOKENS;
   const maxOutputTokens =
     context.options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS;
   const availableInputBudget = contextWindowSize - maxOutputTokens;
