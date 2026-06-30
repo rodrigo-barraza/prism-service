@@ -355,6 +355,34 @@ describe("Dynamic Output Token Clamping", () => {
       const passedOptions = mockGenerateTextStream.mock.calls[0][2];
       expect(passedOptions.maxTokens).toBe(16_384);
     });
+
+    it("should propagate _loadedContextLength back to options on next iteration", () => {
+      const mockGenerateTextStream = vi.fn().mockImplementation((messages, model, options) => {
+        options._loadedContextLength = 90_000;
+        return (async function* () {})();
+      });
+
+      const options: any = { maxTokens: 64_000 };
+      harness = createMinimalHarness({
+        provider: {
+          generateTextStream: mockGenerateTextStream,
+        },
+        modelDefinition: null,
+        options,
+      } as any);
+
+      const messagesFirstIteration = createMessagesWithTokenCount(10_000);
+      harness.createProviderStream(messagesFirstIteration, options);
+
+      expect(options._loadedContextLength).toBe(90_000);
+
+      const messagesSecondIteration = createMessagesWithTokenCount(30_000);
+      harness.createProviderStream(messagesSecondIteration, options);
+
+      const passedOptions = mockGenerateTextStream.mock.calls[1][2];
+      const expectedClamped = 90_000 - 30_000 - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
+      expect(passedOptions.maxTokens).toBe(expectedClamped);
+    });
   });
 });
 
