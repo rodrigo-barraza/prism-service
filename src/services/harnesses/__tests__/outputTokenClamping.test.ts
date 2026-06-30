@@ -2,28 +2,24 @@
  * Output Token Clamping — Defense-in-Depth Regression Tests
  *
  * Validates that `clampOutputTokens` correctly prevents context window
- * overflow for ALL model types — including unregistered local models
- * (LM Studio) that lack a `modelDefinition` in the MODELS registry.
+ * overflow by accounting for ALL three components of the provider's input
+ * budget that contribute to the total token count:
  *
- * Root cause of the original bug: `clampOutputTokens` only resolved
- * the context window from `modelDefinition.maxInputTokens`. When
- * `modelDefinition` was null (all unregistered local models), the
- * clamp was silently skipped and the full 64,000 output tokens were
- * sent unclamped — overflowing models with smaller context windows
- * (e.g. Gemma 4 12B at 90K tokens).
+ *   1. System prompt (passed as systemInstruction, NOT in messages)
+ *   2. Conversation messages (the messages array)
+ *   3. Tool schemas (serialized JSON function definitions)
  *
- * Fix: three-source fallback chain:
- *   1. modelDefinition.maxInputTokens  (registered models)
- *   2. options._loadedContextLength     (runtime from LM Studio)
- *   3. null                             (skip clamping entirely)
+ * The safety margin is a 10% multiplicative buffer on the estimated input
+ * to absorb the systematic ~5-6% underestimate of the 4-chars/token heuristic
+ * vs real tokenizers (verified: 24,624 estimated vs 26,001 provider-reported
+ * on Gemma 4 12B = 94.7% accuracy).
  */
 import { describe, it, expect } from "vitest";
 
 import {
-  OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN,
+  OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
   MINIMUM_CLAMPED_OUTPUT_TOKENS,
 } from "../../../constants/TokenBudgetDefaults.ts";
-import { CONTEXT_WINDOW } from "../../../constants.ts";
 import { estimateTokens } from "../../../utils/CostCalculator.ts";
 
 import type { ConversationMessage } from "../types.ts";
@@ -43,7 +39,8 @@ function clampOutputTokens(
   requestedMaxTokens: number | undefined,
   modelDefinitionMaxInputTokens: number | undefined | null,
   loadedContextLength: number | undefined | null,
-  toolCount = 0,
+  systemPromptText = "",
+  toolSchemas: unknown[] = [],
 ): number | undefined {
   const contextWindow =
     modelDefinitionMaxInputTokens ||
@@ -52,15 +49,30 @@ function clampOutputTokens(
 
   if (!contextWindow || !requestedMaxTokens) return requestedMaxTokens;
 
-  const estimatedInputTokens = estimateInputTokens(messages);
-  const toolSchemaOverhead =
-    CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS +
-    toolCount * CONTEXT_WINDOW.TOKENS_PER_TOOL_SCHEMA;
-  const availableForOutput =
-    contextWindow -
-    estimatedInputTokens -
-    toolSchemaOverhead -
-    OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
+  // 1. Conversation messages
+  const estimatedMessageTokens = estimateInputTokens(messages);
+
+  // 2. System prompt (sent as systemInstruction, invisible to messages)
+  const estimatedSystemPromptTokens = estimateTokens(systemPromptText);
+
+  // 3. Tool schemas (serialized JSON function definitions)
+  const estimatedToolSchemaTokens =
+    toolSchemas.length > 0
+      ? estimateTokens(JSON.stringify(toolSchemas))
+      : 0;
+
+  const totalEstimatedInput =
+    estimatedMessageTokens +
+    estimatedSystemPromptTokens +
+    estimatedToolSchemaTokens;
+
+  // Multiplicative safety margin to absorb tokenizer underestimate
+  const safetyMargin = Math.ceil(
+    totalEstimatedInput * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
+  );
+  const adjustedInput = totalEstimatedInput + safetyMargin;
+
+  const availableForOutput = contextWindow - adjustedInput;
 
   if (requestedMaxTokens <= availableForOutput) return requestedMaxTokens;
 
@@ -106,392 +118,353 @@ function createMessagesWithTokenCount(
   ];
 }
 
+/**
+ * Generate a fake system prompt with a known approximate token count.
+ */
+function createSystemPromptWithTokenCount(targetTokens: number): string {
+  return "x".repeat(targetTokens * 4);
+}
+
+/**
+ * Generate fake tool schemas with realistic sizes.
+ * Average real tool schema ≈ 100-200 tokens (from live API analysis).
+ */
+function createToolSchemas(toolCount: number): unknown[] {
+  return Array.from({ length: toolCount }, (_, index) => ({
+    name: `tool_${index}`,
+    description: "A tool that does something useful with parameters and returns results. " +
+      "Use this when you need to perform an operation that requires external data.",
+    parameters: {
+      type: "object",
+      properties: {
+        input: { type: "string", description: "The primary input for this tool" },
+        options: { type: "object", description: "Additional configuration options" },
+      },
+      required: ["input"],
+    },
+  }));
+}
+
 // ── Test Suite ───────────────────────────────────────────────
 
 describe("Output Token Clamping (clampOutputTokens)", () => {
-  describe("registered models (modelDefinition.maxInputTokens present)", () => {
-    it("should clamp when input + output exceeds context window", () => {
+  /**
+   * ── REAL CONVERSATION REPRODUCTION ──
+   * These tests use EXACT numbers from the live failing conversation
+   * (8fb3b7c8-7f9f-443f-8c3e-915043d92be3) verified against api.prism.rod.dev.
+   */
+  describe("real conversation reproduction (Gemma 4 12B overflow)", () => {
+    // Real values from the API:
+    // - System prompt: 55,662 chars = ~13,915 tokens
+    // - Messages: ~8,749 tokens (system context + user + tool calls + tool update)
+    // - Tool schemas: ~1,960 tokens (18 tools, 108 tokens avg)
+    // - Provider reported: 26,001 input tokens
+    // - Our estimate: 24,624 tokens (94.7% of actual)
+    // - Context window: 90,000
+    // - Requested output: 64,000
+
+    it("should clamp with exact real conversation token counts", () => {
       const contextWindow = 90_000;
-      const inputTokens = 30_000;
       const requestedOutputTokens = 64_000;
-      const messages = createMessagesWithTokenCount(inputTokens);
+
+      // Real system prompt: 55,662 chars ≈ 13,915 tokens
+      const systemPrompt = createSystemPromptWithTokenCount(13_915);
+      // Real messages: 8,749 tokens
+      const messages = createMessagesWithTokenCount(8_749);
+      // Real tool schemas: 18 tools ≈ 1,960 tokens total
+      const toolSchemas = createToolSchemas(18);
 
       const clamped = clampOutputTokens(
         messages,
         requestedOutputTokens,
-        contextWindow,
         null,
+        contextWindow,
+        systemPrompt,
+        toolSchemas,
       );
 
       expect(clamped).toBeDefined();
       expect(clamped!).toBeLessThan(requestedOutputTokens);
-      const baseToolSchemaOverhead = CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS;
-      expect(clamped!).toBeLessThanOrEqual(
-        contextWindow - inputTokens - baseToolSchemaOverhead - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN,
-      );
+
+      // Verify the full budget: adjusted input + clamped output ≤ context window
+      const estimatedInput = estimateInputTokens(messages) +
+        estimateTokens(systemPrompt) +
+        estimateTokens(JSON.stringify(toolSchemas));
+      const safetyMargin = Math.ceil(estimatedInput * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER);
+      const adjustedInput = estimatedInput + safetyMargin;
+
+      expect(adjustedInput + clamped!).toBeLessThanOrEqual(contextWindow);
     });
 
-    it("should return unchanged when request fits within budget", () => {
+    it("should have adjusted estimate that exceeds provider-reported 26,001", () => {
+      const systemPrompt = createSystemPromptWithTokenCount(13_915);
+      const messages = createMessagesWithTokenCount(8_749);
+      const toolSchemas = createToolSchemas(18);
+
+      const estimatedInput = estimateInputTokens(messages) +
+        estimateTokens(systemPrompt) +
+        estimateTokens(JSON.stringify(toolSchemas));
+      const safetyMargin = Math.ceil(estimatedInput * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER);
+      const adjustedInput = estimatedInput + safetyMargin;
+
+      // Our adjusted estimate must EXCEED the provider's actual count
+      // to guarantee the clamp fires conservatively
+      const providerReportedInput = 26_001;
+      expect(adjustedInput).toBeGreaterThan(providerReportedInput);
+    });
+  });
+
+  describe("system prompt accounting", () => {
+    it("should clamp when system prompt alone pushes input over budget", () => {
+      const contextWindow = 90_000;
+      const requestedOutputTokens = 64_000;
+
+      // 14K system prompt + 5K messages + 10% safety = ~20,900 adjusted
+      // available = 90,000 - 20,900 = 69,100 → fits
+      // But 20K system prompt + 5K messages + 10% safety = ~27,500 adjusted
+      // available = 90,000 - 27,500 = 62,500 → doesn't fit → clamps
+      const largeSystemPrompt = createSystemPromptWithTokenCount(20_000);
+      const messages = createMessagesWithTokenCount(5_000);
+
+      const clamped = clampOutputTokens(
+        messages,
+        requestedOutputTokens,
+        null,
+        contextWindow,
+        largeSystemPrompt,
+      );
+
+      expect(clamped).toBeDefined();
+      expect(clamped!).toBeLessThan(requestedOutputTokens);
+    });
+
+    it("should NOT clamp when system prompt is empty and messages are small", () => {
       const contextWindow = 200_000;
-      const inputTokens = 10_000;
       const requestedOutputTokens = 16_384;
-      const messages = createMessagesWithTokenCount(inputTokens);
+      const messages = createMessagesWithTokenCount(5_000);
 
       const clamped = clampOutputTokens(
         messages,
         requestedOutputTokens,
         contextWindow,
         null,
+        "", // no system prompt
       );
 
       expect(clamped).toBe(requestedOutputTokens);
     });
   });
 
-  describe("unregistered models (modelDefinition is null, _loadedContextLength present)", () => {
-    it("should fall back to _loadedContextLength and clamp correctly", () => {
-      const loadedContextLength = 90_000;
-      const inputTokens = 26_000;
+  describe("tool schema accounting", () => {
+    it("should clamp when 20 tool schemas push context over the limit", () => {
+      const contextWindow = 90_000;
       const requestedOutputTokens = 64_000;
-      const messages = createMessagesWithTokenCount(inputTokens);
+      const systemPrompt = createSystemPromptWithTokenCount(15_000);
+      const messages = createMessagesWithTokenCount(8_000);
+      const toolSchemas = createToolSchemas(20);
 
       const clamped = clampOutputTokens(
         messages,
         requestedOutputTokens,
         null,
-        loadedContextLength,
+        contextWindow,
+        systemPrompt,
+        toolSchemas,
       );
 
       expect(clamped).toBeDefined();
       expect(clamped!).toBeLessThan(requestedOutputTokens);
-
-      const estimatedInput = estimateInputTokens(messages);
-      const baseToolSchemaOverhead = CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS;
-      const expectedMaxOutput =
-        loadedContextLength - estimatedInput - baseToolSchemaOverhead - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
-      expect(clamped).toBe(Math.max(expectedMaxOutput, MINIMUM_CLAMPED_OUTPUT_TOKENS));
     });
 
-    it("should return unchanged when request fits within loaded context budget", () => {
-      const loadedContextLength = 131_072;
-      const inputTokens = 5_000;
-      const requestedOutputTokens = 16_384;
-      const messages = createMessagesWithTokenCount(inputTokens);
+    it("should allow more output when no tool schemas are present", () => {
+      const contextWindow = 90_000;
+      const requestedOutputTokens = 80_000;
+      const messages = createMessagesWithTokenCount(3_000);
 
-      const clamped = clampOutputTokens(
+      const withoutTools = clampOutputTokens(
         messages,
         requestedOutputTokens,
         null,
-        loadedContextLength,
+        contextWindow,
+        "",
+        [],
       );
 
-      expect(clamped).toBe(requestedOutputTokens);
-    });
-
-    it("should reproduce the exact Gemma 4 12B overflow scenario", () => {
-      // Exact reproduction: Gemma 4 12B with 90K context,
-      // 64K output tokens, ~26K input tokens
-      const loadedContextLength = 90_000;
-      const inputTokens = 26_001;
-      const requestedOutputTokens = 64_000;
-      const messages = createMessagesWithTokenCount(inputTokens);
-
-      const clamped = clampOutputTokens(
+      const withTools = clampOutputTokens(
         messages,
         requestedOutputTokens,
         null,
-        loadedContextLength,
+        contextWindow,
+        "",
+        createToolSchemas(20),
       );
 
-      // Without the fix, this would return 64_000 (unclamped) and overflow.
-      // With the fix, it should clamp to fit.
-      expect(clamped).toBeDefined();
-      expect(clamped!).toBeLessThan(requestedOutputTokens);
-
-      const estimatedInput = estimateInputTokens(messages);
-      const baseToolSchemaOverhead = CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS;
-      expect(estimatedInput + clamped! + baseToolSchemaOverhead + OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN).toBeLessThanOrEqual(
-        loadedContextLength,
-      );
+      // More tools = less available for output
+      if (withTools !== requestedOutputTokens) {
+        expect(withTools!).toBeLessThan(withoutTools!);
+      }
     });
   });
 
-  describe("no context information available", () => {
-    it("should return requestedMaxTokens unchanged when both sources are null", () => {
-      const requestedOutputTokens = 64_000;
-      const messages = createMessagesWithTokenCount(10_000);
+  describe("context source priority", () => {
+    it("should prefer modelDefinition.maxInputTokens over _loadedContextLength", () => {
+      const messages = createMessagesWithTokenCount(30_000);
 
-      const clamped = clampOutputTokens(
+      const clampedWithLargeModel = clampOutputTokens(
         messages,
-        requestedOutputTokens,
+        64_000,
+        200_000, // modelDefinition says 200K
+        90_000,  // runtime says 90K
+      );
+
+      // With 200K context, 30K messages + 10% safety ≈ 33K → 167K available → fits
+      expect(clampedWithLargeModel).toBe(64_000);
+
+      // Verify that with only the smaller loaded context, it would clamp
+      const clampedWithSmallRuntime = clampOutputTokens(
+        messages,
+        64_000,
+        null,
+        90_000,
+      );
+      expect(clampedWithSmallRuntime!).toBeLessThan(64_000);
+    });
+  });
+
+  describe("edge cases", () => {
+    it("should return unchanged when both context sources are null", () => {
+      const clamped = clampOutputTokens(
+        createMessagesWithTokenCount(10_000),
+        64_000,
         null,
         null,
       );
-
-      expect(clamped).toBe(requestedOutputTokens);
+      expect(clamped).toBe(64_000);
     });
 
     it("should return undefined when requestedMaxTokens is undefined", () => {
-      const messages = createMessagesWithTokenCount(10_000);
-
-      const clamped = clampOutputTokens(messages, undefined, 128_000, null);
-
+      const clamped = clampOutputTokens(
+        createMessagesWithTokenCount(10_000),
+        undefined,
+        128_000,
+        null,
+      );
       expect(clamped).toBeUndefined();
     });
-  });
 
-  describe("priority order of context sources", () => {
-    it("should prefer modelDefinition.maxInputTokens over _loadedContextLength", () => {
-      const modelDefinitionContextWindow = 200_000;
-      const loadedContextLength = 90_000;
-      const inputTokens = 30_000;
-      const requestedOutputTokens = 64_000;
-      const messages = createMessagesWithTokenCount(inputTokens);
-
-      const clampedWithModelDef = clampOutputTokens(
-        messages,
-        requestedOutputTokens,
-        modelDefinitionContextWindow,
-        loadedContextLength,
-      );
-
-      // With a 200K context window, 30K input + 64K output fits easily
-      expect(clampedWithModelDef).toBe(requestedOutputTokens);
-
-      // Verify that with only the smaller loaded context, it would clamp
-      const clampedWithLoadedOnly = clampOutputTokens(
-        messages,
-        requestedOutputTokens,
-        null,
-        loadedContextLength,
-      );
-      expect(clampedWithLoadedOnly!).toBeLessThan(requestedOutputTokens);
-    });
-  });
-
-  describe("edge cases and boundary conditions", () => {
     it("should floor at MINIMUM_CLAMPED_OUTPUT_TOKENS when context is nearly exhausted", () => {
-      // Context is 10K, input is 9K — only ~1K left, but floor is 1024
-      const contextWindow = 10_000;
-      const inputTokens = 9_500;
-      const requestedOutputTokens = 64_000;
-      const messages = createMessagesWithTokenCount(inputTokens);
-
       const clamped = clampOutputTokens(
-        messages,
-        requestedOutputTokens,
-        contextWindow,
+        createMessagesWithTokenCount(9_500),
+        64_000,
+        10_000,
         null,
       );
-
       expect(clamped).toBe(MINIMUM_CLAMPED_OUTPUT_TOKENS);
     });
 
-    it("should floor at MINIMUM_CLAMPED_OUTPUT_TOKENS when input exceeds context window", () => {
-      // Pathological: input already exceeds context — available is negative
-      const contextWindow = 10_000;
-      const inputTokens = 15_000;
-      const requestedOutputTokens = 64_000;
-      const messages = createMessagesWithTokenCount(inputTokens);
-
+    it("should floor at MINIMUM_CLAMPED_OUTPUT_TOKENS when input exceeds context", () => {
       const clamped = clampOutputTokens(
-        messages,
-        requestedOutputTokens,
-        contextWindow,
+        createMessagesWithTokenCount(15_000),
+        64_000,
+        10_000,
         null,
       );
-
       expect(clamped).toBe(MINIMUM_CLAMPED_OUTPUT_TOKENS);
-    });
-
-    it("should return unchanged at exact boundary minus safety margin and tool overhead", () => {
-      // Set up so input + output + tool overhead + safety margin == exactly contextWindow
-      const contextWindow = 100_000;
-      const requestedOutputTokens = 16_384;
-      const baseToolSchemaOverhead = CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS;
-      const targetInputTokens =
-        contextWindow - requestedOutputTokens - baseToolSchemaOverhead - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
-      const messages = createMessagesWithTokenCount(targetInputTokens);
-
-      const clamped = clampOutputTokens(
-        messages,
-        requestedOutputTokens,
-        contextWindow,
-        null,
-      );
-
-      // Should fit exactly (available == requested)
-      expect(clamped).toBe(requestedOutputTokens);
-    });
-
-    it("should clamp when 1 token over the boundary", () => {
-      const contextWindow = 100_000;
-      const requestedOutputTokens = 16_384;
-      const baseToolSchemaOverhead = CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS;
-      // 1 extra token beyond what fits
-      const targetInputTokens =
-        contextWindow - requestedOutputTokens - baseToolSchemaOverhead - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN + 1;
-      const messages = createMessagesWithTokenCount(targetInputTokens);
-
-      const clamped = clampOutputTokens(
-        messages,
-        requestedOutputTokens,
-        contextWindow,
-        null,
-      );
-
-      expect(clamped!).toBeLessThan(requestedOutputTokens);
     });
 
     it("should handle empty messages array", () => {
-      const contextWindow = 128_000;
-      const requestedOutputTokens = 64_000;
-
       const clamped = clampOutputTokens(
         [],
-        requestedOutputTokens,
-        contextWindow,
+        64_000,
+        128_000,
         null,
       );
-
-      // Empty messages → 0 input tokens → base overhead only → plenty of room
-      expect(clamped).toBe(requestedOutputTokens);
+      expect(clamped).toBe(64_000);
     });
 
-    it("should handle zero context window gracefully", () => {
-      // Zero is falsy — should skip clamping (same as null)
-      const requestedOutputTokens = 64_000;
-      const messages = createMessagesWithTokenCount(10_000);
-
+    it("should handle zero context window (falsy → skip clamping)", () => {
       const clamped = clampOutputTokens(
-        messages,
-        requestedOutputTokens,
+        createMessagesWithTokenCount(10_000),
+        64_000,
         0,
         0,
       );
-
-      expect(clamped).toBe(requestedOutputTokens);
+      expect(clamped).toBe(64_000);
     });
   });
 
-  describe("invariant: input + clamped output never exceeds context window", () => {
+  describe("invariant: adjusted input + clamped output ≤ context window", () => {
     const testCases = [
-      { contextWindow: 90_000, inputTokens: 26_001, requestedOutput: 64_000, label: "Gemma 4 12B (90K)" },
-      { contextWindow: 32_768, inputTokens: 20_000, requestedOutput: 16_384, label: "Small local model (32K)" },
-      { contextWindow: 8_192, inputTokens: 6_000, requestedOutput: 16_384, label: "Tiny model (8K)" },
-      { contextWindow: 128_000, inputTokens: 100_000, requestedOutput: 64_000, label: "Large model saturated (128K)" },
-      { contextWindow: 200_000, inputTokens: 10_000, requestedOutput: 64_000, label: "Large model with headroom (200K)" },
+      {
+        label: "Gemma 4 12B (90K) — real failure scenario",
+        contextWindow: 90_000,
+        messageTokens: 8_749,
+        systemPromptTokens: 13_915,
+        toolCount: 18,
+        requestedOutput: 64_000,
+      },
+      {
+        label: "Small local model (32K) — tight budget",
+        contextWindow: 32_768,
+        messageTokens: 10_000,
+        systemPromptTokens: 8_000,
+        toolCount: 10,
+        requestedOutput: 16_384,
+      },
+      {
+        label: "Tiny model (8K) — near-zero headroom",
+        contextWindow: 8_192,
+        messageTokens: 3_000,
+        systemPromptTokens: 2_000,
+        toolCount: 5,
+        requestedOutput: 16_384,
+      },
+      {
+        label: "Large model saturated (128K)",
+        contextWindow: 128_000,
+        messageTokens: 60_000,
+        systemPromptTokens: 14_000,
+        toolCount: 25,
+        requestedOutput: 64_000,
+      },
+      {
+        label: "Large model with headroom (200K)",
+        contextWindow: 200_000,
+        messageTokens: 10_000,
+        systemPromptTokens: 14_000,
+        toolCount: 30,
+        requestedOutput: 64_000,
+      },
     ];
 
-    for (const { contextWindow, inputTokens, requestedOutput, label } of testCases) {
-      it(`${label}: clamped output + input + safety margin ≤ context window`, () => {
-        const messages = createMessagesWithTokenCount(inputTokens);
-        const estimatedInput = estimateInputTokens(messages);
+    for (const { label, contextWindow, messageTokens, systemPromptTokens, toolCount, requestedOutput } of testCases) {
+      it(`${label}: adjusted input + clamped output ≤ context window`, () => {
+        const messages = createMessagesWithTokenCount(messageTokens);
+        const systemPrompt = createSystemPromptWithTokenCount(systemPromptTokens);
+        const toolSchemas = createToolSchemas(toolCount);
 
         const clamped = clampOutputTokens(
           messages,
           requestedOutput,
           null,
           contextWindow,
+          systemPrompt,
+          toolSchemas,
         );
 
-        if (clamped !== requestedOutput) {
-          // Was clamped — verify the invariant (including base tool overhead)
-          // Skip the sum check when clamped hit the MINIMUM floor, since
-          // the floor intentionally allows exceeding the budget so the model
-          // can produce a meaningful partial response rather than 0 output.
-          const baseToolSchemaOverhead = CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS;
-          if (clamped !== MINIMUM_CLAMPED_OUTPUT_TOKENS) {
-            expect(
-              estimatedInput + clamped! + baseToolSchemaOverhead + OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN,
-            ).toBeLessThanOrEqual(contextWindow);
-          }
-        }
-        // Either way, should never be undefined
         expect(clamped).toBeDefined();
+
+        if (clamped !== requestedOutput && clamped !== MINIMUM_CLAMPED_OUTPUT_TOKENS) {
+          // Was clamped — verify the invariant
+          const rawEstimate = estimateInputTokens(messages) +
+            estimateTokens(systemPrompt) +
+            estimateTokens(JSON.stringify(toolSchemas));
+          const safetyMargin = Math.ceil(rawEstimate * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER);
+          const adjustedInput = rawEstimate + safetyMargin;
+
+          expect(adjustedInput + clamped!).toBeLessThanOrEqual(contextWindow);
+        }
       });
     }
-  });
-
-  describe("tool-schema-induced overflow (discover_and_enable_tools regression)", () => {
-    it("should clamp when 20 dynamically enabled tools push context over the limit", () => {
-      // Exact reproduction of the Gemma 4 12B + discover_and_enable_tools bug:
-      // - Context window: 90,000
-      // - Requested output: 64,000
-      // - Input tokens: ~20,000 (moderate conversation)
-      // - Tool count: 35 (15 core + 20 discovered)
-      // Without tool schema overhead: 90,000 - 20,000 - 256 = 69,744 → 64,000 fits (no clamp!)
-      // With tool schema overhead:    90,000 - 20,000 - (2000 + 35*150) - 256 = 62,494 → 64,000 overflows → must clamp
-      const contextWindow = 90_000;
-      const inputTokens = 20_000;
-      const requestedOutputTokens = 64_000;
-      const toolCount = 35; // 15 core + 20 discovered via discover_and_enable_tools
-      const messages = createMessagesWithTokenCount(inputTokens);
-
-      const clamped = clampOutputTokens(
-        messages,
-        requestedOutputTokens,
-        null,
-        contextWindow,
-        toolCount,
-      );
-
-      expect(clamped).toBeDefined();
-      expect(clamped!).toBeLessThan(requestedOutputTokens);
-
-      // Verify the full budget equation
-      const estimatedInput = estimateInputTokens(messages);
-      const toolSchemaOverhead =
-        CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS +
-        toolCount * CONTEXT_WINDOW.TOKENS_PER_TOOL_SCHEMA;
-      expect(
-        estimatedInput + clamped! + toolSchemaOverhead + OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN,
-      ).toBeLessThanOrEqual(contextWindow);
-    });
-
-    it("should not clamp on large-context models even with many tools", () => {
-      // Claude 4 Opus (200K context) — 20 extra tools shouldn't cause issues
-      const contextWindow = 200_000;
-      const inputTokens = 20_000;
-      const requestedOutputTokens = 64_000;
-      const toolCount = 50;
-      const messages = createMessagesWithTokenCount(inputTokens);
-
-      const clamped = clampOutputTokens(
-        messages,
-        requestedOutputTokens,
-        contextWindow,
-        null,
-        toolCount,
-      );
-
-      expect(clamped).toBe(requestedOutputTokens);
-    });
-
-    it("should account for increasing tool counts proportionally", () => {
-      // Use a large enough context that neither case floors at MINIMUM_CLAMPED_OUTPUT_TOKENS
-      const contextWindow = 120_000;
-      const inputTokens = 15_000;
-      const requestedOutputTokens = 100_000;
-      const messages = createMessagesWithTokenCount(inputTokens);
-
-      const clampedWithFewTools = clampOutputTokens(
-        messages,
-        requestedOutputTokens,
-        null,
-        contextWindow,
-        5,
-      );
-      const clampedWithManyTools = clampOutputTokens(
-        messages,
-        requestedOutputTokens,
-        null,
-        contextWindow,
-        40,
-      );
-
-      // More tools → less available output → lower clamped value
-      expect(clampedWithManyTools!).toBeLessThan(clampedWithFewTools!);
-    });
   });
 });

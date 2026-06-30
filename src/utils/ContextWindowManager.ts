@@ -29,9 +29,6 @@ import {
 /** Default overhead for tool schemas, internal formatting, etc. */
 const TOOL_SCHEMA_OVERHEAD_TOKENS = CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS;
 
-/** Estimated tokens consumed per tool schema in the provider request payload. */
-const TOKENS_PER_TOOL_SCHEMA = CONTEXT_WINDOW.TOKENS_PER_TOOL_SCHEMA;
-
 /** Fraction of context window to target (leave headroom for output + safety) */
 const TARGET_UTILIZATION = CONTEXT_WINDOW.TARGET_UTILIZATION;
 
@@ -340,7 +337,7 @@ export default class ContextWindowManager {
     } = options;
 
     // Calculate the effective token budget
-    const schemaOverhead = TOOL_SCHEMA_OVERHEAD_TOKENS + toolCount * TOKENS_PER_TOOL_SCHEMA;
+    const schemaOverhead = TOOL_SCHEMA_OVERHEAD_TOKENS + toolCount * 150;
     const outputReserve = Math.max(maxOutputTokens, MIN_OUTPUT_RESERVE);
     const budget = Math.floor(
       (maxInputTokens - outputReserve - schemaOverhead) * TARGET_UTILIZATION,
