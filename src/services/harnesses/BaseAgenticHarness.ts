@@ -527,15 +527,40 @@ export default class BaseAgenticHarness {
         filterDeleted: false,
       },
     );
+
+    const providerOptions = {
+      ...clampedPassOptions,
+      signal,
+    };
+
+    for (const optionKey of [
+      "_loadedContextLength",
+      "_loadedEvalBatchSize",
+      "_loadedPhysicalBatchSize",
+    ]) {
+      Object.defineProperty(providerOptions, optionKey, {
+        get: () => this.context.options?.[optionKey],
+        set: (value) => {
+          if (this.context.options) {
+            this.context.options[optionKey] = value;
+          }
+        },
+        configurable: true,
+        enumerable: true,
+      });
+    }
+
     return modelDefinition?.liveAPI && provider.generateTextStreamLive
-      ? provider.generateTextStreamLive(expandedMessages, resolvedModel, {
-          ...clampedPassOptions,
-          signal,
-        })
-      : provider.generateTextStream(expandedMessages, resolvedModel, {
-          ...clampedPassOptions,
-          signal,
-        });
+      ? provider.generateTextStreamLive(
+          expandedMessages,
+          resolvedModel,
+          providerOptions,
+        )
+      : provider.generateTextStream(
+          expandedMessages,
+          resolvedModel,
+          providerOptions,
+        );
   }
 
   // ── Stream consumption ────────────────────────────────────
