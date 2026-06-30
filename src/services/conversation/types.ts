@@ -10,6 +10,7 @@ export interface ConversationMeta {
   workspaceRoot?: string | null;
   synthetic?: boolean;
   agent?: string | null;
+  contextBudget?: Record<string, unknown> | null;
 }
 
 export interface ConversationSettings {
