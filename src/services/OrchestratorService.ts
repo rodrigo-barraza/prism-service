@@ -2609,11 +2609,17 @@ export default class OrchestratorService {
 
     // The parent's SSE stream already closed and isGenerating was cleared
     // by the Finalizer. However, pendingBackgroundTasks is still > 0.
-    // If the parent is currently generating (user sent a follow-up message
-    // while sub-agents were running), don't interrupt the active turn.
-    if (conversation.isGenerating) {
+    // If the parent is currently generating because the user sent a follow-up
+    // message while sub-agents were running, don't interrupt the active turn.
+    // We distinguish this from the deferred-done scenario by checking if the
+    // last message in the history is a user message.
+    const parentMessages = (conversation.messages || []) as ConversationMessage[];
+    const lastMessage = parentMessages[parentMessages.length - 1];
+    const isUserMidTurn = conversation.isGenerating && lastMessage?.role === "user";
+
+    if (isUserMidTurn) {
       logger.info(
-        `[Orchestrator] Parent conversation ${conversationId} is currently generating — skipping auto-response (user is mid-turn)`,
+        `[Orchestrator] Parent conversation ${conversationId} is currently generating new user message — skipping auto-response (user is mid-turn)`,
       );
       // Decrement pendingBackgroundTasks even though we're skipping the
       // auto-response — the sub-agent results are already persisted as
@@ -2633,6 +2639,25 @@ export default class OrchestratorService {
         );
       }
       return;
+    }
+
+    // When the orchestrator dispatches a non-blocking router in a deferred-done scenario,
+    // the Finalizer defers `isGenerating` clear so the auto-response owns the flag lifecycle.
+    // Proactively clear it here so we don't deadlock.
+    if (conversation.isGenerating) {
+      try {
+        await conversationCollection.updateOne(
+          { id: conversationId, project, username },
+          { $set: { isGenerating: false } },
+        );
+        logger.info(
+          `[Orchestrator] Cleared deferred isGenerating flag on parent ${conversationId} before auto-response`,
+        );
+      } catch (clearError: unknown) {
+        logger.warn(
+          `[Orchestrator] Failed to clear isGenerating on ${conversationId}: ${getErrorMessage(clearError)}`,
+        );
+      }
     }
 
     logger.info(
