@@ -484,6 +484,19 @@ setupWebSocket(wss);
           `Cleared ${agentCleared} stale isGenerating flag(s) in agent_conversations`,
         );
       }
+      // Clear stale pendingBackgroundTasks counters — any in-flight async
+      // work from a previous process is dead after a restart.
+      const { modifiedCount: pendingCleared } = await db
+        .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+        .updateMany(
+          { pendingBackgroundTasks: { $gt: 0 } },
+          { $set: { pendingBackgroundTasks: 0 } },
+        );
+      if (pendingCleared > 0) {
+        logger.info(
+          `Cleared ${pendingCleared} stale pendingBackgroundTasks counter(s) in agent_conversations`,
+        );
+      }
     }
   } catch (error: unknown) {
     logger.error(

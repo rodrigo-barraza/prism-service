@@ -27,6 +27,7 @@ router.use(requireDb);
 const CONVERSATION_LIST_PROJECTION: import("mongodb").Document = {
   ...CONVERSATION_LIST_BASE_PROJECTION,
   isGenerating: 1,
+  pendingBackgroundTasks: 1,
   traceId: 1,
   synthetic: 1,
   systemPrompt: 1,

@@ -959,43 +959,35 @@ export default class ReActHarness extends BaseAgenticHarness {
       // ── Finalization (happy path) ──────────────────────────────
       cleanupReminderCache(agentConversationId);
 
-      // When the loop exits due to NON_BLOCKING_DISPATCH, defer the
-      // SSE `done` event and keep isGenerating=true in MongoDB. This
-      // prevents the client from treating the generation as complete
-      // while sub-agents are still running. The auto-response path
-      // (_triggerParentAutoResponse → handleAgent) will emit its own
-      // authoritative `done` event and clear isGenerating when the
-      // entire agentic cycle (parent + sub-agents + synthesis) completes.
-      const deferredDoneEvent = await this.finalize(
-        currentMessages,
-        hooks,
-        hasNonBlockingDispatchBreak ? { deferDoneEmission: true } : undefined,
-      );
+      // Finalize normally — emit `done`, clear isGenerating, persist messages.
+      // Even when sub-agents are still running (NON_BLOCKING_DISPATCH), we
+      // close the SSE stream so the client can accept new user messages.
+      await this.finalize(currentMessages, hooks);
 
-      // ── Await non-blocking dispatches ──────────────────────────
-      // When the loop exited due to NON_BLOCKING_DISPATCH, keep the
-      // SSE stream alive by awaiting all pending router promises.
-      // This allows sub-agent status events (phase, tok/s, completion)
-      // to flow to the client in real-time.
-      if (hasNonBlockingDispatchBreak && agentConversationId) {
+      // ── Increment pending background tasks counter ─────────────
+      // When the loop exited due to NON_BLOCKING_DISPATCH, async work
+      // is running in the background (sub-agents, long-running tools, etc.).
+      // Increment the counter so the client knows background work is
+      // in-flight even though isGenerating is false. The completion
+      // handler decrements when the async work finishes.
+      if (hasNonBlockingDispatchBreak && agentConversationId && conversationId) {
         try {
-          const { default: OrchestratorService } =
-            await import("../OrchestratorService.js");
-          await OrchestratorService.awaitPendingDispatches(
-            agentConversationId,
+          const { default: ConversationService } =
+            await import("../conversation/ConversationService.ts");
+          const { COLLECTIONS } = await import("../../constants.ts");
+          await ConversationService.adjustPendingBackgroundTasks(
+            conversationId,
+            project,
+            username,
+            1,
+            { collection: COLLECTIONS.AGENT_CONVERSATIONS },
           );
-        } catch (awaitError: unknown) {
-          logger.warn(
-            `[ReActHarness] Failed to await pending dispatches: ${awaitError instanceof Error ? awaitError.message : String(awaitError)}`,
-          );
-        }
-
-        // The auto-response emits its own `done` event, so the
-        // deferred one from the initial finalize is discarded.
-        // Log for observability.
-        if (deferredDoneEvent) {
           logger.info(
-            `[ReActHarness] Discarded deferred done event — auto-response owns the terminal signal`,
+            `[ReActHarness] Incremented pendingBackgroundTasks on conversation ${conversationId}`,
+          );
+        } catch (backgroundTaskError: unknown) {
+          logger.warn(
+            `[ReActHarness] Failed to increment pendingBackgroundTasks: ${backgroundTaskError instanceof Error ? backgroundTaskError.message : String(backgroundTaskError)}`,
           );
         }
       }

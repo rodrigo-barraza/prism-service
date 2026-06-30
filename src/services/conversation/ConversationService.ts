@@ -254,6 +254,46 @@ const ConversationService: ConversationServiceInterface = {
     }
   },
 
+  /**
+   * Atomically adjust the pendingBackgroundTasks counter on a conversation.
+   * Uses MongoDB $inc for race-safe concurrent completions.
+   * After decrementing, clamps to 0 to prevent negative counts from
+   * double-decrements or crash recovery edge cases.
+   */
+  async adjustPendingBackgroundTasks(
+    conversationId: string,
+    project: string,
+    username: string,
+    delta: number,
+    { collection = DEFAULT_COLLECTION }: { collection?: string } = {},
+  ): Promise<void> {
+    const db = MongoWrapper.getDb(MONGO_DB_NAME);
+    if (!db) return;
+    const now = new Date().toISOString();
+
+    await db
+      .collection(collection)
+      .updateOne(
+        { id: conversationId, project, username },
+        { $inc: { pendingBackgroundTasks: delta }, $set: { updatedAt: now } },
+      );
+
+    // Clamp: if decrementing could have gone negative, floor at 0
+    if (delta < 0) {
+      await db
+        .collection(collection)
+        .updateOne(
+          {
+            id: conversationId,
+            project,
+            username,
+            pendingBackgroundTasks: { $lt: 0 },
+          },
+          { $set: { pendingBackgroundTasks: 0 } },
+        );
+    }
+  },
+
   async getConversationStats(
     conversationId: string,
     project: string,

@@ -77,6 +77,7 @@ export interface TransformedConversation {
   totalCost: number;
   modelNames: string[];
   isGenerating: boolean;
+  pendingBackgroundTasks?: number;
   synthetic?: boolean;
   traceId?: string | null;
   parentAgentConversationId?: string | null;
@@ -136,4 +137,16 @@ export interface ConversationServiceInterface {
     project: string,
     username: string,
   ): Promise<TransformedConversationStats | null>;
+  /**
+   * Atomically increment or decrement the pendingBackgroundTasks counter.
+   * Use +1 when dispatching an async tool, -1 when it completes.
+   * MongoDB $inc ensures correctness under concurrent completions.
+   */
+  adjustPendingBackgroundTasks(
+    conversationId: string,
+    project: string,
+    username: string,
+    delta: number,
+    options?: { collection?: string },
+  ): Promise<void>;
 }

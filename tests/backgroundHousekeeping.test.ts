@@ -74,7 +74,7 @@ describe("BackgroundHousekeepingService", () => {
         conversationsCleared: 3,
         agentConversationsCleared: 3
       });
-      expect(updateManyMock).toHaveBeenCalledTimes(2);
+      expect(updateManyMock).toHaveBeenCalledTimes(3);
     });
 
     it("should handle MongoDB connection errors gracefully", async () => {

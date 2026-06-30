@@ -2607,25 +2607,32 @@ export default class OrchestratorService {
       return;
     }
 
-    // When the orchestrator dispatches a non-blocking router, the Finalizer
-    // defers `isGenerating` clear (skipGeneratingClear: true) so the auto-response
-    // owns the flag lifecycle. The auto-response fires inside awaitPendingDispatches,
-    // meaning isGenerating is guaranteed to still be true. Clear it here so we don't
-    // deadlock waiting for a flag that only WE can clear.
+    // The parent's SSE stream already closed and isGenerating was cleared
+    // by the Finalizer. However, pendingBackgroundTasks is still > 0.
+    // If the parent is currently generating (user sent a follow-up message
+    // while sub-agents were running), don't interrupt the active turn.
     if (conversation.isGenerating) {
+      logger.info(
+        `[Orchestrator] Parent conversation ${conversationId} is currently generating — skipping auto-response (user is mid-turn)`,
+      );
+      // Decrement pendingBackgroundTasks even though we're skipping the
+      // auto-response — the sub-agent results are already persisted as
+      // a completion notification message.
       try {
-        await conversationCollection.updateOne(
-          { id: conversationId, project, username },
-          { $set: { isGenerating: false } },
-        );
-        logger.info(
-          `[Orchestrator] Cleared deferred isGenerating flag on parent ${conversationId} before auto-response`,
+        const ConversationService = (await import("./conversation/ConversationService.ts")).default;
+        await ConversationService.adjustPendingBackgroundTasks(
+          conversationId,
+          project,
+          username,
+          -1,
+          { collection: COLLECTIONS.AGENT_CONVERSATIONS },
         );
       } catch (clearError: unknown) {
         logger.warn(
-          `[Orchestrator] Failed to clear isGenerating on ${conversationId}: ${getErrorMessage(clearError)}`,
+          `[Orchestrator] Failed to decrement pendingBackgroundTasks: ${getErrorMessage(clearError)}`,
         );
       }
+      return;
     }
 
     logger.info(
@@ -2663,9 +2670,11 @@ export default class OrchestratorService {
     );
 
     // Resolve emit function for the auto-response. Priority:
-    // 1. orchestratorContext.emit — the parent's live SSE stream (kept alive
-    //    by awaitPendingDispatches). This is the primary path for HTTP SSE clients.
-    // 2. WebSocketConnectionRegistry — for clients connected via WebSocket.
+    // 1. orchestratorContext.emit — stale reference from the original SSE
+    //    stream. Will be null since the parent's SSE stream is now closed
+    //    immediately after non-blocking dispatch. Kept for defensive compat.
+    // 2. WebSocketConnectionRegistry — primary path for streaming auto-response
+    //    events to clients connected via WebSocket.
     // 3. Debug logger — headless/API mode fallback.
     const parentEmit = orchestratorContext.emit || null;
 
@@ -2791,6 +2800,26 @@ export default class OrchestratorService {
         `[Orchestrator] Parent auto-response error for conversation ${conversationId}: ${getErrorMessage(autoResponseError)}`,
       );
       throw autoResponseError;
+    } finally {
+      // Always decrement pendingBackgroundTasks when the async work cycle
+      // finishes (success or failure) so the client indicator updates.
+      try {
+        const ConversationService = (await import("./conversation/ConversationService.ts")).default;
+        await ConversationService.adjustPendingBackgroundTasks(
+          conversationId,
+          project,
+          username,
+          -1,
+          { collection: COLLECTIONS.AGENT_CONVERSATIONS },
+        );
+        logger.info(
+          `[Orchestrator] Decremented pendingBackgroundTasks on conversation ${conversationId}`,
+        );
+      } catch (clearError: unknown) {
+        logger.warn(
+          `[Orchestrator] Failed to decrement pendingBackgroundTasks on ${conversationId}: ${getErrorMessage(clearError)}`,
+        );
+      }
     }
   }
 
