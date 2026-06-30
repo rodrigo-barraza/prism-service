@@ -156,9 +156,12 @@ export function expandMessagesForFunctionCall(
         })),
       };
       const toolMessages: ExpandedMessage[] = message.toolCalls
-        .filter((toolCall: ToolCallEntry) => toolCall.result !== undefined)
         .map((toolCall: ToolCallEntry) => {
-          let finalResult = toolCall.result;
+          // Coalesce undefined → null so every tool_call in the assistant
+          // message gets a matching tool-role response. Dropping tool calls
+          // with undefined results creates an orphaned tool_calls structure
+          // that providers reject (assistant has tool_calls but no tool results).
+          let finalResult = toolCall.result ?? null;
           if (
             (toolCall.name === TOOL_NAMES.CREATE_SUBAGENTS ||
               toolCall.name === "team_create") &&
