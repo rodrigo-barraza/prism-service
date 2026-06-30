@@ -1833,9 +1833,14 @@ export default class OrchestratorService {
       },
     );
 
+    const agentStatusEmoji = agentResult.status === "completed" ? "✅" : "❌";
+
     await OrchestratorService._sendParentCompletionNotification(
       {
+        status: `${agentStatusEmoji} ${agentResult.status}`,
         summary: resumedAgentCompletedSummary,
+        toolUses: agentResult.toolUses || 0,
+        durationMs: agentResult.durationMs || 0,
         resultBody: truncatedOutput,
       },
       orchestratorContext,
@@ -1848,7 +1853,10 @@ export default class OrchestratorService {
    */
   static async _sendParentCompletionNotification(
     options: {
+      status: string;
       summary: string;
+      toolUses: number;
+      durationMs: number;
       resultBody: string;
     },
     orchestratorContext: OrchestratorContext,
@@ -1861,8 +1869,10 @@ export default class OrchestratorService {
       role: "user" as const,
       content: [
         `<task-notification>`,
-        `<status>completed</status>`,
+        `<status>${options.status}</status>`,
         `<summary>${options.summary}</summary>`,
+        `<tool_uses>${options.toolUses}</tool_uses>`,
+        `<duration_ms>${options.durationMs}</duration_ms>`,
         `<result>`,
         options.resultBody,
         `</result>`,
@@ -2509,9 +2519,29 @@ export default class OrchestratorService {
     // Build the detailed result body (preserved for LLM context + markdown rendering)
     const resultBody = resultSummaries.join("\n\n");
 
+    const overallStatus = routerResults.every(
+      (result) => "status" in result && result.status === "completed",
+    )
+      ? "completed"
+      : "failed";
+
+    const totalToolUses = routerResults.reduce(
+      (sum, result) => sum + ("toolUses" in result ? (result.toolUses || 0) : 0),
+      0,
+    );
+
+    const totalDurationMs = routerResults.reduce(
+      (sum, result) =>
+        sum + ("durationMs" in result ? (result.durationMs || 0) : 0),
+      0,
+    );
+
     await OrchestratorService._sendParentCompletionNotification(
       {
+        status: overallStatus,
         summary: teamCompletedHeader,
+        toolUses: totalToolUses,
+        durationMs: totalDurationMs,
         resultBody,
       },
       orchestratorContext,
