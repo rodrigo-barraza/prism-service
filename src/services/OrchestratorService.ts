@@ -1000,8 +1000,11 @@ export default class OrchestratorService {
 
   static cleanupConversation(parentAgentConversationId: string): void {
     const keysToRemove: string[] = [];
-    const keysPreserved: string[] = [];
+    const keysPreservedRunning: string[] = [];
+    const keysPreservedResumable: string[] = [];
     const conversationIdsToClean = new Set<string>();
+    const currentTimestamp = Date.now();
+
     for (const [key, subAgentState] of activeSubAgents.entries()) {
       if (
         subAgentState.parentAgentConversationId === parentAgentConversationId
@@ -1009,9 +1012,27 @@ export default class OrchestratorService {
         // Preserve sub-agents that are still running (non-blocking dispatch).
         // They will be cleaned up when they complete or are explicitly stopped.
         if (subAgentState.status === "running") {
-          keysPreserved.push(key);
+          keysPreservedRunning.push(key);
           continue;
         }
+
+        // Preserve completed/idle sub-agents for resume_subagent — they stay
+        // in the map until the TTL expires (IDLE_AGENT_TTL_MILLISECONDS).
+        // This is the Antigravity-equivalent "idle → re-awaken" lifecycle.
+        if (
+          subAgentState.status === "complete" ||
+          subAgentState.status === "idle"
+        ) {
+          const completedTimestamp = subAgentState.completedAt ?? (subAgentState.startedAt + subAgentState.durationMs);
+          const elapsedSinceCompletion = currentTimestamp - completedTimestamp;
+
+          if (elapsedSinceCompletion < ORCHESTRATOR.IDLE_AGENT_TTL_MILLISECONDS) {
+            keysPreservedResumable.push(key);
+            continue;
+          }
+          // TTL expired — fall through to removal
+        }
+
         keysToRemove.push(key);
         if (subAgentState.parentConversationId) {
           conversationIdsToClean.add(subAgentState.parentConversationId);
@@ -1021,22 +1042,23 @@ export default class OrchestratorService {
     for (const key of keysToRemove) {
       activeSubAgents.delete(key);
     }
-    // Only clean conversation counters when no running agents remain for that conversation
+    // Only clean conversation counters when no running or resumable agents remain for that conversation
     for (const conversationId of conversationIdsToClean) {
-      const hasRunningAgentsForConversation = Array.from(
+      const hasActiveAgentsForConversation = Array.from(
         activeSubAgents.values(),
       ).some(
         (subAgent) =>
           subAgent.parentConversationId === conversationId &&
-          subAgent.status === "running",
+          (subAgent.status === "running" || subAgent.status === "complete" || subAgent.status === "idle"),
       );
-      if (!hasRunningAgentsForConversation) {
+      if (!hasActiveAgentsForConversation) {
         agentCountersByConversation.delete(conversationId);
       }
     }
-    if (keysPreserved.length > 0) {
+    const totalPreserved = keysPreservedRunning.length + keysPreservedResumable.length;
+    if (totalPreserved > 0) {
       logger.info(
-        `[Orchestrator] Cleaned up conversation ${parentAgentConversationId}: removed ${keysToRemove.length}, preserved ${keysPreserved.length} running agent(s)`,
+        `[Orchestrator] Cleaned up conversation ${parentAgentConversationId}: removed ${keysToRemove.length}, preserved ${keysPreservedRunning.length} running + ${keysPreservedResumable.length} resumable agent(s)`,
       );
     } else {
       logger.info(
@@ -1624,6 +1646,7 @@ export default class OrchestratorService {
     // Reset for the new session
     subAgent.status = "running";
     subAgent.startedAt = Date.now();
+    subAgent.completedAt = undefined;
     subAgent.abortController = createAbortController();
     subAgent.error = null;
 
@@ -2296,6 +2319,7 @@ export default class OrchestratorService {
         subAgent.diff = null;
       }
       subAgent.status = "complete";
+      subAgent.completedAt = Date.now();
     }
 
     // ── Release heavy data from completed sub-agents ──────────

@@ -58,6 +58,8 @@ export interface SubAgentState {
   thinkingBudget?: number;
   /** Reference to the live telemetry emitter — used to re-wire parentEmit when a new SSE stream starts. */
   telemetryEmitter?: { updateParentEmit: (emit: EmitFunction | null | undefined) => void } | null;
+  /** Epoch ms when the agent transitioned to complete/idle — used for TTL-based eviction. */
+  completedAt?: number;
 }
 
 export interface WorktreeDiff {
