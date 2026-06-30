@@ -1190,6 +1190,23 @@ export default class OrchestratorService {
       return [{ error: errorMessage }];
     }
 
+    // ── Single-member topology guard ──────────────────────────────
+    // Topologies are multi-agent coordination patterns. If the LLM
+    // explicitly passes a topology with only 1 member, reject so
+    // it retries without the topology param — prevents wasteful
+    // router instantiation for what's effectively a simple delegation.
+    if (
+      teamCreationArguments.members?.length === 1 &&
+      teamCreationArguments.topology
+    ) {
+      const errorMessage =
+        `Topology "${teamCreationArguments.topology}" is not needed for a single sub-agent. ` +
+        `Topologies coordinate multiple agents — with only 1 member, omit the 'topology' parameter entirely. ` +
+        `The agent will be spawned directly without a coordination pattern.`;
+      logger.info(`[Orchestrator] createTeam: ${errorMessage}`);
+      return [{ error: errorMessage }];
+    }
+
     // Propagate the resolved topology back to the context so _runSubAgentLoop
     // (and all downstream consumers) build the sub-agent system prompt with the
     // correct topology — not the stale conversation-level default.
