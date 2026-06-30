@@ -27,6 +27,7 @@ import type { IncomingMessage } from "http";
 import type { WebSocketServer } from "ws";
 import type { GoogleToolConfigEntry } from "../providers/google.ts";
 import WebSocketConnectionRegistry from "./WebSocketConnectionRegistry.ts";
+import type { ToolResultValue } from "../utils/FunctionCallingUtilities.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -86,7 +87,7 @@ interface FunctionCallRef {
 interface ToolResult {
   id: string;
   name: string;
-  result: Record<string, unknown>;
+  result: { [key: string]: ToolResultValue };
 }
 
 /**
@@ -636,7 +637,7 @@ function handleWebsocketLive(
                               _providerName: "google",
                               _resolvedModel: activeModel,
                             },
-                          )) as Record<string, unknown>;
+                          )) as { [key: string]: ToolResultValue };
                         return { id: toolCall.id, name: toolCall.name, result };
                       }),
                     );

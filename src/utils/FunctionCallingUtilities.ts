@@ -10,7 +10,16 @@
 import type { ChatMessage, ToolCallEntry } from "../types/admin.ts";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
-// ── Array keys whose entries get capped during truncation ─────
+export type ToolResultValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | { [key: string]: ToolResultValue }
+  | ToolResultValue[];
+
+// Array keys whose entries get capped during truncation
 const TRUNCATABLE_ARRAY_KEYS = [
   "events",
   "products",
@@ -21,44 +30,32 @@ const TRUNCATABLE_ARRAY_KEYS = [
   "commodities",
 ];
 
-function isTruncatableResult(
-  value:
-    | object
-    | string
-    | number
-    | boolean
-    | null
-    | undefined
-    | symbol
-    | ((...argumentsList: unknown[]) => unknown),
-): value is object | string | number | boolean | null | undefined {
-  return typeof value !== "function" && typeof value !== "symbol";
-}
-
 /**
  * Truncate a tool result to avoid blowing up the model's context window.
- * Caps arrays at 10 items and the serialized JSON at ~maxChars.
+ * Caps arrays at 10 items and the serialized JSON at ~maximumCharacters.
  * The full result is still stored in the DB and shown in the UI;
  * this only affects what gets re-sent to the model.
  */
 export function truncateToolResult(
-  result: object | string | number | boolean | null | undefined,
-  maxChars = 8000,
-): object | string | number | boolean | null | undefined {
+  result: ToolResultValue,
+  maximumCharacters = 8000,
+): ToolResultValue {
   if (!result || typeof result !== "object") return result;
 
   // Also handle top-level arrays (e.g. tides, earthquakes)
-  if (Array.isArray(result) && result.length > 10) {
-    const sliced = result.slice(0, 10);
-    sliced.push({ _truncated: `Showing 10 of ${result.length}` });
-    const serialized = JSON.stringify(sliced);
-    return serialized.length > maxChars
-      ? serialized.slice(0, maxChars) + "…}"
-      : sliced;
+  if (Array.isArray(result)) {
+    if (result.length > 10) {
+      const sliced = result.slice(0, 10);
+      sliced.push({ _truncated: `Showing 10 of ${result.length}` });
+      const serialized = JSON.stringify(sliced);
+      return serialized.length > maximumCharacters
+        ? serialized.slice(0, maximumCharacters) + "…}"
+        : sliced;
+    }
   }
 
   // If result has a known array wrapper, cap items at 10
-  const resultRecord = result as Record<string, unknown>;
+  const resultRecord = result as { [key: string]: ToolResultValue };
   const trimmed = { ...resultRecord };
   for (const key of TRUNCATABLE_ARRAY_KEYS) {
     const items = trimmed[key];
@@ -70,8 +67,8 @@ export function truncateToolResult(
   }
 
   const serialized = JSON.stringify(trimmed);
-  if (serialized.length <= maxChars) return trimmed;
-  return serialized.slice(0, maxChars) + "…}";
+  if (serialized.length <= maximumCharacters) return trimmed;
+  return serialized.slice(0, maximumCharacters) + "…}";
 }
 
 interface ExpandOptions {
@@ -81,7 +78,7 @@ interface ExpandOptions {
 interface ExpandedToolCall {
   id?: string | null;
   name: string;
-  args?: unknown;
+  args?: ToolResultValue;
   responsesItemId?: string;
   thoughtSignature?: string;
   reasoningItem?: {
@@ -92,7 +89,7 @@ interface ExpandedToolCall {
 
 interface ExpandedMessage {
   role: string;
-  content?: string | unknown | null;
+  content?: string | null;
   name?: string;
   tool_call_id?: string | null;
   thinking?: string;
@@ -143,7 +140,7 @@ export function expandMessagesForFunctionCall(
         toolCalls: message.toolCalls.map((toolCall: ToolCallEntry) => ({
           id: toolCall.id,
           name: toolCall.name,
-          args: toolCall.args,
+          args: toolCall.args as ToolResultValue,
           ...(toolCall.responsesItemId
             ? { responsesItemId: toolCall.responsesItemId }
             : {}),
@@ -161,33 +158,22 @@ export function expandMessagesForFunctionCall(
           // message gets a matching tool-role response. Dropping tool calls
           // with undefined results creates an orphaned tool_calls structure
           // that providers reject (assistant has tool_calls but no tool results).
-          let finalResult = toolCall.result ?? null;
+          let finalResult: ToolResultValue = (toolCall.result as ToolResultValue) ?? null;
           if (
             (toolCall.name === TOOL_NAMES.CREATE_SUBAGENTS ||
               toolCall.name === "team_create") &&
             Array.isArray(toolCall.result)
           ) {
-            finalResult = toolCall.result.map((subAgentResult) => {
-              if (subAgentResult && typeof subAgentResult === "object") {
-                const { messages: _messages, ...rest } = subAgentResult;
-                return rest;
-              }
-              return subAgentResult;
-            });
+            finalResult = (toolCall.result as Array<Record<string, ToolResultValue>>).map(
+              (subAgentResult) => {
+                if (subAgentResult && typeof subAgentResult === "object") {
+                  const { messages: _messages, ...remainingFields } = subAgentResult;
+                  return remainingFields;
+                }
+                return subAgentResult;
+              },
+            );
           }
-
-          const resolvedValue = finalResult as
-            | object
-            | string
-            | number
-            | boolean
-            | null
-            | undefined
-            | symbol
-            | ((...argumentsList: unknown[]) => unknown);
-          const truncatableResult = isTruncatableResult(resolvedValue)
-            ? resolvedValue
-            : undefined;
 
           return {
             role: "tool",
@@ -196,7 +182,7 @@ export function expandMessagesForFunctionCall(
             content:
               typeof finalResult === "string"
                 ? finalResult
-                : JSON.stringify(truncateToolResult(truncatableResult)),
+                : JSON.stringify(truncateToolResult(finalResult)),
           };
         });
       return [assistantMessage, ...toolMessages];
@@ -239,14 +225,8 @@ export function expandMessagesForFunctionCall(
         ...(message.role === "assistant" && message.thinking
           ? { thinking: message.thinking }
           : {}),
-        ...(message.role === "assistant" &&
-        (message as ChatMessage & { thinkingSignature?: string })
-          .thinkingSignature
-          ? {
-              thinkingSignature: (
-                message as ChatMessage & { thinkingSignature?: string }
-              ).thinkingSignature,
-            }
+        ...(message.role === "assistant" && message.thinkingSignature
+          ? { thinkingSignature: message.thinkingSignature }
           : {}),
       },
     ];
