@@ -2840,6 +2840,33 @@ export default class OrchestratorService {
         logger.info(
           `[Orchestrator] Decremented pendingBackgroundTasks on conversation ${conversationId}`,
         );
+
+        // Notify the client via WebSocket so it patches the in-memory
+        // conversation list entry. Without this, the status bar shows
+        // "Awaiting Background Tasks" indefinitely because the client
+        // only refreshes pendingBackgroundTasks on conversation list fetch.
+        try {
+          const { default: WebSocketConnectionRegistry } =
+            await import("../websocket/WebSocketConnectionRegistry.ts");
+          const emitFunction = WebSocketConnectionRegistry.getEmitFunction(conversationId);
+          if (emitFunction) {
+            // Read the updated document to get the authoritative counter
+            const freshConversation = await MongoWrapper.getDb(databaseName)
+              ?.collection(COLLECTIONS.AGENT_CONVERSATIONS)
+              .findOne(
+                { id: conversationId, project, username },
+                { projection: { pendingBackgroundTasks: 1 } },
+              );
+            emitFunction({
+              type: SERVER_SENT_EVENT_TYPES.CONVERSATION_STATE_UPDATE,
+              pendingBackgroundTasks: (freshConversation?.pendingBackgroundTasks as number) ?? 0,
+            });
+          }
+        } catch (emitError: unknown) {
+          logger.debug(
+            `[Orchestrator] Failed to emit conversation_state_update: ${getErrorMessage(emitError)}`,
+          );
+        }
       } catch (clearError: unknown) {
         logger.warn(
           `[Orchestrator] Failed to decrement pendingBackgroundTasks on ${conversationId}: ${getErrorMessage(clearError)}`,
