@@ -8,6 +8,7 @@ import {
 import { ProviderError } from "../utils/errors.ts";
 import { STREAMING_DISPATCHER } from "../utils/openai-compat.ts";
 import logger from "../utils/logger.ts";
+import { discoverContextLength } from "../utils/ContextLengthDiscovery.ts";
 
 import { TYPES, getDefaultModels } from "../config.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
@@ -92,6 +93,7 @@ export function createOllamaProvider(
         "Ollama",
         `generateText model=${model} baseUrl=${baseUrl}`,
       );
+      await discoverContextLength(instanceId, baseUrl, model, options);
       try {
         const preparedMessages = prepareOllamaMessages(messages);
 
@@ -151,6 +153,7 @@ export function createOllamaProvider(
         "Ollama",
         `generateTextStream model=${model} baseUrl=${baseUrl}`,
       );
+      await discoverContextLength(instanceId, baseUrl, model, options);
       let partialOutputCharacters = 0;
       let partialThinkingCharacters = 0;
       try {

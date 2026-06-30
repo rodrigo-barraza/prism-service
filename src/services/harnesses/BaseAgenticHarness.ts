@@ -507,13 +507,24 @@ export default class BaseAgenticHarness {
 
     // Apply a multiplicative safety margin to absorb the ~5-6% gap between
     // our 4-chars/token heuristic and real tokenizer output.
-    // Verified on live Gemma 4 12B: estimate 24,624 vs provider 26,001 (94.7%).
     const safetyMargin = Math.ceil(
       totalEstimatedInput * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
     );
     const adjustedInput = totalEstimatedInput + safetyMargin;
 
     const availableForOutput = contextWindow - adjustedInput;
+
+    // ── Always log the budget breakdown for diagnostics ──
+    logger.info(
+      `[OutputTokenClamp] Budget: contextWindow=${contextWindow}, ` +
+        `messages=${estimatedMessageTokens}, ` +
+        `systemPrompt=${estimatedSystemPromptTokens} (${systemPromptText.length} chars), ` +
+        `toolSchemas=${estimatedToolSchemaTokens} (${toolSchemas.length} tools), ` +
+        `totalRaw=${totalEstimatedInput}, safety=${safetyMargin}, ` +
+        `adjusted=${adjustedInput}, available=${availableForOutput}, ` +
+        `requested=${requestedMaxTokens}, ` +
+        `willClamp=${requestedMaxTokens > availableForOutput}`,
+    );
 
     if (requestedMaxTokens <= availableForOutput) return requestedMaxTokens;
 
@@ -523,13 +534,8 @@ export default class BaseAgenticHarness {
     );
 
     logger.warn(
-      `[OutputTokenClamp] Clamping maxTokens from ${requestedMaxTokens} → ${clampedMaxTokens} ` +
-        `(contextWindow=${contextWindow}, messages=${estimatedMessageTokens}, ` +
-        `systemPrompt=${estimatedSystemPromptTokens}, ` +
-        `toolSchemas=${estimatedToolSchemaTokens} [${toolSchemas.length} tools], ` +
-        `totalInput=${totalEstimatedInput}, safetyMargin=${safetyMargin} (${(OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER * 100).toFixed(0)}%), ` +
-        `adjustedInput=${adjustedInput}). ` +
-        `Without clamping: ${adjustedInput + requestedMaxTokens} > ${contextWindow}.`,
+      `[OutputTokenClamp] CLAMPING maxTokens ${requestedMaxTokens} → ${clampedMaxTokens}. ` +
+        `Without clamp: ${adjustedInput + requestedMaxTokens} > ${contextWindow}.`,
     );
 
     return clampedMaxTokens;

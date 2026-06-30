@@ -5,6 +5,12 @@ import { createVllmProvider } from '../src/providers/vllm.ts';
 import { createLlamaCppProvider } from '../src/providers/llama-cpp.ts';
 import { ChatMessage } from '../src/types/provider.ts';
 
+// Mock context length discovery so it doesn't consume fetch mocks.
+// Discovery is tested in its own dedicated test suite.
+vi.mock('../src/utils/ContextLengthDiscovery.ts', () => ({
+  discoverContextLength: vi.fn().mockResolvedValue(undefined),
+}));
+
 describe('Local Provider Adapters (Ollama, vLLM, Llama-cpp)', () => {
   let fetchSpy: any;
 
