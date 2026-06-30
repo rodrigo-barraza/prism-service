@@ -1053,6 +1053,7 @@ describe("Event-Driven Auto-Response", () => {
           topology: "hierarchical",
           members: [
             { description: "Agent A", prompt: "Do task A", model: "gemini-3-flash-preview" },
+            { description: "Agent B", prompt: "Do task B", model: "gemini-3-flash-preview" },
           ],
         },
         orchestratorContext,
