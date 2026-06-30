@@ -156,7 +156,6 @@ describe("OrchestratorService Resume Agent", () => {
     expect(proj).toBe("test-project");
     expect(user).toBe("test-user");
     expect(msg.role).toBe("user");
-    expect(msg.content).toContain("<task-notification>");
     expect(msg.content).toContain("[SUB-AGENT RESUMED COMPLETED]");
 
     autoResponseSpy.mockRestore();

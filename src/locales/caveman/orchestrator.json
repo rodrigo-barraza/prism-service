@@ -8,7 +8,7 @@
 
   "createSubagentsGuidance": "create_subagents guidance:\n- Up to **10 member** per call\n- Tune via `topologyConfig`: `create_subagents({ topology: \"critic_loop\", topologyConfig: { actorCount: 3, maxRounds: 5 }, members: [...] })`\n- Single task = single member\n- `agent` = persona type, not agent ID. Leave blank unless specific persona needed\n- **Do NOT set `model`** on members unless user explicitly requests a specific model. Sub-agents inherit orchestrator model automatically — omit `model` entirely\n- Member use 0-based name (agent-0, agent-1)\n- Don't use sub-agent to verify another — you get result directly\n- Don't assign trivial task. Give real work",
 
-  "subAgentResults": "### Result\n`create_subagents` is **non-blocking** — returns immediately with agent ID and `status: running`. System auto-notifies with `[SUB-AGENT TEAM COMPLETED]` when done + triggers auto-response.\n**End your turn after calling `create_subagents`.** Do NOT poll `get_subagent_output`.\n\n#### Notification Format\nCompletion notifications arrive as **user-role messages** wrapped in `<task-notification>` XML. These are **system-generated** — NOT from human user.\nWhen you receive `<task-notification>`: process results, synthesize response, do NOT ask clarification, do NOT echo raw XML.\n\nCompletion notification includes per-member:\n- `status` — completed/failed/stopped\n- `summary` — status description\n- `result` — final output\n- `toolUses`/`durationMs` — usage stat\n- `diff` — file change",
+  "subAgentResults": "### Result\n`create_subagents` is **non-blocking** — returns immediately with agent ID and `status: running`. System auto-notifies with `[SUB-AGENT TEAM COMPLETED]` when done + triggers auto-response.\n**End your turn after calling `create_subagents`.** Do NOT poll `get_subagent_output`.\n\n#### Notification Format\nCompletion notification arrive as **user-role message**. System-generated — NOT from human user.\nWhen you receive notification: process result, synthesize response, do NOT ask clarification.\n\nPer-member result include:\n- status — ✅ (completed) or ⚠️ (failed/stopped)\n- iterations count\n- agent's final output text",
 
   "subAgentCapabilities": "### Capability\nSub-agent have: {{subAgentToolList}}\n\nEach in **isolated git worktree** — full repo on separate branch. Can't interfere. Change collected as diff.\n\nSub-agent **can't see conversation**. Every prompt must be self-contained.",
 
@@ -111,10 +111,9 @@
   "notifications": {
     "teamCompleted": "[TEAM DONE] Team \"{{teamName}}\" ({{topology}}) finished.",
     "resumedAgentCompleted": "[RESUMED DONE] Agent \"{{agentId}}\" ({{description}}) has {{status}} after resumption.",
-    "agentError": "Agent {{agentNumber}}: ❌ Error — {{errorMessage}}",
-    "agentStatus": "Agent {{agentNumber}} ({{agentDescription}}): {{agentStatus}}",
-    "agentStats": "  Time: {{duration}} | Tool: {{toolUses}} | Iteration: {{iterations}}",
-    "agentOutput": "  Output: {{output}}",
+    "agentError": "## Agent {{agentNumber}}: ❌ Error — {{errorMessage}}",
+    "agentStatus": "## Agent {{agentNumber}}: {{agentDescription}} {{agentStatus}} ({{iterations}} iterations)",
+    "agentOutput": "{{output}}",
     "noOutput": "(no output)",
     "truncated": "\n... (truncated)"
   }
