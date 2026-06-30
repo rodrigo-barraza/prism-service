@@ -552,6 +552,8 @@ describe("Event-Driven Auto-Response", () => {
       content: "<task-notification>\n[SUB-AGENT TEAM COMPLETED] Team finished.\n</task-notification>",
       timestamp: new Date().toISOString(),
       _alreadyPersisted: true,
+      _notificationSource: NOTIFICATION_SOURCES.ORCHESTRATOR,
+      _notificationId: `orchestrator:team-completed:${new Date().toISOString()}`,
     };
 
     it("should persist completion message and call handleAgent", async () => {
@@ -927,6 +929,57 @@ describe("Event-Driven Auto-Response", () => {
 
       // Calling the fallback should not throw
       expect(() => emitArg({ type: "debug_event" })).not.toThrow();
+    });
+
+    it("should emit task_notification SSE event before calling handleAgent", async () => {
+      const parentSseEmit = vi.fn();
+      const contextWithEmit = { ...orchestratorContext, emit: parentSseEmit };
+
+      mockFindOne.mockResolvedValue({
+        id: "parent-conv-id",
+        isGenerating: false,
+        messages: [
+          { role: "user", content: "Build me a feature" },
+          { role: "assistant", content: "I spawned sub-agents" },
+        ],
+        settings: {
+          provider: PROVIDERS.GOOGLE,
+          model: "gemini-3-flash-preview",
+          agent: "CODING",
+        },
+      });
+
+      await OrchestratorService._triggerParentAutoResponse(
+        "parent-conv-id", "test-project", "test-user",
+        contextWithEmit, completionMessage,
+      );
+
+      // The task_notification SSE event should have been emitted
+      // BEFORE handleAgent was called (it's the first emit call)
+      const taskNotificationCalls = parentSseEmit.mock.calls.filter(
+        (callArguments: unknown[]) => (callArguments[0] as Record<string, unknown>)?.type === "task_notification",
+      );
+      expect(taskNotificationCalls).toHaveLength(1);
+
+      const notificationPayload = taskNotificationCalls[0][0];
+      expect(notificationPayload).toEqual(
+        expect.objectContaining({
+          type: "task_notification",
+          content: expect.stringContaining("<task-notification>"),
+          timestamp: expect.any(String),
+          _notificationSource: NOTIFICATION_SOURCES.ORCHESTRATOR,
+          _notificationId: expect.stringContaining("orchestrator:"),
+        }),
+      );
+
+      // task_notification should have been emitted before handleAgent was called
+      // (parentSseEmit's first call should be the notification, handleAgent is called after)
+      expect(mockHandleAgent).toHaveBeenCalledTimes(1);
+
+      // Verify the notification event was emitted before handleAgent by checking call order
+      const notificationEmitOrder = parentSseEmit.mock.invocationCallOrder[0];
+      const handleAgentCallOrder = mockHandleAgent.mock.invocationCallOrder[0];
+      expect(notificationEmitOrder).toBeLessThan(handleAgentCallOrder);
     });
   });
 
