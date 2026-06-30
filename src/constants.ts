@@ -218,6 +218,9 @@ export const ORCHESTRATOR = {
   /** Max characters of sub-agent result text propagated in tool-call fallback summaries. */
   MAX_RESULT_LENGTH_FOR_PROPAGATION: 2000,
 
+  /** TTL for completed/idle sub-agents before they are evicted from memory (ms). 30 minutes. */
+  IDLE_AGENT_TTL_MILLISECONDS: 30 * 60 * 1_000,
+
   /** Max retries waiting for a parent conversation to become idle before auto-responding. */
   AUTO_RESPONSE_GENERATION_WAIT_MAXIMUM_RETRIES: 30,
 
