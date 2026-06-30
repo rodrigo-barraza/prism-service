@@ -14,6 +14,7 @@ import type {
   ConversationMessage,
   AgenticContext,
 } from "../src/services/harnesses/types.ts";
+import { CONTEXT_WINDOW } from "../src/constants.ts";
 
 vi.mock("../src/utils/logger.ts", () => ({
   default: {
@@ -144,7 +145,8 @@ describe("Dynamic Output Token Clamping", () => {
       const messages = createMessagesWithTokenCount(30_000);
       const clamped = (harness as any).clampOutputTokens(messages, 64_000);
 
-      const expectedClamped = 90_000 - 30_000 - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
+      const baseToolSchemaOverhead = CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS;
+      const expectedClamped = 90_000 - 30_000 - baseToolSchemaOverhead - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
       expect(clamped).toBe(expectedClamped);
       expect(clamped).toBeLessThan(64_000);
     });
@@ -161,9 +163,10 @@ describe("Dynamic Output Token Clamping", () => {
       // Without clamping: 26001 + 64000 = 90001 > 90000 → 400 error
       expect(26_001 + 64_000).toBeGreaterThan(90_000);
 
-      // With clamping: should fit
-      expect(26_001 + clamped + OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN).toBeLessThanOrEqual(90_000);
-      expect(clamped).toBe(90_000 - 26_001 - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN);
+      // With clamping: should fit (accounting for base tool schema overhead)
+      const baseToolSchemaOverhead = CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS;
+      expect(26_001 + clamped + baseToolSchemaOverhead + OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN).toBeLessThanOrEqual(90_000);
+      expect(clamped).toBe(90_000 - 26_001 - baseToolSchemaOverhead - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN);
     });
 
     it("should floor at MINIMUM_CLAMPED_OUTPUT_TOKENS when context is nearly exhausted", () => {
@@ -210,7 +213,8 @@ describe("Dynamic Output Token Clamping", () => {
       const messages = createMessagesWithTokenCount(15_000);
       const clamped = (harness as any).clampOutputTokens(messages, 40_000);
 
-      const expectedWithoutMargin = 50_000 - 15_000;
+      const baseToolSchemaOverhead = CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS;
+      const expectedWithoutMargin = 50_000 - 15_000 - baseToolSchemaOverhead;
       const expectedWithMargin = expectedWithoutMargin - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
       expect(clamped).toBe(expectedWithMargin);
       expect(clamped).toBeLessThan(expectedWithoutMargin);
@@ -333,7 +337,8 @@ describe("Dynamic Output Token Clamping", () => {
       harness.createProviderStream(messages, { maxTokens: 64_000 } as any);
 
       const passedOptions = mockGenerateTextStream.mock.calls[0][2];
-      const expectedClamped = 90_000 - 30_000 - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
+      const baseToolSchemaOverhead = CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS;
+      const expectedClamped = 90_000 - 30_000 - baseToolSchemaOverhead - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
       expect(passedOptions.maxTokens).toBe(expectedClamped);
       expect(passedOptions.maxTokens).toBeLessThan(64_000);
     });
@@ -380,7 +385,8 @@ describe("Dynamic Output Token Clamping", () => {
       harness.createProviderStream(messagesSecondIteration, options);
 
       const passedOptions = mockGenerateTextStream.mock.calls[1][2];
-      const expectedClamped = 90_000 - 30_000 - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
+      const baseToolSchemaOverhead = CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS;
+      const expectedClamped = 90_000 - 30_000 - baseToolSchemaOverhead - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
       expect(passedOptions.maxTokens).toBe(expectedClamped);
     });
   });

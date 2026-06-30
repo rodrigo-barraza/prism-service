@@ -23,6 +23,7 @@ import {
   OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN,
   MINIMUM_CLAMPED_OUTPUT_TOKENS,
 } from "../../../constants/TokenBudgetDefaults.ts";
+import { CONTEXT_WINDOW } from "../../../constants.ts";
 import { estimateTokens } from "../../../utils/CostCalculator.ts";
 
 import type { ConversationMessage } from "../types.ts";
@@ -42,6 +43,7 @@ function clampOutputTokens(
   requestedMaxTokens: number | undefined,
   modelDefinitionMaxInputTokens: number | undefined | null,
   loadedContextLength: number | undefined | null,
+  toolCount = 0,
 ): number | undefined {
   const contextWindow =
     modelDefinitionMaxInputTokens ||
@@ -51,8 +53,14 @@ function clampOutputTokens(
   if (!contextWindow || !requestedMaxTokens) return requestedMaxTokens;
 
   const estimatedInputTokens = estimateInputTokens(messages);
+  const toolSchemaOverhead =
+    CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS +
+    toolCount * CONTEXT_WINDOW.TOKENS_PER_TOOL_SCHEMA;
   const availableForOutput =
-    contextWindow - estimatedInputTokens - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
+    contextWindow -
+    estimatedInputTokens -
+    toolSchemaOverhead -
+    OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
 
   if (requestedMaxTokens <= availableForOutput) return requestedMaxTokens;
 
@@ -117,8 +125,9 @@ describe("Output Token Clamping (clampOutputTokens)", () => {
 
       expect(clamped).toBeDefined();
       expect(clamped!).toBeLessThan(requestedOutputTokens);
+      const baseToolSchemaOverhead = CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS;
       expect(clamped!).toBeLessThanOrEqual(
-        contextWindow - inputTokens - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN,
+        contextWindow - inputTokens - baseToolSchemaOverhead - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN,
       );
     });
 
@@ -157,8 +166,9 @@ describe("Output Token Clamping (clampOutputTokens)", () => {
       expect(clamped!).toBeLessThan(requestedOutputTokens);
 
       const estimatedInput = estimateInputTokens(messages);
+      const baseToolSchemaOverhead = CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS;
       const expectedMaxOutput =
-        loadedContextLength - estimatedInput - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
+        loadedContextLength - estimatedInput - baseToolSchemaOverhead - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
       expect(clamped).toBe(Math.max(expectedMaxOutput, MINIMUM_CLAMPED_OUTPUT_TOKENS));
     });
 
@@ -199,7 +209,8 @@ describe("Output Token Clamping (clampOutputTokens)", () => {
       expect(clamped!).toBeLessThan(requestedOutputTokens);
 
       const estimatedInput = estimateInputTokens(messages);
-      expect(estimatedInput + clamped! + OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN).toBeLessThanOrEqual(
+      const baseToolSchemaOverhead = CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS;
+      expect(estimatedInput + clamped! + baseToolSchemaOverhead + OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN).toBeLessThanOrEqual(
         loadedContextLength,
       );
     });
@@ -293,12 +304,13 @@ describe("Output Token Clamping (clampOutputTokens)", () => {
       expect(clamped).toBe(MINIMUM_CLAMPED_OUTPUT_TOKENS);
     });
 
-    it("should return unchanged at exact boundary minus safety margin", () => {
-      // Set up so input + output + safety margin == exactly contextWindow
+    it("should return unchanged at exact boundary minus safety margin and tool overhead", () => {
+      // Set up so input + output + tool overhead + safety margin == exactly contextWindow
       const contextWindow = 100_000;
       const requestedOutputTokens = 16_384;
+      const baseToolSchemaOverhead = CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS;
       const targetInputTokens =
-        contextWindow - requestedOutputTokens - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
+        contextWindow - requestedOutputTokens - baseToolSchemaOverhead - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN;
       const messages = createMessagesWithTokenCount(targetInputTokens);
 
       const clamped = clampOutputTokens(
@@ -315,9 +327,10 @@ describe("Output Token Clamping (clampOutputTokens)", () => {
     it("should clamp when 1 token over the boundary", () => {
       const contextWindow = 100_000;
       const requestedOutputTokens = 16_384;
+      const baseToolSchemaOverhead = CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS;
       // 1 extra token beyond what fits
       const targetInputTokens =
-        contextWindow - requestedOutputTokens - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN + 1;
+        contextWindow - requestedOutputTokens - baseToolSchemaOverhead - OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN + 1;
       const messages = createMessagesWithTokenCount(targetInputTokens);
 
       const clamped = clampOutputTokens(
@@ -341,7 +354,7 @@ describe("Output Token Clamping (clampOutputTokens)", () => {
         null,
       );
 
-      // Empty messages → 0 input tokens → plenty of room
+      // Empty messages → 0 input tokens → base overhead only → plenty of room
       expect(clamped).toBe(requestedOutputTokens);
     });
 
@@ -383,14 +396,102 @@ describe("Output Token Clamping (clampOutputTokens)", () => {
         );
 
         if (clamped !== requestedOutput) {
-          // Was clamped — verify the invariant
-          expect(
-            estimatedInput + clamped! + OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN,
-          ).toBeLessThanOrEqual(contextWindow);
+          // Was clamped — verify the invariant (including base tool overhead)
+          // Skip the sum check when clamped hit the MINIMUM floor, since
+          // the floor intentionally allows exceeding the budget so the model
+          // can produce a meaningful partial response rather than 0 output.
+          const baseToolSchemaOverhead = CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS;
+          if (clamped !== MINIMUM_CLAMPED_OUTPUT_TOKENS) {
+            expect(
+              estimatedInput + clamped! + baseToolSchemaOverhead + OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN,
+            ).toBeLessThanOrEqual(contextWindow);
+          }
         }
         // Either way, should never be undefined
         expect(clamped).toBeDefined();
       });
     }
+  });
+
+  describe("tool-schema-induced overflow (discover_and_enable_tools regression)", () => {
+    it("should clamp when 20 dynamically enabled tools push context over the limit", () => {
+      // Exact reproduction of the Gemma 4 12B + discover_and_enable_tools bug:
+      // - Context window: 90,000
+      // - Requested output: 64,000
+      // - Input tokens: ~20,000 (moderate conversation)
+      // - Tool count: 35 (15 core + 20 discovered)
+      // Without tool schema overhead: 90,000 - 20,000 - 256 = 69,744 → 64,000 fits (no clamp!)
+      // With tool schema overhead:    90,000 - 20,000 - (2000 + 35*150) - 256 = 62,494 → 64,000 overflows → must clamp
+      const contextWindow = 90_000;
+      const inputTokens = 20_000;
+      const requestedOutputTokens = 64_000;
+      const toolCount = 35; // 15 core + 20 discovered via discover_and_enable_tools
+      const messages = createMessagesWithTokenCount(inputTokens);
+
+      const clamped = clampOutputTokens(
+        messages,
+        requestedOutputTokens,
+        null,
+        contextWindow,
+        toolCount,
+      );
+
+      expect(clamped).toBeDefined();
+      expect(clamped!).toBeLessThan(requestedOutputTokens);
+
+      // Verify the full budget equation
+      const estimatedInput = estimateInputTokens(messages);
+      const toolSchemaOverhead =
+        CONTEXT_WINDOW.TOOL_SCHEMA_OVERHEAD_TOKENS +
+        toolCount * CONTEXT_WINDOW.TOKENS_PER_TOOL_SCHEMA;
+      expect(
+        estimatedInput + clamped! + toolSchemaOverhead + OUTPUT_TOKEN_CLAMP_SAFETY_MARGIN,
+      ).toBeLessThanOrEqual(contextWindow);
+    });
+
+    it("should not clamp on large-context models even with many tools", () => {
+      // Claude 4 Opus (200K context) — 20 extra tools shouldn't cause issues
+      const contextWindow = 200_000;
+      const inputTokens = 20_000;
+      const requestedOutputTokens = 64_000;
+      const toolCount = 50;
+      const messages = createMessagesWithTokenCount(inputTokens);
+
+      const clamped = clampOutputTokens(
+        messages,
+        requestedOutputTokens,
+        contextWindow,
+        null,
+        toolCount,
+      );
+
+      expect(clamped).toBe(requestedOutputTokens);
+    });
+
+    it("should account for increasing tool counts proportionally", () => {
+      // Use a large enough context that neither case floors at MINIMUM_CLAMPED_OUTPUT_TOKENS
+      const contextWindow = 120_000;
+      const inputTokens = 15_000;
+      const requestedOutputTokens = 100_000;
+      const messages = createMessagesWithTokenCount(inputTokens);
+
+      const clampedWithFewTools = clampOutputTokens(
+        messages,
+        requestedOutputTokens,
+        null,
+        contextWindow,
+        5,
+      );
+      const clampedWithManyTools = clampOutputTokens(
+        messages,
+        requestedOutputTokens,
+        null,
+        contextWindow,
+        40,
+      );
+
+      // More tools → less available output → lower clamped value
+      expect(clampedWithManyTools!).toBeLessThan(clampedWithFewTools!);
+    });
   });
 });
