@@ -37,6 +37,7 @@ import { TOOL_API_HEALTH_TIMEOUT_MS } from "../constants.ts";
 
 import { ProviderError } from "../utils/errors.ts";
 import logger from "../utils/logger.ts";
+import { discoverContextLength } from "../utils/ContextLengthDiscovery.ts";
 
 import { TYPES, getDefaultModels } from "../config.ts";
 import {
@@ -197,6 +198,7 @@ export function createLlamaCppProvider(
         "llama.cpp",
         `generateText model=${model} baseUrl=${baseUrl}`,
       );
+      await discoverContextLength(instanceId, baseUrl, model, options);
       try {
         // Expand video attachments to image frames (ffmpeg) before message prep
         await expandVideoToFrames(messages);
@@ -289,6 +291,7 @@ export function createLlamaCppProvider(
         "llama.cpp",
         `generateTextStream model=${model} baseUrl=${baseUrl}`,
       );
+      await discoverContextLength(instanceId, baseUrl, model, options);
       try {
         // Expand video attachments to image frames (ffmpeg) before message prep
         await expandVideoToFrames(messages);
