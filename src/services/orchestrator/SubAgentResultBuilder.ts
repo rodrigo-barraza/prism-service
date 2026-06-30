@@ -115,9 +115,23 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
     durationMs: subAgent.durationMs || 0,
     // Include full conversation for frontend MessageList rendering.
     // Strip system messages — they're large and not useful for display.
-    messages: (subAgent.messages || []).filter(
-      (message) => message.role !== "system",
-    ),
+    // Sanitize assistant content to remove leaked model tokens
+    // (e.g. Gemma 4 channel/thought blocks that survived streaming).
+    messages: (subAgent.messages || [])
+      .filter((message) => message.role !== "system")
+      .map((message) => {
+        if (
+          message.role === "assistant" &&
+          typeof message.content === "string" &&
+          message.content.includes("<")
+        ) {
+          const sanitizedContent = stripToolCallMarkup(message.content).trim();
+          if (sanitizedContent !== message.content) {
+            return { ...message, content: sanitizedContent };
+          }
+        }
+        return message;
+      }),
   };
 
   if (subAgent.diff?.hasChanges) {

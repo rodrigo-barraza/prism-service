@@ -68,10 +68,10 @@ export function blockUnauthorizedToolCalls(
 
   if (pendingToolCalls.length === 0) {
     // All tool calls were blocked — add system feedback and continue loop
-    if (pass.streamedText) {
+    if (pass.finalStreamedText || pass.streamedText) {
       currentMessages.push({
         role: "assistant",
-        content: pass.streamedText,
+        content: pass.finalStreamedText || pass.streamedText,
         ...(pass.streamedThinking && {
           thinking: pass.streamedThinking,
         }),

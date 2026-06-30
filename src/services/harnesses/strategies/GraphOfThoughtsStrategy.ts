@@ -1033,7 +1033,7 @@ async function runPlanningPhase(
 
       currentMessages.push({
         role: "assistant",
-        content: pass.streamedText || "",
+        content: pass.finalStreamedText || "",
         ...(pass.streamedThinking.trim() && {
           thinking: pass.streamedThinking.trim(),
         }),
@@ -1066,10 +1066,10 @@ async function runPlanningPhase(
       logger.warn(
         `[GraphOfThoughts] Planning phase: blocked ${unauthorizedCalls.length} unauthorized tool call(s): [${blockedNames}]`,
       );
-      if (pass.streamedText) {
+      if (pass.finalStreamedText || pass.streamedText) {
         currentMessages.push({
           role: "assistant",
-          content: pass.streamedText,
+          content: pass.finalStreamedText || pass.streamedText,
           ...(pass.streamedThinking.trim() && {
             thinking: pass.streamedThinking.trim(),
           }),
@@ -1090,10 +1090,10 @@ async function runPlanningPhase(
       continue;
     }
 
-    if (pass.streamedText || pass.streamedThinking.trim()) {
+    if (pass.finalStreamedText || pass.streamedText || pass.streamedThinking.trim()) {
       currentMessages.push({
         role: "assistant",
-        content: pass.streamedText,
+        content: pass.finalStreamedText || pass.streamedText,
         ...(pass.streamedThinking.trim() && {
           thinking: pass.streamedThinking.trim(),
         }),
