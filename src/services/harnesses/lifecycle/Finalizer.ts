@@ -54,6 +54,8 @@ export interface FinalizerContext {
   signal?: AbortSignal;
 }
 
+import type { ContextBudgetSnapshot } from "../ContextBudgetTracker.ts";
+
 export interface FinalizerPayload {
   text: string | null;
   thinking: string | null;
@@ -72,6 +74,7 @@ export interface FinalizerPayload {
   textFragments?: unknown[];
   thinkingFragments?: unknown[];
   resolvedEnabledTools?: string[] | null;
+  contextBudget?: ContextBudgetSnapshot;
 }
 
 /**
@@ -178,6 +181,7 @@ export async function finalizeTextGeneration(
     textFragments,
     thinkingFragments,
     resolvedEnabledTools,
+    contextBudget,
   }: FinalizerPayload,
   overrideMessagesToAppend: MessagePayload[] | null = null,
   finalizerOptions?: { deferDoneEmission?: boolean },
@@ -471,6 +475,12 @@ export async function finalizeTextGeneration(
     }
     if (agent) {
       finalMeta.agent = agent;
+    }
+    // Persist the latest context budget snapshot on the conversation document
+    // so the client can display it when users switch between conversations.
+    // All agent conversations (including sub-agents) track their own budget.
+    if (contextBudget) {
+      finalMeta.contextBudget = contextBudget;
     }
     // Ensure all user messages to append are properly swapped/sanitized,
     // then filter out synthetic compaction artifacts that should never

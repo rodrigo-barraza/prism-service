@@ -79,6 +79,9 @@ const ConversationService: ConversationServiceInterface = {
       if (conversationMeta.workspaceRoot) {
         setFields.workspaceRoot = conversationMeta.workspaceRoot;
       }
+      if (conversationMeta.contextBudget) {
+        setFields.contextBudget = conversationMeta.contextBudget;
+      }
     }
 
     // Build $setOnInsert for auto-creation of new conversations

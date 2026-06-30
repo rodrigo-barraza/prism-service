@@ -12,6 +12,8 @@ import { calculateTokensPerSec } from "../../utils/math.ts";
 import { getPricing, TYPES } from "../../config.ts";
 import { stripToolCallMarkup } from "../../utils/StreamChunkDispatcher.ts";
 import ContextWindowManager from "../../utils/ContextWindowManager.ts";
+import ContextBudgetTracker from "./ContextBudgetTracker.ts";
+import type { ContextBudgetSnapshot } from "./ContextBudgetTracker.ts";
 import {
   DEFAULT_MAX_INPUT_TOKENS,
   DEFAULT_MAX_OUTPUT_TOKENS,
@@ -100,6 +102,11 @@ export default class BaseAgenticHarness {
   protected tools: ResolvedTools;
   protected trackerConversationId: string;
   protected repetitionDetector: RepetitionDetector;
+  protected budgetTracker: ContextBudgetTracker | null;
+
+  /** Cached estimated message tokens from the last clampOutputTokens call.
+   *  Used by the usage handler to compute calibration ratio. */
+  private lastEstimatedMessageTokens = 0;
 
   constructor(
     context: AgenticContext,
@@ -113,6 +120,15 @@ export default class BaseAgenticHarness {
       context.agentConversationId ||
       "") as string;
     this.repetitionDetector = new RepetitionDetector();
+
+    // Initialize budget tracker when a context window is known
+    const contextWindow =
+      context.modelDefinition?.maxInputTokens ||
+      (context.options?._loadedContextLength as number | undefined) ||
+      null;
+    this.budgetTracker = contextWindow
+      ? new ContextBudgetTracker(context.emit, contextWindow)
+      : null;
   }
 
   /** Execute the agentic loop. Subclasses MUST override. */
@@ -485,16 +501,59 @@ export default class BaseAgenticHarness {
 
     if (!contextWindow) return requestedMaxTokens;
 
-    // 1. Conversation messages
+    // Ensure the tracker has the latest context window (may be updated at runtime)
+    if (this.budgetTracker) {
+      this.budgetTracker.updateContextWindow(contextWindow);
+    }
+
+    // 1. Conversation messages (raw heuristic, before calibration)
     const estimatedMessageTokens = this.estimateInputTokens(messages);
+    this.lastEstimatedMessageTokens = estimatedMessageTokens;
 
     // 2. System prompt (sent as systemInstruction, invisible to messages)
     const systemPromptText =
       (this.context.options?.systemPrompt as string | undefined) || "";
-    const estimatedSystemPromptTokens = estimateTokens(systemPromptText);
 
     // 3. Tool schemas (serialized JSON function definitions)
     const toolSchemas = this.tools.finalTools;
+
+    // Delegate budget computation and SSE emission to the tracker
+    if (this.budgetTracker) {
+      const { clampedMaxTokens, adjustedInput, availableForOutput } =
+        this.budgetTracker.computeAndEmitEstimate(
+          estimatedMessageTokens,
+          systemPromptText,
+          toolSchemas,
+          requestedMaxTokens,
+        );
+
+      const calibrationRatio = this.budgetTracker.getCalibrationRatio();
+
+      // ── Always log the budget breakdown for diagnostics ──
+      logger.info(
+        `[OutputTokenClamp] Budget: contextWindow=${contextWindow}, ` +
+          `messages=${estimatedMessageTokens}${calibrationRatio !== null ? ` (calibrated ×${calibrationRatio.toFixed(3)})` : ""}, ` +
+          `systemPrompt=${estimateTokens(systemPromptText)} (${systemPromptText.length} chars), ` +
+          `toolSchemas=${toolSchemas.length > 0 ? estimateTokens(JSON.stringify(toolSchemas)) : 0} (${toolSchemas.length} tools), ` +
+          `adjusted=${adjustedInput}, available=${availableForOutput}, ` +
+          `requested=${requestedMaxTokens}, ` +
+          `willClamp=${requestedMaxTokens ? requestedMaxTokens > availableForOutput : false}`,
+      );
+
+      if (!requestedMaxTokens) return requestedMaxTokens;
+
+      if (clampedMaxTokens !== requestedMaxTokens) {
+        logger.warn(
+          `[OutputTokenClamp] CLAMPING maxTokens ${requestedMaxTokens} → ${clampedMaxTokens}. ` +
+            `Without clamp: ${adjustedInput + requestedMaxTokens} > ${contextWindow}.`,
+        );
+      }
+
+      return clampedMaxTokens;
+    }
+
+    // Fallback: no tracker (no context window known at construction)
+    const estimatedSystemPromptTokens = estimateTokens(systemPromptText);
     const estimatedToolSchemaTokens =
       toolSchemas.length > 0
         ? estimateTokens(JSON.stringify(toolSchemas))
@@ -505,28 +564,18 @@ export default class BaseAgenticHarness {
       estimatedSystemPromptTokens +
       estimatedToolSchemaTokens;
 
-    // Apply a multiplicative safety margin to absorb the ~5-6% gap between
-    // our 4-chars/token heuristic and real tokenizer output.
     const safetyMargin = Math.ceil(
       totalEstimatedInput * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
     );
     const adjustedInput = totalEstimatedInput + safetyMargin;
-
     const availableForOutput = contextWindow - adjustedInput;
 
-    // ── Always log the budget breakdown for diagnostics ──
     logger.info(
-      `[OutputTokenClamp] Budget: contextWindow=${contextWindow}, ` +
-        `messages=${estimatedMessageTokens}, ` +
-        `systemPrompt=${estimatedSystemPromptTokens} (${systemPromptText.length} chars), ` +
-        `toolSchemas=${estimatedToolSchemaTokens} (${toolSchemas.length} tools), ` +
-        `totalRaw=${totalEstimatedInput}, safety=${safetyMargin}, ` +
+      `[OutputTokenClamp] Budget (no tracker): contextWindow=${contextWindow}, ` +
         `adjusted=${adjustedInput}, available=${availableForOutput}, ` +
-        `requested=${requestedMaxTokens}, ` +
-        `willClamp=${requestedMaxTokens ? requestedMaxTokens > availableForOutput : false}`,
+        `requested=${requestedMaxTokens}`,
     );
 
-    // ── Stream budget breakdown to the frontend ──
     this.context.emit({
       type: SERVER_SENT_EVENT_TYPES.CONTEXT_BUDGET,
       contextWindow,
@@ -539,10 +588,10 @@ export default class BaseAgenticHarness {
       requestedOutputTokens: requestedMaxTokens,
       isClamped: requestedMaxTokens ? requestedMaxTokens > availableForOutput : false,
       toolCount: toolSchemas.length,
+      source: "estimated",
     });
 
     if (!requestedMaxTokens) return requestedMaxTokens;
-
     if (requestedMaxTokens <= availableForOutput) return requestedMaxTokens;
 
     const clampedMaxTokens = Math.max(
@@ -723,6 +772,16 @@ export default class BaseAgenticHarness {
           ConversationGenerationTracker.update(pass.requestId, trackerUpdate);
         }
       }
+
+      // Record real token counts on the budget tracker for calibration
+      // and to re-emit a corrected context budget snapshot.
+      if (this.budgetTracker) {
+        this.budgetTracker.recordRealUsage(
+          usageChunk,
+          this.lastEstimatedMessageTokens,
+        );
+      }
+
       return { action: "continue" };
     }
 
@@ -1377,6 +1436,7 @@ export default class BaseAgenticHarness {
         textFragments: cleanTextFragments,
         thinkingFragments: cleanThinkingFragments,
         resolvedEnabledTools: this.tools.resolvedEnabledTools,
+        contextBudget: this.budgetTracker?.getSnapshot() ?? undefined,
       },
       newTurnMessages as MessagePayload[],
       finalizeOptions,
