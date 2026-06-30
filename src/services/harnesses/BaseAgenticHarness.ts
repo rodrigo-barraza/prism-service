@@ -483,7 +483,7 @@ export default class BaseAgenticHarness {
       (this.context.options?._loadedContextLength as number | undefined) ||
       null;
 
-    if (!contextWindow || !requestedMaxTokens) return requestedMaxTokens;
+    if (!contextWindow) return requestedMaxTokens;
 
     // 1. Conversation messages
     const estimatedMessageTokens = this.estimateInputTokens(messages);
@@ -523,7 +523,7 @@ export default class BaseAgenticHarness {
         `totalRaw=${totalEstimatedInput}, safety=${safetyMargin}, ` +
         `adjusted=${adjustedInput}, available=${availableForOutput}, ` +
         `requested=${requestedMaxTokens}, ` +
-        `willClamp=${requestedMaxTokens > availableForOutput}`,
+        `willClamp=${requestedMaxTokens ? requestedMaxTokens > availableForOutput : false}`,
     );
 
     // ── Stream budget breakdown to the frontend ──
@@ -537,9 +537,11 @@ export default class BaseAgenticHarness {
       totalInputTokens: adjustedInput,
       availableOutputTokens: Math.max(availableForOutput, 0),
       requestedOutputTokens: requestedMaxTokens,
-      isClamped: requestedMaxTokens > availableForOutput,
+      isClamped: requestedMaxTokens ? requestedMaxTokens > availableForOutput : false,
       toolCount: toolSchemas.length,
     });
+
+    if (!requestedMaxTokens) return requestedMaxTokens;
 
     if (requestedMaxTokens <= availableForOutput) return requestedMaxTokens;
 
