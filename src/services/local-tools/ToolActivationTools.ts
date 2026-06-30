@@ -8,6 +8,7 @@ import {
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
 import SettingsService from "../SettingsService.ts";
+import { TOOLS } from "../../constants.ts";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 import {
   getCurrentDynamicTools,
@@ -130,20 +131,39 @@ const enableTools = {
       };
     }
 
+    // Cap the number of tools enabled per call to avoid context overflow
+    const maxPerActivation = TOOLS.MAX_DYNAMIC_TOOLS_PER_ACTIVATION;
+    let droppedTools: string[] = [];
+    let cappedActivatedTools = newlyActivatedTools;
+    if (newlyActivatedTools.length > maxPerActivation) {
+      cappedActivatedTools = newlyActivatedTools.slice(0, maxPerActivation);
+      droppedTools = newlyActivatedTools.slice(maxPerActivation);
+      // Remove dropped tools from the merged set
+      for (const droppedName of droppedTools) {
+        mergedToolSet.delete(droppedName);
+      }
+    }
+
     persistDynamicTools(agentConversationId, [...mergedToolSet]);
 
     logger.info(
-      `[ToolActivation] enable_tools: conversation=${agentConversationId} activated ${newlyActivatedTools.length} tools: [${newlyActivatedTools.join(", ")}] (total: ${mergedToolSet.size})`,
+      `[ToolActivation] enable_tools: conversation=${agentConversationId} activated ${cappedActivatedTools.length} tools: [${cappedActivatedTools.join(", ")}]` +
+        (droppedTools.length > 0 ? ` (dropped ${droppedTools.length} over cap: [${droppedTools.join(", ")}])` : "") +
+        ` (total: ${mergedToolSet.size})`,
     );
 
     return {
       success: true,
-      activated: newlyActivatedTools,
+      activated: cappedActivatedTools,
       totalEnabled: mergedToolSet.size,
+      ...(droppedTools.length > 0 && {
+        dropped: droppedTools,
+        droppedReason: `Only ${maxPerActivation} tools can be enabled per call to avoid exceeding the model's context window. Call enable_tools again for the remaining tools if needed.`,
+      }),
       message: PromptLocaleService.get(
         PromptLocaleService.getDefaultLocale(),
         "internal-tools-runtime.enable_tools.activated",
-        { count: String(newlyActivatedTools.length) },
+        { count: String(cappedActivatedTools.length) },
       ),
     };
   },

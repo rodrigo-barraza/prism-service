@@ -259,10 +259,49 @@ const discoverAndEnableTools = {
     }
 
     if (newlyActivatedTools.length > 0) {
+      // Cap the number of tools auto-enabled per call to avoid context overflow
+      const maxPerActivation = TOOLS.MAX_DYNAMIC_TOOLS_PER_ACTIVATION;
+      let cappedActivatedTools = newlyActivatedTools;
+      let droppedTools: string[] = [];
+      if (newlyActivatedTools.length > maxPerActivation) {
+        cappedActivatedTools = newlyActivatedTools.slice(0, maxPerActivation);
+        droppedTools = newlyActivatedTools.slice(maxPerActivation);
+        // Remove dropped tools from the merged set
+        for (const droppedName of droppedTools) {
+          mergedToolSet.delete(droppedName);
+        }
+      }
+
       persistDynamicTools(agentConversationId, [...mergedToolSet]);
       logger.info(
-        `[DiscoverAndEnable] conversation=${agentConversationId} searched "${query}" → auto-enabled ${newlyActivatedTools.length} tools: [${newlyActivatedTools.join(", ")}]`,
+        `[DiscoverAndEnable] conversation=${agentConversationId} searched "${query}" → auto-enabled ${cappedActivatedTools.length} tools: [${cappedActivatedTools.join(", ")}]` +
+          (droppedTools.length > 0 ? ` (dropped ${droppedTools.length} over cap: [${droppedTools.join(", ")}])` : ""),
       );
+
+      const enabledSet = new Set(cappedActivatedTools);
+
+      return {
+        matches: matches.map((matchEntry) => ({
+          ...matchEntry,
+          isEnabled: enabledSet.has(matchEntry.name) || currentDynamicTools.includes(matchEntry.name),
+        })),
+        total: searchResult.total || matches.length,
+        query: query || null,
+        domain: domain || null,
+        auto_enabled: cappedActivatedTools,
+        ...(droppedTools.length > 0 && {
+          not_enabled: droppedTools,
+          not_enabled_reason: `Only ${maxPerActivation} tools can be auto-enabled per call to avoid exceeding the model's context window. Call enable_tools for the remaining tools if needed.`,
+        }),
+        message: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.discover_and_enable_tools.foundAndEnabled",
+          {
+            matchCount: String(matches.length),
+            enabledCount: String(cappedActivatedTools.length),
+          },
+        ),
+      };
     }
 
     return {
@@ -273,22 +312,12 @@ const discoverAndEnableTools = {
       total: searchResult.total || matches.length,
       query: query || null,
       domain: domain || null,
-      auto_enabled: newlyActivatedTools,
-      message:
-        newlyActivatedTools.length > 0
-          ? PromptLocaleService.get(
-              PromptLocaleService.getDefaultLocale(),
-              "internal-tools-runtime.discover_and_enable_tools.foundAndEnabled",
-              {
-                matchCount: String(matches.length),
-                enabledCount: String(newlyActivatedTools.length),
-              },
-            )
-          : PromptLocaleService.get(
-              PromptLocaleService.getDefaultLocale(),
-              "internal-tools-runtime.discover_and_enable_tools.foundAlreadyEnabled",
-              { matchCount: String(matches.length) },
-            ),
+      auto_enabled: [],
+      message: PromptLocaleService.get(
+        PromptLocaleService.getDefaultLocale(),
+        "internal-tools-runtime.discover_and_enable_tools.foundAlreadyEnabled",
+        { matchCount: String(matches.length) },
+      ),
     };
   },
 };
