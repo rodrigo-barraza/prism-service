@@ -110,7 +110,7 @@ async function clearStaleConversations(): Promise<HousekeepingConversationResult
     Date.now() - STALE_CONVERSATION_CUTOFF_MS,
   ).toISOString();
 
-  const [convResult, agentConvResult] = await Promise.all([
+  const [convResult, agentConvResult, staleAwaitingResult] = await Promise.all([
     db
       .collection(COLLECTIONS.MODEL_CONVERSATIONS)
       .updateMany(
@@ -123,7 +123,20 @@ async function clearStaleConversations(): Promise<HousekeepingConversationResult
         { isGenerating: true, updatedAt: { $lt: cutoff } },
         { $set: { isGenerating: false } },
       ),
+    // Clear stale pendingBackgroundTasks counters left from crashes/restarts
+    db
+      .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+      .updateMany(
+        { pendingBackgroundTasks: { $gt: 0 }, updatedAt: { $lt: cutoff } },
+        { $set: { pendingBackgroundTasks: 0 } },
+      ),
   ]);
+
+  if (staleAwaitingResult.modifiedCount > 0) {
+    logger.info(
+      `[Housekeeping] Cleared ${staleAwaitingResult.modifiedCount} stale pendingBackgroundTasks counter(s)`,
+    );
+  }
 
   return {
     conversationsCleared: convResult.modifiedCount,
