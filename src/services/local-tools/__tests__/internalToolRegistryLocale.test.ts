@@ -15,7 +15,7 @@
  * which `localizeSchema` now calls when present, bypassing the getter.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import PromptLocaleService from "../../PromptLocaleService.ts";
+
 
 // ── Mock heavy services that require DB / network ──────────
 

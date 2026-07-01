@@ -412,9 +412,6 @@ function handleWebsocketLive(
           ).default;
           const { convertToolsToGoogle } =
             await import("../providers/google.js");
-          const MongoWrapper = (await import("../wrappers/MongoWrapper.js"))
-            .default;
-          const { MONGO_DB_NAME } = await import("../../config.js");
 
           const SettingsService = (
             await import("../services/SettingsService.js")
@@ -527,7 +524,7 @@ function handleWebsocketLive(
                       username,
                       true,
                       { title: activeConversationTitle },
-                    ).catch((error: Error) => {});
+                    ).catch((_error: Error) => {});
                   }
                 }
 

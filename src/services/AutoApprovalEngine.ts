@@ -227,7 +227,7 @@ export default class AutoApprovalEngine {
     return { autoApproved, needsApproval };
   }
   createHook() {
-    return async (toolCall: ToolCall, context: AgenticContext) => {
+    return async (toolCall: ToolCall, _context: AgenticContext) => {
       return this.check(toolCall);
     };
   }

@@ -616,7 +616,7 @@ export function injectSystemPromptContext(
   },
 ): void {
   const {
-    systemPrompt,
+    systemPrompt: _systemPrompt,
     platformContextMessage,
     selfContextMessage,
     skillsText,

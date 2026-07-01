@@ -211,7 +211,7 @@ async function executeModelNode(
   context: ExecutionContext,
   {
     toolSchemas,
-    customToolMap,
+    customToolMap: _customToolMap,
     signal,
   }: {
     toolSchemas?: ToolSchemaEntry[] | null;

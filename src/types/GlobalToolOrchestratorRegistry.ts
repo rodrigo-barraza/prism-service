@@ -1,7 +1,6 @@
 import type ToolOrchestratorServiceClass from "../services/ToolOrchestratorService.ts";
 
 declare global {
-  // eslint-disable-next-line no-var
   var __ToolOrchestratorService:
     | typeof ToolOrchestratorServiceClass
     | undefined;

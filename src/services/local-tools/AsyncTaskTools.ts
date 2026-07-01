@@ -321,7 +321,7 @@ const cancelAsyncTask = {
 
   async execute(
     toolArguments: Record<string, unknown>,
-    context: InternalToolContext,
+    _context: InternalToolContext,
   ) {
     const taskId =
       typeof toolArguments.taskId === "string"

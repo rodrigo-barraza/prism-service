@@ -66,9 +66,6 @@ const ENGLISH_AVAILABLE_MARKER =
 const CAVEMAN_GUIDELINES_MARKER = "## Tool Usage";
 const ENGLISH_GUIDELINES_MARKER = "## Tool Usage Guidelines";
 
-// Tool descriptions
-const CAVEMAN_WRITE_TODO_MARKER = "write or update todo list";
-const ENGLISH_WRITE_TODO_MARKER = "Write or update a persistent TODO checklist";
 
 // ── Tests ──────────────────────────────────────────────────
 

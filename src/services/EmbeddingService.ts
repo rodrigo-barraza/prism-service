@@ -13,7 +13,6 @@ import { calculateTokensPerSec } from "../utils/math.ts";
 import SettingsService from "./SettingsService.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import type {
-  EmbeddingMultimodalPart,
   EmbeddingContent,
 } from "../types/provider.ts";
 /** Resolve the current embedding provider + model from settings. */

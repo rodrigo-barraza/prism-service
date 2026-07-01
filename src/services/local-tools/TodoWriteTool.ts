@@ -6,11 +6,6 @@ import {
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 
-interface TodoItemInput {
-  content: string;
-  status?: "pending" | "in_progress" | "completed";
-  priority?: "high" | "medium" | "low";
-}
 
 interface TodoItemNormalized {
   id: number;

@@ -1,16 +1,12 @@
 import logger from "../../../utils/logger.ts";
 import PromptLocaleService from "../../PromptLocaleService.ts";
-import {
-  SERVER_SENT_EVENT_TYPES,
-  STATUS_MESSAGES,
-} from "@rodrigo-barraza/utilities-library/taxonomy";
+
 import { LOG_PREVIEW } from "../../../constants.ts";
 import type AgenticLoopState from "../../AgenticLoopState.ts";
 import type {
   ToolCall,
   ToolResult,
   ConversationMessage,
-  EmitFunction,
 } from "../types.ts";
 
 /**

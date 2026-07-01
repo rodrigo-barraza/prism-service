@@ -18,18 +18,6 @@ interface SkillCreateArgs {
   [key: string]: unknown;
 }
 
-interface SkillExecuteArgs {
-  skillId: string;
-  variables?: Record<string, unknown>;
-}
-
-interface SkillListArgs {
-  project?: string;
-}
-
-interface SkillDeleteArgs {
-  skillId: string;
-}
 
 // ── Skill Tools ────────────────────────────────────────────
 // CRUD operations for reusable workflow skills.
@@ -91,7 +79,7 @@ const createSkill = {
   domain: DOMAINS.CORE_SKILL.displayName,
   async execute(
     toolArguments: Record<string, unknown>,
-    context: InternalToolContext,
+    _context: InternalToolContext,
   ) {
     const createArgs: SkillCreateArgs = {
       name: typeof toolArguments.name === "string" ? toolArguments.name : "",
@@ -262,7 +250,7 @@ const deleteSkill = {
   domain: DOMAINS.CORE_SKILL.displayName,
   async execute(
     toolArguments: Record<string, unknown>,
-    context: InternalToolContext,
+    _context: InternalToolContext,
   ) {
     const skillId =
       typeof toolArguments.skillId === "string" ? toolArguments.skillId : "";
