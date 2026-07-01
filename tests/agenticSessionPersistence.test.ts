@@ -182,8 +182,8 @@ describe("finalizeTextGeneration — segment deduplication", () => {
     expect(ConversationService.appendMessages).toHaveBeenCalledTimes(1);
 
     const appendedMessages = ConversationService.appendMessages.mock.calls[0][3];
-    // Should have: user, intermediate assistant, final assistant
-    expect(appendedMessages).toHaveLength(3);
+    // Canonical format should have: user, intermediate assistant, tool result, final assistant
+    expect(appendedMessages).toHaveLength(4);
 
     const finalMessage = appendedMessages[appendedMessages.length - 1];
     expect(finalMessage.role).toBe("assistant");
@@ -304,10 +304,18 @@ describe("finalizeTextGeneration — segment deduplication", () => {
     await finalizeTextGeneration(context, gen, intermediateMessages);
 
     const appendedMessages = ConversationService.appendMessages.mock.calls[0][3];
-    const finalMessage = appendedMessages[appendedMessages.length - 1];
+    expect(appendedMessages).toHaveLength(3);
 
-    // toolCalls SHOULD be on the final message (no intermediate tool messages)
-    expect(finalMessage.toolCalls).toEqual(nativeToolCalls);
+    const assistantMessage = appendedMessages[1];
+    expect(assistantMessage.role).toBe("assistant");
+    expect(assistantMessage.toolCalls).toEqual([
+      { id: "ntc-1", name: "search_web", args: { query: "test" } }
+    ]);
+
+    const toolMessage = appendedMessages[2];
+    expect(toolMessage.role).toBe("tool");
+    expect(toolMessage.tool_call_id).toBe("ntc-1");
+    expect(toolMessage.content).toBe('{"results":[]}');
   });
 
   // ── Multi-tool-iteration stress test ────────────────────────

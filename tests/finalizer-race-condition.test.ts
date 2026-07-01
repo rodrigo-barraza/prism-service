@@ -83,15 +83,18 @@ describe("Finalizer message assembly", () => {
       providerName: PROVIDERS.ANTHROPIC,
     });
 
-    expect(messagesToAppend).toHaveLength(3);
+    expect(messagesToAppend).toHaveLength(4);
     expect(messagesToAppend[0].role).toBe("user");
     expect(messagesToAppend[0].content).toBe("make a song about the war");
+    expect(messagesToAppend[1].role).toBe("assistant");
     expect(messagesToAppend[1].toolCalls![0].name).toBe("generate_audio");
-    expect(messagesToAppend[2].content).toBe(
+    expect(messagesToAppend[2].role).toBe("tool");
+    expect(messagesToAppend[2].content).toBe('{"success":true,"audioRef":"minio://audio/war.wav"}');
+    expect(messagesToAppend[3].content).toBe(
       "Here's your song! I hope you enjoy it.",
     );
     // Final assistant should NOT have toolCalls (hasIntermediateToolMessages = true)
-    expect(messagesToAppend[2].toolCalls).toBeUndefined();
+    expect(messagesToAppend[3].toolCalls).toBeUndefined();
   });
 
   it("does NOT duplicate toolCalls when hasIntermediateToolMessages is true", () => {
@@ -191,8 +194,8 @@ describe("Finalizer message assembly", () => {
       providerName: PROVIDERS.ANTHROPIC,
     });
 
-    // Summary should be filtered out
-    expect(result).toHaveLength(3);
+    // Summary should be filtered out. Split: user, assistant, tool, assistant
+    expect(result).toHaveLength(4);
     expect(result[0].role).toBe("user");
     expect(result[0].content).toBe("make a song");
   });
@@ -778,8 +781,8 @@ describe("End-to-end DB state after generate_audio flow", () => {
     //  VERIFICATION
     // ════════════════════════════════════════════════
 
-    // 1. Correct message count
-    expect(databaseAfterTurn2).toHaveLength(5);
+    // 1. Correct message count (2 from turn 1 + 4 from turn 2)
+    expect(databaseAfterTurn2).toHaveLength(6);
 
     // 2. All user messages present with correct content
     const userMessages = databaseAfterTurn2.filter(
@@ -799,19 +802,22 @@ describe("End-to-end DB state after generate_audio flow", () => {
       userMessages[1].rawContent?.startsWith(PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX)
     ).toBe(true);
 
-    // 4. Tool calls preserved
+    // 4. Tool calls preserved on assistant, result split into tool role message
+    const assistantWithTools = databaseAfterTurn2.find(
+      (message) => message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0,
+    );
+    expect(assistantWithTools).toBeDefined();
+    expect(assistantWithTools!.toolCalls![0].name).toBe("generate_audio");
+
     const toolMessage = databaseAfterTurn2.find(
-      (message) => message.toolCalls && message.toolCalls.length > 0,
+      (message) => message.role === "tool",
     );
     expect(toolMessage).toBeDefined();
-    expect(toolMessage!.toolCalls![0].name).toBe("generate_audio");
-    expect(toolMessage!.toolCalls![0].result).toHaveProperty("audioRef");
+    expect(toolMessage!.name).toBe("generate_audio");
+    expect(toolMessage!.tool_call_id).toBe("toolCall-0");
 
-    // 5. Audio ref in tool result
-    const audioResult = toolMessage!.toolCalls![0].result as Record<
-      string,
-      unknown
-    >;
+    // 5. Audio ref in tool content JSON
+    const audioResult = JSON.parse(toolMessage!.content as string);
     expect(audioResult.audioRef).toBe(
       "minio://generations/audio/echoes-of-war.wav",
     );
@@ -827,13 +833,14 @@ describe("End-to-end DB state after generate_audio flow", () => {
     );
     expect(uniqueUserContents.size).toBe(userMessages.length);
 
-    // 8. Message order is correct: user, assistant alternation
+    // 8. Message order is correct: user, assistant, tool, assistant alternation
     const roles = databaseAfterTurn2.map((message) => message.role);
     expect(roles).toEqual([
       "user",
       "assistant",
       "user",
       "assistant",
+      "tool",
       "assistant",
     ]);
   });
