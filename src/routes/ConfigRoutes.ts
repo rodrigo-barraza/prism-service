@@ -17,7 +17,13 @@ import {
   getDefaultModels,
   getParameterDescriptors,
   resolveRecommendedDefault,
+  getModelByName,
 } from "../config.ts";
+import { estimateTokens } from "../utils/CostCalculator.ts";
+import {
+  OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
+  DEFAULT_MAX_INPUT_TOKENS,
+} from "../constants/TokenBudgetDefaults.ts";
 import type { ModelOptionEntry } from "../config.ts";
 import { listInstances } from "../providers/instance-registry.ts";
 import { ARENA_SCORES } from "../arrays.ts";
@@ -583,12 +589,14 @@ router.post(
         workspaceEnabled,
         systemPrompt: userSystemPrompt,
         locale,
+        model,
       } = req.body as {
         agent?: string;
         disabledTools?: string[];
         workspaceEnabled?: boolean;
         systemPrompt?: string;
         locale?: string;
+        model?: string;
       };
 
       const agentSettings = await SettingsService.getSection("agents");
@@ -609,12 +617,14 @@ router.post(
         .map((tool: { name: string }) => tool.name)
         .filter((name: string) => !disabledSet.has(name));
 
-      const resolvedToolNames = ToolOrchestratorService.getToolSchemas(
+      const resolvedToolSchemas = ToolOrchestratorService.getToolSchemas(
         defaultTopology,
         resolvedLocale,
-      )
-        .map((tool: { name: string }) => tool.name)
-        .filter((name: string) => !disabledSet.has(name));
+      ).filter((tool: { name: string }) => !disabledSet.has(tool.name));
+
+      const resolvedToolNames = resolvedToolSchemas.map(
+        (tool: { name: string }) => tool.name,
+      );
 
       const assembler = new SystemPromptAssembler({
         workspaceRoot: req.workspaceRoot || undefined,
@@ -662,11 +672,48 @@ router.post(
       }
 
       const fullPrompt = sections.join("\n\n");
+      const systemPromptTokens = estimateTokens(fullPrompt);
+
+      // ── Baseline context budget estimation ──
+      const toolSchemaTokens =
+        resolvedToolSchemas.length > 0
+          ? estimateTokens(JSON.stringify(resolvedToolSchemas))
+          : 0;
+      const toolCount = resolvedToolSchemas.length;
+
+      const modelDefinition = model
+        ? (getModelByName(model) as Record<string, unknown> | null)
+        : null;
+      const contextWindow =
+        (modelDefinition?.maxInputTokens as number | undefined) ||
+        DEFAULT_MAX_INPUT_TOKENS;
+
+      const totalEstimatedInput = systemPromptTokens + toolSchemaTokens;
+      const safetyMarginTokens = Math.ceil(
+        totalEstimatedInput * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
+      );
+      const totalInputTokens = totalEstimatedInput + safetyMarginTokens;
+      const availableOutputTokens = Math.max(
+        contextWindow - totalInputTokens,
+        0,
+      );
 
       res.json({
         prompt: fullPrompt,
         characterCount: fullPrompt.length,
-        estimatedTokens: Math.ceil(fullPrompt.length / 4),
+        estimatedTokens: systemPromptTokens,
+        baselineBudget: {
+          contextWindow,
+          messageTokens: 0,
+          systemPromptTokens,
+          toolSchemaTokens,
+          safetyMarginTokens,
+          totalInputTokens,
+          availableOutputTokens,
+          isClamped: false,
+          toolCount,
+          source: "estimated" as const,
+        },
       });
     } catch (error: unknown) {
       res.status(500).json({ error: errorMessage(error) });
