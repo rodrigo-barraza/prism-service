@@ -166,7 +166,7 @@ registerCleanup(async () => {
 // Public API
 // ────────────────────────────────────────────────────────────
 
-export default class OrchestratorService {
+export class OrchestratorService {
   private static agenticLoopServicePromise: Promise<AgenticLoopServiceModule> | null =
     null;
   private static getAgenticLoopService() {
@@ -3050,3 +3050,4 @@ export default class OrchestratorService {
     }
   }
 }
+export default OrchestratorService;
