@@ -201,7 +201,7 @@ router.get(
             const timestampFilter: Record<string, unknown> = {};
             if (from) timestampFilter.$gte = from;
             if (to) timestampFilter.$lte = to;
-            requestMatch.timestamp = timestampFilter;
+            requestMatch.createdAt = timestampFilter;
           }
           if (provider) requestMatch.provider = provider;
           if (model) requestMatch.model = model;
@@ -232,7 +232,7 @@ router.get(
                 project: 1,
                 username: 1,
                 role: "assistant",
-                timestamp: 1,
+                timestamp: "$createdAt",
                 model: 1,
                 provider: 1,
                 agent: 1,

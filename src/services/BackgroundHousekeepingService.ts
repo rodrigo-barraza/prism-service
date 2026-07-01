@@ -158,7 +158,7 @@ async function pruneOldRequestLogs(): Promise<number> {
     Date.now() - REQUEST_LOG_MAX_AGE_DAYS * MILLISECONDS_PER_DAY,
   ).toISOString();
   const result = await db.collection(COLLECTIONS.REQUESTS).deleteMany({
-    timestamp: { $lt: cutoff },
+    createdAt: { $lt: cutoff },
   });
 
   return result.deletedCount;

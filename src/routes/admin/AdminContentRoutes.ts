@@ -312,7 +312,7 @@ router.get(
                 project: 1,
                 username: 1,
                 role: "assistant",
-                timestamp: 1,
+                timestamp: "$createdAt",
                 model: 1,
                 agent: 1,
               },

@@ -56,7 +56,7 @@ describe("RequestLogger Unit Tests Suite", () => {
       expect(insertedDocument.success).toBe(true);
       expect(insertedDocument.inputTokens).toBe(100);
       expect(insertedDocument.outputTokens).toBe(50);
-      expect(insertedDocument.timestamp).toBeDefined();
+      expect(insertedDocument.createdAt).toBeDefined();
 
       expect(mockWebhookEmit).toHaveBeenCalledWith(
         "request.created",
@@ -197,7 +197,7 @@ describe("RequestLogger Unit Tests Suite", () => {
       expect(insertedDocument.conversationId).toBe("conv-123");
       expect(insertedDocument.agentConversationId).toBe("agent-conv-456");
       expect(insertedDocument.agenticIteration).toBe(1);
-      expect(insertedDocument.timestamp).toBeDefined();
+      expect(insertedDocument.createdAt).toBeDefined();
 
       // Pending documents should have zeroed telemetry
       expect(insertedDocument.inputTokens).toBe(0);

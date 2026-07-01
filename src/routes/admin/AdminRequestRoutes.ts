@@ -37,7 +37,7 @@ router.get(
         agent,
         from,
         to,
-        sort = "timestamp",
+        sort = "createdAt",
         workspace,
       } = req.query;
 
@@ -213,8 +213,8 @@ router.get(
                   requestCount: { $sum: 1 },
                   project: { $first: "$project" },
                   username: { $first: "$username" },
-                  createdAt: { $min: "$timestamp" },
-                  updatedAt: { $max: "$timestamp" },
+                  createdAt: { $min: "$createdAt" },
+                  updatedAt: { $max: "$createdAt" },
                 },
               },
             ])

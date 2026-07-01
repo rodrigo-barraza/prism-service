@@ -23,7 +23,7 @@ export interface TransformedStatsMatchFilter {
   agent?: unknown;
   provider?: unknown;
   model?: unknown;
-  timestamp?: { $gte?: Date; $lte?: Date };
+  createdAt?: { $gte?: Date; $lte?: Date };
   workspaceId?: unknown;
   [key: string]: unknown;
 }
@@ -233,7 +233,7 @@ router.get(
             totalCost: COST_SUM_EXPR,
             avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
             avgTokensPerSec: AVG_TOKENS_PER_SEC_EXPR,
-            lastRequest: { $max: "$timestamp" },
+            lastRequest: { $max: "$createdAt" },
             _models: { $addToSet: "$model" },
             _providers: { $addToSet: "$provider" },
           },
@@ -377,7 +377,7 @@ router.get(
             totalTokens: TOTAL_TOKENS_EXPR,
             totalCost: COST_SUM_EXPR,
             avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
-            lastRequest: { $max: "$timestamp" },
+            lastRequest: { $max: "$createdAt" },
           },
         },
         { $sort: { totalRequests: -1 } },
@@ -583,8 +583,8 @@ router.get(
               },
             },
             avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
-            firstUsed: { $min: "$timestamp" },
-            lastUsed: { $max: "$timestamp" },
+            firstUsed: { $min: "$createdAt" },
+            lastUsed: { $max: "$createdAt" },
             _models: { $push: "$model" },
             _agents: { $push: "$agent" },
             _providers: { $addToSet: "$provider" },
@@ -1060,7 +1060,7 @@ router.get(
           {
             $dateToString: {
               format: "%Y-%m-%dT%H:%M:",
-              date: { $toDate: "$timestamp" },
+              date: { $toDate: "$createdAt" },
               timezone: "UTC",
             },
           },
@@ -1073,7 +1073,7 @@ router.get(
                       {
                         $floor: {
                           $divide: [
-                            { $second: { $toDate: "$timestamp" } },
+                            { $second: { $toDate: "$createdAt" } },
                             interval,
                           ],
                         },
@@ -1093,7 +1093,7 @@ router.get(
                         {
                           $floor: {
                             $divide: [
-                              { $second: { $toDate: "$timestamp" } },
+                              { $second: { $toDate: "$createdAt" } },
                               interval,
                             ],
                           },
@@ -1110,7 +1110,7 @@ router.get(
                     {
                       $floor: {
                         $divide: [
-                          { $second: { $toDate: "$timestamp" } },
+                          { $second: { $toDate: "$createdAt" } },
                           interval,
                         ],
                       },
@@ -1129,7 +1129,7 @@ router.get(
           {
             $dateToString: {
               format: "%Y-%m-%dT%H:",
-              date: { $toDate: "$timestamp" },
+              date: { $toDate: "$createdAt" },
               timezone: "UTC",
             },
           },
@@ -1142,7 +1142,7 @@ router.get(
                       {
                         $floor: {
                           $divide: [
-                            { $minute: { $toDate: "$timestamp" } },
+                            { $minute: { $toDate: "$createdAt" } },
                             interval,
                           ],
                         },
@@ -1162,7 +1162,7 @@ router.get(
                         {
                           $floor: {
                             $divide: [
-                              { $minute: { $toDate: "$timestamp" } },
+                              { $minute: { $toDate: "$createdAt" } },
                               interval,
                             ],
                           },
@@ -1179,7 +1179,7 @@ router.get(
                     {
                       $floor: {
                         $divide: [
-                          { $minute: { $toDate: "$timestamp" } },
+                          { $minute: { $toDate: "$createdAt" } },
                           interval,
                         ],
                       },
@@ -1198,7 +1198,7 @@ router.get(
           {
             $dateToString: {
               format: "%Y-%m-%dT",
-              date: { $toDate: "$timestamp" },
+              date: { $toDate: "$createdAt" },
               timezone: "UTC",
             },
           },
@@ -1211,7 +1211,7 @@ router.get(
                       {
                         $floor: {
                           $divide: [
-                            { $hour: { $toDate: "$timestamp" } },
+                            { $hour: { $toDate: "$createdAt" } },
                             interval,
                           ],
                         },
@@ -1231,7 +1231,7 @@ router.get(
                         {
                           $floor: {
                             $divide: [
-                              { $hour: { $toDate: "$timestamp" } },
+                              { $hour: { $toDate: "$createdAt" } },
                               interval,
                             ],
                           },
@@ -1248,7 +1248,7 @@ router.get(
                     {
                       $floor: {
                         $divide: [
-                          { $hour: { $toDate: "$timestamp" } },
+                          { $hour: { $toDate: "$createdAt" } },
                           interval,
                         ],
                       },
@@ -1268,7 +1268,7 @@ router.get(
           format: "%Y-%m-%d",
           date: {
             $dateSubtract: {
-              startDate: { $toDate: "$timestamp" },
+              startDate: { $toDate: "$createdAt" },
               unit: "day",
               amount: {
                 $mod: [
@@ -1276,7 +1276,7 @@ router.get(
                     $add: [
                       {
                         $subtract: [
-                          { $dayOfWeek: { $toDate: "$timestamp" } },
+                          { $dayOfWeek: { $toDate: "$createdAt" } },
                           2,
                         ],
                       },
@@ -1298,7 +1298,7 @@ router.get(
           groupId = {
             $dateToString: {
               format: "%Y-%m-%dT%H:%M:%S",
-              date: { $toDate: "$timestamp" },
+              date: { $toDate: "$createdAt" },
               timezone: "UTC",
             },
           };
@@ -1316,7 +1316,7 @@ router.get(
           groupId = {
             $dateToString: {
               format: "%Y-%m-%dT%H:%M",
-              date: { $toDate: "$timestamp" },
+              date: { $toDate: "$createdAt" },
               timezone: "UTC",
             },
           };
@@ -1328,19 +1328,19 @@ router.get(
           groupId = floorMinutesExpr(15);
           break;
         case "1hr":
-          groupId = { $substr: ["$timestamp", 0, 13] };
+          groupId = { $substr: ["$createdAt", 0, 13] };
           break;
         case "4hr":
           groupId = floorHoursExpr(4);
           break;
         case "1day":
-          groupId = { $substr: ["$timestamp", 0, 10] };
+          groupId = { $substr: ["$createdAt", 0, 10] };
           break;
         case "1week":
           groupId = weekStartExpr;
           break;
         default:
-          groupId = { $substr: ["$timestamp", 0, 10] };
+          groupId = { $substr: ["$createdAt", 0, 10] };
       }
 
       const timeMatch: Record<string, string> = {
@@ -1349,7 +1349,7 @@ router.get(
       if (untilDate) timeMatch.$lte = untilDate!.toISOString();
 
       const matchFilter = await buildMatchFilter(req);
-      matchFilter.timestamp = timeMatch;
+      matchFilter.createdAt = timeMatch;
 
       const pipeline: Record<string, unknown>[] = [
         { $match: matchFilter },
@@ -1429,7 +1429,7 @@ router.get(
             _providers: { $addToSet: "$provider" },
             _convIds: { $addToSet: "$conversationId" },
             _traceIds: { $addToSet: "$traceId" },
-            lastRequest: { $max: "$timestamp" },
+            lastRequest: { $max: "$createdAt" },
             successCount: {
               $sum: { $cond: [{ $eq: ["$success", true] }, 1, 0] },
             },

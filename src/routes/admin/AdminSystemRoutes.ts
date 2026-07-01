@@ -142,8 +142,8 @@ router.get(
           .toArray(),
         req.db
           .collection(REQUESTS_COLLECTION)
-          .find({ timestamp: { $gte: since } })
-          .sort({ timestamp: -1 })
+          .find({ createdAt: { $gte: since } })
+          .sort({ createdAt: -1 })
           .limit(20)
           .toArray(),
       ]);
@@ -190,7 +190,7 @@ router.get(
 
       const totalRecent = await req.db
         .collection(REQUESTS_COLLECTION)
-        .countDocuments({ timestamp: { $gte: since } });
+        .countDocuments({ createdAt: { $gte: since } });
       const requestsPerMinute = totalRecent / parseInt(minParam as string, 10);
 
       res.json({

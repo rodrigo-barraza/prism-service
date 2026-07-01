@@ -27,8 +27,8 @@ interface McpServerDocument {
   url?: string;
   headers?: Record<string, string>;
   enabled: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface ConnectedServerInfo {
@@ -125,8 +125,8 @@ router.post(
         url,
         headers,
         enabled,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
 
       const result = await db.collection(COLLECTION).insertOne(document);
@@ -157,7 +157,7 @@ router.put(
 
       const updates: Record<string, unknown> = {
         ...parsed.data,
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
       };
 
       // Filter out undefined values from updates to only update provided fields

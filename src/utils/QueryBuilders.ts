@@ -23,7 +23,7 @@ export function applyDateRangeFilter(
   matchFilter: MongoFilter,
   from: string | undefined | null,
   to: string | undefined | null,
-  field: string = "timestamp",
+  field: string = "createdAt",
 ): void {
   const range = buildDateRangeFilter(from, to);
   if (range) matchFilter[field] = range;

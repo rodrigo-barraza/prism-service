@@ -52,7 +52,7 @@ interface VramBenchmarkDocument {
     ram?: Record<string, unknown>;
     motherboard?: Record<string, unknown>;
   };
-  createdAt: Date | string;
+  createdAt: string;
   error?: string | null;
 }
 

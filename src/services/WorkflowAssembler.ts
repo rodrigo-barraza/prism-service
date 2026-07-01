@@ -238,7 +238,7 @@ function assembleGraph(steps: WorkflowStep[]): AssembledGraph {
       position: { x: baseX + MODEL_X_OFFSET, y: baseY + 100 },
       stepMeta: {
         duration: step.duration,
-        timestamp: step.timestamp,
+        createdAt: step.createdAt,
         index: step.index,
       },
     } as ModelNode);
