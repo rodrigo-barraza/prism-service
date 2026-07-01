@@ -87,7 +87,7 @@ vi.mock("../../src/services/system-prompt/ToolDocFormatter.ts", () => ({
   },
 }));
 
-const mockFetchMemories = vi.fn().mockResolvedValue(null);
+const mockFetchMemories = vi.fn().mockResolvedValue({ memoriesText: "", injectedMemoryIds: [] });
 const mockFetchSkills = vi.fn().mockResolvedValue({ text: null, skillNames: [] });
 
 vi.mock("../../src/services/system-prompt/SkillMemoryScorer.ts", () => ({
@@ -544,7 +544,7 @@ describe("Sub-agent memory isolation", () => {
 
   it("does not fetch memories for sub-agents", async () => {
     mockPersonas.set("CODING", createCodingPersona());
-    mockFetchMemories.mockResolvedValue("[project] Some memory about user preferences");
+    mockFetchMemories.mockResolvedValue({ memoriesText: "[project] Some memory about user preferences", injectedMemoryIds: ["memory-id-abc"] });
 
     const context = createContext({
       agent: "CODING",
@@ -605,7 +605,7 @@ describe("Sub-agent memory isolation", () => {
 
   it("fetches memories and workflows for top-level agents (no parentAgentConversationId)", async () => {
     mockPersonas.set("CODING", createCodingPersona());
-    mockFetchMemories.mockResolvedValue("[project] User prefers TypeScript");
+    mockFetchMemories.mockResolvedValue({ memoriesText: "[project] User prefers TypeScript", injectedMemoryIds: ["memory-id-typescript"] });
     mockRetrieveRelevantWorkflows.mockResolvedValue("Past Workflow: npm test steps");
 
     const context = createContext({

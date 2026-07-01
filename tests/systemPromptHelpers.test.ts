@@ -115,7 +115,7 @@ describe("SkillMemoryScorer", () => {
   describe("fetchMemories", () => {
     it("should search and format relevant memories correctly", async () => {
       const mockMemories = [
-        { type: "user", title: "Deployment preference", content: "User likes to deploy to staging using task runners." }
+        { id: "memory-id-1", type: "user", title: "Deployment preference", content: "User likes to deploy to staging using task runners." }
       ];
       vi.mocked(MemoryService.search).mockResolvedValueOnce(mockMemories as any);
 
@@ -127,14 +127,15 @@ describe("SkillMemoryScorer", () => {
         project: "test-project",
         queryText: "staging deploy",
       }));
-      expect(result).toBe("- [user] **Deployment preference**: User likes to deploy to staging using task runners.");
+      expect(result.memoriesText).toBe("- [user] **Deployment preference**: User likes to deploy to staging using task runners.");
+      expect(result.injectedMemoryIds).toEqual(["memory-id-1"]);
     });
 
     it("should return empty string if search returns no results", async () => {
       vi.mocked(MemoryService.search).mockResolvedValueOnce([]);
       const scorer = new SkillMemoryScorer();
       const result = await scorer.fetchMemories("CODING", "test-project", "query");
-      expect(result).toBe("");
+      expect(result).toEqual({ memoriesText: "", injectedMemoryIds: [] });
     });
   });
 
