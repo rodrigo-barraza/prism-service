@@ -54,7 +54,7 @@ vi.mock('../src/services/BenchmarkService.ts', () => ({
     getById: vi.fn().mockResolvedValue({ id: 'bench-1', name: 'Test Benchmark', prompt: 'test prompt' }),
     remove: vi.fn().mockResolvedValue({ deleted: true }),
     runBenchmark: vi.fn().mockResolvedValue({ id: 'run-1', models: [] }),
-    MATCH_MODES: {
+    BENCHMARK_MATCH_MODES: {
       CONTAINS: "contains",
       EXACT: "exact",
       STARTS_WITH: "startsWith",

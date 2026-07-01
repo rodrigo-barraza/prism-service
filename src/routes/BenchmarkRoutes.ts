@@ -420,7 +420,7 @@ router.post(
         });
       }
 
-      const validModes = Object.values(BenchmarkService.MATCH_MODES);
+      const validModes = Object.values(BenchmarkService.BENCHMARK_MATCH_MODES);
 
       // Validate top-level matchMode (backward compat)
       if (matchMode && !validModes.includes(matchMode)) {
