@@ -396,7 +396,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
     let subtasks: DecomposedSubtask[];
 
     try {
-      const decompositionStartMs = performance.now();
+      const decompositionStartMilliseconds = performance.now();
       const decompositionMessages: Array<{
         role: "user" | "assistant" | "system";
         content: string;
@@ -406,8 +406,8 @@ export class DivideAndConquerRouter implements TopologyRouter {
         resolvedModel,
         { maxTokens: ORCHESTRATOR.EVALUATION_MAX_TOKENS },
       );
-      const decompositionDurationMs = Math.round(
-        performance.now() - decompositionStartMs,
+      const decompositionDurationMilliseconds = Math.round(
+        performance.now() - decompositionStartMilliseconds,
       );
 
       RequestLogger.logBackgroundLlmCall({
@@ -426,7 +426,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
         usage: decompositionResult.usage || null,
         success: true,
         errorMessage: null,
-        requestStartMs: decompositionStartMs,
+        requestStartMilliseconds: decompositionStartMilliseconds,
         extraRequestPayload: { teamName, phase: "decomposition" },
       }).catch((loggingError: Error) =>
         logger.error(
@@ -440,7 +440,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
       );
 
       logger.info(
-        `[DivideAndConquerRouter] Decomposed into ${subtasks.length} subtask(s) in ${decompositionDurationMs}ms`,
+        `[DivideAndConquerRouter] Decomposed into ${subtasks.length} subtask(s) in ${decompositionDurationMilliseconds}ms`,
       );
     } catch (decompositionError: unknown) {
       const errorMessage = `Decomposition failed: ${getErrorMessage(decompositionError)}`;
@@ -614,7 +614,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
         subtaskDescriptions,
       );
 
-      const synthesisStartMs = performance.now();
+      const synthesisStartMilliseconds = performance.now();
       const synthesisMessages: Array<{
         role: "user" | "assistant" | "system";
         content: string;
@@ -624,8 +624,8 @@ export class DivideAndConquerRouter implements TopologyRouter {
         resolvedModel,
         { maxTokens: ORCHESTRATOR.SYNTHESIS_MAX_TOKENS },
       );
-      const synthesisDurationMs = Math.round(
-        performance.now() - synthesisStartMs,
+      const synthesisDurationMilliseconds = Math.round(
+        performance.now() - synthesisStartMilliseconds,
       );
 
       RequestLogger.logBackgroundLlmCall({
@@ -644,7 +644,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
         usage: synthesisResult.usage || null,
         success: true,
         errorMessage: null,
-        requestStartMs: synthesisStartMs,
+        requestStartMilliseconds: synthesisStartMilliseconds,
         extraRequestPayload: {
           teamName,
           phase: "synthesis",
@@ -665,13 +665,13 @@ export class DivideAndConquerRouter implements TopologyRouter {
         result: synthesisResult.text,
         toolUses: 0,
         iterations: 1,
-        durationMs: synthesisDurationMs,
+        durationMilliseconds: synthesisDurationMilliseconds,
         messages: [],
         diff: { additions: 0, deletions: 0, files: [] },
       };
 
       logger.info(
-        `[DivideAndConquerRouter] Synthesis complete in ${synthesisDurationMs}ms`,
+        `[DivideAndConquerRouter] Synthesis complete in ${synthesisDurationMilliseconds}ms`,
       );
 
       // ── Synthesis telemetry: mark virtual sub-agent as complete
@@ -680,7 +680,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
           type: "sub_agent_status",
           subAgentId: synthesisSubAgentId,
           message: "complete",
-          durationMs: synthesisDurationMs,
+          durationMilliseconds: synthesisDurationMilliseconds,
           toolCount: 0,
         });
       }
@@ -696,7 +696,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
           type: "sub_agent_status",
           subAgentId: synthesisSubAgentId,
           message: "complete",
-          durationMs: 0,
+          durationMilliseconds: 0,
           toolCount: 0,
         });
       }
@@ -893,7 +893,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
         recursiveSubtaskDescriptions,
       );
 
-      const recursiveSynthesisStartMs = performance.now();
+      const recursiveSynthesisStartMilliseconds = performance.now();
       const recursiveSynthesisMessages: Array<{
         role: "user" | "assistant" | "system";
         content: string;
@@ -903,8 +903,8 @@ export class DivideAndConquerRouter implements TopologyRouter {
         orchestratorContext.resolvedModel,
         { maxTokens: ORCHESTRATOR.SYNTHESIS_MAX_TOKENS },
       );
-      const recursiveSynthesisDurationMs = Math.round(
-        performance.now() - recursiveSynthesisStartMs,
+      const recursiveSynthesisDurationMilliseconds = Math.round(
+        performance.now() - recursiveSynthesisStartMilliseconds,
       );
 
       const recursiveSynthesizedResult: SubAgentResult = {
@@ -915,13 +915,13 @@ export class DivideAndConquerRouter implements TopologyRouter {
         result: recursiveSynthesisResult.text,
         toolUses: 0,
         iterations: 1,
-        durationMs: recursiveSynthesisDurationMs,
+        durationMilliseconds: recursiveSynthesisDurationMilliseconds,
         messages: [],
         diff: { additions: 0, deletions: 0, files: [] },
       };
 
       logger.info(
-        `[DivideAndConquerRouter] Recursive synthesis at depth ${currentDepth} complete in ${recursiveSynthesisDurationMs}ms`,
+        `[DivideAndConquerRouter] Recursive synthesis at depth ${currentDepth} complete in ${recursiveSynthesisDurationMilliseconds}ms`,
       );
 
       // ── Synthesis telemetry: mark virtual sub-agent as complete
@@ -930,7 +930,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
           type: "sub_agent_status",
           subAgentId: recursiveSynthesisSubAgentId,
           message: "complete",
-          durationMs: recursiveSynthesisDurationMs,
+          durationMilliseconds: recursiveSynthesisDurationMilliseconds,
           toolCount: 0,
         });
       }

@@ -1,4 +1,4 @@
-import { VOICES, DEFAULT_VOICES, getDefaultModels, TYPES } from "../config.ts";
+import { VOICES, DEFAULT_VOICES, getDefaultModels, MODALITY_TYPES } from "../config.ts";
 import { PROVIDERS } from "../constants.ts";
 import PromptLocaleService from "../services/PromptLocaleService.ts";
 
@@ -31,7 +31,7 @@ function buildInworldCatalog(model?: string): string {
 
   const activeModel =
     model ||
-    getDefaultModels(TYPES.TEXT, TYPES.AUDIO).inworld ||
+    getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.AUDIO).inworld ||
     "inworld-tts-2";
   const isTtsTwo = activeModel.startsWith("inworld-tts-2");
 

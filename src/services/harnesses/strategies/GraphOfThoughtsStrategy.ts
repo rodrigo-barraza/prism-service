@@ -571,7 +571,7 @@ export async function runGraphOfThoughts(
                 thoughtSignature: toolCall.thoughtSignature || undefined,
                 reasoningItem: toolCall.reasoningItem || undefined,
                 result: matchingResult ? matchingResult.result : null,
-                durationMs: matchingResult?.durationMs,
+                durationMilliseconds: matchingResult?.durationMilliseconds,
               };
             },
           ),
@@ -1181,7 +1181,7 @@ async function scoreBranchesMultiCriteria(
     };
 
     let scoreResponseText = "";
-    const scoringRequestStartMs = performance.now();
+    const scoringRequestStartMilliseconds = performance.now();
     const scoringStream = context.provider.generateTextStream(
       scoringMessages,
       context.resolvedModel,
@@ -1211,7 +1211,7 @@ async function scoreBranchesMultiCriteria(
       resultText: scoreResponseText,
       success: true,
       errorMessage: null,
-      requestStartMs: scoringRequestStartMs,
+      requestStartMilliseconds: scoringRequestStartMilliseconds,
     }).catch((scoringLogError: Error) =>
       logger.error(
         `[GraphOfThoughts] Failed to log scoring request: ${getErrorMessage(scoringLogError)}`,

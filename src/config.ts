@@ -1,6 +1,6 @@
 // ─── Configuration & Reference Catalog ──────────────────────
 
-import { PROVIDERS, PROVIDER_LIST, TYPES, MODEL_TYPES } from "./constants.ts";
+import { PROVIDERS, PROVIDER_LIST, MODALITY_TYPES, MODEL_TYPES } from "./constants.ts";
 
 // ─── UNIFIED MODEL CATALOG ──────────────────────────────────
 // Every model lives here with all its metadata.
@@ -32,8 +32,8 @@ const MODELS = {
     },
     maxInputTokens: 400_000,
     maxOutputTokens: 128_000,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
     streaming: true,
     thinking: true,
@@ -61,8 +61,8 @@ const MODELS = {
     },
     maxInputTokens: 400_000,
     maxOutputTokens: 128_000,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
     streaming: true,
     thinking: true,
@@ -87,8 +87,8 @@ const MODELS = {
     },
     maxInputTokens: 400_000,
     maxOutputTokens: 128_000,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
     streaming: true,
     thinking: false,
@@ -112,8 +112,8 @@ const MODELS = {
     },
     maxInputTokens: 1_047_576,
     maxOutputTokens: 32_768,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
     streaming: true,
   },
@@ -133,8 +133,8 @@ const MODELS = {
     },
     maxInputTokens: 1_047_576,
     maxOutputTokens: 32_768,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
     streaming: true,
   },
@@ -154,8 +154,8 @@ const MODELS = {
     },
     maxInputTokens: 128_000,
     maxOutputTokens: 16_384,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
     streaming: true,
   },
@@ -171,8 +171,8 @@ const MODELS = {
     pricing: { inputPerMillion: 30.0, outputPerMillion: 60.0 },
     maxInputTokens: 8_192,
     maxOutputTokens: 8_192,
-    inputTypes: [TYPES.TEXT],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.TEXT],
     streaming: true,
   },
   GPT_53_CHAT: {
@@ -192,8 +192,8 @@ const MODELS = {
     },
     maxInputTokens: 128_000,
     maxOutputTokens: 128_000,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
     streaming: true,
     thinking: true,
@@ -219,8 +219,8 @@ const MODELS = {
     },
     maxInputTokens: 272_000,
     maxOutputTokens: 128_000,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
     streaming: true,
     thinking: true,
@@ -248,8 +248,8 @@ const MODELS = {
     },
     maxInputTokens: 1_050_000,
     maxOutputTokens: 128_000,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
     streaming: true,
     thinking: true,
@@ -284,8 +284,8 @@ const MODELS = {
     },
     maxInputTokens: 1_050_000,
     maxOutputTokens: 128_000,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
     streaming: true,
     thinking: true,
@@ -319,8 +319,8 @@ const MODELS = {
     },
     maxInputTokens: 400_000,
     maxOutputTokens: 128_000,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
     streaming: true,
     thinking: true,
@@ -354,8 +354,8 @@ const MODELS = {
     },
     maxInputTokens: 400_000,
     maxOutputTokens: 128_000,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
     streaming: true,
     thinking: false,
@@ -383,8 +383,8 @@ const MODELS = {
     },
     maxInputTokens: 1_050_000,
     maxOutputTokens: 128_000,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
     streaming: true,
     thinking: true,
@@ -419,8 +419,8 @@ const MODELS = {
     },
     maxInputTokens: 1_050_000,
     maxOutputTokens: 128_000,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
     streaming: true,
     thinking: true,
@@ -457,8 +457,8 @@ const MODELS = {
     },
     maxInputTokens: 200_000,
     maxOutputTokens: 64_000,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: {
       image: { maxCount: 100, maxSizeMB: 32 },
       pdf: { maxCount: 5, maxSizeMB: 32 },
@@ -490,8 +490,8 @@ const MODELS = {
     },
     maxInputTokens: 200_000,
     maxOutputTokens: 64_000,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: {
       image: { maxCount: 100, maxSizeMB: 32 },
       pdf: { maxCount: 5, maxSizeMB: 32 },
@@ -529,8 +529,8 @@ const MODELS = {
     },
     maxInputTokens: 200_000,
     maxOutputTokens: 64_000,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: {
       image: { maxCount: 100, maxSizeMB: 32 },
       pdf: { maxCount: 5, maxSizeMB: 32 },
@@ -568,8 +568,8 @@ const MODELS = {
     },
     maxInputTokens: 200_000,
     maxOutputTokens: 64_000,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: {
       image: { maxCount: 100, maxSizeMB: 32 },
       pdf: { maxCount: 5, maxSizeMB: 32 },
@@ -607,8 +607,8 @@ const MODELS = {
     },
     maxInputTokens: 200_000,
     maxOutputTokens: 64_000,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: {
       image: { maxCount: 100, maxSizeMB: 32 },
       pdf: { maxCount: 5, maxSizeMB: 32 },
@@ -647,8 +647,8 @@ const MODELS = {
     },
     maxInputTokens: 200_000,
     maxOutputTokens: 64_000,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: {
       image: { maxCount: 100, maxSizeMB: 32 },
       pdf: { maxCount: 5, maxSizeMB: 32 },
@@ -688,8 +688,8 @@ const MODELS = {
     },
     maxInputTokens: 200_000,
     maxOutputTokens: 64_000,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: {
       image: { maxCount: 100, maxSizeMB: 32 },
       pdf: { maxCount: 5, maxSizeMB: 32 },
@@ -728,8 +728,8 @@ const MODELS = {
     },
     maxInputTokens: 200_000,
     maxOutputTokens: 128_000,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: {
       image: { maxCount: 100, maxSizeMB: 32 },
       pdf: { maxCount: 5, maxSizeMB: 32 },
@@ -768,8 +768,8 @@ const MODELS = {
     },
     maxInputTokens: 200_000,
     maxOutputTokens: 128_000,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: {
       image: { maxCount: 100, maxSizeMB: 32 },
       pdf: { maxCount: 5, maxSizeMB: 32 },
@@ -816,8 +816,8 @@ const MODELS = {
     },
     maxInputTokens: 1_048_576,
     maxOutputTokens: 65_536,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE, TYPES.AUDIO, TYPES.VIDEO, TYPES.PDF],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.AUDIO, MODALITY_TYPES.VIDEO, MODALITY_TYPES.PDF],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: {
       image: { maxCount: 3000, maxSizeMB: 100 },
       audio: { maxCount: 50, maxSizeMB: 100 },
@@ -861,8 +861,8 @@ const MODELS = {
     },
     maxInputTokens: 1_048_576,
     maxOutputTokens: 65_536,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE, TYPES.AUDIO, TYPES.VIDEO, TYPES.PDF],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.AUDIO, MODALITY_TYPES.VIDEO, MODALITY_TYPES.PDF],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: {
       image: { maxCount: 3000, maxSizeMB: 100 },
       audio: { maxCount: 50, maxSizeMB: 100 },
@@ -902,8 +902,8 @@ const MODELS = {
     },
     maxInputTokens: 1_048_576,
     maxOutputTokens: 65_536,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE, TYPES.AUDIO, TYPES.VIDEO, TYPES.PDF],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.AUDIO, MODALITY_TYPES.VIDEO, MODALITY_TYPES.PDF],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: {
       image: { maxCount: 3000, maxSizeMB: 100 },
       audio: { maxCount: 50, maxSizeMB: 100 },
@@ -942,8 +942,8 @@ const MODELS = {
     },
     maxInputTokens: 131_072,
     maxOutputTokens: 65_536,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE, TYPES.AUDIO, TYPES.VIDEO],
-    outputTypes: [TYPES.TEXT, TYPES.AUDIO],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.AUDIO, MODALITY_TYPES.VIDEO],
+    outputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.AUDIO],
     mediaLimits: {
       image: { maxCount: 3000, maxSizeMB: 100 },
       audio: { maxCount: 50, maxSizeMB: 100 },
@@ -981,8 +981,8 @@ const MODELS = {
     },
     maxInputTokens: 1_048_576,
     maxOutputTokens: 65_536,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE, TYPES.AUDIO, TYPES.VIDEO, TYPES.PDF],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.AUDIO, MODALITY_TYPES.VIDEO, MODALITY_TYPES.PDF],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: {
       image: { maxCount: 3000, maxSizeMB: 100 },
       audio: { maxCount: 50, maxSizeMB: 100 },
@@ -1019,8 +1019,8 @@ const MODELS = {
     },
     maxInputTokens: 1_048_576,
     maxOutputTokens: 65_536,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE, TYPES.AUDIO, TYPES.VIDEO, TYPES.PDF],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.AUDIO, MODALITY_TYPES.VIDEO, MODALITY_TYPES.PDF],
+    outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: {
       image: { maxCount: 3000, maxSizeMB: 100 },
       audio: { maxCount: 50, maxSizeMB: 100 },
@@ -1057,8 +1057,8 @@ const MODELS = {
       audioOutputPerMillion: 12.0,
       perMinute: 0.015,
     },
-    inputTypes: [TYPES.TEXT],
-    outputTypes: [TYPES.AUDIO],
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.AUDIO],
     streaming: true,
   },
   GEMINI_2_FLASH_LITE_PREVIEW_TTS: {
@@ -1070,8 +1070,8 @@ const MODELS = {
     year: 2025,
     modelType: MODEL_TYPES.AUDIO,
     pricing: { inputPerMillion: 0.075, audioOutputPerMillion: 0.3 },
-    inputTypes: [TYPES.TEXT],
-    outputTypes: [TYPES.AUDIO],
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.AUDIO],
     streaming: true,
   },
   GEMINI_25_FLASH_LITE_TTS: {
@@ -1083,8 +1083,8 @@ const MODELS = {
     year: 2025,
     modelType: MODEL_TYPES.AUDIO,
     pricing: { inputPerMillion: 0.3, audioOutputPerMillion: 2.5 },
-    inputTypes: [TYPES.TEXT],
-    outputTypes: [TYPES.AUDIO],
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.AUDIO],
     streaming: true,
   },
   GEMINI_25_FLASH_TTS: {
@@ -1096,8 +1096,8 @@ const MODELS = {
     year: 2025,
     modelType: MODEL_TYPES.AUDIO,
     pricing: { inputPerMillion: 0.5, audioOutputPerMillion: 10.0 },
-    inputTypes: [TYPES.TEXT],
-    outputTypes: [TYPES.AUDIO],
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.AUDIO],
     streaming: true,
   },
   GEMINI_25_PRO_TTS: {
@@ -1110,8 +1110,8 @@ const MODELS = {
     year: 2025,
     default: true,
     pricing: { inputPerMillion: 1.0, audioOutputPerMillion: 20.0 },
-    inputTypes: [TYPES.TEXT],
-    outputTypes: [TYPES.AUDIO],
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.AUDIO],
     streaming: true,
   },
   GEMINI_31_FLASH_TTS: {
@@ -1123,8 +1123,8 @@ const MODELS = {
     modelType: MODEL_TYPES.AUDIO,
     year: 2026,
     pricing: { inputPerMillion: 1.0, audioOutputPerMillion: 20.0 },
-    inputTypes: [TYPES.TEXT],
-    outputTypes: [TYPES.AUDIO],
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.AUDIO],
     streaming: true,
   },
   ESPEAKNG: {
@@ -1136,8 +1136,8 @@ const MODELS = {
     year: 2015,
     modelType: MODEL_TYPES.AUDIO,
     listed: false,
-    inputTypes: [TYPES.TEXT],
-    outputTypes: [TYPES.AUDIO],
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.AUDIO],
     streaming: false,
   },
   ELEVEN_TURBO_V2: {
@@ -1150,8 +1150,8 @@ const MODELS = {
     modelType: MODEL_TYPES.AUDIO,
     default: true,
     pricing: { perCharacter: 0.00005 },
-    inputTypes: [TYPES.TEXT],
-    outputTypes: [TYPES.AUDIO],
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.AUDIO],
     streaming: true,
   },
   INWORLD_TTS_2: {
@@ -1164,8 +1164,8 @@ const MODELS = {
     modelType: MODEL_TYPES.AUDIO,
     default: true,
     pricing: { perCharacter: 0.00001, perMinute: 0.01 },
-    inputTypes: [TYPES.TEXT],
-    outputTypes: [TYPES.AUDIO],
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.AUDIO],
     streaming: true,
   },
   INWORLD_TTS_1_5_MAX: {
@@ -1177,8 +1177,8 @@ const MODELS = {
     year: 2025,
     modelType: MODEL_TYPES.AUDIO,
     pricing: { perCharacter: 0.00001, perMinute: 0.01 },
-    inputTypes: [TYPES.TEXT],
-    outputTypes: [TYPES.AUDIO],
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.AUDIO],
     streaming: true,
   },
   INWORLD_TTS_1_5_MINI: {
@@ -1190,8 +1190,8 @@ const MODELS = {
     year: 2025,
     modelType: MODEL_TYPES.AUDIO,
     pricing: { perCharacter: 0.000005, perMinute: 0.005 },
-    inputTypes: [TYPES.TEXT],
-    outputTypes: [TYPES.AUDIO],
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.AUDIO],
     streaming: true,
   },
 
@@ -1217,8 +1217,8 @@ const MODELS = {
     imageTokensPerImage: 1056,
     maxInputTokens: 32_768,
     maxOutputTokens: 32_768,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT, TYPES.IMAGE],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
     imageAPI: true,
     supportsSystemPrompt: false,
     tools: ["Image Generation"],
@@ -1243,8 +1243,8 @@ const MODELS = {
     imageTokensPerImage: 1120,
     maxInputTokens: 1_048_576,
     maxOutputTokens: 32_768,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE],
-    outputTypes: [TYPES.TEXT, TYPES.IMAGE],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
     streaming: false,
     thinking: true,
     thinkingLevels: ["minimal", "low", "medium", "high"],
@@ -1270,8 +1270,8 @@ const MODELS = {
     imageTokensPerImage: 1120,
     maxInputTokens: 131_072,
     maxOutputTokens: 32_768,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE, TYPES.PDF],
-    outputTypes: [TYPES.TEXT, TYPES.IMAGE],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.PDF],
+    outputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
     streaming: false,
     thinking: true,
     thinkingLevels: ["minimal", "low", "medium", "high"],
@@ -1292,8 +1292,8 @@ const MODELS = {
     pricing: { inputPerMillion: 0.02 },
     maxInputTokens: 8_191,
     dimensions: 1536,
-    inputTypes: [TYPES.TEXT],
-    outputTypes: [TYPES.EMBEDDING],
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.EMBEDDING],
   },
   TEXT_EMBEDDING_3_LARGE: {
     description:
@@ -1306,8 +1306,8 @@ const MODELS = {
     pricing: { inputPerMillion: 0.13 },
     maxInputTokens: 8_191,
     dimensions: 3072,
-    inputTypes: [TYPES.TEXT],
-    outputTypes: [TYPES.EMBEDDING],
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.EMBEDDING],
   },
   TEXT_EMBEDDING_ADA_002: {
     description:
@@ -1320,8 +1320,8 @@ const MODELS = {
     pricing: { inputPerMillion: 0.1 },
     maxInputTokens: 8_191,
     dimensions: 1536,
-    inputTypes: [TYPES.TEXT],
-    outputTypes: [TYPES.EMBEDDING],
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.EMBEDDING],
   },
   GEMINI_EMBEDDING_2: {
     description:
@@ -1335,8 +1335,8 @@ const MODELS = {
     pricing: { inputPerMillion: 0.2 },
     maxInputTokens: 8_192,
     dimensions: 3072,
-    inputTypes: [TYPES.TEXT, TYPES.IMAGE, TYPES.AUDIO, TYPES.VIDEO, TYPES.PDF],
-    outputTypes: [TYPES.EMBEDDING],
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.AUDIO, MODALITY_TYPES.VIDEO, MODALITY_TYPES.PDF],
+    outputTypes: [MODALITY_TYPES.EMBEDDING],
   },
   GEMINI_EMBEDDING_001: {
     description:
@@ -1349,8 +1349,8 @@ const MODELS = {
     pricing: { inputPerMillion: 0.2 },
     maxInputTokens: 2_048,
     dimensions: 3072,
-    inputTypes: [TYPES.TEXT],
-    outputTypes: [TYPES.EMBEDDING],
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.EMBEDDING],
   },
 
   // ----- Speech-to-Text (Audio → Text) -----
@@ -1368,8 +1368,8 @@ const MODELS = {
       outputPerMillion: 10.0,
       perMinute: 0.006,
     },
-    inputTypes: [TYPES.AUDIO],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.AUDIO],
+    outputTypes: [MODALITY_TYPES.TEXT],
   },
   GPT_4O_MINI_TRANSCRIBE: {
     description:
@@ -1384,8 +1384,8 @@ const MODELS = {
       outputPerMillion: 5.0,
       perMinute: 0.003,
     },
-    inputTypes: [TYPES.AUDIO],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.AUDIO],
+    outputTypes: [MODALITY_TYPES.TEXT],
   },
   WHISPER_1: {
     description:
@@ -1396,8 +1396,8 @@ const MODELS = {
     year: 2022,
     modelType: MODEL_TYPES.AUDIO,
     pricing: { perMinute: 0.006 },
-    inputTypes: [TYPES.AUDIO],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.AUDIO],
+    outputTypes: [MODALITY_TYPES.TEXT],
   },
   GEMINI_3_FLASH_STT: {
     description:
@@ -1409,8 +1409,8 @@ const MODELS = {
     year: 2025,
     default: true,
     pricing: { audioInputPerMillion: 1.0, outputPerMillion: 3.0 },
-    inputTypes: [TYPES.AUDIO],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.AUDIO],
+    outputTypes: [MODALITY_TYPES.TEXT],
   },
   GEMINI_3_PRO_STT: {
     description:
@@ -1421,8 +1421,8 @@ const MODELS = {
     year: 2025,
     modelType: MODEL_TYPES.AUDIO,
     pricing: { audioInputPerMillion: 4.0, outputPerMillion: 12.0 },
-    inputTypes: [TYPES.AUDIO],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.AUDIO],
+    outputTypes: [MODALITY_TYPES.TEXT],
   },
   GEMINI_35_FLASH_STT: {
     description:
@@ -1434,8 +1434,8 @@ const MODELS = {
     year: 2026,
     default: true,
     pricing: { audioInputPerMillion: 1.0, outputPerMillion: 3.0 },
-    inputTypes: [TYPES.AUDIO],
-    outputTypes: [TYPES.TEXT],
+    inputTypes: [MODALITY_TYPES.AUDIO],
+    outputTypes: [MODALITY_TYPES.TEXT],
   },
 };
 
@@ -1512,7 +1512,7 @@ function getModelOptions(
       if (modelRecord.description)
         entry.description = modelRecord.description as string;
       if (modelRecord.thinking) entry.thinking = true;
-      if (model.inputTypes?.includes(TYPES.IMAGE)) entry.vision = true;
+      if (model.inputTypes?.includes(MODALITY_TYPES.IMAGE)) entry.vision = true;
       if (modelRecord.webSearch)
         entry.webSearch = modelRecord.webSearch as boolean | string;
       if (model.inputTypes) entry.inputTypes = model.inputTypes;
@@ -1557,7 +1557,7 @@ function getModelOptions(
       entry.supportsSystemPrompt =
         modelRecord.supportsSystemPrompt !== undefined
           ? (modelRecord.supportsSystemPrompt as boolean)
-          : model.outputTypes.includes(TYPES.TEXT);
+          : model.outputTypes.includes(MODALITY_TYPES.TEXT);
       (optionsMap[model.provider] ??= []).push(entry);
     }
   }
@@ -2652,7 +2652,7 @@ export {
   PROVIDER_LIST,
 
   // Types
-  TYPES,
+  MODALITY_TYPES,
   MODEL_TYPES,
 
   // Models

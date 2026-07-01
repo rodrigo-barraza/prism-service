@@ -18,7 +18,7 @@ import {
   calculateTextCost,
   getTotalInputTokens,
 } from "../utils/CostCalculator.ts";
-import { TYPES, getPricing } from "../config.ts";
+import { MODALITY_TYPES, getPricing } from "../config.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { MEMORY, LOG_PREVIEW } from "../constants.ts";
 import type {
@@ -235,7 +235,7 @@ export default class MemoryExtractor {
           usage: realUsage,
           success,
           errorMessage: extractionError,
-          requestStartMs: requestStart,
+          requestStartMilliseconds: requestStart,
           extraRequestPayload: {
             messageCount: messages.length,
           },
@@ -247,7 +247,7 @@ export default class MemoryExtractor {
         // before the backend aggregation (fetchConversationStats) completes.
         if (emit && success) {
           try {
-            const extractPricing = getPricing(TYPES.TEXT, TYPES.TEXT)[
+            const extractPricing = getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[
               extractionModel
             ];
             const extractCost = extractPricing
@@ -371,7 +371,7 @@ export default class MemoryExtractor {
         try {
           const embedTokens = stored.length * 50; // ~50 tokens per memory title+content
           // Embedding cost: input tokens only (no output tokens)
-          const embedPricing = getPricing(TYPES.TEXT, TYPES.EMBEDDING);
+          const embedPricing = getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.EMBEDDING);
           const embedModel = (
             (await SettingsService.getSection(
               "memory",

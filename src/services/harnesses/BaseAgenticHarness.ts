@@ -8,7 +8,7 @@ import {
   estimateTokens,
 } from "../../utils/CostCalculator.ts";
 import { calculateTokensPerSec } from "../../utils/math.ts";
-import { getPricing, TYPES } from "../../config.ts";
+import { getPricing, MODALITY_TYPES } from "../../config.ts";
 import { stripToolCallMarkup } from "../../utils/StreamChunkDispatcher.ts";
 import ContextWindowManager from "../../utils/ContextWindowManager.ts";
 import ContextBudgetTracker from "./ContextBudgetTracker.ts";
@@ -345,7 +345,7 @@ export default class BaseAgenticHarness {
     const timeSinceLast = performance.now() - state.lastProgressEmitTime;
     if (
       state.chunksSinceLastProgress >= state.PROGRESS_CHUNK_INTERVAL ||
-      timeSinceLast >= state.PROGRESS_TIME_INTERVAL_MS
+      timeSinceLast >= state.PROGRESS_TIME_INTERVAL_MILLISECONDS
     ) {
       this.emitGenerationProgress();
     }
@@ -362,7 +362,7 @@ export default class BaseAgenticHarness {
     const { emit } = this.context;
     const state = this.state;
     const usage = { ...state.overallUsage, requests: state.iterations };
-    const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[
+    const pricing = getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[
       this.context.resolvedModel
     ];
     const estimatedCost = calculateTextCost(usage, pricing);
@@ -925,7 +925,7 @@ export default class BaseAgenticHarness {
             toolEmoji: ToolOrchestratorService.getToolEmoji(toolName),
             toolCallId,
             toolResult: streamChunk.result || null,
-            durationMs: null,
+            durationMilliseconds: null,
             status: streamChunk.status,
             agent: this.context.agent || null,
             conversationId: this.context.conversationId || null,
@@ -1111,7 +1111,7 @@ export default class BaseAgenticHarness {
       traceId,
     } = this.context;
     const state = this.state;
-    const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
+    const pricing = getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[resolvedModel];
 
     const passTotalSec = (performance.now() - pass.start) / 1000;
     const passGenerationSec =
@@ -1375,8 +1375,8 @@ export default class BaseAgenticHarness {
 
     logger.info(
       `[AgenticLoop] finalize: conversation=${agentConversationId} conversationId=${conversationId} project=${project} ` +
-        `originalMsgCount=${state.originalMessageCount} currentMsgs=${currentMessages.length} ` +
-        `newTurnMsgs=${newTurnMessages.length} ` +
+        `originalMillisecondsgCount=${state.originalMessageCount} currentMillisecondsgs=${currentMessages.length} ` +
+        `newTurnMillisecondsgs=${newTurnMessages.length} ` +
         `roles=[${newTurnMessages.map((conversationMessage) => conversationMessage.role).join(",")}] ` +
         `text=${(state.finalStreamedText || "").length}chars`,
     );

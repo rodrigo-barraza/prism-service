@@ -1,4 +1,4 @@
-import { TYPES } from "../../config.ts";
+import { MODALITY_TYPES } from "../../config.ts";
 import {
   THINKING_PATTERNS,
   FUNCTION_CALL_PATTERNS,
@@ -48,10 +48,10 @@ export function detectCapabilities(
   if (supportsFunctionCalling) tools.push("Tool Calling");
 
   // Build input types
-  const inputTypes = [TYPES.TEXT];
-  if (supportsVision) inputTypes.push(TYPES.IMAGE);
-  if (supportsVideo) inputTypes.push(TYPES.VIDEO);
-  if (supportsAudio) inputTypes.push(TYPES.AUDIO);
+  const inputTypes = [MODALITY_TYPES.TEXT];
+  if (supportsVision) inputTypes.push(MODALITY_TYPES.IMAGE);
+  if (supportsVideo) inputTypes.push(MODALITY_TYPES.VIDEO);
+  if (supportsAudio) inputTypes.push(MODALITY_TYPES.AUDIO);
 
   return {
     thinking: supportsThinking,
@@ -61,6 +61,6 @@ export function detectCapabilities(
     audio: supportsAudio,
     tools,
     inputTypes,
-    outputTypes: [TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.TEXT],
   };
 }

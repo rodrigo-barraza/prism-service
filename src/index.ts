@@ -5,14 +5,13 @@ import http from "http";
 import { WebSocketServer } from "ws";
 
 import { errorHandler } from "./utils/errors.ts";
-import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import logger from "./utils/logger.ts";
 import { listProviders } from "./providers/index.ts";
-import { TYPES } from "./config.ts";
 import { setupWebSocket } from "./websocket/index.ts";
 import { authMiddleware } from "./middleware/AuthMiddleware.ts";
 import { requestLoggerMiddleware } from "./middleware/RequestLoggerMiddleware.ts";
-import { COLLECTIONS, CORS_MAX_AGE_SECONDS } from "./constants.ts";
+import { MODALITY_TYPES, COLLECTIONS, CROSS_ORIGIN_RESOURCE_SHARING_MAXIMUM_AGE_SECONDS } from "./constants.ts";
+import { getErrorMessage } from "./utils/ErrorHelpers.ts";
 import {
   PRISM_SERVICE_PORT as PORT,
   MONGO_URI,
@@ -95,7 +94,7 @@ app.use(
       "x-api-secret",
       "x-admin-secret",
     ],
-    maxAge: CORS_MAX_AGE_SECONDS, // cache preflight for 24h — eliminates burst OPTIONS storms
+    maxAge: CROSS_ORIGIN_RESOURCE_SHARING_MAXIMUM_AGE_SECONDS, // cache preflight for 24h — eliminates burst OPTIONS storms
   }),
 );
 app.use(express.json({ limit: "50mb" }));
@@ -460,7 +459,7 @@ setupWebSocket(wss);
       );
     }
   } catch (error: unknown) {
-    logger.error(`Failed to ensure indexes: ${errorMessage(error)}`);
+    logger.error(`Failed to ensure indexes: ${getErrorMessage(error)}`);
   }
 
   // Clear any stale isGenerating flags left over from a previous crash/restart
@@ -500,7 +499,7 @@ setupWebSocket(wss);
     }
   } catch (error: unknown) {
     logger.error(
-      `Failed to clear stale isGenerating flags: ${errorMessage(error)}`,
+      `Failed to clear stale isGenerating flags: ${getErrorMessage(error)}`,
     );
   }
 
@@ -510,7 +509,7 @@ setupWebSocket(wss);
       await import("./services/AgentPersonaRegistry.js");
     await AgentPersonaRegistryCustom.loadCustomAgents();
   } catch (error: unknown) {
-    logger.warn(`Custom agent loading failed: ${errorMessage(error)}`);
+    logger.warn(`Custom agent loading failed: ${getErrorMessage(error)}`);
   }
 
   // Initialize Change Streams (requires replica set — graceful fallback)
@@ -572,7 +571,7 @@ setupWebSocket(wss);
           }
         } catch (seedError: unknown) {
           logger.warn(
-            `Failed to parse/seed DEFAULT_MCP_SERVERS: ${errorMessage(seedError)}`,
+            `Failed to parse/seed DEFAULT_MCP_SERVERS: ${getErrorMessage(seedError)}`,
           );
         }
       }
@@ -580,13 +579,13 @@ setupWebSocket(wss);
       await MCPClientService.connectAllFromDB(mcpDb, codingProject, "admin");
     }
   } catch (error: unknown) {
-    logger.warn(`MCP auto-connect failed: ${errorMessage(error)}`);
+    logger.warn(`MCP auto-connect failed: ${getErrorMessage(error)}`);
   }
 
   // ── Scheduled Memory Consolidation ─────────────────
   // Runs every 24 hours, consolidates memories for all active projects and agents.
   const { hours } = await import("@rodrigo-barraza/utilities-library");
-  const CONSOLIDATION_INTERVAL_MS = hours(24);
+  const CONSOLIDATION_INTERVAL_MILLISECONDS = hours(24);
   const consolidationInterval = setInterval(async () => {
     try {
       const db = MongoWrapper.getDb(MONGO_DB_NAME);
@@ -625,20 +624,20 @@ setupWebSocket(wss);
             });
           } catch (error: unknown) {
             logger.error(
-              `[AutoDream] Scheduled consolidation failed for "${agent}/${project}": ${errorMessage(error)}`,
+              `[AutoDream] Scheduled consolidation failed for "${agent}/${project}": ${getErrorMessage(error)}`,
             );
           }
         }
       }
     } catch (error: unknown) {
       logger.error(
-        `[AutoDream] Scheduled consolidation sweep failed: ${errorMessage(error)}`,
+        `[AutoDream] Scheduled consolidation sweep failed: ${getErrorMessage(error)}`,
       );
     }
-  }, CONSOLIDATION_INTERVAL_MS);
+  }, CONSOLIDATION_INTERVAL_MILLISECONDS);
   registerCleanup(async () => clearInterval(consolidationInterval));
   logger.info(
-    `[AutoDream] Scheduled consolidation every ${CONSOLIDATION_INTERVAL_MS / 3_600_000}h`,
+    `[AutoDream] Scheduled consolidation every ${CONSOLIDATION_INTERVAL_MILLISECONDS / 3_600_000}h`,
   );
 
   // ── Scheduled Tasks Background Daemon ──────────────────
@@ -649,7 +648,7 @@ setupWebSocket(wss);
     registerCleanup(async () => ScheduledTaskService.destroy());
   } catch (error: unknown) {
     logger.error(
-      "Failed to initialize Scheduled Tasks daemon: " + errorMessage(error),
+      "Failed to initialize Scheduled Tasks daemon: " + getErrorMessage(error),
     );
   }
 
@@ -661,7 +660,7 @@ setupWebSocket(wss);
     registerCleanup(async () => ConversationTimerService.destroy());
   } catch (error: unknown) {
     logger.error(
-      "Failed to initialize Conversation Timers daemon: " + errorMessage(error),
+      "Failed to initialize Conversation Timers daemon: " + getErrorMessage(error),
     );
   }
 
@@ -673,7 +672,7 @@ setupWebSocket(wss);
     registerCleanup(async () => WebhookDispatcher.destroy());
   } catch (error: unknown) {
     logger.error(
-      "Failed to initialize Webhook Dispatcher: " + errorMessage(error),
+      "Failed to initialize Webhook Dispatcher: " + getErrorMessage(error),
     );
   }
 
@@ -685,7 +684,7 @@ setupWebSocket(wss);
     registerCleanup(async () => SomaticStateService.persistAll());
   } catch (error: unknown) {
     logger.error(
-      "Failed to initialize Somatic State Service: " + errorMessage(error),
+      "Failed to initialize Somatic State Service: " + getErrorMessage(error),
     );
   }
 
@@ -695,25 +694,25 @@ setupWebSocket(wss);
       await BackgroundHousekeepingService.run({ trigger: "boot" });
     } catch (error: unknown) {
       logger.error(
-        `[Housekeeping] Boot-time run failed: ${errorMessage(error)}`,
+        `[Housekeeping] Boot-time run failed: ${getErrorMessage(error)}`,
       );
     }
   })();
 
   // Scheduled run: every 6h (independent of consolidation interval)
-  const HOUSEKEEPING_INTERVAL_MS = hours(6);
+  const HOUSEKEEPING_INTERVAL_MILLISECONDS = hours(6);
   const housekeepingInterval = setInterval(async () => {
     try {
       await BackgroundHousekeepingService.run({ trigger: "scheduled" });
     } catch (error: unknown) {
       logger.error(
-        `[Housekeeping] Scheduled run failed: ${errorMessage(error)}`,
+        `[Housekeeping] Scheduled run failed: ${getErrorMessage(error)}`,
       );
     }
-  }, HOUSEKEEPING_INTERVAL_MS);
+  }, HOUSEKEEPING_INTERVAL_MILLISECONDS);
   registerCleanup(async () => clearInterval(housekeepingInterval));
   logger.info(
-    `[Housekeeping] Scheduled cleanup every ${HOUSEKEEPING_INTERVAL_MS / 3_600_000}h`,
+    `[Housekeeping] Scheduled cleanup every ${HOUSEKEEPING_INTERVAL_MILLISECONDS / 3_600_000}h`,
   );
 
   // Initialize MinIO if all secrets are configured
@@ -747,7 +746,7 @@ setupWebSocket(wss);
       pdf: [100, 116, 139], // #64748b — slate
       embedding: [6, 182, 212], // #06b6d4 — cyan
     };
-    const coloredModalities = Object.values(TYPES)
+    const coloredModalities = (Object.values(MODALITY_TYPES) as string[])
       .map((modality: string) => {
         const [r, g, b] = MODALITY_COLORS[modality] || [255, 255, 255];
         return `\x1b[38;2;${r};${g};${b}m${modality}\x1b[0m`;

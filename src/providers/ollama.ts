@@ -10,7 +10,7 @@ import { STREAMING_DISPATCHER } from "../utils/openai-compat.ts";
 import logger from "../utils/logger.ts";
 import { discoverContextLength } from "../utils/ContextLengthDiscovery.ts";
 
-import { TYPES, getDefaultModels } from "../config.ts";
+import { MODALITY_TYPES, getDefaultModels } from "../config.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 /**
@@ -85,7 +85,7 @@ export function createOllamaProvider(
 
     async generateText(
       messages: ChatMessage[],
-      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["ollama"],
+      model: string = getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)["ollama"],
       options: ProviderOptions = {},
     ): Promise<GenerateTextResult> {
       const baseUrl = getBaseUrl();
@@ -145,7 +145,7 @@ export function createOllamaProvider(
 
     async *generateTextStream(
       messages: ChatMessage[],
-      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["ollama"],
+      model: string = getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)["ollama"],
       options: ProviderOptions = {},
     ): AsyncGenerator<StreamChunk, void, unknown> {
       const baseUrl = getBaseUrl();
@@ -322,7 +322,7 @@ export function createOllamaProvider(
     async captionImage(
       images: string[],
       prompt: string = "Describe this image.",
-      model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["ollama"],
+      model: string = getDefaultModels(MODALITY_TYPES.IMAGE, MODALITY_TYPES.TEXT)["ollama"],
       systemPrompt?: string,
     ): Promise<{
       text: string;

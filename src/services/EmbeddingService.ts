@@ -4,7 +4,7 @@ import {
 } from "@rodrigo-barraza/utilities-library";
 import crypto from "crypto";
 import { getProvider } from "../providers/index.ts";
-import { TYPES, getDefaultModels, getPricing } from "../config.ts";
+import { MODALITY_TYPES, getDefaultModels, getPricing } from "../config.ts";
 import { estimateTokens } from "../utils/CostCalculator.ts";
 import { ProviderError } from "../utils/errors.ts";
 import RequestLogger from "./RequestLogger.ts";
@@ -53,7 +53,7 @@ const EmbeddingService = {
     const resolvedModel =
       options.model ||
       (
-        getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING) as
+        getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.EMBEDDING) as
           | Record<string, string>
           | undefined
       )?.[providerName] ||
@@ -86,7 +86,7 @@ const EmbeddingService = {
     } finally {
       const totalSec = (performance.now() - requestStart) / 1000;
       // Cost estimation
-      const pricing = getPricing(TYPES.TEXT, TYPES.EMBEDDING)[resolvedModel];
+      const pricing = getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.EMBEDDING)[resolvedModel];
       const approxInputTokens =
         typeof content === "string" ? estimateTokens(content) : 100;
       let estimatedCost = null;

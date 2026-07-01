@@ -31,7 +31,7 @@ import type {
  * to reuse the same plan lifecycle without duplicating the logic.
  */
 
-const PLAN_APPROVAL_TIMEOUT_MS = HARNESS.APPROVAL_TIMEOUT_MS;
+const PLAN_APPROVAL_TIMEOUT_MILLISECONDS = HARNESS.APPROVAL_TIMEOUT_MILLISECONDS;
 
 /**
  * Filter out unauthorized tool calls during plan mode.
@@ -133,7 +133,7 @@ export async function handleExitPlanMode(
       const timeoutId = setTimeout(() => {
         pendingApprovals.delete(conversationId);
         resolve(false);
-      }, PLAN_APPROVAL_TIMEOUT_MS);
+      }, PLAN_APPROVAL_TIMEOUT_MILLISECONDS);
 
       const existingApproval = pendingApprovals.get(conversationId);
       if (existingApproval) {

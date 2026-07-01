@@ -17,10 +17,10 @@ interface WebhookSubscription {
   enabled: boolean;
 }
 
-const DISPATCH_TIMEOUT_MS = WEBHOOK.DISPATCH_TIMEOUT_MS;
+const DISPATCH_TIMEOUT_MILLISECONDS = WEBHOOK.DISPATCH_TIMEOUT_MILLISECONDS;
 const MAX_RETRY_ATTEMPTS = WEBHOOK.MAX_RETRY_ATTEMPTS;
-const RETRY_BASE_DELAY_MS = WEBHOOK.RETRY_BASE_DELAY_MS;
-const SUBSCRIPTION_REFRESH_INTERVAL_MS = WEBHOOK.SUBSCRIPTION_REFRESH_INTERVAL_MS;
+const RETRY_BASE_DELAY_MILLISECONDS = WEBHOOK.RETRY_BASE_DELAY_MILLISECONDS;
+const SUBSCRIPTION_REFRESH_INTERVAL_MILLISECONDS = WEBHOOK.SUBSCRIPTION_REFRESH_INTERVAL_MILLISECONDS;
 
 let cachedSubscriptions: WebhookSubscription[] = [];
 let refreshInterval: ReturnType<typeof setInterval> | null = null;
@@ -58,7 +58,7 @@ async function dispatchToSubscription(
     let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
     try {
       const controller = new AbortController();
-      timeoutHandle = setTimeout(() => controller.abort(), DISPATCH_TIMEOUT_MS);
+      timeoutHandle = setTimeout(() => controller.abort(), DISPATCH_TIMEOUT_MILLISECONDS);
 
       const response = await fetch(subscription.url, {
         method: "POST",
@@ -91,7 +91,7 @@ async function dispatchToSubscription(
     }
 
     if (attempt < MAX_RETRY_ATTEMPTS - 1) {
-      const delay = RETRY_BASE_DELAY_MS * Math.pow(4, attempt);
+      const delay = RETRY_BASE_DELAY_MILLISECONDS * Math.pow(4, attempt);
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
@@ -136,7 +136,7 @@ const WebhookDispatcher = {
 
     refreshInterval = setInterval(
       refreshSubscriptions,
-      SUBSCRIPTION_REFRESH_INTERVAL_MS,
+      SUBSCRIPTION_REFRESH_INTERVAL_MILLISECONDS,
     );
 
     WebhookEventBus.subscribe(handleEvent);

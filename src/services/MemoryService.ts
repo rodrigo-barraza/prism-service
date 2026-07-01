@@ -214,7 +214,7 @@ async function extractFactsFromConversation(
       usage: result?.usage || null,
       success,
       errorMessage,
-      requestStartMs: requestStart,
+      requestStartMilliseconds: requestStart,
       extraRequestPayload: {
         participantCount: participants.length,
         messageCount: messages.length,

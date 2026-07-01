@@ -52,14 +52,14 @@ export interface ToolCall {
   _approval?: { tier: string; tierLabel: string };
   result?: unknown;
   status?: string;
-  durationMs?: number;
+  durationMilliseconds?: number;
 }
 
 export interface ToolResult {
   name: string;
   id: string | null;
   result: unknown;
-  durationMs?: number;
+  durationMilliseconds?: number;
 }
 
 export interface ResolvedTools {

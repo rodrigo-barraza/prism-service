@@ -8,10 +8,10 @@ import {
 import { ProviderError } from "../utils/errors.ts";
 import logger from "../utils/logger.ts";
 import type { TokenUsage } from "../types/admin.ts";
-import { TOOL_API_HEALTH_TIMEOUT_MS } from "../constants.ts";
+import { TOOL_API_HEALTH_TIMEOUT_MILLISECONDS } from "../constants.ts";
 import { discoverContextLength } from "../utils/ContextLengthDiscovery.ts";
 
-import { TYPES, getDefaultModels } from "../config.ts";
+import { MODALITY_TYPES, getDefaultModels } from "../config.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import {
   convertToolsToOpenAI,
@@ -106,7 +106,7 @@ export function createVllmProvider(
 
     async generateText(
       messages: ChatMessage[],
-      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["vllm"],
+      model: string = getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)["vllm"],
       options: ProviderOptions = {},
     ): Promise<GenerateTextResult> {
       const baseUrl = getBaseUrl();
@@ -191,7 +191,7 @@ export function createVllmProvider(
 
     async *generateTextStream(
       messages: ChatMessage[],
-      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["vllm"],
+      model: string = getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)["vllm"],
       options: ProviderOptions = {},
     ): AsyncGenerator<StreamChunk, void, unknown> {
       const baseUrl = getBaseUrl();
@@ -281,7 +281,7 @@ export function createVllmProvider(
     async captionImage(
       images: string[],
       prompt: string = "Describe this image.",
-      model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["vllm"],
+      model: string = getDefaultModels(MODALITY_TYPES.IMAGE, MODALITY_TYPES.TEXT)["vllm"],
       systemPrompt?: string,
     ): Promise<{
       text: string;
@@ -386,7 +386,7 @@ export function createVllmProvider(
       try {
         const response = await fetch(`${baseUrl}/health`, {
           method: "GET",
-          signal: AbortSignal.timeout(TOOL_API_HEALTH_TIMEOUT_MS),
+          signal: AbortSignal.timeout(TOOL_API_HEALTH_TIMEOUT_MILLISECONDS),
         });
         return {
           ok: response.ok,

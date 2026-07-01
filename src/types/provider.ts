@@ -155,7 +155,7 @@ export interface GenerateTextResult {
     name: string;
     args: Record<string, unknown>;
     thoughtSignature?: string;
-    durationMs?: number;
+    durationMilliseconds?: number;
   }>;
   images?: Array<{ data: string; mimeType: string }>;
   safetyBlock?: boolean;

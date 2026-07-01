@@ -276,6 +276,43 @@ export function computeTotalCost(messages: ChatMessage[]): number {
 }
 
 /**
+ * Aggregate input/output tokens from assistant messages.
+ */
+export function computeTokenStats(messages: ChatMessage[]): {
+  input: number;
+  output: number;
+} {
+  let input = 0;
+  let output = 0;
+  for (const message of messages || []) {
+    if (message.deleted || message.role !== "assistant") continue;
+    if (message.usage) {
+      input += (message.usage as Record<string, unknown>).inputTokens as number || 0;
+      output += (message.usage as Record<string, unknown>).outputTokens as number || 0;
+    }
+  }
+  return { input, output };
+}
+
+/**
+ * Count tool invocations across assistant messages.
+ */
+export function computeToolCounts(messages: ChatMessage[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const message of messages || []) {
+    if (message.deleted || message.role !== "assistant") continue;
+    if (message.toolCalls && message.toolCalls.length > 0) {
+      for (const toolCall of message.toolCalls) {
+        if (toolCall.name) {
+          counts[toolCall.name] = (counts[toolCall.name] || 0) + 1;
+        }
+      }
+    }
+  }
+  return counts;
+}
+
+/**
  * Build the $set fields for a conversation/agent-session PATCH request.
  * Centralises the identical logic shared by conversations.js and agent-sessions.js.
  */
@@ -294,6 +331,11 @@ export function buildConversationPatchFields({
     setFields.modalities = computeModalities(messages);
     setFields.providers = extractProviders(messages, settings || null);
     setFields.totalCost = computeTotalCost(messages);
+
+    const tokenStats = computeTokenStats(messages);
+    setFields.inputTokens = tokenStats.input;
+    setFields.outputTokens = tokenStats.output;
+    setFields.toolCounts = computeToolCounts(messages);
 
     const modelNamesSet = new Set<string>();
     for (const message of messages || []) {

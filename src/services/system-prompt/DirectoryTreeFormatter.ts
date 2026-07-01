@@ -3,8 +3,8 @@ import { createAbortController } from "../../utils/AbortController.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 import { TOOLS_SERVICE_URL } from "../../../config.ts";
 import {
-  DIRECTORY_CACHE_TTL_MS,
-  DIRECTORY_FETCH_TIMEOUT_MS,
+  DIRECTORY_CACHE_TIME_TO_LIVE_MILLISECONDS,
+  DIRECTORY_FETCH_TIMEOUT_MILLISECONDS,
   DIRECTORY_TREE_CHILD_LIMIT,
 } from "../../constants.ts";
 import { DirectoryData } from "./types.ts";
@@ -17,7 +17,7 @@ export class DirectoryTreeFormatter {
 
   constructor(workspaceRoot: string) {
     this.workspaceRoot = workspaceRoot;
-    this._directoryCacheTTL = DIRECTORY_CACHE_TTL_MS;
+    this._directoryCacheTTL = DIRECTORY_CACHE_TIME_TO_LIVE_MILLISECONDS;
   }
 
   /**
@@ -37,7 +37,7 @@ export class DirectoryTreeFormatter {
       const controller = createAbortController();
       const timeout = setTimeout(
         () => controller.abort(),
-        DIRECTORY_FETCH_TIMEOUT_MS,
+        DIRECTORY_FETCH_TIMEOUT_MILLISECONDS,
       );
 
       const url = `${TOOLS_SERVICE_URL}/filesystem/list?path=${encodeURIComponent(this.workspaceRoot)}&depth=2`;

@@ -6,16 +6,10 @@ import {
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import { InternalToolContext } from "./InternalToolRegistry.ts";
+import type { SkillDocument, SkillPrepareResult } from "../SkillService.ts";
 
-interface SkillCreateArgs {
-  name: string;
-  description?: string;
-  prompt: string;
-  steps?: string[];
-  tools?: string[];
-  maxIterations?: number;
-  model?: string;
-  [key: string]: unknown;
+interface SkillCreateArgs extends Partial<SkillDocument> {
+  [key: string]: any;
 }
 
 
@@ -165,8 +159,8 @@ const executeSkill = {
         ),
       };
 
-    const { default: SkillService } = await import("../SkillService.js");
-    const prepared = await SkillService.prepare(skillId, variables);
+    const { default: SkillService } = await import("../SkillService.ts");
+    const prepared: SkillPrepareResult = await SkillService.prepare(skillId, variables);
     if (prepared.error) return prepared;
 
     // Execute via orchestrator's create_subagents mechanism

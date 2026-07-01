@@ -46,7 +46,7 @@ const EXTENSION_VALIDATORS: Record<string, ValidatorConfig> = {
   ".json": { command: null, type: "json-parse" },
 };
 
-const VALIDATION_TIMEOUT_MS = HARNESS.VALIDATION_TIMEOUT_MS;
+const VALIDATION_TIMEOUT_MILLISECONDS = HARNESS.VALIDATION_TIMEOUT_MILLISECONDS;
 
 /**
  * Extract the file path from a tool call's arguments.
@@ -132,7 +132,7 @@ async function runShellValidator(
       {
         command: validatorConfig.command,
         cwd: executionCwd,
-        timeout: VALIDATION_TIMEOUT_MS,
+        timeout: VALIDATION_TIMEOUT_MILLISECONDS,
       },
       {
         project: context.project,

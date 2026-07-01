@@ -100,7 +100,7 @@ export default class AgenticLoopState {
 
   // ── Progress emission throttling ────────────────────────
   readonly PROGRESS_CHUNK_INTERVAL = 10;
-  readonly PROGRESS_TIME_INTERVAL_MS = 500;
+  readonly PROGRESS_TIME_INTERVAL_MILLISECONDS = 500;
   lastProgressEmitTime: number;
   chunksSinceLastProgress: number;
 

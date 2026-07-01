@@ -13,7 +13,7 @@ import {
   estimateTokens,
   calculateTextCost,
 } from "../../utils/CostCalculator.ts";
-import { TYPES, getPricing } from "../../config.ts";
+import { MODALITY_TYPES, getPricing } from "../../config.ts";
 import {
   COMPACTION_SYSTEM_PROMPT,
   COMPACTION_USER_PROMPT,
@@ -259,7 +259,7 @@ export default class CompactionService {
         usage: realUsage,
         success,
         errorMessage: compactionError,
-        requestStartMs: requestStart,
+        requestStartMilliseconds: requestStart,
         extraRequestPayload: {
           operation: "compact:summarize",
           preCompactTokenCount,
@@ -323,7 +323,7 @@ export default class CompactionService {
     // Emit usage for the compaction call so the UI token badge updates
     if (options.emit && result?.usage) {
       try {
-        const compactPricing = getPricing(TYPES.TEXT, TYPES.TEXT)[
+        const compactPricing = getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[
           compactionModel
         ];
         const compactCost = compactPricing

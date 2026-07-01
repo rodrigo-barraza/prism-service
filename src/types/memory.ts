@@ -133,7 +133,7 @@ export interface ConsolidationRunResult {
   deleted?: number;
   errors?: number;
   batches?: number;
-  durationMs?: number;
+  durationMilliseconds?: number;
 }
 
 // ── Fact Extraction ─────────────────────────────────────────

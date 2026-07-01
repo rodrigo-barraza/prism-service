@@ -1,5 +1,5 @@
 import { formatBytes } from "@rodrigo-barraza/utilities-library";
-import { TYPES } from "../../config.ts";
+import { MODALITY_TYPES } from "../../config.ts";
 import { HuggingFaceMetadata, ModelEntry } from "./types.ts";
 import { formatParams } from "./nameParsers.ts";
 import { LOCAL_PROVIDER } from "../../constants.ts";
@@ -8,7 +8,7 @@ const _hfCache = new Map<
   string,
   { data: HuggingFaceMetadata | null; timestamp: number }
 >();
-const HF_CACHE_TTL_MS = LOCAL_PROVIDER.HF_CACHE_TTL_MS;
+const HUGGING_FACE_CACHE_TIME_TO_LIVE_MILLISECONDS = LOCAL_PROVIDER.HUGGING_FACE_CACHE_TIME_TO_LIVE_MILLISECONDS;
 
 /**
  * Fetch model metadata from HuggingFace Hub API.
@@ -19,7 +19,7 @@ export async function fetchHuggingFaceMetadata(
   modelId: string,
 ): Promise<HuggingFaceMetadata | null> {
   const cached = _hfCache.get(modelId);
-  if (cached && Date.now() - cached.timestamp < HF_CACHE_TTL_MS) {
+  if (cached && Date.now() - cached.timestamp < HUGGING_FACE_CACHE_TIME_TO_LIVE_MILLISECONDS) {
     return cached.data;
   }
 
@@ -78,24 +78,24 @@ export async function enrichWithHuggingFace(
     huggingFaceMeta.tags.includes("vision")
   ) {
     entry.vision = true;
-    if (!entry.inputTypes.includes(TYPES.IMAGE)) {
-      entry.inputTypes.push(TYPES.IMAGE);
+    if (!entry.inputTypes.includes(MODALITY_TYPES.IMAGE)) {
+      entry.inputTypes.push(MODALITY_TYPES.IMAGE);
     }
   }
   if (
     huggingFaceMeta.pipelineTag === "video-text-to-text" ||
     huggingFaceMeta.tags.includes("video")
   ) {
-    if (!entry.inputTypes.includes(TYPES.VIDEO)) {
-      entry.inputTypes.push(TYPES.VIDEO);
+    if (!entry.inputTypes.includes(MODALITY_TYPES.VIDEO)) {
+      entry.inputTypes.push(MODALITY_TYPES.VIDEO);
     }
   }
   if (
     huggingFaceMeta.pipelineTag === "audio-text-to-text" ||
     huggingFaceMeta.tags.includes("audio")
   ) {
-    if (!entry.inputTypes.includes(TYPES.AUDIO)) {
-      entry.inputTypes.push(TYPES.AUDIO);
+    if (!entry.inputTypes.includes(MODALITY_TYPES.AUDIO)) {
+      entry.inputTypes.push(MODALITY_TYPES.AUDIO);
     }
   }
 

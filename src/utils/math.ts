@@ -1,4 +1,4 @@
-import { MAX_TOKENS_PER_SEC } from "../constants.ts";
+import { MAXIMUM_TOKENS_PER_SECOND } from "../constants.ts";
 
 interface TokensPerSecOptions {
   providerReported?: number | null;
@@ -21,7 +21,7 @@ export function calculateTokensPerSec(
   // 1. Provider-reported value takes priority
   if (opts.providerReported != null && opts.providerReported > 0) {
     const value = parseFloat(opts.providerReported.toFixed(1));
-    return value > MAX_TOKENS_PER_SEC ? null : value;
+    return value > MAXIMUM_TOKENS_PER_SECOND ? null : value;
   }
 
   // 2. Determine effective duration
@@ -35,5 +35,5 @@ export function calculateTokensPerSec(
   if (!effectiveSec || !tokens || tokens <= 0) return null;
 
   const value = parseFloat((tokens / effectiveSec).toFixed(1));
-  return value > MAX_TOKENS_PER_SEC ? null : value;
+  return value > MAXIMUM_TOKENS_PER_SECOND ? null : value;
 }

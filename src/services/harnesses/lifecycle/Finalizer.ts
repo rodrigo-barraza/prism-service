@@ -8,7 +8,7 @@ import {
   getTotalInputTokens,
 } from "../../../utils/CostCalculator.ts";
 import { calculateTokensPerSec } from "../../../utils/math.ts";
-import { TYPES, getPricing } from "../../../config.ts";
+import { MODALITY_TYPES, getPricing } from "../../../config.ts";
 import RequestLogger from "../../RequestLogger.ts";
 import FileService from "../../FileService.ts";
 import AgentPersonaRegistry from "../../AgentPersonaRegistry.ts";
@@ -231,7 +231,7 @@ export async function finalizeTextGeneration(
     const imageCount = images.length;
     if (imageCount > 0) {
       const imgPricing =
-        getPricing(TYPES.TEXT, TYPES.IMAGE)[resolvedModel] ||
+        getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE)[resolvedModel] ||
         (modelDefinition?.pricing as Record<string, number>);
       if (imgPricing?.imageOutputPerMillion) {
         // Derive image tokens dynamically from the API-reported total.
@@ -259,11 +259,11 @@ export async function finalizeTextGeneration(
           (inputCost + textOutCost + imageOutCost).toFixed(8),
         );
       } else {
-        const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
+        const pricing = getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[resolvedModel];
         estimatedCost = calculateTextCost(usage, pricing);
       }
     } else {
-      const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
+      const pricing = getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[resolvedModel];
       estimatedCost = calculateTextCost(usage, pricing);
     }
     tokensPerSec = calculateTokensPerSec(
@@ -621,8 +621,8 @@ export function expandToolCallsForPersistence(
               typeof resultValue === "string"
                 ? resultValue
                 : JSON.stringify(resultValue),
-            ...(toolCallWithResult.durationMs !== undefined && {
-              durationMs: toolCallWithResult.durationMs,
+            ...(toolCallWithResult.durationMilliseconds !== undefined && {
+              durationMilliseconds: toolCallWithResult.durationMilliseconds,
             }),
             ...(parentRequestId && { requestId: parentRequestId }),
           });

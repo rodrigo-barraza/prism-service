@@ -370,7 +370,7 @@ export class SubAgentTelemetryEmitter {
 
   /** Emit a completion event to the parent SSE stream. */
   emitCompletion(
-    durationMs: number,
+    durationMilliseconds: number,
     usage: Record<string, number> | null,
     estimatedCost: number | null,
   ) {
@@ -379,7 +379,7 @@ export class SubAgentTelemetryEmitter {
         type: "sub_agent_status",
         subAgentId: this.subAgentId,
         message: "complete",
-        durationMs,
+        durationMilliseconds,
         toolCount: this.toolCalls.length,
         usage: usage || null,
         estimatedCost: estimatedCost || null,

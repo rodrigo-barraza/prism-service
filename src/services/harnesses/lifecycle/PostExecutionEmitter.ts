@@ -132,7 +132,7 @@ export async function processToolResultMedia(
         id: toolCall.id,
         responsesItemId: toolCall.responsesItemId,
         result: resultObject,
-        durationMs: toolResult?.durationMs,
+        durationMilliseconds: toolResult?.durationMilliseconds,
       },
       status: hasError ? "error" : "done",
     });
@@ -143,7 +143,7 @@ export async function processToolResultMedia(
       toolEmoji: ToolOrchestratorService.getToolEmoji(toolCall.name),
       toolCallId: toolCall.id,
       toolResult: resultObject,
-      durationMs: toolResult?.durationMs || null,
+      durationMilliseconds: toolResult?.durationMilliseconds || null,
       status: hasError ? "error" : "done",
       agent: context?.agent || null,
       conversationId: context?.conversationId || null,

@@ -1081,14 +1081,14 @@ describe("Message Array Construction", () => {
             name: "get_weather",
             args: { city: "Tokyo" },
             result: '{"temperature": "22°C"}',
-            durationMs: 450,
+            durationMilliseconds: 450,
           },
           {
             id: "call_weather_vancouver",
             name: "get_weather",
             args: { city: "Vancouver" },
             result: '{"temperature": "15°C"}',
-            durationMs: 380,
+            durationMilliseconds: 380,
           },
         ],
       });
@@ -1131,13 +1131,13 @@ describe("Message Array Construction", () => {
       expect(newTurnMessages[3].name).toBe("get_weather");
       expect(newTurnMessages[3].tool_call_id).toBe("call_weather_tokyo");
       expect(newTurnMessages[3].content).toContain("22°C");
-      expect(newTurnMessages[3].durationMs).toBe(450);
+      expect(newTurnMessages[3].durationMilliseconds).toBe(450);
 
       expect(newTurnMessages[4].role).toBe("tool");
       expect(newTurnMessages[4].name).toBe("get_weather");
       expect(newTurnMessages[4].tool_call_id).toBe("call_weather_vancouver");
       expect(newTurnMessages[4].content).toContain("15°C");
-      expect(newTurnMessages[4].durationMs).toBe(380);
+      expect(newTurnMessages[4].durationMilliseconds).toBe(380);
     });
   });
 
@@ -1254,7 +1254,7 @@ describe("Message Array Construction", () => {
               prompt: "A dramatic sunset over mountains, oil painting style",
             },
             result: '{"url": "https://cdn.example.com/sunset.png"}',
-            durationMs: 12500,
+            durationMilliseconds: 12500,
           },
         ],
       });
@@ -1310,7 +1310,7 @@ describe("Message Array Construction", () => {
               text: "[snarl with contempt] You dare approach my den, mortal?",
             },
             result: '{"url": "https://cdn.example.com/speech.wav"}',
-            durationMs: 3200,
+            durationMilliseconds: 3200,
           },
         ],
       });
@@ -1366,7 +1366,7 @@ describe("Message Array Construction", () => {
             name: "edit_file",
             args: { path: "routes.ts", content: "router.get('/api/users');" },
             result: "File edited.",
-            durationMs: 120,
+            durationMilliseconds: 120,
           },
         ],
       });
@@ -1395,7 +1395,7 @@ describe("Message Array Construction", () => {
                 "import { Router } from 'express';\nconst router = Router();\nrouter.get('/api/users');",
             },
             result: "File edited.",
-            durationMs: 95,
+            durationMilliseconds: 95,
           },
         ],
       });
@@ -1613,7 +1613,7 @@ describe("Message Array Construction", () => {
             name: "get_weather",
             args: { city: "Tokyo" },
             result: '{"temperature": "22°C"}',
-            durationMs: 400,
+            durationMilliseconds: 400,
           },
         ],
       });
@@ -1683,7 +1683,7 @@ describe("Message Array Construction", () => {
               ],
             },
             result: '{"results": []}',
-            durationMs: 1200,
+            durationMilliseconds: 1200,
           },
         ],
       });
@@ -1721,7 +1721,7 @@ describe("Message Array Construction", () => {
   // Scenario 22: Tool call with duration tracking
   // ────────────────────────────────────────────────────────────
   describe("Tool call duration tracking", () => {
-    it("should preserve durationMs on individual tool call results", () => {
+    it("should preserve durationMilliseconds on individual tool call results", () => {
       const originalMessages: HarnessPayload[] = [
         { role: "user", content: "run the test suite" },
       ];
@@ -1743,7 +1743,7 @@ describe("Message Array Construction", () => {
             name: "run_command",
             args: { command: "npm test" },
             result: "All 42 tests passed.",
-            durationMs: 8750,
+            durationMilliseconds: 8750,
           },
         ],
       });
@@ -1767,7 +1767,7 @@ describe("Message Array Construction", () => {
           message.toolCalls &&
           message.toolCalls.length > 0,
       )!;
-      expect(toolCallMessage.toolCalls![0].durationMs).toBe(8750);
+      expect(toolCallMessage.toolCalls![0].durationMilliseconds).toBe(8750);
     });
   });
 
@@ -2060,7 +2060,7 @@ describe("Message Array Construction", () => {
             },
             result:
               '{"url": "https://cdn.example.com/wolf-warrior.png", "success": true}',
-            durationMs: 15200,
+            durationMilliseconds: 15200,
           },
         ],
       });
@@ -2080,7 +2080,7 @@ describe("Message Array Construction", () => {
               text: "[say in a deep, gravelly, commanding tone] Rise, warrior. The battlefield calls for blood, and only the wolves answer.",
             },
             result: '{"url": "https://cdn.example.com/epic-speech.wav"}',
-            durationMs: 4100,
+            durationMilliseconds: 4100,
           },
         ],
       });
@@ -2140,7 +2140,7 @@ describe("Message Array Construction", () => {
         "sig_lupos_thinking_1",
       );
       expect(assistantMessages[0].toolCalls![0].name).toBe("generate_image");
-      expect(assistantMessages[0].toolCalls![0].durationMs).toBe(15200);
+      expect(assistantMessages[0].toolCalls![0].durationMilliseconds).toBe(15200);
 
       expect(assistantMessages[1].thinking).toContain("epic voice line");
       expect(assistantMessages[1].thinkingSignature).toBe(
@@ -2326,7 +2326,7 @@ describe("Message Array Construction", () => {
             args: { location: "Vancouver", dateRange: "this weekend" },
             result:
               '{"events": [{"name": "Summer Jazz Festival", "date": "2026-06-21"}]}',
-            durationMs: 1800,
+            durationMilliseconds: 1800,
           },
         ],
       });
@@ -2437,7 +2437,7 @@ describe("Message Array Construction", () => {
             name: "get_weather",
             args: { city: "Vancouver" },
             result: '{"temperature": "15°C", "condition": "Cloudy"}',
-            durationMs: 350,
+            durationMilliseconds: 350,
           },
         ],
       });
@@ -2590,7 +2590,7 @@ describe("Message Array Construction", () => {
                 content: `// refactored file ${iteration}`,
               },
               result: "File edited.",
-              durationMs: 150,
+              durationMilliseconds: 150,
             },
           ],
         });
@@ -2689,7 +2689,7 @@ describe("Message Array Construction", () => {
             name: "write_to_file",
             args: { path: "UserRoutes.ts", content: "// routes" },
             result: "File created.",
-            durationMs: 100,
+            durationMilliseconds: 100,
           },
         ],
       });
@@ -2934,7 +2934,7 @@ describe("Message Array Construction", () => {
             name: "run_command",
             args: { command: "npm run build" },
             result: "Build successful.",
-            durationMs: 5000,
+            durationMilliseconds: 5000,
           },
         ],
       });
@@ -3047,7 +3047,7 @@ describe("Message Array Construction", () => {
             name: "get_weather",
             args: { city: "Vancouver" },
             result: '{"temperature": "18°C"}',
-            durationMs: 400,
+            durationMilliseconds: 400,
           },
         ],
       });
@@ -3103,7 +3103,7 @@ describe("Message Array Construction", () => {
             name: "search_events",
             args: { location: "Vancouver" },
             result: '{"events": [{"name": "Jazz Fest"}]}',
-            durationMs: 600,
+            durationMilliseconds: 600,
           },
         ],
       });
@@ -3383,7 +3383,7 @@ describe("Message Array Construction", () => {
             name: "generate_image",
             args: { prompt: "a wolf warrior" },
             result: '{"url": "https://cdn.example.com/wolf.png"}',
-            durationMs: 14000,
+            durationMilliseconds: 14000,
           },
         ],
       });

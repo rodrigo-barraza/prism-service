@@ -3,7 +3,7 @@ import WebSocket from "ws";
 import { ProviderError } from "../utils/errors.ts";
 import logger from "../utils/logger.ts";
 import { ELEVENLABS_API_KEY } from "../../config.ts";
-import { TYPES, DEFAULT_VOICES, getDefaultModels } from "../config.ts";
+import { MODALITY_TYPES, DEFAULT_VOICES, getDefaultModels } from "../config.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 function getApiKey() {
@@ -37,7 +37,7 @@ const elevenlabsProvider = {
             text,
             model_id:
               options.modelId ||
-              getDefaultModels(TYPES.TEXT, TYPES.AUDIO).elevenlabs,
+              getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.AUDIO).elevenlabs,
             voice_settings: {
               stability: options.stability || 0.5,
               similarity_boost: options.similarityBoost || 0.8,
@@ -67,7 +67,7 @@ const elevenlabsProvider = {
     logger.provider("ElevenLabs", `generateSpeechStream voiceId=${voiceId}`);
     const apiKey = getApiKey();
     const modelId =
-      options.modelId || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).elevenlabs;
+      options.modelId || getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.AUDIO).elevenlabs;
     const websocketUrl = `wss://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream-input?model_id=${modelId}`;
 
     const websocket = new WebSocket(websocketUrl, {

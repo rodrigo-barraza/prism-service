@@ -235,7 +235,7 @@ export interface LogBackgroundLlmCallParams {
   usage?: TokenUsage | null;
   success: boolean;
   errorMessage: string | null;
-  requestStartMs: number;
+  requestStartMilliseconds: number;
   extraRequestPayload?: Record<string, unknown>;
   extraResponsePayload?: Record<string, unknown>;
 }
@@ -282,7 +282,7 @@ export interface ToolCallEntry {
     id: string;
     summary: Array<{ type: string; text: string }>;
   };
-  durationMs?: number;
+  durationMilliseconds?: number;
 }
 
 export interface ChatMessage {

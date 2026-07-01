@@ -12,7 +12,7 @@ import {
   DEFAULT_TOPOLOGY,
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { TYPES } from "../config.ts";
+import { MODALITY_TYPES } from "../config.ts";
 import { resolveToolEntriesToSet } from "../utils/resolveToolEntriesToSet.ts";
 import {
   THINKING_PATTERNS,
@@ -314,13 +314,13 @@ export default class AgenticToolResolver {
       );
     }
 
-    if (modelDefinition?.outputTypes?.includes(TYPES.IMAGE)) {
+    if (modelDefinition?.outputTypes?.includes(MODALITY_TYPES.IMAGE)) {
       finalTools = finalTools.filter(
         (tool) => tool.name !== TOOL_NAMES.GENERATE_IMAGE,
       );
     }
 
-    if (modelDefinition?.inputTypes?.includes(TYPES.IMAGE)) {
+    if (modelDefinition?.inputTypes?.includes(MODALITY_TYPES.IMAGE)) {
       finalTools = finalTools.filter(
         (tool) => tool.name !== TOOL_NAMES.DESCRIBE_IMAGE,
       );

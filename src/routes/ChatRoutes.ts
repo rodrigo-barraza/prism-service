@@ -18,7 +18,7 @@ import crypto from "crypto";
 import { getProvider } from "../providers/index.ts";
 import { ProviderError } from "../utils/errors.ts";
 import {
-  TYPES,
+  MODALITY_TYPES,
   getDefaultModels,
   getPricing,
   getModelByName,
@@ -392,7 +392,7 @@ async function prepareGenerationContext(
   // but skip load balancing — the request is pinned to that instance.
   let resolvedModel =
     requestedModel ||
-    getDefaultModels(TYPES.TEXT, TYPES.TEXT)[providerName as string];
+    getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[providerName as string];
   if (localModelQueue.isLocal(providerName)) {
     const pinnedInstanceType = getInstanceType(providerName);
     const isInstancePinned =
@@ -942,7 +942,7 @@ async function handleImageAPIModel(
   const totalSec = (performance.now() - requestStart) / 1000;
   // Cost calculation
   const imgPricing =
-    getPricing(TYPES.TEXT, TYPES.IMAGE)[resolvedModel as string] ||
+    getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE)[resolvedModel as string] ||
     (modelDefinition as Record<string, unknown> | null)?.pricing;
   const outputImgTokens =
     ((modelDefinition as Record<string, unknown> | null)
@@ -1197,7 +1197,7 @@ async function handleStreamingText(context: GenerationContext) {
             _resolvedModel: resolvedModel,
           },
         );
-        const durationMs = Date.now() - startTime;
+        const durationMilliseconds = Date.now() - startTime;
         toolCall.result = result;
         toolCall.status =
           result &&
@@ -1206,7 +1206,7 @@ async function handleStreamingText(context: GenerationContext) {
           result.error
             ? "error"
             : "done";
-        toolCall.durationMs = durationMs;
+        toolCall.durationMilliseconds = durationMilliseconds;
         emit({
           type: SERVER_SENT_EVENT_TYPES.TOOL_CALL,
           id: toolCall.id,
@@ -1214,13 +1214,13 @@ async function handleStreamingText(context: GenerationContext) {
           args: toolCall.args,
           result,
           status: toolCall.status,
-          durationMs,
+          durationMilliseconds,
         });
       } catch (error: unknown) {
-        const durationMs = Date.now() - startTime;
+        const durationMilliseconds = Date.now() - startTime;
         toolCall.result = { error: getErrorMessage(error) };
         toolCall.status = "error";
-        toolCall.durationMs = durationMs;
+        toolCall.durationMilliseconds = durationMilliseconds;
         emit({
           type: SERVER_SENT_EVENT_TYPES.TOOL_CALL,
           id: toolCall.id,
@@ -1228,7 +1228,7 @@ async function handleStreamingText(context: GenerationContext) {
           args: toolCall.args,
           result: toolCall.result,
           status: "error",
-          durationMs,
+          durationMilliseconds,
         });
       }
     }
@@ -1255,7 +1255,7 @@ async function handleStreamingText(context: GenerationContext) {
         ? { thinkingSignature: streamState.thinkingSignature }
         : {}),
     };
-    const toolResultMsgs = streamState.toolCalls
+    const toolResultMillisecondsgs = streamState.toolCalls
       .filter((toolCall) => toolCall.result)
       .map((toolCall) => ({
         role: "tool",
@@ -1270,7 +1270,7 @@ async function handleStreamingText(context: GenerationContext) {
     const updatedMessages = [
       ...messages,
       assistantToolMessage,
-      ...toolResultMsgs,
+      ...toolResultMillisecondsgs,
     ];
     // Reset accumulators for the follow-up stream
     streamState.text = "";
@@ -1320,7 +1320,7 @@ async function handleStreamingText(context: GenerationContext) {
     // Update messages ref for potential next iteration
     (messages as Record<string, unknown>[]).push(
       assistantToolMessage,
-      ...toolResultMsgs,
+      ...toolResultMillisecondsgs,
     );
   }
   // Surface max_tokens truncation if the model produced no useful output
@@ -1359,7 +1359,7 @@ async function handleStreamingText(context: GenerationContext) {
         ...(toolCall.thoughtSignature
           ? { thoughtSignature: toolCall.thoughtSignature }
           : {}),
-        durationMs: toolCall.durationMs,
+        durationMilliseconds: toolCall.durationMilliseconds,
       }),
     ),
     audioChunks: streamState.audioChunks,
@@ -1503,7 +1503,7 @@ async function handleNonStreamingText(context: GenerationContext) {
         name: toolCall.name,
         args: toolCall.args || {},
         thoughtSignature: toolCall.thoughtSignature || undefined,
-        durationMs: toolCall.durationMs as number | undefined,
+        durationMilliseconds: toolCall.durationMilliseconds as number | undefined,
       })) || [],
     audioChunks: [],
     audioSampleRate: 24000,

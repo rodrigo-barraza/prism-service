@@ -30,7 +30,7 @@ import type { LLMProvider } from "../types.ts";
  */
 
 const EXTRACTION_MAX_TOKENS = HARNESS.EXTRACTION_MAX_TOKENS;
-const EXTRACTION_TIMEOUT_MILLISECONDS = HARNESS.EXTRACTION_TIMEOUT_MS;
+const EXTRACTION_TIMEOUT_MILLISECONDS = HARNESS.EXTRACTION_TIMEOUT_MILLISECONDS;
 
 const EXTRACTION_PROMPT = PromptLocaleService.get(
   "en",
@@ -78,7 +78,7 @@ export async function extractReminderViaLLM(
     };
 
     let responseText = "";
-    const requestStartMs = performance.now();
+    const requestStartMilliseconds = performance.now();
 
     const stream = provider.generateTextStream(
       extractionMessages,
@@ -111,7 +111,7 @@ export async function extractReminderViaLLM(
         resultText: responseText,
         success: true,
         errorMessage: null,
-        requestStartMs,
+        requestStartMilliseconds,
       }).catch((loggingError: Error) =>
         logger.error(
           `[SystemReminderExtractor] Failed to log extraction request: ${getErrorMessage(loggingError)}`,

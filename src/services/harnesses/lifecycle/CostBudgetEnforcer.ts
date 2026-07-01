@@ -1,5 +1,5 @@
 import { calculateTextCost } from "../../../utils/CostCalculator.ts";
-import { getPricing, TYPES } from "../../../config.ts";
+import { getPricing, MODALITY_TYPES } from "../../../config.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
@@ -38,7 +38,7 @@ export function checkCostBudget(
 ): boolean {
   if (!maxCostDollars || maxCostDollars <= 0) return false;
 
-  const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[resolvedModel];
+  const pricing = getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[resolvedModel];
   const currentUsage = { ...state.overallUsage, requests: state.iterations };
   const estimatedCost = calculateTextCost(currentUsage, pricing);
 

@@ -36,7 +36,7 @@ export interface AsyncTaskState {
   error: string | null;
   startedAt: number;
   completedAt: number | null;
-  durationMs: number | null;
+  durationMilliseconds: number | null;
   conversationId: string | null;
   agentConversationId: string | null;
   project: string | null;
@@ -131,7 +131,7 @@ registerCleanup(async () => {
     taskState.abortController?.abort();
     taskState.status = "cancelled";
     taskState.completedAt = Date.now();
-    taskState.durationMs = taskState.completedAt - taskState.startedAt;
+    taskState.durationMilliseconds = taskState.completedAt - taskState.startedAt;
   }
 
   if (pruningIntervalHandle) {
@@ -183,7 +183,7 @@ export default class AsyncTaskRegistry {
       error: null,
       startedAt: Date.now(),
       completedAt: null,
-      durationMs: null,
+      durationMilliseconds: null,
       conversationId: context.conversationId || null,
       agentConversationId: context.agentConversationId || null,
       project: context.project || null,
@@ -207,10 +207,10 @@ export default class AsyncTaskRegistry {
         taskState.status = "completed";
         taskState.result = executionResult;
         taskState.completedAt = Date.now();
-        taskState.durationMs = taskState.completedAt - taskState.startedAt;
+        taskState.durationMilliseconds = taskState.completedAt - taskState.startedAt;
 
         logger.info(
-          `[AsyncTaskRegistry] Task ${taskId} completed: tool="${toolName}" durationMs=${taskState.durationMs}`,
+          `[AsyncTaskRegistry] Task ${taskId} completed: tool="${toolName}" durationMilliseconds=${taskState.durationMilliseconds}`,
         );
 
         onComplete?.(taskState);
@@ -233,7 +233,7 @@ export default class AsyncTaskRegistry {
         }
 
         taskState.completedAt = Date.now();
-        taskState.durationMs = taskState.completedAt - taskState.startedAt;
+        taskState.durationMilliseconds = taskState.completedAt - taskState.startedAt;
 
         onComplete?.(taskState);
       });
@@ -274,7 +274,7 @@ export default class AsyncTaskRegistry {
     taskState.abortController?.abort();
     taskState.status = "cancelled";
     taskState.completedAt = Date.now();
-    taskState.durationMs = taskState.completedAt - taskState.startedAt;
+    taskState.durationMilliseconds = taskState.completedAt - taskState.startedAt;
 
     logger.info(`[AsyncTaskRegistry] Cancelled task ${taskId}: tool="${taskState.toolName}"`);
     return true;
@@ -317,7 +317,7 @@ export default class AsyncTaskRegistry {
           taskState.abortController?.abort();
           taskState.status = "cancelled";
           taskState.completedAt = Date.now();
-          taskState.durationMs = taskState.completedAt - taskState.startedAt;
+          taskState.durationMilliseconds = taskState.completedAt - taskState.startedAt;
         }
         taskIdsToRemove.push(taskId);
       }

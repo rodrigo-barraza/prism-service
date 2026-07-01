@@ -91,7 +91,7 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
     hasResult,
     toolCallCount,
     iterationCount,
-    subAgent.durationMs || 0,
+    subAgent.durationMilliseconds || 0,
   );
 
   // Construct a mapped tool usage count for frontend badge rendering.
@@ -112,7 +112,7 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
     toolUses: toolCallCount,
     toolNames: Object.keys(toolNames).length > 0 ? toolNames : undefined,
     iterations: iterationCount,
-    durationMs: subAgent.durationMs || 0,
+    durationMilliseconds: subAgent.durationMilliseconds || 0,
     // Include full conversation for frontend MessageList rendering.
     // Strip system messages — they're large and not useful for display.
     // Sanitize assistant content to remove leaked model tokens
@@ -151,7 +151,7 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
     result.error = buildEmptyResultDiagnostic(
       toolCallCount,
       iterationCount,
-      subAgent.durationMs || 0,
+      subAgent.durationMilliseconds || 0,
     );
   }
 
@@ -174,7 +174,7 @@ function buildDiagnosticSummary(
   hasResult: boolean,
   toolCallCount: number,
   iterationCount: number,
-  durationMs: number,
+  durationMilliseconds: number,
 ): string {
   if (status === "failed") {
     return `Agent "${description}" failed: ${error || "Unknown error"}`;
@@ -187,7 +187,7 @@ function buildDiagnosticSummary(
   }
   // Completed but no result — build an informative diagnostic
   if (status === "completed" && !hasResult) {
-    const durationSeconds = (durationMs / 1000).toFixed(1);
+    const durationSeconds = (durationMilliseconds / 1000).toFixed(1);
     if (toolCallCount === 0 && iterationCount <= 1) {
       return (
         `Agent "${description}" completed but produced no output ` +
@@ -215,9 +215,9 @@ function buildDiagnosticSummary(
 function buildEmptyResultDiagnostic(
   toolCallCount: number,
   iterationCount: number,
-  durationMs: number,
+  durationMilliseconds: number,
 ): string {
-  const durationSeconds = (durationMs / 1000).toFixed(1);
+  const durationSeconds = (durationMilliseconds / 1000).toFixed(1);
   if (toolCallCount === 0 && iterationCount <= 1) {
     return (
       `Sub-agent produced no output after ${durationSeconds}s ` +
@@ -276,7 +276,7 @@ interface SerializedSubAgentResult {
   status: string;
   description?: string;
   recursionDepth?: number;
-  durationMs?: number;
+  durationMilliseconds?: number;
   toolUses?: number;
   result?: string | null;
   error?: string | null;
@@ -339,7 +339,7 @@ function collectChildSummariesFromPayload(
       description: entry.description || "",
       status: entry.status,
       recursionDepth: entry.recursionDepth || 0,
-      durationMs: entry.durationMs || 0,
+      durationMilliseconds: entry.durationMilliseconds || 0,
       toolUses: entry.toolUses || 0,
       cost: 0,
     };
@@ -429,12 +429,12 @@ export function extractSubtreeMetrics(
   let totalDescendants = 0;
   let maxDepthReached = 0;
   let aggregatedCost = 0;
-  let aggregatedDurationMs = 0;
+  let aggregatedDurationMilliseconds = 0;
   let aggregatedToolUses = 0;
 
   for (const child of childSummaries) {
     totalDescendants += 1;
-    aggregatedDurationMs += child.durationMs;
+    aggregatedDurationMilliseconds += child.durationMilliseconds;
     aggregatedToolUses += child.toolUses;
     aggregatedCost += child.cost;
     maxDepthReached = Math.max(maxDepthReached, child.recursionDepth);
@@ -446,7 +446,7 @@ export function extractSubtreeMetrics(
         child.subtreeMetrics.maxDepthReached,
       );
       aggregatedCost += child.subtreeMetrics.aggregatedCost;
-      aggregatedDurationMs += child.subtreeMetrics.aggregatedDurationMs;
+      aggregatedDurationMilliseconds += child.subtreeMetrics.aggregatedDurationMilliseconds;
       aggregatedToolUses += child.subtreeMetrics.aggregatedToolUses;
     }
   }
@@ -455,7 +455,7 @@ export function extractSubtreeMetrics(
     totalDescendants,
     maxDepthReached,
     aggregatedCost,
-    aggregatedDurationMs,
+    aggregatedDurationMilliseconds,
     aggregatedToolUses,
     childResults: childSummaries,
   };

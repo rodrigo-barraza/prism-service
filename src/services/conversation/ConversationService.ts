@@ -2,7 +2,7 @@ import { DEFAULT_CONVERSATION_TITLE } from "@rodrigo-barraza/utilities-library/t
 import MongoWrapper from "../../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../../config.ts";
 
-import { COLLECTIONS, DERIVED_CONVERSATION_TITLE_MAX_LENGTH } from "../../constants.ts";
+import { COLLECTIONS, MAXIMUM_DERIVED_CONVERSATION_TITLE_LENGTH } from "../../constants.ts";
 import type { ChatMessage } from "../../types/admin.ts";
 import { discoverDescendantConversationIds } from "../../utils/ConversationDiscovery.ts";
 import type {
@@ -18,6 +18,8 @@ import {
   computeModalities,
   extractProviders,
   computeTotalCost,
+  computeTokenStats,
+  computeToolCounts,
 } from "./utils.ts";
 
 const DEFAULT_COLLECTION = COLLECTIONS.MODEL_CONVERSATIONS;
@@ -53,7 +55,7 @@ const ConversationService: ConversationServiceInterface = {
     const now = new Date().toISOString();
 
     // Build $set fields for metadata
-    const setFields: Record<string, unknown> = { updatedAt: now };
+    const setFields: Partial<TransformedConversation> = { updatedAt: now };
     if (traceId) setFields.traceId = traceId;
 
     if (conversationMeta) {
@@ -90,7 +92,7 @@ const ConversationService: ConversationServiceInterface = {
     const parentId = conversationMeta?.parentAgentConversationId || null;
     const parentConversationId = conversationMeta?.parentConversationId || null;
 
-    const setOnInsertBase: Record<string, unknown> = {
+    const setOnInsertBase: Partial<TransformedConversation> = {
       title: conversationMeta?.title || DEFAULT_CONVERSATION_TITLE,
       systemPrompt: metaSysPrompt,
       settings: {
@@ -117,8 +119,9 @@ const ConversationService: ConversationServiceInterface = {
     // MongoDB forbids the same field path in both $set and $setOnInsert —
     // strip any keys already present in $set to prevent MongoServerError:
     // "Updating the path 'X' would create a conflict at 'X'"
-    const setOnInsert = { ...setOnInsertBase };
-    for (const key of Object.keys(setFields)) {
+    const setOnInsert = { ...setOnInsertBase } as Record<string, any>;
+    const setFieldsTyped = setFields as Record<string, any>;
+    for (const key of Object.keys(setFieldsTyped)) {
       delete setOnInsert[key];
     }
 
@@ -156,13 +159,18 @@ const ConversationService: ConversationServiceInterface = {
       modelNamesSet.add(conversation.settings.model as string);
     }
 
-    const derived: Record<string, unknown> = {
+    const tokenStats = computeTokenStats(conversation.messages as ChatMessage[]);
+
+    const derived: Partial<TransformedConversation> = {
       modalities: computeModalities(conversation.messages as ChatMessage[]),
       providers: extractProviders(
         conversation.messages as ChatMessage[],
         conversation.settings as ConversationSettings,
       ),
       totalCost: computeTotalCost(conversation.messages as ChatMessage[]),
+      inputTokens: tokenStats.input,
+      outputTokens: tokenStats.output,
+      toolCounts: computeToolCounts(conversation.messages as ChatMessage[]),
       modelNames: Array.from(modelNamesSet),
     };
 
@@ -175,7 +183,9 @@ const ConversationService: ConversationServiceInterface = {
         (chatMessage) => chatMessage.role === "user",
       );
       if (firstUserMessage?.content) {
-        const titleSnippet = firstUserMessage.content.slice(0, DERIVED_CONVERSATION_TITLE_MAX_LENGTH).trim();
+        const titleSnippet = (firstUserMessage.content as string)
+          .slice(0, MAXIMUM_DERIVED_CONVERSATION_TITLE_LENGTH)
+          .trim();
         if (titleSnippet) {
           derived.title = titleSnippet;
           conversation.title = titleSnippet; // Update local memory representation
@@ -238,8 +248,13 @@ const ConversationService: ConversationServiceInterface = {
             modalities: computeModalities([]),
             providers: [],
             totalCost: 0,
-            ...(agent && { agent }),
+            inputTokens: 0,
+            outputTokens: 0,
+            toolCounts: {},
+            modelNames: [],
             createdAt: now,
+            updatedAt: now,
+            ...(agent && { agent }),
           },
         },
         { upsert: true },
@@ -312,7 +327,27 @@ const ConversationService: ConversationServiceInterface = {
       },
     );
 
-    const requests = await db
+
+
+    interface RequestProjection {
+      estimatedCost?: number;
+      inputTokens?: number;
+      outputTokens?: number;
+      cacheReadInputTokens?: number;
+      cacheCreationInputTokens?: number;
+      reasoningOutputTokens?: number;
+      provider?: string;
+      model?: string;
+      operation?: string;
+      createdAt?: string;
+      modalities?: Record<string, boolean>;
+      toolApiNames?: string[];
+      success?: boolean;
+      agentConversationId?: string;
+      parentAgentConversationId?: string;
+    }
+
+    const requests = (await db
       .collection(COLLECTIONS.REQUESTS)
       .find({
         agentConversationId: { $in: [...allConversationIds] },
@@ -336,7 +371,7 @@ const ConversationService: ConversationServiceInterface = {
         agentConversationId: 1,
         parentAgentConversationId: 1,
       })
-      .toArray();
+      .toArray()) as unknown as RequestProjection[];
 
     if (requests.length === 0) {
       return null;
@@ -387,12 +422,12 @@ const ConversationService: ConversationServiceInterface = {
       (reservation) => reservation.agentConversationId !== conversationId,
     ).length;
 
-    const createdAt = (requests as Record<string, unknown>[]).reduce(
+    const createdAt = requests.reduce(
       (min: string | null, r) =>
         !min || (r.createdAt as string) < min ? (r.createdAt as string) : min,
       null as string | null,
     );
-    const updatedAt = (requests as Record<string, unknown>[]).reduce(
+    const updatedAt = requests.reduce(
       (max: string | null, r) =>
         !max || (r.createdAt as string) > max ? (r.createdAt as string) : max,
       null as string | null,

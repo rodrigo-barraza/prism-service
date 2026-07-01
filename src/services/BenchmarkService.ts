@@ -633,7 +633,7 @@ const BenchmarkService = {
     // Local providers: models are bucketed per instance (e.g. lm-studio,
     // lm-studio-2), and each instance runs up to its concurrency limit.
     // Two instances means two concurrent local inference streams.
-    const INTRA_PROVIDER_DELAY_MS = BENCHMARK.INTRA_PROVIDER_DELAY_MS;
+    const INTRA_PROVIDER_DELAY_MILLISECONDS = BENCHMARK.INTRA_PROVIDER_DELAY_MILLISECONDS;
     // Group models by provider; local providers use their instance ID as key
     const buckets = new Map<string, ModelEntry[]>();
     for (const model of models) {
@@ -657,7 +657,7 @@ const BenchmarkService = {
             logger.info(`[benchmark] Aborting bucket — signal received`);
             break;
           }
-          if (i > 0) await sleep(INTRA_PROVIDER_DELAY_MS);
+          if (i > 0) await sleep(INTRA_PROVIDER_DELAY_MILLISECONDS);
           const model = bucketModels[i];
           if (onModelStart) {
             try {

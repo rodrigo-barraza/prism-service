@@ -34,6 +34,9 @@ export interface ConversationPatchFields {
   modalities?: Record<string, boolean>;
   providers?: string[];
   totalCost?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  toolCounts?: Record<string, number>;
   modelNames?: string[];
   systemPrompt?: string;
   settings?: ConversationSettings;
@@ -44,7 +47,7 @@ export interface ToolCallPayload {
   id?: string | null;
   args?: Record<string, unknown> | string;
   thoughtSignature?: string;
-  durationMs?: number;
+  durationMilliseconds?: number;
 }
 
 export interface MessagePayload {
@@ -81,6 +84,9 @@ export interface TransformedConversation {
   modalities: Record<string, boolean>;
   providers: string[];
   totalCost: number;
+  inputTokens: number;
+  outputTokens: number;
+  toolCounts: Record<string, number>;
   modelNames: string[];
   isGenerating: boolean;
   pendingBackgroundTasks?: number;

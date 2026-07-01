@@ -272,8 +272,8 @@ const listAsyncTasks = {
           ...(taskState.completedAt && {
             completedAt: new Date(taskState.completedAt).toISOString(),
           }),
-          ...(taskState.durationMs !== null && {
-            durationMs: taskState.durationMs,
+          ...(taskState.durationMilliseconds !== null && {
+            durationMilliseconds: taskState.durationMilliseconds,
           }),
           ...(taskState.status === "completed" && {
             result: taskState.result,
@@ -515,7 +515,7 @@ async function triggerAsyncTaskAutoResponse(
       `<task-notification>`,
       `<status>${taskStatusEmoji} ${taskState.status}</status>`,
       `<summary>[ASYNC TASK COMPLETED] Tool "${taskState.toolName}" (task ${taskState.taskId}) has ${taskState.status}.</summary>`,
-      `<duration_ms>${taskState.durationMs || 0}</duration_ms>`,
+      `<duration_ms>${taskState.durationMilliseconds || 0}</duration_ms>`,
       `<result>`,
       truncatedResult,
       `</result>`,

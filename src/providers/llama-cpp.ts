@@ -5,7 +5,7 @@ import {
   GenerateTextResult,
   StreamChunk,
 } from "../types/provider.ts";
-import { TOOL_API_HEALTH_TIMEOUT_MS } from "../constants.ts";
+import { TOOL_API_HEALTH_TIMEOUT_MILLISECONDS } from "../constants.ts";
 // ─────────────────────────────────────────────────────────────
 // llama.cpp Provider (llama-server)
 // ─────────────────────────────────────────────────────────────
@@ -39,7 +39,7 @@ import { ProviderError } from "../utils/errors.ts";
 import logger from "../utils/logger.ts";
 import { discoverContextLength } from "../utils/ContextLengthDiscovery.ts";
 
-import { TYPES, getDefaultModels } from "../config.ts";
+import { MODALITY_TYPES, getDefaultModels } from "../config.ts";
 import {
   convertToolsToOpenAI,
   buildPayloadParams,
@@ -190,7 +190,7 @@ export function createLlamaCppProvider(
 
     async generateText(
       messages: ChatMessage[],
-      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["llama-cpp"],
+      model: string = getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)["llama-cpp"],
       options: ProviderOptions = {},
     ): Promise<GenerateTextResult> {
       const baseUrl = getBaseUrl();
@@ -283,7 +283,7 @@ export function createLlamaCppProvider(
 
     async *generateTextStream(
       messages: ChatMessage[],
-      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)["llama-cpp"],
+      model: string = getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)["llama-cpp"],
       options: ProviderOptions = {},
     ): AsyncGenerator<StreamChunk, void, unknown> {
       const baseUrl = getBaseUrl();
@@ -389,7 +389,7 @@ export function createLlamaCppProvider(
     async captionImage(
       images: string[],
       prompt: string = "Describe this image.",
-      model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)["llama-cpp"],
+      model: string = getDefaultModels(MODALITY_TYPES.IMAGE, MODALITY_TYPES.TEXT)["llama-cpp"],
       systemPrompt?: string,
     ): Promise<{
       text: string;
@@ -546,7 +546,7 @@ export function createLlamaCppProvider(
       try {
         const response = await fetch(`${baseUrl}/health`, {
           method: "GET",
-          signal: AbortSignal.timeout(TOOL_API_HEALTH_TIMEOUT_MS),
+          signal: AbortSignal.timeout(TOOL_API_HEALTH_TIMEOUT_MILLISECONDS),
         });
         const data = (await response.json()) as HealthResponse;
         return {
@@ -578,21 +578,21 @@ export function createLlamaCppProvider(
         [
           fetch(`${baseUrl}/props`, {
             method: "GET",
-            signal: AbortSignal.timeout(TOOL_API_HEALTH_TIMEOUT_MS),
+            signal: AbortSignal.timeout(TOOL_API_HEALTH_TIMEOUT_MILLISECONDS),
           }).then((response) => {
             if (!response.ok) return null;
             return response.json() as Promise<LlamaCppPropsResponse>;
           }),
           fetch(`${baseUrl}/slots`, {
             method: "GET",
-            signal: AbortSignal.timeout(TOOL_API_HEALTH_TIMEOUT_MS),
+            signal: AbortSignal.timeout(TOOL_API_HEALTH_TIMEOUT_MILLISECONDS),
           }).then((response) => {
             if (!response.ok) return null;
             return response.json() as Promise<LlamaCppSlotEntry[]>;
           }),
           fetch(`${baseUrl}/health`, {
             method: "GET",
-            signal: AbortSignal.timeout(TOOL_API_HEALTH_TIMEOUT_MS),
+            signal: AbortSignal.timeout(TOOL_API_HEALTH_TIMEOUT_MILLISECONDS),
           }).then((response) => {
             if (!response.ok) return null;
             return response.json() as Promise<HealthResponse>;

@@ -3,7 +3,7 @@ import { Readable } from "stream";
 import { ProviderError } from "../utils/errors.ts";
 import logger from "../utils/logger.ts";
 import { INWORLD_BASIC } from "../../config.ts";
-import { DEFAULT_VOICES, getDefaultModels, TYPES } from "../config.ts";
+import { DEFAULT_VOICES, getDefaultModels, MODALITY_TYPES } from "../config.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 const INWORLD_TTS_URL = "https://api.inworld.ai/tts/v1/voice:stream";
@@ -70,7 +70,7 @@ const inworldProvider = {
     try {
       const apiKey = getApiKey();
       const model =
-        options.model || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).inworld;
+        options.model || getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.AUDIO).inworld;
 
       const isTtsTwo = model.startsWith("inworld-tts-2");
 
@@ -138,7 +138,7 @@ const inworldProvider = {
 
     const apiKey = getApiKey();
     const model =
-      options.model || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).inworld;
+      options.model || getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.AUDIO).inworld;
 
     // Accumulate all text from the async iterator first, since
     // Inworld's API is request-level streaming (not input-level).
