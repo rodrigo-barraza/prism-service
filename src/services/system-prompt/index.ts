@@ -9,6 +9,8 @@ import {
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
 import { resolveLockedOffToolNames } from "../../utils/resolveLockedOffToolNames.ts";
 import SettingsService from "../SettingsService.ts";
+import MongoWrapper from "../../wrappers/MongoWrapper.ts";
+import { MONGO_DB_NAME } from "../../../config.ts";
 import {
   AGENT_IDS,
   DEFAULT_TOPOLOGY,
@@ -24,8 +26,39 @@ import { SkillMemoryScorer } from "./SkillMemoryScorer.ts";
 import { AssemblerContext } from "./types.ts";
 import SomaticStateService from "../somatic/SomaticStateService.ts";
 import WorkflowMemoryService from "../WorkflowMemoryService.ts";
-import { PROMPT_DELIMITERS } from "../../constants.ts";
+import { PROMPT_DELIMITERS, COLLECTIONS } from "../../constants.ts";
 import PromptLocaleService from "../PromptLocaleService.ts";
+
+
+/**
+ * Retrieve the memory IDs already injected into this conversation across
+ * all prior turns. Uses a targeted single-field projection so we never
+ * load the full messages array. Returns an empty Set when the conversation
+ * doesn't exist yet or has no injected memories recorded.
+ */
+async function fetchAlreadyInjectedMemoryIds(
+  conversationId: string | null | undefined,
+): Promise<Set<string>> {
+  if (!conversationId) return new Set();
+  try {
+    const collection = MongoWrapper.getCollection(
+      MONGO_DB_NAME,
+      COLLECTIONS.AGENT_CONVERSATIONS,
+    );
+    const document = await collection.findOne(
+      { id: conversationId },
+      { projection: { injectedMemoryIds: 1, _id: 0 } },
+    );
+    const storedIds = document?.injectedMemoryIds;
+    if (!Array.isArray(storedIds) || storedIds.length === 0) return new Set();
+    return new Set<string>(storedIds as string[]);
+  } catch (error: unknown) {
+    logger.warn(
+      `[SystemPromptAssembler] Could not load injectedMemoryIds for conversation ${conversationId}: ${getErrorMessage(error)}`,
+    );
+    return new Set();
+  }
+}
 
 export default class SystemPromptAssembler {
   workspaceRoot: string;
@@ -480,13 +513,21 @@ export default class SystemPromptAssembler {
     // by LangGraph, CrewAI, AutoGen, Google ADK, and OpenAI Agents SDK.
     const memoryQuery = queryText || context.project || "";
     let memoriesText = "";
+    let injectedMemoryIds: string[] = [];
 
     if (memoryQuery && !isSubAgent) {
       const agentContextForMemory = context.agentContext || {};
       const memoryGuildId = agentContextForMemory.guildId;
       const memoryUserIds = agentContextForMemory.participantUserIds;
 
-      const memories = await this.scorer.fetchMemories(
+      // Load the set of memory IDs already injected in prior turns for this
+      // conversation. A targeted projection keeps the read cost minimal —
+      // we only fetch the single array field, not the full document.
+      const alreadyInjectedMemoryIds = await fetchAlreadyInjectedMemoryIds(
+        context.conversationId as string | null | undefined,
+      );
+
+      const memoryResult = await this.scorer.fetchMemories(
         agentId,
         context.project || null,
         memoryQuery,
@@ -498,10 +539,12 @@ export default class SystemPromptAssembler {
           _username: context.username,
           guildId: memoryGuildId,
           userIds: memoryUserIds,
+          excludeMemoryIds: alreadyInjectedMemoryIds,
         },
       );
-      if (memories) {
-        memoriesText = `${PROMPT_DELIMITERS.AGENT_MEMORY}\n` + memories;
+      if (memoryResult.memoriesText) {
+        memoriesText = `${PROMPT_DELIMITERS.AGENT_MEMORY}\n` + memoryResult.memoriesText;
+        injectedMemoryIds = memoryResult.injectedMemoryIds;
       }
     }
 
@@ -547,6 +590,7 @@ export default class SystemPromptAssembler {
       skillsText,
       memoriesText,
       workflowsText,
+      injectedMemoryIds,
     };
   }
 
@@ -561,11 +605,18 @@ export default class SystemPromptAssembler {
           skillsText,
           memoriesText,
           workflowsText,
+          injectedMemoryIds,
         } = await this.assemble(context);
         if (!systemPrompt) return;
 
         context._injectedSkills = skillNames;
         context._assembledSystemPrompt = systemPrompt;
+
+        // Propagate newly injected memory IDs to the hook context so the
+        // Finalizer can persist them via $addToSet on the conversation document.
+        if (injectedMemoryIds.length > 0) {
+          context._injectedMemoryIds = injectedMemoryIds;
+        }
 
         const assembledLocale =
           context.locale ||
@@ -581,7 +632,7 @@ export default class SystemPromptAssembler {
         });
 
         logger.info(
-          `[SystemPromptAssembler] Assembled ${systemPrompt.length} char static system prompt for agent="${context.agent || "DIRECT"}" (${skillNames.length} skills injected into user context)`,
+          `[SystemPromptAssembler] Assembled ${systemPrompt.length} char static system prompt for agent="${context.agent || "DIRECT"}" (${skillNames.length} skills injected into user context, ${injectedMemoryIds.length} new memories injected)`,
         );
       } catch (error: unknown) {
         logger.error(

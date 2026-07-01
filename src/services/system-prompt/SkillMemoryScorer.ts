@@ -15,6 +15,13 @@ export class SkillMemoryScorer {
    * Fetch relevant memories via embedding similarity search.
    * Queries the unified `memories` collection using cosine similarity,
    * scoped by agent and project.
+   *
+   * Already-injected memory IDs (sourced from the persisted conversation
+   * document) are excluded before formatting to prevent the same memories
+   * from being repeated across turns in long conversations.
+   *
+   * Returns both the formatted prompt text and the IDs of what was injected
+   * so the caller can persist them for future deduplication.
    */
   async fetchMemories(
     agent: string,
@@ -28,8 +35,9 @@ export class SkillMemoryScorer {
       _username,
       guildId,
       userIds,
+      excludeMemoryIds,
     }: MemoryFetchOptions = {},
-  ): Promise<string> {
+  ): Promise<{ memoriesText: string; injectedMemoryIds: string[] }> {
     try {
       const memories = await MemoryService.search({
         agent,
@@ -45,17 +53,36 @@ export class SkillMemoryScorer {
         userIds: userIds || undefined,
       });
 
-      if (!memories || memories.length === 0) return "";
+      if (!memories || memories.length === 0) {
+        return { memoriesText: "", injectedMemoryIds: [] };
+      }
 
+      const novelMemories = excludeMemoryIds?.size
+        ? memories.filter(
+            (memory) => !excludeMemoryIds.has(memory.id as string),
+          )
+        : memories;
+
+      const excludedCount = memories.length - novelMemories.length;
       logger.info(
-        `[SystemPromptAssembler] Memory search returned ${memories.length} results for ${agent}`,
+        `[SystemPromptAssembler] Memory search: ${memories.length} results for ${agent}` +
+          (excludedCount > 0 ? `, ${excludedCount} already injected this conversation (skipped)` : ""),
       );
-      return MemoryService.formatForPrompt(memories);
+
+      if (novelMemories.length === 0) {
+        return { memoriesText: "", injectedMemoryIds: [] };
+      }
+
+      const injectedMemoryIds = novelMemories.map(
+        (memory) => memory.id as string,
+      );
+      const memoriesText = MemoryService.formatForPrompt(novelMemories);
+      return { memoriesText, injectedMemoryIds };
     } catch (error: unknown) {
       logger.warn(
         `[SystemPromptAssembler] Memory fetch error: ${getErrorMessage(error)}`,
       );
-      return "";
+      return { memoriesText: "", injectedMemoryIds: [] };
     }
   }
 

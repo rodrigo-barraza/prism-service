@@ -51,6 +51,7 @@ export interface AssemblerContext {
   resolvedToolNames?: string[];
   agentContext?: AgentContext;
   traceId?: string | null;
+  conversationId?: string | null;
   agentConversationId?: string | null;
   parentAgentConversationId?: string | null;
   clientIp?: string | null;
@@ -71,6 +72,7 @@ export interface MemoryFetchOptions {
   _username?: string;
   guildId?: string;
   userIds?: string[];
+  excludeMemoryIds?: Set<string>;
 }
 
 export interface SkillFetchOptions {

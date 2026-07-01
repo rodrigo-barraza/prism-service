@@ -255,6 +255,19 @@ export default class ReActHarness extends BaseAgenticHarness {
             }
           }
 
+          // ── Persist newly injected memory IDs to conversationMeta ──
+          // The Finalizer will $addToSet these onto the agent_conversations
+          // document so subsequent turns can exclude already-seen memories.
+          if (
+            Array.isArray(hookContext._injectedMemoryIds) &&
+            (hookContext._injectedMemoryIds as string[]).length > 0
+          ) {
+            context.conversationMeta = {
+              ...(context.conversationMeta || {}),
+              _newInjectedMemoryIds: hookContext._injectedMemoryIds as string[],
+            };
+          }
+
           if (
             Array.isArray(hookContext._injectedSkills) &&
             hookContext._injectedSkills.length > 0
