@@ -1,0 +1,123 @@
+
+> prism-service@1.0.0 lint
+> eslint src
+
+
+/home/rodrigo/development/prism-service/src/routes/OrchestratorRoutes.ts
+  50:9  error  'persistedSubAgentsList' is never reassigned. Use 'const' instead  prefer-const
+
+/home/rodrigo/development/prism-service/src/routes/ScheduledTasksRoutes.ts
+  66:7  error  'name' is never reassigned. Use 'const' instead            prefer-const
+  67:7  error  'prompt' is never reassigned. Use 'const' instead          prefer-const
+  68:7  error  'agent' is never reassigned. Use 'const' instead           prefer-const
+  71:7  error  'scheduleType' is never reassigned. Use 'const' instead    prefer-const
+  72:7  error  'scheduleTime' is never reassigned. Use 'const' instead    prefer-const
+  73:7  error  'scheduleDay' is never reassigned. Use 'const' instead     prefer-const
+  74:7  error  'scheduleDate' is never reassigned. Use 'const' instead    prefer-const
+  75:7  error  'cronExpression' is never reassigned. Use 'const' instead  prefer-const
+  76:7  error  'recurrenceRule' is never reassigned. Use 'const' instead  prefer-const
+  77:7  error  'toolConfig' is never reassigned. Use 'const' instead      prefer-const
+
+/home/rodrigo/development/prism-service/src/routes/admin/AdminContentRoutes.ts
+  4:23  error  'COST_SUM_EXPR' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/routes/admin/AdminConversationRoutes.ts
+  49:9  error  'order' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/routes/admin/AdminRequestRoutes.ts
+  6:23  error  'COST_SUM_EXPR' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/routes/admin/AdminStatsRoutes.ts
+   16:3  error  'parsePaginationParams' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  907:9  error  'project' is assigned a value but never used. Allowed unused vars must match /^_/u       @typescript-eslint/no-unused-vars
+  908:9  error  'agent' is assigned a value but never used. Allowed unused vars must match /^_/u         @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/services/AutoApprovalEngine.ts
+  230:39  error  'context' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/services/EmbeddingService.ts
+  16:3  error  'EmbeddingMultimodalPart' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/services/WorkflowExecutionService.ts
+  214:5  error  'customToolMap' is assigned a value but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/services/harnesses/BaseAgenticHarness.ts
+     4:15  error  'RepetitionVerdict' is defined but never used. Allowed unused vars must match /^_/u                     @typescript-eslint/no-unused-vars
+    16:15  error  'ContextBudgetSnapshot' is defined but never used. Allowed unused vars must match /^_/u                 @typescript-eslint/no-unused-vars
+    20:3   error  'OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+    21:3   error  'MINIMUM_CLAMPED_OUTPUT_TOKENS' is defined but never used. Allowed unused vars must match /^_/u         @typescript-eslint/no-unused-vars
+    26:8   error  'MongoWrapper' is defined but never used. Allowed unused vars must match /^_/u                          @typescript-eslint/no-unused-vars
+    27:10  error  'MONGO_DB_NAME' is defined but never used. Allowed unused vars must match /^_/u                         @typescript-eslint/no-unused-vars
+    28:10  error  'COLLECTIONS' is defined but never used. Allowed unused vars must match /^_/u                           @typescript-eslint/no-unused-vars
+    28:40  error  'CONTEXT_WINDOW' is defined but never used. Allowed unused vars must match /^_/u                        @typescript-eslint/no-unused-vars
+    73:11  error  'SubAgentSnapshot' is defined but never used. Allowed unused vars must match /^_/u                      @typescript-eslint/no-unused-vars
+  1372:59  error  'username' is assigned a value but never used. Allowed unused vars must match /^_/u                     @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/services/harnesses/__tests__/contextBudgetTracker.test.ts
+  8:36  error  'beforeEach' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/services/harnesses/__tests__/toolUpdateMessageLocale.test.ts
+  70:7  error  'CAVEMAN_WRITE_TODO_MARKER' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  71:7  error  'ENGLISH_WRITE_TODO_MARKER' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/services/harnesses/lifecycle/ToolRetryInterceptor.ts
+   4:3  error  'SERVER_SENT_EVENT_TYPES' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+   5:3  error  'STATUS_MESSAGES' is defined but never used. Allowed unused vars must match /^_/u          @typescript-eslint/no-unused-vars
+  13:3  error  'EmitFunction' is defined but never used. Allowed unused vars must match /^_/u             @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/services/local-provider/index.ts
+  31:10  error  'detectCapabilities' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/services/local-provider/types.ts
+  1:10  error  'InstanceEntry' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/services/local-tools/AskUserQuestionTool.ts
+  52:11  error  'AskUserQuestionArgs' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/services/local-tools/AsyncTaskTools.ts
+  324:5  error  'context' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/services/local-tools/SkillTools.ts
+   21:11  error  'SkillExecuteArgs' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+   26:11  error  'SkillListArgs' is defined but never used. Allowed unused vars must match /^_/u     @typescript-eslint/no-unused-vars
+   30:11  error  'SkillDeleteArgs' is defined but never used. Allowed unused vars must match /^_/u   @typescript-eslint/no-unused-vars
+   94:5   error  'context' is defined but never used. Allowed unused args must match /^_/u           @typescript-eslint/no-unused-vars
+  265:5   error  'context' is defined but never used. Allowed unused args must match /^_/u           @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/services/local-tools/TodoWriteTool.ts
+  9:11  error  'TodoItemInput' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/services/local-tools/__tests__/internalToolRegistryLocale.test.ts
+  18:8  error  'PromptLocaleService' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/services/orchestrator/routers/CriticLoopRouter.ts
+  320:13  error  'providerName' is assigned a value but never used. Allowed unused vars must match /^_/u   @typescript-eslint/no-unused-vars
+  320:27  error  'resolvedModel' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/services/somatic/SomaticStateService.ts
+  6:3  error  'ALCOHOL_DESCRIPTIONS' is defined but never used. Allowed unused vars must match /^_/u      @typescript-eslint/no-unused-vars
+  9:3  error  'EMOTION_BEHAVIOR_PROMPTS' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/services/somatic/StatFactory.ts
+  18:10  error  'capitalize' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/services/system-prompt/__tests__/toolDescriptionLocale.test.ts
+  77:7  error  'CAVEMAN_SEND_MESSAGE_MARKER' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  78:7  error  'ENGLISH_SEND_MESSAGE_MARKER' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  81:7  error  'CAVEMAN_STOP_AGENT_MARKER' is assigned a value but never used. Allowed unused vars must match /^_/u    @typescript-eslint/no-unused-vars
+  82:7  error  'ENGLISH_STOP_AGENT_MARKER' is assigned a value but never used. Allowed unused vars must match /^_/u    @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/services/system-prompt/index.ts
+  619:5  error  'systemPrompt' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/home/rodrigo/development/prism-service/src/types/GlobalToolOrchestratorRegistry.ts
+  4:3  warning  Unused eslint-disable directive (no problems were reported from 'no-var')
+
+/home/rodrigo/development/prism-service/src/websocket/index.ts
+  415:17  error  'MongoWrapper' is assigned a value but never used. Allowed unused vars must match /^_/u   @typescript-eslint/no-unused-vars
+  417:19  error  'MONGO_DB_NAME' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  530:30  error  'error' is defined but never used. Allowed unused args must match /^_/u                   @typescript-eslint/no-unused-vars
+
+✖ 61 problems (60 errors, 1 warning)
+  1 error and 1 warning potentially fixable with the `--fix` option.
+

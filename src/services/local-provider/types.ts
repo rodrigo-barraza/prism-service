@@ -1,4 +1,4 @@
-import { InstanceEntry, ChatMessage } from "../../types/ProviderTypes.ts";
+import { ChatMessage } from "../../types/ProviderTypes.ts";
 import { ArchParams } from "../../utils/gguf-arch.ts";
 
 export interface ModelEntry {

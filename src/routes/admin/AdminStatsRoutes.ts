@@ -13,7 +13,6 @@ import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 import {
   applyDateRangeFilter,
-  parsePaginationParams,
 } from "../../utils/QueryBuilders.ts";
 import requireDb from "../../middleware/RequireDbMiddleware.ts";
 import { hours as hoursToMs } from "@rodrigo-barraza/utilities-library";
@@ -904,8 +903,6 @@ router.get(
         hours = 24,
         from,
         to,
-        project,
-        agent,
         granularity: requestedGranularity,
       } = req.query;
 

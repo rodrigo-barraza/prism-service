@@ -5,7 +5,7 @@
  * heuristic estimates (4 chars/token) and real provider-reported token
  * counts with calibration ratio for progressively better accuracy.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 import ContextBudgetTracker from "../ContextBudgetTracker.ts";
 import type { ContextBudgetSnapshot } from "../ContextBudgetTracker.ts";

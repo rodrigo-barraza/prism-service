@@ -317,7 +317,7 @@ export class CriticLoopRouter implements TopologyRouter {
     continueSubAgent?: ContinueSubAgentCallback,
     topologyConfig?: TopologyConfig,
   ): Promise<(SubAgentResult | { error: string })[]> {
-    const { providerName, resolvedModel } = orchestratorContext;
+    const { providerName: _providerName, resolvedModel: _resolvedModel } = orchestratorContext;
     const actorCount = Math.max(
       1,
       Number(topologyConfig?.actorCount) || DEFAULT_ACTOR_COUNT,

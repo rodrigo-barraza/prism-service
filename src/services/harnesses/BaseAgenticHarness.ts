@@ -1,7 +1,6 @@
 import { expandMessagesForFunctionCall } from "../../utils/FunctionCallingUtilities.ts";
 import { roundMilliseconds } from "@rodrigo-barraza/utilities-library";
 import RepetitionDetector from "../../utils/RepetitionDetector.ts";
-import type { RepetitionVerdict } from "../../utils/RepetitionDetector.ts";
 import {
   mergeUsage,
   createUsageAccumulator,
@@ -13,19 +12,14 @@ import { getPricing, TYPES } from "../../config.ts";
 import { stripToolCallMarkup } from "../../utils/StreamChunkDispatcher.ts";
 import ContextWindowManager from "../../utils/ContextWindowManager.ts";
 import ContextBudgetTracker from "./ContextBudgetTracker.ts";
-import type { ContextBudgetSnapshot } from "./ContextBudgetTracker.ts";
 import {
   DEFAULT_MAX_INPUT_TOKENS,
   DEFAULT_MAX_OUTPUT_TOKENS,
-  OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
-  MINIMUM_CLAMPED_OUTPUT_TOKENS,
 } from "../../constants/TokenBudgetDefaults.ts";
 import ConversationGenerationTracker from "../ConversationGenerationTracker.ts";
 import RequestLogger from "../RequestLogger.ts";
 import FileService from "../FileService.ts";
-import MongoWrapper from "../../wrappers/MongoWrapper.ts";
-import { MONGO_DB_NAME } from "../../../config.ts";
-import { COLLECTIONS, FILE_CATEGORIES, CONTEXT_WINDOW } from "../../constants.ts";
+import { FILE_CATEGORIES } from "../../constants.ts";
 import {
   finalizeTextGeneration,
   type FinalizerContext,
@@ -66,14 +60,6 @@ import type {
   ToolCall,
 } from "./types.ts";
 
-/**
- * Snapshot of an orchestrator sub-agent for persistence.
- * Captures the essential identifiers and metadata for each spawned sub-agent.
- */
-interface SubAgentSnapshot {
-  agentId: string;
-  [key: string]: unknown;
-}
 
 /**
  * BaseAgenticHarness — abstract base class that defines the contract
@@ -1369,7 +1355,7 @@ export default class BaseAgenticHarness {
       state.conversationOutcome = "aborted";
     }
 
-    const { agentConversationId, conversationId, project, username } = context;
+    const { agentConversationId, conversationId, project, username: _username } = context;
     const requestStart = context.requestStart ?? performance.now();
 
     const now = performance.now();

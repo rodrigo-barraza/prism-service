@@ -28,7 +28,7 @@ import {
   TransformedLocalProviderOptions,
 } from "./types.ts";
 import { ChatMessage } from "../../types/ProviderTypes.ts";
-import { detectCapabilities } from "./detectCapabilities.ts";
+
 import { enrichWithHuggingFace } from "./hfMetadata.ts";
 import { NORMALIZER_BY_TYPE, HF_ENRICHED_TYPES } from "./normalizers.ts";
 import { estimateVRAM, estimateVRAMForModel } from "./vramEstimation.ts";

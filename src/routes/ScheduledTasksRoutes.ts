@@ -62,7 +62,7 @@ router.post(
       typeof req.project === "string" ? req.project : "direct";
     const username: string =
       typeof req.username === "string" ? req.username : "system";
-    let {
+    const {
       name,
       prompt,
       agent,
@@ -77,10 +77,10 @@ router.post(
       toolConfig,
     } = req.body;
 
-    provider = provider || PROVIDERS.ANTHROPIC;
-    model = model || MODELS.SONNET_45.name;
+    const finalProvider = provider || PROVIDERS.ANTHROPIC;
+    const finalModel = model || MODELS.SONNET_45.name;
 
-    if (!name || !prompt || !provider || !model || !scheduleType) {
+    if (!name || !prompt || !finalProvider || !finalModel || !scheduleType) {
       return res.status(400).json({
         error:
           "Missing required fields: name, prompt, provider, model, scheduleType",
@@ -92,8 +92,8 @@ router.post(
         name,
         prompt,
         agent: agent || null,
-        provider,
-        model,
+        provider: finalProvider,
+        model: finalModel,
         scheduleType,
         scheduleTime,
         scheduleDay,

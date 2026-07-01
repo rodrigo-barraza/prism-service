@@ -49,10 +49,6 @@ interface QuestionInput {
   multiSelect?: boolean;
 }
 
-interface AskUserQuestionArgs {
-  context?: string;
-  questions: QuestionInput[];
-}
 
 export default {
   name: TOOL_NAMES.ASK_USER,

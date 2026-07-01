@@ -47,7 +47,7 @@ router.get(
       ? OrchestratorService.listAllDescendantSubAgents(conversationIdentifier)
       : OrchestratorService.listSubAgents();
 
-    let persistedSubAgentsList: SubAgentSummary[] = [];
+    const persistedSubAgentsList: SubAgentSummary[] = [];
     if (conversationIdentifier) {
       try {
         const { default: MongoWrapper } =
