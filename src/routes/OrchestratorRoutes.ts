@@ -1,6 +1,6 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { Router, Request, Response } from "express";
-import OrchestratorService from "../services/OrchestratorService.ts";
+import { OrchestratorService } from "../services/OrchestratorService.ts";
 
 interface SubAgentSummary {
   agentId: string;

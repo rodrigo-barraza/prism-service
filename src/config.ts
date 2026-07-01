@@ -2653,6 +2653,7 @@ export {
 
   // Types
   MODALITY_TYPES,
+  MODALITY_TYPES as TYPES,
   MODEL_TYPES,
 
   // Models

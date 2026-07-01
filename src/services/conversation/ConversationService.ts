@@ -253,7 +253,6 @@ const ConversationService: ConversationServiceInterface = {
             toolCounts: {},
             modelNames: [],
             createdAt: now,
-            updatedAt: now,
             ...(agent && { agent }),
           },
         },

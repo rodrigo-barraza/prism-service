@@ -63,13 +63,19 @@ vi.mock('../src/services/BenchmarkService.ts', () => ({
   }
 }));
 
-vi.mock('../src/services/OrchestratorService.ts', () => ({
-  default: {
+const { mockOrchestratorService } = vi.hoisted(() => ({
+  mockOrchestratorService: {
     listSubAgents: vi.fn().mockReturnValue([{ agentId: 'sub-1', status: 'running' }]),
     listAllDescendantSubAgents: vi.fn().mockReturnValue([{ agentId: 'sub-1', status: 'running' }]),
     abortSubAgentsByConversation: vi.fn().mockResolvedValue({ aborted: true }),
-    getSubAgentStatus: vi.fn().mockReturnValue({ agentId: 'sub-1', status: 'running' })
+    getSubAgentStatus: vi.fn().mockReturnValue({ agentId: 'sub-1', status: 'running' }),
+    getPersistedDescendantSubAgents: vi.fn().mockResolvedValue([{ agentId: 'sub-1', status: 'persisted', durationMilliseconds: 1000, toolUses: 5, hasChanges: false }])
   }
+}));
+
+vi.mock('../src/services/OrchestratorService.ts', () => ({
+  default: mockOrchestratorService,
+  OrchestratorService: mockOrchestratorService
 }));
 
 vi.mock('../src/services/AgenticLoopService.ts', () => ({
