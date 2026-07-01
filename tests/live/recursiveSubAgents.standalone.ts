@@ -5,7 +5,7 @@
  */
 
 const PRISM_SERVICE_URL = "https://api.prism.rod.dev";
-const RECURSIVE_TEST_TIMEOUT_MS = 600_000;
+const RECURSIVE_TEST_TIMEOUT_MILLISECONDS = 600_000;
 
 const RECURSIVE_SPAWNING_PROMPT = `You have access to the create_team tool. Use it RIGHT NOW. Do not explain anything first — immediately call create_team.
 
@@ -30,7 +30,7 @@ interface SSEEvent {
   subAgentId?: string;
   description?: string;
   error?: string;
-  durationMs?: number;
+  durationMilliseconds?: number;
   tool?: { name: string; args?: Record<string, unknown> };
   name?: string;
   status?: string;
@@ -47,13 +47,13 @@ async function runTest() {
   console.log(`  🤖 Agent: OMNI`);
   console.log(`  📊 Provider: anthropic (claude-sonnet-4-6)`);
   console.log(`  🌳 Max Recursion Depth: 2`);
-  console.log(`  ⏱  Timeout: ${RECURSIVE_TEST_TIMEOUT_MS / 1000}s\n`);
+  console.log(`  ⏱  Timeout: ${RECURSIVE_TEST_TIMEOUT_MILLISECONDS / 1000}s\n`);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
     console.log("\n  ⏱ TIMEOUT — aborting...");
     controller.abort();
-  }, RECURSIVE_TEST_TIMEOUT_MS);
+  }, RECURSIVE_TEST_TIMEOUT_MILLISECONDS);
 
   const startTime = Date.now();
 
@@ -147,7 +147,7 @@ async function runTest() {
                   console.log(`  📌 SPAWNED: ${event.subAgentId} — "${event.description}"`);
                 } else if (event.message === "complete") {
                   completedAgents.push(event);
-                  console.log(`  ✅ COMPLETED: ${event.subAgentId} (${event.durationMs}ms, ${event.toolCount ?? "?"} tools)`);
+                  console.log(`  ✅ COMPLETED: ${event.subAgentId} (${event.durationMilliseconds}ms, ${event.toolCount ?? "?"} tools)`);
                 } else if (event.message === "failed") {
                   failedAgents.push(event);
                   console.log(`  ❌ FAILED: ${event.subAgentId} — ${event.error}`);
@@ -192,14 +192,14 @@ async function runTest() {
       clearInterval(idleCheckId);
     }
 
-    const durationMs = Date.now() - startTime;
+    const durationMilliseconds = Date.now() - startTime;
 
     // ── Report ──────────────────────────────────────────────────
     console.log("\n═══════════════════════════════════════════════════════════════");
     console.log("  📊 TEST RESULTS");
     console.log("═══════════════════════════════════════════════════════════════\n");
 
-    console.log(`  Duration: ${(durationMs / 1000).toFixed(1)}s`);
+    console.log(`  Duration: ${(durationMilliseconds / 1000).toFixed(1)}s`);
     console.log(`  Total SSE events: ${allEvents.length}`);
     console.log(`  Response text length: ${responseText.length} chars`);
     console.log(`  Done event: ${doneEvent ? "✅ yes" : "❌ no"}`);
@@ -265,7 +265,7 @@ async function runTest() {
       console.log(`\n  ⚠ WARNING: ${noOutputAgents.length} agent(s) completed with 0 tool calls`);
       console.log(`     This matches the "Sub-agent produced no output" pattern from the bug report`);
       for (const agent of noOutputAgents) {
-        console.log(`     → ${agent.subAgentId}: 0 tools, ${agent.durationMs}ms`);
+        console.log(`     → ${agent.subAgentId}: 0 tools, ${agent.durationMilliseconds}ms`);
       }
     }
 

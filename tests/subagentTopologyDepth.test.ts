@@ -80,7 +80,7 @@ function createSubAgentResult(overrides: Partial<SubAgentResult> & { description
     summary: overrides.summary ?? "Done",
     result: overrides.result ?? `Output from "${overrides.description}"`,
     toolUses: overrides.toolUses ?? 2,
-    durationMs: overrides.durationMs ?? 150,
+    durationMilliseconds: overrides.durationMilliseconds ?? 150,
     iterations: overrides.iterations ?? 1,
     messages: overrides.messages ?? [],
     diff: overrides.diff,
@@ -108,7 +108,7 @@ function createToolResultMessage(results: SubAgentResult[]): ConversationMessage
         result: result.result,
         error: result.error,
         recursionDepth: result.recursionDepth,
-        durationMs: result.durationMs,
+        durationMilliseconds: result.durationMilliseconds,
         toolUses: result.toolUses,
         subtreeMetrics: result.subtreeMetrics,
       })),
@@ -168,7 +168,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
       result: `Continued output from ${agentId}`,
       summary: "Continued",
       toolUses: 1,
-      durationMs: 80,
+      durationMilliseconds: 80,
       iterations: 1,
       messages: [],
     }));
@@ -271,8 +271,8 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
   describe("Depth 2 — Grandchild sub-agents via subtreeMetrics", () => {
     it("extractSubtreeMetrics should correctly aggregate depth-2 child results from tool messages", () => {
       const grandchildResults: SubAgentResult[] = [
-        createSubAgentResult({ description: "GC-1", agent_id: "gc-1", recursionDepth: 2, durationMs: 500, toolUses: 3, result: "Grandchild 1 done" }),
-        createSubAgentResult({ description: "GC-2", agent_id: "gc-2", recursionDepth: 2, durationMs: 700, toolUses: 5, result: "Grandchild 2 done" }),
+        createSubAgentResult({ description: "GC-1", agent_id: "gc-1", recursionDepth: 2, durationMilliseconds: 500, toolUses: 3, result: "Grandchild 1 done" }),
+        createSubAgentResult({ description: "GC-2", agent_id: "gc-2", recursionDepth: 2, durationMilliseconds: 700, toolUses: 5, result: "Grandchild 2 done" }),
       ];
 
       const messages: ConversationMessage[] = [
@@ -287,7 +287,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
       expect(metrics).not.toBeNull();
       expect(metrics!.totalDescendants).toBe(2);
       expect(metrics!.maxDepthReached).toBe(2);
-      expect(metrics!.aggregatedDurationMs).toBe(1200);
+      expect(metrics!.aggregatedDurationMilliseconds).toBe(1200);
       expect(metrics!.aggregatedToolUses).toBe(8);
       expect(metrics!.childResults).toHaveLength(2);
       expect(metrics!.childResults![0].result).toBe("Grandchild 1 done");
@@ -314,7 +314,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
                   result: "The sub-agents provided research results about Pokemon card values.",
                   toolUses: 3,
                   iterations: 4,
-                  durationMs: 422847,
+                  durationMilliseconds: 422847,
                   recursionDepth: 1,
                 },
                 {
@@ -325,7 +325,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
                   result: "Market trends analyzed across Japanese and English markets.",
                   toolUses: 5,
                   iterations: 3,
-                  durationMs: 315000,
+                  durationMilliseconds: 315000,
                   recursionDepth: 1,
                 },
               ],
@@ -340,7 +340,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
       expect(metrics).not.toBeNull();
       expect(metrics!.totalDescendants).toBe(2);
       expect(metrics!.maxDepthReached).toBe(1);
-      expect(metrics!.aggregatedDurationMs).toBe(422847 + 315000);
+      expect(metrics!.aggregatedDurationMilliseconds).toBe(422847 + 315000);
       expect(metrics!.aggregatedToolUses).toBe(3 + 5);
       expect(metrics!.childResults).toHaveLength(2);
       expect(metrics!.childResults![0].agent_id).toBe("agent-1-55df");
@@ -357,7 +357,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
             description: "Anthropic-format child",
             status: "completed",
             recursionDepth: 1,
-            durationMs: 1000,
+            durationMilliseconds: 1000,
             toolUses: 2,
             result: "Anthropic style result",
           }),
@@ -376,7 +376,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
                   description: "ReAct-format child",
                   status: "completed",
                   recursionDepth: 1,
-                  durationMs: 2000,
+                  durationMilliseconds: 2000,
                   toolUses: 4,
                   result: "ReAct style result",
                 },
@@ -393,7 +393,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
       expect(metrics!.childResults).toHaveLength(2);
       expect(metrics!.childResults![0].agent_id).toBe("anthropic-child");
       expect(metrics!.childResults![1].agent_id).toBe("react-child");
-      expect(metrics!.aggregatedDurationMs).toBe(3000);
+      expect(metrics!.aggregatedDurationMilliseconds).toBe(3000);
       expect(metrics!.aggregatedToolUses).toBe(6);
     });
 
@@ -419,7 +419,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
                   description: "Real sub-agent",
                   status: "completed",
                   recursionDepth: 1,
-                  durationMs: 500,
+                  durationMilliseconds: 500,
                   toolUses: 1,
                   result: "Real result",
                 },
@@ -448,12 +448,12 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
         totalDescendants: 3,
         maxDepthReached: 2,
         aggregatedCost: 0.08,
-        aggregatedDurationMs: 5000,
+        aggregatedDurationMilliseconds: 5000,
         aggregatedToolUses: 15,
         childResults: [
-          { agent_id: "gc-a1", description: "React components", status: "completed", recursionDepth: 2, durationMs: 1500, toolUses: 5, cost: 0.02, result: "Components built" },
-          { agent_id: "gc-a2", description: "CSS styling", status: "completed", recursionDepth: 2, durationMs: 1200, toolUses: 4, cost: 0.02, result: "Styles applied" },
-          { agent_id: "gc-a3", description: "Unit tests", status: "completed", recursionDepth: 2, durationMs: 2300, toolUses: 6, cost: 0.04, result: "Tests passing" },
+          { agent_id: "gc-a1", description: "React components", status: "completed", recursionDepth: 2, durationMilliseconds: 1500, toolUses: 5, cost: 0.02, result: "Components built" },
+          { agent_id: "gc-a2", description: "CSS styling", status: "completed", recursionDepth: 2, durationMilliseconds: 1200, toolUses: 4, cost: 0.02, result: "Styles applied" },
+          { agent_id: "gc-a3", description: "Unit tests", status: "completed", recursionDepth: 2, durationMilliseconds: 2300, toolUses: 6, cost: 0.04, result: "Tests passing" },
         ],
       };
 
@@ -461,11 +461,11 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
         totalDescendants: 2,
         maxDepthReached: 2,
         aggregatedCost: 0.05,
-        aggregatedDurationMs: 3000,
+        aggregatedDurationMilliseconds: 3000,
         aggregatedToolUses: 10,
         childResults: [
-          { agent_id: "gc-b1", description: "API routes", status: "completed", recursionDepth: 2, durationMs: 1800, toolUses: 6, cost: 0.03, result: "Routes created" },
-          { agent_id: "gc-b2", description: "Database models", status: "failed", recursionDepth: 2, durationMs: 1200, toolUses: 4, cost: 0.02, result: null, error: "Schema validation failed" },
+          { agent_id: "gc-b1", description: "API routes", status: "completed", recursionDepth: 2, durationMilliseconds: 1800, toolUses: 6, cost: 0.03, result: "Routes created" },
+          { agent_id: "gc-b2", description: "Database models", status: "failed", recursionDepth: 2, durationMilliseconds: 1200, toolUses: 4, cost: 0.02, result: null, error: "Schema validation failed" },
         ],
       };
 
@@ -517,7 +517,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
             totalDescendants: 2,
             maxDepthReached: 2,
             aggregatedCost: 0.04,
-            aggregatedDurationMs: 3000,
+            aggregatedDurationMilliseconds: 3000,
             aggregatedToolUses: 8,
           },
         }))
@@ -599,7 +599,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
             totalDescendants: 2,
             maxDepthReached: 2,
             aggregatedCost: 0.06,
-            aggregatedDurationMs: 4000,
+            aggregatedDurationMilliseconds: 4000,
             aggregatedToolUses: 12,
           },
         }))
@@ -634,7 +634,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
           status: "completed",
           result: "Leaf worker 1 output",
           recursionDepth: 3,
-          durationMs: 300,
+          durationMilliseconds: 300,
           toolUses: 2,
         },
         {
@@ -643,7 +643,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
           status: "completed",
           result: "Leaf worker 2 output",
           recursionDepth: 3,
-          durationMs: 400,
+          durationMilliseconds: 400,
           toolUses: 3,
         },
       ];
@@ -652,7 +652,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
         totalDescendants: 2,
         maxDepthReached: 3,
         aggregatedCost: 0.03,
-        aggregatedDurationMs: 700,
+        aggregatedDurationMilliseconds: 700,
         aggregatedToolUses: 5,
         childResults: depth3ChildResults.map((child) => ({
           ...child,
@@ -667,7 +667,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
           status: "completed",
           result: "Coordinated 2 great-grandchildren",
           recursionDepth: 2,
-          durationMs: 1000,
+          durationMilliseconds: 1000,
           toolUses: 4,
           subtreeMetrics: depth2SubtreeMetrics,
         },
@@ -677,7 +677,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
         totalDescendants: 3,
         maxDepthReached: 3,
         aggregatedCost: 0.06,
-        aggregatedDurationMs: 1700,
+        aggregatedDurationMilliseconds: 1700,
         aggregatedToolUses: 9,
         childResults: depth2ChildResults.map((child) => ({
           ...child,
@@ -695,7 +695,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
               status: "completed",
               result: "All descendant work complete",
               recursionDepth: 1,
-              durationMs: 2000,
+              durationMilliseconds: 2000,
               toolUses: 6,
               subtreeMetrics: depth1SubtreeMetrics,
             },
@@ -709,7 +709,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
       // 1 direct child + 3 nested descendants (from its subtreeMetrics)
       expect(metrics!.totalDescendants).toBe(4);
       expect(metrics!.maxDepthReached).toBe(3);
-      expect(metrics!.aggregatedDurationMs).toBe(2000 + 1700); // child duration + subtree duration
+      expect(metrics!.aggregatedDurationMilliseconds).toBe(2000 + 1700); // child duration + subtree duration
       expect(metrics!.aggregatedToolUses).toBe(6 + 9);
       expect(metrics!.childResults).toHaveLength(1);
       expect(metrics!.childResults![0].subtreeMetrics).toBeDefined();
@@ -727,11 +727,11 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
         totalDescendants: 2,
         maxDepthReached: 3,
         aggregatedCost: 0.02,
-        aggregatedDurationMs: 600,
+        aggregatedDurationMilliseconds: 600,
         aggregatedToolUses: 4,
         childResults: [
-          { agent_id: "ggc-x", description: "GGC-X", status: "completed", recursionDepth: 3, durationMs: 300, toolUses: 2, cost: 0.01, result: "Leaf X done" },
-          { agent_id: "ggc-y", description: "GGC-Y", status: "completed", recursionDepth: 3, durationMs: 300, toolUses: 2, cost: 0.01, result: "Leaf Y done" },
+          { agent_id: "ggc-x", description: "GGC-X", status: "completed", recursionDepth: 3, durationMilliseconds: 300, toolUses: 2, cost: 0.01, result: "Leaf X done" },
+          { agent_id: "ggc-y", description: "GGC-Y", status: "completed", recursionDepth: 3, durationMilliseconds: 300, toolUses: 2, cost: 0.01, result: "Leaf Y done" },
         ],
       };
 
@@ -739,7 +739,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
         totalDescendants: 3,
         maxDepthReached: 3,
         aggregatedCost: 0.05,
-        aggregatedDurationMs: 1600,
+        aggregatedDurationMilliseconds: 1600,
         aggregatedToolUses: 10,
         childResults: [
           {
@@ -747,7 +747,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
             description: "GC-Coordinator",
             status: "completed",
             recursionDepth: 2,
-            durationMs: 1000,
+            durationMilliseconds: 1000,
             toolUses: 6,
             cost: 0.03,
             result: "Coordinated great-grandchildren",
@@ -825,14 +825,14 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
               description: "Depth-1 Coordinator",
               status: "completed",
               recursionDepth: 1,
-              durationMs: 5000,
+              durationMilliseconds: 5000,
               toolUses: 10,
               result: "Coordinated 2 sub-teams",
               subtreeMetrics: {
                 totalDescendants: 5,
                 maxDepthReached: 3,
                 aggregatedCost: 0.12,
-                aggregatedDurationMs: 8000,
+                aggregatedDurationMilliseconds: 8000,
                 aggregatedToolUses: 25,
                 childResults: [
                   {
@@ -840,7 +840,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
                     description: "Depth-2A",
                     status: "completed",
                     recursionDepth: 2,
-                    durationMs: 3000,
+                    durationMilliseconds: 3000,
                     toolUses: 8,
                     cost: 0.04,
                     result: "Sub-team A output",
@@ -848,7 +848,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
                       totalDescendants: 2,
                       maxDepthReached: 3,
                       aggregatedCost: 0.04,
-                      aggregatedDurationMs: 4000,
+                      aggregatedDurationMilliseconds: 4000,
                       aggregatedToolUses: 12,
                     },
                   },
@@ -857,7 +857,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
                     description: "Depth-2B",
                     status: "failed",
                     recursionDepth: 2,
-                    durationMs: 1000,
+                    durationMilliseconds: 1000,
                     toolUses: 5,
                     cost: 0.02,
                     error: "Timeout after 60s",
@@ -865,7 +865,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
                       totalDescendants: 1,
                       maxDepthReached: 3,
                       aggregatedCost: 0.02,
-                      aggregatedDurationMs: 1000,
+                      aggregatedDurationMilliseconds: 1000,
                       aggregatedToolUses: 5,
                     },
                   },
@@ -883,7 +883,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
       expect(metrics!.totalDescendants).toBe(6);
       expect(metrics!.maxDepthReached).toBe(3);
       // Direct child: 5000 + nested: 8000
-      expect(metrics!.aggregatedDurationMs).toBe(13000);
+      expect(metrics!.aggregatedDurationMilliseconds).toBe(13000);
       // Direct child: 10 + nested: 25
       expect(metrics!.aggregatedToolUses).toBe(35);
 
@@ -910,11 +910,11 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
           totalDescendants: 2,
           maxDepthReached: 2,
           aggregatedCost: 0.04,
-          aggregatedDurationMs: 2000,
+          aggregatedDurationMilliseconds: 2000,
           aggregatedToolUses: 8,
           childResults: [
-            { agent_id: `${agentId}-gc1`, description: `${description} GC1`, status: "completed", recursionDepth: 2, durationMs: 1000, toolUses: 4, cost: 0.02, result: "GC1 done" },
-            { agent_id: `${agentId}-gc2`, description: `${description} GC2`, status: "completed", recursionDepth: 2, durationMs: 1000, toolUses: 4, cost: 0.02, result: "GC2 done" },
+            { agent_id: `${agentId}-gc1`, description: `${description} GC1`, status: "completed", recursionDepth: 2, durationMilliseconds: 1000, toolUses: 4, cost: 0.02, result: "GC1 done" },
+            { agent_id: `${agentId}-gc2`, description: `${description} GC2`, status: "completed", recursionDepth: 2, durationMilliseconds: 1000, toolUses: 4, cost: 0.02, result: "GC2 done" },
           ],
         },
       });
@@ -1016,14 +1016,14 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
             description: "Top coordinator",
             status: "completed",
             recursionDepth: 1,
-            durationMs: 3000,
+            durationMilliseconds: 3000,
             toolUses: 5,
             result: "Partial success with nested failures",
             subtreeMetrics: {
               totalDescendants: 3,
               maxDepthReached: 3,
               aggregatedCost: 0.05,
-              aggregatedDurationMs: 6000,
+              aggregatedDurationMilliseconds: 6000,
               aggregatedToolUses: 15,
               childResults: [
                 {
@@ -1031,7 +1031,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
                   description: "Healthy grandchild",
                   status: "completed",
                   recursionDepth: 2,
-                  durationMs: 2000,
+                  durationMilliseconds: 2000,
                   toolUses: 5,
                   cost: 0.02,
                   result: "Grandchild completed successfully",
@@ -1041,7 +1041,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
                   description: "Failing grandchild",
                   status: "failed",
                   recursionDepth: 2,
-                  durationMs: 1000,
+                  durationMilliseconds: 1000,
                   toolUses: 3,
                   cost: 0.01,
                   error: "Provider returned 429: Rate limit exceeded",
@@ -1049,7 +1049,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
                     totalDescendants: 1,
                     maxDepthReached: 3,
                     aggregatedCost: 0.01,
-                    aggregatedDurationMs: 500,
+                    aggregatedDurationMilliseconds: 500,
                     aggregatedToolUses: 2,
                     childResults: [
                       {
@@ -1057,7 +1057,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
                         description: "Crashed great-grandchild",
                         status: "failed",
                         recursionDepth: 3,
-                        durationMs: 500,
+                        durationMilliseconds: 500,
                         toolUses: 2,
                         cost: 0.01,
                         error: "CUDA out of memory",
@@ -1092,7 +1092,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
               description: "Depth-1 Success",
               status: "completed",
               recursionDepth: 1,
-              durationMs: 2000,
+              durationMilliseconds: 2000,
               toolUses: 5,
               result: "First coordinator succeeded",
             },
@@ -1101,14 +1101,14 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
               description: "Depth-1 Partial",
               status: "completed",
               recursionDepth: 1,
-              durationMs: 4000,
+              durationMilliseconds: 4000,
               toolUses: 8,
               result: "Second coordinator had mixed results",
               subtreeMetrics: {
                 totalDescendants: 2,
                 maxDepthReached: 3,
                 aggregatedCost: 0.04,
-                aggregatedDurationMs: 3000,
+                aggregatedDurationMilliseconds: 3000,
                 aggregatedToolUses: 10,
                 childResults: [
                   {
@@ -1116,7 +1116,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
                     description: "Depth-2 Success",
                     status: "completed",
                     recursionDepth: 2,
-                    durationMs: 1500,
+                    durationMilliseconds: 1500,
                     toolUses: 5,
                     cost: 0.02,
                     result: "Subtask completed",
@@ -1126,7 +1126,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
                     description: "Depth-2 Failure",
                     status: "failed",
                     recursionDepth: 2,
-                    durationMs: 1500,
+                    durationMilliseconds: 1500,
                     toolUses: 5,
                     cost: 0.02,
                     error: "Context window exceeded",
@@ -1157,7 +1157,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
             description: "Leaf worker",
             status: "completed",
             recursionDepth: 2,
-            durationMs: 800,
+            durationMilliseconds: 800,
             toolUses: 3,
             result: "Completed task without spawning",
           }),
@@ -1183,7 +1183,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
             description: "First batch",
             status: "completed",
             recursionDepth: 1,
-            durationMs: 1000,
+            durationMilliseconds: 1000,
             toolUses: 3,
             result: "Batch 1 done",
           }),
@@ -1196,7 +1196,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
             description: "Second batch",
             status: "completed",
             recursionDepth: 1,
-            durationMs: 2000,
+            durationMilliseconds: 2000,
             toolUses: 5,
             result: "Batch 2 done",
           }),
@@ -1233,7 +1233,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
         diff: null,
         error: null,
         startedAt: Date.now() - 5000,
-        durationMs: 5000,
+        durationMilliseconds: 5000,
         totalCost: null,
         usage: null,
         abortController: null,
@@ -1260,7 +1260,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
                 status: "completed",
                 result: "GC-1 output",
                 recursionDepth: 2,
-                durationMs: 1500,
+                durationMilliseconds: 1500,
                 toolUses: 4,
               },
               {
@@ -1269,7 +1269,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
                 status: "completed",
                 result: "GC-2 output",
                 recursionDepth: 2,
-                durationMs: 2000,
+                durationMilliseconds: 2000,
                 toolUses: 6,
               },
             ]),
@@ -1284,7 +1284,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
       expect(result.subtreeMetrics).toBeDefined();
       expect(result.subtreeMetrics!.totalDescendants).toBe(2);
       expect(result.subtreeMetrics!.maxDepthReached).toBe(2);
-      expect(result.subtreeMetrics!.aggregatedDurationMs).toBe(3500);
+      expect(result.subtreeMetrics!.aggregatedDurationMilliseconds).toBe(3500);
       expect(result.subtreeMetrics!.aggregatedToolUses).toBe(10);
     });
   });
@@ -1356,7 +1356,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
         toolUses: 5,
         toolNames: { create_team: 2, read_file: 3 },
         iterations: 8,
-        durationMs: 15000,
+        durationMilliseconds: 15000,
         messages: [],
       };
 
@@ -1377,7 +1377,7 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
         toolUses: 3,
         toolNames: { create_team: 1, send_message: 1, stop_agent: 1 },
         iterations: 3,
-        durationMs: 5000,
+        durationMilliseconds: 5000,
         messages: [],
       };
 

@@ -71,7 +71,7 @@ describe("TopologyConfig Test Suite", () => {
     result,
     summary: "Done",
     toolUses: 2,
-    durationMs: 120,
+    durationMilliseconds: 120,
     iterations: 1,
     messages: [],
     diff: { additions: 1, deletions: 0, files: ["test.txt"] },
@@ -102,7 +102,7 @@ describe("TopologyConfig Test Suite", () => {
       result: `Revised output from ${agentId}`,
       summary: "Revised",
       toolUses: 1,
-      durationMs: 80,
+      durationMilliseconds: 80,
       iterations: 1,
       messages: [],
     }));
@@ -1001,7 +1001,7 @@ describe("TopologyConfig Test Suite", () => {
         result: `Result for ${assignment.description}`,
         summary: "Done",
         toolUses: 0,
-        durationMs: 50,
+        durationMilliseconds: 50,
         iterations: 1,
         messages: [],
         // No diff — research task

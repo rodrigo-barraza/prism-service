@@ -80,10 +80,10 @@ const waitForAgentRegistration = (parentConversationId = "conv-id-789") =>
  * Used for non-blocking createTeam tests where background promises
  * resolve asynchronously.
  */
-async function waitForMockCalls(mock: ReturnType<typeof vi.fn>, expectedCalls: number, timeoutMs = 2000): Promise<void> {
+async function waitForMockCalls(mock: ReturnType<typeof vi.fn>, expectedCalls: number, timeoutMilliseconds = 2000): Promise<void> {
   const startTime = Date.now();
   while (mock.mock.calls.length < expectedCalls) {
-    if (Date.now() - startTime > timeoutMs) {
+    if (Date.now() - startTime > timeoutMilliseconds) {
       throw new Error(`Timed out waiting for mock to be called ${expectedCalls} times (got ${mock.mock.calls.length})`);
     }
     await new Promise((resolve) => setTimeout(resolve, 10));

@@ -2,6 +2,14 @@ import { describe, it, expect, vi } from 'vitest';
 import { PROVIDERS, MODEL_TYPES, TYPES } from '../src/constants.ts';
 
 vi.mock('../src/config.ts', () => ({
+  MODALITY_TYPES: {
+    TEXT: 'text',
+    IMAGE: 'image',
+    AUDIO: 'audio',
+    VIDEO: 'video',
+    PDF: 'pdf',
+    EMBEDDING: 'embedding',
+  },
   TYPES: {
     TEXT: 'text',
     IMAGE: 'image',

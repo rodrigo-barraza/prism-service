@@ -96,7 +96,7 @@ describe("DivideAndConquerRouter Tests", () => {
         result: `Completed: ${assignment.prompt}`,
         toolUses: 2,
         iterations: 3,
-        durationMs: 8000,
+        durationMilliseconds: 8000,
         messages: [],
         diff: { additions: 1, deletions: 0, files: [] },
       };
@@ -249,7 +249,7 @@ describe("DivideAndConquerRouter Tests", () => {
           result: "Subtask 1 result",
           toolUses: 0,
           iterations: 1,
-          durationMs: 100,
+          durationMilliseconds: 100,
           messages: [],
         },
         { error: "Timeout occurred" },
@@ -276,7 +276,7 @@ describe("DivideAndConquerRouter Tests", () => {
           result: "A".repeat(130_000), // budget is 120_000 / 1 = 120_000
           toolUses: 0,
           iterations: 1,
-          durationMs: 100,
+          durationMilliseconds: 100,
           messages: [],
         },
       ];
@@ -295,7 +295,7 @@ describe("DivideAndConquerRouter Tests", () => {
         result: "Output A",
         toolUses: 0,
         iterations: 1,
-        durationMs: 100,
+        durationMilliseconds: 100,
         messages: [],
       });
       completed.set(1, { error: "Failed dependency B" });
@@ -415,7 +415,7 @@ describe("DivideAndConquerRouter Tests", () => {
           result: `Completed: ${assignment.prompt}`,
           toolUses: 0,
           iterations: 1,
-          durationMs: 100,
+          durationMilliseconds: 100,
           messages: [],
         };
       });
@@ -469,7 +469,7 @@ describe("DivideAndConquerRouter Tests", () => {
           result: "Result B",
           toolUses: 0,
           iterations: 1,
-          durationMs: 100,
+          durationMilliseconds: 100,
           messages: [],
         };
       });

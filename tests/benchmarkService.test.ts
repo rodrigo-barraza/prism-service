@@ -78,7 +78,7 @@ describe("BenchmarkService", () => {
     expect(handleAgent).not.toHaveBeenCalled();
   });
 
-  it("should route non-agent LLMs to handleAgent if tools are enabled", async () => {
+  it("should route non-agent LLMilliseconds to handleAgent if tools are enabled", async () => {
     (handleAgent as any).mockImplementation(
       async (parameters: any, emitCallback: any, options: any) => {
         emitCallback({ type: "chunk", content: "Agentic answer" });

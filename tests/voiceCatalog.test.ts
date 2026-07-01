@@ -11,6 +11,10 @@ vi.mock('../src/config.ts', () => ({
     inworld: 'Dennis',
   },
   getDefaultModels: () => ({ inworld: 'inworld-tts-2' }),
+  MODALITY_TYPES: {
+    TEXT: 'text',
+    AUDIO: 'audio',
+  },
   TYPES: {
     TEXT: 'text',
     AUDIO: 'audio',

@@ -107,7 +107,7 @@ describe("ToolOrchestratorService.executeToolStreaming", () => {
         { event: "stdout", data: "line 1\n" },
         { event: "stdout", data: "line 2\n" },
         { event: "stdout", data: "line 3\n" },
-        { event: "exit", success: true, exitCode: 0, executionTimeMs: 150 },
+        { event: "exit", success: true, exitCode: 0, executionTimeMilliseconds: 150 },
       ]),
     );
 
@@ -123,7 +123,7 @@ describe("ToolOrchestratorService.executeToolStreaming", () => {
     expect(result.stderr).toBe("");
     expect(result.success).toBe(true);
     expect(result.exitCode).toBe(0);
-    expect(result.executionTimeMs).toBe(150);
+    expect(result.executionTimeMilliseconds).toBe(150);
   });
 
   it("should accumulate stderr chunks and include them in the final result", async () => {
@@ -133,7 +133,7 @@ describe("ToolOrchestratorService.executeToolStreaming", () => {
         { event: "stdout", data: "output\n" },
         { event: "stderr", data: "warning: something\n" },
         { event: "stderr", data: "error: failed\n" },
-        { event: "exit", success: false, exitCode: 1, executionTimeMs: 300 },
+        { event: "exit", success: false, exitCode: 1, executionTimeMilliseconds: 300 },
       ]),
     );
 
@@ -155,7 +155,7 @@ describe("ToolOrchestratorService.executeToolStreaming", () => {
         { event: "start", pid: 100 },
         { event: "stdout", data: "hello" },
         { event: "stderr", data: "warn" },
-        { event: "exit", success: true, exitCode: 0, executionTimeMs: 50 },
+        { event: "exit", success: true, exitCode: 0, executionTimeMilliseconds: 50 },
       ]),
     );
 
@@ -179,7 +179,7 @@ describe("ToolOrchestratorService.executeToolStreaming", () => {
     globalThis.fetch = vi.fn().mockResolvedValue(
       createSSEResponse([
         { event: "start", pid: 200 },
-        { event: "exit", success: true, exitCode: 0, executionTimeMs: 10 },
+        { event: "exit", success: true, exitCode: 0, executionTimeMilliseconds: 10 },
       ]),
     );
 
@@ -200,7 +200,7 @@ describe("ToolOrchestratorService.executeToolStreaming", () => {
       createSSEResponse([
         { event: "start", pid: 300 },
         { event: "stdout", data: "partial output\n" },
-        { event: "exit", success: false, exitCode: null, timedOut: true, executionTimeMs: 60000, error: "Command timed out after 60000ms" },
+        { event: "exit", success: false, exitCode: null, timedOut: true, executionTimeMilliseconds: 60000, error: "Command timed out after 60000ms" },
       ]),
     );
 
@@ -243,7 +243,7 @@ describe("ToolOrchestratorService.executeToolStreaming", () => {
     const events = [
       { event: "start", pid: 500 },
       ...lines.map((line) => ({ event: "stdout", data: line + "\n" })),
-      { event: "exit", success: true, exitCode: 0, executionTimeMs: 1200 },
+      { event: "exit", success: true, exitCode: 0, executionTimeMilliseconds: 1200 },
     ];
 
     globalThis.fetch = vi.fn().mockResolvedValue(createSSEResponse(events));
@@ -266,7 +266,7 @@ describe("ToolOrchestratorService.executeToolStreaming", () => {
         { event: "start", pid: 600 },
         { event: "stdout", data: "output" },
         { event: "stderr", data: "err" },
-        { event: "exit", success: true, exitCode: 0, executionTimeMs: 42 },
+        { event: "exit", success: true, exitCode: 0, executionTimeMilliseconds: 42 },
       ]),
     );
 
@@ -281,7 +281,7 @@ describe("ToolOrchestratorService.executeToolStreaming", () => {
     expect(result).toHaveProperty("stdout");
     expect(result).toHaveProperty("stderr");
     expect(result).toHaveProperty("exitCode");
-    expect(result).toHaveProperty("executionTimeMs");
+    expect(result).toHaveProperty("executionTimeMilliseconds");
 
     // Types
     expect(typeof result.success).toBe("boolean");

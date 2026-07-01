@@ -67,7 +67,7 @@ describe("Divide & Conquer Router — Adversarial Test Suite", () => {
     result,
     summary: "Done",
     toolUses: 2,
-    durationMs: 120,
+    durationMilliseconds: 120,
     iterations: 1,
     messages: [],
     diff: { additions: 1, deletions: 0, files: ["test.txt"] },

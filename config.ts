@@ -68,7 +68,7 @@ export const PROVIDER_LLAMA_CPP = parseProviderInstances("PROVIDER_LLAMA_CPP");
 
 // ── MongoDB ────────────────────────────────────────────────────
 export const MONGO_URI = process.env.MONGO_URI;
-if (!MONGO_URI) {
+if (!MONGO_URI && process.env.NODE_ENV !== "test") {
   throw new Error("CRITICAL: MONGO_URI environment variable is not defined.");
 }
 

@@ -164,7 +164,7 @@ describe("Background Token Accuracy", () => {
       resultText: "[]",
       success: true,
       errorMessage: null,
-      requestStartMs: performance.now() - 1000,
+      requestStartMilliseconds: performance.now() - 1000,
       extraRequestPayload: {},
     };
 
@@ -447,7 +447,7 @@ describe("Background Token Accuracy", () => {
         usage: realUsage,
         success: true,
         errorMessage: null,
-        requestStartMs: performance.now() - 500,
+        requestStartMilliseconds: performance.now() - 500,
       });
 
       const doc = mockInsertOne.mock.calls[0][0];
@@ -488,7 +488,7 @@ describe("Background Token Accuracy", () => {
         usage: realUsage,
         success: true,
         errorMessage: null,
-        requestStartMs: performance.now() - 2000,
+        requestStartMilliseconds: performance.now() - 2000,
       });
 
       const doc = mockInsertOne.mock.calls[0][0];
@@ -528,7 +528,7 @@ describe("Background Token Accuracy", () => {
         // No usage provided
         success: true,
         errorMessage: null,
-        requestStartMs: performance.now() - 300,
+        requestStartMilliseconds: performance.now() - 300,
       });
 
       const doc = mockInsertOne.mock.calls[0][0];

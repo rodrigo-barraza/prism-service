@@ -358,14 +358,14 @@ describe("WebhookEventBus — event type contract", () => {
       requestId: "req-003",
       toolName: "execute_code",
       toolCallId: "tc-002",
-      durationMs: 1500,
+      durationMilliseconds: 1500,
       status: "done",
       toolResult: { output: "Hello world" },
     });
 
     expect(capturedEvents).toHaveLength(1);
     expect(capturedEvents[0].eventType).toBe("request.tool_call.completed");
-    expect(capturedEvents[0].data.durationMs).toBe(1500);
+    expect(capturedEvents[0].data.durationMilliseconds).toBe(1500);
     expect(capturedEvents[0].data.status).toBe("done");
   });
 
@@ -374,7 +374,7 @@ describe("WebhookEventBus — event type contract", () => {
       requestId: "req-004",
       toolName: "read_file",
       toolCallId: "tc-003",
-      durationMs: 50,
+      durationMilliseconds: 50,
       status: "error",
       toolResult: { error: "File not found" },
     });
@@ -600,7 +600,7 @@ describe("Webhook animation timeline — event sequence contract", () => {
     WebhookEventBus.emit("request.tool_call.completed", {
       toolName: "web_search",
       toolCallId: "tc-001",
-      durationMs: 1200,
+      durationMilliseconds: 1200,
       status: "done",
     });
 
@@ -639,13 +639,13 @@ describe("Webhook animation timeline — event sequence contract", () => {
     WebhookEventBus.emit("request.tool_call.completed", {
       toolName: "web_search",
       toolCallId: "tc-b",
-      durationMs: 800,
+      durationMilliseconds: 800,
       status: "done",
     });
     WebhookEventBus.emit("request.tool_call.completed", {
       toolName: "read_file",
       toolCallId: "tc-a",
-      durationMs: 1500,
+      durationMilliseconds: 1500,
       status: "done",
     });
 
@@ -677,7 +677,7 @@ describe("Webhook animation timeline — event sequence contract", () => {
     WebhookEventBus.emit("request.tool_call.completed", {
       toolName: "execute_code",
       toolCallId: "tc-err",
-      durationMs: 250,
+      durationMilliseconds: 250,
       status: "error",
       toolResult: { error: "Syntax error in code" },
     });
@@ -714,7 +714,7 @@ describe("PostExecutionEmitter — request.tool_call.completed webhook contract"
       toolName: "web_search",
       toolCallId: "tc-123",
       toolResult: { results: ["result1", "result2"] },
-      durationMs: 450,
+      durationMilliseconds: 450,
       status: "done",
       agent: "meepo",
       conversationId: "conv-xyz",
@@ -733,7 +733,7 @@ describe("PostExecutionEmitter — request.tool_call.completed webhook contract"
     const data = completedEvents[0].data;
     expect(data.toolName).toBe("web_search");
     expect(data.toolCallId).toBe("tc-123");
-    expect(data.durationMs).toBe(450);
+    expect(data.durationMilliseconds).toBe(450);
     expect(data.status).toBe("done");
     expect(data.agent).toBe("meepo");
     expect(data.provider).toBe(PROVIDERS.ANTHROPIC);
@@ -746,7 +746,7 @@ describe("PostExecutionEmitter — request.tool_call.completed webhook contract"
       toolName: "read_file",
       toolCallId: "tc-456",
       toolResult: { error: "ENOENT: no such file or directory" },
-      durationMs: 12,
+      durationMilliseconds: 12,
       status: "error",
       agent: null,
       conversationId: "conv-ghi",
@@ -756,7 +756,7 @@ describe("PostExecutionEmitter — request.tool_call.completed webhook contract"
       (event) => event.eventType === "request.tool_call.completed",
     );
     expect(completedEvents[0].data.status).toBe("error");
-    expect(completedEvents[0].data.durationMs).toBe(12);
+    expect(completedEvents[0].data.durationMilliseconds).toBe(12);
   });
 });
 

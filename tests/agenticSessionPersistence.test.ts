@@ -403,7 +403,7 @@ describe("message persistence contract for TerminalRenderer", () => {
               stdout: "added 150 packages in 5s\n10 packages are looking for funding",
               stderr: "",
               exitCode: 0,
-              executionTimeMs: 5200,
+              executionTimeMilliseconds: 5200,
             },
           },
         ],

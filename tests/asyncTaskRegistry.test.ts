@@ -99,7 +99,7 @@ describe("AsyncTaskRegistry", () => {
     expect(taskState.result).toEqual({ results: ["item1", "item2"] });
     expect(taskState.error).toBeNull();
     expect(taskState.completedAt).toBeGreaterThan(0);
-    expect(taskState.durationMs).toBeGreaterThanOrEqual(0);
+    expect(taskState.durationMilliseconds).toBeGreaterThanOrEqual(0);
   });
 
   // ── Task Failure ────────────────────────────────────────
@@ -121,7 +121,7 @@ describe("AsyncTaskRegistry", () => {
     expect(taskState.result).toBeNull();
     expect(taskState.error).toBe("Tool execution failed");
     expect(taskState.completedAt).toBeGreaterThan(0);
-    expect(taskState.durationMs).toBeGreaterThanOrEqual(0);
+    expect(taskState.durationMilliseconds).toBeGreaterThanOrEqual(0);
   });
 
   // ── Task Cancellation via AbortController ───────────────
@@ -144,7 +144,7 @@ describe("AsyncTaskRegistry", () => {
     expect(wasCancelled).toBe(true);
     expect(taskState.status).toBe("cancelled");
     expect(taskState.completedAt).toBeGreaterThan(0);
-    expect(taskState.durationMs).toBeGreaterThanOrEqual(0);
+    expect(taskState.durationMilliseconds).toBeGreaterThanOrEqual(0);
   });
 
   it("should return false when cancelling a non-existent task", () => {

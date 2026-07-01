@@ -2,7 +2,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { app } from './setup.ts';
 import request from 'supertest';
 import MongoWrapper from '../src/wrappers/MongoWrapper.ts';
-import { COLLECTIONS, PROVIDERS, TYPES } from '../src/constants.ts';
+import { COLLECTIONS, PROVIDERS, MODALITY_TYPES } from '../src/constants.ts';
 import { errorHandler } from '../src/utils/errors.ts';
 import EmbeddingService from '../src/services/EmbeddingService.ts';
 
@@ -92,7 +92,7 @@ describe('Media and Synthesis Routes Integration Tests', () => {
         toArray: vi.fn().mockResolvedValue([
           {
             url: 'http://example.com/image.png',
-            mediaType: TYPES.IMAGE,
+            mediaType: MODALITY_TYPES.IMAGE,
             convId: 'conv-123',
             convTitle: 'Mock Conv Title',
             project: 'test-project',
@@ -220,7 +220,7 @@ describe('Media and Synthesis Routes Integration Tests', () => {
         })
         .expect(200);
 
-      expect(response.body).toHaveProperty(TYPES.EMBEDDING);
+      expect(response.body).toHaveProperty(MODALITY_TYPES.EMBEDDING);
       expect(response.body).toHaveProperty('dimensions');
     });
 
@@ -233,7 +233,7 @@ describe('Media and Synthesis Routes Integration Tests', () => {
         })
         .expect(200);
 
-      expect(response.body).toHaveProperty(TYPES.EMBEDDING);
+      expect(response.body).toHaveProperty(MODALITY_TYPES.EMBEDDING);
     });
 
     it('throws validation error for missing provider', async () => {
