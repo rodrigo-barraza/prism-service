@@ -19,10 +19,10 @@ export const PRISM_SERVICE_URL = process.env.PRISM_TEST_URL || "https://api.pris
 export const LM_STUDIO_URL = process.env.LM_STUDIO_TEST_URL || "https://api.prism.rod.dev/lm-studio";
 export const OLLAMA_URL = process.env.OLLAMA_TEST_URL || "https://api.prism.rod.dev/ollama";
 
-export const DEFAULT_AGENT_TIMEOUT_MS = 120_000;
-export const CLOUD_AGENT_TIMEOUT_MS = 60_000;
-export const MULTI_AGENT_TIMEOUT_MS = 300_000;
-export const SSE_IDLE_TIMEOUT_MS = 60_000;
+export const DEFAULT_AGENT_TIMEOUT_MILLISECONDS = 120_000;
+export const CLOUD_AGENT_TIMEOUT_MILLISECONDS = 60_000;
+export const MULTI_AGENT_TIMEOUT_MILLISECONDS = 300_000;
+export const SSE_IDLE_TIMEOUT_MILLISECONDS = 60_000;
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -58,7 +58,7 @@ export interface SubAgentStatusEvent {
   message?: string;
   description?: string;
   error?: string;
-  durationMs?: number;
+  durationMilliseconds?: number;
   [key: string]: unknown;
 }
 
@@ -125,7 +125,7 @@ export interface AgentSSEResult {
   durationMilliseconds: number;
   aborted: boolean;
   timedOut: boolean;
-  durationMs: number;
+  durationMilliseconds: number;
 }
 
 interface ConsumeOptions {
@@ -216,7 +216,7 @@ function createEmptyResult(): AgentSSEResult {
     enumerable: true,
     configurable: true,
   });
-  Object.defineProperty(result, "durationMs", {
+  Object.defineProperty(result, "durationMilliseconds", {
     get() { return this.durationMilliseconds; },
     set(value: number) { this.durationMilliseconds = value; },
     enumerable: true,
@@ -233,7 +233,7 @@ function createEmptyResult(): AgentSSEResult {
 export async function consumeAgentSSE(
   response: Response,
   {
-    timeoutMilliseconds = DEFAULT_AGENT_TIMEOUT_MS,
+    timeoutMilliseconds = DEFAULT_AGENT_TIMEOUT_MILLISECONDS,
     idleTimeoutMilliseconds,
     controller,
   }: ConsumeOptions = {},
@@ -252,7 +252,7 @@ export async function consumeAgentSSE(
     reader.cancel().catch(() => {});
   }, timeoutMilliseconds);
 
-  const finalIdleTimeout = idleTimeoutMilliseconds ?? Math.max(SSE_IDLE_TIMEOUT_MS, timeoutMilliseconds / 2);
+  const finalIdleTimeout = idleTimeoutMilliseconds ?? Math.max(SSE_IDLE_TIMEOUT_MILLISECONDS, timeoutMilliseconds / 2);
 
   const idleCheckId = setInterval(() => {
     if (Date.now() - lastEventTime > finalIdleTimeout) {
@@ -381,10 +381,10 @@ export async function agentStream(
   payload: AgentStreamPayload,
   {
     timeoutMilliseconds,
-    timeoutMs,
-  }: { timeoutMilliseconds?: number; timeoutMs?: number } = {},
+    timeoutMilliseconds,
+  }: { timeoutMilliseconds?: number; timeoutMilliseconds?: number } = {},
 ): Promise<AgentSSEResult> {
-  const finalTimeout = timeoutMilliseconds ?? timeoutMs ?? DEFAULT_AGENT_TIMEOUT_MS;
+  const finalTimeout = timeoutMilliseconds ?? timeoutMilliseconds ?? DEFAULT_AGENT_TIMEOUT_MILLISECONDS;
   const enrichedPayload = {
     minContextLength: DEFAULT_MIN_CONTEXT_LENGTH,
     evalBatchSize: DEFAULT_EVAL_BATCH_SIZE,
@@ -409,7 +409,7 @@ export async function agentStream(
 
   return consumeAgentSSE(response, {
     timeoutMilliseconds: finalTimeout,
-    idleTimeoutMilliseconds: Math.max(SSE_IDLE_TIMEOUT_MS, finalTimeout / 2),
+    idleTimeoutMilliseconds: Math.max(SSE_IDLE_TIMEOUT_MILLISECONDS, finalTimeout / 2),
     controller,
   });
 }
@@ -618,12 +618,12 @@ export async function discoverProviders(): Promise<ProviderTarget[]> {
 
 // ── Timeout Helpers ─────────────────────────────────────────────
 
-export function getTimeout(target: ProviderTarget, baseMilliseconds: number = DEFAULT_AGENT_TIMEOUT_MS): number {
+export function getTimeout(target: ProviderTarget, baseMilliseconds: number = DEFAULT_AGENT_TIMEOUT_MILLISECONDS): number {
   return baseMilliseconds * target.timeoutMultiplier;
 }
 
 export function getMultiAgentTimeout(target: ProviderTarget): number {
-  return MULTI_AGENT_TIMEOUT_MS * target.timeoutMultiplier;
+  return MULTI_AGENT_TIMEOUT_MILLISECONDS * target.timeoutMultiplier;
 }
 
 
@@ -651,12 +651,12 @@ export async function agentStreamWithRetry(
   payload: AgentStreamPayload,
   options: {
     timeoutMilliseconds?: number;
-    timeoutMs?: number;
+    timeoutMilliseconds?: number;
     maximumRetries?: number;
     maxRetries?: number;
   } = {},
 ): Promise<AgentSSEResult> {
-  const finalTimeout = options.timeoutMilliseconds ?? options.timeoutMs;
+  const finalTimeout = options.timeoutMilliseconds ?? options.timeoutMilliseconds;
   const finalRetries = options.maximumRetries ?? options.maxRetries ?? 2;
   let lastResult: AgentSSEResult | null = null;
 

@@ -219,7 +219,7 @@ describe("buildToolCallFallbackSummary", () => {
       toolUses: 10,
       toolNames: { web_search: 5, read_file: 3, analyze_data: 2 },
       iterations: 15,
-      durationMs: 5000,
+      durationMilliseconds: 5000,
       messages: [],
     };
 
@@ -240,7 +240,7 @@ describe("buildToolCallFallbackSummary", () => {
       result: null,
       toolUses: 4,
       iterations: 3,
-      durationMs: 2000,
+      durationMilliseconds: 2000,
       messages: [],
     };
 
@@ -258,7 +258,7 @@ describe("buildToolCallFallbackSummary", () => {
       result: null,
       toolUses: 0,
       iterations: 0,
-      durationMs: 100,
+      durationMilliseconds: 100,
       messages: [],
     };
 
@@ -276,7 +276,7 @@ describe("buildToolCallFallbackSummary", () => {
       toolUses: 1,
       toolNames: { read_file: 1 },
       iterations: 1,
-      durationMs: 500,
+      durationMilliseconds: 500,
       messages: [],
     };
 
@@ -309,7 +309,7 @@ describe("extractSubtreeMetrics", () => {
           status: "completed",
           result: "Found 3 relevant documents.",
           recursionDepth: 1,
-          durationMs: 1200,
+          durationMilliseconds: 1200,
           toolUses: 5,
         }),
       },
@@ -319,7 +319,7 @@ describe("extractSubtreeMetrics", () => {
     expect(metrics).not.toBeNull();
     expect(metrics!.totalDescendants).toBe(1);
     expect(metrics!.maxDepthReached).toBe(1);
-    expect(metrics!.aggregatedDurationMs).toBe(1200);
+    expect(metrics!.aggregatedDurationMilliseconds).toBe(1200);
     expect(metrics!.aggregatedToolUses).toBe(5);
     expect(metrics!.childResults).toHaveLength(1);
     expect(metrics!.childResults![0].agent_id).toBe("agent-child-1");
@@ -339,7 +339,7 @@ describe("extractSubtreeMetrics", () => {
             status: "completed",
             result: "Analysis complete.",
             recursionDepth: 1,
-            durationMs: 1000,
+            durationMilliseconds: 1000,
             toolUses: 3,
           },
           {
@@ -348,7 +348,7 @@ describe("extractSubtreeMetrics", () => {
             status: "failed",
             error: "Model timeout after 30s",
             recursionDepth: 1,
-            durationMs: 2000,
+            durationMilliseconds: 2000,
             toolUses: 4,
           },
         ]),
@@ -359,7 +359,7 @@ describe("extractSubtreeMetrics", () => {
     expect(metrics).not.toBeNull();
     expect(metrics!.totalDescendants).toBe(2);
     expect(metrics!.maxDepthReached).toBe(1);
-    expect(metrics!.aggregatedDurationMs).toBe(3000);
+    expect(metrics!.aggregatedDurationMilliseconds).toBe(3000);
     expect(metrics!.aggregatedToolUses).toBe(7);
     expect(metrics!.childResults).toHaveLength(2);
     expect(metrics!.childResults![0].result).toBe("Analysis complete.");
@@ -379,13 +379,13 @@ describe("extractSubtreeMetrics", () => {
             description: "child 1",
             status: "completed",
             recursionDepth: 1,
-            durationMs: 1000,
+            durationMilliseconds: 1000,
             toolUses: 3,
             subtreeMetrics: {
               totalDescendants: 2,
               maxDepthReached: 2,
               aggregatedCost: 0.05,
-              aggregatedDurationMs: 4000,
+              aggregatedDurationMilliseconds: 4000,
               aggregatedToolUses: 10,
             },
           },
@@ -397,7 +397,7 @@ describe("extractSubtreeMetrics", () => {
     expect(metrics).not.toBeNull();
     expect(metrics!.totalDescendants).toBe(3); // 1 child + 2 nested descendants
     expect(metrics!.maxDepthReached).toBe(2);
-    expect(metrics!.aggregatedDurationMs).toBe(5000); // 1000 + 4000
+    expect(metrics!.aggregatedDurationMilliseconds).toBe(5000); // 1000 + 4000
     expect(metrics!.aggregatedToolUses).toBe(13); // 3 + 10
   });
 
@@ -411,7 +411,7 @@ describe("extractSubtreeMetrics", () => {
         content: JSON.stringify({
           agent_id: "agent-valid",
           status: "completed",
-          durationMs: "invalid-duration", // string instead of number
+          durationMilliseconds: "invalid-duration", // string instead of number
         }),
       },
     ];
@@ -420,7 +420,7 @@ describe("extractSubtreeMetrics", () => {
     expect(metrics).not.toBeNull();
     expect(metrics!.totalDescendants).toBe(1);
     expect(metrics!.childResults![0].agent_id).toBe("agent-valid");
-    expect(metrics!.childResults![0].durationMs).toBe("invalid-duration"); // truthy string passes through || 0
+    expect(metrics!.childResults![0].durationMilliseconds).toBe("invalid-duration"); // truthy string passes through || 0
     expect(metrics!.childResults![0].result).toBeNull();
   });
 
@@ -436,7 +436,7 @@ describe("extractSubtreeMetrics", () => {
           status: "completed",
           result: longResult,
           recursionDepth: 1,
-          durationMs: 5000,
+          durationMilliseconds: 5000,
           toolUses: 8,
         }),
       },
@@ -460,7 +460,7 @@ describe("extractSubtreeMetrics", () => {
             status: "completed",
             result: "   ",
             recursionDepth: 1,
-            durationMs: 100,
+            durationMilliseconds: 100,
             toolUses: 0,
           },
           {
@@ -468,7 +468,7 @@ describe("extractSubtreeMetrics", () => {
             description: "missing result agent",
             status: "completed",
             recursionDepth: 1,
-            durationMs: 200,
+            durationMilliseconds: 200,
             toolUses: 1,
           },
         ]),
@@ -493,7 +493,7 @@ describe("extractSubtreeMetrics", () => {
           result: "Partial findings before crash.",
           error: "Sub-agent produced no output after 12.5s (0 tool calls, 1 iteration).",
           recursionDepth: 1,
-          durationMs: 12500,
+          durationMilliseconds: 12500,
           toolUses: 0,
         }),
       },
@@ -523,7 +523,7 @@ describe("buildSubAgentResult — channel token stripping", () => {
       diff: null,
       error: null,
       startedAt: Date.now() - 5000,
-      durationMs: 5000,
+      durationMilliseconds: 5000,
       totalCost: null,
       usage: null,
       abortController: null,

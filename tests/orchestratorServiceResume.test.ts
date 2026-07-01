@@ -71,7 +71,7 @@ describe("OrchestratorService Resume Agent", () => {
       diff: null,
       error: null,
       startedAt: Date.now() - 5000,
-      durationMs: 5000,
+      durationMilliseconds: 5000,
       totalCost: 0.01,
       usage: { inputTokens: 100, outputTokens: 50 },
       abortController: null,
@@ -176,7 +176,7 @@ describe("OrchestratorService Resume Agent", () => {
         result: "continueResult",
         toolUses: 2,
         iterations: 1,
-        durationMs: 100,
+        durationMilliseconds: 100,
         messages: [],
       });
 

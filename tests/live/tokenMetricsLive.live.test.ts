@@ -111,7 +111,7 @@ async function streamAndCollect(provider: any, model: any, prompt: any, {
     thinkingChunkCount: 0,
     lastOutputChars: 0,
     totalEvents: 0,
-    durationMs: 0,
+    durationMilliseconds: 0,
     text: "",
     timedOut: false,
     // Worker tracking
@@ -189,7 +189,7 @@ async function streamAndCollect(provider: any, model: any, prompt: any, {
     }
   } finally {
     clearTimeout(timer);
-    result.durationMs = performance.now() - startTime;
+    result.durationMilliseconds = performance.now() - startTime;
     reader.releaseLock();
   }
 
@@ -236,7 +236,7 @@ function printTable(label: any, result: any) {
   console.log(`  │ Progress in:      ${String(last.inputTokens).padStart(6)}   Provider in:  ${String(providerIn).padStart(6)}      │`);
   console.log(`  │ Progress total:   ${String(last.totalTokens).padStart(6)}                             │`);
   console.log(`  │ Peak tok/s:       ${String(Math.max(...events.filter((e: any) => e.tokPerSec != null).map((e: any) => e.tokPerSec), 0).toFixed(1)).padStart(6)}                             │`);
-  console.log(`  │ Duration:         ${(result.durationMs / 1000).toFixed(1).padStart(5)}s                             │`);
+  console.log(`  │ Duration:         ${(result.durationMilliseconds / 1000).toFixed(1).padStart(5)}s                             │`);
   if (providerOut > 0) {
     const ratio = last.outputTokens / providerOut;
     console.log(`  │ Progress/Provider: ${ratio.toFixed(4)}                             │`);

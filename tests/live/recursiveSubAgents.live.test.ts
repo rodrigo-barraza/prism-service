@@ -19,12 +19,12 @@ import { describe, test, expect } from "vitest";
 import {
   PRISM_SERVICE_URL,
   consumeAgentSSE,
-  MULTI_AGENT_TIMEOUT_MS,
+  MULTI_AGENT_TIMEOUT_MILLISECONDS,
   type AgentSSEResult,
   type SubAgentStatusEvent,
 } from "./helpers/agentTestHarness.ts";
 
-const RECURSIVE_TEST_TIMEOUT_MS = 600_000;
+const RECURSIVE_TEST_TIMEOUT_MILLISECONDS = 600_000;
 
 const RECURSIVE_SPAWNING_PROMPT = `You have access to the create_team tool. Use it RIGHT NOW. Do not explain anything first — immediately call create_team.
 
@@ -80,7 +80,7 @@ describe("Recursive Sub-Agent Spawning (Grandchildren)", () => {
       expect(response.ok).toBe(true);
 
       const result = await consumeAgentSSE(response, {
-        timeoutMilliseconds: RECURSIVE_TEST_TIMEOUT_MS,
+        timeoutMilliseconds: RECURSIVE_TEST_TIMEOUT_MILLISECONDS,
         idleTimeoutMilliseconds: 120_000,
         controller,
       });
@@ -114,7 +114,7 @@ describe("Recursive Sub-Agent Spawning (Grandchildren)", () => {
         console.log(`     📌 Spawned: ${agentEvent.subAgentId} — "${agentEvent.description}"`);
       }
       for (const agentEvent of completedAgentEvents) {
-        console.log(`     ✅ Completed: ${agentEvent.subAgentId} (${agentEvent.durationMs}ms)`);
+        console.log(`     ✅ Completed: ${agentEvent.subAgentId} (${agentEvent.durationMilliseconds}ms)`);
       }
       for (const agentEvent of failedAgentEvents) {
         console.log(`     ❌ Failed: ${agentEvent.subAgentId} — ${agentEvent.error}`);
@@ -200,6 +200,6 @@ describe("Recursive Sub-Agent Spawning (Grandchildren)", () => {
 
       expect(spawnedAgentEvents.length).toBeGreaterThanOrEqual(4);
     },
-    RECURSIVE_TEST_TIMEOUT_MS,
+    RECURSIVE_TEST_TIMEOUT_MILLISECONDS,
   );
 });

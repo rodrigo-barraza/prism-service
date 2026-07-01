@@ -331,7 +331,7 @@ describe("done event → appendAndFinalize race condition", () => {
     }
 
     function simulateFireAndForget(
-      writeDelayMs: number,
+      writeDelayMilliseconds: number,
     ): {
       appendAndFinalize: () => void;
       events: TimelineEvent[];
@@ -348,7 +348,7 @@ describe("done event → appendAndFinalize race condition", () => {
             timestamp: Date.now(),
             event: "appendAndFinalize_complete",
           });
-        }, writeDelayMs);
+        }, writeDelayMilliseconds);
       };
 
       return {
@@ -359,7 +359,7 @@ describe("done event → appendAndFinalize race condition", () => {
     }
 
     function simulateAwaitableAppend(
-      writeDelayMs: number,
+      writeDelayMilliseconds: number,
     ): {
       appendAndFinalize: () => Promise<void>;
       events: TimelineEvent[];
@@ -370,7 +370,7 @@ describe("done event → appendAndFinalize race condition", () => {
 
       const appendAndFinalize = async () => {
         events.push({ timestamp: Date.now(), event: "appendAndFinalize_start" });
-        await new Promise((resolve) => setTimeout(resolve, writeDelayMs));
+        await new Promise((resolve) => setTimeout(resolve, writeDelayMilliseconds));
         isWriteComplete = true;
         events.push({
           timestamp: Date.now(),

@@ -479,7 +479,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
           result: "Step completed",
           summary: "Done",
           toolUses: 1,
-          durationMs: 50,
+          durationMilliseconds: 50,
           iterations: 1,
           messages: [],
           diff: {
@@ -562,7 +562,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
           result: "Point made.",
           summary: "Done",
           toolUses: 1,
-          durationMs: 50,
+          durationMilliseconds: 50,
           iterations: 1,
           messages: [],
           diff: {
@@ -840,7 +840,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
         diff: null,
         error: null,
         startedAt: Date.now(),
-        durationMs: 0,
+        durationMilliseconds: 0,
         totalCost: null,
         usage: null,
         abortController: null,

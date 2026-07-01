@@ -351,8 +351,8 @@ vi.mock("../src/constants.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/constants.ts")>();
   return {
     ...actual,
-    DIRECTORY_CACHE_TTL_MS: 60_000,
-    DIRECTORY_FETCH_TIMEOUT_MS: 5_000,
+    DIRECTORY_CACHE_TTL_MILLISECONDS: 60_000,
+    DIRECTORY_FETCH_TIMEOUT_MILLISECONDS: 5_000,
   };
 });
 

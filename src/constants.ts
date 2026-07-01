@@ -133,6 +133,9 @@ export const MODALITY_TYPES = {
   EMBEDDING: "embedding",
 };
 
+/** @deprecated Use MODALITY_TYPES instead. Kept for test backward compatibility. */
+export const TYPES = MODALITY_TYPES;
+
 export const MODEL_TYPES = {
   CONVERSATION: "conversation",
   AUDIO: "audio",
@@ -159,6 +162,9 @@ export const FILE_CATEGORIES = {
 export const HARNESS_IDENTIFIERS = {
   STANDARD: "standard",
 } as const;
+
+/** @deprecated Use HARNESS_IDENTIFIERS instead. Kept for test backward compatibility. */
+export const HARNESS_IDS = HARNESS_IDENTIFIERS;
 
 // Re-exported from utilities-library (single source of truth)
 export { THOUGHT_STRUCTURES } from "@rodrigo-barraza/utilities-library/taxonomy";

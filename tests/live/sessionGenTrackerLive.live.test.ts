@@ -34,8 +34,8 @@ const TARGET_MODEL_PATTERNS = [
 ];
 
 // ── Timeout constants ──────────────────────────────────────
-const AGENT_TIMEOUT_MS = 120_000;
-const SSE_IDLE_TIMEOUT_MS = 60_000;
+const AGENT_TIMEOUT_MILLISECONDS = 120_000;
+const SSE_IDLE_TIMEOUT_MILLISECONDS = 60_000;
 
 // ═══════════════════════════════════════════════════════════
 // Helpers
@@ -67,7 +67,7 @@ async function findTargetModel() {
  * Extended to capture generation_progress and worker_status events
  * for tok/s validation.
  */
-async function consumeAgentSSE(response: any, { timeoutMs = AGENT_TIMEOUT_MS, controller }: any = {}) {
+async function consumeAgentSSE(response: any, { timeoutMilliseconds = AGENT_TIMEOUT_MILLISECONDS, controller }: any = {}) {
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -86,7 +86,7 @@ async function consumeAgentSSE(response: any, { timeoutMs = AGENT_TIMEOUT_MS, co
     aborted: false,
     timedOut: false,
     totalEvents: 0,
-    durationMs: 0,
+    durationMilliseconds: 0,
 
     // ── Tok/s tracking fields ────────────────────────────
     generationProgressEvents: [],   // { tokPerSec, activeRequests, outputTokens }
@@ -103,11 +103,11 @@ async function consumeAgentSSE(response: any, { timeoutMs = AGENT_TIMEOUT_MS, co
     result.timedOut = true;
     controller?.abort();
     reader.cancel().catch(() => {});
-  }, timeoutMs);
+  }, timeoutMilliseconds);
 
   const idleTimeoutId = setInterval(() => {
-    if (Date.now() - lastEventTime > SSE_IDLE_TIMEOUT_MS) {
-      console.warn(`  ⚠ SSE idle for ${SSE_IDLE_TIMEOUT_MS / 1000}s — aborting`);
+    if (Date.now() - lastEventTime > SSE_IDLE_TIMEOUT_MILLISECONDS) {
+      console.warn(`  ⚠ SSE idle for ${SSE_IDLE_TIMEOUT_MILLISECONDS / 1000}s — aborting`);
       result.timedOut = true;
       controller?.abort();
       reader.cancel().catch(() => {});
@@ -211,7 +211,7 @@ async function consumeAgentSSE(response: any, { timeoutMs = AGENT_TIMEOUT_MS, co
   } finally {
     clearTimeout(timeoutId);
     clearInterval(idleTimeoutId);
-    result.durationMs = Date.now() - startTime;
+    result.durationMilliseconds = Date.now() - startTime;
   }
 
   return result;
@@ -220,7 +220,7 @@ async function consumeAgentSSE(response: any, { timeoutMs = AGENT_TIMEOUT_MS, co
 /**
  * Stream an agent request and return structured SSE results.
  */
-async function agentStream(payload: any, { timeoutMs = AGENT_TIMEOUT_MS }: any = {}) {
+async function agentStream(payload: any, { timeoutMilliseconds = AGENT_TIMEOUT_MILLISECONDS }: any = {}) {
   const controller = new AbortController();
   const response = await fetch(`${PRISM_SERVICE_URL}/agent`, {
     method: "POST",
@@ -238,14 +238,14 @@ async function agentStream(payload: any, { timeoutMs = AGENT_TIMEOUT_MS }: any =
     throw new Error(`Agent endpoint failed: ${response.status} ${text}`);
   }
 
-  return consumeAgentSSE(response, { timeoutMs, controller });
+  return consumeAgentSSE(response, { timeoutMilliseconds, controller });
 }
 
 /**
  * Log tok/s test results with comprehensive telemetry.
  */
 function logTokPerSecResult(label: any, result: any) {
-  const dur = (result.durationMs / 1000).toFixed(1);
+  const dur = (result.durationMilliseconds / 1000).toFixed(1);
   const progEvents = result.generationProgressEvents;
   const lastProg = progEvents[progEvents.length - 1];
   const peakTokPerSec = progEvents.reduce(
@@ -373,7 +373,7 @@ describe("SessionGenerationTracker — Tok/s Attribution", () => {
 
     // usage_update should also have been emitted at least once
     expect(result.usageUpdateEvents.length).toBeGreaterThan(0);
-  }, AGENT_TIMEOUT_MS + 10_000);
+  }, AGENT_TIMEOUT_MILLISECONDS + 10_000);
 
   // ── Test 2: Tool-calling agent maintains tok/s across iterations ──
   // When an agent generates tool call JSON, the LLM is actively producing
@@ -419,7 +419,7 @@ describe("SessionGenerationTracker — Tok/s Attribution", () => {
       expect(typeof event.activeRequests).toBe("number");
       expect(typeof event.outputTokens).toBe("number");
     }
-  }, AGENT_TIMEOUT_MS + 30_000);
+  }, AGENT_TIMEOUT_MILLISECONDS + 30_000);
 
   // ── Test 3: Coordinator with 4 workers — combined + per-worker tok/s ──
   // The critical test: spawn 4 parallel workers and validate that:
@@ -452,7 +452,7 @@ describe("SessionGenerationTracker — Tok/s Attribution", () => {
       maxTokens: 1500,
       autoApprove: true,
       maxIterations: 10,
-    }, { timeoutMs: COORDINATOR_TIMEOUT });
+    }, { timeoutMilliseconds: COORDINATOR_TIMEOUT });
 
     logTokPerSecResult("Coordinator + 4 Workers — tok/s", result);
 
@@ -577,7 +577,7 @@ describe("SessionGenerationTracker — Tok/s Attribution", () => {
       expect(ratio).toBeGreaterThan(0.1);
       expect(ratio).toBeLessThan(5);
     }
-  }, AGENT_TIMEOUT_MS + 10_000);
+  }, AGENT_TIMEOUT_MILLISECONDS + 10_000);
 
   // ── Test 5: Full metrics — inputTokens, totalTokens, avgTtft ─────
   // Validates that all backend-sourced metrics are present and accurate
@@ -662,5 +662,5 @@ describe("SessionGenerationTracker — Tok/s Attribution", () => {
         expect(event.totalTokens).toBe(event.inputTokens + event.outputTokens);
       }
     }
-  }, AGENT_TIMEOUT_MS + 10_000);
+  }, AGENT_TIMEOUT_MILLISECONDS + 10_000);
 });

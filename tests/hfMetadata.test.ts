@@ -35,6 +35,7 @@ vi.mock('../src/config.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/config.ts')>();
   return {
     ...actual,
+    MODALITY_TYPES: TYPES,
     TYPES,
   };
 });

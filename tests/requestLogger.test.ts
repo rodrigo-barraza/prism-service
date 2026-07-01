@@ -148,7 +148,7 @@ describe("RequestLogger Unit Tests Suite", () => {
           { role: "user", content: "Extract info" },
         ],
         resultText: "Extracted data",
-        requestStartMs: requestStartMilliseconds,
+        requestStartMilliseconds: requestStartMilliseconds,
         success: true,
       });
 

@@ -508,7 +508,7 @@ describe('BaseAgenticHarness Helper Methods', () => {
     it('should emit progress when time interval is exceeded', () => {
       const harness = createTestHarness();
       const state = harness.getState();
-      state.lastProgressEmitTime = performance.now() - state.PROGRESS_TIME_INTERVAL_MS - 1000;
+      state.lastProgressEmitTime = performance.now() - state.PROGRESS_TIME_INTERVAL_MILLISECONDS - 1000;
       state.chunksSinceLastProgress = 0;
 
       harness.maybeEmitProgress();

@@ -34,8 +34,8 @@ const TARGET_MODEL_PATTERNS = [
 ];
 
 // ── Timeout constants ──────────────────────────────────────
-const AGENT_TIMEOUT_MS = 120_000;       // 2 min per agent call
-const SSE_IDLE_TIMEOUT_MS = 60_000;     // No SSE event for 60s = hung
+const AGENT_TIMEOUT_MILLISECONDS = 120_000;       // 2 min per agent call
+const SSE_IDLE_TIMEOUT_MILLISECONDS = 60_000;     // No SSE event for 60s = hung
 
 // ── Helpers ────────────────────────────────────────────────
 
@@ -72,7 +72,7 @@ async function findTargetModel() {
  *
  * @returns {Promise<any>} Parsed result
  */
-async function consumeAgentSSE(response: any, { timeoutMs = AGENT_TIMEOUT_MS, controller }: any = {}) {
+async function consumeAgentSSE(response: any, { timeoutMilliseconds = AGENT_TIMEOUT_MILLISECONDS, controller }: any = {}) {
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -98,7 +98,7 @@ async function consumeAgentSSE(response: any, { timeoutMs = AGENT_TIMEOUT_MS, co
     aborted: false,
     timedOut: false,
     totalEvents: 0,
-    durationMs: 0,
+    durationMilliseconds: 0,
   };
 
   const startTime = Date.now();
@@ -109,12 +109,12 @@ async function consumeAgentSSE(response: any, { timeoutMs = AGENT_TIMEOUT_MS, co
     result.timedOut = true;
     controller?.abort();
     reader.cancel().catch(() => {});
-  }, timeoutMs);
+  }, timeoutMilliseconds);
 
   // Idle detection timer — resets on every event
   const idleTimeoutId = setInterval(() => {
-    if (Date.now() - lastEventTime > SSE_IDLE_TIMEOUT_MS) {
-      console.warn(`  ⚠ SSE idle for ${SSE_IDLE_TIMEOUT_MS / 1000}s — aborting`);
+    if (Date.now() - lastEventTime > SSE_IDLE_TIMEOUT_MILLISECONDS) {
+      console.warn(`  ⚠ SSE idle for ${SSE_IDLE_TIMEOUT_MILLISECONDS / 1000}s — aborting`);
       result.timedOut = true;
       controller?.abort();
       reader.cancel().catch(() => {});
@@ -206,7 +206,7 @@ async function consumeAgentSSE(response: any, { timeoutMs = AGENT_TIMEOUT_MS, co
   } finally {
     clearTimeout(timeoutId);
     clearInterval(idleTimeoutId);
-    result.durationMs = Date.now() - startTime;
+    result.durationMilliseconds = Date.now() - startTime;
   }
 
   return result;
@@ -217,7 +217,7 @@ async function consumeAgentSSE(response: any, { timeoutMs = AGENT_TIMEOUT_MS, co
  *
  * @returns {Promise<any>} Parsed SSE result
  */
-async function agentStream(payload: any, { timeoutMs = AGENT_TIMEOUT_MS }: any = {}) {
+async function agentStream(payload: any, { timeoutMilliseconds = AGENT_TIMEOUT_MILLISECONDS }: any = {}) {
   const controller = new AbortController();
   const response = await fetch(`${PRISM_SERVICE_URL}/agent`, {
     method: "POST",
@@ -235,7 +235,7 @@ async function agentStream(payload: any, { timeoutMs = AGENT_TIMEOUT_MS }: any =
     throw new Error(`Agent endpoint failed: ${response.status} ${text}`);
   }
 
-  return consumeAgentSSE(response, { timeoutMs, controller });
+  return consumeAgentSSE(response, { timeoutMilliseconds, controller });
 }
 
 /**
@@ -264,7 +264,7 @@ async function agentJSON(payload: any) {
  * Helper to log a test result with timing and phase info.
  */
 function logResult(label: any, result: any) {
-  const dur = (result.durationMs / 1000).toFixed(1);
+  const dur = (result.durationMilliseconds / 1000).toFixed(1);
   const phases = [...result.phases].join(" → ");
   const textLen = result.text.length;
   const thinkLen = result.thinking.length;
@@ -367,7 +367,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
     // Model may need to load once (cold start) — never more
     expect(result.modelLoadStarts).toBeLessThanOrEqual(1);
     expect(result.errors).toHaveLength(0);
-  }, AGENT_TIMEOUT_MS + 10_000);
+  }, AGENT_TIMEOUT_MILLISECONDS + 10_000);
 
   // ── Test 2: Multi-turn continuation (THE BUG REPRODUCTION) ──
   // This is the exact scenario that triggers the infinite loop:
@@ -450,7 +450,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
     expect(turn3.promptProcessingStarts).toBeLessThanOrEqual(2);
     expect(turn3.modelLoadStarts).toBe(0);
     expect(turn3.errors).toHaveLength(0);
-  }, AGENT_TIMEOUT_MS * 3 + 30_000);
+  }, AGENT_TIMEOUT_MILLISECONDS * 3 + 30_000);
 
   // ── Test 3: Agent with tool calling ──────────────────────────
   // Verifies the OpenAI-compat path (_streamOpenAICompat) used
@@ -481,7 +481,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
     // starts (initial + retries).
     expect(result.promptProcessingStarts).toBeLessThanOrEqual(4);
     expect(result.modelLoadStarts).toBeLessThanOrEqual(1);
-  }, AGENT_TIMEOUT_MS + 30_000);
+  }, AGENT_TIMEOUT_MILLISECONDS + 30_000);
 
   // ── Test 4: Abort mid-generation ─────────────────────────────
   // Ensures that aborting a stream doesn't leave the model in a
@@ -582,7 +582,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
     expect(followUp.promptProcessingStarts).toBeLessThanOrEqual(2);
     // Model may need to reload after abort — that's acceptable
     expect(followUp.modelLoadStarts).toBeLessThanOrEqual(1);
-  }, AGENT_TIMEOUT_MS * 2 + 20_000);
+  }, AGENT_TIMEOUT_MILLISECONDS * 2 + 20_000);
 
   // ── Test 5: Rapid consecutive turns ──────────────────────────
   // Stress test: send 5 rapid-fire single-turn requests to verify
@@ -612,7 +612,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
     console.log("\n  ┌─ Rapid Turns ─────────────────────────────────────────┐");
     for (let i = 0; i < results.length; i++) {
       const r = results[i];
-      const dur = (r.durationMs / 1000).toFixed(1);
+      const dur = (r.durationMilliseconds / 1000).toFixed(1);
       const status = r.timedOut ? "⏰" : r.errors.length > 0 ? "✗" : "✓";
       const pp = r.promptProcessingStarts;
       const loads = r.modelLoadStarts;
@@ -632,7 +632,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
     // Only the first turn should need to load the model (if not already loaded)
     const totalLoads = results.reduce((s, r) => s + r.modelLoadStarts, 0);
     expect(totalLoads).toBeLessThanOrEqual(1);
-  }, AGENT_TIMEOUT_MS * 5 + 30_000);
+  }, AGENT_TIMEOUT_MILLISECONDS * 5 + 30_000);
 
   // ── Test 6: Non-streaming JSON agent ─────────────────────────
   // Validates the ?stream=false path completes without hanging.
@@ -658,7 +658,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
     // Verify usage structure exists (values may be zero for empty model output)
     expect(typeof result.usage.inputTokens).toBe("number");
     expect(typeof result.usage.outputTokens).toBe("number");
-  }, AGENT_TIMEOUT_MS + 10_000);
+  }, AGENT_TIMEOUT_MILLISECONDS + 10_000);
 
   // ── Test 7: Coordinator with 4 workers across 3 turns ────────
   // Exercises the full coordinator pipeline: the model is asked to
@@ -692,7 +692,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
       maxTokens: 1000,
       autoApprove: true,
       maxIterations: 10,
-    }, { timeoutMs: COORDINATOR_TIMEOUT });
+    }, { timeoutMilliseconds: COORDINATOR_TIMEOUT });
 
     logResult("Coordinator Turn 1", turn1);
 
@@ -742,7 +742,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
       maxTokens: 500,
       autoApprove: true,
       maxIterations: 5,
-    }, { timeoutMs: COORDINATOR_TIMEOUT });
+    }, { timeoutMilliseconds: COORDINATOR_TIMEOUT });
 
     logResult("Coordinator Turn 2", turn2);
 
@@ -775,7 +775,7 @@ describe("Agent Loop — LM Studio Agentic Endpoint", () => {
       maxTokens: 50,
       autoApprove: true,
       maxIterations: 3,
-    }, { timeoutMs: COORDINATOR_TIMEOUT });
+    }, { timeoutMilliseconds: COORDINATOR_TIMEOUT });
 
     logResult("Coordinator Turn 3", turn3);
 

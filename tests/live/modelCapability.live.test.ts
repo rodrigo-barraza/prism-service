@@ -91,7 +91,7 @@ describe("Suite 1: Tool Calling Capability", () => {
           autoApprove: true,
           maxIterations: 5,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`1.1 [${target.providerName}]`, result);
@@ -125,7 +125,7 @@ describe("Suite 1: Tool Calling Capability", () => {
           autoApprove: true,
           maxIterations: 6,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`1.2 [${target.providerName}]`, result);
@@ -163,7 +163,7 @@ describe("Suite 1: Tool Calling Capability", () => {
           autoApprove: true,
           maxIterations: 5,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`1.3 [${target.providerName}]`, result);
@@ -198,7 +198,7 @@ describe("Suite 1: Tool Calling Capability", () => {
           autoApprove: true,
           maxIterations: 5,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`1.4 [${target.providerName}]`, result);
@@ -233,7 +233,7 @@ describe("Suite 1: Tool Calling Capability", () => {
           maxIterations: 5,
           thinkingEnabled: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`1.5 [${target.providerName}]`, result);
@@ -267,7 +267,7 @@ describe("Suite 1: Tool Calling Capability", () => {
           autoApprove: true,
           maxIterations: 8,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`1.6 [${target.providerName}]`, result);
@@ -303,7 +303,7 @@ describe("Suite 1: Tool Calling Capability", () => {
           maxIterations: 5,
           harness: HARNESS_IDS.STANDARD,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`1.7 [${target.providerName}]`, result);
@@ -337,7 +337,7 @@ describe("Suite 1: Tool Calling Capability", () => {
           autoApprove: true,
           maxIterations: 5,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`1.8 [${target.providerName}]`, result);
@@ -384,7 +384,7 @@ describe("Suite 2: Thinking Quality", () => {
           autoApprove: true,
           thinkingEnabled: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`2.1 [${target.providerName}]`, result);
@@ -423,7 +423,7 @@ describe("Suite 2: Thinking Quality", () => {
           autoApprove: true,
           thinkingEnabled: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`2.2 [${target.providerName}]`, result);
@@ -467,7 +467,7 @@ describe("Suite 2: Thinking Quality", () => {
           maxIterations: 5,
           thinkingEnabled: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`2.3 [${target.providerName}]`, result);
@@ -510,7 +510,7 @@ describe("Suite 2: Thinking Quality", () => {
           maxIterations: 5,
           thinkingEnabled: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`2.4 [${target.providerName}]`, result);
@@ -551,7 +551,7 @@ describe("Suite 3: Multi-Turn Context", () => {
           maxTokens: 200,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`3.1 Turn 1 [${target.providerName}]`, turn1);
@@ -572,7 +572,7 @@ describe("Suite 3: Multi-Turn Context", () => {
           maxTokens: 100,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`3.1 Turn 2 [${target.providerName}]`, turn2);
@@ -606,7 +606,7 @@ describe("Suite 3: Multi-Turn Context", () => {
           maxTokens: 200,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
       expect(turn1.done).toBeTruthy();
 
@@ -624,7 +624,7 @@ describe("Suite 3: Multi-Turn Context", () => {
           maxTokens: 100,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
       expect(turn2.done).toBeTruthy();
 
@@ -644,7 +644,7 @@ describe("Suite 3: Multi-Turn Context", () => {
           maxTokens: 50,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`3.2 Turn 3 [${target.providerName}]`, turn3);
@@ -679,7 +679,7 @@ describe("Suite 3: Multi-Turn Context", () => {
           autoApprove: true,
           maxIterations: 3,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
       expect(turn1.done).toBeTruthy();
 
@@ -706,7 +706,7 @@ describe("Suite 3: Multi-Turn Context", () => {
           maxTokens: 100,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`3.3 Turn 2 [${target.providerName}]`, turn2);
@@ -748,7 +748,7 @@ describe("Suite 3: Multi-Turn Context", () => {
           autoApprove: true,
           thinkingEnabled: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
       expect(turn1.done).toBeTruthy();
 
@@ -771,7 +771,7 @@ describe("Suite 3: Multi-Turn Context", () => {
           autoApprove: true,
           thinkingEnabled: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`3.4 Turn 2 [${target.providerName}]`, turn2);
@@ -819,7 +819,7 @@ describe("Suite 4: Plan Mode Compliance", () => {
           maxIterations: 5,
           planFirst: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`4.1 [${target.providerName}]`, result);
@@ -872,7 +872,7 @@ describe("Suite 5: Usage & Cost Reporting", () => {
           maxTokens: 100,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`5.1 [${target.providerName}]`, result);
@@ -904,7 +904,7 @@ describe("Suite 5: Usage & Cost Reporting", () => {
           maxTokens: 200,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`5.2 [${target.providerName}]`, result);
@@ -939,7 +939,7 @@ describe("Suite 5: Usage & Cost Reporting", () => {
           autoApprove: true,
           maxIterations: 5,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`5.3 [${target.providerName}]`, result);
@@ -990,7 +990,7 @@ describe("Suite 6: Multi-Agent Orchestration", () => {
           autoApprove: true,
           maxIterations: 10,
         },
-        { timeoutMs: getMultiAgentTimeout(target) },
+        { timeoutMilliseconds: getMultiAgentTimeout(target) },
       );
 
       logResult(`6.1 [${target.providerName}]`, result);
@@ -1043,7 +1043,7 @@ describe("Suite 6: Multi-Agent Orchestration", () => {
           autoApprove: true,
           maxIterations: 15,
         },
-        { timeoutMs: getMultiAgentTimeout(target) },
+        { timeoutMilliseconds: getMultiAgentTimeout(target) },
       );
 
       logResult(`6.2 [${target.providerName}]`, result);
@@ -1089,7 +1089,7 @@ describe("Suite 6: Multi-Agent Orchestration", () => {
           maxIterations: 15,
           topology: "sequential",
         },
-        { timeoutMs: getMultiAgentTimeout(target) },
+        { timeoutMilliseconds: getMultiAgentTimeout(target) },
       );
 
       logResult(`6.3 [${target.providerName}]`, result);
@@ -1145,7 +1145,7 @@ describe("Suite 7: Cross-Provider Tool Format", () => {
           autoApprove: true,
           maxIterations: 5,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`7.1 [${target.providerName}]`, result);

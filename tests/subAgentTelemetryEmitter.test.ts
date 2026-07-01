@@ -475,7 +475,7 @@ describe("SubAgentTelemetryEmitter", () => {
           (call[0] as Record<string, unknown>).message === "complete",
       );
       expect(completionEvent).toBeDefined();
-      expect(completionEvent![0].durationMs).toBe(5000);
+      expect(completionEvent![0].durationMilliseconds).toBe(5000);
       expect(completionEvent![0].toolCount).toBe(2);
       expect(completionEvent![0].usage).toEqual({ inputTokens: 800, outputTokens: 300 });
       expect(completionEvent![0].estimatedCost).toBe(0.065);

@@ -512,7 +512,7 @@ describe("ToolOrchestratorService", () => {
           controller.enqueue(encoder.encode('data: {"event":"start"}\n'));
           controller.enqueue(encoder.encode('data: {"event":"stdout","data":"hello "}\n'));
           controller.enqueue(encoder.encode('data: {"event":"stdout","data":"world"}\n'));
-          controller.enqueue(encoder.encode('data: {"event":"exit","success":true,"exitCode":0,"executionTimeMs":50}\n'));
+          controller.enqueue(encoder.encode('data: {"event":"exit","success":true,"exitCode":0,"executionTimeMilliseconds":50}\n'));
           controller.close();
         }
       });
@@ -536,7 +536,7 @@ describe("ToolOrchestratorService", () => {
         stdout: "hello world",
         stderr: "",
         exitCode: 0,
-        executionTimeMs: 50,
+        executionTimeMilliseconds: 50,
         timedOut: false,
       });
       expect(onChunk).toHaveBeenCalledTimes(4); // start, stdout (hello ), stdout (world), exit

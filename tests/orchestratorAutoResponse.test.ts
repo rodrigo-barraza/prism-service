@@ -69,11 +69,11 @@ function cleanAllConversations() {
 async function waitForMockCalls(
   mock: ReturnType<typeof vi.fn>,
   expectedCalls: number,
-  timeoutMs = 5000,
+  timeoutMilliseconds = 5000,
 ): Promise<void> {
   const startTime = Date.now();
   while (mock.mock.calls.length < expectedCalls) {
-    if (Date.now() - startTime > timeoutMs) {
+    if (Date.now() - startTime > timeoutMilliseconds) {
       throw new Error(
         `Timed out waiting for mock to be called ${expectedCalls} times (got ${mock.mock.calls.length})`,
       );
@@ -155,7 +155,7 @@ describe("Event-Driven Auto-Response", () => {
           result: "Paper A, Paper B, Paper C",
           toolUses: 5,
           iterations: 2,
-          durationMs: 12000,
+          durationMilliseconds: 12000,
           messages: [],
         },
         {
@@ -166,7 +166,7 @@ describe("Event-Driven Auto-Response", () => {
           result: "Feature implemented successfully",
           toolUses: 10,
           iterations: 4,
-          durationMs: 30000,
+          durationMilliseconds: 30000,
           messages: [],
         },
       ];
@@ -213,7 +213,7 @@ describe("Event-Driven Auto-Response", () => {
           result: "Done",
           toolUses: 1,
           iterations: 1,
-          durationMs: 1000,
+          durationMilliseconds: 1000,
           messages: [],
         },
         {
@@ -224,7 +224,7 @@ describe("Event-Driven Auto-Response", () => {
           result: "",
           toolUses: 0,
           iterations: 0,
-          durationMs: 500,
+          durationMilliseconds: 500,
           messages: [],
         },
       ] as SubAgentResult[];
@@ -260,7 +260,7 @@ describe("Event-Driven Auto-Response", () => {
           result: longOutput,
           toolUses: 1,
           iterations: 1,
-          durationMs: 1000,
+          durationMilliseconds: 1000,
           messages: [],
         },
       ];
@@ -301,7 +301,7 @@ describe("Event-Driven Auto-Response", () => {
           [{
             agent_id: "a1", description: "A", status: "completed",
             summary: "", result: "x", toolUses: 0, iterations: 0,
-            durationMs: 0, messages: [],
+            durationMilliseconds: 0, messages: [],
           }],
           orchestratorContext,
         ),
@@ -360,7 +360,7 @@ describe("Event-Driven Auto-Response", () => {
         result: "Default output text",
         toolUses: 1,
         iterations: 1,
-        durationMs: 1000,
+        durationMilliseconds: 1000,
         messages: [],
         ...overrides,
       };
@@ -414,7 +414,7 @@ describe("Event-Driven Auto-Response", () => {
         const { content } = await notifyAndExtract(
           "Worker_Team",
           "sequential",
-          [createSubAgentResult({ toolUses: 12, durationMs: 45000 })],
+          [createSubAgentResult({ toolUses: 12, durationMilliseconds: 45000 })],
         );
 
         for (const fieldName of REQUIRED_XML_FIELDS) {
@@ -427,11 +427,11 @@ describe("Event-Driven Auto-Response", () => {
 
       it("should aggregate tool_uses and duration_ms across all sub-agents", async () => {
         const fastAgentToolUses = 3;
-        const fastAgentDurationMs = 10_000;
+        const fastAgentDurationMilliseconds = 10_000;
         const slowAgentToolUses = 15;
-        const slowAgentDurationMs = 80_000;
+        const slowAgentDurationMilliseconds = 80_000;
         const expectedTotalToolUses = fastAgentToolUses + slowAgentToolUses;
-        const expectedTotalDurationMs = fastAgentDurationMs + slowAgentDurationMs;
+        const expectedTotalDurationMilliseconds = fastAgentDurationMilliseconds + slowAgentDurationMilliseconds;
 
         const { content } = await notifyAndExtract(
           "Dual_Team",
@@ -441,19 +441,19 @@ describe("Event-Driven Auto-Response", () => {
               agent_id: "agent-fast",
               description: "Fast agent",
               toolUses: fastAgentToolUses,
-              durationMs: fastAgentDurationMs,
+              durationMilliseconds: fastAgentDurationMilliseconds,
             }),
             createSubAgentResult({
               agent_id: "agent-slow",
               description: "Slow agent",
               toolUses: slowAgentToolUses,
-              durationMs: slowAgentDurationMs,
+              durationMilliseconds: slowAgentDurationMilliseconds,
             }),
           ],
         );
 
         expect(content).toContain(`<tool_uses>${expectedTotalToolUses}</tool_uses>`);
-        expect(content).toContain(`<duration_ms>${expectedTotalDurationMs}</duration_ms>`);
+        expect(content).toContain(`<duration_ms>${expectedTotalDurationMilliseconds}</duration_ms>`);
       });
 
       it("should set status to 'failed' when any sub-agent fails", async () => {
@@ -469,7 +469,7 @@ describe("Event-Driven Auto-Response", () => {
               result: "",
               toolUses: 0,
               iterations: 0,
-              durationMs: 1000,
+              durationMilliseconds: 1000,
             }),
           ],
         );

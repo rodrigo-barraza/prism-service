@@ -23,7 +23,7 @@ describe('Memory Consolidation Tracker Unit Tests', () => {
     actionsApplied: number;
     actions: any[];
     summary: string;
-    durationMs: number;
+    durationMilliseconds: number;
   }> = [];
 
   beforeEach(() => {
@@ -163,7 +163,7 @@ describe('Memory Consolidation Tracker Unit Tests', () => {
         { type: 'delete', deletedId: 'id3', reason: 'Redundant' },
       ]);
       expect(record.summary).toBe('Consolidated memories successfully');
-      expect(record.durationMs).toBe(150);
+      expect(record.durationMilliseconds).toBe(150);
       expect(record.runAt).toBeDefined();
     });
   });
@@ -179,7 +179,7 @@ describe('Memory Consolidation Tracker Unit Tests', () => {
         actionsApplied: 1,
         actions: [],
         summary: 'Merged',
-        durationMs: 100,
+        durationMilliseconds: 100,
       });
 
       const allowed = await canRunToday('test-project');
@@ -197,7 +197,7 @@ describe('Memory Consolidation Tracker Unit Tests', () => {
           actionsApplied: 1,
           actions: [],
           summary: 'Merged',
-          durationMs: 100,
+          durationMilliseconds: 100,
         });
       }
 
@@ -219,7 +219,7 @@ describe('Memory Consolidation Tracker Unit Tests', () => {
           actionsApplied: 1,
           actions: [],
           summary: 'Merged',
-          durationMs: 100,
+          durationMilliseconds: 100,
         });
       }
 
@@ -239,7 +239,7 @@ describe('Memory Consolidation Tracker Unit Tests', () => {
         actionsApplied: 1,
         actions: [],
         summary: 'Merged 1',
-        durationMs: 100,
+        durationMilliseconds: 100,
       });
       mockHistory.push({
         project: 'test-project',
@@ -250,7 +250,7 @@ describe('Memory Consolidation Tracker Unit Tests', () => {
         actionsApplied: 1,
         actions: [],
         summary: 'Merged 2',
-        durationMs: 120,
+        durationMilliseconds: 120,
       });
 
       const history = await getHistory('test-project', 1);

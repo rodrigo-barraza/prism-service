@@ -90,7 +90,7 @@ describe("MCTSRouter - Pure Functions", () => {
             result: "root-result",
             toolUses: 0,
             iterations: 1,
-            durationMs: 100,
+            durationMilliseconds: 100,
             messages: [],
           },
           score: 0.5,
@@ -112,7 +112,7 @@ describe("MCTSRouter - Pure Functions", () => {
             result: "child-result",
             toolUses: 0,
             iterations: 1,
-            durationMs: 100,
+            durationMilliseconds: 100,
             messages: [],
           },
           score: 0.5,
@@ -134,7 +134,7 @@ describe("MCTSRouter - Pure Functions", () => {
             result: "leaf-result",
             toolUses: 0,
             iterations: 1,
-            durationMs: 100,
+            durationMilliseconds: 100,
             messages: [],
           },
           score: 0.5,
@@ -175,7 +175,7 @@ describe("MCTSRouter - Pure Functions", () => {
             result: "root-result",
             toolUses: 0,
             iterations: 1,
-            durationMs: 100,
+            durationMilliseconds: 100,
             messages: [],
           },
           score: 0.5,
@@ -207,7 +207,7 @@ describe("MCTSRouter - Pure Functions", () => {
             result: "root-result",
             toolUses: 0,
             iterations: 1,
-            durationMs: 100,
+            durationMilliseconds: 100,
             messages: [],
           },
           score: 0.5,
@@ -477,7 +477,7 @@ describe("MCTSRouter - Pure Functions", () => {
         result: "primary result text",
         toolUses: 0,
         iterations: 1,
-        durationMs: 100,
+        durationMilliseconds: 100,
         messages: [],
       };
 
@@ -492,7 +492,7 @@ describe("MCTSRouter - Pure Functions", () => {
         toolUses: 1,
         toolNames: { test: 1 },
         iterations: 1,
-        durationMs: 100,
+        durationMilliseconds: 100,
         messages: [{ role: "assistant", tool_calls: [{ id: "call-1", type: "function", function: { name: "test", arguments: "{}" } }] }],
       };
 
@@ -506,7 +506,7 @@ describe("MCTSRouter - Pure Functions", () => {
         result: "",
         toolUses: 0,
         iterations: 1,
-        durationMs: 100,
+        durationMilliseconds: 100,
         messages: [],
       };
 
@@ -520,7 +520,7 @@ describe("MCTSRouter - Pure Functions", () => {
         result: "",
         toolUses: 0,
         iterations: 0,
-        durationMs: 100,
+        durationMilliseconds: 100,
         messages: [],
       };
 
@@ -545,7 +545,7 @@ describe("MCTSRouter.execute() - Main Orchestration Loop", () => {
       result: "Success implementation",
       toolUses: 3,
       iterations: 5,
-      durationMs: 1000,
+      durationMilliseconds: 1000,
       messages: [],
     });
 
@@ -747,7 +747,7 @@ describe("MCTSRouter.execute() - Main Orchestration Loop", () => {
         result: "Result A",
         toolUses: 0,
         iterations: 1,
-        durationMs: 100,
+        durationMilliseconds: 100,
         messages: [],
       })
       .mockResolvedValueOnce({
@@ -758,7 +758,7 @@ describe("MCTSRouter.execute() - Main Orchestration Loop", () => {
         result: "Result B",
         toolUses: 0,
         iterations: 1,
-        durationMs: 100,
+        durationMilliseconds: 100,
         messages: [],
       })
       .mockResolvedValue({ error: "Execution failure" }); // Iteration 2 branches fail
@@ -829,7 +829,7 @@ describe("MCTSRouter.execute() - Main Orchestration Loop", () => {
         result: "Highest Score Output",
         toolUses: 0,
         iterations: 1,
-        durationMs: 100,
+        durationMilliseconds: 100,
         messages: [],
       })
       .mockResolvedValueOnce({
@@ -840,7 +840,7 @@ describe("MCTSRouter.execute() - Main Orchestration Loop", () => {
         result: "Lower Score Output",
         toolUses: 0,
         iterations: 1,
-        durationMs: 100,
+        durationMilliseconds: 100,
         messages: [],
       });
 

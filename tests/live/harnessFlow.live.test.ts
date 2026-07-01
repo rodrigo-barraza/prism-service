@@ -35,7 +35,7 @@ import {
   isEmptyResponse,
   getTimeout,
   getMultiAgentTimeout,
-  DEFAULT_AGENT_TIMEOUT_MS,
+  DEFAULT_AGENT_TIMEOUT_MILLISECONDS,
   type ProviderTarget,
   type AgentSSEResult,
 } from "./helpers/agentTestHarness.ts";
@@ -94,7 +94,7 @@ describe("Suite 1: Basic SSE Stream Completion", () => {
           maxTokens: 100,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`1.1 [${target.providerName}]`, result);
@@ -121,7 +121,7 @@ describe("Suite 1: Basic SSE Stream Completion", () => {
           maxTokens: 100,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`1.2 [${target.providerName}]`, result);
@@ -149,7 +149,7 @@ describe("Suite 1: Basic SSE Stream Completion", () => {
           maxTokens: 200,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`1.3 [${target.providerName}]`, result);
@@ -175,7 +175,7 @@ describe("Suite 1: Basic SSE Stream Completion", () => {
           maxTokens: 10,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`1.4 [${target.providerName}]`, result);
@@ -209,7 +209,7 @@ describe("Suite 2: Harness Loop Mechanics", () => {
           autoApprove: true,
           maxIterations: maximumIterations,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`2.1 [${target.providerName}]`, result);
@@ -236,7 +236,7 @@ describe("Suite 2: Harness Loop Mechanics", () => {
           autoApprove: true,
           maxIterations: 5,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`2.2 [${target.providerName}]`, result);
@@ -265,7 +265,7 @@ describe("Suite 2: Harness Loop Mechanics", () => {
           autoApprove: true,
           maxIterations: 2,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`2.3 [${target.providerName}]`, result);
@@ -299,7 +299,7 @@ describe("Suite 2: Harness Loop Mechanics", () => {
           autoApprove: true,
           maxIterations: 5,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`2.4 [${target.providerName}]`, result);
@@ -338,7 +338,7 @@ describe("Suite 3: Thinking Mode Detection", () => {
           autoApprove: true,
           thinkingEnabled: false,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`3.1 [${target.providerName}]`, result);
@@ -371,7 +371,7 @@ describe("Suite 3: Thinking Mode Detection", () => {
           maxIterations: 5,
           thinkingEnabled: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`3.2 [${target.providerName}]`, result);
@@ -406,7 +406,7 @@ describe("Suite 4: Harness Variants", () => {
           harness: "tree-of-thought",
           branchCount: 2,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 2) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 2) },
       );
 
       logResult(`4.1 [${target.providerName}]`, result);
@@ -430,7 +430,7 @@ describe("Suite 4: Harness Variants", () => {
           autoApprove: true,
           harness: "vision-language",
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`4.2 [${target.providerName}]`, result);
@@ -462,7 +462,7 @@ describe("Suite 5: Plan Mode Infrastructure", () => {
           maxIterations: 5,
           planFirst: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`5.1 [${target.providerName}]`, result);
@@ -540,7 +540,7 @@ describe("Suite 6: Edge Cases & Error Handling", () => {
           maxTokens: 20,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`6.1 Post-Abort [${target.providerName}]`, followUp);
@@ -566,7 +566,7 @@ describe("Suite 6: Edge Cases & Error Handling", () => {
             maxTokens: 30,
             autoApprove: true,
           },
-          { timeoutMs: getTimeout(target) },
+          { timeoutMilliseconds: getTimeout(target) },
         );
         results.push(result);
       }
@@ -574,7 +574,7 @@ describe("Suite 6: Edge Cases & Error Handling", () => {
       console.log("\n  ┌─ Rapid Requests ──────────────────────────────────────┐");
       for (let turnIndex = 0; turnIndex < results.length; turnIndex++) {
         const turnResult = results[turnIndex];
-        const durationSeconds = (turnResult.durationMs / 1000).toFixed(1);
+        const durationSeconds = (turnResult.durationMilliseconds / 1000).toFixed(1);
         const statusIcon = turnResult.timedOut ? "⏰" : turnResult.errors.length > 0 ? "✗" : "✓";
         console.log(
           `  │ ${statusIcon} Turn ${turnIndex + 1}: ${durationSeconds.padStart(5)}s | text=${turnResult.text.length}`.padEnd(
@@ -606,7 +606,7 @@ describe("Suite 6: Edge Cases & Error Handling", () => {
             maxTokens: 100,
             autoApprove: true,
           },
-          { timeoutMs: getTimeout(target) },
+          { timeoutMilliseconds: getTimeout(target) },
         );
 
         logResult(`6.3 [${target.providerName}]`, result);
@@ -632,7 +632,7 @@ describe("Suite 6: Edge Cases & Error Handling", () => {
           maxTokens: 100,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 2) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 2) },
       );
 
       logResult(`6.4 [${target.providerName}]`, result);
@@ -656,7 +656,7 @@ describe("Suite 6: Edge Cases & Error Handling", () => {
           maxTokens: 200,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`6.5 [${target.providerName}]`, result);
@@ -683,7 +683,7 @@ describe("Suite 6: Edge Cases & Error Handling", () => {
           autoApprove: true,
           enabledTools: [],
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`6.6 [${target.providerName}]`, result);
@@ -705,7 +705,7 @@ describe("Suite 6: Edge Cases & Error Handling", () => {
           maxTokens: 100,
           autoApprove: true,
         },
-        { timeoutMs: 15_000, maxRetries: 0 },
+        { timeoutMilliseconds: 15_000, maxRetries: 0 },
       );
     } catch (error: unknown) {
       console.log(`  ✓ Invalid provider returned error: ${(error as Error).message}`);
@@ -728,7 +728,7 @@ describe("Suite 6: Edge Cases & Error Handling", () => {
             maxTokens: 100,
             autoApprove: true,
           },
-          { timeoutMs: 30_000 },
+          { timeoutMilliseconds: 30_000 },
         );
 
         logResult(`6.8 [${target.providerName}]`, result);
@@ -756,7 +756,7 @@ describe("Suite 6: Edge Cases & Error Handling", () => {
             maxTokens: 100,
             autoApprove: true,
           },
-          { timeoutMs: getTimeout(target) },
+          { timeoutMilliseconds: getTimeout(target) },
         ),
         agentStream(
           {
@@ -768,7 +768,7 @@ describe("Suite 6: Edge Cases & Error Handling", () => {
             maxTokens: 100,
             autoApprove: true,
           },
-          { timeoutMs: getTimeout(target) },
+          { timeoutMilliseconds: getTimeout(target) },
         ),
       ]);
 
@@ -812,7 +812,7 @@ describe("Suite 7: SSE Event Structure", () => {
           maxTokens: 300,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`7.1 [${target.providerName}]`, result);
@@ -842,7 +842,7 @@ describe("Suite 7: SSE Event Structure", () => {
           maxTokens: 100,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`7.2 [${target.providerName}]`, result);
@@ -874,7 +874,7 @@ describe("Suite 7: SSE Event Structure", () => {
           maxTokens: 200,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`7.3 [${target.providerName}]`, result);
@@ -929,7 +929,7 @@ describe("Suite 8: Context Window Enforcement", () => {
           maxTokens: 100,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 2) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 2) },
       );
 
       logResult(`8.1 [${target.providerName}]`, result);
@@ -979,7 +979,7 @@ describe("Suite 8: Context Window Enforcement", () => {
           maxTokens: 50,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 2) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 2) },
       );
 
       logResult(`8.2 [${target.providerName}]`, result);
@@ -1015,7 +1015,7 @@ describe("Suite 9: Output Truncation Recovery", () => {
           autoApprove: true,
           maxIterations: 5,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 2) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 2) },
       );
 
       logResult(`9.1 [${target.providerName}]`, result);
@@ -1057,7 +1057,7 @@ describe("Suite 9: Output Truncation Recovery", () => {
           autoApprove: true,
           maxIterations: 4,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 2) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 2) },
       );
 
       logResult(`9.2 [${target.providerName}]`, result);
@@ -1092,7 +1092,7 @@ describe("Suite 10: Plan Mode Full Lifecycle", () => {
           maxIterations: 5,
           planFirst: true,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 2) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 2) },
       );
 
       logResult(`10.1 [${target.providerName}]`, result);
@@ -1139,7 +1139,7 @@ describe("Suite 10: Plan Mode Full Lifecycle", () => {
           maxIterations: 8,
           planFirst: true,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 3) },
       );
 
       logResult(`10.2 [${target.providerName}]`, result);
@@ -1185,7 +1185,7 @@ describe("Suite 11: Tree-of-Thought Branching Events", () => {
           harness: "tree-of-thought",
           branchCount: 2,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 3) },
       );
 
       logResult(`11.1 [${target.providerName}]`, result);
@@ -1231,7 +1231,7 @@ describe("Suite 11: Tree-of-Thought Branching Events", () => {
           harness: "tree-of-thought",
           branchCount: 2,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 3) },
       );
 
       logResult(`11.2 [${target.providerName}]`, result);
@@ -1280,7 +1280,7 @@ describe("Suite 11: Tree-of-Thought Branching Events", () => {
           harness: "tree-of-thought",
           branchCount: 1,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 2) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 2) },
       );
 
       logResult(`11.3 [${target.providerName}]`, result);
@@ -1336,7 +1336,7 @@ describe("Suite 12: Error-Path Recovery", () => {
             autoApprove: true,
             maxIterations: 2,
           },
-          { timeoutMs: getTimeout(target) },
+          { timeoutMilliseconds: getTimeout(target) },
         );
 
         logResult(`12.1 [${target.providerName}]`, result);
@@ -1377,7 +1377,7 @@ describe("Suite 12: Error-Path Recovery", () => {
             maxTokens: 50,
             autoApprove: true,
           },
-          { timeoutMs: 30_000 },
+          { timeoutMilliseconds: 30_000 },
         );
       } catch {
         // Expected — the invalid model should error
@@ -1397,7 +1397,7 @@ describe("Suite 12: Error-Path Recovery", () => {
           maxTokens: 30,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`12.2 Post-Error Health [${target.providerName}]`, healthCheckResult);
@@ -1472,7 +1472,7 @@ describe("Suite 12: Error-Path Recovery", () => {
           maxTokens: 30,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`12.3 Post-Abort [${target.providerName}]`, postAbortResult);
@@ -1506,7 +1506,7 @@ describe("Suite 13: Dynamic Tool Discovery & Mutation", () => {
           autoApprove: true,
           maxIterations: 5,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 2) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 2) },
       );
 
       logResult(`13.1 [${target.providerName}]`, result);
@@ -1566,7 +1566,7 @@ describe("Suite 13: Dynamic Tool Discovery & Mutation", () => {
           maxIterations: 3,
           enabledTools: ["shell_execute"],
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 2) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 2) },
       );
 
       logResult(`13.2 [${target.providerName}]`, result);
@@ -1613,7 +1613,7 @@ describe("Suite 14: Harness-Specific Edge Cases", () => {
           autoApprove: true,
           harness: "vision-language",
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`14.1 VLM [${target.providerName}]`, result);
@@ -1651,7 +1651,7 @@ describe("Suite 14: Harness-Specific Edge Cases", () => {
           planFirst: true,
           harness: HARNESS_IDS.STANDARD,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 3) },
       );
 
       logResult(`14.2 [${target.providerName}]`, result);
@@ -1698,7 +1698,7 @@ describe("Suite 14: Harness-Specific Edge Cases", () => {
           autoApprove: true,
           maxIterations: 2,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 2) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 2) },
       );
 
       logResult(`14.3 [${target.providerName}]`, result);
@@ -1754,7 +1754,7 @@ describe("Suite 14: Harness-Specific Edge Cases", () => {
           autoApprove: true,
           maxIterations: 6,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 2) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 2) },
       );
 
       logResult(`14.4 [${target.providerName}]`, result);
@@ -1789,7 +1789,7 @@ describe("Suite 14: Harness-Specific Edge Cases", () => {
           autoApprove: true,
           maxIterations: maximumIterations,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`14.5 [${target.providerName}]`, result);
@@ -1830,7 +1830,7 @@ describe("Suite 14: Harness-Specific Edge Cases", () => {
           maxTokens: 100,
           autoApprove: true,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`14.6 [${target.providerName}]`, result);
@@ -1878,7 +1878,7 @@ describe("Suite 15: Harness Strategies, Topologies, and Mixtures", () => {
           harness: HARNESS_IDS.STANDARD,
           thoughtStructure: THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`15.1 [${target.providerName}]`, result);
@@ -1907,7 +1907,7 @@ describe("Suite 15: Harness Strategies, Topologies, and Mixtures", () => {
           thoughtStructure: THOUGHT_STRUCTURES.TREE_OF_THOUGHTS,
           branchCount: 2,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 3) },
       );
 
       logResult(`15.2 [${target.providerName}]`, result);
@@ -1957,7 +1957,7 @@ describe("Suite 15: Harness Strategies, Topologies, and Mixtures", () => {
           thoughtStructure: THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT,
           topology: "sequential",
         },
-        { timeoutMs: getMultiAgentTimeout(target) },
+        { timeoutMilliseconds: getMultiAgentTimeout(target) },
       );
 
       logResult(`15.3 [${target.providerName}]`, result);
@@ -2002,7 +2002,7 @@ describe("Suite 15: Harness Strategies, Topologies, and Mixtures", () => {
           topology: "sequential",
           branchCount: 2,
         },
-        { timeoutMs: getMultiAgentTimeout(target) },
+        { timeoutMilliseconds: getMultiAgentTimeout(target) },
       );
 
       logResult(`15.4 [${target.providerName}]`, result);
@@ -2041,7 +2041,7 @@ describe("Suite 15: Harness Strategies, Topologies, and Mixtures", () => {
           thoughtStructure: THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS,
           branchCount: 2,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 3) },
       );
 
       logResult(`15.5 [${target.providerName}]`, result);
@@ -2092,7 +2092,7 @@ describe("Suite 16: System Reminder Lifecycle", () => {
           maxIterations: 10,
           // reminderModel intentionally omitted — feature should be disabled
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 2) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 2) },
       );
 
       logResult(`16.1 [${target.providerName}]`, result);
@@ -2146,7 +2146,7 @@ describe("Suite 16: System Reminder Lifecycle", () => {
           reminderProvider: target.providerName,
           reminderInterval: 5,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 3) },
       );
 
       logResult(`16.2 [${target.providerName}]`, result);
@@ -2199,7 +2199,7 @@ describe("Suite 16: System Reminder Lifecycle", () => {
           reminderProvider: target.providerName,
           reminderInterval: 1,
         },
-        { timeoutMs: getTimeout(target) },
+        { timeoutMilliseconds: getTimeout(target) },
       );
 
       logResult(`16.3 [${target.providerName}]`, result);
@@ -2246,7 +2246,7 @@ describe("Suite 17: Graph-of-Thoughts Branching & Synthesis Events", () => {
           thoughtStructure: THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS,
           branchCount: 2,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 3) },
       );
 
       logResult(`17.1 [${target.providerName}]`, result);
@@ -2306,7 +2306,7 @@ describe("Suite 17: Graph-of-Thoughts Branching & Synthesis Events", () => {
           thoughtStructure: THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS,
           branchCount: 3,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 3) },
       );
 
       logResult(`17.2 [${target.providerName}]`, result);
@@ -2353,7 +2353,7 @@ describe("Suite 17: Graph-of-Thoughts Branching & Synthesis Events", () => {
           thoughtStructure: THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS,
           branchCount: 1,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 2) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 2) },
       );
 
       logResult(`17.3 [${target.providerName}]`, result);
@@ -2396,7 +2396,7 @@ describe("Suite 17: Graph-of-Thoughts Branching & Synthesis Events", () => {
           thoughtStructure: THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS,
           branchCount: 2,
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 3) },
       );
 
       logResult(`17.4 [${target.providerName}]`, result);
@@ -2442,7 +2442,7 @@ describe("Suite 17: Graph-of-Thoughts Branching & Synthesis Events", () => {
         thoughtStructure: THOUGHT_STRUCTURES.TREE_OF_THOUGHTS,
         branchCount: 2,
       },
-      { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+      { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 3) },
     );
 
     // Run GoT
@@ -2460,7 +2460,7 @@ describe("Suite 17: Graph-of-Thoughts Branching & Synthesis Events", () => {
         thoughtStructure: THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS,
         branchCount: 2,
       },
-      { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+      { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 3) },
     );
 
     logResult(`17.5 ToT [${target.providerName}]`, totResult);
@@ -2605,7 +2605,7 @@ describe("Suite 18: Strategy × Topology Live Combination Matrix", () => {
             topology: topology.key,
             ...(isMultiBranch ? { branchCount: 2 } : {}),
           },
-          { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+          { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 3) },
         );
 
         logResult(
@@ -2704,7 +2704,7 @@ describe("Suite 18: Strategy × Topology Live Combination Matrix", () => {
           thoughtStructure: THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT,
           topology,
         },
-        { timeoutMs: getMultiAgentTimeout(target) },
+        { timeoutMilliseconds: getMultiAgentTimeout(target) },
       );
 
       logResult(`18.13 [${topology}] [${target.providerName}]`, result);
@@ -2772,7 +2772,7 @@ describe("Suite 18: Strategy × Topology Live Combination Matrix", () => {
           topology: "peer_to_peer",
           ...(isMultiBranch ? { branchCount: 2 } : {}),
         },
-        { timeoutMs: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MS * 3) },
+        { timeoutMilliseconds: getTimeout(target, DEFAULT_AGENT_TIMEOUT_MILLISECONDS * 3) },
       );
 
       logResult(`18.14 [${strategyKey}+p2p] [${target.providerName}]`, result);
@@ -2841,7 +2841,7 @@ describe("Suite 19: Forced Subagent Topology Execution Matrix", () => {
           thoughtStructure: THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT,
           topology: topology.key,
         },
-        { timeoutMs: getMultiAgentTimeout(target) },
+        { timeoutMilliseconds: getMultiAgentTimeout(target) },
       );
 
       logResult(`19.${topologyTestIndex} [${topology.label}] [${target.providerName}]`, result);
@@ -2933,7 +2933,7 @@ describe("Suite 19: Forced Subagent Topology Execution Matrix", () => {
           thoughtStructure: THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT,
           topology: topologyKey,
         },
-        { timeoutMs: getMultiAgentTimeout(target) },
+        { timeoutMilliseconds: getMultiAgentTimeout(target) },
       );
     };
 
@@ -3013,7 +3013,7 @@ describe("Suite 19: Forced Subagent Topology Execution Matrix", () => {
         topology: "hierarchical",
         branchCount: 2,
       },
-      { timeoutMs: getMultiAgentTimeout(target) * 2 },
+      { timeoutMilliseconds: getMultiAgentTimeout(target) * 2 },
     );
 
     logResult(`19.6 [ToT+Hierarchical] [${target.providerName}]`, result);
@@ -3061,7 +3061,7 @@ describe("Suite 19: Forced Subagent Topology Execution Matrix", () => {
         topology: "peer_to_peer",
         branchCount: 2,
       },
-      { timeoutMs: getMultiAgentTimeout(target) * 2 },
+      { timeoutMilliseconds: getMultiAgentTimeout(target) * 2 },
     );
 
     logResult(`19.7 [GoT+P2P] [${target.providerName}]`, result);
