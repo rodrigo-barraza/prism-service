@@ -9,7 +9,7 @@ import {
   calculateTextCost,
 } from "../utils/CostCalculator.ts";
 import { computeModalities } from "./conversation/index.ts";
-import { COLLECTIONS } from "../constants.ts";
+import { COLLECTIONS, SYSTEM_STATUSES } from "../constants.ts";
 import { MODALITY_TYPES, getPricing } from "../config.ts";
 import { calculateTokensPerSec } from "../utils/math.ts";
 import WebhookEventBus from "./WebhookEventBus.ts";
@@ -281,7 +281,7 @@ const RequestLogger = {
         ...(contextLength != null && { contextLength }),
         ...(evalBatchSize != null && { evalBatchSize }),
         ...(physicalBatchSize != null && { physicalBatchSize }),
-        status: "completed",
+        status: SYSTEM_STATUSES.COMPLETED,
       };
       await db.collection(COLLECTION).insertOne(document);
 
@@ -625,7 +625,7 @@ const RequestLogger = {
         ...(agentConversationId && { agentConversationId }),
         ...(parentAgentConversationId && { parentAgentConversationId }),
         ...(agenticIteration !== null && { agenticIteration }),
-        status: "pending",
+        status: SYSTEM_STATUSES.PENDING,
         inputTokens: 0,
         outputTokens: 0,
         estimatedCost: null,
@@ -710,7 +710,7 @@ const RequestLogger = {
       } = fullPayload;
 
       const updateFields: Record<string, unknown> = {
-        status: "completed",
+        status: SYSTEM_STATUSES.COMPLETED,
         requestId,
         endpoint,
         operation: operation || null,

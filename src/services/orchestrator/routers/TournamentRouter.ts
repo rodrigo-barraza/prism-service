@@ -19,7 +19,7 @@ import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 import RequestLogger from "../../RequestLogger.ts";
 import PromptLocaleService from "../../PromptLocaleService.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
-import { ORCHESTRATOR } from "../../../constants.ts";
+import { ORCHESTRATOR, SYSTEM_STATUSES } from "../../../constants.ts";
 
 const MAXIMUM_EVALUATION_CHARACTERS = ORCHESTRATOR.MAXIMUM_SYNTHESIS_CHARACTERS;
 const DEFAULT_VERIFICATION_COMMANDS = ["tsc --noEmit", "npm test"];
@@ -503,7 +503,7 @@ export class TournamentRouter implements TopologyRouter {
       const judgeSubAgentResult: SubAgentResult = {
         agent_id: `tournament-judge-${teamName}-${Date.now()}`,
         description: `Tournament judge for team "${teamName}"`,
-        status: "completed",
+        status: SYSTEM_STATUSES.COMPLETED,
         summary: `Evaluated ${successfulResults.length} sub-agent results and selected the best one`,
         result: selectionResult.text,
         toolUses: 0,

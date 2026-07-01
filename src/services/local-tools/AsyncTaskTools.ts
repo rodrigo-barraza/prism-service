@@ -1,5 +1,5 @@
 import logger from "../../utils/logger.ts";
-import { DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { DOMAINS, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 import { ASYNC_TASK_TOOL_NAMES, MAXIMUM_CONCURRENT_ASYNC_TASKS } from "../AsyncTaskConstants.ts";
 import { ORCHESTRATOR, NOTIFICATION_SOURCES } from "../../constants.ts";
@@ -21,35 +21,35 @@ import PromptLocaleService from "../PromptLocaleService.ts";
 
 // Tools that should NOT be dispatched asynchronously because they
 // are inherently synchronous, interactive, or manage async state themselves
-const DISALLOWED_ASYNC_TOOL_NAMES = new Set([
+const DISALLOWED_ASYNC_TOOL_NAMES = new Set<string>([
   // Async task tools (prevent recursive dispatch)
   ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
   ASYNC_TASK_TOOL_NAMES.LIST_ASYNC_TASKS,
   ASYNC_TASK_TOOL_NAMES.CANCEL_ASYNC_TASK,
 
   // Orchestrator tools (already have their own non-blocking dispatch)
-  "create_subagents",
-  "send_subagent_message",
-  "stop_subagent",
-  "get_subagent_output",
-  "delete_subagents",
-  "resume_subagent",
+  TOOL_NAMES.CREATE_SUBAGENTS,
+  TOOL_NAMES.SEND_SUBAGENT_MESSAGE,
+  TOOL_NAMES.STOP_SUBAGENT,
+  TOOL_NAMES.GET_SUBAGENT_OUTPUT,
+  TOOL_NAMES.DELETE_SUBAGENTS,
+  TOOL_NAMES.RESUME_SUBAGENT,
 
   // Interactive tools that block on user input
-  "ask_user",
-  "enter_plan_mode",
-  "exit_plan_mode",
+  TOOL_NAMES.ASK_USER,
+  TOOL_NAMES.ENTER_PLAN_MODE,
+  TOOL_NAMES.EXIT_PLAN_MODE,
 
   // Timer tools (already async by nature)
-  "set_timer",
-  "list_timers",
-  "cancel_timer",
+  TOOL_NAMES.SET_TIMER,
+  TOOL_NAMES.LIST_TIMERS,
+  TOOL_NAMES.CANCEL_TIMER,
 
   // Tool management (instant, no benefit from async)
-  "enable_tools",
-  "disable_tools",
-  "discover_and_enable_tools",
-  "search_tools",
+  TOOL_NAMES.ENABLE_TOOLS,
+  TOOL_NAMES.DISABLE_TOOLS,
+  TOOL_NAMES.DISCOVER_AND_ENABLE_TOOLS,
+  TOOL_NAMES.SEARCH_TOOLS,
 ]);
 
 // ── run_async_task ─────────────────────────────────────────

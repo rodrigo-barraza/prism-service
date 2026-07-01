@@ -19,7 +19,7 @@ import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 import RequestLogger from "../../RequestLogger.ts";
 import PromptLocaleService from "../../PromptLocaleService.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
-import { ORCHESTRATOR } from "../../../constants.ts";
+import { ORCHESTRATOR, SYSTEM_STATUSES } from "../../../constants.ts";
 
 const MAXIMUM_SUBTASKS = ORCHESTRATOR.ROUTERS.MAXIMUM_SUBTASKS;
 const MAXIMUM_SYNTHESIS_CHARACTERS = ORCHESTRATOR.MAXIMUM_SYNTHESIS_CHARACTERS;
@@ -660,7 +660,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
       const synthesisSubAgentResult: SubAgentResult = {
         agent_id: `divide-conquer-synthesis-${teamName}-${Date.now()}`,
         description: `Divide & Conquer synthesis for team "${teamName}"`,
-        status: "completed",
+        status: SYSTEM_STATUSES.COMPLETED,
         summary: `Decomposed into ${subtasks.length} subtasks, synthesized ${successfulResults.length} successful results`,
         result: synthesisResult.text,
         toolUses: 0,
@@ -910,7 +910,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
       const recursiveSynthesizedResult: SubAgentResult = {
         agent_id: `recursive-synthesis-depth${currentDepth}-${Date.now()}`,
         description: `Recursive synthesis at depth ${currentDepth} for "${assignment.description}"`,
-        status: "completed",
+        status: SYSTEM_STATUSES.COMPLETED,
         summary: `Recursively decomposed into ${recursiveSubtasks.length} sub-subtasks at depth ${currentDepth}, synthesized ${recursiveSuccessfulResults.length} results`,
         result: recursiveSynthesisResult.text,
         toolUses: 0,

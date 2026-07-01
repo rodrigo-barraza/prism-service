@@ -26,6 +26,7 @@ import {
   LM_STUDIO_DEFAULT_MAX_CONTEXT,
 } from "../../config.ts";
 import { MODALITY_TYPES, getDefaultModels } from "../config.ts";
+import { SYSTEM_STATUSES, MESSAGE_ROLES } from "../constants.ts";
 // Default MCP server URL for ephemeral tool integrations (vault-resolved)
 const DEFAULT_MCP_SERVER_URL = TOOLS_SERVICE_URL;
 import {
@@ -199,7 +200,7 @@ async function* parseNativeSSEStream(
               name: toolName,
               args: typeof args === "object" ? args : safeParseJSON(args),
               result: json.output ? safeParseJSON(json.output) : json.output,
-              status: "done",
+              status: SYSTEM_STATUSES.DONE,
               native: true,
             };
             currentToolCall = null;
@@ -210,7 +211,7 @@ async function* parseNativeSSEStream(
               name: json.tool || currentToolCall?.tool || "any",
               args: currentToolCall?.arguments || {},
               result: { error: json.reason || "Tool call failed" },
-              status: "error",
+              status: SYSTEM_STATUSES.ERROR,
               native: true,
             };
             currentToolCall = null;
@@ -1382,9 +1383,9 @@ export function createLmStudioProvider(
         ];
         const messages: ChatMessage[] = [];
         if (systemPrompt) {
-          messages.push({ role: "system", content: systemPrompt });
+          messages.push({ role: MESSAGE_ROLES.SYSTEM, content: systemPrompt });
         }
-        messages.push({ role: "user", content });
+        messages.push({ role: MESSAGE_ROLES.USER, content });
         const response = await fetchOpenAICompat(
           `${baseUrl}/v1/chat/completions`,
           {
