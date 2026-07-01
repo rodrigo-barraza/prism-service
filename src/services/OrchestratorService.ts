@@ -2794,7 +2794,14 @@ export class OrchestratorService {
       try {
         await conversationCollection.updateOne(
           { id: conversationId, project, username },
-          { $set: { isGenerating: false } },
+          [
+            { $set: { isGenerating: false } },
+            {
+              $set: {
+                isActive: { $gt: [{ $ifNull: ["$pendingBackgroundTasks", 0] }, 0] },
+              },
+            },
+          ],
         );
         logger.info(
           `[Orchestrator] Cleared deferred isGenerating flag on parent ${conversationId} before auto-response`,

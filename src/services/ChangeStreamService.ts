@@ -29,6 +29,7 @@ export interface ChangeStreamEventPayload {
   updatedFields: string[] | null;
   timestamp: string;
   isGenerating?: boolean;
+  isActive?: boolean;
   conversationId?: string | null;
   parentAgentConversationId?: string | null;
 }
@@ -90,7 +91,7 @@ function openStream(db: Db, collectionName: string) {
         timestamp: new Date().toISOString(),
       };
 
-      // Enrich with isGenerating state for conversations
+      // Enrich with isGenerating and isActive state for conversations
       if (
         collectionName === COLLECTIONS.MODEL_CONVERSATIONS ||
         collectionName === COLLECTIONS.AGENT_CONVERSATIONS
@@ -100,6 +101,11 @@ function openStream(db: Db, collectionName: string) {
             .isGenerating as boolean;
         } else if (fullDocument?.isGenerating !== undefined) {
           payload.isGenerating = fullDocument.isGenerating as boolean;
+        }
+        if (updateDescription?.updatedFields?.isActive !== undefined) {
+          payload.isActive = updateDescription.updatedFields.isActive as boolean;
+        } else if (fullDocument?.isActive !== undefined) {
+          payload.isActive = fullDocument.isActive as boolean;
         }
       }
 
@@ -209,13 +215,13 @@ const ChangeStreamService = {
           .collection(COLLECTIONS.MODEL_CONVERSATIONS)
           .updateMany(
             { isGenerating: true, updatedAt: { $lt: fiveMinAgo } },
-            { $set: { isGenerating: false } },
+            { $set: { isGenerating: false, isActive: false } },
           );
         const { modifiedCount: agentCleared } = await db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
           .updateMany(
             { isGenerating: true, updatedAt: { $lt: fiveMinAgo } },
-            { $set: { isGenerating: false } },
+            { $set: { isGenerating: false, isActive: false } },
           );
         if (modifiedCount > 0 || agentCleared > 0) {
           logger.info(

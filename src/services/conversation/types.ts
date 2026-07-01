@@ -91,6 +91,7 @@ export interface TransformedConversation {
   toolCounts: Record<string, number>;
   modelNames: string[];
   isGenerating: boolean;
+  isActive?: boolean;
   pendingBackgroundTasks?: number;
   synthetic?: boolean;
   traceId?: string | null;

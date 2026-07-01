@@ -972,17 +972,11 @@ export default class ReActHarness extends BaseAgenticHarness {
       // ── Finalization (happy path) ──────────────────────────────
       cleanupReminderCache(agentConversationId);
 
-      // Finalize normally — emit `done`, clear isGenerating, persist messages.
-      // Even when sub-agents are still running (NON_BLOCKING_DISPATCH), we
-      // close the SSE stream so the client can accept new user messages.
-      await this.finalize(currentMessages, hooks);
-
       // ── Increment pending background tasks counter ─────────────
-      // When the loop exited due to NON_BLOCKING_DISPATCH, async work
-      // is running in the background (sub-agents, long-running tools, etc.).
-      // Increment the counter so the client knows background work is
-      // in-flight even though isGenerating is false. The completion
-      // handler decrements when the async work finishes.
+      // Must happen BEFORE finalize() so that when setGenerating(false) fires
+      // inside finalize, the aggregation pipeline sees pendingBackgroundTasks=1
+      // and keeps isActive=true. Without this ordering, there would be a brief
+      // window where isActive=false even though sub-agents are already running.
       if (hasNonBlockingDispatchBreak && agentConversationId && conversationId) {
         try {
           const { default: ConversationService } =
@@ -1004,6 +998,12 @@ export default class ReActHarness extends BaseAgenticHarness {
           );
         }
       }
+
+      // Finalize — emit `done`, clear isGenerating, persist messages.
+      // Even when sub-agents are still running (NON_BLOCKING_DISPATCH), we
+      // close the SSE stream so the client can accept new user messages.
+      // isActive remains true via pendingBackgroundTasks (incremented above).
+      await this.finalize(currentMessages, hooks);
 
       return { messages: currentMessages };
     } catch (loopError: unknown) {

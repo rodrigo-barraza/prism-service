@@ -103,6 +103,7 @@ const ConversationService: ConversationServiceInterface = {
       providers: extractProviders([], metaSettings as ConversationSettings),
       totalCost: 0,
       isGenerating: true,
+      isActive: true,
       ...(conversationMeta?.synthetic && { synthetic: true }),
       ...(traceId && { traceId }),
       ...(parentId && { parentAgentConversationId: parentId }),
@@ -254,6 +255,7 @@ const ConversationService: ConversationServiceInterface = {
         {
           $set: {
             isGenerating: true,
+            isActive: true,
             updatedAt: now,
             ...(agentConversationId && { agentConversationId }),
           },
@@ -276,11 +278,20 @@ const ConversationService: ConversationServiceInterface = {
         { upsert: true },
       );
     } else {
+      // Use an aggregation pipeline so isActive is derived atomically from
+      // the resulting pendingBackgroundTasks value — no second round-trip needed.
       await db
         .collection(collection)
         .updateOne(
           { id: conversationId, project, username },
-          { $set: { isGenerating: false, updatedAt: now } },
+          [
+            { $set: { isGenerating: false, updatedAt: now } },
+            {
+              $set: {
+                isActive: { $gt: [{ $ifNull: ["$pendingBackgroundTasks", 0] }, 0] },
+              },
+            },
+          ],
         );
     }
   },
@@ -302,27 +313,36 @@ const ConversationService: ConversationServiceInterface = {
     if (!db) return;
     const now = new Date().toISOString();
 
+    // Single atomic aggregation pipeline: clamp the counter at 0 and derive
+    // isActive from the resulting values — no second round-trip needed.
     await db
       .collection(collection)
       .updateOne(
         { id: conversationId, project, username },
-        { $inc: { pendingBackgroundTasks: delta }, $set: { updatedAt: now } },
-      );
-
-    // Clamp: if decrementing could have gone negative, floor at 0
-    if (delta < 0) {
-      await db
-        .collection(collection)
-        .updateOne(
+        [
           {
-            id: conversationId,
-            project,
-            username,
-            pendingBackgroundTasks: { $lt: 0 },
+            $set: {
+              pendingBackgroundTasks: {
+                $max: [
+                  { $add: [{ $ifNull: ["$pendingBackgroundTasks", 0] }, delta] },
+                  0,
+                ],
+              },
+              updatedAt: now,
+            },
           },
-          { $set: { pendingBackgroundTasks: 0 } },
-        );
-    }
+          {
+            $set: {
+              isActive: {
+                $or: [
+                  { $eq: ["$isGenerating", true] },
+                  { $gt: ["$pendingBackgroundTasks", 0] },
+                ],
+              },
+            },
+          },
+        ],
+      );
   },
 
   async getConversationStats(

@@ -115,20 +115,20 @@ async function clearStaleConversations(): Promise<HousekeepingConversationResult
       .collection(COLLECTIONS.MODEL_CONVERSATIONS)
       .updateMany(
         { isGenerating: true, updatedAt: { $lt: cutoff } },
-        { $set: { isGenerating: false } },
+        { $set: { isGenerating: false, isActive: false } },
       ),
     db
       .collection(COLLECTIONS.AGENT_CONVERSATIONS)
       .updateMany(
         { isGenerating: true, updatedAt: { $lt: cutoff } },
-        { $set: { isGenerating: false } },
+        { $set: { isGenerating: false, isActive: false } },
       ),
     // Clear stale pendingBackgroundTasks counters left from crashes/restarts
     db
       .collection(COLLECTIONS.AGENT_CONVERSATIONS)
       .updateMany(
         { pendingBackgroundTasks: { $gt: 0 }, updatedAt: { $lt: cutoff } },
-        { $set: { pendingBackgroundTasks: 0 } },
+        { $set: { pendingBackgroundTasks: 0, isActive: false } },
       ),
   ]);
 

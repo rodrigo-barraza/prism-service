@@ -317,6 +317,11 @@ setupWebSocket(wss);
           collection: COLLECTIONS.AGENT_CONVERSATIONS,
           keys: { isGenerating: 1, updatedAt: -1 },
         },
+        // agent_conversations — isActive lookup (active conversation queries)
+        {
+          collection: COLLECTIONS.AGENT_CONVERSATIONS,
+          keys: { isActive: 1, updatedAt: -1 },
+        },
         // agent_conversations — sub-agent parent linkage (tree grouping in UI)
         {
           collection: COLLECTIONS.AGENT_CONVERSATIONS,
@@ -468,7 +473,7 @@ setupWebSocket(wss);
     if (db) {
       const { modifiedCount } = await db
         .collection(COLLECTIONS.MODEL_CONVERSATIONS)
-        .updateMany({ isGenerating: true }, { $set: { isGenerating: false } });
+        .updateMany({ isGenerating: true }, { $set: { isGenerating: false, isActive: false } });
       if (modifiedCount > 0) {
         logger.info(
           `Cleared ${modifiedCount} stale isGenerating flag(s) in conversations`,
@@ -477,7 +482,7 @@ setupWebSocket(wss);
       // Also clear in agent_conversations
       const { modifiedCount: agentCleared } = await db
         .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-        .updateMany({ isGenerating: true }, { $set: { isGenerating: false } });
+        .updateMany({ isGenerating: true }, { $set: { isGenerating: false, isActive: false } });
       if (agentCleared > 0) {
         logger.info(
           `Cleared ${agentCleared} stale isGenerating flag(s) in agent_conversations`,
@@ -489,7 +494,7 @@ setupWebSocket(wss);
         .collection(COLLECTIONS.AGENT_CONVERSATIONS)
         .updateMany(
           { pendingBackgroundTasks: { $gt: 0 } },
-          { $set: { pendingBackgroundTasks: 0 } },
+          { $set: { pendingBackgroundTasks: 0, isActive: false } },
         );
       if (pendingCleared > 0) {
         logger.info(
