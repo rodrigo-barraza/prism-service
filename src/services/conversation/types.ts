@@ -11,6 +11,8 @@ export interface ConversationMeta {
   synthetic?: boolean;
   agent?: string | null;
   contextBudget?: Record<string, unknown> | null;
+  /** Runtime-only: memory IDs injected this turn, written via $addToSet to the document's injectedMemoryIds array. Not stored as a top-level field. */
+  _newInjectedMemoryIds?: string[];
 }
 
 export interface ConversationSettings {
@@ -89,6 +91,7 @@ export interface TransformedConversation {
   toolCounts: Record<string, number>;
   modelNames: string[];
   isGenerating: boolean;
+  isActive?: boolean;
   pendingBackgroundTasks?: number;
   synthetic?: boolean;
   traceId?: string | null;

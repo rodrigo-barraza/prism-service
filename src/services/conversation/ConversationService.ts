@@ -125,14 +125,31 @@ const ConversationService: ConversationServiceInterface = {
       delete setOnInsert[key];
     }
 
-    // 1. Atomic upsert: push messages + set metadata in a single operation
+    // 1. Atomic upsert: push messages + set metadata in a single operation.
+    // When new memory IDs were injected this turn, $addToSet them onto the
+    // injectedMemoryIds array so future turns can exclude them. $addToSet with
+    // $each is idempotent — safe to retry without producing duplicates.
+    const newInjectedMemoryIds = Array.isArray(
+      conversationMeta?._newInjectedMemoryIds,
+    )
+      ? (conversationMeta._newInjectedMemoryIds as string[])
+      : null;
+
+    const updateOperation: Record<string, unknown> = {
+      $push: { messages: { $each: processedMessages } },
+      $set: setFields,
+      $setOnInsert: setOnInsert,
+    };
+
+    if (newInjectedMemoryIds && newInjectedMemoryIds.length > 0) {
+      updateOperation.$addToSet = {
+        injectedMemoryIds: { $each: newInjectedMemoryIds },
+      };
+    }
+
     await dbCollection.updateOne(
       { id: conversationId, project, username },
-      {
-        $push: { messages: { $each: processedMessages } },
-        $set: setFields,
-        $setOnInsert: setOnInsert,
-      } as import("mongodb").Document,
+      updateOperation as import("mongodb").Document,
       { upsert: true },
     );
 
