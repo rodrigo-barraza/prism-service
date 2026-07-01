@@ -236,9 +236,12 @@ describe("newTurnMessages slice — compaction mid-loop (BUG SCENARIO)", () => {
 
     // But after sanitization, the compaction summary is irrelevant
     // because it wasn't in the slice anyway.
+    // Split: user, assistant, tool result
     const sanitized = sanitizeMessagesToAppend(newTurnMessages);
-    expect(sanitized).toHaveLength(2);
+    expect(sanitized).toHaveLength(3);
     expect(sanitized[0].content).toBe("make a song about the war");
+    expect(sanitized[1].role).toBe("assistant");
+    expect(sanitized[2].role).toBe("tool");
   });
 
   it("BUG: compaction drops user2 from recent tail → user message lost entirely", () => {
@@ -283,9 +286,10 @@ describe("newTurnMessages slice — compaction mid-loop (BUG SCENARIO)", () => {
     // After sanitization: summary is filtered out
     const sanitized = sanitizeMessagesToAppend(newTurnMessages);
 
-    // BUG: Only assistant remains — user message was LOST
-    expect(sanitized).toHaveLength(1);
+    // BUG: Only assistant and tool remain — user message was LOST
+    expect(sanitized).toHaveLength(2);
     expect(sanitized[0].role).toBe("assistant");
+    expect(sanitized[1].role).toBe("tool");
     // The user's "make a song about the war" is nowhere to be found!
   });
 });
@@ -528,9 +532,12 @@ describe("Generate Audio tool flow — second turn message persistence", () => {
     });
 
     // After sanitization (no compaction artifacts in this case)
+    // Split: user, assistant, tool result
     const sanitized = sanitizeMessagesToAppend(newTurnMessages);
-    expect(sanitized).toHaveLength(2);
+    expect(sanitized).toHaveLength(3);
     expect(sanitized[0].content).toBe("make a song about the war");
+    expect(sanitized[1].role).toBe("assistant");
+    expect(sanitized[2].role).toBe("tool");
   });
 
   it("simulates generate_audio flow WITH compaction triggering (large context)", () => {
@@ -585,8 +592,10 @@ describe("Generate Audio tool flow — second turn message persistence", () => {
     expect(newTurnMessages[0].content).toBe("make me a song");
 
     const sanitized = sanitizeMessagesToAppend(newTurnMessages);
-    expect(sanitized).toHaveLength(2);
+    expect(sanitized).toHaveLength(3);
     expect(sanitized[0].content).toBe("make me a song");
+    expect(sanitized[1].role).toBe("assistant");
+    expect(sanitized[2].role).toBe("tool");
   });
 
   it("compaction flow realistically preserves user message from the tail", () => {
@@ -681,11 +690,12 @@ describe("Finalizer messagesToAppend — what gets $pushed to MongoDB", () => {
     const messagesToAppend = [...overrideMessagesToAppend, finalAssistant];
     const sanitized = sanitizeMessagesToAppend(messagesToAppend);
 
-    expect(sanitized).toHaveLength(3);
+    expect(sanitized).toHaveLength(4);
     expect(sanitized[0].role).toBe("user");
     expect(sanitized[0].content).toBe("make a song about the war");
     expect(sanitized[1].toolCalls![0].name).toBe("generate_audio");
-    expect(sanitized[2].content).toBe(
+    expect(sanitized[2].role).toBe("tool");
+    expect(sanitized[3].content).toBe(
       "Here's your song! I created a powerful piece about war.",
     );
   });

@@ -631,11 +631,15 @@ export function expandToolCallsForPersistence(
     } else if (
       message.role === "assistant" &&
       !message.content?.toString().trim() &&
-      (!message.toolCalls || message.toolCalls.length === 0)
+      (!message.toolCalls || message.toolCalls.length === 0) &&
+      !message.usage &&
+      !message.model
     ) {
-      // Strip empty assistant stubs — no content AND no tool calls.
-      // These are artifacts from intermediate loop iterations that
-      // produced no output.
+      // Strip empty assistant stubs — no content, no tool calls, AND no
+      // metadata (usage/model/provider). The final metadata-bearing
+      // assistant message from assembleMessagesToAppend may have empty
+      // content but carries telemetry (usage, cost, timing) that must
+      // be preserved.
       continue;
     } else {
       expanded.push(message);
@@ -768,15 +772,7 @@ export function assembleMessagesToAppend(options: {
         }
       }
     }
-    messagesToAppend.push({
-      role: "assistant",
-      content: text,
-      ...(finalThinking && { thinking: finalThinking }),
-      ...(thinkingSignature && { thinkingSignature }),
-      ...(images.length > 0 && { images }),
-      ...(audioReference && { audio: audioReference }),
-      ...(!hasIntermediateToolMessages &&
-        toolCalls.length > 0 && { toolCalls }),
+    const finalMetadata: Record<string, unknown> = {
       model: resolvedModel,
       provider: providerName,
       timestamp: new Date().toISOString(),
@@ -785,15 +781,6 @@ export function assembleMessagesToAppend(options: {
         totalSeconds != null ? roundMilliseconds(totalSeconds as number) : null,
       tokensPerSec: tokensPerSecond,
       estimatedCost,
-      ...(!hasIntermediateToolMessages && contentSegments?.length
-        ? { contentSegments }
-        : {}),
-      ...(!hasIntermediateToolMessages && textFragments?.length
-        ? { textFragments }
-        : {}),
-      ...(!hasIntermediateToolMessages && thinkingFragments?.length
-        ? { thinkingFragments }
-        : {}),
       generationSettings: {
         temperature,
         maxTokens,
@@ -801,7 +788,68 @@ export function assembleMessagesToAppend(options: {
         ...(reasoningEffort ? { reasoningEffort } : {}),
         ...(thinkingBudget ? { thinkingBudget } : {}),
       },
-    } as MessagePayload);
+    };
+
+    const hasFinalContent = text?.trim();
+
+    if (hasFinalContent || !hasIntermediateToolMessages) {
+      // The final iteration produced text — push it as a proper message
+      // with content and metadata. Also used for non-agentic single-shot
+      // tool calls where there are no intermediate iterations.
+      messagesToAppend.push({
+        role: "assistant",
+        content: text,
+        ...(finalThinking && { thinking: finalThinking }),
+        ...(thinkingSignature && { thinkingSignature }),
+        ...(images.length > 0 && { images }),
+        ...(audioReference && { audio: audioReference }),
+        ...(!hasIntermediateToolMessages &&
+          toolCalls.length > 0 && { toolCalls }),
+        ...(!hasIntermediateToolMessages && contentSegments?.length
+          ? { contentSegments }
+          : {}),
+        ...(!hasIntermediateToolMessages && textFragments?.length
+          ? { textFragments }
+          : {}),
+        ...(!hasIntermediateToolMessages && thinkingFragments?.length
+          ? { thinkingFragments }
+          : {}),
+        ...finalMetadata,
+      } as MessagePayload);
+    } else {
+      // The final iteration produced no text — all response content was
+      // delivered during intermediate tool-calling iterations. Merge the
+      // telemetry metadata into the last assistant message instead of
+      // creating a separate empty stub that would produce consecutive
+      // assistant messages in the database.
+      let lastAssistantIndex = -1;
+      for (
+        let scanIndex = messagesToAppend.length - 1;
+        scanIndex >= 0;
+        scanIndex--
+      ) {
+        if (messagesToAppend[scanIndex].role === "assistant") {
+          lastAssistantIndex = scanIndex;
+          break;
+        }
+      }
+      if (lastAssistantIndex !== -1) {
+        Object.assign(messagesToAppend[lastAssistantIndex], finalMetadata);
+        if (finalThinking) {
+          messagesToAppend[lastAssistantIndex].thinking = finalThinking;
+        }
+        if (thinkingSignature) {
+          messagesToAppend[lastAssistantIndex].thinkingSignature =
+            thinkingSignature;
+        }
+        if (images.length > 0) {
+          messagesToAppend[lastAssistantIndex].images = images;
+        }
+        if (audioReference) {
+          messagesToAppend[lastAssistantIndex].audio = audioReference;
+        }
+      }
+    }
   } else {
     if (userMessage && conversationMeta) {
       messagesToAppend.push({
