@@ -1107,20 +1107,37 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      expect(newTurnMessages).toHaveLength(4);
+      // Canonical format: assistant(2 toolCalls) + tool(tokyo) + tool(vancouver) + assistant(final)
+      expect(newTurnMessages).toHaveLength(6);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
         "system", // injected context (skills, memories, local time)
         "user",
-        "assistant",
-        "assistant",
+        "assistant", // parallel tool calls (results stripped)
+        "tool", // Tokyo result
+        "tool", // Vancouver result
+        "assistant", // final response
       ]);
 
-      // Verify parallel tool calls are preserved on the first assistant message
+      // Verify parallel tool calls are preserved on the assistant message (without results)
       const toolCallMessage = newTurnMessages[2];
       expect(toolCallMessage.toolCalls).toHaveLength(2);
       expect(toolCallMessage.toolCalls![0].name).toBe("get_weather");
       expect(toolCallMessage.toolCalls![0].args.city).toBe("Tokyo");
+      expect((toolCallMessage.toolCalls![0] as unknown as Record<string, unknown>).result).toBeUndefined();
       expect(toolCallMessage.toolCalls![1].args.city).toBe("Vancouver");
+
+      // Verify separate tool-role messages contain the results
+      expect(newTurnMessages[3].role).toBe("tool");
+      expect(newTurnMessages[3].name).toBe("get_weather");
+      expect(newTurnMessages[3].tool_call_id).toBe("call_weather_tokyo");
+      expect(newTurnMessages[3].content).toContain("22°C");
+      expect(newTurnMessages[3].durationMs).toBe(450);
+
+      expect(newTurnMessages[4].role).toBe("tool");
+      expect(newTurnMessages[4].name).toBe("get_weather");
+      expect(newTurnMessages[4].tool_call_id).toBe("call_weather_vancouver");
+      expect(newTurnMessages[4].content).toContain("15°C");
+      expect(newTurnMessages[4].durationMs).toBe(380);
     });
   });
 
@@ -1397,8 +1414,8 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      // Should include: system(injected context) + user + assistant(buggy) + system(validation) + assistant(fix) + assistant(final)
-      expect(newTurnMessages).toHaveLength(6);
+      // Canonical format: system + user + assistant(toolCalls) + tool(result) + system(validation) + assistant(toolCalls) + tool(result) + assistant(final)
+      expect(newTurnMessages).toHaveLength(8);
 
       const validationMessage = newTurnMessages.find(
         (message) =>
@@ -2088,15 +2105,17 @@ describe("Message Array Construction", () => {
         originalMessageCount,
       );
 
-      // Expected: system(platform) + system(somatic) + system(injected context) + user + assistant(img tool) + assistant(tts tool) + assistant(final)
-      expect(newTurnMessages).toHaveLength(7);
+      // Canonical format: sys(platform) + sys(somatic) + sys(context) + user + asst(img toolCalls) + tool(img result) + asst(tts toolCalls) + tool(tts result) + asst(final)
+      expect(newTurnMessages).toHaveLength(9);
       expect(newTurnMessages.map((message) => message.role)).toEqual([
         "system", // platform context
         "system", // somatic state
         "system", // injected context (skills, memories, local time)
         "user", // user message (clean)
-        "assistant", // image generation iteration
-        "assistant", // speech synthesis iteration
+        "assistant", // image generation iteration (toolCalls, no results)
+        "tool", // image generation result
+        "assistant", // speech synthesis iteration (toolCalls, no results)
+        "tool", // speech synthesis result
         "assistant", // final response
       ]);
 
@@ -2330,11 +2349,14 @@ describe("Message Array Construction", () => {
       expect(newTurnMessages.map((message) => message.role)).toEqual([
         "system", // injected context (skills, memories, local time)
         "user", // user message
-        "assistant", // search_tools call
+        "assistant", // search_tools call (toolCalls, no results)
+        "tool", // search_tools result
         "system", // <tool-update> nudge
-        "assistant", // enable_tools call
+        "assistant", // enable_tools call (toolCalls, no results)
+        "tool", // enable_tools result
         "system", // [TOOL SET UPDATED] documentation addendum
-        "assistant", // search_events call
+        "assistant", // search_events call (toolCalls, no results)
+        "tool", // search_events result
         "assistant", // final response
       ]);
 

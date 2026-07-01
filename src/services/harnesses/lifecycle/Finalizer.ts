@@ -547,20 +547,121 @@ export async function finalizeTextGeneration(
 export { getCollectionOpts };
 
 /**
+ * Expand assistant messages with embedded tool call results into the
+ * industry-standard canonical format for persistence.
+ *
+ * During the live agentic loop, tool call results are embedded directly
+ * inside the assistant message's `toolCalls[].result` field for
+ * convenience. This compact format produces consecutive assistant
+ * messages in the database because there are no interleaving tool-role
+ * messages to maintain the alternating conversation contract.
+ *
+ * This function transforms each compact assistant message into:
+ *   assistant: { toolCalls: [{ id, name, args }] }  (results stripped)
+ *   tool:      { tool_call_id, name, content }       (one per tool call)
+ *
+ * The result is the standard format used by OpenAI, Anthropic, and
+ * Google — tool results are always separate messages. Providers that
+ * require `role: "user"` for tool results (Anthropic, Google) transform
+ * at their own adapter layer.
+ *
+ * Shared between production finalizer and test assertion suites.
+ */
+export function expandToolCallsForPersistence(
+  messages: MessagePayload[],
+): MessagePayload[] {
+  const expanded: MessagePayload[] = [];
+
+  for (const message of messages) {
+    if (
+      message.role === "assistant" &&
+      message.toolCalls &&
+      message.toolCalls.length > 0
+    ) {
+      // Check if any tool call has an embedded result — if none do,
+      // the message is already in canonical format (or is a fresh call
+      // that hasn't been executed yet).
+      const hasEmbeddedResults = message.toolCalls.some(
+        (toolCall) => (toolCall as unknown as Record<string, unknown>).result !== undefined,
+      );
+
+      if (hasEmbeddedResults) {
+        // Push the assistant message with toolCalls but WITHOUT results
+        const cleanedToolCalls: ToolCallPayload[] = message.toolCalls.map(
+          (toolCall) => {
+            const { result: _result, status: _status, ...cleanedFields } =
+              toolCall as ToolCallPayload & {
+                result?: unknown;
+                status?: string;
+              };
+            return cleanedFields;
+          },
+        );
+
+        expanded.push({
+          ...message,
+          toolCalls: cleanedToolCalls,
+        });
+
+        // Push separate tool-role messages for each result
+        for (const toolCall of message.toolCalls) {
+          const toolCallWithResult = toolCall as ToolCallPayload & {
+            result?: unknown;
+            status?: string;
+          };
+          const resultValue = toolCallWithResult.result ?? null;
+
+          expanded.push({
+            role: "tool",
+            tool_call_id: toolCall.id || null,
+            name: toolCall.name,
+            content:
+              typeof resultValue === "string"
+                ? resultValue
+                : JSON.stringify(resultValue),
+            ...(toolCallWithResult.durationMs !== undefined && {
+              durationMs: toolCallWithResult.durationMs,
+            }),
+          });
+        }
+      } else {
+        // No embedded results — pass through as-is
+        expanded.push(message);
+      }
+    } else if (
+      message.role === "assistant" &&
+      !message.content?.toString().trim() &&
+      (!message.toolCalls || message.toolCalls.length === 0)
+    ) {
+      // Strip empty assistant stubs — no content AND no tool calls.
+      // These are artifacts from intermediate loop iterations that
+      // produced no output.
+      continue;
+    } else {
+      expanded.push(message);
+    }
+  }
+
+  return expanded;
+}
+
+/**
  * Sanitize messages for MongoDB persistence — clones each message,
  * applies content/rawContent swapping, strips runtime-only tags,
- * and filters out synthetic compaction artifacts that should never
- * reach the database (context notes, compaction summaries, planning
- * injections, eagerly-persisted stubs). System context messages
- * (_isInjectedContext) are preserved for conversation history visibility;
- * only the internal marker flag is cleaned from the persisted payload.
+ * filters out synthetic compaction artifacts, and expands compact
+ * assistant messages with embedded tool results into separate
+ * role="tool" messages per the industry-standard canonical format.
+ *
+ * System context messages (_isInjectedContext) are preserved for
+ * conversation history visibility; only the internal marker flag
+ * is cleaned from the persisted payload.
  *
  * Shared between production finalizer and test assertion suites.
  */
 export function sanitizeMessagesForPersistence(
   messagesToAppend: MessagePayload[],
 ): MessagePayload[] {
-  return messagesToAppend
+  const filtered = messagesToAppend
     .filter((message) => {
       if (message._isIdentityPrompt === true) return false;
 
@@ -586,6 +687,8 @@ export function sanitizeMessagesForPersistence(
       delete cloned._isInjectedContext;
       return cloned;
     });
+
+  return expandToolCallsForPersistence(filtered);
 }
 
 /**

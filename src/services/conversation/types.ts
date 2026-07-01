@@ -57,6 +57,10 @@ export interface MessagePayload {
   pdf?: string | unknown[];
   toolCalls?: ToolCallPayload[];
   thinking?: string;
+  /** For role="tool" messages — links this result back to the assistant's tool call. */
+  tool_call_id?: string | null;
+  /** For role="tool" messages — the name of the tool that produced this result. */
+  name?: string;
   isCompactSummary?: boolean;
   _isInjectedContext?: boolean;
   _isPlanningInjection?: boolean;
