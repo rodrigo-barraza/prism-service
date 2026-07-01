@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import "./setup.ts";
-import { PROVIDERS } from "../src/constants.ts";
+import { PROVIDERS, SYSTEM_STATUSES } from "../src/constants.ts";
 import OrchestratorService from "../src/services/OrchestratorService.ts";
 import type { SubAgentState } from "../src/types/orchestrator.ts";
 
@@ -145,7 +145,7 @@ describe("OrchestratorService Resume Agent", () => {
       expect.objectContaining({
         type: "sub_agent_status",
         subAgentId: "agent-1",
-        message: "spawned",
+        status: SYSTEM_STATUSES.RUNNING,
       }),
     );
 
