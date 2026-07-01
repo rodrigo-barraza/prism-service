@@ -67,11 +67,16 @@ vi.mock("../../config.ts", () => ({
   MONGO_DB_NAME: "test-db",
 }));
 
-vi.mock("../src/constants.ts", () => ({
-  COLLECTIONS: {
-    AGENT_CONVERSATIONS: "agent_conversations",
-  },
-}));
+vi.mock("../src/constants.ts", async (importOriginal) => {
+  const actual = await importOriginal() as any;
+  return {
+    ...actual,
+    COLLECTIONS: {
+      ...actual.COLLECTIONS,
+      AGENT_CONVERSATIONS: "agent_conversations",
+    },
+  };
+});
 
 // Mock ChatRoutes
 vi.mock("../src/routes/ChatRoutes.ts", () => ({

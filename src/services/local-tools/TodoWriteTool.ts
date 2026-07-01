@@ -4,6 +4,7 @@ import {
   SERVER_SENT_EVENT_TYPES,
   TOOL_NAMES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { SYSTEM_STATUSES, TODO_PRIORITIES } from "../../constants.ts";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 
 
@@ -55,7 +56,11 @@ export default {
               content: { type: "string", description: "The todo item text." },
               status: {
                 type: "string",
-                enum: ["pending", "in_progress", "completed"],
+                enum: [
+                  SYSTEM_STATUSES.PENDING,
+                  SYSTEM_STATUSES.IN_PROGRESS,
+                  SYSTEM_STATUSES.COMPLETED,
+                ],
                 description: "Item status. Default: 'pending'.",
               },
               priority: {
@@ -97,27 +102,28 @@ export default {
         content: typeof itemInput.content === "string" ? itemInput.content : "",
         status:
           typeof itemInput.status === "string" &&
-          (itemInput.status === "pending" ||
-            itemInput.status === "in_progress" ||
-            itemInput.status === "completed")
+          (itemInput.status === SYSTEM_STATUSES.PENDING ||
+            itemInput.status === SYSTEM_STATUSES.IN_PROGRESS ||
+            itemInput.status === SYSTEM_STATUSES.COMPLETED)
             ? itemInput.status
-            : "pending",
+            : SYSTEM_STATUSES.PENDING,
         priority:
           typeof itemInput.priority === "string" &&
-          (itemInput.priority === "high" ||
-            itemInput.priority === "medium" ||
-            itemInput.priority === "low")
+          (itemInput.priority === TODO_PRIORITIES.HIGH ||
+            itemInput.priority === TODO_PRIORITIES.MEDIUM ||
+            itemInput.priority === TODO_PRIORITIES.LOW)
             ? itemInput.priority
-            : "medium",
+            : TODO_PRIORITIES.MEDIUM,
       };
     });
 
     const stats: TodoStats = {
       total: normalized.length,
-      pending: normalized.filter((todoItem) => todoItem.status === "pending")
-        .length,
+      pending: normalized.filter(
+        (todoItem) => todoItem.status === SYSTEM_STATUSES.PENDING,
+      ).length,
       in_progress: normalized.filter(
-        (todoItem) => todoItem.status === "in_progress",
+        (todoItem) => todoItem.status === SYSTEM_STATUSES.IN_PROGRESS,
       ).length,
       completed: normalized.filter(
         (todoItem) => todoItem.status === "completed",

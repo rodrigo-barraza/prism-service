@@ -50,7 +50,7 @@ import type {
 import type { ConversationMessage, LLMProvider } from "./harnesses/types.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import ConversationService from "./ConversationService.ts";
-import { COLLECTIONS, ORCHESTRATOR, NOTIFICATION_SOURCES } from "../constants.ts";
+import { COLLECTIONS, ORCHESTRATOR, NOTIFICATION_SOURCES, SYSTEM_STATUSES, DEFAULT_LOCALE } from "../constants.ts";
 
 type AgenticLoopServiceModule = typeof import("./AgenticLoopService.ts");
 
@@ -123,7 +123,7 @@ const pendingRouterDispatches = new Map<string, Promise<void>[]>();
 // Register shutdown cleanup — abort all running sub-agents and remove worktrees
 registerCleanup(async () => {
   const running = [...activeSubAgents.values()].filter(
-    (subAgent) => subAgent.status === "running",
+    (subAgent) => subAgent.status === SYSTEM_STATUSES.RUNNING,
   );
   if (running.length === 0) return;
 
@@ -131,9 +131,11 @@ registerCleanup(async () => {
     `[Orchestrator] Shutdown: aborting ${running.length} running sub-agent(s)…`,
   );
   for (const subAgent of running) {
-    subAgent.abortController?.abort();
-    subAgent.status = "stopped";
-    subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
+    if (subAgent) {
+      subAgent.abortController?.abort();
+      subAgent.status = SYSTEM_STATUSES.STOPPED;
+      subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
+    }
   }
 
   // Clean up worktrees in parallel
@@ -225,7 +227,7 @@ export class OrchestratorService {
       providerName,
       resolvedModel,
       traceId,
-      agentConversationId: parentAgentConversationId,
+      agentConversationId,
       conversationId: parentConversationId,
       maxSubAgentIterations: clientMaxSubAgentIterations,
       minContextLength,
@@ -279,7 +281,7 @@ export class OrchestratorService {
 
     // Check concurrency limit (global)
     const runningCount = Array.from(activeSubAgents.values()).filter(
-      (subAgent) => subAgent.status === "running",
+      (subAgent) => subAgent.status === SYSTEM_STATUSES.RUNNING,
     ).length;
     if (runningCount >= ORCHESTRATOR.MAX_SUB_AGENTS) {
       return {
@@ -394,7 +396,7 @@ export class OrchestratorService {
     }
 
     const conversationCounterKey =
-      parentConversationId || parentAgentConversationId || "global";
+      parentConversationId || agentConversationId || "global";
     const currentConversationCount =
       (agentCountersByConversation.get(conversationCounterKey) || 0) + 1;
     agentCountersByConversation.set(
@@ -457,13 +459,13 @@ export class OrchestratorService {
     const subAgentState: SubAgentState = {
       agentId,
       subAgentConversationId,
-      parentAgentConversationId,
+      parentAgentConversationId: agentConversationId,
       description,
       branchName: worktreeResult.error ? null : branchName,
       worktreePath,
       repositoryPath,
       isolated: !worktreeResult.error, // true if running in a worktree
-      status: "running",
+      status: SYSTEM_STATUSES.RUNNING,
       output: "",
       toolCalls: [],
       diff: null,
@@ -543,14 +545,14 @@ export class OrchestratorService {
                 isSubAgent: true,
                 subAgentId: agentId,
                 subAgentDescription: description,
-                subAgentStatus: "running",
+                subAgentStatus: SYSTEM_STATUSES.RUNNING,
                 subAgentProviderName: subAgentProvider,
                 subAgentResolvedModel: subAgentModel,
                 subAgentRecursionDepth: currentRecursionDepth + 1,
                 subAgentBranchName: worktreeResult.error ? null : branchName,
                 subAgentFiles: files || [],
                 parentConversationId,
-                parentAgentConversationId: orchestratorContext.agentConversationId || null,
+                parentAgentConversationId: agentConversationId || null,
                 project,
                 username,
               },
@@ -578,8 +580,8 @@ export class OrchestratorService {
       orchestratorContext.emit({
         type: "sub_agent_status",
         subAgentId: agentId,
-        message: "spawned",
-        description,
+        status: SYSTEM_STATUSES.RUNNING,
+        agentConversationId,
         conversationId: subAgentConversationId,
         parentConversationId: parentConversationId || null,
         model: subAgentModel,
@@ -615,7 +617,7 @@ export class OrchestratorService {
         logger.error(
           `[Orchestrator] Sub-agent ${agentId} loop error: ${getErrorMessage(error)}`,
         );
-        subAgentState.status = "failed";
+        subAgentState.status = SYSTEM_STATUSES.FAILED;
         subAgentState.error = getErrorMessage(error);
         subAgentState.durationMilliseconds = Date.now() - subAgentState.startedAt;
 
@@ -632,7 +634,7 @@ export class OrchestratorService {
 
         // Update sub-agent metadata on the child conversation document
         OrchestratorService._updateSubAgentDocument(subAgentState.subAgentConversationId, {
-          subAgentStatus: "failed",
+          subAgentStatus: SYSTEM_STATUSES.FAILED,
           subAgentDurationMilliseconds: subAgentState.durationMilliseconds,
           subAgentCompletedAt: new Date().toISOString(),
         }).catch(() => {});
@@ -641,7 +643,7 @@ export class OrchestratorService {
           orchestratorContext.emit({
             type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
             subAgentId: agentId,
-            message: "failed",
+            message: SYSTEM_STATUSES.FAILED,
             error: getErrorMessage(error),
           });
         }
@@ -691,7 +693,7 @@ export class OrchestratorService {
         logger.error(
           `[Orchestrator] Sub-agent ${agentId} loop error: ${getErrorMessage(error)}`,
         );
-        subAgentState.status = "failed";
+        subAgentState.status = SYSTEM_STATUSES.FAILED;
         subAgentState.error = getErrorMessage(error);
         subAgentState.durationMilliseconds = Date.now() - subAgentState.startedAt;
 
@@ -708,7 +710,7 @@ export class OrchestratorService {
 
         // Update sub-agent metadata on the child conversation document
         OrchestratorService._updateSubAgentDocument(subAgentState.subAgentConversationId, {
-          subAgentStatus: "failed",
+          subAgentStatus: SYSTEM_STATUSES.FAILED,
           subAgentDurationMilliseconds: subAgentState.durationMilliseconds,
           subAgentCompletedAt: new Date().toISOString(),
         }).catch(() => {});
@@ -717,7 +719,7 @@ export class OrchestratorService {
           orchestratorContext.emit({
             type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
             subAgentId: agentId,
-            message: "failed",
+            message: SYSTEM_STATUSES.FAILED,
             error: getErrorMessage(error),
           });
           orchestratorContext.emit({
@@ -746,7 +748,7 @@ export class OrchestratorService {
       return { error: `Sub-agent "${agentId}" not found` };
     }
 
-    if (subAgent.status === "running") {
+    if (subAgent.status === SYSTEM_STATUSES.RUNNING) {
       // Sub-agent still running — queue the message
       if (!subAgent.pendingMessages) subAgent.pendingMessages = [];
       subAgent.pendingMessages.push(message);
@@ -757,14 +759,14 @@ export class OrchestratorService {
       };
     }
 
-    if (subAgent.status !== "complete" && subAgent.status !== "idle") {
+    if (subAgent.status !== SYSTEM_STATUSES.COMPLETE && subAgent.status !== SYSTEM_STATUSES.IDLE) {
       return {
         error: `Sub-agent "${agentId}" is in "${subAgent.status}" state. Cannot send message.`,
       };
     }
 
     // Re-activate the sub-agent with the follow-up prompt
-    subAgent.status = "running";
+    subAgent.status = SYSTEM_STATUSES.RUNNING;
     subAgent.startedAt = Date.now();
 
     logger.info(
@@ -779,13 +781,13 @@ export class OrchestratorService {
       logger.error(
         `[Orchestrator] Sub-agent ${agentId} continuation error: ${getErrorMessage(error)}`,
       );
-      subAgent.status = "failed";
+      subAgent.status = SYSTEM_STATUSES.FAILED;
       subAgent.error = getErrorMessage(error);
     });
 
     return {
       agent_id: agentId,
-      status: "running",
+      status: SYSTEM_STATUSES.RUNNING,
       message: "Sub-agent continued with follow-up.",
     };
   }
@@ -812,12 +814,12 @@ export class OrchestratorService {
       subAgent.worktreePath = null;
     }
 
-    subAgent.status = "stopped";
+    subAgent.status = SYSTEM_STATUSES.STOPPED;
     subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
 
     logger.info(`[Orchestrator] Stopped sub-agent ${agentId}`);
 
-    return { agent_id: agentId, status: "stopped" };
+    return { agent_id: agentId, status: SYSTEM_STATUSES.STOPPED };
   }
 
   /**
@@ -841,11 +843,11 @@ export class OrchestratorService {
       };
     }
 
-    if (subAgent.status === "running") {
+    if (subAgent.status === SYSTEM_STATUSES.RUNNING) {
       return {
         agent_id: agentId,
         description: subAgent.description,
-        status: "running",
+        status: SYSTEM_STATUSES.RUNNING,
         partialOutput: stripToolCallMarkup((subAgent.output || "").slice(-ORCHESTRATOR.PARTIAL_OUTPUT_TAIL_CHARACTERS)) || null,
         toolUses: subAgent.toolCalls?.length || 0,
       };
@@ -870,9 +872,9 @@ export class OrchestratorService {
 
     const cleanupPromises: Promise<unknown>[] = [];
     for (const subAgent of sessionSubAgents) {
-      if (subAgent.status === "running") {
+      if (subAgent.status === SYSTEM_STATUSES.RUNNING) {
         subAgent.abortController?.abort();
-        subAgent.status = "stopped";
+        subAgent.status = SYSTEM_STATUSES.STOPPED;
         subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
       }
 
@@ -901,7 +903,7 @@ export class OrchestratorService {
 
   static getSubAgentStatus(agentId: string): {
     agentId: string;
-    status: "running" | "complete" | "failed" | "stopped" | "idle";
+    status: (typeof SYSTEM_STATUSES)[keyof typeof SYSTEM_STATUSES];
     error: string | null;
     diff: WorktreeDiff | null;
     durationMilliseconds: number;
@@ -950,7 +952,7 @@ export class OrchestratorService {
         providerName: subAgent.providerName,
         resolvedModel: subAgent.resolvedModel,
         durationMilliseconds:
-          subAgent.status === "running"
+          subAgent.status === SYSTEM_STATUSES.RUNNING
             ? Date.now() - subAgent.startedAt
             : subAgent.durationMilliseconds,
         toolUses: subAgent.toolCalls?.length || 0,
@@ -1019,7 +1021,7 @@ export class OrchestratorService {
           providerName: subAgentState.providerName,
           resolvedModel: subAgentState.resolvedModel,
           durationMilliseconds:
-            subAgentState.status === "running"
+            subAgentState.status === SYSTEM_STATUSES.RUNNING
               ? Date.now() - subAgentState.startedAt
               : subAgentState.durationMilliseconds,
           toolUses: subAgentState.toolCalls?.length || 0,
@@ -1204,7 +1206,7 @@ export class OrchestratorService {
       ) {
         // Preserve sub-agents that are still running (non-blocking dispatch).
         // They will be cleaned up when they complete or are explicitly stopped.
-        if (subAgentState.status === "running") {
+        if (subAgentState.status === SYSTEM_STATUSES.RUNNING) {
           keysPreservedRunning.push(key);
           continue;
         }
@@ -1213,8 +1215,8 @@ export class OrchestratorService {
         // in the map until the TTL expires (IDLE_AGENT_TTL_MILLISECONDS).
         // This is the Antigravity-equivalent "idle → re-awaken" lifecycle.
         if (
-          subAgentState.status === "complete" ||
-          subAgentState.status === "idle"
+          subAgentState.status === SYSTEM_STATUSES.COMPLETE ||
+          subAgentState.status === SYSTEM_STATUSES.IDLE
         ) {
           const completedTimestamp = subAgentState.completedAt ?? (subAgentState.startedAt + subAgentState.durationMilliseconds);
           const elapsedSinceCompletion = currentTimestamp - completedTimestamp;
@@ -1242,7 +1244,7 @@ export class OrchestratorService {
       ).some(
         (subAgent) =>
           subAgent.parentConversationId === conversationId &&
-          (subAgent.status === "running" || subAgent.status === "complete" || subAgent.status === "idle"),
+          (subAgent.status === SYSTEM_STATUSES.RUNNING || subAgent.status === SYSTEM_STATUSES.COMPLETE || subAgent.status === SYSTEM_STATUSES.IDLE),
       );
       if (!hasActiveAgentsForConversation) {
         agentCountersByConversation.delete(conversationId);
@@ -1669,9 +1671,9 @@ export class OrchestratorService {
 
     for (const [key, subAgent] of teamSubAgents) {
       // Abort running sub-agents
-      if (subAgent.status === "running") {
+      if (subAgent.status === SYSTEM_STATUSES.RUNNING) {
         subAgent.abortController?.abort();
-        subAgent.status = "stopped";
+        subAgent.status = SYSTEM_STATUSES.STOPPED;
         subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
       }
 
@@ -1740,7 +1742,7 @@ export class OrchestratorService {
       return { error: `Sub-agent "${agentId}" not found for continuation` };
     }
 
-    if (subAgent.status !== "complete" && subAgent.status !== "idle") {
+    if (subAgent.status !== SYSTEM_STATUSES.COMPLETE && subAgent.status !== SYSTEM_STATUSES.IDLE) {
       return {
         error: `Sub-agent "${agentId}" is in "${subAgent.status}" state and cannot be continued`,
       };
@@ -1750,7 +1752,7 @@ export class OrchestratorService {
       subAgent.round = round;
     }
 
-    subAgent.status = "running";
+    subAgent.status = SYSTEM_STATUSES.RUNNING;
     subAgent.startedAt = Date.now();
     subAgent.abortController = createAbortController();
 
@@ -1762,7 +1764,7 @@ export class OrchestratorService {
       orchestratorContext.emit({
         type: "sub_agent_status",
         subAgentId: agentId,
-        message: "spawned",
+        status: SYSTEM_STATUSES.RUNNING,
         description: subAgent.description,
         conversationId: subAgent.subAgentConversationId,
         parentConversationId: subAgent.parentConversationId || null,
@@ -1782,7 +1784,7 @@ export class OrchestratorService {
       logger.error(
         `[Orchestrator] Sub-agent ${agentId} continuation error: ${getErrorMessage(error)}`,
       );
-      subAgent.status = "failed";
+      subAgent.status = SYSTEM_STATUSES.FAILED;
       subAgent.error = getErrorMessage(error);
       subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
 
@@ -1790,7 +1792,7 @@ export class OrchestratorService {
         orchestratorContext.emit({
           type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
           subAgentId: agentId,
-          message: "failed",
+          message: SYSTEM_STATUSES.FAILED,
           error: getErrorMessage(error),
         });
       }
@@ -1834,13 +1836,13 @@ export class OrchestratorService {
       return { error: `Sub-agent "${agentId}" not found. It may have been cleaned up or expired.` };
     }
 
-    if (subAgent.status === "running") {
+    if (subAgent.status === SYSTEM_STATUSES.RUNNING) {
       return {
         error: `Sub-agent "${agentId}" is currently running. Use send_subagent_message to queue a follow-up, or stop_subagent to abort it first.`,
       };
     }
 
-    if (subAgent.status !== "complete" && subAgent.status !== "idle") {
+    if (subAgent.status !== SYSTEM_STATUSES.COMPLETE && subAgent.status !== SYSTEM_STATUSES.IDLE) {
       return {
         error: `Sub-agent "${agentId}" is in "${subAgent.status}" state and cannot be resumed. Only completed or idle agents can be resumed.`,
       };
@@ -1854,7 +1856,7 @@ export class OrchestratorService {
     }
 
     // Reset for the new session
-    subAgent.status = "running";
+    subAgent.status = SYSTEM_STATUSES.RUNNING;
     subAgent.startedAt = Date.now();
     subAgent.completedAt = undefined;
     subAgent.abortController = createAbortController();
@@ -1868,7 +1870,7 @@ export class OrchestratorService {
       orchestratorContext.emit({
         type: "sub_agent_status",
         subAgentId: agentId,
-        message: "spawned",
+        status: SYSTEM_STATUSES.RUNNING,
         description: subAgent.description,
         conversationId: subAgent.subAgentConversationId,
         parentConversationId: subAgent.parentConversationId || null,
@@ -1913,7 +1915,7 @@ export class OrchestratorService {
         logger.error(
           `[Orchestrator] Resumed sub-agent ${agentId} error: ${getErrorMessage(error)}`,
         );
-        subAgent.status = "failed";
+        subAgent.status = SYSTEM_STATUSES.FAILED;
         subAgent.error = getErrorMessage(error);
         subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
 
@@ -1921,7 +1923,7 @@ export class OrchestratorService {
           orchestratorContext.emit({
             type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
             subAgentId: agentId,
-            message: "failed",
+            message: SYSTEM_STATUSES.FAILED,
             error: getErrorMessage(error),
           });
           orchestratorContext.emit({
@@ -1951,7 +1953,7 @@ export class OrchestratorService {
       agent: {
         agent_id: agentId,
         description: subAgent.description,
-        status: "running",
+        status: SYSTEM_STATUSES.RUNNING,
         previousToolUses: subAgent.toolCalls?.length || 0,
       },
     };
@@ -1992,7 +1994,7 @@ export class OrchestratorService {
       },
     );
 
-    const agentStatusEmoji = agentResult.status === "completed" ? "✅" : "❌";
+    const agentStatusEmoji = agentResult.status === SYSTEM_STATUSES.COMPLETE ? "✅" : "❌";
 
     await OrchestratorService._sendParentCompletionNotification(
       {
@@ -2460,7 +2462,7 @@ export class OrchestratorService {
         (error instanceof Error && error.name === "AbortError") ||
         subAgent.abortController?.signal.aborted
       ) {
-        subAgent.status = "stopped";
+        subAgent.status = SYSTEM_STATUSES.STOPPED;
       } else {
         if (!preserveWorktree && subAgent.isolated) {
           ToolOrchestratorService._clearWorktree(
@@ -2483,7 +2485,8 @@ export class OrchestratorService {
     const messagesOutput = getLastAssistantText(finalMessages);
     const telemetryOutput = (telemetry.output || "").trim();
     subAgent.output = stripToolCallMarkup(messagesOutput || telemetryOutput);
-    if (!subAgent.output && subAgent.status !== "stopped") {
+    if (!subAgent.output && subAgent.status !== SYSTEM_STATUSES.STOPPED) {
+      subAgent.output = "[No output from sub-agent]";
       logger.warn(
         `[Orchestrator] Sub-agent ${subAgent.agentId} completed with empty output. ` +
           `messages=${finalMessages.length}, telemetryOutput=${telemetryOutput.length}chars`,
@@ -2493,7 +2496,7 @@ export class OrchestratorService {
     subAgent.messages = finalMessages;
     subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
 
-    if (subAgent.status !== "stopped") {
+    if (subAgent.status !== SYSTEM_STATUSES.STOPPED) {
       // Stage and commit changes in the worktree
       await GitWorktreeHelper.toolsApiPost("/agentic/command/run", {
         command: "git add -A",
@@ -2529,7 +2532,7 @@ export class OrchestratorService {
       } else {
         subAgent.diff = null;
       }
-      subAgent.status = "complete";
+      subAgent.status = SYSTEM_STATUSES.COMPLETE;
       subAgent.completedAt = Date.now();
     }
 
@@ -2539,20 +2542,21 @@ export class OrchestratorService {
     // in spawnFromTool and getTaskOutput once the orchestrator builds
     // the result payload.
     subAgent.abortController = null;
+
     // Remove worktree now that the diff has been collected — prevents orphaned
     // worktrees from accumulating on disk across conversations.
     // When preserveWorktree is true (P2P mesh turns), the worktree stays alive
     // so the agent can be continued with its local file state intact.
     if (
       !preserveWorktree &&
-      subAgent.status !== "stopped" &&
+      subAgent.status !== SYSTEM_STATUSES.STOPPED &&
       subAgent.isolated &&
       subAgent.worktreePath
     ) {
       await GitWorktreeHelper.removeWorktree(
         subAgent.repositoryPath,
         subAgent.worktreePath,
-      ).catch((error: Error) =>
+      ).catch((error: unknown) =>
         logger.warn(
           `[Orchestrator] Post-completion worktree cleanup failed for ${subAgent.agentId}: ${getErrorMessage(error)}`,
         ),

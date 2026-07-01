@@ -61,6 +61,45 @@ export const COLLECTIONS = {
   WORKFLOW_MEMORIES: "workflow_memories",
 };
 
+/** Shared system-wide statuses for agents, tasks, and workflows. */
+export const SYSTEM_STATUSES = {
+  RUNNING: "running",
+  IN_PROGRESS: "in_progress",
+  PENDING: "pending",
+  FAILED: "failed",
+  STOPPED: "stopped",
+  COMPLETE: "complete",
+  COMPLETED: "completed",
+  SUCCESS: "success",
+  DONE: "done",
+  IDLE: "idle",
+  ACTIVE: "active",
+  CANCELLED: "cancelled",
+  ERROR: "error",
+  WARNING: "warning",
+} as const;
+
+export const APPROVAL_STATUS = {
+  PENDING: "pending",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+} as const;
+
+/** Priorities specifically for Todo items and task ranking. */
+export const TODO_PRIORITIES = {
+  HIGH: "high",
+  MEDIUM: "medium",
+  LOW: "low",
+} as const;
+
+/** Standard message roles for LLM conversations. */
+export const MESSAGE_ROLES = {
+  USER: "user",
+  ASSISTANT: "assistant",
+  SYSTEM: "system",
+  TOOL: "tool",
+} as const;
+
 export const TIMER_MODES = {
   ONE_SHOT: "one_shot",
   RECURRING: "recurring",
@@ -155,6 +194,43 @@ export const FILE_CATEGORIES = {
   UPLOADS: "uploads",
   SCREENSHOTS: "screenshots",
   PROJECTS: "projects",
+} as const;
+
+// ─── Benchmark Constants ─────────────────────────────────────
+
+export const BENCHMARK_MATCH_MODES = {
+  CONTAINS: "contains",
+  EXACT: "exact",
+  STARTS_WITH: "startsWith",
+  REGEX: "regex",
+} as const;
+
+// ─── Localization Constants ──────────────────────────────────
+
+/** Default locale code for prompt generation and tool documentation. */
+export const DEFAULT_LOCALE = "en";
+
+// ─── Parameter Registry & Schema Constants ───────────────────
+
+export const PARAMETER_SCHEMAS = {
+  DATA_TYPES: {
+    NUMBER: "number",
+    STRING: "string",
+    BOOLEAN: "boolean",
+  },
+  CONTROL_TYPES: {
+    SLIDER: "slider",
+    SELECT: "select",
+    TOGGLE: "toggle",
+    INPUT: "input",
+  },
+  GROUPS: {
+    SAMPLING: "sampling",
+    REASONING: "reasoning",
+    OUTPUT: "output",
+    PENALTIES: "penalties",
+    ADVANCED: "advanced",
+  },
 } as const;
 
 // ─── Harness & Thought Structure Identifiers ───────────────
@@ -651,3 +727,17 @@ export const DIRECTORY_TREE_CHILD_LIMIT = 20;
 
 /** Maximum execution time for long-running database aggregation queries (milliseconds). */
 export const AGGREGATE_MAX_TIME_MILLISECONDS = 30_000;
+
+// ─── Encoding & Media Format Constants ───────────────────────
+
+export const ENCODINGS = {
+  BASE64: "base64",
+} as const;
+
+// ─── Unit Conversion Constants ───────────────────────────────
+
+export const UNITS = {
+  MILLISECONDS_PER_SECOND: 1000,
+  BYTES_PER_KB: 1024,
+  BYTES_PER_MB: 1024 * 1024,
+} as const;

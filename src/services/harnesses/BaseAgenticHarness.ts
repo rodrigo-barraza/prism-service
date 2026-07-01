@@ -19,7 +19,7 @@ import {
 import ConversationGenerationTracker from "../ConversationGenerationTracker.ts";
 import RequestLogger from "../RequestLogger.ts";
 import FileService from "../FileService.ts";
-import { FILE_CATEGORIES } from "../../constants.ts";
+import { FILE_CATEGORIES, UNITS, DEFAULT_LOCALE } from "../../constants.ts";
 import {
   finalizeTextGeneration,
   type FinalizerContext,
@@ -392,7 +392,7 @@ export default class BaseAgenticHarness {
           DEFAULT_MAX_INPUT_TOKENS,
         maxOutputTokens: options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS,
         toolCount,
-        locale: options?.locale as string | undefined,
+        locale: options?.locale as string | undefined || DEFAULT_LOCALE,
       },
     );
     if (contextResult.truncated) {
@@ -450,7 +450,7 @@ export default class BaseAgenticHarness {
         Array.isArray((message as ChatMessage).images)
       ) {
         totalTokens +=
-          ((message as ChatMessage).images as unknown[]).length * 1000;
+          ((message as ChatMessage).images as unknown[]).length * UNITS.MILLISECONDS_PER_SECOND;
       }
     }
     return totalTokens;

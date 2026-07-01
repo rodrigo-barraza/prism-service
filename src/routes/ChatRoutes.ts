@@ -67,7 +67,13 @@ import type {
 } from "../services/harnesses/types.ts";
 import type { ChatMessage } from "../types/ProviderTypes.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import { PROVIDERS, FILE_CATEGORIES, MAX_FUNCTION_CALL_ITERATIONS } from "../constants.ts";
+import {
+  PROVIDERS,
+  FILE_CATEGORIES,
+  MAX_FUNCTION_CALL_ITERATIONS,
+  SYSTEM_STATUSES,
+  MESSAGE_ROLES,
+} from "../constants.ts";
 
 interface ToolSchemaWithDomain extends ToolSchema {
   domain?: string;
@@ -1219,7 +1225,7 @@ async function handleStreamingText(context: GenerationContext) {
       } catch (error: unknown) {
         const durationMilliseconds = Date.now() - startTime;
         toolCall.result = { error: getErrorMessage(error) };
-        toolCall.status = "error";
+        toolCall.status = SYSTEM_STATUSES.ERROR;
         toolCall.durationMilliseconds = durationMilliseconds;
         emit({
           type: SERVER_SENT_EVENT_TYPES.TOOL_CALL,
@@ -1227,14 +1233,14 @@ async function handleStreamingText(context: GenerationContext) {
           name: toolCall.name,
           args: toolCall.args,
           result: toolCall.result,
-          status: "error",
+          status: SYSTEM_STATUSES.ERROR,
           durationMilliseconds,
         });
       }
     }
     // Build tool result messages for the provider
     const assistantToolMessage = {
-      role: "assistant",
+      role: MESSAGE_ROLES.ASSISTANT,
       content: streamState.text || "",
       toolCalls: streamState.toolCalls.map((toolCall) => ({
         id: toolCall.id,
@@ -1258,7 +1264,7 @@ async function handleStreamingText(context: GenerationContext) {
     const toolResultMillisecondsgs = streamState.toolCalls
       .filter((toolCall) => toolCall.result)
       .map((toolCall) => ({
-        role: "tool",
+        role: MESSAGE_ROLES.TOOL,
         tool_call_id: toolCall.id,
         name: toolCall.name,
         content:

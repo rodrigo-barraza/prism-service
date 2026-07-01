@@ -21,19 +21,16 @@ vi.mock('../src/config.ts', () => ({
   },
 }));
 
-vi.mock('../src/constants.ts', () => ({
-  PROVIDERS: {
-    OPENAI: 'openai',
-    ANTHROPIC: 'anthropic',
-    GOOGLE: 'google',
-    ELEVENLABS: 'elevenlabs',
-    INWORLD: 'inworld',
-    LM_STUDIO: 'lm-studio',
-    VLLM: 'vllm',
-    OLLAMA: 'ollama',
-    LLAMA_CPP: 'llama-cpp',
-  },
-}));
+vi.mock('../src/constants.ts', async (importOriginal) => {
+  const actual = await importOriginal() as any;
+  return {
+    ...actual,
+    PROVIDERS: {
+      ...actual.PROVIDERS,
+      INWORLD: 'inworld',
+    },
+  };
+});
 
 import { PROVIDERS } from '../src/constants.ts';
 import {

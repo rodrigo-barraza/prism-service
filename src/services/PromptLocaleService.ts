@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import logger from "../utils/logger.ts";
+import { DEFAULT_LOCALE } from "../constants.ts";
 
 // ────────────────────────────────────────────────────────────
 // PromptLocaleService — Agent Prompt Internationalization
@@ -21,7 +22,7 @@ import logger from "../utils/logger.ts";
 //   No runtime file I/O after initialization.
 // ────────────────────────────────────────────────────────────
 
-const DEFAULT_LOCALE = "en";
+
 
 export interface TransformedLocaleFlatObject {
   [key: string]: unknown;

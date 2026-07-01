@@ -19,7 +19,7 @@ import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 import RequestLogger from "../../RequestLogger.ts";
 import PromptLocaleService from "../../PromptLocaleService.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
-import { ORCHESTRATOR } from "../../../constants.ts";
+import { ORCHESTRATOR, SYSTEM_STATUSES } from "../../../constants.ts";
 
 const MAXIMUM_SYNTHESIS_CHARACTERS = ORCHESTRATOR.MAXIMUM_SYNTHESIS_CHARACTERS;
 const DEFAULT_LAYER_COUNT = ORCHESTRATOR.ROUTERS.DEFAULT_LAYER_COUNT;
@@ -325,7 +325,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
         const synthesisSubAgentResult: SubAgentResult = {
           agent_id: `synthesis-${teamName}-L${layerIndex + 1}-${Date.now()}`,
           description: `Synthesis pass for team "${teamName}"${layerLabel}`,
-          status: "completed",
+          status: SYSTEM_STATUSES.COMPLETED,
           summary: `Aggregated ${successfulResults.length} sub-agent results into a unified synthesis${layerLabel}`,
           result: synthesisResult.text,
           toolUses: 0,

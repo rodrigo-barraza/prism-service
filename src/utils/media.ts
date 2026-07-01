@@ -9,6 +9,7 @@ import { join } from "path";
 import sharp from "sharp";
 import logger from "./logger.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { UNITS, ENCODINGS } from "../constants.ts";
 
 // ── ffmpeg availability (cached per process) ────────────────
 let _ffmpegAvailable: boolean | null = null;
@@ -35,7 +36,7 @@ async function isFfmpegAvailable(): Promise<boolean> {
 // ── Provider Image Limits ───────────────────────────────────
 
 /** Anthropic's per-image inline base64 limit. */
-const ANTHROPIC_IMAGE_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+const ANTHROPIC_IMAGE_MAX_BYTES = 5 * UNITS.BYTES_PER_MB; // 5 MB
 
 /**
  * Maximum pixel dimension (width or height) for images sent to providers.
@@ -72,8 +73,8 @@ export async function compressImageForSizeLimit(
       return { data: base64Data, mediaType };
     }
 
-    const sizeMB = (rawBytes / 1024 / 1024).toFixed(2);
-    const limitMB = (maxBytes / 1024 / 1024).toFixed(0);
+    const sizeMB = (rawBytes / UNITS.BYTES_PER_MB).toFixed(2);
+    const limitMB = (maxBytes / UNITS.BYTES_PER_MB).toFixed(0);
     logger.info(
       `[media] Image exceeds ${limitMB} MB limit (${sizeMB} MB, ${mediaType}). Compressing...`,
     );
@@ -111,7 +112,7 @@ export async function constrainImageDimensions(
   }
 
   try {
-    const buffer = Buffer.from(base64Data, "base64");
+    const buffer = Buffer.from(base64Data, ENCODINGS.BASE64);
     const metadata = await sharp(buffer).metadata();
     const { width, height } = metadata;
 
@@ -147,11 +148,11 @@ export async function constrainImageDimensions(
     }
 
     const resized = await pipeline.toBuffer();
-    const resizedB64 = resized.toString("base64");
+    const resizedB64 = resized.toString(ENCODINGS.BASE64);
 
     logger.info(
       `[media] Dimension-constrained: ${width}×${height} → ${newWidth}×${newHeight} ` +
-        `(${(resizedB64.length / 1024 / 1024).toFixed(2)} MB b64)`,
+        `(${(resizedB64.length / UNITS.BYTES_PER_MB).toFixed(2)} MB b64)`,
     );
 
     return { data: resizedB64, mediaType: outputMime };
@@ -182,7 +183,7 @@ async function compressGifWithFfmpeg(base64Data: string, maxBytes: number) {
   try {
     temporaryDirectory = await mkdtemp(join(tmpdir(), "prism-gif-"));
     const inputPath = join(temporaryDirectory, "input.gif");
-    const buffer = Buffer.from(base64Data, "base64");
+    const buffer = Buffer.from(base64Data, ENCODINGS.BASE64);
     await writeFile(inputPath, buffer);
 
     // Progressive resize: 75% → 56% → 42% → 32% → 24% → 18% of original
@@ -227,10 +228,10 @@ async function compressGifWithFfmpeg(base64Data: string, maxBytes: number) {
       });
 
       const result = await readFile(outputPath);
-      const resultB64 = result.toString("base64");
+      const resultB64 = result.toString(ENCODINGS.BASE64);
       if (resultB64.length <= maxBytes) {
         logger.info(
-          `[media] GIF compressed to ${(resultB64.length / 1024 / 1024).toFixed(2)} MB b64 ` +
+          `[media] GIF compressed to ${(resultB64.length / UNITS.BYTES_PER_MB).toFixed(2)} MB b64 ` +
             `(scale=${Math.round(cumulativeScale * 100)}%)`,
         );
         return {
@@ -273,9 +274,9 @@ async function compressGifWithFfmpeg(base64Data: string, maxBytes: number) {
     });
 
     const fallback = await readFile(fallbackPath);
-    const fallbackB64 = fallback.toString("base64");
+    const fallbackB64 = fallback.toString(ENCODINGS.BASE64);
     logger.warn(
-      `[media] GIF aggressive fallback: ${(fallbackB64.length / 1024 / 1024).toFixed(2)} MB b64 (512px max)`,
+      `[media] GIF aggressive fallback: ${(fallbackB64.length / UNITS.BYTES_PER_MB).toFixed(2)} MB b64 (512px max)`,
     );
     return {
       data: fallbackB64,
@@ -298,7 +299,7 @@ async function compressGifWithFfmpeg(base64Data: string, maxBytes: number) {
  * Converts to JPEG with progressive quality + dimension reduction.
  */
 async function compressWithSharp(base64Data: string, maxBytes: number) {
-  let buffer = Buffer.from(base64Data, "base64");
+  let buffer = Buffer.from(base64Data, ENCODINGS.BASE64);
   const qualitySteps = [85, 70, 50];
 
   // Step 1: try quality reduction (convert to JPEG)
@@ -307,10 +308,10 @@ async function compressWithSharp(base64Data: string, maxBytes: number) {
       .jpeg({ quality, mozjpeg: true })
       .toBuffer();
 
-    const compressedB64 = compressed.toString("base64");
+    const compressedB64 = compressed.toString(ENCODINGS.BASE64);
     if (compressedB64.length <= maxBytes) {
       logger.info(
-        `[media] Compressed to ${(compressedB64.length / 1024 / 1024).toFixed(2)} MB b64 ` +
+        `[media] Compressed to ${(compressedB64.length / UNITS.BYTES_PER_MB).toFixed(2)} MB b64 ` +
           `(JPEG q=${quality})`,
       );
       return {
@@ -330,15 +331,15 @@ async function compressWithSharp(base64Data: string, maxBytes: number) {
     width = Math.round(width * 0.75);
     height = Math.round(height * 0.75);
 
-    const resized = await sharp(Buffer.from(base64Data, "base64"))
+    const resized = await sharp(Buffer.from(base64Data, ENCODINGS.BASE64))
       .resize(width, height, { fit: "inside", withoutEnlargement: true })
       .jpeg({ quality: 70, mozjpeg: true })
       .toBuffer();
 
-    const resizedB64 = resized.toString("base64");
+    const resizedB64 = resized.toString(ENCODINGS.BASE64);
     if (resizedB64.length <= maxBytes) {
       logger.info(
-        `[media] Compressed to ${(resizedB64.length / 1024 / 1024).toFixed(2)} MB b64 ` +
+        `[media] Compressed to ${(resizedB64.length / UNITS.BYTES_PER_MB).toFixed(2)} MB b64 ` +
           `(${width}x${height}, JPEG q=70)`,
       );
       return {
@@ -349,14 +350,14 @@ async function compressWithSharp(base64Data: string, maxBytes: number) {
   }
 
   // Final fallback: aggressive resize
-  const fallback = await sharp(Buffer.from(base64Data, "base64"))
+  const fallback = await sharp(Buffer.from(base64Data, ENCODINGS.BASE64))
     .resize(1024, 1024, { fit: "inside", withoutEnlargement: true })
     .jpeg({ quality: 50, mozjpeg: true })
     .toBuffer();
 
-  const fallbackB64 = fallback.toString("base64");
+  const fallbackB64 = fallback.toString(ENCODINGS.BASE64);
   logger.warn(
-    `[media] Aggressive fallback: ${(fallbackB64.length / 1024 / 1024).toFixed(2)} MB b64 (1024px, q=50)`,
+    `[media] Aggressive fallback: ${(fallbackB64.length / UNITS.BYTES_PER_MB).toFixed(2)} MB b64 (1024px, q=50)`,
   );
 
   return {
@@ -432,8 +433,8 @@ export async function extractVideoFrames(
     const outputPattern = join(temporaryDirectory, "frame_%04d.jpg");
 
     // Write video to temp file
-    const videoBuffer = Buffer.from(base64Data, "base64");
-    const fileSizeMB = (videoBuffer.length / (1024 * 1024)).toFixed(1);
+    const videoBuffer = Buffer.from(base64Data, ENCODINGS.BASE64);
+    const fileSizeMB = (videoBuffer.length / UNITS.BYTES_PER_MB).toFixed(1);
     logger.info(
       `[media] Writing ${fileSizeMB} MB video (${mime}) to ${inputPath}`,
     );
@@ -484,7 +485,7 @@ export async function extractVideoFrames(
       );
       try {
         const frameBuffer = await readFile(framePath);
-        const frameBase64 = frameBuffer.toString("base64");
+        const frameBase64 = frameBuffer.toString(ENCODINGS.BASE64);
         frames.push(`data:image/jpeg;base64,${frameBase64}`);
       } catch {
         break;

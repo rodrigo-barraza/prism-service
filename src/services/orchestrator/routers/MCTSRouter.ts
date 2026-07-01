@@ -19,7 +19,7 @@ import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
 import RequestLogger from "../../RequestLogger.ts";
 import PromptLocaleService from "../../PromptLocaleService.ts";
 import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
-import { ORCHESTRATOR } from "../../../constants.ts";
+import { ORCHESTRATOR, SYSTEM_STATUSES } from "../../../constants.ts";
 
 const DEFAULT_MAXIMUM_DEPTH = ORCHESTRATOR.ROUTERS.DEFAULT_MCTS_DEPTH;
 const DEFAULT_BRANCH_FACTOR = ORCHESTRATOR.ROUTERS.DEFAULT_MCTS_BRANCH_FACTOR;
@@ -734,7 +734,7 @@ export class MCTSRouter implements TopologyRouter {
       const searchSummary: SubAgentResult = {
         agent_id: `mcts-search-${teamName}-${Date.now()}`,
         description: `MCTS search summary for team "${teamName}"`,
-        status: "completed",
+        status: SYSTEM_STATUSES.COMPLETED,
         summary:
           `MCTS search explored ${allTreeNodes.length} nodes across ${treeDepthReached} depth levels ` +
           `(${expandedNodeCount} expanded). Best node: depth ${bestOverallNode.depth}, score ${bestOverallNode.score.toFixed(3)}`,

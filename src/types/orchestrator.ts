@@ -11,6 +11,8 @@ import type {
   ToolCall,
 } from "../services/harnesses/types.ts";
 
+import { SYSTEM_STATUSES } from "../constants.ts";
+
 // ── Sub-Agent State ────────────────────────────────────────
 
 export interface SubAgentState {
@@ -22,7 +24,12 @@ export interface SubAgentState {
   worktreePath: string | null;
   repositoryPath: string;
   isolated: boolean;
-  status: "running" | "complete" | "failed" | "stopped" | "idle";
+  status:
+    | typeof SYSTEM_STATUSES.RUNNING
+    | typeof SYSTEM_STATUSES.COMPLETE
+    | typeof SYSTEM_STATUSES.FAILED
+    | typeof SYSTEM_STATUSES.STOPPED
+    | typeof SYSTEM_STATUSES.IDLE;
   output: string;
   toolCalls: ToolCall[];
   diff: WorktreeDiff | null;

@@ -7,6 +7,7 @@ import {
   COMPLETED_TASK_TIME_TO_LIVE_MILLISECONDS,
   TASK_PRUNING_INTERVAL_MILLISECONDS,
 } from "./AsyncTaskConstants.ts";
+import { SYSTEM_STATUSES } from "../constants.ts";
 
 // ────────────────────────────────────────────────────────────
 // AsyncTaskRegistry — General-Purpose Background Task Tracking
@@ -31,7 +32,7 @@ export interface AsyncTaskState {
   taskId: string;
   toolName: string;
   toolArguments: Record<string, unknown>;
-  status: "running" | "completed" | "failed" | "cancelled";
+  status: (typeof SYSTEM_STATUSES)[keyof typeof SYSTEM_STATUSES];
   result: unknown;
   error: string | null;
   startedAt: number;
@@ -86,7 +87,7 @@ function pruneExpiredTasks(): void {
 
   for (const [taskId, taskState] of activeTasks) {
     if (
-      taskState.status !== "running" &&
+      taskState.status !== SYSTEM_STATUSES.RUNNING &&
       taskState.completedAt !== null &&
       taskState.completedAt < expirationThreshold
     ) {
@@ -120,7 +121,7 @@ startPruningInterval();
 // Register shutdown cleanup — abort all running tasks
 registerCleanup(async () => {
   const runningTasks = [...activeTasks.values()].filter(
-    (taskState) => taskState.status === "running",
+    (taskState) => taskState.status === SYSTEM_STATUSES.RUNNING,
   );
   if (runningTasks.length === 0) return;
 
@@ -129,7 +130,7 @@ registerCleanup(async () => {
   );
   for (const taskState of runningTasks) {
     taskState.abortController?.abort();
-    taskState.status = "cancelled";
+    taskState.status = SYSTEM_STATUSES.CANCELLED;
     taskState.completedAt = Date.now();
     taskState.durationMilliseconds = taskState.completedAt - taskState.startedAt;
   }
@@ -144,7 +145,7 @@ export default class AsyncTaskRegistry {
   /**
    * Dispatch a tool to run asynchronously in the background.
    *
-   * Returns the initial task state immediately (status: "running").
+   * Returns the initial task state immediately (status: SYSTEM_STATUSES.RUNNING).
    * The task promise runs detached — when it settles, the task state
    * updates in-place.
    *
@@ -178,7 +179,7 @@ export default class AsyncTaskRegistry {
       taskId,
       toolName,
       toolArguments,
-      status: "running",
+      status: SYSTEM_STATUSES.RUNNING,
       result: null,
       error: null,
       startedAt: Date.now(),
@@ -202,9 +203,9 @@ export default class AsyncTaskRegistry {
       .then((executionResult) => {
         // Guard against cancelled tasks — if the task was cancelled while
         // the executor was still running, don't overwrite the cancelled state
-        if (taskState.status === "cancelled") return;
+        if (taskState.status === SYSTEM_STATUSES.CANCELLED) return;
 
-        taskState.status = "completed";
+        taskState.status = SYSTEM_STATUSES.COMPLETED;
         taskState.result = executionResult;
         taskState.completedAt = Date.now();
         taskState.durationMilliseconds = taskState.completedAt - taskState.startedAt;
@@ -216,16 +217,16 @@ export default class AsyncTaskRegistry {
         onComplete?.(taskState);
       })
       .catch((executionError: Error) => {
-        if (taskState.status === "cancelled") return;
+        if (taskState.status === SYSTEM_STATUSES.CANCELLED) return;
 
         const isAbortError =
           executionError instanceof Error && executionError.name === "AbortError";
 
         if (isAbortError) {
-          taskState.status = "cancelled";
+          taskState.status = SYSTEM_STATUSES.CANCELLED;
           logger.info(`[AsyncTaskRegistry] Task ${taskId} aborted`);
         } else {
-          taskState.status = "failed";
+          taskState.status = SYSTEM_STATUSES.FAILED;
           taskState.error = getErrorMessage(executionError);
           logger.warn(
             `[AsyncTaskRegistry] Task ${taskId} failed: ${taskState.error}`,
@@ -269,10 +270,10 @@ export default class AsyncTaskRegistry {
   static cancelTask(taskId: string): boolean {
     const taskState = activeTasks.get(taskId);
     if (!taskState) return false;
-    if (taskState.status !== "running") return false;
+    if (taskState.status !== SYSTEM_STATUSES.RUNNING) return false;
 
     taskState.abortController?.abort();
-    taskState.status = "cancelled";
+    taskState.status = SYSTEM_STATUSES.CANCELLED;
     taskState.completedAt = Date.now();
     taskState.durationMilliseconds = taskState.completedAt - taskState.startedAt;
 
@@ -288,7 +289,7 @@ export default class AsyncTaskRegistry {
     for (const taskState of activeTasks.values()) {
       if (
         taskState.agentConversationId === agentConversationId &&
-        taskState.status === "running"
+        taskState.status === SYSTEM_STATUSES.RUNNING
       ) {
         runningCount++;
       }
@@ -301,7 +302,7 @@ export default class AsyncTaskRegistry {
    */
   static hasActiveTask(taskId: string): boolean {
     const taskState = activeTasks.get(taskId);
-    return taskState?.status === "running" || false;
+    return taskState?.status === SYSTEM_STATUSES.RUNNING || false;
   }
 
   /**
@@ -313,9 +314,9 @@ export default class AsyncTaskRegistry {
     for (const [taskId, taskState] of activeTasks) {
       if (taskState.agentConversationId === agentConversationId) {
         // Abort any still-running tasks
-        if (taskState.status === "running") {
+        if (taskState.status === SYSTEM_STATUSES.RUNNING) {
           taskState.abortController?.abort();
-          taskState.status = "cancelled";
+          taskState.status = SYSTEM_STATUSES.CANCELLED;
           taskState.completedAt = Date.now();
           taskState.durationMilliseconds = taskState.completedAt - taskState.startedAt;
         }
@@ -345,7 +346,7 @@ export default class AsyncTaskRegistry {
   /** Clear all tasks and counters — used in tests */
   static clear(): void {
     for (const taskState of activeTasks.values()) {
-      if (taskState.status === "running") {
+      if (taskState.status === SYSTEM_STATUSES.RUNNING) {
         taskState.abortController?.abort();
       }
     }

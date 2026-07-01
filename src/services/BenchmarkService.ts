@@ -9,7 +9,7 @@ import { isInstance } from "../providers/instance-registry.ts";
 import MongoWrapper from "../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
-import { COLLECTIONS, BENCHMARK } from "../constants.ts";
+import { COLLECTIONS, BENCHMARK, BENCHMARK_MATCH_MODES } from "../constants.ts";
 import type { SseEvent } from "../types/SseTypes.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
@@ -142,28 +142,21 @@ interface BenchmarkCreateData {
 }
 
 // ─── evaluate model response against expected value ─────────
-const MATCH_MODES = {
-  CONTAINS: "contains",
-  EXACT: "exact",
-  STARTS_WITH: "startsWith",
-  REGEX: "regex",
-} as const;
-
-type MatchMode = (typeof MATCH_MODES)[keyof typeof MATCH_MODES];
+type MatchMode = (typeof BENCHMARK_MATCH_MODES)[keyof typeof BENCHMARK_MATCH_MODES];
 
 function evaluate(
   response: string,
   expected: string,
-  matchMode: MatchMode | string = MATCH_MODES.CONTAINS,
+  matchMode: MatchMode | string = BENCHMARK_MATCH_MODES.CONTAINS,
 ): boolean {
   if (!response || !expected) return false;
   const norm = (s: string) => s.trim().toLowerCase();
   switch (matchMode) {
-    case MATCH_MODES.EXACT:
+    case BENCHMARK_MATCH_MODES.EXACT:
       return norm(response) === norm(expected);
-    case MATCH_MODES.STARTS_WITH:
+    case BENCHMARK_MATCH_MODES.STARTS_WITH:
       return norm(response).startsWith(norm(expected));
-    case MATCH_MODES.REGEX: {
+    case BENCHMARK_MATCH_MODES.REGEX: {
       try {
         const regex = new RegExp(expected, "i");
         return regex.test(response);
@@ -172,7 +165,7 @@ function evaluate(
         return false;
       }
     }
-    case MATCH_MODES.CONTAINS:
+    case BENCHMARK_MATCH_MODES.CONTAINS:
     default:
       return norm(response).includes(norm(expected));
   }
@@ -192,7 +185,7 @@ function evaluateAssertions(
       evaluate(
         response,
         assertion.expectedValue,
-        assertion.matchMode || MATCH_MODES.CONTAINS,
+        assertion.matchMode || BENCHMARK_MATCH_MODES.CONTAINS,
       ),
     );
   }
@@ -201,7 +194,7 @@ function evaluateAssertions(
     evaluate(
       response,
       assertion.expectedValue,
-      assertion.matchMode || MATCH_MODES.CONTAINS,
+      assertion.matchMode || BENCHMARK_MATCH_MODES.CONTAINS,
     ),
   );
 }
@@ -349,7 +342,7 @@ async function runSingleModel(
       response: null,
       thinking: null,
       passed: false,
-      matchMode: benchmark.matchMode || MATCH_MODES.CONTAINS,
+      matchMode: benchmark.matchMode || BENCHMARK_MATCH_MODES.CONTAINS,
       latency: 0,
       usage: null,
       estimatedCost: null,
@@ -451,7 +444,7 @@ async function runSingleModel(
         response: null,
         thinking: null,
         passed: false,
-        matchMode: benchmark.matchMode || MATCH_MODES.CONTAINS,
+        matchMode: benchmark.matchMode || BENCHMARK_MATCH_MODES.CONTAINS,
         latency: roundMilliseconds(latency),
         usage: null,
         estimatedCost: null,
@@ -471,7 +464,7 @@ async function runSingleModel(
     }
     const doneEvent =
       events.find((e) => e.type === "done") || ({} as BenchmarkEvent);
-    const matchMode = benchmark.matchMode || MATCH_MODES.CONTAINS;
+    const matchMode = benchmark.matchMode || BENCHMARK_MATCH_MODES.CONTAINS;
     // Extract thinking content (emitted as type: "thinking")
     const thinkingText = events
       .filter((e) => e.type === "thinking")
@@ -562,7 +555,7 @@ async function runSingleModel(
       response: null,
       thinking: null,
       passed: false,
-      matchMode: benchmark.matchMode || MATCH_MODES.CONTAINS,
+      matchMode: benchmark.matchMode || BENCHMARK_MATCH_MODES.CONTAINS,
       latency: roundMilliseconds(latency),
       usage: null,
       estimatedCost: null,
@@ -573,7 +566,7 @@ async function runSingleModel(
 }
 // ─── public API ─────────────────────────────────────────────
 const BenchmarkService = {
-  MATCH_MODES,
+  BENCHMARK_MATCH_MODES,
   evaluate,
   getConversationModels,
   /** Number of benchmark model calls currently in-flight. */
@@ -788,7 +781,7 @@ const BenchmarkService = {
       prompt: data.prompt,
       systemPrompt: data.systemPrompt || null,
       expectedValue: data.expectedValue,
-      matchMode: data.matchMode || MATCH_MODES.CONTAINS,
+      matchMode: data.matchMode || BENCHMARK_MATCH_MODES.CONTAINS,
       benchmarkMode: data.benchmarkMode || "model",
       assertions: data.assertions || [],
       assertionOperator: data.assertionOperator || "AND",
