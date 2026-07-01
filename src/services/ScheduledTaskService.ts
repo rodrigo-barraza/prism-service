@@ -346,6 +346,7 @@ const ScheduledTaskService = {
       providers: [task.provider.toLowerCase()],
       totalCost: 0,
       isGenerating: true,
+      isActive: true,
       createdAt: nowISO,
       updatedAt: nowISO,
     });
@@ -418,7 +419,7 @@ const ScheduledTaskService = {
         .updateOne(
           { id: resolvedConversationId },
           {
-            $set: { isGenerating: false, updatedAt: new Date().toISOString() },
+            $set: { isGenerating: false, isActive: false, updatedAt: new Date().toISOString() },
           },
         )
         .catch((cleanupError: Error) =>

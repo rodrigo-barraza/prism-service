@@ -34,18 +34,75 @@ vi.mock("../src/utils/ConversationDiscovery.ts", () => ({
 function createMockCollection() {
   const documents = new Map<string, Record<string, unknown>>();
 
+  function evaluate(
+    expression: unknown,
+    document: Record<string, unknown>,
+  ): unknown {
+    if (typeof expression === "string" && expression.startsWith("$")) {
+      return document[expression.slice(1)];
+    }
+    if (typeof expression !== "object" || expression === null) return expression;
+    const expressionObject = expression as Record<string, unknown>;
+
+    if ("$gt" in expressionObject) {
+      const [left, right] = expressionObject.$gt as unknown[];
+      return (evaluate(left, document) as number) > (evaluate(right, document) as number);
+    }
+    if ("$or" in expressionObject) {
+      return (expressionObject.$or as unknown[]).some((operand) =>
+        Boolean(evaluate(operand, document)),
+      );
+    }
+    if ("$eq" in expressionObject) {
+      const [left, right] = expressionObject.$eq as unknown[];
+      return evaluate(left, document) === evaluate(right, document);
+    }
+    if ("$add" in expressionObject) {
+      return (expressionObject.$add as unknown[]).reduce(
+        (sum, operand) => (sum as number) + (evaluate(operand, document) as number),
+        0,
+      );
+    }
+    if ("$max" in expressionObject) {
+      return Math.max(
+        ...(expressionObject.$max as unknown[]).map(
+          (operand) => evaluate(operand, document) as number,
+        ),
+      );
+    }
+    if ("$ifNull" in expressionObject) {
+      const [value, fallback] = expressionObject.$ifNull as unknown[];
+      const resolved = evaluate(value, document);
+      return resolved !== null && resolved !== undefined
+        ? resolved
+        : evaluate(fallback, document);
+    }
+    return expression;
+  }
+
+  function applyPipeline(
+    document: Record<string, unknown>,
+    pipeline: Array<Record<string, unknown>>,
+  ): void {
+    for (const stage of pipeline) {
+      const stageSet = stage.$set as Record<string, unknown> | undefined;
+      if (!stageSet) continue;
+      const resolved: Record<string, unknown> = {};
+      for (const [field, expression] of Object.entries(stageSet)) {
+        resolved[field] = evaluate(expression, document);
+      }
+      Object.assign(document, resolved);
+    }
+  }
+
   return {
     _documents: documents,
 
     async updateOne(
       filter: Record<string, unknown>,
-      update: Record<string, unknown>,
+      update: Record<string, unknown> | Array<Record<string, unknown>>,
       options: Record<string, unknown> = {},
     ) {
-      const $set = (update.$set || {}) as Record<string, unknown>;
-      const $inc = (update.$inc || {}) as Record<string, number>;
-
-      // Identity keys for document lookup (id, project, username)
       const identityKeys = Object.fromEntries(
         Object.entries(filter).filter(
           ([, value]) => typeof value !== "object" || value === null,
@@ -53,7 +110,6 @@ function createMockCollection() {
       );
       const identityKey = JSON.stringify(identityKeys);
 
-      // Find document by identity keys
       let document = documents.get(identityKey);
       const isInsert = !document;
 
@@ -64,36 +120,16 @@ function createMockCollection() {
         return { matchedCount: 0, modifiedCount: 0 };
       }
 
-      // Validate ALL filter conditions (including $lt/$gt operators)
-      // against the found document — MongoDB rejects the update if the
-      // document doesn't match the full query, not just the identity keys.
-      const matchesAllConditions = Object.entries(filter).every(
-        ([key, value]) => {
-          if (typeof value !== "object" || value === null) {
-            return document![key] === value;
-          }
-          const operatorObject = value as Record<string, unknown>;
-          if ("$lt" in operatorObject) {
-            return (document![key] as number) < (operatorObject.$lt as number);
-          }
-          if ("$gt" in operatorObject) {
-            return (document![key] as number) > (operatorObject.$gt as number);
-          }
-          return document![key] === value;
-        },
-      );
-
-      if (!matchesAllConditions) {
-        return { matchedCount: 0, modifiedCount: 0 };
+      // Aggregation pipeline update
+      if (Array.isArray(update)) {
+        applyPipeline(document!, update);
+        return { matchedCount: 1, modifiedCount: 1 };
       }
 
-      // Apply $inc
-      for (const [field, delta] of Object.entries($inc)) {
-        document![field] = ((document![field] as number) || 0) + delta;
-      }
-
-      // Apply $set
-      Object.assign(document!, $set);
+      // Classic update operators
+      const classicUpdate = update as Record<string, Record<string, unknown>>;
+      Object.assign(document!, classicUpdate.$set ?? {});
+      if (isInsert) Object.assign(document!, classicUpdate.$setOnInsert ?? {});
 
       return { matchedCount: 1, modifiedCount: 1 };
     },
@@ -167,6 +203,7 @@ async function seedConversation(
     username: BASE_ARGUMENTS.username,
     pendingBackgroundTasks: 0,
     isGenerating: false,
+    isActive: false,
     updatedAt: new Date().toISOString(),
     ...overrides,
   };
@@ -186,6 +223,7 @@ async function getConversationDocument(): Promise<Record<string, unknown> | null
   });
   return (mockCollection._documents.get(filterKey) as Record<string, unknown>) ?? null;
 }
+
 
 describe("pendingBackgroundTasks", () => {
   beforeEach(() => {
