@@ -77,9 +77,9 @@ export async function executeToolBatch(
             _toolState: ToolContext.getStore(resolvedAgentConversationId),
           },
         );
-        const durationMs = Date.now() - startTime;
+        const durationMilliseconds = Date.now() - startTime;
         await hooks.run("afterToolCall", toolCall, result, context);
-        return { name: toolCall.name, id: toolCall.id, result, durationMs };
+        return { name: toolCall.name, id: toolCall.id, result, durationMilliseconds };
       }
 
       const startTime = Date.now();
@@ -124,9 +124,9 @@ export async function executeToolBatch(
           _thinkingBudget: context.options?.thinkingBudget,
         },
       );
-      const durationMs = Date.now() - startTime;
+      const durationMilliseconds = Date.now() - startTime;
       await hooks.run("afterToolCall", toolCall, result, context);
-      return { name: toolCall.name, id: toolCall.id, result, durationMs };
+      return { name: toolCall.name, id: toolCall.id, result, durationMilliseconds };
     }),
   );
 

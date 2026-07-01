@@ -37,7 +37,7 @@ interface VramBenchmarkDocument {
   fitsInVram?: boolean;
   generation?: Record<string, unknown>;
   tokensPerSecond?: number;
-  loadTimeMs?: number;
+  loadTimeMilliseconds?: number;
   gpu?: Record<string, unknown>;
   ttft?: number;
   cpuRam?: Record<string, unknown>;
@@ -126,7 +126,7 @@ router.get(
         // Generation performance
         generation: 1,
         tokensPerSecond: 1,
-        loadTimeMs: 1,
+        loadTimeMilliseconds: 1,
 
         // GPU snapshot during benchmark
         gpu: 1,

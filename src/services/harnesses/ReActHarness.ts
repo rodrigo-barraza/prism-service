@@ -561,7 +561,7 @@ export default class ReActHarness extends BaseAgenticHarness {
                   name: toolCall.name,
                   args: toolCall.args,
                   result: matchingResult ? matchingResult.result : null,
-                  durationMs: matchingResult?.durationMs,
+                  durationMilliseconds: matchingResult?.durationMilliseconds,
                 };
               }),
             });
@@ -647,7 +647,7 @@ export default class ReActHarness extends BaseAgenticHarness {
                 thoughtSignature: toolCall.thoughtSignature || undefined,
                 reasoningItem: toolCall.reasoningItem || undefined,
                 result: matchingResult ? matchingResult.result : null,
-                durationMs: matchingResult?.durationMs,
+                durationMilliseconds: matchingResult?.durationMilliseconds,
               };
             }),
           };
@@ -669,7 +669,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             );
             if (stateToolCall && matchingResult) {
               stateToolCall.result = matchingResult.result;
-              stateToolCall.durationMs = matchingResult.durationMs;
+              stateToolCall.durationMilliseconds = matchingResult.durationMilliseconds;
             }
           }
 

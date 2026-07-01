@@ -1,9 +1,6 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { Router, Request, Response } from "express";
 import OrchestratorService from "../services/OrchestratorService.ts";
-import logger from "../utils/logger.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import { ORCHESTRATOR } from "../constants.ts";
 
 interface SubAgentSummary {
   agentId: string;
@@ -11,7 +8,7 @@ interface SubAgentSummary {
   status: string;
   providerName?: string;
   resolvedModel?: string;
-  durationMs: number;
+  durationMilliseconds: number;
   toolUses: number;
   hasChanges: boolean;
   totalCost?: number | null;
@@ -47,107 +44,10 @@ router.get(
       ? OrchestratorService.listAllDescendantSubAgents(conversationIdentifier)
       : OrchestratorService.listSubAgents();
 
-    const persistedSubAgentsList: SubAgentSummary[] = [];
-    if (conversationIdentifier) {
-      try {
-        const { default: MongoWrapper } =
-          await import("../wrappers/MongoWrapper.js");
-        const { MONGO_DB_NAME } = await import("../../config.js");
-        const { COLLECTIONS } = await import("../constants.js");
+    const persistedSubAgentsList = conversationIdentifier
+      ? await OrchestratorService.getPersistedDescendantSubAgents(conversationIdentifier)
+      : [];
 
-        const conversationCollection = MongoWrapper.getCollection(
-          MONGO_DB_NAME,
-          COLLECTIONS.AGENT_CONVERSATIONS,
-        );
-
-        // Fetch the root conversation's subAgentIds
-        const rootDocument = await conversationCollection.findOne(
-          { id: conversationIdentifier },
-          { projection: { subAgentIds: 1 } },
-        );
-
-        if (rootDocument && Array.isArray(rootDocument.subAgentIds) && rootDocument.subAgentIds.length > 0) {
-          // BFS: discover all descendant sub-agents through the self-referential model.
-          // Each agent_conversation with isSubAgent=true stores its own subAgent* fields.
-          const visitedConversationIds = new Set<string>([conversationIdentifier]);
-          let frontier: string[] = [...rootDocument.subAgentIds];
-          const MAX_DESCENDANT_DEPTH = ORCHESTRATOR.AGENT_TREE_DISCOVERY_MAX_DEPTH;
-
-          for (
-            let depth = 0;
-            depth < MAX_DESCENDANT_DEPTH && frontier.length > 0;
-            depth++
-          ) {
-            const unvisitedIds = frontier.filter((conversationId) => !visitedConversationIds.has(conversationId));
-            if (unvisitedIds.length === 0) break;
-
-            for (const conversationId of unvisitedIds) {
-              visitedConversationIds.add(conversationId);
-            }
-
-            const subAgentDocuments = await conversationCollection
-              .find(
-                { id: { $in: unvisitedIds }, isSubAgent: true },
-                {
-                  projection: {
-                    id: 1,
-                    subAgentId: 1,
-                    subAgentDescription: 1,
-                    subAgentStatus: 1,
-                    subAgentProviderName: 1,
-                    subAgentResolvedModel: 1,
-                    subAgentDurationMs: 1,
-                    subAgentToolUses: 1,
-                    subAgentHasChanges: 1,
-                    subAgentTotalCost: 1,
-                    subAgentBranchName: 1,
-                    subAgentFiles: 1,
-                    subAgentRecursionDepth: 1,
-                    subAgentToolNames: 1,
-                    subAgentIds: 1,
-                  },
-                },
-              )
-              .toArray();
-
-            if (subAgentDocuments.length === 0) break;
-
-            const nextFrontier: string[] = [];
-            for (const subAgentDocument of subAgentDocuments) {
-              persistedSubAgentsList.push({
-                agentId: (subAgentDocument.subAgentId as string) || (subAgentDocument.id as string),
-                description: (subAgentDocument.subAgentDescription as string) || "",
-                status: (subAgentDocument.subAgentStatus as string) || "unknown",
-                providerName: subAgentDocument.subAgentProviderName as string | undefined,
-                resolvedModel: subAgentDocument.subAgentResolvedModel as string | undefined,
-                durationMs: (subAgentDocument.subAgentDurationMs as number) || 0,
-                toolUses: (subAgentDocument.subAgentToolUses as number) || 0,
-                hasChanges: (subAgentDocument.subAgentHasChanges as boolean) || false,
-                totalCost: subAgentDocument.subAgentTotalCost as number | null | undefined,
-                branchName: subAgentDocument.subAgentBranchName as string | null | undefined,
-                files: subAgentDocument.subAgentFiles as string[] | undefined,
-                toolCallCount: (subAgentDocument.subAgentToolUses as number) || 0,
-                recursionDepth: subAgentDocument.subAgentRecursionDepth as number | undefined,
-                toolNames: subAgentDocument.subAgentToolNames as Record<string, number> | undefined,
-                subAgentConversationId: subAgentDocument.id as string,
-              });
-
-              // If this sub-agent itself has children, add them to the next frontier
-              const childSubAgentIds = subAgentDocument.subAgentIds as string[] | undefined;
-              if (Array.isArray(childSubAgentIds) && childSubAgentIds.length > 0) {
-                nextFrontier.push(...childSubAgentIds);
-              }
-            }
-            frontier = nextFrontier;
-          }
-        }
-
-      } catch (error: unknown) {
-        logger.warn(
-          `[orchestrator] Failed to load persisted sub-agents: ${getErrorMessage(error)}`,
-        );
-      }
-    }
 
     const mergedSubAgentsMap = new Map<string, SubAgentSummary>();
     for (const subAgent of persistedSubAgentsList) {

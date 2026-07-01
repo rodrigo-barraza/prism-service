@@ -8,7 +8,7 @@ import logger from "./logger.ts";
 import { getProvider } from "../providers/index.ts";
 import type { InstanceEntry } from "../types/ProviderTypes.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import { TOOL_API_HEALTH_TIMEOUT_MS } from "../constants.ts";
+import { TOOL_API_HEALTH_TIMEOUT_MILLISECONDS } from "../constants.ts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -137,7 +137,7 @@ export async function resolveModelForInstances(
         const result = await Promise.race([
           provider.listModels(),
           new Promise<never>((_, rej) =>
-            setTimeout(() => rej(new Error("timeout")), TOOL_API_HEALTH_TIMEOUT_MS),
+            setTimeout(() => rej(new Error("timeout")), TOOL_API_HEALTH_TIMEOUT_MILLISECONDS),
           ),
         ]);
 

@@ -9,7 +9,7 @@ import {
   getInstanceType,
   listInstanceTypes,
 } from "../../providers/instance-registry.ts";
-import { TYPES } from "../../config.ts";
+import { MODALITY_TYPES } from "../../config.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 
 import {
@@ -150,9 +150,9 @@ class LocalProviderGateway {
    * with capability detection and (optionally) HuggingFace metadata.
    */
   async discoverModels({
-    timeoutMs = 3000,
+    timeoutMilliseconds = 3000,
     enrich = true,
-  }: { timeoutMs?: number; enrich?: boolean } = {}): Promise<
+  }: { timeoutMilliseconds?: number; enrich?: boolean } = {}): Promise<
     Record<string, ModelEntry[]>
   > {
     const instances = listInstances();
@@ -162,7 +162,7 @@ class LocalProviderGateway {
       instances.map(async (instance: InstanceEntry) => {
         const fetched = await this._fetchModelsForInstance(
           instance,
-          timeoutMs,
+          timeoutMilliseconds,
           enrich,
         );
         return {
@@ -197,9 +197,9 @@ class LocalProviderGateway {
   async discoverModelsForInstance(
     instanceId: string,
     {
-      timeoutMs = 3000,
+      timeoutMilliseconds = 3000,
       enrich = true,
-    }: { timeoutMs?: number; enrich?: boolean } = {},
+    }: { timeoutMilliseconds?: number; enrich?: boolean } = {},
   ): Promise<ModelEntry[]> {
     const instance = getInstance(instanceId);
     if (!instance) {
@@ -208,7 +208,7 @@ class LocalProviderGateway {
     }
     return this._fetchModelsForInstance(
       instance as InstanceEntry,
-      timeoutMs,
+      timeoutMilliseconds,
       enrich,
     );
   }
@@ -219,7 +219,7 @@ class LocalProviderGateway {
    */
   async _fetchModelsForInstance(
     instance: InstanceEntry,
-    timeoutMs: number,
+    timeoutMilliseconds: number,
     enrich: boolean,
   ): Promise<ModelEntry[]> {
     try {
@@ -228,7 +228,7 @@ class LocalProviderGateway {
 
       const rawResult = (await withTimeoutFallback(
         provider.listModels(),
-        timeoutMs,
+        timeoutMilliseconds,
         { models: [] },
       )) as ListModelsResponse | null | undefined;
 
@@ -307,8 +307,8 @@ class LocalProviderGateway {
     if (filter.functionCalling && !model.tools?.includes("Tool Calling"))
       return false;
     if (filter.vision && !model.vision) return false;
-    if (filter.video && !model.inputTypes?.includes(TYPES.VIDEO)) return false;
-    if (filter.audio && !model.inputTypes?.includes(TYPES.AUDIO)) return false;
+    if (filter.video && !model.inputTypes?.includes(MODALITY_TYPES.VIDEO)) return false;
+    if (filter.audio && !model.inputTypes?.includes(MODALITY_TYPES.AUDIO)) return false;
     if (filter.modelType && model.modelType !== filter.modelType) return false;
     if (filter.loaded === true && !model.loaded) return false;
     if (filter.loaded === false && model.loaded) return false;
@@ -375,9 +375,9 @@ class LocalProviderGateway {
         if (model.tools?.includes("Tool Calling"))
           capabilityDistribution.functionCalling++;
         if (model.vision) capabilityDistribution.vision++;
-        if (model.inputTypes?.includes(TYPES.VIDEO))
+        if (model.inputTypes?.includes(MODALITY_TYPES.VIDEO))
           capabilityDistribution.video++;
-        if (model.inputTypes?.includes(TYPES.AUDIO))
+        if (model.inputTypes?.includes(MODALITY_TYPES.AUDIO))
           capabilityDistribution.audio++;
       }
     }
@@ -403,7 +403,7 @@ class LocalProviderGateway {
    */
   async resolveProvider(
     modelName: string,
-    { timeoutMs = 3000 }: { timeoutMs?: number } = {},
+    { timeoutMilliseconds = 3000 }: { timeoutMilliseconds?: number } = {},
   ): Promise<{
     instanceId: string;
     type: string;
@@ -420,7 +420,7 @@ class LocalProviderGateway {
 
         const result = (await withTimeoutFallback(
           provider.listModels(),
-          timeoutMs,
+          timeoutMilliseconds,
           { models: [] },
         )) as ListModelsResponse | null | undefined;
         const models = result?.models || result?.data || [];
@@ -459,7 +459,7 @@ class LocalProviderGateway {
    * For others, performs a lightweight listModels() probe.
    */
   async checkHealth(
-    timeoutMs: number = 3000,
+    timeoutMilliseconds: number = 3000,
   ): Promise<TransformedHealthStatusMap> {
     const instances = listInstances();
     const health: TransformedHealthStatusMap = {};
@@ -474,7 +474,7 @@ class LocalProviderGateway {
         if (provider?.checkHealth) {
           const result = await withTimeoutFallback(
             provider.checkHealth(),
-            timeoutMs,
+            timeoutMilliseconds,
             { ok: false, status: "timeout" },
           );
           return {
@@ -489,7 +489,7 @@ class LocalProviderGateway {
           try {
             const result = (await withTimeoutFallback(
               provider.listModels(),
-              timeoutMs,
+              timeoutMilliseconds,
               null,
             )) as ListModelsResponse | null | undefined;
             if (!result) {

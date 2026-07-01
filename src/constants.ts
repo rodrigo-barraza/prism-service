@@ -4,30 +4,30 @@
 
 // ─── Timing Constants ───────────────────────────────────────
 
-/** SSE keep-alive ping interval for admin streaming endpoints. */
-export const SSE_KEEPALIVE_INTERVAL_MS = 30_000;
+/** SERVER_SENT_EVENTS keep-alive ping interval for admin streaming endpoints. */
+export const SERVER_SENT_EVENTS_KEEPALIVE_INTERVAL_MILLISECONDS = 30_000;
 
 /** Reconnect interval for MongoDB change stream watchers. */
-export const CHANGE_STREAM_RECONNECT_MS = 60_000;
+export const CHANGE_STREAM_RECONNECT_INTERVAL_MILLISECONDS = 60_000;
 
 /** Retry delay for reopening a failed change stream. */
-export const CHANGE_STREAM_RETRY_MS = 5000;
+export const CHANGE_STREAM_RETRY_DELAY_MILLISECONDS = 5000;
 
-/** Cache TTL for directory listings. */
-export const DIRECTORY_CACHE_TTL_MS = 60_000;
+/** Cache TIME_TO_LIVE for directory listings. */
+export const DIRECTORY_CACHE_TIME_TO_LIVE_MILLISECONDS = 60_000;
 
-/** CORS preflight cache duration — 24 hours. */
-export const CORS_MAX_AGE_SECONDS = 86_400;
+/** CROSS_ORIGIN_RESOURCE_SHARING preflight cache duration — 24 hours. */
+export const CROSS_ORIGIN_RESOURCE_SHARING_MAXIMUM_AGE_SECONDS = 86_400;
 
 // ─── Tool Orchestration Timeouts ────────────────────────────
-export const TOOL_SCHEMA_FETCH_TIMEOUT_MS = 5000;
-export const TOOL_CONFIG_FETCH_TIMEOUT_MS = 3000;
-export const TOOL_WORKSPACE_UPDATE_TIMEOUT_MS = 10000;
-export const TOOL_WORKSPACE_VALIDATE_TIMEOUT_MS = 5000;
-export const TOOL_API_HEALTH_TIMEOUT_MS = 3000;
-export const DIRECTORY_FETCH_TIMEOUT_MS = 5000;
-export const TOOL_SCHEMA_FETCH_RETRY_COOLDOWN_MS = 30_000;
-export const TOOL_PROXY_TIMEOUT_MS = 65_000;
+export const TOOL_SCHEMA_FETCH_TIMEOUT_MILLISECONDS = 5000;
+export const TOOL_CONFIG_FETCH_TIMEOUT_MILLISECONDS = 3000;
+export const TOOL_WORKSPACE_UPDATE_TIMEOUT_MILLISECONDS = 10000;
+export const TOOL_WORKSPACE_VALIDATE_TIMEOUT_MILLISECONDS = 5000;
+export const TOOL_API_HEALTH_TIMEOUT_MILLISECONDS = 3000;
+export const DIRECTORY_FETCH_TIMEOUT_MILLISECONDS = 5000;
+export const TOOL_SCHEMA_FETCH_RETRY_COOLDOWN_MILLISECONDS = 30_000;
+export const TOOL_PROXY_TIMEOUT_MILLISECONDS = 65_000;
 
 /**
  * MongoDB collection names — single source of truth.
@@ -77,36 +77,38 @@ export const TIMER_STATUSES = {
  * Reusable MongoDB $group aggregation expression for summing estimated costs.
  * Sums the per-request `estimatedCost` field (USD, nullable).
  * Convention: aggregation outputs use `totalCost` as the destination field name.
- * Usage: `totalCost: COST_SUM_EXPR` inside `$group` stages.
+ * Usage: `totalCost: COST_SUMMATION_EXPRESSION` inside `$group` stages.
  */
-export const COST_SUM_EXPR = { $sum: { $ifNull: ["$estimatedCost", 0] } };
+export const COST_SUMMATION_EXPRESSION = {
+  $sum: { $ifNull: ["$estimatedCost", 0] },
+};
 
 /**
  * Reusable MongoDB $group aggregation expression for summing total tokens.
  * Adds inputTokens + outputTokens (both nullable).
- * Usage: `totalTokens: TOTAL_TOKENS_EXPR` inside `$group` stages.
+ * Usage: `totalTokens: TOTAL_TOKENS_EXPRESSION` inside `$group` stages.
  */
-export const TOTAL_TOKENS_EXPR = {
+export const TOTAL_TOKENS_EXPRESSION = {
   $sum: {
     $add: [{ $ifNull: ["$inputTokens", 0] }, { $ifNull: ["$outputTokens", 0] }],
   },
 };
-/** Cap — anything above this is a measurement artifact (tok/s). */
-export const MAX_TOKENS_PER_SEC = 10_000;
+/** Cap — anything above this is a measurement artifact (tokens/second). */
+export const MAXIMUM_TOKENS_PER_SECOND = 10_000;
 
 /**
- * Reusable MongoDB $group aggregation expression for averaging tok/s.
+ * Reusable MongoDB $group aggregation expression for averaging tokens/second.
  * Filters out null and outlier (>10k) values before averaging.
- * Usage: `avgTokensPerSec: AVG_TOKENS_PER_SEC_EXPR` inside `$group` stages.
- * DB-side filter matches the MAX_TOKENS_PER_SEC constant threshold.
+ * Usage: `avgTokensPerSec: AVERAGE_TOKENS_PER_SECOND_EXPRESSION` inside `$group` stages.
+ * DB-side filter matches the MAXIMUM_TOKENS_PER_SECOND constant threshold.
  */
-export const AVG_TOKENS_PER_SEC_EXPR = {
+export const AVERAGE_TOKENS_PER_SECOND_EXPRESSION = {
   $avg: {
     $cond: [
       {
         $and: [
           { $ne: ["$tokensPerSec", null] },
-          { $lte: ["$tokensPerSec", MAX_TOKENS_PER_SEC] },
+          { $lte: ["$tokensPerSec", MAXIMUM_TOKENS_PER_SECOND] },
         ],
       },
       "$tokensPerSec",
@@ -122,7 +124,7 @@ export {
   PROVIDER_LIST,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 
-export const TYPES = {
+export const MODALITY_TYPES = {
   TEXT: "text",
   IMAGE: "image",
   AUDIO: "audio",
@@ -154,7 +156,7 @@ export const FILE_CATEGORIES = {
 
 // ─── Harness & Thought Structure Identifiers ───────────────
 
-export const HARNESS_IDS = {
+export const HARNESS_IDENTIFIERS = {
   STANDARD: "standard",
 } as const;
 
@@ -218,13 +220,13 @@ export const ORCHESTRATOR = {
   /** Max characters of sub-agent result text propagated in tool-call fallback summaries. */
   MAX_RESULT_LENGTH_FOR_PROPAGATION: 2000,
 
-  /** TTL for completed/idle sub-agents before they are evicted from memory (ms). 30 minutes. */
-  IDLE_AGENT_TTL_MILLISECONDS: 30 * 60 * 1_000,
+  /** TIME_TO_LIVE for completed/idle sub-agents before they are evicted from memory (milliseconds). 30 minutes. */
+  IDLE_AGENT_TIME_TO_LIVE_MILLISECONDS: 30 * 60 * 1_000,
 
   /** Max retries waiting for a parent conversation to become idle before auto-responding. */
   AUTO_RESPONSE_GENERATION_WAIT_MAXIMUM_RETRIES: 30,
 
-  /** Delay between retries when waiting for parent generation to finish (ms). */
+  /** Delay between retries when waiting for parent generation to finish (milliseconds). */
   AUTO_RESPONSE_GENERATION_WAIT_DELAY_MILLISECONDS: 2_000,
 
   /** Max characters of async task result included in completion notifications. */
@@ -344,23 +346,23 @@ export const HARNESS = {
   /** Critic gate LLM output token limit. */
   CRITIC_MAX_TOKENS: 200,
 
-  /** Critic gate timeout (ms). */
-  CRITIC_TIMEOUT_MS: 10_000,
+  /** Critic gate timeout (milliseconds). */
+  CRITIC_TIMEOUT_MILLISECONDS: 10_000,
 
   /** System reminder extraction LLM output token limit. */
   EXTRACTION_MAX_TOKENS: 600,
 
-  /** System reminder extraction timeout (ms). */
-  EXTRACTION_TIMEOUT_MS: 15_000,
+  /** System reminder extraction timeout (milliseconds). */
+  EXTRACTION_TIMEOUT_MILLISECONDS: 15_000,
 
-  /** Approval gate timeout — how long to wait for user response (ms). */
-  APPROVAL_TIMEOUT_MS: 120_000,
+  /** Approval gate timeout — how long to wait for user response (milliseconds). */
+  APPROVAL_TIMEOUT_MILLISECONDS: 120_000,
 
-  /** Validation interceptor timeout (ms). */
-  VALIDATION_TIMEOUT_MS: 15_000,
+  /** Validation interceptor timeout (milliseconds). */
+  VALIDATION_TIMEOUT_MILLISECONDS: 15_000,
 
-  /** Sandbox command execution timeout (ms). */
-  COMMAND_TIMEOUT_MS: 15_000,
+  /** Sandbox command execution timeout (milliseconds). */
+  COMMAND_TIMEOUT_MILLISECONDS: 15_000,
 
   /** Context pressure threshold — fraction of context window triggering compaction. */
   CONTEXT_PRESSURE_THRESHOLD: 0.7,
@@ -425,7 +427,7 @@ export const CONTEXT_WINDOW = {
   /** Fraction of context window to target (leave headroom for output + safety). */
   TARGET_UTILIZATION: 0.8,
 
-  /** When truncating tool results aggressively, cap at this many chars. */
+  /** When truncating tool results aggressively, cap at this many characters. */
   AGGRESSIVE_TOOL_RESULT_CAP: 3000,
 } as const;
 
@@ -490,17 +492,17 @@ export const MEMORY = {
 // ─── Webhook Constants ──────────────────────────────────────
 
 export const WEBHOOK = {
-  /** HTTP dispatch timeout for webhook delivery (ms). */
-  DISPATCH_TIMEOUT_MS: 10_000,
+  /** HTTP dispatch timeout for webhook delivery (milliseconds). */
+  DISPATCH_TIMEOUT_MILLISECONDS: 10_000,
 
   /** Maximum retry attempts for failed webhook deliveries. */
   MAX_RETRY_ATTEMPTS: 3,
 
-  /** Base delay for exponential backoff between webhook retries (ms). */
-  RETRY_BASE_DELAY_MS: 1000,
+  /** Base delay for exponential backoff between webhook retries (milliseconds). */
+  RETRY_BASE_DELAY_MILLISECONDS: 1000,
 
-  /** Interval for refreshing cached webhook subscriptions (ms). */
-  SUBSCRIPTION_REFRESH_INTERVAL_MS: 30_000,
+  /** Interval for refreshing cached webhook subscriptions (milliseconds). */
+  SUBSCRIPTION_REFRESH_INTERVAL_MILLISECONDS: 30_000,
 
   /** Maximum events buffered for webhook replay. */
   REPLAY_BUFFER_CAPACITY: 200,
@@ -518,8 +520,8 @@ export const TIMERS = {
   /** Minimum interval for cron jobs (seconds). */
   CRON_MINIMUM_DELAY_SECONDS: 600,
 
-  /** Background daemon tick interval (ms). */
-  BACKGROUND_DAEMON_INTERVAL_MS: 1000,
+  /** Background daemon tick interval (milliseconds). */
+  BACKGROUND_DAEMON_INTERVAL_MILLISECONDS: 1000,
 
   /** One-shot timer maximum duration — 24 hours (seconds). */
   ONE_SHOT_MAXIMUM_DURATION_SECONDS: 86400,
@@ -531,7 +533,7 @@ export const TIMERS = {
 // ─── Media Constants ────────────────────────────────────────
 
 export const MEDIA = {
-  /** Anthropic per-image inline base64 byte limit (5 MB). */
+  /** Anthropic per-image inline base64 byte limit (5 Megabytes). */
   ANTHROPIC_IMAGE_MAX_BYTES: 5 * 1024 * 1024,
 
   /** Maximum pixel dimension (width or height) for images sent to providers. */
@@ -559,8 +561,8 @@ export const WORKFLOW_MEMORY = {
   /** Maximum characters of workflow text embedded for similarity search. */
   TEXT_MAXIMUM_CHARACTERS: 1500,
 
-  /** Cooldown between workflow extraction attempts (ms). */
-  COOLDOWN_MS: 60_000,
+  /** Cooldown between workflow extraction attempts (milliseconds). */
+  COOLDOWN_MILLISECONDS: 60_000,
 
   /** Maximum characters of workflow summary sliced for embedding. */
   EMBEDDING_SOURCE_MAX_CHARACTERS: 2000,
@@ -569,16 +571,16 @@ export const WORKFLOW_MEMORY = {
 // ─── Log Preview Truncation Limits ──────────────────────────
 
 export const LOG_PREVIEW = {
-  /** Short preview — titles, question snippets (60 chars). */
+  /** Short preview — titles, question snippets (60 characters). */
   SHORT: 60,
 
-  /** Medium preview — text summaries, debug output (200 chars). */
+  /** Medium preview — text summaries, debug output (200 characters). */
   MEDIUM: 200,
 
-  /** Large preview — JSON/text logs (300 chars). */
+  /** Large preview — JSON/text logs (300 characters). */
   LARGE: 300,
 
-  /** Long preview — consolidation snippets, content previews (500 chars). */
+  /** Long preview — consolidation snippets, content previews (500 characters). */
   LONG: 500,
 } as const;
 
@@ -591,18 +593,18 @@ export const LOCAL_PROVIDER = {
   /** Maximum output token capacity forced on vLLM models. */
   VLLM_MAX_OUTPUT_TOKENS: 50_000,
 
-  /** Cache TTL for HuggingFace model metadata (30 minutes). */
-  HF_CACHE_TTL_MS: 30 * 60 * 1000,
+  /** Cache TIME_TO_LIVE for HuggingFace model metadata (30 minutes). */
+  HUGGING_FACE_CACHE_TIME_TO_LIVE_MILLISECONDS: 30 * 60 * 1000,
 } as const;
 
 // ─── Somatic State Constants ────────────────────────────────
 
 export const SOMATIC = {
-  /** Passive drift tick interval (ms). */
-  PASSIVE_DRIFT_INTERVAL_MS: 30_000,
+  /** Passive drift tick interval (milliseconds). */
+  PASSIVE_DRIFT_INTERVAL_MILLISECONDS: 30_000,
 
-  /** Persistence interval (ms). */
-  PERSIST_INTERVAL_MS: 60_000,
+  /** Persistence interval (milliseconds). */
+  PERSIST_INTERVAL_MILLISECONDS: 60_000,
 } as const;
 
 // ─── Tool Management & Keywords Constants ───────────────────
@@ -623,8 +625,8 @@ export const TOOLS = {
 // ─── Benchmark Constants ────────────────────────────────────
 
 export const BENCHMARK = {
-  /** Delay between sequentially run models within the same provider (ms). */
-  INTRA_PROVIDER_DELAY_MS: 100,
+  /** Delay between sequentially run models within the same provider (milliseconds). */
+  INTRA_PROVIDER_DELAY_MILLISECONDS: 100,
 
   /** Default/minimum token budget for benchmark execution. */
   DEFAULT_MAX_TOKENS: 2048,
@@ -633,7 +635,7 @@ export const BENCHMARK = {
 // ─── Miscellaneous Conversation & Routing Constants ──────────
 
 /** Maximum character length of conversation titles derived from the first user message. */
-export const DERIVED_CONVERSATION_TITLE_MAX_LENGTH = 100;
+export const MAXIMUM_DERIVED_CONVERSATION_TITLE_LENGTH = 100;
 
 /** Maximum iteration count for synchronous function calling loops on non-agentic /chat route. */
 export const MAX_FUNCTION_CALL_ITERATIONS = 10;
@@ -641,5 +643,5 @@ export const MAX_FUNCTION_CALL_ITERATIONS = 10;
 /** Maximum number of directory tree children to display in system prompt formatting. */
 export const DIRECTORY_TREE_CHILD_LIMIT = 20;
 
-/** Maximum execution time for long-running database aggregation queries (ms). */
-export const AGGREGATE_MAX_TIME_MS = 30_000;
+/** Maximum execution time for long-running database aggregation queries (milliseconds). */
+export const AGGREGATE_MAX_TIME_MILLISECONDS = 30_000;

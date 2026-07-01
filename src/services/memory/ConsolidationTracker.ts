@@ -62,7 +62,7 @@ export async function recordHistory(
   memoriesBefore: number,
   actions: ConsolidationAction[],
   summary: string,
-  durationMs: number,
+  durationMilliseconds: number,
 ): Promise<void> {
   const db = MongoWrapper.getDb(MONGO_DB_NAME);
   if (!db) return;
@@ -91,7 +91,7 @@ export async function recordHistory(
       reason: action.reason || "",
     })),
     summary,
-    durationMs,
+    durationMilliseconds,
   });
 }
 

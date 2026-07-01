@@ -5,8 +5,8 @@ import requireDb from "../middleware/RequireDbMiddleware.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import {
   COLLECTIONS,
-  COST_SUM_EXPR,
-  AVG_TOKENS_PER_SEC_EXPR,
+  COST_SUMMATION_EXPRESSION,
+  AVERAGE_TOKENS_PER_SECOND_EXPRESSION,
 } from "../constants.ts";
 
 const router = Router();
@@ -56,9 +56,9 @@ router.get(
                 ],
               },
             },
-            totalCost: COST_SUM_EXPR,
+            totalCost: COST_SUMMATION_EXPRESSION,
             avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
-            avgTokensPerSec: AVG_TOKENS_PER_SEC_EXPR,
+            avgTokensPerSec: AVERAGE_TOKENS_PER_SECOND_EXPRESSION,
             firstUsed: { $min: "$createdAt" },
             lastUsed: { $max: "$createdAt" },
             successCount: {

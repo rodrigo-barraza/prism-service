@@ -155,7 +155,7 @@ function buildSelectionPrompt(
       `### Sub-Agent #${resultIndex + 1}: ${result.description || "unnamed"}`,
       `**Status:** ${result.status}`,
       `**Tool Uses:** ${result.toolUses}`,
-      `**Duration:** ${result.durationMs}ms`,
+      `**Duration:** ${result.durationMilliseconds}ms`,
       ...(verificationOutcomes?.has(resultIndex)
         ? [
             `**Verification:**`,
@@ -452,7 +452,7 @@ export class TournamentRouter implements TopologyRouter {
             type: "sub_agent_status",
             subAgentId: synthesisSubAgentId,
             message: "complete",
-            durationMs: 0,
+            durationMilliseconds: 0,
             toolCount: 0,
           });
         }
@@ -460,7 +460,7 @@ export class TournamentRouter implements TopologyRouter {
       }
 
       const selectionStartTime = Date.now();
-      const selectionRequestStartMs = performance.now();
+      const selectionRequestStartMilliseconds = performance.now();
       const selectionMessages: Array<{
         role: "user" | "assistant" | "system";
         content: string;
@@ -470,7 +470,7 @@ export class TournamentRouter implements TopologyRouter {
         resolvedModel,
         { maxTokens: ORCHESTRATOR.SYNTHESIS_MAX_TOKENS },
       );
-      const selectionDurationMs = Date.now() - selectionStartTime;
+      const selectionDurationMilliseconds = Date.now() - selectionStartTime;
 
       RequestLogger.logBackgroundLlmCall({
         requestId: `${orchestratorContext.conversationId || "unknown"}-tournament-${teamName}`,
@@ -488,7 +488,7 @@ export class TournamentRouter implements TopologyRouter {
         usage: selectionResult.usage || null,
         success: true,
         errorMessage: null,
-        requestStartMs: selectionRequestStartMs,
+        requestStartMilliseconds: selectionRequestStartMilliseconds,
         extraRequestPayload: {
           teamName,
           memberCount: members.length,
@@ -508,7 +508,7 @@ export class TournamentRouter implements TopologyRouter {
         result: selectionResult.text,
         toolUses: 0,
         iterations: 1,
-        durationMs: selectionDurationMs,
+        durationMilliseconds: selectionDurationMilliseconds,
         messages: [],
         diff: { additions: 0, deletions: 0, files: [] },
       };
@@ -517,7 +517,7 @@ export class TournamentRouter implements TopologyRouter {
       const outputTokens = selectionResult.usage?.outputTokens ?? 0;
 
       logger.info(
-        `[TournamentRouter] Judge selection complete in ${selectionDurationMs}ms (${inputTokens} input, ${outputTokens} output tokens)`,
+        `[TournamentRouter] Judge selection complete in ${selectionDurationMilliseconds}ms (${inputTokens} input, ${outputTokens} output tokens)`,
       );
 
       // ── Synthesis telemetry: mark virtual sub-agent as complete
@@ -526,7 +526,7 @@ export class TournamentRouter implements TopologyRouter {
           type: "sub_agent_status",
           subAgentId: synthesisSubAgentId,
           message: "complete",
-          durationMs: selectionDurationMs,
+          durationMilliseconds: selectionDurationMilliseconds,
           toolCount: 0,
         });
       }
@@ -542,7 +542,7 @@ export class TournamentRouter implements TopologyRouter {
           type: "sub_agent_status",
           subAgentId: synthesisSubAgentId,
           message: "complete",
-          durationMs: 0,
+          durationMilliseconds: 0,
           toolCount: 0,
         });
       }

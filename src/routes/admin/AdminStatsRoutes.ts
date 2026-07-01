@@ -3,9 +3,9 @@ import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import {
   COLLECTIONS,
-  COST_SUM_EXPR,
-  TOTAL_TOKENS_EXPR,
-  AVG_TOKENS_PER_SEC_EXPR,
+  COST_SUMMATION_EXPRESSION,
+  TOTAL_TOKENS_EXPRESSION,
+  AVERAGE_TOKENS_PER_SECOND_EXPRESSION,
 } from "../../constants.ts";
 import AgentPersonaRegistry from "../../services/AgentPersonaRegistry.ts";
 import ToolOrchestratorService from "../../services/ToolOrchestratorService.ts";
@@ -15,7 +15,7 @@ import {
   applyDateRangeFilter,
 } from "../../utils/QueryBuilders.ts";
 import requireDb from "../../middleware/RequireDbMiddleware.ts";
-import { hours as hoursToMs } from "@rodrigo-barraza/utilities-library";
+import { hours as hoursToMilliseconds } from "@rodrigo-barraza/utilities-library";
 
 export interface TransformedStatsMatchFilter {
   project?: unknown;
@@ -116,9 +116,9 @@ router.get(
             totalRequests: { $sum: 1 },
             totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
             totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
-            totalCost: COST_SUM_EXPR,
+            totalCost: COST_SUMMATION_EXPRESSION,
             avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
-            avgTokensPerSec: AVG_TOKENS_PER_SEC_EXPR,
+            avgTokensPerSec: AVERAGE_TOKENS_PER_SECOND_EXPRESSION,
             totalDuration: { $sum: { $ifNull: ["$totalTime", 0] } },
             successCount: {
               $sum: { $cond: [{ $eq: ["$success", true] }, 1, 0] },
@@ -228,10 +228,10 @@ router.get(
             totalRequests: { $sum: 1 },
             totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
             totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
-            totalTokens: TOTAL_TOKENS_EXPR,
-            totalCost: COST_SUM_EXPR,
+            totalTokens: TOTAL_TOKENS_EXPRESSION,
+            totalCost: COST_SUMMATION_EXPRESSION,
             avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
-            avgTokensPerSec: AVG_TOKENS_PER_SEC_EXPR,
+            avgTokensPerSec: AVERAGE_TOKENS_PER_SECOND_EXPRESSION,
             lastRequest: { $max: "$createdAt" },
             _models: { $addToSet: "$model" },
             _providers: { $addToSet: "$provider" },
@@ -373,8 +373,8 @@ router.get(
           $group: {
             _id: "$username",
             totalRequests: { $sum: 1 },
-            totalTokens: TOTAL_TOKENS_EXPR,
-            totalCost: COST_SUM_EXPR,
+            totalTokens: TOTAL_TOKENS_EXPRESSION,
+            totalCost: COST_SUMMATION_EXPRESSION,
             avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
             lastRequest: { $max: "$createdAt" },
           },
@@ -419,10 +419,10 @@ router.get(
             totalRequests: { $sum: 1 },
             totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
             totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
-            totalTokens: TOTAL_TOKENS_EXPR,
-            totalCost: COST_SUM_EXPR,
+            totalTokens: TOTAL_TOKENS_EXPRESSION,
+            totalCost: COST_SUMMATION_EXPRESSION,
             avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
-            avgTokensPerSec: AVG_TOKENS_PER_SEC_EXPR,
+            avgTokensPerSec: AVERAGE_TOKENS_PER_SECOND_EXPRESSION,
             toolsUsed: {
               $max: { $cond: [{ $eq: ["$toolsUsed", true] }, true, false] },
             },
@@ -666,8 +666,8 @@ router.get(
           $group: {
             _id: "$endpoint",
             totalRequests: { $sum: 1 },
-            totalTokens: TOTAL_TOKENS_EXPR,
-            totalCost: COST_SUM_EXPR,
+            totalTokens: TOTAL_TOKENS_EXPRESSION,
+            totalCost: COST_SUMMATION_EXPRESSION,
             avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
             successRate: {
               $avg: { $cond: [{ $eq: ["$success", true] }, 1, 0] },
@@ -708,11 +708,11 @@ router.get(
       const matchStage = Object.keys(match).length ? [{ $match: match }] : [];
 
       const groupFields = {
-        totalCost: COST_SUM_EXPR,
+        totalCost: COST_SUMMATION_EXPRESSION,
         totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
         totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
         totalRequests: { $sum: 1 },
-        avgTokensPerSec: AVG_TOKENS_PER_SEC_EXPR,
+        avgTokensPerSec: AVERAGE_TOKENS_PER_SECOND_EXPRESSION,
       };
 
       const [result] = await req.db
@@ -912,14 +912,14 @@ router.get(
         sinceDate = new Date(from);
       } else {
         sinceDate = new Date(
-          Date.now() - hoursToMs(parseInt(hours as string, 10)),
+          Date.now() - hoursToMilliseconds(parseInt(hours as string, 10)),
         );
       }
       if (typeof to === "string") {
         untilDate = new Date(to);
       }
 
-      const spanMs =
+      const spanMilliseconds =
         (untilDate ? untilDate.getTime() : Date.now()) - sinceDate.getTime();
 
       // ── Granularity tier definitions (ordered finest → coarsest) ──
@@ -941,79 +941,79 @@ router.get(
         TIER_INDEX[key] = index;
       });
 
-      const MINUTES_MS = 60_000;
-      const HOURS_MS = 3_600_000;
-      const DAYS_MS = 86_400_000;
+      const MINUTES_MILLISECONDS = 60_000;
+      const HOURS_MILLISECONDS = 3_600_000;
+      const DAYS_MILLISECONDS = 86_400_000;
 
       const SPAN_RULES = [
         {
-          maxSpanMs: 2 * MINUTES_MS,
+          maxSpanMilliseconds: 2 * MINUTES_MILLISECONDS,
           defaultGranularity: "1s",
           minGranularity: "1s",
           maxGranularity: "15s",
         },
         {
-          maxSpanMs: 10 * MINUTES_MS,
+          maxSpanMilliseconds: 10 * MINUTES_MILLISECONDS,
           defaultGranularity: "5s",
           minGranularity: "1s",
           maxGranularity: "1min",
         },
         {
-          maxSpanMs: 30 * MINUTES_MS,
+          maxSpanMilliseconds: 30 * MINUTES_MILLISECONDS,
           defaultGranularity: "15s",
           minGranularity: "5s",
           maxGranularity: "5min",
         },
         {
-          maxSpanMs: 1 * HOURS_MS,
+          maxSpanMilliseconds: 1 * HOURS_MILLISECONDS,
           defaultGranularity: "30s",
           minGranularity: "15s",
           maxGranularity: "5min",
         },
         {
-          maxSpanMs: 6 * HOURS_MS,
+          maxSpanMilliseconds: 6 * HOURS_MILLISECONDS,
           defaultGranularity: "1min",
           minGranularity: "15s",
           maxGranularity: "15min",
         },
         {
-          maxSpanMs: 1 * DAYS_MS,
+          maxSpanMilliseconds: 1 * DAYS_MILLISECONDS,
           defaultGranularity: "5min",
           minGranularity: "1min",
           maxGranularity: "1hr",
         },
         {
-          maxSpanMs: 3 * DAYS_MS,
+          maxSpanMilliseconds: 3 * DAYS_MILLISECONDS,
           defaultGranularity: "15min",
           minGranularity: "5min",
           maxGranularity: "1day",
         },
         {
-          maxSpanMs: 7 * DAYS_MS,
+          maxSpanMilliseconds: 7 * DAYS_MILLISECONDS,
           defaultGranularity: "1day",
           minGranularity: "1hr",
           maxGranularity: "1day",
         },
         {
-          maxSpanMs: 14 * DAYS_MS,
+          maxSpanMilliseconds: 14 * DAYS_MILLISECONDS,
           defaultGranularity: "1day",
           minGranularity: "4hr",
           maxGranularity: "1day",
         },
         {
-          maxSpanMs: 30 * DAYS_MS,
+          maxSpanMilliseconds: 30 * DAYS_MILLISECONDS,
           defaultGranularity: "1day",
           minGranularity: "4hr",
           maxGranularity: "1week",
         },
         {
-          maxSpanMs: 90 * DAYS_MS,
+          maxSpanMilliseconds: 90 * DAYS_MILLISECONDS,
           defaultGranularity: "1day",
           minGranularity: "1day",
           maxGranularity: "1week",
         },
         {
-          maxSpanMs: Infinity,
+          maxSpanMilliseconds: Infinity,
           defaultGranularity: "1week",
           minGranularity: "1day",
           maxGranularity: "1week",
@@ -1021,7 +1021,7 @@ router.get(
       ];
 
       const matchingRule =
-        SPAN_RULES.find((rule) => spanMs <= rule.maxSpanMs) ||
+        SPAN_RULES.find((rule) => spanMilliseconds <= rule.maxSpanMilliseconds) ||
         SPAN_RULES[SPAN_RULES.length - 1];
       const minimumIndex = TIER_INDEX[matchingRule.minGranularity] ?? 0;
       const maximumIndex =
@@ -1362,7 +1362,7 @@ router.get(
                 ],
               },
             },
-            cost: COST_SUM_EXPR,
+            cost: COST_SUMMATION_EXPRESSION,
             avgLatency: { $avg: { $ifNull: ["$totalTime", null] } },
             successes: {
               $sum: { $cond: [{ $eq: ["$success", true] }, 1, 0] },
@@ -1418,10 +1418,10 @@ router.get(
             totalRequests: { $sum: 1 },
             totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
             totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
-            totalTokens: TOTAL_TOKENS_EXPR,
-            totalCost: COST_SUM_EXPR,
+            totalTokens: TOTAL_TOKENS_EXPRESSION,
+            totalCost: COST_SUMMATION_EXPRESSION,
             avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
-            avgTokensPerSec: AVG_TOKENS_PER_SEC_EXPR,
+            avgTokensPerSec: AVERAGE_TOKENS_PER_SECOND_EXPRESSION,
             _models: { $addToSet: "$model" },
             _providers: { $addToSet: "$provider" },
             _convIds: { $addToSet: "$conversationId" },

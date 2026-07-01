@@ -1,5 +1,5 @@
 import { formatBytes } from "@rodrigo-barraza/utilities-library";
-import { TYPES } from "../../config.ts";
+import { MODALITY_TYPES } from "../../config.ts";
 import { detectCapabilities } from "./detectCapabilities.ts";
 import {
   parseParamsFromName,
@@ -33,8 +33,8 @@ export function normalizeLmStudioModel(raw: LmStudioRawModel): ModelEntry {
     name: modelKey,
     label,
     modelType: isEmbedding ? "embed" : "conversation",
-    inputTypes: isEmbedding ? [TYPES.TEXT] : capabilities.inputTypes,
-    outputTypes: isEmbedding ? [TYPES.EMBEDDING] : capabilities.outputTypes,
+    inputTypes: isEmbedding ? [MODALITY_TYPES.TEXT] : capabilities.inputTypes,
+    outputTypes: isEmbedding ? [MODALITY_TYPES.EMBEDDING] : capabilities.outputTypes,
     supportsSystemPrompt: !isEmbedding,
     streaming: !isEmbedding,
     defaultTemperature: isEmbedding ? undefined : 0.7,

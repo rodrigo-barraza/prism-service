@@ -133,7 +133,7 @@ registerCleanup(async () => {
   for (const subAgent of running) {
     subAgent.abortController?.abort();
     subAgent.status = "stopped";
-    subAgent.durationMs = Date.now() - subAgent.startedAt;
+    subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
   }
 
   // Clean up worktrees in parallel
@@ -469,7 +469,7 @@ export default class OrchestratorService {
       diff: null,
       error: null,
       startedAt: Date.now(),
-      durationMs: 0,
+      durationMilliseconds: 0,
       totalCost: null,
       usage: null,
       abortController: createAbortController(),
@@ -617,7 +617,7 @@ export default class OrchestratorService {
         );
         subAgentState.status = "failed";
         subAgentState.error = getErrorMessage(error);
-        subAgentState.durationMs = Date.now() - subAgentState.startedAt;
+        subAgentState.durationMilliseconds = Date.now() - subAgentState.startedAt;
 
         if (subAgentState.isolated && subAgentState.worktreePath) {
           await GitWorktreeHelper.removeWorktree(
@@ -633,7 +633,7 @@ export default class OrchestratorService {
         // Update sub-agent metadata on the child conversation document
         OrchestratorService._updateSubAgentDocument(subAgentState.subAgentConversationId, {
           subAgentStatus: "failed",
-          subAgentDurationMs: subAgentState.durationMs,
+          subAgentDurationMilliseconds: subAgentState.durationMilliseconds,
           subAgentCompletedAt: new Date().toISOString(),
         }).catch(() => {});
 
@@ -657,7 +657,7 @@ export default class OrchestratorService {
       const subAgentResult = buildSubAgentResult(subAgentState);
       subAgentState.messages = null;
       logger.info(
-        `[Orchestrator] Sub-agent ${agentId} result (blocking): status=${subAgentResult.status} toolUses=${subAgentResult.toolUses} durationMs=${subAgentResult.durationMs}`,
+        `[Orchestrator] Sub-agent ${agentId} result (blocking): status=${subAgentResult.status} toolUses=${subAgentResult.toolUses} durationMilliseconds=${subAgentResult.durationMilliseconds}`,
       );
       return subAgentResult;
     }
@@ -684,7 +684,7 @@ export default class OrchestratorService {
         const completedResult = buildSubAgentResult(subAgentState);
         subAgentState.messages = null;
         logger.info(
-          `[Orchestrator] Sub-agent ${agentId} completed: status=${completedResult.status} toolUses=${completedResult.toolUses} durationMs=${completedResult.durationMs}`,
+          `[Orchestrator] Sub-agent ${agentId} completed: status=${completedResult.status} toolUses=${completedResult.toolUses} durationMilliseconds=${completedResult.durationMilliseconds}`,
         );
       })
       .catch((error: Error) => {
@@ -693,7 +693,7 @@ export default class OrchestratorService {
         );
         subAgentState.status = "failed";
         subAgentState.error = getErrorMessage(error);
-        subAgentState.durationMs = Date.now() - subAgentState.startedAt;
+        subAgentState.durationMilliseconds = Date.now() - subAgentState.startedAt;
 
         if (subAgentState.isolated && subAgentState.worktreePath) {
           GitWorktreeHelper.removeWorktree(
@@ -709,7 +709,7 @@ export default class OrchestratorService {
         // Update sub-agent metadata on the child conversation document
         OrchestratorService._updateSubAgentDocument(subAgentState.subAgentConversationId, {
           subAgentStatus: "failed",
-          subAgentDurationMs: subAgentState.durationMs,
+          subAgentDurationMilliseconds: subAgentState.durationMilliseconds,
           subAgentCompletedAt: new Date().toISOString(),
         }).catch(() => {});
 
@@ -813,7 +813,7 @@ export default class OrchestratorService {
     }
 
     subAgent.status = "stopped";
-    subAgent.durationMs = Date.now() - subAgent.startedAt;
+    subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
 
     logger.info(`[Orchestrator] Stopped sub-agent ${agentId}`);
 
@@ -873,7 +873,7 @@ export default class OrchestratorService {
       if (subAgent.status === "running") {
         subAgent.abortController?.abort();
         subAgent.status = "stopped";
-        subAgent.durationMs = Date.now() - subAgent.startedAt;
+        subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
       }
 
       // Cleanup isolated worktrees immediately
@@ -904,7 +904,7 @@ export default class OrchestratorService {
     status: "running" | "complete" | "failed" | "stopped" | "idle";
     error: string | null;
     diff: WorktreeDiff | null;
-    durationMs: number;
+    durationMilliseconds: number;
   } | null {
     const subAgent = activeSubAgents.get(agentId);
     if (!subAgent) return null;
@@ -913,7 +913,7 @@ export default class OrchestratorService {
       status: subAgent.status,
       error: subAgent.error,
       diff: subAgent.diff,
-      durationMs: subAgent.durationMs,
+      durationMilliseconds: subAgent.durationMilliseconds,
     };
   }
 
@@ -925,7 +925,7 @@ export default class OrchestratorService {
     status: string;
     providerName: string;
     resolvedModel: string;
-    durationMs: number;
+    durationMilliseconds: number;
     toolUses: number;
     hasChanges: boolean;
     totalCost?: number | null;
@@ -949,10 +949,10 @@ export default class OrchestratorService {
         status: subAgent.status,
         providerName: subAgent.providerName,
         resolvedModel: subAgent.resolvedModel,
-        durationMs:
+        durationMilliseconds:
           subAgent.status === "running"
             ? Date.now() - subAgent.startedAt
-            : subAgent.durationMs,
+            : subAgent.durationMilliseconds,
         toolUses: subAgent.toolCalls?.length || 0,
         hasChanges: subAgent.diff?.hasChanges || false,
         totalCost: subAgent.totalCost,
@@ -971,7 +971,7 @@ export default class OrchestratorService {
     status: string;
     providerName: string;
     resolvedModel: string;
-    durationMs: number;
+    durationMilliseconds: number;
     toolUses: number;
     hasChanges: boolean;
     totalCost?: number | null;
@@ -988,7 +988,7 @@ export default class OrchestratorService {
       status: string;
       providerName: string;
       resolvedModel: string;
-      durationMs: number;
+      durationMilliseconds: number;
       toolUses: number;
       hasChanges: boolean;
       totalCost?: number | null;
@@ -1018,10 +1018,10 @@ export default class OrchestratorService {
           status: subAgentState.status,
           providerName: subAgentState.providerName,
           resolvedModel: subAgentState.resolvedModel,
-          durationMs:
+          durationMilliseconds:
             subAgentState.status === "running"
               ? Date.now() - subAgentState.startedAt
-              : subAgentState.durationMs,
+              : subAgentState.durationMilliseconds,
           toolUses: subAgentState.toolCalls?.length || 0,
           hasChanges: subAgentState.diff?.hasChanges || false,
           totalCost: subAgentState.totalCost,
@@ -1044,6 +1044,148 @@ export default class OrchestratorService {
         }
       }
       frontier = nextFrontier;
+    }
+
+    return results;
+  }
+  static async getPersistedDescendantSubAgents(rootConversationId: string): Promise<Array<{
+    agentId: string;
+    description: string;
+    status: string;
+    providerName?: string;
+    resolvedModel?: string;
+    durationMilliseconds: number;
+    toolUses: number;
+    hasChanges: boolean;
+    totalCost?: number | null;
+    branchName?: string | null;
+    files?: string[];
+    toolCallCount?: number;
+    recursionDepth?: number;
+    toolNames?: Record<string, number>;
+    subAgentConversationId?: string;
+  }>> {
+    const results: Array<{
+      agentId: string;
+      description: string;
+      status: string;
+      providerName?: string;
+      resolvedModel?: string;
+      durationMilliseconds: number;
+      toolUses: number;
+      hasChanges: boolean;
+      totalCost?: number | null;
+      branchName?: string | null;
+      files?: string[];
+      toolCallCount?: number;
+      recursionDepth?: number;
+      toolNames?: Record<string, number>;
+      subAgentConversationId?: string;
+    }> = [];
+
+    try {
+      const { default: MongoWrapper } = await import("../wrappers/MongoWrapper.ts");
+      const { MONGO_DB_NAME } = await import("../../config.ts");
+
+      const conversationCollection = MongoWrapper.getCollection(
+        MONGO_DB_NAME,
+        COLLECTIONS.AGENT_CONVERSATIONS,
+      );
+
+      // Fetch the root conversation's subAgentIds
+      const rootDocument = await conversationCollection.findOne(
+        { id: rootConversationId },
+        { projection: { subAgentIds: 1 } },
+      );
+
+      if (
+        !rootDocument ||
+        !Array.isArray(rootDocument.subAgentIds) ||
+        rootDocument.subAgentIds.length === 0
+      ) {
+        return results;
+      }
+
+      // BFS: discover all descendant sub-agents through the self-referential model.
+      const visitedConversationIds = new Set<string>([rootConversationId]);
+      let frontier: string[] = [...rootDocument.subAgentIds];
+      const MAX_DESCENDANT_DEPTH = ORCHESTRATOR.AGENT_TREE_DISCOVERY_MAX_DEPTH;
+
+      for (
+        let depth = 0;
+        depth < MAX_DESCENDANT_DEPTH && frontier.length > 0;
+        depth++
+      ) {
+        const unvisitedIds = frontier.filter(
+          (conversationId) => !visitedConversationIds.has(conversationId),
+        );
+        if (unvisitedIds.length === 0) break;
+
+        for (const conversationId of unvisitedIds) {
+          visitedConversationIds.add(conversationId);
+        }
+
+        const subAgentDocuments = await conversationCollection
+          .find(
+            { id: { $in: unvisitedIds }, isSubAgent: true },
+            {
+              projection: {
+                id: 1,
+                subAgentId: 1,
+                subAgentDescription: 1,
+                subAgentStatus: 1,
+                subAgentProviderName: 1,
+                subAgentResolvedModel: 1,
+                subAgentDurationMilliseconds: 1,
+                subAgentToolUses: 1,
+                subAgentHasChanges: 1,
+                subAgentTotalCost: 1,
+                subAgentBranchName: 1,
+                subAgentFiles: 1,
+                subAgentRecursionDepth: 1,
+                subAgentToolNames: 1,
+                subAgentIds: 1,
+              },
+            },
+          )
+          .toArray();
+
+        if (subAgentDocuments.length === 0) break;
+
+        const nextFrontier: string[] = [];
+        for (const subAgentDocument of subAgentDocuments) {
+          results.push({
+            agentId:
+              (subAgentDocument.subAgentId as string) ||
+              (subAgentDocument.id as string),
+            description: (subAgentDocument.subAgentDescription as string) || "",
+            status: (subAgentDocument.subAgentStatus as string) || "unknown",
+            providerName: subAgentDocument.subAgentProviderName as string | undefined,
+            resolvedModel: subAgentDocument.subAgentResolvedModel as string | undefined,
+            durationMilliseconds: (subAgentDocument.subAgentDurationMilliseconds as number) || 0,
+            toolUses: (subAgentDocument.subAgentToolUses as number) || 0,
+            hasChanges: (subAgentDocument.subAgentHasChanges as boolean) || false,
+            totalCost: subAgentDocument.subAgentTotalCost as number | null | undefined,
+            branchName: subAgentDocument.subAgentBranchName as string | null | undefined,
+            files: subAgentDocument.subAgentFiles as string[] | undefined,
+            toolCallCount: (subAgentDocument.subAgentToolUses as number) || 0,
+            recursionDepth: subAgentDocument.subAgentRecursionDepth as number | undefined,
+            toolNames: subAgentDocument.subAgentToolNames as Record<string, number> | undefined,
+            subAgentConversationId: subAgentDocument.id as string,
+          });
+
+          // If this sub-agent itself has children, add them to the next frontier
+          const childSubAgentIds = subAgentDocument.subAgentIds as string[] | undefined;
+          if (Array.isArray(childSubAgentIds) && childSubAgentIds.length > 0) {
+            nextFrontier.push(...childSubAgentIds);
+          }
+        }
+        frontier = nextFrontier;
+      }
+    } catch (error: unknown) {
+      logger.warn(
+        `[Orchestrator] Failed to load persisted descendant sub-agents: ${getErrorMessage(error)}`,
+      );
     }
 
     return results;
@@ -1074,10 +1216,10 @@ export default class OrchestratorService {
           subAgentState.status === "complete" ||
           subAgentState.status === "idle"
         ) {
-          const completedTimestamp = subAgentState.completedAt ?? (subAgentState.startedAt + subAgentState.durationMs);
+          const completedTimestamp = subAgentState.completedAt ?? (subAgentState.startedAt + subAgentState.durationMilliseconds);
           const elapsedSinceCompletion = currentTimestamp - completedTimestamp;
 
-          if (elapsedSinceCompletion < ORCHESTRATOR.IDLE_AGENT_TTL_MILLISECONDS) {
+          if (elapsedSinceCompletion < ORCHESTRATOR.IDLE_AGENT_TIME_TO_LIVE_MILLISECONDS) {
             keysPreservedResumable.push(key);
             continue;
           }
@@ -1530,7 +1672,7 @@ export default class OrchestratorService {
       if (subAgent.status === "running") {
         subAgent.abortController?.abort();
         subAgent.status = "stopped";
-        subAgent.durationMs = Date.now() - subAgent.startedAt;
+        subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
       }
 
       // Release load balancer reservation
@@ -1642,7 +1784,7 @@ export default class OrchestratorService {
       );
       subAgent.status = "failed";
       subAgent.error = getErrorMessage(error);
-      subAgent.durationMs = Date.now() - subAgent.startedAt;
+      subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
 
       if (orchestratorContext.emit) {
         orchestratorContext.emit({
@@ -1663,7 +1805,7 @@ export default class OrchestratorService {
 
     const continuationResult = buildSubAgentResult(subAgent);
     logger.info(
-      `[Orchestrator] Sub-agent ${agentId} continuation result: status=${continuationResult.status} toolUses=${continuationResult.toolUses} durationMs=${continuationResult.durationMs}`,
+      `[Orchestrator] Sub-agent ${agentId} continuation result: status=${continuationResult.status} toolUses=${continuationResult.toolUses} durationMilliseconds=${continuationResult.durationMilliseconds}`,
     );
     return continuationResult;
   }
@@ -1753,7 +1895,7 @@ export default class OrchestratorService {
         const completedResult = buildSubAgentResult(subAgent);
         subAgent.messages = null;
         logger.info(
-          `[Orchestrator] Resumed sub-agent ${agentId} completed: status=${completedResult.status} toolUses=${completedResult.toolUses} durationMs=${completedResult.durationMs}`,
+          `[Orchestrator] Resumed sub-agent ${agentId} completed: status=${completedResult.status} toolUses=${completedResult.toolUses} durationMilliseconds=${completedResult.durationMilliseconds}`,
         );
 
         // Trigger auto-response so the parent LLM processes the result
@@ -1773,7 +1915,7 @@ export default class OrchestratorService {
         );
         subAgent.status = "failed";
         subAgent.error = getErrorMessage(error);
-        subAgent.durationMs = Date.now() - subAgent.startedAt;
+        subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
 
         if (orchestratorContext.emit) {
           orchestratorContext.emit({
@@ -1857,7 +1999,7 @@ export default class OrchestratorService {
         status: `${agentStatusEmoji} ${agentResult.status}`,
         summary: resumedAgentCompletedSummary,
         toolUses: agentResult.toolUses || 0,
-        durationMs: agentResult.durationMs || 0,
+        durationMilliseconds: agentResult.durationMilliseconds || 0,
         resultBody: truncatedOutput,
       },
       orchestratorContext,
@@ -1873,7 +2015,7 @@ export default class OrchestratorService {
       status: string;
       summary: string;
       toolUses: number;
-      durationMs: number;
+      durationMilliseconds: number;
       resultBody: string;
     },
     orchestratorContext: OrchestratorContext,
@@ -1889,7 +2031,7 @@ export default class OrchestratorService {
         `<status>${options.status}</status>`,
         `<summary>${options.summary}</summary>`,
         `<tool_uses>${options.toolUses}</tool_uses>`,
-        `<duration_ms>${options.durationMs}</duration_ms>`,
+        `<duration_ms>${options.durationMilliseconds}</duration_ms>`,
         `<result>`,
         options.resultBody,
         `</result>`,
@@ -2349,7 +2491,7 @@ export default class OrchestratorService {
     }
     subAgent.toolCalls = telemetry.toolCalls;
     subAgent.messages = finalMessages;
-    subAgent.durationMs = Date.now() - subAgent.startedAt;
+    subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
 
     if (subAgent.status !== "stopped") {
       // Stage and commit changes in the worktree
@@ -2426,7 +2568,7 @@ export default class OrchestratorService {
     // Notify frontend immediately so the per-sub-agent StatusBar updates
     // from "Generating..." to a completed state.
     telemetry.emitCompletion(
-      subAgent.durationMs,
+      subAgent.durationMilliseconds,
       subAgent.usage || null,
       subAgent.totalCost || null,
     );
@@ -2438,7 +2580,7 @@ export default class OrchestratorService {
     }
 
     logger.info(
-      `[Orchestrator] Sub-agent ${subAgent.agentId} completed in ${subAgent.durationMs}ms (${telemetry.toolCalls.length} tool calls)`,
+      `[Orchestrator] Sub-agent ${subAgent.agentId} completed in ${subAgent.durationMilliseconds}ms (${telemetry.toolCalls.length} tool calls)`,
     );
 
     // Persist final sub-agent stats to the child agent_conversations document
@@ -2457,7 +2599,7 @@ export default class OrchestratorService {
 
     OrchestratorService._updateSubAgentDocument(subAgent.subAgentConversationId, {
       subAgentStatus: subAgent.status,
-      subAgentDurationMs: subAgent.durationMs,
+      subAgentDurationMilliseconds: subAgent.durationMilliseconds,
       subAgentToolUses: telemetry.toolCalls.length,
       subAgentTotalCost: subAgent.totalCost,
       subAgentHasChanges: subAgent.diff?.hasChanges || false,
@@ -2547,9 +2689,9 @@ export default class OrchestratorService {
       0,
     );
 
-    const totalDurationMs = routerResults.reduce(
+    const totalDurationMilliseconds = routerResults.reduce(
       (sum, result) =>
-        sum + ("durationMs" in result ? (result.durationMs || 0) : 0),
+        sum + ("durationMilliseconds" in result ? (result.durationMilliseconds || 0) : 0),
       0,
     );
 
@@ -2558,7 +2700,7 @@ export default class OrchestratorService {
         status: overallStatus,
         summary: teamCompletedHeader,
         toolUses: totalToolUses,
-        durationMs: totalDurationMs,
+        durationMilliseconds: totalDurationMilliseconds,
         resultBody,
       },
       orchestratorContext,

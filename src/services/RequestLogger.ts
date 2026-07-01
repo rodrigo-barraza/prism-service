@@ -10,7 +10,7 @@ import {
 } from "../utils/CostCalculator.ts";
 import { computeModalities } from "./conversation/index.ts";
 import { COLLECTIONS } from "../constants.ts";
-import { TYPES, getPricing } from "../config.ts";
+import { MODALITY_TYPES, getPricing } from "../config.ts";
 import { calculateTokensPerSec } from "../utils/math.ts";
 import WebhookEventBus from "./WebhookEventBus.ts";
 const COLLECTION = COLLECTIONS.REQUESTS;
@@ -131,7 +131,7 @@ export interface LogBackgroundLlmCallParams extends LogParams {
   aiMessages: MessagePayload[];
   resultText: string | null;
   usage?: TokenUsage | Record<string, unknown> | null;
-  requestStartMs: number;
+  requestStartMilliseconds: number;
   extraRequestPayload?: Record<string, unknown>;
   extraResponsePayload?: Record<string, unknown>;
 }
@@ -499,11 +499,11 @@ const RequestLogger = {
     usage: apiUsage = null,
     success,
     errorMessage,
-    requestStartMs,
+    requestStartMilliseconds,
     extraRequestPayload,
     extraResponsePayload,
   }: LogBackgroundLlmCallParams) {
-    const totalSec = (performance.now() - requestStartMs) / 1000;
+    const totalSec = (performance.now() - requestStartMilliseconds) / 1000;
     const inputText = aiMessages
       .map((message) =>
         typeof message.content === "string"
@@ -527,7 +527,7 @@ const RequestLogger = {
     const cacheReadInputTokens = apiUsage?.cacheReadInputTokens || 0;
     const cacheCreationInputTokens = apiUsage?.cacheCreationInputTokens || 0;
 
-    const pricing = getPricing(TYPES.TEXT, TYPES.TEXT)[model as string];
+    const pricing = getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[model as string];
     let estimatedCost = null;
     if (pricing) {
       estimatedCost = calculateTextCost(

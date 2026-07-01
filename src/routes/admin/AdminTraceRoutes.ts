@@ -1,7 +1,7 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
-import { COLLECTIONS, COST_SUM_EXPR, AGGREGATE_MAX_TIME_MS } from "../../constants.ts";
+import { COLLECTIONS, COST_SUMMATION_EXPRESSION, AGGREGATE_MAX_TIME_MILLISECONDS } from "../../constants.ts";
 import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 import {
@@ -18,7 +18,7 @@ router.use(requireDb);
 // ─── GET /traces — paginated trace list (derived from requests) ─
 // Lightweight summary-only aggregate: no $push of full documents.
 // Full request details are fetched lazily via GET /traces/:id.
-// AGGREGATE_MAX_TIME_MS imported from constants.ts
+// AGGREGATE_MAX_TIME_MILLISECONDS imported from constants.ts
 
 router.get(
   "/",
@@ -107,7 +107,7 @@ router.get(
           requestCount: { $sum: 1 },
           totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
           totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
-          totalCost: COST_SUM_EXPR,
+          totalCost: COST_SUMMATION_EXPRESSION,
           totalLatency: { $sum: { $ifNull: ["$totalTime", 0] } },
           totalMessages: { $sum: { $ifNull: ["$messageCount", 0] } },
           _models: { $addToSet: "$model" },
@@ -249,7 +249,7 @@ router.get(
 
       const [result] = await req.db
         .collection(REQUESTS_COLLECTION)
-        .aggregate(facetPipeline, { maxTimeMS: AGGREGATE_MAX_TIME_MS })
+        .aggregate(facetPipeline, { maxTimeMS: AGGREGATE_MAX_TIME_MILLISECONDS })
         .toArray();
 
       const docs = result?.data || [];
@@ -274,7 +274,7 @@ router.get(
           { traceId: req.params.id },
           {
             projection: { requestPayload: 0, responsePayload: 0 },
-            maxTimeMS: AGGREGATE_MAX_TIME_MS,
+            maxTimeMS: AGGREGATE_MAX_TIME_MILLISECONDS,
           },
         )
         .toArray();

@@ -21,6 +21,40 @@ import logger from "../utils/logger.ts";
 // agentic workflows stored as atomic operations.
 // ────────────────────────────────────────────────────────────
 
+export interface SkillConfig {
+  maxIterations: number;
+  model: string | null;
+  tools: string[] | null;
+  agent: string | null;
+  project: string | null;
+}
+
+export interface SkillDocument {
+  skillId: string;
+  name: string;
+  description: string;
+  prompt: string;
+  steps: string[];
+  tools: string[] | null;
+  maxIterations: number;
+  model: string | null;
+  project: string | null;
+  agent: string | null;
+  usageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SkillPrepareResult {
+  skillId?: string;
+  name?: string;
+  prompt?: string;
+  config?: SkillConfig;
+  unresolved?: string[];
+  steps?: string[];
+  error?: string;
+}
+
 /** @returns {import("mongodb").Collection} */
 function getCollection() {
   return MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTIONS.AGENT_SKILLS);
@@ -30,7 +64,7 @@ const SkillService = {
   /**
    * Create a new skill.
    */
-  async create(data: Record<string, unknown>) {
+  async create(data: Partial<SkillDocument>) {
     const collection = getCollection();
     if (!collection) throw new Error("Database not available");
 
@@ -90,7 +124,7 @@ const SkillService = {
     logger.info(`[SkillService] Created skill "${name}" (${skillId})`);
 
     return {
-      skill: sanitize(document),
+      skill: sanitize(document as unknown as SkillDocument),
       message: `Skill "${name}" created. Execute with execute_skill({ skillId: "${skillId}" }).`,
     };
   },
@@ -114,7 +148,7 @@ const SkillService = {
       .toArray();
 
     return {
-      skills: skills.map(sanitize),
+      skills: (skills as unknown as SkillDocument[]).map(sanitize),
       total: skills.length,
     };
   },
@@ -127,7 +161,7 @@ const SkillService = {
   async get(skillId: string) {
     const collection = getCollection();
     if (!collection) return null;
-    const document = await collection.findOne({ skillId });
+    const document = (await collection.findOne({ skillId })) as unknown as SkillDocument;
     return document ? sanitize(document) : null;
   },
 
@@ -138,7 +172,7 @@ const SkillService = {
     const collection = getCollection();
     if (!collection) return { error: "Database not available" };
 
-    const document = await collection.findOne({ skillId });
+    const document = (await collection.findOne({ skillId })) as unknown as SkillDocument;
     if (!document) {
       return { error: `Skill "${skillId}" not found` };
     }
@@ -156,11 +190,16 @@ const SkillService = {
    * The caller (ToolOrchestratorService) is responsible for actually
    * running the agentic loop with the returned config.
    */
-  async prepare(skillId: string, variables: Record<string, unknown> = {}) {
+  async prepare(
+    skillId: string,
+    variables: Record<string, unknown> = {},
+  ): Promise<SkillPrepareResult> {
     const collection = getCollection();
     if (!collection) return { error: "Database not available" };
 
-    const document = await collection.findOne({ skillId });
+    const document = (await collection.findOne({
+      skillId,
+    })) as unknown as SkillDocument;
     if (!document) {
       return {
         error: `Skill "${skillId}" not found. Use list_skills to see available skills.`,
@@ -214,9 +253,9 @@ const SkillService = {
   },
 };
 
-function sanitize(document: Record<string, unknown>) {
+function sanitize(document: SkillDocument) {
   if (!document) return null;
-  const { _id, ...rest } = document;
+  const { ...rest } = document;
   return rest;
 }
 

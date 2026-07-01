@@ -9,7 +9,7 @@ import express, { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
 import { getProvider } from "../providers/index.ts";
 import { ProviderError } from "../utils/errors.ts";
-import { TYPES, getPricing, getModelByName } from "../config.ts";
+import { MODALITY_TYPES, getPricing, getModelByName } from "../config.ts";
 import { calculateAudioCost } from "../utils/CostCalculator.ts";
 import ConversationService from "../services/ConversationService.ts";
 import FileService from "../services/FileService.ts";
@@ -439,7 +439,7 @@ router.post(
       > | null;
       const pricing =
         modelDefinition?.pricing ||
-        getPricing(TYPES.AUDIO, TYPES.TEXT)[model] ||
+        getPricing(MODALITY_TYPES.AUDIO, MODALITY_TYPES.TEXT)[model] ||
         null;
       const estimatedCost = calculateAudioCost(
         result.usage,

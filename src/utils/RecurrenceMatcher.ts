@@ -43,9 +43,9 @@ export function matchRecurrenceRule(
 
   switch (rule.frequency) {
     case "daily": {
-      const differenceInMs = targetDate.getTime() - startDate.getTime();
+      const differenceInMilliseconds = targetDate.getTime() - startDate.getTime();
       const differenceInDays = Math.floor(
-        differenceInMs / (24 * 60 * 60 * 1000),
+        differenceInMilliseconds / (24 * 60 * 60 * 1000),
       );
       return differenceInDays % interval === 0;
     }
@@ -58,9 +58,9 @@ export function matchRecurrenceRule(
       const targetSunday = new Date(targetDate);
       targetSunday.setDate(targetDate.getDate() - targetDate.getDay());
 
-      const differenceInMs = targetSunday.getTime() - startSunday.getTime();
+      const differenceInMilliseconds = targetSunday.getTime() - startSunday.getTime();
       const differenceInWeeks = Math.floor(
-        differenceInMs / (7 * 24 * 60 * 60 * 1000),
+        differenceInMilliseconds / (7 * 24 * 60 * 60 * 1000),
       );
 
       if (differenceInWeeks % interval !== 0) {

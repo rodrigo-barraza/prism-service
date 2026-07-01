@@ -780,7 +780,7 @@ export class CriticLoopRouter implements TopologyRouter {
           type: "sub_agent_status",
           subAgentId: synthesisSubAgentId,
           message: "complete",
-          durationMs: 0,
+          durationMilliseconds: 0,
           toolCount: 0,
         });
       }
@@ -793,7 +793,7 @@ export class CriticLoopRouter implements TopologyRouter {
           type: "sub_agent_status",
           subAgentId: synthesisSubAgentId,
           message: "complete",
-          durationMs: 0,
+          durationMilliseconds: 0,
           toolCount: 0,
         });
       }
@@ -924,7 +924,7 @@ export class CriticLoopRouter implements TopologyRouter {
             type: "sub_agent_status",
             subAgentId: reevaluationSubAgentId,
             message: "complete",
-            durationMs: 0,
+            durationMilliseconds: 0,
             toolCount: 0,
           });
         }
@@ -937,7 +937,7 @@ export class CriticLoopRouter implements TopologyRouter {
             type: "sub_agent_status",
             subAgentId: reevaluationSubAgentId,
             message: "complete",
-            durationMs: 0,
+            durationMilliseconds: 0,
             toolCount: 0,
           });
         }

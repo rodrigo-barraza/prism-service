@@ -4,8 +4,8 @@ import { MONGO_DB_NAME } from "../../config.ts";
 import logger from "../utils/logger.ts";
 import {
   COLLECTIONS,
-  CHANGE_STREAM_RECONNECT_MS,
-  CHANGE_STREAM_RETRY_MS,
+  CHANGE_STREAM_RECONNECT_INTERVAL_MILLISECONDS,
+  CHANGE_STREAM_RETRY_DELAY_MILLISECONDS,
 } from "../constants.ts";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
@@ -143,7 +143,7 @@ function openStream(db: Db, collectionName: string) {
             logger.info(`ChangeStream re-opened on ${collectionName}`);
           }
         }
-      }, CHANGE_STREAM_RETRY_MS);
+      }, CHANGE_STREAM_RETRY_DELAY_MILLISECONDS);
     });
 
     return stream;
@@ -203,7 +203,7 @@ const ChangeStreamService = {
     staleGeneratingInterval = setInterval(async () => {
       try {
         const fiveMinAgo = new Date(
-          Date.now() - CHANGE_STREAM_RECONNECT_MS,
+          Date.now() - CHANGE_STREAM_RECONNECT_INTERVAL_MILLISECONDS,
         ).toISOString();
         const { modifiedCount } = await db
           .collection(COLLECTIONS.MODEL_CONVERSATIONS)
@@ -227,7 +227,7 @@ const ChangeStreamService = {
       } catch {
         // ignore
       }
-    }, CHANGE_STREAM_RECONNECT_MS);
+    }, CHANGE_STREAM_RECONNECT_INTERVAL_MILLISECONDS);
   },
   subscribe(callback: ChangeStreamCallback) {
     listeners.add(callback);

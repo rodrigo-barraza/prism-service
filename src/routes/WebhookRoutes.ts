@@ -4,7 +4,7 @@ import type { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
 import WebhookEventBus from "../services/WebhookEventBus.ts";
 import type { WebhookEvent } from "../services/WebhookEventBus.ts";
-import { COLLECTIONS, SSE_KEEPALIVE_INTERVAL_MS } from "../constants.ts";
+import { COLLECTIONS, SERVER_SENT_EVENTS_KEEPALIVE_INTERVAL_MILLISECONDS } from "../constants.ts";
 import logger from "../utils/logger.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 import requireDb from "../middleware/RequireDbMiddleware.ts";
@@ -81,7 +81,7 @@ router.get(
       } catch {
         // ignore
       }
-    }, SSE_KEEPALIVE_INTERVAL_MS);
+    }, SERVER_SENT_EVENTS_KEEPALIVE_INTERVAL_MILLISECONDS);
 
     req.on("close", () => {
       WebhookEventBus.unsubscribe(onEvent);

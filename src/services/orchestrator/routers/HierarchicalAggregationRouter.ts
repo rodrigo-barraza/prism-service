@@ -272,7 +272,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
               type: "sub_agent_status",
               subAgentId: synthesisSubAgentId,
               message: "complete",
-              durationMs: 0,
+              durationMilliseconds: 0,
               toolCount: 0,
             });
           }
@@ -280,7 +280,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
         }
 
         const synthesisStartTime = Date.now();
-        const synthesisRequestStartMs = performance.now();
+        const synthesisRequestStartMilliseconds = performance.now();
         const synthesisMessages: Array<{
           role: "user" | "assistant" | "system";
           content: string;
@@ -290,7 +290,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
           resolvedModel,
           { maxTokens: ORCHESTRATOR.SYNTHESIS_MAX_TOKENS },
         );
-        const synthesisDurationMs = Date.now() - synthesisStartTime;
+        const synthesisDurationMilliseconds = Date.now() - synthesisStartTime;
 
         RequestLogger.logBackgroundLlmCall({
           requestId: `${orchestratorContext.conversationId || "unknown"}-synthesis-L${layerIndex + 1}-${teamName}`,
@@ -308,7 +308,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
           usage: synthesisResult.usage || null,
           success: true,
           errorMessage: null,
-          requestStartMs: synthesisRequestStartMs,
+          requestStartMilliseconds: synthesisRequestStartMilliseconds,
           extraRequestPayload: {
             teamName,
             layer: layerIndex + 1,
@@ -330,7 +330,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
           result: synthesisResult.text,
           toolUses: 0,
           iterations: 1,
-          durationMs: synthesisDurationMs,
+          durationMilliseconds: synthesisDurationMilliseconds,
           messages: [],
           diff: { additions: 0, deletions: 0, files: [] },
         };
@@ -339,7 +339,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
         const outputTokens = synthesisResult.usage?.outputTokens ?? 0;
 
         logger.info(
-          `[HierarchicalAggregationRouter]${layerLabel} Synthesis complete in ${synthesisDurationMs}ms ` +
+          `[HierarchicalAggregationRouter]${layerLabel} Synthesis complete in ${synthesisDurationMilliseconds}ms ` +
             `(${inputTokens} input, ${outputTokens} output tokens)`,
         );
 
@@ -352,7 +352,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
             type: "sub_agent_status",
             subAgentId: synthesisSubAgentId,
             message: "complete",
-            durationMs: synthesisDurationMs,
+            durationMilliseconds: synthesisDurationMilliseconds,
             toolCount: 0,
           });
         }
@@ -370,7 +370,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
             type: "sub_agent_status",
             subAgentId: synthesisSubAgentId,
             message: "complete",
-            durationMs: 0,
+            durationMilliseconds: 0,
             toolCount: 0,
           });
         }

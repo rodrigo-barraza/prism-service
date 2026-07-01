@@ -23,15 +23,26 @@ export interface ProviderInstance {
  *
  * Returns: [{ url, concurrency, nickname? }, ...]
  */
-function parseProviderInstances(envPrefix: string): ProviderInstance[] {
+function parseProviderInstances(
+  environmentVariablePrefix: string,
+): ProviderInstance[] {
   const instances: ProviderInstance[] = [];
-  for (let i = 1; i <= 10; i++) {
-    const url = process.env[`${envPrefix}_${i}_URL`];
-    if (!url) continue;
-    const concurrency = parseInt(process.env[`${envPrefix}_${i}_CONCURRENCY`] ?? "", 10) || 1;
-    const nickname = process.env[`${envPrefix}_${i}_NICKNAME`];
+  for (let index = 1; index <= 10; index++) {
+    const url = process.env[`${environmentVariablePrefix}_${index}_URL`];
+    if (!url) {
+      continue;
+    }
+    const concurrency =
+      parseInt(
+        process.env[`${environmentVariablePrefix}_${index}_CONCURRENCY`] ?? "",
+        10,
+      ) || 1;
+    const nickname =
+      process.env[`${environmentVariablePrefix}_${index}_NICKNAME`];
     const entry: ProviderInstance = { url, concurrency };
-    if (nickname) entry.nickname = nickname;
+    if (nickname) {
+      entry.nickname = nickname;
+    }
     instances.push(entry);
   }
   return instances;
@@ -43,7 +54,8 @@ export const PRISM_SERVICE_PORT = process.env.PRISM_SERVICE_PORT || 7777;
 // ── AI Provider API Keys ───────────────────────────────────────
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 export const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-export const GOOGLE_CLOUD_GEMINI_API_KEY = process.env.GOOGLE_CLOUD_GEMINI_API_KEY;
+export const GOOGLE_CLOUD_GEMINI_API_KEY =
+  process.env.GOOGLE_CLOUD_GEMINI_API_KEY;
 export const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 export const INWORLD_BASIC = process.env.INWORLD_BASIC;
 
@@ -56,13 +68,24 @@ export const PROVIDER_LLAMA_CPP = parseProviderInstances("PROVIDER_LLAMA_CPP");
 
 // ── MongoDB ────────────────────────────────────────────────────
 export const MONGO_URI = process.env.MONGO_URI;
-export const MONGO_DB_NAME = process.env.PRISM_SERVICE_MONGO_DB_NAME || process.env.PRISM_MONGO_DB_NAME || process.env.MONGO_DB_NAME || "prism";
+if (!MONGO_URI) {
+  throw new Error("CRITICAL: MONGO_URI environment variable is not defined.");
+}
+
+export const MONGO_DB_NAME =
+  process.env.PRISM_SERVICE_MONGO_DB_NAME ||
+  process.env.PRISM_MONGO_DB_NAME ||
+  process.env.MONGO_DB_NAME ||
+  "prism";
 
 // ── MinIO (Optional — files stored inline in MongoDB if not set) ──
 export const MINIO_ENDPOINT = process.env.MINIO_ENDPOINT;
 export const MINIO_ACCESS_KEY = process.env.MINIO_ACCESS_KEY;
 export const MINIO_SECRET_KEY = process.env.MINIO_SECRET_KEY;
-export const MINIO_BUCKET_NAME = process.env.PRISM_SERVICE_MINIO_BUCKET_NAME || process.env.PRISM_MINIO_BUCKET_NAME || process.env.MINIO_BUCKET_NAME;
+export const MINIO_BUCKET_NAME =
+  process.env.PRISM_SERVICE_MINIO_BUCKET_NAME ||
+  process.env.PRISM_MINIO_BUCKET_NAME ||
+  process.env.MINIO_BUCKET_NAME;
 
 // ── Tools API ──────────────────────────────────────────────────
 export const TOOLS_SERVICE_URL = process.env.TOOLS_SERVICE_URL;
@@ -71,11 +94,15 @@ export const TOOLS_SERVICE_URL = process.env.TOOLS_SERVICE_URL;
 // Vault-backed model identifiers — swap models without code deploys.
 
 export const LIVE_AUDIO_MODEL = process.env.LIVE_AUDIO_MODEL;
-export const OPENAI_TRANSCRIPTION_MODEL = process.env.OPENAI_TRANSCRIPTION_MODEL;
-export const GOOGLE_TTS_MODEL = process.env.GOOGLE_TTS_MODEL;
+export const OPENAI_TRANSCRIPTION_MODEL =
+  process.env.OPENAI_TRANSCRIPTION_MODEL;
+export const GOOGLE_TEXT_TO_SPEECH_MODEL = process.env.GOOGLE_TTS_MODEL;
 export const GOOGLE_EMBEDDING_MODEL = process.env.GOOGLE_EMBEDDING_MODEL;
 
 // ── LM Studio Tuning ──────────────────────────────────────────
-export const LM_STUDIO_EVAL_BATCH_SIZE = parseInt(process.env.LM_STUDIO_EVAL_BATCH_SIZE ?? "", 10) || 4096;
-export const LM_STUDIO_PHYSICAL_BATCH_SIZE = parseInt(process.env.LM_STUDIO_PHYSICAL_BATCH_SIZE ?? "", 10) || 4096;
-export const LM_STUDIO_DEFAULT_MAX_CONTEXT = parseInt(process.env.LM_STUDIO_DEFAULT_MAX_CONTEXT ?? "", 10) || 262144;
+export const LM_STUDIO_EVALUATION_BATCH_SIZE =
+  parseInt(process.env.LM_STUDIO_EVAL_BATCH_SIZE ?? "", 10) || 4096;
+export const LM_STUDIO_PHYSICAL_BATCH_SIZE =
+  parseInt(process.env.LM_STUDIO_PHYSICAL_BATCH_SIZE ?? "", 10) || 4096;
+export const LM_STUDIO_DEFAULT_MAX_CONTEXT =
+  parseInt(process.env.LM_STUDIO_DEFAULT_MAX_CONTEXT ?? "", 10) || 262144;

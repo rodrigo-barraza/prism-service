@@ -21,7 +21,7 @@ import { HARNESS } from "../../../constants.ts";
  */
 
 const CRITIC_MAX_TOKENS = HARNESS.CRITIC_MAX_TOKENS;
-const CRITIC_TIMEOUT_MS = HARNESS.CRITIC_TIMEOUT_MS;
+const CRITIC_TIMEOUT_MILLISECONDS = HARNESS.CRITIC_TIMEOUT_MILLISECONDS;
 
 interface CriticGateOptions {
   model?: string;
@@ -134,11 +134,11 @@ export default class CriticGate {
     const criticOptions = {
       maxTokens: CRITIC_MAX_TOKENS,
       temperature: 0,
-      signal: AbortSignal.timeout(CRITIC_TIMEOUT_MS),
+      signal: AbortSignal.timeout(CRITIC_TIMEOUT_MILLISECONDS),
     };
 
     let responseText = "";
-    const requestStartMs = performance.now();
+    const requestStartMilliseconds = performance.now();
 
     const stream = provider.generateTextStream(
       criticMessages,
@@ -170,7 +170,7 @@ export default class CriticGate {
       resultText: responseText,
       success: true,
       errorMessage: null,
-      requestStartMs,
+      requestStartMilliseconds,
       extraRequestPayload: {
         reviewedTool: prompt.includes("Tool:")
           ? prompt.split("Tool: ")[1]?.split("\n")[0]

@@ -10,7 +10,7 @@ import express, { Request, Response } from "express";
 import {
   PROVIDERS,
   PROVIDER_LIST,
-  TYPES,
+  MODALITY_TYPES,
   VOICES,
   DEFAULT_VOICES,
   getModelOptions,
@@ -220,8 +220,8 @@ router.get(
   asyncHandler(async (_req: Request, res: Response) => {
     await ToolOrchestratorService.ensureSchemas();
     // Get static model options (cloud-only — no network calls)
-    let textToTextModels = getModelOptions(TYPES.TEXT, TYPES.TEXT);
-    let textToImageModels = getModelOptions(TYPES.TEXT, TYPES.IMAGE);
+    let textToTextModels = getModelOptions(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT);
+    let textToImageModels = getModelOptions(MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE);
 
     // Enrich ALL model lists with arena scores from the scraped leaderboard data
     enrichModelsWithArenaScores(textToTextModels);
@@ -236,7 +236,7 @@ router.get(
     if (shouldIncludeLocal && localInstances.length > 0) {
       try {
         const localModels = (await LocalProviderGateway.discoverModels({
-          timeoutMs: 3000,
+          timeoutMilliseconds: 3000,
           enrich: true,
         })) as Record<string, ModelOptionEntry[]>;
 
@@ -315,49 +315,49 @@ Guidelines:
       thinkingPatterns: THINKING_PATTERNS,
       textToText: {
         models: textToTextModels,
-        defaults: filterDefaults(getDefaultModels(TYPES.TEXT, TYPES.TEXT)),
+        defaults: filterDefaults(getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)),
         recommendedDefault: resolveRecommendedDefault(
-          TYPES.TEXT,
-          TYPES.TEXT,
+          MODALITY_TYPES.TEXT,
+          MODALITY_TYPES.TEXT,
           AVAILABLE_PROVIDERS,
           false,
         ),
         recommendedAgenticDefault: resolveRecommendedDefault(
-          TYPES.TEXT,
-          TYPES.TEXT,
+          MODALITY_TYPES.TEXT,
+          MODALITY_TYPES.TEXT,
           AVAILABLE_PROVIDERS,
           true,
         ),
       },
       textToSpeech: {
         models: filterByAvailableProviders(
-          getModelOptions(TYPES.TEXT, TYPES.AUDIO),
+          getModelOptions(MODALITY_TYPES.TEXT, MODALITY_TYPES.AUDIO),
         ),
-        defaults: filterDefaults(getDefaultModels(TYPES.TEXT, TYPES.AUDIO)),
+        defaults: filterDefaults(getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.AUDIO)),
         voices: VOICES,
         defaultVoices: DEFAULT_VOICES,
       },
       textToImage: {
         models: textToImageModels,
-        defaults: filterDefaults(getDefaultModels(TYPES.TEXT, TYPES.IMAGE)),
+        defaults: filterDefaults(getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE)),
       },
       imageToText: {
         models: filterByAvailableProviders(
-          getModelOptions(TYPES.IMAGE, TYPES.TEXT),
+          getModelOptions(MODALITY_TYPES.IMAGE, MODALITY_TYPES.TEXT),
         ),
-        defaults: filterDefaults(getDefaultModels(TYPES.IMAGE, TYPES.TEXT)),
+        defaults: filterDefaults(getDefaultModels(MODALITY_TYPES.IMAGE, MODALITY_TYPES.TEXT)),
       },
       embedding: {
         models: filterByAvailableProviders(
-          getModelOptions(TYPES.TEXT, TYPES.EMBEDDING),
+          getModelOptions(MODALITY_TYPES.TEXT, MODALITY_TYPES.EMBEDDING),
         ),
-        defaults: filterDefaults(getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING)),
+        defaults: filterDefaults(getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.EMBEDDING)),
       },
       audioToText: {
         models: filterByAvailableProviders(
-          getModelOptions(TYPES.AUDIO, TYPES.TEXT),
+          getModelOptions(MODALITY_TYPES.AUDIO, MODALITY_TYPES.TEXT),
         ),
-        defaults: filterDefaults(getDefaultModels(TYPES.AUDIO, TYPES.TEXT)),
+        defaults: filterDefaults(getDefaultModels(MODALITY_TYPES.AUDIO, MODALITY_TYPES.TEXT)),
       },
       parameterDescriptors: getParameterDescriptors(),
     });
@@ -378,7 +378,7 @@ Guidelines:
 const localConfigRouter = express.Router();
 localConfigRouter.get("/", async (_req: Request, res: Response) => {
   const models = (await LocalProviderGateway.discoverModels({
-    timeoutMs: 3000,
+    timeoutMilliseconds: 3000,
     enrich: true,
   })) as Record<string, ModelOptionEntry[]>;
 

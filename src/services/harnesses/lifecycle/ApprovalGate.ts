@@ -14,7 +14,7 @@ import { HARNESS } from "../../../constants.ts";
  * Reusable by any harness that executes write/danger-tier tools.
  */
 
-const APPROVAL_TIMEOUT_MS = HARNESS.APPROVAL_TIMEOUT_MS;
+const APPROVAL_TIMEOUT_MILLISECONDS = HARNESS.APPROVAL_TIMEOUT_MILLISECONDS;
 
 /**
  * Check a batch of tool calls against the approval engine and, if any
@@ -54,7 +54,7 @@ export async function checkAndWaitForApproval(
     const timeoutId = setTimeout(() => {
       pendingApprovals.delete(conversationId);
       resolve({ isApproved: false, reason: "timeout" });
-    }, APPROVAL_TIMEOUT_MS);
+    }, APPROVAL_TIMEOUT_MILLISECONDS);
 
     const existingApproval = pendingApprovals.get(conversationId);
     if (existingApproval) {

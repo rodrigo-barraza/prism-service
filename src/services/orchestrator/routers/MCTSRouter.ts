@@ -567,7 +567,7 @@ export class MCTSRouter implements TopologyRouter {
       let evaluationResult: EvaluationResult;
 
       try {
-        const evaluationStartMs = performance.now();
+        const evaluationStartMilliseconds = performance.now();
         const evaluationMessages: Array<{
           role: "user" | "assistant" | "system";
           content: string;
@@ -594,7 +594,7 @@ export class MCTSRouter implements TopologyRouter {
           usage: evaluationResponse.usage || null,
           success: true,
           errorMessage: null,
-          requestStartMs: evaluationStartMs,
+          requestStartMilliseconds: evaluationStartMilliseconds,
           extraRequestPayload: {
             teamName,
             iteration,
@@ -619,7 +619,7 @@ export class MCTSRouter implements TopologyRouter {
             type: "sub_agent_status",
             subAgentId: synthesisSubAgentId,
             message: "complete",
-            durationMs: Math.round(performance.now() - evaluationStartMs),
+            durationMilliseconds: Math.round(performance.now() - evaluationStartMilliseconds),
             toolCount: 0,
           });
         }
@@ -633,7 +633,7 @@ export class MCTSRouter implements TopologyRouter {
             type: "sub_agent_status",
             subAgentId: synthesisSubAgentId,
             message: "complete",
-            durationMs: 0,
+            durationMilliseconds: 0,
             toolCount: 0,
           });
         }
@@ -741,9 +741,9 @@ export class MCTSRouter implements TopologyRouter {
         result: bestOverallNode.result.result,
         toolUses: 0,
         iterations: allTreeNodes.length,
-        durationMs: allResults
+        durationMilliseconds: allResults
           .filter((result): result is SubAgentResult => !("error" in result))
-          .reduce((total, result) => total + (result.durationMs || 0), 0),
+          .reduce((total, result) => total + (result.durationMilliseconds || 0), 0),
         messages: [],
         diff: bestOverallNode.result.diff,
       };

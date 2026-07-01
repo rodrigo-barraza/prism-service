@@ -18,10 +18,10 @@ import { ProviderError } from "../utils/errors.ts";
 import logger from "../utils/logger.ts";
 import {
   GOOGLE_CLOUD_GEMINI_API_KEY,
-  GOOGLE_TTS_MODEL,
+  GOOGLE_TEXT_TO_SPEECH_MODEL,
   GOOGLE_EMBEDDING_MODEL,
 } from "../../config.ts";
-import { TYPES, MODELS, DEFAULT_VOICES, getDefaultModels } from "../config.ts";
+import { MODALITY_TYPES, MODELS, DEFAULT_VOICES, getDefaultModels } from "../config.ts";
 import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 
 /** Shape of a model definition from the MODELS catalog. */
@@ -446,7 +446,7 @@ const googleProvider = {
 
   async generateText(
     messages: ConversationMessage[],
-    model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).google,
+    model: string = getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT).google,
     options: ProviderOptions = {},
   ) {
     logger.provider("Google", `generateText model=${model}`);
@@ -472,7 +472,7 @@ const googleProvider = {
       // These models REQUIRE ["TEXT", "IMAGE"] — ["TEXT"] alone returns 0 tokens.
       if (
         modelDefinition?.outputTypes &&
-        (modelDefinition.outputTypes as string[]).includes(TYPES.IMAGE)
+        (modelDefinition.outputTypes as string[]).includes(MODALITY_TYPES.IMAGE)
       ) {
         config.responseModalities = options.forceImageGeneration
           ? ["IMAGE"]
@@ -555,7 +555,7 @@ const googleProvider = {
 
   async *generateTextStream(
     messages: ConversationMessage[],
-    model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).google,
+    model: string = getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT).google,
     options: ProviderOptions = {},
   ) {
     logger.provider("Google", `generateTextStream model=${model}`);
@@ -581,7 +581,7 @@ const googleProvider = {
       // For models that output images, set responseModalities explicitly.
       if (
         modelDefinition?.outputTypes &&
-        (modelDefinition.outputTypes as string[]).includes(TYPES.IMAGE)
+        (modelDefinition.outputTypes as string[]).includes(MODALITY_TYPES.IMAGE)
       ) {
         config.responseModalities = options.forceImageGeneration
           ? ["IMAGE"]
@@ -1014,7 +1014,7 @@ const googleProvider = {
   async captionImage(
     images: string[],
     prompt: string = "Describe this image.",
-    model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT).google,
+    model: string = getDefaultModels(MODALITY_TYPES.IMAGE, MODALITY_TYPES.TEXT).google,
     systemPrompt?: string,
   ) {
     logger.provider("Google", `captionImage model=${model}`);
@@ -1168,7 +1168,7 @@ const googleProvider = {
 
       const speechModel =
         (options.model as string) ||
-        getDefaultModels(TYPES.TEXT, TYPES.AUDIO).google;
+        getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.AUDIO).google;
       const speechText = options.prompt ? `${options.prompt}\n\n${text}` : text;
       const response = await getClient().models.generateContent({
         model: speechModel,
@@ -1210,7 +1210,7 @@ const googleProvider = {
   async transcribeAudio(
     audioBuffer: Buffer,
     mimeType: string,
-    model: string = GOOGLE_TTS_MODEL || MODELS.GEMINI_35_FLASH.name,
+    model: string = GOOGLE_TEXT_TO_SPEECH_MODEL || MODELS.GEMINI_35_FLASH.name,
     options: ProviderOptions = {},
   ) {
     logger.provider("Google", `transcribeAudio model=${model}`);
@@ -1266,7 +1266,7 @@ const googleProvider = {
   ) {
     const resolvedModel =
       model ||
-      getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING)?.google ||
+      getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.EMBEDDING)?.google ||
       GOOGLE_EMBEDDING_MODEL ||
       MODELS.GEMINI_EMBEDDING_2.name;
     logger.provider("Google", `generateEmbedding model=${resolvedModel}`);

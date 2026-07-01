@@ -5,7 +5,7 @@ import { extractAnthropicRateLimits } from "../utils/rateLimits.ts";
 import { compressImageForSizeLimit } from "../utils/media.ts";
 import { EMPTY_USAGE } from "../utils/openai-compat.ts";
 import { ANTHROPIC_API_KEY } from "../../config.ts";
-import { TYPES, getDefaultModels, getModelByName } from "../config.ts";
+import { MODALITY_TYPES, getDefaultModels, getModelByName } from "../config.ts";
 import { DEFAULT_MAX_OUTPUT_TOKENS } from "../constants/TokenBudgetDefaults.ts";
 import { sleep } from "@rodrigo-barraza/utilities-library";
 
@@ -84,7 +84,7 @@ const EFFORT_BUDGET_MAP: Record<string, number> = {
 };
 
 // Retry config for transient Anthropic errors (overloaded, rate limit)
-const RETRY_DELAY_MS = 10_000;
+const RETRY_DELAY_MILLISECONDS = 10_000;
 const MAX_RETRIES = 3;
 function isRetryableError(error: AnthropicSdkError | null | undefined): boolean {
   if (!error) return false;
@@ -569,7 +569,7 @@ const anthropicProvider = {
 
   async generateText(
     messages: ChatMessage[],
-    model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
+    model: string = getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT).anthropic,
     options: ProviderOptions = {},
   ) {
     logger.provider("Anthropic", `generateText model=${model}`);
@@ -700,9 +700,9 @@ const anthropicProvider = {
           attempt < MAX_RETRIES
         ) {
           logger.warn(
-            `[anthropic] Overloaded on attempt ${attempt}/${MAX_RETRIES} for generateText model=${model}. Retrying in ${RETRY_DELAY_MS / 1000}s...`,
+            `[anthropic] Overloaded on attempt ${attempt}/${MAX_RETRIES} for generateText model=${model}. Retrying in ${RETRY_DELAY_MILLISECONDS / 1000}s...`,
           );
-          await sleep(RETRY_DELAY_MS);
+          await sleep(RETRY_DELAY_MILLISECONDS);
           continue;
         }
         throw new ProviderError(
@@ -724,7 +724,7 @@ const anthropicProvider = {
   async captionImage(
     images: string[],
     prompt: string = "Describe this image.",
-    model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
+    model: string = getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT).anthropic,
     systemPrompt?: string,
   ) {
     logger.provider("Anthropic", `captionImage model=${model}`);
@@ -801,7 +801,7 @@ const anthropicProvider = {
 
   async *generateTextStream(
     messages: ChatMessage[],
-    model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).anthropic,
+    model: string = getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT).anthropic,
     options: ProviderOptions = {},
   ): AsyncGenerator<TransformedStreamEvent> {
     logger.provider("Anthropic", `generateTextStream model=${model}`);
@@ -1153,9 +1153,9 @@ const anthropicProvider = {
         const attempt = options._retryAttempt ?? 1;
         if (attempt < MAX_RETRIES) {
           logger.warn(
-            `[anthropic] Overloaded on attempt ${attempt}/${MAX_RETRIES} for generateTextStream model=${model}. Retrying in ${RETRY_DELAY_MS / 1000}s...`,
+            `[anthropic] Overloaded on attempt ${attempt}/${MAX_RETRIES} for generateTextStream model=${model}. Retrying in ${RETRY_DELAY_MILLISECONDS / 1000}s...`,
           );
-          await sleep(RETRY_DELAY_MS);
+          await sleep(RETRY_DELAY_MILLISECONDS);
           yield* this.generateTextStream(messages, model, {
             ...options,
             _retryAttempt: attempt + 1,

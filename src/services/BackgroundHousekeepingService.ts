@@ -29,7 +29,7 @@ import { getErrorMessage } from "../utils/ErrorHelpers.ts";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** Worktrees older than this are considered orphaned */
-const WORKTREE_MAX_AGE_MS = MILLISECONDS_PER_DAY;
+const WORKTREE_MAX_AGE_MILLISECONDS = MILLISECONDS_PER_DAY;
 
 /** Temp worktree root directory used by OrchestratorService */
 const WORKTREE_ROOT = "/tmp/prism-worktrees";
@@ -38,7 +38,7 @@ const WORKTREE_ROOT = "/tmp/prism-worktrees";
 const REQUEST_LOG_MAX_AGE_DAYS = 90;
 
 /** Stale isGenerating flags left from crashes */
-const STALE_CONVERSATION_CUTOFF_MS = hours(2);
+const STALE_CONVERSATION_CUTOFF_MILLISECONDS = hours(2);
 
 export interface HousekeepingWorktreeResult {
   pruned: string[];
@@ -55,7 +55,7 @@ export interface HousekeepingResult {
   staleConversations?: HousekeepingConversationResult | { error: string };
   requestLogs?: { deleted: number } | { error: string };
   minioOrphans?: { removed: number } | { error: string };
-  durationMs: number;
+  durationMilliseconds: number;
   trigger: string;
 }
 
@@ -79,7 +79,7 @@ async function pruneOrphanedWorktrees(): Promise<HousekeepingWorktreeResult> {
 
   if (entries.length === 0) return { pruned, errors };
 
-  const cutoff = Date.now() - WORKTREE_MAX_AGE_MS;
+  const cutoff = Date.now() - WORKTREE_MAX_AGE_MILLISECONDS;
 
   for (const entry of entries) {
     const entryPath = resolve(WORKTREE_ROOT, entry);
@@ -107,7 +107,7 @@ async function clearStaleConversations(): Promise<HousekeepingConversationResult
   if (!db) return { conversationsCleared: 0, agentConversationsCleared: 0 };
 
   const cutoff = new Date(
-    Date.now() - STALE_CONVERSATION_CUTOFF_MS,
+    Date.now() - STALE_CONVERSATION_CUTOFF_MILLISECONDS,
   ).toISOString();
 
   const [convResult, agentConvResult, staleAwaitingResult] = await Promise.all([
@@ -342,11 +342,11 @@ const BackgroundHousekeepingService = {
       );
     }
 
-    const durationMs = Math.round(performance.now() - startTime);
-    results.durationMs = durationMs;
+    const durationMilliseconds = Math.round(performance.now() - startTime);
+    results.durationMilliseconds = durationMilliseconds;
     results.trigger = trigger;
 
-    logger.success(`[Housekeeping] Complete (${durationMs}ms)`);
+    logger.success(`[Housekeeping] Complete (${durationMilliseconds}ms)`);
     return results as HousekeepingResult;
   },
 };

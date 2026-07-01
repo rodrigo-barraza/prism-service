@@ -4,7 +4,7 @@ import type { Request, Response, NextFunction } from "express";
 import os from "os";
 import MongoWrapper from "../../wrappers/MongoWrapper.ts";
 import { MONGO_DB_NAME } from "../../../config.ts";
-import { COLLECTIONS, SSE_KEEPALIVE_INTERVAL_MS } from "../../constants.ts";
+import { COLLECTIONS, SERVER_SENT_EVENTS_KEEPALIVE_INTERVAL_MILLISECONDS } from "../../constants.ts";
 import ChangeStreamService from "../../services/ChangeStreamService.ts";
 import logger from "../../utils/logger.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
@@ -90,7 +90,7 @@ router.get(
         } catch {
           // ignore
         }
-      }, SSE_KEEPALIVE_INTERVAL_MS);
+      }, SERVER_SENT_EVENTS_KEEPALIVE_INTERVAL_MILLISECONDS);
 
       req.on("close", () => {
         ChangeStreamService.unsubscribe(onEvent);
@@ -103,7 +103,7 @@ router.get(
         } catch {
           // ignore
         }
-      }, SSE_KEEPALIVE_INTERVAL_MS);
+      }, SERVER_SENT_EVENTS_KEEPALIVE_INTERVAL_MILLISECONDS);
 
       req.on("close", () => {
         clearInterval(keepAlive);

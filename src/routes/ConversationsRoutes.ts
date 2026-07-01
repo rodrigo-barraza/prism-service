@@ -10,7 +10,7 @@ import ConversationService, {
   enrichConversationsWithRequestCosts,
   enrichSingleConversationCost,
 } from "../services/ConversationService.ts";
-import { COLLECTIONS, COST_SUM_EXPR, ORCHESTRATOR } from "../constants.ts";
+import { COLLECTIONS, COST_SUMMATION_EXPRESSION, ORCHESTRATOR } from "../constants.ts";
 import logger from "../utils/logger.ts";
 import ConversationTimerService from "../services/ConversationTimerService.ts";
 import AgenticLoopService from "../services/AgenticLoopService.ts";
@@ -263,7 +263,7 @@ router.get(
               {
                 $group: {
                   _id: groupId,
-                  totalCost: COST_SUM_EXPR,
+                  totalCost: COST_SUMMATION_EXPRESSION,
                   requestErrorCount: {
                     $sum: { $cond: [{ $eq: ["$success", false] }, 1, 0] },
                   },
@@ -447,7 +447,7 @@ router.get(
               {
                 $group: {
                   _id: "$conversationId",
-                  totalCost: COST_SUM_EXPR,
+                  totalCost: COST_SUMMATION_EXPRESSION,
                   requestErrorCount: {
                     $sum: { $cond: [{ $eq: ["$success", false] }, 1, 0] },
                   },

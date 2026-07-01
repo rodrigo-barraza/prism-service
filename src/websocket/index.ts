@@ -466,8 +466,8 @@ function handleWebsocketLive(
             disabled: false,
             startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_HIGH,
             endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_LOW,
-            prefixPaddingMs: 500,
-            silenceDurationMs: 1500,
+            prefixPaddingMilliseconds: 500,
+            silenceDurationMilliseconds: 1500,
           },
         },
         // Voice config — explicit voice selection

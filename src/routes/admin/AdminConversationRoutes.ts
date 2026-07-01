@@ -3,7 +3,7 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import type { Document } from "mongodb";
-import { COLLECTIONS, SSE_KEEPALIVE_INTERVAL_MS } from "../../constants.ts";
+import { COLLECTIONS, SERVER_SENT_EVENTS_KEEPALIVE_INTERVAL_MILLISECONDS } from "../../constants.ts";
 import ChangeStreamService from "../../services/ChangeStreamService.ts";
 import BenchmarkService from "../../services/BenchmarkService.ts";
 import ActiveGenerationTracker from "../../services/ActiveGenerationTracker.ts";
@@ -543,7 +543,7 @@ router.get(
         } catch {
           /* ignore */
         }
-      }, SSE_KEEPALIVE_INTERVAL_MS);
+      }, SERVER_SENT_EVENTS_KEEPALIVE_INTERVAL_MILLISECONDS);
 
       req.on("close", () => {
         ChangeStreamService.unsubscribe(onEvent);
@@ -555,7 +555,7 @@ router.get(
       const interval = setInterval(sendStats, 2000);
       const keepAlive = setInterval(() => {
         res.write(": ping\n\n");
-      }, SSE_KEEPALIVE_INTERVAL_MS);
+      }, SERVER_SENT_EVENTS_KEEPALIVE_INTERVAL_MILLISECONDS);
 
       req.on("close", () => {
         clearInterval(interval);

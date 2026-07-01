@@ -197,7 +197,7 @@ router.post(
           loadError = error;
         });
       const startTime = Date.now();
-      const EXPECTED_LOAD_MS = 15_000;
+      const EXPECTED_LOAD_MILLISECONDS = 15_000;
       let lastPercentage = 0;
       while (!loadDone && !aborted) {
         await sleep(300);
@@ -205,7 +205,7 @@ router.post(
         const elapsed = Date.now() - startTime;
         const percentage = Math.min(
           0.95,
-          elapsed / (elapsed + EXPECTED_LOAD_MS),
+          elapsed / (elapsed + EXPECTED_LOAD_MILLISECONDS),
         );
         if (percentage > lastPercentage + 0.005) {
           lastPercentage = percentage;

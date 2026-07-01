@@ -7,7 +7,7 @@ import logger from "../utils/logger.ts";
 import { extractOpenAIRateLimits } from "../utils/rateLimits.ts";
 import { OPENAI_API_KEY, OPENAI_TRANSCRIPTION_MODEL } from "../../config.ts";
 import {
-  TYPES,
+  MODALITY_TYPES,
   MODELS,
   DEFAULT_VOICES,
   getDefaultModels,
@@ -102,7 +102,7 @@ function getClient(): OpenAI {
   return client;
 }
 
-/** OpenAI conversation message (same shape as Google's ConversationMsg) */
+/** OpenAI conversation message (same shape as Google's ConversationMillisecondsg) */
 export interface OpenAIMessage {
   role: string;
   content?: string;
@@ -739,7 +739,7 @@ const openaiProvider = {
 
   async generateText(
     messages: OpenAIMessage[],
-    model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).openai,
+    model: string = getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT).openai,
     options: ProviderOptions = {},
   ) {
     logger.provider("OpenAI", `generateText model=${model}`);
@@ -1094,7 +1094,7 @@ const openaiProvider = {
 
   async *generateTextStream(
     messages: OpenAIMessage[],
-    model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).openai,
+    model: string = getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT).openai,
     options: ProviderOptions = {},
   ) {
     logger.provider("OpenAI", `generateTextStream model=${model}`);
@@ -1655,7 +1655,7 @@ const openaiProvider = {
         instructions?: string;
       } = {
         model:
-          options.model || getDefaultModels(TYPES.TEXT, TYPES.AUDIO).openai,
+          options.model || getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.AUDIO).openai,
         voice: voice as OpenAI.Audio.SpeechCreateParams["voice"],
         input: text,
         response_format:
@@ -1752,7 +1752,7 @@ const openaiProvider = {
   async captionImage(
     images: string[],
     prompt: string = "What's in this image?",
-    model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT).openai,
+    model: string = getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT).openai,
     systemPrompt?: string,
   ) {
     logger.provider("OpenAI", `captionImage model=${model}`);
@@ -1785,7 +1785,7 @@ const openaiProvider = {
 
   async generateEmbedding(
     text: string,
-    model: string = getDefaultModels(TYPES.TEXT, TYPES.EMBEDDING).openai,
+    model: string = getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.EMBEDDING).openai,
   ) {
     logger.provider("OpenAI", `generateEmbedding model=${model}`);
     try {

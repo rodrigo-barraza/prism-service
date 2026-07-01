@@ -149,8 +149,8 @@ function resolveEnergyLabel(level: number): string {
   return "Energized";
 }
 
-const PASSIVE_DRIFT_INTERVAL_MILLISECONDS = SOMATIC.PASSIVE_DRIFT_INTERVAL_MS;
-const PERSIST_INTERVAL_MILLISECONDS = SOMATIC.PERSIST_INTERVAL_MS;
+const PASSIVE_DRIFT_INTERVAL_MILLISECONDS = SOMATIC.PASSIVE_DRIFT_INTERVAL_MILLISECONDS;
+const PERSIST_INTERVAL_MILLISECONDS = SOMATIC.PERSIST_INTERVAL_MILLISECONDS;
 
 const agentStates = new Map<string, AgentSomaticState>();
 
@@ -464,7 +464,7 @@ async function analyzeEmotionFromText(
     usage: result?.usage || null,
     success,
     errorMessage,
-    requestStartMs: requestStart,
+    requestStartMilliseconds: requestStart,
     extraRequestPayload: {
       inputTextLength: text.length,
       textPreview: text.slice(0, LOG_PREVIEW.MEDIUM),

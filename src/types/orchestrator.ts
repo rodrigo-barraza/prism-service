@@ -28,7 +28,7 @@ export interface SubAgentState {
   diff: WorktreeDiff | null;
   error: string | null;
   startedAt: number;
-  durationMs: number;
+  durationMilliseconds: number;
   totalCost: number | null;
   usage: Record<string, number> | null;
   abortController: AbortController | null;
@@ -80,7 +80,7 @@ export interface SubAgentResult {
   toolUses: number;
   toolNames?: Record<string, number>;
   iterations: number;
-  durationMs: number;
+  durationMilliseconds: number;
   messages: ConversationMessage[];
   diff?: {
     additions: number;
@@ -96,7 +96,7 @@ export interface SubtreeMetrics {
   totalDescendants: number;
   maxDepthReached: number;
   aggregatedCost: number;
-  aggregatedDurationMs: number;
+  aggregatedDurationMilliseconds: number;
   aggregatedToolUses: number;
   childResults?: SubAgentChildSummary[];
 }
@@ -106,7 +106,7 @@ export interface SubAgentChildSummary {
   description: string;
   status: string;
   recursionDepth: number;
-  durationMs: number;
+  durationMilliseconds: number;
   toolUses: number;
   cost: number;
   result?: string | null;

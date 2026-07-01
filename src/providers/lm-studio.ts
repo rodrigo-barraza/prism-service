@@ -22,10 +22,10 @@ import logger from "../utils/logger.ts";
 import { resolveArchParams } from "../utils/gguf-arch.ts";
 import {
   TOOLS_SERVICE_URL,
-  LM_STUDIO_EVAL_BATCH_SIZE,
+  LM_STUDIO_EVALUATION_BATCH_SIZE,
   LM_STUDIO_DEFAULT_MAX_CONTEXT,
 } from "../../config.ts";
-import { TYPES, getDefaultModels } from "../config.ts";
+import { MODALITY_TYPES, getDefaultModels } from "../config.ts";
 // Default MCP server URL for ephemeral tool integrations (vault-resolved)
 const DEFAULT_MCP_SERVER_URL = TOOLS_SERVICE_URL;
 import {
@@ -416,7 +416,7 @@ export function createLmStudioProvider(
     name: instanceId,
     async generateText(
       messages: ChatMessage[],
-      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)[
+      model: string = getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[
         PROVIDERS.LM_STUDIO
       ],
       options: ProviderOptions = {},
@@ -436,7 +436,7 @@ export function createLmStudioProvider(
 
         // Ensure the model is loaded with appropriate batch and context size
         const loadOpts: ProviderOptions = {
-          eval_batch_size: options.evalBatchSize || LM_STUDIO_EVAL_BATCH_SIZE,
+          eval_batch_size: options.evalBatchSize || LM_STUDIO_EVALUATION_BATCH_SIZE,
         };
         if (options.minContextLength) {
           loadOpts.context_length = options.minContextLength;
@@ -523,7 +523,7 @@ export function createLmStudioProvider(
     // ── Streaming Text Generation (SSE) ──────────────────────
     async *generateTextStream(
       messages: ChatMessage[],
-      model: string = getDefaultModels(TYPES.TEXT, TYPES.TEXT)[
+      model: string = getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[
         PROVIDERS.LM_STUDIO
       ],
       options: ProviderOptions = {},
@@ -700,7 +700,7 @@ export function createLmStudioProvider(
               };
               const loadOpts: ProviderOptions = {
                 eval_batch_size:
-                  options.evalBatchSize || LM_STUDIO_EVAL_BATCH_SIZE,
+                  options.evalBatchSize || LM_STUDIO_EVALUATION_BATCH_SIZE,
               };
               if (options.minContextLength) {
                 const maxContextLength =
@@ -740,7 +740,7 @@ export function createLmStudioProvider(
                 });
 
               const startTime = Date.now();
-              const EXPECTED_LOAD_MS = 15000;
+              const EXPECTED_LOAD_MILLISECONDS = 15000;
               let lastPercentage = 0;
               while (!loadDone) {
                 await sleep(500);
@@ -759,7 +759,7 @@ export function createLmStudioProvider(
                 const elapsed = Date.now() - startTime;
                 const percentage = Math.min(
                   95,
-                  Math.round((elapsed / (elapsed + EXPECTED_LOAD_MS)) * 100),
+                  Math.round((elapsed / (elapsed + EXPECTED_LOAD_MILLISECONDS)) * 100),
                 );
                 if (percentage > lastPercentage) {
                   lastPercentage = percentage;
@@ -786,12 +786,12 @@ export function createLmStudioProvider(
               if (loadError && loadOpts.context_length) {
                 const requestedContextLength = loadOpts.context_length;
                 const requestedBatchSize =
-                  loadOpts.eval_batch_size || LM_STUDIO_EVAL_BATCH_SIZE;
+                  loadOpts.eval_batch_size || LM_STUDIO_EVALUATION_BATCH_SIZE;
                 const rawTiers = [
                   { contextLength: requestedContextLength, batchSize: 512 },
                   {
                     contextLength: 65_000,
-                    batchSize: LM_STUDIO_EVAL_BATCH_SIZE,
+                    batchSize: LM_STUDIO_EVALUATION_BATCH_SIZE,
                   },
                   { contextLength: 65_000, batchSize: 512 },
                 ];
@@ -1359,7 +1359,7 @@ export function createLmStudioProvider(
     async captionImage(
       images: string[],
       prompt: string = "Describe this image.",
-      model: string = getDefaultModels(TYPES.IMAGE, TYPES.TEXT)[
+      model: string = getDefaultModels(MODALITY_TYPES.IMAGE, MODALITY_TYPES.TEXT)[
         PROVIDERS.LM_STUDIO
       ],
       systemPrompt?: string,

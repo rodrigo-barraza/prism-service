@@ -19,7 +19,7 @@ import {
   calculateTextCost,
   getTotalInputTokens,
 } from "../utils/CostCalculator.ts";
-import { TYPES, getPricing } from "../config.ts";
+import { MODALITY_TYPES, getPricing } from "../config.ts";
 
 // ── Extracted sub-modules ───────────────────────────────────
 import {
@@ -267,7 +267,7 @@ async function processBatch(
     usage: realUsage,
     success: llmSuccess,
     errorMessage: llmError,
-    requestStartMs: llmStart,
+    requestStartMilliseconds: llmStart,
     extraRequestPayload: {
       trigger,
       batchIndex,
@@ -280,7 +280,7 @@ async function processBatch(
   // Broadcast incremental usage with cost
   if (typeof broadcast === "function" && llmSuccess) {
     try {
-      const consolidatePricing = getPricing(TYPES.TEXT, TYPES.TEXT)[
+      const consolidatePricing = getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[
         consolidationModel
       ];
       const consolidateCost = consolidatePricing
@@ -594,8 +594,8 @@ const MemoryConsolidationService = {
     );
     await resetRunCount(project || guildId || "global");
     const summary = `Merged ${results.merged}, deleted ${results.deleted} (${batches.length} batches)`;
-    const durationMs = Math.round(performance.now() - startTime);
-    logger.info(`[MemoryConsolidation] Complete: ${summary} (${durationMs}ms)`);
+    const durationMilliseconds = Math.round(performance.now() - startTime);
+    logger.info(`[MemoryConsolidation] Complete: ${summary} (${durationMilliseconds}ms)`);
 
     // Record history for audit trail
     await recordHistory(
@@ -604,7 +604,7 @@ const MemoryConsolidationService = {
       allMemories.length,
       allActions,
       summary,
-      durationMs,
+      durationMilliseconds,
     );
     const consolidationResult = {
       ...results,
@@ -613,7 +613,7 @@ const MemoryConsolidationService = {
       summary,
       total: allMemories.length,
       trigger,
-      durationMs,
+      durationMilliseconds,
     };
     // Broadcast to connected clients if callback provided
     if (typeof broadcast === "function") {
