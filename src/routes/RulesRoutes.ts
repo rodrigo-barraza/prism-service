@@ -20,8 +20,8 @@ interface RuleDocument {
   description: string;
   content: string;
   enabled: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
@@ -80,8 +80,8 @@ router.post(
         description: validated.description,
         content: validated.content,
         enabled: validated.enabled,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
 
       const result = await db
@@ -116,7 +116,7 @@ router.put(
         }),
         ...(validated.content !== undefined && { content: validated.content }),
         ...(validated.enabled !== undefined && { enabled: validated.enabled }),
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
       };
 
       const result = await db

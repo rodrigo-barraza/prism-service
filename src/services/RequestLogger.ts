@@ -235,7 +235,7 @@ const RequestLogger = {
       }
       const document = {
         requestId,
-        timestamp: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
         endpoint,
         operation: operation || null,
         project,
@@ -610,7 +610,7 @@ const RequestLogger = {
       }
       const pendingDocument = {
         requestId,
-        timestamp: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
         endpoint: endpoint || null,
         operation: operation || null,
         project: project || null,

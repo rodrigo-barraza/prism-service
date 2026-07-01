@@ -32,7 +32,7 @@ describe("QueryBuilders", () => {
       applyDateRangeFilter(matchFilter, "2026-01-01", "2026-01-31");
       expect(matchFilter).toEqual({
         status: "active",
-        timestamp: { $gte: "2026-01-01", $lte: "2026-01-31" }
+        createdAt: { $gte: "2026-01-01", $lte: "2026-01-31" }
       });
     });
 

@@ -603,7 +603,9 @@ export function expandToolCallsForPersistence(
           toolCalls: cleanedToolCalls,
         });
 
-        // Push separate tool-role messages for each result
+        // Push separate tool-role messages for each result,
+        // inheriting requestId from the parent assistant message.
+        const parentRequestId = message.requestId;
         for (const toolCall of message.toolCalls) {
           const toolCallWithResult = toolCall as ToolCallPayload & {
             result?: unknown;
@@ -622,6 +624,7 @@ export function expandToolCallsForPersistence(
             ...(toolCallWithResult.durationMs !== undefined && {
               durationMs: toolCallWithResult.durationMs,
             }),
+            ...(parentRequestId && { requestId: parentRequestId }),
           });
         }
       } else {
@@ -631,15 +634,11 @@ export function expandToolCallsForPersistence(
     } else if (
       message.role === "assistant" &&
       !message.content?.toString().trim() &&
-      (!message.toolCalls || message.toolCalls.length === 0) &&
-      !message.usage &&
-      !message.model
+      (!message.toolCalls || message.toolCalls.length === 0)
     ) {
-      // Strip empty assistant stubs — no content, no tool calls, AND no
-      // metadata (usage/model/provider). The final metadata-bearing
-      // assistant message from assembleMessagesToAppend may have empty
-      // content but carries telemetry (usage, cost, timing) that must
-      // be preserved.
+      // Strip empty assistant stubs — no content and no tool calls.
+      // These are artifacts from intermediate loop iterations that
+      // produced no output.
       continue;
     } else {
       expanded.push(message);
@@ -707,8 +706,8 @@ export function assembleMessagesToAppend(options: {
   images?: string[];
   audioReference?: string | null;
   toolCalls?: ToolCallPayload[];
-  resolvedModel: string;
-  providerName: string;
+  resolvedModel?: string;
+  providerName?: string;
   usage?: TokenUsage | null;
   totalSeconds?: number | null;
   tokensPerSecond?: number | null;
@@ -723,6 +722,7 @@ export function assembleMessagesToAppend(options: {
   thinkingBudget?: number;
   userMessage?: MessagePayload | null;
   conversationMeta?: Record<string, unknown> | null;
+  requestId?: string;
 }): MessagePayload[] {
   const {
     overrideMessagesToAppend,
@@ -732,22 +732,12 @@ export function assembleMessagesToAppend(options: {
     images = [],
     audioReference,
     toolCalls = [],
-    resolvedModel,
-    providerName,
-    usage,
-    totalSeconds,
-    tokensPerSecond,
-    estimatedCost,
     contentSegments,
     textFragments,
     thinkingFragments,
-    temperature,
-    maxTokens,
-    thinkingEnabled,
-    reasoningEffort,
-    thinkingBudget,
     userMessage,
     conversationMeta,
+    requestId,
   } = options;
 
   let messagesToAppend: MessagePayload[] = [];
@@ -772,30 +762,13 @@ export function assembleMessagesToAppend(options: {
         }
       }
     }
-    const finalMetadata: Record<string, unknown> = {
-      model: resolvedModel,
-      provider: providerName,
-      timestamp: new Date().toISOString(),
-      usage: usage || null,
-      totalTime:
-        totalSeconds != null ? roundMilliseconds(totalSeconds as number) : null,
-      tokensPerSec: tokensPerSecond,
-      estimatedCost,
-      generationSettings: {
-        temperature,
-        maxTokens,
-        thinkingEnabled: thinkingEnabled || false,
-        ...(reasoningEffort ? { reasoningEffort } : {}),
-        ...(thinkingBudget ? { thinkingBudget } : {}),
-      },
-    };
 
     const hasFinalContent = text?.trim();
 
     if (hasFinalContent || !hasIntermediateToolMessages) {
       // The final iteration produced text — push it as a proper message
-      // with content and metadata. Also used for non-agentic single-shot
-      // tool calls where there are no intermediate iterations.
+      // with content only (no telemetry). Also used for non-agentic
+      // single-shot tool calls where there are no intermediate iterations.
       messagesToAppend.push({
         role: "assistant",
         content: text,
@@ -814,12 +787,13 @@ export function assembleMessagesToAppend(options: {
         ...(!hasIntermediateToolMessages && thinkingFragments?.length
           ? { thinkingFragments }
           : {}),
-        ...finalMetadata,
+        timestamp: new Date().toISOString(),
+        ...(requestId && { requestId }),
       } as MessagePayload);
     } else {
       // The final iteration produced no text — all response content was
-      // delivered during intermediate tool-calling iterations. Merge the
-      // telemetry metadata into the last assistant message instead of
+      // delivered during intermediate tool-calling iterations. Merge any
+      // remaining media fields into the last assistant message instead of
       // creating a separate empty stub that would produce consecutive
       // assistant messages in the database.
       let lastAssistantIndex = -1;
@@ -834,7 +808,6 @@ export function assembleMessagesToAppend(options: {
         }
       }
       if (lastAssistantIndex !== -1) {
-        Object.assign(messagesToAppend[lastAssistantIndex], finalMetadata);
         if (finalThinking) {
           messagesToAppend[lastAssistantIndex].thinking = finalThinking;
         }
@@ -866,20 +839,8 @@ export function assembleMessagesToAppend(options: {
       ...(images.length > 0 && { images }),
       ...(audioReference && { audio: audioReference }),
       ...(toolCalls.length > 0 && { toolCalls }),
-      model: resolvedModel,
-      provider: providerName,
       timestamp: new Date().toISOString(),
-      usage: usage || null,
-      totalTime: totalSeconds != null ? roundMilliseconds(totalSeconds) : null,
-      tokensPerSec: tokensPerSecond,
-      estimatedCost,
-      generationSettings: {
-        temperature,
-        maxTokens,
-        thinkingEnabled: thinkingEnabled || false,
-        ...(reasoningEffort ? { reasoningEffort } : {}),
-        ...(thinkingBudget ? { thinkingBudget } : {}),
-      },
+      ...(requestId && { requestId }),
     } as MessagePayload);
   }
 

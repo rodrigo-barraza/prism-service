@@ -44,7 +44,7 @@ conversationStatsRouter.get(
           provider: 1,
           model: 1,
           operation: 1,
-          timestamp: 1,
+          createdAt: 1,
           modalities: 1,
           toolApiNames: 1,
           success: 1,
@@ -100,15 +100,15 @@ conversationStatsRouter.get(
 
       const createdAt = (requests as Record<string, unknown>[]).reduce(
         (min: string | null, requestItem) =>
-          !min || (requestItem.timestamp as string) < min
-            ? (requestItem.timestamp as string)
+          !min || (requestItem.createdAt as string) < min
+            ? (requestItem.createdAt as string)
             : min,
         null as string | null,
       );
       const updatedAt = (requests as Record<string, unknown>[]).reduce(
         (max: string | null, requestItem) =>
-          !max || (requestItem.timestamp as string) > max
-            ? (requestItem.timestamp as string)
+          !max || (requestItem.createdAt as string) > max
+            ? (requestItem.createdAt as string)
             : max,
         null as string | null,
       );
@@ -170,7 +170,7 @@ conversationStatsRouter.get(
         })
         .project({
           requestId: 1,
-          timestamp: 1,
+          createdAt: 1,
           provider: 1,
           model: 1,
           operation: 1,
@@ -195,7 +195,7 @@ conversationStatsRouter.get(
           agent: 1,
           username: 1,
         })
-        .sort({ timestamp: 1 })
+        .sort({ createdAt: 1 })
         .toArray();
 
       res.json({

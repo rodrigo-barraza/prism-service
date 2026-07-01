@@ -102,8 +102,8 @@ router.get(
           _id: "$traceId",
           project: { $first: "$project" },
           username: { $first: "$username" },
-          createdAt: { $min: "$timestamp" },
-          updatedAt: { $max: "$timestamp" },
+          createdAt: { $min: "$createdAt" },
+          updatedAt: { $max: "$createdAt" },
           requestCount: { $sum: 1 },
           totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
           totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
@@ -305,15 +305,15 @@ router.get(
         ),
         createdAt: (requests as Record<string, unknown>[]).reduce(
           (min: string | null, r) =>
-            !min || (r.timestamp as string) < min
-              ? (r.timestamp as string)
+            !min || (r.createdAt as string) < min
+              ? (r.createdAt as string)
               : min,
           null as string | null,
         ),
         updatedAt: (requests as Record<string, unknown>[]).reduce(
           (max: string | null, r) =>
-            !max || (r.timestamp as string) > max
-              ? (r.timestamp as string)
+            !max || (r.createdAt as string) > max
+              ? (r.createdAt as string)
               : max,
           null as string | null,
         ),

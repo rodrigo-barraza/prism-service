@@ -59,8 +59,8 @@ router.get(
             totalCost: COST_SUM_EXPR,
             avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
             avgTokensPerSec: AVG_TOKENS_PER_SEC_EXPR,
-            firstUsed: { $min: "$timestamp" },
-            lastUsed: { $max: "$timestamp" },
+            firstUsed: { $min: "$createdAt" },
+            lastUsed: { $max: "$createdAt" },
             successCount: {
               $sum: { $cond: [{ $eq: ["$success", true] }, 1, 0] },
             },

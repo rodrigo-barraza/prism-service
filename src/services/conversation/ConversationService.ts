@@ -329,7 +329,7 @@ const ConversationService: ConversationServiceInterface = {
         provider: 1,
         model: 1,
         operation: 1,
-        timestamp: 1,
+        createdAt: 1,
         modalities: 1,
         toolApiNames: 1,
         success: 1,
@@ -389,12 +389,12 @@ const ConversationService: ConversationServiceInterface = {
 
     const createdAt = (requests as Record<string, unknown>[]).reduce(
       (min: string | null, r) =>
-        !min || (r.timestamp as string) < min ? (r.timestamp as string) : min,
+        !min || (r.createdAt as string) < min ? (r.createdAt as string) : min,
       null as string | null,
     );
     const updatedAt = (requests as Record<string, unknown>[]).reduce(
       (max: string | null, r) =>
-        !max || (r.timestamp as string) > max ? (r.timestamp as string) : max,
+        !max || (r.createdAt as string) > max ? (r.createdAt as string) : max,
       null as string | null,
     );
 

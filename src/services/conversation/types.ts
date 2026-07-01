@@ -61,6 +61,8 @@ export interface MessagePayload {
   tool_call_id?: string | null;
   /** For role="tool" messages — the name of the tool that produced this result. */
   name?: string;
+  /** Foreign key linking this message to the `requests` collection for telemetry data. */
+  requestId?: string;
   isCompactSummary?: boolean;
   _isInjectedContext?: boolean;
   _isPlanningInjection?: boolean;

@@ -203,7 +203,7 @@ describe("GET /admin/stats/tools", () => {
         model: "gpt-4o",
         agent: "CODING",
         provider: PROVIDERS.OPENAI,
-        timestamp: "2026-05-30T10:00:00Z",
+        createdAt: "2026-05-30T10:00:00Z",
       },
       {
         requestId: "request-2",
@@ -216,7 +216,7 @@ describe("GET /admin/stats/tools", () => {
         model: "gpt-4o",
         agent: "CODING",
         provider: PROVIDERS.OPENAI,
-        timestamp: "2026-05-30T10:05:00Z",
+        createdAt: "2026-05-30T10:05:00Z",
       },
     ];
 
@@ -282,7 +282,7 @@ describe("GET /admin/stats/tools", () => {
           estimatedCost: 0.01,
           totalTime: 5,
           success: true,
-          timestamp: "2026-05-30T10:00:00Z"
+          createdAt: "2026-05-30T10:00:00Z"
         },
         {
           requestId: "req-2",
@@ -296,7 +296,7 @@ describe("GET /admin/stats/tools", () => {
           estimatedCost: 0.02,
           totalTime: 10,
           success: true,
-          timestamp: "2026-05-30T10:05:00Z"
+          createdAt: "2026-05-30T10:05:00Z"
         }
       ];
 

@@ -87,7 +87,7 @@ export interface WorkflowStep {
   outputType?: string;
   outputImageRef?: string;
   duration?: number;
-  timestamp?: string;
+  createdAt?: string;
   index?: number;
 }
 

@@ -236,10 +236,10 @@ setupWebSocket(wss);
         // requests — used by $lookup from conversations and agent conversation joins
         { collection: COLLECTIONS.REQUESTS, keys: { conversationId: 1 } },
         { collection: COLLECTIONS.REQUESTS, keys: { traceId: 1 } },
-        { collection: COLLECTIONS.REQUESTS, keys: { timestamp: -1 } },
+        { collection: COLLECTIONS.REQUESTS, keys: { createdAt: -1 } },
         {
           collection: COLLECTIONS.REQUESTS,
-          keys: { project: 1, timestamp: -1 },
+          keys: { project: 1, createdAt: -1 },
         },
         // requests — agent conversation joins (admin traces, conversation detail)
         { collection: COLLECTIONS.REQUESTS, keys: { agentConversationId: 1 } },
@@ -251,7 +251,7 @@ setupWebSocket(wss);
         // requests — per-user stats aggregation
         {
           collection: COLLECTIONS.REQUESTS,
-          keys: { username: 1, timestamp: -1 },
+          keys: { username: 1, createdAt: -1 },
         },
         // requests — tool stats aggregation (multikey on array field)
         { collection: COLLECTIONS.REQUESTS, keys: { toolApiNames: 1 } },
@@ -262,7 +262,7 @@ setupWebSocket(wss);
         // requests — success/failure filtering with time range
         {
           collection: COLLECTIONS.REQUESTS,
-          keys: { success: 1, timestamp: -1 },
+          keys: { success: 1, createdAt: -1 },
         },
         // conversations — used by findOne lookups and list queries
         {
@@ -549,7 +549,7 @@ setupWebSocket(wss);
                 { project: codingProject, username: "admin", name },
                 {
                   $setOnInsert: {
-                    createdAt: new Date(),
+                    createdAt: new Date().toISOString(),
                   },
                   $set: {
                     displayName: displayName || name,
@@ -560,7 +560,7 @@ setupWebSocket(wss);
                     env: env || {},
                     headers: headers || {},
                     enabled: enabled !== false,
-                    updatedAt: new Date(),
+                    updatedAt: new Date().toISOString(),
                   },
                 },
                 { upsert: true },
