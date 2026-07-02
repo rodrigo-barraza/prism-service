@@ -11,6 +11,7 @@
  * that enforces the same constraint MongoDB does.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { TEST_PROJECT, TEST_USER, TEST_CONVERSATION_ID } from "./setup.ts";
 import { COLLECTIONS, PROVIDERS } from "../src/constants.ts";
 import { TOOL_NAMES } from "../src/services/ToolTaxonomyConstants.ts";
 import {
@@ -46,162 +47,14 @@ vi.mock("../src/services/FileService.ts", () => ({
 // ── Mock ConversationDiscovery ────────────────────────────────
 vi.mock("../src/utils/ConversationDiscovery.ts", () => ({
   discoverDescendantConversationIds: vi.fn().mockImplementation(async (db, id) => {
+    if (id === TEST_CONVERSATION_ID) {
+      return new Set([TEST_CONVERSATION_ID, "sub-agent-session-abc"]);
+    }
     return new Set([id]);
   }),
 }));
 
-// ── In-memory collection mock ──────────────────────────────────
-// Enforces MongoDB's $set/$setOnInsert disjoint-path constraint.
-function evaluateMongoExpression(existingDocument: any, expression: any): any {
-  if (expression && typeof expression === "object" && !Array.isArray(expression)) {
-    if ("$gt" in expression) {
-      const argumentsList = expression.$gt;
-      if (Array.isArray(argumentsList) && argumentsList.length === 2) {
-        const leftOperand = evaluateMongoExpression(existingDocument, argumentsList[0]);
-        const rightOperand = evaluateMongoExpression(existingDocument, argumentsList[1]);
-        return leftOperand > rightOperand;
-      }
-    }
-    if ("$ifNull" in expression) {
-      const argumentsList = expression.$ifNull;
-      if (Array.isArray(argumentsList) && argumentsList.length === 2) {
-        const leftOperand = evaluateMongoExpression(existingDocument, argumentsList[0]);
-        const rightOperand = evaluateMongoExpression(existingDocument, argumentsList[1]);
-        return leftOperand !== undefined && leftOperand !== null ? leftOperand : rightOperand;
-      }
-    }
-    if ("$or" in expression) {
-      const argumentsList = expression.$or;
-      if (Array.isArray(argumentsList)) {
-        return argumentsList.some(argument => evaluateMongoExpression(existingDocument, argument));
-      }
-    }
-    if ("$and" in expression) {
-      const argumentsList = expression.$and;
-      if (Array.isArray(argumentsList)) {
-        return argumentsList.every(argument => evaluateMongoExpression(existingDocument, argument));
-      }
-    }
-    if ("$eq" in expression) {
-      const argumentsList = expression.$eq;
-      if (Array.isArray(argumentsList) && argumentsList.length === 2) {
-        const leftOperand = evaluateMongoExpression(existingDocument, argumentsList[0]);
-        const rightOperand = evaluateMongoExpression(existingDocument, argumentsList[1]);
-        return leftOperand === rightOperand;
-      }
-    }
-    if ("$max" in expression) {
-      const argumentsList = expression.$max;
-      if (Array.isArray(argumentsList)) {
-        const valuesList = argumentsList.map(argument => evaluateMongoExpression(existingDocument, argument));
-        return Math.max(...valuesList);
-      }
-    }
-    if ("$add" in expression) {
-      const argumentsList = expression.$add;
-      if (Array.isArray(argumentsList)) {
-        const valuesList = argumentsList.map(argument => evaluateMongoExpression(existingDocument, argument));
-        return valuesList.reduce((accumulatedSum, currentValue) => accumulatedSum + currentValue, 0);
-      }
-    }
-    return expression;
-  }
-  if (typeof expression === "string" && expression.startsWith("$")) {
-    const fieldName = expression.slice(1);
-    return existingDocument[fieldName];
-  }
-  return expression;
-}
-
-function createMockCollection() {
-  const documents = new Map();
-
-  return {
-    _docs: documents,
-
-    async updateOne(filter: any, update: any, options: any = {}) {
-      // Find or create document
-      const key = JSON.stringify(filter);
-      let existingDocument = documents.get(key);
-      const isInsert = !existingDocument;
-
-      if (Array.isArray(update)) {
-        if (isInsert && options.upsert) {
-          existingDocument = { ...filter };
-          documents.set(key, existingDocument);
-        } else if (isInsert && !options.upsert) {
-          return { matchedCount: 0, modifiedCount: 0, upsertedCount: 0 };
-        }
-
-        // Apply aggregation pipeline stages
-        for (const stage of update) {
-          if (stage.$set) {
-            for (const [field, value] of Object.entries(stage.$set)) {
-              existingDocument[field] = evaluateMongoExpression(existingDocument, value);
-            }
-          }
-        }
-
-        return {
-          matchedCount: isInsert ? 0 : 1,
-          modifiedCount: isInsert ? 0 : 1,
-          upsertedCount: isInsert ? 1 : 0,
-        };
-      }
-
-      const $set = update.$set || {};
-      const $setOnInsert = update.$setOnInsert || {};
-      const $push = update.$push || {};
-
-      // ─── Enforce MongoDB's disjoint-path constraint ───────
-      // This is the exact check MongoDB performs — same field
-      // in both $set and $setOnInsert is a server error.
-      const setKeys = new Set(Object.keys($set));
-      const insertKeys = Object.keys($setOnInsert);
-      const conflicts = insertKeys.filter((k) => setKeys.has(k));
-      if (conflicts.length > 0) {
-        const error = new Error(
-          `Updating the path '${conflicts[0]}' would create a conflict at '${conflicts[0]}'`,
-        ) as any;
-        error.name = "MongoServerError";
-        error.code = 40;
-        throw error;
-      }
-
-      if (isInsert && options.upsert) {
-        existingDocument = { ...filter, ...$setOnInsert };
-        documents.set(key, existingDocument);
-      } else if (isInsert && !options.upsert) {
-        return { matchedCount: 0, modifiedCount: 0, upsertedCount: 0 };
-      }
-
-      // Apply $set
-      Object.assign(existingDocument, $set);
-
-      // Apply $push
-      for (const [field, value] of Object.entries($push)) {
-        if (!existingDocument[field]) existingDocument[field] = [];
-        const val = value as any;
-        if (val.$each) {
-          existingDocument[field].push(...val.$each);
-        } else {
-          existingDocument[field].push(val);
-        }
-      }
-
-      return {
-        matchedCount: isInsert ? 0 : 1,
-        modifiedCount: isInsert ? 0 : 1,
-        upsertedCount: isInsert ? 1 : 0,
-      };
-    },
-
-    async findOne(filter: any) {
-      const key = JSON.stringify(filter);
-      return documents.get(key) || null;
-    },
-  };
-}
+import { createMockCollection } from "./mongoMock.ts";
 
 let mockCollection: any;
 
@@ -218,17 +71,21 @@ vi.mock("../src/wrappers/MongoWrapper.ts", () => {
 });
 
 // Import AFTER mocks are wired
+vi.unmock("../src/services/ConversationService.ts");
+vi.unmock("../src/services/ConversationService.js");
+vi.unmock("../src/services/conversation/index.ts");
+vi.unmock("../src/services/conversation/ConversationService.ts");
 const MongoWrapperModule = await import("../src/wrappers/MongoWrapper.ts");
 const MongoWrapper = MongoWrapperModule.default;
 const { default: ConversationService } = await import(
-  "../src/services/ConversationService.js"
+  "../src/services/conversation/ConversationService.ts"
 );
 
 // ── Helpers ────────────────────────────────────────────────────
 const BASE_ARGS = {
-  conversationId: "test-session-123",
-  project: "coding",
-  username: "testuser",
+  conversationId: TEST_CONVERSATION_ID,
+  project: TEST_PROJECT,
+  username: TEST_USER,
 };
 
 function makeMessages(count = 1) {
@@ -534,8 +391,8 @@ describe("ConversationService.appendMessages", () => {
     async function createActiveTimer(sessionId: any) {
       const filter = {
         conversationId: sessionId,
-        project: "coding",
-        username: "testuser",
+        project: TEST_PROJECT,
+        username: TEST_USER,
         status: "active",
         mode: "one_shot",
       };
@@ -559,8 +416,8 @@ describe("ConversationService.appendMessages", () => {
 
       await ConversationService.appendMessages(
         sessionId,
-        "coding",
-        "testuser",
+        TEST_PROJECT,
+        TEST_USER,
         [{ role: "user", content: "Check status please" }],
         null,
         { collection: COLLECTIONS.AGENT_CONVERSATIONS }
@@ -577,8 +434,8 @@ describe("ConversationService.appendMessages", () => {
 
       await ConversationService.appendMessages(
         sessionId,
-        "coding",
-        "testuser",
+        TEST_PROJECT,
+        TEST_USER,
         [{ role: "assistant", content: "I've set a timer for 1 minute. Stay hydrated! 💧", model: "gemini-3.5-flash", provider: PROVIDERS.GOOGLE }],
         null,
         { collection: COLLECTIONS.AGENT_CONVERSATIONS }
@@ -595,8 +452,8 @@ describe("ConversationService.appendMessages", () => {
 
       await ConversationService.appendMessages(
         sessionId,
-        "coding",
-        "testuser",
+        TEST_PROJECT,
+        TEST_USER,
         [{ role: "user", content: "🔔 Notification: check build status" }],
         null,
         { collection: COLLECTIONS.AGENT_CONVERSATIONS }
@@ -613,8 +470,8 @@ describe("ConversationService.appendMessages", () => {
 
       await ConversationService.appendMessages(
         sessionId,
-        "coding",
-        "testuser",
+        TEST_PROJECT,
+        TEST_USER,
         [
           { role: "user", content: "What's the status?" },
           { role: "assistant", content: "Let me check.", model: "gemini-3.5-flash", provider: PROVIDERS.GOOGLE },
@@ -643,16 +500,16 @@ describe("ConversationService.setGenerating", () => {
   it("should create stub document when setting generating=true", async () => {
     await ConversationService.setGenerating(
       "gen-test",
-      "coding",
-      "testuser",
+      TEST_PROJECT,
+      TEST_USER,
       true,
       { collection: COLLECTIONS.AGENT_CONVERSATIONS },
     );
 
     const doc = await mockCollection.findOne({
       id: "gen-test",
-      project: "coding",
-      username: "testuser",
+      project: TEST_PROJECT,
+      username: TEST_USER,
     });
 
     expect(doc).not.toBeNull();
@@ -664,16 +521,16 @@ describe("ConversationService.setGenerating", () => {
   it("should create stub document when setting generating=true with a custom title", async () => {
     await ConversationService.setGenerating(
       "gen-test-title",
-      "coding",
-      "testuser",
+      TEST_PROJECT,
+      TEST_USER,
       true,
       { collection: COLLECTIONS.AGENT_CONVERSATIONS, title: "Custom Title" },
     );
 
     const doc = await mockCollection.findOne({
       id: "gen-test-title",
-      project: "coding",
-      username: "testuser",
+      project: TEST_PROJECT,
+      username: TEST_USER,
     });
 
     expect(doc).not.toBeNull();
@@ -684,7 +541,7 @@ describe("ConversationService.setGenerating", () => {
   it("should clear generating flag on existing document", async () => {
     // Pre-create
     await mockCollection.updateOne(
-      { id: "gen-test", project: "coding", username: "testuser" },
+      { id: "gen-test", project: TEST_PROJECT, username: TEST_USER },
       {
         $set: { isGenerating: true },
         $setOnInsert: { title: "Test", messages: [], createdAt: new Date().toISOString() },
@@ -694,16 +551,16 @@ describe("ConversationService.setGenerating", () => {
 
     await ConversationService.setGenerating(
       "gen-test",
-      "coding",
-      "testuser",
+      TEST_PROJECT,
+      TEST_USER,
       false,
       { collection: COLLECTIONS.AGENT_CONVERSATIONS },
     );
 
     const doc = await mockCollection.findOne({
       id: "gen-test",
-      project: "coding",
-      username: "testuser",
+      project: TEST_PROJECT,
+      username: TEST_USER,
     });
 
     expect(doc.isGenerating).toBe(false);
@@ -732,7 +589,7 @@ describe("ConversationService.getConversationStats", () => {
               modalities: { textIn: true, textOut: true },
               toolApiNames: ["read_file"],
               success: true,
-              agentConversationId: "test-session-123",
+              agentConversationId: TEST_CONVERSATION_ID,
             },
             {
               estimatedCost: 0.002,
@@ -748,7 +605,8 @@ describe("ConversationService.getConversationStats", () => {
               modalities: { textIn: true, textOut: true, imageIn: true },
               toolApiNames: [],
               success: false,
-              agentConversationId: "sub-agent-conversation",
+              conversationId: "sub-agent-conv-id",
+              agentConversationId: "sub-agent-session-abc",
             }
           ])
         })
@@ -767,9 +625,9 @@ describe("ConversationService.getConversationStats", () => {
 
   it("should return aggregated stats correctly for main and sub-agents", async () => {
     const statsResult = await ConversationService.getConversationStats(
-      "test-session-123",
-      "coding",
-      "testuser"
+      TEST_CONVERSATION_ID,
+      TEST_PROJECT,
+      TEST_USER
     );
 
     expect(statsResult).not.toBeNull();
@@ -801,9 +659,9 @@ describe("ConversationService.getConversationStats", () => {
   it("should return null if no request log records exist", async () => {
     mockRequestsCollection.find().project().toArray.mockResolvedValueOnce([]);
     const statsResult = await ConversationService.getConversationStats(
-      "test-session-123",
-      "coding",
-      "testuser"
+      TEST_CONVERSATION_ID,
+      TEST_PROJECT,
+      TEST_USER
     );
     expect(statsResult).toBeNull();
   });
@@ -820,7 +678,7 @@ describe("Conversation Utilities (utils.ts)", () => {
       const messagesInput = [
         { role: "user", content: "hello", images: ["data:image/jpeg;base64,abc"] }
       ];
-      const processedMessages = await extractFiles(messagesInput, "coding", "testuser");
+      const processedMessages = await extractFiles(messagesInput, TEST_PROJECT, TEST_USER);
       expect(processedMessages).toEqual(messagesInput);
     });
 
@@ -843,7 +701,7 @@ describe("Conversation Utilities (utils.ts)", () => {
         }
       ];
 
-      const processedMessages = await extractFiles(messagesInput, "coding", "testuser");
+      const processedMessages = await extractFiles(messagesInput, TEST_PROJECT, TEST_USER);
       expect(processedMessages[0].images).toEqual([
         "minio://test/ref",
         "minio://existing/image.jpg",
@@ -860,7 +718,7 @@ describe("Conversation Utilities (utils.ts)", () => {
         { role: "user", content: "hello", images: ["data:image/jpeg;base64,abc"] }
       ];
 
-      const processedMessages = await extractFiles(messagesInput, "coding", "testuser");
+      const processedMessages = await extractFiles(messagesInput, TEST_PROJECT, TEST_USER);
       expect(processedMessages[0].images).toEqual(["data:image/jpeg;base64,abc"]);
     });
   });

@@ -45,7 +45,7 @@ vi.mock('@modelcontextprotocol/sdk/client/sse.js', () => {
   };
 });
 
-import MCPClientService from '../src/services/MCPClientService.ts';
+import MCPClientService, { type MCPServerConfig } from '../src/services/MCPClientService.ts';
 import { TYPES } from "../src/constants.ts";
 
 describe('MCPClientService Unit Tests', () => {
@@ -65,7 +65,7 @@ describe('MCPClientService Unit Tests', () => {
 
   describe('Connection Lifecycle', () => {
     it('should connect to stdio transport and list tools', async () => {
-      const config: any = {
+      const config: MCPServerConfig = {
         name: 'test-stdio',
         transport: 'stdio',
         command: 'node',
@@ -89,7 +89,7 @@ describe('MCPClientService Unit Tests', () => {
     });
 
     it('should connect to sse transport and resolve tools', async () => {
-      const config: any = {
+      const config: MCPServerConfig = {
         name: 'test-sse',
         transport: 'sse',
         url: 'http://example.com/sse',
@@ -109,7 +109,7 @@ describe('MCPClientService Unit Tests', () => {
     });
 
     it('should fail to connect if transport throws', async () => {
-      const config: any = {
+      const config: MCPServerConfig = {
         name: 'test-fail',
         transport: 'stdio',
         command: 'node',
@@ -122,7 +122,7 @@ describe('MCPClientService Unit Tests', () => {
     });
 
     it('should disconnect from a server and clean up', async () => {
-      const config: any = {
+      const config: MCPServerConfig = {
         name: 'test-disco',
         transport: 'stdio',
         command: 'node',
@@ -139,7 +139,7 @@ describe('MCPClientService Unit Tests', () => {
 
   describe('Tool Execution', () => {
     beforeEach(async () => {
-      const config: any = {
+      const config: MCPServerConfig = {
         name: 'test-tools',
         transport: 'stdio',
         command: 'node',
@@ -206,7 +206,7 @@ describe('MCPClientService Unit Tests', () => {
 
   describe('Resources operations', () => {
     beforeEach(async () => {
-      const config: any = {
+      const config: MCPServerConfig = {
         name: 'test-resources',
         transport: 'streamable-http',
         url: 'http://example.com/mcp',
@@ -245,7 +245,7 @@ describe('MCPClientService Unit Tests', () => {
 
   describe('Authentication', () => {
     it('should update config and reconnect with auth Bearer Token', async () => {
-      const config: any = {
+      const config: MCPServerConfig = {
         name: 'test-auth',
         transport: 'streamable-http',
         url: 'http://example.com/mcp',
