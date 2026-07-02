@@ -301,7 +301,16 @@ export function computeToolCounts(messages: ChatMessage[]): Record<string, numbe
   const counts: Record<string, number> = {};
   for (const message of messages || []) {
     if (message.deleted || message.role !== "assistant") continue;
+
+    // Capability: Thinking
+    if (message.thinking) {
+      counts["Thinking"] = (counts["Thinking"] || 0) + 1;
+    }
+
+    // Capability: Tool Calling (if any tool calls present)
     if (message.toolCalls && message.toolCalls.length > 0) {
+      counts["Tool Calling"] = (counts["Tool Calling"] || 0) + 1;
+
       for (const toolCall of message.toolCalls) {
         if (toolCall.name) {
           counts[toolCall.name] = (counts[toolCall.name] || 0) + 1;
