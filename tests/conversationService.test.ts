@@ -52,13 +52,103 @@ vi.mock("../src/utils/ConversationDiscovery.ts", () => ({
 
 // ── In-memory collection mock ──────────────────────────────────
 // Enforces MongoDB's $set/$setOnInsert disjoint-path constraint.
+function evaluateMongoExpression(existingDocument: any, expression: any): any {
+  if (expression && typeof expression === "object" && !Array.isArray(expression)) {
+    if ("$gt" in expression) {
+      const argumentsList = expression.$gt;
+      if (Array.isArray(argumentsList) && argumentsList.length === 2) {
+        const leftOperand = evaluateMongoExpression(existingDocument, argumentsList[0]);
+        const rightOperand = evaluateMongoExpression(existingDocument, argumentsList[1]);
+        return leftOperand > rightOperand;
+      }
+    }
+    if ("$ifNull" in expression) {
+      const argumentsList = expression.$ifNull;
+      if (Array.isArray(argumentsList) && argumentsList.length === 2) {
+        const leftOperand = evaluateMongoExpression(existingDocument, argumentsList[0]);
+        const rightOperand = evaluateMongoExpression(existingDocument, argumentsList[1]);
+        return leftOperand !== undefined && leftOperand !== null ? leftOperand : rightOperand;
+      }
+    }
+    if ("$or" in expression) {
+      const argumentsList = expression.$or;
+      if (Array.isArray(argumentsList)) {
+        return argumentsList.some(argument => evaluateMongoExpression(existingDocument, argument));
+      }
+    }
+    if ("$and" in expression) {
+      const argumentsList = expression.$and;
+      if (Array.isArray(argumentsList)) {
+        return argumentsList.every(argument => evaluateMongoExpression(existingDocument, argument));
+      }
+    }
+    if ("$eq" in expression) {
+      const argumentsList = expression.$eq;
+      if (Array.isArray(argumentsList) && argumentsList.length === 2) {
+        const leftOperand = evaluateMongoExpression(existingDocument, argumentsList[0]);
+        const rightOperand = evaluateMongoExpression(existingDocument, argumentsList[1]);
+        return leftOperand === rightOperand;
+      }
+    }
+    if ("$max" in expression) {
+      const argumentsList = expression.$max;
+      if (Array.isArray(argumentsList)) {
+        const valuesList = argumentsList.map(argument => evaluateMongoExpression(existingDocument, argument));
+        return Math.max(...valuesList);
+      }
+    }
+    if ("$add" in expression) {
+      const argumentsList = expression.$add;
+      if (Array.isArray(argumentsList)) {
+        const valuesList = argumentsList.map(argument => evaluateMongoExpression(existingDocument, argument));
+        return valuesList.reduce((accumulatedSum, currentValue) => accumulatedSum + currentValue, 0);
+      }
+    }
+    return expression;
+  }
+  if (typeof expression === "string" && expression.startsWith("$")) {
+    const fieldName = expression.slice(1);
+    return existingDocument[fieldName];
+  }
+  return expression;
+}
+
 function createMockCollection() {
-  const docs = new Map();
+  const documents = new Map();
 
   return {
-    _docs: docs,
+    _docs: documents,
 
     async updateOne(filter: any, update: any, options: any = {}) {
+      // Find or create document
+      const key = JSON.stringify(filter);
+      let existingDocument = documents.get(key);
+      const isInsert = !existingDocument;
+
+      if (Array.isArray(update)) {
+        if (isInsert && options.upsert) {
+          existingDocument = { ...filter };
+          documents.set(key, existingDocument);
+        } else if (isInsert && !options.upsert) {
+          return { matchedCount: 0, modifiedCount: 0, upsertedCount: 0 };
+        }
+
+        // Apply aggregation pipeline stages
+        for (const stage of update) {
+          if (stage.$set) {
+            for (const [field, value] of Object.entries(stage.$set)) {
+              existingDocument[field] = evaluateMongoExpression(existingDocument, value);
+            }
+          }
+        }
+
+        return {
+          matchedCount: isInsert ? 0 : 1,
+          modifiedCount: isInsert ? 0 : 1,
+          upsertedCount: isInsert ? 1 : 0,
+        };
+      }
+
       const $set = update.$set || {};
       const $setOnInsert = update.$setOnInsert || {};
       const $push = update.$push || {};
@@ -78,29 +168,24 @@ function createMockCollection() {
         throw error;
       }
 
-      // Find or create doc
-      const key = JSON.stringify(filter);
-      let doc = docs.get(key);
-      const isInsert = !doc;
-
       if (isInsert && options.upsert) {
-        doc = { ...filter, ...$setOnInsert };
-        docs.set(key, doc);
+        existingDocument = { ...filter, ...$setOnInsert };
+        documents.set(key, existingDocument);
       } else if (isInsert && !options.upsert) {
         return { matchedCount: 0, modifiedCount: 0, upsertedCount: 0 };
       }
 
       // Apply $set
-      Object.assign(doc, $set);
+      Object.assign(existingDocument, $set);
 
       // Apply $push
       for (const [field, value] of Object.entries($push)) {
-        if (!doc[field]) doc[field] = [];
+        if (!existingDocument[field]) existingDocument[field] = [];
         const val = value as any;
         if (val.$each) {
-          doc[field].push(...val.$each);
+          existingDocument[field].push(...val.$each);
         } else {
-          doc[field].push(val);
+          existingDocument[field].push(val);
         }
       }
 
@@ -113,7 +198,7 @@ function createMockCollection() {
 
     async findOne(filter: any) {
       const key = JSON.stringify(filter);
-      return docs.get(key) || null;
+      return documents.get(key) || null;
     },
   };
 }

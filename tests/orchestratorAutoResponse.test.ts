@@ -651,7 +651,14 @@ describe("Event-Driven Auto-Response", () => {
       // The isGenerating flag should have been cleared via updateOne
       expect(mockUpdateOne).toHaveBeenCalledWith(
         { id: "parent-conv-id", project: "test-project", username: "test-user" },
-        { $set: { isGenerating: false } },
+        [
+          { $set: { isGenerating: false } },
+          {
+            $set: {
+              isActive: { $gt: [{ $ifNull: ["$pendingBackgroundTasks", 0] }, 0] },
+            },
+          },
+        ],
       );
 
       // handleAgent should have been called — no deadlock
@@ -1067,8 +1074,17 @@ describe("Event-Driven Auto-Response", () => {
       // The isGenerating flag should have been proactively cleared
       const isGeneratingClearCalls = mockUpdateOne.mock.calls.filter(
         (callArguments: unknown[]) => {
-          const updatePayload = callArguments[1] as Record<string, unknown>;
-          return updatePayload?.$set && (updatePayload.$set as Record<string, unknown>).isGenerating === false;
+          const updatePayload = callArguments[1];
+          if (Array.isArray(updatePayload)) {
+            return updatePayload.some(
+              (stage: any) => stage?.$set && stage.$set.isGenerating === false
+            );
+          }
+          if (updatePayload && typeof updatePayload === "object") {
+            const payloadObject = updatePayload as Record<string, any>;
+            return payloadObject.$set && payloadObject.$set.isGenerating === false;
+          }
+          return false;
         },
       );
       expect(isGeneratingClearCalls.length).toBeGreaterThanOrEqual(1);
