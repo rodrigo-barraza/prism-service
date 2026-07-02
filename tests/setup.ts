@@ -51,8 +51,8 @@ global.fetch = vi.fn().mockImplementation(async (url, init) => {
             status: 200,
             statusText: 'OK',
             json: async () => ({
-                workspaceRoots: ['/home/rodrigo/development'],
-                staticRoots: ['/home/rodrigo/development']
+                workspaceRoots: [process.cwd()],
+                staticRoots: [process.cwd()]
             }),
         } as any;
     }
@@ -320,3 +320,7 @@ app.use(errorHandler);
 
 // ── Helpers ───────────────────────────────────────────────────
 export const TEST_SECRET = 'test-secret';
+
+export const TEST_PROJECT = "coding";
+export const TEST_USER = "testuser";
+export const TEST_CONVERSATION_ID = "test-session-123";

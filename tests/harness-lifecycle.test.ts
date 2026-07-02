@@ -5,7 +5,8 @@
  * to verify behavior without requiring a running service.
  */
 import "./setup.ts";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { TEST_PROJECT, TEST_USER, TEST_CONVERSATION_ID } from "./setup.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
@@ -38,7 +39,7 @@ vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
     executeTool: vi.fn(),
     isStreamable: vi.fn().mockReturnValue(false),
     getToolEmoji: vi.fn().mockReturnValue(null),
-    getWorkspaceRoot: vi.fn().mockReturnValue("/home/rodrigo/development"),
+    getWorkspaceRoot: vi.fn().mockReturnValue(process.cwd()),
     getClientToolSchemas: vi.fn().mockReturnValue([]),
   },
 }));
@@ -560,9 +561,9 @@ describe("ExhaustionRecovery", () => {
       resolvedModel: "test-model",
       modelDefinition: {},
       provider: mockProvider,
-      project: "test-project",
-      username: "test-user",
-      agentConversationId: "session-123",
+      project: TEST_PROJECT,
+      username: TEST_USER,
+      agentConversationId: TEST_CONVERSATION_ID,
       requestId: "req-123",
     };
     const mockHarness: any = {
@@ -603,9 +604,9 @@ describe("ExhaustionRecovery", () => {
       resolvedModel: "test-model",
       modelDefinition: { liveAPI: true },
       provider: mockProvider,
-      project: "test-project",
-      username: "test-user",
-      agentConversationId: "session-123",
+      project: TEST_PROJECT,
+      username: TEST_USER,
+      agentConversationId: TEST_CONVERSATION_ID,
     };
     const mockHarness: any = {
       enforceContextWindow: vi.fn().mockImplementation((messages) => messages),
@@ -638,14 +639,14 @@ import { validateAfterToolExecution } from "../src/services/harnesses/lifecycle/
 
 function createMockAgenticContext(overrides?: Partial<AgenticContext>): AgenticContext {
   return {
-    project: "test-project",
-    username: "test-user",
-    agentConversationId: "session-123",
-    conversationId: "conv-123",
+    project: TEST_PROJECT,
+    username: TEST_USER,
+    agentConversationId: TEST_CONVERSATION_ID,
+    conversationId: TEST_CONVERSATION_ID,
     traceId: "trace-123",
     providerName: "test-provider",
     resolvedModel: "test-model",
-    workspaceRoot: "/home/rodrigo/development",
+    workspaceRoot: process.cwd(),
     emit: vi.fn(),
     requestId: "req-123",
     options: {},
@@ -694,9 +695,9 @@ describe("ToolExecutor", () => {
       { y: 2 },
       expect.any(Function),
       expect.objectContaining({
-        project: "test-project",
-        username: "test-user",
-        agentConversationId: "session-123",
+        project: TEST_PROJECT,
+        username: TEST_USER,
+        agentConversationId: TEST_CONVERSATION_ID,
       })
     );
     expect(results[0].result).toEqual({ success: true, content: "streaming result" });
@@ -713,9 +714,9 @@ describe("ToolExecutor", () => {
       "standard_tool",
       { z: 3 },
       expect.objectContaining({
-        project: "test-project",
-        username: "test-user",
-        agentConversationId: "session-123",
+        project: TEST_PROJECT,
+        username: TEST_USER,
+        agentConversationId: TEST_CONVERSATION_ID,
         enabledTools: ["read_file"],
       })
     );
@@ -840,7 +841,7 @@ describe("ValidationInterceptor", () => {
       "execute_command",
       expect.objectContaining({
         command: "npx tsc --noEmit --pretty",
-        cwd: "/home/rodrigo/development",
+        cwd: process.cwd(),
         timeout: 15000,
       }),
       expect.any(Object),
@@ -867,7 +868,7 @@ describe("ValidationInterceptor", () => {
       "execute_command",
       expect.objectContaining({
         command: "npx tsc --noEmit --pretty",
-        cwd: "/home/rodrigo/development",
+        cwd: process.cwd(),
         timeout: 15000,
       }),
       expect.any(Object),

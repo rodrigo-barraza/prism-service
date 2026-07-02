@@ -14,10 +14,12 @@
 // ── Constants ───────────────────────────────────────────────────
 
 import { PROVIDERS, TYPES } from "../../../src/constants.ts";
+import type { UsageAccumulator, ToolCall, AgenticOptions } from "../../../src/services/harnesses/types.ts";
+import { TEST_PROJECT, TEST_USER } from "../../setup.ts";
 
 export const PRISM_SERVICE_URL = process.env.PRISM_TEST_URL || "https://api.prism.rod.dev";
-export const LM_STUDIO_URL = process.env.LM_STUDIO_TEST_URL || "https://api.prism.rod.dev/lm-studio";
-export const OLLAMA_URL = process.env.OLLAMA_TEST_URL || "https://api.prism.rod.dev/ollama";
+export const LM_STUDIO_URL = process.env.LM_STUDIO_TEST_URL || `${PRISM_SERVICE_URL}/lm-studio`;
+export const OLLAMA_URL = process.env.OLLAMA_TEST_URL || `${PRISM_SERVICE_URL}/ollama`;
 
 export const DEFAULT_AGENT_TIMEOUT_MILLISECONDS = 120_000;
 export const CLOUD_AGENT_TIMEOUT_MILLISECONDS = 60_000;
@@ -62,25 +64,11 @@ export interface SubAgentStatusEvent {
   [key: string]: unknown;
 }
 
-export interface ToolCallEvent {
+export interface ToolCallEvent extends Partial<ToolCall> {
   type: string;
-  tool?: { name: string; args: Record<string, unknown>; id: string };
-  name?: string;
-  args?: Record<string, unknown>;
-  id?: string;
-  status?: string;
-  result?: unknown;
 }
 
-export interface UsageData {
-  inputTokens?: number;
-  outputTokens?: number;
-  reasoningOutputTokens?: number;
-  requests?: number;
-  promptTokens?: number;
-  completionTokens?: number;
-  [key: string]: unknown;
-}
+export type UsageData = UsageAccumulator;
 
 export interface DoneEvent {
   type: string;
@@ -125,7 +113,6 @@ export interface AgentSSEResult {
   durationMilliseconds: number;
   aborted: boolean;
   timedOut: boolean;
-  durationMilliseconds: number;
 }
 
 interface ConsumeOptions {
@@ -134,18 +121,12 @@ interface ConsumeOptions {
   controller?: AbortController;
 }
 
-interface AgentStreamPayload {
+export interface AgentStreamPayload extends Partial<AgenticOptions> {
   provider: string;
   model: string;
   messages: Array<{ role: string; content: string; toolCalls?: unknown[]; thinking?: string }>;
   agent?: string;
   agentConversationId?: string;
-  maxTokens?: number;
-  autoApprove?: boolean;
-  maxIterations?: number;
-  harness?: string;
-  planFirst?: boolean;
-  thinkingEnabled?: boolean;
   reasoningEffort?: string;
   enabledTools?: string[];
   disabledTools?: string[];
@@ -381,10 +362,9 @@ export async function agentStream(
   payload: AgentStreamPayload,
   {
     timeoutMilliseconds,
-    timeoutMilliseconds,
-  }: { timeoutMilliseconds?: number; timeoutMilliseconds?: number } = {},
+  }: { timeoutMilliseconds?: number } = {},
 ): Promise<AgentSSEResult> {
-  const finalTimeout = timeoutMilliseconds ?? timeoutMilliseconds ?? DEFAULT_AGENT_TIMEOUT_MILLISECONDS;
+  const finalTimeout = timeoutMilliseconds ?? DEFAULT_AGENT_TIMEOUT_MILLISECONDS;
   const enrichedPayload = {
     minContextLength: DEFAULT_MIN_CONTEXT_LENGTH,
     evalBatchSize: DEFAULT_EVAL_BATCH_SIZE,
@@ -394,8 +374,8 @@ export async function agentStream(
   const response = await fetch(`${PRISM_SERVICE_URL}/agent`, {
     method: "POST",
     headers: {
-      "x-project": "agent-behavior-tests",
-      "x-username": "test-runner",
+      "x-project": TEST_PROJECT,
+      "x-username": TEST_USER,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(enrichedPayload),
@@ -424,8 +404,8 @@ export async function agentJSON(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-project": "agent-behavior-tests",
-      "x-username": "test-runner",
+      "x-project": TEST_PROJECT,
+      "x-username": TEST_USER,
     },
     body: JSON.stringify(payload),
   });
@@ -651,12 +631,11 @@ export async function agentStreamWithRetry(
   payload: AgentStreamPayload,
   options: {
     timeoutMilliseconds?: number;
-    timeoutMilliseconds?: number;
     maximumRetries?: number;
     maxRetries?: number;
   } = {},
 ): Promise<AgentSSEResult> {
-  const finalTimeout = options.timeoutMilliseconds ?? options.timeoutMilliseconds;
+  const finalTimeout = options.timeoutMilliseconds;
   const finalRetries = options.maximumRetries ?? options.maxRetries ?? 2;
   let lastResult: AgentSSEResult | null = null;
 
@@ -685,18 +664,16 @@ export function assertToolCallPresent(
   toolName: string,
 ): void {
   const toolExecutionMatch = result.toolExecutions.some(
-    (toolEvent) =>
-      toolEvent.tool?.name === toolName || toolEvent.name === toolName,
+    (toolEvent) => toolEvent.name === toolName,
   );
   const toolCallMatch = result.toolCalls.some(
-    (toolEvent) =>
-      toolEvent.tool?.name === toolName || toolEvent.name === toolName,
+    (toolEvent) => toolEvent.name === toolName,
   );
 
   if (!toolExecutionMatch && !toolCallMatch) {
     const allToolNames = [
-      ...result.toolExecutions.map((toolEvent) => toolEvent.tool?.name || toolEvent.name),
-      ...result.toolCalls.map((toolEvent) => toolEvent.tool?.name || toolEvent.name),
+      ...result.toolExecutions.map((toolEvent) => toolEvent.name),
+      ...result.toolCalls.map((toolEvent) => toolEvent.name),
     ];
     throw new Error(
       `Expected tool call "${toolName}" but found: [${allToolNames.join(", ")}]`,
@@ -783,7 +760,13 @@ export function getEffectiveUsage(result: AgentSSEResult): UsageData {
     if (lastUpdate.usage) return lastUpdate.usage;
   }
 
-  return doneUsage || { inputTokens: 0, outputTokens: 0 };
+  return doneUsage || {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadInputTokens: 0,
+    cacheCreationInputTokens: 0,
+    reasoningOutputTokens: 0,
+  };
 }
 
 /**

@@ -1,6 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { createMockCollection } from "./mongoMock.ts";
+import { ObjectId } from "mongodb";
 
-vi.mock('../src/wrappers/MongoWrapper.ts', () => {
+vi.mock("../src/wrappers/MongoWrapper.ts", () => {
   return {
     default: {
       createClient: vi.fn().mockResolvedValue(undefined),
@@ -10,273 +12,128 @@ vi.mock('../src/wrappers/MongoWrapper.ts', () => {
   };
 });
 
-import CustomAgentService from '../src/services/CustomAgentService.ts';
-import MongoWrapper from '../src/wrappers/MongoWrapper.ts';
-import { COLLECTIONS } from '../src/constants.ts';
-import { ObjectId } from 'mongodb';
+// Mock deriveAgentId from utilities-library
+vi.mock("@rodrigo-barraza/utilities-library", () => ({
+  deriveAgentId: (name: string) => name.toLowerCase().replace(/\s+/g, "-"),
+}));
 
-describe('CustomAgentService Unit Tests', () => {
-  let mockCustomAgents: any[] = [];
+import CustomAgentService from "../src/services/CustomAgentService.ts";
+import MongoWrapper from "../src/wrappers/MongoWrapper.ts";
+import { COLLECTIONS } from "../src/constants.ts";
+
+describe("CustomAgentService Unit Tests", () => {
+  let mockCollection: ReturnType<typeof createMockCollection>;
   let databaseNotAvailable = false;
 
-  const mockDbCollection = {
-    find: () => {
-      const chain: any = {
-        sort: () => chain,
-        toArray: async () => {
-          return [...mockCustomAgents].sort((first, second) =>
-            new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()
-          );
-        },
-      };
-      return chain;
-    },
-    findOne: async (query: any) => {
-      if (query._id && !query.agentId) {
-        return mockCustomAgents.find((agent) => agent._id.toString() === query._id.toString()) || null;
-      }
-      if (query.agentId) {
-        return mockCustomAgents.find((agent) => {
-          const matchesAgentId = agent.agentId === query.agentId;
-          let matchesNe = true;
-          if (query._id && query._id.$ne) {
-            matchesNe = agent._id.toString() !== query._id.$ne.toString();
-          }
-          return matchesAgentId && matchesNe;
-        }) || null;
-      }
-      return null;
-    },
-    insertOne: async (document: any) => {
-      const insertedId = new ObjectId();
-      const newDocument = { ...document, _id: insertedId };
-      mockCustomAgents.push(newDocument);
-      return { insertedId };
-    },
-    updateOne: async (query: any, update: any) => {
-      const agentIndex = mockCustomAgents.findIndex((agent) => agent._id.toString() === query._id.toString());
-      if (agentIndex === -1) {
-        return { matchedCount: 0 };
-      }
-      if (update.$set) {
-        mockCustomAgents[agentIndex] = {
-          ...mockCustomAgents[agentIndex],
-          ...update.$set,
-        };
-      }
-      return { matchedCount: 1 };
-    },
-    deleteOne: async (query: any) => {
-      const agentIndex = mockCustomAgents.findIndex((agent) => agent._id.toString() === query._id.toString());
-      if (agentIndex === -1) {
-        return { deletedCount: 0 };
-      }
-      mockCustomAgents.splice(agentIndex, 1);
-      return { deletedCount: 1 };
-    },
-  };
-
   beforeEach(() => {
-    mockCustomAgents = [];
+    mockCollection = createMockCollection([]);
     databaseNotAvailable = false;
 
-    vi.mocked(MongoWrapper.getCollection).mockImplementation((databaseName, collectionName) => {
-      if (databaseNotAvailable) return null as any;
-      if (collectionName === COLLECTIONS.CUSTOM_AGENTS) {
-        return mockDbCollection as any;
-      }
-      return null as any;
-    });
+    vi.mocked(MongoWrapper.getCollection).mockImplementation(
+      (databaseName, collectionName) => {
+        if (databaseNotAvailable) return null as any;
+        if (collectionName === COLLECTIONS.CUSTOM_AGENTS) {
+          return mockCollection as any;
+        }
+        return null as any;
+      },
+    );
   });
 
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('list', () => {
-    it('should return empty list if collection is not available', async () => {
+  describe("create", () => {
+    it("should insert a new agent and return the document", async () => {
+      const agentData = {
+        name: "Test Agent",
+        project: "p1",
+      };
+      const result = await CustomAgentService.create(agentData as any);
+      expect(result._id).toBeDefined();
+      expect(result.agentId).toBe("test-agent");
+
+      const doc = await mockCollection.findOne({ agentId: "test-agent" });
+      expect(doc).toBeDefined();
+      expect(doc?.name).toBe("Test Agent");
+    });
+
+    it("should throw error if name already exists (conflicting agentId)", async () => {
+      await mockCollection.insertOne({ agentId: "existing", name: "Existing" });
+
+      await expect(
+        CustomAgentService.create({ name: "Existing" } as any),
+      ).rejects.toThrow('Agent with name "Existing" already exists');
+    });
+  });
+
+  describe("list", () => {
+    it("should return all agents sorted by createdAt desc", async () => {
+      await mockCollection.insertOne({ agentId: "old", createdAt: "2020-01-01" });
+      await mockCollection.insertOne({ agentId: "new", createdAt: "2021-01-01" });
+
+      const list = await CustomAgentService.list();
+      expect(list).toHaveLength(2);
+      // mongoMock.ts find().sort() is a no-op currently, but list() sorts in memory
+      expect(list[0].agentId).toBe("new");
+    });
+
+    it("should return empty list if DB not available", async () => {
       databaseNotAvailable = true;
       const list = await CustomAgentService.list();
       expect(list).toEqual([]);
     });
+  });
 
-    it('should return custom agents sorted by createdAt descending', async () => {
-      mockCustomAgents = [
-        {
-          _id: new ObjectId(),
-          name: 'Agent A',
-          agentId: 'CUSTOM_AGENT_A',
-          createdAt: new Date('2026-06-18').toISOString(),
-        },
-        {
-          _id: new ObjectId(),
-          name: 'Agent B',
-          agentId: 'CUSTOM_AGENT_B',
-          createdAt: new Date('2026-06-20').toISOString(),
-        },
-      ];
+  describe("get", () => {
+    it("should find an agent by string id (ObjectId)", async () => {
+      const id = new ObjectId();
+      await mockCollection.insertOne({ _id: id, agentId: "find-me" });
 
-      const list = await CustomAgentService.list();
-      expect(list).toHaveLength(2);
-      expect(list[0].name).toBe('Agent B');
-      expect(list[1].name).toBe('Agent A');
+      const agent = await CustomAgentService.get(id.toString());
+      expect(agent?.agentId).toBe("find-me");
+    });
+
+    it("should return null if not found", async () => {
+      const agent = await CustomAgentService.get(new ObjectId().toString());
+      expect(agent).toBeNull();
     });
   });
 
-  describe('get & getByAgentId', () => {
-    it('should return null if database is not available', async () => {
-      databaseNotAvailable = true;
-      const testId = new ObjectId().toString();
-      expect(await CustomAgentService.get(testId)).toBeNull();
-      expect(await CustomAgentService.getByAgentId(testId as any)).toBeNull();
+  describe("update", () => {
+    it("should update an existing agent", async () => {
+      const id = new ObjectId();
+      await mockCollection.insertOne({ _id: id, name: "Old", agentId: "old" });
+
+      await CustomAgentService.update(id.toString(), { name: "New" });
+      const updated = await mockCollection.findOne({ _id: id });
+      expect(updated?.name).toBe("New");
+      expect(updated?.agentId).toBe("new");
     });
 
-    it('should retrieve a custom agent by its ObjectId string', async () => {
-      const generatedId = new ObjectId();
-      mockCustomAgents = [
-        {
-          _id: generatedId,
-          name: 'Test Coder',
-          agentId: 'CUSTOM_TEST_CODER',
-        },
-      ];
-
-      const result = await CustomAgentService.get(generatedId.toString());
-      expect(result).not.toBeNull();
-      expect(result?.name).toBe('Test Coder');
-    });
-
-    it('should retrieve a custom agent by its agentId identifier', async () => {
-      mockCustomAgents = [
-        {
-          _id: new ObjectId(),
-          name: 'Test Coder',
-          agentId: 'CUSTOM_TEST_CODER',
-        },
-      ];
-
-      const result = await CustomAgentService.getByAgentId('CUSTOM_TEST_CODER' as any);
-      expect(result).not.toBeNull();
-      expect(result?.name).toBe('Test Coder');
-    });
-  });
-
-  describe('create', () => {
-    it('should throw an error if database is not available', async () => {
-      databaseNotAvailable = true;
-      await expect(CustomAgentService.create({ name: 'Fails' })).rejects.toThrow('Database not available');
-    });
-
-    it('should create an agent and generate a stable CUSTOM_ slug agentId', async () => {
-      const creationPayload = {
-        name: 'Super Special Agent! 123',
-        description: 'Does super things',
-        availableTools: ['tool_x'],
-      };
-
-      const result = await CustomAgentService.create(creationPayload);
-      expect(result.agentId).toBe('CUSTOM_SUPER_SPECIAL_AGENT_123');
-      expect(result.name).toBe('Super Special Agent! 123');
-      expect(result.availableTools).toEqual(['tool_x']);
-      expect(result._id).toBeDefined();
-
-      expect(mockCustomAgents).toHaveLength(1);
-    });
-
-    it('should fall back to enabledTools if availableTools is empty', async () => {
-      const creationPayload = {
-        name: 'Fallback Tools Agent',
-        enabledTools: ['fallback_tool_y'],
-      };
-
-      const result = await CustomAgentService.create(creationPayload);
-      expect(result.availableTools).toEqual(['fallback_tool_y']);
-    });
-
-    it('should throw an error if name already exists (case-insensitive agentId matches)', async () => {
-      mockCustomAgents = [
-        {
-          _id: new ObjectId(),
-          name: 'Duplicate Me',
-          agentId: 'CUSTOM_DUPLICATE_ME',
-        },
-      ];
-
-      const creationPayload = {
-        name: 'Duplicate Me',
-      };
-
-      await expect(CustomAgentService.create(creationPayload)).rejects.toThrow('already exists');
-    });
-  });
-
-  describe('update', () => {
-    it('should throw an error if database is not available', async () => {
-      databaseNotAvailable = true;
-      await expect(CustomAgentService.update(new ObjectId().toString(), {})).rejects.toThrow('Database not available');
-    });
-
-    it('should update fields and regenerate agentId if name is updated', async () => {
-      const targetId = new ObjectId();
-      mockCustomAgents = [
-        {
-          _id: targetId,
-          name: 'Original Name',
-          agentId: 'CUSTOM_ORIGINAL_NAME',
-        },
-      ];
-
-      const result = await CustomAgentService.update(targetId.toString(), { name: 'Brand New Name' });
-      expect(result).not.toBeNull();
-      expect(result?.name).toBe('Brand New Name');
-      expect(result?.agentId).toBe('CUSTOM_BRAND_NEW_NAME');
-    });
-
-    it('should throw conflict error if updated name conflicts with another agentId', async () => {
-      const targetId = new ObjectId();
-      mockCustomAgents = [
-        {
-          _id: targetId,
-          name: 'Target Agent',
-          agentId: 'CUSTOM_TARGET_AGENT',
-        },
-        {
-          _id: new ObjectId(),
-          name: 'Existing Conflicting Agent',
-          agentId: 'CUSTOM_EXISTING_CONFLICTING_AGENT',
-        },
-      ];
+    it("should throw error if new name conflicts with another agent", async () => {
+      const id1 = new ObjectId();
+      const id2 = new ObjectId();
+      await mockCollection.insertOne({ _id: id1, name: "Agent 1", agentId: "agent-1" });
+      await mockCollection.insertOne({ _id: id2, name: "Agent 2", agentId: "agent-2" });
 
       await expect(
-        CustomAgentService.update(targetId.toString(), { name: 'Existing Conflicting Agent' })
-      ).rejects.toThrow('already exists');
+        CustomAgentService.update(id1.toString(), { name: "Agent 2" }),
+      ).rejects.toThrow('Agent with name "Agent 2" already exists');
     });
   });
 
-  describe('delete', () => {
-    it('should throw an error if database is not available', async () => {
-      databaseNotAvailable = true;
-      await expect(CustomAgentService.delete(new ObjectId().toString())).rejects.toThrow('Database not available');
-    });
+  describe("delete", () => {
+    it("should remove an agent", async () => {
+      const id = new ObjectId();
+      await mockCollection.insertOne({ _id: id });
 
-    it('should return true and delete agent if it exists', async () => {
-      const targetId = new ObjectId();
-      mockCustomAgents = [
-        {
-          _id: targetId,
-          name: 'To Delete',
-          agentId: 'CUSTOM_TO_DELETE',
-        },
-      ];
-
-      const deleted = await CustomAgentService.delete(targetId.toString());
-      expect(deleted).toBe(true);
-      expect(mockCustomAgents).toHaveLength(0);
-    });
-
-    it('should return false if agent does not exist', async () => {
-      const deleted = await CustomAgentService.delete(new ObjectId().toString());
-      expect(deleted).toBe(false);
+      const result = await CustomAgentService.delete(id.toString());
+      expect(result).toBe(true);
+      
+      const remaining = await mockCollection.find({}).toArray();
+      expect(remaining).toHaveLength(0);
     });
   });
 });

@@ -1,5 +1,6 @@
 import "./setup.ts";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { TEST_PROJECT, TEST_USER, TEST_CONVERSATION_ID } from "./setup.ts";
 import {
   MCTSRouter,
   computeUpperConfidenceBound,
@@ -46,6 +47,34 @@ vi.mock("../src/services/orchestrator/InstanceResolver.ts", () => ({
   })),
 }));
 
+// ── Helpers ───────────────────────────────────────────────────
+
+function createMockNode(overrides: Partial<MCTSTreeNode> = {}): MCTSTreeNode {
+  return {
+    nodeIndex: 0,
+    depth: 1,
+    branchIndex: 0,
+    result: {
+      agent_id: `agent-${overrides.nodeIndex || 0}`,
+      description: "mock node",
+      status: "completed",
+      summary: "mock",
+      result: "mock-result",
+      toolUses: 0,
+      iterations: 1,
+      durationMilliseconds: 100,
+      messages: [],
+    },
+    score: 0.5,
+    visitCount: 1,
+    parentNodeIndex: null,
+    childNodeIndices: [],
+    isExpanded: false,
+    evaluationFeedback: "",
+    ...overrides,
+  };
+}
+
 describe("MCTSRouter - Pure Functions", () => {
   describe("computeUpperConfidenceBound()", () => {
     it("should return Infinity when visitCount is 0", () => {
@@ -78,72 +107,9 @@ describe("MCTSRouter - Pure Functions", () => {
   describe("backpropagateScores()", () => {
     it("should update leaf and all ancestors correctly", () => {
       const initialNodes: MCTSTreeNode[] = [
-        {
-          nodeIndex: 0,
-          depth: 1,
-          branchIndex: 0,
-          result: {
-            agent_id: "agent-0",
-            description: "root node",
-            status: "completed",
-            summary: "root",
-            result: "root-result",
-            toolUses: 0,
-            iterations: 1,
-            durationMilliseconds: 100,
-            messages: [],
-          },
-          score: 0.5,
-          visitCount: 1,
-          parentNodeIndex: null,
-          childNodeIndices: [1],
-          isExpanded: true,
-          evaluationFeedback: "",
-        },
-        {
-          nodeIndex: 1,
-          depth: 2,
-          branchIndex: 0,
-          result: {
-            agent_id: "agent-1",
-            description: "child node",
-            status: "completed",
-            summary: "child",
-            result: "child-result",
-            toolUses: 0,
-            iterations: 1,
-            durationMilliseconds: 100,
-            messages: [],
-          },
-          score: 0.5,
-          visitCount: 1,
-          parentNodeIndex: 0,
-          childNodeIndices: [2],
-          isExpanded: true,
-          evaluationFeedback: "",
-        },
-        {
-          nodeIndex: 2,
-          depth: 3,
-          branchIndex: 0,
-          result: {
-            agent_id: "agent-2",
-            description: "leaf node",
-            status: "completed",
-            summary: "leaf",
-            result: "leaf-result",
-            toolUses: 0,
-            iterations: 1,
-            durationMilliseconds: 100,
-            messages: [],
-          },
-          score: 0.5,
-          visitCount: 1,
-          parentNodeIndex: 1,
-          childNodeIndices: [],
-          isExpanded: false,
-          evaluationFeedback: "",
-        },
+        createMockNode({ nodeIndex: 0, depth: 1, childNodeIndices: [1], isExpanded: true }),
+        createMockNode({ nodeIndex: 1, depth: 2, parentNodeIndex: 0, childNodeIndices: [2], isExpanded: true }),
+        createMockNode({ nodeIndex: 2, depth: 3, parentNodeIndex: 1, isExpanded: false }),
       ];
 
       backpropagateScores(initialNodes, 2, 0.9);
@@ -163,28 +129,7 @@ describe("MCTSRouter - Pure Functions", () => {
 
     it("should handle single-node tree", () => {
       const initialNodes: MCTSTreeNode[] = [
-        {
-          nodeIndex: 0,
-          depth: 1,
-          branchIndex: 0,
-          result: {
-            agent_id: "agent-0",
-            description: "root node",
-            status: "completed",
-            summary: "root",
-            result: "root-result",
-            toolUses: 0,
-            iterations: 1,
-            durationMilliseconds: 100,
-            messages: [],
-          },
-          score: 0.5,
-          visitCount: 1,
-          parentNodeIndex: null,
-          childNodeIndices: [],
-          isExpanded: false,
-          evaluationFeedback: "",
-        },
+        createMockNode({ nodeIndex: 0, depth: 1 }),
       ];
 
       backpropagateScores(initialNodes, 0, 0.9);
@@ -550,14 +495,14 @@ describe("MCTSRouter.execute() - Main Orchestration Loop", () => {
     });
 
     orchestratorContext = {
-      project: "test-project",
-      username: "test-user",
+      project: TEST_PROJECT,
+      username: TEST_USER,
       agent: null,
       providerName: "google",
       resolvedModel: "gemini-3-flash-preview",
       traceId: "trace-123",
-      agentConversationId: "conv-123",
-      conversationId: "conv-123",
+      agentConversationId: TEST_CONVERSATION_ID,
+      conversationId: TEST_CONVERSATION_ID,
       emit: vi.fn(),
     };
 
