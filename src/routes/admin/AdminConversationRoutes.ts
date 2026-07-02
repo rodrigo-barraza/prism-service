@@ -504,7 +504,7 @@ router.get(
         .collection(CONVERSATIONS_COLLECTION)
         .updateMany(
           { isGenerating: true, updatedAt: { $lt: fiveMinAgo } },
-          { $set: { isGenerating: false } },
+          { $set: { isGenerating: false, isActive: false } },
         )
         .then(({ modifiedCount }: { modifiedCount: number }) => {
           if (modifiedCount > 0)

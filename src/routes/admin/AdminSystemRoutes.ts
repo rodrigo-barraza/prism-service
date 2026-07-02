@@ -137,6 +137,7 @@ router.get(
             modalities: 1,
             providers: 1,
             isGenerating: 1,
+            isActive: 1,
           })
           .sort({ updatedAt: -1 })
           .toArray(),
@@ -181,6 +182,7 @@ router.get(
             lastMessage: lastMessageText,
             lastMessageRole: lastMessage?.role || null,
             isGenerating: record.isGenerating || false,
+            isActive: record.isActive,
             modalities: record.modalities || null,
             providers: record.providers || [],
             totalCost,

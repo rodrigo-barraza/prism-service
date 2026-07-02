@@ -26,8 +26,6 @@ router.use(requireDb);
 
 const CONVERSATION_LIST_PROJECTION: import("mongodb").Document = {
   ...CONVERSATION_LIST_BASE_PROJECTION,
-  isGenerating: 1,
-  pendingBackgroundTasks: 1,
   traceId: 1,
   synthetic: 1,
   systemPrompt: 1,
@@ -50,6 +48,8 @@ interface ConversationDocument {
   providers?: string[];
   totalCost?: number;
   isGenerating?: boolean;
+  isActive?: boolean;
+  pendingBackgroundTasks?: number;
   traceId?: string | null;
   synthetic?: boolean;
   messages: Record<string, unknown>[];

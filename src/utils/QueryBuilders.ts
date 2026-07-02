@@ -76,4 +76,7 @@ export const CONVERSATION_LIST_BASE_PROJECTION: Record<string, 1> = {
   agent: 1,
   parentConversationId: 1,
   hasSubAgents: 1,
+  isGenerating: 1,
+  isActive: 1,
+  pendingBackgroundTasks: 1,
 };
