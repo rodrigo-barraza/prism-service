@@ -190,6 +190,16 @@ function handleWebsocketChat(
       );
     }
 
+    // "subscribe" messages only register the WebSocket for auto-response
+    // streaming — they do NOT trigger a conversation turn. The client
+    // uses this after the SSE stream closes (non-blocking subagent
+    // dispatch) so that background task completion events and the
+    // subsequent auto-response chunks stream in real-time.
+    if (data.type === "subscribe") {
+      emitFunction({ type: "subscribed", conversationId });
+      return;
+    }
+
     await handleConversation(
       { ...data, project, username, clientIp, agent },
       emitFunction,

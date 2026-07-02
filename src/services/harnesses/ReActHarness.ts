@@ -999,11 +999,33 @@ export default class ReActHarness extends BaseAgenticHarness {
         }
       }
 
-      // Finalize — emit `done`, clear isGenerating, persist messages.
-      // Even when sub-agents are still running (NON_BLOCKING_DISPATCH), we
-      // close the SSE stream so the client can accept new user messages.
-      // isActive remains true via pendingBackgroundTasks (incremented above).
-      await this.finalize(currentMessages, hooks);
+      // Finalize — persist messages, compute costs, and conditionally emit `done`.
+      // When sub-agents are dispatched non-blockingly, we DEFER the `done` event
+      // and keep the SSE stream open so the auto-response (triggered after all
+      // sub-agents complete) streams its chunks through the same connection.
+      // Without this, the SSE stream closes, the auto-response runs headlessly,
+      // and the client only sees the result as a bulk change-stream update.
+      if (hasNonBlockingDispatchBreak && agentConversationId) {
+        await this.finalize(
+          currentMessages,
+          hooks,
+          { deferDoneEmission: true },
+        );
+
+        // Keep the SSE stream alive until all sub-agent dispatches settle
+        // and the auto-response completes. The auto-response's handleAgent
+        // call uses orchestratorContext.emit (which is the live SSE emit
+        // function), so chunks stream in real-time to the client.
+        // The auto-response's own finalize() emits the `done` event, so
+        // we deliberately do NOT emit the deferred done from the parent
+        // harness — that would overwrite the auto-response's correct
+        // metadata with stale parent-turn data.
+        const { default: OrchestratorService } =
+          await import("../OrchestratorService.ts");
+        await OrchestratorService.awaitPendingDispatches(agentConversationId);
+      } else {
+        await this.finalize(currentMessages, hooks);
+      }
 
       return { messages: currentMessages };
     } catch (loopError: unknown) {

@@ -2848,11 +2848,12 @@ export class OrchestratorService {
     );
 
     // Resolve emit function for the auto-response. Priority:
-    // 1. orchestratorContext.emit — stale reference from the original SSE
-    //    stream. Will be null since the parent's SSE stream is now closed
-    //    immediately after non-blocking dispatch. Kept for defensive compat.
-    // 2. WebSocketConnectionRegistry — primary path for streaming auto-response
-    //    events to clients connected via WebSocket.
+    // 1. orchestratorContext.emit — the live SSE emit function from the
+    //    parent harness. With deferred-done emission, the SSE stream stays
+    //    open until all pending dispatches settle, so this is the primary
+    //    streaming path for auto-response chunks.
+    // 2. WebSocketConnectionRegistry — fallback for clients connected via
+    //    WebSocket, or when the SSE stream has closed (legacy/edge cases).
     // 3. Debug logger — headless/API mode fallback.
     const parentEmit = orchestratorContext.emit || null;
 
