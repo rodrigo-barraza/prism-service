@@ -79,4 +79,5 @@ export const CONVERSATION_LIST_BASE_PROJECTION: Record<string, 1> = {
   isGenerating: 1,
   isActive: 1,
   pendingBackgroundTasks: 1,
+  requestErrorCount: 1,
 };
