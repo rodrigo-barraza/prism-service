@@ -3003,16 +3003,17 @@ export class OrchestratorService {
             await import("../websocket/WebSocketConnectionRegistry.ts");
           const emitFunction = WebSocketConnectionRegistry.getEmitFunction(conversationId);
           if (emitFunction) {
-            // Read the updated document to get the authoritative counter
+            // Read the updated document to get the authoritative counter and active state
             const freshConversation = await MongoWrapper.getDb(databaseName)
               ?.collection(COLLECTIONS.AGENT_CONVERSATIONS)
               .findOne(
                 { id: conversationId, project, username },
-                { projection: { pendingBackgroundTasks: 1 } },
+                { projection: { pendingBackgroundTasks: 1, isActive: 1 } },
               );
             emitFunction({
               type: SERVER_SENT_EVENT_TYPES.CONVERSATION_STATE_UPDATE,
               pendingBackgroundTasks: (freshConversation?.pendingBackgroundTasks as number) ?? 0,
+              isActive: freshConversation?.isActive ?? false,
             });
           }
         } catch (emitError: unknown) {
