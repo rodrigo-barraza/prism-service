@@ -265,7 +265,19 @@ router.get(
                   _id: groupId,
                   totalCost: COST_SUMMATION_EXPRESSION,
                   requestErrorCount: {
-                    $sum: { $cond: [{ $eq: ["$success", false] }, 1, 0] },
+                    $sum: {
+                      $cond: [
+                        {
+                          $and: [
+                            { $eq: ["$success", false] },
+                            { $ne: ["$clientIp", "auto-response"] },
+                            { $ne: ["$clientIp", "async-task-auto-response"] },
+                          ],
+                        },
+                        1,
+                        0,
+                      ],
+                    },
                   },
                 },
               },
@@ -449,7 +461,19 @@ router.get(
                   _id: "$conversationId",
                   totalCost: COST_SUMMATION_EXPRESSION,
                   requestErrorCount: {
-                    $sum: { $cond: [{ $eq: ["$success", false] }, 1, 0] },
+                    $sum: {
+                      $cond: [
+                        {
+                          $and: [
+                            { $eq: ["$success", false] },
+                            { $ne: ["$clientIp", "auto-response"] },
+                            { $ne: ["$clientIp", "async-task-auto-response"] },
+                          ],
+                        },
+                        1,
+                        0,
+                      ],
+                    },
                   },
                 },
               },

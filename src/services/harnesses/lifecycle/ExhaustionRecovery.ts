@@ -40,13 +40,18 @@ export async function runExhaustionRecoveryPass(
     message: STATUS_MESSAGES.ITERATION_LIMIT_REACHED,
   });
 
+  const activeLocale =
+    (options?.locale as string | undefined) ||
+    PromptLocaleService.getDefaultLocale();
+
+  const isSubAgent = !!context.parentAgentConversationId;
+  const recoveryMessageKey = isSubAgent
+    ? "harness.exhaustionRecovery.subAgentMessage"
+    : "harness.exhaustionRecovery.message";
+
   currentMessages.push({
     role: "system",
-    content: PromptLocaleService.get(
-      (options?.locale as string | undefined) ||
-        PromptLocaleService.getDefaultLocale(),
-      "harness.exhaustionRecovery.message",
-    ),
+    content: PromptLocaleService.get(activeLocale, recoveryMessageKey),
   });
 
   const { tools: _tools, ...exhaustionOptions } = options;
