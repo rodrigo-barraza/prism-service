@@ -5,6 +5,7 @@ import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts"
 import {
   CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST,
   isCoreDomain,
+  DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
@@ -36,24 +37,33 @@ export class ToolDocFormatter {
    *   - Full parameter listing with required markers
    */
   buildToolDescriptions(
-    enabledTools?: string[],
+    enabledTools?: string[] | null,
     agentId?: string | null,
     defaultTopology?: string,
-    resolvedToolNames?: string[],
+    resolvedToolNames?: string[] | null,
     lockedOffToolNames?: Set<string>,
     compact?: boolean,
     locale = "en",
+    workspaceEnabled = true,
   ): string {
     const schemas = ToolOrchestratorService.getClientToolSchemas(
       defaultTopology,
       locale,
     ) as ToolSchemaDescriptor[];
 
+    const isWorkspaceDomain = (domainName: string) =>
+      domainName === DOMAINS.CORE_WORKSPACE.displayName;
+
     if (resolvedToolNames?.length) {
       const resolvedSet = new Set(resolvedToolNames);
       let filteredSchemas = schemas.filter((toolSchema) =>
         resolvedSet.has(toolSchema.name),
       );
+      if (!workspaceEnabled) {
+        filteredSchemas = filteredSchemas.filter(
+          (toolSchema) => !isWorkspaceDomain(toolSchema.domain || ""),
+        );
+      }
       if (lockedOffToolNames?.size) {
         filteredSchemas = filteredSchemas.filter(
           (toolSchema) => !lockedOffToolNames.has(toolSchema.name),
@@ -64,6 +74,11 @@ export class ToolDocFormatter {
 
     if (!enabledTools) {
       let allSchemas = schemas;
+      if (!workspaceEnabled) {
+        allSchemas = allSchemas.filter(
+          (toolSchema) => !isWorkspaceDomain(toolSchema.domain || ""),
+        );
+      }
       if (lockedOffToolNames?.size) {
         allSchemas = allSchemas.filter(
           (toolSchema) => !lockedOffToolNames.has(toolSchema.name),
@@ -89,7 +104,8 @@ export class ToolDocFormatter {
       (toolSchema) =>
         enabledSet.has(toolSchema.name) ||
         (isCoreToolsLocked &&
-          (isCoreDomain(toolSchema.domain || "") ||
+          ((isCoreDomain(toolSchema.domain || "") &&
+            (workspaceEnabled || !isWorkspaceDomain(toolSchema.domain || ""))) ||
             CORE_AGENTIC_TOOLS.has(toolSchema.name))),
     );
 
@@ -101,6 +117,12 @@ export class ToolDocFormatter {
       filteredSchemas = filteredSchemas.filter(
         (toolSchema) =>
           !disabledSet.has(toolSchema.name) || enabledSet.has(toolSchema.name),
+      );
+    }
+
+    if (!workspaceEnabled) {
+      filteredSchemas = filteredSchemas.filter(
+        (toolSchema) => !isWorkspaceDomain(toolSchema.domain || ""),
       );
     }
 
