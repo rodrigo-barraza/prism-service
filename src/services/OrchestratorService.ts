@@ -588,6 +588,7 @@ export class OrchestratorService {
         parentConversationId: parentConversationId || null,
         model: subAgentModel,
         provider: subAgentProvider,
+        agentIndex: agentIndex ?? null,
       });
     }
 
@@ -1776,6 +1777,7 @@ export class OrchestratorService {
         parentConversationId: subAgent.parentConversationId || null,
         model: subAgent.resolvedModel,
         provider: subAgent.providerName,
+        agentIndex: subAgent.agentIndex ?? null,
       });
     }
 
@@ -1883,6 +1885,7 @@ export class OrchestratorService {
         parentConversationId: subAgent.parentConversationId || null,
         model: subAgent.resolvedModel,
         provider: subAgent.providerName,
+        agentIndex: subAgent.agentIndex ?? null,
       });
     }
 
