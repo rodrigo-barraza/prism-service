@@ -483,6 +483,8 @@ router.get(
         enabledByDefaultToolNames: finalEnabledByDefaultToolNames,
         coreToolsLocked: persona?.coreToolsLocked ?? true,
         canSpawnSubAgents: ORCHESTRATOR_ONLY_TOOLS.includes(
+          TOOL_NAMES.CREATE_SUBAGENT,
+        ) || ORCHESTRATOR_ONLY_TOOLS.includes(
           TOOL_NAMES.CREATE_SUBAGENTS,
         ),
         usesDirectoryTree: persona?.usesDirectoryTree || false,

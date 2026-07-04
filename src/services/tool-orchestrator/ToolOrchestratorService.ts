@@ -527,17 +527,24 @@ async function fetchJsonWithBody(
  * the AgentPersonaRegistry. This avoids hard-coding persona names
  * like "Lupos" or "Coding" which caused the LLM to misuse the field.
  */
-function buildAgentParameterDescription(locale?: string): string {
+function buildAgentParameterDescription(locale?: string, toolName: string = "create_subagents"): string {
   const activeLocale = locale || PromptLocaleService.getDefaultLocale();
   const registeredAgents = AgentPersonaRegistry.list();
   const agentNames = registeredAgents
     .map((entry) => `'${entry.name}'`)
     .join(", ");
 
+  const agentKey = toolName === "create_subagent"
+    ? "orchestrator.tools.create_subagent.parameters.agent"
+    : "orchestrator.tools.create_subagents.parameters.memberAgent";
+  const defaultKey = toolName === "create_subagent"
+    ? "orchestrator.tools.create_subagent.parameters.agentDefault"
+    : "orchestrator.tools.create_subagents.parameters.memberAgentDefault";
+
   if (agentNames) {
     return PromptLocaleService.get(
       activeLocale,
-      "orchestrator.tools.create_subagents.parameters.memberAgent",
+      agentKey,
       {
         agentNames,
       },
@@ -546,7 +553,7 @@ function buildAgentParameterDescription(locale?: string): string {
 
   return PromptLocaleService.get(
     activeLocale,
-    "orchestrator.tools.create_subagents.parameters.memberAgentDefault",
+    defaultKey,
   );
 }
 
@@ -628,6 +635,53 @@ function getOrchestratorToolSchemas(
     defaultTopology === TOPOLOGIES.MCTS ? "'mcts' (default)" : "'mcts'";
 
   return [
+    {
+      name: TOOL_NAMES.CREATE_SUBAGENT,
+      emoji: ["🤖", "📤"],
+      description: PromptLocaleService.get(
+        activeLocale,
+        "orchestrator.tools.create_subagent.description",
+      ),
+      parameters: {
+        type: "object",
+        properties: {
+          description: {
+            type: "string",
+            description: PromptLocaleService.get(
+              activeLocale,
+              "orchestrator.tools.create_subagent.parameters.description",
+            ),
+          },
+          prompt: {
+            type: "string",
+            description: PromptLocaleService.get(
+              activeLocale,
+              "orchestrator.tools.create_subagent.parameters.prompt",
+            ),
+          },
+          files: {
+            type: "array",
+            items: { type: "string" },
+            description: PromptLocaleService.get(
+              activeLocale,
+              "orchestrator.tools.create_subagent.parameters.files",
+            ),
+          },
+          model: {
+            type: "string",
+            description: PromptLocaleService.get(
+              activeLocale,
+              "orchestrator.tools.create_subagent.parameters.model",
+            ),
+          },
+          agent: {
+            type: "string",
+            description: buildAgentParameterDescription(activeLocale, "create_subagent"),
+          },
+        },
+        required: ["description", "prompt"],
+      },
+    },
     {
       name: TOOL_NAMES.CREATE_SUBAGENTS,
       emoji: ["👥", "🤖"],
@@ -1216,6 +1270,7 @@ export default class ToolOrchestratorService {
       create_cron_job: ["📅", "🔔"],
       list_cron_jobs: ["📅", "📋"],
       delete_cron_job: ["📅", "❌"],
+      create_subagent: ["🤖", "📤"],
       create_subagents: ["👥", "🤖"],
       send_subagent_message: ["💬", "📤"],
       stop_subagent: ["⏹️", "🤖"],
@@ -1605,6 +1660,45 @@ export default class ToolOrchestratorService {
     };
 
     switch (name) {
+      case TOOL_NAMES.CREATE_SUBAGENT: {
+        // Wrap flat singular args into the createTeam format (single member, no topology)
+        const singularArgs = args as { description?: string; prompt?: string; files?: string[]; model?: string; agent?: string };
+        const teamName = (singularArgs.description || "subagent").toLowerCase().replace(/\s+/g, "_").slice(0, 32);
+        const wrappedArgs = {
+          name: teamName,
+          members: [{
+            description: singularArgs.description,
+            prompt: singularArgs.prompt,
+            files: singularArgs.files,
+            model: singularArgs.model,
+            agent: singularArgs.agent,
+          }],
+        };
+        const singleResult = await OrchestratorService.createTeam(
+          wrappedArgs as unknown as { name: string; members: TeamMember[] },
+          orchestratorContext as OrchestratorContext,
+        );
+
+        const singleCallerDepth = orchestratorContext.recursionDepth ?? 0;
+        if (singleCallerDepth > 0) {
+          return singleResult;
+        }
+
+        const hasSingleRunning = Array.isArray(singleResult) && singleResult.some(
+          (agentResult) => "status" in agentResult && agentResult.status === "running",
+        );
+
+        if (!hasSingleRunning) {
+          return singleResult;
+        }
+
+        return {
+          _directive: "NON_BLOCKING_DISPATCH",
+          instruction: "Sub-agent is running in the background. You will be automatically notified with a [SUB-AGENT TEAM COMPLETED] message when it finishes. END YOUR TURN NOW — do not call get_subagent_output or delay_execution. Simply respond to the user that the sub-agent has been dispatched and you will report back when it completes.",
+          agents: singleResult,
+        };
+      }
+
       case TOOL_NAMES.CREATE_SUBAGENTS: {
         const createTeamResults = await OrchestratorService.createTeam(
           args as unknown as { name: string; members: TeamMember[]; topology?: string },

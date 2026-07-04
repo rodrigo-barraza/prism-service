@@ -1334,19 +1334,22 @@ export class OrchestratorService {
       return [{ error: errorMessage }];
     }
 
-    // ── Single-member topology guard ──────────────────────────────
-    // Topologies are multi-agent coordination patterns. If the LLM
-    // explicitly passes a topology with only 1 member, reject so
-    // it retries without the topology param — prevents wasteful
-    // router instantiation for what's effectively a simple delegation.
+    // ── Minimum members guard for create_subagents ─────────────────
+    // The plural create_subagents tool requires 2+ members for
+    // multi-agent coordination. Single-agent delegation should use
+    // create_subagent (singular) instead. This guard catches LLMs
+    // that incorrectly use the plural tool with only 1 member.
+    // Note: create_subagent (singular) bypasses this entirely — it
+    // wraps into a single-member team internally.
     if (
       teamCreationArguments.members?.length === 1 &&
       teamCreationArguments.topology
     ) {
       const errorMessage =
-        `Topology "${teamCreationArguments.topology}" is not needed for a single sub-agent. ` +
-        `Topologies coordinate multiple agents — with only 1 member, omit the 'topology' parameter entirely. ` +
-        `The agent will be spawned directly without a coordination pattern.`;
+        `create_subagents requires at least 2 members for multi-agent coordination. ` +
+        `For a single sub-agent, use create_subagent (singular) instead: ` +
+        `create_subagent({ description: "...", prompt: "..." }). ` +
+        `It has simpler flat parameters with no topology.`;
       logger.info(`[Orchestrator] createTeam: ${errorMessage}`);
       return [{ error: errorMessage }];
     }

@@ -160,7 +160,8 @@ export function expandMessagesForFunctionCall(
           // that providers reject (assistant has tool_calls but no tool results).
           let finalResult: ToolResultValue = (toolCall.result as ToolResultValue) ?? null;
           if (
-            (toolCall.name === TOOL_NAMES.CREATE_SUBAGENTS ||
+            (toolCall.name === TOOL_NAMES.CREATE_SUBAGENT ||
+              toolCall.name === TOOL_NAMES.CREATE_SUBAGENTS ||
               toolCall.name === "team_create") &&
             Array.isArray(toolCall.result)
           ) {

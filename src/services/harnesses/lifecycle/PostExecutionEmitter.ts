@@ -58,6 +58,7 @@ export function emitPostExecutionStatus(
   if (
     toolCalls.some(
       (toolCall) =>
+        toolCall.name === TOOL_NAMES.CREATE_SUBAGENT ||
         toolCall.name === TOOL_NAMES.CREATE_SUBAGENTS ||
         // TODO(cleanup): Remove "team_create" once historical sessions have aged out
         toolCall.name === "team_create" ||
