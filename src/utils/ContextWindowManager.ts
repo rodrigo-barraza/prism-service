@@ -339,8 +339,11 @@ export default class ContextWindowManager {
     // Calculate the effective token budget
     const schemaOverhead = TOOL_SCHEMA_OVERHEAD_TOKENS + toolCount * 150;
     const outputReserve = Math.max(maxOutputTokens, MIN_OUTPUT_RESERVE);
-    const budget = Math.floor(
-      (maxInputTokens - outputReserve - schemaOverhead) * TARGET_UTILIZATION,
+    const budget = Math.max(
+      Math.floor(
+        (maxInputTokens - outputReserve - schemaOverhead) * TARGET_UTILIZATION,
+      ),
+      1024, // Ensure at least a small budget even if window is tight
     );
 
     if (budget <= 0) {

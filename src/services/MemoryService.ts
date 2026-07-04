@@ -268,6 +268,10 @@ const MemoryService = {
       type = CODING_MEMORY_TYPES.includes(type as string) ? type : "project";
     }
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
+    if (!collection) {
+      logger.warn(`[MemoryService] store: collection ${COLLECTION} not available`);
+      return null;
+    }
     const embedText = title ? `${title}: ${content}` : content;
     // Generate embedding if not provided
     if (!embedding) {
@@ -421,6 +425,10 @@ const MemoryService = {
     if (!agent)
       throw new Error("MemoryService.search requires an agent identifier");
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
+    if (!collection) {
+      logger.warn(`[MemoryService] search: collection ${COLLECTION} not available`);
+      return [];
+    }
     // Generate embedding for the search query
     const embeddingOpts: EmbedOptions = {};
     if (conversationId) embeddingOpts.conversationId = conversationId;
@@ -461,7 +469,9 @@ const MemoryService = {
     const scored = memories
       .filter(
         (memory: Record<string, unknown>) =>
-          memory.embedding && (memory.embedding as number[]).length > 0,
+          memory &&
+          memory.embedding &&
+          (memory.embedding as number[]).length > 0,
       )
       .map((memory: Record<string, unknown>) => ({
         id: memory._id,
@@ -599,11 +609,14 @@ const MemoryService = {
   formatForPrompt(memories: Record<string, unknown>[]) {
     if (!memories || memories.length === 0) return "";
     return memories
+      .filter((memory) => !!memory)
       .map((memory: Record<string, unknown>) => {
-        const badge = `[${memory.type}]`;
-        const age = memory.age !== "today" ? ` (${memory.age})` : "";
+        const badge = `[${memory.type || "other"}]`;
+        const age = memory.age !== "today" ? ` (${memory.age || ""})` : "";
         const caveat = freshnessCaveat(memory.createdAt as string);
-        return `- ${badge} **${memory.title}**${age}: ${memory.content}${caveat}`;
+        const title = memory.title || "Untitled";
+        const content = memory.content || "";
+        return `- ${badge} **${title}**${age}: ${content}${caveat}`;
       })
       .join("\n");
   },
