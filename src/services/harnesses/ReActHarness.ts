@@ -378,7 +378,7 @@ export default class ReActHarness extends BaseAgenticHarness {
         this.registerTrackerRequest(passRequestId);
 
         // ── Stream LLM response ────────────────────────────────
-        const stream = this.createProviderStream(currentMessages, passOptions);
+        const stream = await this.createProviderStream(currentMessages, passOptions);
         await this.consumeStream(stream, pass, allowedToolNames);
 
         // ── Repetition detection recovery ──────────────────────
@@ -424,7 +424,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             retryPass.requestId = retryRequestId;
             this.registerTrackerRequest(retryRequestId);
 
-            const retryStream = this.createProviderStream(
+            const retryStream = await this.createProviderStream(
               currentMessages,
               perturbedPassOptions,
             );

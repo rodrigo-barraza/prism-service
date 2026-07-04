@@ -670,5 +670,12 @@ export function createLlamaCppProvider(
         health: normalizedHealth,
       };
     },
+
+    async discoverContextWindow(
+      model: string,
+      options: ProviderOptions,
+    ): Promise<void> {
+      await discoverContextLength(instanceId, getBaseUrl(), model, options);
+    },
   };
 }

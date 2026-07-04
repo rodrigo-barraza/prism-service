@@ -550,12 +550,27 @@ export default class BaseAgenticHarness {
    * Create an LLM text stream from the provider.
    * Handles liveAPI fallback, message expansion, and dynamic output
    * token clamping to prevent context window overflow.
+   *
+   * Async because self-hosted providers (vLLM, llama-cpp, Ollama) may
+   * need to query their model info endpoint to discover the context
+   * window before clamping can run. This fixes the cold-start race
+   * where the first iteration would skip clamping because the context
+   * length hadn't been discovered yet.
    */
-  createProviderStream(
+  async createProviderStream(
     messages: ConversationMessage[],
     passOptions: AgenticOptions,
-  ): AsyncIterable<unknown> {
+  ): Promise<AsyncIterable<unknown>> {
     const { provider, resolvedModel, modelDefinition, signal } = this.context;
+
+    // Pre-discover context window for self-hosted providers so
+    // clampOutputTokens has the budget available on the first iteration
+    if (provider.discoverContextWindow) {
+      await provider.discoverContextWindow(
+        resolvedModel,
+        this.context.options,
+      );
+    }
 
     const clampedMaxTokens = this.clampOutputTokens(
       messages,

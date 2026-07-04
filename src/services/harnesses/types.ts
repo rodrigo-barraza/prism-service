@@ -138,6 +138,10 @@ export interface LLMProvider {
     model: string,
     options: Record<string, unknown>,
   ): AsyncIterable<unknown>;
+  discoverContextWindow?(
+    model: string,
+    options: Record<string, unknown>,
+  ): Promise<void>;
 }
 
 // ── Model Definition ────────────────────────────────────────
