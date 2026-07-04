@@ -64,6 +64,7 @@ export class SubAgentTelemetryEmitter {
 
   // Phase tracking
   private lastPhase: string | null = null;
+  private startedAt: string;
 
   // Aggregate session-level HWMs (prevent non-monotonic values)
   private highWaterMarkOutputTokens = 0;
@@ -86,6 +87,7 @@ export class SubAgentTelemetryEmitter {
     this.parentEmit = config.parentEmit;
     this.parentConversationId = config.parentConversationId;
     this.recursionDepth = config.recursionDepth ?? 0;
+    this.startedAt = new Date().toISOString();
   }
 
   /**
@@ -217,7 +219,10 @@ export class SubAgentTelemetryEmitter {
             ConversationStatusRegistry.patchSubAgent(
               this.parentConversationId,
               this.subAgentId,
-              { phase: "generating" },
+              {
+                phase: "generating",
+                startedAt: this.startedAt,
+              },
             );
           }
         }
@@ -252,7 +257,10 @@ export class SubAgentTelemetryEmitter {
             ConversationStatusRegistry.patchSubAgent(
               this.parentConversationId,
               this.subAgentId,
-              { phase: "thinking" },
+              {
+                phase: "thinking",
+                startedAt: this.startedAt,
+              },
             );
           }
         }
@@ -363,6 +371,7 @@ export class SubAgentTelemetryEmitter {
           {
             phase: event.phase,
             label: typeof event.message === "string" ? event.message : null,
+            startedAt: this.startedAt,
           },
         );
       }
