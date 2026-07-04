@@ -580,6 +580,8 @@ export class OrchestratorService {
       orchestratorContext.emit({
         type: "sub_agent_status",
         subAgentId: agentId,
+        message: STATUS_MESSAGES.SPAWNED,
+        description,
         status: SYSTEM_STATUSES.RUNNING,
         agentConversationId,
         conversationId: subAgentConversationId,
@@ -1767,8 +1769,9 @@ export class OrchestratorService {
       orchestratorContext.emit({
         type: "sub_agent_status",
         subAgentId: agentId,
-        status: SYSTEM_STATUSES.RUNNING,
+        message: STATUS_MESSAGES.SPAWNED,
         description: subAgent.description,
+        status: SYSTEM_STATUSES.RUNNING,
         conversationId: subAgent.subAgentConversationId,
         parentConversationId: subAgent.parentConversationId || null,
         model: subAgent.resolvedModel,
@@ -1873,8 +1876,9 @@ export class OrchestratorService {
       orchestratorContext.emit({
         type: "sub_agent_status",
         subAgentId: agentId,
-        status: SYSTEM_STATUSES.RUNNING,
+        message: STATUS_MESSAGES.SPAWNED,
         description: subAgent.description,
+        status: SYSTEM_STATUSES.RUNNING,
         conversationId: subAgent.subAgentConversationId,
         parentConversationId: subAgent.parentConversationId || null,
         model: subAgent.resolvedModel,
