@@ -455,7 +455,10 @@ describe("AgenticLoopService", () => {
     const toolExecEvents = emittedEvents.filter((e: any) => e.type === "tool_execution");
     expect(toolExecEvents.length).toBe(0);
     
-    // And it shouldn't have iterated a second time because there were no pending tools
-    expect(mockProvider.generateTextStream).toHaveBeenCalledTimes(1);
+    // The first call produces empty output (tool call was dropped). The empty
+    // output recovery mechanism retries with a temperature bump and continuation
+    // nudge. Since maxIterations=2, only 1 retry happens before hitting the
+    // iteration limit. Total calls: 1 original + 1 retry = 2.
+    expect(mockProvider.generateTextStream).toHaveBeenCalledTimes(2);
   });
 });
