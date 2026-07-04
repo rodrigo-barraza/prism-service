@@ -26,13 +26,85 @@ vi.mock("../../SettingsService.ts", () => ({
   },
 }));
 
+const MOCK_CLIENT_TOOL_SCHEMAS = [
+  {
+    name: "write_todo",
+    description: "Write or update a persistent TODO checklist.",
+    domain: "Core Harness Tools",
+    parameters: {
+      type: "object",
+      properties: {
+        items: { type: "string", description: "Full list of todo items." },
+      },
+      required: ["items"],
+    },
+  },
+  {
+    name: "search_web",
+    description: "Search the web for information.",
+    domain: "Core Harness Tools",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search query." },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "read_file",
+    description: "Read the contents of a file.",
+    domain: "Core Workspace Tools",
+    parameters: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "File path to read." },
+      },
+      required: ["path"],
+    },
+  },
+  {
+    name: "write_file",
+    description: "Write content to a file.",
+    domain: "Core Workspace Tools",
+    parameters: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "File path to write." },
+        content: { type: "string", description: "Content to write." },
+      },
+      required: ["path", "content"],
+    },
+  },
+  {
+    name: "replace_in_file",
+    description: "Replace content in a file.",
+    domain: "Core Workspace Tools",
+    parameters: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "File path." },
+        old: { type: "string", description: "Old content." },
+        new: { type: "string", description: "New content." },
+      },
+      required: ["path", "old", "new"],
+    },
+  },
+];
+
+const MOCK_TOOL_SCHEMAS = MOCK_CLIENT_TOOL_SCHEMAS.map(({ name, description, parameters }) => ({
+  name,
+  description,
+  parameters,
+}));
+
 vi.mock("../../ToolOrchestratorService.ts", () => ({
   default: {
     getWorkspaceRoot: vi.fn().mockReturnValue("/home/test"),
-    getClientToolSchemas: vi.fn().mockReturnValue([]),
-    getToolSchemas: vi.fn().mockReturnValue([]),
+    getClientToolSchemas: vi.fn().mockReturnValue(MOCK_CLIENT_TOOL_SCHEMAS),
+    getToolSchemas: vi.fn().mockReturnValue(MOCK_TOOL_SCHEMAS),
     getAvailableTopologies: vi.fn().mockReturnValue([]),
-    isWorkspaceAgentConnected: vi.fn().mockResolvedValue(false),
+    isWorkspaceAgentConnected: vi.fn().mockResolvedValue(true),
     ensureSchemas: vi.fn().mockResolvedValue(undefined),
   },
 }));
@@ -62,6 +134,11 @@ const CAVEMAN_RESPONSE_GUIDELINES_MARKER =
 const ENGLISH_RESPONSE_GUIDELINES_MARKER =
   "use tools proactively rather than asking if the user wants you to";
 
+const ALL_TOOL_NAMES = MOCK_CLIENT_TOOL_SCHEMAS.map((schema) => schema.name);
+const NON_WORKSPACE_TOOL_NAMES = MOCK_CLIENT_TOOL_SCHEMAS
+  .filter((schema) => schema.domain !== "Core Workspace Tools")
+  .map((schema) => schema.name);
+
 function buildMinimalAssemblerContext(
   overrides: Partial<AssemblerContext> = {},
 ): AssemblerContext {
@@ -73,8 +150,8 @@ function buildMinimalAssemblerContext(
       { role: "system", content: "" },
       { role: "user", content: "hello" },
     ],
-    enabledTools: [],
-    resolvedToolNames: [],
+    enabledTools: ALL_TOOL_NAMES,
+    resolvedToolNames: ALL_TOOL_NAMES,
     workspaceEnabled: false,
     ...overrides,
   };
@@ -276,6 +353,7 @@ describe("Locale Assembly", () => {
     const COMMAND_EXECUTION_MARKER = "## Command Execution";
     const WORKSPACE_LINE_MARKER = "Workspace:";
     const PROJECT_STRUCTURE_MARKER = "Project Structure";
+    const WORKSPACE_DOMAIN_HEADER = "Core Workspace Tools";
 
     it("should exclude coding guidelines when workspaceEnabled is false", async () => {
       const assembler = new SystemPromptAssembler();
@@ -301,6 +379,50 @@ describe("Locale Assembly", () => {
 
       expect(result.prompt).toContain(CODING_GUIDELINES_MARKER);
       expect(result.prompt).toContain(COMMAND_EXECUTION_MARKER);
+    });
+
+    it("should exclude workspace-domain tools from tool descriptions when workspaceEnabled is false", async () => {
+      const assembler = new SystemPromptAssembler();
+      const context = buildMinimalAssemblerContext({
+        workspaceEnabled: false,
+        locale: "en",
+      });
+
+      const result = await assembler.assemble(context);
+
+      expect(result.prompt).not.toContain(WORKSPACE_DOMAIN_HEADER);
+      expect(result.prompt).not.toContain("### read_file");
+      expect(result.prompt).not.toContain("### write_file");
+      expect(result.prompt).not.toContain("### replace_in_file");
+    });
+
+    it("should include workspace-domain tools in tool descriptions when workspaceEnabled is true", async () => {
+      const assembler = new SystemPromptAssembler();
+      const context = buildMinimalAssemblerContext({
+        workspaceEnabled: true,
+        locale: "en",
+      });
+
+      const result = await assembler.assemble(context);
+
+      expect(result.prompt).toContain(WORKSPACE_DOMAIN_HEADER);
+      expect(result.prompt).toContain("### read_file");
+      expect(result.prompt).toContain("### write_file");
+      expect(result.prompt).toContain("### replace_in_file");
+    });
+
+    it("should still include non-workspace tools when workspaceEnabled is false", async () => {
+      const assembler = new SystemPromptAssembler();
+      const context = buildMinimalAssemblerContext({
+        workspaceEnabled: false,
+        locale: "en",
+      });
+
+      const result = await assembler.assemble(context);
+
+      expect(result.prompt).toContain("### write_todo");
+      expect(result.prompt).toContain("### search_web");
+      expect(result.prompt).toContain("Core Harness Tools");
     });
 
     it("should exclude workspace line from environment when workspaceEnabled is false", async () => {
@@ -354,9 +476,11 @@ describe("Locale Assembly", () => {
 
       expect(result.prompt).toContain(CODING_GUIDELINES_MARKER);
       expect(result.prompt).toContain(COMMAND_EXECUTION_MARKER);
+      expect(result.prompt).toContain(WORKSPACE_DOMAIN_HEADER);
+      expect(result.prompt).toContain("### read_file");
     });
 
-    it("should exclude workspace tool references from Omni identity when workspaceEnabled is false", async () => {
+    it("should produce correct tool count excluding workspace tools", async () => {
       const assembler = new SystemPromptAssembler();
       const context = buildMinimalAssemblerContext({
         workspaceEnabled: false,
@@ -365,12 +489,10 @@ describe("Locale Assembly", () => {
 
       const result = await assembler.assemble(context);
 
-      expect(result.prompt).not.toContain("replace_in_file");
-      expect(result.prompt).not.toContain("patch_file");
-      expect(result.prompt).not.toContain("write_file for new files");
+      expect(result.prompt).toContain("Enabled Tools (2)");
     });
 
-    it("should include workspace tool references in Omni identity when workspaceEnabled is true", async () => {
+    it("should produce correct tool count including workspace tools", async () => {
       const assembler = new SystemPromptAssembler();
       const context = buildMinimalAssemblerContext({
         workspaceEnabled: true,
@@ -379,8 +501,7 @@ describe("Locale Assembly", () => {
 
       const result = await assembler.assemble(context);
 
-      expect(result.prompt).toContain("replace_in_file");
-      expect(result.prompt).toContain("patch_file");
+      expect(result.prompt).toContain("Enabled Tools (5)");
     });
   });
 });

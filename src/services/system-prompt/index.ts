@@ -14,6 +14,7 @@ import { MONGO_DB_NAME } from "../../../config.ts";
 import {
   AGENT_IDS,
   DEFAULT_TOPOLOGY,
+  DOMAINS,
   CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST,
   isCoreDomain,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
@@ -257,6 +258,10 @@ export default class SystemPromptAssembler {
       if (policyText) sections.push(policyText);
     }
 
+    // Resolve once — used by sections 4 through 8 to skip workspace-specific
+    // content when the client has workspace mode disabled.
+    const isWorkspaceEnabled = context.workspaceEnabled !== false;
+
     // ── 4. Enabled Tools (domain-grouped) ──────────────────────
     {
       // Guarantee locale-specific remote tool schemas are cached
@@ -264,24 +269,60 @@ export default class SystemPromptAssembler {
       await ToolOrchestratorService.ensureSchemas(locale);
       const lockedOffToolNames = await resolveLockedOffToolNames();
       const isCompactToolDocs = persona?.compactToolDocs === true;
+
+      // Defense-in-depth: strip workspace-domain tools from the lists
+      // passed to buildToolDescriptions regardless of upstream filtering.
+      // The AgenticToolResolver handles this for the harness path, but
+      // the preview path (ConfigRoutes) builds its own resolvedToolNames
+      // from all schemas without workspace filtering.
+      let effectiveResolvedToolNames = context.resolvedToolNames;
+      let effectiveEnabledTools = context.enabledTools;
+      if (!isWorkspaceEnabled) {
+        const workspaceDomainName = DOMAINS.CORE_WORKSPACE.displayName;
+        const clientSchemas = ToolOrchestratorService.getClientToolSchemas(
+          defaultTopology,
+          locale,
+        );
+        const workspaceToolNames = new Set(
+          clientSchemas
+            .filter(
+              (toolSchema) =>
+                (toolSchema as Record<string, unknown>).domain ===
+                workspaceDomainName,
+            )
+            .map((toolSchema) => toolSchema.name as string),
+        );
+
+        if (effectiveResolvedToolNames?.length) {
+          effectiveResolvedToolNames = effectiveResolvedToolNames.filter(
+            (toolName) => !workspaceToolNames.has(toolName),
+          );
+        }
+        if (effectiveEnabledTools?.length) {
+          effectiveEnabledTools = effectiveEnabledTools.filter(
+            (toolName) => !workspaceToolNames.has(toolName),
+          );
+        }
+      }
+
       const toolDescriptions = this.buildToolDescriptions(
-        context.enabledTools,
+        effectiveEnabledTools,
         agentId,
         defaultTopology,
-        context.resolvedToolNames,
+        effectiveResolvedToolNames,
         lockedOffToolNames,
         isCompactToolDocs,
         locale,
       );
       if (toolDescriptions) {
         let count: number;
-        if (context.resolvedToolNames?.length) {
+        if (effectiveResolvedToolNames?.length) {
           count =
             lockedOffToolNames.size > 0
-              ? context.resolvedToolNames.filter(
+              ? effectiveResolvedToolNames.filter(
                   (toolName) => !lockedOffToolNames.has(toolName),
                 ).length
-              : context.resolvedToolNames.length;
+              : effectiveResolvedToolNames.length;
         } else {
           const schemas = ToolOrchestratorService.getClientToolSchemas(
             defaultTopology,
@@ -294,15 +335,15 @@ export default class SystemPromptAssembler {
                     !lockedOffToolNames.has(toolSchema.name as string),
                 ).length
               : schemas.length;
-          if (context.enabledTools) {
-            const hasPrefixed = context.enabledTools.some(
+          if (effectiveEnabledTools) {
+            const hasPrefixed = effectiveEnabledTools.some(
               (enabledTool) =>
                 enabledTool.startsWith("domain:") ||
                 enabledTool.startsWith("domainKey:"),
             );
             const enabledSet = hasPrefixed
-              ? resolveToolEntriesToSet(context.enabledTools, schemas)
-              : new Set(context.enabledTools);
+              ? resolveToolEntriesToSet(effectiveEnabledTools, schemas)
+              : new Set(effectiveEnabledTools);
 
             const countPersona = agentId
               ? AgentPersonaRegistry.get(agentId)
@@ -354,10 +395,6 @@ export default class SystemPromptAssembler {
         sections.push(header + "\n" + toolDescriptions);
       }
     }
-
-    // Resolve once — used by sections 5 through 8 to skip workspace-specific
-    // content when the client has workspace mode disabled.
-    const isWorkspaceEnabled = context.workspaceEnabled !== false;
 
     // ── 5. Guidelines ─────────────────────────────────────────────
     // Coding guidelines reference workspace tools (replace_in_file,
