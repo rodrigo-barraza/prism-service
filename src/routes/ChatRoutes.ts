@@ -8,6 +8,7 @@ import {
   STATUS_MESSAGES,
   DEFAULT_TOPOLOGY,
   DEFAULT_CONVERSATION_TITLE,
+  DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import express, { Request, Response, NextFunction } from "express";
 import {
@@ -650,6 +651,17 @@ export async function handleConversation(
         ) {
           const disabledSet = new Set(options.disabledTools as string[]);
           tools = tools.filter((toolItem) => !disabledSet.has(toolItem.name));
+        }
+        if (options.workspaceEnabled === false) {
+          const workspaceDomainName = DOMAINS.CORE_WORKSPACE.displayName;
+          const clientSchemas =
+            ToolOrchestratorService.getClientToolSchemas(defaultTopology);
+          const workspaceToolNames = new Set(
+            clientSchemas
+              .filter((toolSchema) => toolSchema.domain === workspaceDomainName)
+              .map((toolSchema) => toolSchema.name),
+          );
+          tools = tools.filter((toolItem) => !workspaceToolNames.has(toolItem.name));
         }
         options.tools = tools;
 

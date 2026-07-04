@@ -75,6 +75,7 @@ export async function executeToolBatch(
             iteration: state.iterations,
             workspaceRoot,
             _toolState: ToolContext.getStore(resolvedAgentConversationId),
+            _workspaceEnabled: context.options?.workspaceEnabled as boolean | undefined,
           },
         );
         const durationMilliseconds = Date.now() - startTime;
@@ -122,6 +123,7 @@ export async function executeToolBatch(
           _thinkingEnabled: context.options?.thinkingEnabled,
           _reasoningEffort: context.options?.reasoningEffort,
           _thinkingBudget: context.options?.thinkingBudget,
+          _workspaceEnabled: context.options?.workspaceEnabled as boolean | undefined,
         },
       );
       const durationMilliseconds = Date.now() - startTime;

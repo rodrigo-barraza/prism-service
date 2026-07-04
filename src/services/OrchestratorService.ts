@@ -2465,6 +2465,7 @@ export class OrchestratorService {
           ...(subAgent.thinkingBudget !== undefined && {
             thinkingBudget: subAgent.thinkingBudget,
           }),
+          workspaceEnabled: orchestratorContext.workspaceEnabled !== false,
         },
         agentConversationId: subAgent.subAgentConversationId,
         parentAgentConversationId: subAgent.parentAgentConversationId,

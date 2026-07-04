@@ -1643,6 +1643,7 @@ export default class ToolOrchestratorService {
       conversationId: context.conversationId,
       traceId: context.traceId,
       workspaceRoot: context.workspaceRoot || null,
+      workspaceEnabled: context._workspaceEnabled !== false,
 
       // Pass the parent's emit so sub-agents can forward live events
       emit: context._emit || null,

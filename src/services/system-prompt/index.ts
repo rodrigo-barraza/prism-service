@@ -90,6 +90,7 @@ export default class SystemPromptAssembler {
     lockedOffToolNames?: Set<string>,
     compact?: boolean,
     locale = "en",
+    workspaceEnabled = true,
   ): string {
     return this.docFormatter.buildToolDescriptions(
       enabledTools,
@@ -99,6 +100,7 @@ export default class SystemPromptAssembler {
       lockedOffToolNames,
       compact,
       locale,
+      workspaceEnabled,
     );
   }
 
@@ -313,6 +315,7 @@ export default class SystemPromptAssembler {
         lockedOffToolNames,
         isCompactToolDocs,
         locale,
+        isWorkspaceEnabled,
       );
       if (toolDescriptions) {
         let count: number;

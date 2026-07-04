@@ -52,6 +52,7 @@ export interface ToolExecutionContext {
   _thinkingEnabled?: boolean;
   _reasoningEffort?: string;
   _thinkingBudget?: number;
+  _workspaceEnabled?: boolean;
   clientIp?: string | null;
   _toolState?: unknown;
 }

@@ -861,6 +861,7 @@ describe("ToolOrchestratorService", () => {
         thinkingEnabled: true,
         reasoningEffort: "medium",
         thinkingBudget: 2000,
+        workspaceEnabled: true,
       });
     });
 

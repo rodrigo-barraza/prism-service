@@ -296,9 +296,16 @@ export default class AgenticToolResolver {
     // ── Workspace domain exclusion ─────────────────────────────────
     if (options.workspaceEnabled === false) {
       const workspaceDomainName = DOMAINS.CORE_WORKSPACE.displayName;
+      const clientSchemas =
+        ToolOrchestratorService.getClientToolSchemas(defaultTopology);
+      const workspaceToolNames = new Set(
+        clientSchemas
+          .filter((toolSchema) => toolSchema.domain === workspaceDomainName)
+          .map((toolSchema) => toolSchema.name),
+      );
       const previousCount = finalTools.length;
       finalTools = finalTools.filter(
-        (tool) => (tool as ToolSchema).domain !== workspaceDomainName,
+        (tool) => !workspaceToolNames.has(tool.name),
       );
       if (finalTools.length < previousCount) {
         logger.info(
