@@ -5,6 +5,7 @@ import logger from "../../utils/logger.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
+  type StatusMessage,
   TOOL_NAMES,
   THOUGHT_STRUCTURES,
   MAX_TOOL_ITERATIONS,
@@ -80,6 +81,8 @@ const {
   REPETITION_TEMPERATURE_BUMP,
   REPETITION_PENALTY_BUMP,
   MAX_POST_WARNING_STALL_ITERATIONS,
+  MAX_EMPTY_OUTPUT_RETRIES,
+  EMPTY_OUTPUT_TEMPERATURE_BUMP,
 } = HARNESS;
 
 /**
@@ -176,6 +179,7 @@ export default class ReActHarness extends BaseAgenticHarness {
 
     let currentMessages: ConversationMessage[] = [...context.messages];
     let truncationRecoveryCount = 0;
+    let emptyOutputRetryCount = 0;
     let hasCleanTextBreak = false;
     let hasNonBlockingDispatchBreak = false;
 
@@ -943,11 +947,48 @@ export default class ReActHarness extends BaseAgenticHarness {
           break;
         }
 
-        // Genuinely empty output (not truncation)
+        // Genuinely empty output (not truncation) — retry with perturbed
+        // parameters before giving up. Small models (12B-class) can
+        // stochastically emit EOS immediately after processing tool results.
+        // A temperature bump and continuation nudge usually recovers them.
+        emptyOutputRetryCount++;
+        if (emptyOutputRetryCount <= MAX_EMPTY_OUTPUT_RETRIES) {
+          const bumpedTemperature =
+            (context.options.temperature ?? 0.7) +
+            EMPTY_OUTPUT_TEMPERATURE_BUMP * emptyOutputRetryCount;
+          context.options.temperature = Math.min(bumpedTemperature, 1.5);
+
+          currentMessages.push({
+            role: "system",
+            content:
+              "Your previous response was empty. You MUST provide a response. " +
+              "If you have gathered information from tool results, synthesize it into a clear summary now. " +
+              "If you need more information, make another tool call.",
+          });
+
+          logger.warn(
+            `[AgenticLoop] Empty output recovery attempt ${emptyOutputRetryCount}/${MAX_EMPTY_OUTPUT_RETRIES} — ` +
+              `bumping temperature to ${context.options.temperature}, injecting continuation nudge.`,
+          );
+
+          emit({
+            type: SERVER_SENT_EVENT_TYPES.STATUS,
+            message: "empty_output_recovery" as StatusMessage,
+            attempt: emptyOutputRetryCount,
+            maxAttempts: MAX_EMPTY_OUTPUT_RETRIES,
+            iteration: state.iterations,
+          });
+
+          this.logIteration(pass, currentMessages);
+          continue;
+        }
+
+        // All empty output recovery attempts exhausted
         logger.warn(
           `[AgenticLoop] Empty model output on iteration ${state.iterations} — ` +
             `text=${pass.streamedText.length}, thinking=${pass.streamedThinking.length}, ` +
-            `toolCalls=${pass.pendingToolCalls.length}. Breaking.`,
+            `toolCalls=${pass.pendingToolCalls.length}. ` +
+            `${MAX_EMPTY_OUTPUT_RETRIES} recovery attempts exhausted. Breaking.`,
         );
 
         emit({

@@ -403,6 +403,12 @@ export const HARNESS = {
   /** Max additional stalled iterations after the first warning before hard-breaking. */
   MAX_POST_WARNING_STALL_ITERATIONS: 2,
 
+  /** Max retries when the model produces genuinely empty output (no text, no thinking, no tools). */
+  MAX_EMPTY_OUTPUT_RETRIES: 2,
+
+  /** Temperature bump applied on each empty output retry attempt. */
+  EMPTY_OUTPUT_TEMPERATURE_BUMP: 0.2,
+
   // ─── Thought Structure Defaults (ToT / GoT shared) ────────
 
   /** Default number of parallel branches for ToT / GoT exploration. */
