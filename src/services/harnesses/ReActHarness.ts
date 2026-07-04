@@ -949,6 +949,13 @@ export default class ReActHarness extends BaseAgenticHarness {
             `text=${pass.streamedText.length}, thinking=${pass.streamedThinking.length}, ` +
             `toolCalls=${pass.pendingToolCalls.length}. Breaking.`,
         );
+
+        emit({
+          type: SERVER_SENT_EVENT_TYPES.STATUS,
+          message: STATUS_MESSAGES.EMPTY_OUTPUT,
+          iteration: state.iterations,
+        });
+
         this.logIteration(pass, currentMessages);
         break;
       }
