@@ -994,6 +994,13 @@ export async function runTreeOfThoughts(
       logger.warn(
         `[TreeOfThoughts] Empty model output on iteration ${state.iterations}. Breaking.`,
       );
+
+      emit({
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.EMPTY_OUTPUT,
+        iteration: state.iterations,
+      });
+
       harness.logIteration(selectedPass, currentMessages);
       break;
     }
