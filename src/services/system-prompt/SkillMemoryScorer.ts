@@ -59,9 +59,9 @@ export class SkillMemoryScorer {
 
       const novelMemories = excludeMemoryIds?.size
         ? memories.filter(
-            (memory) => !excludeMemoryIds.has(memory.id as string),
+            (memory) => memory && !excludeMemoryIds.has(memory.id as string),
           )
-        : memories;
+        : memories.filter((memory) => !!memory);
 
       const excludedCount = memories.length - novelMemories.length;
       logger.info(
@@ -145,6 +145,7 @@ export class SkillMemoryScorer {
 
       // Score and filter by relevance threshold
       const scored: ScoredSkill[] = skills
+        .filter((skill) => !!skill)
         .map((skill) => ({
           name: skill.name as string,
           content: skill.content as string,

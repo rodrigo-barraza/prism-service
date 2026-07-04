@@ -354,7 +354,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
     expect(results).toHaveLength(1);
     expect(results[0]).toHaveProperty("error");
     expect((results[0] as { error: string }).error).toContain(
-      "not needed for a single sub-agent"
+      "requires at least 2 members"
     );
   });
 

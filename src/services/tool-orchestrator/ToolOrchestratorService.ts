@@ -1115,12 +1115,22 @@ export default class ToolOrchestratorService {
         }),
       );
 
-      return [
+      const allTools = [
         ...clientSchemasEnriched,
         ...internalClient,
         ...orchestratorClient,
         ...mcpClient,
       ];
+
+      // Deduplicate by name, prioritizing system:true
+      const uniqueTools = new Map<string, ToolSchemaFull>();
+      for (const tool of allTools) {
+        if (!uniqueTools.has(tool.name) || tool.system) {
+          uniqueTools.set(tool.name, tool);
+        }
+      }
+
+      return Array.from(uniqueTools.values());
     } finally {
       isResolvingClientSchemas = false;
     }
