@@ -355,5 +355,32 @@ describe("Locale Assembly", () => {
       expect(result.prompt).toContain(CODING_GUIDELINES_MARKER);
       expect(result.prompt).toContain(COMMAND_EXECUTION_MARKER);
     });
+
+    it("should exclude workspace tool references from Omni identity when workspaceEnabled is false", async () => {
+      const assembler = new SystemPromptAssembler();
+      const context = buildMinimalAssemblerContext({
+        workspaceEnabled: false,
+        locale: "en",
+      });
+
+      const result = await assembler.assemble(context);
+
+      expect(result.prompt).not.toContain("replace_in_file");
+      expect(result.prompt).not.toContain("patch_file");
+      expect(result.prompt).not.toContain("write_file for new files");
+    });
+
+    it("should include workspace tool references in Omni identity when workspaceEnabled is true", async () => {
+      const assembler = new SystemPromptAssembler();
+      const context = buildMinimalAssemblerContext({
+        workspaceEnabled: true,
+        locale: "en",
+      });
+
+      const result = await assembler.assemble(context);
+
+      expect(result.prompt).toContain("replace_in_file");
+      expect(result.prompt).toContain("patch_file");
+    });
   });
 });

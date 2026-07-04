@@ -19,12 +19,18 @@ export const OogPersona: Persona = {
   avatar: "/oog-agent-avatar.jpg",
   identity: (context) => {
     const activeLocale = context.locale || "en";
+    const isWorkspaceEnabled = context.workspaceEnabled !== false;
     const sections = [
       PromptLocaleService.get(activeLocale, "personas.oog.coreIdentity"),
       PromptLocaleService.get(activeLocale, "personas.oog.innerMonologue"),
       PromptLocaleService.get(activeLocale, "personas.oog.responseGuidelines"),
-      PromptLocaleService.get(activeLocale, "personas.oog.codeSkills"),
     ];
+
+    if (isWorkspaceEnabled) {
+      sections.push(
+        PromptLocaleService.get(activeLocale, "personas.oog.codeSkills"),
+      );
+    }
 
     return sections.join("\n\n");
   },
