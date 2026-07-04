@@ -510,7 +510,7 @@ describe("Tool Description Locale Threading", () => {
         ],
         enabledTools: [],
         resolvedToolNames: [],
-        workspaceEnabled: false,
+        workspaceEnabled: true,
         locale: localeOverride,
       };
     }
@@ -673,7 +673,7 @@ describe("Tool Description Locale Threading", () => {
         ],
         enabledTools: [],
         resolvedToolNames: [],
-        workspaceEnabled: false,
+        workspaceEnabled: true,
         locale,
       };
     }

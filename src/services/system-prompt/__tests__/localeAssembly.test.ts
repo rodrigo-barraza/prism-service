@@ -270,4 +270,90 @@ describe("Locale Assembly", () => {
       expect(assembledPrompt).toContain(ENGLISH_IDENTITY_MARKER);
     });
   });
+
+  describe("workspace gating: workspaceEnabled = false excludes workspace-specific sections", () => {
+    const CODING_GUIDELINES_MARKER = "## Coding Guidelines";
+    const COMMAND_EXECUTION_MARKER = "## Command Execution";
+    const WORKSPACE_LINE_MARKER = "Workspace:";
+    const PROJECT_STRUCTURE_MARKER = "Project Structure";
+
+    it("should exclude coding guidelines when workspaceEnabled is false", async () => {
+      const assembler = new SystemPromptAssembler();
+      const context = buildMinimalAssemblerContext({
+        workspaceEnabled: false,
+        locale: "en",
+      });
+
+      const result = await assembler.assemble(context);
+
+      expect(result.prompt).not.toContain(CODING_GUIDELINES_MARKER);
+      expect(result.prompt).not.toContain(COMMAND_EXECUTION_MARKER);
+    });
+
+    it("should include coding guidelines when workspaceEnabled is true", async () => {
+      const assembler = new SystemPromptAssembler();
+      const context = buildMinimalAssemblerContext({
+        workspaceEnabled: true,
+        locale: "en",
+      });
+
+      const result = await assembler.assemble(context);
+
+      expect(result.prompt).toContain(CODING_GUIDELINES_MARKER);
+      expect(result.prompt).toContain(COMMAND_EXECUTION_MARKER);
+    });
+
+    it("should exclude workspace line from environment when workspaceEnabled is false", async () => {
+      const assembler = new SystemPromptAssembler();
+      const context = buildMinimalAssemblerContext({
+        workspaceEnabled: false,
+        locale: "en",
+      });
+
+      const result = await assembler.assemble(context);
+
+      expect(result.prompt).not.toContain(WORKSPACE_LINE_MARKER);
+      expect(result.prompt).not.toContain(PROJECT_STRUCTURE_MARKER);
+    });
+
+    it("should not fetch skills when workspaceEnabled is false", async () => {
+      const assembler = new SystemPromptAssembler();
+      const context = buildMinimalAssemblerContext({
+        workspaceEnabled: false,
+        locale: "en",
+      });
+
+      const result = await assembler.assemble(context);
+
+      expect(result.skillNames).toEqual([]);
+      expect(result.skillsText).toBe("");
+    });
+
+    it("should still include identity and environment header when workspaceEnabled is false", async () => {
+      const assembler = new SystemPromptAssembler();
+      const context = buildMinimalAssemblerContext({
+        workspaceEnabled: false,
+        locale: "en",
+      });
+
+      const result = await assembler.assemble(context);
+
+      expect(result.prompt).toContain(ENGLISH_IDENTITY_MARKER);
+      expect(result.prompt).toContain("Environment");
+      expect(result.prompt).toContain("Linux");
+    });
+
+    it("should default to workspace enabled when workspaceEnabled is undefined", async () => {
+      const assembler = new SystemPromptAssembler();
+      const context = buildMinimalAssemblerContext({
+        workspaceEnabled: undefined,
+        locale: "en",
+      });
+
+      const result = await assembler.assemble(context);
+
+      expect(result.prompt).toContain(CODING_GUIDELINES_MARKER);
+      expect(result.prompt).toContain(COMMAND_EXECUTION_MARKER);
+    });
+  });
 });

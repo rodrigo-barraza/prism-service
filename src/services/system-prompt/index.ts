@@ -355,8 +355,15 @@ export default class SystemPromptAssembler {
       }
     }
 
+    // Resolve once — used by sections 5 through 8 to skip workspace-specific
+    // content when the client has workspace mode disabled.
+    const isWorkspaceEnabled = context.workspaceEnabled !== false;
+
     // ── 5. Guidelines ─────────────────────────────────────────────
-    if (!isDirectMode) {
+    // Coding guidelines reference workspace tools (replace_in_file,
+    // patch_file, write_file, run_in_background) so they must be
+    // excluded when workspace is off to avoid confusing the LLM.
+    if (!isDirectMode && isWorkspaceEnabled) {
       if (persona?.guidelines) {
         sections.push(persona.guidelines);
       } else if (codingFallback || persona?.usesCodingGuidelines) {
@@ -371,7 +378,8 @@ export default class SystemPromptAssembler {
     }
 
     // ── 5b. Orchestrator Mode Addendum (when orchestrator tools available) ──
-    if (!isDirectMode && (codingFallback || persona?.usesCodingGuidelines)) {
+    // Sub-agent orchestration is workspace-scoped — skip when disabled.
+    if (!isDirectMode && isWorkspaceEnabled && (codingFallback || persona?.usesCodingGuidelines)) {
       const resolvedEnabledSet = (() => {
         if (!context.enabledTools) return null;
         const hasPrefixed = context.enabledTools.some(
@@ -444,7 +452,6 @@ export default class SystemPromptAssembler {
     }
 
     // ── 6. Environment ───────────────────────────────────────────
-    const isWorkspaceEnabled = context.workspaceEnabled !== false;
     const environmentLines = [
       PromptLocaleService.get(locale, "system-prompt.environmentOsLine"),
     ];
@@ -478,31 +485,35 @@ export default class SystemPromptAssembler {
     }
 
     // ── 8. Project Skills (relevance-filtered) ────────────────────
+    // Skills are workspace-scoped context — skip entirely when workspace
+    // is disabled to avoid injecting irrelevant coding/project instructions.
     const lastUserMessage = [...(context.messages || [])]
       .reverse()
       .find((message) => message.role === "user");
     const queryText = (lastUserMessage?.content as string) || "";
 
-    const skills = await this.scorer.fetchSkills(
-      context.project || null,
-      context.username || "",
-      queryText,
-      {
-        traceId: context.traceId,
-        agentConversationId: context.agentConversationId,
-        endpoint: "/agent",
-        agent: agentId,
-      },
-    );
     const skillNames: string[] = [];
     let skillsText = "";
-    if (skills.length > 0) {
-      const skillBlocks = skills.map((s) => {
-        skillNames.push(s.name);
-        return `### ${s.name}\n${s.content}`;
-      });
-      skillsText =
-        `${PROMPT_DELIMITERS.PROJECT_SKILLS}\n` + skillBlocks.join("\n\n");
+    if (isWorkspaceEnabled) {
+      const skills = await this.scorer.fetchSkills(
+        context.project || null,
+        context.username || "",
+        queryText,
+        {
+          traceId: context.traceId,
+          agentConversationId: context.agentConversationId,
+          endpoint: "/agent",
+          agent: agentId,
+        },
+      );
+      if (skills.length > 0) {
+        const skillBlocks = skills.map((s) => {
+          skillNames.push(s.name);
+          return `### ${s.name}\n${s.content}`;
+        });
+        skillsText =
+          `${PROMPT_DELIMITERS.PROJECT_SKILLS}\n` + skillBlocks.join("\n\n");
+      }
     }
 
     // ── 9. Conversation Memory (embedding search) ────────────────────
