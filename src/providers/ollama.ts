@@ -475,5 +475,12 @@ export function createOllamaProvider(
         throw new ProviderError("ollama", getErrorMessage(error), 500, error as Error);
       }
     },
+
+    async discoverContextWindow(
+      model: string,
+      options: ProviderOptions,
+    ): Promise<void> {
+      await discoverContextLength(instanceId, getBaseUrl(), model, options);
+    },
   };
 }

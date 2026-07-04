@@ -309,4 +309,20 @@ export interface Provider {
     onStatus?: (status: string) => void,
   ): Promise<EnsureModelLoadedResult>;
   unloadModel?(modelId: string): Promise<void>;
+  /**
+   * Pre-discover the model's context window before the harness runs
+   * output token clamping. Self-hosted providers (vLLM, llama-cpp,
+   * Ollama) implement this to query their model info endpoint and
+   * populate `options._loadedContextLength`. Cloud providers with
+   * static model definitions don't need this.
+   *
+   * Called by the harness in `createProviderStream` so the budget
+   * tracker has the context window available on the very first
+   * iteration (fixing the cold-start race where discovery happened
+   * inside the async generator, after clamping had already run).
+   */
+  discoverContextWindow?(
+    model: string,
+    options: ProviderOptions,
+  ): Promise<void>;
 }

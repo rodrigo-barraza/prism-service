@@ -817,7 +817,7 @@ async function generateBranch(
   pass.requestId = passRequestId;
   harness.registerTrackerRequest(passRequestId);
 
-  const stream = harness.createProviderStream(branchMessages, passOptions);
+  const stream = await harness.createProviderStream(branchMessages, passOptions);
   await harness.consumeStream(stream, pass, allowedToolNames);
 
   return {
@@ -933,7 +933,7 @@ async function synthesizeBranches(
   synthesisPass.requestId = passRequestId;
   harness.registerTrackerRequest(passRequestId);
 
-  const synthesisStream = harness.createProviderStream(
+  const synthesisStream = await harness.createProviderStream(
     synthesisMessages,
     passOptions,
   );
@@ -1001,7 +1001,7 @@ async function runPlanningPhase(
     pass.requestId = passRequestId;
     harness.registerTrackerRequest(passRequestId);
 
-    const stream = harness.createProviderStream(
+    const stream = await harness.createProviderStream(
       currentMessages,
       planPassOptions,
     );
