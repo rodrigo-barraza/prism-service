@@ -13,6 +13,7 @@ import ConversationService, {
 import { COLLECTIONS, COST_SUMMATION_EXPRESSION, ORCHESTRATOR } from "../constants.ts";
 import logger from "../utils/logger.ts";
 import ConversationTimerService from "../services/ConversationTimerService.ts";
+import ConversationStatusRegistry from "../services/ConversationStatusRegistry.ts";
 import AgenticLoopService from "../services/AgenticLoopService.ts";
 import {
   GetConversationsQuerySchema,
@@ -492,6 +493,9 @@ router.get(
         return res.json({
           ...chat,
           type: "direct",
+          liveStatus: (chat.isGenerating || chat.isActive)
+            ? ConversationStatusRegistry.get(conversationId) || undefined
+            : undefined,
           pendingApproval: pendingApproval.isPending
             ? pendingApproval
             : undefined,
@@ -529,10 +533,15 @@ router.get(
           agentChatRecord.hasSubAgents = true;
         }
 
+        const isConversationActive = !!(agentChatRecord.isGenerating || agentChatRecord.isActive);
+
         return res.json({
           ...agentChat,
           stats: stats || undefined,
           type: "agent",
+          liveStatus: isConversationActive
+            ? ConversationStatusRegistry.get(conversationId) || undefined
+            : undefined,
           pendingApproval: pendingApproval.isPending
             ? pendingApproval
             : undefined,
@@ -548,6 +557,24 @@ router.get(
         `Error fetching specific conversation: ${errorMessage(error)}`,
       );
       next(error);
+    }
+  }),
+);
+
+/**
+ * GET /conversations/:id/live-status
+ * Returns the real-time generation status for an active conversation.
+ * Reads from an in-memory registry — no database query.
+ */
+router.get(
+  "/:id/live-status",
+  asyncHandler(async (req: Request, res: Response) => {
+    const conversationId = req.params.id as string;
+    const liveStatus = ConversationStatusRegistry.get(conversationId);
+    if (liveStatus) {
+      res.json({ active: true, ...liveStatus });
+    } else {
+      res.json({ active: false });
     }
   }),
 );

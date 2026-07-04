@@ -54,6 +54,7 @@ import SemanticStallDetector from "./lifecycle/SemanticStallDetector.ts";
 
 import PlanningModeService from "../PlanningModeService.ts";
 import PromptLocaleService from "../PromptLocaleService.ts";
+import ConversationStatusRegistry from "../ConversationStatusRegistry.ts";
 import { HARNESS } from "../../constants.ts";
 
 import type {
@@ -202,6 +203,27 @@ export default class ReActHarness extends BaseAgenticHarness {
       });
     }
 
+    // ── Register initial live status in the registry ──────────
+    // So clients recovering from a page refresh or conversation switch
+    // can read the current generation state from the REST endpoint.
+    const registryConversationId = context.agentConversationId as string;
+    if (registryConversationId) {
+      ConversationStatusRegistry.set(registryConversationId, {
+        phase: options.planFirst ? "thinking" : "generating",
+        label: options.planFirst ? "Planning..." : null,
+        iteration: 0,
+        maxIterations: Number.isFinite(resolvedMaxIterations) ? resolvedMaxIterations : 0,
+        startedAt: new Date().toISOString(),
+        phaseStartedAt: new Date().toISOString(),
+        tokensPerSecond: null,
+        activeRequests: 0,
+        outputTokens: 0,
+        inputTokens: 0,
+        totalTokens: 0,
+        subAgents: {},
+      });
+    }
+
     // ── Main loop ────────────────────────────────────────────
     // Wrapped in try/catch to persist accumulated messages on error.
     // Without this, a provider timeout mid-loop leaves the conversation
@@ -217,6 +239,14 @@ export default class ReActHarness extends BaseAgenticHarness {
           iteration: state.iterations,
           maxIterations: resolvedMaxIterations,
         });
+
+        // Mirror iteration progress to the live status registry
+        if (registryConversationId) {
+          ConversationStatusRegistry.patch(registryConversationId, {
+            iteration: state.iterations,
+            maxIterations: Number.isFinite(resolvedMaxIterations) ? resolvedMaxIterations : 0,
+          });
+        }
 
         // ── Instruction fade-out countermeasure ─────────────────
         await maybeInjectSystemReminder(currentMessages, state, context);

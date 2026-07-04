@@ -4,6 +4,7 @@
 // Extracted from OrchestratorService._runSubAgentLoop()
 
 import ConversationGenerationTracker from "../ConversationGenerationTracker.ts";
+import ConversationStatusRegistry from "../ConversationStatusRegistry.ts";
 import { estimateTokens } from "./SubAgentResultBuilder.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
@@ -211,6 +212,14 @@ export class SubAgentTelemetryEmitter {
             message: "phase",
             phase: "generating",
           });
+          // Mirror to parent's live status registry
+          if (this.parentConversationId) {
+            ConversationStatusRegistry.patchSubAgent(
+              this.parentConversationId,
+              this.subAgentId,
+              { phase: "generating" },
+            );
+          }
         }
 
         if (this.parentEmit && this.shouldEmitProgress()) {
@@ -238,6 +247,14 @@ export class SubAgentTelemetryEmitter {
             message: "phase",
             phase: "thinking",
           });
+          // Mirror to parent's live status registry
+          if (this.parentConversationId) {
+            ConversationStatusRegistry.patchSubAgent(
+              this.parentConversationId,
+              this.subAgentId,
+              { phase: "thinking" },
+            );
+          }
         }
 
         if (this.parentEmit && this.shouldEmitProgress()) {
@@ -338,6 +355,17 @@ export class SubAgentTelemetryEmitter {
         label: typeof event.message === "string" ? event.message : undefined,
         ...(event.progress != null && { progress: event.progress }),
       });
+      // Mirror to parent's live status registry
+      if (this.parentConversationId) {
+        ConversationStatusRegistry.patchSubAgent(
+          this.parentConversationId,
+          this.subAgentId,
+          {
+            phase: event.phase,
+            label: typeof event.message === "string" ? event.message : null,
+          },
+        );
+      }
     }
   }
 
@@ -384,6 +412,13 @@ export class SubAgentTelemetryEmitter {
         usage: usage || null,
         estimatedCost: estimatedCost || null,
       });
+    }
+    // Remove sub-agent from parent's live status registry
+    if (this.parentConversationId) {
+      ConversationStatusRegistry.removeSubAgent(
+        this.parentConversationId,
+        this.subAgentId,
+      );
     }
   }
 }
