@@ -70,9 +70,9 @@ const CAVEMAN_REQUIRED_LABEL = "(required)";
 const ENGLISH_REQUIRED_LABEL = "(required)";
 
 // Orchestrator tools
-const CAVEMAN_CREATE_TEAM_MARKER = "spawn sub-agent in isolated worktree";
+const CAVEMAN_CREATE_TEAM_MARKER = "spawn multi-agent team";
 const ENGLISH_CREATE_TEAM_MARKER =
-  "Spawn one or more sub-agents, each in an isolated git worktree";
+  "Spawn a multi-agent team";
 
 
 // System prompt structural sections

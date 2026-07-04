@@ -163,30 +163,25 @@ const executeSkill = {
     const prepared: SkillPrepareResult = await SkillService.prepare(skillId, variables);
     if (prepared.error) return prepared;
 
-    // Execute via orchestrator's create_subagents mechanism
+    // Execute via orchestrator's create_subagent mechanism
     logger.info(
       `[SkillExecute] Executing skill "${prepared.name}" (${prepared.skillId})`,
     );
     const { default: ToolOrchestratorService } =
       await import("../ToolOrchestratorService.js");
     return ToolOrchestratorService.executeOrchestratorTool(
-      TOOL_NAMES.CREATE_SUBAGENTS,
+      TOOL_NAMES.CREATE_SUBAGENT,
       {
-        name: `skill_${prepared.skillId}`,
-        members: [
-          {
-            description: `Skill: ${prepared.name}`,
-            prompt: prepared.prompt,
-            model:
-              "config" in prepared &&
-              prepared.config &&
-              typeof prepared.config === "object" &&
-              "model" in prepared.config &&
-              typeof prepared.config.model === "string"
-                ? prepared.config.model
-                : undefined,
-          },
-        ],
+        description: `Skill: ${prepared.name}`,
+        prompt: prepared.prompt,
+        model:
+          "config" in prepared &&
+          prepared.config &&
+          typeof prepared.config === "object" &&
+          "model" in prepared.config &&
+          typeof prepared.config.model === "string"
+            ? prepared.config.model
+            : undefined,
       },
       context,
     );
