@@ -17,6 +17,7 @@ import {
   DEFAULT_MAX_OUTPUT_TOKENS,
 } from "../../constants/TokenBudgetDefaults.ts";
 import ConversationGenerationTracker from "../ConversationGenerationTracker.ts";
+import ConversationStatusRegistry from "../ConversationStatusRegistry.ts";
 import RequestLogger from "../RequestLogger.ts";
 import FileService from "../FileService.ts";
 import { FILE_CATEGORIES, UNITS, DEFAULT_LOCALE } from "../../constants.ts";
@@ -333,6 +334,20 @@ export default class BaseAgenticHarness {
         outputCharacters: state.hwmOutputCharacters,
         avgTtft: stats.avgTtft,
       });
+
+      // Mirror throughput data to the live status registry so clients
+      // recovering from a page refresh or conversation switch can read
+      // the current generation state from the REST endpoint.
+      const registryConversationId = this.context.agentConversationId as string;
+      if (registryConversationId) {
+        ConversationStatusRegistry.patch(registryConversationId, {
+          tokensPerSecond: stats.tokPerSec,
+          activeRequests: stats.activeRequests,
+          outputTokens: state.hwmOutputTokens,
+          inputTokens: state.hwmInputTokens,
+          totalTokens: state.hwmTotalTokens,
+        });
+      }
     }
     state.lastProgressEmitTime = performance.now();
     state.chunksSinceLastProgress = 0;

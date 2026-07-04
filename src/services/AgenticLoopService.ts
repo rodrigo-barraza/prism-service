@@ -13,6 +13,7 @@ import {
   type QuestionAnswer,
 } from "./ApprovalRegistry.ts";
 import ConversationGenerationTracker from "./ConversationGenerationTracker.ts";
+import ConversationStatusRegistry from "./ConversationStatusRegistry.ts";
 import ToolContext from "./ToolContext.ts";
 import logger from "../utils/logger.ts";
 
@@ -169,6 +170,10 @@ export default class AgenticLoopService {
       // Always clean up per-session tracker entries to prevent memory leaks —
       // sub-agent sessions have their own agentConversationId that must be released.
       ConversationGenerationTracker.cleanup(resolvedAgentConversationId);
+
+      // Remove the live status entry so clients no longer see this conversation
+      // as actively generating after the loop ends.
+      ConversationStatusRegistry.remove(resolvedAgentConversationId);
 
       // Only clean up orchestrator state for root sessions — sub-agents are
       // cleaned by the parent session's OrchestratorService.cleanupConversation().
