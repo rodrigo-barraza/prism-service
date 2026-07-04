@@ -379,6 +379,7 @@ const ConversationService: ConversationServiceInterface = {
       modalities?: Record<string, boolean>;
       toolApiNames?: string[];
       success?: boolean;
+      clientIp?: string;
       agentConversationId?: string;
       parentAgentConversationId?: string;
     }
@@ -404,6 +405,7 @@ const ConversationService: ConversationServiceInterface = {
         modalities: 1,
         toolApiNames: 1,
         success: 1,
+        clientIp: 1,
         agentConversationId: 1,
         parentAgentConversationId: 1,
       })
@@ -449,7 +451,10 @@ const ConversationService: ConversationServiceInterface = {
           toolCounts[name] = (toolCounts[name] || 0) + 1;
         }
       }
-      if (request.success === false) {
+      const isAutoResponse =
+        request.clientIp === "auto-response" ||
+        request.clientIp === "async-task-auto-response";
+      if (request.success === false && !isAutoResponse) {
         requestErrorCount++;
       }
     }

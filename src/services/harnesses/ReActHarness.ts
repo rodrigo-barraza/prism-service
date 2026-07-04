@@ -958,12 +958,18 @@ export default class ReActHarness extends BaseAgenticHarness {
             EMPTY_OUTPUT_TEMPERATURE_BUMP * emptyOutputRetryCount;
           context.options.temperature = Math.min(bumpedTemperature, 1.5);
 
+          const isSubAgent = !!context.parentAgentConversationId;
+          const emptyOutputRecoveryMessage = isSubAgent
+            ? "CRITICAL: Your previous response was completely empty. You are a sub-agent and your output " +
+              "will be returned to the orchestrator. You MUST respond NOW with a synthesis of all tool " +
+              "results you have gathered. Do not attempt more tool calls — summarize what you have."
+            : "Your previous response was empty. You MUST provide a response. " +
+              "If you have gathered information from tool results, synthesize it into a clear summary now. " +
+              "If you need more information, make another tool call.";
+
           currentMessages.push({
             role: "system",
-            content:
-              "Your previous response was empty. You MUST provide a response. " +
-              "If you have gathered information from tool results, synthesize it into a clear summary now. " +
-              "If you need more information, make another tool call.",
+            content: emptyOutputRecoveryMessage,
           });
 
           logger.warn(

@@ -444,7 +444,7 @@ export class OrchestratorService {
       if (persona) {
         subAgentAgentType = persona.id;
         subAgentEnabledTools = persona.availableTools.includes("*")
-          ? null
+          ? enabledTools || null
           : persona.availableTools;
         logger.info(
           `[Orchestrator] Spawning specified sub-agent type "${persona.id}" with availableTools: [${(subAgentEnabledTools || ["*"]).join(", ")}]`,
@@ -2388,21 +2388,39 @@ export class OrchestratorService {
     }
 
     if (!subAgentEnabledTools) {
-      const settings = await SettingsService.getSection("agents");
-      const defaultTopology =
-        orchestratorContext.topology || settings?.topology || DEFAULT_TOPOLOGY;
-      const allToolSchemas =
-        ToolOrchestratorService.getToolSchemas(defaultTopology);
-
-      if (canSpawnRecursively) {
-        subAgentEnabledTools = allToolSchemas.map(
-          (toolSchema) => toolSchema.name,
+      // Inherit the parent orchestrator's enabled tool set. Without this,
+      // sub-agents with no explicit enabledTools (e.g. OMNI persona with
+      // availableTools: ["*"]) would receive the full 289-tool catalog
+      // (~48.5K tokens), consuming most of the context window and leaving
+      // no room for output on smaller models.
+      const parentEnabledTools = orchestratorContext.enabledTools;
+      if (parentEnabledTools?.length) {
+        const orchestratorToolNames = canSpawnRecursively
+          ? new Set<string>()
+          : new Set(ORCHESTRATOR_ONLY_TOOLS);
+        subAgentEnabledTools = parentEnabledTools.filter(
+          (name: string) => !orchestratorToolNames.has(name),
         );
       } else {
-        const orchestratorToolNames = new Set(ORCHESTRATOR_ONLY_TOOLS);
-        subAgentEnabledTools = allToolSchemas
-          .map((toolSchema) => toolSchema.name)
-          .filter((name: string) => !orchestratorToolNames.has(name));
+        // Parent also has no enabled tools — fall back to the full catalog
+        // (this preserves backward compatibility for direct API callers
+        // that don't specify enabledTools at all).
+        const settings = await SettingsService.getSection("agents");
+        const defaultTopology =
+          orchestratorContext.topology || settings?.topology || DEFAULT_TOPOLOGY;
+        const allToolSchemas =
+          ToolOrchestratorService.getToolSchemas(defaultTopology);
+
+        if (canSpawnRecursively) {
+          subAgentEnabledTools = allToolSchemas.map(
+            (toolSchema) => toolSchema.name,
+          );
+        } else {
+          const orchestratorToolNames = new Set(ORCHESTRATOR_ONLY_TOOLS);
+          subAgentEnabledTools = allToolSchemas
+            .map((toolSchema) => toolSchema.name)
+            .filter((name: string) => !orchestratorToolNames.has(name));
+        }
       }
     }
 
