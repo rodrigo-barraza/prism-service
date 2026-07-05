@@ -18,6 +18,8 @@ import {
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import localModelQueue from "./LocalModelQueue.ts";
 import ToolOrchestratorService from "./ToolOrchestratorService.ts";
+import { SubAgentLifecycleService } from "./orchestrator/SubAgentLifecycleService.ts";
+import { TopologyExecutionService } from "./orchestrator/TopologyExecutionService.ts";
 import { ORCHESTRATOR_ONLY_TOOLS } from "./OrchestratorPrompt.ts";
 import SettingsService from "./SettingsService.ts";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
@@ -36,6 +38,9 @@ import {
 import { SubAgentTelemetryEmitter } from "./orchestrator/SubAgentTelemetryEmitter.ts";
 import { evictIdleSecondaryModel } from "./orchestrator/VramEvictionPolicy.ts";
 import type { TopologyRouter } from "./orchestrator/TopologyRouter.ts";
+import { SubAgentIdGenerator } from "./orchestrator/SubAgentIdGenerator.ts";
+import { ConversationUtils } from "./orchestrator/ConversationUtils.ts";
+import { SubAgentPersistenceService } from "./orchestrator/SubAgentPersistenceService.ts";
 
 import type {
   SubAgentState,
@@ -178,18 +183,10 @@ export class OrchestratorService {
     return this.agenticLoopServicePromise;
   }
   private static getRootConversationId(conversationId: string): string {
-    let currentId = conversationId;
-    while (currentId) {
-      const parentAgent = Array.from(activeSubAgents.values()).find(
-        (subAgent) => subAgent.subAgentConversationId === currentId,
-      );
-      if (parentAgent && parentAgent.parentConversationId) {
-        currentId = parentAgent.parentConversationId;
-      } else {
-        break;
-      }
-    }
-    return currentId;
+    return ConversationUtils.getRootConversationId(
+      conversationId,
+      activeSubAgents,
+    );
   }
 
   // ══════════════════════════════════════════════════════════
@@ -396,16 +393,12 @@ export class OrchestratorService {
       }
     }
 
+    // ── Unique ID generation ──────────────────────────────────
     const conversationCounterKey =
       parentConversationId || agentConversationId || "global";
-    const currentConversationCount =
-      (agentCountersByConversation.get(conversationCounterKey) || 0) + 1;
-    agentCountersByConversation.set(
+    const { agentId, branchName } = SubAgentIdGenerator.generate(
       conversationCounterKey,
-      currentConversationCount,
     );
-    const agentId = `agent-${currentConversationCount.toString(36)}-${crypto.randomUUID().slice(0, ORCHESTRATOR.AGENT_ID_SUFFIX_LENGTH)}`;
-    const branchName = `orchestrator/${agentId}`;
     const workspaceRoot = GitWorktreeHelper.getDefaultWorkspaceRoot(
       orchestratorWorkspaceRoot ?? undefined,
     );
@@ -507,75 +500,25 @@ export class OrchestratorService {
     );
 
     // Mark the parent conversation as having sub-agents and register the child's
-    // conversationId in the parent's subAgentIds array. Sub-agents ARE agent_conversations
-    // — the same document type references itself via subAgentIds[].
+    // conversationId in the parent's subAgentIds array.
     if (parentConversationId) {
-      try {
-        const { MONGO_DB_NAME: databaseName } = await import("../../config.ts");
-        const { COLLECTIONS: collectionNames } =
-          await import("../constants.ts");
-        const MongoWrapper = (await import("../wrappers/MongoWrapper.ts"))
-          .default;
-        const conversationCollection = MongoWrapper.getCollection(
-          databaseName,
-          collectionNames.AGENT_CONVERSATIONS,
-        );
-
-        if (conversationCollection) {
-          // Push the child's conversationId into the parent's subAgentIds array
-          const parentUpdateResult = await conversationCollection.updateOne(
-            { id: parentConversationId, project, username },
-            {
-              $set: { hasSubAgents: true },
-              $addToSet: { subAgentIds: subAgentConversationId },
-            },
-          );
-          if (parentUpdateResult.matchedCount === 0) {
-            logger.warn(
-              `[Orchestrator] subAgentIds push matched 0 documents for parent ${parentConversationId} (project=${project}, username=${username})`,
-            );
-          }
-
-          // Set sub-agent metadata on the child conversation document.
-          // The child document may not exist yet (created by the Finalizer after
-          // the agentic loop starts), so we use upsert to ensure the fields
-          // are ready when the Finalizer merges them.
-          await conversationCollection.updateOne(
-            { id: subAgentConversationId },
-            {
-              $set: {
-                isSubAgent: true,
-                subAgentId: agentId,
-                subAgentDescription: description,
-                subAgentStatus: SYSTEM_STATUSES.RUNNING,
-                subAgentProviderName: subAgentProvider,
-                subAgentResolvedModel: subAgentModel,
-                subAgentRecursionDepth: currentRecursionDepth + 1,
-                subAgentGlobalSpawnIndex: globalSpawnIndex ?? null,
-                subAgentBranchName: worktreeResult.error ? null : branchName,
-                subAgentFiles: files || [],
-                parentConversationId,
-                parentAgentConversationId: agentConversationId || null,
-                project,
-                username,
-                agent: subAgentAgentType,
-              },
-              $setOnInsert: {
-                createdAt: new Date().toISOString(),
-              },
-            },
-            { upsert: true },
-          );
-
-          logger.info(
-            `[Orchestrator] Registered sub-agent ${agentId} (${subAgentConversationId}) on parent ${parentConversationId}`,
-          );
-        }
-      } catch (databaseError: unknown) {
-        logger.warn(
-          `[Orchestrator] Failed to persist sub-agent spawn for ${parentConversationId}: ${getErrorMessage(databaseError)}`,
-        );
-      }
+      await SubAgentPersistenceService.registerSubAgent({
+        parentConversationId,
+        project,
+        username,
+        subAgentConversationId,
+        agentId,
+        description,
+        subAgentProvider,
+        subAgentModel,
+        currentRecursionDepth,
+        globalSpawnIndex,
+        branchName,
+        files: files || [],
+        agentConversationId: agentConversationId || "",
+        subAgentAgentType,
+        worktreeError: worktreeResult.error ?? null,
+      });
     }
 
     // Emit early so the frontend can show live status immediately
@@ -830,10 +773,6 @@ export class OrchestratorService {
     return { agent_id: agentId, status: SYSTEM_STATUSES.STOPPED };
   }
 
-  /**
-   * Read the output from a previously spawned sub-agent.
-   * Returns the full result if completed, or partial status if still running.
-   */
   static getTaskOutput(agentId: string):
     | SubAgentResult
     | { error: string }
@@ -844,69 +783,20 @@ export class OrchestratorService {
         partialOutput: string | null;
         toolUses: number;
       } {
-    const subAgent = activeSubAgents.get(agentId);
-    if (!subAgent) {
-      return {
-        error: `Sub-agent "${agentId}" not found. It may have been cleaned up.`,
-      };
-    }
-
-    if (subAgent.status === SYSTEM_STATUSES.RUNNING) {
-      return {
-        agent_id: agentId,
-        description: subAgent.description,
-        status: SYSTEM_STATUSES.RUNNING,
-        partialOutput: stripToolCallMarkup((subAgent.output || "").slice(-ORCHESTRATOR.PARTIAL_OUTPUT_TAIL_CHARACTERS)) || null,
-        toolUses: subAgent.toolCalls?.length || 0,
-      };
-    }
-
-    const subAgentResult = buildSubAgentResult(subAgent);
-    subAgent.messages = null; // Release heavy message data from RAM after copying to result
-    return subAgentResult;
+    return SubAgentLifecycleService.getTaskOutput(
+      agentId,
+      activeSubAgents,
+      stripToolCallMarkup,
+    );
   }
 
   static async abortSubAgentsByConversation(
     parentConversationId: string,
   ): Promise<void> {
-    const sessionSubAgents = [...activeSubAgents.values()].filter(
-      (subAgent) => subAgent.parentConversationId === parentConversationId,
+    return SubAgentLifecycleService.abortSubAgentsByConversation(
+      parentConversationId,
+      activeSubAgents,
     );
-    if (sessionSubAgents.length === 0) return;
-
-    logger.info(
-      `[Orchestrator] Aborting ${sessionSubAgents.length} sub-agent(s) for conversation ${parentConversationId}`,
-    );
-
-    const cleanupPromises: Promise<unknown>[] = [];
-    for (const subAgent of sessionSubAgents) {
-      if (subAgent.status === SYSTEM_STATUSES.RUNNING) {
-        subAgent.abortController?.abort();
-        subAgent.status = SYSTEM_STATUSES.STOPPED;
-        subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
-      }
-
-      // Cleanup isolated worktrees immediately
-      const cleanupPromise =
-        subAgent.isolated && subAgent.worktreePath
-          ? GitWorktreeHelper.removeWorktree(
-              subAgent.repositoryPath,
-              subAgent.worktreePath,
-            )
-              .then(() => {
-                subAgent.worktreePath = null;
-              })
-              .catch((error: Error) =>
-                logger.warn(
-                  `[Orchestrator] Worktree cleanup failed for ${subAgent.agentId}: ${getErrorMessage(error)}`,
-                ),
-              )
-          : Promise.resolve();
-
-      cleanupPromises.push(cleanupPromise);
-    }
-
-    await Promise.allSettled(cleanupPromises);
   }
 
   static getSubAgentStatus(agentId: string): {
@@ -1209,6 +1099,7 @@ export class OrchestratorService {
   }
 
   static cleanupConversation(parentAgentConversationId: string): void {
+    SubAgentIdGenerator.deleteConversationCounter(parentAgentConversationId);
     const keysToRemove: string[] = [];
     const keysPreservedRunning: string[] = [];
     const keysPreservedResumable: string[] = [];
@@ -1439,82 +1330,15 @@ export class OrchestratorService {
 
     // Sync the active topology to the conversation settings in MongoDB so the UI badge and state match execution
     if (orchestratorContext.conversationId) {
-      try {
-        const { MONGO_DB_NAME: databaseName } = await import("../../config.ts");
-        const { COLLECTIONS: collectionNames } =
-          await import("../constants.ts");
-        const MongoWrapper = (await import("../wrappers/MongoWrapper.ts"))
-          .default;
-        const databaseCollection = MongoWrapper.getCollection(
-          databaseName,
-          collectionNames.AGENT_CONVERSATIONS,
-        );
-
-        if (databaseCollection) {
-          const topologyResult = await databaseCollection.updateOne(
-            {
-              id: orchestratorContext.conversationId,
-              project: orchestratorContext.project,
-              username: orchestratorContext.username,
-            },
-            {
-              $set: {
-                "settings.agents.topology": topology,
-                updatedAt: new Date().toISOString(),
-              },
-            },
-          );
-          if (topologyResult.matchedCount === 0) {
-            logger.warn(
-              `[Orchestrator] Topology sync matched 0 documents for conversation ${orchestratorContext.conversationId}`,
-            );
-          } else {
-            logger.info(
-              `[Orchestrator] Updated conversation settings topology to "${topology}" for conversation ${orchestratorContext.conversationId}`,
-            );
-          }
-        }
-      } catch (databaseError: unknown) {
-        logger.warn(
-          `[Orchestrator] Failed to update conversation settings topology in MongoDB: ${getErrorMessage(databaseError)}`,
-        );
-      }
+      await TopologyExecutionService.syncTopologyToDatabase(
+        orchestratorContext.conversationId,
+        orchestratorContext.project,
+        orchestratorContext.username,
+        topology,
+      );
     }
 
-    let router: TopologyRouter;
-    if (topology === TOPOLOGIES.SEQUENTIAL) {
-      const { SequentialRouter } =
-        await import("./orchestrator/routers/SequentialRouter.ts");
-      router = new SequentialRouter();
-    } else if (topology === TOPOLOGIES.PEER_TO_PEER) {
-      const { PeerToPeerRouter } =
-        await import("./orchestrator/routers/PeerToPeerRouter.ts");
-      router = new PeerToPeerRouter();
-    } else if (topology === TOPOLOGIES.HIERARCHICAL_AGGREGATION) {
-      const { HierarchicalAggregationRouter } =
-        await import("./orchestrator/routers/HierarchicalAggregationRouter.ts");
-      router = new HierarchicalAggregationRouter();
-    } else if (topology === TOPOLOGIES.TOURNAMENT) {
-      const { TournamentRouter } =
-        await import("./orchestrator/routers/TournamentRouter.ts");
-      router = new TournamentRouter();
-    } else if (topology === TOPOLOGIES.CRITIC_LOOP) {
-      const { CriticLoopRouter } =
-        await import("./orchestrator/routers/CriticLoopRouter.ts");
-      router = new CriticLoopRouter();
-    } else if (topology === TOPOLOGIES.DIVIDE_AND_CONQUER) {
-      const { DivideAndConquerRouter } =
-        await import("./orchestrator/routers/DivideAndConquerRouter.ts");
-      router = new DivideAndConquerRouter();
-    } else if (topology === TOPOLOGIES.MCTS) {
-      const { MCTSRouter } =
-        await import("./orchestrator/routers/MCTSRouter.ts");
-      router = new MCTSRouter();
-    } else {
-      const { HierarchicalRouter } =
-        await import("./orchestrator/routers/HierarchicalRouter.ts");
-      router = new HierarchicalRouter();
-    }
+    const router = await TopologyExecutionService.resolveRouter(topology);
 
     // ── Dispatch mode: blocking (sub-agent) vs non-blocking (top-level) ──
     // Sub-agents (recursionDepth > 0) block on create_subagents: their agentic

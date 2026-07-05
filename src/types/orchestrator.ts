@@ -101,6 +101,11 @@ export interface SubAgentResult {
   subtreeMetrics?: SubtreeMetrics;
 }
 
+export interface SubAgentStopResult {
+  agent_id: string;
+  status: string;
+}
+
 export interface SubtreeMetrics {
   totalDescendants: number;
   maxDepthReached: number;
@@ -204,7 +209,8 @@ export interface OrchestratorContext {
   reasoningEffort?: string;
   /** Inherit parent's thinking token budget. */
   thinkingBudget?: number;
-  [key: string]: unknown;
+  /** Extensibility for custom orchestrator data. */
+  extensionData?: Record<string, string | number | boolean | null | undefined>;
 }
 
 /**
@@ -222,7 +228,8 @@ export function nextGlobalSpawnIndex(orchestratorContext: OrchestratorContext): 
 
 export interface ToolsApiResponse {
   error?: string;
-  [key: string]: unknown;
+  /** Additional response metadata. */
+  metadata?: Record<string, string | number | boolean | null | undefined>;
 }
 
 export interface WorktreeCreateResponse extends ToolsApiResponse {
@@ -250,11 +257,17 @@ export interface TeamMemberResult {
   agent_id?: string;
   status?: string;
   error?: string;
-  [key: string]: unknown;
+  /** Additional result metadata. */
+  metadata?: Record<string, string | number | boolean | null | undefined>;
 }
 
 export interface ResumedAgentResult {
   _directive: string;
   instruction: string;
-  agent: Record<string, unknown>;
+  agent: {
+    agent_id: string;
+    description: string;
+    status: string;
+    previousToolUses?: number;
+  };
 }

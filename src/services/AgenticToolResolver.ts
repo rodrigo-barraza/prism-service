@@ -33,7 +33,13 @@ interface ToolSchema {
 interface ModelDefinition {
   outputTypes?: string[];
   inputTypes?: string[];
-  [key: string]: unknown;
+  contextWindow?: number;
+  maxTokens?: number;
+  pricing?: Record<string, number>;
+  thinking?: boolean;
+  supportsThinking?: boolean;
+  thinkingLevels?: string[];
+  tools?: boolean;
 }
 
 interface ResolveOptions {
@@ -42,7 +48,8 @@ interface ResolveOptions {
   webSearch?: boolean;
   isSubAgent?: boolean;
   workspaceEnabled?: boolean;
-  [key: string]: unknown;
+  mcpServers?: string[];
+  thinkingEnabled?: boolean;
 }
 
 interface ResolveParams {
