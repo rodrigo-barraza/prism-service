@@ -9,6 +9,7 @@ import {
   parsePaginationParams,
 } from "../../utils/QueryBuilders.ts";
 import requireDb from "../../middleware/RequireDbMiddleware.ts";
+import { StatsCache } from "../../caches/StatsCache.ts";
 
 const router = express.Router();
 const { REQUESTS: REQUESTS_COLLECTION } = COLLECTIONS;
@@ -24,238 +25,243 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const {
-        project,
-        username,
-        from,
-        to,
-        sort = "createdAt",
-        provider,
-        model,
-        agent,
-        workspace,
-      } = req.query;
+      const cacheKey = StatsCache.buildCacheKey("/traces", req.query);
+      const responseData = await StatsCache.getOrFetch(cacheKey, async () => {
+        const {
+          project,
+          username,
+          from,
+          to,
+          sort = "createdAt",
+          provider,
+          model,
+          agent,
+          workspace,
+        } = req.query;
 
-      const { skip, limit, page, sortDirection } = parsePaginationParams(
-        req.query,
-      );
-
-      const match: Record<string, unknown> = { traceId: { $ne: null } };
-      if (project) match.project = project;
-      if (username) match.username = username;
-
-      if (agent) {
-        const agentIds = String(agent).split(",").filter(Boolean);
-        if (agentIds.length === 1) {
-          match.agent = agentIds[0];
-        } else if (agentIds.length > 1) {
-          match.agent = { $in: agentIds };
-        }
-      }
-
-      if (provider) {
-        const providerNames = String(provider).split(",").filter(Boolean);
-        if (providerNames.length === 1) {
-          match.provider = providerNames[0];
-        } else if (providerNames.length > 1) {
-          match.provider = { $in: providerNames };
-        }
-      }
-
-      if (model) {
-        const modelNames = String(model).split(",").filter(Boolean);
-        if (modelNames.length === 1) {
-          match.model = modelNames[0];
-        } else if (modelNames.length > 1) {
-          match.model = { $in: modelNames };
-        }
-      }
-
-      applyDateRangeFilter(match, from as string, to as string);
-
-      if (workspace) {
-        const [convDocs, agentConvDocs] = await Promise.all([
-          req.db
-            .collection(COLLECTIONS.MODEL_CONVERSATIONS)
-            .find({ workspaceRoot: workspace })
-            .project({ id: 1 })
-            .toArray(),
-          req.db
-            .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-            .find({ workspaceRoot: workspace })
-            .project({ id: 1 })
-            .toArray(),
-        ]);
-        const convIds = convDocs.map((document) => document.id);
-        const agentConversationIds = agentConvDocs.map(
-          (document) => document.id,
+        const { skip, limit, page, sortDirection } = parsePaginationParams(
+          req.query,
         );
-        match.$or = [
-          { conversationId: { $in: convIds } },
-          { agentConversationId: { $in: agentConversationIds } },
-          { parentAgentConversationId: { $in: agentConversationIds } },
-        ];
-      }
 
-      const groupStage = {
-        $group: {
-          _id: "$traceId",
-          project: { $first: "$project" },
-          username: { $first: "$username" },
-          createdAt: { $min: "$createdAt" },
-          updatedAt: { $max: "$createdAt" },
-          requestCount: { $sum: 1 },
-          totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
-          totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
-          totalCost: COST_SUMMATION_EXPRESSION,
-          totalLatency: { $sum: { $ifNull: ["$totalTime", 0] } },
-          totalMessages: { $sum: { $ifNull: ["$messageCount", 0] } },
-          _models: { $addToSet: "$model" },
-          _providers: { $addToSet: "$provider" },
-          _agents: { $addToSet: "$agent" },
-          _toolDisplayNames: { $addToSet: "$toolDisplayNames" },
-          _toolApiNames: { $addToSet: "$toolApiNames" },
-          _hasAudio: { $max: { $ifNull: ["$modalities.audio", false] } },
-          _hasVision: { $max: { $ifNull: ["$modalities.vision", false] } },
-          _hasImage: { $max: { $ifNull: ["$modalities.image", false] } },
-          _tpsSum: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $ne: ["$tokensPerSec", null] },
-                    { $gt: ["$tokensPerSec", 0] },
-                  ],
-                },
-                "$tokensPerSec",
-                0,
-              ],
-            },
-          },
-          _tpsCount: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $ne: ["$tokensPerSec", null] },
-                    { $gt: ["$tokensPerSec", 0] },
-                  ],
-                },
-                1,
-                0,
-              ],
-            },
-          },
-        },
-      };
+        const match: Record<string, unknown> = { traceId: { $ne: null } };
+        if (project) match.project = project;
+        if (username) match.username = username;
 
-      const projectStage = {
-        $addFields: {
-          id: "$_id",
-          models: { $setDifference: ["$_models", [null]] },
-          providers: { $setDifference: ["$_providers", [null]] },
-          agents: { $setDifference: ["$_agents", [null]] },
-          toolDisplayNames: {
-            $setDifference: [
-              {
-                $reduce: {
-                  input: {
-                    $filter: {
-                      input: "$_toolDisplayNames",
-                      as: "array",
-                      cond: { $isArray: "$$array" },
-                    },
+        if (agent) {
+          const agentIds = String(agent).split(",").filter(Boolean);
+          if (agentIds.length === 1) {
+            match.agent = agentIds[0];
+          } else if (agentIds.length > 1) {
+            match.agent = { $in: agentIds };
+          }
+        }
+
+        if (provider) {
+          const providerNames = String(provider).split(",").filter(Boolean);
+          if (providerNames.length === 1) {
+            match.provider = providerNames[0];
+          } else if (providerNames.length > 1) {
+            match.provider = { $in: providerNames };
+          }
+        }
+
+        if (model) {
+          const modelNames = String(model).split(",").filter(Boolean);
+          if (modelNames.length === 1) {
+            match.model = modelNames[0];
+          } else if (modelNames.length > 1) {
+            match.model = { $in: modelNames };
+          }
+        }
+
+        applyDateRangeFilter(match, from as string, to as string);
+
+        if (workspace) {
+          const [convDocs, agentConvDocs] = await Promise.all([
+            req.db
+              .collection(COLLECTIONS.MODEL_CONVERSATIONS)
+              .find({ workspaceRoot: workspace })
+              .project({ id: 1 })
+              .toArray(),
+            req.db
+              .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+              .find({ workspaceRoot: workspace })
+              .project({ id: 1 })
+              .toArray(),
+          ]);
+          const convIds = convDocs.map((document) => document.id);
+          const agentConversationIds = agentConvDocs.map(
+            (document) => document.id,
+          );
+          match.$or = [
+            { conversationId: { $in: convIds } },
+            { agentConversationId: { $in: agentConversationIds } },
+            { parentAgentConversationId: { $in: agentConversationIds } },
+          ];
+        }
+
+        const groupStage = {
+          $group: {
+            _id: "$traceId",
+            project: { $first: "$project" },
+            username: { $first: "$username" },
+            createdAt: { $min: "$createdAt" },
+            updatedAt: { $max: "$createdAt" },
+            requestCount: { $sum: 1 },
+            totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
+            totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
+            totalCost: COST_SUMMATION_EXPRESSION,
+            totalLatency: { $sum: { $ifNull: ["$totalTime", 0] } },
+            totalMessages: { $sum: { $ifNull: ["$messageCount", 0] } },
+            _models: { $addToSet: "$model" },
+            _providers: { $addToSet: "$provider" },
+            _agents: { $addToSet: "$agent" },
+            _toolDisplayNames: { $addToSet: "$toolDisplayNames" },
+            _toolApiNames: { $addToSet: "$toolApiNames" },
+            _hasAudio: { $max: { $ifNull: ["$modalities.audio", false] } },
+            _hasVision: { $max: { $ifNull: ["$modalities.vision", false] } },
+            _hasImage: { $max: { $ifNull: ["$modalities.image", false] } },
+            _tpsSum: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $ne: ["$tokensPerSec", null] },
+                      { $gt: ["$tokensPerSec", 0] },
+                    ],
                   },
-                  initialValue: [],
-                  in: { $setUnion: ["$$value", "$$this"] },
-                },
-              },
-              [null],
-            ],
-          },
-          toolApiNames: {
-            $setDifference: [
-              {
-                $reduce: {
-                  input: {
-                    $filter: {
-                      input: "$_toolApiNames",
-                      as: "array",
-                      cond: { $isArray: "$$array" },
-                    },
-                  },
-                  initialValue: [],
-                  in: { $setUnion: ["$$value", "$$this"] },
-                },
-              },
-              [null],
-            ],
-          },
-          avgTokensPerSec: {
-            $cond: [
-              { $gt: ["$_tpsCount", 0] },
-              { $divide: ["$_tpsSum", "$_tpsCount"] },
-              null,
-            ],
-          },
-          startedAt: "$createdAt",
-          finishedAt: "$updatedAt",
-          modalities: {
-            $arrayToObject: {
-              $filter: {
-                input: [
-                  { k: "audio", v: "$_hasAudio" },
-                  { k: "vision", v: "$_hasVision" },
-                  { k: "image", v: "$_hasImage" },
+                  "$tokensPerSec",
+                  0,
                 ],
-                as: "entry",
-                cond: { $eq: ["$$entry.v", true] },
+              },
+            },
+            _tpsCount: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $ne: ["$tokensPerSec", null] },
+                      { $gt: ["$tokensPerSec", 0] },
+                    ],
+                  },
+                  1,
+                  0,
+                ],
               },
             },
           },
-        },
-      };
+        };
 
-      const cleanupStage = {
-        $project: {
-          _id: 0,
-          _models: 0,
-          _providers: 0,
-          _agents: 0,
-          _toolDisplayNames: 0,
-          _toolApiNames: 0,
-          _tpsSum: 0,
-          _tpsCount: 0,
-          _hasAudio: 0,
-          _hasVision: 0,
-          _hasImage: 0,
-        },
-      };
-
-      const sortStage = { $sort: { [sort as string]: sortDirection } };
-
-      const facetPipeline = [
-        { $match: match },
-        groupStage,
-        projectStage,
-        cleanupStage,
-        {
-          $facet: {
-            data: [sortStage, { $skip: skip }, { $limit: limit }],
-            metadata: [{ $count: "total" }],
+        const projectStage = {
+          $addFields: {
+            id: "$_id",
+            models: { $setDifference: ["$_models", [null]] },
+            providers: { $setDifference: ["$_providers", [null]] },
+            agents: { $setDifference: ["$_agents", [null]] },
+            toolDisplayNames: {
+              $setDifference: [
+                {
+                  $reduce: {
+                    input: {
+                      $filter: {
+                        input: "$_toolDisplayNames",
+                        as: "array",
+                        cond: { $isArray: "$$array" },
+                      },
+                    },
+                    initialValue: [],
+                    in: { $setUnion: ["$$value", "$$this"] },
+                  },
+                },
+                [null],
+              ],
+            },
+            toolApiNames: {
+              $setDifference: [
+                {
+                  $reduce: {
+                    input: {
+                      $filter: {
+                        input: "$_toolApiNames",
+                        as: "array",
+                        cond: { $isArray: "$$array" },
+                      },
+                    },
+                    initialValue: [],
+                    in: { $setUnion: ["$$value", "$$this"] },
+                  },
+                },
+                [null],
+              ],
+            },
+            avgTokensPerSec: {
+              $cond: [
+                { $gt: ["$_tpsCount", 0] },
+                { $divide: ["$_tpsSum", "$_tpsCount"] },
+                null,
+              ],
+            },
+            startedAt: "$createdAt",
+            finishedAt: "$updatedAt",
+            modalities: {
+              $arrayToObject: {
+                $filter: {
+                  input: [
+                    { k: "audio", v: "$_hasAudio" },
+                    { k: "vision", v: "$_hasVision" },
+                    { k: "image", v: "$_hasImage" },
+                  ],
+                  as: "entry",
+                  cond: { $eq: ["$$entry.v", true] },
+                },
+              },
+            },
           },
-        },
-      ];
+        };
 
-      const [result] = await req.db
-        .collection(REQUESTS_COLLECTION)
-        .aggregate(facetPipeline, { maxTimeMS: AGGREGATE_MAX_TIME_MILLISECONDS })
-        .toArray();
+        const cleanupStage = {
+          $project: {
+            _id: 0,
+            _models: 0,
+            _providers: 0,
+            _agents: 0,
+            _toolDisplayNames: 0,
+            _toolApiNames: 0,
+            _tpsSum: 0,
+            _tpsCount: 0,
+            _hasAudio: 0,
+            _hasVision: 0,
+            _hasImage: 0,
+          },
+        };
 
-      const docs = result?.data || [];
-      const total = result?.metadata?.[0]?.total || 0;
+        const sortStage = { $sort: { [sort as string]: sortDirection } };
 
-      res.json({ data: docs, total, page, limit });
+        const facetPipeline = [
+          { $match: match },
+          groupStage,
+          projectStage,
+          cleanupStage,
+          {
+            $facet: {
+              data: [sortStage, { $skip: skip }, { $limit: limit }],
+              metadata: [{ $count: "total" }],
+            },
+          },
+        ];
+
+        const [result] = await req.db
+          .collection(REQUESTS_COLLECTION)
+          .aggregate(facetPipeline, { maxTimeMS: AGGREGATE_MAX_TIME_MILLISECONDS })
+          .toArray();
+
+        const docs = result?.data || [];
+        const total = result?.metadata?.[0]?.total || 0;
+
+        return { data: docs, total, page, limit };
+      });
+
+      res.json(responseData);
     } catch (error: unknown) {
       logger.error(`Admin /traces error: ${getErrorMessage(error)}`);
       next(error);

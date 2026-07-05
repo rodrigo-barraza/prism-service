@@ -144,6 +144,7 @@ describe('AdminConversationRoutes Integration', () => {
             }
             return list.length;
           },
+          estimatedDocumentCount: async () => mockAgentConvs.length,
           distinct: async (field: string) => {
             return [...new Set(mockAgentConvs.map(c => c[field]))];
           },

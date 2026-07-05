@@ -413,6 +413,15 @@ describe("Session Cost Reconciliation", () => {
               }
               return 0;
             },
+            estimatedDocumentCount: async () => {
+              if (collectionName === COLLECTIONS.AGENT_CONVERSATIONS) {
+                return agentConversations.length;
+              }
+              if (collectionName === COLLECTIONS.MODEL_CONVERSATIONS) {
+                return modelConversations.length;
+              }
+              return 0;
+            },
             aggregate: (pipeline: any[]) => {
               return {
                 toArray: async () => {
