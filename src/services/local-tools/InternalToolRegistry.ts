@@ -41,7 +41,7 @@ export interface InternalToolSchema {
   name: string;
   description?: string;
   parameters?: InternalToolSchemaParameters;
-  emoji?: string[];
+  emoji?: string | string[];
 }
 
 export interface InternalToolContext {

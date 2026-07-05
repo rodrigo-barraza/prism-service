@@ -6,6 +6,7 @@ import {
   TOOL_NAMES,
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { INTERNAL_TOOL_EMOJIS } from "../tool-orchestrator/InternalToolEmojis.ts";
 
 // ── Worktree Isolation Tools ────────────────────────────────
 // Allows the agent to self-isolate into a git worktree for
@@ -32,7 +33,7 @@ const enterWorktree = {
   name: TOOL_NAMES.ENTER_WORKTREE,
   schema: {
     name: TOOL_NAMES.ENTER_WORKTREE,
-    emoji: ["🌳", "💻"],
+    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.ENTER_WORKTREE],
     description:
       "Enter an isolated git worktree for the current conversation. Creates a new branch " +
       "and redirects all file/git/shell tool calls to the worktree directory. " +
@@ -171,7 +172,7 @@ const exitWorktree = {
   name: TOOL_NAMES.EXIT_WORKTREE,
   schema: {
     name: TOOL_NAMES.EXIT_WORKTREE,
-    emoji: ["🚪", "🌳"],
+    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.EXIT_WORKTREE],
     description:
       "Exit the current isolated worktree and return to the main workspace. " +
       "Choose to 'merge' changes back to the main branch or 'discard' them entirely. " +

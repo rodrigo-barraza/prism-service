@@ -4,13 +4,14 @@ import {
   TOOL_NAMES,
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { INTERNAL_TOOL_EMOJIS } from "../tool-orchestrator/InternalToolEmojis.ts";
 import MCPClientService from "../MCPClientService.ts";
 
 const listMcpResources = {
   name: TOOL_NAMES.LIST_MCP_RESOURCES,
   schema: {
     name: TOOL_NAMES.LIST_MCP_RESOURCES,
-    emoji: ["🔌", "📋"],
+    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.LIST_MCP_RESOURCES],
     description: "List available resources from a connected MCP server.",
     parameters: {
       type: "object",
@@ -77,7 +78,7 @@ const readMcpResource = {
   name: TOOL_NAMES.READ_MCP_RESOURCE,
   schema: {
     name: TOOL_NAMES.READ_MCP_RESOURCE,
-    emoji: ["🔌", "📄"],
+    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.READ_MCP_RESOURCE],
     description:
       "Read a specific resource from a connected MCP server by its URI.",
     parameters: {
@@ -120,7 +121,7 @@ const mcpAuthenticate = {
   name: TOOL_NAMES.AUTHENTICATE_MCP_SERVER,
   schema: {
     name: TOOL_NAMES.AUTHENTICATE_MCP_SERVER,
-    emoji: ["🔌", "🔐"],
+    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.AUTHENTICATE_MCP_SERVER],
     description:
       "Authenticate with a connected MCP server by providing credentials.",
     parameters: {

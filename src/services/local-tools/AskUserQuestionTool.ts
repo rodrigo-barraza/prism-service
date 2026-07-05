@@ -4,6 +4,7 @@ import {
   TOOL_NAMES,
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { INTERNAL_TOOL_EMOJIS } from "../tool-orchestrator/InternalToolEmojis.ts";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 import { LOG_PREVIEW } from "../../constants.ts";
 import type { QuestionDefinition } from "../ApprovalRegistry.ts";
@@ -54,7 +55,7 @@ export default {
   name: TOOL_NAMES.ASK_USER,
   schema: {
     name: TOOL_NAMES.ASK_USER,
-    emoji: ["💬", "❓"],
+    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.ASK_USER],
     description:
       "Ask the user one or more questions and wait for their responses before continuing. " +
       "Use this when you need clarification, a decision between options, or explicit " +

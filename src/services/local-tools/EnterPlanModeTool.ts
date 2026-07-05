@@ -4,13 +4,14 @@ import {
   TOOL_NAMES,
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { INTERNAL_TOOL_EMOJIS } from "../tool-orchestrator/InternalToolEmojis.ts";
 
 export default {
   name: TOOL_NAMES.ENTER_PLAN_MODE,
 
   schema: {
     name: TOOL_NAMES.ENTER_PLAN_MODE,
-    emoji: ["📝", "🧠"],
+    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.ENTER_PLAN_MODE],
     description:
       "Switch into planning mode. While in plan mode, you will not have access to any tools — " +
       "you can only output text. Use this to produce a structured implementation plan before " +

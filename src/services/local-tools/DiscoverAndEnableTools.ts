@@ -3,6 +3,7 @@ import {
   TOOL_NAMES,
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { INTERNAL_TOOL_EMOJIS } from "../tool-orchestrator/InternalToolEmojis.ts";
 import SettingsService from "../SettingsService.ts";
 import PromptLocaleService from "../PromptLocaleService.ts";
 import {
@@ -65,7 +66,7 @@ function buildDiscoverAndEnableSchema(locale: string) {
 
   return {
     name: "discover_and_enable_tools",
-    emoji: ["🔍", "🧰"],
+    emoji: INTERNAL_TOOL_EMOJIS["discover_and_enable_tools"],
     description: PromptLocaleService.get(
       locale,
       "internal-tools.discover_and_enable_tools.description",

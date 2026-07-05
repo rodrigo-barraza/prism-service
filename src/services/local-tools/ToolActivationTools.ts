@@ -6,6 +6,7 @@ import {
   CORE_AGENTIC_TOOLS,
   CORE_ORCHESTRATOR_TOOLS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { INTERNAL_TOOL_EMOJIS } from "../tool-orchestrator/InternalToolEmojis.ts";
 import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
 import SettingsService from "../SettingsService.ts";
 import { TOOLS } from "../../constants.ts";
@@ -31,7 +32,7 @@ const enableTools = {
   name: TOOL_NAMES.ENABLE_TOOLS,
   schema: {
     name: TOOL_NAMES.ENABLE_TOOLS,
-    emoji: ["🔓", "🧰"],
+    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.ENABLE_TOOLS],
     description:
       "REQUIRED after search_tools: Activate tools discovered by search_tools so you can call them. " +
       "You MUST call this after search_tools returns results where isEnabled is false — without " +
@@ -174,7 +175,7 @@ const disableTools = {
   name: TOOL_NAMES.DISABLE_TOOLS,
   schema: {
     name: TOOL_NAMES.DISABLE_TOOLS,
-    emoji: ["🔒", "🧰"],
+    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.DISABLE_TOOLS],
     description:
       "Dynamically disable tools from this conversation to reduce token usage and tool interference. " +
       'Accepts exact tool names or domain prefixes (e.g. "domain:Finance"). ' +

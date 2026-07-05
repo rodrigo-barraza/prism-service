@@ -3,13 +3,14 @@ import {
   TOOL_NAMES,
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { INTERNAL_TOOL_EMOJIS } from "../tool-orchestrator/InternalToolEmojis.ts";
 
 export default {
   name: TOOL_NAMES.EXIT_PLAN_MODE,
 
   schema: {
     name: TOOL_NAMES.EXIT_PLAN_MODE,
-    emoji: ["🚀", "🧠"],
+    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.EXIT_PLAN_MODE],
     description:
       "Exit planning mode and resume normal tool execution. Call this after you have " +
       "produced your plan and are ready to execute it with tools.",
