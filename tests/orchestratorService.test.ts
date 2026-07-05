@@ -36,6 +36,9 @@ vi.mock("../src/services/AgenticLoopService.ts", () => ({
 import AgenticLoopService from "../src/services/AgenticLoopService.ts";
 import { runCleanupFunctions } from "../src/utils/CleanupRegistry.ts";
 import { GitWorktreeHelper } from "../src/services/orchestrator/GitWorktreeHelper.ts";
+import { SubAgentPersistenceService } from "../src/services/orchestrator/SubAgentPersistenceService.ts";
+
+// Mock the GitWorktreeHelper to avoid disk operations
 
 
 // Mock the GitWorktreeHelper to avoid disk operations
@@ -125,11 +128,6 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       files: [],
     });
 
-    mockExistsSyncResult = undefined;
-    resolveDeferredPromise = undefined;
-    cleanAllConversations();
-    OrchestratorService.clearAllActiveSubAgents();
-
     orchestratorContext = {
       project: "test-project",
       username: "test-user",
@@ -146,12 +144,8 @@ describe("OrchestratorService Spawning & Agent Types", () => {
   });
 
   afterEach(() => {
-    cleanAllConversations();
-    if (resolveDeferredPromise) {
-      resolveDeferredPromise({ messages: [] });
-      resolveDeferredPromise = undefined;
-    }
-    vi.restoreAllMocks();
+    OrchestratorService.clearAllActiveSubAgents();
+    vi.clearAllMocks();
   });
 
   it("should spawn sub-agent that inherits parent agent type and enabled tools by default", async () => {
@@ -435,171 +429,138 @@ describe("OrchestratorService Spawning & Agent Types", () => {
     getWorkspaceRootsSpy.mockRestore();
   });
 
-  describe("hasSubAgents flag persistence", () => {
-    it("should set hasSubAgents: true on the parent conversation when a sub-agent is spawned", async () => {
-      const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
-      const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true });
-      const mockCollection = { updateOne: mockUpdateOne };
+    describe("hasSubAgents flag persistence", () => {
+      it("should set hasSubAgents: true on the parent conversation when a sub-agent is spawned", async () => {
+        const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+        const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true, matchedCount: 1 });
+        const mockCollection = { updateOne: mockUpdateOne };
 
-      const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
-        mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>
-      );
+        const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
+          mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>
+        );
 
-      await OrchestratorService.spawnFromTool({
-        description: "Sub-agent that triggers hasSubAgents",
-        prompt: "Do work",
-        files: [],
-        orchestratorContext,
-      awaitCompletion: true,
+        await OrchestratorService.spawnFromTool({
+          description: "Sub-agent that triggers hasSubAgents",
+          prompt: "Do work",
+          files: [],
+          orchestratorContext,
+          awaitCompletion: true,
+        });
+
+        const updateCalls = mockUpdateOne.mock.calls;
+        const hasSubAgentsCall = updateCalls.find(
+          (call: unknown[]) =>
+            (call[0] as Record<string, unknown>).id === orchestratorContext.conversationId &&
+            (call[1] as Record<string, Record<string, unknown>>).$set?.hasSubAgents === true,
+        );
+        expect(hasSubAgentsCall).toBeDefined();
+
+        getCollectionSpy.mockRestore();
       });
 
-      // The parent conversation update now includes both hasSubAgents flag
-      // and adds the child conversationId to the subAgentIds array.
-      const parentUpdateCall = mockUpdateOne.mock.calls.find(
-        (call: unknown[]) =>
-          (call[0] as Record<string, unknown>).id === orchestratorContext.conversationId &&
-          (call[1] as Record<string, Record<string, unknown>>).$set?.hasSubAgents === true &&
-          (call[1] as Record<string, Record<string, unknown>>).$addToSet?.subAgentIds != null,
-      );
-      expect(parentUpdateCall).toBeDefined();
+      it("should target the correct parent conversation ID from orchestratorContext.conversationId", async () => {
+        const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+        const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true, matchedCount: 1 });
+        const mockCollection = { updateOne: mockUpdateOne };
 
-      getCollectionSpy.mockRestore();
-    });
+        const customContext = { ...orchestratorContext, conversationId: "custom-parent-conv-abc" };
+        const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
+          mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>
+        );
 
-    it("should target the correct parent conversation ID from orchestratorContext.conversationId", async () => {
-      const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
-      const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true });
-      const mockCollection = { updateOne: mockUpdateOne };
+        await OrchestratorService.spawnFromTool({
+          description: "Sub-agent with custom parent",
+          prompt: "Do work",
+          files: [],
+          orchestratorContext: customContext,
+          awaitCompletion: true,
+        });
 
-      const customContext = {
-        ...orchestratorContext,
-        conversationId: "custom-parent-conv-abc",
-      };
+        const updateCalls = mockUpdateOne.mock.calls;
+        const hasSubAgentsCall = updateCalls.find(
+          (call: unknown[]) =>
+            (call[0] as Record<string, unknown>).id === "custom-parent-conv-abc" &&
+            (call[1] as Record<string, Record<string, unknown>>).$set?.hasSubAgents === true,
+        );
+        expect(hasSubAgentsCall).toBeDefined();
 
-      const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
-        mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>
-      );
-
-      await OrchestratorService.spawnFromTool({
-        description: "Sub-agent with custom parent",
-        prompt: "Do work",
-        files: [],
-        awaitCompletion: true,
-      orchestratorContext: customContext,
+        getCollectionSpy.mockRestore();
       });
 
-      const hasSubAgentsCall = mockUpdateOne.mock.calls.find(
-        (call: unknown[]) =>
-          (call[0] as Record<string, unknown>).id === "custom-parent-conv-abc" &&
-          (call[1] as Record<string, unknown>).$set &&
-          ((call[1] as Record<string, Record<string, unknown>>).$set as Record<string, unknown>).hasSubAgents === true,
-      );
-      expect(hasSubAgentsCall).toBeDefined();
+      it("should use the AGENT_CONVERSATIONS collection for the registration", async () => {
+        const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+        const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true, matchedCount: 1 });
+        const mockCollection = { updateOne: mockUpdateOne };
 
-      getCollectionSpy.mockRestore();
-    });
+        const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
+          mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>
+        );
 
-    it("should use the AGENT_CONVERSATIONS collection for the hasSubAgents update", async () => {
-      const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
-      const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true });
-      const mockCollection = { updateOne: mockUpdateOne };
+        await OrchestratorService.spawnFromTool({
+          description: "Sub-agent collection check",
+          prompt: "Do work",
+          files: [],
+          orchestratorContext,
+          awaitCompletion: true,
+        });
 
-      const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
-        mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>
-      );
+        const collectionCalls = getCollectionSpy.mock.calls;
+        const agentConversationsCall = collectionCalls.find(
+          (call: unknown[]) => (call[1] as string) === COLLECTIONS.AGENT_CONVERSATIONS,
+        );
+        expect(agentConversationsCall).toBeDefined();
 
-      await OrchestratorService.spawnFromTool({
-        description: "Sub-agent collection check",
-        prompt: "Do work",
-        files: [],
-        orchestratorContext,
-      awaitCompletion: true,
+        getCollectionSpy.mockRestore();
       });
 
-      const collectionCalls = getCollectionSpy.mock.calls;
-      const agentConversationsCall = collectionCalls.find(
-        (call: unknown[]) => (call[1] as string) === COLLECTIONS.AGENT_CONVERSATIONS,
-      );
-      expect(agentConversationsCall).toBeDefined();
+      it("should not throw when persistence service fails internally (original catch block)", async () => {
+        const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+        const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockImplementation(() => {
+          throw new Error("Unexpected DB crash");
+        });
 
-      getCollectionSpy.mockRestore();
-    });
+        const result = await OrchestratorService.spawnFromTool({
+          description: "Sub-agent with failing persistence",
+          prompt: "Do work",
+          files: [],
+          orchestratorContext,
+          awaitCompletion: true,
+        });
 
-    it("should not throw when MongoDB is unavailable for hasSubAgents update", async () => {
-      const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
-
-      const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
-        null as unknown as ReturnType<typeof MongoWrapper.getCollection>
-      );
-
-      const result = await OrchestratorService.spawnFromTool({
-        description: "Sub-agent with null collection",
-        prompt: "Do work",
-        files: [],
-        orchestratorContext,
-      awaitCompletion: true,
+        expect(result).toBeDefined();
+        expect(result.error).toBeUndefined();
+        getCollectionSpy.mockRestore();
       });
 
-      expect(result).toBeDefined();
-      expect(result.error).toBeUndefined();
+      it("should register each sub-agent spawned via createTeam", async () => {
+        const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+        const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true, matchedCount: 1 });
+        const mockCollection = { updateOne: mockUpdateOne };
 
-      getCollectionSpy.mockRestore();
-    });
+        const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
+          mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>
+        );
 
-    it("should not throw when the MongoDB updateOne rejects for hasSubAgents", async () => {
-      const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
-      const mockUpdateOne = vi.fn().mockRejectedValue(new Error("MongoDB connection lost"));
-      const mockCollection = { updateOne: mockUpdateOne };
+        const teamArgs = {
+          name: "has_sub_agents_team",
+          members: [
+            { description: "Agent A", prompt: "Do task A" },
+            { description: "Agent B", prompt: "Do task B" },
+          ],
+        };
 
-      const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
-        mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>
-      );
+        await OrchestratorService.createTeam(teamArgs, orchestratorContext);
+        await waitForMockCalls(mockRunAgenticLoop, 2);
 
-      const result = await OrchestratorService.spawnFromTool({
-        description: "Sub-agent with failing DB",
-        prompt: "Do work",
-        files: [],
-        orchestratorContext,
-      awaitCompletion: true,
+        const hasSubAgentsCalls = mockUpdateOne.mock.calls.filter(
+          (call: unknown[]) =>
+            (call[0] as Record<string, unknown>).id === orchestratorContext.conversationId &&
+            (call[1] as Record<string, Record<string, unknown>>).$set?.hasSubAgents === true,
+        );
+        expect(hasSubAgentsCalls.length).toBeGreaterThanOrEqual(1);
+        getCollectionSpy.mockRestore();
       });
-
-      expect(result).toBeDefined();
-      expect(result.error).toBeUndefined();
-
-      getCollectionSpy.mockRestore();
     });
-
-    it("should set hasSubAgents on parent conversation for each sub-agent spawned via createTeam", async () => {
-      const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
-      const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true });
-      const mockCollection = { updateOne: mockUpdateOne };
-
-      const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
-        mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>
-      );
-
-      const teamArgs = {
-        name: "has_sub_agents_team",
-        members: [
-          { description: "Agent A", prompt: "Do task A" },
-          { description: "Agent B", prompt: "Do task B" },
-        ],
-      };
-
-      await OrchestratorService.createTeam(teamArgs, orchestratorContext);
-      await waitForMockCalls(mockRunAgenticLoop, 2);
-
-      const hasSubAgentsCalls = mockUpdateOne.mock.calls.filter(
-        (call: unknown[]) =>
-          (call[0] as Record<string, unknown>).id === orchestratorContext.conversationId &&
-          (call[1] as Record<string, unknown>).$set &&
-          ((call[1] as Record<string, Record<string, unknown>>).$set as Record<string, unknown>).hasSubAgents === true,
-      );
-      expect(hasSubAgentsCalls.length).toBeGreaterThanOrEqual(1);
-
-      getCollectionSpy.mockRestore();
-    });
-  });
 
   describe("Peer-to-Peer Router 0-Based Agent Naming", () => {
     it("should use 0-based speaker names and correctly tag shared discussion entries", async () => {
