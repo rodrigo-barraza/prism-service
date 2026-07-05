@@ -56,6 +56,8 @@ export interface SubAgentState {
   enabledTools?: string[] | null;
   reservationReleased?: boolean;
   agentIndex?: number;
+  /** Conversation-scoped monotonically increasing spawn index (0-based, unique across all teams). */
+  globalSpawnIndex?: number;
   teamSize?: number;
   round?: number;
   totalRounds?: number;
@@ -147,6 +149,8 @@ export interface OrchestratorSpawnParams {
   assignedProvider?: string;
   assignedModel?: string;
   agentIndex?: number;
+  /** Conversation-scoped monotonically increasing spawn index (0-based, unique across all teams). */
+  globalSpawnIndex?: number;
   teamSize?: number;
   round?: number;
   totalRounds?: number;
@@ -192,6 +196,8 @@ export interface OrchestratorContext {
   recursionDepth?: number;
   /** Maximum allowed recursion depth for this session. 0 = sub-agents cannot spawn (default). */
   maxRecursionDepth?: number;
+  /** Monotonically increasing spawn counter — used by routers to assign globalSpawnIndex. */
+  subAgentSpawnCounter?: number;
   /** Inherit parent's thinking/extended-thinking toggle. */
   thinkingEnabled?: boolean;
   /** Inherit parent's reasoning effort level (e.g. "low", "medium", "high"). */
@@ -199,6 +205,17 @@ export interface OrchestratorContext {
   /** Inherit parent's thinking token budget. */
   thinkingBudget?: number;
   [key: string]: unknown;
+}
+
+/**
+ * Atomically read-and-increment the conversation-scoped spawn counter
+ * on the given OrchestratorContext.
+ * Returns the current value (0-based) and advances the counter by 1.
+ */
+export function nextGlobalSpawnIndex(orchestratorContext: OrchestratorContext): number {
+  const currentIndex = orchestratorContext.subAgentSpawnCounter ?? 0;
+  orchestratorContext.subAgentSpawnCounter = currentIndex + 1;
+  return currentIndex;
 }
 
 // ── Tools API Responses ─────────────────────────────────────

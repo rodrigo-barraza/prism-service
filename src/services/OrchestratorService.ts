@@ -212,6 +212,7 @@ export class OrchestratorService {
     assignedProvider,
     assignedModel,
     agentIndex,
+    globalSpawnIndex,
     teamSize,
     round,
     totalRounds,
@@ -489,6 +490,7 @@ export class OrchestratorService {
       parentConversationId,
       enabledTools: subAgentEnabledTools || null,
       agentIndex,
+      globalSpawnIndex,
       teamSize,
       round,
       totalRounds,
@@ -549,6 +551,7 @@ export class OrchestratorService {
                 subAgentProviderName: subAgentProvider,
                 subAgentResolvedModel: subAgentModel,
                 subAgentRecursionDepth: currentRecursionDepth + 1,
+                subAgentGlobalSpawnIndex: globalSpawnIndex ?? null,
                 subAgentBranchName: worktreeResult.error ? null : branchName,
                 subAgentFiles: files || [],
                 parentConversationId,
@@ -589,6 +592,7 @@ export class OrchestratorService {
         model: subAgentModel,
         provider: subAgentProvider,
         agentIndex: agentIndex ?? null,
+        globalSpawnIndex: globalSpawnIndex ?? null,
       });
     }
 
@@ -984,6 +988,7 @@ export class OrchestratorService {
     files?: string[];
     toolCallCount?: number;
     recursionDepth?: number;
+    globalSpawnIndex?: number;
     toolNames?: Record<string, number>;
   }> {
     const collectedSubAgentIds = new Set<string>();
@@ -1001,6 +1006,7 @@ export class OrchestratorService {
       files?: string[];
       toolCallCount?: number;
       recursionDepth?: number;
+      globalSpawnIndex?: number;
       toolNames?: Record<string, number>;
     }> = [];
 
@@ -1034,6 +1040,7 @@ export class OrchestratorService {
           files: subAgentState.files,
           toolCallCount: subAgentState.toolCalls?.length || 0,
           recursionDepth: subAgentState.recursionDepth,
+          globalSpawnIndex: subAgentState.globalSpawnIndex,
           toolNames: Object.keys(toolNames).length > 0 ? toolNames : undefined,
         });
         if (
@@ -1067,6 +1074,7 @@ export class OrchestratorService {
     files?: string[];
     toolCallCount?: number;
     recursionDepth?: number;
+    globalSpawnIndex?: number;
     toolNames?: Record<string, number>;
     subAgentConversationId?: string;
   }>> {
@@ -1084,6 +1092,7 @@ export class OrchestratorService {
       files?: string[];
       toolCallCount?: number;
       recursionDepth?: number;
+      globalSpawnIndex?: number;
       toolNames?: Record<string, number>;
       subAgentConversationId?: string;
     }> = [];
@@ -1148,6 +1157,7 @@ export class OrchestratorService {
                 subAgentBranchName: 1,
                 subAgentFiles: 1,
                 subAgentRecursionDepth: 1,
+                subAgentGlobalSpawnIndex: 1,
                 subAgentToolNames: 1,
                 subAgentIds: 1,
               },
@@ -1175,6 +1185,7 @@ export class OrchestratorService {
             files: subAgentDocument.subAgentFiles as string[] | undefined,
             toolCallCount: (subAgentDocument.subAgentToolUses as number) || 0,
             recursionDepth: subAgentDocument.subAgentRecursionDepth as number | undefined,
+            globalSpawnIndex: subAgentDocument.subAgentGlobalSpawnIndex as number | undefined,
             toolNames: subAgentDocument.subAgentToolNames as Record<string, number> | undefined,
             subAgentConversationId: subAgentDocument.id as string,
           });
@@ -1778,6 +1789,7 @@ export class OrchestratorService {
         model: subAgent.resolvedModel,
         provider: subAgent.providerName,
         agentIndex: subAgent.agentIndex ?? null,
+        globalSpawnIndex: subAgent.globalSpawnIndex ?? null,
       });
     }
 
@@ -1886,6 +1898,7 @@ export class OrchestratorService {
         model: subAgent.resolvedModel,
         provider: subAgent.providerName,
         agentIndex: subAgent.agentIndex ?? null,
+        globalSpawnIndex: subAgent.globalSpawnIndex ?? null,
       });
     }
 

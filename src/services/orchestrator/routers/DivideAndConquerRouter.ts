@@ -4,6 +4,7 @@ import type {
   OrchestratorSpawnParams,
   SubAgentResult,
 } from "../../../types/orchestrator.ts";
+import { nextGlobalSpawnIndex } from "../../../types/orchestrator.ts";
 import type {
   TopologyRouter,
   ContinueSubAgentCallback,
@@ -525,6 +526,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
             assignedProvider,
             assignedModel,
             agentIndex: subtaskIndex,
+            globalSpawnIndex: nextGlobalSpawnIndex(orchestratorContext),
             teamSize: subtasks.length,
             orchestratorContext,
             awaitCompletion: true,
@@ -815,6 +817,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
               assignedProvider,
               assignedModel,
               agentIndex: subtaskIndex,
+              globalSpawnIndex: nextGlobalSpawnIndex(orchestratorContext),
               teamSize: recursiveSubtasks.length,
               orchestratorContext,
               awaitCompletion: true,

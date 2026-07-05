@@ -4,6 +4,7 @@ import type {
   OrchestratorSpawnParams,
   SubAgentResult,
 } from "../../../types/orchestrator.ts";
+import { nextGlobalSpawnIndex } from "../../../types/orchestrator.ts";
 import type {
   TopologyRouter,
   ContinueSubAgentCallback,
@@ -68,6 +69,7 @@ export class HierarchicalRouter implements TopologyRouter {
         assignedProvider,
         assignedModel,
         agentIndex: memberIndex,
+        globalSpawnIndex: nextGlobalSpawnIndex(orchestratorContext),
         teamSize: members.length,
         orchestratorContext,
         awaitCompletion: true,
