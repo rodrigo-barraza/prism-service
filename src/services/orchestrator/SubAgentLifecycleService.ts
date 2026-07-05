@@ -1,8 +1,10 @@
 import logger from "../../utils/logger.ts";
-import { SYSTEM_STATUSES, ORCHESTRATOR } from "../../constants.ts";
+import { SYSTEM_STATUSES, COLLECTIONS, ORCHESTRATOR } from "../../constants.ts";
 import { GitWorktreeHelper } from "./GitWorktreeHelper.ts";
 import { buildSubAgentResult } from "./SubAgentResultBuilder.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
+import MongoWrapper from "../../wrappers/MongoWrapper.ts";
+import { MONGO_DB_NAME } from "../../../config.ts";
 import type {
   SubAgentState,
   SubAgentResult,
@@ -13,6 +15,38 @@ import type {
  * Service for managing the lifecycle of sub-agents (stopping, aborting, output retrieval).
  */
 export class SubAgentLifecycleService {
+  /**
+   * Persist the terminal status of a sub-agent to MongoDB so that
+   * reloading the conversation after a stop/abort doesn't leave
+   * stale "running" entries that the frontend renders as "Generating…".
+   */
+  private static async persistSubAgentTerminalStatus(
+    subAgent: SubAgentState,
+  ): Promise<void> {
+    try {
+      const conversationCollection = MongoWrapper.getCollection(
+        MONGO_DB_NAME,
+        COLLECTIONS.AGENT_CONVERSATIONS,
+      );
+      if (!conversationCollection) return;
+
+      await conversationCollection.updateOne(
+        { id: subAgent.subAgentConversationId },
+        {
+          $set: {
+            subAgentStatus: subAgent.status,
+            subAgentDurationMilliseconds: subAgent.durationMilliseconds,
+            subAgentCompletedAt: new Date().toISOString(),
+          },
+        },
+      );
+    } catch (error: unknown) {
+      logger.warn(
+        `[SubAgentLifecycle] Failed to persist terminal status for ${subAgent.agentId}: ${getErrorMessage(error)}`,
+      );
+    }
+  }
+
   /**
    * Stop a specific sub-agent and clean up its worktree.
    */
@@ -46,6 +80,9 @@ export class SubAgentLifecycleService {
     subAgent.status = SYSTEM_STATUSES.STOPPED;
     subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
 
+    // Persist to DB so reloads don't show stale "running" → "Generating…"
+    await SubAgentLifecycleService.persistSubAgentTerminalStatus(subAgent);
+
     logger.info(`[SubAgentLifecycle] Stopped sub-agent ${agentId}`);
 
     return { agent_id: agentId, status: SYSTEM_STATUSES.STOPPED };
@@ -68,11 +105,13 @@ export class SubAgentLifecycleService {
     );
 
     const cleanupPromises: Promise<unknown>[] = [];
+    const stoppedSubAgents: SubAgentState[] = [];
     for (const subAgent of sessionSubAgents) {
       if (subAgent.status === SYSTEM_STATUSES.RUNNING) {
         subAgent.abortController?.abort();
         subAgent.status = SYSTEM_STATUSES.STOPPED;
         subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
+        stoppedSubAgents.push(subAgent);
       }
 
       // Cleanup isolated worktrees immediately
@@ -91,6 +130,13 @@ export class SubAgentLifecycleService {
           );
         cleanupPromises.push(cleanupPromise);
       }
+    }
+
+    // Persist terminal status for all stopped sub-agents to MongoDB
+    for (const stoppedSubAgent of stoppedSubAgents) {
+      cleanupPromises.push(
+        SubAgentLifecycleService.persistSubAgentTerminalStatus(stoppedSubAgent),
+      );
     }
 
     await Promise.allSettled(cleanupPromises);

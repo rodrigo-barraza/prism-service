@@ -48,6 +48,7 @@ export interface HousekeepingWorktreeResult {
 export interface HousekeepingConversationResult {
   conversationsCleared: number;
   agentConversationsCleared: number;
+  staleSubAgentsCleared?: number;
 }
 
 export interface HousekeepingResult {
@@ -110,7 +111,7 @@ async function clearStaleConversations(): Promise<HousekeepingConversationResult
     Date.now() - STALE_CONVERSATION_CUTOFF_MILLISECONDS,
   ).toISOString();
 
-  const [convResult, agentConvResult, staleAwaitingResult] = await Promise.all([
+  const [convResult, agentConvResult, staleAwaitingResult, staleSubAgentResult] = await Promise.all([
     db
       .collection(COLLECTIONS.MODEL_CONVERSATIONS)
       .updateMany(
@@ -130,6 +131,18 @@ async function clearStaleConversations(): Promise<HousekeepingConversationResult
         { pendingBackgroundTasks: { $gt: 0 }, updatedAt: { $lt: cutoff } },
         { $set: { pendingBackgroundTasks: 0, isActive: false } },
       ),
+    // Clear stale subAgentStatus: "running" left from crashes/restarts
+    db
+      .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+      .updateMany(
+        { subAgentStatus: "running", updatedAt: { $lt: cutoff } },
+        {
+          $set: {
+            subAgentStatus: "stopped",
+            subAgentCompletedAt: new Date().toISOString(),
+          },
+        },
+      ),
   ]);
 
   if (staleAwaitingResult.modifiedCount > 0) {
@@ -138,9 +151,16 @@ async function clearStaleConversations(): Promise<HousekeepingConversationResult
     );
   }
 
+  if (staleSubAgentResult.modifiedCount > 0) {
+    logger.info(
+      `[Housekeeping] Cleared ${staleSubAgentResult.modifiedCount} stale subAgentStatus flag(s)`,
+    );
+  }
+
   return {
     conversationsCleared: convResult.modifiedCount,
     agentConversationsCleared: agentConvResult.modifiedCount,
+    staleSubAgentsCleared: staleSubAgentResult.modifiedCount,
   };
 }
 
@@ -297,7 +317,8 @@ const BackgroundHousekeepingService = {
       results.staleConversations = conversationsCleanup;
       const total =
         conversationsCleanup.conversationsCleared +
-        conversationsCleanup.agentConversationsCleared;
+        conversationsCleanup.agentConversationsCleared +
+        (conversationsCleanup.staleSubAgentsCleared || 0);
       if (total > 0) {
         logger.info(
           `[Housekeeping] Cleared ${total} stale isGenerating flag(s)`,
