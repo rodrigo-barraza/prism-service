@@ -81,6 +81,10 @@ export interface ConversationMessage {
   content?: string;
   thinking?: string;
   thinkingSignature?: string;
+  /** Duration of the thinking phase in seconds (wall-clock, per-iteration). */
+  thinkingDurationSeconds?: number | null;
+  /** Duration of the content generation phase in seconds (wall-clock, per-iteration). */
+  contentDurationSeconds?: number | null;
   toolCalls?: ToolCall[];
   images?: string[];
   audio?: string;
@@ -256,6 +260,10 @@ export interface PassState {
   start: number;
   firstTokenTime: number | null;
   generationEnd: number | null;
+  /** Timestamp (performance.now()) when the first thinking chunk arrived. */
+  thinkingStartTime: number | null;
+  /** Timestamp (performance.now()) when thinking ended (first non-thinking output). */
+  thinkingEndTime: number | null;
   outputCharacters: number;
   usage: UsageAccumulator;
   options: AgenticOptions;

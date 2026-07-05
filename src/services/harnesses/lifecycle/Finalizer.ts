@@ -75,6 +75,10 @@ export interface FinalizerPayload {
   thinkingFragments?: unknown[];
   resolvedEnabledTools?: string[] | null;
   contextBudget?: ContextBudgetSnapshot;
+  /** Accumulated thinking phase duration across all iterations (seconds). */
+  thinkingDurationSeconds?: number | null;
+  /** Accumulated content generation phase duration across all iterations (seconds). */
+  contentDurationSeconds?: number | null;
 }
 
 /**
@@ -182,6 +186,8 @@ export async function finalizeTextGeneration(
     thinkingFragments,
     resolvedEnabledTools,
     contextBudget,
+    thinkingDurationSeconds,
+    contentDurationSeconds,
   }: FinalizerPayload,
   overrideMessagesToAppend: MessagePayload[] | null = null,
   finalizerOptions?: { deferDoneEmission?: boolean },
@@ -404,6 +410,8 @@ export async function finalizeTextGeneration(
       thinkingEnabled: options.thinkingEnabled,
       reasoningEffort: options.reasoningEffort,
       thinkingBudget: options.thinkingBudget,
+      thinkingDurationSeconds,
+      contentDurationSeconds,
       userMessage,
       conversationMeta,
     });
@@ -528,6 +536,8 @@ export async function finalizeTextGeneration(
       generationTime:
         generationSec != null ? roundMilliseconds(generationSec) : null,
       totalTime: totalSec != null ? roundMilliseconds(totalSec) : null,
+      ...(thinkingDurationSeconds != null && { thinkingDurationSeconds }),
+      ...(contentDurationSeconds != null && { contentDurationSeconds }),
       ...(traceId && { traceId }),
       ...(conversationId && { conversationId }),
     };
@@ -720,6 +730,8 @@ export function assembleMessagesToAppend(options: {
   thinkingEnabled?: boolean;
   reasoningEffort?: string;
   thinkingBudget?: number;
+  thinkingDurationSeconds?: number | null;
+  contentDurationSeconds?: number | null;
   userMessage?: MessagePayload | null;
   conversationMeta?: Record<string, unknown> | null;
   requestId?: string;
@@ -735,6 +747,8 @@ export function assembleMessagesToAppend(options: {
     contentSegments,
     textFragments,
     thinkingFragments,
+    thinkingDurationSeconds,
+    contentDurationSeconds,
     userMessage,
     conversationMeta,
     requestId,
@@ -787,6 +801,8 @@ export function assembleMessagesToAppend(options: {
         ...(!hasIntermediateToolMessages && thinkingFragments?.length
           ? { thinkingFragments }
           : {}),
+        ...(thinkingDurationSeconds != null && { thinkingDurationSeconds }),
+        ...(contentDurationSeconds != null && { contentDurationSeconds }),
         timestamp: new Date().toISOString(),
         ...(requestId && { requestId }),
       } as MessagePayload);
@@ -839,6 +855,8 @@ export function assembleMessagesToAppend(options: {
       ...(images.length > 0 && { images }),
       ...(audioReference && { audio: audioReference }),
       ...(toolCalls.length > 0 && { toolCalls }),
+      ...(thinkingDurationSeconds != null && { thinkingDurationSeconds }),
+      ...(contentDurationSeconds != null && { contentDurationSeconds }),
       timestamp: new Date().toISOString(),
       ...(requestId && { requestId }),
     } as MessagePayload);

@@ -1,6 +1,7 @@
 import BaseAgenticHarness from "./BaseAgenticHarness.ts";
 import { runTreeOfThoughts } from "./strategies/TreeOfThoughtsStrategy.ts";
 import { runGraphOfThoughts } from "./strategies/GraphOfThoughtsStrategy.ts";
+import { roundMilliseconds } from "@rodrigo-barraza/utilities-library";
 import logger from "../../utils/logger.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
@@ -64,6 +65,7 @@ import type {
   ToolResult,
   AgenticOptions,
   BeforePromptHookContext,
+  PassState,
 } from "./types.ts";
 
 /**
@@ -74,6 +76,25 @@ interface IterationPassOptions extends AgenticOptions {
   project: string;
   agent?: string | null;
   username: string;
+}
+
+/** Compute thinking and content phase durations from a PassState's timestamps. */
+function computePassPhaseDurations(pass: PassState) {
+  // Seal thinking phase with generationEnd if thinking was active but never sealed
+  // (thinking-only response with no text/tools to trigger the seal).
+  const effectiveThinkingEnd = pass.thinkingEndTime ?? pass.generationEnd;
+  return {
+    ...(pass.thinkingStartTime != null && effectiveThinkingEnd != null && {
+      thinkingDurationSeconds: roundMilliseconds(
+        (effectiveThinkingEnd - pass.thinkingStartTime) / 1000,
+      ),
+    }),
+    ...(pass.thinkingEndTime != null && pass.generationEnd != null && {
+      contentDurationSeconds: roundMilliseconds(
+        (pass.generationEnd - pass.thinkingEndTime) / 1000,
+      ),
+    }),
+  };
 }
 
 const {
@@ -599,6 +620,7 @@ export default class ReActHarness extends BaseAgenticHarness {
               ...(pass.thinkingSignature && {
                 thinkingSignature: pass.thinkingSignature,
               }),
+              ...computePassPhaseDurations(pass),
               toolCalls: pass.pendingToolCalls.map((toolCall: ToolCall) => {
                 const matchingResult = results.find(
                   (result) => result.id === toolCall.id,
@@ -682,6 +704,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             ...(pass.thinkingSignature && {
               thinkingSignature: pass.thinkingSignature,
             }),
+            ...computePassPhaseDurations(pass),
             toolCalls: pass.pendingToolCalls.map((toolCall: ToolCall) => {
               const matchingResult = results.find(
                 (result) => result.id === toolCall.id,
@@ -859,6 +882,7 @@ export default class ReActHarness extends BaseAgenticHarness {
               ...(pass.thinkingSignature && {
                 thinkingSignature: pass.thinkingSignature,
               }),
+              ...computePassPhaseDurations(pass),
             });
             this.logIteration(pass, currentMessages);
             continue;
@@ -908,6 +932,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             ...(pass.thinkingSignature && {
               thinkingSignature: pass.thinkingSignature,
             }),
+            ...computePassPhaseDurations(pass),
           });
 
           currentMessages.push({

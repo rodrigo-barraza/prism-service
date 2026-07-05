@@ -800,6 +800,9 @@ export default class BaseAgenticHarness {
     if (streamChunk?.type === "thinking") {
       this._recordFirstToken(pass);
       this._recordTiming(pass);
+      if (pass.thinkingStartTime === null) {
+        pass.thinkingStartTime = performance.now();
+      }
       state.streamedThinking += streamChunk.content || "";
       pass.streamedThinking += streamChunk.content || "";
       if (
@@ -864,6 +867,7 @@ export default class BaseAgenticHarness {
     if (streamChunk?.type === "toolCallStart") {
       this._recordFirstToken(pass);
       this._recordTiming(pass);
+      this._sealThinkingPhase(pass);
       emit({
         type: SERVER_SENT_EVENT_TYPES.TOOL_EXECUTION,
         tool: {
@@ -896,6 +900,7 @@ export default class BaseAgenticHarness {
     if (streamChunk?.type === "toolCall") {
       this._recordFirstToken(pass);
       this._recordTiming(pass);
+      this._sealThinkingPhase(pass);
       if (pass.requestId) {
         ConversationGenerationTracker.recordChunkTiming(
           pass.requestId,
@@ -1074,6 +1079,7 @@ export default class BaseAgenticHarness {
     // ── Text chunk (default) ─────────────────────────────
     this._recordFirstToken(pass);
     this._recordTiming(pass);
+    this._sealThinkingPhase(pass);
     const rawChunkString = typeof chunk === "string" ? chunk : "";
     state.overallOutputCharacters += rawChunkString.length;
     pass.outputCharacters += rawChunkString.length;
@@ -1153,6 +1159,17 @@ export default class BaseAgenticHarness {
       passGenerationSec,
     );
     const passEstimatedCost = calculateTextCost(pass.usage, pricing);
+
+    // Accumulate per-pass thinking/content phase durations into overall totals
+    if (pass.thinkingStartTime != null) {
+      const effectiveThinkingEnd = pass.thinkingEndTime ?? pass.generationEnd;
+      if (effectiveThinkingEnd != null) {
+        state.overallThinkingDurationSeconds += (effectiveThinkingEnd - pass.thinkingStartTime) / 1000;
+      }
+      if (pass.thinkingEndTime != null && pass.generationEnd != null) {
+        state.overallContentDurationSeconds += (pass.generationEnd - pass.thinkingEndTime) / 1000;
+      }
+    }
 
     // Two-phase completion: if we pre-inserted a pending skeleton on
     // iteration start, update it in-place instead of inserting a new doc.
@@ -1354,6 +1371,8 @@ export default class BaseAgenticHarness {
       start: performance.now(),
       firstTokenTime: null,
       generationEnd: null,
+      thinkingStartTime: null,
+      thinkingEndTime: null,
       outputCharacters: 0,
       usage: createUsageAccumulator(),
       options: passOptions,
@@ -1436,6 +1455,12 @@ export default class BaseAgenticHarness {
         thinkingFragments: cleanThinkingFragments,
         resolvedEnabledTools: this.tools.resolvedEnabledTools,
         contextBudget: this.budgetTracker?.getSnapshot() ?? undefined,
+        thinkingDurationSeconds: state.overallThinkingDurationSeconds > 0
+          ? roundMilliseconds(state.overallThinkingDurationSeconds)
+          : null,
+        contentDurationSeconds: state.overallContentDurationSeconds > 0
+          ? roundMilliseconds(state.overallContentDurationSeconds)
+          : null,
       },
       newTurnMessages as MessagePayload[],
       finalizeOptions,
@@ -1517,6 +1542,13 @@ export default class BaseAgenticHarness {
     } else {
       state.displaySegments.push({ type: "tools", toolIds: [toolCallId] });
       state.lastDisplaySegType = "tools";
+    }
+  }
+
+  /** Seal the thinking phase — record thinkingEndTime if thinking was active and not yet sealed. */
+  private _sealThinkingPhase(pass: PassState): void {
+    if (pass.thinkingStartTime !== null && pass.thinkingEndTime === null) {
+      pass.thinkingEndTime = performance.now();
     }
   }
 

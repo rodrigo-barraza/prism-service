@@ -98,6 +98,12 @@ export default class AgenticLoopState {
   hwmTotalTokens: number;
   hwmOutputCharacters: number;
 
+  // ── Accumulated phase durations ──────────────────────────
+  // Sum of all per-pass thinking/content durations, passed to
+  // the finalizer for the done event and DB persistence.
+  overallThinkingDurationSeconds: number;
+  overallContentDurationSeconds: number;
+
   // ── Progress emission throttling ────────────────────────
   readonly PROGRESS_CHUNK_INTERVAL = 10;
   readonly PROGRESS_TIME_INTERVAL_MILLISECONDS = 500;
@@ -150,6 +156,9 @@ export default class AgenticLoopState {
     this.hwmInputTokens = 0;
     this.hwmTotalTokens = 0;
     this.hwmOutputCharacters = 0;
+
+    this.overallThinkingDurationSeconds = 0;
+    this.overallContentDurationSeconds = 0;
 
     this.lastProgressEmitTime = 0;
     this.chunksSinceLastProgress = 0;

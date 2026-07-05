@@ -84,6 +84,9 @@ const ConversationService: ConversationServiceInterface = {
       if (conversationMeta.contextBudget) {
         setFields.contextBudget = conversationMeta.contextBudget;
       }
+      if (conversationMeta.agent) {
+        setFields.agent = conversationMeta.agent;
+      }
     }
 
     // Build $setOnInsert for auto-creation of new conversations
