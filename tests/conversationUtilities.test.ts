@@ -11,7 +11,7 @@
  * as "generating" in the UI.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS, COLLECTIONS } from "../src/constants.ts";
+import { PROVIDERS, COLLECTIONS, MESSAGE_ROLES } from "../src/constants.ts";
 
 // ── Mock ConversationService before import ─────────────────────
 const mockAppendMessages = vi.fn();
@@ -58,7 +58,7 @@ describe("appendAndFinalize", () => {
       "conv-123",
       "coding",
       "testuser",
-      [{ role: "user", content: "Hello" }],
+      [{ role: MESSAGE_ROLES.USER, content: "Hello" }],
       null,
       { collection: COLLECTIONS.AGENT_CONVERSATIONS },
     );
@@ -80,7 +80,7 @@ describe("appendAndFinalize", () => {
       "conv-123",
       "coding",
       "testuser",
-      [{ role: "assistant", content: "Response" }],
+      [{ role: MESSAGE_ROLES.ASSISTANT, content: "Response" }],
       null,
     );
 
@@ -103,7 +103,7 @@ describe("appendAndFinalize", () => {
         "conv-123",
         "coding",
         "testuser",
-        [{ role: "user", content: "Hello" }],
+        [{ role: MESSAGE_ROLES.USER, content: "Hello" }],
         null,
       ),
     ).resolves.not.toThrow();
@@ -131,7 +131,7 @@ describe("appendAndFinalize", () => {
       "conv-456",
       "coding",
       "rodrigo",
-      [{ role: "user", content: "Test" }],
+      [{ role: MESSAGE_ROLES.USER, content: "Test" }],
       meta,
       options,
     );
@@ -140,7 +140,7 @@ describe("appendAndFinalize", () => {
       "conv-456",
       "coding",
       "rodrigo",
-      [{ role: "user", content: "Test" }],
+      [{ role: MESSAGE_ROLES.USER, content: "Test" }],
       meta,
       options,
     );

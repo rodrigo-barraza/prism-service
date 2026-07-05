@@ -5,7 +5,7 @@ import openaiProvider, {
   prepareResponsesInput,
 } from "../src/providers/openai.ts";
 import { OpenAIMessage } from "../src/providers/openai.ts";
-import { PROVIDERS, TYPES } from "../src/constants.ts";
+import { PROVIDERS, TYPES, MESSAGE_ROLES } from "../src/constants.ts";
 
 const mockChatCreate = vi.fn();
 const mockResponsesCreate = vi.fn();
@@ -104,7 +104,7 @@ vi.mock("openai", () => {
               choices: [
                 {
                   message: {
-                    role: "assistant",
+                    role: MESSAGE_ROLES.ASSISTANT,
                     content: "OpenAI Chat completions response",
                   },
                   finish_reason: "stop",
@@ -368,20 +368,20 @@ describe("OpenAI Provider Adapter", () => {
   describe("prepareResponsesInput helper", () => {
     it("correctly maps system message to developer role and handles standard content", () => {
       const messages: OpenAIMessage[] = [
-        { role: "system", content: "You are an agent" },
-        { role: "user", content: "Hello" },
+        { role: MESSAGE_ROLES.SYSTEM, content: "You are an agent" },
+        { role: MESSAGE_ROLES.USER, content: "Hello" },
       ];
 
       const result = prepareResponsesInput(messages);
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual({ role: "developer", content: "You are an agent" });
-      expect(result[1]).toEqual({ role: "user", content: "Hello" });
+      expect(result[1]).toEqual({ role: MESSAGE_ROLES.USER, content: "Hello" });
     });
 
     it("maps user images and files properly", () => {
       const messages: OpenAIMessage[] = [
         {
-          role: "user",
+          role: MESSAGE_ROLES.USER,
           content: "Here is content",
           images: [
             "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA",
@@ -419,7 +419,7 @@ describe("OpenAI Provider Adapter", () => {
     it("handles text file inline decoding and other data URLs", () => {
       const messages: OpenAIMessage[] = [
         {
-          role: "user",
+          role: MESSAGE_ROLES.USER,
           images: [
             "data:text/plain;base64,SGVsbG8gV29ybGQ=", // "Hello World"
             "data:application/octet-stream;base64,SGVsbG8=",
@@ -443,7 +443,7 @@ describe("OpenAI Provider Adapter", () => {
     it("supports assistant and tool messages in responses input format", () => {
       const messages: OpenAIMessage[] = [
         {
-          role: "assistant",
+          role: MESSAGE_ROLES.ASSISTANT,
           content: "Hello",
           toolCalls: [
             {
@@ -456,14 +456,14 @@ describe("OpenAI Provider Adapter", () => {
           ],
         },
         {
-          role: "tool",
+          role: MESSAGE_ROLES.TOOL,
           tool_call_id: "fc_1",
           content: "User loaded",
         },
       ];
       const result = prepareResponsesInput(messages);
       expect(result).toHaveLength(4);
-      expect(result[0]).toEqual({ role: "assistant", content: "Hello" });
+      expect(result[0]).toEqual({ role: MESSAGE_ROLES.ASSISTANT, content: "Hello" });
       expect(result[1]).toEqual({
         type: "function_call",
         id: "fc_1",
@@ -486,7 +486,7 @@ describe("OpenAI Provider Adapter", () => {
 
   describe("generateText", () => {
     it("uses chat.completions when Responses API is not supported by model", async () => {
-      const messages: OpenAIMessage[] = [{ role: "user", content: "Hello" }];
+      const messages: OpenAIMessage[] = [{ role: MESSAGE_ROLES.USER, content: "Hello" }];
       const result = await openaiProvider.generateText(messages, "gpt-4o");
 
       expect(mockChatCreate).toHaveBeenCalled();
@@ -514,7 +514,7 @@ describe("OpenAI Provider Adapter", () => {
     });
 
     it("uses responses API when Responses API is supported by model", async () => {
-      const messages: OpenAIMessage[] = [{ role: "user", content: "Hello" }];
+      const messages: OpenAIMessage[] = [{ role: MESSAGE_ROLES.USER, content: "Hello" }];
       const result = await openaiProvider.generateText(messages, "gpt-5.5", {
         reasoningEffort: "medium",
         reasoningSummary: "concise",
@@ -546,7 +546,7 @@ describe("OpenAI Provider Adapter", () => {
     });
 
     it("applies strict schema sanitization for responses API with complex tools", async () => {
-      const messages: OpenAIMessage[] = [{ role: "user", content: "Action" }];
+      const messages: OpenAIMessage[] = [{ role: MESSAGE_ROLES.USER, content: "Action" }];
       const result = await openaiProvider.generateText(messages, "gpt-5.5", {
         responseFormat: "json_schema",
         responseSchema: {
@@ -587,7 +587,7 @@ describe("OpenAI Provider Adapter", () => {
     });
 
     it("triggers parameter retry on 400 error status", async () => {
-      const messages: OpenAIMessage[] = [{ role: "user", content: "Error retry" }];
+      const messages: OpenAIMessage[] = [{ role: MESSAGE_ROLES.USER, content: "Error retry" }];
       const mockCompletionsError = new Error("Unsupported parameter: 'temperature'");
       (mockCompletionsError as any).status = 400;
 
@@ -606,7 +606,7 @@ describe("OpenAI Provider Adapter", () => {
 
   describe("generateTextStream", () => {
     it("streams chat completions correctly with delta accumulation", async () => {
-      const messages: OpenAIMessage[] = [{ role: "user", content: "Hello Stream" }];
+      const messages: OpenAIMessage[] = [{ role: MESSAGE_ROLES.USER, content: "Hello Stream" }];
       const stream = openaiProvider.generateTextStream(messages, "gpt-4o");
 
       const chunks: any[] = [];
@@ -632,7 +632,7 @@ describe("OpenAI Provider Adapter", () => {
     });
 
     it("streams responses API correctly with thinking and completed events", async () => {
-      const messages: OpenAIMessage[] = [{ role: "user", content: "Responses Stream" }];
+      const messages: OpenAIMessage[] = [{ role: MESSAGE_ROLES.USER, content: "Responses Stream" }];
       const stream = openaiProvider.generateTextStream(messages, "gpt-5.5", {
         parallelToolCalls: false,
         store: false,
@@ -746,7 +746,7 @@ describe("OpenAI Provider Adapter", () => {
       );
       expect(mockChatCreate).toHaveBeenCalled();
       const payload = mockChatCreate.mock.calls[0][0];
-      expect(payload.messages[0]).toEqual({ role: "system", content: "A system prompt" });
+      expect(payload.messages[0]).toEqual({ role: MESSAGE_ROLES.SYSTEM, content: "A system prompt" });
     });
   });
 
@@ -806,7 +806,7 @@ describe("OpenAI Provider Adapter", () => {
       });
 
       await expect(
-        openaiProvider.generateText([{ role: "user", content: "Hello" }], "gpt-4o")
+        openaiProvider.generateText([{ role: MESSAGE_ROLES.USER, content: "Hello" }], "gpt-4o")
       ).rejects.toThrow("API Connection Error");
     });
 
@@ -868,7 +868,7 @@ describe("OpenAI Provider Adapter", () => {
         throw mockCompletionsError;
       });
 
-      const messages: OpenAIMessage[] = [{ role: "user", content: "Retry stream" }];
+      const messages: OpenAIMessage[] = [{ role: MESSAGE_ROLES.USER, content: "Retry stream" }];
       const stream = openaiProvider.generateTextStream(messages, "gpt-4o", {
         temperature: 0.8,
       });
@@ -886,7 +886,7 @@ describe("OpenAI Provider Adapter", () => {
       const controller = new AbortController();
       controller.abort();
 
-      const messages: OpenAIMessage[] = [{ role: "user", content: "Abort stream" }];
+      const messages: OpenAIMessage[] = [{ role: MESSAGE_ROLES.USER, content: "Abort stream" }];
       const stream = openaiProvider.generateTextStream(messages, "gpt-4o", {
         signal: controller.signal,
       });
@@ -906,7 +906,7 @@ describe("OpenAI Provider Adapter", () => {
         throw badRequestError;
       });
 
-      const messages: OpenAIMessage[] = [{ role: "user", content: "stream error trigger" }];
+      const messages: OpenAIMessage[] = [{ role: MESSAGE_ROLES.USER, content: "stream error trigger" }];
       const stream = openaiProvider.generateTextStream(messages, "gpt-4o");
 
       await expect(async () => {
@@ -944,7 +944,7 @@ describe("OpenAI Provider Adapter", () => {
         }),
       });
 
-      const messages: OpenAIMessage[] = [{ role: "user", content: "stream length stop" }];
+      const messages: OpenAIMessage[] = [{ role: MESSAGE_ROLES.USER, content: "stream length stop" }];
       const stream = openaiProvider.generateTextStream(messages, "gpt-4o");
 
       const chunks: any[] = [];
@@ -979,7 +979,7 @@ describe("OpenAI Provider Adapter", () => {
         }),
       });
 
-      const messages: OpenAIMessage[] = [{ role: "user", content: "stream no usage" }];
+      const messages: OpenAIMessage[] = [{ role: MESSAGE_ROLES.USER, content: "stream no usage" }];
       const stream = openaiProvider.generateTextStream(messages, "gpt-4o");
 
       const chunks: any[] = [];
@@ -992,7 +992,7 @@ describe("OpenAI Provider Adapter", () => {
     });
 
     it("submits and formats custom tools in generateTextStream options", async () => {
-      const messages: OpenAIMessage[] = [{ role: "user", content: "stream tools test" }];
+      const messages: OpenAIMessage[] = [{ role: MESSAGE_ROLES.USER, content: "stream tools test" }];
       const tools = [
         {
           name: "get_weather",
@@ -1018,7 +1018,7 @@ describe("OpenAI Provider Adapter", () => {
     });
 
     it("sets response_format and web_search tool in generateTextStream payload when options are specified", async () => {
-      const messages: OpenAIMessage[] = [{ role: "user", content: "stream options test" }];
+      const messages: OpenAIMessage[] = [{ role: MESSAGE_ROLES.USER, content: "stream options test" }];
       const stream = openaiProvider.generateTextStream(messages, "gpt-4o", {
         responseFormat: "json_object",
         webSearch: true,
@@ -1040,7 +1040,7 @@ describe("OpenAI Provider Adapter", () => {
     it("converts multimodal message structures properly", async () => {
       const messages: OpenAIMessage[] = [
         {
-          role: "user",
+          role: MESSAGE_ROLES.USER,
           content: "Multimodal user",
           images: [
             "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA",
@@ -1059,7 +1059,7 @@ describe("OpenAI Provider Adapter", () => {
       expect(mockChatCreate).toHaveBeenCalled();
       const payload = mockChatCreate.mock.calls[0][0];
       const userMessage = payload.messages[0];
-      expect(userMessage.role).toBe("user");
+      expect(userMessage.role).toBe(MESSAGE_ROLES.USER);
       expect(userMessage.content).toHaveLength(7); // 6 valid parts + 1 content text
     });
   });

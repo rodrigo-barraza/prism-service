@@ -1,12 +1,11 @@
 import "./setup.ts";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import ToolOrchestratorService, { ARG_REMAPS } from "../src/services/ToolOrchestratorService.ts";
-import { TYPES, MODEL_TYPES, FILE_CATEGORIES } from "../src/constants.ts";
+import { TYPES, MODEL_TYPES, FILE_CATEGORIES, MESSAGE_ROLES } from "../src/constants.ts";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { TOOLS_SERVICE_URL } from "../config.ts";
 import { TTS_VOICE_CATALOG_PLACEHOLDER } from "../src/utils/VoiceCatalog.ts";
 import OrchestratorService from "../src/services/OrchestratorService.ts";
-import MCPClientService from "../src/services/MCPClientService.ts";
 
 vi.mock("../src/services/FileService.ts", () => {
   return {
@@ -28,6 +27,8 @@ vi.mock("../src/services/FileService.ts", () => {
   };
 });
 
+import MCPClientService, { MCP_PREFIX } from "../src/services/MCPClientService.ts";
+
 vi.mock("../src/services/MCPClientService.ts", () => ({
   default: {
     isMCPTool: vi.fn().mockImplementation((name: string) => name.startsWith("mcp__")),
@@ -35,6 +36,7 @@ vi.mock("../src/services/MCPClientService.ts", () => ({
     callTool: vi.fn(),
     getToolSchemas: vi.fn().mockReturnValue([]),
   },
+  MCP_PREFIX: "mcp__", // Align mock with production default
 }));
 
 vi.mock("../src/services/OrchestratorService.ts", () => ({
@@ -169,7 +171,7 @@ describe("ToolOrchestratorService", () => {
         {
           messages: [
             {
-              role: "user",
+              role: MESSAGE_ROLES.USER,
               content: "Hello",
             },
           ],
@@ -221,7 +223,7 @@ describe("ToolOrchestratorService", () => {
         {
           messages: [
             {
-              role: "user",
+              role: MESSAGE_ROLES.USER,
               images: [fakeDataUrl],
             },
           ],
@@ -273,7 +275,7 @@ describe("ToolOrchestratorService", () => {
         {
           messages: [
             {
-              role: "user",
+              role: MESSAGE_ROLES.USER,
               images: [fakeHttpUrl],
             },
           ],
@@ -325,7 +327,7 @@ describe("ToolOrchestratorService", () => {
         {
           messages: [
             {
-              role: "user",
+              role: MESSAGE_ROLES.USER,
               images: [minioReference],
             },
           ],
@@ -388,7 +390,7 @@ describe("ToolOrchestratorService", () => {
         {
           messages: [
             {
-              role: "user",
+              role: MESSAGE_ROLES.USER,
               content: "Hello",
             },
           ],
@@ -440,7 +442,7 @@ describe("ToolOrchestratorService", () => {
         {
           messages: [
             {
-              role: "user",
+              role: MESSAGE_ROLES.USER,
               images: [fakeDataUrl],
             },
           ],
@@ -492,7 +494,7 @@ describe("ToolOrchestratorService", () => {
         {
           messages: [
             {
-              role: "user",
+              role: MESSAGE_ROLES.USER,
               images: [minioReference],
             },
           ],
@@ -937,7 +939,7 @@ describe("ToolOrchestratorService", () => {
       });
       vi.mocked(MCPClientService.callTool).mockResolvedValue({ result: "ok" });
 
-      const result = await ToolOrchestratorService.executeMCPTool("mcp__server__tool", { arg: 1 });
+      const result = await ToolOrchestratorService.executeTool("mcp__server__tool", { arg: 1 }, {} as any);
       expect(result).toEqual({ result: "ok" });
       expect(MCPClientService.parseMCPToolName).toHaveBeenCalledWith("mcp__server__tool");
       expect(MCPClientService.callTool).toHaveBeenCalledWith("server", "tool", { arg: 1 });
@@ -1486,7 +1488,7 @@ describe("ToolOrchestratorService", () => {
 
       const context = {
         messages: [
-          { role: "user", images: ["https://example.com/photo.jpg"] }
+          { role: MESSAGE_ROLES.USER, images: ["https://example.com/photo.jpg"] }
         ]
       };
 
@@ -1520,7 +1522,7 @@ describe("ToolOrchestratorService", () => {
 
       const context = {
         messages: [
-          { role: "user", images: ["data:image/png;base64,abc"] }
+          { role: MESSAGE_ROLES.USER, images: ["data:image/png;base64,abc"] }
         ]
       };
 
@@ -1554,7 +1556,7 @@ describe("ToolOrchestratorService", () => {
 
       const context = {
         messages: [
-          { role: "user", content: "hello" }
+          { role: MESSAGE_ROLES.USER, content: "hello" }
         ]
       };
 
@@ -1601,7 +1603,7 @@ describe("ToolOrchestratorService", () => {
       const context = {
         messages: [
           {
-            role: "user",
+            role: MESSAGE_ROLES.USER,
             images: [
               "https://example.com/ref1.png",
               "data:image/jpeg;base64,ref2",
