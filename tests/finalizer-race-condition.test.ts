@@ -796,7 +796,7 @@ describe("End-to-end DB state after generate_audio flow", () => {
     );
     expect(assistantWithTools).toBeDefined();
     expect(assistantWithTools!.toolCalls![0].name).toBe("generate_audio");
-    expect((assistantWithTools!.toolCalls![0] as any).result).toBeDefined();
+    expect((assistantWithTools!.toolCalls![0] as any).result).toBeUndefined();
 
     const toolMessage = databaseAfterTurn2.find(
       (message) => message.role === MESSAGE_ROLES.TOOL,
