@@ -172,16 +172,21 @@ vi.mock('../src/services/SettingsService.ts', () => {
 });
 
 // ── Mock ConversationService to avoid DB writes ───────────────────────
-vi.mock('../src/services/ConversationService.ts', () => ({
-    default: {
-        appendMessages: vi.fn().mockResolvedValue(undefined),
-        setGenerating: vi.fn().mockResolvedValue(undefined),
-        getConversationStats: vi.fn().mockResolvedValue(null),
-    },
-    enrichConversationsWithRequestCosts: vi.fn(),
-    enrichSingleConversationCost: vi.fn(),
-    buildConversationPatchFields: vi.fn().mockImplementation((input: any) => input),
-}));
+vi.mock('../src/services/ConversationService.ts', async () => {
+    const actual = await vi.importActual<any>('../src/services/ConversationService.ts');
+    return {
+        ...actual,
+        default: {
+            ...actual.default,
+            appendMessages: vi.fn().mockResolvedValue(undefined),
+            setGenerating: vi.fn().mockResolvedValue(undefined),
+            getConversationStats: vi.fn().mockResolvedValue(null),
+        },
+        enrichConversationsWithRequestCosts: vi.fn(),
+        enrichSingleConversationCost: vi.fn(),
+        buildConversationPatchFields: vi.fn().mockImplementation((input: any) => input),
+    };
+});
 
 // ── Mock RequestLogger to avoid DB writes ─────────────────────────────
 vi.mock('../src/services/RequestLogger.ts', () => ({
