@@ -10,6 +10,11 @@ import {
 } from "../../utils/QueryBuilders.ts";
 import { discoverDescendantConversationIds } from "../../utils/ConversationDiscovery.ts";
 import { buildConversationGraph } from "../../services/conversation/buildConversationGraph.ts";
+import {
+  buildGraphCacheKey,
+  getGraphFromCache,
+  setGraphInCache,
+} from "../../services/conversation/ConversationGraphCache.ts";
 import requireDb from "../../middleware/RequireDbMiddleware.ts";
 
 const conversationStatsRouter = express.Router();
@@ -223,11 +228,32 @@ conversationStatsRouter.get(
       const canvasWidth = parseInt(req.query.width as string, 10) || 1600;
       const canvasHeight = parseInt(req.query.height as string, 10) || 900;
 
+      // Fast path: discover descendant IDs and count requests to build
+      // the cache key. countDocuments is cheaper than fetching all fields.
       const allConversationIds = await discoverDescendantConversationIds(
         req.db,
         rootConversationId,
       );
 
+      const requestCount = await req.db
+        .collection(REQUESTS_COLLECTION)
+        .countDocuments({
+          agentConversationId: { $in: [...allConversationIds] },
+        });
+
+      const cacheKey = buildGraphCacheKey(
+        rootConversationId,
+        requestCount,
+        canvasWidth,
+        canvasHeight,
+      );
+
+      const cachedGraphData = getGraphFromCache(cacheKey);
+      if (cachedGraphData) {
+        return res.json(cachedGraphData);
+      }
+
+      // Cache miss — full pipeline: fetch conversation + request documents
       const [conversationDocument, requests] = await Promise.all([
         req.db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
@@ -272,6 +298,7 @@ conversationStatsRouter.get(
         canvasHeight,
       );
 
+      setGraphInCache(cacheKey, graphData);
       res.json(graphData);
     } catch (error: unknown) {
       logger.error(
