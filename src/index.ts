@@ -240,6 +240,15 @@ setupWebSocket(wss);
           collection: COLLECTIONS.REQUESTS,
           keys: { project: 1, createdAt: -1 },
         },
+        // requests — project-level compound index optimizations for admin unique count groupings
+        {
+          collection: COLLECTIONS.REQUESTS,
+          keys: { project: 1, traceId: 1 },
+        },
+        {
+          collection: COLLECTIONS.REQUESTS,
+          keys: { project: 1, conversationId: 1 },
+        },
         // requests — agent conversation joins (admin traces, conversation detail)
         { collection: COLLECTIONS.REQUESTS, keys: { agentConversationId: 1 } },
         // requests — parent agent conversation hierarchy traversal (7+ query sites use $in on this field)
