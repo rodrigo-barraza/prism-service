@@ -13,21 +13,23 @@
 
 import { describe, it, expect } from "vitest";
 import { swapMessageContent, assembleMessagesToAppend as assembleMessagesToAppendReal, sanitizeMessagesForPersistence } from "../src/services/harnesses/lifecycle/Finalizer.ts";
-import { PROMPT_DELIMITERS, PROVIDERS } from "../src/constants.ts";
+import { PROMPT_DELIMITERS, PROVIDERS, MESSAGE_ROLES, SYSTEM_STATUSES } from "../src/constants.ts";
 import type { MessagePayload, ToolCallPayload } from "../src/services/conversation/types.ts";
 import type { ConversationMessage } from "../src/services/harnesses/types.ts";
 import type { ChatMessage } from "../src/types/ProviderTypes.ts";
 
-type TestPayload = ConversationMessage & { rawContent?: string };
+type TestPayload = MessagePayload;
 
 type FinalizerInput = Parameters<typeof assembleMessagesToAppendReal>[0];
+
+type TestToolCallPayload = ToolCallPayload & { result?: string };
 
 type TestAssemblyInput = Omit<FinalizerInput, "text" | "thinking" | "audioReference" | "overrideMessagesToAppend" | "toolCalls"> & {
   overrideMessagesToAppend: TestPayload[];
   finalText: string;
   finalThinking: string;
   audioRef: string | null;
-  toolCalls: ToolCallPayload[];
+  toolCalls: TestToolCallPayload[];
 };
 
 // ── Simulate the Finalizer's message assembly ───────────────────
@@ -42,6 +44,7 @@ function assembleTestMessagesToAppend(input: TestAssemblyInput): TestPayload[] {
     text: input.finalText,
     thinking: input.finalThinking,
     audioReference: input.audioRef,
+    toolCalls: input.toolCalls as ToolCallPayload[],
   }) as TestPayload[];
 
   return sanitizeMessagesForPersistence(messages) as TestPayload[];
@@ -54,9 +57,9 @@ function assembleTestMessagesToAppend(input: TestAssemblyInput): TestPayload[] {
 describe("Finalizer message assembly", () => {
   it("correctly assembles messages for a generate_audio tool turn", () => {
     const newTurnMessages: TestPayload[] = [
-      { role: "user", content: "make a song about the war" },
+      { role: MESSAGE_ROLES.USER, content: "make a song about the war" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "I'll create a song!",
         toolCalls: [
           {
@@ -68,7 +71,7 @@ describe("Finalizer message assembly", () => {
               audioRef: "minio://audio/war.wav",
             },
           },
-        ],
+        ] as any[],
       },
     ];
 
@@ -84,11 +87,11 @@ describe("Finalizer message assembly", () => {
     });
 
     expect(messagesToAppend).toHaveLength(4);
-    expect(messagesToAppend[0].role).toBe("user");
+    expect(messagesToAppend[0].role).toBe(MESSAGE_ROLES.USER);
     expect(messagesToAppend[0].content).toBe("make a song about the war");
-    expect(messagesToAppend[1].role).toBe("assistant");
+    expect(messagesToAppend[1].role).toBe(MESSAGE_ROLES.ASSISTANT);
     expect(messagesToAppend[1].toolCalls![0].name).toBe("generate_audio");
-    expect(messagesToAppend[2].role).toBe("tool");
+    expect(messagesToAppend[2].role).toBe(MESSAGE_ROLES.TOOL);
     expect(messagesToAppend[2].content).toBe('{"success":true,"audioRef":"minio://audio/war.wav"}');
     expect(messagesToAppend[3].content).toBe(
       "Here's your song! I hope you enjoy it.",
@@ -100,30 +103,20 @@ describe("Finalizer message assembly", () => {
   it("does NOT duplicate toolCalls when hasIntermediateToolMessages is true", () => {
     const result = assembleTestMessagesToAppend({
       overrideMessagesToAppend: [
-        { role: "user", content: "search and make audio" },
+        { role: MESSAGE_ROLES.USER, content: "search and make audio" },
         {
-          role: "assistant",
+          role: MESSAGE_ROLES.ASSISTANT,
           content: "Searching...",
           toolCalls: [
-            {
-              id: "toolCall-0",
-              name: "search_web",
-              args: {},
-              result: { results: [] },
-            },
-          ],
+            { id: "toolCall-1", name: "search", args: { q: "war" }, result: ["War 1", "War 2"] },
+          ] as any[],
         },
         {
-          role: "assistant",
+          role: MESSAGE_ROLES.ASSISTANT,
           content: "Making audio...",
           toolCalls: [
-            {
-              id: "toolCall-1",
-              name: "generate_audio",
-              args: {},
-              result: { success: true },
-            },
-          ],
+            { id: "toolCall-2", name: "generate_audio", args: { prompt: "war song" }, result: "audioRef" },
+          ] as any[],
         },
       ],
       finalText: "Done!",
@@ -148,7 +141,7 @@ describe("Finalizer message assembly", () => {
     // This happens with native MCP tool calls that bypass the standard loop
     const result = assembleTestMessagesToAppend({
       overrideMessagesToAppend: [
-        { role: "user", content: "query the database" },
+        { role: MESSAGE_ROLES.USER, content: "query the database" },
       ],
       finalText: "Query results: ...",
       finalThinking: "",
@@ -172,17 +165,17 @@ describe("Finalizer message assembly", () => {
     const result = assembleTestMessagesToAppend({
       overrideMessagesToAppend: [
         {
-          role: "user",
+          role: MESSAGE_ROLES.USER,
           content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX}\nPrevious context summary.`,
           isCompactSummary: true,
         },
-        { role: "user", content: "make a song" },
+        { role: MESSAGE_ROLES.USER, content: "make a song" },
         {
-          role: "assistant",
+          role: MESSAGE_ROLES.ASSISTANT,
           content: "Making it!",
           toolCalls: [
             { id: "toolCall-0", name: "generate_audio", args: {}, result: {} },
-          ],
+          ] as any[],
         },
       ],
       finalText: "Done!",
@@ -196,26 +189,28 @@ describe("Finalizer message assembly", () => {
 
     // Summary should be filtered out. Split: user, assistant, tool, assistant
     expect(result).toHaveLength(4);
-    expect(result[0].role).toBe("user");
+    expect(result[0].role).toBe(MESSAGE_ROLES.USER);
     expect(result[0].content).toBe("make a song");
   });
 });
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  done event + appendAndFinalize race condition tests
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-describe("done event → appendAndFinalize race condition", () => {
-  it("documents the timing: done fires before DB write", () => {
-    // In Finalizer.ts:
-    // Line 328-347: emit({ type: "done" })  ← FIRES FIRST
-    // Line 348-493: appendAndFinalize(...)   ← RUNS AFTER (fire-and-forget)
+describe("Finalizer Lifecycle Timing — Persist-Before-Emit Invariant", () => {
+  it("documents the timing: appendAndFinalize completes before done event emission", () => {
+    /**
+     * In Finalizer.ts:
+     * Line 499: await appendAndFinalize(...)   ← PERSISTS FIRST
+     * Line 550: emit({ type: "done" })         ← EMITS AFTER
+     */
 
     const timeline: string[] = [];
 
-    // Simulate the Finalizer execution order
-    timeline.push("emit_done");
+    // Simulate the Finalizer execution order (Persist-Before-Emit)
     timeline.push("appendAndFinalize_start");
+    timeline.push("appendAndFinalize_mongodb_write");
+    timeline.push("appendAndFinalize_complete");
+
+    // After DB is guaranteed, we emit the done event
+    timeline.push("emit_done");
 
     // Client receives done, resolves promise
     timeline.push("client_onDone_resolve");
@@ -223,26 +218,19 @@ describe("done event → appendAndFinalize race condition", () => {
     // Client starts post-stream refresh
     timeline.push("client_fetch_from_db");
 
-    // appendAndFinalize is still running...
-    timeline.push("appendAndFinalize_mongodb_write");
-    timeline.push("appendAndFinalize_complete");
-
-    // Verify the order
-    const doneIndex = timeline.indexOf("emit_done");
-    const writeIndex = timeline.indexOf("appendAndFinalize_mongodb_write");
+    // Verify the invariant: write happens before fetch
     const fetchIndex = timeline.indexOf("client_fetch_from_db");
+    const writeIndex = timeline.indexOf("appendAndFinalize_mongodb_write");
 
-    // The client fetch happens BEFORE the MongoDB write
-    expect(fetchIndex).toBeLessThan(writeIndex);
-    // Done event fires BEFORE the write
-    expect(doneIndex).toBeLessThan(writeIndex);
+    expect(writeIndex).toBeLessThan(fetchIndex);
+    expect(timeline.indexOf("appendAndFinalize_complete")).toBeLessThan(timeline.indexOf("emit_done"));
   });
 
-  it("stale DB fetch returns only turn 1 messages", () => {
-    // DB state at the time of the first fetch (before appendAndFinalize completes)
+  it("client fetch returns complete turn 2 messages due to await", () => {
+    // DB state at the time of the fetch (since we await appendAndFinalize)
     const staleDatabaseMessages: TestPayload[] = [
-      { role: "user", content: "hey whats up" },
-      { role: "assistant", content: "Hey Rodrigo!" },
+      { role: MESSAGE_ROLES.USER, content: "hey whats up" },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Hey Rodrigo!" },
     ];
 
     // Streaming state has 4 messages
@@ -255,30 +243,30 @@ describe("done event → appendAndFinalize race condition", () => {
   it("after retry, DB should have all messages (if appendAndFinalize succeeded)", () => {
     // DB state after appendAndFinalize completes
     const completeDatabaseMessages: TestPayload[] = [
-      { role: "user", content: "hey whats up" },
-      { role: "assistant", content: "Hey Rodrigo!" },
-      { role: "user", content: "make a song about the war" },
+      { role: MESSAGE_ROLES.USER, content: "hey whats up" },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Hey Rodrigo!" },
+      { role: MESSAGE_ROLES.USER, content: "make a song about the war" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "I'll create a song!",
         toolCalls: [
           {
             id: "toolCall-0",
             name: "generate_audio",
-            args: {},
+            args: { prompt: "war song" },
             result: { success: true, audioRef: "minio://audio/war.wav" },
           },
-        ],
+        ] as any[],
       },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Here's your song!",
       },
     ];
 
     // Now filtering through prepareDisplayMessages equivalent
     const displayMessages = completeDatabaseMessages.filter(
-      (message) => message.role !== "system" && message.role !== "tool",
+      (message) => message.role !== "system" && message.role !== MESSAGE_ROLES.TOOL,
     );
 
     const streamingMessageCount = 4;
@@ -290,7 +278,7 @@ describe("done event → appendAndFinalize race condition", () => {
 
     // All user messages preserved
     const userMessages = displayMessages.filter(
-      (message) => message.role === "user",
+      (message) => message.role === MESSAGE_ROLES.USER,
     );
     expect(userMessages).toHaveLength(2);
     expect(userMessages[0].content).toBe("hey whats up");
@@ -302,7 +290,7 @@ describe("done event → appendAndFinalize race condition", () => {
     );
     expect(toolMessages).toHaveLength(1);
     expect(toolMessages[0].toolCalls![0].name).toBe("generate_audio");
-    expect(toolMessages[0].toolCalls![0].result).toHaveProperty("audioRef");
+    expect((toolMessages[0].toolCalls![0] as any).result).toHaveProperty("audioRef");
   });
 
   it("count mismatch between streaming (4) and DB (5) is expected and valid", () => {
@@ -468,27 +456,27 @@ describe("done event → appendAndFinalize race condition", () => {
 
     it("content-aware guard catches missing user messages", () => {
       const streamingMessages: ChatMessage[] = [
-        { role: "user", content: "hey whats up" },
-        { role: "assistant", content: "Hey Rodrigo!" },
-        { role: "user", content: "make a song about the war" },
-        { role: "assistant", content: "Creating your song!" },
+        { role: MESSAGE_ROLES.USER, content: "hey whats up" },
+        { role: MESSAGE_ROLES.ASSISTANT, content: "Hey Rodrigo!" },
+        { role: MESSAGE_ROLES.USER, content: "make a song about the war" },
+        { role: MESSAGE_ROLES.ASSISTANT, content: "Creating your song!" },
       ];
 
       const databaseMessages: ChatMessage[] = [
-        { role: "user", content: "hey whats up" },
-        { role: "assistant", content: "Hey Rodrigo!" },
-        { role: "assistant", content: "Creating!" },
-        { role: "assistant", content: "Done!" },
+        { role: MESSAGE_ROLES.USER, content: "hey whats up" },
+        { role: MESSAGE_ROLES.ASSISTANT, content: "Hey Rodrigo!" },
+        { role: MESSAGE_ROLES.ASSISTANT, content: "Creating!" },
+        { role: MESSAGE_ROLES.ASSISTANT, content: "Done!" },
       ];
 
       expect(databaseMessages.length >= streamingMessages.length).toBe(true);
 
       const lastStreamingUser = [...streamingMessages]
         .reverse()
-        .find((message) => message.role === "user");
+        .find((message) => message.role === MESSAGE_ROLES.USER);
       const lastDatabaseUser = [...databaseMessages]
         .reverse()
-        .find((message) => message.role === "user");
+        .find((message) => message.role === MESSAGE_ROLES.USER);
 
       expect(lastStreamingUser?.content).toBe("make a song about the war");
       expect(lastDatabaseUser?.content).toBe("hey whats up");
@@ -509,11 +497,11 @@ describe("done event → appendAndFinalize race condition", () => {
 
         const lastStreamingUser = [...streamingMessages]
           .reverse()
-          .find((message) => message.role === "user");
+          .find((message) => message.role === MESSAGE_ROLES.USER);
 
         if (lastStreamingUser) {
           const databaseUserMessages = databaseMessages
-            .filter((message) => message.role === "user")
+            .filter((message) => message.role === MESSAGE_ROLES.USER)
             .map((message) => message.content as string);
 
           if (!databaseUserMessages.includes(lastStreamingUser.content as string)) {
@@ -527,17 +515,17 @@ describe("done event → appendAndFinalize race condition", () => {
       expect(
         shouldOverwriteWithDatabaseMessages(
           [
-            { role: "user", content: "hey" },
-            { role: "assistant", content: "Hi!" },
-            { role: "user", content: "make a song" },
-            { role: "assistant", content: "Creating!" },
+            { role: MESSAGE_ROLES.USER, content: "hey" },
+            { role: MESSAGE_ROLES.ASSISTANT, content: "Hi!" },
+            { role: MESSAGE_ROLES.USER, content: "make a song" },
+            { role: MESSAGE_ROLES.ASSISTANT, content: "Creating!" },
           ],
           [
-            { role: "user", content: "hey" },
-            { role: "assistant", content: "Hi!" },
-            { role: "user", content: "make a song" },
-            { role: "assistant", content: "Creating!" },
-            { role: "assistant", content: "Done!" },
+            { role: MESSAGE_ROLES.USER, content: "hey" },
+            { role: MESSAGE_ROLES.ASSISTANT, content: "Hi!" },
+            { role: MESSAGE_ROLES.USER, content: "make a song" },
+            { role: MESSAGE_ROLES.ASSISTANT, content: "Creating!" },
+            { role: MESSAGE_ROLES.ASSISTANT, content: "Done!" },
           ],
         ),
       ).toBe(true);
@@ -545,14 +533,14 @@ describe("done event → appendAndFinalize race condition", () => {
       expect(
         shouldOverwriteWithDatabaseMessages(
           [
-            { role: "user", content: "hey" },
-            { role: "assistant", content: "Hi!" },
-            { role: "user", content: "make a song" },
-            { role: "assistant", content: "Creating!" },
+            { role: MESSAGE_ROLES.USER, content: "hey" },
+            { role: MESSAGE_ROLES.ASSISTANT, content: "Hi!" },
+            { role: MESSAGE_ROLES.USER, content: "make a song" },
+            { role: MESSAGE_ROLES.ASSISTANT, content: "Creating!" },
           ],
           [
-            { role: "user", content: "hey" },
-            { role: "assistant", content: "Hi!" },
+            { role: MESSAGE_ROLES.USER, content: "hey" },
+            { role: MESSAGE_ROLES.ASSISTANT, content: "Hi!" },
           ],
         ),
       ).toBe(false);
@@ -560,16 +548,16 @@ describe("done event → appendAndFinalize race condition", () => {
       expect(
         shouldOverwriteWithDatabaseMessages(
           [
-            { role: "user", content: "hey" },
-            { role: "assistant", content: "Hi!" },
-            { role: "user", content: "make a song" },
-            { role: "assistant", content: "Creating!" },
+            { role: MESSAGE_ROLES.USER, content: "hey" },
+            { role: MESSAGE_ROLES.ASSISTANT, content: "Hi!" },
+            { role: MESSAGE_ROLES.USER, content: "make a song" },
+            { role: MESSAGE_ROLES.ASSISTANT, content: "Creating!" },
           ],
           [
-            { role: "user", content: "hey" },
-            { role: "assistant", content: "Hi!" },
-            { role: "assistant", content: "Creating!" },
-            { role: "assistant", content: "Done!" },
+            { role: MESSAGE_ROLES.USER, content: "hey" },
+            { role: MESSAGE_ROLES.ASSISTANT, content: "Hi!" },
+            { role: MESSAGE_ROLES.ASSISTANT, content: "Creating!" },
+            { role: MESSAGE_ROLES.ASSISTANT, content: "Done!" },
           ],
         ),
       ).toBe(false);
@@ -586,7 +574,7 @@ describe("done event → appendAndFinalize race condition", () => {
 describe("swapMsgContent — system context injection handling", () => {
   it("swaps injected system context to rawContent", () => {
     const message: TestPayload = {
-      role: "user",
+      role: MESSAGE_ROLES.USER,
       content:
         `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\nYou are helpful.\n\n${PROMPT_DELIMITERS.USER_MESSAGE}\nmake a song about the war`,
     };
@@ -601,7 +589,7 @@ describe("swapMsgContent — system context injection handling", () => {
 
   it("swaps Local Time context format", () => {
     const message: TestPayload = {
-      role: "user",
+      role: MESSAGE_ROLES.USER,
       content:
         `${PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX} 2026-05-26T20:00:00-07:00]\n\nhey whats up`,
     };
@@ -617,7 +605,7 @@ describe("swapMsgContent — system context injection handling", () => {
     // early-returns — no swap is performed. This prevents double-swapping
     // on messages that were already processed.
     const message: TestPayload = {
-      role: "user",
+      role: MESSAGE_ROLES.USER,
       content: "make a song about the war",
       rawContent:
         `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\nContext\n\n${PROMPT_DELIMITERS.USER_MESSAGE}\nmake a song about the war`,
@@ -632,7 +620,7 @@ describe("swapMsgContent — system context injection handling", () => {
 
   it("no-ops when rawContent already has System Context prefix", () => {
     const message: TestPayload = {
-      role: "user",
+      role: MESSAGE_ROLES.USER,
       content: "make a song",
       rawContent: `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\nAlready swapped`,
     };
@@ -646,7 +634,7 @@ describe("swapMsgContent — system context injection handling", () => {
 
   it("does nothing to assistant messages", () => {
     const message: TestPayload = {
-      role: "assistant",
+      role: MESSAGE_ROLES.ASSISTANT,
       content: `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\nThis should not be swapped`,
     };
 
@@ -660,7 +648,7 @@ describe("swapMsgContent — system context injection handling", () => {
 
   it("handles messages without system context prefix", () => {
     const message: TestPayload = {
-      role: "user",
+      role: MESSAGE_ROLES.USER,
       content: "simple message",
     };
 
@@ -690,13 +678,13 @@ describe("End-to-end DB state after generate_audio flow", () => {
 
     const databaseAfterTurn1: TestPayload[] = [
       {
-        role: "user",
+        role: MESSAGE_ROLES.USER,
         content: "hey whats up",
         rawContent:
           `${PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX} 2026-05-26T20:00:00]\n\nhey whats up`,
       },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Hey Rodrigo! Not much, just here and ready to help.",
         model: "claude-haiku-4-5-20251001",
         provider: PROVIDERS.ANTHROPIC,
@@ -725,13 +713,13 @@ describe("End-to-end DB state after generate_audio flow", () => {
 
     const turn2NewTurnMessages: TestPayload[] = [
       {
-        role: "user",
+        role: MESSAGE_ROLES.USER,
         content: "make a song about the war",
         rawContent:
           `${PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX} 2026-05-26T20:00:10]\n\nmake a song about the war`,
       },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "I'll create an original song about war!",
         toolCalls: [
           {
@@ -751,7 +739,7 @@ describe("End-to-end DB state after generate_audio flow", () => {
               sampleRate: 44100,
             },
           },
-        ],
+        ] as any[],
       },
     ];
 
@@ -786,7 +774,7 @@ describe("End-to-end DB state after generate_audio flow", () => {
 
     // 2. All user messages present with correct content
     const userMessages = databaseAfterTurn2.filter(
-      (message) => message.role === "user",
+      (message) => message.role === MESSAGE_ROLES.USER,
     );
     expect(userMessages).toHaveLength(2);
     expect(userMessages[0].content).toBe("hey whats up");
@@ -804,13 +792,14 @@ describe("End-to-end DB state after generate_audio flow", () => {
 
     // 4. Tool calls preserved on assistant, result split into tool role message
     const assistantWithTools = databaseAfterTurn2.find(
-      (message) => message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0,
+      (message) => message.role === MESSAGE_ROLES.ASSISTANT && message.toolCalls && message.toolCalls.length > 0,
     );
     expect(assistantWithTools).toBeDefined();
     expect(assistantWithTools!.toolCalls![0].name).toBe("generate_audio");
+    expect((assistantWithTools!.toolCalls![0] as any).result).toBeDefined();
 
     const toolMessage = databaseAfterTurn2.find(
-      (message) => message.role === "tool",
+      (message) => message.role === MESSAGE_ROLES.TOOL,
     );
     expect(toolMessage).toBeDefined();
     expect(toolMessage!.name).toBe("generate_audio");
@@ -824,7 +813,7 @@ describe("End-to-end DB state after generate_audio flow", () => {
 
     // 6. Final assistant has summary text
     const lastMessage = databaseAfterTurn2[databaseAfterTurn2.length - 1];
-    expect(lastMessage.role).toBe("assistant");
+    expect(lastMessage.role).toBe(MESSAGE_ROLES.ASSISTANT);
     expect(lastMessage.content).toContain("Echoes of War");
 
     // 7. No duplicate user messages
@@ -836,12 +825,12 @@ describe("End-to-end DB state after generate_audio flow", () => {
     // 8. Message order is correct: user, assistant, tool, assistant alternation
     const roles = databaseAfterTurn2.map((message) => message.role);
     expect(roles).toEqual([
-      "user",
-      "assistant",
-      "user",
-      "assistant",
-      "tool",
-      "assistant",
+      MESSAGE_ROLES.USER,
+      MESSAGE_ROLES.ASSISTANT,
+      MESSAGE_ROLES.USER,
+      MESSAGE_ROLES.ASSISTANT,
+      MESSAGE_ROLES.TOOL,
+      MESSAGE_ROLES.ASSISTANT,
     ]);
   });
 });

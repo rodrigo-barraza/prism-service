@@ -82,8 +82,8 @@ interface MCPContentBlock {
  * Tool name delimiter — MCP tools are namespaced as `mcp__{serverName}__{toolName}`.
  * Double underscore avoids collisions since neither server names nor tool names use it.
  */
-const MCP_DELIMITER = "__";
-const MCP_PREFIX = "mcp" + MCP_DELIMITER;
+export const MCP_DELIMITER = "__";
+export const MCP_PREFIX = "mcp" + MCP_DELIMITER;
 
 // ─── Connection Store ─────────────────────────────────────────────────────────
 
