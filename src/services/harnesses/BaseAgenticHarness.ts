@@ -1012,6 +1012,7 @@ export default class BaseAgenticHarness {
           args: streamChunk.args || {},
           id: standardToolCallId,
         },
+        toolEmoji: ToolOrchestratorService.getToolEmoji(toolName),
         status: "calling",
         timestamp: Date.now(),
       });
