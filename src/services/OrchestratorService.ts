@@ -1200,6 +1200,7 @@ export class OrchestratorService {
     activeSubAgents.clear();
     agentCountersByConversation.clear();
     pendingRouterDispatches.clear();
+    SubAgentIdGenerator.resetCounters();
     logger.info("[Orchestrator] Cleared all active sub-agents from registry");
   }
 
