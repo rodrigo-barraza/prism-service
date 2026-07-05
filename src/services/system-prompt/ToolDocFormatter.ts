@@ -69,7 +69,10 @@ export class ToolDocFormatter {
           (toolSchema) => !lockedOffToolNames.has(toolSchema.name),
         );
       }
-      return this._formatToolDescriptions(filteredSchemas, compact, locale);
+      return this._scrubWorkspaceDomainReferences(
+        this._formatToolDescriptions(filteredSchemas, compact, locale),
+        workspaceEnabled,
+      );
     }
 
     if (!enabledTools) {
@@ -84,7 +87,10 @@ export class ToolDocFormatter {
           (toolSchema) => !lockedOffToolNames.has(toolSchema.name),
         );
       }
-      return this._formatToolDescriptions(allSchemas, compact, locale);
+      return this._scrubWorkspaceDomainReferences(
+        this._formatToolDescriptions(allSchemas, compact, locale),
+        workspaceEnabled,
+      );
     }
 
     const hasPrefixed = enabledTools.some(
@@ -132,7 +138,10 @@ export class ToolDocFormatter {
       );
     }
 
-    return this._formatToolDescriptions(filteredSchemas, compact, locale);
+    return this._scrubWorkspaceDomainReferences(
+      this._formatToolDescriptions(filteredSchemas, compact, locale),
+      workspaceEnabled,
+    );
   }
 
   private _formatToolDescriptions(
@@ -198,5 +207,60 @@ export class ToolDocFormatter {
     }
 
     return sections.join("\n\n");
+  }
+
+  /**
+   * Defense-in-depth: when workspace is disabled, scrub any lingering
+   * workspace domain name references from tool description text.
+   *
+   * Some tool schemas (e.g. search_tools, discover_and_enable_tools) embed
+   * domain names in their parameter descriptions as enumerated lists.
+   * Even after workspace tool definitions are stripped, these textual
+   * references can leak through. This post-processor removes them.
+   */
+  private _scrubWorkspaceDomainReferences(
+    formattedText: string,
+    workspaceEnabled: boolean,
+  ): string {
+    if (workspaceEnabled || !formattedText) return formattedText;
+
+    const workspaceDomainName = DOMAINS.CORE_WORKSPACE.displayName;
+
+    // Remove from comma-separated quoted domain lists:
+    //   "'Core Workspace Tools', " or ", 'Core Workspace Tools'"
+    const escapedDomainName = workspaceDomainName.replace(
+      /[.*+?^${}()|[\]\\]/g,
+      "\\$&",
+    );
+    const domainListPattern = new RegExp(
+      `'${escapedDomainName}',\\s*|,\\s*'${escapedDomainName}'`,
+      "g",
+    );
+    let scrubbed = formattedText.replace(domainListPattern, "");
+
+    // Remove standalone quoted reference: "'Core Workspace Tools'"
+    const standalonePattern = new RegExp(`'${escapedDomainName}'`, "g");
+    scrubbed = scrubbed.replace(standalonePattern, "");
+
+    // Remove workspace tool name examples from query example lists:
+    //   "'read_file', " or ", 'read_file'" or "'write_file', " etc.
+    const workspaceToolSchemas = ToolOrchestratorService.getClientToolSchemas();
+    const workspaceToolNames = workspaceToolSchemas
+      .filter(
+        (toolSchema) =>
+          (toolSchema as Record<string, unknown>).domain === workspaceDomainName,
+      )
+      .map((toolSchema) => toolSchema.name as string);
+
+    for (const toolName of workspaceToolNames) {
+      const escapedToolName = toolName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const toolListPattern = new RegExp(
+        `'${escapedToolName}',\\s*|,\\s*'${escapedToolName}'`,
+        "g",
+      );
+      scrubbed = scrubbed.replace(toolListPattern, "");
+    }
+
+    return scrubbed;
   }
 }
