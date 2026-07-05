@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { PROMPT_DELIMITERS } from "../src/constants.ts";
+import { PROMPT_DELIMITERS, MESSAGE_ROLES } from "../src/constants.ts";
 import type { ConversationMessage as TestMessage } from "../src/services/harnesses/types.ts";
 import { computeNewTurnMessages, sanitizeMessagesForPersistence } from "../src/services/harnesses/lifecycle/Finalizer.ts";
 import type { MessagePayload } from "../src/services/conversation/types.ts";
@@ -54,12 +54,12 @@ describe("newTurnMessages slice — normal flow (no compaction)", () => {
     // currentMessages.length = 5
 
     const currentMessages: TestMessage[] = [
-      { role: "system", content: "You are helpful." },
-      { role: "user", content: "hey whats up" },
-      { role: "assistant", content: "Hey Rodrigo! What's good?" },
-      { role: "user", content: "make a song about the war" },
+      { role: MESSAGE_ROLES.SYSTEM, content: "You are helpful." },
+      { role: MESSAGE_ROLES.USER, content: "hey whats up" },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Hey Rodrigo! What's good?" },
+      { role: MESSAGE_ROLES.USER, content: "make a song about the war" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "I'll create a song for you!",
         toolCalls: [
           {
@@ -80,9 +80,9 @@ describe("newTurnMessages slice — normal flow (no compaction)", () => {
 
     // Should capture: user2 + assistant2_with_tools (slice from index 3)
     expect(newTurnMessages).toHaveLength(2);
-    expect(newTurnMessages[0].role).toBe("user");
+    expect(newTurnMessages[0].role).toBe(MESSAGE_ROLES.USER);
     expect(newTurnMessages[0].content).toBe("make a song about the war");
-    expect(newTurnMessages[1].role).toBe("assistant");
+    expect(newTurnMessages[1].role).toBe(MESSAGE_ROLES.ASSISTANT);
     expect(newTurnMessages[1].toolCalls).toHaveLength(1);
     expect(newTurnMessages[1].toolCalls![0].name).toBe("generate_audio");
   });
@@ -92,10 +92,10 @@ describe("newTurnMessages slice — normal flow (no compaction)", () => {
     // Iteration 1 produces text only → breaks without pushing
     // currentMessages stays at 4
     const currentMessages: TestMessage[] = [
-      { role: "system", content: "You are helpful." },
-      { role: "user", content: "hey" },
-      { role: "assistant", content: "Hello!" },
-      { role: "user", content: "how are you?" },
+      { role: MESSAGE_ROLES.SYSTEM, content: "You are helpful." },
+      { role: MESSAGE_ROLES.USER, content: "hey" },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Hello!" },
+      { role: MESSAGE_ROLES.USER, content: "how are you?" },
     ];
     const originalMessageCount = 4;
 
@@ -106,19 +106,19 @@ describe("newTurnMessages slice — normal flow (no compaction)", () => {
 
     // Should capture: user2 (slice from index 3)
     expect(newTurnMessages).toHaveLength(1);
-    expect(newTurnMessages[0].role).toBe("user");
+    expect(newTurnMessages[0].role).toBe(MESSAGE_ROLES.USER);
     expect(newTurnMessages[0].content).toBe("how are you?");
   });
 
   it("captures user + multiple tool iterations", () => {
     // Two tool iterations before final text
     const currentMessages: TestMessage[] = [
-      { role: "system", content: "System" },
-      { role: "user", content: "hello" },
-      { role: "assistant", content: "Hi!" },
-      { role: "user", content: "search for X and generate audio" },
+      { role: MESSAGE_ROLES.SYSTEM, content: "System" },
+      { role: MESSAGE_ROLES.USER, content: "hello" },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Hi!" },
+      { role: MESSAGE_ROLES.USER, content: "search for X and generate audio" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Let me search first.",
         toolCalls: [
           {
@@ -130,7 +130,7 @@ describe("newTurnMessages slice — normal flow (no compaction)", () => {
         ],
       },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Now generating audio.",
         toolCalls: [
           {
@@ -151,7 +151,7 @@ describe("newTurnMessages slice — normal flow (no compaction)", () => {
 
     // Should capture: user2, assistant_search, assistant_audio
     expect(newTurnMessages).toHaveLength(3);
-    expect(newTurnMessages[0].role).toBe("user");
+    expect(newTurnMessages[0].role).toBe(MESSAGE_ROLES.USER);
     expect(newTurnMessages[0].content).toBe(
       "search for X and generate audio",
     );
@@ -188,17 +188,17 @@ describe("newTurnMessages slice — compaction mid-loop (BUG SCENARIO)", () => {
     // But wait, the issue might be different...
 
     const currentMessagesAfterCompaction: TestMessage[] = [
-      { role: "system", content: "You are helpful." },
+      { role: MESSAGE_ROLES.SYSTEM, content: "You are helpful." },
       {
-        role: "user",
+        role: MESSAGE_ROLES.USER,
         content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX}\nUser greeted the assistant.`,
         isCompactSummary: true,
       },
-      { role: "user", content: "hey whats up" },
-      { role: "assistant", content: "Hey Rodrigo!" },
-      { role: "user", content: "make a song about the war" },
+      { role: MESSAGE_ROLES.USER, content: "hey whats up" },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Hey Rodrigo!" },
+      { role: MESSAGE_ROLES.USER, content: "make a song about the war" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Creating your song!",
         toolCalls: [
           {
@@ -231,7 +231,7 @@ describe("newTurnMessages slice — compaction mid-loop (BUG SCENARIO)", () => {
 
     // user2 IS included — so the bug is not here when compaction preserves user2.
     expect(newTurnMessages).toHaveLength(2);
-    expect(newTurnMessages[0].role).toBe("user");
+    expect(newTurnMessages[0].role).toBe(MESSAGE_ROLES.USER);
     expect(newTurnMessages[0].content).toBe("make a song about the war");
 
     // But after sanitization, the compaction summary is irrelevant
@@ -240,8 +240,8 @@ describe("newTurnMessages slice — compaction mid-loop (BUG SCENARIO)", () => {
     const sanitized = sanitizeMessagesToAppend(newTurnMessages);
     expect(sanitized).toHaveLength(3);
     expect(sanitized[0].content).toBe("make a song about the war");
-    expect(sanitized[1].role).toBe("assistant");
-    expect(sanitized[2].role).toBe("tool");
+    expect(sanitized[1].role).toBe(MESSAGE_ROLES.ASSISTANT);
+    expect(sanitized[2].role).toBe(MESSAGE_ROLES.TOOL);
   });
 
   it("BUG: compaction drops user2 from recent tail → user message lost entirely", () => {
@@ -254,14 +254,14 @@ describe("newTurnMessages slice — compaction mid-loop (BUG SCENARIO)", () => {
     // After sanitization: [assistant2_with_tools] — user2 is GONE!
 
     const currentMessagesAfterBadCompaction: TestMessage[] = [
-      { role: "system", content: "You are helpful." },
+      { role: MESSAGE_ROLES.SYSTEM, content: "You are helpful." },
       {
-        role: "user",
+        role: MESSAGE_ROLES.USER,
         content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX}\nEntire history compacted.`,
         isCompactSummary: true,
       },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Creating your song!",
         toolCalls: [
           {
@@ -288,8 +288,8 @@ describe("newTurnMessages slice — compaction mid-loop (BUG SCENARIO)", () => {
 
     // BUG: Only assistant and tool remain — user message was LOST
     expect(sanitized).toHaveLength(2);
-    expect(sanitized[0].role).toBe("assistant");
-    expect(sanitized[1].role).toBe("tool");
+    expect(sanitized[0].role).toBe(MESSAGE_ROLES.ASSISTANT);
+    expect(sanitized[1].role).toBe(MESSAGE_ROLES.TOOL);
     // The user's "make a song about the war" is nowhere to be found!
   });
 });
@@ -304,10 +304,10 @@ describe("newTurnMessages slice — first turn", () => {
     // originalMessageCount = 2
     // After iteration 1 (tool call): [system, user1, assistant1_with_tools]
     const currentMessages: TestMessage[] = [
-      { role: "system", content: "System" },
-      { role: "user", content: "generate an image of a cat" },
+      { role: MESSAGE_ROLES.SYSTEM, content: "System" },
+      { role: MESSAGE_ROLES.USER, content: "generate an image of a cat" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Creating a cat image!",
         toolCalls: [
           {
@@ -324,15 +324,15 @@ describe("newTurnMessages slice — first turn", () => {
 
     // Slice from 2 - 1 = 1: [user1, assistant1_with_tools]
     expect(newTurnMessages).toHaveLength(2);
-    expect(newTurnMessages[0].role).toBe("user");
+    expect(newTurnMessages[0].role).toBe(MESSAGE_ROLES.USER);
     expect(newTurnMessages[0].content).toBe("generate an image of a cat");
     expect(newTurnMessages[1].toolCalls![0].name).toBe("generate_image");
   });
 
   it("captures only user message on first turn without tools", () => {
     const currentMessages: TestMessage[] = [
-      { role: "system", content: "System" },
-      { role: "user", content: "hello" },
+      { role: MESSAGE_ROLES.SYSTEM, content: "System" },
+      { role: MESSAGE_ROLES.USER, content: "hello" },
     ];
 
     const newTurnMessages = extractNewTurnMessages(currentMessages, 2);
@@ -358,13 +358,13 @@ describe("newTurnMessages slice — context window enforcement", () => {
     //   currentMessages = [system, CONTEXT_NOTE, user2, assistant2, user3, assistant3_tools]
 
     const currentMessages: TestMessage[] = [
-      { role: "system", content: "System" },
-      { role: "user", content: `${PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX} 2 messages truncated]` },
-      { role: "user", content: "second message" },
-      { role: "assistant", content: "response to second" },
-      { role: "user", content: "third message" },
+      { role: MESSAGE_ROLES.SYSTEM, content: "System" },
+      { role: MESSAGE_ROLES.USER, content: `${PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX} 2 messages truncated]` },
+      { role: MESSAGE_ROLES.USER, content: "second message" },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "response to second" },
+      { role: MESSAGE_ROLES.USER, content: "third message" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Using tool",
         toolCalls: [
           {
@@ -388,8 +388,8 @@ describe("newTurnMessages slice — context window enforcement", () => {
     // Slice from 4 - 1 = 3: [assistant2, user3, assistant3_tools]
     // CONTEXT_NOTE should be filtered out (not in this slice anyway)
     expect(newTurnMessages).toHaveLength(3);
-    expect(newTurnMessages[0].role).toBe("assistant");
-    expect(newTurnMessages[1].role).toBe("user");
+    expect(newTurnMessages[0].role).toBe(MESSAGE_ROLES.ASSISTANT);
+    expect(newTurnMessages[1].role).toBe(MESSAGE_ROLES.USER);
     expect(newTurnMessages[1].content).toBe("third message");
     expect(newTurnMessages[2].toolCalls![0].name).toBe("generate_audio");
   });
@@ -402,9 +402,9 @@ describe("newTurnMessages slice — context window enforcement", () => {
 describe("newTurnMessages slice — edge cases", () => {
   it("handles originalMessageCount = 0 (empty history)", () => {
     const currentMessages: TestMessage[] = [
-      { role: "user", content: "hello" },
+      { role: MESSAGE_ROLES.USER, content: "hello" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Hi!",
         toolCalls: [
           {
@@ -424,8 +424,8 @@ describe("newTurnMessages slice — edge cases", () => {
 
   it("handles originalMessageCount = 1 (only system message)", () => {
     const currentMessages: TestMessage[] = [
-      { role: "system", content: "System" },
-      { role: "user", content: "hello" },
+      { role: MESSAGE_ROLES.SYSTEM, content: "System" },
+      { role: MESSAGE_ROLES.USER, content: "hello" },
     ];
 
     const newTurnMessages = extractNewTurnMessages(currentMessages, 1);
@@ -435,8 +435,8 @@ describe("newTurnMessages slice — edge cases", () => {
 
   it("handles originalMessageCount equal to currentMessages length (no new messages)", () => {
     const currentMessages: TestMessage[] = [
-      { role: "system", content: "System" },
-      { role: "user", content: "hello" },
+      { role: MESSAGE_ROLES.SYSTEM, content: "System" },
+      { role: MESSAGE_ROLES.USER, content: "hello" },
     ];
 
     const newTurnMessages = extractNewTurnMessages(currentMessages, 2);
@@ -449,9 +449,9 @@ describe("newTurnMessages slice — edge cases", () => {
     // This can happen if compaction reduces the array below the original count
     // due to aggressive summarization
     const currentMessages: TestMessage[] = [
-      { role: "system", content: "System" },
+      { role: MESSAGE_ROLES.SYSTEM, content: "System" },
       {
-        role: "user",
+        role: MESSAGE_ROLES.USER,
         content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX}\nSummary`,
         isCompactSummary: true,
       },
@@ -485,12 +485,12 @@ describe("Generate Audio tool flow — second turn message persistence", () => {
     //   (unchanged — text-only break doesn't push)
 
     const currentMessages: TestMessage[] = [
-      { role: "system", content: "You are a creative assistant." },
-      { role: "user", content: "hey whats up" },
-      { role: "assistant", content: "Hey Rodrigo! What's good?" },
-      { role: "user", content: "make a song about the war" },
+      { role: MESSAGE_ROLES.SYSTEM, content: "You are a creative assistant." },
+      { role: MESSAGE_ROLES.USER, content: "hey whats up" },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Hey Rodrigo! What's good?" },
+      { role: MESSAGE_ROLES.USER, content: "make a song about the war" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "I'll create an original song about war!",
         toolCalls: [
           {
@@ -518,9 +518,9 @@ describe("Generate Audio tool flow — second turn message persistence", () => {
 
     // Slice from 3: [user2, assistant2_with_tools]
     expect(newTurnMessages).toHaveLength(2);
-    expect(newTurnMessages[0].role).toBe("user");
+    expect(newTurnMessages[0].role).toBe(MESSAGE_ROLES.USER);
     expect(newTurnMessages[0].content).toBe("make a song about the war");
-    expect(newTurnMessages[1].role).toBe("assistant");
+    expect(newTurnMessages[1].role).toBe(MESSAGE_ROLES.ASSISTANT);
     expect(newTurnMessages[1].content).toBe(
       "I'll create an original song about war!",
     );
@@ -536,8 +536,8 @@ describe("Generate Audio tool flow — second turn message persistence", () => {
     const sanitized = sanitizeMessagesToAppend(newTurnMessages);
     expect(sanitized).toHaveLength(3);
     expect(sanitized[0].content).toBe("make a song about the war");
-    expect(sanitized[1].role).toBe("assistant");
-    expect(sanitized[2].role).toBe("tool");
+    expect(sanitized[1].role).toBe(MESSAGE_ROLES.ASSISTANT);
+    expect(sanitized[2].role).toBe(MESSAGE_ROLES.TOOL);
   });
 
   it("simulates generate_audio flow WITH compaction triggering (large context)", () => {
@@ -556,17 +556,17 @@ describe("Generate Audio tool flow — second turn message persistence", () => {
     // finalize(): slice(5-1=4) → [user2, assistant2_tools] ✓ CORRECT
 
     const currentMessages: TestMessage[] = [
-      { role: "system", content: "Massive system prompt with tools..." },
+      { role: MESSAGE_ROLES.SYSTEM, content: "Massive system prompt with tools..." },
       {
-        role: "user",
+        role: MESSAGE_ROLES.USER,
         content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX}\nPrevious context.`,
         isCompactSummary: true,
       },
-      { role: "user", content: "hey whats up" },
-      { role: "assistant", content: "Hey! What's up?" },
-      { role: "user", content: "make me a song" },
+      { role: MESSAGE_ROLES.USER, content: "hey whats up" },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Hey! What's up?" },
+      { role: MESSAGE_ROLES.USER, content: "make me a song" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Creating your song!",
         toolCalls: [
           {
@@ -588,35 +588,35 @@ describe("Generate Audio tool flow — second turn message persistence", () => {
 
     // Slice from 4: [user2:"make me a song", assistant2_tools]
     expect(newTurnMessages).toHaveLength(2);
-    expect(newTurnMessages[0].role).toBe("user");
+    expect(newTurnMessages[0].role).toBe(MESSAGE_ROLES.USER);
     expect(newTurnMessages[0].content).toBe("make me a song");
 
     const sanitized = sanitizeMessagesToAppend(newTurnMessages);
     expect(sanitized).toHaveLength(3);
     expect(sanitized[0].content).toBe("make me a song");
-    expect(sanitized[1].role).toBe("assistant");
-    expect(sanitized[2].role).toBe("tool");
+    expect(sanitized[1].role).toBe(MESSAGE_ROLES.ASSISTANT);
+    expect(sanitized[2].role).toBe(MESSAGE_ROLES.TOOL);
   });
 
   it("compaction flow realistically preserves user message from the tail", () => {
     // Realistically verify that a pre-compaction messages array retains the user message
     // after compaction, and that finalize/sanitize properly extracts it for persistence.
     const preCompactionMessages: TestMessage[] = [
-      { role: "system", content: "System" },
-      { role: "user", content: "hey whats up" },
-      { role: "assistant", content: "Hey! What's up?" },
-      { role: "user", content: "make me a song" },
+      { role: MESSAGE_ROLES.SYSTEM, content: "System" },
+      { role: MESSAGE_ROLES.USER, content: "hey whats up" },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Hey! What's up?" },
+      { role: MESSAGE_ROLES.USER, content: "make me a song" },
     ];
 
     // Simulate compaction by preserving the recent user turn (make me a song)
     const compactedMessages: TestMessage[] = [
-      { role: "system", content: "System" },
+      { role: MESSAGE_ROLES.SYSTEM, content: "System" },
       {
-        role: "user",
+        role: MESSAGE_ROLES.USER,
         content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX}\nAll history.`,
         isCompactSummary: true,
       },
-      { role: "user", content: "make me a song" },
+      { role: MESSAGE_ROLES.USER, content: "make me a song" },
     ];
 
     // Harness sets originalMessageCount to the length of the compactedMessages list
@@ -626,7 +626,7 @@ describe("Generate Audio tool flow — second turn message persistence", () => {
     const currentMessages: TestMessage[] = [
       ...compactedMessages,
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Making your song!",
         toolCalls: [
           {
@@ -644,7 +644,7 @@ describe("Generate Audio tool flow — second turn message persistence", () => {
 
     // The user message should be present in the sanitized messages to append
     const hasUserMessage = sanitized.some(
-      (message) => message.role === "user" && !message.isCompactSummary,
+      (message) => message.role === MESSAGE_ROLES.USER && !message.isCompactSummary,
     );
 
     expect(hasUserMessage).toBe(true);
@@ -666,9 +666,9 @@ describe("Finalizer messagesToAppend — what gets $pushed to MongoDB", () => {
     // Result: [user1, assistant1, user2, assistant2_tools, assistant_final]
 
     const overrideMessagesToAppend: TestMessage[] = [
-      { role: "user", content: "make a song about the war" },
+      { role: MESSAGE_ROLES.USER, content: "make a song about the war" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Creating your song!",
         toolCalls: [
           {
@@ -683,7 +683,7 @@ describe("Finalizer messagesToAppend — what gets $pushed to MongoDB", () => {
 
     // Finalizer appends final assistant
     const finalAssistant: TestMessage = {
-      role: "assistant",
+      role: MESSAGE_ROLES.ASSISTANT,
       content: "Here's your song! I created a powerful piece about war.",
     };
 
@@ -691,10 +691,10 @@ describe("Finalizer messagesToAppend — what gets $pushed to MongoDB", () => {
     const sanitized = sanitizeMessagesToAppend(messagesToAppend);
 
     expect(sanitized).toHaveLength(4);
-    expect(sanitized[0].role).toBe("user");
+    expect(sanitized[0].role).toBe(MESSAGE_ROLES.USER);
     expect(sanitized[0].content).toBe("make a song about the war");
     expect(sanitized[1].toolCalls![0].name).toBe("generate_audio");
-    expect(sanitized[2].role).toBe("tool");
+    expect(sanitized[2].role).toBe(MESSAGE_ROLES.TOOL);
     expect(sanitized[3].content).toBe(
       "Here's your song! I created a powerful piece about war.",
     );
@@ -702,9 +702,9 @@ describe("Finalizer messagesToAppend — what gets $pushed to MongoDB", () => {
 
   it("hasIntermediateToolMessages detection prevents duplicate toolCalls on final message", () => {
     const overrideMessagesToAppend: TestMessage[] = [
-      { role: "user", content: "make a song" },
+      { role: MESSAGE_ROLES.USER, content: "make a song" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Creating!",
         toolCalls: [
           { id: "toolCall-0", name: "generate_audio", args: {}, result: {} },
@@ -715,7 +715,7 @@ describe("Finalizer messagesToAppend — what gets $pushed to MongoDB", () => {
     // Check if any intermediate message has toolCalls
     const hasIntermediateToolMessages = overrideMessagesToAppend.some(
       (message) =>
-        message.role === "assistant" &&
+        message.role === MESSAGE_ROLES.ASSISTANT &&
         message.toolCalls &&
         message.toolCalls.length > 0,
     );
@@ -725,7 +725,7 @@ describe("Finalizer messagesToAppend — what gets $pushed to MongoDB", () => {
     // When true, the final assistant should NOT include toolCalls
     // (they're already in the intermediate message)
     const finalAssistant: TestMessage = {
-      role: "assistant",
+      role: MESSAGE_ROLES.ASSISTANT,
       content: "Done!",
       // toolCalls should NOT be included when hasIntermediateToolMessages is true
     };
@@ -744,16 +744,16 @@ describe("Full round-trip: DB state after appendAndFinalize", () => {
 
     // === TURN 1 ===
     const dbMessagesAfterTurn1: TestMessage[] = [
-      { role: "user", content: "hey whats up" },
-      { role: "assistant", content: "Hey Rodrigo! What's good?" },
+      { role: MESSAGE_ROLES.USER, content: "hey whats up" },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Hey Rodrigo! What's good?" },
     ];
 
     // === TURN 2 ===
     // Server processes turn 2, finalize() produces newTurnMessages:
     const turn2AppendMessages: TestMessage[] = [
-      { role: "user", content: "make a song about the war" },
+      { role: MESSAGE_ROLES.USER, content: "make a song about the war" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "I'll create a song!",
         toolCalls: [
           {
@@ -768,7 +768,7 @@ describe("Full round-trip: DB state after appendAndFinalize", () => {
         ],
       },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Here's your song about the war!",
       },
     ];
@@ -784,7 +784,7 @@ describe("Full round-trip: DB state after appendAndFinalize", () => {
 
     // All user messages should be present
     const userMessages = dbMessagesAfterTurn2.filter(
-      (message) => message.role === "user",
+      (message) => message.role === MESSAGE_ROLES.USER,
     );
     expect(userMessages).toHaveLength(2);
     expect(userMessages[0].content).toBe("hey whats up");
@@ -803,18 +803,18 @@ describe("Full round-trip: DB state after appendAndFinalize", () => {
     // Final assistant message should have the summary text
     const lastMessage =
       dbMessagesAfterTurn2[dbMessagesAfterTurn2.length - 1];
-    expect(lastMessage.role).toBe("assistant");
+    expect(lastMessage.role).toBe(MESSAGE_ROLES.ASSISTANT);
     expect(lastMessage.content).toBe("Here's your song about the war!");
   });
 
   it("the user's second message should never be a duplicate of the first", () => {
     // Bug symptom: user message 3 shows "hey whats up" instead of "make a song"
     const dbMessages: TestMessage[] = [
-      { role: "user", content: "hey whats up" },
-      { role: "assistant", content: "Hey Rodrigo!" },
-      { role: "user", content: "make a song about the war" },
+      { role: MESSAGE_ROLES.USER, content: "hey whats up" },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Hey Rodrigo!" },
+      { role: MESSAGE_ROLES.USER, content: "make a song about the war" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Creating!",
         toolCalls: [
           {
@@ -826,14 +826,14 @@ describe("Full round-trip: DB state after appendAndFinalize", () => {
         ],
       },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Here it is!",
       },
     ];
 
     // No two consecutive user messages should have the same content
     const userMessages = dbMessages.filter(
-      (message) => message.role === "user",
+      (message) => message.role === MESSAGE_ROLES.USER,
     );
     for (let index = 1; index < userMessages.length; index++) {
       // Consecutive user messages in a multi-turn conversation
@@ -858,11 +858,11 @@ describe("newTurnMessages slice — background timer / scheduled task", () => {
     // currentMessages = [system, user1, assistant1, reminderMessage, assistant2]
 
     const currentMessages: TestMessage[] = [
-      { role: "system", content: "You are a creative assistant." },
-      { role: "user", content: "hey whats up" },
-      { role: "assistant", content: "Hey Rodrigo! What's good?" },
+      { role: MESSAGE_ROLES.SYSTEM, content: "You are a creative assistant." },
+      { role: MESSAGE_ROLES.USER, content: "hey whats up" },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Hey Rodrigo! What's good?" },
       {
-        role: "user",
+        role: MESSAGE_ROLES.USER,
         content: "🔔 Notification: Rodrigo, your 1-minute timer is up!",
         _alreadyPersisted: true,
       },
@@ -887,12 +887,12 @@ describe("newTurnMessages slice — background timer / scheduled task", () => {
 
     const currentMessages: TestMessage[] = [
       {
-        role: "user",
+        role: MESSAGE_ROLES.USER,
         content: "Run database integrity check",
         _alreadyPersisted: true,
       },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Starting database check...",
         toolCalls: [
           {
@@ -913,7 +913,7 @@ describe("newTurnMessages slice — background timer / scheduled task", () => {
 
     // Should slice from 1 (skipping userTrigger) → newTurnMessages contains assistant_tool
     expect(newTurnMessages).toHaveLength(1);
-    expect(newTurnMessages[0].role).toBe("assistant");
+    expect(newTurnMessages[0].role).toBe(MESSAGE_ROLES.ASSISTANT);
     expect(newTurnMessages[0].content).toBe("Starting database check...");
     expect(newTurnMessages[0].toolCalls![0].name).toBe("run_integrity_check");
   });
@@ -931,15 +931,15 @@ describe("newTurnMessages slice — background timer / scheduled task", () => {
     // Then sliceIndex = 1 (wrong) and reminder leaks into newTurnMessages
 
     const currentMessages: TestMessage[] = [
-      { role: "system", content: "You are a creative assistant." },
-      { role: "assistant", content: "[Conversation summary]" },
+      { role: MESSAGE_ROLES.SYSTEM, content: "You are a creative assistant." },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "[Conversation summary]" },
       {
-        role: "user",
+        role: MESSAGE_ROLES.USER,
         content: "🔔 Notification: Drink water!",
         _alreadyPersisted: true,
       },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Here's your water reminder! 💧",
       },
     ];
@@ -972,15 +972,15 @@ describe("newTurnMessages slice — background timer / scheduled task", () => {
     // Also verify sanitizeMessagesToAppend catches it as a second defense layer
     const messagesWithPersisted: TestMessage[] = [
       {
-        role: "user",
+        role: MESSAGE_ROLES.USER,
         content: "🔔 Notification: Drink water!",
         _alreadyPersisted: true,
       },
-      { role: "assistant", content: "Reminder delivered!" },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Reminder delivered!" },
     ];
     const sanitized = sanitizeMessagesToAppend(messagesWithPersisted);
     expect(sanitized).toHaveLength(1);
-    expect(sanitized[0].role).toBe("assistant");
+    expect(sanitized[0].role).toBe(MESSAGE_ROLES.ASSISTANT);
   });
 
   it("filters multiple _alreadyPersisted messages from recurring cron timers", () => {
@@ -988,19 +988,19 @@ describe("newTurnMessages slice — background timer / scheduled task", () => {
     // before the agentic loop. If the context carries history from prior fires,
     // multiple _alreadyPersisted messages may exist in currentMessages.
     const currentMessages: TestMessage[] = [
-      { role: "system", content: "You are a creative assistant." },
+      { role: MESSAGE_ROLES.SYSTEM, content: "You are a creative assistant." },
       {
-        role: "user",
+        role: MESSAGE_ROLES.USER,
         content: "🔔 Notification: Check build status (iteration 1)",
         _alreadyPersisted: true,
       },
-      { role: "assistant", content: "Build still running..." },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Build still running..." },
       {
-        role: "user",
+        role: MESSAGE_ROLES.USER,
         content: "🔔 Notification: Check build status (iteration 2)",
         _alreadyPersisted: true,
       },
-      { role: "assistant", content: "Build complete! All tests passed." },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Build complete! All tests passed." },
     ];
     // originalMessageCount = 5 (all messages were loaded as context)
     const originalMessageCount = 5;
@@ -1024,28 +1024,28 @@ describe("newTurnMessages slice — background timer / scheduled task", () => {
     );
     expect(hasAnyNotification).toBe(false);
     // Only assistant messages survive
-    expect(driftedResult.every((message) => message.role === "assistant")).toBe(true);
+    expect(driftedResult.every((message) => message.role === MESSAGE_ROLES.ASSISTANT)).toBe(true);
   });
 
   it("preserves normal user messages while filtering _alreadyPersisted ones", () => {
     // A conversation where the user sent a real message, THEN a timer fired.
     // The real user message must NOT be filtered.
     const currentMessages: TestMessage[] = [
-      { role: "system", content: "You are a creative assistant." },
-      { role: "user", content: "Set a timer for 1 minute" },
+      { role: MESSAGE_ROLES.SYSTEM, content: "You are a creative assistant." },
+      { role: MESSAGE_ROLES.USER, content: "Set a timer for 1 minute" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Timer set!",
         toolCalls: [
           { id: "toolCall-0", name: "set_timer", args: { durationSeconds: 60 }, result: { success: true } },
         ],
       },
       {
-        role: "user",
+        role: MESSAGE_ROLES.USER,
         content: "🔔 Notification: Your 1-minute timer is up!",
         _alreadyPersisted: true,
       },
-      { role: "assistant", content: "Time's up! Here's your reminder." },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Time's up! Here's your reminder." },
     ];
 
     // Normal case: originalMessageCount = 4 (everything before the model's response)
@@ -1076,27 +1076,27 @@ describe("newTurnMessages slice — background timer / scheduled task", () => {
     // Only the _alreadyPersisted triggering message should be stripped;
     // all intermediate tool-calling assistant messages must survive.
     const currentMessages: TestMessage[] = [
-      { role: "system", content: "You are an assistant." },
+      { role: MESSAGE_ROLES.SYSTEM, content: "You are an assistant." },
       {
-        role: "user",
+        role: MESSAGE_ROLES.USER,
         content: "🔔 Notification: Run daily backup",
         _alreadyPersisted: true,
       },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Starting backup...",
         toolCalls: [
           { id: "toolCall-0", name: "create_backup", args: {}, result: { success: true } },
         ],
       },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Verifying backup integrity...",
         toolCalls: [
           { id: "toolCall-1", name: "verify_backup", args: {}, result: { verified: true } },
         ],
       },
-      { role: "assistant", content: "Backup complete and verified! ✅" },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Backup complete and verified! ✅" },
     ];
     // originalMessageCount = 2 (system + notification)
     const originalMessageCount = 2;
@@ -1108,7 +1108,7 @@ describe("newTurnMessages slice — background timer / scheduled task", () => {
 
     // Notification is stripped, all 3 assistant messages survive
     expect(newTurnMessages).toHaveLength(3);
-    expect(newTurnMessages.every((message) => message.role === "assistant")).toBe(true);
+    expect(newTurnMessages.every((message) => message.role === MESSAGE_ROLES.ASSISTANT)).toBe(true);
     expect(newTurnMessages[0].content).toBe("Starting backup...");
     expect(newTurnMessages[0].toolCalls![0].name).toBe("create_backup");
     expect(newTurnMessages[1].content).toBe("Verifying backup integrity...");
@@ -1120,17 +1120,17 @@ describe("newTurnMessages slice — background timer / scheduled task", () => {
     // match any content-based filter, _alreadyPersisted alone should cause removal.
     const messagesToAppend: TestMessage[] = [
       {
-        role: "user",
+        role: MESSAGE_ROLES.USER,
         content: "Totally normal looking message",
         _alreadyPersisted: true,
       },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Some tool output",
         _alreadyPersisted: true,
       },
-      { role: "assistant", content: "Final response" },
-      { role: "user", content: "Follow-up question" },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Final response" },
+      { role: MESSAGE_ROLES.USER, content: "Follow-up question" },
     ];
 
     const sanitized = sanitizeMessagesToAppend(messagesToAppend);
@@ -1143,12 +1143,12 @@ describe("newTurnMessages slice — background timer / scheduled task", () => {
     // Guard test: messages with notification-like content but WITHOUT
     // _alreadyPersisted must NOT be filtered.
     const currentMessages: TestMessage[] = [
-      { role: "system", content: "You are a creative assistant." },
+      { role: MESSAGE_ROLES.SYSTEM, content: "You are a creative assistant." },
       {
-        role: "user",
+        role: MESSAGE_ROLES.USER,
         content: "🔔 Notification: This is a manual user message, not from a timer",
       },
-      { role: "assistant", content: "Got it!" },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Got it!" },
     ];
     const originalMessageCount = 1;
 
@@ -1175,13 +1175,13 @@ describe("newTurnMessages slice — background timer / scheduled task", () => {
     // exact position where sliceIndex points. Without the filter, it would
     // be the first element in newTurnMessages.
     const currentMessages: TestMessage[] = [
-      { role: "system", content: "You are an assistant." },
+      { role: MESSAGE_ROLES.SYSTEM, content: "You are an assistant." },
       {
-        role: "user",
+        role: MESSAGE_ROLES.USER,
         content: "🔔 Notification: Check deployment status",
         _alreadyPersisted: true,
       },
-      { role: "assistant", content: "Deployment is healthy! ✅" },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Deployment is healthy! ✅" },
     ];
     // truncation adjusted originalMessageCount to 2, but last original
     // is the reminder. Index check works here (happy path).

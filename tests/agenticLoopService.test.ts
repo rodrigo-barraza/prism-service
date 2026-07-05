@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import AgenticLoopService from "../src/services/AgenticLoopService.ts";
 import ContextWindowManager from "../src/utils/ContextWindowManager.ts";
 import SettingsService from "../src/services/SettingsService.ts";
-import { HARNESS_IDS, PROVIDERS } from "../src/constants.ts";
+import { HARNESS_IDS, PROVIDERS, MESSAGE_ROLES } from "../src/constants.ts";
 import { TYPES } from "../src/config.ts";
 
 vi.mock("../src/utils/logger.ts", () => ({
@@ -186,7 +186,7 @@ describe("AgenticLoopService", () => {
         inputTypes: [TYPES.TEXT],
         outputTypes: [TYPES.TEXT],
       },
-      messages: [{ role: "user", content: "Hi" }],
+      messages: [{ role: MESSAGE_ROLES.USER, content: "Hi" }],
       options: {
         maxIterations: 1,
       },
@@ -267,7 +267,7 @@ describe("AgenticLoopService", () => {
   it("should handle context truncation", async () => {
     (ContextWindowManager.enforce as any).mockReturnValueOnce({
       truncated: true,
-      messages: [{ role: "user", content: "Truncated" }],
+      messages: [{ role: MESSAGE_ROLES.USER, content: "Truncated" }],
       strategy: "oldest",
       estimatedTokens: 5,
     });
