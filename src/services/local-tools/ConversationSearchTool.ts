@@ -4,6 +4,7 @@ import {
   TOOL_NAMES,
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { INTERNAL_TOOL_EMOJIS } from "../tool-orchestrator/InternalToolEmojis.ts";
 import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
 import type { InternalToolContext } from "./InternalToolRegistry.ts";
 import { MEMORY, LOG_PREVIEW } from "../../constants.ts";
@@ -33,7 +34,7 @@ const searchConversations = {
   name: SEARCH_CONVERSATIONS_NAME,
   schema: {
     name: SEARCH_CONVERSATIONS_NAME,
-    emoji: ["🔍", "💬"],
+    emoji: INTERNAL_TOOL_EMOJIS[SEARCH_CONVERSATIONS_NAME],
     description:
       "Search past agent conversations using a natural language query. " +
       "Finds previous sessions by semantic similarity to the query text. " +

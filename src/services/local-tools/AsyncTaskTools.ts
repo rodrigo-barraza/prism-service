@@ -1,5 +1,6 @@
 import logger from "../../utils/logger.ts";
 import { DOMAINS, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { INTERNAL_TOOL_EMOJIS } from "../tool-orchestrator/InternalToolEmojis.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 import { ASYNC_TASK_TOOL_NAMES, MAXIMUM_CONCURRENT_ASYNC_TASKS } from "../AsyncTaskConstants.ts";
 import { ORCHESTRATOR, NOTIFICATION_SOURCES } from "../../constants.ts";
@@ -58,7 +59,7 @@ const runAsyncTask = {
   name: ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
   schema: {
     name: ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
-    emoji: ["⚡", "🔄"],
+    emoji: INTERNAL_TOOL_EMOJIS[ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK],
     description:
       "Dispatch a tool to run asynchronously in the background. " +
       "Returns immediately with a task ID — the tool executes in the background while you continue other work. " +
@@ -230,7 +231,7 @@ const listAsyncTasks = {
   name: ASYNC_TASK_TOOL_NAMES.LIST_ASYNC_TASKS,
   schema: {
     name: ASYNC_TASK_TOOL_NAMES.LIST_ASYNC_TASKS,
-    emoji: ["📋", "🔄"],
+    emoji: INTERNAL_TOOL_EMOJIS[ASYNC_TASK_TOOL_NAMES.LIST_ASYNC_TASKS],
     description:
       "List all async background tasks dispatched in this conversation. " +
       "Shows task ID, tool name, status, duration, and results for completed tasks. " +
@@ -301,7 +302,7 @@ const cancelAsyncTask = {
   name: ASYNC_TASK_TOOL_NAMES.CANCEL_ASYNC_TASK,
   schema: {
     name: ASYNC_TASK_TOOL_NAMES.CANCEL_ASYNC_TASK,
-    emoji: ["⏹️", "🔄"],
+    emoji: INTERNAL_TOOL_EMOJIS[ASYNC_TASK_TOOL_NAMES.CANCEL_ASYNC_TASK],
     description:
       "Cancel a running async background task. " +
       "The task's abort signal will be triggered, stopping execution if the tool supports cancellation. " +

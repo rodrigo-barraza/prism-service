@@ -453,7 +453,7 @@ export async function finalizeTextGeneration(
       };
     }
 
-    const mergedSettings = {
+    const mergedSettings: Record<string, unknown> = {
       ...(conversationMeta?.settings || {}),
       provider: providerName,
       model: resolvedModel,
@@ -465,6 +465,10 @@ export async function finalizeTextGeneration(
       thoughtStructure: options.thoughtStructure || undefined,
       locale: options.locale || undefined,
     };
+    if (options.thinkingEnabled != null) mergedSettings.thinkingEnabled = options.thinkingEnabled;
+    if (options.thinkingBudget != null) mergedSettings.thinkingBudget = options.thinkingBudget;
+    if (options.thinkingLevel) mergedSettings.thinkingLevel = options.thinkingLevel;
+    if (options.reasoningEffort) mergedSettings.reasoningEffort = options.reasoningEffort;
 
     const finalMeta: Record<string, unknown> = {
       ...(conversationMeta || {}),

@@ -6,6 +6,7 @@ import {
   DEFAULT_USERNAME,
   DEFAULT_PROJECT,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { INTERNAL_TOOL_EMOJIS } from "../tool-orchestrator/InternalToolEmojis.ts";
 import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
 import { TIMERS } from "../../constants.ts";
 
@@ -28,7 +29,7 @@ const setTimer = {
   name: TOOL_NAMES.SET_TIMER,
   schema: {
     name: TOOL_NAMES.SET_TIMER,
-    emoji: ["⏰", "⏳"],
+    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.SET_TIMER],
     description:
       "Set a short one-shot timer to pause, wait, or defer execution within this conversation. " +
       "Use this when you need to wait for an asynchronous process to finish, poll a build or deployment, " +
@@ -145,7 +146,7 @@ const listTimers = {
   name: TOOL_NAMES.LIST_TIMERS,
   schema: {
     name: TOOL_NAMES.LIST_TIMERS,
-    emoji: ["⏱️", "📋"],
+    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.LIST_TIMERS],
     description:
       "List all active one-shot agent timers in the current conversation. " +
       "Shows short-duration waits (30–599 seconds) set by set_timer. " +
@@ -210,7 +211,7 @@ const cancelTimer = {
   name: TOOL_NAMES.CANCEL_TIMER,
   schema: {
     name: TOOL_NAMES.CANCEL_TIMER,
-    emoji: ["⏰", "❌"],
+    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.CANCEL_TIMER],
     description:
       "Cancel an active one-shot agent timer in the current conversation. " +
       "To delete a scheduled cron job, reminder, or alarm, use delete_cron_job instead.",

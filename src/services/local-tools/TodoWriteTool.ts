@@ -4,6 +4,7 @@ import {
   SERVER_SENT_EVENT_TYPES,
   TOOL_NAMES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { INTERNAL_TOOL_EMOJIS } from "../tool-orchestrator/InternalToolEmojis.ts";
 import { SYSTEM_STATUSES, TODO_PRIORITIES } from "../../constants.ts";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 
@@ -37,7 +38,7 @@ export default {
 
   schema: {
     name: TOOL_NAMES.WRITE_TODO,
-    emoji: ["📝", "📌"],
+    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.WRITE_TODO],
     description:
       "Write or update a persistent TODO checklist for the current project. " +
       "Maintains a structured list of items with completion status. " +

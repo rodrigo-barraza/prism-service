@@ -42,6 +42,7 @@ import {
   type BrowserActionToolResult,
   type ToolEndpoint,
 } from "./types.ts";
+import { INTERNAL_TOOL_EMOJIS } from "./InternalToolEmojis.ts";
 
 // ────────────────────────────────────────────────────────────
 // Schema Cache — fetched from tools-api at startup
@@ -637,7 +638,7 @@ function getOrchestratorToolSchemas(
   return [
     {
       name: TOOL_NAMES.CREATE_SUBAGENT,
-      emoji: ["🤖", "📤"],
+      emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.CREATE_SUBAGENT],
       description: PromptLocaleService.get(
         activeLocale,
         "orchestrator.tools.create_subagent.description",
@@ -684,7 +685,7 @@ function getOrchestratorToolSchemas(
     },
     {
       name: TOOL_NAMES.CREATE_SUBAGENTS,
-      emoji: ["🤖", "🫡"],
+      emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.CREATE_SUBAGENTS],
       description: PromptLocaleService.get(
         activeLocale,
         "orchestrator.tools.create_subagents.description",
@@ -833,7 +834,7 @@ function getOrchestratorToolSchemas(
     },
     {
       name: TOOL_NAMES.SEND_SUBAGENT_MESSAGE,
-      emoji: ["💬", "📤"],
+      emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.SEND_SUBAGENT_MESSAGE],
       description: PromptLocaleService.get(
         activeLocale,
         "orchestrator.tools.send_subagent_message.description",
@@ -861,7 +862,7 @@ function getOrchestratorToolSchemas(
     },
     {
       name: TOOL_NAMES.STOP_SUBAGENT,
-      emoji: ["⏹️", "🤖"],
+      emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.STOP_SUBAGENT],
       description: PromptLocaleService.get(
         activeLocale,
         "orchestrator.tools.stop_subagent.description",
@@ -882,7 +883,7 @@ function getOrchestratorToolSchemas(
     },
     {
       name: TOOL_NAMES.GET_SUBAGENT_OUTPUT,
-      emoji: ["📥", "🤖"],
+      emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.GET_SUBAGENT_OUTPUT],
       description: PromptLocaleService.get(
         activeLocale,
         "orchestrator.tools.get_subagent_output.description",
@@ -903,7 +904,7 @@ function getOrchestratorToolSchemas(
     },
     {
       name: TOOL_NAMES.DELETE_SUBAGENTS,
-      emoji: ["🗑️", "👥"],
+      emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.DELETE_SUBAGENTS],
       description: PromptLocaleService.get(
         activeLocale,
         "orchestrator.tools.delete_subagents.description",
@@ -924,7 +925,7 @@ function getOrchestratorToolSchemas(
     },
     {
       name: TOOL_NAMES.RESUME_SUBAGENT,
-      emoji: ["🔄", "🤖"],
+      emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.RESUME_SUBAGENT],
       description: PromptLocaleService.get(
         activeLocale,
         "orchestrator.tools.resume_subagent.description",
@@ -1258,47 +1259,13 @@ export default class ToolOrchestratorService {
     const schema = toolMap.get(toolName);
     if (schema?.emoji) return schema.emoji as string;
 
-    // Check internal / orchestrator tools
-    const localEmojis: Record<string, string | [string, string]> = {
-      enter_plan_mode: ["📝", "🧠"],
-      exit_plan_mode: ["🚀", "🧠"],
-      create_skill: ["🪄", "🛠️"],
-      execute_skill: ["⚡", "🪄"],
-      list_skills: ["📋", "🪄"],
-      delete_skill: ["🗑️", "🪄"],
-      enter_worktree: ["🌳", "💻"],
-      exit_worktree: ["🚪", "🌳"],
-      write_todo: ["📝", "📌"],
-      summarize_conversation: ["💬", "📝"],
-      ask_user: ["💬", "❓"],
-      list_mcp_resources: ["🔌", "📋"],
-      read_mcp_resource: ["🔌", "📄"],
-      authenticate_mcp_server: ["🔌", "🔐"],
-      set_timer: ["⏰", "⏳"],
-      list_timers: ["⏱️", "📋"],
-      cancel_timer: ["⏰", "❌"],
-      create_cron_job: ["📅", "🔔"],
-      list_cron_jobs: ["📅", "📋"],
-      delete_cron_job: ["📅", "❌"],
-      create_subagent: ["🤖", "📤"],
-      create_subagents: ["🤖", "🫡"],
-      send_subagent_message: ["💬", "📤"],
-      stop_subagent: ["⏹️", "🤖"],
-      get_subagent_output: ["📥", "🤖"],
-      delete_subagents: ["🗑️", "👥"],
-      resume_subagent: ["🔄", "🤖"],
-      run_async_task: ["⚡", "🔄"],
-      list_async_tasks: ["📋", "🔄"],
-      cancel_async_task: ["⏹️", "🔄"],
-    };
-    const emojiValue = localEmojis[toolName];
-    if (emojiValue) {
-      if (Array.isArray(emojiValue)) {
-        return emojiValue[0];
-      }
-      return emojiValue;
+    const emojiValue = INTERNAL_TOOL_EMOJIS[toolName];
+    if (!emojiValue) return null;
+
+    if (Array.isArray(emojiValue)) {
+      return emojiValue[0];
     }
-    return null;
+    return emojiValue;
   }
 
   static getToolFields(toolName: string) {

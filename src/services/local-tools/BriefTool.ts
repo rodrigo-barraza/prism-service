@@ -4,6 +4,7 @@ import {
   SERVER_SENT_EVENT_TYPES,
   TOOL_NAMES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { INTERNAL_TOOL_EMOJIS } from "../tool-orchestrator/InternalToolEmojis.ts";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 
 interface BriefContext extends InternalToolContext {
@@ -15,7 +16,7 @@ export default {
 
   schema: {
     name: TOOL_NAMES.SUMMARIZE_CONVERSATION,
-    emoji: ["💬", "📝"],
+    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.SUMMARIZE_CONVERSATION],
     description:
       "Produce a compressed summary of the current conversation context. " +
       "Use this tool when the conversation is getting long and you need to " +
