@@ -22,6 +22,8 @@ import { SubAgentLifecycleService } from "./orchestrator/SubAgentLifecycleServic
 import { TopologyExecutionService } from "./orchestrator/TopologyExecutionService.ts";
 import { ORCHESTRATOR_ONLY_TOOLS } from "./OrchestratorPrompt.ts";
 import SettingsService from "./SettingsService.ts";
+import AgentNotificationService from "./AgentNotificationService.ts";
+import AgentSessionRegistry from "./AgentSessionRegistry.ts";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import { createAbortController } from "../utils/AbortController.ts";
 import { registerCleanup } from "../utils/CleanupRegistry.ts";
@@ -1873,25 +1875,14 @@ export class OrchestratorService {
     const { conversationId, project, username } = orchestratorContext;
     if (!conversationId || !project || !username) return;
 
-    const notificationTimestamp = new Date().toISOString();
-    const completionMessage = {
-      role: "user" as const,
-      content: [
-        `<task-notification>`,
-        `<status>${options.status}</status>`,
-        `<summary>${options.summary}</summary>`,
-        `<tool_uses>${options.toolUses}</tool_uses>`,
-        `<duration_ms>${options.durationMilliseconds}</duration_ms>`,
-        `<result>`,
-        options.resultBody,
-        `</result>`,
-        `</task-notification>`,
-      ].join("\n"),
-      timestamp: notificationTimestamp,
-      _alreadyPersisted: true,
-      _notificationSource: NOTIFICATION_SOURCES.ORCHESTRATOR,
-      _notificationId: `orchestrator:${options.summary}:${notificationTimestamp}`,
-    };
+    const completionMessage = AgentNotificationService.createNotificationMessage({
+      status: options.status,
+      summary: options.summary,
+      toolUses: options.toolUses,
+      durationMilliseconds: options.durationMilliseconds,
+      resultBody: options.resultBody,
+      source: NOTIFICATION_SOURCES.ORCHESTRATOR,
+    });
 
     try {
       await OrchestratorService._triggerParentAutoResponse(

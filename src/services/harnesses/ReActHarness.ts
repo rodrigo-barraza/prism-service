@@ -361,9 +361,6 @@ export default class ReActHarness extends BaseAgenticHarness {
             (tool: ToolSchema) => tool.name === TOOL_NAMES.EXIT_PLAN_MODE,
           );
           passOptions.tools = planModeTools;
-          logger.info(
-            `[PlanningMode] Sending ${planModeTools.length} tools to provider: ${planModeTools.map((tool: ToolSchema) => tool.name).join(", ")}`,
-          );
         } else {
           passOptions.tools = this.tools.finalTools;
         }
@@ -374,7 +371,6 @@ export default class ReActHarness extends BaseAgenticHarness {
         );
 
         // ── Context pressure management ──────────────────────────
-        // Micro-compaction (pressure-gated) → auto-compaction → summary persistence
         const pressureResult = await manageContextPressure(
           currentMessages,
           context,
@@ -403,8 +399,6 @@ export default class ReActHarness extends BaseAgenticHarness {
         await this.consumeStream(stream, pass, allowedToolNames);
 
         // ── Repetition detection recovery ──────────────────────
-        // When the streaming repetition detector flags degenerate output,
-        // discard the response and retry with perturbed sampling parameters.
         if (pass.repetitionDetected) {
           finalizePassTracker(pass, passRequestId);
           this.emitGenerationProgress();
@@ -415,7 +409,6 @@ export default class ReActHarness extends BaseAgenticHarness {
             iteration: state.iterations,
           });
 
-          // Retry loop with perturbation
           let retrySucceeded = false;
           for (
             let repetitionRetry = 1;
@@ -424,10 +417,9 @@ export default class ReActHarness extends BaseAgenticHarness {
           ) {
             logger.warn(
               `[ReActHarness] Repetition recovery attempt ${repetitionRetry}/${MAX_REPETITION_RETRIES} — ` +
-                `bumping temperature by +${REPETITION_TEMPERATURE_BUMP}, repeatPenalty by +${REPETITION_PENALTY_BUMP}`,
+                `bumping temperature and penalty`,
             );
 
-            // Perturb sampling parameters
             const perturbedPassOptions = { ...passOptions };
             const currentTemperature =
               typeof perturbedPassOptions.temperature === "number"
@@ -454,38 +446,25 @@ export default class ReActHarness extends BaseAgenticHarness {
             finalizePassTracker(retryPass, retryRequestId);
 
             if (!retryPass.repetitionDetected) {
-              // Retry succeeded — adopt the clean pass and continue the loop
               logger.info(
                 `[ReActHarness] Repetition recovery succeeded on attempt ${repetitionRetry}`,
               );
-
-              // Transfer the clean pass data into the main pass reference
-              // so the rest of the loop iteration works as-if this was the original pass.
               Object.assign(pass, retryPass);
               pass.repetitionDetected = false;
               retrySucceeded = true;
               break;
             }
-
-            logger.warn(
-              `[ReActHarness] Repetition recovery attempt ${repetitionRetry} still degenerate`,
-            );
           }
 
           if (!retrySucceeded) {
             logger.error(
-              `[ReActHarness] All ${MAX_REPETITION_RETRIES} repetition recovery attempts exhausted — injecting error`,
+              `[ReActHarness] All repetition recovery attempts exhausted`,
             );
-
             injectErrorAsConversationMessage(
               currentMessages,
-              `The model entered a degenerate repetition loop and ${MAX_REPETITION_RETRIES} recovery ` +
-                `attempts with perturbed sampling parameters were unsuccessful. ` +
-                `This typically occurs with smaller models under certain prompts. ` +
-                `Consider using a different model or adjusting the repetition_penalty parameter.`,
+              `Repetition recovery failed.`,
               context,
             );
-
             this.logIteration(pass, currentMessages);
             break;
           }
@@ -496,472 +475,13 @@ export default class ReActHarness extends BaseAgenticHarness {
         logKVCacheHitRate(pass.usage, state.iterations, "ReActHarness");
         this.emitGenerationProgress();
 
-        if (signal?.aborted) break;
-
-        this.emitUsageUpdate();
-
-        // ── Cost budget enforcement ────────────────────────────
-        if (
-          checkCostBudget(
-            state,
-            context.resolvedModel,
-            options.maxCostDollars,
-            emit,
-          )
-        ) {
-          break;
-        }
-
-        // ── Tool execution ─────────────────────────────────────
-        if (pass.pendingToolCalls.length > 0) {
-          // Plan mode enforcement
-          if (state.planModeActive) {
-            const { allBlocked } = blockUnauthorizedToolCalls(
-              pass.pendingToolCalls,
-              currentMessages,
-              pass,
-              state,
-              this.context.options?.locale as string | undefined,
-            );
-            if (allBlocked) {
-              this.logIteration(pass, currentMessages);
-              continue;
-            }
-          }
-
-          // ── Approval gating ───────────────────────────────────
-          const { isApproved, shouldApproveAll } =
-            await checkAndWaitForApproval(
-              pass.pendingToolCalls,
-              context,
-              approvalEngine,
-            );
-
-          let results: ToolResult[] = [];
-          let sandboxCheckpointReference: string | null = null;
-          if (!isApproved) {
-            results = pass.pendingToolCalls.map((toolCall) => ({
-              name: toolCall.name,
-              id: toolCall.id,
-              result: {
-                success: false,
-                error: "USER_REJECTED",
-                message: "Tool execution was manually rejected by the user.",
-              },
-            }));
-          } else {
-            if (shouldApproveAll) {
-              options.autoApprove = true;
-            }
-
-            // ── Execute tools in parallel ─────────────────────────
-            // Attach currentMessages to context so ToolExecutor can pass them
-            // to tools-api (needed by tools like generate_image that inspect conversation)
-            context._currentMessages = currentMessages;
-
-            // ── Sandbox checkpoint (git-based rollback) ────────────
-            sandboxCheckpointReference = options.enableSandbox
-              ? createSandboxCheckpoint(workspaceRoot, emit)
-              : null;
-
-            results = await executeToolBatch(
-              pass.pendingToolCalls,
-              context,
-              this.tools,
-              hooks,
-              state,
-            );
-          }
-
-          // ── Post-execution: media, errors, status ─────────────
-          await processToolResultMedia(
-            pass.pendingToolCalls,
-            results,
-            state,
-            pass,
-            emit,
-            context,
-          );
-
-          trackToolErrors(
-            pass.pendingToolCalls,
-            results,
-            state,
-            MAX_CONSECUTIVE_TOOL_ERRORS,
-            emit,
-          );
-
-          emitPostExecutionStatus(pass.pendingToolCalls, emit);
-
-          // ── Validation intercept (linter auto-remediation) ──────
-          // Must run BEFORE plan mode toggling — no point entering plan
-          // mode if validation will inject error feedback and continue.
-          const validationFeedback = await validateAfterToolExecution(
-            pass.pendingToolCalls,
-            results,
-            context,
-            state,
-          );
-
-          if (validationFeedback.length > 0) {
-            const errorBlock = validationFeedback
-              .map(
-                (feedback) =>
-                  `### ${feedback.filePath} (${feedback.validatorType})\n${feedback.rawOutput}`,
-              )
-              .join("\n\n");
-
-            currentMessages.push({
-              role: "assistant",
-              content: pass.finalStreamedText || "",
-              ...(pass.streamedThinking.trim() && {
-                thinking: pass.streamedThinking.trim(),
-              }),
-              ...(pass.thinkingSignature && {
-                thinkingSignature: pass.thinkingSignature,
-              }),
-              ...computePassPhaseDurations(pass),
-              toolCalls: pass.pendingToolCalls.map((toolCall: ToolCall) => {
-                const matchingResult = results.find(
-                  (result) => result.id === toolCall.id,
-                );
-                return {
-                  id: toolCall.id || null,
-                  name: toolCall.name,
-                  args: toolCall.args,
-                  result: matchingResult ? matchingResult.result : null,
-                  durationMilliseconds: matchingResult?.durationMilliseconds,
-                };
-              }),
-            });
-
-            // Restore sandbox checkpoint on validation failure
-            if (sandboxCheckpointReference) {
-              restoreSandboxCheckpoint(
-                workspaceRoot,
-                sandboxCheckpointReference,
-                emit,
-              );
-            }
-
-            currentMessages.push({
-              role: "system",
-              content:
-                PromptLocaleService.get(
-                  (this.context.options?.locale as string | undefined) ||
-                    PromptLocaleService.getDefaultLocale(),
-                  "harness.validationError.header",
-                  { errorCount: String(validationFeedback.length) },
-                ) +
-                `\n\n${errorBlock}\n\n` +
-                PromptLocaleService.get(
-                  (this.context.options?.locale as string | undefined) ||
-                    PromptLocaleService.getDefaultLocale(),
-                  "harness.validationError.analyzePrompt",
-                ),
-            });
-
-            emit({
-              type: SERVER_SENT_EVENT_TYPES.STATUS,
-              message: STATUS_MESSAGES.VALIDATION_ERRORS_DETECTED,
-              count: validationFeedback.length,
-            });
-            this.logIteration(pass, currentMessages);
-            continue;
-          }
-
-          // ── Plan mode toggling ────────────────────────────────
-          await checkForPlanModeEntry(
-            pass.pendingToolCalls,
-            currentMessages,
-            state,
-            emit,
-            this.context.options?.locale as string | undefined,
-          );
-
-          const exitPlanToolCall = pass.pendingToolCalls.find(
-            (toolCall) => toolCall.name === TOOL_NAMES.EXIT_PLAN_MODE,
-          );
-          if (exitPlanToolCall) {
-            const { shouldContinueLoop } = await handleExitPlanMode(
-              exitPlanToolCall,
-              pass,
-              results,
-              currentMessages,
-              context,
-              state,
-            );
-            if (!shouldContinueLoop) return { messages: currentMessages };
-          }
-
-          // ── Append to context for next pass ───────────────────
-          const assistantMessage: ConversationMessage = {
-            role: "assistant",
-            content: pass.finalStreamedText || "",
-            ...(pass.streamedThinking.trim() && {
-              thinking: pass.streamedThinking.trim(),
-            }),
-            ...(pass.thinkingSignature && {
-              thinkingSignature: pass.thinkingSignature,
-            }),
-            ...computePassPhaseDurations(pass),
-            toolCalls: pass.pendingToolCalls.map((toolCall: ToolCall) => {
-              const matchingResult = results.find(
-                (result) => result.id === toolCall.id,
-              );
-              return {
-                id: toolCall.id || null,
-                responsesItemId: toolCall.responsesItemId || undefined,
-                name: toolCall.name,
-                args: toolCall.args,
-                thoughtSignature: toolCall.thoughtSignature || undefined,
-                reasoningItem: toolCall.reasoningItem || undefined,
-                result: matchingResult ? matchingResult.result : null,
-                durationMilliseconds: matchingResult?.durationMilliseconds,
-              };
-            }),
-          };
-          currentMessages.push(assistantMessage);
-
-          // ── Sync tool results back to state ───────────────────
-          // state.streamedToolCalls are populated during streaming but
-          // never receive tool execution results. The Finalizer's metadata
-          // message path uses state.streamedToolCalls — if results are
-          // missing, persisted tool calls have result: undefined, which
-          // breaks expandMessagesForFunctionCall on the next auto-response.
-          for (const pendingToolCall of pass.pendingToolCalls) {
-            const matchingResult = results.find(
-              (toolResult) => toolResult.id === pendingToolCall.id,
-            );
-            const stateToolCall = state.streamedToolCalls.find(
-              (streamedToolCall) =>
-                streamedToolCall.id === pendingToolCall.id,
-            );
-            if (stateToolCall && matchingResult) {
-              stateToolCall.result = matchingResult.result;
-              stateToolCall.durationMilliseconds = matchingResult.durationMilliseconds;
-            }
-          }
-
-          // ── Structured retry guidance on tool failure ──────────
-          // When tool calls fail, inject a system message prompting the
-          // model to analyze which arguments caused the failure and retry
-          // with corrections (Fission-GRPO pattern, arXiv 2026).
-          const retryGuidanceMessage = buildToolRetryGuidance(
-            pass.pendingToolCalls,
-            results,
-            state,
-            MAX_CONSECUTIVE_TOOL_ERRORS,
-            this.context.options?.locale as string | undefined,
-          );
-          if (retryGuidanceMessage) {
-            currentMessages.push(retryGuidanceMessage);
-          }
-
-          currentMessages = currentMessages.filter(
-            (message) =>
-              !(
-                message.role === "assistant" &&
-                !message.content?.trim() &&
-                (!message.toolCalls || message.toolCalls.length === 0)
-              ),
-          );
-
-          // ── Post-search nudge for tool discovery chain ─────────
-          injectToolDiscoveryNudge(
-            pass.pendingToolCalls,
-            results,
-            currentMessages,
-            context,
-          );
-
-          this.checkAndApplyToolSetChanges(currentMessages);
-
-          this.logIteration(pass, currentMessages);
-
-          // ── Semantic stall detection ────────────────────────────
-          const stallVerdict = semanticStallDetector.recordIteration(
-            pass.pendingToolCalls,
-          );
-
-          if (stallVerdict.isStalled) {
-            const toolList = (stallVerdict.repeatedTools || []).join(", ");
-            logger.warn(
-              `[ReActHarness] Semantic stall detected: type=${stallVerdict.stallType}, ` +
-                `consecutiveRepeats=${stallVerdict.consecutiveRepeats}, tools=[${toolList}]`,
-            );
-
-            emit({
-              type: SERVER_SENT_EVENT_TYPES.STATUS,
-              message: "semantic_stall_detected",
-              stallType: stallVerdict.stallType,
-              consecutiveRepeats: stallVerdict.consecutiveRepeats,
-              repeatedTools: stallVerdict.repeatedTools,
-              iteration: state.iterations,
-            });
-
-            if (
-              semanticStallDetector.hasWarningBeenIssued &&
-              semanticStallDetector.postWarningStalls >= MAX_POST_WARNING_STALL_ITERATIONS
-            ) {
-              // Escalation: stall persisted after warning — hard break
-              logger.error(
-                `[ReActHarness] Semantic stall persisted for ${semanticStallDetector.postWarningStalls} ` +
-                  `iterations after warning — hard-breaking loop`,
-              );
-
-              injectErrorAsConversationMessage(
-                currentMessages,
-                `The agent has been stuck in a behavioral loop, repeatedly calling the same tools ` +
-                  `(${toolList}) with identical arguments for ${stallVerdict.consecutiveRepeats} iterations. ` +
-                  `The loop has been terminated. A fundamentally different approach is needed to make progress.`,
-                context,
-              );
-              break;
-            }
-
-            // First warning: inject guidance but let the model try to self-correct
-            if (!semanticStallDetector.hasWarningBeenIssued) {
-              semanticStallDetector.markWarningIssued();
-
-              currentMessages.push({
-                role: "system",
-                content:
-                  `[STALL WARNING] You have been calling the same tools (${toolList}) with identical ` +
-                  `arguments for ${stallVerdict.consecutiveRepeats} consecutive iterations without making progress. ` +
-                  `You are stuck in a behavioral loop. You MUST try a fundamentally different approach:\n` +
-                  `- Use different tools or different arguments\n` +
-                  `- Break the problem into smaller steps\n` +
-                  `- Ask the user for clarification if you're unsure how to proceed\n` +
-                  `- If a tool keeps failing, stop calling it and explain the issue to the user\n` +
-                  `Do NOT repeat the same action again.`,
-              });
-
-              logger.info(
-                `[ReActHarness] Injected stall warning — giving model a chance to self-correct`,
-              );
-            }
-          }
-
-          // ── Non-blocking dispatch exit ──────────────────────────
-          // When any tool returns NON_BLOCKING_DISPATCH, background work
-          // has been dispatched. Break immediately to avoid a wasteful
-          // next iteration where the LLM generates filler text like
-          // "I've dispatched sub-agents!". The completion handler will
-          // trigger an auto-response with the real results later.
-          const hasNonBlockingDispatch = results.some((toolResult) => {
-            const resultData = toolResult.result as Record<string, unknown> | null;
-            return resultData?._directive === "NON_BLOCKING_DISPATCH";
-          });
-
-          if (hasNonBlockingDispatch) {
-            logger.info(
-              `[ReActHarness] NON_BLOCKING_DISPATCH detected — exiting loop (no filler text generation)`,
-            );
-            hasCleanTextBreak = true;
-            hasNonBlockingDispatchBreak = true;
-            break;
-          }
-
-          continue;
-        }
-
-        // ── No tools — check if we should break ─────────────────
-        // Text present (with or without thinking) → clean text break.
-        // Thinking-only (no text, no tools) → the model exhausted its
-        // output budget on thinking tokens before producing a response.
-        // Inject a continuation prompt asking it to respond concisely.
-        if (pass.streamedText) {
-          if (state.planModeActive) {
-            currentMessages.push({
-              role: "assistant",
-              content: pass.finalStreamedText || pass.streamedText,
-              ...(pass.streamedThinking.trim() && {
-                thinking: pass.streamedThinking.trim(),
-              }),
-              ...(pass.thinkingSignature && {
-                thinkingSignature: pass.thinkingSignature,
-              }),
-              ...computePassPhaseDurations(pass),
-            });
-            this.logIteration(pass, currentMessages);
-            continue;
-          }
-
-          // Handle Codex/planning models that separate planning and action
-          const codexResult = handleCodexPlanningResponse(
-            pass,
-            currentMessages,
-            context,
-            state,
-            this.tools.finalTools,
-            "ReActHarness",
-          );
-          if (codexResult.shouldContinueLoop) {
-            this.logIteration(pass, currentMessages);
-            continue;
-          }
-
-          this.logIteration(pass, currentMessages);
-
-          // Record text-only iteration for stall detection
-          semanticStallDetector.recordIteration([], pass.streamedText);
-
-          hasCleanTextBreak = true;
-          break;
-        }
-
-        if (!pass.streamedText && pass.streamedThinking.trim()) {
-          // Thinking-only response: model spent its entire output budget on
-          // extended thinking without producing visible text or tool calls.
-          // This commonly happens with local models (e.g. Gemma on lm-studio)
-          // where the thinking budget isn't separately capped.
-          //
-          // Append the thinking as context and inject a continuation prompt
-          // so the model can produce an actual response on the next iteration.
-          logger.warn(
-            `[AgenticLoop] Thinking-only response on iteration ${state.iterations} — ` +
-              `thinking=${pass.streamedThinking.length}chars, text=0. ` +
-              `Injecting continuation prompt to elicit text response.`,
-          );
-
-          currentMessages.push({
-            role: "assistant",
-            content: "",
-            thinking: pass.streamedThinking.trim(),
-            ...(pass.thinkingSignature && {
-              thinkingSignature: pass.thinkingSignature,
-            }),
-            ...computePassPhaseDurations(pass),
-          });
-
-          currentMessages.push({
-            role: "user",
-            content:
-              "[System: Your previous response contained only internal reasoning " +
-              "without producing any visible output. Your thinking has been preserved. " +
-              "Now respond concisely with your actual answer, analysis, or tool calls. " +
-              "Do not repeat your reasoning — act on it.]",
-          });
-
-          this.logIteration(pass, currentMessages);
-          continue;
-        }
-
-        // ── Empty output — check for truncation recovery ─────────
+        // ── Truncation recovery ────────────────────────────────
         if (isOutputTruncated(pass)) {
           truncationRecoveryCount++;
           const configuredMaxTokens = context.options.maxTokens || "default";
           const modelOutputCeiling = context.modelDefinition
             ?.maxOutputTokens as number | undefined;
-          logger.warn(
-            `[AgenticLoop] Max tokens truncation detected on iteration ${state.iterations} — ` +
-              `stopReason=${pass.stopReason}, maxTokens=${configuredMaxTokens}` +
-              `${modelOutputCeiling ? `, modelCeiling=${modelOutputCeiling}` : ""}. ` +
-              `Recovery attempt ${truncationRecoveryCount}/${MAX_OUTPUT_TRUNCATION_RECOVERIES}.`,
-          );
 
-          // Skip recovery if already at the model's physical output ceiling
           const alreadyAtCeiling =
             typeof configuredMaxTokens === "number" &&
             isAtOutputCeiling(configuredMaxTokens, modelOutputCeiling);
@@ -981,156 +501,279 @@ export default class ReActHarness extends BaseAgenticHarness {
             continue;
           }
 
-          // All recovery attempts exhausted or at ceiling — inject error as conversation context
           if (alreadyAtCeiling) {
-            logger.warn(
-              `[AgenticLoop] Skipping truncation recovery — maxTokens (${configuredMaxTokens}) ` +
-                `is already at or above model ceiling (${modelOutputCeiling}). Escalation would be pointless.`,
-            );
+            logger.warn(`[AgenticLoop] Already at ceiling — no truncation recovery.`);
           }
-          const exhaustionMessage = buildExhaustedRecoveryMessage(
-            alreadyAtCeiling ? 0 : MAX_OUTPUT_TRUNCATION_RECOVERIES,
-            configuredMaxTokens,
-            this.context.options?.locale as string | undefined,
-          );
           injectErrorAsConversationMessage(
             currentMessages,
-            exhaustionMessage,
+            buildExhaustedRecoveryMessage(
+              alreadyAtCeiling ? 0 : MAX_OUTPUT_TRUNCATION_RECOVERIES,
+              configuredMaxTokens,
+              this.context.options?.locale as string | undefined,
+            ),
             context,
           );
           this.logIteration(pass, currentMessages);
           break;
         }
 
-        // Genuinely empty output (not truncation) — retry with perturbed
-        // parameters before giving up. Small models (12B-class) can
-        // stochastically emit EOS immediately after processing tool results.
-        // A temperature bump and continuation nudge usually recovers them.
-        emptyOutputRetryCount++;
-        if (emptyOutputRetryCount <= MAX_EMPTY_OUTPUT_RETRIES) {
-          const bumpedTemperature =
-            (context.options.temperature ?? 0.7) +
-            EMPTY_OUTPUT_TEMPERATURE_BUMP * emptyOutputRetryCount;
-          context.options.temperature = Math.min(bumpedTemperature, 1.5);
+        if (signal?.aborted) break;
+        this.emitUsageUpdate();
 
-          const isSubAgent = !!context.parentAgentConversationId;
-          const emptyOutputRecoveryMessage = isSubAgent
-            ? "CRITICAL: Your previous response was completely empty. You are a sub-agent and your output " +
-              "will be returned to the orchestrator. You MUST respond NOW with a synthesis of all tool " +
-              "results you have gathered. Do not attempt more tool calls — summarize what you have."
-            : "Your previous response was empty. You MUST provide a response. " +
-              "If you have gathered information from tool results, synthesize it into a clear summary now. " +
-              "If you need more information, make another tool call.";
+        if (checkCostBudget(state, context.resolvedModel, options.maxCostDollars, emit)) {
+          break;
+        }
 
-          currentMessages.push({
-            role: "system",
-            content: emptyOutputRecoveryMessage,
-          });
+        // ── Tool execution ─────────────────────────────────────
+        if (pass.pendingToolCalls.length > 0) {
+          if (state.planModeActive) {
+            const { allBlocked } = blockUnauthorizedToolCalls(
+              pass.pendingToolCalls,
+              currentMessages,
+              pass,
+              state,
+              this.context.options?.locale as string | undefined,
+            );
+            if (allBlocked) {
+              this.logIteration(pass, currentMessages);
+              continue;
+            }
+          }
 
-          logger.warn(
-            `[AgenticLoop] Empty output recovery attempt ${emptyOutputRetryCount}/${MAX_EMPTY_OUTPUT_RETRIES} — ` +
-              `bumping temperature to ${context.options.temperature}, injecting continuation nudge.`,
+          const { isApproved, shouldApproveAll } =
+            await checkAndWaitForApproval(
+              pass.pendingToolCalls,
+              context,
+              approvalEngine,
+            );
+
+          let results: ToolResult[] = [];
+          if (!isApproved) {
+            results = pass.pendingToolCalls.map((toolCall) => ({
+              name: toolCall.name,
+              id: toolCall.id,
+              result: {
+                success: false,
+                error: "USER_REJECTED",
+                message: "Tool execution was manually rejected by the user.",
+              },
+            }));
+          } else {
+            if (shouldApproveAll) options.autoApprove = true;
+            context._currentMessages = currentMessages;
+            results = await executeToolBatch(
+              pass.pendingToolCalls,
+              context,
+              this.tools,
+              hooks,
+              state,
+            );
+          }
+
+          await processToolResultMedia(
+            pass.pendingToolCalls,
+            results,
+            state,
+            pass,
+            emit,
+            context,
           );
 
-          emit({
-            type: SERVER_SENT_EVENT_TYPES.STATUS,
-            message: "empty_output_recovery" as StatusMessage,
-            attempt: emptyOutputRetryCount,
-            maxAttempts: MAX_EMPTY_OUTPUT_RETRIES,
-            iteration: state.iterations,
-          });
+          emitPostExecutionStatus(pass.pendingToolCalls, emit);
 
+          const validationFeedback = await validateAfterToolExecution(
+            pass.pendingToolCalls,
+            results,
+            context,
+            state,
+          );
+
+          if (validationFeedback.length > 0) {
+            const errorBlock = validationFeedback
+              .map(f => `### ${f.filePath} (${f.validatorType})\n${f.rawOutput}`)
+              .join("\n\n");
+
+            currentMessages.push({
+              role: "assistant",
+              content: pass.finalStreamedText || "",
+              thinking: pass.streamedThinking.trim(),
+              thinkingSignature: pass.thinkingSignature,
+              ...computePassPhaseDurations(pass),
+              toolCalls: pass.pendingToolCalls.map(tc => {
+                const res = results.find(r => r.id === tc.id);
+                return {
+                  id: tc.id || null,
+                  name: tc.name,
+                  args: tc.args,
+                  result: res ? res.result : null,
+                  durationMilliseconds: res?.durationMilliseconds,
+                };
+              }),
+            });
+
+            currentMessages.push({
+              role: "system",
+              content: `Validation Errors:\n\n${errorBlock}`,
+            });
+
+            this.logIteration(pass, currentMessages);
+            continue;
+          }
+
+          await checkForPlanModeEntry(
+            pass.pendingToolCalls,
+            currentMessages,
+            state,
+            emit,
+            this.context.options?.locale as string | undefined,
+          );
+
+          const exitPlanToolCall = pass.pendingToolCalls.find(tc => tc.name === TOOL_NAMES.EXIT_PLAN_MODE);
+          if (exitPlanToolCall) {
+            const { shouldContinueLoop } = await handleExitPlanMode(
+              exitPlanToolCall, pass, results, currentMessages, context, state,
+            );
+            if (!shouldContinueLoop) return { messages: currentMessages };
+          }
+
+          const assistantMessage: ConversationMessage = {
+            role: "assistant",
+            content: pass.finalStreamedText || "",
+            thinking: pass.streamedThinking.trim(),
+            thinkingSignature: pass.thinkingSignature,
+            ...computePassPhaseDurations(pass),
+            toolCalls: pass.pendingToolCalls.map(tc => {
+              const res = results.find(r => r.id === tc.id);
+              return {
+                id: tc.id || null,
+                responsesItemId: tc.responsesItemId,
+                name: tc.name,
+                args: tc.args,
+                thoughtSignature: tc.thoughtSignature,
+                reasoningItem: tc.reasoningItem,
+                result: res ? res.result : null,
+                durationMilliseconds: res?.durationMilliseconds,
+              };
+            }),
+          };
+          currentMessages.push(assistantMessage);
+
+          for (const tc of pass.pendingToolCalls) {
+            const res = results.find(r => r.id === tc.id);
+            const stc = state.streamedToolCalls.find(s => s.id === tc.id);
+            if (stc && res) {
+              stc.result = res.result;
+              stc.durationMilliseconds = res.durationMilliseconds;
+            }
+          }
+
+          const retryGuidance = buildToolRetryGuidance(
+            pass.pendingToolCalls, results, state, MAX_CONSECUTIVE_TOOL_ERRORS, this.context.options?.locale as string,
+          );
+          if (retryGuidance) currentMessages.push(retryGuidance);
+
+          currentMessages = currentMessages.filter(m => !(m.role === "assistant" && !m.content?.trim() && (!m.toolCalls || m.toolCalls.length === 0)));
+
+          injectToolDiscoveryNudge(pass.pendingToolCalls, results, currentMessages, context);
+          this.checkAndApplyToolSetChanges(currentMessages);
+          this.logIteration(pass, currentMessages);
+
+          const stallVerdict = semanticStallDetector.recordIteration(pass.pendingToolCalls);
+          if (stallVerdict.isStalled) {
+            if (semanticStallDetector.hasWarningBeenIssued && semanticStallDetector.postWarningStalls >= MAX_POST_WARNING_STALL_ITERATIONS) {
+              injectErrorAsConversationMessage(currentMessages, `Behavioral loop detected.`, context);
+              break;
+            }
+            if (!semanticStallDetector.hasWarningBeenIssued) {
+              semanticStallDetector.markWarningIssued();
+              currentMessages.push({ role: "system", content: "You are in a behavioral loop. Try a different approach." });
+            }
+          }
+
+          const hasNonBlockingDispatch = results.some(r => (r.result as any)?._directive === "NON_BLOCKING_DISPATCH");
+          if (hasNonBlockingDispatch) {
+            hasCleanTextBreak = true;
+            hasNonBlockingDispatchBreak = true;
+            break;
+          }
+          continue;
+        }
+
+        // ── No tools — check if we should break ─────────────────
+        if (pass.streamedText) {
+          if (state.planModeActive) {
+            currentMessages.push({
+              role: "assistant",
+              content: pass.finalStreamedText || pass.streamedText,
+              thinking: pass.streamedThinking.trim(),
+              thinkingSignature: pass.thinkingSignature,
+              ...computePassPhaseDurations(pass),
+            });
+            this.logIteration(pass, currentMessages);
+            continue;
+          }
+
+          const codexResult = handleCodexPlanningResponse(pass, currentMessages, context, state, this.tools.finalTools, "ReActHarness");
+          if (codexResult.shouldContinueLoop) {
+            this.logIteration(pass, currentMessages);
+            continue;
+          }
+
+          this.logIteration(pass, currentMessages);
+          semanticStallDetector.recordIteration([], pass.streamedText);
+          hasCleanTextBreak = true;
+          break;
+        }
+
+        if (!pass.streamedText && pass.streamedThinking.trim()) {
+          logger.warn(`[AgenticLoop] Thinking-only response.`);
+          currentMessages.push({
+            role: "assistant",
+            content: "",
+            thinking: pass.streamedThinking.trim(),
+            thinkingSignature: pass.thinkingSignature,
+            ...computePassPhaseDurations(pass),
+          });
+          currentMessages.push({
+            role: "user",
+            content: "[System: Reasoning preserved. Please provide actual output now.]",
+          });
           this.logIteration(pass, currentMessages);
           continue;
         }
 
-        // All empty output recovery attempts exhausted
-        logger.warn(
-          `[AgenticLoop] Empty model output on iteration ${state.iterations} — ` +
-            `text=${pass.streamedText.length}, thinking=${pass.streamedThinking.length}, ` +
-            `toolCalls=${pass.pendingToolCalls.length}. ` +
-            `${MAX_EMPTY_OUTPUT_RETRIES} recovery attempts exhausted. Breaking.`,
-        );
+        // ── Empty output recovery ──────────────────────────────
+        emptyOutputRetryCount++;
+        if (emptyOutputRetryCount <= MAX_EMPTY_OUTPUT_RETRIES) {
+          const curTemp = context.options.temperature ?? 0.7;
+          context.options.temperature = Math.min(curTemp + EMPTY_OUTPUT_TEMPERATURE_BUMP, 1.5);
+          currentMessages.push({ role: "system", content: "Your previous response was empty. Please provide output." });
+          this.logIteration(pass, currentMessages);
+          continue;
+        }
 
-        emit({
-          type: SERVER_SENT_EVENT_TYPES.STATUS,
-          message: STATUS_MESSAGES.EMPTY_OUTPUT,
-          iteration: state.iterations,
-        });
-
-        this.logIteration(pass, currentMessages);
+        logger.warn(`[AgenticLoop] Empty output recovery exhausted.`);
         break;
       }
 
-      // ── Exhaustion Recovery Pass ─────────────────────────────
-      // Triggers when the agent used tools but never produced a clean text-only
-      // break — regardless of how the loop exited (max iterations, empty output,
-      // truncation exhaustion). In all these cases, state.finalStreamedText
-      // contains stale per-pass planning text ("Let me search for...") instead
-      // of a synthesized final summary.
-      // Skipped when signal is aborted (provider would reject the call).
-      if (
-        !hasCleanTextBreak &&
-        state.streamedToolCalls.length > 0 &&
-        !signal?.aborted
-      ) {
+      if (!hasCleanTextBreak && state.streamedToolCalls.length > 0 && !signal?.aborted) {
         state.conversationOutcome = "exhausted";
         await runExhaustionRecoveryPass(this, context, state, currentMessages);
       }
 
-      // ── Finalization (happy path) ──────────────────────────────
       cleanupReminderCache(agentConversationId);
 
-      // ── Increment pending background tasks counter ─────────────
-      // Must happen BEFORE finalize() so that when setGenerating(false) fires
-      // inside finalize, the aggregation pipeline sees pendingBackgroundTasks=1
-      // and keeps isActive=true. Without this ordering, there would be a brief
-      // window where isActive=false even though sub-agents are already running.
       if (hasNonBlockingDispatchBreak && agentConversationId && conversationId) {
         try {
-          const { default: ConversationService } =
-            await import("../conversation/ConversationService.ts");
+          const { default: ConversationService } = await import("../conversation/ConversationService.ts");
           const { COLLECTIONS } = await import("../../constants.ts");
-          await ConversationService.adjustPendingBackgroundTasks(
-            conversationId,
-            project,
-            username,
-            1,
-            { collection: COLLECTIONS.AGENT_CONVERSATIONS },
-          );
-          logger.info(
-            `[ReActHarness] Incremented pendingBackgroundTasks on conversation ${conversationId}`,
-          );
-        } catch (backgroundTaskError: unknown) {
-          logger.warn(
-            `[ReActHarness] Failed to increment pendingBackgroundTasks: ${backgroundTaskError instanceof Error ? backgroundTaskError.message : String(backgroundTaskError)}`,
-          );
-        }
+          await ConversationService.adjustPendingBackgroundTasks(conversationId, project, username, 1, { collection: COLLECTIONS.AGENT_CONVERSATIONS });
+        } catch (e) {}
       }
 
-      // Finalize — persist messages, compute costs, and conditionally emit `done`.
-      // When sub-agents are dispatched non-blockingly, we DEFER the `done` event
-      // and keep the SSE stream open so the auto-response (triggered after all
-      // sub-agents complete) streams its chunks through the same connection.
-      // Without this, the SSE stream closes, the auto-response runs headlessly,
-      // and the client only sees the result as a bulk change-stream update.
       if (hasNonBlockingDispatchBreak && agentConversationId) {
-        await this.finalize(
-          currentMessages,
-          hooks,
-          { deferDoneEmission: true },
-        );
-
-        // Keep the SSE stream alive until all sub-agent dispatches settle
-        // and the auto-response completes. The auto-response's handleAgent
-        // call uses orchestratorContext.emit (which is the live SSE emit
-        // function), so chunks stream in real-time to the client.
-        // The auto-response's own finalize() emits the `done` event, so
-        // we deliberately do NOT emit the deferred done from the parent
-        // harness — that would overwrite the auto-response's correct
-        // metadata with stale parent-turn data.
-        const { default: OrchestratorService } =
-          await import("../OrchestratorService.ts");
+        await this.finalize(currentMessages, hooks, { deferDoneEmission: true });
+        const { default: OrchestratorService } = await import("../OrchestratorService.ts");
         await OrchestratorService.awaitPendingDispatches(agentConversationId);
       } else {
         await this.finalize(currentMessages, hooks);
