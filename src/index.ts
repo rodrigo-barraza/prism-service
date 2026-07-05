@@ -501,6 +501,24 @@ setupWebSocket(wss);
           `Cleared ${pendingCleared} stale pendingBackgroundTasks counter(s) in agent_conversations`,
         );
       }
+      // Clear stale subAgentStatus: "running" — any sub-agents left in
+      // "running" state from a previous process are dead after a restart.
+      const { modifiedCount: staleSubAgentsCleared } = await db
+        .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+        .updateMany(
+          { subAgentStatus: "running" },
+          {
+            $set: {
+              subAgentStatus: "stopped",
+              subAgentCompletedAt: new Date().toISOString(),
+            },
+          },
+        );
+      if (staleSubAgentsCleared > 0) {
+        logger.info(
+          `Cleared ${staleSubAgentsCleared} stale subAgentStatus flag(s) in agent_conversations`,
+        );
+      }
     }
   } catch (error: unknown) {
     logger.error(
