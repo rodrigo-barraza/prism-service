@@ -170,6 +170,9 @@ router.get(
   "/full",
   asyncHandler(async (_req: Request, res: Response) => {
     try {
+      // Refresh from tools-api to pick up agent-registered roots
+      await ToolOrchestratorService.refreshWorkspaceRoots();
+
       const roots = ToolOrchestratorService.getWorkspaceRoots() as string[];
       const staticRoots = ToolOrchestratorService.getStaticRoots() as string[];
 
