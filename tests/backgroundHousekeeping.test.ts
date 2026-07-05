@@ -65,16 +65,21 @@ describe("BackgroundHousekeepingService", () => {
   describe("clearStaleConversations", () => {
     it("should clear isGenerating flags on conversations older than 2 hours", async () => {
       const updateManyMock = vi.fn().mockResolvedValue({ modifiedCount: 3 });
-      const collectionMock = vi.fn().mockReturnValue({ updateMany: updateManyMock });
+      const collectionMock = vi.fn().mockReturnValue({
+        updateMany: updateManyMock,
+        deleteMany: vi.fn().mockResolvedValue({ deletedCount: 0 }),
+        find: vi.fn().mockReturnValue({ [Symbol.asyncIterator]: async function* () {} })
+      });
       const databaseMock = { collection: collectionMock };
       vi.spyOn(MongoWrapper, "getDb").mockReturnValue(databaseMock as any);
 
       const result = await BackgroundHousekeepingService.run({ trigger: "test" });
       expect(result.staleConversations).toEqual({
         conversationsCleared: 3,
-        agentConversationsCleared: 3
+        agentConversationsCleared: 3,
+        staleSubAgentsCleared: 3
       });
-      expect(updateManyMock).toHaveBeenCalledTimes(3);
+      expect(updateManyMock).toHaveBeenCalledTimes(4); // 4 updates in clearStaleConversations
     });
 
     it("should handle MongoDB connection errors gracefully", async () => {
@@ -90,7 +95,11 @@ describe("BackgroundHousekeepingService", () => {
   describe("pruneOldRequestLogs", () => {
     it("should delete request logs older than 90 days", async () => {
       const deleteManyMock = vi.fn().mockResolvedValue({ deletedCount: 15 });
-      const collectionMock = vi.fn().mockReturnValue({ deleteMany: deleteManyMock });
+      const collectionMock = vi.fn().mockReturnValue({
+        deleteMany: deleteManyMock,
+        updateMany: vi.fn().mockResolvedValue({ modifiedCount: 0 }),
+        find: vi.fn().mockReturnValue({ [Symbol.asyncIterator]: async function* () {} })
+      });
       const databaseMock = { collection: collectionMock };
       vi.spyOn(MongoWrapper, "getDb").mockReturnValue(databaseMock as any);
 
@@ -113,7 +122,11 @@ describe("BackgroundHousekeepingService", () => {
       };
 
       const findMock = vi.fn().mockReturnValue(cursorMock);
-      const collectionMock = vi.fn().mockReturnValue({ find: findMock });
+      const collectionMock = vi.fn().mockReturnValue({
+        find: findMock,
+        updateMany: vi.fn().mockResolvedValue({ modifiedCount: 0 }),
+        deleteMany: vi.fn().mockResolvedValue({ deletedCount: 0 })
+      });
       const databaseMock = { collection: collectionMock };
       vi.spyOn(MongoWrapper, "getDb").mockReturnValue(databaseMock as any);
 
