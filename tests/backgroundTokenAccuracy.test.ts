@@ -14,7 +14,7 @@
  * and prefers real API-reported tokens when available.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS } from "../src/constants.ts";
+import { PROVIDERS, MESSAGE_ROLES } from "../src/constants.ts";
 
 // ── Mock logger ──────────────────────────────────────────────────
 vi.mock("../src/utils/logger.ts", () => ({
@@ -158,8 +158,8 @@ describe("Background Token Accuracy", () => {
       traceId: null,
       agentConversationId: "session-1",
       aiMessages: [
-        { role: "system", content: "You are a memory extraction agent." },
-        { role: "user", content: "Extract memories from this session." },
+        { role: MESSAGE_ROLES.SYSTEM, content: "You are a memory extraction agent." },
+        { role: MESSAGE_ROLES.USER, content: "Extract memories from this session." },
       ],
       resultText: "[]",
       success: true,
@@ -440,8 +440,8 @@ describe("Background Token Accuracy", () => {
         traceId: null,
         agentConversationId: "session-1",
         aiMessages: [
-          { role: "system", content: "System prompt..." },
-          { role: "user", content: "User message..." },
+          { role: MESSAGE_ROLES.SYSTEM, content: "System prompt..." },
+          { role: MESSAGE_ROLES.USER, content: "User message..." },
         ],
         resultText: "[]",
         usage: realUsage,
@@ -481,8 +481,8 @@ describe("Background Token Accuracy", () => {
         traceId: null,
         agentConversationId: "session-2",
         aiMessages: [
-          { role: "system", content: "Consolidation prompt..." },
-          { role: "user", content: "Memories to consolidate..." },
+          { role: MESSAGE_ROLES.SYSTEM, content: "Consolidation prompt..." },
+          { role: MESSAGE_ROLES.USER, content: "Memories to consolidate..." },
         ],
         resultText: '{"actions": []}',
         usage: realUsage,
@@ -507,8 +507,8 @@ describe("Background Token Accuracy", () => {
 
     it("heuristic fallback still works when usage is absent", async () => {
       const messages = [
-        { role: "system", content: "Short system prompt" },
-        { role: "user", content: "Short user message" },
+        { role: MESSAGE_ROLES.SYSTEM, content: "Short system prompt" },
+        { role: MESSAGE_ROLES.USER, content: "Short user message" },
       ];
       const resultText = "Short response";
 

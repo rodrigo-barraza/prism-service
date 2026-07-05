@@ -14,7 +14,7 @@
  *      duplicate content for multi-iteration agentic turns
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS, TYPES } from "../src/constants.ts";
+import { PROVIDERS, TYPES, MESSAGE_ROLES } from "../src/constants.ts";
 
 // ═══════════════════════════════════════════════════════════════
 // Part 1: finalizeTextGeneration segment attachment logic
@@ -153,9 +153,9 @@ describe("finalizeTextGeneration — segment deduplication", () => {
   // ── Multi-iteration: segments must NOT be attached ──────────
   it("should NOT attach contentSegments when intermediate assistant messages have toolCalls", async () => {
     const intermediateMessages = [
-      { role: "user", content: "Run npm install" },
+      { role: MESSAGE_ROLES.USER, content: "Run npm install" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "I'll run npm install for you.",
         toolCalls: [
           { id: "toolCall-1", name: "execute_command", args: { command: "npm install" }, result: { success: true, stdout: "added 50 packages", stderr: "", exitCode: 0 } },
@@ -186,7 +186,7 @@ describe("finalizeTextGeneration — segment deduplication", () => {
     expect(appendedMessages).toHaveLength(4);
 
     const finalMessage = appendedMessages[appendedMessages.length - 1];
-    expect(finalMessage.role).toBe("assistant");
+    expect(finalMessage.role).toBe(MESSAGE_ROLES.ASSISTANT);
     expect(finalMessage.content).toBe("✅ npm install completed successfully.");
 
     // Key assertion: segments must NOT be on the final message
@@ -197,9 +197,9 @@ describe("finalizeTextGeneration — segment deduplication", () => {
 
   it("should NOT attach toolCalls on final message when intermediate messages already have them", async () => {
     const intermediateMessages = [
-      { role: "user", content: "List files" },
+      { role: MESSAGE_ROLES.USER, content: "List files" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Let me check.",
         toolCalls: [
           { id: "toolCall-1", name: "read_file", args: { path: "/test" }, result: { content: "file data" } },
@@ -226,7 +226,7 @@ describe("finalizeTextGeneration — segment deduplication", () => {
   it("should ATTACH contentSegments when no intermediate assistant messages have toolCalls", async () => {
     // Single-iteration turn — no tool calls, just text + thinking
     const intermediateMessages = [
-      { role: "user", content: "Explain JavaScript closures" },
+      { role: MESSAGE_ROLES.USER, content: "Explain JavaScript closures" },
     ];
 
     const segments = [
@@ -260,8 +260,8 @@ describe("finalizeTextGeneration — segment deduplication", () => {
     // Intermediate assistant message exists but has no tool calls
     // (e.g. pure text in plan mode or multi-turn without tools)
     const intermediateMessages = [
-      { role: "user", content: "Hello" },
-      { role: "assistant", content: "Hi there!" },
+      { role: MESSAGE_ROLES.USER, content: "Hello" },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Hi there!" },
     ];
 
     const segments = [{ type: TYPES.TEXT, fragmentIndex: 0 }];
@@ -288,7 +288,7 @@ describe("finalizeTextGeneration — segment deduplication", () => {
   it("should ATTACH toolCalls on final message for native MCP tool calls with no intermediate messages", async () => {
     // No intermediate assistant messages → toolCalls go on final message
     const intermediateMessages = [
-      { role: "user", content: "Search the web" },
+      { role: MESSAGE_ROLES.USER, content: "Search the web" },
     ];
 
     const nativeToolCalls = [
@@ -307,7 +307,7 @@ describe("finalizeTextGeneration — segment deduplication", () => {
     expect(appendedMessages).toHaveLength(3);
 
     const assistantMessage = appendedMessages[1];
-    expect(assistantMessage.role).toBe("assistant");
+    expect(assistantMessage.role).toBe(MESSAGE_ROLES.ASSISTANT);
     expect(assistantMessage.toolCalls).toEqual([
       { id: "ntc-1", name: "search_web", args: { query: "test" } }
     ]);
@@ -321,19 +321,19 @@ describe("finalizeTextGeneration — segment deduplication", () => {
   // ── Multi-tool-iteration stress test ────────────────────────
   it("should handle 3+ iterations without duplicating segments", async () => {
     const intermediateMessages = [
-      { role: "user", content: "Refactor the code" },
+      { role: MESSAGE_ROLES.USER, content: "Refactor the code" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Let me read the file first.",
         toolCalls: [{ id: "toolCall-1", name: "read_file", args: { path: "/src/app.js" }, result: { content: "old code" } }],
       },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Now I'll write the updated file.",
         toolCalls: [{ id: "toolCall-2", name: "write_file", args: { path: "/src/app.js", content: "new code" }, result: { success: true } }],
       },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Let me verify with tests.",
         toolCalls: [{ id: "toolCall-3", name: "execute_command", args: { command: "npm test" }, result: { success: true, stdout: "all tests pass", stderr: "", exitCode: 0 } }],
       },
@@ -372,7 +372,7 @@ describe("finalizeTextGeneration — segment deduplication", () => {
 
     // Verify intermediate messages are preserved as-is
     const toolMessages = appendedMessages.filter(
-      (message: any) => message.role === "assistant" && message.toolCalls?.length > 0,
+      (message: any) => message.role === MESSAGE_ROLES.ASSISTANT && message.toolCalls?.length > 0,
     );
     expect(toolMessages).toHaveLength(3);
   });
@@ -389,9 +389,9 @@ describe("message persistence contract for TerminalRenderer", () => {
   it("intermediate assistant messages should carry toolCalls with result.stdout", () => {
     // Simulate what the DB contains after our fix
     const storedMessages: any[] = [
-      { role: "user", content: "Run npm install" },
+      { role: MESSAGE_ROLES.USER, content: "Run npm install" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "I'll run npm install for you.",
         toolCalls: [
           {
@@ -409,7 +409,7 @@ describe("message persistence contract for TerminalRenderer", () => {
         ],
       },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "✅ npm install completed successfully.",
         model: "test-model",
         provider: "test-provider",
@@ -439,7 +439,7 @@ describe("message persistence contract for TerminalRenderer", () => {
 
     // No content duplication: each message has its own unique text
     const allTexts = storedMessages
-      .filter((message) => message.role === "assistant")
+      .filter((message) => message.role === MESSAGE_ROLES.ASSISTANT)
       .map((message) => message.content);
     const uniqueTexts = new Set(allTexts);
     expect(uniqueTexts.size).toBe(allTexts.length);
@@ -447,9 +447,9 @@ describe("message persistence contract for TerminalRenderer", () => {
 
   it("single-iteration messages should still have contentSegments for interleaved display", () => {
     const storedMessages: any[] = [
-      { role: "user", content: "What is 2+2?" },
+      { role: MESSAGE_ROLES.USER, content: "What is 2+2?" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "2+2 equals 4.",
         model: "test-model",
         provider: "test-provider",
@@ -491,9 +491,9 @@ describe("finalizeTextGeneration — thinking deduplication across iterations", 
     const thinkingContent = "The user wants to create a 3D cube. I should use the create_3d_model tool.";
 
     const intermediateMessages = [
-      { role: "user", content: "make a cube" },
+      { role: MESSAGE_ROLES.USER, content: "make a cube" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "",
         thinking: thinkingContent,
         toolCalls: [
@@ -501,7 +501,7 @@ describe("finalizeTextGeneration — thinking deduplication across iterations", 
         ],
       },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "",
         toolCalls: [
           { id: "tc-2", name: "create_3d_model", args: { objects: [] }, result: { success: true } },
@@ -520,7 +520,7 @@ describe("finalizeTextGeneration — thinking deduplication across iterations", 
     const appendedMessages = ConversationService.appendMessages.mock.calls[0][3];
     const finalMessage = appendedMessages[appendedMessages.length - 1];
 
-    expect(finalMessage.role).toBe("assistant");
+    expect(finalMessage.role).toBe(MESSAGE_ROLES.ASSISTANT);
     expect(finalMessage.content).toBe("I've created a 3D cube for you.");
     expect(finalMessage.thinking).toBeUndefined();
   });
@@ -531,9 +531,9 @@ describe("finalizeTextGeneration — thinking deduplication across iterations", 
     const accumulatedThinking = iterationOneThinking + iterationTwoThinking;
 
     const intermediateMessages = [
-      { role: "user", content: "refactor app.js" },
+      { role: MESSAGE_ROLES.USER, content: "refactor app.js" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Let me find the file.",
         thinking: iterationOneThinking,
         toolCalls: [
@@ -563,15 +563,15 @@ describe("finalizeTextGeneration — thinking deduplication across iterations", 
     const accumulatedThinking = thinkingA + thinkingB + thinkingC;
 
     const intermediateMessages = [
-      { role: "user", content: "update config" },
+      { role: MESSAGE_ROLES.USER, content: "update config" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Reading config.",
         thinking: thinkingA,
         toolCalls: [{ id: "tc-1", name: "read_file", args: {}, result: {} }],
       },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Updating settings.",
         thinking: thinkingB,
         toolCalls: [{ id: "tc-2", name: "write_file", args: {}, result: {} }],
@@ -602,7 +602,7 @@ describe("finalizeTextGeneration — thinking deduplication across iterations", 
     const thinkingContent = "Let me explain closures clearly.";
 
     const intermediateMessages = [
-      { role: "user", content: "explain closures" },
+      { role: MESSAGE_ROLES.USER, content: "explain closures" },
     ];
 
     const context = makeCtx();
@@ -623,8 +623,8 @@ describe("finalizeTextGeneration — thinking deduplication across iterations", 
     const thinkingContent = "Planning my response.";
 
     const intermediateMessages = [
-      { role: "user", content: "hello" },
-      { role: "assistant", content: "Hi there!" },
+      { role: MESSAGE_ROLES.USER, content: "hello" },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "Hi there!" },
     ];
 
     const context = makeCtx();
@@ -643,9 +643,9 @@ describe("finalizeTextGeneration — thinking deduplication across iterations", 
 
   it("should handle empty thinking gracefully", async () => {
     const intermediateMessages = [
-      { role: "user", content: "do something" },
+      { role: MESSAGE_ROLES.USER, content: "do something" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Doing it.",
         toolCalls: [{ id: "tc-1", name: "execute_command", args: {}, result: {} }],
       },
@@ -670,9 +670,9 @@ describe("finalizeTextGeneration — thinking deduplication across iterations", 
     const accumulatedThinking = "The user asked about quantum physics. Let me explain.";
 
     const intermediateMessages = [
-      { role: "user", content: "explain quantum physics" },
+      { role: MESSAGE_ROLES.USER, content: "explain quantum physics" },
       {
-        role: "assistant",
+        role: MESSAGE_ROLES.ASSISTANT,
         content: "Searching.",
         thinking: intermediateThinking,
         toolCalls: [{ id: "tc-1", name: "search_web", args: {}, result: {} }],
