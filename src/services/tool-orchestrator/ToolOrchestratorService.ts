@@ -684,7 +684,7 @@ function getOrchestratorToolSchemas(
     },
     {
       name: TOOL_NAMES.CREATE_SUBAGENTS,
-      emoji: ["👥", "🤖"],
+      emoji: ["🤖", "🫡"],
       description: PromptLocaleService.get(
         activeLocale,
         "orchestrator.tools.create_subagents.description",
@@ -1281,7 +1281,7 @@ export default class ToolOrchestratorService {
       list_cron_jobs: ["📅", "📋"],
       delete_cron_job: ["📅", "❌"],
       create_subagent: ["🤖", "📤"],
-      create_subagents: ["👥", "🤖"],
+      create_subagents: ["🤖", "🫡"],
       send_subagent_message: ["💬", "📤"],
       stop_subagent: ["⏹️", "🤖"],
       get_subagent_output: ["📥", "🤖"],

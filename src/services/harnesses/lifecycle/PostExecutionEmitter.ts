@@ -136,6 +136,7 @@ export async function processToolResultMedia(
         durationMilliseconds: toolResult?.durationMilliseconds,
         durationMs: toolResult?.durationMilliseconds,
       },
+      toolEmoji: ToolOrchestratorService.getToolEmoji(toolCall.name),
       status: hasError ? "error" : "done",
     });
 
