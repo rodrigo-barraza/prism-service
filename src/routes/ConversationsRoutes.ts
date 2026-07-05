@@ -9,6 +9,7 @@ import ConversationService, {
   type ConversationPatchInput,
   enrichConversationsWithRequestCosts,
   enrichSingleConversationCost,
+  prepareDisplayMessages,
 } from "../services/ConversationService.ts";
 import { COLLECTIONS, COST_SUMMATION_EXPRESSION, ORCHESTRATOR } from "../constants.ts";
 import logger from "../utils/logger.ts";
@@ -493,6 +494,9 @@ router.get(
         return res.json({
           ...chat,
           type: "direct",
+          displayMessages: prepareDisplayMessages(
+            (chat.messages as import("../types/admin.ts").ChatMessage[]) || [],
+          ),
           liveStatus: (chat.isGenerating || chat.isActive)
             ? ConversationStatusRegistry.get(conversationId) || undefined
             : undefined,
@@ -539,6 +543,9 @@ router.get(
           ...agentChat,
           stats: stats || undefined,
           type: "agent",
+          displayMessages: prepareDisplayMessages(
+            (agentChat.messages as import("../types/admin.ts").ChatMessage[]) || [],
+          ),
           liveStatus: isConversationActive
             ? ConversationStatusRegistry.get(conversationId) || undefined
             : undefined,
