@@ -1,8 +1,10 @@
 import ChangeStreamService from "../services/ChangeStreamService.ts";
 import { COLLECTIONS } from "../constants.ts";
 
-/** Time-to-live for stats cache entries (5 seconds). */
-const CACHE_TIME_TO_LIVE_MILLISECONDS = 5000;
+/** Time-to-live for stats cache entries (30 seconds).
+ * Change stream invalidation handles real-time freshness; this TTL
+ * is only a fallback when change streams are unavailable. */
+const CACHE_TIME_TO_LIVE_MILLISECONDS = 30_000;
 
 interface CacheEntry<T> {
   resultData: T;
@@ -20,6 +22,7 @@ class StatsCacheManager {
       if (
         changePayload.collection === COLLECTIONS.REQUESTS ||
         changePayload.collection === COLLECTIONS.MODEL_CONVERSATIONS ||
+        changePayload.collection === COLLECTIONS.AGENT_CONVERSATIONS ||
         changePayload.collection === COLLECTIONS.WORKFLOWS
       ) {
         this.clear();
