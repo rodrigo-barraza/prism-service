@@ -558,6 +558,7 @@ export class OrchestratorService {
                 parentAgentConversationId: agentConversationId || null,
                 project,
                 username,
+                agent: subAgentAgentType,
               },
               $setOnInsert: {
                 createdAt: new Date().toISOString(),
