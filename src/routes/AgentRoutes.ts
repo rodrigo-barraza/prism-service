@@ -21,13 +21,13 @@ const router = express.Router();
  */
 router.post(
   "/approve",
-  asyncHandler(async (req: Request, res: Response) => {
-    const { conversationId, approved, approveAll } = req.body;
+  asyncHandler(async (request: Request, response: Response) => {
+    const { conversationId, approved, approveAll } = request.body;
     const isApproved = approved !== false;
     const shouldApproveAll = approveAll === true;
 
     if (!conversationId) {
-      return res.status(400).json({ error: "Missing conversationId" });
+      return response.status(400).json({ error: "Missing conversationId" });
     }
 
     const resolved = AgenticLoopService.resolveApproval(
@@ -37,7 +37,7 @@ router.post(
     );
 
     if (!resolved) {
-      return res.status(404).json({
+      return response.status(404).json({
         error: "No pending approval for this conversation",
         conversationId,
       });
@@ -47,7 +47,7 @@ router.post(
       `[agent/approve] ${isApproved ? "Approved" : "Rejected"}${shouldApproveAll ? " (all future)" : ""} for conversation ${conversationId}`,
     );
 
-    res.json({ ok: true, approved: isApproved });
+    response.json({ ok: true, approved: isApproved });
   }),
 );
 
@@ -65,11 +65,11 @@ router.post(
  */
 router.post(
   "/answer",
-  asyncHandler(async (req: Request, res: Response) => {
-    const { conversationId, answer, answers } = req.body;
+  asyncHandler(async (request: Request, response: Response) => {
+    const { conversationId, answer, answers } = request.body;
 
     if (!conversationId) {
-      return res.status(400).json({ error: "Missing conversationId" });
+      return response.status(400).json({ error: "Missing conversationId" });
     }
 
     // Normalize: structured answers take priority, fall back to simple string
@@ -85,7 +85,7 @@ router.post(
     } else if (answer !== undefined && answer !== null) {
       normalizedAnswers = [{ answer: String(answer) }];
     } else {
-      return res.status(400).json({ error: "Missing answer or answers" });
+      return response.status(400).json({ error: "Missing answer or answers" });
     }
 
     const resolved = AgenticLoopService.resolveUserQuestion(
@@ -94,7 +94,7 @@ router.post(
     );
 
     if (!resolved) {
-      return res.status(404).json({
+      return response.status(404).json({
         error: "No pending question for this conversation",
         conversationId,
       });
@@ -104,7 +104,7 @@ router.post(
       `[agent/answer] ${normalizedAnswers.length} answer(s) for conversation ${conversationId}`,
     );
 
-    res.json({ ok: true });
+    response.json({ ok: true });
   }),
 );
 
@@ -123,17 +123,17 @@ router.post(
  */
 router.post(
   "/stop",
-  asyncHandler(async (req: Request, res: Response) => {
-    const { conversationId } = req.body;
+  asyncHandler(async (request: Request, response: Response) => {
+    const { conversationId } = request.body;
 
     if (!conversationId) {
-      return res.status(400).json({ error: "Missing conversationId" });
+      return response.status(400).json({ error: "Missing conversationId" });
     }
 
     const stopped = AgentSessionRegistry.stop(conversationId);
 
     if (!stopped) {
-      return res.status(404).json({
+      return response.status(404).json({
         error: "No active session for this conversation",
         conversationId,
       });
@@ -143,7 +143,7 @@ router.post(
       `[agent/stop] Explicitly stopped session for conversation ${conversationId}`,
     );
 
-    res.json({ ok: true, stopped: true });
+    response.json({ ok: true, stopped: true });
   }),
 );
 
@@ -164,29 +164,29 @@ router.post(
  */
 router.post(
   "/",
-  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  asyncHandler(async (request: Request, response: Response, next: NextFunction) => {
     // Force agentic mode — the entire point of this endpoint
     const params = {
-      ...req.body,
+      ...request.body,
       functionCallingEnabled: true,
       agenticLoopEnabled: true,
-      project: req.project,
-      username: req.username,
-      clientIp: req.clientIp,
-      agent: req.body.agent || req.agent || null,
+      project: request.project,
+      username: request.username,
+      clientIp: request.clientIp,
+      agent: request.body.agent || request.agent || null,
       // Multi-workspace: override the default workspace root when the user has
       // selected a non-default workspace in the Prism Client sidebar. Sources:
       //   1. x-workspace-root header (set by Prism Client's serviceHeaders.js)
       //   2. body.workspaceRoot (for server-to-server / API callers)
-      workspaceRoot: req.workspaceRoot || req.body.workspaceRoot || null,
+      workspaceRoot: request.workspaceRoot || request.body.workspaceRoot || null,
     };
 
-    if (req.query.stream !== "false") {
-      await handleSseRequest(req, res, params, handleAgent, {
+    if (request.query.stream !== "false") {
+      await handleSseRequest(request, response, params, handleAgent, {
         persistOnDisconnect: true,
       });
     } else {
-      await handleJsonRequest(req, res, next, params, handleAgent);
+      await handleJsonRequest(request, response, next, params, handleAgent);
     }
   }),
 );

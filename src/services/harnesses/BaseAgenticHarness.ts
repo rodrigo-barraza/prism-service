@@ -876,6 +876,7 @@ export default class BaseAgenticHarness {
           id: streamChunk.id || "",
         },
         status: "streaming",
+        timestamp: Date.now(),
       });
       this.maybeEmitProgress();
       return { action: "continue" };
@@ -1012,6 +1013,7 @@ export default class BaseAgenticHarness {
           id: standardToolCallId,
         },
         status: "calling",
+        timestamp: Date.now(),
       });
       WebhookEventBus.emit("request.tool_call.started", {
         requestId: this.context.requestId || null,

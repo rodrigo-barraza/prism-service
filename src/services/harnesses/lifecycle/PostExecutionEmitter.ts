@@ -134,6 +134,7 @@ export async function processToolResultMedia(
         responsesItemId: toolCall.responsesItemId,
         result: resultObject,
         durationMilliseconds: toolResult?.durationMilliseconds,
+        durationMs: toolResult?.durationMilliseconds,
       },
       status: hasError ? "error" : "done",
     });

@@ -144,8 +144,8 @@ const ENDPOINTS = {
 };
 
 // Health check (public — no auth required)
-app.get("/", (_req: Request, res: Response) => {
-  res.json({
+app.get("/", (_request: Request, response: Response) => {
+  response.json({
     name: "Prism the AI Gateway",
     version: "1.0.0",
     providers: listProviders(),
@@ -154,8 +154,8 @@ app.get("/", (_req: Request, res: Response) => {
 });
 
 // Health check (public — standard path for Docker, load balancers, portal)
-app.get("/health", (_req: Request, res: Response) => {
-  res.json({ status: "ok" });
+app.get("/health", (_request: Request, response: Response) => {
+  response.json({ status: "ok" });
 });
 
 // Admin routes
