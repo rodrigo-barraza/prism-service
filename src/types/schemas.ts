@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sanitizedStringSchema } from "@rodrigo-barraza/utilities-library";
 
 /**
  * Zod Schemas for Runtime Payload Validation
@@ -8,21 +9,7 @@ import { z } from "zod";
  * unsafe manual assertions and explicit 'any' parsing.
  */
 
-const isDisallowedIdentifier = (value: string): boolean =>
-  value.includes("\0") || value.includes("../") || value.includes("..\\");
-
-const sanitizedString = () =>
-  z
-    .string()
-    .transform((value) => value.split("\0").join(""))
-    .pipe(
-      z
-        .string()
-        .refine((value) => !isDisallowedIdentifier(value), {
-          message:
-            "String contains disallowed characters (null bytes or path traversal)",
-        }),
-    );
+const sanitizedString = () => sanitizedStringSchema;
 
 export const ToolSchemaSchema = z.object({
   name: z.string(),
