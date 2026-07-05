@@ -1362,23 +1362,123 @@ router.get(
           .aggregate(timelinePipeline)
           .toArray();
 
+        // ── Gap Filling Logic ─────────────────────────────────
+        // We iterate from sinceDate to untilDate based on granularity
+        // and fill missing buckets with zeroed data.
+
+        const getStepMs = (g: string): number => {
+          switch (g) {
+            case "1s": return 1000;
+            case "5s": return 5000;
+            case "15s": return 15000;
+            case "30s": return 30000;
+            case "1min": return 60000;
+            case "5min": return 300000;
+            case "15min": return 900000;
+            case "1hr": return 3600000;
+            case "4hr": return 14400000;
+            case "1day": return 86400000;
+            case "1week": return 604800000;
+            default: return 86400000;
+          }
+        };
+
+        const getBucketIdFromDate = (date: Date, g: string): string => {
+          const iso = date.toISOString();
+          switch (g) {
+            case "1s": return iso.slice(0, 19);
+            case "5s":
+            case "15s":
+            case "30s": {
+              const interval = parseInt(g.replace("s", ""), 10);
+              const s = Math.floor(date.getUTCSeconds() / interval) * interval;
+              return iso.slice(0, 17) + String(s).padStart(2, "0");
+            }
+            case "1min": return iso.slice(0, 16);
+            case "5min":
+            case "15min": {
+              const interval = parseInt(g.replace("min", ""), 10);
+              const m = Math.floor(date.getUTCMinutes() / interval) * interval;
+              return iso.slice(0, 14) + String(m).padStart(2, "0");
+            }
+            case "1hr": return iso.slice(0, 13);
+            case "4hr": {
+              const h = Math.floor(date.getUTCHours() / 4) * 4;
+              return iso.slice(0, 11) + String(h).padStart(2, "0");
+            }
+            case "1day": return iso.slice(0, 10);
+            case "1week": {
+              const day = date.getUTCDay();
+              const diff = (day === 0 ? 6 : day - 1);
+              const monday = new Date(date);
+              monday.setUTCDate(date.getUTCDate() - diff);
+              return monday.toISOString().slice(0, 10);
+            }
+            default: return iso.slice(0, 10);
+          }
+        };
+
+        const resultsMap = new Map(results.map((r) => [r._id, r]));
+        const filledData = [];
+        const stepMs = getStepMs(granularity);
+
+        // Align sinceDate to bucket start to avoid missing the first bucket
+        const alignedSince = new Date(sinceDate);
+        alignedSince.setUTCMilliseconds(0);
+        if (stepMs >= 1000) alignedSince.setUTCSeconds(0);
+        if (stepMs >= 60000) alignedSince.setUTCMinutes(0);
+        if (stepMs >= 3600000) alignedSince.setUTCHours(0);
+
+        // Re-calculate alignment based on granularity specifically
+        const startId = getBucketIdFromDate(alignedSince, granularity);
+        let cursor = new Date(alignedSince);
+        // Ensure the cursor starts exactly at the bucket start for sub-hourly granularities
+        if (granularity.endsWith("s")) {
+          const interval = parseInt(granularity.replace("s", ""), 10);
+          cursor.setUTCSeconds(Math.floor(cursor.getUTCSeconds() / interval) * interval);
+        } else if (granularity.endsWith("min")) {
+          const interval = parseInt(granularity.replace("min", ""), 10);
+          cursor.setUTCMinutes(Math.floor(cursor.getUTCMinutes() / interval) * interval);
+        } else if (granularity === "4hr") {
+          cursor.setUTCHours(Math.floor(cursor.getUTCHours() / 4) * 4);
+        } else if (granularity === "1week") {
+          const day = cursor.getUTCDay();
+          const diff = (day === 0 ? 6 : day - 1);
+          cursor.setUTCDate(cursor.getUTCDate() - diff);
+        }
+
+        const endLimitDate = untilDate || new Date();
+        const endId = getBucketIdFromDate(endLimitDate, granularity);
+
+        // Safety break to prevent infinite loops or huge payloads (max 1000 points)
+        let iterations = 0;
+        const MAX_ITERATIONS = 1000;
+
+        while (iterations < MAX_ITERATIONS) {
+          const bucketId = getBucketIdFromDate(cursor, granularity);
+          const result = resultsMap.get(bucketId);
+
+          filledData.push({
+            hour: bucketId,
+            requests: result ? result.requests : 0,
+            tokens: result ? result.tokens : 0,
+            cost: result ? result.cost : 0,
+            avgLatency: result && result.avgLatency ? Math.round(result.avgLatency as number) : 0,
+            successRate: result && result.requests > 0
+              ? Math.round(((result.successes as number) / (result.requests as number)) * 100)
+              : 100,
+          });
+
+          if (bucketId === endId) break;
+          cursor.setTime(cursor.getTime() + stepMs);
+          iterations++;
+        }
+
         return {
           granularity,
           defaultGranularity,
           validGranularities,
-          data: results.map((result: Record<string, unknown>) => ({
-            hour: result._id,
-            requests: result.requests,
-            tokens: result.tokens,
-            cost: result.cost,
-            avgLatency: result.avgLatency ? Math.round(result.avgLatency as number) : 0,
-            successRate:
-              (result.requests as number) > 0
-                ? Math.round(
-                    ((result.successes as number) / (result.requests as number)) * 100,
-                  )
-                : 100,
-          })),
+          data: filledData,
         };
       });
 
