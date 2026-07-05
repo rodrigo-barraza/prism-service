@@ -99,6 +99,7 @@ interface ModelResult {
   response: string | null;
   thinking: string | null;
   toolCalls?: ToolCallResult[] | null;
+  toolNames?: string[];
   passed: boolean;
   matchMode: string;
   turnCount?: number;
@@ -497,6 +498,13 @@ async function runSingleModel(
       }));
     const toolCalls = [...nativeToolCalls, ...agenticToolCalls];
     const toolCallsResult = toolCalls.length > 0 ? toolCalls : null;
+    const toolNames: string[] = toolCallsResult
+      ? [...new Set(
+          toolCallsResult
+            .map((toolCall) => toolCall.name)
+            .filter((name): name is string => Boolean(name)),
+        )]
+      : [];
     // Count agentic loop turns (each chunk of tool calls + response = 1 turn)
     // A turn is roughly: user→model→(tools)→model. Count "done" events as turn markers.
     const turnCount = events.filter((e) => e.type === "done").length || 1;
@@ -533,6 +541,7 @@ async function runSingleModel(
       response: text || null,
       thinking: thinkingText || null,
       toolCalls: toolCallsResult,
+      toolNames,
       passed,
       matchMode,
       turnCount,
