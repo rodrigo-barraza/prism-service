@@ -1,2 +1,0 @@
-⚠️  Vault unreachable (The operation was aborted due to timeout)
-No conversations found.
