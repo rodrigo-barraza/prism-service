@@ -92,8 +92,22 @@ global.fetch = vi.fn().mockImplementation(async (url, init) => {
 vi.mock('../src/wrappers/MongoWrapper.ts', () => ({
     default: {
         createClient: vi.fn().mockResolvedValue(undefined),
-        getDb: vi.fn().mockReturnValue(null),
-        getCollection: vi.fn().mockReturnValue(null),
+        getDb: vi.fn().mockReturnValue({
+            collection: () => ({
+                updateOne: vi.fn().mockResolvedValue({ acknowledged: true, matchedCount: 1 }),
+                insertOne: vi.fn().mockResolvedValue({ acknowledged: true }),
+                findOne: vi.fn().mockResolvedValue(null),
+                find: vi.fn().mockReturnValue({ toArray: async () => [] }),
+                deleteMany: vi.fn().mockResolvedValue({ acknowledged: true }),
+            })
+        }),
+        getCollection: vi.fn().mockReturnValue({
+            updateOne: vi.fn().mockResolvedValue({ acknowledged: true, matchedCount: 1 }),
+            insertOne: vi.fn().mockResolvedValue({ acknowledged: true }),
+            findOne: vi.fn().mockResolvedValue(null),
+            find: vi.fn().mockReturnValue({ toArray: async () => [] }),
+            deleteMany: vi.fn().mockResolvedValue({ acknowledged: true }),
+        }),
     },
 }));
 
