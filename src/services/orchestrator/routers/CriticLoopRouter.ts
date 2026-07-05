@@ -4,6 +4,7 @@ import type {
   OrchestratorSpawnParams,
   SubAgentResult,
 } from "../../../types/orchestrator.ts";
+import { nextGlobalSpawnIndex } from "../../../types/orchestrator.ts";
 import type {
   TopologyRouter,
   ContinueSubAgentCallback,
@@ -417,6 +418,7 @@ export class CriticLoopRouter implements TopologyRouter {
       assignedProvider: actorProvider,
       assignedModel: actorModel,
       agentIndex: 0,
+      globalSpawnIndex: nextGlobalSpawnIndex(orchestratorContext),
       teamSize: totalTeamSize,
       round: 1,
       totalRounds: maximumRounds,
@@ -487,6 +489,7 @@ export class CriticLoopRouter implements TopologyRouter {
             assignedProvider: criticProvider,
             assignedModel: criticModel,
             agentIndex: 1 + criticMemberIndex,
+            globalSpawnIndex: nextGlobalSpawnIndex(orchestratorContext),
             teamSize: totalTeamSize,
             round: roundNumber,
             totalRounds: maximumRounds,
@@ -687,6 +690,7 @@ export class CriticLoopRouter implements TopologyRouter {
           assignedProvider,
           assignedModel,
           agentIndex: actorIndex,
+          globalSpawnIndex: nextGlobalSpawnIndex(orchestratorContext),
           teamSize: actualActorCount,
           round: 1,
           totalRounds: maximumRounds,

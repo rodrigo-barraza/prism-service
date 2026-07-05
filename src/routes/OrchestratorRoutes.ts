@@ -16,6 +16,7 @@ interface SubAgentSummary {
   files?: string[];
   toolCallCount?: number;
   recursionDepth?: number;
+  globalSpawnIndex?: number;
   toolNames?: Record<string, number>;
   subAgentConversationId?: string;
 }

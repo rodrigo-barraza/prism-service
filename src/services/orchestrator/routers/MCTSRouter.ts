@@ -4,6 +4,7 @@ import type {
   OrchestratorSpawnParams,
   SubAgentResult,
 } from "../../../types/orchestrator.ts";
+import { nextGlobalSpawnIndex } from "../../../types/orchestrator.ts";
 import type {
   TopologyRouter,
   ContinueSubAgentCallback,
@@ -485,6 +486,7 @@ export class MCTSRouter implements TopologyRouter {
           assignedProvider,
           assignedModel,
           agentIndex: branchIndex,
+          globalSpawnIndex: nextGlobalSpawnIndex(orchestratorContext),
           teamSize: branchFactor,
           round: iteration,
           totalRounds: searchIterations,

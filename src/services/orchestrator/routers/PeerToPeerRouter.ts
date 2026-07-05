@@ -4,6 +4,7 @@ import type {
   OrchestratorSpawnParams,
   SubAgentResult,
 } from "../../../types/orchestrator.ts";
+import { nextGlobalSpawnIndex } from "../../../types/orchestrator.ts";
 import type {
   TopologyRouter,
   ContinueSubAgentCallback,
@@ -223,6 +224,7 @@ export class PeerToPeerRouter implements TopologyRouter {
           assignedProvider,
           assignedModel,
           agentIndex: memberIndex,
+          globalSpawnIndex: nextGlobalSpawnIndex(orchestratorContext),
           teamSize: members.length,
           round: currentRound,
           totalRounds: totalRoundsCount,
