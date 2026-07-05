@@ -9,6 +9,7 @@ import {
   parsePaginationParams,
 } from "../../utils/QueryBuilders.ts";
 import { discoverDescendantConversationIds } from "../../utils/ConversationDiscovery.ts";
+import { buildConversationGraph } from "../../services/conversation/buildConversationGraph.ts";
 import requireDb from "../../middleware/RequireDbMiddleware.ts";
 
 const conversationStatsRouter = express.Router();
@@ -207,6 +208,74 @@ conversationStatsRouter.get(
     } catch (error: unknown) {
       logger.error(
         `Admin /sessions/:id/requests error: ${getErrorMessage(error)}`,
+      );
+      next(error);
+    }
+  }),
+);
+
+// ─── GET /agent-conversations/:id/graph — pre-computed graph with layout ─
+conversationStatsRouter.get(
+  "/:id/graph",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const rootConversationId = req.params.id as string;
+      const canvasWidth = parseInt(req.query.width as string, 10) || 1600;
+      const canvasHeight = parseInt(req.query.height as string, 10) || 900;
+
+      const allConversationIds = await discoverDescendantConversationIds(
+        req.db,
+        rootConversationId,
+      );
+
+      const [conversationDocument, requests] = await Promise.all([
+        req.db
+          .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+          .findOne({ id: rootConversationId }),
+        req.db
+          .collection(REQUESTS_COLLECTION)
+          .find({
+            agentConversationId: { $in: [...allConversationIds] },
+          })
+          .project({
+            requestId: 1,
+            createdAt: 1,
+            provider: 1,
+            model: 1,
+            operation: 1,
+            success: 1,
+            inputTokens: 1,
+            outputTokens: 1,
+            estimatedCost: 1,
+            toolApiNames: 1,
+            agentConversationId: 1,
+            parentAgentConversationId: 1,
+            agent: 1,
+            username: 1,
+            status: 1,
+            duration: 1,
+            timestamp: 1,
+          })
+          .sort({ createdAt: 1 })
+          .toArray(),
+      ]);
+
+      if (!conversationDocument) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+
+      const graphData = buildConversationGraph(
+        conversationDocument as Record<string, unknown>,
+        null,
+        requests as Record<string, unknown>[],
+        canvasWidth,
+        canvasHeight,
+      );
+
+      res.json(graphData);
+    } catch (error: unknown) {
+      logger.error(
+        `Admin /agent-conversations/:id/graph error: ${getErrorMessage(error)}`,
       );
       next(error);
     }
