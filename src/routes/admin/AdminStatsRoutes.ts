@@ -1427,7 +1427,15 @@ router.get(
         alignedSince.setUTCMilliseconds(0);
         if (stepMs >= 1000) alignedSince.setUTCSeconds(0);
         if (stepMs >= 60000) alignedSince.setUTCMinutes(0);
-        if (stepMs >= 3600000) alignedSince.setUTCHours(0);
+        // For hourly or larger granularities, floor to the hour (but NOT to UTC midnight unless it's a day-long bin)
+        if (stepMs >= 3600000 && stepMs < 86400000) {
+          // If it's a 4hr bin, floor to nearest 4 hours of the day
+          const hourInterval = stepMs / 3600000;
+          alignedSince.setUTCHours(Math.floor(alignedSince.getUTCHours() / hourInterval) * hourInterval);
+        } else if (stepMs >= 86400000) {
+          // Daily or weekly, floor to midnight
+          alignedSince.setUTCHours(0);
+        }
 
         // Re-calculate alignment based on granularity specifically
         const startId = getBucketIdFromDate(alignedSince, granularity);
