@@ -108,6 +108,34 @@ async function queryContextLength(
 
 // ── vLLM ─────────────────────────────────────────────────────
 // GET /v1/models → { data: [{ id, max_model_len, ... }] }
+
+/**
+ * Pure parser for vLLM /v1/models response.
+ * Exported for unit testing.
+ */
+export function parseVllmResponse(
+  payload: any,
+  model: string,
+): number | null {
+  if (!payload || !payload.data || !Array.isArray(payload.data)) return null;
+
+  // Find the matching model entry.
+  // Priority: exact match → substring match → first entry (single-model servers)
+  const modelEntry =
+    payload.data.find((entry: any) => entry.id === model) ||
+    (model
+      ? payload.data.find(
+          (entry: any) =>
+            model.includes(entry.id) || entry.id.includes(model),
+        )
+      : undefined) ||
+    (payload.data.length === 1 ? payload.data[0] : undefined);
+
+  return typeof modelEntry?.max_model_len === "number"
+    ? modelEntry.max_model_len
+    : null;
+}
+
 async function queryVllmContextLength(
   baseUrl: string,
   model: string,
@@ -118,28 +146,8 @@ async function queryVllmContextLength(
     });
     if (!response.ok) return null;
 
-    const payload = (await response.json()) as {
-      data?: Array<{
-        id: string;
-        max_model_len?: number;
-      }>;
-    };
-
-    if (!payload.data || !Array.isArray(payload.data)) return null;
-
-    // Find the matching model entry.
-    // Priority: exact match → substring match → first entry (single-model servers)
-    const modelEntry =
-      payload.data.find((entry) => entry.id === model) ||
-      (model
-        ? payload.data.find(
-            (entry) =>
-              model.includes(entry.id) || entry.id.includes(model),
-          )
-        : undefined) ||
-      (payload.data.length === 1 ? payload.data[0] : undefined);
-
-    return modelEntry?.max_model_len ?? null;
+    const payload = await response.json();
+    return parseVllmResponse(payload, model);
   } catch {
     return null;
   }
@@ -149,6 +157,18 @@ async function queryVllmContextLength(
 // GET /props → { n_ctx: number } (top-level) or { default_params: { n_ctx: number } }
 // Requires --props flag to be enabled on llama-server.
 // Fallback: GET /v1/models (OpenAI-compat endpoint always available)
+
+/**
+ * Pure parser for llama-cpp /props response.
+ * Exported for unit testing.
+ */
+export function parseLlamaCppResponse(payload: any): number | null {
+  if (!payload) return null;
+  const contextLength =
+    payload.n_ctx ?? payload.default_params?.n_ctx ?? null;
+  return typeof contextLength === "number" ? contextLength : null;
+}
+
 async function queryLlamaCppContextLength(
   baseUrl: string,
 ): Promise<number | null> {
@@ -158,13 +178,8 @@ async function queryLlamaCppContextLength(
       signal: AbortSignal.timeout(5000),
     });
     if (propsResponse.ok) {
-      const payload = (await propsResponse.json()) as {
-        n_ctx?: number;
-        default_params?: { n_ctx?: number };
-      };
-
-      const contextLength =
-        payload.n_ctx ?? payload.default_params?.n_ctx ?? null;
+      const payload = await propsResponse.json();
+      const contextLength = parseLlamaCppResponse(payload);
       if (contextLength) return contextLength;
     }
   } catch {
@@ -179,6 +194,37 @@ async function queryLlamaCppContextLength(
 // POST /api/show { name: model } → { model_info: { ... }, parameters: "..." }
 // The context length is in model_info as a key containing "context_length"
 // or in the parameters string as "num_ctx <number>"
+
+/**
+ * Pure parser for Ollama /api/show response.
+ * Exported for unit testing.
+ */
+export function parseOllamaResponse(
+  payload: any,
+  model: string,
+): number | null {
+  if (!payload) return null;
+
+  // Check model_info for context_length keys
+  if (payload.model_info) {
+    for (const [key, value] of Object.entries(payload.model_info)) {
+      if (key.includes("context_length") && typeof value === "number") {
+        return value;
+      }
+    }
+  }
+
+  // Parse the parameters string for num_ctx
+  if (payload.parameters && typeof payload.parameters === "string") {
+    const contextMatch = payload.parameters.match(/num_ctx\s+(\d+)/);
+    if (contextMatch) {
+      return parseInt(contextMatch[1], 10);
+    }
+  }
+
+  return null;
+}
+
 async function queryOllamaContextLength(
   baseUrl: string,
   model: string,
@@ -192,29 +238,8 @@ async function queryOllamaContextLength(
     });
     if (!response.ok) return null;
 
-    const payload = (await response.json()) as {
-      model_info?: Record<string, unknown>;
-      parameters?: string;
-    };
-
-    // Check model_info for context_length keys
-    if (payload.model_info) {
-      for (const [key, value] of Object.entries(payload.model_info)) {
-        if (key.includes("context_length") && typeof value === "number") {
-          return value;
-        }
-      }
-    }
-
-    // Parse the parameters string for num_ctx
-    if (payload.parameters && typeof payload.parameters === "string") {
-      const contextMatch = payload.parameters.match(/num_ctx\s+(\d+)/);
-      if (contextMatch) {
-        return parseInt(contextMatch[1], 10);
-      }
-    }
-
-    return null;
+    const payload = await response.json();
+    return parseOllamaResponse(payload, model);
   } catch {
     return null;
   }
