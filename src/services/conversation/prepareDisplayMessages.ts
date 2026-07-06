@@ -61,18 +61,30 @@ export function prepareDisplayMessages(
 
     // Enrich assistant tool calls with results and durations
     let enrichedToolCalls = message.toolCalls;
+    const hasToolCallDurations =
+      message.toolCalls?.some(
+        (toolCall) =>
+          (toolCall as unknown as Record<string, unknown>)
+            .durationMilliseconds != null,
+      ) ?? false;
     if (
       message.toolCalls &&
       message.toolCalls.length > 0 &&
-      (hasToolResults || hasToolDurations)
+      (hasToolResults || hasToolDurations || hasToolCallDurations)
     ) {
       enrichedToolCalls = message.toolCalls.map((toolCall) => {
         const toolCallId = toolCall.id || "";
+        const resolvedDurationMilliseconds =
+          toolDurations[toolCallId] ??
+          (toolCall as unknown as Record<string, unknown>).durationMilliseconds as
+            | number
+            | undefined;
         return {
           ...toolCall,
           result: toolCall.result || toolResults[toolCallId] || null,
-          ...(toolDurations[toolCallId] != null && {
-            durationMilliseconds: toolDurations[toolCallId],
+          ...(resolvedDurationMilliseconds != null && {
+            durationMilliseconds: resolvedDurationMilliseconds,
+            durationMs: resolvedDurationMilliseconds,
           }),
         };
       });
