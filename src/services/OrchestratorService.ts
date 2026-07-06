@@ -2193,6 +2193,7 @@ export class OrchestratorService {
     const telemetry = new SubAgentTelemetryEmitter({
       subAgentId: subAgent.agentId,
       subAgentDescription: subAgent.description,
+      subAgentConversationId: subAgent.subAgentConversationId,
       parentEmit,
       parentConversationId: orchestratorContext.agentConversationId,
       recursionDepth: childRecursionDepth,

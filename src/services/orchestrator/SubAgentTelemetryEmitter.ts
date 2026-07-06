@@ -5,6 +5,7 @@
 
 import ConversationGenerationTracker from "../ConversationGenerationTracker.ts";
 import ConversationStatusRegistry from "../ConversationStatusRegistry.ts";
+import WebSocketConnectionRegistry from "../../websocket/WebSocketConnectionRegistry.ts";
 import { estimateTokens } from "./SubAgentResultBuilder.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
@@ -15,6 +16,7 @@ import type { EmitFunction, ToolCall } from "../harnesses/types.ts";
 interface SubAgentTelemetryConfig {
   subAgentId: string;
   subAgentDescription: string;
+  subAgentConversationId: string | null | undefined;
   parentEmit: EmitFunction | null | undefined;
   parentConversationId: string | null | undefined;
   recursionDepth?: number;
@@ -46,6 +48,7 @@ function isUsageRecord(value: object | null | undefined): value is Record<string
 export class SubAgentTelemetryEmitter {
   private subAgentId: string;
   private subAgentDescription: string;
+  private subAgentConversationId: string | null | undefined;
   private parentEmit: EmitFunction | null | undefined;
   private parentConversationId: string | null | undefined;
   private recursionDepth: number;
@@ -84,6 +87,7 @@ export class SubAgentTelemetryEmitter {
   constructor(config: SubAgentTelemetryConfig) {
     this.subAgentId = config.subAgentId;
     this.subAgentDescription = config.subAgentDescription;
+    this.subAgentConversationId = config.subAgentConversationId;
     this.parentEmit = config.parentEmit;
     this.parentConversationId = config.parentConversationId;
     this.recursionDepth = config.recursionDepth ?? 0;
@@ -97,6 +101,22 @@ export class SubAgentTelemetryEmitter {
    */
   updateParentEmit(emit: EmitFunction | null | undefined): void {
     this.parentEmit = emit;
+  }
+
+  /**
+   * Broadcast a raw event to any WebSocket subscribers viewing this
+   * sub-agent's conversation directly. This enables live streaming
+   * (chunks, thinking, tool activity) when the user navigates to
+   * a sub-agent conversation while it's still running.
+   */
+  private broadcastToDirectViewers(event: Record<string, unknown>): void {
+    if (!this.subAgentConversationId) return;
+    const directViewerEmit = WebSocketConnectionRegistry.getEmitFunction(
+      this.subAgentConversationId,
+    );
+    if (directViewerEmit) {
+      directViewerEmit(event as { type: string; [key: string]: unknown });
+    }
   }
 
   /** Build the generation_progress payload for the frontend. */
@@ -198,6 +218,9 @@ export class SubAgentTelemetryEmitter {
         this.output += contentString;
         const chunkCharacters = contentString.length;
 
+        // Broadcast raw chunk to any direct WebSocket viewers
+        this.broadcastToDirectViewers(event);
+
         // Reset burst counters on phase transition (thinking → generating)
         if (this.lastPhase === "thinking" && this.burstOutputCharacters > 0) {
           this.flushBurstProgress();
@@ -235,6 +258,9 @@ export class SubAgentTelemetryEmitter {
         const contentString =
           typeof event.content === "string" ? event.content : "";
         const thinkingCharacters = contentString.length;
+
+        // Broadcast raw thinking to any direct WebSocket viewers
+        this.broadcastToDirectViewers(event);
 
         // Reset burst counters on phase transition (generating → thinking)
         if (this.lastPhase === "generating" && this.burstOutputCharacters > 0) {
@@ -285,6 +311,9 @@ export class SubAgentTelemetryEmitter {
         this.resetBurst();
         this.lastPhase = null;
 
+        // Broadcast tool_execution to direct WebSocket viewers
+        this.broadcastToDirectViewers(event);
+
         if (this.parentEmit) {
           this.parentEmit({
             type: "sub_agent_tool_execution",
@@ -295,6 +324,9 @@ export class SubAgentTelemetryEmitter {
           });
         }
       } else if (event.type === "tool_output") {
+        // Broadcast tool_output to direct WebSocket viewers
+        this.broadcastToDirectViewers(event);
+
         if (this.parentEmit) {
           this.parentEmit({
             type: "sub_agent_tool_output",
@@ -306,10 +338,16 @@ export class SubAgentTelemetryEmitter {
           });
         }
       } else if (event.type === "status") {
+        // Broadcast status events to direct WebSocket viewers
+        this.broadcastToDirectViewers(event);
         this.handleStatusEvent(event);
       } else if (event.type === "done") {
+        // Broadcast done event to direct WebSocket viewers
+        this.broadcastToDirectViewers(event);
         this.handleDoneEvent(event);
       } else if (event.type === "usage_update") {
+        // Broadcast usage updates to direct WebSocket viewers
+        this.broadcastToDirectViewers(event);
         if (this.parentEmit) {
           this.parentEmit(event);
         }
@@ -322,6 +360,8 @@ export class SubAgentTelemetryEmitter {
         // grandchildren, their telemetry emitters produce sub_agent_* events.
         // Forward them directly — they are already namespaced with the
         // grandchild's subAgentId and contain all needed metadata.
+        // Also broadcast to direct viewers of this sub-agent's conversation
+        this.broadcastToDirectViewers(event);
         if (this.parentEmit) {
           this.parentEmit(event);
         }
