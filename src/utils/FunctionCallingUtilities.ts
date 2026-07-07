@@ -121,6 +121,19 @@ export function expandMessagesForFunctionCall(
       )
     : messages;
 
+  // Build a set of tool_call_ids that already have dedicated role:"tool"
+  // messages in the array. Agent conversations store tool results as separate
+  // messages rather than inline on toolCalls[].result — generating synthetic
+  // tool messages from the (undefined) result would produce duplicate responses
+  // where the model sees "null" before the real content, losing access to URLs
+  // and other data the tool actually returned.
+  const existingToolResultIds = new Set<string>();
+  for (const messageItem of filtered) {
+    if (messageItem.role === "tool" && messageItem.tool_call_id) {
+      existingToolResultIds.add(messageItem.tool_call_id);
+    }
+  }
+
   return filtered.flatMap((message) => {
     // Expand assistant messages with toolCalls into
     // [assistant(tool_calls), tool(result1), tool(result2), ...]
@@ -153,6 +166,15 @@ export function expandMessagesForFunctionCall(
         })),
       };
       const toolMessages: ExpandedMessage[] = message.toolCalls
+        .filter((toolCall: ToolCallEntry) => {
+          // Skip synthetic expansion when a real role:"tool" message with
+          // this tool_call_id already exists in the conversation. The real
+          // message will be passed through on its own iteration.
+          if (toolCall.id && existingToolResultIds.has(toolCall.id)) {
+            return false;
+          }
+          return true;
+        })
         .map((toolCall: ToolCallEntry) => {
           // Coalesce undefined → null so every tool_call in the assistant
           // message gets a matching tool-role response. Dropping tool calls

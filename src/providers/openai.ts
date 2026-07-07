@@ -57,7 +57,7 @@ function useResponsesAPI(model: string): boolean {
  * are prioritized to the front so the agent can always dynamically discover
  * and enable additional tools even when the full catalog exceeds the limit.
  */
-function truncateToolsForChatCompletions<
+export function truncateToolsForChatCompletions<
   T extends { type: string; function?: { name: string } },
 >(tools: T[]): T[] {
   if (tools.length <= OPENAI_CHAT_COMPLETIONS_MAX_TOOLS) return tools;
@@ -155,7 +155,7 @@ const OPENAI_ALLOWED_SCHEMA_KEYWORDS = new Set([
  * - Forbidden keywords (pattern, minimum, maximum, default, etc.) must be stripped
  * - `anyOf` branches must each be independently valid
  */
-function sanitizeSchemaForOpenAI(
+export function sanitizeSchemaForOpenAI(
   schema: JsonValue | undefined,
   isInsidePropertiesMap = false,
 ): JsonValue | undefined {
@@ -404,7 +404,7 @@ export function normalizeResponsesUsage(
 
   return usage;
 }
-function prepareOpenAIMessages(
+export function prepareOpenAIMessages(
   messages: OpenAIMessage[],
 ): OpenAI.Chat.ChatCompletionMessageParam[] {
   return messages.map(

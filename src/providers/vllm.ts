@@ -54,7 +54,7 @@ function requiresSystemMessageRewriteTemporaryPatch(
 }
 
 // FIXME(vllm-qwen3.6): Temporary rewriter — delete with the patch above
-function rewriteNonLeadingSystemMessages(
+export function rewriteNonLeadingSystemMessages(
   messages: InputMessage[],
   modelName: string,
 ): InputMessage[] {
