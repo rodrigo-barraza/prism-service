@@ -32,6 +32,7 @@ describe("SubAgentTelemetryEmitter", () => {
     return new SubAgentTelemetryEmitter({
       subAgentId: overrides?.subAgentId ?? "sub-agent-test-1",
       subAgentDescription: overrides?.subAgentDescription ?? "Test sub-agent",
+      subAgentConversationId: "sub-conv-test-1",
       parentEmit: (overrides?.parentEmit ?? parentEmitMock) as any,
       parentConversationId: overrides?.parentConversationId ?? "parent-conv-1",
       recursionDepth: overrides?.recursionDepth ?? 0,

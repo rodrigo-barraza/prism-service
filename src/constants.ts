@@ -383,6 +383,7 @@ export const NOTIFICATION_SOURCES = {
   ORCHESTRATOR: "orchestrator",
   TIMER: "timer",
   ASYNC_TASK: "async-task",
+  BACKGROUND_TASK: "background-task",
 } as const;
 
 // ─── Harness Constants ──────────────────────────────────────
