@@ -1,5 +1,5 @@
-import logger from "../../../utils/logger.ts";
-import type { UsageAccumulator } from "../types.ts";
+import logger from "#src/utils/logger";
+import type { UsageAccumulator } from "#src/services/harnesses/types";
 
 /**
  * KVCacheReporter — per-iteration KV cache hit rate diagnostics.

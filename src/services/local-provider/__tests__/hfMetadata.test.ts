@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-vi.mock('../../../utils/logger.ts', () => ({
+vi.mock('#src/utils/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
@@ -8,7 +8,7 @@ vi.mock('@rodrigo-barraza/utilities-library', () => ({
   formatBytes: vi.fn((bytes: number) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`),
 }));
 
-vi.mock('../nameParsers.ts', () => ({
+vi.mock('#src/services/local-provider/nameParsers', () => ({
   formatParams: vi.fn((totalParams: number) => {
     if (!totalParams) return null;
     if (totalParams >= 1_000_000_000) {
@@ -20,7 +20,7 @@ vi.mock('../nameParsers.ts', () => ({
   }),
 }));
 
-import { TYPES as CONST_TYPES, MODEL_TYPES } from "../../../constants.ts";
+import { TYPES as CONST_TYPES, MODEL_TYPES } from "#src/constants";
 
 const TYPES = {
   TEXT: CONST_TYPES.TEXT,
@@ -31,7 +31,7 @@ const TYPES = {
   EMBEDDING: CONST_TYPES.EMBEDDING,
 };
 
-vi.mock('../../../config.ts', async (importOriginal) => {
+vi.mock('#src/config', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../config.ts')>();
   return {
     ...actual,
@@ -40,7 +40,7 @@ vi.mock('../../../config.ts', async (importOriginal) => {
   };
 });
 
-import type { ModelEntry } from '../types.ts';
+import type { ModelEntry } from '#src/services/local-provider/types';
 
 function createBaseModelEntry(overrides: Partial<ModelEntry> = {}): ModelEntry {
   return {
@@ -61,7 +61,7 @@ let enrichWithHuggingFace: typeof import('../hfMetadata.ts').enrichWithHuggingFa
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  const module = await import('../hfMetadata.ts');
+  const module = await import('#src/services/local-provider/hfMetadata');
   fetchHuggingFaceMetadata = module.fetchHuggingFaceMetadata;
   enrichWithHuggingFace = module.enrichWithHuggingFace;
 });

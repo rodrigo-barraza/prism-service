@@ -20,7 +20,7 @@
  * ════════════════════════════════════════════════════════════════
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { HARNESS_IDS } from "../../src/constants.ts";
+import { HARNESS_IDS } from "#src/constants";
 import {
   discoverProviders,
   agentStreamWithRetry,

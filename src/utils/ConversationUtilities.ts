@@ -1,9 +1,9 @@
-import ConversationService from "../services/ConversationService.ts";
+import ConversationService from "#src/services/ConversationService";
 import logger from "./logger.ts";
-import type { ChatMessage } from "../types/admin.ts";
-import type { MessagePayload } from "../services/RequestLogger.ts";
-import { COLLECTIONS } from "../constants.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import type { ChatMessage } from "#src/types/admin";
+import type { MessagePayload } from "#src/services/RequestLogger";
+import { COLLECTIONS } from "#src/constants";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 // ─── Conversation persistence helpers ───────────────────────
 

@@ -1,6 +1,6 @@
 import crypto from "crypto";
-import PromptLocaleService from "../PromptLocaleService.ts";
-import SettingsService from "../SettingsService.ts";
+import PromptLocaleService from "#src/services/PromptLocaleService";
+import SettingsService from "#src/services/SettingsService";
 import StatFactory, { type StatInstance } from "./StatFactory.ts";
 import {
   SOMATIC_KEYWORDS,
@@ -14,12 +14,12 @@ import {
   EmotionalStateEngine,
   type SerializedEmotionalState,
 } from "./EmotionalStateEngine.ts";
-import MongoWrapper from "../../wrappers/MongoWrapper.ts";
-import RequestLogger from "../RequestLogger.ts";
-import { MONGO_DB_NAME } from "../../../config.ts";
-import { COLLECTIONS, SOMATIC, LOG_PREVIEW } from "../../constants.ts";
-import logger from "../../utils/logger.ts";
-import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import RequestLogger from "#src/services/RequestLogger";
+import { MONGO_DB_NAME } from "#config";
+import { COLLECTIONS, SOMATIC, LOG_PREVIEW } from "#src/constants";
+import logger from "#src/utils/logger";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 interface SomaticStatEntry {
   level: number;
@@ -368,7 +368,7 @@ async function resolveEmotionModel(): Promise<{
   model: string;
 } | null> {
   try {
-    const SettingsService = (await import("../SettingsService.ts")).default;
+    const SettingsService = (await import("#src/services/SettingsService")).default;
     return await SettingsService.getSomaticModelConfig();
   } catch {
     return null;
@@ -414,7 +414,7 @@ async function analyzeEmotionFromText(
   const emotionModel = await resolveEmotionModel();
   if (!emotionModel) return "neutral";
 
-  const { getProvider } = await import("../../providers/index.ts");
+  const { getProvider } = await import("#src/providers/index");
   const { provider: providerName, model: modelName } = emotionModel;
   const provider = getProvider(providerName);
   const classificationPrompt = EMOTION_CLASSIFICATION_PROMPT(

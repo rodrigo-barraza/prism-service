@@ -1,13 +1,13 @@
 import "./setup.ts";
 import { describe, it, expect, beforeAll } from "vitest";
-import ToolOrchestratorService from "../src/services/ToolOrchestratorService.ts";
-import InternalToolRegistry from "../src/services/local-tools/InternalToolRegistry.ts";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
+import InternalToolRegistry from "#src/services/local-tools/InternalToolRegistry";
 import {
   extractDiscoverableDomains,
   extractDomainKeywords,
   buildToolPolicy,
-} from "../src/services/personas/utils.ts";
-import { ToolDocFormatter } from "../src/services/system-prompt/ToolDocFormatter.ts";
+} from "#src/services/personas/utils";
+import { ToolDocFormatter } from "#src/services/system-prompt/ToolDocFormatter";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 describe("Dynamic Tool Discovery & Prompt Injection", () => {

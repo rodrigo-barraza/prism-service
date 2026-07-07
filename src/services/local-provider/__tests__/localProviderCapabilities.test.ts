@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('../../../config.ts', () => ({
+vi.mock('#src/config', () => ({
   MODALITY_TYPES: {
     TEXT: 'text',
     IMAGE: 'image',
@@ -19,8 +19,8 @@ vi.mock('../../../config.ts', () => ({
   },
 }));
 
-import { matchesAny, detectCapabilities } from '../detectCapabilities.ts';
-import { TYPES, MODEL_TYPES } from "../../../constants.ts";
+import { matchesAny, detectCapabilities } from '#src/services/local-provider/detectCapabilities';
+import { TYPES, MODEL_TYPES } from "#src/constants";
 
 describe('detectCapabilities', () => {
   describe('matchesAny', () => {

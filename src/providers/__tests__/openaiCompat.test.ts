@@ -8,11 +8,11 @@ import {
   processNonStreamingResponse,
   EMPTY_USAGE,
   MEDIA_STRATEGIES,
-} from '../../utils/openai-compat.ts';
-import type { InputMessage } from '../../utils/openai-compat.ts';
-import { TYPES } from "../../constants.ts";
+} from '#src/utils/openai-compat';
+import type { InputMessage } from '#src/utils/openai-compat';
+import { TYPES } from "#src/constants";
 
-vi.mock('../../utils/logger.ts', () => ({
+vi.mock('#src/utils/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 

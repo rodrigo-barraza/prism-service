@@ -18,7 +18,7 @@ import {
   getCollection,
   disconnectDatabase,
 } from "@rodrigo-barraza/service-library/mongo";
-import logger from "../utils/logger.ts";
+import logger from "#src/utils/logger";
 
 const MongoWrapper = {
   async createClient(name: string, uri: string) {

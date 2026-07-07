@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import supertest from 'supertest';
 import { app, MOCK_GENERATE_TEXT, MOCK_GENERATE_TEXT_STREAM } from './setup.ts';
-import agentRouter from '../src/routes/AgentRoutes.ts';
-import { PROVIDERS } from '../src/constants.ts';
-import { ProviderError } from '../src/utils/errors.ts';
+import agentRouter from '#src/routes/AgentRoutes';
+import { PROVIDERS } from '#src/constants';
+import { ProviderError } from '#src/utils/errors';
 
 // Mount the agent router
 app.use('/agent', agentRouter);
 
 // Mock AgenticLoopService
-vi.mock('../src/services/AgenticLoopService.ts', () => {
+vi.mock('#src/services/AgenticLoopService', () => {
   return {
     default: {
       runAgenticLoop: vi.fn().mockImplementation(async (opts) => {

@@ -1,39 +1,39 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import supertest from 'supertest';
 import { app } from './setup.ts';
-import adminConversationRouter from '../src/routes/admin/AdminConversationRoutes.ts';
-import MongoWrapper from '../src/wrappers/MongoWrapper.ts';
-import { COLLECTIONS } from '../src/constants.ts';
+import adminConversationRouter from '#src/routes/admin/AdminConversationRoutes';
+import MongoWrapper from '#src/wrappers/MongoWrapper';
+import { COLLECTIONS } from '#src/constants';
 
 // Mount the admin conversations router at /admin/conversations
 app.use('/admin/conversations', adminConversationRouter);
 
 // Mock services that are used by the admin routes
-vi.mock('../src/services/ToolOrchestratorService.ts', () => ({
+vi.mock('#src/services/ToolOrchestratorService', () => ({
   default: {
     getWorkspaceRoots: vi.fn().mockReturnValue(['/home/rodrigo/development']),
   },
 }));
 
-vi.mock('../src/services/AgentPersonaRegistry.ts', () => ({
+vi.mock('#src/services/AgentPersonaRegistry', () => ({
   default: {
     list: vi.fn().mockReturnValue([{ id: 'OMNI', name: 'Omni' }]),
   },
 }));
 
-vi.mock('../src/services/BenchmarkService.ts', () => ({
+vi.mock('#src/services/BenchmarkService', () => ({
   default: {
     activeGenerationCount: 0,
   },
 }));
 
-vi.mock('../src/services/ActiveGenerationTracker.ts', () => ({
+vi.mock('#src/services/ActiveGenerationTracker', () => ({
   default: {
     count: 0,
   },
 }));
 
-vi.mock('../src/services/ChangeStreamService.ts', () => ({
+vi.mock('#src/services/ChangeStreamService', () => ({
   default: {
     available: false,
     subscribe: vi.fn(),

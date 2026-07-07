@@ -18,34 +18,34 @@ import {
   getParameterDescriptors,
   resolveRecommendedDefault,
   getModelByName,
-} from "../config.ts";
-import { estimateTokens } from "../utils/CostCalculator.ts";
+} from "#src/config";
+import { estimateTokens } from "#src/utils/CostCalculator";
 import {
   OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
   DEFAULT_MAX_INPUT_TOKENS,
-} from "../constants/TokenBudgetDefaults.ts";
-import type { ModelOptionEntry } from "../config.ts";
-import { listInstances } from "../providers/instance-registry.ts";
-import { ARENA_SCORES } from "../arrays.ts";
-import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
-import AgentPersonaRegistry from "../services/AgentPersonaRegistry.ts";
-import SettingsService from "../services/SettingsService.ts";
-import SystemPromptAssembler from "../services/system-prompt/index.ts";
-import rateLimitStore from "../services/RateLimitStore.ts";
-import MinioWrapper from "../wrappers/MinioWrapper.ts";
-import LocalProviderGateway from "../services/local-provider/index.ts";
-import { THINKING_PATTERNS } from "../services/local-provider/constants.ts";
-import { ORCHESTRATOR_ONLY_TOOLS } from "../services/OrchestratorPrompt.ts";
-import { resolveToolEntriesToSet } from "../utils/resolveToolEntriesToSet.ts";
+} from "#src/constants/TokenBudgetDefaults";
+import type { ModelOptionEntry } from "#src/config";
+import { listInstances } from "#src/providers/instance-registry";
+import { ARENA_SCORES } from "#src/arrays";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
+import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
+import SettingsService from "#src/services/SettingsService";
+import SystemPromptAssembler from "#src/services/system-prompt/index";
+import rateLimitStore from "#src/services/RateLimitStore";
+import MinioWrapper from "#src/wrappers/MinioWrapper";
+import LocalProviderGateway from "#src/services/local-provider/index";
+import { THINKING_PATTERNS } from "#src/services/local-provider/constants";
+import { ORCHESTRATOR_ONLY_TOOLS } from "#src/services/OrchestratorPrompt";
+import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
-import PromptLocaleService from "../services/PromptLocaleService.ts";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 import {
   OPENAI_API_KEY,
   ANTHROPIC_API_KEY,
   GOOGLE_CLOUD_GEMINI_API_KEY,
   ELEVENLABS_API_KEY,
   INWORLD_BASIC,
-} from "../../config.ts";
+} from "#config";
 
 const router = express.Router();
 

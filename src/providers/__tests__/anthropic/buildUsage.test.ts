@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { buildUsage } from "../../anthropic.ts";
+import { buildUsage } from "#src/providers/anthropic";
 
 describe("buildUsage", () => {
   it("maps all standard usage fields correctly", () => {

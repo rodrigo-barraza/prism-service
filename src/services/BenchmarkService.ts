@@ -2,16 +2,16 @@ import { sleep, roundMilliseconds } from "@rodrigo-barraza/utilities-library";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 // ─── Custom LLM Accuracy Benchmarking ───────────────────────
 import crypto from "crypto";
-import { handleConversation, handleAgent } from "../routes/ChatRoutes.ts";
-import { MODELS, MODEL_TYPES, getModelByName } from "../config.ts";
-import { getProvider } from "../providers/index.ts";
-import { isInstance } from "../providers/instance-registry.ts";
-import MongoWrapper from "../wrappers/MongoWrapper.ts";
-import { MONGO_DB_NAME } from "../../config.ts";
-import logger from "../utils/logger.ts";
-import { COLLECTIONS, BENCHMARK, BENCHMARK_MATCH_MODES } from "../constants.ts";
-import type { SseEvent } from "../types/SseTypes.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { handleConversation, handleAgent } from "#src/routes/ChatRoutes";
+import { MODELS, MODEL_TYPES, getModelByName } from "#src/config";
+import { getProvider } from "#src/providers/index";
+import { isInstance } from "#src/providers/instance-registry";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import { MONGO_DB_NAME } from "#config";
+import logger from "#src/utils/logger";
+import { COLLECTIONS, BENCHMARK, BENCHMARK_MATCH_MODES } from "#src/constants";
+import type { SseEvent } from "#src/types/SseTypes";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 const BENCHMARKS_COLLECTION = COLLECTIONS.BENCHMARKS;
 const RUNS_COLLECTION = COLLECTIONS.BENCHMARK_RUNS;

@@ -15,7 +15,7 @@ vi.mock('@rodrigo-barraza/service-library/mongo', () => ({
   disconnectDatabase: mockDisconnectDatabase,
 }));
 
-vi.mock('../../utils/logger.ts', () => ({
+vi.mock('#src/utils/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
@@ -23,7 +23,7 @@ let MongoWrapper: typeof import('../MongoWrapper.ts').default;
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  const module = await import('../MongoWrapper.ts');
+  const module = await import('#src/wrappers/MongoWrapper');
   MongoWrapper = module.default;
 });
 

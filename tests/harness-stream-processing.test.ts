@@ -15,8 +15,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ── Setup: must import after vi.mock calls ──────────────────────
 import './setup.ts';
 
-import AgenticLoopState from '../src/services/AgenticLoopState.ts';
-import { createUsageAccumulator } from '../src/utils/CostCalculator.ts';
+import AgenticLoopState from '#src/services/AgenticLoopState';
+import { createUsageAccumulator } from '#src/utils/CostCalculator';
 import type {
   PassState,
   StreamChunk,
@@ -24,7 +24,7 @@ import type {
   ResolvedTools,
   ToolCall,
   ConversationMessage,
-} from '../src/services/harnesses/types.ts';
+} from '#src/services/harnesses/types';
 
 // ── Test helpers ────────────────────────────────────────────────
 
@@ -59,7 +59,7 @@ describe('BaseAgenticHarness processStreamChunk — adversarial chunks', () => {
   let BaseAgenticHarness: any;
 
   beforeEach(async () => {
-    const module = await import('../src/services/harnesses/BaseAgenticHarness.ts');
+    const module = await import('#src/services/harnesses/BaseAgenticHarness');
     BaseAgenticHarness = module.default;
   });
 
@@ -421,7 +421,7 @@ describe('BaseAgenticHarness consumeStream — abort and error recovery', () => 
   let BaseAgenticHarness: any;
 
   beforeEach(async () => {
-    const module = await import('../src/services/harnesses/BaseAgenticHarness.ts');
+    const module = await import('#src/services/harnesses/BaseAgenticHarness');
     BaseAgenticHarness = module.default;
   });
 
@@ -515,7 +515,7 @@ describe('Display segment tracking — interleaved thinking/text/tools', () => {
   let BaseAgenticHarness: any;
 
   beforeEach(async () => {
-    const module = await import('../src/services/harnesses/BaseAgenticHarness.ts');
+    const module = await import('#src/services/harnesses/BaseAgenticHarness');
     BaseAgenticHarness = module.default;
   });
 
@@ -611,14 +611,14 @@ describe('AgenticLoopState concurrent operations — idempotency', () => {
 // 6. Dynamic Tool Activation — System Prompt Documentation Sync
 // ────────────────────────────────────────────────────────────────
 
-import ToolContext from '../src/services/ToolContext.ts';
-import { TYPES } from "../src/constants.ts";
+import ToolContext from '#src/services/ToolContext';
+import { TYPES } from "#src/constants";
 
 describe('checkAndApplyToolSetChanges — dynamic tool activation doc sync', () => {
   let BaseAgenticHarness: any;
 
   beforeEach(async () => {
-    const module = await import('../src/services/harnesses/BaseAgenticHarness.ts');
+    const module = await import('#src/services/harnesses/BaseAgenticHarness');
     BaseAgenticHarness = module.default;
   });
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
-import { PROVIDERS } from "../src/constants.ts";
+import { PROVIDERS } from "#src/constants";
 import { app, MOCK_GENERATE_SPEECH } from "./setup.ts";
 
 describe("POST /text-to-audio", () => {

@@ -1,8 +1,8 @@
-import { pendingApprovals } from "../../ApprovalRegistry.ts";
+import { pendingApprovals } from "#src/services/ApprovalRegistry";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
-import type { ToolCall, AgenticContext } from "../types.ts";
-import type AutoApprovalEngine from "../../AutoApprovalEngine.ts";
-import { HARNESS } from "../../../constants.ts";
+import type { ToolCall, AgenticContext } from "#src/services/harnesses/types";
+import type AutoApprovalEngine from "#src/services/AutoApprovalEngine";
+import { HARNESS } from "#src/constants";
 
 /**
  * ApprovalGate — extracted approval gating logic.

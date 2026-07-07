@@ -9,7 +9,7 @@ vi.mock('@rodrigo-barraza/utilities-library', () => ({
   },
 }));
 
-vi.mock('../../utils/CostCalculator.ts', () => ({
+vi.mock('#src/utils/CostCalculator', () => ({
   estimateTokens: (text: string) => Math.ceil((text || '').length / 4),
 }));
 
@@ -18,8 +18,8 @@ import {
   BATCH_MAX_CLUSTERS,
   BATCH_MAX_STALE,
   BATCH_INPUT_TOKEN_BUDGET,
-} from '../memory/BatchBuilder.ts';
-import type { MemoryDoc } from '../memory/types.ts';
+} from '#src/services/memory/BatchBuilder';
+import type { MemoryDoc } from '#src/services/memory/types';
 
 function createMemory(id: string, overrides: Partial<MemoryDoc> = {}): MemoryDoc {
   return {

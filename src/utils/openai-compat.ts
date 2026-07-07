@@ -10,8 +10,8 @@ import { ThinkTagParser, extractThinkTags } from "./ThinkTagParser.ts";
 import type {
   ProviderOptions,
   ChatMessageContent,
-} from "../types/ProviderTypes.ts";
-import type { TokenUsage, ToolCallEntry } from "../types/admin.ts";
+} from "#src/types/ProviderTypes";
+import type { TokenUsage, ToolCallEntry } from "#src/types/admin";
 
 // ─── Streaming fetch dispatcher ─────────────────────────────
 // Node.js's built-in fetch (powered by undici) defaults bodyTimeout to

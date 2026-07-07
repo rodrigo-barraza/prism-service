@@ -3,9 +3,9 @@
 // Extracted from MemoryConsolidationService.ts
 
 import { daysSinceIso } from "@rodrigo-barraza/utilities-library";
-import PromptLocaleService from "../PromptLocaleService.ts";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 import type { MemoryDoc, PartitionMeta } from "./types.ts";
-import { LOG_PREVIEW } from "../../constants.ts";
+import { LOG_PREVIEW } from "#src/constants";
 
 function daysSince(isoDate: string) {
   return daysSinceIso(isoDate);

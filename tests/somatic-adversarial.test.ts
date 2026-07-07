@@ -3,7 +3,7 @@ import { MOCK_GENERATE_TEXT } from './setup.ts';
 
 // ── Import under test ────────────────────────────────────────────
 
-const { default: SomaticStateService } = await import('../src/services/somatic/SomaticStateService.ts');
+const { default: SomaticStateService } = await import('#src/services/somatic/SomaticStateService');
 
 describe('Somatic State Flow Adversarial Tests', () => {
   beforeEach(async () => {
@@ -150,7 +150,7 @@ describe('Somatic State Flow Adversarial Tests', () => {
 
       // Note: MongoDB is mocked globally in setup.ts so we don't have to worry about connection errors
       // unless we want to simulate db query failures by mocking the collection findOne to reject.
-      const MongoWrapper = (await import('../src/wrappers/MongoWrapper.ts')).default;
+      const MongoWrapper = (await import('#src/wrappers/MongoWrapper')).default;
       const getCollectionSpy = vi.spyOn(MongoWrapper, 'getCollection').mockImplementation(() => {
         throw new Error('Database connection lost');
       });

@@ -1,4 +1,4 @@
-import type { ChatMessage } from "../../types/admin.ts";
+import type { ChatMessage } from "#src/types/admin";
 import type { ToolCallPayload } from "./types.ts";
 
 /**

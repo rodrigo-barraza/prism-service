@@ -3,9 +3,9 @@ import "./setup.ts";
 import openaiProvider, {
   normalizeResponsesUsage,
   prepareResponsesInput,
-} from "../src/providers/openai.ts";
-import { OpenAIMessage } from "../src/providers/openai.ts";
-import { PROVIDERS, TYPES, MESSAGE_ROLES } from "../src/constants.ts";
+} from "#src/providers/openai";
+import { OpenAIMessage } from "#src/providers/openai";
+import { PROVIDERS, TYPES, MESSAGE_ROLES } from "#src/constants";
 
 const mockChatCreate = vi.fn();
 const mockResponsesCreate = vi.fn();

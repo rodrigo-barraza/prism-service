@@ -1,15 +1,15 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { sleep } from "@rodrigo-barraza/utilities-library";
 import express, { Request, Response, NextFunction } from "express";
-import { getProvider } from "../providers/index.ts";
-import type { LmStudioProvider } from "../providers/lm-studio.ts";
-import { isInstance } from "../providers/instance-registry.ts";
-import { PROVIDERS } from "../constants.ts";
-import logger from "../utils/logger.ts";
-import LocalProviderGateway from "../services/local-provider/index.ts";
-import { initSseResponse } from "../utils/SseUtilities.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import type { ProviderOptions } from "../types/provider.ts";
+import { getProvider } from "#src/providers/index";
+import type { LmStudioProvider } from "#src/providers/lm-studio";
+import { isInstance } from "#src/providers/instance-registry";
+import { PROVIDERS } from "#src/constants";
+import logger from "#src/utils/logger";
+import LocalProviderGateway from "#src/services/local-provider/index";
+import { initSseResponse } from "#src/utils/SseUtilities";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import type { ProviderOptions } from "#src/types/provider";
 const router = express.Router();
 /** Resolve instance ID from request — supports ?instance=lm-studio-2 */
 function resolveInstanceId(req: Request) {

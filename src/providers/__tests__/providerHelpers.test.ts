@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { getProvider, listProviders } from "../index.ts";
-import { PROVIDERS, TYPES } from "../../constants.ts";
-import { convertToolsToGoogle } from "../google.ts";
+import { getProvider, listProviders } from "#src/providers/index";
+import { PROVIDERS, TYPES } from "#src/constants";
+import { convertToolsToGoogle } from "#src/providers/google";
 import {
   normalizeResponsesUsage,
   prepareResponsesInput,
-} from "../openai.ts";
+} from "#src/providers/openai";
 
 describe("Provider Helpers and Adapters Suite", () => {
   // ── 1. Provider Registry Tests ──────────────────────────────────────

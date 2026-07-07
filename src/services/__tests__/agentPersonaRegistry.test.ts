@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-vi.mock('../CustomAgentService.ts', () => {
+vi.mock('#src/services/CustomAgentService', () => {
   return {
     default: {
       list: vi.fn(),
@@ -8,8 +8,8 @@ vi.mock('../CustomAgentService.ts', () => {
   };
 });
 
-import AgentPersonaRegistry from '../AgentPersonaRegistry.ts';
-import CustomAgentService from '../CustomAgentService.ts';
+import AgentPersonaRegistry from '#src/services/AgentPersonaRegistry';
+import CustomAgentService from '#src/services/CustomAgentService';
 import { AGENT_IDS } from '@rodrigo-barraza/utilities-library/taxonomy';
 
 describe('AgentPersonaRegistry Unit Tests', () => {

@@ -12,7 +12,7 @@
 import { describe, it, expect } from "vitest";
 import request from "supertest";
 import { app } from "./setup.ts";
-import { PROVIDERS, MODEL_TYPES, TYPES } from "../src/constants.ts";
+import { PROVIDERS, MODEL_TYPES, TYPES } from "#src/constants";
 
 // ═══════════════════════════════════════════════════════════════
 // Pattern detection — verify the extracted constants work correctly

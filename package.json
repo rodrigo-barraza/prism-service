@@ -4,8 +4,18 @@
   "description": "Prism the AI Gateway — a centralized backend for routing requests to multiple AI providers",
   "type": "module",
   "main": "dist/boot.js",
+  "imports": {
+    "#src/*": {
+      "production": "./dist/src/*.js",
+      "import": "./src/*.ts"
+    },
+    "#config": {
+      "production": "./dist/config.js",
+      "import": "./config.ts"
+    }
+  },
   "scripts": {
-    "start": "node dist/boot.js",
+    "start": "node --conditions=production dist/boot.js",
     "dev": "tsx watch boot.ts",
     "build": "rm -rf dist && tsc && mkdir -p dist/src/locales && rsync -a --exclude='__tests__' src/locales/ dist/src/locales/",
     "typecheck": "tsc --noEmit",

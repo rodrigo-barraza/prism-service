@@ -6,8 +6,8 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { buildTools } from "../../anthropic.ts";
-import type { ProviderOptions } from "../../../types/ProviderTypes.ts";
+import { buildTools } from "#src/providers/anthropic";
+import type { ProviderOptions } from "#src/types/ProviderTypes";
 
 // ── Server Tools ─────────────────────────────────────────────
 describe("buildTools — server tools", () => {

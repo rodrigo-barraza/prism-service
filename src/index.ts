@@ -20,7 +20,7 @@ import {
   MINIO_ACCESS_KEY,
   MINIO_SECRET_KEY,
   MINIO_BUCKET_NAME,
-} from "../config.ts";
+} from "#config";
 import MongoWrapper from "./wrappers/MongoWrapper.ts";
 import MinioWrapper from "./wrappers/MinioWrapper.ts";
 import ChangeStreamService from "./services/ChangeStreamService.ts";

@@ -1,15 +1,15 @@
-import logger from "../../utils/logger.ts";
-import { SYSTEM_STATUSES, COLLECTIONS, ORCHESTRATOR } from "../../constants.ts";
+import logger from "#src/utils/logger";
+import { SYSTEM_STATUSES, COLLECTIONS, ORCHESTRATOR } from "#src/constants";
 import { GitWorktreeHelper } from "./GitWorktreeHelper.ts";
 import { buildSubAgentResult } from "./SubAgentResultBuilder.ts";
-import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
-import MongoWrapper from "../../wrappers/MongoWrapper.ts";
-import { MONGO_DB_NAME } from "../../../config.ts";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import { MONGO_DB_NAME } from "#config";
 import type {
   SubAgentState,
   SubAgentResult,
   SubAgentStopResult,
-} from "../../types/orchestrator.ts";
+} from "#src/types/orchestrator";
 
 /**
  * Service for managing the lifecycle of sub-agents (stopping, aborting, output retrieval).

@@ -10,16 +10,16 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 
-import type { ConversationMessage as HarnessBasePayload } from "../types.ts";
-import type { MessagePayload } from "../../conversation/types.ts";
+import type { ConversationMessage as HarnessBasePayload } from "#src/services/harnesses/types";
+import type { MessagePayload } from "#src/services/conversation/types";
 
-import { injectSystemPromptContext } from "../../system-prompt/index.ts";
+import { injectSystemPromptContext } from "#src/services/system-prompt/index";
 import {
   computeNewTurnMessages as computeNewTurnMessagesReal,
   sanitizeMessagesForPersistence,
   swapMessageContent,
-} from "../lifecycle/Finalizer.ts";
-import { PROMPT_DELIMITERS } from "../../../constants.ts";
+} from "#src/services/harnesses/lifecycle/Finalizer";
+import { PROMPT_DELIMITERS } from "#src/constants";
 
 interface HarnessPayload
   extends

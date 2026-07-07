@@ -1,29 +1,29 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { app } from './setup.ts';
 import request from 'supertest';
-import MongoWrapper from '../src/wrappers/MongoWrapper.ts';
-import BenchmarkService from '../src/services/BenchmarkService.ts';
-import OrchestratorService from '../src/services/OrchestratorService.ts';
-import AgenticLoopService from '../src/services/AgenticLoopService.ts';
-import FileService from '../src/services/FileService.ts';
-import SettingsService from '../src/services/SettingsService.ts';
-import * as providersModule from '../src/providers/index.ts';
-import { errorHandler } from '../src/utils/errors.ts';
-import * as instanceRegistryModule from '../src/providers/instance-registry.ts';
-import LocalProviderGateway from '../src/services/local-provider/index.ts';
+import MongoWrapper from '#src/wrappers/MongoWrapper';
+import BenchmarkService from '#src/services/BenchmarkService';
+import OrchestratorService from '#src/services/OrchestratorService';
+import AgenticLoopService from '#src/services/AgenticLoopService';
+import FileService from '#src/services/FileService';
+import SettingsService from '#src/services/SettingsService';
+import * as providersModule from '#src/providers/index';
+import { errorHandler } from '#src/utils/errors';
+import * as instanceRegistryModule from '#src/providers/instance-registry';
+import LocalProviderGateway from '#src/services/local-provider/index';
 
 // Import the infrastructure routers
-import benchmarkRouter from '../src/routes/BenchmarkRoutes.ts';
-import lmStudioRouter from '../src/routes/LmStudioRoutes.ts';
-import vramBenchmarksRouter from '../src/routes/VramBenchmarksRoutes.ts';
-import orchestratorRouter from '../src/routes/OrchestratorRoutes.ts';
-import conversationExecutionRouter from '../src/routes/ConversationExecutionRoute.ts';
-import favoritesRouter from '../src/routes/FavoritesRoutes.ts';
-import filesRouter from '../src/routes/FilesRoutes.ts';
-import statsRouter from '../src/routes/StatsRoutes.ts';
-import settingsRouter from '../src/routes/SettingsRoutes.ts';
-import ollamaRouter from '../src/routes/OllamaRoutes.ts';
-import { PROVIDERS, COLLECTIONS } from "../src/constants.ts";
+import benchmarkRouter from '#src/routes/BenchmarkRoutes';
+import lmStudioRouter from '#src/routes/LmStudioRoutes';
+import vramBenchmarksRouter from '#src/routes/VramBenchmarksRoutes';
+import orchestratorRouter from '#src/routes/OrchestratorRoutes';
+import conversationExecutionRouter from '#src/routes/ConversationExecutionRoute';
+import favoritesRouter from '#src/routes/FavoritesRoutes';
+import filesRouter from '#src/routes/FilesRoutes';
+import statsRouter from '#src/routes/StatsRoutes';
+import settingsRouter from '#src/routes/SettingsRoutes';
+import ollamaRouter from '#src/routes/OllamaRoutes';
+import { PROVIDERS, COLLECTIONS } from "#src/constants";
 
 // Mount routers on app
 app.use('/benchmark', benchmarkRouter);
@@ -44,7 +44,7 @@ app.use((error: any, req: any, res: any, next: any) => {
 });
 
 // Mock services
-vi.mock('../src/services/BenchmarkService.ts', () => ({
+vi.mock('#src/services/BenchmarkService', () => ({
   default: {
     list: vi.fn().mockResolvedValue([{ id: 'bench-1', name: 'Test Benchmark' }]),
     getLatestRun: vi.fn().mockResolvedValue({ id: 'run-1', summary: { totalCost: 0.01 } }),
@@ -73,12 +73,12 @@ const { mockOrchestratorService } = vi.hoisted(() => ({
   }
 }));
 
-vi.mock('../src/services/OrchestratorService.ts', () => ({
+vi.mock('#src/services/OrchestratorService', () => ({
   default: mockOrchestratorService,
   OrchestratorService: mockOrchestratorService
 }));
 
-vi.mock('../src/services/AgenticLoopService.ts', () => ({
+vi.mock('#src/services/AgenticLoopService', () => ({
   default: {
     resolveApproval: vi.fn().mockReturnValue(true),
     resolveUserQuestion: vi.fn().mockReturnValue(true),
@@ -89,7 +89,7 @@ vi.mock('../src/services/AgenticLoopService.ts', () => ({
   }
 }));
 
-vi.mock('../src/services/FileService.ts', () => ({
+vi.mock('#src/services/FileService', () => ({
   default: {
     uploadFile: vi.fn().mockResolvedValue({ ref: 'file-123', size: 1000, contentType: 'image/png' }),
     getFile: vi.fn().mockResolvedValue({

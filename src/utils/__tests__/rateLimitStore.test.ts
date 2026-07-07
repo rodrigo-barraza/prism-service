@@ -6,11 +6,11 @@
  * the admin sees stale or incorrect limits.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { PROVIDERS } from "../../constants.ts";
+import { PROVIDERS } from "#src/constants";
 
 // Import the singleton — tests exercise its public interface
 const { default: rateLimitStore } = await import(
-  "../../services/RateLimitStore.ts"
+  "#src/services/RateLimitStore"
 );
 
 // ═══════════════════════════════════════════════════════════════

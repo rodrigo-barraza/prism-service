@@ -5,7 +5,7 @@
 
 import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
 import type { MemoryDoc } from "./types.ts";
-import { MEMORY } from "../../constants.ts";
+import { MEMORY } from "#src/constants";
 
 /** Cosine similarity above which two memories are clustered together */
 export const CLUSTER_THRESHOLD = MEMORY.CLUSTER_THRESHOLD;

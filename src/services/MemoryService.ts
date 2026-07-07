@@ -4,18 +4,18 @@ import {
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { daysSinceIso } from "@rodrigo-barraza/utilities-library";
 import crypto from "crypto";
-import MongoWrapper from "../wrappers/MongoWrapper.ts";
-import { getProvider } from "../providers/index.ts";
-import { MONGO_DB_NAME } from "../../config.ts";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import { getProvider } from "#src/providers/index";
+import { MONGO_DB_NAME } from "#config";
 import EmbeddingService from "./EmbeddingService.ts";
 import PromptLocaleService from "./PromptLocaleService.ts";
 import RequestLogger from "./RequestLogger.ts";
-import logger from "../utils/logger.ts";
+import logger from "#src/utils/logger";
 import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
 import { parseJsonFromLargeLanguageModelResponse } from "@rodrigo-barraza/utilities-library";
-import { COLLECTIONS, MEMORY, LOG_PREVIEW } from "../constants.ts";
+import { COLLECTIONS, MEMORY, LOG_PREVIEW } from "#src/constants";
 import SettingsService from "./SettingsService.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 // ─── Constants ────────────────────────────────────────────────────────────────
 /** Single unified collection for all agent memories. */
 const COLLECTION = COLLECTIONS.MEMORIES;

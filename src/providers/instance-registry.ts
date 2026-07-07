@@ -1,13 +1,13 @@
 // ─── Multi-Instance Local Provider Support ──────────────────
 
-import logger from "../utils/logger.ts";
+import logger from "#src/utils/logger";
 import {
   PROVIDER_LM_STUDIO,
   PROVIDER_VLLM,
   PROVIDER_OLLAMA,
   PROVIDER_LLAMA_CPP,
-} from "../../config.ts";
-import { PROVIDERS } from "../constants.ts";
+} from "#config";
+import { PROVIDERS } from "#src/constants";
 
 // Import factories
 import { createLmStudioProvider } from "./lm-studio.ts";
@@ -17,7 +17,7 @@ import { createLlamaCppProvider } from "./llama-cpp.ts";
 import {
   InstanceEntry,
   ProviderInstanceConfig,
-} from "../types/ProviderTypes.ts";
+} from "#src/types/ProviderTypes";
 
 // ── Factory map ─────────────────────────────────────────────
 const FACTORIES = {

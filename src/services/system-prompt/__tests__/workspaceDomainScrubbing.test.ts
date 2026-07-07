@@ -12,7 +12,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../../PromptLocaleService.ts", () => ({
+vi.mock("#src/services/PromptLocaleService", () => ({
   default: {
     get: vi.fn((_locale: string, key: string) => {
       if (key === "system-prompt.requiredLabel") return " (required)";
@@ -21,7 +21,7 @@ vi.mock("../../PromptLocaleService.ts", () => ({
   },
 }));
 
-vi.mock("../../AgentPersonaRegistry.ts", () => ({
+vi.mock("#src/services/AgentPersonaRegistry", () => ({
   default: {
     get: vi.fn().mockReturnValue(null),
   },
@@ -107,7 +107,7 @@ const MOCK_CLIENT_TOOL_SCHEMAS = [
   },
 ];
 
-vi.mock("../../ToolOrchestratorService.ts", () => ({
+vi.mock("#src/services/ToolOrchestratorService", () => ({
   default: {
     getClientToolSchemas: vi.fn().mockReturnValue(MOCK_CLIENT_TOOL_SCHEMAS),
     getToolSchemas: vi.fn().mockReturnValue(MOCK_CLIENT_TOOL_SCHEMAS),
@@ -119,7 +119,7 @@ describe("ToolDocFormatter workspace domain scrubbing", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    const module = await import("../ToolDocFormatter.ts");
+    const module = await import("#src/services/system-prompt/ToolDocFormatter");
     ToolDocFormatterClass = module.ToolDocFormatter;
   });
 

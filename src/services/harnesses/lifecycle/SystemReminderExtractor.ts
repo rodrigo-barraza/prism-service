@@ -1,10 +1,10 @@
-import logger from "../../../utils/logger.ts";
-import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
-import PromptLocaleService from "../../PromptLocaleService.ts";
-import RequestLogger from "../../RequestLogger.ts";
-import { HARNESS } from "../../../constants.ts";
+import logger from "#src/utils/logger";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import PromptLocaleService from "#src/services/PromptLocaleService";
+import RequestLogger from "#src/services/RequestLogger";
+import { HARNESS } from "#src/constants";
 
-import type { LLMProvider } from "../types.ts";
+import type { LLMProvider } from "#src/services/harnesses/types";
 
 /**
  * SystemReminderExtractor — LLM-based distillation of system prompt constraints.

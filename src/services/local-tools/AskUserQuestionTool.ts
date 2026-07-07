@@ -1,13 +1,13 @@
-import logger from "../../utils/logger.ts";
-import PromptLocaleService from "../PromptLocaleService.ts";
+import logger from "#src/utils/logger";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 import {
   TOOL_NAMES,
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { INTERNAL_TOOL_EMOJIS } from "../tool-orchestrator/InternalToolEmojis.ts";
+import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
-import { LOG_PREVIEW } from "../../constants.ts";
-import type { QuestionDefinition } from "../ApprovalRegistry.ts";
+import { LOG_PREVIEW } from "#src/constants";
+import type { QuestionDefinition } from "#src/services/ApprovalRegistry";
 
 interface QuestionOption {
   label: string;
@@ -240,7 +240,7 @@ export default {
     }
 
     const { default: AgenticLoopService } =
-      await import("../AgenticLoopService.js");
+      await import("#src/services/AgenticLoopService");
     const result = await new Promise<QuestionResult>((resolve) => {
       const timeoutId = setTimeout(
         () => resolve({ answers: null, timedOut: true }),

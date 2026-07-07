@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import AgentNotificationService from "../AgentNotificationService.ts";
-import { NOTIFICATION_SOURCES } from "../../constants.ts";
+import AgentNotificationService from "#src/services/AgentNotificationService";
+import { NOTIFICATION_SOURCES } from "#src/constants";
 
 describe("AgentNotificationService", () => {
   describe("formatTaskNotification", () => {

@@ -16,7 +16,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TOOL_NAMES, CORE_ORCHESTRATOR_TOOLS } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { PROMPT_DELIMITERS, PROVIDERS, MODEL_TYPES } from "../../../constants.ts";
+import { PROMPT_DELIMITERS, PROVIDERS, MODEL_TYPES } from "#src/constants";
 
 // ── Mock tool schemas (simulates tools-api + coordinator tools) ────────
 
@@ -191,7 +191,7 @@ const ALL_AI_SCHEMAS = [
 
 let mockIsWorkspaceAgentConnected = true;
 
-vi.mock("../../ToolOrchestratorService.ts", () => ({
+vi.mock("#src/services/ToolOrchestratorService", () => ({
   default: {
     ensureSchemas: vi.fn().mockResolvedValue(undefined),
     getToolSchemas: vi.fn(() => ALL_AI_SCHEMAS),
@@ -249,7 +249,7 @@ const omniPersona = {
   usesCodingGuidelines: true,
 };
 
-vi.mock("../../AgentPersonaRegistry.ts", () => ({
+vi.mock("#src/services/AgentPersonaRegistry", () => ({
   default: {
     get: vi.fn((agentId: string) => {
       if (agentId === "CODING") return codingPersona;
@@ -263,7 +263,7 @@ vi.mock("../../AgentPersonaRegistry.ts", () => ({
 
 // ── Mock CoordinatorPrompt ───────────────────────────────────────────
 
-vi.mock("../../OrchestratorPrompt.ts", () => ({
+vi.mock("#src/services/OrchestratorPrompt", () => ({
   getOrchestratorPromptAddendum: vi.fn(
     () => "## Orchestrator Mode — Multi-Agent Orchestration\n\nMocked coordinator prompt addendum.",
   ),
@@ -294,7 +294,7 @@ const MOCK_SETTINGS_SECTIONS: Record<string, Record<string, unknown>> = {
   },
 };
 
-vi.mock("../../SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
     getSection: vi.fn((section: string) =>
@@ -305,7 +305,7 @@ vi.mock("../../SettingsService.ts", () => ({
 
 // ── Mock MongoWrapper (no DB needed) ─────────────────────────────────
 
-vi.mock("../../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getDb: vi.fn(() => null),
   },
@@ -313,20 +313,20 @@ vi.mock("../../../wrappers/MongoWrapper.ts", () => ({
 
 // ── Mock config ──────────────────────────────────────────────────────
 
-vi.mock("../config.ts", () => ({
+vi.mock("#src/services/system-prompt/config", () => ({
   TOOLS_SERVICE_URL: "https://tools.test.rod.dev",
   MONGO_DB_NAME: "prism-test",
 }));
 
 // ── Mock EmbeddingService and MemoryService ──────────────────────────
 
-vi.mock("../../EmbeddingService.ts", () => ({
+vi.mock("#src/services/EmbeddingService", () => ({
   default: {
     embed: vi.fn().mockResolvedValue([0.1, 0.2, 0.3]),
   },
 }));
 
-vi.mock("../../MemoryService.ts", () => ({
+vi.mock("#src/services/MemoryService", () => ({
   default: {
     search: vi.fn().mockResolvedValue([]),
     formatForPrompt: vi.fn(() => ""),
@@ -335,7 +335,7 @@ vi.mock("../../MemoryService.ts", () => ({
 
 // ── Mock logger ──────────────────────────────────────────────────────
 
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -347,7 +347,7 @@ vi.mock("../../../utils/logger.ts", () => ({
 
 // ── Mock constants ───────────────────────────────────────────────────
 
-vi.mock("../../../constants.ts", async (importOriginal) => {
+vi.mock("#src/constants", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../constants.ts")>();
   return {
     ...actual,
@@ -379,8 +379,8 @@ global.fetch = vi.fn().mockImplementation(async (url) => {
 
 // ── Import after mocks ──────────────────────────────────────────────
 
-const { default: SystemPromptAssembler } = await import("../index.ts");
-const { getOrchestratorPromptAddendum } = await import("../../OrchestratorPrompt.ts");
+const { default: SystemPromptAssembler } = await import("#src/services/system-prompt/index");
+const { getOrchestratorPromptAddendum } = await import("#src/services/OrchestratorPrompt");
 
 // ── Helper ──────────────────────────────────────────────────────────
 

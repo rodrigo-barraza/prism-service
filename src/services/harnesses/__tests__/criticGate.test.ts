@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import CriticGate from "../lifecycle/CriticGate.ts";
-import { APPROVAL_TIERS } from "../../AutoApprovalEngine.ts";
-import type { ToolCall, AgenticContext } from "../types.ts";
+import CriticGate from "#src/services/harnesses/lifecycle/CriticGate";
+import { APPROVAL_TIERS } from "#src/services/AutoApprovalEngine";
+import type { ToolCall, AgenticContext } from "#src/services/harnesses/types";
 
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -11,7 +11,7 @@ vi.mock("../../../utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../../RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: {
     logBackgroundLlmCall: vi.fn().mockResolvedValue(undefined),
   },

@@ -7,13 +7,13 @@
  */
 import { describe, it, expect, vi } from "vitest";
 
-import ContextBudgetTracker from "../ContextBudgetTracker.ts";
-import type { ContextBudgetSnapshot } from "../ContextBudgetTracker.ts";
+import ContextBudgetTracker from "#src/services/harnesses/ContextBudgetTracker";
+import type { ContextBudgetSnapshot } from "#src/services/harnesses/ContextBudgetTracker";
 import {
   OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
   MINIMUM_CLAMPED_OUTPUT_TOKENS,
-} from "../../../constants/TokenBudgetDefaults.ts";
-import { estimateTokens } from "../../../utils/CostCalculator.ts";
+} from "#src/constants/TokenBudgetDefaults";
+import { estimateTokens } from "#src/utils/CostCalculator";
 
 // ── Test helpers ────────────────────────────────────────────
 

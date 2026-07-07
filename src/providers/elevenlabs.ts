@@ -1,10 +1,10 @@
-import { ProviderOptions } from "../types/ProviderTypes.ts";
+import { ProviderOptions } from "#src/types/ProviderTypes";
 import WebSocket from "ws";
-import { ProviderError } from "../utils/errors.ts";
-import logger from "../utils/logger.ts";
-import { ELEVENLABS_API_KEY } from "../../config.ts";
-import { MODALITY_TYPES, DEFAULT_VOICES, getDefaultModels } from "../config.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { ProviderError } from "#src/utils/errors";
+import logger from "#src/utils/logger";
+import { ELEVENLABS_API_KEY } from "#config";
+import { MODALITY_TYPES, DEFAULT_VOICES, getDefaultModels } from "#src/config";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 function getApiKey() {
   if (!ELEVENLABS_API_KEY) {

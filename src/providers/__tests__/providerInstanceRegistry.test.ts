@@ -1,29 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { PROVIDERS } from "../../constants.ts";
+import { PROVIDERS } from "#src/constants";
 
 const mockLmStudioProvider = { name: 'lm-studio-mock' };
 const mockOllamaProvider = { name: 'ollama-mock' };
 const mockVllmProvider = { name: 'vllm-mock' };
 const mockLlamaCppProvider = { name: 'llama-cpp-mock' };
 
-vi.mock('../lm-studio.ts', () => ({
+vi.mock('#src/providers/lm-studio', () => ({
   createLmStudioProvider: vi.fn((_url: string, _id: string) => mockLmStudioProvider),
 }));
-vi.mock('../ollama.ts', () => ({
+vi.mock('#src/providers/ollama', () => ({
   createOllamaProvider: vi.fn((_url: string, _id: string) => mockOllamaProvider),
 }));
-vi.mock('../vllm.ts', () => ({
+vi.mock('#src/providers/vllm', () => ({
   createVllmProvider: vi.fn((_url: string, _id: string) => mockVllmProvider),
 }));
-vi.mock('../llama-cpp.ts', () => ({
+vi.mock('#src/providers/llama-cpp', () => ({
   createLlamaCppProvider: vi.fn((_url: string, _id: string) => mockLlamaCppProvider),
 }));
-vi.mock('../../utils/logger.ts', () => ({
+vi.mock('#src/utils/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
 // instance-registry.ts imports from ../../config.ts which resolves to <root>/config.ts
-vi.mock('../../../config.ts', () => ({
+vi.mock('#config', () => ({
   PROVIDER_LM_STUDIO: [
     { url: 'http://gpu-1:1234', concurrency: 4, nickname: 'Desktop' },
     { url: 'http://gpu-2:1234', concurrency: 2 },
@@ -42,7 +42,7 @@ let getInstanceType: typeof import('../instance-registry.ts').getInstanceType;
 let getInstanceProvider: typeof import('../instance-registry.ts').getInstanceProvider;
 
 beforeEach(async () => {
-  const module = await import('../instance-registry.ts');
+  const module = await import('#src/providers/instance-registry');
   getInstance = module.getInstance;
   isInstance = module.isInstance;
   listInstances = module.listInstances;

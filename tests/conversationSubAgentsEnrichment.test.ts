@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { COLLECTIONS } from "../src/constants.ts";
+import { COLLECTIONS } from "#src/constants";
 
 // Mock logger
-vi.mock("../src/utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -11,7 +11,7 @@ vi.mock("../src/utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../config.ts", () => ({
+vi.mock("#config", () => ({
   MONGO_DB_NAME: "prism-test",
 }));
 
@@ -25,8 +25,8 @@ describe("Conversation Sub-agents Enrichment Integration Tests", () => {
   beforeEach(async () => {
     const request = (await import("supertest")).default;
     const { app } = await import("./setup.ts");
-    const conversationsRouter = (await import("../src/routes/ConversationsRoutes.ts")).default;
-    const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+    const conversationsRouter = (await import("#src/routes/ConversationsRoutes")).default;
+    const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
 
     try {
       app.use("/conversations", conversationsRouter);

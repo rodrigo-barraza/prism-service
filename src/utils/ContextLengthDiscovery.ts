@@ -13,7 +13,7 @@
  *   - Ollama:   POST /api/show → model_info.context_length or parameters
  */
 import logger from "./logger.ts";
-import type { ProviderOptions } from "../types/provider.ts";
+import type { ProviderOptions } from "#src/types/provider";
 
 // ── Cache ────────────────────────────────────────────────────
 // Maps "providerName:model" → context length (number)

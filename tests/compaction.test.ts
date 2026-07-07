@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MOCK_GENERATE_TEXT } from "./setup.ts";
 
 // Suppress logger output during tests to keep console output clean
-vi.mock("../src/utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -13,20 +13,20 @@ vi.mock("../src/utils/logger.ts", () => ({
   },
 }));
 
-import AutoCompactionTrigger from "../src/services/compact/AutoCompactionTrigger.ts";
-import MicroCompactionService from "../src/services/compact/MicroCompactionService.ts";
+import AutoCompactionTrigger from "#src/services/compact/AutoCompactionTrigger";
+import MicroCompactionService from "#src/services/compact/MicroCompactionService";
 import {
   extractSummaryFromResponse,
   stripImagesFromMessages,
-} from "../src/services/compact/CompactionPrompt.ts";
-import CompactionService from "../src/services/compact/CompactionService.ts";
-import ContextWindowManager from "../src/utils/ContextWindowManager.ts";
-import AgenticLoopState from "../src/services/AgenticLoopState.ts";
-import RequestLogger from "../src/services/RequestLogger.ts";
-import BaseAgenticHarness from "../src/services/harnesses/BaseAgenticHarness.ts";
+} from "#src/services/compact/CompactionPrompt";
+import CompactionService from "#src/services/compact/CompactionService";
+import ContextWindowManager from "#src/utils/ContextWindowManager";
+import AgenticLoopState from "#src/services/AgenticLoopState";
+import RequestLogger from "#src/services/RequestLogger";
+import BaseAgenticHarness from "#src/services/harnesses/BaseAgenticHarness";
 
-import type { ConversationMessage } from "../src/services/harnesses/types.ts";
-import type { ChatMessage } from "../src/types/admin.ts";
+import type { ConversationMessage } from "#src/services/harnesses/types";
+import type { ChatMessage } from "#src/types/admin";
 
 // ═══════════════════════════════════════════════════════════════
 // 1. AutoCompactionTrigger Tests

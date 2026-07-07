@@ -3,10 +3,10 @@
 // remain active on them, preventing idle VRAM consumption.
 // Extracted from OrchestratorService._runSubAgentLoop()
 
-import { getProvider } from "../../providers/index.ts";
-import logger from "../../utils/logger.ts";
-import type { SubAgentState } from "../../types/orchestrator.ts";
-import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
+import { getProvider } from "#src/providers/index";
+import logger from "#src/utils/logger";
+import type { SubAgentState } from "#src/types/orchestrator";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 /*
  * Evict the model from a secondary GPU instance when no other sub-agents

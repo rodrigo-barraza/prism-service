@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 // Mock dependencies before any imports
 // ────────────────────────────────────────────────────────────
 
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -14,11 +14,11 @@ vi.mock("../../utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../../utils/AbortController.ts", () => ({
+vi.mock("#src/utils/AbortController", () => ({
   createAbortController: () => new AbortController(),
 }));
 
-vi.mock("../../utils/CleanupRegistry.ts", () => ({
+vi.mock("#src/utils/CleanupRegistry", () => ({
   registerCleanup: vi.fn(),
 }));
 
@@ -26,8 +26,8 @@ vi.mock("../../utils/CleanupRegistry.ts", () => ({
 // Import under test
 // ────────────────────────────────────────────────────────────
 
-import AsyncTaskRegistry from "../AsyncTaskRegistry.ts";
-import type { AsyncTaskState } from "../AsyncTaskRegistry.ts";
+import AsyncTaskRegistry from "#src/services/AsyncTaskRegistry";
+import type { AsyncTaskState } from "#src/services/AsyncTaskRegistry";
 
 describe("AsyncTaskRegistry", () => {
   beforeEach(() => {

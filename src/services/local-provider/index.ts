@@ -1,6 +1,6 @@
-import logger from "../../utils/logger.ts";
+import logger from "#src/utils/logger";
 import { withTimeoutFallback } from "@rodrigo-barraza/utilities-library";
-import { getProvider } from "../../providers/index.ts";
+import { getProvider } from "#src/providers/index";
 import {
   listInstances,
   getInstancesByType,
@@ -8,9 +8,9 @@ import {
   getInstance,
   getInstanceType,
   listInstanceTypes,
-} from "../../providers/instance-registry.ts";
-import { MODALITY_TYPES } from "../../config.ts";
-import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
+} from "#src/providers/instance-registry";
+import { MODALITY_TYPES } from "#src/config";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 import {
   LOCAL_PROVIDER_TYPES,
@@ -27,12 +27,12 @@ import {
   TransformedHealthStatusMap,
   TransformedLocalProviderOptions,
 } from "./types.ts";
-import { ChatMessage } from "../../types/ProviderTypes.ts";
+import { ChatMessage } from "#src/types/ProviderTypes";
 
 import { enrichWithHuggingFace } from "./hfMetadata.ts";
 import { NORMALIZER_BY_TYPE, HF_ENRICHED_TYPES } from "./normalizers.ts";
 import { estimateVRAM, estimateVRAMForModel } from "./vramEstimation.ts";
-import { InstanceEntry } from "../../types/ProviderTypes.ts";
+import { InstanceEntry } from "#src/types/ProviderTypes";
 
 class LocalProviderGateway {
   constructor() {

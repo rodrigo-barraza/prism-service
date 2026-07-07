@@ -1,64 +1,64 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS, PROMPT_DELIMITERS } from "../../../constants.ts";
+import { PROVIDERS, PROMPT_DELIMITERS } from "#src/constants";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
-import FileService from "../../FileService.ts";
-import { appendAndFinalize } from "../../../utils/ConversationUtilities.ts";
-import { APPROVAL_TIERS } from "../../AutoApprovalEngine.ts";
-import CriticGate from "../lifecycle/CriticGate.ts";
-import { pendingApprovals } from "../../ApprovalRegistry.ts";
-import { checkAndWaitForApproval } from "../lifecycle/ApprovalGate.ts";
-import { manageContextPressure } from "../lifecycle/ContextPressureManager.ts";
-import { checkCostBudget } from "../lifecycle/CostBudgetEnforcer.ts";
-import { runExhaustionRecoveryPass } from "../lifecycle/ExhaustionRecovery.ts";
-import { createStandardHooks } from "../lifecycle/HookInitializer.ts";
+import FileService from "#src/services/FileService";
+import { appendAndFinalize } from "#src/utils/ConversationUtilities";
+import { APPROVAL_TIERS } from "#src/services/AutoApprovalEngine";
+import CriticGate from "#src/services/harnesses/lifecycle/CriticGate";
+import { pendingApprovals } from "#src/services/ApprovalRegistry";
+import { checkAndWaitForApproval } from "#src/services/harnesses/lifecycle/ApprovalGate";
+import { manageContextPressure } from "#src/services/harnesses/lifecycle/ContextPressureManager";
+import { checkCostBudget } from "#src/services/harnesses/lifecycle/CostBudgetEnforcer";
+import { runExhaustionRecoveryPass } from "#src/services/harnesses/lifecycle/ExhaustionRecovery";
+import { createStandardHooks } from "#src/services/harnesses/lifecycle/HookInitializer";
 import {
   blockUnauthorizedToolCalls,
   handleExitPlanMode,
   checkForPlanModeEntry,
-} from "../lifecycle/PlanModeController.ts";
+} from "#src/services/harnesses/lifecycle/PlanModeController";
 import {
   emitPostExecutionStatus,
   processToolResultMedia,
   trackToolErrors,
-} from "../lifecycle/PostExecutionEmitter.ts";
-import { buildToolRetryGuidance } from "../lifecycle/ToolRetryInterceptor.ts";
-import { injectToolDiscoveryNudge } from "../lifecycle/ToolDiscoveryNudge.ts";
+} from "#src/services/harnesses/lifecycle/PostExecutionEmitter";
+import { buildToolRetryGuidance } from "#src/services/harnesses/lifecycle/ToolRetryInterceptor";
+import { injectToolDiscoveryNudge } from "#src/services/harnesses/lifecycle/ToolDiscoveryNudge";
 import {
   maybeInjectSystemReminder,
   cleanupReminderCache,
-} from "../lifecycle/SystemReminderInjector.ts";
-import { extractReminderViaLLM } from "../lifecycle/SystemReminderExtractor.ts";
+} from "#src/services/harnesses/lifecycle/SystemReminderInjector";
+import { extractReminderViaLLM } from "#src/services/harnesses/lifecycle/SystemReminderExtractor";
 import {
   createSandboxCheckpoint,
   restoreSandboxCheckpoint,
-} from "../lifecycle/SandboxExecutor.ts";
+} from "#src/services/harnesses/lifecycle/SandboxExecutor";
 import {
   executeToolBatch,
   executeToolSingle,
-} from "../lifecycle/ToolExecutor.ts";
-import { logKVCacheHitRate } from "../lifecycle/KVCacheReporter.ts";
-import { finalizePassTracker } from "../lifecycle/TrackerFinalizer.ts";
-import { handleCodexPlanningResponse } from "../lifecycle/CodexPlanningDetector.ts";
+} from "#src/services/harnesses/lifecycle/ToolExecutor";
+import { logKVCacheHitRate } from "#src/services/harnesses/lifecycle/KVCacheReporter";
+import { finalizePassTracker } from "#src/services/harnesses/lifecycle/TrackerFinalizer";
+import { handleCodexPlanningResponse } from "#src/services/harnesses/lifecycle/CodexPlanningDetector";
 import {
   finalizeTextGeneration,
   swapMessageContent,
   sanitizeMessagesForPersistence,
-} from "../lifecycle/Finalizer.ts";
+} from "#src/services/harnesses/lifecycle/Finalizer";
 
 import { execSync } from "node:child_process";
-import logger from "../../../utils/logger.ts";
-import RequestLogger from "../../RequestLogger.ts";
-import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
-import MicroCompactionService from "../../compact/MicroCompactionService.ts";
-import AutoCompactionTrigger from "../../compact/AutoCompactionTrigger.ts";
-import CompactionService from "../../compact/CompactionService.ts";
-import ConversationEmbeddingService from "../../ConversationEmbeddingService.ts";
-import MemoryExtractor from "../../MemoryExtractor.ts";
-import WorkflowMemoryService from "../../WorkflowMemoryService.ts";
-import ConversationGenerationTracker from "../../ConversationGenerationTracker.ts";
-import AgentHooks from "../../AgentHooks.ts";
-import AutoApprovalEngine from "../../AutoApprovalEngine.ts";
-import SystemPromptAssembler from "../../system-prompt/index.ts";
+import logger from "#src/utils/logger";
+import RequestLogger from "#src/services/RequestLogger";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
+import MicroCompactionService from "#src/services/compact/MicroCompactionService";
+import AutoCompactionTrigger from "#src/services/compact/AutoCompactionTrigger";
+import CompactionService from "#src/services/compact/CompactionService";
+import ConversationEmbeddingService from "#src/services/ConversationEmbeddingService";
+import MemoryExtractor from "#src/services/MemoryExtractor";
+import WorkflowMemoryService from "#src/services/WorkflowMemoryService";
+import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
+import AgentHooks from "#src/services/AgentHooks";
+import AutoApprovalEngine from "#src/services/AutoApprovalEngine";
+import SystemPromptAssembler from "#src/services/system-prompt/index";
 
 // Mock child_process.execSync
 vi.mock("node:child_process", () => ({
@@ -66,7 +66,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 // Mock logger to prevent output pollution
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -76,51 +76,51 @@ vi.mock("../../../utils/logger.ts", () => ({
 }));
 
 // Mock external services
-vi.mock("../../compact/MicroCompactionService.ts", () => ({
+vi.mock("#src/services/compact/MicroCompactionService", () => ({
   default: {
     microcompactMessages: vi.fn(),
   },
 }));
 
-vi.mock("../../compact/AutoCompactionTrigger.ts", () => ({
+vi.mock("#src/services/compact/AutoCompactionTrigger", () => ({
   default: {
     evaluate: vi.fn(),
   },
 }));
 
-vi.mock("../../compact/CompactionService.ts", () => ({
+vi.mock("#src/services/compact/CompactionService", () => ({
   default: {
     compactConversation: vi.fn(),
   },
 }));
 
-vi.mock("../../ConversationEmbeddingService.ts", () => ({
+vi.mock("#src/services/ConversationEmbeddingService", () => ({
   default: {
     persistCompactionSummary: vi.fn().mockResolvedValue(undefined),
     createHook: vi.fn().mockReturnValue(vi.fn()),
   },
 }));
 
-vi.mock("../../MemoryExtractor.ts", () => ({
+vi.mock("#src/services/MemoryExtractor", () => ({
   default: {
     createHook: vi.fn().mockReturnValue(vi.fn()),
   },
 }));
 
-vi.mock("../../WorkflowMemoryService.ts", () => ({
+vi.mock("#src/services/WorkflowMemoryService", () => ({
   default: {
     createHook: vi.fn().mockReturnValue(vi.fn()),
   },
 }));
 
-vi.mock("../../ConversationGenerationTracker.ts", () => ({
+vi.mock("#src/services/ConversationGenerationTracker", () => ({
   default: {
     update: vi.fn(),
     complete: vi.fn(),
   },
 }));
 
-vi.mock("../../ToolOrchestratorService.ts", () => ({
+vi.mock("#src/services/ToolOrchestratorService", () => ({
   default: {
     isStreamable: vi.fn().mockReturnValue(false),
     executeTool: vi.fn(),
@@ -130,19 +130,19 @@ vi.mock("../../ToolOrchestratorService.ts", () => ({
   },
 }));
 
-vi.mock("../../FileService.ts", () => ({
+vi.mock("#src/services/FileService", () => ({
   default: {
     uploadFile: vi.fn().mockResolvedValue({ ref: "minio-ref-123" }),
   },
 }));
 
-vi.mock("../../WebhookEventBus.ts", () => ({
+vi.mock("#src/services/WebhookEventBus", () => ({
   default: {
     emit: vi.fn(),
   },
 }));
 
-vi.mock("../../../utils/ConversationUtilities.ts", () => ({
+vi.mock("#src/utils/ConversationUtilities", () => ({
   appendAndFinalize: vi.fn().mockResolvedValue(undefined),
   computeNewTurnMessages: vi.fn(),
 }));

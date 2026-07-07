@@ -20,13 +20,13 @@ import {
   buildExhaustedRecoveryMessage,
   buildProviderErrorMessage,
   MAX_OUTPUT_TRUNCATION_RECOVERIES,
-} from "../lifecycle/OutputTruncationRecovery.ts";
+} from "#src/services/harnesses/lifecycle/OutputTruncationRecovery";
 
 import type {
   PassState,
   AgenticContext,
   ConversationMessage,
-} from "../types.ts";
+} from "#src/services/harnesses/types";
 
 // ── Helper: create a minimal PassState ────────────────────────────────
 function createMockPassState(overrides: Partial<PassState> = {}): PassState {

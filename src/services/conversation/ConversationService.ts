@@ -1,10 +1,10 @@
 import { DEFAULT_CONVERSATION_TITLE } from "@rodrigo-barraza/utilities-library/taxonomy";
-import MongoWrapper from "../../wrappers/MongoWrapper.ts";
-import { MONGO_DB_NAME } from "../../../config.ts";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import { MONGO_DB_NAME } from "#config";
 
-import { COLLECTIONS, MAXIMUM_DERIVED_CONVERSATION_TITLE_LENGTH } from "../../constants.ts";
-import type { ChatMessage } from "../../types/admin.ts";
-import { discoverDescendantConversationIds } from "../../utils/ConversationDiscovery.ts";
+import { COLLECTIONS, MAXIMUM_DERIVED_CONVERSATION_TITLE_LENGTH } from "#src/constants";
+import type { ChatMessage } from "#src/types/admin";
+import { discoverDescendantConversationIds } from "#src/utils/ConversationDiscovery";
 import type {
   ConversationMeta,
   ConversationSettings,

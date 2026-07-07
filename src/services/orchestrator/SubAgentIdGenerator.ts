@@ -1,4 +1,4 @@
-import { ORCHESTRATOR } from "../../constants.ts";
+import { ORCHESTRATOR } from "#src/constants";
 
 /**
  * Service for generating unique sub-agent identifiers and git branch names.

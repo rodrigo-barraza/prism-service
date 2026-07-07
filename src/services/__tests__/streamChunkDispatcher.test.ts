@@ -10,9 +10,9 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { TYPES, MODEL_TYPES } from "../../constants.ts";
+import { TYPES, MODEL_TYPES } from "#src/constants";
 
-vi.mock("../FileService.ts", () => ({
+vi.mock("#src/services/FileService", () => ({
   default: {
     isExternalStorage: () => false,
     isMinioRef: () => false,
@@ -20,7 +20,7 @@ vi.mock("../FileService.ts", () => ({
   },
 }));
 
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -33,7 +33,7 @@ const {
   stripToolCallMarkup,
   dispatchChunk,
   createStreamState,
-} = await import("../../utils/StreamChunkDispatcher.ts");
+} = await import("#src/utils/StreamChunkDispatcher");
 
 // ── Helpers ────────────────────────────────────────────────────
 

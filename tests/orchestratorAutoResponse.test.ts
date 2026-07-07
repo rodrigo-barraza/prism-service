@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import "./setup.ts";
-import { PROVIDERS, ORCHESTRATOR, NOTIFICATION_SOURCES } from "../src/constants.ts";
+import { PROVIDERS, ORCHESTRATOR, NOTIFICATION_SOURCES } from "#src/constants";
 
 // ── vi.mock blocks (must come before imports that use them) ────────────
 
@@ -8,13 +8,13 @@ const mockRunAgenticLoop = vi.fn().mockResolvedValue({
   messages: [{ role: "assistant", content: "Mock sub-agent output" }],
 });
 
-vi.mock("../src/services/AgenticLoopService.ts", () => ({
+vi.mock("#src/services/AgenticLoopService", () => ({
   default: {
     runAgenticLoop: (...args: unknown[]) => mockRunAgenticLoop(...args),
   },
 }));
 
-vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
+vi.mock("#src/services/orchestrator/GitWorktreeHelper", () => ({
   GitWorktreeHelper: {
     getDefaultWorkspaceRoot: vi.fn().mockReturnValue("/workspace"),
     resolveRepositoryPath: vi.fn().mockReturnValue("/workspace"),
@@ -34,7 +34,7 @@ vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
 
 const mockHandleAgent = vi.fn().mockResolvedValue(undefined);
 
-vi.mock("../src/routes/ChatRoutes.ts", async (importOriginal) => {
+vi.mock("#src/routes/ChatRoutes", async (importOriginal) => {
   const actual = await importOriginal() as Record<string, unknown>;
   return {
     ...actual,
@@ -44,11 +44,11 @@ vi.mock("../src/routes/ChatRoutes.ts", async (importOriginal) => {
 
 // ── Imports (after vi.mock) ───────────────────────────────────
 
-import MongoWrapper from "../src/wrappers/MongoWrapper.ts";
-import ConversationService from "../src/services/ConversationService.ts";
-import OrchestratorService from "../src/services/OrchestratorService.ts";
-import { GitWorktreeHelper } from "../src/services/orchestrator/GitWorktreeHelper.ts";
-import type { OrchestratorContext, SubAgentResult } from "../src/types/orchestrator.ts";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import ConversationService from "#src/services/ConversationService";
+import OrchestratorService from "#src/services/OrchestratorService";
+import { GitWorktreeHelper } from "#src/services/orchestrator/GitWorktreeHelper";
+import type { OrchestratorContext, SubAgentResult } from "#src/types/orchestrator";
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -809,7 +809,7 @@ describe("Event-Driven Auto-Response", () => {
 
       // Even register a WebSocket — it should NOT be used because SSE takes priority
       const WebSocketConnectionRegistry = (
-        await import("../src/websocket/WebSocketConnectionRegistry.ts")
+        await import("#src/websocket/WebSocketConnectionRegistry")
       ).default;
       const mockWebSocketEmit = vi.fn();
       const mockWebSocket = { readyState: 1, OPEN: 1, send: vi.fn() };
@@ -855,7 +855,7 @@ describe("Event-Driven Auto-Response", () => {
 
     it("should fall back to WebSocket emit when orchestratorContext has no emit function", async () => {
       const WebSocketConnectionRegistry = (
-        await import("../src/websocket/WebSocketConnectionRegistry.ts")
+        await import("#src/websocket/WebSocketConnectionRegistry")
       ).default;
 
       const mockWebSocketEmit = vi.fn();
@@ -905,7 +905,7 @@ describe("Event-Driven Auto-Response", () => {
 
     it("should fall back to debug logger when no emit source is available", async () => {
       const WebSocketConnectionRegistry = (
-        await import("../src/websocket/WebSocketConnectionRegistry.ts")
+        await import("#src/websocket/WebSocketConnectionRegistry")
       ).default;
 
       WebSocketConnectionRegistry.clear();

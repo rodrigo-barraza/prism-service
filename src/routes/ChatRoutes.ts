@@ -14,67 +14,67 @@ import express, { Request, Response, NextFunction } from "express";
 import {
   finalizeTextGeneration,
   getCollectionOpts,
-} from "../services/harnesses/lifecycle/Finalizer.ts";
+} from "#src/services/harnesses/lifecycle/Finalizer";
 import crypto from "crypto";
-import { getProvider } from "../providers/index.ts";
-import { ProviderError } from "../utils/errors.ts";
+import { getProvider } from "#src/providers/index";
+import { ProviderError } from "#src/utils/errors";
 import {
   MODALITY_TYPES,
   getDefaultModels,
   getPricing,
   getModelByName,
   getAgentDefaults,
-} from "../config.ts";
+} from "#src/config";
 import {
   estimateTokens,
   calculateImageCost,
   mergeUsage,
-} from "../utils/CostCalculator.ts";
-import type { TokenUsage } from "../types/admin.ts";
+} from "#src/utils/CostCalculator";
+import type { TokenUsage } from "#src/types/admin";
 import type {
   ToolCallPayload,
   TokenUsage as FinalizerTokenUsage,
-} from "../services/RequestLogger.ts";
-import logger from "../utils/logger.ts";
-import RequestLogger from "../services/RequestLogger.ts";
-import FileService from "../services/FileService.ts";
+} from "#src/services/RequestLogger";
+import logger from "#src/utils/logger";
+import RequestLogger from "#src/services/RequestLogger";
+import FileService from "#src/services/FileService";
 import {
   createStreamState,
   dispatchChunk,
-} from "../utils/StreamChunkDispatcher.ts";
-import { resolveMessageMediaReferences } from "../services/MediaResolutionService.ts";
+} from "#src/utils/StreamChunkDispatcher";
+import { resolveMessageMediaReferences } from "#src/services/MediaResolutionService";
 
-import ConversationGenerationTracker from "../services/ConversationGenerationTracker.ts";
-import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
-import localModelQueue from "../services/LocalModelQueue.ts";
-import LocalProviderGateway from "../services/local-provider/index.ts";
+import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
+import localModelQueue from "#src/services/LocalModelQueue";
+import LocalProviderGateway from "#src/services/local-provider/index";
 import {
   getInstancesByType,
   getInstanceType,
   getInstance,
-} from "../providers/instance-registry.ts";
-import { resolveModelForInstances } from "../utils/ModelResolution.ts";
+} from "#src/providers/instance-registry";
+import { resolveModelForInstances } from "#src/utils/ModelResolution";
 import {
   markGenerating,
   appendAndFinalize,
-} from "../utils/ConversationUtilities.ts";
-import { handleSseRequest, handleJsonRequest } from "../utils/SseUtilities.ts";
-import { SseEvent } from "../types/SseTypes.ts";
-import { ChatRequestSchema } from "../types/index.ts";
+} from "#src/utils/ConversationUtilities";
+import { handleSseRequest, handleJsonRequest } from "#src/utils/SseUtilities";
+import { SseEvent } from "#src/types/SseTypes";
+import { ChatRequestSchema } from "#src/types/index";
 import type {
   ConversationMessage,
   EmitFunction,
   ToolSchema,
-} from "../services/harnesses/types.ts";
-import type { ChatMessage } from "../types/ProviderTypes.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+} from "#src/services/harnesses/types";
+import type { ChatMessage } from "#src/types/ProviderTypes";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 import {
   PROVIDERS,
   FILE_CATEGORIES,
   MAX_FUNCTION_CALL_ITERATIONS,
   SYSTEM_STATUSES,
   MESSAGE_ROLES,
-} from "../constants.ts";
+} from "#src/constants";
 
 interface ToolSchemaWithDomain extends ToolSchema {
   domain?: string;
@@ -355,7 +355,7 @@ async function prepareGenerationContext(
   // (e.g., temperature=0, maxTokens=16384, reasoningEffort="high").
   if (agent) {
     const { default: AgentPersonaRegistry } =
-      await import("../services/AgentPersonaRegistry.ts");
+      await import("#src/services/AgentPersonaRegistry");
     if (!AgentPersonaRegistry.has(agent)) {
       throw new ProviderError("server", `Unknown agent: "${agent}"`, 400);
     }
@@ -633,7 +633,7 @@ export async function handleConversation(
       if (options.functionCallingEnabled && !options.agenticLoopEnabled) {
         const useNativeMcp = LocalProviderGateway.isNativeMCP(providerName);
         const { default: SettingsService } =
-          await import("../services/SettingsService.ts");
+          await import("#src/services/SettingsService");
         const settings = await SettingsService.getSection("agents");
         const defaultTopology =
           (options.topology as string) ||
@@ -808,12 +808,12 @@ export async function handleAgent(
         );
       }
       const { default: AgenticLoopService } =
-        await import("../services/AgenticLoopService.js");
+        await import("#src/services/AgenticLoopService");
 
       // Inject persona-level policies into options (if the agent has them)
       if (agent && !options.policies) {
         const { default: AgentPersonaRegistry } =
-          await import("../services/AgentPersonaRegistry.js");
+          await import("#src/services/AgentPersonaRegistry");
         const persona = AgentPersonaRegistry.get(agent);
         if (persona?.policies && persona.policies.length > 0) {
           options.policies = persona.policies;
@@ -855,7 +855,7 @@ export async function handleAgent(
       if (signal?.aborted) {
         try {
           const { default: OrchestratorService } =
-            await import("../services/OrchestratorService.js");
+            await import("#src/services/OrchestratorService");
           await OrchestratorService.abortSubAgentsByConversation(
             conversationId,
           );

@@ -1,6 +1,6 @@
-import logger from "../utils/logger.ts";
+import logger from "#src/utils/logger";
 import type { PolicyRule, PolicyDecision } from "./PolicyEngine.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 import {
   BUILT_IN_PERSONAS,
   Persona,

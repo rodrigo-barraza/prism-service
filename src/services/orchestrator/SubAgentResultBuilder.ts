@@ -3,10 +3,10 @@ import type {
   SubAgentState,
   SubtreeMetrics,
   SubAgentChildSummary,
-} from "../../types/orchestrator.ts";
-import type { ConversationMessage } from "../harnesses/types.ts";
-import { stripToolCallMarkup } from "../../utils/StreamChunkDispatcher.ts";
-import { ORCHESTRATOR } from "../../constants.ts";
+} from "#src/types/orchestrator";
+import type { ConversationMessage } from "#src/services/harnesses/types";
+import { stripToolCallMarkup } from "#src/utils/StreamChunkDispatcher";
+import { ORCHESTRATOR } from "#src/constants";
 
 /*
  * Extract the text content from the last assistant message in a conversation.

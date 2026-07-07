@@ -7,7 +7,7 @@ import { describe, it, expect } from "vitest";
 import {
   expandMessagesForFunctionCall,
   truncateToolResult,
-} from "../FunctionCallingUtilities.ts";
+} from "#src/utils/FunctionCallingUtilities";
 
 describe("expandMessagesForFunctionCall", () => {
   it("expands inline toolCall.result into synthetic tool messages", () => {

@@ -1,7 +1,7 @@
 import crypto from "crypto";
-import logger from "../utils/logger.ts";
+import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import { WEBHOOK } from "../constants.ts";
+import { WEBHOOK } from "#src/constants";
 
 export interface WebhookEvent {
   webhookEventId: string;

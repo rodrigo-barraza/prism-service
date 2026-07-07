@@ -1,7 +1,7 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 
 // Suppress logger output during tests
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -17,7 +17,7 @@ const mockUpdateOne = vi.fn().mockResolvedValue({ modifiedCount: 1 });
 const mockFindOne = vi.fn().mockResolvedValue(null);
 const mockDeleteOne = vi.fn().mockResolvedValue({ deletedCount: 1 });
 
-vi.mock("../../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getCollection: vi.fn().mockReturnValue({
       updateOne: (...args: unknown[]) => mockUpdateOne(...args),
@@ -27,7 +27,7 @@ vi.mock("../../../wrappers/MongoWrapper.ts", () => ({
   },
 }));
 
-vi.mock("../../../config.ts", async (importOriginal) => {
+vi.mock("#src/config", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../config.ts")>();
   return {
     ...actual,
@@ -35,7 +35,7 @@ vi.mock("../../../config.ts", async (importOriginal) => {
   };
 });
 
-import ToolContext from "../../ToolContext.ts";
+import ToolContext from "#src/services/ToolContext";
 
 // ═══════════════════════════════════════════════════════════════
 // In-Memory CRUD Operations

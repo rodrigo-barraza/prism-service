@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import SemanticStallDetector from "../lifecycle/SemanticStallDetector.ts";
-import type { ToolCall } from "../types.ts";
+import SemanticStallDetector from "#src/services/harnesses/lifecycle/SemanticStallDetector";
+import type { ToolCall } from "#src/services/harnesses/types";
 
 // ═══════════════════════════════════════════════════════════════
 // SemanticStallDetector — Comprehensive Test Suite

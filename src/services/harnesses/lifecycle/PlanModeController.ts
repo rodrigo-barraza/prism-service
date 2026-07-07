@@ -1,15 +1,15 @@
-import PlanningModeService from "../../PlanningModeService.ts";
-import { pendingApprovals } from "../../ApprovalRegistry.ts";
-import PromptLocaleService from "../../PromptLocaleService.ts";
-import logger from "../../../utils/logger.ts";
-import { HARNESS } from "../../../constants.ts";
+import PlanningModeService from "#src/services/PlanningModeService";
+import { pendingApprovals } from "#src/services/ApprovalRegistry";
+import PromptLocaleService from "#src/services/PromptLocaleService";
+import logger from "#src/utils/logger";
+import { HARNESS } from "#src/constants";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
   TOOL_NAMES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 
-import type AgenticLoopState from "../../AgenticLoopState.ts";
+import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type {
   ToolCall,
   ToolResult,
@@ -17,7 +17,7 @@ import type {
   ConversationMessage,
   AgenticContext,
   EmitFunction,
-} from "../types.ts";
+} from "#src/services/harnesses/types";
 
 /**
  * PlanModeController — manages plan mode state transitions during the agentic loop.

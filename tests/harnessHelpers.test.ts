@@ -1,18 +1,18 @@
 import './setup.ts';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import BaseAgenticHarness from '../src/services/harnesses/BaseAgenticHarness.ts';
-import AgenticLoopState from '../src/services/AgenticLoopState.ts';
-import ConversationGenerationTracker from '../src/services/ConversationGenerationTracker.ts';
-import ToolContext from '../src/services/ToolContext.ts';
-import ToolOrchestratorService from '../src/services/ToolOrchestratorService.ts';
+import BaseAgenticHarness from '#src/services/harnesses/BaseAgenticHarness';
+import AgenticLoopState from '#src/services/AgenticLoopState';
+import ConversationGenerationTracker from '#src/services/ConversationGenerationTracker';
+import ToolContext from '#src/services/ToolContext';
+import ToolOrchestratorService from '#src/services/ToolOrchestratorService';
 import type {
   AgenticContext,
   ResolvedTools,
   PassState,
   ConversationMessage,
-} from '../src/services/harnesses/types.ts';
+} from '#src/services/harnesses/types';
 
-vi.mock('../src/services/ConversationGenerationTracker.ts', () => ({
+vi.mock('#src/services/ConversationGenerationTracker', () => ({
   default: {
     register: vi.fn(),
     update: vi.fn(),
@@ -29,7 +29,7 @@ vi.mock('../src/services/ConversationGenerationTracker.ts', () => ({
   },
 }));
 
-vi.mock('../src/services/ToolOrchestratorService.ts', () => ({
+vi.mock('#src/services/ToolOrchestratorService', () => ({
   default: {
     getToolSchemas: vi.fn().mockReturnValue([]),
     getMCPToolSchemas: vi.fn().mockReturnValue([]),
@@ -38,13 +38,13 @@ vi.mock('../src/services/ToolOrchestratorService.ts', () => ({
   },
 }));
 
-vi.mock('../src/services/WebhookEventBus.ts', () => ({
+vi.mock('#src/services/WebhookEventBus', () => ({
   default: {
     emit: vi.fn(),
   },
 }));
 
-vi.mock('../src/services/RequestLogger.ts', () => ({
+vi.mock('#src/services/RequestLogger', () => ({
   default: {
     logChatGeneration: vi.fn(),
     insertPending: vi.fn().mockResolvedValue('mock-pending-id'),
@@ -53,8 +53,8 @@ vi.mock('../src/services/RequestLogger.ts', () => ({
   },
 }));
 
-import RequestLogger from '../src/services/RequestLogger.ts';
-import { PROVIDERS, TYPES, MODEL_TYPES } from "../src/constants.ts";
+import RequestLogger from '#src/services/RequestLogger';
+import { PROVIDERS, TYPES, MODEL_TYPES } from "#src/constants";
 
 class TestHarness extends BaseAgenticHarness {
   public getContext() { return this.context; }

@@ -1,14 +1,14 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response } from "express";
-import requireDb from "../middleware/RequireDbMiddleware.ts";
-import logger from "../utils/logger.ts";
-import { COLLECTIONS } from "../constants.ts";
+import requireDb from "#src/middleware/RequireDbMiddleware";
+import logger from "#src/utils/logger";
+import { COLLECTIONS } from "#src/constants";
 import {
   PostPromptSchema,
   PatchPromptSchema,
   GetPromptsQuerySchema,
-} from "../types/index.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+} from "#src/types/index";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 import { generateUUID } from "@rodrigo-barraza/utilities-library";
 
 const router = express.Router();

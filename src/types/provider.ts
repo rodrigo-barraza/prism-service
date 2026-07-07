@@ -1,4 +1,4 @@
-import type { ToolSchema } from "../services/harnesses/types.ts";
+import type { ToolSchema } from "#src/services/harnesses/types";
 import type { ChatMessage, ProviderOptions } from "./ProviderTypes.ts";
 
 export type { ChatMessage, ProviderOptions };

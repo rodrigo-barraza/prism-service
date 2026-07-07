@@ -1,7 +1,7 @@
-import { resolveArchParams, estimateMemory } from "../../utils/gguf-arch.ts";
-import { getProvider } from "../../providers/index.ts";
+import { resolveArchParams, estimateMemory } from "#src/utils/gguf-arch";
+import { getProvider } from "#src/providers/index";
 import { LmStudioRawModel, GenericProvider, TransformedVramEstimate } from "./types.ts";
-import { LOCAL_PROVIDER } from "../../constants.ts";
+import { LOCAL_PROVIDER } from "#src/constants";
 
 /**
  * Estimate VRAM usage for a GGUF model served by a local provider.

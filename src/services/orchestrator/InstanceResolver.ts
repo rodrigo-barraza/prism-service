@@ -1,13 +1,13 @@
-import type { TeamMember } from "../../types/orchestrator.ts";
-import type { InstanceEntry } from "../../types/ProviderTypes.ts";
+import type { TeamMember } from "#src/types/orchestrator";
+import type { InstanceEntry } from "#src/types/ProviderTypes";
 import { InstanceLoadBalancer } from "./InstanceLoadBalancer.ts";
-import { resolveModelForInstances } from "../../utils/ModelResolution.ts";
+import { resolveModelForInstances } from "#src/utils/ModelResolution";
 import {
   getInstancesByType,
   getInstanceType,
-} from "../../providers/instance-registry.ts";
-import localModelQueue from "../LocalModelQueue.ts";
-import logger from "../../utils/logger.ts";
+} from "#src/providers/instance-registry";
+import localModelQueue from "#src/services/LocalModelQueue";
+import logger from "#src/utils/logger";
 import { getSubAgentFallback } from "./SubAgentFallback.ts";
 
 export interface InstanceResolutionContext {

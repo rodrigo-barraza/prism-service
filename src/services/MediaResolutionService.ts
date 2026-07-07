@@ -4,15 +4,15 @@
 // Extracted from ChatRoutes.ts to enforce route→service architectural boundary.
 
 import FileService from "./FileService.ts";
-import logger from "../utils/logger.ts";
+import logger from "#src/utils/logger";
 import {
   compressImageForSizeLimit,
   constrainImageDimensions,
-} from "../utils/media.ts";
+} from "#src/utils/media";
 
 import type { ConversationMessage } from "./harnesses/types.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import { FILE_CATEGORIES } from "../constants.ts";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { FILE_CATEGORIES } from "#src/constants";
 
 // ─── Compress oversized data URLs ───────────────────────────
 /**

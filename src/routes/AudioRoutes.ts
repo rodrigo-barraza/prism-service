@@ -4,20 +4,20 @@ import {
   roundMilliseconds,
   errorMessage,
 } from "@rodrigo-barraza/utilities-library";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 import express, { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
-import { getProvider } from "../providers/index.ts";
-import { ProviderError } from "../utils/errors.ts";
-import { MODALITY_TYPES, getPricing, getModelByName } from "../config.ts";
-import { calculateAudioCost } from "../utils/CostCalculator.ts";
-import ConversationService from "../services/ConversationService.ts";
-import FileService from "../services/FileService.ts";
-import logger from "../utils/logger.ts";
-import RequestLogger from "../services/RequestLogger.ts";
-import { FILE_CATEGORIES } from "../constants.ts";
+import { getProvider } from "#src/providers/index";
+import { ProviderError } from "#src/utils/errors";
+import { MODALITY_TYPES, getPricing, getModelByName } from "#src/config";
+import { calculateAudioCost } from "#src/utils/CostCalculator";
+import ConversationService from "#src/services/ConversationService";
+import FileService from "#src/services/FileService";
+import logger from "#src/utils/logger";
+import RequestLogger from "#src/services/RequestLogger";
+import { FILE_CATEGORIES } from "#src/constants";
 
-import type { ChatMessage } from "../types/admin.ts";
+import type { ChatMessage } from "#src/types/admin";
 
 // ── Types ────────────────────────────────────────────────────
 

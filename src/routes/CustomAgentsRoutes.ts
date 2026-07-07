@@ -1,9 +1,9 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
-import CustomAgentService from "../services/CustomAgentService.ts";
-import AgentPersonaRegistry from "../services/AgentPersonaRegistry.ts";
-import logger from "../utils/logger.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import CustomAgentService from "#src/services/CustomAgentService";
+import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
+import logger from "#src/utils/logger";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 const router = express.Router();
 

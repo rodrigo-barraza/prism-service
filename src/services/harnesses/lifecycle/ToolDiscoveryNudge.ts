@@ -1,15 +1,15 @@
-import logger from "../../../utils/logger.ts";
-import PromptLocaleService from "../../PromptLocaleService.ts";
+import logger from "#src/utils/logger";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
-import ToolContext from "../../ToolContext.ts";
+import ToolContext from "#src/services/ToolContext";
 
 import type {
   ToolCall,
   ToolResult,
   ConversationMessage,
   AgenticContext,
-} from "../types.ts";
+} from "#src/services/harnesses/types";
 
 /**
  * ToolDiscoveryNudge — post-search_tools processing for tool discovery chains.

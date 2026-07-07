@@ -5,15 +5,15 @@
 // handleStreamingText (chat.js) and AgenticLoopService.
 // ─────────────────────────────────────────────────────────────
 
-import FileService from "../services/FileService.ts";
+import FileService from "#src/services/FileService";
 import logger from "./logger.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import type { TokenUsage, ToolCallEntry } from "../types/admin.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import { FILE_CATEGORIES } from "../constants.ts";
+import type { TokenUsage, ToolCallEntry } from "#src/types/admin";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { FILE_CATEGORIES } from "#src/constants";
 
 // ── Types ────────────────────────────────────────────────────
 

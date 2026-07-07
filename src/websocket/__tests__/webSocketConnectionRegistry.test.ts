@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import WebSocketConnectionRegistry from "../WebSocketConnectionRegistry.ts";
+import WebSocketConnectionRegistry from "#src/websocket/WebSocketConnectionRegistry";
 
 // ── Mock WebSocket ──────────────────────────────────────────────
 

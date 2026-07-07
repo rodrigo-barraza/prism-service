@@ -1,14 +1,14 @@
-import { expandMessagesForFunctionCall } from "../../../utils/FunctionCallingUtilities.ts";
-import ConversationGenerationTracker from "../../ConversationGenerationTracker.ts";
-import PromptLocaleService from "../../PromptLocaleService.ts";
+import { expandMessagesForFunctionCall } from "#src/utils/FunctionCallingUtilities";
+import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 
-import type BaseAgenticHarness from "../BaseAgenticHarness.ts";
-import type AgenticLoopState from "../../AgenticLoopState.ts";
-import type { AgenticContext, ConversationMessage } from "../types.ts";
+import type BaseAgenticHarness from "#src/services/harnesses/BaseAgenticHarness";
+import type AgenticLoopState from "#src/services/AgenticLoopState";
+import type { AgenticContext, ConversationMessage } from "#src/services/harnesses/types";
 
 /**
  * ExhaustionRecovery — handles the iteration-limit summary pass.

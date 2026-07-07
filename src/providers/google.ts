@@ -1,6 +1,6 @@
-import { ProviderOptions } from "../types/ProviderTypes.ts";
-import type { GenerateTextResult } from "../types/provider.ts";
-import type { JsonValue } from "../types/index.ts";
+import { ProviderOptions } from "#src/types/ProviderTypes";
+import type { GenerateTextResult } from "#src/types/provider";
+import type { JsonValue } from "#src/types/index";
 import {
   GoogleGenAI,
   Modality,
@@ -14,15 +14,15 @@ import {
 } from "@google/genai";
 import crypto from "crypto";
 import { Readable } from "stream";
-import { ProviderError } from "../utils/errors.ts";
-import logger from "../utils/logger.ts";
+import { ProviderError } from "#src/utils/errors";
+import logger from "#src/utils/logger";
 import {
   GOOGLE_CLOUD_GEMINI_API_KEY,
   GOOGLE_TEXT_TO_SPEECH_MODEL,
   GOOGLE_EMBEDDING_MODEL,
-} from "../../config.ts";
-import { MODALITY_TYPES, MODELS, DEFAULT_VOICES, getDefaultModels } from "../config.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+} from "#config";
+import { MODALITY_TYPES, MODELS, DEFAULT_VOICES, getDefaultModels } from "#src/config";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 /** Shape of a model definition from the MODELS catalog. */
 interface ModelDefinition {

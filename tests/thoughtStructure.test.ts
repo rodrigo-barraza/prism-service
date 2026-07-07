@@ -1,23 +1,23 @@
 import "./setup.ts";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { HARNESS_IDS, THOUGHT_STRUCTURES, TYPES } from "../src/constants.ts";
+import { HARNESS_IDS, THOUGHT_STRUCTURES, TYPES } from "#src/constants";
 import { TOPOLOGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
-import AgenticLoopService from "../src/services/AgenticLoopService.ts";
-import ReActHarness from "../src/services/harnesses/ReActHarness.ts";
-import { runTreeOfThoughts } from "../src/services/harnesses/strategies/TreeOfThoughtsStrategy.ts";
-import { runGraphOfThoughts } from "../src/services/harnesses/strategies/GraphOfThoughtsStrategy.ts";
-import AgenticLoopState from "../src/services/AgenticLoopState.ts";
-import SettingsService from "../src/services/SettingsService.ts";
+import AgenticLoopService from "#src/services/AgenticLoopService";
+import ReActHarness from "#src/services/harnesses/ReActHarness";
+import { runTreeOfThoughts } from "#src/services/harnesses/strategies/TreeOfThoughtsStrategy";
+import { runGraphOfThoughts } from "#src/services/harnesses/strategies/GraphOfThoughtsStrategy";
+import AgenticLoopState from "#src/services/AgenticLoopState";
+import SettingsService from "#src/services/SettingsService";
 
 // Mock the Tree of Thoughts strategy to avoid calling the provider
-vi.mock("../src/services/harnesses/strategies/TreeOfThoughtsStrategy.ts", () => ({
+vi.mock("#src/services/harnesses/strategies/TreeOfThoughtsStrategy", () => ({
   runTreeOfThoughts: vi.fn().mockResolvedValue({
     messages: [{ role: "assistant", content: "Mocked ToT result" }],
   }),
 }));
 
 // Mock the Graph of Thoughts strategy to avoid calling the provider
-vi.mock("../src/services/harnesses/strategies/GraphOfThoughtsStrategy.ts", () => ({
+vi.mock("#src/services/harnesses/strategies/GraphOfThoughtsStrategy", () => ({
   runGraphOfThoughts: vi.fn().mockResolvedValue({
     messages: [{ role: "assistant", content: "Mocked GoT result" }],
   }),

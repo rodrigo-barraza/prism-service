@@ -6,9 +6,9 @@ import type { Request, Response, NextFunction } from 'express';
 // 1. ProviderError + errorHandler (src/utils/errors.ts)
 // ═══════════════════════════════════════════════════════════════
 
-import { ProviderError, errorHandler } from '../src/utils/errors.ts';
+import { ProviderError, errorHandler } from '#src/utils/errors';
 
-vi.mock('../src/utils/logger.ts', () => ({
+vi.mock('#src/utils/logger', () => ({
   default: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
 
@@ -169,7 +169,7 @@ describe('errorHandler middleware', () => {
 // 2. ConversationDiscovery (src/utils/ConversationDiscovery.ts)
 // ═══════════════════════════════════════════════════════════════
 
-import { discoverDescendantConversationIds } from '../src/utils/ConversationDiscovery.ts';
+import { discoverDescendantConversationIds } from '#src/utils/ConversationDiscovery';
 
 describe('discoverDescendantConversationIds', () => {
   function createMockDatabase(distinctResults: Record<string, string[][]>) {
@@ -267,18 +267,18 @@ describe('discoverDescendantConversationIds', () => {
 // 3. resolveLockedOffToolNames (src/utils/resolveLockedOffToolNames.ts)
 // ═══════════════════════════════════════════════════════════════
 
-import { resolveLockedOffToolNames } from '../src/utils/resolveLockedOffToolNames.ts';
-import SettingsService from '../src/services/SettingsService.ts';
-import ToolOrchestratorService from '../src/services/ToolOrchestratorService.ts';
+import { resolveLockedOffToolNames } from '#src/utils/resolveLockedOffToolNames';
+import SettingsService from '#src/services/SettingsService';
+import ToolOrchestratorService from '#src/services/ToolOrchestratorService';
 import { TOOL_NAMES, DOMAINS } from '@rodrigo-barraza/utilities-library/taxonomy';
 
-vi.mock('../src/services/SettingsService.ts', () => ({
+vi.mock('#src/services/SettingsService', () => ({
   default: {
     getSection: vi.fn(),
   },
 }));
 
-vi.mock('../src/services/ToolOrchestratorService.ts', () => ({
+vi.mock('#src/services/ToolOrchestratorService', () => ({
   default: {
     isWorkspaceAgentConnected: vi.fn().mockResolvedValue(true),
     getClientToolSchemas: vi.fn().mockReturnValue([]),
@@ -439,8 +439,8 @@ describe('resolveLockedOffToolNames', () => {
 // 4. BenchmarkPresets (src/data/benchmarkPresets.ts)
 // ═══════════════════════════════════════════════════════════════
 
-import { BENCHMARK_PRESETS, type BenchmarkPreset } from '../src/data/benchmarkPresets.ts';
-import { MATCH_MODES } from '../src/types/benchmark.ts';
+import { BENCHMARK_PRESETS, type BenchmarkPreset } from '#src/data/benchmarkPresets';
+import { MATCH_MODES } from '#src/types/benchmark';
 
 describe('BENCHMARK_PRESETS', () => {
   it('should export a non-empty array of presets', () => {
@@ -552,8 +552,8 @@ import {
   SOMATIC_KEYWORDS,
   EMOTION_CLASSIFICATION_PROMPT,
   type PrimaryEmotion,
-} from '../src/services/somatic/SomaticConstants.ts';
-import { PROVIDERS } from "../src/constants.ts";
+} from '#src/services/somatic/SomaticConstants';
+import { PROVIDERS } from "#src/constants";
 
 describe('SomaticConstants', () => {
   describe('PRIMARY_EMOTIONS', () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { buildDateRangeFilter, applyDateRangeFilter, parsePaginationParams } from "../../../utils/QueryBuilders.ts";
-import type { MongoFilter } from "../../../types/express.ts";
+import { buildDateRangeFilter, applyDateRangeFilter, parsePaginationParams } from "#src/utils/QueryBuilders";
+import type { MongoFilter } from "#src/types/express";
 
 describe("QueryBuilders", () => {
   describe("buildDateRangeFilter", () => {

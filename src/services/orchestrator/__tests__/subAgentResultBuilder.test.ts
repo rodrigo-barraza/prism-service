@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { getLastAssistantText, buildSubAgentResult, buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
-import type { ConversationMessage } from "../../harnesses/types.ts";
-import type { SubAgentResult } from "../../../types/orchestrator.ts";
+import { getLastAssistantText, buildSubAgentResult, buildToolCallFallbackSummary } from "#src/services/orchestrator/SubAgentResultBuilder";
+import type { ConversationMessage } from "#src/services/harnesses/types";
+import type { SubAgentResult } from "#src/types/orchestrator";
 
 describe("getLastAssistantText", () => {
   it("returns the text from the last assistant message with string content", () => {

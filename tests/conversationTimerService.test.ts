@@ -1,16 +1,16 @@
 import "./setup.ts";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PROVIDERS, COLLECTIONS } from "../src/constants.ts";
+import { PROVIDERS, COLLECTIONS } from "#src/constants";
 import crypto from "crypto";
-import MongoWrapper from "../src/wrappers/MongoWrapper.ts";
-import ConversationService from "../src/services/ConversationService.ts";
-import * as configModule from "../src/config.ts";
-import * as scheduledTaskServiceModule from "../src/services/ScheduledTaskService.ts";
-import * as providersModule from "../src/providers/index.ts";
-import { registerCleanup } from "../src/utils/CleanupRegistry.ts";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import ConversationService from "#src/services/ConversationService";
+import * as configModule from "#src/config";
+import * as scheduledTaskServiceModule from "#src/services/ScheduledTaskService";
+import * as providersModule from "#src/providers/index";
+import { registerCleanup } from "#src/utils/CleanupRegistry";
 
 // ── Mock logger (suppress output) ──────────────────────────────
-vi.mock("../src/utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     debug: vi.fn(),
@@ -22,7 +22,7 @@ vi.mock("../src/utils/logger.ts", () => ({
 }));
 
 // ── Mock CleanupRegistry (no-op) ───────────────────────────────
-vi.mock("../src/utils/CleanupRegistry.ts", () => ({
+vi.mock("#src/utils/CleanupRegistry", () => ({
   registerCleanup: vi.fn(),
 }));
 
@@ -34,7 +34,7 @@ const mockRunAgenticLoop = vi.fn().mockImplementation(async (options) => {
   return undefined;
 });
 
-vi.mock("../src/services/AgenticLoopService.ts", () => ({
+vi.mock("#src/services/AgenticLoopService", () => ({
   default: {
     runAgenticLoop: (...parameters: unknown[]) => mockRunAgenticLoop(...parameters),
   },
@@ -175,7 +175,7 @@ vi.mocked(MongoWrapper.getDb).mockImplementation(() => {
 });
 
 // ── Import AFTER mocks are wired ───────────────────────────────
-import ConversationTimerService, { type ConversationTimer } from "../src/services/ConversationTimerService.ts";
+import ConversationTimerService, { type ConversationTimer } from "#src/services/ConversationTimerService";
 
 // ── Test fixtures ──────────────────────────────────────────────
 const TIMER_FIXTURE: ConversationTimer = {
@@ -292,8 +292,8 @@ describe("ConversationTimerService", () => {
     it("should register and execute cleanup hook", async () => {
       vi.resetModules();
 
-      const { registerCleanup: dynamicRegisterCleanup } = await import("../src/utils/CleanupRegistry.ts");
-      const { default: dynamicTimerService } = await import("../src/services/ConversationTimerService.ts");
+      const { registerCleanup: dynamicRegisterCleanup } = await import("#src/utils/CleanupRegistry");
+      const { default: dynamicTimerService } = await import("#src/services/ConversationTimerService");
 
       expect(dynamicRegisterCleanup).toHaveBeenCalledWith(expect.any(Function));
       const cleanupHook = vi.mocked(dynamicRegisterCleanup).mock.calls[0][0];

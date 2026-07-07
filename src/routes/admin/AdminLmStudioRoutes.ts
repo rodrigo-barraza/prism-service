@@ -1,13 +1,13 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
-import { getProvider } from "../../providers/index.ts";
-import type { LmStudioProvider } from "../../providers/lm-studio.ts";
-import { PROVIDERS } from "../../constants.ts";
-import { resolveArchParams, estimateMemory } from "../../utils/gguf-arch.ts";
-import logger from "../../utils/logger.ts";
-import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
-import type { ProviderOptions } from "../../types/provider.ts";
+import { getProvider } from "#src/providers/index";
+import type { LmStudioProvider } from "#src/providers/lm-studio";
+import { PROVIDERS } from "#src/constants";
+import { resolveArchParams, estimateMemory } from "#src/utils/gguf-arch";
+import logger from "#src/utils/logger";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import type { ProviderOptions } from "#src/types/provider";
 
 const router = express.Router();
 

@@ -1,22 +1,22 @@
-import logger from "../../utils/logger.ts";
-import PromptLocaleService from "../PromptLocaleService.ts";
+import logger from "#src/utils/logger";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 import {
   TOOL_NAMES,
   DOMAINS,
   CORE_AGENTIC_TOOLS,
   CORE_ORCHESTRATOR_TOOLS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { INTERNAL_TOOL_EMOJIS } from "../tool-orchestrator/InternalToolEmojis.ts";
-import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
-import SettingsService from "../SettingsService.ts";
-import { TOOLS } from "../../constants.ts";
+import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
+import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";
+import SettingsService from "#src/services/SettingsService";
+import { TOOLS } from "#src/constants";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 import {
   getCurrentDynamicTools,
   persistDynamicTools,
 } from "./utils/DynamicToolHelpers.ts";
 
-import { getGlobalToolOrchestratorService } from "../../types/GlobalToolOrchestratorRegistry.ts";
+import { getGlobalToolOrchestratorService } from "#src/types/GlobalToolOrchestratorRegistry";
 
 const getToolOrchestratorService = () => {
   return getGlobalToolOrchestratorService();

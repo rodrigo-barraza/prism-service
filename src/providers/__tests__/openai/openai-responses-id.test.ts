@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { prepareResponsesInput, OpenAIMessage } from "../../openai.ts";
+import { prepareResponsesInput, OpenAIMessage } from "#src/providers/openai";
 
 describe("OpenAI Responses API input preparation", () => {
   const prepareInput = (messages: OpenAIMessage[]): any[] => {

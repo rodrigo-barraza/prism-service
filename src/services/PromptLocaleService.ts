@@ -1,8 +1,8 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import logger from "../utils/logger.ts";
-import { DEFAULT_LOCALE } from "../constants.ts";
+import logger from "#src/utils/logger";
+import { DEFAULT_LOCALE } from "#src/constants";
 
 // ────────────────────────────────────────────────────────────
 // PromptLocaleService — Agent Prompt Internationalization

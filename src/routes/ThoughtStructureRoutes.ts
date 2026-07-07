@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import {
   THOUGHT_STRUCTURE_DEFINITIONS,
   getThoughtStructureById,
-} from "../services/harnesses/strategies/ThoughtStructureRegistry.ts";
+} from "#src/services/harnesses/strategies/ThoughtStructureRegistry";
 
 const router: Router = Router();
 

@@ -1,33 +1,33 @@
-import { expandMessagesForFunctionCall } from "../../utils/FunctionCallingUtilities.ts";
+import { expandMessagesForFunctionCall } from "#src/utils/FunctionCallingUtilities";
 import { roundMilliseconds } from "@rodrigo-barraza/utilities-library";
-import RepetitionDetector from "../../utils/RepetitionDetector.ts";
+import RepetitionDetector from "#src/utils/RepetitionDetector";
 import {
   mergeUsage,
   createUsageAccumulator,
   calculateTextCost,
   estimateTokens,
-} from "../../utils/CostCalculator.ts";
-import { calculateTokensPerSec } from "../../utils/math.ts";
-import { getPricing, MODALITY_TYPES } from "../../config.ts";
-import { stripToolCallMarkup } from "../../utils/StreamChunkDispatcher.ts";
-import ContextWindowManager from "../../utils/ContextWindowManager.ts";
+} from "#src/utils/CostCalculator";
+import { calculateTokensPerSec } from "#src/utils/math";
+import { getPricing, MODALITY_TYPES } from "#src/config";
+import { stripToolCallMarkup } from "#src/utils/StreamChunkDispatcher";
+import ContextWindowManager from "#src/utils/ContextWindowManager";
 import ContextBudgetTracker from "./ContextBudgetTracker.ts";
 import {
   DEFAULT_MAX_INPUT_TOKENS,
   DEFAULT_MAX_OUTPUT_TOKENS,
-} from "../../constants/TokenBudgetDefaults.ts";
-import ConversationGenerationTracker from "../ConversationGenerationTracker.ts";
-import ConversationStatusRegistry from "../ConversationStatusRegistry.ts";
-import RequestLogger from "../RequestLogger.ts";
-import FileService from "../FileService.ts";
-import { FILE_CATEGORIES, UNITS, DEFAULT_LOCALE } from "../../constants.ts";
+} from "#src/constants/TokenBudgetDefaults";
+import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
+import ConversationStatusRegistry from "#src/services/ConversationStatusRegistry";
+import RequestLogger from "#src/services/RequestLogger";
+import FileService from "#src/services/FileService";
+import { FILE_CATEGORIES, UNITS, DEFAULT_LOCALE } from "#src/constants";
 import {
   finalizeTextGeneration,
   type FinalizerContext,
   type DeferredDoneEvent,
   computeNewTurnMessages,
 } from "./lifecycle/Finalizer.ts";
-import logger from "../../utils/logger.ts";
+import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import {
   SERVER_SENT_EVENT_TYPES,
@@ -37,19 +37,19 @@ import {
   CORE_ORCHESTRATOR_TOOLS as CORE_ORCHESTRATOR_TOOLS_LIST,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 
-import ToolContext from "../ToolContext.ts";
-import InternalToolRegistry from "../local-tools/InternalToolRegistry.ts";
+import ToolContext from "#src/services/ToolContext";
+import InternalToolRegistry from "#src/services/local-tools/InternalToolRegistry";
 
-import WebhookEventBus from "../WebhookEventBus.ts";
-import ToolOrchestratorService from "../ToolOrchestratorService.ts";
-import AgenticToolResolver from "../AgenticToolResolver.ts";
-import { ToolDocFormatter } from "../system-prompt/ToolDocFormatter.ts";
-import { getToolPolicyAddendum } from "../personas/utils.ts";
-import PromptLocaleService from "../PromptLocaleService.ts";
-import type AgenticLoopState from "../AgenticLoopState.ts";
-import type AgentHooks from "../AgentHooks.ts";
-import type { ChatMessage, TokenUsage } from "../../types/admin.ts";
-import type { MessagePayload, ToolCallPayload } from "../conversation/types.ts";
+import WebhookEventBus from "#src/services/WebhookEventBus";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
+import AgenticToolResolver from "#src/services/AgenticToolResolver";
+import { ToolDocFormatter } from "#src/services/system-prompt/ToolDocFormatter";
+import { getToolPolicyAddendum } from "#src/services/personas/utils";
+import PromptLocaleService from "#src/services/PromptLocaleService";
+import type AgenticLoopState from "#src/services/AgenticLoopState";
+import type AgentHooks from "#src/services/AgentHooks";
+import type { ChatMessage, TokenUsage } from "#src/types/admin";
+import type { MessagePayload, ToolCallPayload } from "#src/services/conversation/types";
 import type {
   AgenticContext,
   AgenticOptions,

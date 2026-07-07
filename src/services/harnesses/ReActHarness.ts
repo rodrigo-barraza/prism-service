@@ -2,7 +2,7 @@ import BaseAgenticHarness from "./BaseAgenticHarness.ts";
 import { runTreeOfThoughts } from "./strategies/TreeOfThoughtsStrategy.ts";
 import { runGraphOfThoughts } from "./strategies/GraphOfThoughtsStrategy.ts";
 import { roundMilliseconds } from "@rodrigo-barraza/utilities-library";
-import logger from "../../utils/logger.ts";
+import logger from "#src/utils/logger";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
@@ -53,10 +53,10 @@ import {
 } from "./lifecycle/SandboxExecutor.ts";
 import SemanticStallDetector from "./lifecycle/SemanticStallDetector.ts";
 
-import PlanningModeService from "../PlanningModeService.ts";
-import PromptLocaleService from "../PromptLocaleService.ts";
-import ConversationStatusRegistry from "../ConversationStatusRegistry.ts";
-import { HARNESS } from "../../constants.ts";
+import PlanningModeService from "#src/services/PlanningModeService";
+import PromptLocaleService from "#src/services/PromptLocaleService";
+import ConversationStatusRegistry from "#src/services/ConversationStatusRegistry";
+import { HARNESS } from "#src/constants";
 
 import type {
   ConversationMessage,
@@ -765,15 +765,15 @@ export default class ReActHarness extends BaseAgenticHarness {
 
       if (hasNonBlockingDispatchBreak && agentConversationId && conversationId) {
         try {
-          const { default: ConversationService } = await import("../conversation/ConversationService.ts");
-          const { COLLECTIONS } = await import("../../constants.ts");
+          const { default: ConversationService } = await import("#src/services/conversation/ConversationService");
+          const { COLLECTIONS } = await import("#src/constants");
           await ConversationService.adjustPendingBackgroundTasks(conversationId, project, username, 1, { collection: COLLECTIONS.AGENT_CONVERSATIONS });
         } catch (e) {}
       }
 
       if (hasNonBlockingDispatchBreak && agentConversationId) {
         await this.finalize(currentMessages, hooks, { deferDoneEmission: true });
-        const { default: OrchestratorService } = await import("../OrchestratorService.ts");
+        const { default: OrchestratorService } = await import("#src/services/OrchestratorService");
         await OrchestratorService.awaitPendingDispatches(agentConversationId);
       } else {
         await this.finalize(currentMessages, hooks);

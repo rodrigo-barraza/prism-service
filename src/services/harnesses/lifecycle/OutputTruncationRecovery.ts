@@ -18,19 +18,19 @@
  * what happened on the next turn (error-as-context pattern).
  */
 
-import logger from "../../../utils/logger.ts";
-import { LOG_PREVIEW } from "../../../constants.ts";
-import PromptLocaleService from "../../PromptLocaleService.ts";
+import logger from "#src/utils/logger";
+import { LOG_PREVIEW } from "#src/constants";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 import {
   DEFAULT_MAX_OUTPUT_TOKENS,
   TOKEN_ESCALATION_MULTIPLIER,
   MAX_OUTPUT_TRUNCATION_RECOVERIES,
-} from "../../../constants/TokenBudgetDefaults.ts";
+} from "#src/constants/TokenBudgetDefaults";
 import type {
   ConversationMessage,
   PassState,
   AgenticContext,
-} from "../types.ts";
+} from "#src/services/harnesses/types";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 

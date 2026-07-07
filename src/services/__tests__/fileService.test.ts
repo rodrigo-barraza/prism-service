@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import FileService from "../FileService.ts";
-import MinioWrapper from "../../wrappers/MinioWrapper.ts";
-import { FILE_CATEGORIES, TYPES } from "../../constants.ts";
+import FileService from "#src/services/FileService";
+import MinioWrapper from "#src/wrappers/MinioWrapper";
+import { FILE_CATEGORIES, TYPES } from "#src/constants";
 
-vi.mock("../../wrappers/MinioWrapper.ts", () => ({
+vi.mock("#src/wrappers/MinioWrapper", () => ({
   default: {
     isAvailable: vi.fn(),
     upload: vi.fn(),

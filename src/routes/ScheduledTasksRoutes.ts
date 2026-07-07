@@ -1,10 +1,10 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response } from "express";
-import ScheduledTaskService from "../services/ScheduledTaskService.ts";
-import logger from "../utils/logger.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import { PROVIDERS } from "../constants.ts";
-import { MODELS } from "../config.ts";
+import ScheduledTaskService from "#src/services/ScheduledTaskService";
+import logger from "#src/utils/logger";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { PROVIDERS } from "#src/constants";
+import { MODELS } from "#src/config";
 
 const router = express.Router();
 

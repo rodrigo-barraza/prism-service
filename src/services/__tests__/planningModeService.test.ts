@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -18,12 +18,12 @@ vi.mock("../../utils/logger.ts", () => ({
 }));
 
 const { default: PlanningModeService } = await import(
-  "../PlanningModeService.ts"
+  "#src/services/PlanningModeService"
 );
 
 // ── Helpers ────────────────────────────────────────────────────
 
-import type { ConversationMessage } from "../harnesses/types.ts";
+import type { ConversationMessage } from "#src/services/harnesses/types";
 
 function createBaseMessages(): ConversationMessage[] {
   return [

@@ -109,7 +109,7 @@ const MOCK_ORCHESTRATOR_SCHEMAS = [
 
 // ── Mock dependencies ────────────────────────────────────────
 
-vi.mock("../ToolOrchestratorService.ts", () => ({
+vi.mock("#src/services/ToolOrchestratorService", () => ({
   default: {
     ensureSchemas: vi.fn().mockResolvedValue(undefined),
     getToolSchemas: vi.fn(() => [
@@ -158,7 +158,7 @@ vi.mock("../ToolOrchestratorService.ts", () => ({
   },
 }));
 
-vi.mock("../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getCollection: vi.fn(() => ({
       findOne: vi.fn().mockResolvedValue(null),
@@ -166,7 +166,7 @@ vi.mock("../../wrappers/MongoWrapper.ts", () => ({
   },
 }));
 
-vi.mock("../../config.ts", async (importOriginal) => {
+vi.mock("#src/config", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../config.ts")>();
   return {
     ...actual,
@@ -174,7 +174,7 @@ vi.mock("../../config.ts", async (importOriginal) => {
   };
 });
 
-vi.mock("../config.ts", () => ({
+vi.mock("#src/services/config", () => ({
   MONGO_DB_NAME: "prism-test",
   TYPES: { IMAGE: "image" },
 }));
@@ -207,7 +207,7 @@ const mockUnlockedPersona = {
   coreToolsLocked: false,
 };
 
-vi.mock("../AgentPersonaRegistry.ts", () => ({
+vi.mock("#src/services/AgentPersonaRegistry", () => ({
   default: {
     get: vi.fn((agentId) => {
       if (agentId === "CODING") return mockCodingPersona;
@@ -220,13 +220,13 @@ vi.mock("../AgentPersonaRegistry.ts", () => ({
   },
 }));
 
-vi.mock("../local-tools/InternalToolRegistry.ts", () => ({
+vi.mock("#src/services/local-tools/InternalToolRegistry", () => ({
   default: {
     getNames: vi.fn(() => MOCK_INTERNAL_NAMES),
   },
 }));
 
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -237,10 +237,10 @@ vi.mock("../../utils/logger.ts", () => ({
 // ── Import after mocks ──────────────────────────────────────
 
 const { default: AgenticToolResolver } = await import(
-  "../AgenticToolResolver.js"
+  "#src/services/AgenticToolResolver"
 );
 const { default: ToolOrchestratorService } = await import(
-  "../ToolOrchestratorService.js"
+  "#src/services/ToolOrchestratorService"
 );
 
 // ── Tests ───────────────────────────────────────────────────

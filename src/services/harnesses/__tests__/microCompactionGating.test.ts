@@ -11,10 +11,10 @@
  */
 import { describe, it, expect } from "vitest";
 
-import MicroCompactionService from "../../compact/MicroCompactionService.ts";
-import ContextWindowManager from "../../../utils/ContextWindowManager.ts";
-import type { ChatMessage } from "../../../types/admin.ts";
-import { TOOL_NAMES } from "../../ToolTaxonomyConstants.ts";
+import MicroCompactionService from "#src/services/compact/MicroCompactionService";
+import ContextWindowManager from "#src/utils/ContextWindowManager";
+import type { ChatMessage } from "#src/types/admin";
+import { TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
 
 // ── Helpers ─────────────────────────────────────────────────
 

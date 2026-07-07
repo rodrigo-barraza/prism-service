@@ -3,15 +3,15 @@
 // phase transitions, HWM aggregate progress, and event routing.
 // Extracted from OrchestratorService._runSubAgentLoop()
 
-import ConversationGenerationTracker from "../ConversationGenerationTracker.ts";
-import ConversationStatusRegistry from "../ConversationStatusRegistry.ts";
-import WebSocketConnectionRegistry from "../../websocket/WebSocketConnectionRegistry.ts";
+import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
+import ConversationStatusRegistry from "#src/services/ConversationStatusRegistry";
+import WebSocketConnectionRegistry from "#src/websocket/WebSocketConnectionRegistry";
 import { estimateTokens } from "./SubAgentResultBuilder.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import type { EmitFunction, ToolCall } from "../harnesses/types.ts";
+import type { EmitFunction, ToolCall } from "#src/services/harnesses/types";
 
 interface SubAgentTelemetryConfig {
   subAgentId: string;

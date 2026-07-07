@@ -1,12 +1,12 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import { ObjectId } from "mongodb";
-import requireDb from "../middleware/RequireDbMiddleware.ts";
-import EmbeddingService from "../services/EmbeddingService.ts";
-import logger from "../utils/logger.ts";
-import { COLLECTIONS } from "../constants.ts";
-import { PostSkillSchema, PutSkillSchema } from "../types/index.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import requireDb from "#src/middleware/RequireDbMiddleware";
+import EmbeddingService from "#src/services/EmbeddingService";
+import logger from "#src/utils/logger";
+import { COLLECTIONS } from "#src/constants";
+import { PostSkillSchema, PutSkillSchema } from "#src/types/index";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 const router = express.Router();
 router.use(requireDb);

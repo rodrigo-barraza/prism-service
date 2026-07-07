@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import AgenticLoopService from "../AgenticLoopService.ts";
-import ContextWindowManager from "../../utils/ContextWindowManager.ts";
-import SettingsService from "../SettingsService.ts";
-import { HARNESS_IDS, PROVIDERS, MESSAGE_ROLES } from "../../constants.ts";
-import { TYPES } from "../../config.ts";
+import AgenticLoopService from "#src/services/AgenticLoopService";
+import ContextWindowManager from "#src/utils/ContextWindowManager";
+import SettingsService from "#src/services/SettingsService";
+import { HARNESS_IDS, PROVIDERS, MESSAGE_ROLES } from "#src/constants";
+import { TYPES } from "#src/config";
 
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -16,7 +16,7 @@ vi.mock("../../utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../ToolOrchestratorService.ts", () => ({
+vi.mock("#src/services/ToolOrchestratorService", () => ({
   default: {
     ensureSchemas: vi.fn().mockResolvedValue(undefined),
     getToolSchemas: vi.fn().mockReturnValue([
@@ -36,7 +36,7 @@ vi.mock("../ToolOrchestratorService.ts", () => ({
   },
 }));
 
-vi.mock("../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getDb: vi.fn().mockReturnValue({
       collection: vi.fn().mockReturnValue({
@@ -53,13 +53,13 @@ vi.mock("../../wrappers/MongoWrapper.ts", () => ({
   },
 }));
 
-vi.mock("../FileService.ts", () => ({
+vi.mock("#src/services/FileService", () => ({
   default: {
     uploadFile: vi.fn().mockResolvedValue({ ref: "minio-ref" }),
   },
 }));
 
-vi.mock("../RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: {
     logChatGeneration: vi.fn().mockResolvedValue(undefined),
     insertPending: vi.fn().mockResolvedValue("mock-pending-id"),
@@ -68,13 +68,13 @@ vi.mock("../RequestLogger.ts", () => ({
   },
 }));
 
-vi.mock("../local-tools/InternalToolRegistry.ts", () => ({
+vi.mock("#src/services/local-tools/InternalToolRegistry", () => ({
   default: {
     getNames: vi.fn().mockReturnValue(new Set()),
   },
 }));
 
-vi.mock("../../utils/ContextWindowManager.ts", () => ({
+vi.mock("#src/utils/ContextWindowManager", () => ({
   default: {
     enforce: vi.fn().mockImplementation((messages) => ({
       truncated: false,
@@ -86,7 +86,7 @@ vi.mock("../../utils/ContextWindowManager.ts", () => ({
   },
 }));
 
-vi.mock("../ConversationGenerationTracker.ts", () => ({
+vi.mock("#src/services/ConversationGenerationTracker", () => ({
   default: {
     register: vi.fn(),
     update: vi.fn(),
@@ -112,7 +112,7 @@ vi.mock("../ConversationGenerationTracker.ts", () => ({
   },
 }));
 
-vi.mock("../system-prompt/index.ts", () => ({
+vi.mock("#src/services/system-prompt/index", () => ({
   default: class {
     constructor() {}
     createHook() {
@@ -121,8 +121,8 @@ vi.mock("../system-prompt/index.ts", () => ({
   },
 }));
 
-vi.mock("../SettingsService.ts", async () => {
-  const { HARNESS_IDS } = await import("../../constants.ts");
+vi.mock("#src/services/SettingsService", async () => {
+  const { HARNESS_IDS } = await import("#src/constants");
   return {
     default: {
       getCached: vi.fn(),
@@ -138,17 +138,17 @@ vi.mock("../SettingsService.ts", async () => {
   };
 });
 
-vi.mock("../../routes/ChatRoutes.ts", () => ({
+vi.mock("#src/routes/ChatRoutes", () => ({
   finalizeTextGeneration: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("../MemoryExtractor.ts", () => ({
+vi.mock("#src/services/MemoryExtractor", () => ({
   default: {
     createHook: vi.fn().mockReturnValue(async () => {}),
   },
 }));
 
-vi.mock("../PlanningModeService.ts", () => ({
+vi.mock("#src/services/PlanningModeService", () => ({
   default: {
     injectPlanningInstruction: vi.fn(),
     stripPlanningInstruction: vi.fn(),
@@ -409,7 +409,7 @@ describe("AgenticLoopService", () => {
     await AgenticLoopService.runAgenticLoop(mockContext);
 
     // Should register generation against the parent/coordinator session
-    const ConversationGenerationTracker = (await import("../ConversationGenerationTracker.ts")).default;
+    const ConversationGenerationTracker = (await import("#src/services/ConversationGenerationTracker")).default;
     
     // Verify register was called with the parent session ID and source: sub-agent
     expect(ConversationGenerationTracker.register).toHaveBeenCalledWith(

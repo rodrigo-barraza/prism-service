@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { PROVIDERS, MODEL_TYPES, TYPES } from '../../../constants.ts';
+import { PROVIDERS, MODEL_TYPES, TYPES } from '#src/constants';
 
-vi.mock('../../../config.ts', () => ({
+vi.mock('#src/config', () => ({
   MODALITY_TYPES: {
     TEXT: 'text',
     IMAGE: 'image',
@@ -35,12 +35,12 @@ import {
   normalizeVllmModel,
   NORMALIZER_BY_TYPE,
   HF_ENRICHED_TYPES,
-} from '../normalizers.ts';
+} from '#src/services/local-provider/normalizers';
 import type {
   LmStudioRawModel,
   OllamaRawModel,
   OpenAICompatRawModel,
-} from '../types.ts';
+} from '#src/services/local-provider/types';
 
 describe('normalizers', () => {
   describe('normalizeLmStudioModel', () => {

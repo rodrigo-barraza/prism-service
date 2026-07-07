@@ -7,9 +7,9 @@
  * Wrong cost = incorrect billing display. Wrong providers = broken model filters.
  */
 import { describe, it, expect, vi } from "vitest";
-import { PROVIDERS, COLLECTIONS } from "../../constants.ts";
+import { PROVIDERS, COLLECTIONS } from "#src/constants";
 
-vi.mock("../FileService.ts", () => ({
+vi.mock("#src/services/FileService", () => ({
   default: {
     isExternalStorage: () => false,
     isMinioRef: () => false,
@@ -17,7 +17,7 @@ vi.mock("../FileService.ts", () => ({
   },
 }));
 
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -31,10 +31,10 @@ const {
   extractProviders,
   computeTotalCost,
   buildConversationPatchFields,
-} = await import("../conversation/utils.ts");
+} = await import("#src/services/conversation/utils");
 
 // ── Type alias for convenience ────────────────────────────────
-import type { ChatMessage as TestMessage } from "../../types/admin.ts";
+import type { ChatMessage as TestMessage } from "#src/types/admin";
 
 // ═══════════════════════════════════════════════════════════════
 describe("computeModalities", () => {

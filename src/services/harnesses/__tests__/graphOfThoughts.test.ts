@@ -1,19 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS } from "../../../constants.ts";
-import { runGraphOfThoughts } from "../strategies/GraphOfThoughtsStrategy.ts";
-import { APPROVAL_TIERS } from "../../AutoApprovalEngine.ts";
+import { PROVIDERS } from "#src/constants";
+import { runGraphOfThoughts } from "#src/services/harnesses/strategies/GraphOfThoughtsStrategy";
+import { APPROVAL_TIERS } from "#src/services/AutoApprovalEngine";
 import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { runExhaustionRecoveryPass } from "../lifecycle/ExhaustionRecovery.ts";
-import { validateAfterToolExecution } from "../lifecycle/ValidationInterceptor.ts";
-import { isOutputTruncated } from "../lifecycle/OutputTruncationRecovery.ts";
-import { checkCostBudget } from "../lifecycle/CostBudgetEnforcer.ts";
-import { checkAndWaitForApproval } from "../lifecycle/ApprovalGate.ts";
-import { handleCodexPlanningResponse } from "../lifecycle/CodexPlanningDetector.ts";
-import { handleExitPlanMode } from "../lifecycle/PlanModeController.ts";
-import RequestLogger from "../../RequestLogger.ts";
+import { runExhaustionRecoveryPass } from "#src/services/harnesses/lifecycle/ExhaustionRecovery";
+import { validateAfterToolExecution } from "#src/services/harnesses/lifecycle/ValidationInterceptor";
+import { isOutputTruncated } from "#src/services/harnesses/lifecycle/OutputTruncationRecovery";
+import { checkCostBudget } from "#src/services/harnesses/lifecycle/CostBudgetEnforcer";
+import { checkAndWaitForApproval } from "#src/services/harnesses/lifecycle/ApprovalGate";
+import { handleCodexPlanningResponse } from "#src/services/harnesses/lifecycle/CodexPlanningDetector";
+import { handleExitPlanMode } from "#src/services/harnesses/lifecycle/PlanModeController";
+import RequestLogger from "#src/services/RequestLogger";
 
 // Mock logger to avoid printing in tests
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -21,16 +21,16 @@ vi.mock("../../../utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../lifecycle/SandboxExecutor.ts", () => ({
+vi.mock("#src/services/harnesses/lifecycle/SandboxExecutor", () => ({
   createSandboxCheckpoint: vi.fn().mockReturnValue("mock-stash-ref"),
   restoreSandboxCheckpoint: vi.fn(),
 }));
 
-vi.mock("../lifecycle/ValidationInterceptor.ts", () => ({
+vi.mock("#src/services/harnesses/lifecycle/ValidationInterceptor", () => ({
   validateAfterToolExecution: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("../lifecycle/OutputTruncationRecovery.ts", () => ({
+vi.mock("#src/services/harnesses/lifecycle/OutputTruncationRecovery", () => ({
   isOutputTruncated: vi.fn().mockReturnValue(false),
   injectContinuationContext: vi.fn().mockReturnValue(100),
   injectErrorAsConversationMessage: vi.fn(),
@@ -39,23 +39,23 @@ vi.mock("../lifecycle/OutputTruncationRecovery.ts", () => ({
   MAX_OUTPUT_TRUNCATION_RECOVERIES: 3,
 }));
 
-vi.mock("../lifecycle/ExhaustionRecovery.ts", () => ({
+vi.mock("#src/services/harnesses/lifecycle/ExhaustionRecovery", () => ({
   runExhaustionRecoveryPass: vi.fn().mockResolvedValue({ messages: [] }),
 }));
 
-vi.mock("../lifecycle/CostBudgetEnforcer.ts", () => ({
+vi.mock("#src/services/harnesses/lifecycle/CostBudgetEnforcer", () => ({
   checkCostBudget: vi.fn().mockReturnValue(false),
 }));
 
-vi.mock("../lifecycle/ApprovalGate.ts", () => ({
+vi.mock("#src/services/harnesses/lifecycle/ApprovalGate", () => ({
   checkAndWaitForApproval: vi.fn().mockResolvedValue({ isApproved: true, shouldApproveAll: false }),
 }));
 
-vi.mock("../lifecycle/CodexPlanningDetector.ts", () => ({
+vi.mock("#src/services/harnesses/lifecycle/CodexPlanningDetector", () => ({
   handleCodexPlanningResponse: vi.fn().mockReturnValue({ shouldContinueLoop: false }),
 }));
 
-vi.mock("../../RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: {
     logBackgroundLlmCall: vi.fn().mockResolvedValue(undefined),
     logChatGeneration: vi.fn().mockResolvedValue(undefined),
@@ -64,7 +64,7 @@ vi.mock("../../RequestLogger.ts", () => ({
   },
 }));
 
-vi.mock("../lifecycle/HookInitializer.ts", async () => {
+vi.mock("#src/services/harnesses/lifecycle/HookInitializer", async () => {
   const actual = await vi.importActual("../lifecycle/HookInitializer.ts") as any;
   return {
     ...actual,
@@ -83,7 +83,7 @@ vi.mock("../lifecycle/HookInitializer.ts", async () => {
   };
 });
 
-vi.mock("../lifecycle/PlanModeController.ts", async () => {
+vi.mock("#src/services/harnesses/lifecycle/PlanModeController", async () => {
   const actual = await vi.importActual("../lifecycle/PlanModeController.ts") as any;
   return {
     ...actual,

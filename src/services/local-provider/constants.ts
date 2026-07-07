@@ -1,4 +1,4 @@
-import { PROVIDERS } from "../../constants.ts";
+import { PROVIDERS } from "#src/constants";
 
 // Re-exported from utilities-library (single source of truth)
 export { LOCAL_PROVIDER_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";

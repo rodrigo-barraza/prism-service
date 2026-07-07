@@ -1,13 +1,13 @@
 import type { Db, ChangeStreamDocument } from "mongodb";
-import MongoWrapper from "../wrappers/MongoWrapper.ts";
-import { MONGO_DB_NAME } from "../../config.ts";
-import logger from "../utils/logger.ts";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import { MONGO_DB_NAME } from "#config";
+import logger from "#src/utils/logger";
 import {
   COLLECTIONS,
   CHANGE_STREAM_RECONNECT_INTERVAL_MILLISECONDS,
   CHANGE_STREAM_RETRY_DELAY_MILLISECONDS,
-} from "../constants.ts";
-import { registerCleanup } from "../utils/CleanupRegistry.ts";
+} from "#src/constants";
+import { registerCleanup } from "#src/utils/CleanupRegistry";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 
 /**

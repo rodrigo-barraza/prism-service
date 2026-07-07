@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import supertest from 'supertest';
 import { app } from './setup.ts';
-import conversationsRouter from '../src/routes/ConversationsRoutes.ts';
-import MongoWrapper from '../src/wrappers/MongoWrapper.ts';
-import { COLLECTIONS } from '../src/constants.ts';
-import ConversationService from '../src/services/ConversationService.ts';
+import conversationsRouter from '#src/routes/ConversationsRoutes';
+import MongoWrapper from '#src/wrappers/MongoWrapper';
+import { COLLECTIONS } from '#src/constants';
+import ConversationService from '#src/services/ConversationService';
 
 // Mount the conversations router
 app.use('/conversations', conversationsRouter);

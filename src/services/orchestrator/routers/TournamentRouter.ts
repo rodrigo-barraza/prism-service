@@ -3,24 +3,24 @@ import type {
   OrchestratorContext,
   OrchestratorSpawnParams,
   SubAgentResult,
-} from "../../../types/orchestrator.ts";
-import { nextGlobalSpawnIndex } from "../../../types/orchestrator.ts";
+} from "#src/types/orchestrator";
+import { nextGlobalSpawnIndex } from "#src/types/orchestrator";
 import type {
   TopologyRouter,
   ContinueSubAgentCallback,
   TopologyConfig,
-} from "../TopologyRouter.ts";
+} from "#src/services/orchestrator/TopologyRouter";
 import {
   resolveSiblingInstances,
   selectInstanceForMember,
-} from "../InstanceResolver.ts";
-import { getProvider } from "../../../providers/index.ts";
-import logger from "../../../utils/logger.ts";
-import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
-import RequestLogger from "../../RequestLogger.ts";
-import PromptLocaleService from "../../PromptLocaleService.ts";
-import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
-import { ORCHESTRATOR, SYSTEM_STATUSES } from "../../../constants.ts";
+} from "#src/services/orchestrator/InstanceResolver";
+import { getProvider } from "#src/providers/index";
+import logger from "#src/utils/logger";
+import { buildToolCallFallbackSummary } from "#src/services/orchestrator/SubAgentResultBuilder";
+import RequestLogger from "#src/services/RequestLogger";
+import PromptLocaleService from "#src/services/PromptLocaleService";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { ORCHESTRATOR, SYSTEM_STATUSES } from "#src/constants";
 
 const MAXIMUM_EVALUATION_CHARACTERS = ORCHESTRATOR.MAXIMUM_SYNTHESIS_CHARACTERS;
 const DEFAULT_VERIFICATION_COMMANDS = ["tsc --noEmit", "npm test"];

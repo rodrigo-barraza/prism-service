@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 
-vi.mock("../config.ts", () => ({
+vi.mock("#src/utils/config", () => ({
   PRISM_SERVICE_PORT: 0,
   OPENAI_API_KEY: "fake",
   ANTHROPIC_API_KEY: "fake",
@@ -24,7 +24,7 @@ vi.mock("../config.ts", () => ({
   MONGO_DB_NAME: "prism-test",
 }));
 
-vi.mock("../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     createClient: vi.fn(),
     getDb: vi.fn().mockReturnValue(null),
@@ -32,7 +32,7 @@ vi.mock("../../wrappers/MongoWrapper.ts", () => ({
   },
 }));
 
-vi.mock("../../services/ConversationService.ts", () => ({
+vi.mock("#src/services/ConversationService", () => ({
   default: {
     appendMessages: vi.fn(),
     setGenerating: vi.fn(),
@@ -40,11 +40,11 @@ vi.mock("../../services/ConversationService.ts", () => ({
   },
 }));
 
-vi.mock("../../services/RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: { log: vi.fn(), logChatGeneration: vi.fn(), logBackgroundLlmCall: vi.fn() },
 }));
 
-vi.mock("../../services/SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
     get: vi.fn().mockResolvedValue({}),
@@ -55,20 +55,20 @@ vi.mock("../../services/SettingsService.ts", () => ({
   },
 }));
 
-import { PROVIDERS, TYPES, MODEL_TYPES } from "../../constants.ts";
+import { PROVIDERS, TYPES, MODEL_TYPES } from "#src/constants";
 
 
-vi.mock("../../providers/index.ts", () => ({
+vi.mock("#src/providers/index", () => ({
   getProvider: vi.fn(),
   listProviders: () => [],
 }));
 
 const { buildJsonResponseFromEvents } = await import(
-  "../SseUtilities.ts"
+  "#src/utils/SseUtilities"
 );
 
-import type { SseEvent } from "../../types/SseTypes.ts";
-import type { ChatRequest } from "../../types/schemas.ts";
+import type { SseEvent } from "#src/types/SseTypes";
+import type { ChatRequest } from "#src/types/schemas";
 
 function callBuildJsonResponse(events: SseEvent[], requestBody: Partial<ChatRequest>) {
   return buildJsonResponseFromEvents(events, {

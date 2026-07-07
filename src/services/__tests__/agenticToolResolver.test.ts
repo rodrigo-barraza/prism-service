@@ -9,7 +9,7 @@
 // ────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS, TYPES } from "../../constants.ts";
+import { PROVIDERS, TYPES } from "#src/constants";
 
 // ── Mock dependencies ────────────────────────────────────────
 
@@ -103,7 +103,7 @@ const MOCK_INTERNAL_TOOL_SCHEMAS = [
 ];
 
 // Mock ToolOrchestratorService
-vi.mock("../ToolOrchestratorService.ts", () => ({
+vi.mock("#src/services/ToolOrchestratorService", () => ({
   default: {
     ensureSchemas: vi.fn().mockResolvedValue(undefined),
     getToolSchemas: vi.fn(() => [...MOCK_TOOLS_API_SCHEMAS, ...MOCK_ORCHESTRATOR_TOOL_SCHEMAS, ...MOCK_INTERNAL_TOOL_SCHEMAS]),
@@ -120,7 +120,7 @@ vi.mock("../ToolOrchestratorService.ts", () => ({
 }));
 
 // Mock MongoWrapper
-vi.mock("../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getCollection: vi.fn(() => ({
       findOne: vi.fn().mockResolvedValue(null),
@@ -128,7 +128,7 @@ vi.mock("../../wrappers/MongoWrapper.ts", () => ({
   },
 }));
 
-vi.mock("../../config.ts", async (importOriginal) => {
+vi.mock("#src/config", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../config.ts")>();
   return {
     ...actual,
@@ -137,7 +137,7 @@ vi.mock("../../config.ts", async (importOriginal) => {
   };
 });
 
-vi.mock("../config.ts", () => ({
+vi.mock("#src/services/config", () => ({
   MONGO_DB_NAME: "prism-test",
   TYPES,
 }));
@@ -163,7 +163,7 @@ const mockCustomAgentEmpty = {
 const mockWildcardPersona = {
   availableTools: ["*"],
 };
-vi.mock("../AgentPersonaRegistry.ts", () => ({
+vi.mock("#src/services/AgentPersonaRegistry", () => ({
   default: {
     get: vi.fn((agent) => {
       if (agent === "CODING") return mockPersona;
@@ -179,13 +179,13 @@ vi.mock("../AgentPersonaRegistry.ts", () => ({
 
 
 // Mock InternalToolRegistry
-vi.mock("../local-tools/InternalToolRegistry.ts", () => ({
+vi.mock("#src/services/local-tools/InternalToolRegistry", () => ({
   default: {
     getNames: vi.fn(() => new Set(["think", "sleep"])),
   },
 }));
 
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -196,9 +196,9 @@ vi.mock("../../utils/logger.ts", () => ({
 // ── Import after mocks ──────────────────────────────────────
 
 const { default: AgenticToolResolver } = await import(
-  "../AgenticToolResolver.js"
+  "#src/services/AgenticToolResolver"
 );
-import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
+import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";
 
 // ── Tests ───────────────────────────────────────────────────
 

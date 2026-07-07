@@ -35,8 +35,6 @@ RUN apk add --no-cache ffmpeg
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package.json ./package.json
-# Root-level JS files imported by dist/ via ../config.js
-COPY --from=build /app/dist/config.js ./config.js
 
 # Non-root user for security
 RUN addgroup --system --gid 1001 prism && \
@@ -48,4 +46,4 @@ EXPOSE 7777
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget --no-verbose --tries=1 -O /dev/null http://127.0.0.1:7777/health || exit 1
 
-CMD ["node", "dist/boot.js"]
+CMD ["node", "--conditions=production", "dist/boot.js"]

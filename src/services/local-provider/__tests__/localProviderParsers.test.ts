@@ -4,7 +4,7 @@ import {
   parseParamsFromName,
   parseQuantFromName,
   parsePublisherFromName,
-} from '../nameParsers.ts';
+} from '#src/services/local-provider/nameParsers';
 
 describe('nameParsers', () => {
   describe('formatParams', () => {

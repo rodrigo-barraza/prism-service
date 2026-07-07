@@ -1,13 +1,13 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
-import requireDb from "../middleware/RequireDbMiddleware.ts";
-import logger from "../utils/logger.ts";
+import requireDb from "#src/middleware/RequireDbMiddleware";
+import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import { COLLECTIONS } from "../constants.ts";
+import { COLLECTIONS } from "#src/constants";
 import {
   PostSynthesisBodySchema,
   PatchSynthesisBodySchema,
-} from "../types/index.ts";
+} from "#src/types/index";
 
 const router = express.Router();
 router.use(requireDb);

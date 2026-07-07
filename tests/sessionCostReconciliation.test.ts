@@ -14,10 +14,10 @@
  * pattern already used for toolCounts enrichment.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { COLLECTIONS, PROVIDERS } from "../src/constants.ts";
+import { COLLECTIONS, PROVIDERS } from "#src/constants";
 
 // ── Mock logger (top-level as vitest requires) ──────────────────
-vi.mock("../src/utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -26,17 +26,17 @@ vi.mock("../src/utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../config.ts", () => ({
+vi.mock("#config", () => ({
   MONGO_DB_NAME: "prism-test",
 }));
 
 // Import after mocks
-const { computeTotalCost } = await import("../src/services/ConversationService.ts");
+const { computeTotalCost } = await import("#src/services/ConversationService");
 const {
   mergeUsage,
   createUsageAccumulator,
   calculateTextCost,
-} = await import("../src/utils/CostCalculator.ts");
+} = await import("#src/utils/CostCalculator");
 
 // ═══════════════════════════════════════════════════════════════
 describe("Session Cost Reconciliation", () => {
@@ -341,8 +341,8 @@ describe("Session Cost Reconciliation", () => {
     beforeEach(async () => {
       const request = (await import("supertest")).default;
       const { app } = await import("./setup.ts");
-      const adminRouter = (await import("../src/routes/AdminRoutes.ts")).default;
-      const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+      const adminRouter = (await import("#src/routes/AdminRoutes")).default;
+      const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
 
       try {
         app.use("/admin", adminRouter);

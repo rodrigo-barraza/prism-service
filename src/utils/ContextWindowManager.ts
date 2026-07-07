@@ -1,13 +1,13 @@
 import logger from "./logger.ts";
 import { estimateTokens } from "./CostCalculator.ts";
-import type { ChatMessage, ToolCallEntry } from "../types/admin.ts";
-import MicroCompactionService from "../services/compact/MicroCompactionService.ts";
-import PromptLocaleService from "../services/PromptLocaleService.ts";
-import { PROMPT_DELIMITERS, CONTEXT_WINDOW, COMPACTION, LOG_PREVIEW } from "../constants.ts";
+import type { ChatMessage, ToolCallEntry } from "#src/types/admin";
+import MicroCompactionService from "#src/services/compact/MicroCompactionService";
+import PromptLocaleService from "#src/services/PromptLocaleService";
+import { PROMPT_DELIMITERS, CONTEXT_WINDOW, COMPACTION, LOG_PREVIEW } from "#src/constants";
 import {
   DEFAULT_MAX_INPUT_TOKENS,
   MIN_OUTPUT_RESERVE,
-} from "../constants/TokenBudgetDefaults.ts";
+} from "#src/constants/TokenBudgetDefaults";
 
 // ────────────────────────────────────────────────────────────
 // ContextWindowManager — Token-Budget Truncation

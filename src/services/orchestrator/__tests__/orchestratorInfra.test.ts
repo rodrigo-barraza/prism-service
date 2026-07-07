@@ -1,25 +1,25 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PROVIDERS } from "../../../constants.ts";
-import { InstanceLoadBalancer } from "../InstanceLoadBalancer.ts";
+import { PROVIDERS } from "#src/constants";
+import { InstanceLoadBalancer } from "#src/services/orchestrator/InstanceLoadBalancer";
 import {
   resolveSiblingInstances,
   selectInstanceForMember,
-} from "../InstanceResolver.ts";
-import { GitWorktreeHelper } from "../GitWorktreeHelper.ts";
-import { SubAgentTelemetryEmitter } from "../SubAgentTelemetryEmitter.ts";
-import { evictIdleSecondaryModel } from "../VramEvictionPolicy.ts";
-import ConversationGenerationTracker from "../../ConversationGenerationTracker.ts";
+} from "#src/services/orchestrator/InstanceResolver";
+import { GitWorktreeHelper } from "#src/services/orchestrator/GitWorktreeHelper";
+import { SubAgentTelemetryEmitter } from "#src/services/orchestrator/SubAgentTelemetryEmitter";
+import { evictIdleSecondaryModel } from "#src/services/orchestrator/VramEvictionPolicy";
+import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
 
 // ── Mock providers ────────────────────────────────────────────────────
 const mockGetProvider = vi.fn();
-vi.mock("../../../providers/index.ts", () => ({
+vi.mock("#src/providers/index", () => ({
   getProvider: (name: string) => mockGetProvider(name),
   listProviders: () => [PROVIDERS.GOOGLE, PROVIDERS.OPENAI, PROVIDERS.LM_STUDIO],
   providers: {},
 }));
 
 // ── Mock ModelResolution ──────────────────────────────────────────────
-vi.mock("../../../utils/ModelResolution.ts", () => ({
+vi.mock("#src/utils/ModelResolution", () => ({
   resolveModelForInstances: vi.fn().mockResolvedValue({
     usable: [],
     modelOverrides: new Map(),
@@ -27,25 +27,25 @@ vi.mock("../../../utils/ModelResolution.ts", () => ({
 }));
 
 // ── Mock instance-registry ────────────────────────────────────────────
-vi.mock("../../../providers/instance-registry.ts", () => ({
+vi.mock("#src/providers/instance-registry", () => ({
   getInstancesByType: vi.fn().mockReturnValue([]),
   getInstanceType: vi.fn().mockReturnValue(PROVIDERS.GOOGLE),
 }));
 
 // ── Mock LocalModelQueue ──────────────────────────────────────────────
-vi.mock("../../LocalModelQueue.ts", () => ({
+vi.mock("#src/services/LocalModelQueue", () => ({
   default: {
     isLocal: vi.fn().mockReturnValue(false),
   },
 }));
 
 // ── Mock SubAgentFallback ─────────────────────────────────────────────
-vi.mock("../SubAgentFallback.ts", () => ({
+vi.mock("#src/services/orchestrator/SubAgentFallback", () => ({
   getSubAgentFallback: vi.fn().mockResolvedValue(null),
 }));
 
 // ── Mock ConversationGenerationTracker ────────────────────────────────
-vi.mock("../../ConversationGenerationTracker.ts", () => ({
+vi.mock("#src/services/ConversationGenerationTracker", () => ({
   default: {
     getConversationStats: vi.fn().mockReturnValue({
       totalOutputTokens: 100,
@@ -262,7 +262,7 @@ describe("Orchestrator Infrastructure Suite", () => {
   // ────────────────────────────────────────────────────────────────────
   describe("InstanceResolver", () => {
     it("should return unchanged provider if not a local provider", async () => {
-      const localModelQueueMock = await import("../../LocalModelQueue.ts");
+      const localModelQueueMock = await import("#src/services/LocalModelQueue");
       vi.mocked(localModelQueueMock.default.isLocal).mockReturnValue(false);
 
       const resolved = await resolveSiblingInstances(
@@ -283,9 +283,9 @@ describe("Orchestrator Infrastructure Suite", () => {
     });
 
     it("should resolve sibling instances and model overrides for local provider", async () => {
-      const localModelQueueMock = await import("../../LocalModelQueue.ts");
-      const instanceRegistryMock = await import("../../../providers/instance-registry.ts");
-      const modelResolutionMock = await import("../../../utils/ModelResolution.ts");
+      const localModelQueueMock = await import("#src/services/LocalModelQueue");
+      const instanceRegistryMock = await import("#src/providers/instance-registry");
+      const modelResolutionMock = await import("#src/utils/ModelResolution");
 
       vi.mocked(localModelQueueMock.default.isLocal).mockReturnValue(true);
       vi.mocked(instanceRegistryMock.getInstanceType).mockReturnValue(PROVIDERS.LM_STUDIO);

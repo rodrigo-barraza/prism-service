@@ -2,12 +2,12 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import express, { Request, Response, NextFunction } from "express";
 import { ObjectId } from "mongodb";
-import requireDb from "../middleware/RequireDbMiddleware.ts";
-import MCPClientService from "../services/MCPClientService.ts";
-import type { MCPServerConfig } from "../services/MCPClientService.ts";
-import logger from "../utils/logger.ts";
-import { COLLECTIONS } from "../constants.ts";
-import { PostMcpServerSchema, PutMcpServerSchema } from "../types/index.ts";
+import requireDb from "#src/middleware/RequireDbMiddleware";
+import MCPClientService from "#src/services/MCPClientService";
+import type { MCPServerConfig } from "#src/services/MCPClientService";
+import logger from "#src/utils/logger";
+import { COLLECTIONS } from "#src/constants";
+import { PostMcpServerSchema, PutMcpServerSchema } from "#src/types/index";
 
 const router = express.Router();
 router.use(requireDb);

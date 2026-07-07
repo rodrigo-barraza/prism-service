@@ -8,17 +8,17 @@ import {
   buildExecutionTiers,
   buildDependencyContextPrefix,
   type DecomposedSubtask,
-} from "../src/services/orchestrator/routers/DivideAndConquerRouter.ts";
+} from "#src/services/orchestrator/routers/DivideAndConquerRouter";
 import { MOCK_GENERATE_TEXT } from "./setup.ts";
-import { getProvider } from "../src/providers/index.ts";
+import { getProvider } from "#src/providers/index";
 import type {
   TeamMember,
   OrchestratorContext,
   OrchestratorSpawnParams,
   SubAgentResult,
-} from "../src/types/orchestrator.ts";
+} from "#src/types/orchestrator";
 
-vi.mock("../src/utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -26,7 +26,7 @@ vi.mock("../src/utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../src/services/orchestrator/InstanceResolver.ts", () => ({
+vi.mock("#src/services/orchestrator/InstanceResolver", () => ({
   resolveSiblingInstances: vi.fn().mockResolvedValue({
     isLocal: false,
     siblings: [],

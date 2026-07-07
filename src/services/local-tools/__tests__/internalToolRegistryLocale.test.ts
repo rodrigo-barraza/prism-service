@@ -19,7 +19,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ── Mock heavy services that require DB / network ──────────
 
-vi.mock("../../SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getSection: vi.fn().mockResolvedValue({
       topology: "hierarchical",
@@ -32,7 +32,7 @@ vi.mock("../../SettingsService.ts", () => ({
   },
 }));
 
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -41,7 +41,7 @@ vi.mock("../../../utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../../RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: {
     logRequest: vi.fn(),
   },
@@ -69,7 +69,7 @@ describe("InternalToolRegistry Locale Handling", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    const registryModule = await import("../InternalToolRegistry.ts");
+    const registryModule = await import("#src/services/local-tools/InternalToolRegistry");
     InternalToolRegistry = registryModule.default;
   });
 

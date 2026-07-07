@@ -22,8 +22,8 @@ import {
   CLUSTER_THRESHOLD,
   CONVERSATIONAL_CLUSTER_THRESHOLD,
   MAX_CLUSTER_SIZE,
-} from '../memory/ClusterDetection.ts';
-import type { MemoryDoc } from '../memory/types.ts';
+} from '#src/services/memory/ClusterDetection';
+import type { MemoryDoc } from '#src/services/memory/types';
 
 function createMemoryWithEmbedding(
   id: string,

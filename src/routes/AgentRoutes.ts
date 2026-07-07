@@ -1,10 +1,10 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
-import AgenticLoopService from "../services/AgenticLoopService.ts";
-import AgentSessionRegistry from "../services/AgentSessionRegistry.ts";
+import AgenticLoopService from "#src/services/AgenticLoopService";
+import AgentSessionRegistry from "#src/services/AgentSessionRegistry";
 import { handleAgent } from "./ChatRoutes.ts";
-import logger from "../utils/logger.ts";
-import { handleSseRequest, handleJsonRequest } from "../utils/SseUtilities.ts";
+import logger from "#src/utils/logger";
+import { handleSseRequest, handleJsonRequest } from "#src/utils/SseUtilities";
 
 const router = express.Router();
 

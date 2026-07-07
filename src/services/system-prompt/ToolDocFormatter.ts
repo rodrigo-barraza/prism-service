@@ -1,7 +1,7 @@
-import ToolOrchestratorService from "../ToolOrchestratorService.ts";
-import AgentPersonaRegistry from "../AgentPersonaRegistry.ts";
-import PromptLocaleService from "../PromptLocaleService.ts";
-import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
+import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
+import PromptLocaleService from "#src/services/PromptLocaleService";
+import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";
 import {
   CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST,
   isCoreDomain,

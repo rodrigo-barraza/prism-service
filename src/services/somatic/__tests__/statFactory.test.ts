@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -10,8 +10,8 @@ vi.mock("../../../utils/logger.ts", () => ({
   },
 }));
 
-import StatFactory from "../StatFactory.ts";
-import type { StatInstance } from "../StatFactory.ts";
+import StatFactory from "#src/services/somatic/StatFactory";
+import type { StatInstance } from "#src/services/somatic/StatFactory";
 
 // ═══════════════════════════════════════════════════════════════
 // StatFactory — Basic Creation

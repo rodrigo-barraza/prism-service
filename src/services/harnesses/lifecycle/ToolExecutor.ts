@@ -1,15 +1,15 @@
-import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
-import ToolContext from "../../ToolContext.ts";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
+import ToolContext from "#src/services/ToolContext";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
-import type AgenticLoopState from "../../AgenticLoopState.ts";
-import type AgentHooks from "../../AgentHooks.ts";
+import type AgenticLoopState from "#src/services/AgenticLoopState";
+import type AgentHooks from "#src/services/AgentHooks";
 import type {
   ToolCall,
   ToolResult,
   AgenticContext,
   ResolvedTools,
-} from "../types.ts";
+} from "#src/services/harnesses/types";
 
 /**
  * ToolExecutor — parallel and single tool execution extracted from

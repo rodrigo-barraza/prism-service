@@ -1,9 +1,9 @@
 import { DEFAULT_USERNAME } from "@rodrigo-barraza/utilities-library/taxonomy";
 import crypto from "crypto";
 import type { Readable } from "stream";
-import MinioWrapper from "../wrappers/MinioWrapper.ts";
-import logger from "../utils/logger.ts";
-import { FILE_CATEGORIES } from "../constants.ts";
+import MinioWrapper from "#src/wrappers/MinioWrapper";
+import logger from "#src/utils/logger";
+import { FILE_CATEGORIES } from "#src/constants";
 const MIME_TO_EXT: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",

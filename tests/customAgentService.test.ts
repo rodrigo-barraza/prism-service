@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createMockCollection } from "./mongoMock.ts";
 import { ObjectId } from "mongodb";
 
-vi.mock("../src/wrappers/MongoWrapper.ts", () => {
+vi.mock("#src/wrappers/MongoWrapper", () => {
   return {
     default: {
       createClient: vi.fn().mockResolvedValue(undefined),
@@ -17,9 +17,9 @@ vi.mock("@rodrigo-barraza/utilities-library", () => ({
   deriveAgentId: (name: string) => name.toLowerCase().replace(/\s+/g, "-"),
 }));
 
-import CustomAgentService from "../src/services/CustomAgentService.ts";
-import MongoWrapper from "../src/wrappers/MongoWrapper.ts";
-import { COLLECTIONS } from "../src/constants.ts";
+import CustomAgentService from "#src/services/CustomAgentService";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import { COLLECTIONS } from "#src/constants";
 
 describe("CustomAgentService Unit Tests", () => {
   let mockCollection: ReturnType<typeof createMockCollection>;

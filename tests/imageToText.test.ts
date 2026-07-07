@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
-import { PROVIDERS, TYPES } from "../src/constants.ts";
+import { PROVIDERS, TYPES } from "#src/constants";
 import {
   app,
   MOCK_GENERATE_TEXT_STREAM,

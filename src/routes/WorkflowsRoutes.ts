@@ -2,16 +2,16 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { Router, Request, Response, NextFunction } from "express";
 import { EventEmitter } from "node:events";
 import { ObjectId, type Document, type Db } from "mongodb";
-import logger from "../utils/logger.ts";
-import requireDb from "../middleware/RequireDbMiddleware.ts";
-import FileService from "../services/FileService.ts";
-import MinioWrapper from "../wrappers/MinioWrapper.ts";
-import { assembleGraph } from "../services/WorkflowAssembler.ts";
-import WorkflowExecutionService from "../services/WorkflowExecutionService.ts";
-import { createAbortController } from "../utils/AbortController.ts";
-import { registerCleanup } from "../utils/CleanupRegistry.ts";
-import { COLLECTIONS, FILE_CATEGORIES } from "../constants.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import logger from "#src/utils/logger";
+import requireDb from "#src/middleware/RequireDbMiddleware";
+import FileService from "#src/services/FileService";
+import MinioWrapper from "#src/wrappers/MinioWrapper";
+import { assembleGraph } from "#src/services/WorkflowAssembler";
+import WorkflowExecutionService from "#src/services/WorkflowExecutionService";
+import { createAbortController } from "#src/utils/AbortController";
+import { registerCleanup } from "#src/utils/CleanupRegistry";
+import { COLLECTIONS, FILE_CATEGORIES } from "#src/constants";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 interface CustomRequest extends Request {
   db: Db;

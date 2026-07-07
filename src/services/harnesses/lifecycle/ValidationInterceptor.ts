@@ -1,18 +1,18 @@
-import logger from "../../../utils/logger.ts";
-import { TOOL_NAMES } from "../../ToolTaxonomyConstants.ts";
-import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
+import logger from "#src/utils/logger";
+import { TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import path from "node:path";
 import fs from "node:fs";
 
-import type AgenticLoopState from "../../AgenticLoopState.ts";
+import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type {
   ToolCall,
   ToolResult,
   AgenticContext,
   ValidationFeedback,
-} from "../types.ts";
-import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
-import { HARNESS } from "../../../constants.ts";
+} from "#src/services/harnesses/types";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { HARNESS } from "#src/constants";
 
 /**
  * ValidationInterceptor — automatic linter/AST feedback loop.

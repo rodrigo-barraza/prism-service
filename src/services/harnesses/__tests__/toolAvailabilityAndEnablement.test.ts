@@ -30,7 +30,7 @@
 // ────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PROVIDERS, TYPES } from "../../../constants.ts";
+import { PROVIDERS, TYPES } from "#src/constants";
 
 // ── Mock tool schemas ────────────────────────────────────────
 
@@ -171,7 +171,7 @@ const MOCK_MCP_SCHEMAS = [
 
 // ── Mock ToolOrchestratorService ──────────────────────────────
 
-vi.mock("../../ToolOrchestratorService.ts", () => ({
+vi.mock("#src/services/ToolOrchestratorService", () => ({
   default: {
     ensureSchemas: vi.fn().mockResolvedValue(undefined),
     getToolSchemas: vi.fn(() => [...MOCK_TOOLS_API_SCHEMAS, ...MOCK_ORCHESTRATOR_SCHEMAS]),
@@ -184,7 +184,7 @@ vi.mock("../../ToolOrchestratorService.ts", () => ({
 
 // ── Mock SettingsService ─────────────────────────────────────
 
-vi.mock("../../SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
     getSection: vi.fn().mockResolvedValue({ topology: "hierarchical" }),
@@ -193,7 +193,7 @@ vi.mock("../../SettingsService.ts", () => ({
 
 // ── Mock MongoWrapper ────────────────────────────────────────
 
-vi.mock("../../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getCollection: vi.fn(() => ({
       findOne: vi.fn().mockResolvedValue(null),
@@ -203,7 +203,7 @@ vi.mock("../../../wrappers/MongoWrapper.ts", () => ({
 
 // ── Mock config ──────────────────────────────────────────────
 
-vi.mock("../../../config.ts", async (importOriginal) => {
+vi.mock("#src/config", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../config.ts")>();
   return {
     ...actual,
@@ -211,7 +211,7 @@ vi.mock("../../../config.ts", async (importOriginal) => {
   };
 });
 
-vi.mock("../config.ts", () => ({
+vi.mock("#src/services/harnesses/config", () => ({
   MONGO_DB_NAME: "prism-test",
   TYPES: { IMAGE: "image" },
 }));
@@ -246,7 +246,7 @@ const blockedToolsPersona = {
   blockedTools: ["domainKey:creative", "get_stock_price"],
 };
 
-vi.mock("../../AgentPersonaRegistry.ts", () => ({
+vi.mock("#src/services/AgentPersonaRegistry", () => ({
   default: {
     get: vi.fn((agentId: string) => {
       if (agentId === "CODING") return wildcardPersona;
@@ -260,7 +260,7 @@ vi.mock("../../AgentPersonaRegistry.ts", () => ({
 
 // ── Mock InternalToolRegistry ────────────────────────────────
 
-vi.mock("../../local-tools/InternalToolRegistry.ts", () => ({
+vi.mock("#src/services/local-tools/InternalToolRegistry", () => ({
   default: {
     getNames: vi.fn(() => new Set(["think", "sleep", "enter_plan_mode", "exit_plan_mode"])),
   },
@@ -268,7 +268,7 @@ vi.mock("../../local-tools/InternalToolRegistry.ts", () => ({
 
 // ── Mock logger ──────────────────────────────────────────────
 
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -279,12 +279,12 @@ vi.mock("../../../utils/logger.ts", () => ({
 
 // ── Import after mocks ──────────────────────────────────────
 
-const { default: AgenticToolResolver } = await import("../../AgenticToolResolver.ts");
-const { default: ToolOrchestratorService } = await import("../../ToolOrchestratorService.ts");
-const { default: ToolContext } = await import("../../ToolContext.ts");
-const { default: SettingsService } = await import("../../SettingsService.ts");
-const { default: AgentPersonaRegistry } = await import("../../AgentPersonaRegistry.ts");
-const { default: InternalToolRegistry } = await import("../../local-tools/InternalToolRegistry.ts");
+const { default: AgenticToolResolver } = await import("#src/services/AgenticToolResolver");
+const { default: ToolOrchestratorService } = await import("#src/services/ToolOrchestratorService");
+const { default: ToolContext } = await import("#src/services/ToolContext");
+const { default: SettingsService } = await import("#src/services/SettingsService");
+const { default: AgentPersonaRegistry } = await import("#src/services/AgentPersonaRegistry");
+const { default: InternalToolRegistry } = await import("#src/services/local-tools/InternalToolRegistry");
 
 // ── Helpers ─────────────────────────────────────────────────
 

@@ -3,18 +3,18 @@ import type {
   OrchestratorContext,
   OrchestratorSpawnParams,
   SubAgentResult,
-} from "../../../types/orchestrator.ts";
-import { nextGlobalSpawnIndex } from "../../../types/orchestrator.ts";
+} from "#src/types/orchestrator";
+import { nextGlobalSpawnIndex } from "#src/types/orchestrator";
 import type {
   TopologyRouter,
   ContinueSubAgentCallback,
   TopologyConfig,
-} from "../TopologyRouter.ts";
+} from "#src/services/orchestrator/TopologyRouter";
 import {
   resolveSiblingInstances,
   selectInstanceForMember,
-} from "../InstanceResolver.ts";
-import logger from "../../../utils/logger.ts";
+} from "#src/services/orchestrator/InstanceResolver";
+import logger from "#src/utils/logger";
 
 /**
  * Hierarchical Router — Hierarchical Parallel (HP)

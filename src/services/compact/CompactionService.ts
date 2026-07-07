@@ -1,10 +1,10 @@
 import crypto from "crypto";
-import { getProvider } from "../../providers/index.ts";
-import SettingsService from "../SettingsService.ts";
-import RequestLogger from "../RequestLogger.ts";
-import logger from "../../utils/logger.ts";
+import { getProvider } from "#src/providers/index";
+import SettingsService from "#src/services/SettingsService";
+import RequestLogger from "#src/services/RequestLogger";
+import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import { PROMPT_DELIMITERS, COMPACTION } from "../../constants.ts";
+import { PROMPT_DELIMITERS, COMPACTION } from "#src/constants";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
@@ -12,17 +12,17 @@ import {
 import {
   estimateTokens,
   calculateTextCost,
-} from "../../utils/CostCalculator.ts";
-import { MODALITY_TYPES, getPricing } from "../../config.ts";
+} from "#src/utils/CostCalculator";
+import { MODALITY_TYPES, getPricing } from "#src/config";
 import {
   COMPACTION_SYSTEM_PROMPT,
   COMPACTION_USER_PROMPT,
   extractSummaryFromResponse,
   stripImagesFromMessages,
 } from "./CompactionPrompt.ts";
-import type { ChatMessage as AdminChatMessage } from "../../types/admin.ts";
-import type { ChatMessage, GenerateTextResult } from "../../types/provider.ts";
-import type { EmitFunction } from "../harnesses/types.ts";
+import type { ChatMessage as AdminChatMessage } from "#src/types/admin";
+import type { ChatMessage, GenerateTextResult } from "#src/types/provider";
+import type { EmitFunction } from "#src/services/harnesses/types";
 
 // ────────────────────────────────────────────────────────────
 // CompactionService — LLM-Powered Conversation Summarization

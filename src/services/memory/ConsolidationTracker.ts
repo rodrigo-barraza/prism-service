@@ -3,10 +3,10 @@
 // the memory consolidation pipeline.
 // Extracted from MemoryConsolidationService.ts
 
-import MongoWrapper from "../../wrappers/MongoWrapper.ts";
-import { MONGO_DB_NAME } from "../../../config.ts";
-import logger from "../../utils/logger.ts";
-import { COLLECTIONS, MEMORY } from "../../constants.ts";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import { MONGO_DB_NAME } from "#config";
+import logger from "#src/utils/logger";
+import { COLLECTIONS, MEMORY } from "#src/constants";
 import type { ConsolidationAction } from "./types.ts";
 
 /** Min sessions between consolidation runs */

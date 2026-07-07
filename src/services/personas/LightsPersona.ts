@@ -1,8 +1,8 @@
 import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { DOMAIN_KEY_TAGS, TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
+import { DOMAIN_KEY_TAGS, TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
-import PromptLocaleService from "../PromptLocaleService.ts";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 
 const LIGHTS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {

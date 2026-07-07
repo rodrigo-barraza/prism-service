@@ -1,10 +1,10 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { app } from './setup.ts';
-import adminRouter from '../src/routes/AdminRoutes.ts';
-import MongoWrapper from '../src/wrappers/MongoWrapper.ts';
-import * as providersModule from '../src/providers/index.ts';
+import adminRouter from '#src/routes/AdminRoutes';
+import MongoWrapper from '#src/wrappers/MongoWrapper';
+import * as providersModule from '#src/providers/index';
 import request from 'supertest';
-import { PROVIDERS, COLLECTIONS } from "../src/constants.ts";
+import { PROVIDERS, COLLECTIONS } from "#src/constants";
 
 // Mount the admin router
 app.use('/admin', adminRouter);

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 
 // Use a fresh import per test suite — the module is a singleton Map.
 const { default: ConversationStatusRegistry } = await import(
-  "../ConversationStatusRegistry.ts"
+  "#src/services/ConversationStatusRegistry"
 );
 
 const TEST_CONVERSATION_ID = "test-conv-001";

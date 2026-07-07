@@ -3,9 +3,9 @@
  * workspace tool descriptions are stripped when workspaceEnabled: false.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import PromptLocaleService from "../../PromptLocaleService.ts";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 
-vi.mock("../../SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getSection: vi.fn().mockResolvedValue({
       topology: "hierarchical",
@@ -25,7 +25,7 @@ const MOCK_CLIENT_TOOL_SCHEMAS = [
   { name: "list_directory", description: "List directory contents.", domain: "Core Workspace Tools", parameters: { type: "object", properties: { path: { type: "string", description: "Path." } }, required: ["path"] } },
 ];
 
-vi.mock("../../ToolOrchestratorService.ts", () => ({
+vi.mock("#src/services/ToolOrchestratorService", () => ({
   default: {
     getWorkspaceRoot: vi.fn().mockReturnValue("/workspace"),
     getClientToolSchemas: vi.fn().mockReturnValue(MOCK_CLIENT_TOOL_SCHEMAS),
@@ -36,11 +36,11 @@ vi.mock("../../ToolOrchestratorService.ts", () => ({
   },
 }));
 
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-vi.mock("../../RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: { logRequest: vi.fn() },
 }));
 
@@ -51,7 +51,7 @@ describe("Workspace Tool Filtering Integration", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    const module = await import("../index.ts");
+    const module = await import("#src/services/system-prompt/index");
     SystemPromptAssembler = module.default;
   });
 

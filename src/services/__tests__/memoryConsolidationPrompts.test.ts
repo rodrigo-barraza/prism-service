@@ -14,8 +14,8 @@ import {
   formatConversationalMemoryEntry,
   buildBatchInput,
   buildConversationalBatchInput,
-} from '../memory/ConsolidationPrompts.ts';
-import type { MemoryDoc, PartitionMeta } from '../memory/types.ts';
+} from '#src/services/memory/ConsolidationPrompts';
+import type { MemoryDoc, PartitionMeta } from '#src/services/memory/types';
 
 function createMemory(
   id: string,

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS } from "../../constants.ts";
+import { PROVIDERS } from "#src/constants";
 
 // Unmock RequestLogger so we test the actual implementation
 vi.unmock("../RequestLogger.ts");
@@ -15,7 +15,7 @@ const mockGetDb = vi.fn().mockReturnValue({
   collection: () => mockCollection,
 });
 
-vi.mock("../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getDb: (...arguments_: any[]) => mockGetDb(...arguments_),
   },
@@ -23,13 +23,13 @@ vi.mock("../../wrappers/MongoWrapper.ts", () => ({
 
 // ── Mock WebhookEventBus ──────────────────────────────────────────────
 const mockWebhookEmit = vi.fn();
-vi.mock("../WebhookEventBus.ts", () => ({
+vi.mock("#src/services/WebhookEventBus", () => ({
   default: {
     emit: (...arguments_: any[]) => mockWebhookEmit(...arguments_),
   },
 }));
 
-import RequestLogger from "../RequestLogger.ts";
+import RequestLogger from "#src/services/RequestLogger";
 
 describe("RequestLogger Unit Tests Suite", () => {
   beforeEach(() => {

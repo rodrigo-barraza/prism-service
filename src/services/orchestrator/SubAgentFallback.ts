@@ -1,4 +1,4 @@
-import SettingsService from "../SettingsService.ts";
+import SettingsService from "#src/services/SettingsService";
 
 export async function getSubAgentFallback(): Promise<{
   provider: string;

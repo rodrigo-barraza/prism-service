@@ -1,5 +1,5 @@
-import SettingsService from "../services/SettingsService.ts";
-import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
+import SettingsService from "#src/services/SettingsService";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import {
   TOOL_NAMES,
   DOMAINS,

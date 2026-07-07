@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { app, MOCK_GENERATE_EMBEDDING } from "./setup.ts";
-import { PROVIDERS, TYPES } from "../src/constants.ts";
+import { PROVIDERS, TYPES } from "#src/constants";
 
 describe("POST /modality-to-embedding", () => {
     beforeEach(() => {

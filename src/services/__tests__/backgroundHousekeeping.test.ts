@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as fsPromises from "node:fs/promises";
-import BackgroundHousekeepingService from "../BackgroundHousekeepingService.ts";
-import MongoWrapper from "../../wrappers/MongoWrapper.ts";
-import MinioWrapper from "../../wrappers/MinioWrapper.ts";
+import BackgroundHousekeepingService from "#src/services/BackgroundHousekeepingService";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import MinioWrapper from "#src/wrappers/MinioWrapper";
 
 vi.mock("node:fs/promises", () => ({
   readdir: vi.fn(),

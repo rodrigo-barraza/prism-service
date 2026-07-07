@@ -19,10 +19,10 @@ import { describe, it, expect } from "vitest";
 import {
   OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
   MINIMUM_CLAMPED_OUTPUT_TOKENS,
-} from "../../../constants/TokenBudgetDefaults.ts";
-import { estimateTokens } from "../../../utils/CostCalculator.ts";
+} from "#src/constants/TokenBudgetDefaults";
+import { estimateTokens } from "#src/utils/CostCalculator";
 
-import type { ConversationMessage } from "../types.ts";
+import type { ConversationMessage } from "#src/services/harnesses/types";
 
 // ── Helpers ─────────────────────────────────────────────────
 

@@ -8,10 +8,10 @@ import {
   getDataUrlMimeType,
   getUrlType,
   inferMimeFromUrl,
-} from "../media.ts";
-import { TYPES } from "../../constants.ts";
+} from "#src/utils/media";
+import { TYPES } from "#src/constants";
 
-vi.mock("../logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 

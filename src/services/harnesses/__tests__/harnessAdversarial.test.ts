@@ -19,15 +19,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { HARNESS_IDS, PROVIDERS, THOUGHT_STRUCTURES, TYPES } from "../../../constants.ts";
-import { ChatRequestSchema } from "../../../types/schemas.ts";
-import AgenticLoopState from "../../AgenticLoopState.ts";
-import ToolContext from "../../ToolContext.ts";
+import { HARNESS_IDS, PROVIDERS, THOUGHT_STRUCTURES, TYPES } from "#src/constants";
+import { ChatRequestSchema } from "#src/types/schemas";
+import AgenticLoopState from "#src/services/AgenticLoopState";
+import ToolContext from "#src/services/ToolContext";
 import {
   pendingApprovals,
   pendingQuestions,
-} from "../../ApprovalRegistry.ts";
-import HarnessRegistry from "../HarnessRegistry.ts";
+} from "#src/services/ApprovalRegistry";
+import HarnessRegistry from "#src/services/harnesses/HarnessRegistry";
 
 
 // ═══════════════════════════════════════════════════════════════════

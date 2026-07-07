@@ -9,12 +9,12 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Request, Response, NextFunction } from "express";
-import { requestContext } from "../src/utils/RequestContext.ts";
+import { requestContext } from "#src/utils/RequestContext";
 import supertest from "supertest";
 import { app } from "./setup.ts";
 
 // Import the middleware under test
-import { authMiddleware } from "../src/middleware/AuthMiddleware.ts";
+import { authMiddleware } from "#src/middleware/AuthMiddleware";
 
 // ── Helpers ────────────────────────────────────────────────────
 

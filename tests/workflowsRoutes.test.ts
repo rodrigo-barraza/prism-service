@@ -2,15 +2,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import supertest from 'supertest';
 import { ObjectId } from 'mongodb';
 import { app } from './setup.ts';
-import workflowsRouter from '../src/routes/WorkflowsRoutes.ts';
-import MongoWrapper from '../src/wrappers/MongoWrapper.ts';
-import WorkflowExecutionService from '../src/services/WorkflowExecutionService.ts';
-import { COLLECTIONS, TYPES } from '../src/constants.ts';
+import workflowsRouter from '#src/routes/WorkflowsRoutes';
+import MongoWrapper from '#src/wrappers/MongoWrapper';
+import WorkflowExecutionService from '#src/services/WorkflowExecutionService';
+import { COLLECTIONS, TYPES } from '#src/constants';
 
 // Mount the workflows router
 app.use('/workflows', workflowsRouter);
 
-vi.mock('../src/services/WorkflowExecutionService.ts', () => ({
+vi.mock('#src/services/WorkflowExecutionService', () => ({
   default: {
     executeWorkflow: vi.fn(),
   },

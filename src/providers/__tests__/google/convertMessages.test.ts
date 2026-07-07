@@ -10,7 +10,7 @@ import { describe, it, expect } from "vitest";
 import {
   convertMessages,
   type ConversationMessage,
-} from "../../google.ts";
+} from "#src/providers/google";
 
 // ── Helpers ──────────────────────────────────────────────────
 function makeMessage(

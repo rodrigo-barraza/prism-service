@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock logger to avoid spamming the console
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     warn: vi.fn(),
     info: vi.fn(),
@@ -9,7 +9,7 @@ vi.mock("../../utils/logger.ts", () => ({
   },
 }));
 
-import AgentSessionRegistry from "../AgentSessionRegistry.ts";
+import AgentSessionRegistry from "#src/services/AgentSessionRegistry";
 
 describe("AgentSessionRegistry Unit Tests", () => {
   beforeEach(() => {

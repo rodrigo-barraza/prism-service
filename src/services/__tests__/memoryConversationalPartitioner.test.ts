@@ -13,8 +13,8 @@ import {
   partitionConversationalMemories,
   findStaleConversationalMemories,
   CONVERSATIONAL_STALENESS_CONFIG,
-} from '../memory/ConversationalMemoryPartitioner.ts';
-import type { MemoryDoc } from '../memory/types.ts';
+} from '#src/services/memory/ConversationalMemoryPartitioner';
+import type { MemoryDoc } from '#src/services/memory/types';
 
 function createMemory(
   id: string,

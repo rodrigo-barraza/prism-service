@@ -1,4 +1,4 @@
-import { getModelByName } from "../config.ts";
+import { getModelByName } from "#src/config";
 import type {
   WorkflowStep,
   WorkflowMessage,
@@ -11,7 +11,7 @@ import type {
   InputNode,
   ModelNode,
   ViewerNode,
-} from "../types/workflow.ts";
+} from "#src/types/workflow";
 
 // ─── LAYOUT CONSTANTS ───────────────────────────────────────
 

@@ -1,14 +1,14 @@
 import "./setup.ts";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import googleProvider from "../src/providers/google.ts";
-import anthropicProvider from "../src/providers/anthropic.ts";
-import AgenticLoopState from "../src/services/AgenticLoopState.ts";
-import { MODELS } from "../src/config.ts";
-import { HARNESS_IDS, PROVIDERS, TYPES } from "../src/constants.ts";
+import googleProvider from "#src/providers/google";
+import anthropicProvider from "#src/providers/anthropic";
+import AgenticLoopState from "#src/services/AgenticLoopState";
+import { MODELS } from "#src/config";
+import { HARNESS_IDS, PROVIDERS, TYPES } from "#src/constants";
 import {
   extractThinkTags,
   ThinkTagParser,
-} from "../src/utils/ThinkTagParser.ts";
+} from "#src/utils/ThinkTagParser";
 
 
 // ── Mock @google/genai module in detail ──────────────────────────────
@@ -397,10 +397,10 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
 
       // Import BaseAgenticHarness and ConversationGenerationTracker
       const { default: BaseAgenticHarness } = await import(
-        "../src/services/harnesses/BaseAgenticHarness.ts"
+        "#src/services/harnesses/BaseAgenticHarness"
       );
       const { default: ConversationGenerationTracker } = await import(
-        "../src/services/ConversationGenerationTracker.ts"
+        "#src/services/ConversationGenerationTracker"
       );
 
       class DummyHarness extends BaseAgenticHarness {
@@ -770,10 +770,10 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       };
 
       const { default: BaseAgenticHarness } = await import(
-        "../src/services/harnesses/BaseAgenticHarness.ts"
+        "#src/services/harnesses/BaseAgenticHarness"
       );
       const { default: ConversationGenerationTracker } = await import(
-        "../src/services/ConversationGenerationTracker.ts"
+        "#src/services/ConversationGenerationTracker"
       );
 
       class DummyHarness extends BaseAgenticHarness {

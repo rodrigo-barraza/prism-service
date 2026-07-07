@@ -15,7 +15,7 @@ import {
   clearGraphCache,
   getGraphCacheSize,
   GRAPH_CACHE_TIME_TO_LIVE_MILLISECONDS,
-} from "../ConversationGraphCache.ts";
+} from "#src/services/conversation/ConversationGraphCache";
 import type { GraphData } from "@rodrigo-barraza/utilities-library/graph";
 
 // ── Test Fixtures ──────────────────────────────────────────────────

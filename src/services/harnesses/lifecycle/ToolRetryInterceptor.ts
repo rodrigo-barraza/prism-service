@@ -1,13 +1,13 @@
-import logger from "../../../utils/logger.ts";
-import PromptLocaleService from "../../PromptLocaleService.ts";
+import logger from "#src/utils/logger";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 
-import { LOG_PREVIEW } from "../../../constants.ts";
-import type AgenticLoopState from "../../AgenticLoopState.ts";
+import { LOG_PREVIEW } from "#src/constants";
+import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type {
   ToolCall,
   ToolResult,
   ConversationMessage,
-} from "../types.ts";
+} from "#src/services/harnesses/types";
 
 /**
  * ToolRetryInterceptor — structured retry guidance on tool failure.

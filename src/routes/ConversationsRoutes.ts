@@ -3,25 +3,25 @@ import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { DEFAULT_USERNAME } from "@rodrigo-barraza/utilities-library/taxonomy";
 import express, { Request, Response, NextFunction } from "express";
 import { ObjectId, type Document } from "mongodb";
-import requireDb from "../middleware/RequireDbMiddleware.ts";
+import requireDb from "#src/middleware/RequireDbMiddleware";
 import ConversationService, {
   buildConversationPatchFields,
   type ConversationPatchInput,
   enrichConversationsWithRequestCosts,
   enrichSingleConversationCost,
   prepareDisplayMessages,
-} from "../services/ConversationService.ts";
-import { COLLECTIONS, COST_SUMMATION_EXPRESSION, ORCHESTRATOR } from "../constants.ts";
-import logger from "../utils/logger.ts";
-import ConversationTimerService from "../services/ConversationTimerService.ts";
-import ConversationStatusRegistry from "../services/ConversationStatusRegistry.ts";
-import AgenticLoopService from "../services/AgenticLoopService.ts";
+} from "#src/services/ConversationService";
+import { COLLECTIONS, COST_SUMMATION_EXPRESSION, ORCHESTRATOR } from "#src/constants";
+import logger from "#src/utils/logger";
+import ConversationTimerService from "#src/services/ConversationTimerService";
+import ConversationStatusRegistry from "#src/services/ConversationStatusRegistry";
+import AgenticLoopService from "#src/services/AgenticLoopService";
 import {
   GetConversationsQuerySchema,
   PostConversationMessagesBodySchema,
   PatchConversationBodySchema,
-} from "../types/index.ts";
-import { CONVERSATION_LIST_BASE_PROJECTION } from "../utils/QueryBuilders.ts";
+} from "#src/types/index";
+import { CONVERSATION_LIST_BASE_PROJECTION } from "#src/utils/QueryBuilders";
 
 const router = express.Router();
 router.use(requireDb);

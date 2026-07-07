@@ -10,10 +10,10 @@ import {
   parseModelQuant,
   findBestQuantFallback,
   resolveModelForInstances,
-} from "../../utils/ModelResolution.ts";
-import type { InstanceEntry } from "../../types/ProviderTypes.ts";
+} from "#src/utils/ModelResolution";
+import type { InstanceEntry } from "#src/types/ProviderTypes";
 
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -23,7 +23,7 @@ vi.mock("../../utils/logger.ts", () => ({
 
 const mockGetProvider = vi.fn();
 
-vi.mock("../../providers/index.ts", () => ({
+vi.mock("#src/providers/index", () => ({
   getProvider: (...arguments_: unknown[]) => mockGetProvider(...arguments_),
 }));
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import { app } from './setup.ts';
-import { PROVIDERS } from '../src/constants.ts';
+import { PROVIDERS } from '#src/constants';
 
 describe('GET / (Health Check)', () => {
   it('returns 200 without auth header', async () => {

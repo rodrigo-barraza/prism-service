@@ -2,12 +2,12 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
-import WebhookEventBus from "../services/WebhookEventBus.ts";
-import type { WebhookEvent } from "../services/WebhookEventBus.ts";
-import { COLLECTIONS, SERVER_SENT_EVENTS_KEEPALIVE_INTERVAL_MILLISECONDS } from "../constants.ts";
-import logger from "../utils/logger.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import requireDb from "../middleware/RequireDbMiddleware.ts";
+import WebhookEventBus from "#src/services/WebhookEventBus";
+import type { WebhookEvent } from "#src/services/WebhookEventBus";
+import { COLLECTIONS, SERVER_SENT_EVENTS_KEEPALIVE_INTERVAL_MILLISECONDS } from "#src/constants";
+import logger from "#src/utils/logger";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import requireDb from "#src/middleware/RequireDbMiddleware";
 
 const router = express.Router();
 

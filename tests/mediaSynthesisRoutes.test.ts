@@ -1,15 +1,15 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { app } from './setup.ts';
 import request from 'supertest';
-import MongoWrapper from '../src/wrappers/MongoWrapper.ts';
-import { COLLECTIONS, PROVIDERS, MODALITY_TYPES } from '../src/constants.ts';
-import { errorHandler } from '../src/utils/errors.ts';
-import EmbeddingService from '../src/services/EmbeddingService.ts';
+import MongoWrapper from '#src/wrappers/MongoWrapper';
+import { COLLECTIONS, PROVIDERS, MODALITY_TYPES } from '#src/constants';
+import { errorHandler } from '#src/utils/errors';
+import EmbeddingService from '#src/services/EmbeddingService';
 
 // Import route modules
-import mediaRouter from '../src/routes/MediaRoutes.ts';
-import synthesisRouter from '../src/routes/SynthesisRoutes.ts';
-import textRouter from '../src/routes/TextRoutes.ts';
+import mediaRouter from '#src/routes/MediaRoutes';
+import synthesisRouter from '#src/routes/SynthesisRoutes';
+import textRouter from '#src/routes/TextRoutes';
 
 // Mount routers
 app.use('/media-test', mediaRouter);

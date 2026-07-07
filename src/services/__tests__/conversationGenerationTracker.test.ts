@@ -9,9 +9,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const { default: ConversationGenerationTracker } = await import(
-  "../ConversationGenerationTracker.ts"
+  "#src/services/ConversationGenerationTracker"
 );
-import { PROVIDERS } from "../../constants.ts";
+import { PROVIDERS } from "#src/constants";
 
 // ═══════════════════════════════════════════════════════════════
 describe("ConversationGenerationTracker — lifecycle", () => {

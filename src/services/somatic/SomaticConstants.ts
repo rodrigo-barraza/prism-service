@@ -1,4 +1,4 @@
-import PromptLocaleService from "../PromptLocaleService.ts";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 
 export type PrimaryEmotion =
   | "joy"

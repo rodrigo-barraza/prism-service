@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { PROVIDERS } from "../../constants.ts";
+import { PROVIDERS } from "#src/constants";
 
 const mockBaseLogger = {
   info: vi.fn(),
@@ -14,7 +14,7 @@ vi.mock('@rodrigo-barraza/utilities-library/node', () => ({
 }));
 
 const mockGetRequestContext = vi.fn();
-vi.mock('../RequestContext.ts', () => ({
+vi.mock('#src/utils/RequestContext', () => ({
   getRequestContext: mockGetRequestContext,
 }));
 
@@ -27,7 +27,7 @@ beforeEach(async () => {
     username: 'any',
     clientIp: null,
   });
-  const module = await import('../logger.ts');
+  const module = await import('#src/utils/logger');
   logger = module.default;
 });
 

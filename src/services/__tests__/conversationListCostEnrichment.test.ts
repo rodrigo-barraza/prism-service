@@ -19,10 +19,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   enrichConversationsWithRequestCosts,
   enrichSingleConversationCost,
-} from "../ConversationService.ts";
+} from "#src/services/ConversationService";
 
 // ── Shared mock logger ──────────────────────────────────────────
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -31,7 +31,7 @@ vi.mock("../../utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../config.ts", () => ({
+vi.mock("#src/services/config", () => ({
   MONGO_DB_NAME: "prism-test",
 }));
 

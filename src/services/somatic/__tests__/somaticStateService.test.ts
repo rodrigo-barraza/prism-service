@@ -1,8 +1,8 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
-import { PROVIDERS } from "../../../constants.ts";
+import { PROVIDERS } from "#src/constants";
 
 // Mock logger
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -15,7 +15,7 @@ vi.mock("../../../utils/logger.ts", () => ({
 // Mock MongoWrapper — SomaticStateService depends on it for persistence
 const mockFindOne = vi.fn().mockResolvedValue(null);
 const mockUpdateOne = vi.fn().mockResolvedValue({ modifiedCount: 1 });
-vi.mock("../../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getCollection: vi.fn(() => ({
       findOne: mockFindOne,
@@ -25,7 +25,7 @@ vi.mock("../../../wrappers/MongoWrapper.ts", () => ({
   },
 }));
 
-vi.mock("../../../config.ts", async (importOriginal) => {
+vi.mock("#src/config", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../config.ts")>();
   return {
     ...actual,
@@ -35,13 +35,13 @@ vi.mock("../../../config.ts", async (importOriginal) => {
 
 // Mock the provider used by emotion analysis
 const mockGenerateText = vi.fn().mockResolvedValue({ text: "neutral" });
-vi.mock("../../../providers/index.ts", () => ({
+vi.mock("#src/providers/index", () => ({
   getProvider: vi.fn(() => ({
     generateText: mockGenerateText,
   })),
 }));
 
-vi.mock("../../SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getSomaticModelConfig: vi.fn().mockResolvedValue({
       provider: PROVIDERS.GOOGLE,
@@ -50,9 +50,9 @@ vi.mock("../../SettingsService.ts", () => ({
   },
 }));
 
-import SomaticStateService from "../SomaticStateService.ts";
-import { SOMATIC_KEYWORDS } from "../SomaticConstants.ts";
-import { EmotionalStateEngine } from "../EmotionalStateEngine.ts";
+import SomaticStateService from "#src/services/somatic/SomaticStateService";
+import { SOMATIC_KEYWORDS } from "#src/services/somatic/SomaticConstants";
+import { EmotionalStateEngine } from "#src/services/somatic/EmotionalStateEngine";
 
 const TEST_AGENT_ID = "LUPOS_TEST";
 
@@ -426,7 +426,7 @@ describe("SomaticStateService — stat manipulation", () => {
   });
 
   it("legacy setStatLevel('mood') warns and no-ops", async () => {
-    const logger = (await import("../../../utils/logger.ts")).default;
+    const logger = (await import("#src/utils/logger")).default;
     await SomaticStateService.getSnapshot(AGENT);
     await SomaticStateService.setStatLevel(AGENT, "mood", 5);
     expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining("deprecated"));

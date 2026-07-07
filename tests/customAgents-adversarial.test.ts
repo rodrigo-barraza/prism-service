@@ -5,7 +5,7 @@ import { ObjectId } from 'mongodb';
 
 // ── Mocks ────────────────────────────────────────────────────────
 
-vi.mock('../src/utils/logger.ts', () => ({
+vi.mock('#src/utils/logger', () => ({
   default: {
     info: vi.fn(),
     debug: vi.fn(),
@@ -16,14 +16,14 @@ vi.mock('../src/utils/logger.ts', () => ({
   },
 }));
 
-vi.mock('../config.ts', () => ({
+vi.mock('#config', () => ({
   MONGO_DB_NAME: 'prism-test',
 }));
 
 const databaseStore = new Map<string, any>();
 let simulateDatabaseError = false;
 
-vi.mock('../src/wrappers/MongoWrapper.ts', () => ({
+vi.mock('#src/wrappers/MongoWrapper', () => ({
   default: {
     getCollection: () => ({
       find: (_query: any) => ({
@@ -82,8 +82,8 @@ vi.mock('../src/wrappers/MongoWrapper.ts', () => ({
 
 // ── Import under test ────────────────────────────────────────────
 
-const { default: AgentPersonaRegistry } = await import('../src/services/AgentPersonaRegistry.ts');
-const { default: customAgentsRouter } = await import('../src/routes/CustomAgentsRoutes.ts');
+const { default: AgentPersonaRegistry } = await import('#src/services/AgentPersonaRegistry');
+const { default: customAgentsRouter } = await import('#src/routes/CustomAgentsRoutes');
 
 const app = express();
 app.use(express.json());

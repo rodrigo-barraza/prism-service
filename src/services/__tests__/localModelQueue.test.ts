@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS } from "../../constants.ts";
+import { PROVIDERS } from "#src/constants";
 
 // Mock dependencies
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -10,7 +10,7 @@ vi.mock("../../utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../../providers/instance-registry.ts", () => ({
+vi.mock("#src/providers/instance-registry", () => ({
   getInstance: vi.fn((instanceId: string) => {
     if (instanceId === "concurrency-five-instance") {
       return { concurrency: 5 };
@@ -25,7 +25,7 @@ vi.mock("../../providers/instance-registry.ts", () => ({
   }),
 }));
 
-import localModelQueue from "../LocalModelQueue.ts";
+import localModelQueue from "#src/services/LocalModelQueue";
 
 describe("LocalModelQueue", () => {
   beforeEach(() => {

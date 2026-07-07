@@ -1,9 +1,9 @@
 import "./setup.ts";
 import { describe, it, expect, vi, beforeAll } from "vitest";
-import ToolOrchestratorService from "../src/services/ToolOrchestratorService.ts";
-import InternalToolRegistry from "../src/services/local-tools/InternalToolRegistry.ts";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
+import InternalToolRegistry from "#src/services/local-tools/InternalToolRegistry";
 
-vi.mock("../src/services/FileService.ts", () => ({
+vi.mock("#src/services/FileService", () => ({
   default: {
     extractKey: (imageReference: string) => imageReference.replace("minio://", ""),
     getFile: vi.fn().mockResolvedValue(null),

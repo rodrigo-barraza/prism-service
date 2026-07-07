@@ -1,7 +1,7 @@
-import logger from "../../utils/logger.ts";
+import logger from "#src/utils/logger";
 import { DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import PromptLocaleService from "../PromptLocaleService.ts";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 
 // ────────────────────────────────────────────────────────────
 // Internal Tool Registry
