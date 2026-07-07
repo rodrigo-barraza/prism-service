@@ -426,7 +426,7 @@ describe("ToolRetryInterceptor adversarial — argument formatting", () => {
     expect(guidance).not.toBeNull();
     // Should not crash or produce malformed output
     expect(typeof guidance!.content).toBe("string");
-    expect(guidance!.content.length).toBeGreaterThan(0);
+    expect(guidance!.content!.length).toBeGreaterThan(0);
   });
 
   it("guidance message should always have role 'system'", () => {
