@@ -169,7 +169,6 @@ export interface AgenticOptions {
   planFirst?: boolean;
   autoApprove?: boolean;
   maxIterations?: number;
-  enabledTools?: string[];
   disabledTools?: string[];
   agenticLoopEnabled?: boolean;
   temperature?: number;

@@ -118,12 +118,11 @@ export default class AgenticToolResolver {
     }
 
     // ── Tool filtering ────────────────────────────────────────────
-    let resolvedEnabledTools: string[] | null = options.enabledTools || null;
+    let resolvedEnabledTools: string[] | null = null;
     let shouldApplyDisabledFilter = false;
-    const effectiveAgentConversationId = agentConversationId;
-    if (effectiveAgentConversationId) {
+    if (agentConversationId) {
       const dynamicTools = ToolContext.get<string[]>(
-        effectiveAgentConversationId,
+        agentConversationId,
         "dynamicEnabledTools",
       );
       if (Array.isArray(dynamicTools) && dynamicTools.length > 0) {
@@ -271,6 +270,11 @@ export default class AgenticToolResolver {
       const shouldBypassOrchestratorTools = !options.isSubAgent;
       finalTools = finalTools.filter((tool) => {
         if (clientDisabledSet?.has(tool.name)) return false;
+        if (
+          options.isSubAgent &&
+          CORE_ORCHESTRATOR_TOOLS.has(tool.name)
+        )
+          return false;
         if (enabledSet.has(tool.name)) return true;
         if (
           isCoreToolsLocked &&
@@ -287,15 +291,17 @@ export default class AgenticToolResolver {
       });
 
       if (resolvedPersona?.blockedTools?.length) {
-        const disabledSet = resolveToolEntriesToSet(
+        const blockedSet = resolveToolEntriesToSet(
           resolvedPersona.blockedTools,
           clientSchemas,
         );
         finalTools = finalTools.filter(
-          (tool) => !disabledSet.has(tool.name) || enabledSet.has(tool.name),
+          (tool) =>
+            !blockedSet.has(tool.name) ||
+            (!shouldApplyDisabledFilter && enabledSet.has(tool.name)),
         );
         logger.info(
-          `[AgenticLoop] Applied blockedTools denylist (${disabledSet.size} tools blocked, enabledSet protects ${enabledSet.size})`,
+          `[AgenticLoop] Applied blockedTools denylist (${blockedSet.size} tools blocked${!shouldApplyDisabledFilter ? `, enabledSet protects ${enabledSet.size}` : ""})`,
         );
       }
     }

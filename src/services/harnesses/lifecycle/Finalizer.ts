@@ -465,7 +465,6 @@ export async function finalizeTextGeneration(
       toolConfig = {
         availableTools,
         disabledTools,
-        enabledTools: resolvedEnabledTools,
         dynamicEnabledTools,
       };
     }

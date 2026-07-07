@@ -214,7 +214,7 @@ describe("AgenticLoopService", () => {
 
   it("should filter out native search_web tool if options.webSearch is true", async () => {
     mockContext.options.webSearch = true;
-    mockContext.options.enabledTools = ["search_web", "read_file"];
+    mockContext.options.disabledTools = ["generate_image", "describe_image"];
 
     await AgenticLoopService.runAgenticLoop(mockContext);
 
@@ -227,7 +227,7 @@ describe("AgenticLoopService", () => {
 
   it("should filter out generate_image if model natively outputs images", async () => {
     mockContext.modelDefinition.outputTypes = [TYPES.TEXT, TYPES.IMAGE];
-    mockContext.options.enabledTools = ["generate_image", "read_file"];
+    mockContext.options.disabledTools = ["search_web", "describe_image"];
 
     await AgenticLoopService.runAgenticLoop(mockContext);
 
@@ -240,7 +240,7 @@ describe("AgenticLoopService", () => {
 
   it("should filter out describe_image if model natively inputs images", async () => {
     mockContext.modelDefinition.inputTypes = [TYPES.TEXT, TYPES.IMAGE];
-    mockContext.options.enabledTools = ["describe_image", "read_file"];
+    mockContext.options.disabledTools = ["search_web", "generate_image"];
 
     await AgenticLoopService.runAgenticLoop(mockContext);
 
@@ -251,8 +251,8 @@ describe("AgenticLoopService", () => {
     expect(passTools.find((tool: any) => tool.name === "read_file")).toBeDefined();
   });
 
-  it("should expand domain and label selectors for enabledTools", async () => {
-    mockContext.options.enabledTools = ["domain:knowledge"];
+  it("should expand domain selectors for disabledTools filtering", async () => {
+    mockContext.options.disabledTools = ["generate_image", "describe_image"];
 
     await AgenticLoopService.runAgenticLoop(mockContext);
 
@@ -313,7 +313,7 @@ describe("AgenticLoopService", () => {
   });
 
   it("should drop tool calls not in the allowed schema", async () => {
-    mockContext.options.enabledTools = ["read_file"];
+    mockContext.options.disabledTools = ["search_web", "generate_image", "describe_image"];
     mockProvider.generateTextStream.mockImplementation(async function* () {
       // Mock yielding a tool call that is not in the enabled schema
       yield { type: "toolCall", name: "dangerous_tool", args: {} };
@@ -360,7 +360,7 @@ describe("AgenticLoopService", () => {
   it("should iterate multiple times when tools are executed and maxIterations > 1", async () => {
     mockContext.options.maxIterations = 3;
     mockContext.options.autoApprove = true;
-    mockContext.options.enabledTools = ["read_file"];
+    mockContext.options.disabledTools = ["search_web", "generate_image", "describe_image"];
 
     // First iteration: Model calls read_file
     mockProvider.generateTextStream.mockImplementationOnce(async function* () {
@@ -426,7 +426,6 @@ describe("AgenticLoopService", () => {
   });
 
   it("should resolve disabledTools mode correctly", async () => {
-    mockContext.options.enabledTools = null;
     mockContext.options.disabledTools = ["generate_image"];
     
     await AgenticLoopService.runAgenticLoop(mockContext);
