@@ -267,7 +267,7 @@ fetchSchemas().then(() => prefetchAllLocaleSchemas());
 // Generic URL Builder — uses endpoint metadata
 // ────────────────────────────────────────────────────────────
 
-function buildUrlFromEndpoint(
+export function buildUrlFromEndpoint(
   endpoint: ToolEndpoint,
   args: Record<string, unknown> = {},
 ) {
@@ -307,7 +307,9 @@ function buildUrlFromEndpoint(
   for (const key of queryParams) {
     const value = args[key];
     if (value !== undefined && value !== null && value !== "") {
-      params.set(key, String(value));
+      const serializedValue =
+        typeof value === "object" ? JSON.stringify(value) : String(value);
+      params.set(key, serializedValue);
     }
   }
 
