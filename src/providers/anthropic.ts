@@ -146,7 +146,7 @@ async function enforceImageSizeLimits(messages: ChatMessage[]) {
  * Anthropic requires alternating user/assistant roles and handles system messages separately.
  * This helper extracts the system message and merges consecutive same-role messages.
  */
-async function prepareMessages(messages: ChatMessage[]) {
+export async function prepareMessages(messages: ChatMessage[]) {
   let systemMessage: string | undefined;
 
   // Extract system message
@@ -473,7 +473,7 @@ async function prepareMessages(messages: ChatMessage[]) {
 
   return { systemMessage, messages: merged };
 }
-function buildTools(options: ProviderOptions) {
+export function buildTools(options: ProviderOptions) {
   const tools: Array<Record<string, unknown>> = [];
   if (options.webSearch) {
     tools.push({
@@ -507,7 +507,7 @@ function buildTools(options: ProviderOptions) {
   }
   return tools.length > 0 ? tools : undefined;
 }
-function extractResponseContent(contentBlocks: AnthropicBlock[]) {
+export function extractResponseContent(contentBlocks: AnthropicBlock[]) {
   let text = "";
   let thinking = null;
   let thinkingSignature = null;
@@ -549,7 +549,7 @@ function extractResponseContent(contentBlocks: AnthropicBlock[]) {
 
   return { text, thinking, thinkingSignature, citations, toolCalls };
 }
-function buildUsage(
+export function buildUsage(
   responseUsage:
     | {
         input_tokens?: number | null;

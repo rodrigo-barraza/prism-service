@@ -191,7 +191,7 @@ const GOOGLE_UNSUPPORTED_KEYS = new Set([
 ]);
 
 
-function sanitizeSchemaForGoogle(
+export function sanitizeSchemaForGoogle(
   schema: JsonValue | undefined,
   isPropertyMap: boolean = false,
 ): JsonValue | undefined {
@@ -323,7 +323,7 @@ function buildGenerateConfig(
   return config;
 }
 
-async function convertMessages(
+export async function convertMessages(
   messages: ConversationMessage[],
 ): Promise<Content[]> {
   const result: Content[] = [];
