@@ -247,6 +247,30 @@ export { THOUGHT_STRUCTURES } from "@rodrigo-barraza/utilities-library/taxonomy"
 
 // ─── Prompt Construction Delimiters ──────────────────────────
 
+/**
+ * XML tag names for semantic sections in the assembled system prompt.
+ *
+ * XML delimiters give models explicit structural boundaries for attention,
+ * significantly reducing "instruction bleed" — the model confusing which
+ * section a constraint belongs to. This is especially valuable as system
+ * prompts grow beyond 10k tokens.
+ *
+ * References:
+ *   - Anthropic Prompt Engineering Guide: "Use XML tags to structure"
+ *   - Google System Instructions Best Practices: "Use clear delimiters"
+ */
+export const SYSTEM_PROMPT_SECTIONS = {
+  IDENTITY: "agent-identity",
+  PLATFORM_RULES: "platform-rules",
+  TOOL_POLICY: "tool-policy",
+  ENABLED_TOOLS: "enabled-tools",
+  GUIDELINES: "coding-guidelines",
+  ORCHESTRATOR: "orchestrator-mode",
+  CONSTRAINTS: "constraints",
+  ENVIRONMENT: "environment",
+  PROJECT_STRUCTURE: "project-structure",
+} as const;
+
 export const PROMPT_DELIMITERS = {
   SYSTEM_CONTEXT: "[System Context]",
   SYSTEM_CONTEXT_LOCAL_TIME_PREFIX: "[System Context - Local Time:",

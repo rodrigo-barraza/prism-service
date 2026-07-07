@@ -65,6 +65,9 @@ const CustomAgentService = {
           ? data.platformRules
           : {},
       hasSomaticState: data.hasSomaticState || false,
+      negativeConstraints: Array.isArray(data.negativeConstraints)
+        ? data.negativeConstraints
+        : [],
       usesDirectoryTree: data.usesDirectoryTree || false,
       usesCodingGuidelines: data.usesCodingGuidelines || false,
       createdAt: new Date().toISOString(),

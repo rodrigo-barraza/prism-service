@@ -13,5 +13,6 @@
   "discordIdsHeader": "# Discord ID",
   "discordGuildIdLine": "- Guild ID: {{guildId}}",
   "discordChannelIdLine": "\n- Channel ID: {{channelId}}",
-  "liveApiLanguageHint": "Respond in user's language. Primary: English."
+  "liveApiLanguageHint": "Respond in user's language. Primary: English.",
+  "constraintsHeader": "## Rules\nNEVER break these:"
 }

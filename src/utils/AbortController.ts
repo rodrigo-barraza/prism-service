@@ -25,5 +25,10 @@ export function createAbortController(
 ): AbortController {
   const controller = new AbortController();
   setMaxListeners(maxListeners, controller.signal);
+  // Prevent unhandled DOMException when abort() is called while native
+  // APIs (fetch, streams) have listeners attached to the signal.
+  // Node 22+ dispatches the abort reason through the event target —
+  // without at least one listener, it escalates to process.nextTick(throw).
+  controller.signal.addEventListener("abort", () => {}, { once: true });
   return controller;
 }

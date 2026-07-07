@@ -81,6 +81,13 @@ export interface Persona {
   >;
   /** When true, the assembler injects the agent's somatic state (from agentContext.selfContext) as an interleaved system message before the last user message. */
   hasSomaticState?: boolean;
+  /**
+   * Explicit "thou shalt not" rules injected as a dedicated `<constraints>` block.
+   * LLMs respond more reliably to explicit negative constraints than positive-only
+   * instructions — stating what NOT to do with equal emphasis reduces hallucination
+   * and policy violation rates. Each string is a single constraint rule.
+   */
+  negativeConstraints?: string[];
   usesDirectoryTree: boolean;
   usesCodingGuidelines: boolean;
 }

@@ -27,8 +27,20 @@ import { SkillMemoryScorer } from "./SkillMemoryScorer.ts";
 import { AssemblerContext } from "./types.ts";
 import SomaticStateService from "#src/services/somatic/SomaticStateService";
 import WorkflowMemoryService from "#src/services/WorkflowMemoryService";
-import { PROMPT_DELIMITERS, COLLECTIONS } from "#src/constants";
+import { PROMPT_DELIMITERS, SYSTEM_PROMPT_SECTIONS, COLLECTIONS } from "#src/constants";
 import PromptLocaleService from "#src/services/PromptLocaleService";
+
+/**
+ * Wrap a system prompt section in XML semantic tags.
+ *
+ * XML delimiters give models explicit structural boundaries for attention,
+ * reducing "instruction bleed" where the model confuses which section a
+ * constraint belongs to. The content inside the tags is preserved verbatim,
+ * so existing substring assertions in tests continue to pass.
+ */
+function wrapSection(tagName: string, content: string): string {
+  return `<${tagName}>\n${content}\n</${tagName}>`;
+}
 
 
 /**
@@ -124,17 +136,23 @@ export default class SystemPromptAssembler {
     // ── 1. Agent Identity ────────────────────────────────────────
     if (isDirectMode) {
       sections.push(
-        PromptLocaleService.get(locale, "system-prompt.directModeIdentity"),
+        wrapSection(
+          SYSTEM_PROMPT_SECTIONS.IDENTITY,
+          PromptLocaleService.get(locale, "system-prompt.directModeIdentity"),
+        ),
       );
     } else if (persona) {
       const identityText =
         typeof persona.identity === "function"
           ? persona.identity({ ...context, locale })
           : persona.identity;
-      sections.push(identityText);
+      sections.push(wrapSection(SYSTEM_PROMPT_SECTIONS.IDENTITY, identityText));
     } else {
       sections.push(
-        PromptLocaleService.get(locale, "system-prompt.codingFallbackIdentity"),
+        wrapSection(
+          SYSTEM_PROMPT_SECTIONS.IDENTITY,
+          PromptLocaleService.get(locale, "system-prompt.codingFallbackIdentity"),
+        ),
       );
     }
 
@@ -147,7 +165,7 @@ export default class SystemPromptAssembler {
           typeof platformSection === "function"
             ? platformSection({ ...context, locale })
             : platformSection;
-        if (platformText) sections.push(platformText);
+        if (platformText) sections.push(wrapSection(SYSTEM_PROMPT_SECTIONS.PLATFORM_RULES, platformText));
       }
     }
 
@@ -257,7 +275,7 @@ export default class SystemPromptAssembler {
         typeof persona.toolPolicy === "function"
           ? persona.toolPolicy({ ...context, locale })
           : persona.toolPolicy;
-      if (policyText) sections.push(policyText);
+      if (policyText) sections.push(wrapSection(SYSTEM_PROMPT_SECTIONS.TOOL_POLICY, policyText));
     }
 
     // Resolve once — used by sections 4 through 8 to skip workspace-specific
@@ -395,7 +413,7 @@ export default class SystemPromptAssembler {
           "system-prompt.enabledToolsHeader",
           { count: String(count) },
         );
-        sections.push(header + "\n" + toolDescriptions);
+        sections.push(wrapSection(SYSTEM_PROMPT_SECTIONS.ENABLED_TOOLS, header + "\n" + toolDescriptions));
       }
     }
 
@@ -405,14 +423,17 @@ export default class SystemPromptAssembler {
     // excluded when workspace is off to avoid confusing the LLM.
     if (!isDirectMode && isWorkspaceEnabled) {
       if (persona?.guidelines) {
-        sections.push(persona.guidelines);
+        sections.push(wrapSection(SYSTEM_PROMPT_SECTIONS.GUIDELINES, persona.guidelines));
       } else if (codingFallback || persona?.usesCodingGuidelines) {
         sections.push(
-          PromptLocaleService.get(locale, "system-prompt.codingGuidelines") +
-            PromptLocaleService.get(
-              locale,
-              "system-prompt.commandExecutionGuidelines",
-            ),
+          wrapSection(
+            SYSTEM_PROMPT_SECTIONS.GUIDELINES,
+            PromptLocaleService.get(locale, "system-prompt.codingGuidelines") +
+              PromptLocaleService.get(
+                locale,
+                "system-prompt.commandExecutionGuidelines",
+              ),
+          ),
         );
       }
     }
@@ -482,13 +503,36 @@ export default class SystemPromptAssembler {
             !orchestratorSet.has(toolName) && !lockedOffSet.has(toolName),
         );
         sections.push(
-          getOrchestratorPromptAddendum({
-            subAgentTools,
-            defaultTopology,
-            locale,
-          }),
+          wrapSection(
+            SYSTEM_PROMPT_SECTIONS.ORCHESTRATOR,
+            getOrchestratorPromptAddendum({
+              subAgentTools,
+              defaultTopology,
+              locale,
+            }),
+          ),
         );
       }
+    }
+
+    // ── 5b. Negative Constraints (persona-specific) ──────────────
+    // Explicit "thou shalt not" rules that LLMs respond to more reliably
+    // than positive-only instructions. Standardized as a dedicated section
+    // so every persona benefits from the pattern without ad-hoc formatting.
+    if (persona?.negativeConstraints && persona.negativeConstraints.length > 0) {
+      const constraintItems = persona.negativeConstraints
+        .map((constraint, index) => `${index + 1}. ${constraint}`)
+        .join("\n");
+      const constraintsHeader = PromptLocaleService.get(
+        locale,
+        "system-prompt.constraintsHeader",
+      );
+      sections.push(
+        wrapSection(
+          SYSTEM_PROMPT_SECTIONS.CONSTRAINTS,
+          constraintsHeader + "\n" + constraintItems,
+        ),
+      );
     }
 
     // ── 6. Environment ───────────────────────────────────────────
@@ -507,9 +551,12 @@ export default class SystemPromptAssembler {
       );
     }
     sections.push(
-      PromptLocaleService.get(locale, "system-prompt.environmentHeader") +
-        `\n` +
-        environmentLines.join(`\n`),
+      wrapSection(
+        SYSTEM_PROMPT_SECTIONS.ENVIRONMENT,
+        PromptLocaleService.get(locale, "system-prompt.environmentHeader") +
+          `\n` +
+          environmentLines.join(`\n`),
+      ),
     );
 
     // ── 7. Project Structure (cached) ────────────────────────────
@@ -520,7 +567,7 @@ export default class SystemPromptAssembler {
           locale,
           "system-prompt.projectStructureHeader",
         );
-        sections.push(header + "\n" + dirTree);
+        sections.push(wrapSection(SYSTEM_PROMPT_SECTIONS.PROJECT_STRUCTURE, header + "\n" + dirTree));
       }
     }
 
