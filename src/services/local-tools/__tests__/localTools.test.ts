@@ -2,14 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ── Mock EmbeddingService ─────────────────────────────────────────────
 const mockEmbed = vi.fn().mockResolvedValue([0.1, 0.2, 0.3]);
-vi.mock("../../EmbeddingService.ts", () => ({
+vi.mock("#src/services/EmbeddingService", () => ({
   default: {
     embed: (...args: any[]) => mockEmbed(...args),
   },
 }));
 
 // ── Mock MongoWrapper ─────────────────────────────────────────────────
-vi.mock("../../../wrappers/MongoWrapper.ts", () => {
+vi.mock("#src/wrappers/MongoWrapper", () => {
   const localMockCollection = {
     find: () => ({
       sort: () => ({
@@ -47,7 +47,7 @@ vi.mock("../../../wrappers/MongoWrapper.ts", () => {
 
 // ── Mock AgenticLoopService ───────────────────────────────────────────
 const mockSetPendingQuestion = vi.fn();
-vi.mock("../../AgenticLoopService.ts", () => ({
+vi.mock("#src/services/AgenticLoopService", () => ({
   default: {
     _setPendingQuestion: (...args: any[]) => mockSetPendingQuestion(...args),
   },
@@ -62,7 +62,7 @@ const mockGetConnectedServers = vi.fn().mockReturnValue([{ name: "test-server" }
 const mockReadResource = vi.fn().mockResolvedValue({ contents: [{ text: "content" }] });
 const mockAuthenticateMcp = vi.fn().mockResolvedValue({ success: true });
 
-vi.mock("../../MCPClientService.ts", () => ({
+vi.mock("#src/services/MCPClientService", () => ({
   default: {
     listResources: (...args: any[]) => mockListResources(...args),
     getConnectedServers: (...args: any[]) => mockGetConnectedServers(...args),
@@ -88,7 +88,7 @@ const mockListActiveTimers = vi.fn().mockResolvedValue([
 ]);
 const mockCancelTimer = vi.fn().mockResolvedValue(true);
 
-vi.mock("../../ConversationTimerService.ts", () => ({
+vi.mock("#src/services/ConversationTimerService", () => ({
   default: {
     createTimer: (...args: any[]) => mockCreateTimer(...args),
     listActiveTimers: (...args: any[]) => mockListActiveTimers(...args),
@@ -107,7 +107,7 @@ const mockSkillPrepare = vi.fn().mockResolvedValue({
 const mockSkillList = vi.fn().mockResolvedValue([{ name: "test_skill" }]);
 const mockSkillDelete = vi.fn().mockResolvedValue({ success: true });
 
-vi.mock("../../SkillService.ts", () => ({
+vi.mock("#src/services/SkillService", () => ({
   default: {
     create: (...args: any[]) => mockSkillCreate(...args),
     prepare: (...args: any[]) => mockSkillPrepare(...args),
@@ -126,7 +126,7 @@ const mockExecuteOrchestratorTool = vi.fn().mockResolvedValue({ success: true })
 const mockGetClientToolSchemas = vi.fn().mockReturnValue([]);
 const mockExecuteTool = vi.fn().mockResolvedValue({ matches: [{ name: "discoverable_tool" }], total: 1 });
 
-vi.mock("../../ToolOrchestratorService.ts", () => ({
+vi.mock("#src/services/ToolOrchestratorService", () => ({
   default: {
     getWorktreeState: (...args: any[]) => mockGetWorktreeState(...args),
     getWorkspaceRoot: (...args: any[]) => mockGetWorkspaceRoot(...args),
@@ -139,7 +139,7 @@ vi.mock("../../ToolOrchestratorService.ts", () => ({
   },
 }));
 
-vi.mock("../../../types/GlobalToolOrchestratorRegistry.ts", () => ({
+vi.mock("#src/types/GlobalToolOrchestratorRegistry", () => ({
   getGlobalToolOrchestratorService: () => {
     const mockService = {
       getClientToolSchemas: () => [{ name: "discoverable_tool" }],
@@ -149,8 +149,8 @@ vi.mock("../../../types/GlobalToolOrchestratorRegistry.ts", () => ({
   },
 }));
 
-import InternalToolRegistry from "../InternalToolRegistry.ts";
-import { PROVIDERS } from "../../../constants.ts";
+import InternalToolRegistry from "#src/services/local-tools/InternalToolRegistry";
+import { PROVIDERS } from "#src/constants";
 
 describe("Local Tools Unit Tests Suite", () => {
   beforeEach(() => {

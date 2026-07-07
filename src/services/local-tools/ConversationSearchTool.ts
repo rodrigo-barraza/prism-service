@@ -1,13 +1,13 @@
-import logger from "../../utils/logger.ts";
-import PromptLocaleService from "../PromptLocaleService.ts";
+import logger from "#src/utils/logger";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 import {
   TOOL_NAMES,
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { INTERNAL_TOOL_EMOJIS } from "../tool-orchestrator/InternalToolEmojis.ts";
+import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
 import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
 import type { InternalToolContext } from "./InternalToolRegistry.ts";
-import { MEMORY, LOG_PREVIEW } from "../../constants.ts";
+import { MEMORY, LOG_PREVIEW } from "#src/constants";
 
 // Use the taxonomy constant when available, fall back to string literal
 // until prism-service refreshes its utilities-library dependency.
@@ -80,11 +80,11 @@ const searchConversations = {
       };
 
     const { default: EmbeddingService } =
-      await import("../EmbeddingService.js");
+      await import("#src/services/EmbeddingService");
     const { default: MongoWrapper } =
-      await import("../../wrappers/MongoWrapper.js");
+      await import("#src/wrappers/MongoWrapper");
     const { MONGO_DB_NAME } = await import("../../../config.js");
-    const { COLLECTIONS } = await import("../../constants.js");
+    const { COLLECTIONS } = await import("#src/constants");
 
     const database = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!database) {

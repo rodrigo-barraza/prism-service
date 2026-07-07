@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-vi.mock('../../wrappers/MongoWrapper.ts', () => {
+vi.mock('#src/wrappers/MongoWrapper', () => {
   return {
     default: {
       createClient: vi.fn().mockResolvedValue(undefined),
@@ -10,9 +10,9 @@ vi.mock('../../wrappers/MongoWrapper.ts', () => {
   };
 });
 
-import SettingsService from '../SettingsService.ts';
-import MongoWrapper from '../../wrappers/MongoWrapper.ts';
-import { COLLECTIONS, PROVIDERS } from '../../constants.ts';
+import SettingsService from '#src/services/SettingsService';
+import MongoWrapper from '#src/wrappers/MongoWrapper';
+import { COLLECTIONS, PROVIDERS } from '#src/constants';
 
 describe('SettingsService Unit Tests', () => {
   let mockSettingsDoc: any = null;

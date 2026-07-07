@@ -1,7 +1,7 @@
 import { vi, describe, it, expect, afterEach } from "vitest";
 
 // Suppress logger output during tests
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -13,20 +13,20 @@ vi.mock("../../utils/logger.ts", () => ({
 
 import AutoApprovalEngine, {
   APPROVAL_TIERS,
-} from "../AutoApprovalEngine.ts";
+} from "#src/services/AutoApprovalEngine";
 import {
   pendingApprovals,
   pendingQuestions,
-} from "../ApprovalRegistry.ts";
+} from "#src/services/ApprovalRegistry";
 import type {
   ApprovalResolution,
   PendingToolApprovalEntry,
   QuestionResolution,
-} from "../ApprovalRegistry.ts";
+} from "#src/services/ApprovalRegistry";
 import {
   allow,
   deny,
-} from "../PolicyEngine.ts";
+} from "#src/services/PolicyEngine";
 
 // ═══════════════════════════════════════════════════════════════
 // Tier Constants

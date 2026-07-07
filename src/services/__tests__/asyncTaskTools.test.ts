@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 // Mock dependencies
 // ────────────────────────────────────────────────────────────
 
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -14,15 +14,15 @@ vi.mock("../../utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../../utils/AbortController.ts", () => ({
+vi.mock("#src/utils/AbortController", () => ({
   createAbortController: () => new AbortController(),
 }));
 
-vi.mock("../../utils/CleanupRegistry.ts", () => ({
+vi.mock("#src/utils/CleanupRegistry", () => ({
   registerCleanup: vi.fn(),
 }));
 
-vi.mock("../../utils/ErrorHelpers.ts", () => ({
+vi.mock("#src/utils/ErrorHelpers", () => ({
   getErrorMessage: (error: unknown) =>
     error instanceof Error ? error.message : String(error),
 }));
@@ -32,7 +32,7 @@ const mockExecuteTool = vi.fn();
 const mockExecuteToolStreaming = vi.fn();
 const mockIsStreamable = vi.fn(() => false);
 
-vi.mock("../ToolOrchestratorService.ts", () => ({
+vi.mock("#src/services/ToolOrchestratorService", () => ({
   default: {
     executeTool: mockExecuteTool,
     executeToolStreaming: mockExecuteToolStreaming,
@@ -41,21 +41,21 @@ vi.mock("../ToolOrchestratorService.ts", () => ({
 }));
 
 // Mock WebSocketConnectionRegistry
-vi.mock("../../websocket/WebSocketConnectionRegistry.ts", () => ({
+vi.mock("#src/websocket/WebSocketConnectionRegistry", () => ({
   default: {
     getEmitFunction: vi.fn(() => null),
   },
 }));
 
 // Mock ConversationService
-vi.mock("../ConversationService.ts", () => ({
+vi.mock("#src/services/ConversationService", () => ({
   default: {
     appendMessages: vi.fn(() => Promise.resolve()),
   },
 }));
 
 // Mock MongoWrapper
-vi.mock("../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getDb: vi.fn(() => null),
     getCollection: vi.fn(() => null),
@@ -63,11 +63,11 @@ vi.mock("../../wrappers/MongoWrapper.ts", () => ({
 }));
 
 // Mock config
-vi.mock("../../config.ts", () => ({
+vi.mock("#src/config", () => ({
   MONGO_DB_NAME: "test-db",
 }));
 
-vi.mock("../../constants.ts", async (importOriginal) => {
+vi.mock("#src/constants", async (importOriginal) => {
   const actual = await importOriginal() as any;
   return {
     ...actual,
@@ -79,7 +79,7 @@ vi.mock("../../constants.ts", async (importOriginal) => {
 });
 
 // Mock ChatRoutes
-vi.mock("../../routes/ChatRoutes.ts", () => ({
+vi.mock("#src/routes/ChatRoutes", () => ({
   handleAgent: vi.fn(() => Promise.resolve()),
 }));
 
@@ -87,9 +87,9 @@ vi.mock("../../routes/ChatRoutes.ts", () => ({
 // Imports
 // ────────────────────────────────────────────────────────────
 
-import asyncTaskTools from "../local-tools/AsyncTaskTools.ts";
-import AsyncTaskRegistry from "../AsyncTaskRegistry.ts";
-import { ASYNC_TASK_TOOL_NAMES } from "../AsyncTaskConstants.ts";
+import asyncTaskTools from "#src/services/local-tools/AsyncTaskTools";
+import AsyncTaskRegistry from "#src/services/AsyncTaskRegistry";
+import { ASYNC_TASK_TOOL_NAMES } from "#src/services/AsyncTaskConstants";
 
 // Extract individual tools
 const [runAsyncTask, listAsyncTasks, cancelAsyncTask] = asyncTaskTools;

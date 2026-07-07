@@ -1,5 +1,5 @@
 import type { Db } from "mongodb";
-import { COLLECTIONS, ORCHESTRATOR } from "../constants.ts";
+import { COLLECTIONS, ORCHESTRATOR } from "#src/constants";
 
 const MAX_CONVERSATION_DEPTH = ORCHESTRATOR.AGENT_TREE_DISCOVERY_MAX_DEPTH;
 

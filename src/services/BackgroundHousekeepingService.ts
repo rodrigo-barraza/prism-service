@@ -19,12 +19,12 @@ import {
   MILLISECONDS_PER_DAY,
   hours,
 } from "@rodrigo-barraza/utilities-library";
-import MongoWrapper from "../wrappers/MongoWrapper.ts";
-import MinioWrapper from "../wrappers/MinioWrapper.ts";
-import { MONGO_DB_NAME } from "../../config.ts";
-import { COLLECTIONS, FILE_CATEGORIES } from "../constants.ts";
-import logger from "../utils/logger.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import MinioWrapper from "#src/wrappers/MinioWrapper";
+import { MONGO_DB_NAME } from "#config";
+import { COLLECTIONS, FILE_CATEGORIES } from "#src/constants";
+import logger from "#src/utils/logger";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

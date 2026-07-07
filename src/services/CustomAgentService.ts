@@ -1,9 +1,9 @@
 import { ObjectId } from "mongodb";
-import MongoWrapper from "../wrappers/MongoWrapper.ts";
-import { MONGO_DB_NAME } from "../../config.ts";
-import { COLLECTIONS } from "../constants.ts";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import { MONGO_DB_NAME } from "#config";
+import { COLLECTIONS } from "#src/constants";
 import { deriveAgentId } from "@rodrigo-barraza/utilities-library";
-import logger from "../utils/logger.ts";
+import logger from "#src/utils/logger";
 
 /** @returns {import("mongodb").Collection} */
 function getCollection() {

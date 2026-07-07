@@ -1,11 +1,11 @@
-import { handleConversation } from "../routes/ChatRoutes.ts";
+import { handleConversation } from "#src/routes/ChatRoutes";
 import { ProviderError } from "./errors.ts";
 import { createAbortController } from "./AbortController.ts";
 import logger from "./logger.ts";
 import { Request, Response, NextFunction } from "express";
-import { SseEvent } from "../types/SseTypes.ts";
-import type { ChatRequest } from "../types/schemas.ts";
-import AgentSessionRegistry from "../services/AgentSessionRegistry.ts";
+import { SseEvent } from "#src/types/SseTypes";
+import type { ChatRequest } from "#src/types/schemas";
+import AgentSessionRegistry from "#src/services/AgentSessionRegistry";
 
 // ─── shared by /chat and /agent routes ──────────────────────
 

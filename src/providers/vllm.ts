@@ -4,15 +4,15 @@ import {
   Provider,
   GenerateTextResult,
   StreamChunk,
-} from "../types/provider.ts";
-import { ProviderError } from "../utils/errors.ts";
-import logger from "../utils/logger.ts";
-import type { TokenUsage } from "../types/admin.ts";
-import { TOOL_API_HEALTH_TIMEOUT_MILLISECONDS } from "../constants.ts";
-import { discoverContextLength } from "../utils/ContextLengthDiscovery.ts";
+} from "#src/types/provider";
+import { ProviderError } from "#src/utils/errors";
+import logger from "#src/utils/logger";
+import type { TokenUsage } from "#src/types/admin";
+import { TOOL_API_HEALTH_TIMEOUT_MILLISECONDS } from "#src/constants";
+import { discoverContextLength } from "#src/utils/ContextLengthDiscovery";
 
-import { MODALITY_TYPES, getDefaultModels } from "../config.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { MODALITY_TYPES, getDefaultModels } from "#src/config";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 import {
   convertToolsToOpenAI,
   buildPayloadParams,
@@ -22,8 +22,8 @@ import {
   fetchOpenAICompat,
   MEDIA_STRATEGIES,
   type OpenAICompletionResponse,
-} from "../utils/openai-compat.ts";
-import type { InputMessage } from "../utils/openai-compat.ts";
+} from "#src/utils/openai-compat";
+import type { InputMessage } from "#src/utils/openai-compat";
 
 // ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 // ┃  TEMPORARY PATCH — Remove when vLLM fixes Qwen3.6 chat     ┃

@@ -1,27 +1,27 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import BenchmarkService from "../BenchmarkService.ts";
-import { handleConversation, handleAgent } from "../../routes/ChatRoutes.ts";
-import MongoWrapper from "../../wrappers/MongoWrapper.ts";
-import { PROVIDERS } from "../../constants.ts";
+import BenchmarkService from "#src/services/BenchmarkService";
+import { handleConversation, handleAgent } from "#src/routes/ChatRoutes";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import { PROVIDERS } from "#src/constants";
 
-vi.mock("../../routes/ChatRoutes.ts", () => ({
+vi.mock("#src/routes/ChatRoutes", () => ({
   handleConversation: vi.fn(),
   handleAgent: vi.fn(),
 }));
 
-vi.mock("../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getDb: vi.fn(),
   },
 }));
 
-vi.mock("../../providers/index.ts", () => ({
+vi.mock("#src/providers/index", () => ({
   getProvider: vi.fn().mockReturnValue({
     generateTextStream: vi.fn(),
   }),
 }));
 
-vi.mock("../../providers/instance-registry.ts", () => ({
+vi.mock("#src/providers/instance-registry", () => ({
   isInstance: vi.fn().mockReturnValue(false),
 }));
 

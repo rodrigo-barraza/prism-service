@@ -11,20 +11,20 @@
  * as "generating" in the UI.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS, COLLECTIONS, MESSAGE_ROLES } from "../../constants.ts";
+import { PROVIDERS, COLLECTIONS, MESSAGE_ROLES } from "#src/constants";
 
 // ── Mock ConversationService before import ─────────────────────
 const mockAppendMessages = vi.fn();
 const mockSetGenerating = vi.fn();
 
-vi.mock("../ConversationService.ts", () => ({
+vi.mock("#src/services/ConversationService", () => ({
   default: {
     appendMessages: (...args: unknown[]) => mockAppendMessages(...args),
     setGenerating: (...args: unknown[]) => mockSetGenerating(...args),
   },
 }));
 
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -34,7 +34,7 @@ vi.mock("../../utils/logger.ts", () => ({
 }));
 
 const { appendAndFinalize, markGenerating } = await import(
-  "../../utils/ConversationUtilities.ts"
+  "#src/utils/ConversationUtilities"
 );
 
 // ═══════════════════════════════════════════════════════════════

@@ -7,8 +7,8 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { prepareMessages } from "../../anthropic.ts";
-import type { ChatMessage } from "../../../types/ProviderTypes.ts";
+import { prepareMessages } from "#src/providers/anthropic";
+import type { ChatMessage } from "#src/types/ProviderTypes";
 
 // ── Helpers ──────────────────────────────────────────────────
 function makeMessage(overrides: Partial<ChatMessage>): ChatMessage {

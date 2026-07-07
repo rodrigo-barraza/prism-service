@@ -1,14 +1,14 @@
 import "./setup.ts";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { WebhookEvent } from "../src/services/WebhookEventBus.ts";
-import { PROVIDERS } from "../src/constants.ts";
+import type { WebhookEvent } from "#src/services/WebhookEventBus";
+import { PROVIDERS } from "#src/constants";
 
 // ═══════════════════════════════════════════════════════════════
 //  WebhookEventBus — unit tests
 // ═══════════════════════════════════════════════════════════════
 
 const { default: WebhookEventBus } = await import(
-  "../src/services/WebhookEventBus.ts"
+  "#src/services/WebhookEventBus"
 );
 
 describe("WebhookEventBus — pub/sub lifecycle", () => {
@@ -191,7 +191,7 @@ describe("WebhookEventBus — replay buffer", () => {
 // ═══════════════════════════════════════════════════════════════
 
 const { default: ActiveGenerationTracker } = await import(
-  "../src/services/ActiveGenerationTracker.ts"
+  "#src/services/ActiveGenerationTracker"
 );
 
 describe("ActiveGenerationTracker — webhook events", () => {
@@ -818,7 +818,7 @@ describe("BaseAgenticHarness — request.tool_call.started webhook contract", ()
 //  Subscription event/filter matching logic (pure functions)
 // ═══════════════════════════════════════════════════════════════
 
-import { matchesEventTypes, matchesFilter } from "../src/services/WebhookDispatcher.ts";
+import { matchesEventTypes, matchesFilter } from "#src/services/WebhookDispatcher";
 
 function createWebhookEvent(data: Record<string, unknown>): WebhookEvent {
   return {
@@ -908,7 +908,7 @@ describe("Webhook subscription — event matching logic", () => {
 
 import request from "supertest";
 import { app } from "./setup.ts";
-import MongoWrapper from "../src/wrappers/MongoWrapper.ts";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
 
 describe("WebhookRoutes — REST & SSE integration", () => {
   let mockSubscriptions: any[] = [];
@@ -1096,7 +1096,7 @@ describe("WebhookRoutes — REST & SSE integration", () => {
 //  WebhookDispatcher — lifecycle & resource leaks tests
 // ═══════════════════════════════════════════════════════════════
 
-import WebhookDispatcher from "../src/services/WebhookDispatcher.ts";
+import WebhookDispatcher from "#src/services/WebhookDispatcher";
 
 describe("WebhookDispatcher — resource leak & lifecycle", () => {
   let originalFetch: any;
@@ -1151,8 +1151,8 @@ describe("WebhookDispatcher — resource leak & lifecycle", () => {
 //  BaseAgenticHarness — native MCP tool calls tests
 // ═══════════════════════════════════════════════════════════════
 
-import ReActHarness from "../src/services/harnesses/ReActHarness.ts";
-import AgenticLoopState from "../src/services/AgenticLoopState.ts";
+import ReActHarness from "#src/services/harnesses/ReActHarness";
+import AgenticLoopState from "#src/services/AgenticLoopState";
 
 describe("BaseAgenticHarness — native MCP tool call emits", () => {
   let capturedWebhookEvents: WebhookEvent[] = [];

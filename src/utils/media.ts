@@ -8,8 +8,8 @@ import { tmpdir } from "os";
 import { join } from "path";
 import sharp from "sharp";
 import logger from "./logger.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import { UNITS, ENCODINGS } from "../constants.ts";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { UNITS, ENCODINGS } from "#src/constants";
 
 // ── ffmpeg availability (cached per process) ────────────────
 let _ffmpegAvailable: boolean | null = null;

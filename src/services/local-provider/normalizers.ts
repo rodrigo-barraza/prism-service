@@ -1,5 +1,5 @@
 import { formatBytes } from "@rodrigo-barraza/utilities-library";
-import { MODALITY_TYPES } from "../../config.ts";
+import { MODALITY_TYPES } from "#src/config";
 import { detectCapabilities } from "./detectCapabilities.ts";
 import {
   parseParamsFromName,
@@ -165,7 +165,7 @@ export function normalizeVllmModel(raw: OpenAICompatRawModel): ModelEntry {
   return entry;
 }
 
-import { PROVIDERS, LOCAL_PROVIDER } from "../../constants.ts";
+import { PROVIDERS, LOCAL_PROVIDER } from "#src/constants";
 
 export type NormalizerFunction = (
   raw: LmStudioRawModel & OllamaRawModel & OpenAICompatRawModel,

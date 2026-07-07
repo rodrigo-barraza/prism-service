@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
-import { PROVIDERS } from "../../../constants.ts";
+import { PROVIDERS } from "#src/constants";
 import { TOPOLOGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import type {
   OrchestratorContext,
   SubAgentResult,
   OrchestratorSpawnParams,
-} from "../../../types/orchestrator.ts";
+} from "#src/types/orchestrator";
 
 // Mock RequestLogger to avoid DB writes during router executions
-vi.mock("../../RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: {
     log: vi.fn(),
     logChatGeneration: vi.fn().mockResolvedValue(undefined),
@@ -19,7 +19,7 @@ vi.mock("../../RequestLogger.ts", () => ({
 }));
 
 // Mock GitWorktreeHelper
-vi.mock("../GitWorktreeHelper.ts", () => ({
+vi.mock("#src/services/orchestrator/GitWorktreeHelper", () => ({
   GitWorktreeHelper: {
     getDefaultWorkspaceRoot: vi.fn().mockReturnValue("/workspace"),
     resolveRepositoryPath: vi.fn().mockReturnValue("/workspace"),
@@ -31,7 +31,7 @@ vi.mock("../GitWorktreeHelper.ts", () => ({
 }));
 
 // Mock SettingsService
-vi.mock("../../SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
     getSection: vi.fn().mockResolvedValue({
@@ -48,19 +48,19 @@ const mockGenerateText = vi.fn().mockResolvedValue({
   usage: { inputTokens: 100, outputTokens: 50 },
 });
 
-vi.mock("../../../providers/index.ts", () => ({
+vi.mock("#src/providers/index", () => ({
   getProvider: vi.fn().mockImplementation(() => ({
     generateText: mockGenerateText,
   })),
   providers: {},
 }));
 
-import { HierarchicalRouter } from "../routers/HierarchicalRouter.ts";
-import { HierarchicalAggregationRouter } from "../routers/HierarchicalAggregationRouter.ts";
-import { SequentialRouter } from "../routers/SequentialRouter.ts";
-import { PeerToPeerRouter } from "../routers/PeerToPeerRouter.ts";
-import { TournamentRouter } from "../routers/TournamentRouter.ts";
-import { GitWorktreeHelper } from "../GitWorktreeHelper.ts";
+import { HierarchicalRouter } from "#src/services/orchestrator/routers/HierarchicalRouter";
+import { HierarchicalAggregationRouter } from "#src/services/orchestrator/routers/HierarchicalAggregationRouter";
+import { SequentialRouter } from "#src/services/orchestrator/routers/SequentialRouter";
+import { PeerToPeerRouter } from "#src/services/orchestrator/routers/PeerToPeerRouter";
+import { TournamentRouter } from "#src/services/orchestrator/routers/TournamentRouter";
+import { GitWorktreeHelper } from "#src/services/orchestrator/GitWorktreeHelper";
 
 describe("Topology Routers Test Suite", () => {
   let orchestratorContext: OrchestratorContext;

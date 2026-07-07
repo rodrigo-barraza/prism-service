@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { DirectoryTreeFormatter } from "../DirectoryTreeFormatter.ts";
-import { SkillMemoryScorer } from "../SkillMemoryScorer.ts";
-import { ToolDocFormatter } from "../ToolDocFormatter.ts";
-import MemoryService from "../../MemoryService.ts";
-import EmbeddingService from "../../EmbeddingService.ts";
-import MongoWrapper from "../../../wrappers/MongoWrapper.ts";
-import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
-import AgentPersonaRegistry from "../../AgentPersonaRegistry.ts";
+import { DirectoryTreeFormatter } from "#src/services/system-prompt/DirectoryTreeFormatter";
+import { SkillMemoryScorer } from "#src/services/system-prompt/SkillMemoryScorer";
+import { ToolDocFormatter } from "#src/services/system-prompt/ToolDocFormatter";
+import MemoryService from "#src/services/MemoryService";
+import EmbeddingService from "#src/services/EmbeddingService";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
+import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 
 // ── Mocks ──────────────────────────────────────────────────────
-vi.mock("../../MemoryService.ts", () => ({
+vi.mock("#src/services/MemoryService", () => ({
   default: {
     search: vi.fn(),
     formatForPrompt: vi.fn().mockImplementation((memories) =>
@@ -24,25 +24,25 @@ vi.mock("../../MemoryService.ts", () => ({
   },
 }));
 
-vi.mock("../../EmbeddingService.ts", () => ({
+vi.mock("#src/services/EmbeddingService", () => ({
   default: {
     embed: vi.fn(),
   },
 }));
 
-vi.mock("../../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getDb: vi.fn(),
   },
 }));
 
-vi.mock("../../ToolOrchestratorService.ts", () => ({
+vi.mock("#src/services/ToolOrchestratorService", () => ({
   default: {
     getClientToolSchemas: vi.fn(),
   },
 }));
 
-vi.mock("../../AgentPersonaRegistry.ts", () => ({
+vi.mock("#src/services/AgentPersonaRegistry", () => ({
   default: {
     get: vi.fn(),
   },

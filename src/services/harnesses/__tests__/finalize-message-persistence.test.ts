@@ -11,10 +11,10 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { PROMPT_DELIMITERS, MESSAGE_ROLES } from "../../../constants.ts";
-import type { ConversationMessage as TestMessage } from "../types.ts";
-import { computeNewTurnMessages, sanitizeMessagesForPersistence } from "../lifecycle/Finalizer.ts";
-import type { MessagePayload } from "../../conversation/types.ts";
+import { PROMPT_DELIMITERS, MESSAGE_ROLES } from "#src/constants";
+import type { ConversationMessage as TestMessage } from "#src/services/harnesses/types";
+import { computeNewTurnMessages, sanitizeMessagesForPersistence } from "#src/services/harnesses/lifecycle/Finalizer";
+import type { MessagePayload } from "#src/services/conversation/types";
 
 /**
  * Delegates to the production newTurnMessages slice logic from

@@ -1,4 +1,4 @@
-import ToolContext from "../../ToolContext.ts";
+import ToolContext from "#src/services/ToolContext";
 
 const TOOL_CONTEXT_KEY_DYNAMIC_ENABLED = "dynamicEnabledTools";
 const TOOL_CONTEXT_KEY_DIRTY_FLAG = "toolSetDirty";

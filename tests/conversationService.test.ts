@@ -12,8 +12,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TEST_PROJECT, TEST_USER, TEST_CONVERSATION_ID } from "./setup.ts";
-import { COLLECTIONS, PROVIDERS } from "../src/constants.ts";
-import { TOOL_NAMES } from "../src/services/ToolTaxonomyConstants.ts";
+import { COLLECTIONS, PROVIDERS } from "#src/constants";
+import { TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
 import {
   extractFiles,
   computeModalities,
@@ -22,16 +22,16 @@ import {
   buildConversationPatchFields,
   enrichConversationsWithRequestCosts,
   enrichSingleConversationCost,
-} from "../src/services/conversation/utils.ts";
+} from "#src/services/conversation/utils";
 
 
 // ── Mock config ────────────────────────────────────────────────
-vi.mock("../config.ts", () => ({
+vi.mock("#config", () => ({
   MONGO_DB_NAME: "prism-test",
 }));
 
 // ── Mock FileService (no MinIO in tests) ───────────────────────
-vi.mock("../src/services/FileService.ts", () => ({
+vi.mock("#src/services/FileService", () => ({
   default: {
     isExternalStorage: () => (globalThis as any).isExternalStorageMockValue ?? false,
     isMinioRef: () => false,
@@ -45,7 +45,7 @@ vi.mock("../src/services/FileService.ts", () => ({
 }));
 
 // ── Mock ConversationDiscovery ────────────────────────────────
-vi.mock("../src/utils/ConversationDiscovery.ts", () => ({
+vi.mock("#src/utils/ConversationDiscovery", () => ({
   discoverDescendantConversationIds: vi.fn().mockImplementation(async (db, id) => {
     if (id === TEST_CONVERSATION_ID) {
       return new Set([TEST_CONVERSATION_ID, "sub-agent-session-abc"]);
@@ -59,7 +59,7 @@ import { createMockCollection } from "./mongoMock.ts";
 let mockCollection: any;
 
 // MongoWrapper mock — supports both getCollection() and getDb().collection()
-vi.mock("../src/wrappers/MongoWrapper.ts", () => {
+vi.mock("#src/wrappers/MongoWrapper", () => {
   const getCollectionFn = vi.fn();
   const getDbFn = vi.fn();
   return {
@@ -75,10 +75,10 @@ vi.unmock("../src/services/ConversationService.ts");
 vi.unmock("../src/services/ConversationService.js");
 vi.unmock("../src/services/conversation/index.ts");
 vi.unmock("../src/services/conversation/ConversationService.ts");
-const MongoWrapperModule = await import("../src/wrappers/MongoWrapper.ts");
+const MongoWrapperModule = await import("#src/wrappers/MongoWrapper");
 const MongoWrapper = MongoWrapperModule.default;
 const { default: ConversationService } = await import(
-  "../src/services/conversation/ConversationService.ts"
+  "#src/services/conversation/ConversationService"
 );
 
 // ── Helpers ────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import "./setup.ts";
-import { PROVIDERS } from "../src/constants.ts";
+import { PROVIDERS } from "#src/constants";
 
 // ── Mocks ─────────────────────────────────────────────────────
 
@@ -24,7 +24,7 @@ const mockRunAgenticLoop = vi.fn().mockImplementation(async (params: AgenticCont
   };
 });
 
-vi.mock("../src/services/AgenticLoopService.ts", () => ({
+vi.mock("#src/services/AgenticLoopService", () => ({
   default: {
     runAgenticLoop: (...args: unknown[]) => mockRunAgenticLoop(...args),
   },
@@ -42,7 +42,7 @@ const mockGetWorktreeDiff = vi.fn().mockResolvedValue({
 });
 const mockToolsApiPost = vi.fn().mockResolvedValue({});
 
-vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
+vi.mock("#src/services/orchestrator/GitWorktreeHelper", () => ({
   GitWorktreeHelper: {
     getDefaultWorkspaceRoot: () => "/workspace",
     resolveRepositoryPath: () => "/workspace/repo",
@@ -56,7 +56,7 @@ vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
 }));
 
 // Mock SettingsService
-vi.mock("../src/services/SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
     getSection: vi.fn().mockResolvedValue({
@@ -67,16 +67,16 @@ vi.mock("../src/services/SettingsService.ts", () => ({
   },
 }));
 
-import OrchestratorService from "../src/services/OrchestratorService.ts";
-import { GitWorktreeHelper } from "../src/services/orchestrator/GitWorktreeHelper.ts";
-import { SubAgentTelemetryEmitter } from "../src/services/orchestrator/SubAgentTelemetryEmitter.ts";
-import { HierarchicalRouter } from "../src/services/orchestrator/routers/HierarchicalRouter.ts";
-import { SequentialRouter } from "../src/services/orchestrator/routers/SequentialRouter.ts";
-import { PeerToPeerRouter } from "../src/services/orchestrator/routers/PeerToPeerRouter.ts";
-import { InstanceLoadBalancer } from "../src/services/orchestrator/InstanceLoadBalancer.ts";
-import type { InstanceEntry } from "../src/types/ProviderTypes.ts";
-import type { AgenticContext } from "../src/services/harnesses/types.ts";
-import type { OrchestratorContext, SubAgentResult, SubAgentState } from "../src/types/orchestrator.ts";
+import OrchestratorService from "#src/services/OrchestratorService";
+import { GitWorktreeHelper } from "#src/services/orchestrator/GitWorktreeHelper";
+import { SubAgentTelemetryEmitter } from "#src/services/orchestrator/SubAgentTelemetryEmitter";
+import { HierarchicalRouter } from "#src/services/orchestrator/routers/HierarchicalRouter";
+import { SequentialRouter } from "#src/services/orchestrator/routers/SequentialRouter";
+import { PeerToPeerRouter } from "#src/services/orchestrator/routers/PeerToPeerRouter";
+import { InstanceLoadBalancer } from "#src/services/orchestrator/InstanceLoadBalancer";
+import type { InstanceEntry } from "#src/types/ProviderTypes";
+import type { AgenticContext } from "#src/services/harnesses/types";
+import type { OrchestratorContext, SubAgentResult, SubAgentState } from "#src/types/orchestrator";
 
 describe("Sub-Agent Intensive Integration Tests", () => {
   async function waitForCondition(condition: () => boolean, timeoutMilliseconds = 10000): Promise<void> {

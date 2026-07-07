@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { COLLECTIONS } from "../src/constants.ts";
+import { COLLECTIONS } from "#src/constants";
 
-vi.mock("../src/utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -10,7 +10,7 @@ vi.mock("../src/utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../config.ts", () => ({
+vi.mock("#config", () => ({
   MONGO_DB_NAME: "prism-test",
 }));
 
@@ -24,9 +24,9 @@ describe("hasSubAgents Derivation — Defense-in-Depth Tests", () => {
   beforeEach(async () => {
     const { app } = await import("./setup.ts");
     const conversationsRouter = (
-      await import("../src/routes/ConversationsRoutes.ts")
+      await import("#src/routes/ConversationsRoutes")
     ).default;
-    const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts"))
+    const MongoWrapper = (await import("#src/wrappers/MongoWrapper"))
       .default;
 
     try {

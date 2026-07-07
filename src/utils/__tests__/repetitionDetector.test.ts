@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import RepetitionDetector from "../RepetitionDetector.ts";
-import type { RepetitionVerdict } from "../RepetitionDetector.ts";
+import RepetitionDetector from "#src/utils/RepetitionDetector";
+import type { RepetitionVerdict } from "#src/utils/RepetitionDetector";
 
 // ═══════════════════════════════════════════════════════════════
 // RepetitionDetector — Comprehensive Test Suite

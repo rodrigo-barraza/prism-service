@@ -1,15 +1,15 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response } from "express";
 import { basename } from "node:path";
-import { TOOLS_SERVICE_URL } from "../../config.ts";
-import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
-import logger from "../utils/logger.ts";
+import { TOOLS_SERVICE_URL } from "#config";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
+import logger from "#src/utils/logger";
 import {
   PutWorkspacesSchema,
   ValidateWorkspaceSchema,
-} from "../types/index.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import { TOOL_CONFIG_FETCH_TIMEOUT_MILLISECONDS } from "../constants.ts";
+} from "#src/types/index";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { TOOL_CONFIG_FETCH_TIMEOUT_MILLISECONDS } from "#src/constants";
 
 const router = express.Router();
 

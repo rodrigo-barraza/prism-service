@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { PROVIDERS } from '../../constants.ts';
+import { PROVIDERS } from '#src/constants';
 
 const mockRateLimitStoreUpdate = vi.fn();
 
-vi.mock('../../services/RateLimitStore.ts', () => ({
+vi.mock('#src/services/RateLimitStore', () => ({
   default: {
     update: (...args: unknown[]) => mockRateLimitStoreUpdate(...args),
   },
 }));
 
-vi.mock('../../constants.ts', () => ({
+vi.mock('#src/constants', () => ({
   PROVIDERS: {
     OPENAI: 'openai',
     ANTHROPIC: 'anthropic',
@@ -22,7 +22,7 @@ vi.mock('../../constants.ts', () => ({
 import {
   extractOpenAIRateLimits,
   extractAnthropicRateLimits,
-} from '../rateLimits.ts';
+} from '#src/utils/rateLimits';
 
 function createMockResponse(
   headerMap: Record<string, string>,

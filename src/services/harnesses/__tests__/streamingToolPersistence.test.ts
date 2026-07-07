@@ -16,7 +16,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ── Mock logger ────────────────────────────────────────────────
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -28,7 +28,7 @@ vi.mock("../../../utils/logger.ts", () => ({
 }));
 
 // ── Mock config ────────────────────────────────────────────────
-vi.mock("../../../config.ts", async (importOriginal) => {
+vi.mock("#src/config", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../config.ts")>();
   return {
     ...actual,
@@ -38,14 +38,14 @@ vi.mock("../../../config.ts", async (importOriginal) => {
 });
 
 // ── Mock dependencies ──────────────────────────────────────────
-vi.mock("../../MCPClientService.ts", () => ({
+vi.mock("#src/services/MCPClientService", () => ({
   default: {
     isMCPTool: vi.fn().mockReturnValue(false),
     getToolSchemas: vi.fn().mockReturnValue([]),
   },
 }));
 
-vi.mock("../../local-tools/InternalToolRegistry.ts", () => ({
+vi.mock("#src/services/local-tools/InternalToolRegistry", () => ({
   default: {
     has: vi.fn().mockReturnValue(false),
     getSchemas: vi.fn().mockReturnValue([]),
@@ -54,7 +54,7 @@ vi.mock("../../local-tools/InternalToolRegistry.ts", () => ({
   },
 }));
 
-vi.mock("../../../utils/AbortController.ts", () => ({
+vi.mock("#src/utils/AbortController", () => ({
   createAbortController: vi.fn().mockReturnValue(new AbortController()),
 }));
 
@@ -84,7 +84,7 @@ function createSSEResponse(events: any[]) {
 
 // ── Import SUT ─────────────────────────────────────────────────
 const { default: ToolOrchestratorService } = await import(
-  "../../ToolOrchestratorService.js"
+  "#src/services/ToolOrchestratorService"
 );
 
 // ═══════════════════════════════════════════════════════════════

@@ -1,13 +1,13 @@
-import logger from "../../utils/logger.ts";
-import PromptLocaleService from "../PromptLocaleService.ts";
+import logger from "#src/utils/logger";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 import {
   TOOL_NAMES,
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { INTERNAL_TOOL_EMOJIS } from "../tool-orchestrator/InternalToolEmojis.ts";
+import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
 
 import { InternalToolContext } from "./InternalToolRegistry.ts";
-import type { SkillDocument, SkillPrepareResult } from "../SkillService.ts";
+import type { SkillDocument, SkillPrepareResult } from "#src/services/SkillService";
 
 interface SkillCreateArgs extends Partial<SkillDocument> {
   [key: string]: any;
@@ -110,7 +110,7 @@ const createSkill = {
           "internal-tools-runtime.create_skill.missingFields",
         ),
       };
-    const { default: SkillService } = await import("../SkillService.js");
+    const { default: SkillService } = await import("#src/services/SkillService");
     return SkillService.create(createArgs);
   },
 };
@@ -160,7 +160,7 @@ const executeSkill = {
         ),
       };
 
-    const { default: SkillService } = await import("../SkillService.ts");
+    const { default: SkillService } = await import("#src/services/SkillService");
     const prepared: SkillPrepareResult = await SkillService.prepare(skillId, variables);
     if (prepared.error) return prepared;
 
@@ -169,7 +169,7 @@ const executeSkill = {
       `[SkillExecute] Executing skill "${prepared.name}" (${prepared.skillId})`,
     );
     const { default: ToolOrchestratorService } =
-      await import("../ToolOrchestratorService.js");
+      await import("#src/services/ToolOrchestratorService");
     return ToolOrchestratorService.executeOrchestratorTool(
       TOOL_NAMES.CREATE_SUBAGENT,
       {
@@ -217,7 +217,7 @@ const listSkills = {
       typeof toolArguments.project === "string"
         ? toolArguments.project
         : context.project;
-    const { default: SkillService } = await import("../SkillService.js");
+    const { default: SkillService } = await import("#src/services/SkillService");
     return SkillService.list({ project });
   },
 };
@@ -251,7 +251,7 @@ const deleteSkill = {
           "internal-tools-runtime.delete_skill.missingSkillId",
         ),
       };
-    const { default: SkillService } = await import("../SkillService.js");
+    const { default: SkillService } = await import("#src/services/SkillService");
     return SkillService.delete(skillId);
   },
 };

@@ -13,8 +13,8 @@
 
 // ── Constants ───────────────────────────────────────────────────
 
-import { PROVIDERS, TYPES } from "../../../src/constants.ts";
-import type { UsageAccumulator, ToolCall, AgenticOptions } from "../../../src/services/harnesses/types.ts";
+import { PROVIDERS, TYPES } from "#src/constants";
+import type { UsageAccumulator, ToolCall, AgenticOptions } from "#src/services/harnesses/types";
 import { TEST_PROJECT, TEST_USER } from "../../setup.ts";
 
 export const PRISM_SERVICE_URL = process.env.PRISM_TEST_URL || "https://api.prism.rod.dev";

@@ -1,4 +1,4 @@
-import type ToolOrchestratorServiceClass from "../services/ToolOrchestratorService.ts";
+import type ToolOrchestratorServiceClass from "#src/services/ToolOrchestratorService";
 
 declare global {
   var __ToolOrchestratorService:

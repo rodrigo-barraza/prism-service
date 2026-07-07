@@ -2,21 +2,21 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   isAtOutputCeiling,
   calculateEscalatedMaxTokens,
-} from "../lifecycle/OutputTruncationRecovery.ts";
+} from "#src/services/harnesses/lifecycle/OutputTruncationRecovery";
 import {
   DEFAULT_MAX_OUTPUT_TOKENS,
   DEFAULT_MAX_INPUT_TOKENS,
   OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
   MINIMUM_CLAMPED_OUTPUT_TOKENS,
-} from "../../../constants/TokenBudgetDefaults.ts";
-import BaseAgenticHarness from "../BaseAgenticHarness.ts";
+} from "#src/constants/TokenBudgetDefaults";
+import BaseAgenticHarness from "#src/services/harnesses/BaseAgenticHarness";
 import type {
   ConversationMessage,
   AgenticContext,
-} from "../types.ts";
-import { estimateTokens } from "../../../utils/CostCalculator.ts";
+} from "#src/services/harnesses/types";
+import { estimateTokens } from "#src/utils/CostCalculator";
 
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -24,11 +24,11 @@ vi.mock("../../../utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../../ConversationGenerationTracker.ts", () => ({
+vi.mock("#src/services/ConversationGenerationTracker", () => ({
   default: { registerRequest: vi.fn(), finalizeRequest: vi.fn() },
 }));
 
-vi.mock("../../RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: { log: vi.fn() },
 }));
 

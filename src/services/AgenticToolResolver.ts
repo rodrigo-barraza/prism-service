@@ -1,6 +1,6 @@
 import ToolOrchestratorService from "./ToolOrchestratorService.ts";
 import SettingsService from "./SettingsService.ts";
-import logger from "../utils/logger.ts";
+import logger from "#src/utils/logger";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import ToolContext from "./ToolContext.ts";
 
@@ -12,8 +12,8 @@ import {
   DEFAULT_TOPOLOGY,
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { MODALITY_TYPES } from "../config.ts";
-import { resolveToolEntriesToSet } from "../utils/resolveToolEntriesToSet.ts";
+import { MODALITY_TYPES } from "#src/config";
+import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";
 import {
   THINKING_PATTERNS,
   LOCAL_PROVIDER_TYPES,

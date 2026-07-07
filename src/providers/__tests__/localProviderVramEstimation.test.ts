@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('../../utils/gguf-arch.ts', () => ({
+vi.mock('#src/utils/gguf-arch', () => ({
   resolveArchParams: vi.fn().mockReturnValue({
     layers: 32,
     kvHeads: 8,
@@ -15,14 +15,14 @@ vi.mock('../../utils/gguf-arch.ts', () => ({
   }),
 }));
 
-vi.mock('../index.ts', () => ({
+vi.mock('#src/providers/index', () => ({
   getProvider: vi.fn().mockReturnValue(null),
 }));
 
-import { estimateVRAM, estimateVRAMForModel } from '../../services/local-provider/vramEstimation.ts';
-import { resolveArchParams, estimateMemory } from '../../utils/gguf-arch.ts';
-import { getProvider } from '../index.ts';
-import type { LmStudioRawModel } from '../../services/local-provider/types.ts';
+import { estimateVRAM, estimateVRAMForModel } from '#src/services/local-provider/vramEstimation';
+import { resolveArchParams, estimateMemory } from '#src/utils/gguf-arch';
+import { getProvider } from '#src/providers/index';
+import type { LmStudioRawModel } from '#src/services/local-provider/types';
 
 describe('estimateVRAM', () => {
   it('returns null for null model data', () => {

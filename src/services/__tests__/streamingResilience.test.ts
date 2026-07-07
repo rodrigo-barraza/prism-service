@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import { PROVIDERS } from "../../constants.ts";
+import { PROVIDERS } from "#src/constants";
 
 /**
  * Streaming resilience tests — verifies that all providers and SSE parsers
@@ -227,7 +227,7 @@ describe("parseSSEStream — partial usage on premature termination", () => {
   }
 
   it("yields estimated usage before re-throwing when stream crashes mid-generation", async () => {
-    const { parseSSEStream } = await import("../../utils/openai-compat.ts");
+    const { parseSSEStream } = await import("#src/utils/openai-compat");
 
     const sseChunks = [
       'data: {"choices":[{"delta":{"content":"Hello "}}]}\n\n',
@@ -263,7 +263,7 @@ describe("parseSSEStream — partial usage on premature termination", () => {
   });
 
   it("yields server-reported usage if available before crash", async () => {
-    const { parseSSEStream } = await import("../../utils/openai-compat.ts");
+    const { parseSSEStream } = await import("#src/utils/openai-compat");
 
     const sseChunks = [
       'data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n',
@@ -298,7 +298,7 @@ describe("parseSSEStream — partial usage on premature termination", () => {
   });
 
   it("yields normal usage on happy-path completion", async () => {
-    const { parseSSEStream } = await import("../../utils/openai-compat.ts");
+    const { parseSSEStream } = await import("#src/utils/openai-compat");
 
     const sseChunks = [
       'data: {"choices":[{"delta":{"content":"Hello world"}}]}\n\n',
@@ -326,7 +326,7 @@ describe("parseSSEStream — partial usage on premature termination", () => {
   });
 
   it("tracks reasoning content characters for usage estimation", async () => {
-    const { parseSSEStream } = await import("../../utils/openai-compat.ts");
+    const { parseSSEStream } = await import("#src/utils/openai-compat");
 
     const sseChunks = [
       'data: {"choices":[{"delta":{"reasoning_content":"Let me think about this carefully..."}}]}\n\n',
@@ -362,7 +362,7 @@ describe("parseSSEStream — partial usage on premature termination", () => {
   });
 
   it("skips partial usage yield when no content was generated", async () => {
-    const { parseSSEStream } = await import("../../utils/openai-compat.ts");
+    const { parseSSEStream } = await import("#src/utils/openai-compat");
 
     // Stream crashes immediately with no content chunks
     const reader = createTerminatingReader([], "connection refused");

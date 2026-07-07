@@ -23,23 +23,23 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockUpdateOne = vi.fn().mockResolvedValue({ matchedCount: 1 });
 const mockCollection = { updateOne: mockUpdateOne };
 
-vi.mock("../../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getCollection: vi.fn(() => mockCollection),
   },
 }));
 
-vi.mock("../../../../config.ts", () => ({
+vi.mock("#config", () => ({
   MONGO_DB_NAME: "prism-test",
 }));
 
-vi.mock("../GitWorktreeHelper.ts", () => ({
+vi.mock("#src/services/orchestrator/GitWorktreeHelper", () => ({
   GitWorktreeHelper: {
     removeWorktree: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -48,9 +48,9 @@ vi.mock("../../../utils/logger.ts", () => ({
   },
 }));
 
-import { SubAgentLifecycleService } from "../SubAgentLifecycleService.ts";
-import { SYSTEM_STATUSES } from "../../../constants.ts";
-import type { SubAgentState } from "../../../types/orchestrator.ts";
+import { SubAgentLifecycleService } from "#src/services/orchestrator/SubAgentLifecycleService";
+import { SYSTEM_STATUSES } from "#src/constants";
+import type { SubAgentState } from "#src/types/orchestrator";
 
 // ── Test Helpers ───────────────────────────────────────────────
 

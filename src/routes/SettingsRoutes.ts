@@ -1,9 +1,9 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
-import SettingsService from "../services/SettingsService.ts";
-import ToolOrchestratorService from "../services/ToolOrchestratorService.ts";
-import logger from "../utils/logger.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import SettingsService from "#src/services/SettingsService";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
+import logger from "#src/utils/logger";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 const router = express.Router();
 
@@ -77,7 +77,7 @@ router.get(
   "/harnesses",
   asyncHandler(async (_req: Request, res: Response) => {
     const { default: AgenticLoopService } =
-      await import("../services/AgenticLoopService.js");
+      await import("#src/services/AgenticLoopService");
     res.json(AgenticLoopService.listHarnesses());
   }),
 );

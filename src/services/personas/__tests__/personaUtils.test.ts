@@ -5,12 +5,12 @@ import {
   extractDomainKeywords,
   buildToolPolicy,
   getToolPolicyAddendum,
-} from "../utils.ts";
-import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
+} from "#src/services/personas/utils";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 
 const mockGetClientToolSchemas = vi.fn();
 
-vi.mock("../../ToolOrchestratorService.ts", () => ({
+vi.mock("#src/services/ToolOrchestratorService", () => ({
   default: {
     getClientToolSchemas: () => mockGetClientToolSchemas(),
   },

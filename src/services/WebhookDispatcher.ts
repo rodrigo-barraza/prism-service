@@ -1,12 +1,12 @@
 import crypto from "crypto";
 import WebhookEventBus from "./WebhookEventBus.ts";
 import type { WebhookEvent } from "./WebhookEventBus.ts";
-import MongoWrapper from "../wrappers/MongoWrapper.ts";
-import { MONGO_DB_NAME } from "../../config.ts";
-import { COLLECTIONS, WEBHOOK } from "../constants.ts";
-import logger from "../utils/logger.ts";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import { MONGO_DB_NAME } from "#config";
+import { COLLECTIONS, WEBHOOK } from "#src/constants";
+import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import { registerCleanup } from "../utils/CleanupRegistry.ts";
+import { registerCleanup } from "#src/utils/CleanupRegistry";
 
 interface WebhookSubscription {
   id: string;

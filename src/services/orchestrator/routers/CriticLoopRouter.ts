@@ -3,21 +3,21 @@ import type {
   OrchestratorContext,
   OrchestratorSpawnParams,
   SubAgentResult,
-} from "../../../types/orchestrator.ts";
-import { nextGlobalSpawnIndex } from "../../../types/orchestrator.ts";
+} from "#src/types/orchestrator";
+import { nextGlobalSpawnIndex } from "#src/types/orchestrator";
 import type {
   TopologyRouter,
   ContinueSubAgentCallback,
   TopologyConfig,
-} from "../TopologyRouter.ts";
-import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
+} from "#src/services/orchestrator/TopologyRouter";
+import { buildToolCallFallbackSummary } from "#src/services/orchestrator/SubAgentResultBuilder";
 import {
   resolveSiblingInstances,
   selectInstanceForMember,
-} from "../InstanceResolver.ts";
-import logger from "../../../utils/logger.ts";
-import PromptLocaleService from "../../PromptLocaleService.ts";
-import { ORCHESTRATOR } from "../../../constants.ts";
+} from "#src/services/orchestrator/InstanceResolver";
+import logger from "#src/utils/logger";
+import PromptLocaleService from "#src/services/PromptLocaleService";
+import { ORCHESTRATOR } from "#src/constants";
 
 const DEFAULT_MAXIMUM_ROUNDS = 3;
 const DEFAULT_ACTOR_COUNT = 1;
@@ -728,7 +728,7 @@ export class CriticLoopRouter implements TopologyRouter {
 
     // ── Phase 2: Judge selects best + provides feedback ──────────────────
 
-    const { getProvider } = await import("../../../providers/index.ts");
+    const { getProvider } = await import("#src/providers/index");
     const provider = getProvider(providerName);
 
     if (!provider) {

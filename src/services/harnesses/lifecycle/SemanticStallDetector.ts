@@ -21,8 +21,8 @@
  */
 
 import { createHash } from "crypto";
-import type { ToolCall } from "../types.ts";
-import { HARNESS } from "../../../constants.ts";
+import type { ToolCall } from "#src/services/harnesses/types";
+import { HARNESS } from "#src/constants";
 
 export interface StallVerdict {
   isStalled: boolean;

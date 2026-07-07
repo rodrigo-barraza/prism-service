@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createMockCollection } from "./mongoMock.ts";
 
-vi.mock("../src/wrappers/MongoWrapper.ts", () => {
+vi.mock("#src/wrappers/MongoWrapper", () => {
   return {
     default: {
       createClient: vi.fn().mockResolvedValue(undefined),
@@ -11,9 +11,9 @@ vi.mock("../src/wrappers/MongoWrapper.ts", () => {
   };
 });
 
-import SkillService from "../src/services/SkillService.ts";
-import MongoWrapper from "../src/wrappers/MongoWrapper.ts";
-import { COLLECTIONS } from "../src/constants.ts";
+import SkillService from "#src/services/SkillService";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import { COLLECTIONS } from "#src/constants";
 
 describe("SkillService Unit Tests", () => {
   let mockCollection: ReturnType<typeof createMockCollection>;

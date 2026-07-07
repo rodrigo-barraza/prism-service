@@ -21,11 +21,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ── Mock dependencies before imports ───────────────────────
 
-vi.mock("../../../config.ts", () => ({
+vi.mock("#src/config", () => ({
   TOOLS_SERVICE_URL: "http://mock-tools-service:9999",
 }));
 
-vi.mock("../../MCPClientService.ts", () => ({
+vi.mock("#src/services/MCPClientService", () => ({
   default: {
     getConnectedClients: vi.fn().mockReturnValue([]),
     getAllToolSchemas: vi.fn().mockReturnValue([]),
@@ -33,14 +33,14 @@ vi.mock("../../MCPClientService.ts", () => ({
   },
 }));
 
-vi.mock("../../AgentPersonaRegistry.ts", () => ({
+vi.mock("#src/services/AgentPersonaRegistry", () => ({
   default: {
     get: vi.fn().mockReturnValue(null),
     list: vi.fn().mockReturnValue([]),
   },
 }));
 
-vi.mock("../../local-tools/InternalToolRegistry.ts", () => ({
+vi.mock("#src/services/local-tools/InternalToolRegistry", () => ({
   default: {
     getClientSchemas: vi.fn().mockReturnValue([]),
     getAISchemas: vi.fn().mockReturnValue([]),
@@ -48,12 +48,12 @@ vi.mock("../../local-tools/InternalToolRegistry.ts", () => ({
   },
 }));
 
-vi.mock("../../OrchestratorPrompt.ts", () => ({
+vi.mock("#src/services/OrchestratorPrompt", () => ({
   ORCHESTRATOR_ONLY_TOOLS: [],
   getOrchestratorToolSchemas: vi.fn().mockReturnValue([]),
 }));
 
-vi.mock("../../SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getSection: vi.fn().mockResolvedValue({
       topology: "hierarchical",
@@ -66,7 +66,7 @@ vi.mock("../../SettingsService.ts", () => ({
   },
 }));
 
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -75,7 +75,7 @@ vi.mock("../../../utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../../RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: { logRequest: vi.fn() },
 }));
 
@@ -195,7 +195,7 @@ describe("ToolOrchestratorService — Per-Locale Cache Selection", () => {
       });
 
     // Dynamic import after mocks are set up
-    const orchestratorModule = await import("../../ToolOrchestratorService.ts");
+    const orchestratorModule = await import("#src/services/ToolOrchestratorService");
     ToolOrchestratorService = orchestratorModule.default;
     (ToolOrchestratorService as any)._resetCaches();
   });
@@ -379,7 +379,7 @@ describe("ToolOrchestratorService — Per-Locale Cache Selection", () => {
           return Promise.resolve({ ok: false, status: 404 });
         });
 
-      const freshModule = await import("../../ToolOrchestratorService.ts");
+      const freshModule = await import("#src/services/ToolOrchestratorService");
       const freshService = freshModule.default;
 
       // ensureSchemas("caveman") will attempt to fetch but fail → cache stays empty

@@ -1,20 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import ReActHarness from "../ReActHarness.ts";
-import AgenticLoopState from "../../AgenticLoopState.ts";
-import { SYSTEM_STATUSES } from "../../../constants.ts";
+import ReActHarness from "#src/services/harnesses/ReActHarness";
+import AgenticLoopState from "#src/services/AgenticLoopState";
+import { SYSTEM_STATUSES } from "#src/constants";
 
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
-import ConversationGenerationTracker from "../../ConversationGenerationTracker.ts";
-import ConversationStatusRegistry from "../../ConversationStatusRegistry.ts";
+import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
+import ConversationStatusRegistry from "#src/services/ConversationStatusRegistry";
 
-vi.mock("../../conversation/ConversationService.ts");
-vi.mock("../../ConversationStatusRegistry.ts", () => ({
+vi.mock("#src/services/conversation/ConversationService");
+vi.mock("#src/services/ConversationStatusRegistry", () => ({
   default: {
     set: vi.fn(),
     patch: vi.fn(),
   },
 }));
-vi.mock("../../ConversationGenerationTracker.ts", () => ({
+vi.mock("#src/services/ConversationGenerationTracker", () => ({
   default: {
     getStats: vi.fn(() => ({ activeRequests: 0, totalOutputTokens: 0 })),
     incrementActiveRequests: vi.fn(),

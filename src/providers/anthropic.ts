@@ -1,17 +1,17 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { ProviderError } from "../utils/errors.ts";
-import logger from "../utils/logger.ts";
-import { extractAnthropicRateLimits } from "../utils/rateLimits.ts";
-import { compressImageForSizeLimit } from "../utils/media.ts";
-import { EMPTY_USAGE } from "../utils/openai-compat.ts";
-import { ANTHROPIC_API_KEY } from "../../config.ts";
-import { MODALITY_TYPES, getDefaultModels, getModelByName } from "../config.ts";
-import { DEFAULT_MAX_OUTPUT_TOKENS } from "../constants/TokenBudgetDefaults.ts";
+import { ProviderError } from "#src/utils/errors";
+import logger from "#src/utils/logger";
+import { extractAnthropicRateLimits } from "#src/utils/rateLimits";
+import { compressImageForSizeLimit } from "#src/utils/media";
+import { EMPTY_USAGE } from "#src/utils/openai-compat";
+import { ANTHROPIC_API_KEY } from "#config";
+import { MODALITY_TYPES, getDefaultModels, getModelByName } from "#src/config";
+import { DEFAULT_MAX_OUTPUT_TOKENS } from "#src/constants/TokenBudgetDefaults";
 import { sleep } from "@rodrigo-barraza/utilities-library";
 
-import { ProviderOptions, ChatMessage } from "../types/ProviderTypes.ts";
-import type { TokenUsage } from "../types/admin.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { ProviderOptions, ChatMessage } from "#src/types/ProviderTypes";
+import type { TokenUsage } from "#src/types/admin";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 export interface AnthropicBlock {
   type: string;

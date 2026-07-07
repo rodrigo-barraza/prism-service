@@ -1,9 +1,9 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import express, { Request, Response, NextFunction } from "express";
-import MemoryService from "../services/MemoryService.ts";
-import logger from "../utils/logger.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import MemoryService from "#src/services/MemoryService";
+import logger from "#src/utils/logger";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 const router = express.Router();
 

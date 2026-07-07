@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import WebhookDispatcher, { matchesFilter, matchesEventTypes } from "../WebhookDispatcher.ts";
-import WebhookEventBus from "../WebhookEventBus.ts";
-import MongoWrapper from "../../wrappers/MongoWrapper.ts";
-import type { WebhookEvent } from "../WebhookEventBus.ts";
+import WebhookDispatcher, { matchesFilter, matchesEventTypes } from "#src/services/WebhookDispatcher";
+import WebhookEventBus from "#src/services/WebhookEventBus";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import type { WebhookEvent } from "#src/services/WebhookEventBus";
 
 describe("WebhookDispatcher", () => {
   beforeEach(() => {

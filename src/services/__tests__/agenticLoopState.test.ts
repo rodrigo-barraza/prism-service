@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 
-vi.mock("../../utils/CostCalculator.ts", () => ({
+vi.mock("#src/utils/CostCalculator", () => ({
   createUsageAccumulator: () => ({
     inputTokens: 0,
     outputTokens: 0,
@@ -19,7 +19,7 @@ vi.mock("../../utils/CostCalculator.ts", () => ({
 }));
 
 const { default: AgenticLoopState } = await import(
-  "../AgenticLoopState.ts"
+  "#src/services/AgenticLoopState"
 );
 
 // ═══════════════════════════════════════════════════════════════

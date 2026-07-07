@@ -21,7 +21,7 @@
  * ════════════════════════════════════════════════════════════════
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { THOUGHT_STRUCTURES, HARNESS_IDS } from "../../src/constants.ts";
+import { THOUGHT_STRUCTURES, HARNESS_IDS } from "#src/constants";
 import {
   discoverProviders,
   agentStream,

@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import {
   TOPOLOGY_DEFINITIONS,
   getTopologyById,
-} from "../services/orchestrator/TopologyRegistry.ts";
+} from "#src/services/orchestrator/TopologyRegistry";
 
 const router: Router = Router();
 

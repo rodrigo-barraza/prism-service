@@ -1,12 +1,12 @@
 import { execSync } from "node:child_process";
-import logger from "../../../utils/logger.ts";
+import logger from "#src/utils/logger";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 
-import type { EmitFunction } from "../types.ts";
-import { HARNESS } from "../../../constants.ts";
+import type { EmitFunction } from "#src/services/harnesses/types";
+import { HARNESS } from "#src/constants";
 
 /**
  * SandboxExecutor — git-based filesystem checkpointing and rollback.

@@ -3,9 +3,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import request from "supertest";
 import { app } from "./setup.ts";
-import ToolOrchestratorService from "../src/services/ToolOrchestratorService.ts";
-import { setupWebSocket } from "../src/websocket/index.ts";
-import { PROVIDERS } from "../src/constants.ts";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
+import { setupWebSocket } from "#src/websocket/index";
+import { PROVIDERS } from "#src/constants";
 
 // Mock @google/genai to prevent real network calls and mock Live API session connection
 let mockLiveSessionCallbacks: any = null;

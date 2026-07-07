@@ -5,9 +5,9 @@ import {
   MOCK_GENERATE_TEXT,
   MOCK_GENERATE_TEXT_STREAM,
 } from "./setup.ts";
-import { calculateTextCost } from "../src/utils/CostCalculator.ts";
-import { TYPES, getPricing, MODELS } from "../src/config.ts";
-import { PROVIDERS } from "../src/constants.ts";
+import { calculateTextCost } from "#src/utils/CostCalculator";
+import { TYPES, getPricing, MODELS } from "#src/config";
+import { PROVIDERS } from "#src/constants";
 
 
 // ═══════════════════════════════════════════════════════════════

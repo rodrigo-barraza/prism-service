@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { truncateToolsForChatCompletions } from "../../openai.ts";
+import { truncateToolsForChatCompletions } from "#src/providers/openai";
 
 // ── Helpers ──────────────────────────────────────────────────
 function makeTool(name: string) {

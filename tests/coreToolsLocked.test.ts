@@ -11,8 +11,8 @@
 import { describe, it, expect } from "vitest";
 import request from "supertest";
 import { app, TEST_SECRET } from "./setup.ts";
-import { AGENT_IDS } from "../src/services/ToolTaxonomyConstants.ts";
-import type { AgentConfigResponse, ToolSchemaResponse } from "../src/types/admin.ts";
+import { AGENT_IDS } from "#src/services/ToolTaxonomyConstants";
+import type { AgentConfigResponse, ToolSchemaResponse } from "#src/types/admin";
 
 function authenticatedGet(path: string) {
   return request(app)

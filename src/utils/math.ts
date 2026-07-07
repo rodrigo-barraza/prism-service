@@ -1,4 +1,4 @@
-import { MAXIMUM_TOKENS_PER_SECOND } from "../constants.ts";
+import { MAXIMUM_TOKENS_PER_SECOND } from "#src/constants";
 
 interface TokensPerSecOptions {
   providerReported?: number | null;

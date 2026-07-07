@@ -1,13 +1,13 @@
-import logger from "../../utils/logger.ts";
+import logger from "#src/utils/logger";
 import { TOPOLOGIES, DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
-import SettingsService from "../SettingsService.ts";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import SettingsService from "#src/services/SettingsService";
 import type {
   TeamMember,
   OrchestratorContext,
   SubAgentResult,
   OrchestratorSpawnParams,
-} from "../../types/orchestrator.ts";
+} from "#src/types/orchestrator";
 import type { TopologyRouter, ContinueSubAgentCallback } from "./TopologyRouter.ts";
 
 /**
@@ -24,9 +24,9 @@ export class TopologyExecutionService {
     topology: string,
   ): Promise<void> {
     try {
-      const { MONGO_DB_NAME: databaseName } = await import("../../../config.ts");
-      const { COLLECTIONS: collectionNames } = await import("../../constants.ts");
-      const MongoWrapper = (await import("../../wrappers/MongoWrapper.ts")).default;
+      const { MONGO_DB_NAME: databaseName } = await import("#config");
+      const { COLLECTIONS: collectionNames } = await import("#src/constants");
+      const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
       const databaseCollection = MongoWrapper.getCollection(
         databaseName,
         collectionNames.AGENT_CONVERSATIONS,

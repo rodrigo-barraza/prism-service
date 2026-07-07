@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { PROVIDERS } from "../src/constants.ts";
+import { PROVIDERS } from "#src/constants";
 import request from 'supertest';
 import { app } from './setup.ts';
-import { getParameterDescriptors, getAgentDefaults } from '../src/services/ParameterRegistry.ts';
+import { getParameterDescriptors, getAgentDefaults } from '#src/services/ParameterRegistry';
 
 describe('ParameterRegistry', () => {
   it('should return all parameter descriptors', () => {

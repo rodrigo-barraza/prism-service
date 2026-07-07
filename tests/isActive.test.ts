@@ -21,11 +21,11 @@ const TEST_USER = "testuser";
 const TEST_CONVERSATION_ID = "sess-123";
 
 // ── Mocks ──────────────────────────────────────────────────────
-vi.mock("../config.ts", () => ({
+vi.mock("#config", () => ({
   MONGO_DB_NAME: "prism-test",
 }));
 
-vi.mock("../src/services/FileService.ts", () => ({
+vi.mock("#src/services/FileService", () => ({
   default: {
     isExternalStorage: () => false,
     isMinioRef: () => false,
@@ -33,7 +33,7 @@ vi.mock("../src/services/FileService.ts", () => ({
   },
 }));
 
-vi.mock("../src/utils/ConversationDiscovery.ts", () => ({
+vi.mock("#src/utils/ConversationDiscovery", () => ({
   discoverDescendantConversationIds: vi
     .fn()
     .mockImplementation(async (_database: unknown, identifier: string) =>
@@ -43,7 +43,7 @@ vi.mock("../src/utils/ConversationDiscovery.ts", () => ({
 
 let mockCollection: ReturnType<typeof createMockCollection> & { updateMany: any };
 
-vi.mock("../src/wrappers/MongoWrapper.ts", () => {
+vi.mock("#src/wrappers/MongoWrapper", () => {
   const getDbFunction = vi.fn();
   return {
     default: {
@@ -53,10 +53,10 @@ vi.mock("../src/wrappers/MongoWrapper.ts", () => {
   };
 });
 
-const MongoWrapperModule = await import("../src/wrappers/MongoWrapper.ts");
+const MongoWrapperModule = await import("#src/wrappers/MongoWrapper");
 const MongoWrapper = MongoWrapperModule.default;
 const { default: ConversationService } = await import(
-  "../src/services/conversation/ConversationService.ts"
+  "#src/services/conversation/ConversationService"
 );
 
 const BASE_ARGUMENTS = {

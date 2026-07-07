@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS } from "../../constants.ts";
-import MemoryConsolidationService from "../MemoryConsolidationService.ts";
-import MemoryService from "../MemoryService.ts";
-import MongoWrapper from "../../wrappers/MongoWrapper.ts";
-import SettingsService from "../SettingsService.ts";
+import { PROVIDERS } from "#src/constants";
+import MemoryConsolidationService from "#src/services/MemoryConsolidationService";
+import MemoryService from "#src/services/MemoryService";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import SettingsService from "#src/services/SettingsService";
 
-vi.mock("../MemoryService.ts", () => ({
+vi.mock("#src/services/MemoryService", () => ({
   default: {
     store: vi.fn().mockResolvedValue({ id: "merged-uuid" }),
     remove: vi.fn().mockResolvedValue(true),
   },
 }));
 
-vi.mock("../SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getMemoryModelConfig: vi.fn().mockResolvedValue({
       provider: PROVIDERS.GOOGLE,
@@ -21,7 +21,7 @@ vi.mock("../SettingsService.ts", () => ({
   },
 }));
 
-vi.mock("../RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: {
     log: vi.fn(),
     logChatGeneration: vi.fn(),
@@ -30,14 +30,14 @@ vi.mock("../RequestLogger.ts", () => ({
 }));
 
 const mockGenerateText = vi.fn();
-vi.mock("../../providers/index.ts", () => ({
+vi.mock("#src/providers/index", () => ({
   getProvider: vi.fn().mockImplementation(() => ({
     generateText: mockGenerateText,
   })),
   providers: {},
 }));
 
-vi.mock("../../wrappers/MongoWrapper.ts", () => {
+vi.mock("#src/wrappers/MongoWrapper", () => {
   const collection = {
     find: vi.fn().mockReturnThis(),
     project: vi.fn().mockReturnThis(),

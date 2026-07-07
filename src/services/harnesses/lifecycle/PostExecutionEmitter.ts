@@ -1,22 +1,22 @@
-import logger from "../../../utils/logger.ts";
-import { TOOL_NAMES } from "../../ToolTaxonomyConstants.ts";
+import logger from "#src/utils/logger";
+import { TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 
-import type AgenticLoopState from "../../AgenticLoopState.ts";
+import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type {
   ToolCall,
   ToolResult,
   PassState,
   EmitFunction,
   AgenticContext,
-} from "../types.ts";
-import FileService from "../../FileService.ts";
-import WebhookEventBus from "../../WebhookEventBus.ts";
-import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
-import { FILE_CATEGORIES } from "../../../constants.ts";
+} from "#src/services/harnesses/types";
+import FileService from "#src/services/FileService";
+import WebhookEventBus from "#src/services/WebhookEventBus";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
+import { FILE_CATEGORIES } from "#src/constants";
 
 interface ToolResultPayload {
   error?: string;

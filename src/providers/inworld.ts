@@ -1,10 +1,10 @@
-import { ProviderOptions } from "../types/ProviderTypes.ts";
+import { ProviderOptions } from "#src/types/ProviderTypes";
 import { Readable } from "stream";
-import { ProviderError } from "../utils/errors.ts";
-import logger from "../utils/logger.ts";
-import { INWORLD_BASIC } from "../../config.ts";
-import { DEFAULT_VOICES, getDefaultModels, MODALITY_TYPES } from "../config.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { ProviderError } from "#src/utils/errors";
+import logger from "#src/utils/logger";
+import { INWORLD_BASIC } from "#config";
+import { DEFAULT_VOICES, getDefaultModels, MODALITY_TYPES } from "#src/config";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 const INWORLD_TTS_URL = "https://api.inworld.ai/tts/v1/voice:stream";
 

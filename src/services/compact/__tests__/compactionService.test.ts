@@ -1,22 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS } from "../../../constants.ts";
-import CompactionService from "../CompactionService.ts";
-import AutoCompactionTrigger from "../AutoCompactionTrigger.ts";
-import MicroCompactionService from "../MicroCompactionService.ts";
-import SettingsService from "../../SettingsService.ts";
-import RequestLogger from "../../RequestLogger.ts";
-import { TOOL_NAMES } from "../../ToolTaxonomyConstants.ts";
+import { PROVIDERS } from "#src/constants";
+import CompactionService from "#src/services/compact/CompactionService";
+import AutoCompactionTrigger from "#src/services/compact/AutoCompactionTrigger";
+import MicroCompactionService from "#src/services/compact/MicroCompactionService";
+import SettingsService from "#src/services/SettingsService";
+import RequestLogger from "#src/services/RequestLogger";
+import { TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
 
 const mockGenerateText = vi.fn();
 
-vi.mock("../../../providers/index.ts", () => ({
+vi.mock("#src/providers/index", () => ({
   getProvider: vi.fn().mockImplementation(() => ({
     generateText: mockGenerateText,
   })),
   providers: {},
 }));
 
-vi.mock("../../SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getSection: vi.fn().mockResolvedValue({
       extractionProvider: PROVIDERS.GOOGLE,
@@ -25,7 +25,7 @@ vi.mock("../../SettingsService.ts", () => ({
   },
 }));
 
-vi.mock("../../RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: {
     logBackgroundLlmCall: vi.fn(),
   },

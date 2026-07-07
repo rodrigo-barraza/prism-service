@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { validateAfterToolExecution } from "../lifecycle/ValidationInterceptor.ts";
-import type { ToolCall, ToolResult, AgenticContext } from "../types.ts";
-import type AgenticLoopState from "../../AgenticLoopState.ts";
+import { validateAfterToolExecution } from "#src/services/harnesses/lifecycle/ValidationInterceptor";
+import type { ToolCall, ToolResult, AgenticContext } from "#src/services/harnesses/types";
+import type AgenticLoopState from "#src/services/AgenticLoopState";
 
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -11,7 +11,7 @@ vi.mock("../../../utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../../ToolOrchestratorService.ts", () => ({
+vi.mock("#src/services/ToolOrchestratorService", () => ({
   default: {
     getWorkspaceRoot: vi.fn().mockReturnValue("/workspace"),
     executeTool: vi.fn(),
@@ -25,7 +25,7 @@ vi.mock("node:fs", () => ({
   existsSync: vi.fn().mockReturnValue(false),
 }));
 
-import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import fs from "node:fs";
 
 describe("ValidationInterceptor", () => {

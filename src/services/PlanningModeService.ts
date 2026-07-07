@@ -1,4 +1,4 @@
-import logger from "../utils/logger.ts";
+import logger from "#src/utils/logger";
 import type { ConversationMessage } from "./harnesses/types.ts";
 import PromptLocaleService from "./PromptLocaleService.ts";
 import SettingsService from "./SettingsService.ts";

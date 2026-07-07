@@ -1,13 +1,13 @@
-import logger from "../../../utils/logger.ts";
-import PromptLocaleService from "../../PromptLocaleService.ts";
+import logger from "#src/utils/logger";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 
-import type AgenticLoopState from "../../AgenticLoopState.ts";
+import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type {
   PassState,
   ConversationMessage,
   AgenticContext,
   ToolSchema,
-} from "../types.ts";
+} from "#src/services/harnesses/types";
 
 /**
  * CodexPlanningDetector — handles Codex/planning models that separate

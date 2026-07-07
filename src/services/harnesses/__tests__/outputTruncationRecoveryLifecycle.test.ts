@@ -7,10 +7,10 @@ import {
   buildExhaustedRecoveryMessage,
   buildProviderErrorMessage,
   MAX_OUTPUT_TRUNCATION_RECOVERIES,
-} from "../lifecycle/OutputTruncationRecovery.ts";
-import type { ConversationMessage, PassState, AgenticContext } from "../types.ts";
+} from "#src/services/harnesses/lifecycle/OutputTruncationRecovery";
+import type { ConversationMessage, PassState, AgenticContext } from "#src/services/harnesses/types";
 
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),

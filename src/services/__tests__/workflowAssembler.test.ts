@@ -7,14 +7,14 @@
  * positions, the workflow graph renders incorrectly or crashes.
  */
 import { describe, it, expect, vi } from "vitest";
-import type { WorkflowStep } from "../../types/workflow.ts";
-import { PROVIDERS, TYPES } from "../../constants.ts";
+import type { WorkflowStep } from "#src/types/workflow";
+import { PROVIDERS, TYPES } from "#src/constants";
 
-vi.mock("../../config.ts", () => ({
+vi.mock("#src/config", () => ({
   getModelByName: vi.fn().mockReturnValue(null),
 }));
 
-const { assembleGraph } = await import("../WorkflowAssembler.ts");
+const { assembleGraph } = await import("#src/services/WorkflowAssembler");
 
 
 // ═══════════════════════════════════════════════════════════════

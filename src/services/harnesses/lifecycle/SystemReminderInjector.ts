@@ -1,14 +1,14 @@
-import logger from "../../../utils/logger.ts";
+import logger from "#src/utils/logger";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { extractReminderViaLLM } from "./SystemReminderExtractor.ts";
-import PromptLocaleService from "../../PromptLocaleService.ts";
-import { HARNESS } from "../../../constants.ts";
+import PromptLocaleService from "#src/services/PromptLocaleService";
+import { HARNESS } from "#src/constants";
 
-import type AgenticLoopState from "../../AgenticLoopState.ts";
-import type { ConversationMessage, AgenticContext } from "../types.ts";
+import type AgenticLoopState from "#src/services/AgenticLoopState";
+import type { ConversationMessage, AgenticContext } from "#src/services/harnesses/types";
 
 /**
  * SystemReminderInjector — counteracts instruction fade-out in long sessions.

@@ -1,5 +1,5 @@
-import ConversationGenerationTracker from "../../ConversationGenerationTracker.ts";
-import type { PassState } from "../types.ts";
+import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
+import type { PassState } from "#src/services/harnesses/types";
 
 /**
  * TrackerFinalizer — per-pass ConversationGenerationTracker finalization.

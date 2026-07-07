@@ -1,11 +1,11 @@
-import logger from "../../../utils/logger.ts";
-import { APPROVAL_TIERS } from "../../AutoApprovalEngine.ts";
-import PromptLocaleService from "../../PromptLocaleService.ts";
-import RequestLogger from "../../RequestLogger.ts";
+import logger from "#src/utils/logger";
+import { APPROVAL_TIERS } from "#src/services/AutoApprovalEngine";
+import PromptLocaleService from "#src/services/PromptLocaleService";
+import RequestLogger from "#src/services/RequestLogger";
 
-import type { ToolCall, AgenticContext } from "../types.ts";
-import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
-import { HARNESS } from "../../../constants.ts";
+import type { ToolCall, AgenticContext } from "#src/services/harnesses/types";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { HARNESS } from "#src/constants";
 
 /**
  * CriticGate — lightweight multi-model review of high-risk tool calls.

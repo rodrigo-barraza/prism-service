@@ -1,7 +1,7 @@
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { PersonaContext, ToolPolicySection } from "./types.ts";
-import ToolOrchestratorService from "../ToolOrchestratorService.ts";
-import PromptLocaleService from "../PromptLocaleService.ts";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 
 // ────────────────────────────────────────────────────────────
 // Tool Catalog Introspection Helpers

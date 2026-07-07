@@ -1,13 +1,13 @@
 import "./setup.ts";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import WorkflowExecutionService from "../src/services/WorkflowExecutionService.ts";
-import { handleConversation, handleAgent } from "../src/routes/ChatRoutes.ts";
-import * as providersModule from "../src/providers/index.ts";
-import EmbeddingService from "../src/services/EmbeddingService.ts";
-import FileService from "../src/services/FileService.ts";
-import { PROVIDERS, TYPES, WORKFLOW_ENDPOINTS } from "../src/constants.ts";
+import WorkflowExecutionService from "#src/services/WorkflowExecutionService";
+import { handleConversation, handleAgent } from "#src/routes/ChatRoutes";
+import * as providersModule from "#src/providers/index";
+import EmbeddingService from "#src/services/EmbeddingService";
+import FileService from "#src/services/FileService";
+import { PROVIDERS, TYPES, WORKFLOW_ENDPOINTS } from "#src/constants";
 
-vi.mock("../src/routes/ChatRoutes.ts", () => ({
+vi.mock("#src/routes/ChatRoutes", () => ({
   default: vi.fn(),
   handleConversation: vi.fn().mockImplementation(async (parameters, emit) => {
     emit({ type: "chunk", content: "mock response" });
@@ -19,19 +19,19 @@ vi.mock("../src/routes/ChatRoutes.ts", () => ({
   }),
 }));
 
-vi.mock("../src/services/MediaResolutionService.ts", () => ({
+vi.mock("#src/services/MediaResolutionService", () => ({
   resolveMediaReference: vi.fn().mockImplementation(async (reference) => ({
     providerRef: reference,
   })),
 }));
 
-vi.mock("../src/services/EmbeddingService.ts", () => ({
+vi.mock("#src/services/EmbeddingService", () => ({
   default: {
     generate: vi.fn(),
   },
 }));
 
-vi.mock("../src/services/FileService.ts", () => ({
+vi.mock("#src/services/FileService", () => ({
   default: {
     uploadFile: vi.fn(),
     getFile: vi.fn(),
@@ -40,7 +40,7 @@ vi.mock("../src/services/FileService.ts", () => ({
   },
 }));
 
-vi.mock("../src/wrappers/MinioWrapper.ts", () => ({
+vi.mock("#src/wrappers/MinioWrapper", () => ({
   default: {
     getBucketUrl: vi.fn().mockReturnValue("http://localhost:9000/bucket"),
   },

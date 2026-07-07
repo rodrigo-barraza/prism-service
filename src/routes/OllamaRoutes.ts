@@ -1,10 +1,10 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
-import { getProvider } from "../providers/index.ts";
-import { isInstance } from "../providers/instance-registry.ts";
-import { PROVIDERS } from "../constants.ts";
-import logger from "../utils/logger.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { getProvider } from "#src/providers/index";
+import { isInstance } from "#src/providers/instance-registry";
+import { PROVIDERS } from "#src/constants";
+import logger from "#src/utils/logger";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 const router = express.Router();
 

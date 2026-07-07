@@ -10,7 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────
 
 import { MinioManager } from "@rodrigo-barraza/service-library/minio";
-import logger from "../utils/logger.ts";
+import logger from "#src/utils/logger";
 
 const MinioWrapper = {
   async init(

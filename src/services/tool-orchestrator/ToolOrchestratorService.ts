@@ -1,10 +1,10 @@
-import { TOOLS_SERVICE_URL } from "../../../config.ts";
-import MCPClientService from "../MCPClientService.ts";
-import AgentPersonaRegistry from "../AgentPersonaRegistry.ts";
-import logger from "../../utils/logger.ts";
-import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
-import { ORCHESTRATOR_ONLY_TOOLS } from "../OrchestratorPrompt.ts";
-import { createAbortController } from "../../utils/AbortController.ts";
+import { TOOLS_SERVICE_URL } from "#config";
+import MCPClientService from "#src/services/MCPClientService";
+import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
+import logger from "#src/utils/logger";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { ORCHESTRATOR_ONLY_TOOLS } from "#src/services/OrchestratorPrompt";
+import { createAbortController } from "#src/utils/AbortController";
 import {
   DOMAINS,
   TOOL_NAMES,
@@ -22,16 +22,16 @@ import {
   FILE_CATEGORIES,
   TOOL_SCHEMA_FETCH_RETRY_COOLDOWN_MILLISECONDS,
   TOOL_PROXY_TIMEOUT_MILLISECONDS,
-} from "../../constants.ts";
-import InternalToolRegistry from "../local-tools/InternalToolRegistry.ts";
-import SettingsService from "../SettingsService.ts";
-import PromptLocaleService from "../PromptLocaleService.ts";
+} from "#src/constants";
+import InternalToolRegistry from "#src/services/local-tools/InternalToolRegistry";
+import SettingsService from "#src/services/SettingsService";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 import {
   injectVoiceCatalog,
   TTS_VOICE_CATALOG_PLACEHOLDER,
-} from "../../utils/VoiceCatalog.ts";
+} from "#src/utils/VoiceCatalog";
 import { Bm25ToolIndex } from "@rodrigo-barraza/utilities-library/search";
-import type { OrchestratorContext, TeamMember } from "../../types/orchestrator.ts";
+import type { OrchestratorContext, TeamMember } from "#src/types/orchestrator";
 import {
   type ToolSchemaFull,
   type ToolExecutionContext,
@@ -1483,7 +1483,7 @@ export default class ToolOrchestratorService {
               );
             } else if (imageReference.startsWith("minio://")) {
               try {
-                const FileService = (await import("../FileService.ts")).default;
+                const FileService = (await import("#src/services/FileService")).default;
                 const key = FileService.extractKey(imageReference);
                 const file = await FileService.getFile(key);
                 if (file) {
@@ -1542,7 +1542,7 @@ export default class ToolOrchestratorService {
       !imageResult.error
     ) {
       try {
-        const FileService = (await import("../FileService.ts")).default;
+        const FileService = (await import("#src/services/FileService")).default;
         const image = imageResult.image;
         const dataUrl = `data:${image.mimeType || "image/png"};base64,${image.data}`;
         const { ref } = await FileService.uploadFile(
@@ -1567,7 +1567,7 @@ export default class ToolOrchestratorService {
       !browserResult.error
     ) {
       try {
-        const FileService = (await import("../FileService.ts")).default;
+        const FileService = (await import("#src/services/FileService")).default;
         const dataUrl = `data:${browserResult.mimeType || "image/png"};base64,${browserResult.screenshot}`;
         const { ref } = await FileService.uploadFile(
           dataUrl,
@@ -1597,7 +1597,7 @@ export default class ToolOrchestratorService {
     context: ToolExecutionContext = {},
   ) {
     const { default: OrchestratorService } =
-      await import("../OrchestratorService.ts");
+      await import("#src/services/OrchestratorService");
 
     // Build orchestratorContext from the loop's context
     const orchestratorContext = {
@@ -2079,5 +2079,5 @@ export default class ToolOrchestratorService {
   }
 }
 
-import { registerGlobalToolOrchestratorService } from "../../types/GlobalToolOrchestratorRegistry.ts";
+import { registerGlobalToolOrchestratorService } from "#src/types/GlobalToolOrchestratorRegistry";
 registerGlobalToolOrchestratorService(ToolOrchestratorService);

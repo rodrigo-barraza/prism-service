@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { PROVIDERS } from "../src/constants.ts";
+import { PROVIDERS } from "#src/constants";
 import express, { Request, Response, NextFunction } from 'express';
 import supertest from 'supertest';
 
@@ -11,7 +11,7 @@ const mockModelDefinition = {
   contextLength: 128_000,
 };
 
-vi.mock('../src/utils/logger.ts', () => ({
+vi.mock('#src/utils/logger', () => ({
   default: {
     info: vi.fn(),
     debug: vi.fn(),
@@ -22,25 +22,25 @@ vi.mock('../src/utils/logger.ts', () => ({
   },
 }));
 
-vi.mock('../src/utils/CleanupRegistry.ts', () => ({
+vi.mock('#src/utils/CleanupRegistry', () => ({
   registerCleanup: vi.fn(),
 }));
 
 const mockRunAgenticLoop = vi.fn().mockResolvedValue(undefined);
-vi.mock('../src/services/AgenticLoopService.ts', () => ({
+vi.mock('#src/services/AgenticLoopService', () => ({
   default: {
     runAgenticLoop: (...args: unknown[]) => mockRunAgenticLoop(...args),
   },
 }));
 
-vi.mock('../src/providers/index.ts', () => ({
+vi.mock('#src/providers/index', () => ({
   getProvider: vi.fn().mockReturnValue({
     generateText: vi.fn(),
     generateTextStream: vi.fn(),
   }),
 }));
 
-vi.mock('../config.ts', () => ({
+vi.mock('#config', () => ({
   MONGO_DB_NAME: 'prism-test',
   getModelByName: () => mockModelDefinition,
 }));
@@ -50,7 +50,7 @@ const databaseStore = new Map<string, any>();
 let simulateDatabaseError = false;
 let databaseClaimCount = 0;
 
-vi.mock('../src/wrappers/MongoWrapper.ts', () => ({
+vi.mock('#src/wrappers/MongoWrapper', () => ({
   default: {
     getDb: () => {
       if (simulateDatabaseError) {
@@ -153,8 +153,8 @@ vi.mock('../src/wrappers/MongoWrapper.ts', () => ({
 
 // ── Import under test ────────────────────────────────────────────
 
-const { default: ScheduledTaskService } = await import('../src/services/ScheduledTaskService.ts');
-const { default: scheduledTasksRouter } = await import('../src/routes/ScheduledTasksRoutes.ts');
+const { default: ScheduledTaskService } = await import('#src/services/ScheduledTaskService');
+const { default: scheduledTasksRouter } = await import('#src/routes/ScheduledTasksRoutes');
 
 const app = express();
 app.use(express.json());

@@ -1,4 +1,4 @@
-import type { MongoFilter } from "../types/express.ts";
+import type { MongoFilter } from "#src/types/express";
 
 /**
  * Build a MongoDB date-range filter from optional `from` and `to` query params.

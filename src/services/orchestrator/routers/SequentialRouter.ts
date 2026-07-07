@@ -3,20 +3,20 @@ import type {
   OrchestratorContext,
   OrchestratorSpawnParams,
   SubAgentResult,
-} from "../../../types/orchestrator.ts";
-import { nextGlobalSpawnIndex } from "../../../types/orchestrator.ts";
+} from "#src/types/orchestrator";
+import { nextGlobalSpawnIndex } from "#src/types/orchestrator";
 import type {
   TopologyRouter,
   ContinueSubAgentCallback,
   TopologyConfig,
-} from "../TopologyRouter.ts";
-import { buildToolCallFallbackSummary } from "../SubAgentResultBuilder.ts";
+} from "#src/services/orchestrator/TopologyRouter";
+import { buildToolCallFallbackSummary } from "#src/services/orchestrator/SubAgentResultBuilder";
 import {
   resolveSiblingInstances,
   selectInstanceForMember,
-} from "../InstanceResolver.ts";
-import logger from "../../../utils/logger.ts";
-import { GitWorktreeHelper } from "../GitWorktreeHelper.ts";
+} from "#src/services/orchestrator/InstanceResolver";
+import logger from "#src/utils/logger";
+import { GitWorktreeHelper } from "#src/services/orchestrator/GitWorktreeHelper";
 
 /**
  * Sequential Router — Serial Pipeline (SP)

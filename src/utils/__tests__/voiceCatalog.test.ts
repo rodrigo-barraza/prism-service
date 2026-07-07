@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('../../config.ts', () => ({
+vi.mock('#src/config', () => ({
   VOICES: {
     inworld: [
       { name: 'Dennis', gender: 'Male', description: 'A warm baritone, friendly' },
@@ -21,7 +21,7 @@ vi.mock('../../config.ts', () => ({
   },
 }));
 
-vi.mock('../../constants.ts', async (importOriginal) => {
+vi.mock('#src/constants', async (importOriginal) => {
   const actual = await importOriginal() as any;
   return {
     ...actual,
@@ -32,12 +32,12 @@ vi.mock('../../constants.ts', async (importOriginal) => {
   };
 });
 
-import { PROVIDERS } from '../../constants.ts';
+import { PROVIDERS } from '#src/constants';
 import {
   getVoiceCatalogForProvider,
   injectVoiceCatalog,
   TTS_VOICE_CATALOG_PLACEHOLDER,
-} from '../VoiceCatalog.ts';
+} from '#src/utils/VoiceCatalog';
 
 describe('VoiceCatalog', () => {
   describe('getVoiceCatalogForProvider', () => {

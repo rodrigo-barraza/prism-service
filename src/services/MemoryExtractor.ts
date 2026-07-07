@@ -1,12 +1,12 @@
 import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import crypto from "crypto";
-import { getProvider } from "../providers/index.ts";
+import { getProvider } from "#src/providers/index";
 import MemoryService, { CODING_MEMORY_TYPES } from "./MemoryService.ts";
 import MemoryConsolidationService from "./MemoryConsolidationService.ts";
 import PromptLocaleService from "./PromptLocaleService.ts";
 import RequestLogger from "./RequestLogger.ts";
 import SettingsService from "./SettingsService.ts";
-import logger from "../utils/logger.ts";
+import logger from "#src/utils/logger";
 import { parseJsonFromLargeLanguageModelResponse } from "@rodrigo-barraza/utilities-library";
 import {
   TOOL_NAMES,
@@ -17,17 +17,17 @@ import {
   estimateTokens,
   calculateTextCost,
   getTotalInputTokens,
-} from "../utils/CostCalculator.ts";
-import { MODALITY_TYPES, getPricing } from "../config.ts";
+} from "#src/utils/CostCalculator";
+import { MODALITY_TYPES, getPricing } from "#src/config";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import { MEMORY, LOG_PREVIEW } from "../constants.ts";
+import { MEMORY, LOG_PREVIEW } from "#src/constants";
 import type {
   ConversationMessage,
   ToolCall,
   EmitFunction,
   AgenticContext,
 } from "./harnesses/types.ts";
-import type { ChatMessage, GenerateTextResult } from "../types/provider.ts";
+import type { ChatMessage, GenerateTextResult } from "#src/types/provider";
 import type { MessagePayload } from "./RequestLogger.ts";
 
 // ─── Constants ────────────────────────────────────────────────────────────────

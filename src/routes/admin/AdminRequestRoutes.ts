@@ -3,14 +3,14 @@ import { DEFAULT_WORKFLOW_TITLE } from "@rodrigo-barraza/utilities-library/taxon
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
-import { COLLECTIONS } from "../../constants.ts";
-import logger from "../../utils/logger.ts";
-import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
+import { COLLECTIONS } from "#src/constants";
+import logger from "#src/utils/logger";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 import {
   applyDateRangeFilter,
   parsePaginationParams,
-} from "../../utils/QueryBuilders.ts";
-import requireDb from "../../middleware/RequireDbMiddleware.ts";
+} from "#src/utils/QueryBuilders";
+import requireDb from "#src/middleware/RequireDbMiddleware";
 
 const router = express.Router();
 const {

@@ -3,7 +3,7 @@ import {
   parseVllmResponse,
   parseLlamaCppResponse,
   parseOllamaResponse,
-} from "../ContextLengthDiscovery.ts";
+} from "#src/utils/ContextLengthDiscovery";
 
 describe("ContextLengthDiscovery Parsers", () => {
   describe("parseVllmResponse", () => {

@@ -1,14 +1,14 @@
-import logger from "../../utils/logger.ts";
-import PromptLocaleService from "../PromptLocaleService.ts";
+import logger from "#src/utils/logger";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 import {
   TOOL_NAMES,
   DOMAINS,
   DEFAULT_USERNAME,
   DEFAULT_PROJECT,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { INTERNAL_TOOL_EMOJIS } from "../tool-orchestrator/InternalToolEmojis.ts";
-import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
-import { TIMERS } from "../../constants.ts";
+import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { TIMERS } from "#src/constants";
 
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 
@@ -112,7 +112,7 @@ const setTimer = {
 
     try {
       const { default: ConversationTimerService } =
-        await import("../ConversationTimerService.js");
+        await import("#src/services/ConversationTimerService");
       const timer = await ConversationTimerService.createTimer({
         conversationId,
         project,
@@ -178,7 +178,7 @@ const listTimers = {
 
     try {
       const { default: ConversationTimerService } =
-        await import("../ConversationTimerService.js");
+        await import("#src/services/ConversationTimerService");
       const activeTimers = await ConversationTimerService.listActiveTimers(
         conversationId,
         project,
@@ -251,7 +251,7 @@ const cancelTimer = {
 
     try {
       const { default: ConversationTimerService } =
-        await import("../ConversationTimerService.js");
+        await import("#src/services/ConversationTimerService");
       const wasCancelled = await ConversationTimerService.cancelTimer(
         timerId,
         project,

@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { buildConversationGraph } from "../conversation/buildConversationGraph.ts";
+import { buildConversationGraph } from "#src/services/conversation/buildConversationGraph";
 import type { GraphData } from "@rodrigo-barraza/utilities-library/graph";
 
 // ── Test Fixtures ──────────────────────────────────────────────────

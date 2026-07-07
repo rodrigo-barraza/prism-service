@@ -1,4 +1,4 @@
-import { MODALITY_TYPES } from "../../config.ts";
+import { MODALITY_TYPES } from "#src/config";
 import {
   THINKING_PATTERNS,
   FUNCTION_CALL_PATTERNS,

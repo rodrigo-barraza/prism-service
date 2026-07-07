@@ -1,12 +1,12 @@
 import { existsSync } from "node:fs";
-import logger from "../utils/logger.ts";
+import logger from "#src/utils/logger";
 import PromptLocaleService from "./PromptLocaleService.ts";
 
-import { getProvider } from "../providers/index.ts";
+import { getProvider } from "#src/providers/index";
 import {
   getInstancesByType,
   getInstanceType,
-} from "../providers/instance-registry.ts";
+} from "#src/providers/instance-registry";
 
 import {
   SERVER_SENT_EVENT_TYPES,
@@ -25,10 +25,10 @@ import SettingsService from "./SettingsService.ts";
 import AgentNotificationService from "./AgentNotificationService.ts";
 import AgentSessionRegistry from "./AgentSessionRegistry.ts";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
-import { createAbortController } from "../utils/AbortController.ts";
-import { registerCleanup } from "../utils/CleanupRegistry.ts";
-import { resolveModelForInstances } from "../utils/ModelResolution.ts";
-import { stripToolCallMarkup } from "../utils/StreamChunkDispatcher.ts";
+import { createAbortController } from "#src/utils/AbortController";
+import { registerCleanup } from "#src/utils/CleanupRegistry";
+import { resolveModelForInstances } from "#src/utils/ModelResolution";
+import { stripToolCallMarkup } from "#src/utils/StreamChunkDispatcher";
 
 // Extracted Domain Helpers
 import { InstanceLoadBalancer } from "./orchestrator/InstanceLoadBalancer.ts";
@@ -52,12 +52,12 @@ import type {
   TeamMember,
   SubAgentResult,
   ResumedAgentResult,
-} from "../types/orchestrator.ts";
+} from "#src/types/orchestrator";
 
 import type { ConversationMessage, LLMProvider } from "./harnesses/types.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 import ConversationService from "./ConversationService.ts";
-import { COLLECTIONS, ORCHESTRATOR, NOTIFICATION_SOURCES, SYSTEM_STATUSES, DEFAULT_LOCALE } from "../constants.ts";
+import { COLLECTIONS, ORCHESTRATOR, NOTIFICATION_SOURCES, SYSTEM_STATUSES, DEFAULT_LOCALE } from "#src/constants";
 
 type AgenticLoopServiceModule = typeof import("./AgenticLoopService.ts");
 
@@ -991,8 +991,8 @@ export class OrchestratorService {
     }> = [];
 
     try {
-      const { default: MongoWrapper } = await import("../wrappers/MongoWrapper.ts");
-      const { MONGO_DB_NAME } = await import("../../config.ts");
+      const { default: MongoWrapper } = await import("#src/wrappers/MongoWrapper");
+      const { MONGO_DB_NAME } = await import("#config");
 
       const conversationCollection = MongoWrapper.getCollection(
         MONGO_DB_NAME,
@@ -2266,7 +2266,7 @@ export class OrchestratorService {
     if (!subAgentProviderInstance) {
       throw new Error(`Provider not found: ${subAgent.providerName}`);
     }
-    const { getModelByName } = await import("../config.js");
+    const { getModelByName } = await import("#src/config");
     const subAgentModelDefinition = getModelByName(subAgent.resolvedModel);
 
     let loopResult: { messages?: ConversationMessage[] } | undefined;
@@ -2583,8 +2583,8 @@ export class OrchestratorService {
     orchestratorContext: OrchestratorContext,
     completionMessage: ConversationMessage,
   ): Promise<void> {
-    const MongoWrapper = (await import("../wrappers/MongoWrapper.ts")).default;
-    const { MONGO_DB_NAME: databaseName } = await import("../../config.ts");
+    const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
+    const { MONGO_DB_NAME: databaseName } = await import("#config");
 
     const database = MongoWrapper.getDb(databaseName);
     if (!database) {
@@ -2726,7 +2726,7 @@ export class OrchestratorService {
       );
     } else {
       const { default: WebSocketConnectionRegistry } =
-        await import("../websocket/WebSocketConnectionRegistry.ts");
+        await import("#src/websocket/WebSocketConnectionRegistry");
       const registeredEmit = WebSocketConnectionRegistry.getEmitFunction(conversationId);
 
       if (registeredEmit) {
@@ -2788,7 +2788,7 @@ export class OrchestratorService {
     // Route through the full handleAgent pipeline — same path as a real
     // user-triggered agent message. This gives us SSE framing, request
     // logging, cost tracking, persona injection, and proper error handling.
-    const { handleAgent } = await import("../routes/ChatRoutes.ts");
+    const { handleAgent } = await import("#src/routes/ChatRoutes");
 
     const autoResponseParams = {
       provider: providerName,
@@ -2861,7 +2861,7 @@ export class OrchestratorService {
         // only refreshes pendingBackgroundTasks on conversation list fetch.
         try {
           const { default: WebSocketConnectionRegistry } =
-            await import("../websocket/WebSocketConnectionRegistry.ts");
+            await import("#src/websocket/WebSocketConnectionRegistry");
           const emitFunction = WebSocketConnectionRegistry.getEmitFunction(conversationId);
           if (emitFunction) {
             // Read the updated document to get the authoritative counter and active state
@@ -2898,8 +2898,8 @@ export class OrchestratorService {
     updateFields: Record<string, unknown>,
   ): Promise<void> {
     try {
-      const { MONGO_DB_NAME: databaseName } = await import("../../config.ts");
-      const MongoWrapper = (await import("../wrappers/MongoWrapper.ts")).default;
+      const { MONGO_DB_NAME: databaseName } = await import("#config");
+      const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
       const conversationCollection = MongoWrapper.getCollection(
         databaseName,
         COLLECTIONS.AGENT_CONVERSATIONS,

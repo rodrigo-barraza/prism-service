@@ -2,8 +2,8 @@ import {
   DEFAULT_TOPOLOGY,
   DEFAULT_USERNAME,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { handleConversation } from "../routes/ChatRoutes.ts";
-import { handleVoice } from "../routes/AudioRoutes.ts";
+import { handleConversation } from "#src/routes/ChatRoutes";
+import { handleVoice } from "#src/routes/AudioRoutes";
 import {
   GoogleGenAI,
   Modality,
@@ -11,23 +11,23 @@ import {
   EndSensitivity,
   Session,
 } from "@google/genai";
-import { GOOGLE_CLOUD_GEMINI_API_KEY, LIVE_AUDIO_MODEL } from "../../config.ts";
+import { GOOGLE_CLOUD_GEMINI_API_KEY, LIVE_AUDIO_MODEL } from "#config";
 import crypto from "crypto";
-import logger from "../utils/logger.ts";
-import RequestLogger from "../services/RequestLogger.ts";
-import ConversationService from "../services/ConversationService.ts";
-import { calculateLiveCost } from "../utils/CostCalculator.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import { FILE_CATEGORIES } from "../constants.ts";
-import { getModelByName, MODELS } from "../config.ts";
-import { calculateTokensPerSec } from "../utils/math.ts";
-import PromptLocaleService from "../services/PromptLocaleService.ts";
+import logger from "#src/utils/logger";
+import RequestLogger from "#src/services/RequestLogger";
+import ConversationService from "#src/services/ConversationService";
+import { calculateLiveCost } from "#src/utils/CostCalculator";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { FILE_CATEGORIES } from "#src/constants";
+import { getModelByName, MODELS } from "#src/config";
+import { calculateTokensPerSec } from "#src/utils/math";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 import type { WebSocket } from "ws";
 import type { IncomingMessage } from "http";
 import type { WebSocketServer } from "ws";
-import type { GoogleToolConfigEntry } from "../providers/google.ts";
+import type { GoogleToolConfigEntry } from "#src/providers/google";
 import WebSocketConnectionRegistry from "./WebSocketConnectionRegistry.ts";
-import type { ToolResultValue } from "../utils/FunctionCallingUtilities.ts";
+import type { ToolResultValue } from "#src/utils/FunctionCallingUtilities";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -349,7 +349,7 @@ function handleWebsocketLive(
       const wavBuffer = Buffer.concat([wavHeader, pcmData]);
       const dataUrl = `data:audio/wav;base64,${wavBuffer.toString("base64")}`;
 
-      const FileService = (await import("../services/FileService.js")).default;
+      const FileService = (await import("#src/services/FileService")).default;
       const { ref } = await FileService.uploadFile(
         dataUrl,
         FILE_CATEGORIES.GENERATIONS,
@@ -418,13 +418,13 @@ function handleWebsocketLive(
 
         try {
           const ToolOrchestratorService = (
-            await import("../services/ToolOrchestratorService.js")
+            await import("#src/services/ToolOrchestratorService")
           ).default;
           const { convertToolsToGoogle } =
-            await import("../providers/google.js");
+            await import("#src/providers/google");
 
           const SettingsService = (
-            await import("../services/SettingsService.js")
+            await import("#src/services/SettingsService")
           ).default;
           const settings = await SettingsService.getSection("agents");
           const defaultTopology =
@@ -624,10 +624,10 @@ function handleWebsocketLive(
                 (async () => {
                   try {
                     const ToolOrchestratorService = (
-                      await import("../services/ToolOrchestratorService.js")
+                      await import("#src/services/ToolOrchestratorService")
                     ).default;
                     const { truncateToolResult } =
-                      await import("../utils/FunctionCallingUtilities.js");
+                      await import("#src/utils/FunctionCallingUtilities");
 
                     const results: ToolResult[] = await Promise.all(
                       functionCalls.map(async (toolCall) => {

@@ -12,7 +12,7 @@
 // is used as the compacted conversation.
 // ────────────────────────────────────────────────────────────
 
-import PromptLocaleService from "../PromptLocaleService.ts";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 
 export const COMPACTION_SYSTEM_PROMPT = PromptLocaleService.get(
   "en",

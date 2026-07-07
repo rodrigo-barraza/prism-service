@@ -6,10 +6,10 @@
  * unknown harness IDs with graceful fallback.
  */
 import { describe, it, expect, vi } from "vitest";
-import { HARNESS_IDS, PROVIDERS } from "../../../constants.ts";
+import { HARNESS_IDS, PROVIDERS } from "#src/constants";
 
 // ── Mock heavy dependencies that ReActHarness transitively imports ──
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -20,7 +20,7 @@ vi.mock("../../../utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../config.ts", () => ({
+vi.mock("#src/services/harnesses/config", () => ({
   PRISM_SERVICE_PORT: 0,
   OPENAI_API_KEY: "fake",
   ANTHROPIC_API_KEY: "fake",
@@ -36,7 +36,7 @@ vi.mock("../config.ts", () => ({
   MONGO_DB_NAME: "prism-test",
 }));
 
-vi.mock("../../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     createClient: vi.fn().mockResolvedValue(undefined),
     getDb: vi.fn().mockReturnValue(null),
@@ -44,8 +44,8 @@ vi.mock("../../../wrappers/MongoWrapper.ts", () => ({
   },
 }));
 
-vi.mock("../../SettingsService.ts", async () => {
-  const { PROVIDERS } = await import("../../../constants.ts");
+vi.mock("#src/services/SettingsService", async () => {
+  const { PROVIDERS } = await import("#src/constants");
   const mockSettings = {
     creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS }
   } as unknown as import("../../SettingsService.ts").SettingsData;
@@ -64,7 +64,7 @@ vi.mock("../../SettingsService.ts", async () => {
   };
 });
 
-vi.mock("../../ConversationService.ts", () => ({
+vi.mock("#src/services/ConversationService", () => ({
   default: {
     appendMessages: vi.fn().mockResolvedValue(undefined),
     setGenerating: vi.fn().mockResolvedValue(undefined),
@@ -72,7 +72,7 @@ vi.mock("../../ConversationService.ts", () => ({
   },
 }));
 
-vi.mock("../../RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: {
     log: vi.fn(),
     logChatGeneration: vi.fn(),
@@ -84,7 +84,7 @@ vi.mock("../../RequestLogger.ts", () => ({
 
 // ── Import SUT ─────────────────────────────────────────────────
 const HarnessRegistry = (
-  await import("../HarnessRegistry.ts")
+  await import("#src/services/harnesses/HarnessRegistry")
 ).default;
 
 // ═══════════════════════════════════════════════════════════════

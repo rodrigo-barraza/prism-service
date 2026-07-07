@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import AgentHooks from "../AgentHooks.ts";
-import logger from "../../utils/logger.ts";
+import AgentHooks from "#src/services/AgentHooks";
+import logger from "#src/utils/logger";
 
 describe("AgentHooks Lifecycle Suite", () => {
   it("should correctly identify when hooks are registered for a lifecycle event", () => {

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { SubAgentTelemetryEmitter } from "../SubAgentTelemetryEmitter.ts";
+import { SubAgentTelemetryEmitter } from "#src/services/orchestrator/SubAgentTelemetryEmitter";
 
-vi.mock("../../ConversationGenerationTracker.ts", () => ({
+vi.mock("#src/services/ConversationGenerationTracker", () => ({
   default: {
     getConversationStats: vi.fn().mockReturnValue({
       totalOutputTokens: 100,

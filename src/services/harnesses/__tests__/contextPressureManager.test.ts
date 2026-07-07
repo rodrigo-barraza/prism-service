@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { manageContextPressure } from "../lifecycle/ContextPressureManager.ts";
-import type { ConversationMessage, AgenticContext } from "../types.ts";
-import type AgenticLoopState from "../../AgenticLoopState.ts";
+import { manageContextPressure } from "#src/services/harnesses/lifecycle/ContextPressureManager";
+import type { ConversationMessage, AgenticContext } from "#src/services/harnesses/types";
+import type AgenticLoopState from "#src/services/AgenticLoopState";
 
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -21,7 +21,7 @@ const mockMicrocompactMessages = vi.fn().mockReturnValue({
   freedTokens: 0,
 });
 
-vi.mock("../../compact/MicroCompactionService.ts", () => ({
+vi.mock("#src/services/compact/MicroCompactionService", () => ({
   default: {
     microcompactMessages: (...arguments_: unknown[]) => mockMicrocompactMessages(...arguments_),
   },
@@ -29,7 +29,7 @@ vi.mock("../../compact/MicroCompactionService.ts", () => ({
 
 const mockEvaluate = vi.fn().mockReturnValue({ shouldCompact: false });
 
-vi.mock("../../compact/AutoCompactionTrigger.ts", () => ({
+vi.mock("#src/services/compact/AutoCompactionTrigger", () => ({
   default: {
     evaluate: (...arguments_: unknown[]) => mockEvaluate(...arguments_),
   },
@@ -37,7 +37,7 @@ vi.mock("../../compact/AutoCompactionTrigger.ts", () => ({
 
 const mockCompactConversation = vi.fn().mockResolvedValue(null);
 
-vi.mock("../../compact/CompactionService.ts", () => ({
+vi.mock("#src/services/compact/CompactionService", () => ({
   default: {
     compactConversation: (...arguments_: unknown[]) => mockCompactConversation(...arguments_),
   },
@@ -45,7 +45,7 @@ vi.mock("../../compact/CompactionService.ts", () => ({
 
 const mockPersistCompactionSummary = vi.fn().mockResolvedValue(undefined);
 
-vi.mock("../../ConversationEmbeddingService.ts", () => ({
+vi.mock("#src/services/ConversationEmbeddingService", () => ({
   default: {
     persistCompactionSummary: (...arguments_: unknown[]) => mockPersistCompactionSummary(...arguments_),
   },
@@ -53,7 +53,7 @@ vi.mock("../../ConversationEmbeddingService.ts", () => ({
 
 const mockEstimateTokens = vi.fn().mockReturnValue(5000);
 
-vi.mock("../../../utils/ContextWindowManager.ts", () => ({
+vi.mock("#src/utils/ContextWindowManager", () => ({
   default: {
     estimateTokens: (...arguments_: unknown[]) => mockEstimateTokens(...arguments_),
   },

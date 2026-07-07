@@ -3,10 +3,10 @@
 // that respect the input token budget.
 // Extracted from MemoryConsolidationService.ts
 
-import { estimateTokens } from "../../utils/CostCalculator.ts";
+import { estimateTokens } from "#src/utils/CostCalculator";
 import { formatMemoryEntry } from "./ConsolidationPrompts.ts";
 import type { MemoryDoc, ConsolidationBatch } from "./types.ts";
-import { MEMORY } from "../../constants.ts";
+import { MEMORY } from "#src/constants";
 
 /** Max clusters per LLM batch — keeps input well under context window limits */
 export const BATCH_MAX_CLUSTERS = MEMORY.BATCH_MAX_CLUSTERS;

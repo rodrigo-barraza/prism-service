@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { sanitizeSchemaForGoogle } from "../../google.ts";
+import { sanitizeSchemaForGoogle } from "#src/providers/google";
 
 // ── Edge Cases ───────────────────────────────────────────────
 describe("sanitizeSchemaForGoogle — edge cases", () => {

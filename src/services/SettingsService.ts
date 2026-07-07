@@ -1,10 +1,10 @@
 import { DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
-import MongoWrapper from "../wrappers/MongoWrapper.ts";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { deepMerge } from "@rodrigo-barraza/utilities-library";
-import { MONGO_DB_NAME } from "../../config.ts";
-import { COLLECTIONS, PROVIDERS } from "../constants.ts";
-import { MODELS } from "../config.ts";
-import logger from "../utils/logger.ts";
+import { MONGO_DB_NAME } from "#config";
+import { COLLECTIONS, PROVIDERS } from "#src/constants";
+import { MODELS } from "#src/config";
+import logger from "#src/utils/logger";
 
 // ─── In-memory cache ──────────────────────────────────────────────────────────
 // Hot path: MemoryService + EmbeddingService read these on every call.

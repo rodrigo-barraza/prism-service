@@ -1,7 +1,7 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import './setup.ts';
-import elevenlabsProvider from '../src/providers/elevenlabs.ts';
-import inworldProvider from '../src/providers/inworld.ts';
+import elevenlabsProvider from '#src/providers/elevenlabs';
+import inworldProvider from '#src/providers/inworld';
 import { Readable } from 'stream';
 import EventEmitter from 'events';
 import WebSocket from 'ws';

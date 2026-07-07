@@ -9,7 +9,7 @@ import { describe, it, expect } from "vitest";
 import {
   extractResponseContent,
   type AnthropicBlock,
-} from "../../anthropic.ts";
+} from "#src/providers/anthropic";
 
 // ── Text Extraction ──────────────────────────────────────────
 describe("extractResponseContent — text extraction", () => {

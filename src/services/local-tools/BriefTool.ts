@@ -1,10 +1,10 @@
-import logger from "../../utils/logger.ts";
-import PromptLocaleService from "../PromptLocaleService.ts";
+import logger from "#src/utils/logger";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 import {
   SERVER_SENT_EVENT_TYPES,
   TOOL_NAMES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { INTERNAL_TOOL_EMOJIS } from "../tool-orchestrator/InternalToolEmojis.ts";
+import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 
 interface BriefContext extends InternalToolContext {

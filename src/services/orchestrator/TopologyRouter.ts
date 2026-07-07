@@ -3,7 +3,7 @@ import type {
   OrchestratorContext,
   OrchestratorSpawnParams,
   SubAgentResult,
-} from "../../types/orchestrator.ts";
+} from "#src/types/orchestrator";
 import type { TopologyType } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 export type { TopologyType };

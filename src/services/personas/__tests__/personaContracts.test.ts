@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BUILT_IN_PERSONAS } from '../index.ts';
+import { BUILT_IN_PERSONAS } from '#src/services/personas/index';
 
 describe('Persona Contracts Verification Tests', () => {
   it('should have at least one persona registered', () => {

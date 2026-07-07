@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { EmotionalStateEngine } from '../EmotionalStateEngine.ts';
-import { PRIMARY_EMOTIONS } from '../SomaticConstants.ts';
+import { EmotionalStateEngine } from '#src/services/somatic/EmotionalStateEngine';
+import { PRIMARY_EMOTIONS } from '#src/services/somatic/SomaticConstants';
 
 describe('EmotionalStateEngine Unit Tests', () => {
   it('should initialize with default emotions at 0', () => {

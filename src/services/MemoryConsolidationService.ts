@@ -2,24 +2,24 @@ import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { daysSinceIso } from "@rodrigo-barraza/utilities-library";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import crypto from "crypto";
-import { getProvider } from "../providers/index.ts";
-import type { ChatMessage } from "../types/provider.ts";
+import { getProvider } from "#src/providers/index";
+import type { ChatMessage } from "#src/types/provider";
 import type { MessagePayload } from "./conversation/types.ts";
 import MemoryService from "./MemoryService.ts";
 import RequestLogger from "./RequestLogger.ts";
-import MongoWrapper from "../wrappers/MongoWrapper.ts";
-import { MONGO_DB_NAME } from "../../config.ts";
-import logger from "../utils/logger.ts";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import { MONGO_DB_NAME } from "#config";
+import logger from "#src/utils/logger";
 import { parseJsonFromLargeLanguageModelResponse } from "@rodrigo-barraza/utilities-library";
-import { COLLECTIONS, MEMORY, LOG_PREVIEW } from "../constants.ts";
+import { COLLECTIONS, MEMORY, LOG_PREVIEW } from "#src/constants";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import SettingsService from "./SettingsService.ts";
 import {
   estimateTokens,
   calculateTextCost,
   getTotalInputTokens,
-} from "../utils/CostCalculator.ts";
-import { MODALITY_TYPES, getPricing } from "../config.ts";
+} from "#src/utils/CostCalculator";
+import { MODALITY_TYPES, getPricing } from "#src/config";
 
 // ── Extracted sub-modules ───────────────────────────────────
 import {
@@ -47,7 +47,7 @@ import {
   findStaleConversationalMemories,
 } from "./memory/ConversationalMemoryPartitioner.ts";
 
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 import type {
   MemoryDoc,
   ConsolidationAction,

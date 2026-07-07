@@ -14,14 +14,14 @@
  *      duplicate content for multi-iteration agentic turns
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS, TYPES, MESSAGE_ROLES } from "../../constants.ts";
+import { PROVIDERS, TYPES, MESSAGE_ROLES } from "#src/constants";
 
 // ═══════════════════════════════════════════════════════════════
 // Part 1: finalizeTextGeneration segment attachment logic
 // ═══════════════════════════════════════════════════════════════
 
 // ── Mock the entire world ──────────────────────────────────────
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -32,7 +32,7 @@ vi.mock("../../utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../config.ts", () => ({
+vi.mock("#src/services/config", () => ({
   PRISM_SERVICE_PORT: 0,
   OPENAI_API_KEY: "fake",
   ANTHROPIC_API_KEY: "fake",
@@ -48,7 +48,7 @@ vi.mock("../config.ts", () => ({
   MONGO_DB_NAME: "prism-test",
 }));
 
-vi.mock("../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     createClient: vi.fn().mockResolvedValue(undefined),
     getDb: vi.fn().mockReturnValue(null),
@@ -56,7 +56,7 @@ vi.mock("../../wrappers/MongoWrapper.ts", () => ({
   },
 }));
 
-vi.mock("../FileService.ts", () => ({
+vi.mock("#src/services/FileService", () => ({
   default: {
     isExternalStorage: () => false,
     isMinioRef: () => false,
@@ -64,14 +64,14 @@ vi.mock("../FileService.ts", () => ({
   },
 }));
 
-vi.mock("../RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: {
     log: vi.fn(),
     logChatGeneration: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
-vi.mock("../ConversationService.ts", () => ({
+vi.mock("#src/services/ConversationService", () => ({
   default: {
     appendMessages: vi.fn().mockResolvedValue(undefined),
     setGenerating: vi.fn().mockResolvedValue(undefined),
@@ -79,7 +79,7 @@ vi.mock("../ConversationService.ts", () => ({
   extractFiles: vi.fn().mockImplementation(async (msgs) => msgs),
 }));
 
-vi.mock("../SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getCached: vi.fn().mockReturnValue({
       creative: {
@@ -92,8 +92,8 @@ vi.mock("../SettingsService.ts", () => ({
 }));
 
 // ── Import SUT ─────────────────────────────────────────────────
-const { finalizeTextGeneration } = await import("../harnesses/lifecycle/Finalizer.ts");
-const ConversationService = (await import("../ConversationService.ts")).default as any;
+const { finalizeTextGeneration } = await import("#src/services/harnesses/lifecycle/Finalizer");
+const ConversationService = (await import("#src/services/ConversationService")).default as any;
 
 // ── Helpers ────────────────────────────────────────────────────
 function makeCtx(overrides = {}) {

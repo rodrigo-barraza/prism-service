@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getProvider } from "../../../providers/index.ts";
+import { getProvider } from "#src/providers/index";
 
 // Mock logger to avoid spamming the console
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -16,7 +16,7 @@ const mockInstances = [
   { id: "ollama-1", type: PROVIDERS.OLLAMA, instanceNumber: 1, concurrency: 4 },
 ];
 
-vi.mock("../../../providers/instance-registry.ts", () => ({
+vi.mock("#src/providers/instance-registry", () => ({
   listInstances: vi.fn().mockImplementation(() => mockInstances),
   getInstancesByType: vi.fn().mockImplementation((type) =>
     mockInstances.filter((instance) => instance.type === type)
@@ -53,16 +53,16 @@ const mockProvider = {
   checkHealth: vi.fn().mockResolvedValue({ ok: true, status: "ok" }),
 };
 
-vi.mock("../../../providers/index.ts", () => ({
+vi.mock("#src/providers/index", () => ({
   getProvider: vi.fn().mockImplementation(() => mockProvider),
 }));
 
-vi.mock("../vramEstimation.ts", () => ({
+vi.mock("#src/services/local-provider/vramEstimation", () => ({
   estimateVRAM: vi.fn().mockReturnValue({ vramBytes: 12345 }),
   estimateVRAMForModel: vi.fn().mockResolvedValue({ vramBytes: 67890 }),
 }));
 
-vi.mock("../hfMetadata.ts", () => ({
+vi.mock("#src/services/local-provider/hfMetadata", () => ({
   enrichWithHuggingFace: vi.fn().mockImplementation((entry) => ({
     ...entry,
     huggingFaceEnriched: true,
@@ -73,8 +73,8 @@ vi.mock("@rodrigo-barraza/utilities-library", () => ({
   withTimeoutFallback: vi.fn().mockImplementation((promise) => promise),
 }));
 
-import LocalProviderGateway from "../index.ts";
-import { PROVIDERS, TYPES, MODEL_TYPES } from "../../../constants.ts";
+import LocalProviderGateway from "#src/services/local-provider/index";
+import { PROVIDERS, TYPES, MODEL_TYPES } from "#src/constants";
 
 describe("LocalProviderGateway Unit Tests", () => {
   beforeEach(() => {

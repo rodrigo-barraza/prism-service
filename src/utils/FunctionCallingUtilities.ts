@@ -7,7 +7,7 @@
  * logic to avoid duplication.
  */
 
-import type { ChatMessage, ToolCallEntry } from "../types/admin.ts";
+import type { ChatMessage, ToolCallEntry } from "#src/types/admin";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 export type ToolResultValue =

@@ -4,8 +4,8 @@ import {
   Provider,
   GenerateTextResult,
   StreamChunk,
-} from "../types/provider.ts";
-import { TOOL_API_HEALTH_TIMEOUT_MILLISECONDS, SYSTEM_STATUSES, MESSAGE_ROLES } from "../constants.ts";
+} from "#src/types/provider";
+import { TOOL_API_HEALTH_TIMEOUT_MILLISECONDS, SYSTEM_STATUSES, MESSAGE_ROLES } from "#src/constants";
 // ─────────────────────────────────────────────────────────────
 // llama.cpp Provider (llama-server)
 // ─────────────────────────────────────────────────────────────
@@ -35,11 +35,11 @@ import { TOOL_API_HEALTH_TIMEOUT_MILLISECONDS, SYSTEM_STATUSES, MESSAGE_ROLES } 
 //   500 { status: "error" }
 // ─────────────────────────────────────────────────────────────
 
-import { ProviderError } from "../utils/errors.ts";
-import logger from "../utils/logger.ts";
-import { discoverContextLength } from "../utils/ContextLengthDiscovery.ts";
+import { ProviderError } from "#src/utils/errors";
+import logger from "#src/utils/logger";
+import { discoverContextLength } from "#src/utils/ContextLengthDiscovery";
 
-import { MODALITY_TYPES, getDefaultModels } from "../config.ts";
+import { MODALITY_TYPES, getDefaultModels } from "#src/config";
 import {
   convertToolsToOpenAI,
   buildPayloadParams,
@@ -50,9 +50,9 @@ import {
   fetchOpenAICompat,
   MEDIA_STRATEGIES,
   type OpenAICompletionResponse,
-} from "../utils/openai-compat.ts";
-import type { TokenUsage } from "../types/admin.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+} from "#src/utils/openai-compat";
+import type { TokenUsage } from "#src/types/admin";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 // ── Types ────────────────────────────────────────────────────
 

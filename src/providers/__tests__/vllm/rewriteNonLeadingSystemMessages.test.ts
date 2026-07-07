@@ -6,8 +6,8 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { rewriteNonLeadingSystemMessages } from "../../vllm.ts";
-import type { InputMessage } from "../../../utils/openai-compat.ts";
+import { rewriteNonLeadingSystemMessages } from "#src/providers/vllm";
+import type { InputMessage } from "#src/utils/openai-compat";
 
 // ── Helpers ──────────────────────────────────────────────────
 function makeMessage(overrides: Partial<InputMessage>): InputMessage {

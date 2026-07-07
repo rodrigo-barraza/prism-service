@@ -7,7 +7,7 @@ import {
   PendingToolApprovalEntry,
   PendingPlanApprovalEntry,
   PendingQuestionEntry,
-} from '../ApprovalRegistry.ts';
+} from '#src/services/ApprovalRegistry';
 
 describe('ApprovalRegistry Unit Tests', () => {
   beforeEach(() => {

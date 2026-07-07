@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateTokensPerSec } from '../math.ts';
+import { calculateTokensPerSec } from '#src/utils/math';
 
 describe('math', () => {
   describe('calculateTokensPerSec', () => {

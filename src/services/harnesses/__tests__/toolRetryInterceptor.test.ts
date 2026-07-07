@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { buildToolRetryGuidance } from "../lifecycle/ToolRetryInterceptor.ts";
-import type { ToolCall, ToolResult } from "../types.ts";
-import type AgenticLoopState from "../../AgenticLoopState.ts";
+import { buildToolRetryGuidance } from "#src/services/harnesses/lifecycle/ToolRetryInterceptor";
+import type { ToolCall, ToolResult } from "#src/services/harnesses/types";
+import type AgenticLoopState from "#src/services/AgenticLoopState";
 
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),

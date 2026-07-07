@@ -1,10 +1,10 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
-import requireDb from "../middleware/RequireDbMiddleware.ts";
-import logger from "../utils/logger.ts";
-import { COLLECTIONS } from "../constants.ts";
-import { GetTextQuerySchema } from "../types/index.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import requireDb from "#src/middleware/RequireDbMiddleware";
+import logger from "#src/utils/logger";
+import { COLLECTIONS } from "#src/constants";
+import { GetTextQuerySchema } from "#src/types/index";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 const router = express.Router();
 router.use(requireDb);

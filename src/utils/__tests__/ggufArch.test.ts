@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { resolveArchParams, estimateMemory } from '../gguf-arch.ts';
-import type { ArchParams } from '../gguf-arch.ts';
+import { resolveArchParams, estimateMemory } from '#src/utils/gguf-arch';
+import type { ArchParams } from '#src/utils/gguf-arch';
 
 describe('resolveArchParams', () => {
   describe('known architectures', () => {

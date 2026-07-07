@@ -1,22 +1,22 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { app } from './setup.ts';
 import request from 'supertest';
-import MongoWrapper from '../src/wrappers/MongoWrapper.ts';
+import MongoWrapper from '#src/wrappers/MongoWrapper';
 
 // Import route modules
-import configRouter, { localConfigRouter } from '../src/routes/ConfigRoutes.ts';
-import workspacesRouter from '../src/routes/WorkspacesRoutes.ts';
-import mcpServersRouter from '../src/routes/McpServersRoutes.ts';
-import webhookRouter from '../src/routes/WebhookRoutes.ts';
-import skillsRouter from '../src/routes/SkillsRoutes.ts';
-import scheduledTasksRouter from '../src/routes/ScheduledTasksRoutes.ts';
-import promptsRouter from '../src/routes/PromptsRoutes.ts';
-import agentRouter from '../src/routes/AgentRoutes.ts';
-import agentMemoriesRouter from '../src/routes/AgentMemoriesRoutes.ts';
-import rulesRouter from '../src/routes/RulesRoutes.ts';
-import memoryRouter from '../src/routes/MemoryRoutes.ts';
-import customAgentsRouter from '../src/routes/CustomAgentsRoutes.ts';
-import { COLLECTIONS, PROVIDERS } from "../src/constants.ts";
+import configRouter, { localConfigRouter } from '#src/routes/ConfigRoutes';
+import workspacesRouter from '#src/routes/WorkspacesRoutes';
+import mcpServersRouter from '#src/routes/McpServersRoutes';
+import webhookRouter from '#src/routes/WebhookRoutes';
+import skillsRouter from '#src/routes/SkillsRoutes';
+import scheduledTasksRouter from '#src/routes/ScheduledTasksRoutes';
+import promptsRouter from '#src/routes/PromptsRoutes';
+import agentRouter from '#src/routes/AgentRoutes';
+import agentMemoriesRouter from '#src/routes/AgentMemoriesRoutes';
+import rulesRouter from '#src/routes/RulesRoutes';
+import memoryRouter from '#src/routes/MemoryRoutes';
+import customAgentsRouter from '#src/routes/CustomAgentsRoutes';
+import { COLLECTIONS, PROVIDERS } from "#src/constants";
 
 // Mount all routers
 app.use('/config-test', configRouter);
@@ -34,7 +34,7 @@ app.use('/memory-test', memoryRouter);
 app.use('/custom-agents-test', customAgentsRouter);
 
 // Set up mocks
-vi.mock('../src/services/ToolOrchestratorService.ts', () => ({
+vi.mock('#src/services/ToolOrchestratorService', () => ({
   default: {
     ensureSchemas: vi.fn(),
     refreshSchemas: vi.fn().mockResolvedValue(10),
@@ -48,7 +48,7 @@ vi.mock('../src/services/ToolOrchestratorService.ts', () => ({
   }
 }));
 
-vi.mock('../src/services/AgentPersonaRegistry.ts', () => ({
+vi.mock('#src/services/AgentPersonaRegistry', () => ({
   default: {
     list: vi.fn().mockReturnValue([{ id: 'CODING', name: 'Coding Persona' }]),
     get: vi.fn().mockReturnValue({
@@ -64,7 +64,7 @@ vi.mock('../src/services/AgentPersonaRegistry.ts', () => ({
   }
 }));
 
-vi.mock('../src/services/CustomAgentService.ts', () => ({
+vi.mock('#src/services/CustomAgentService', () => ({
   default: {
     list: vi.fn().mockResolvedValue([{ id: 'mock-agent-id', name: 'Custom Agent', agentId: 'CUSTOM_AGENT' }]),
     create: vi.fn().mockResolvedValue({ id: 'mock-agent-id', name: 'Custom Agent', agentId: 'CUSTOM_AGENT' }),
@@ -74,7 +74,7 @@ vi.mock('../src/services/CustomAgentService.ts', () => ({
   }
 }));
 
-vi.mock('../src/services/local-provider/index.ts', () => ({
+vi.mock('#src/services/local-provider/index', () => ({
   default: {
     discoverModels: vi.fn().mockResolvedValue({
       'local-provider-1': [{ name: 'local-model-1', architecture: 'llama', params_string: '7B', size_bytes: 1000, quantization: { bits_per_weight: 4 } }]
@@ -82,7 +82,7 @@ vi.mock('../src/services/local-provider/index.ts', () => ({
   }
 }));
 
-vi.mock('../src/services/MemoryService.ts', () => ({
+vi.mock('#src/services/MemoryService', () => ({
   default: {
     extractAndStore: vi.fn().mockResolvedValue([{ id: 'memory-1', text: 'extracted' }]),
     search: vi.fn().mockResolvedValue([{ id: 'memory-1', text: 'searched' }]),
@@ -94,14 +94,14 @@ vi.mock('../src/services/MemoryService.ts', () => ({
   }
 }));
 
-vi.mock('../src/services/MemoryConsolidationService.ts', () => ({
+vi.mock('#src/services/MemoryConsolidationService', () => ({
   default: {
     getHistory: vi.fn().mockResolvedValue([{ id: 'history-1', project: 'default', timestamp: new Date().toISOString() }]),
     consolidate: vi.fn().mockResolvedValue({ success: true, count: 5 }),
   }
 }));
 
-vi.mock('../src/services/ScheduledTaskService.ts', () => ({
+vi.mock('#src/services/ScheduledTaskService', () => ({
   default: {
     listTasks: vi.fn().mockResolvedValue([{ id: 'task-1', name: 'Task One' }]),
     listAllTasks: vi.fn().mockResolvedValue([{ id: 'task-1', name: 'Task One' }]),
@@ -112,14 +112,14 @@ vi.mock('../src/services/ScheduledTaskService.ts', () => ({
   }
 }));
 
-vi.mock('../src/services/AgenticLoopService.ts', () => ({
+vi.mock('#src/services/AgenticLoopService', () => ({
   default: {
     resolveApproval: vi.fn().mockReturnValue(true),
     resolveUserQuestion: vi.fn().mockReturnValue(true),
   }
 }));
 
-vi.mock('../src/utils/SseUtilities.ts', () => ({
+vi.mock('#src/utils/SseUtilities', () => ({
   handleSseRequest: vi.fn().mockImplementation(async (req, res, params, handler) => {
     res.writeHead(200, { 'Content-Type': 'text/event-stream' });
     res.write('data: {}\n\n');
@@ -130,7 +130,7 @@ vi.mock('../src/utils/SseUtilities.ts', () => ({
   }),
 }));
 
-vi.mock('../src/services/WebhookEventBus.ts', () => ({
+vi.mock('#src/services/WebhookEventBus', () => ({
   default: {
     subscribe: vi.fn(),
     unsubscribe: vi.fn(),
@@ -139,7 +139,7 @@ vi.mock('../src/services/WebhookEventBus.ts', () => ({
   }
 }));
 
-vi.mock('../src/services/MCPClientService.ts', () => ({
+vi.mock('#src/services/MCPClientService', () => ({
   default: {
     getConnectedServers: vi.fn().mockReturnValue([
       { name: 'mock-mcp-server', status: 'connected', toolCount: 2, tools: [], transport: 'stdio', connectedAt: new Date() }

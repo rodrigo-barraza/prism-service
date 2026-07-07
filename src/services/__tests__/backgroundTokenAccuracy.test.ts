@@ -14,10 +14,10 @@
  * and prefers real API-reported tokens when available.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS, MESSAGE_ROLES } from "../../constants.ts";
+import { PROVIDERS, MESSAGE_ROLES } from "#src/constants";
 
 // ── Mock logger ──────────────────────────────────────────────────
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -27,13 +27,13 @@ vi.mock("../../utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../config.ts", () => ({
+vi.mock("#src/services/config", () => ({
   MONGO_DB_NAME: "prism-test",
 }));
 
 // ── Mock MongoWrapper so RequestLogger.log doesn't throw ─────────
 const mockInsertOne = vi.fn().mockResolvedValue({ insertedId: "test" });
-vi.mock("../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getDb: vi.fn().mockReturnValue({
       collection: vi.fn().mockReturnValue({
@@ -50,8 +50,8 @@ const {
   getTotalInputTokens,
   calculateTextCost,
   createUsageAccumulator,
-} = await import("../../utils/CostCalculator.ts");
-const { default: RequestLogger } = await import("../RequestLogger.ts");
+} = await import("#src/utils/CostCalculator");
+const { default: RequestLogger } = await import("#src/services/RequestLogger");
 
 // ═══════════════════════════════════════════════════════════════
 // Anthropic Dashboard vs Prism — Real-world regression data

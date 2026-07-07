@@ -16,7 +16,7 @@ vi.mock('@rodrigo-barraza/service-library/minio', () => ({
   MinioManager: mockMinioManager,
 }));
 
-vi.mock('../../utils/logger.ts', () => ({
+vi.mock('#src/utils/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
@@ -24,7 +24,7 @@ let MinioWrapper: typeof import('../MinioWrapper.ts').default;
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  const module = await import('../MinioWrapper.ts');
+  const module = await import('#src/wrappers/MinioWrapper');
   MinioWrapper = module.default;
 });
 

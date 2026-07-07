@@ -30,8 +30,8 @@
  * See ThoughtStructureRegistry.ts → THOUGHT_STRUCTURE_DEFINITIONS
  * (id: "tree_of_thoughts") for full paper-alignment metadata.
  */
-import type BaseAgenticHarness from "../BaseAgenticHarness.ts";
-import type AgenticLoopState from "../../AgenticLoopState.ts";
+import type BaseAgenticHarness from "#src/services/harnesses/BaseAgenticHarness";
+import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type {
   ConversationMessage,
   ToolCall,
@@ -40,32 +40,32 @@ import type {
   AgenticOptions,
   PassState,
   BeforePromptHookContext,
-} from "../types.ts";
+} from "#src/services/harnesses/types";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
   TOOL_NAMES,
   MAX_TOOL_ITERATIONS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import logger from "../../../utils/logger.ts";
-import PromptLocaleService from "../../PromptLocaleService.ts";
-import { getErrorMessage } from "../../../utils/ErrorHelpers.ts";
-import RequestLogger from "../../RequestLogger.ts";
-import { createStandardHooks } from "../lifecycle/HookInitializer.ts";
-import { executeToolBatch } from "../lifecycle/ToolExecutor.ts";
-import { checkAndWaitForApproval } from "../lifecycle/ApprovalGate.ts";
+import logger from "#src/utils/logger";
+import PromptLocaleService from "#src/services/PromptLocaleService";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import RequestLogger from "#src/services/RequestLogger";
+import { createStandardHooks } from "#src/services/harnesses/lifecycle/HookInitializer";
+import { executeToolBatch } from "#src/services/harnesses/lifecycle/ToolExecutor";
+import { checkAndWaitForApproval } from "#src/services/harnesses/lifecycle/ApprovalGate";
 import {
   emitPostExecutionStatus,
   processToolResultMedia,
   trackToolErrors,
-} from "../lifecycle/PostExecutionEmitter.ts";
-import { runExhaustionRecoveryPass } from "../lifecycle/ExhaustionRecovery.ts";
+} from "#src/services/harnesses/lifecycle/PostExecutionEmitter";
+import { runExhaustionRecoveryPass } from "#src/services/harnesses/lifecycle/ExhaustionRecovery";
 import {
   handleExitPlanMode,
   checkForPlanModeEntry,
-} from "../lifecycle/PlanModeController.ts";
-import { validateAfterToolExecution } from "../lifecycle/ValidationInterceptor.ts";
-import { buildToolRetryGuidance } from "../lifecycle/ToolRetryInterceptor.ts";
+} from "#src/services/harnesses/lifecycle/PlanModeController";
+import { validateAfterToolExecution } from "#src/services/harnesses/lifecycle/ValidationInterceptor";
+import { buildToolRetryGuidance } from "#src/services/harnesses/lifecycle/ToolRetryInterceptor";
 import {
   isOutputTruncated,
   isAtOutputCeiling,
@@ -74,23 +74,23 @@ import {
   buildExhaustedRecoveryMessage,
   buildProviderErrorMessage,
   MAX_OUTPUT_TRUNCATION_RECOVERIES,
-} from "../lifecycle/OutputTruncationRecovery.ts";
-import { manageContextPressure } from "../lifecycle/ContextPressureManager.ts";
-import { logKVCacheHitRate } from "../lifecycle/KVCacheReporter.ts";
-import { injectToolDiscoveryNudge } from "../lifecycle/ToolDiscoveryNudge.ts";
-import { finalizePassTracker } from "../lifecycle/TrackerFinalizer.ts";
-import { handleCodexPlanningResponse } from "../lifecycle/CodexPlanningDetector.ts";
+} from "#src/services/harnesses/lifecycle/OutputTruncationRecovery";
+import { manageContextPressure } from "#src/services/harnesses/lifecycle/ContextPressureManager";
+import { logKVCacheHitRate } from "#src/services/harnesses/lifecycle/KVCacheReporter";
+import { injectToolDiscoveryNudge } from "#src/services/harnesses/lifecycle/ToolDiscoveryNudge";
+import { finalizePassTracker } from "#src/services/harnesses/lifecycle/TrackerFinalizer";
+import { handleCodexPlanningResponse } from "#src/services/harnesses/lifecycle/CodexPlanningDetector";
 import {
   maybeInjectSystemReminder,
   cleanupReminderCache,
-} from "../lifecycle/SystemReminderInjector.ts";
-import { checkCostBudget } from "../lifecycle/CostBudgetEnforcer.ts";
+} from "#src/services/harnesses/lifecycle/SystemReminderInjector";
+import { checkCostBudget } from "#src/services/harnesses/lifecycle/CostBudgetEnforcer";
 import {
   createSandboxCheckpoint,
   restoreSandboxCheckpoint,
-} from "../lifecycle/SandboxExecutor.ts";
-import PlanningModeService from "../../PlanningModeService.ts";
-import { HARNESS } from "../../../constants.ts";
+} from "#src/services/harnesses/lifecycle/SandboxExecutor";
+import PlanningModeService from "#src/services/PlanningModeService";
+import { HARNESS } from "#src/constants";
 
 interface IterationPassOptions extends AgenticOptions {
   project: string;

@@ -1,8 +1,8 @@
-import MongoWrapper from "../wrappers/MongoWrapper.ts";
-import { MONGO_DB_NAME } from "../../config.ts";
-import { COLLECTIONS } from "../constants.ts";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import { MONGO_DB_NAME } from "#config";
+import { COLLECTIONS } from "#src/constants";
 import { MAX_TOOL_ITERATIONS } from "@rodrigo-barraza/utilities-library/taxonomy";
-import logger from "../utils/logger.ts";
+import logger from "#src/utils/logger";
 
 // ────────────────────────────────────────────────────────────
 // SkillService — Reusable Workflow Templates

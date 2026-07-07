@@ -12,7 +12,7 @@
 // ────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS } from "../../constants.ts";
+import { PROVIDERS } from "#src/constants";
 
 // ── Mock MCP tool schemas ──────────────────────────────────────
 
@@ -68,14 +68,14 @@ let mockToolsApiSearchResult: Record<string, unknown> = {
 
 // ── Mock dependencies ──────────────────────────────────────────
 
-vi.mock("../MCPClientService.ts", () => ({
+vi.mock("#src/services/MCPClientService", () => ({
   default: {
     getToolSchemas: vi.fn(() => mockMCPSchemas),
     isMCPTool: vi.fn((name: string) => name.startsWith("mcp__")),
   },
 }));
 
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -83,18 +83,18 @@ vi.mock("../../utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../config.ts", () => ({
+vi.mock("#src/services/config", () => ({
   TOOLS_SERVICE_URL: "http://localhost:5590",
   MONGO_DB_NAME: "prism-test",
 }));
 
-vi.mock("../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getCollection: vi.fn().mockReturnValue(null),
   },
 }));
 
-vi.mock("../SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
     get: vi.fn().mockResolvedValue({}),
@@ -102,7 +102,7 @@ vi.mock("../SettingsService.ts", () => ({
   },
 }));
 
-vi.mock("../local-tools/InternalToolRegistry.ts", () => ({
+vi.mock("#src/services/local-tools/InternalToolRegistry", () => ({
   default: {
     has: vi.fn(() => false),
     getNames: vi.fn(() => new Set()),
@@ -110,7 +110,7 @@ vi.mock("../local-tools/InternalToolRegistry.ts", () => ({
   },
 }));
 
-vi.mock("../AgentPersonaRegistry.ts", () => ({
+vi.mock("#src/services/AgentPersonaRegistry", () => ({
   default: {
     get: vi.fn(() => null),
     list: vi.fn().mockReturnValue([]),
@@ -183,7 +183,7 @@ global.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit
 // ── Import after mocks ─────────────────────────────────────────
 
 const { default: ToolOrchestratorService } = await import(
-  "../ToolOrchestratorService.ts"
+  "#src/services/ToolOrchestratorService"
 );
 
 // Force schema loading so toolMap is populated with search_tools

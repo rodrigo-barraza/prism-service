@@ -13,11 +13,11 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import PromptLocaleService from "../../PromptLocaleService.ts";
-import type { AssemblerContext } from "../types.ts";
+import PromptLocaleService from "#src/services/PromptLocaleService";
+import type { AssemblerContext } from "#src/services/system-prompt/types";
 
 // ── Mock heavy services that require DB / network ──────────
-vi.mock("../../SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getSection: vi.fn().mockResolvedValue({
       topology: "hierarchical",
@@ -98,7 +98,7 @@ const MOCK_TOOL_SCHEMAS = MOCK_CLIENT_TOOL_SCHEMAS.map(({ name, description, par
   parameters,
 }));
 
-vi.mock("../../ToolOrchestratorService.ts", () => ({
+vi.mock("#src/services/ToolOrchestratorService", () => ({
   default: {
     getWorkspaceRoot: vi.fn().mockReturnValue("/home/test"),
     getClientToolSchemas: vi.fn().mockReturnValue(MOCK_CLIENT_TOOL_SCHEMAS),
@@ -109,7 +109,7 @@ vi.mock("../../ToolOrchestratorService.ts", () => ({
   },
 }));
 
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -118,7 +118,7 @@ vi.mock("../../../utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../../RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: {
     logRequest: vi.fn(),
   },
@@ -164,7 +164,7 @@ describe("Locale Assembly", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    const module = await import("../index.ts");
+    const module = await import("#src/services/system-prompt/index");
     SystemPromptAssembler = module.default;
   });
 

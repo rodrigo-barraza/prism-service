@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { prepareDisplayMessages } from "../conversation/prepareDisplayMessages.ts";
-import type { ChatMessage } from "../../types/admin.ts";
+import { prepareDisplayMessages } from "#src/services/conversation/prepareDisplayMessages";
+import type { ChatMessage } from "#src/types/admin";
 
 describe("prepareDisplayMessages", () => {
   it("returns empty array for null/undefined/empty input", () => {

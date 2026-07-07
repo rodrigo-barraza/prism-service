@@ -1,13 +1,13 @@
 import "./setup.ts";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import ToolOrchestratorService, { ARG_REMAPS } from "../src/services/ToolOrchestratorService.ts";
-import { TYPES, MODEL_TYPES, FILE_CATEGORIES, MESSAGE_ROLES } from "../src/constants.ts";
+import ToolOrchestratorService, { ARG_REMAPS } from "#src/services/ToolOrchestratorService";
+import { TYPES, MODEL_TYPES, FILE_CATEGORIES, MESSAGE_ROLES } from "#src/constants";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { TOOLS_SERVICE_URL } from "../config.ts";
-import { TTS_VOICE_CATALOG_PLACEHOLDER } from "../src/utils/VoiceCatalog.ts";
-import OrchestratorService from "../src/services/OrchestratorService.ts";
+import { TOOLS_SERVICE_URL } from "#config";
+import { TTS_VOICE_CATALOG_PLACEHOLDER } from "#src/utils/VoiceCatalog";
+import OrchestratorService from "#src/services/OrchestratorService";
 
-vi.mock("../src/services/FileService.ts", () => {
+vi.mock("#src/services/FileService", () => {
   return {
     default: {
       extractKey: (imageReference: string) => imageReference.replace("minio://", ""),
@@ -27,9 +27,9 @@ vi.mock("../src/services/FileService.ts", () => {
   };
 });
 
-import MCPClientService, { MCP_PREFIX } from "../src/services/MCPClientService.ts";
+import MCPClientService, { MCP_PREFIX } from "#src/services/MCPClientService";
 
-vi.mock("../src/services/MCPClientService.ts", () => ({
+vi.mock("#src/services/MCPClientService", () => ({
   default: {
     isMCPTool: vi.fn().mockImplementation((name: string) => name.startsWith("mcp__")),
     parseMCPToolName: vi.fn(),
@@ -39,7 +39,7 @@ vi.mock("../src/services/MCPClientService.ts", () => ({
   MCP_PREFIX: "mcp__", // Align mock with production default
 }));
 
-vi.mock("../src/services/OrchestratorService.ts", () => ({
+vi.mock("#src/services/OrchestratorService", () => ({
   default: {
     createTeam: vi.fn(),
     sendMessage: vi.fn(),
@@ -1304,7 +1304,7 @@ describe("ToolOrchestratorService", () => {
 
       await ToolOrchestratorService.refreshSchemas();
 
-      const FileService = (await import("../src/services/FileService.ts")).default;
+      const FileService = (await import("#src/services/FileService")).default;
       vi.mocked(FileService.uploadFile).mockResolvedValue({ ref: "minio://gen/image.png" } as any);
 
       const result = await ToolOrchestratorService.executeTool(
@@ -1352,7 +1352,7 @@ describe("ToolOrchestratorService", () => {
 
       await ToolOrchestratorService.refreshSchemas();
 
-      const FileService = (await import("../src/services/FileService.ts")).default;
+      const FileService = (await import("#src/services/FileService")).default;
       vi.mocked(FileService.uploadFile).mockRejectedValue(new Error("MinIO down"));
 
       const result = await ToolOrchestratorService.executeTool(
@@ -1395,7 +1395,7 @@ describe("ToolOrchestratorService", () => {
 
       await ToolOrchestratorService.refreshSchemas();
 
-      const FileService = (await import("../src/services/FileService.ts")).default;
+      const FileService = (await import("#src/services/FileService")).default;
       vi.mocked(FileService.uploadFile).mockResolvedValue({ ref: "minio://screenshots/scr.png" } as any);
 
       const result = await ToolOrchestratorService.executeTool(
@@ -1444,7 +1444,7 @@ describe("ToolOrchestratorService", () => {
 
       await ToolOrchestratorService.refreshSchemas();
 
-      const FileService = (await import("../src/services/FileService.ts")).default;
+      const FileService = (await import("#src/services/FileService")).default;
       vi.mocked(FileService.uploadFile).mockRejectedValue(new Error("MinIO down"));
 
       const result = await ToolOrchestratorService.executeTool(

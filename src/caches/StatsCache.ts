@@ -1,5 +1,5 @@
-import ChangeStreamService from "../services/ChangeStreamService.ts";
-import { COLLECTIONS } from "../constants.ts";
+import ChangeStreamService from "#src/services/ChangeStreamService";
+import { COLLECTIONS } from "#src/constants";
 
 /** Time-to-live for stats cache entries (30 seconds).
  * Change stream invalidation handles real-time freshness; this TTL

@@ -15,7 +15,7 @@
  * Run:  npx vitest run tests/live/tokenAccuracyLive.test.js --config vitest.live.config.js
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { PROVIDERS, TYPES } from "../../src/constants.ts";
+import { PROVIDERS, TYPES } from "#src/constants";
 
 const PRISM_SERVICE_URL = "http://localhost:7777";
 const LM_STUDIO_URL = "http://localhost:1234";

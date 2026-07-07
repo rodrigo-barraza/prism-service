@@ -1,9 +1,9 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
-import { HARNESS_IDS } from "../../../constants.ts";
+import { HARNESS_IDS } from "#src/constants";
 
 // ─── Mock everything the SystemPromptAssembler touches ──────────
 
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -13,7 +13,7 @@ vi.mock("../../../utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../../../utils/ErrorHelpers.ts", () => ({
+vi.mock("#src/utils/ErrorHelpers", () => ({
   getErrorMessage: (error: unknown) => String(error),
 }));
 
@@ -21,7 +21,7 @@ const mockGetSnapshot = vi.fn();
 const mockAdaptFromMessage = vi.fn();
 const mockRenderSystemMessage = vi.fn();
 
-vi.mock("../SomaticStateService.ts", () => ({
+vi.mock("#src/services/somatic/SomaticStateService", () => ({
   default: {
     getSnapshot: (...arguments_: unknown[]) => mockGetSnapshot(...arguments_),
     adaptFromMessage: (...arguments_: unknown[]) => mockAdaptFromMessage(...arguments_),
@@ -32,14 +32,14 @@ vi.mock("../SomaticStateService.ts", () => ({
 
 const mockPersonas = new Map<string, Record<string, unknown>>();
 
-vi.mock("../../AgentPersonaRegistry.ts", () => ({
+vi.mock("#src/services/AgentPersonaRegistry", () => ({
   default: {
     get: (agentId: string) => mockPersonas.get(agentId) || null,
     list: vi.fn().mockReturnValue([]),
   },
 }));
 
-vi.mock("../../ToolOrchestratorService.ts", () => ({
+vi.mock("#src/services/ToolOrchestratorService", () => ({
   default: {
     ensureSchemas: vi.fn().mockResolvedValue(undefined),
     getWorkspaceRoot: () => "/test",
@@ -52,7 +52,7 @@ vi.mock("../../ToolOrchestratorService.ts", () => ({
   },
 }));
 
-vi.mock("../../SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getSection: vi.fn().mockResolvedValue({
       topology: HARNESS_IDS.STANDARD,
@@ -62,26 +62,26 @@ vi.mock("../../SettingsService.ts", () => ({
   },
 }));
 
-vi.mock("../../OrchestratorPrompt.ts", () => ({
+vi.mock("#src/services/OrchestratorPrompt", () => ({
   getOrchestratorPromptAddendum: () => "",
   ORCHESTRATOR_ONLY_TOOLS: new Set<string>(),
 }));
 
-vi.mock("../../../utils/resolveToolEntriesToSet.ts", () => ({
+vi.mock("#src/utils/resolveToolEntriesToSet", () => ({
   resolveToolEntriesToSet: () => new Set<string>(),
 }));
 
-vi.mock("../../../utils/resolveLockedOffToolNames.ts", () => ({
+vi.mock("#src/utils/resolveLockedOffToolNames", () => ({
   resolveLockedOffToolNames: () => new Set<string>(),
 }));
 
-vi.mock("../../system-prompt/DirectoryTreeFormatter.ts", () => ({
+vi.mock("#src/services/system-prompt/DirectoryTreeFormatter", () => ({
   DirectoryTreeFormatter: class {
     fetchDirectoryTree() { return Promise.resolve(""); }
   },
 }));
 
-vi.mock("../../system-prompt/ToolDocFormatter.ts", () => ({
+vi.mock("#src/services/system-prompt/ToolDocFormatter", () => ({
   ToolDocFormatter: class {
     buildToolDescriptions() { return ""; }
   },
@@ -90,7 +90,7 @@ vi.mock("../../system-prompt/ToolDocFormatter.ts", () => ({
 const mockFetchMemories = vi.fn().mockResolvedValue({ memoriesText: "", injectedMemoryIds: [] });
 const mockFetchSkills = vi.fn().mockResolvedValue({ text: null, skillNames: [] });
 
-vi.mock("../../system-prompt/SkillMemoryScorer.ts", () => ({
+vi.mock("#src/services/system-prompt/SkillMemoryScorer", () => ({
   SkillMemoryScorer: class {
     fetchSkills(...arguments_: unknown[]) { return mockFetchSkills(...arguments_); }
     fetchMemories(...arguments_: unknown[]) { return mockFetchMemories(...arguments_); }
@@ -99,14 +99,14 @@ vi.mock("../../system-prompt/SkillMemoryScorer.ts", () => ({
 
 const mockRetrieveRelevantWorkflows = vi.fn().mockResolvedValue(null);
 
-vi.mock("../../WorkflowMemoryService.ts", () => ({
+vi.mock("#src/services/WorkflowMemoryService", () => ({
   default: {
     retrieveRelevantWorkflows: (...arguments_: unknown[]) => mockRetrieveRelevantWorkflows(...arguments_),
     createHook: () => vi.fn(),
   },
 }));
 
-vi.mock("../../../config.ts", async (importOriginal) => {
+vi.mock("#src/config", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../config.ts")>();
   return {
     ...actual,
@@ -114,15 +114,15 @@ vi.mock("../../../config.ts", async (importOriginal) => {
   };
 });
 
-vi.mock("../../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getCollection: vi.fn(() => null),
     getDb: vi.fn(() => null),
   },
 }));
 
-import SystemPromptAssembler from "../../system-prompt/index.ts";
-import type { AssemblerContext } from "../../system-prompt/types.ts";
+import SystemPromptAssembler from "#src/services/system-prompt/index";
+import type { AssemblerContext } from "#src/services/system-prompt/types";
 
 // ─── Helpers ────────────────────────────────────────────────────
 

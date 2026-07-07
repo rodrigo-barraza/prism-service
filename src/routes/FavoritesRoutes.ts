@@ -1,14 +1,14 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
-import requireDb from "../middleware/RequireDbMiddleware.ts";
-import logger from "../utils/logger.ts";
-import { COLLECTIONS } from "../constants.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import requireDb from "#src/middleware/RequireDbMiddleware";
+import logger from "#src/utils/logger";
+import { COLLECTIONS } from "#src/constants";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 import {
   GetFavoritesQuerySchema,
   PostFavoritesBodySchema,
   DeleteFavoritesQuerySchema,
-} from "../types/index.ts";
+} from "#src/types/index";
 
 const router = express.Router();
 router.use(requireDb);

@@ -17,10 +17,10 @@
  * even ran, and plan mode could activate in the middle of an error correction cycle.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS } from "../../../constants.ts";
+import { PROVIDERS } from "#src/constants";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -31,7 +31,7 @@ vi.mock("../../../utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../config.ts", () => ({
+vi.mock("#src/services/harnesses/config", () => ({
   PRISM_SERVICE_PORT: 0,
   OPENAI_API_KEY: "fake",
   ANTHROPIC_API_KEY: "fake",
@@ -47,7 +47,7 @@ vi.mock("../config.ts", () => ({
   MONGO_DB_NAME: "prism-test",
 }));
 
-vi.mock("../../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     createClient: vi.fn().mockResolvedValue(undefined),
     getDb: vi.fn().mockReturnValue(null),
@@ -55,7 +55,7 @@ vi.mock("../../../wrappers/MongoWrapper.ts", () => ({
   },
 }));
 
-vi.mock("../../SettingsService.ts", () => {
+vi.mock("#src/services/SettingsService", () => {
   const mockSettings = {
     creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS }
   } as unknown as import("../../SettingsService.ts").SettingsData;
@@ -74,21 +74,21 @@ vi.mock("../../SettingsService.ts", () => {
   };
 });
 
-vi.mock("../../ConversationService.ts", () => ({
+vi.mock("#src/services/ConversationService", () => ({
   default: {
     appendMessages: vi.fn().mockResolvedValue(undefined),
     setGenerating: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
-vi.mock("../../RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: {
     log: vi.fn(),
     logChatGeneration: vi.fn(),
   },
 }));
 
-vi.mock("../../ToolOrchestratorService.ts", () => ({
+vi.mock("#src/services/ToolOrchestratorService", () => ({
   default: {
     executeTool: vi.fn(),
     getWorkspaceRoot: vi.fn().mockReturnValue("/home/rodrigo/development"),
@@ -97,15 +97,15 @@ vi.mock("../../ToolOrchestratorService.ts", () => ({
   },
 }));
 
-import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
-import { validateAfterToolExecution } from "../lifecycle/ValidationInterceptor.ts";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
+import { validateAfterToolExecution } from "#src/services/harnesses/lifecycle/ValidationInterceptor";
 import {
   checkForPlanModeEntry,
   blockUnauthorizedToolCalls,
-} from "../lifecycle/PlanModeController.ts";
+} from "#src/services/harnesses/lifecycle/PlanModeController";
 
-import type { ToolCall, ToolResult, AgenticContext, ValidationFeedback, ConversationMessage } from "../types.ts";
-import type AgenticLoopState from "../../AgenticLoopState.ts";
+import type { ToolCall, ToolResult, AgenticContext, ValidationFeedback, ConversationMessage } from "#src/services/harnesses/types";
+import type AgenticLoopState from "#src/services/AgenticLoopState";
 
 describe("Validation Flow Ordering", () => {
   let mockContext: AgenticContext;

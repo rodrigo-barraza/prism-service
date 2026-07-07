@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-vi.mock('../FileService.ts', () => {
+vi.mock('#src/services/FileService', () => {
   return {
     default: {
       uploadFile: vi.fn(),
@@ -11,7 +11,7 @@ vi.mock('../FileService.ts', () => {
   };
 });
 
-vi.mock('../../utils/media.ts', () => {
+vi.mock('#src/utils/media', () => {
   return {
     compressImageForSizeLimit: vi.fn(),
     constrainImageDimensions: vi.fn(),
@@ -22,12 +22,12 @@ import {
   compressDataUrlIfOversized,
   resolveMediaReference,
   resolveMessageMediaReferences,
-} from '../MediaResolutionService.ts';
-import FileService from '../FileService.ts';
+} from '#src/services/MediaResolutionService';
+import FileService from '#src/services/FileService';
 import {
   compressImageForSizeLimit,
   constrainImageDimensions,
-} from '../../utils/media.ts';
+} from '#src/utils/media';
 
 describe('MediaResolutionService Unit Tests', () => {
   beforeEach(() => {

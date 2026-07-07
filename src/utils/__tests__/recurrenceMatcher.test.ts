@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { matchRecurrenceRule, RecurrenceRule } from "../RecurrenceMatcher.ts";
-import { matchCron } from "../../services/ScheduledTaskService.ts";
+import { matchRecurrenceRule, RecurrenceRule } from "#src/utils/RecurrenceMatcher";
+import { matchCron } from "#src/services/ScheduledTaskService";
 
 describe("RecurrenceMatcher - matchRecurrenceRule", () => {
   // Test time matching is evaluated correctly by the calling scheduler

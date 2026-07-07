@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
-import MongoWrapper from "../wrappers/MongoWrapper.ts";
-import { MONGO_DB_NAME } from "../../config.ts";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import { MONGO_DB_NAME } from "#config";
 
 /**
  * Express middleware that attaches the MongoDB database instance to `req.db`.

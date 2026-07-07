@@ -17,22 +17,22 @@ import {
   emitPostExecutionStatus,
   processToolResultMedia,
   trackToolErrors,
-} from "../src/services/harnesses/lifecycle/PostExecutionEmitter.ts";
+} from "#src/services/harnesses/lifecycle/PostExecutionEmitter";
 
 // ─── Missing Lifecycle Imports ─────────────────────────────────
-import { runExhaustionRecoveryPass } from "../src/services/harnesses/lifecycle/ExhaustionRecovery.ts";
-import { executeToolBatch, executeToolSingle } from "../src/services/harnesses/lifecycle/ToolExecutor.ts";
-import { createStandardHooks } from "../src/services/harnesses/lifecycle/HookInitializer.ts";
+import { runExhaustionRecoveryPass } from "#src/services/harnesses/lifecycle/ExhaustionRecovery";
+import { executeToolBatch, executeToolSingle } from "#src/services/harnesses/lifecycle/ToolExecutor";
+import { createStandardHooks } from "#src/services/harnesses/lifecycle/HookInitializer";
 
-import ToolOrchestratorService from "../src/services/ToolOrchestratorService.ts";
-import ConversationGenerationTracker from "../src/services/ConversationGenerationTracker.ts";
-import BaseAgenticHarness from "../src/services/harnesses/BaseAgenticHarness.ts";
-import AgentHooks from "../src/services/AgentHooks.ts";
-import AutoApprovalEngine from "../src/services/AutoApprovalEngine.ts";
-import { COLLECTIONS, TYPES } from "../src/constants.ts";
-import SystemPromptAssembler from "../src/services/system-prompt/index.ts";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
+import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
+import BaseAgenticHarness from "#src/services/harnesses/BaseAgenticHarness";
+import AgentHooks from "#src/services/AgentHooks";
+import AutoApprovalEngine from "#src/services/AutoApprovalEngine";
+import { COLLECTIONS, TYPES } from "#src/constants";
+import SystemPromptAssembler from "#src/services/system-prompt/index";
 
-vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
+vi.mock("#src/services/ToolOrchestratorService", () => ({
   default: {
     executeCustomTool: vi.fn(),
     executeToolStreaming: vi.fn(),
@@ -44,7 +44,7 @@ vi.mock("../src/services/ToolOrchestratorService.ts", () => ({
   },
 }));
 
-vi.mock("../src/services/ConversationGenerationTracker.ts", () => ({
+vi.mock("#src/services/ConversationGenerationTracker", () => ({
   default: {
     complete: vi.fn(),
     register: vi.fn(),
@@ -312,7 +312,7 @@ describe("PostExecutionEmitter", () => {
 import {
   blockUnauthorizedToolCalls,
   checkForPlanModeEntry,
-} from "../src/services/harnesses/lifecycle/PlanModeController.ts";
+} from "#src/services/harnesses/lifecycle/PlanModeController";
 
 describe("PlanModeController", () => {
   describe("blockUnauthorizedToolCalls", () => {
@@ -416,7 +416,7 @@ describe("PlanModeController", () => {
 });
 
 // ─── ApprovalGate ──────────────────────────────────────────────
-import { checkAndWaitForApproval } from "../src/services/harnesses/lifecycle/ApprovalGate.ts";
+import { checkAndWaitForApproval } from "#src/services/harnesses/lifecycle/ApprovalGate";
 
 describe("ApprovalGate", () => {
   it("should auto-approve when no tools need approval", async () => {
@@ -470,10 +470,10 @@ describe("ApprovalGate", () => {
 });
 
 // ─── Finalizer (getCollectionOpts) ─────────────────────────────
-import { getCollectionOpts } from "../src/services/harnesses/lifecycle/Finalizer.ts";
+import { getCollectionOpts } from "#src/services/harnesses/lifecycle/Finalizer";
 
 // We need to mock AgentPersonaRegistry for this test
-vi.mock("../src/services/AgentPersonaRegistry.ts", () => ({
+vi.mock("#src/services/AgentPersonaRegistry", () => ({
   default: {
     isAgentProject: vi.fn((project: string) =>
       project.startsWith("agent_"),
@@ -633,9 +633,9 @@ import type {
   ToolSchema,
   ToolCall,
   ToolResult,
-} from "../src/services/harnesses/types.ts";
+} from "#src/services/harnesses/types";
 
-import { validateAfterToolExecution } from "../src/services/harnesses/lifecycle/ValidationInterceptor.ts";
+import { validateAfterToolExecution } from "#src/services/harnesses/lifecycle/ValidationInterceptor";
 
 function createMockAgenticContext(overrides?: Partial<AgenticContext>): AgenticContext {
   return {
@@ -657,9 +657,9 @@ function createMockAgenticContext(overrides?: Partial<AgenticContext>): AgenticC
     ...overrides,
   } as AgenticContext;
 }
-import CriticGate from "../src/services/harnesses/lifecycle/CriticGate.ts";
+import CriticGate from "#src/services/harnesses/lifecycle/CriticGate";
 
-import AgenticLoopState from "../src/services/AgenticLoopState.ts";
+import AgenticLoopState from "#src/services/AgenticLoopState";
 
 describe("ToolExecutor", () => {
   let mockContext: AgenticContext;

@@ -1,12 +1,12 @@
-import logger from "../../utils/logger.ts";
-import PromptLocaleService from "../PromptLocaleService.ts";
+import logger from "#src/utils/logger";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
   TOOL_NAMES,
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { INTERNAL_TOOL_EMOJIS } from "../tool-orchestrator/InternalToolEmojis.ts";
+import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
 
 // ── Worktree Isolation Tools ────────────────────────────────
 // Allows the agent to self-isolate into a git worktree for
@@ -65,7 +65,7 @@ const enterWorktree = {
         : undefined;
 
     const { default: ToolOrchestratorService } =
-      await import("../ToolOrchestratorService.js");
+      await import("#src/services/ToolOrchestratorService");
     const { resolve } = await import("node:path");
     const { existsSync } = await import("node:fs");
 
@@ -213,7 +213,7 @@ const exitWorktree = {
         : undefined;
 
     const { default: ToolOrchestratorService } =
-      await import("../ToolOrchestratorService.js");
+      await import("#src/services/ToolOrchestratorService");
 
     const agentConversationId = context.agentConversationId;
     const worktreeState =

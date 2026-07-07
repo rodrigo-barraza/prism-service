@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import WorkflowMemoryService from "../WorkflowMemoryService.ts";
-import MongoWrapper from "../../wrappers/MongoWrapper.ts";
-import EmbeddingService from "../EmbeddingService.ts";
-import type { AgenticContext, ConversationMessage } from "../harnesses/types.ts";
-import { PROVIDERS } from "../../constants.ts";
+import WorkflowMemoryService from "#src/services/WorkflowMemoryService";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import EmbeddingService from "#src/services/EmbeddingService";
+import type { AgenticContext, ConversationMessage } from "#src/services/harnesses/types";
+import { PROVIDERS } from "#src/constants";
 
-vi.mock("../../wrappers/MongoWrapper.ts", () => {
+vi.mock("#src/wrappers/MongoWrapper", () => {
   const mockGetDb = vi.fn();
   return {
     default: {
@@ -14,7 +14,7 @@ vi.mock("../../wrappers/MongoWrapper.ts", () => {
   };
 });
 
-vi.mock("../EmbeddingService.ts", () => {
+vi.mock("#src/services/EmbeddingService", () => {
   return {
     default: {
       embed: vi.fn().mockImplementation(async (text: string) => {

@@ -3,10 +3,10 @@ import anthropicProvider from "./anthropic.ts";
 import googleProvider from "./google.ts";
 import elevenlabsProvider from "./elevenlabs.ts";
 import inworldProvider from "./inworld.ts";
-import ActiveGenerationTracker from "../services/ActiveGenerationTracker.ts";
+import ActiveGenerationTracker from "#src/services/ActiveGenerationTracker";
 import { getInstanceProvider, isInstance } from "./instance-registry.ts";
-import type { Provider } from "../types/provider.ts";
-import { PROVIDERS } from "../constants.ts";
+import type { Provider } from "#src/types/provider";
+import { PROVIDERS } from "#src/constants";
 
 // Static cloud providers — local providers are resolved via instance registry
 const providers: Record<string, Provider> = {

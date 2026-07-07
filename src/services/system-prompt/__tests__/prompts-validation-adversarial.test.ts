@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PostPromptSchema, PatchPromptSchema } from "../../../types/schemas.ts";
+import { PostPromptSchema, PatchPromptSchema } from "#src/types/schemas";
 
 describe("Prompts Schema Validation Adversarial Tests", () => {
   describe("PostPromptSchema", () => {

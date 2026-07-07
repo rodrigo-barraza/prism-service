@@ -1,4 +1,4 @@
-import logger from "../utils/logger.ts";
+import logger from "#src/utils/logger";
 import type { ToolCall, AgenticContext } from "./harnesses/types.ts";
 import PolicyEngine from "./PolicyEngine.ts";
 import type { PolicyRule } from "./PolicyEngine.ts";

@@ -20,10 +20,10 @@
  * localization pipeline executes end-to-end.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import PromptLocaleService from "../../PromptLocaleService.ts";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 
 // ── Mock heavy services that require DB / network ──────────
-vi.mock("../../SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getSection: vi.fn().mockResolvedValue({
       topology: "hierarchical",
@@ -36,7 +36,7 @@ vi.mock("../../SettingsService.ts", () => ({
   },
 }));
 
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -45,7 +45,7 @@ vi.mock("../../../utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../../RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: {
     logRequest: vi.fn(),
   },
@@ -206,10 +206,10 @@ describe("Tool Description Locale Threading", () => {
 
     beforeEach(async () => {
       vi.clearAllMocks();
-      const formatterModule = await import("../ToolDocFormatter.ts");
+      const formatterModule = await import("#src/services/system-prompt/ToolDocFormatter");
       ToolDocFormatter = formatterModule.ToolDocFormatter;
       const orchestratorModule =
-        await import("../../ToolOrchestratorService.ts");
+        await import("#src/services/ToolOrchestratorService");
       ToolOrchestratorService = orchestratorModule.default;
 
       getClientSchemasSpy = vi.spyOn(
@@ -442,10 +442,10 @@ describe("Tool Description Locale Threading", () => {
 
     beforeEach(async () => {
       vi.clearAllMocks();
-      const assemblerModule = await import("../index.ts");
+      const assemblerModule = await import("#src/services/system-prompt/index");
       SystemPromptAssembler = assemblerModule.default;
       const orchestratorModule =
-        await import("../../ToolOrchestratorService.ts");
+        await import("#src/services/ToolOrchestratorService");
       ToolOrchestratorService = orchestratorModule.default;
 
       getClientSchemasSpy = vi.spyOn(
@@ -608,10 +608,10 @@ describe("Tool Description Locale Threading", () => {
 
     beforeEach(async () => {
       vi.clearAllMocks();
-      const assemblerModule = await import("../index.ts");
+      const assemblerModule = await import("#src/services/system-prompt/index");
       SystemPromptAssembler = assemblerModule.default;
       const orchestratorModule =
-        await import("../../ToolOrchestratorService.ts");
+        await import("#src/services/ToolOrchestratorService");
       ToolOrchestratorService = orchestratorModule.default;
 
       getClientSchemasSpy = vi.spyOn(

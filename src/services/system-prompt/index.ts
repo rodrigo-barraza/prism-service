@@ -1,16 +1,16 @@
-import ToolOrchestratorService from "../ToolOrchestratorService.ts";
-import AgentPersonaRegistry from "../AgentPersonaRegistry.ts";
-import logger from "../../utils/logger.ts";
-import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
+import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
+import logger from "#src/utils/logger";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 import {
   getOrchestratorPromptAddendum,
   ORCHESTRATOR_ONLY_TOOLS,
-} from "../OrchestratorPrompt.ts";
-import { resolveToolEntriesToSet } from "../../utils/resolveToolEntriesToSet.ts";
-import { resolveLockedOffToolNames } from "../../utils/resolveLockedOffToolNames.ts";
-import SettingsService from "../SettingsService.ts";
-import MongoWrapper from "../../wrappers/MongoWrapper.ts";
-import { MONGO_DB_NAME } from "../../../config.ts";
+} from "#src/services/OrchestratorPrompt";
+import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";
+import { resolveLockedOffToolNames } from "#src/utils/resolveLockedOffToolNames";
+import SettingsService from "#src/services/SettingsService";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import { MONGO_DB_NAME } from "#config";
 import {
   AGENT_IDS,
   DEFAULT_TOPOLOGY,
@@ -25,10 +25,10 @@ import { DirectoryTreeFormatter } from "./DirectoryTreeFormatter.ts";
 import { ToolDocFormatter } from "./ToolDocFormatter.ts";
 import { SkillMemoryScorer } from "./SkillMemoryScorer.ts";
 import { AssemblerContext } from "./types.ts";
-import SomaticStateService from "../somatic/SomaticStateService.ts";
-import WorkflowMemoryService from "../WorkflowMemoryService.ts";
-import { PROMPT_DELIMITERS, COLLECTIONS } from "../../constants.ts";
-import PromptLocaleService from "../PromptLocaleService.ts";
+import SomaticStateService from "#src/services/somatic/SomaticStateService";
+import WorkflowMemoryService from "#src/services/WorkflowMemoryService";
+import { PROMPT_DELIMITERS, COLLECTIONS } from "#src/constants";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 
 
 /**

@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import ConversationService from "../../services/ConversationService.ts";
+import ConversationService from "#src/services/ConversationService";
 
 // ── Mock ChatRoutes & AudioRoutes ─────────────────────────────────────
 const mockHandleConversation = vi.fn();
-vi.mock("../../routes/ChatRoutes.ts", () => ({
+vi.mock("#src/routes/ChatRoutes", () => ({
   handleConversation: (...args: any[]) => mockHandleConversation(...args),
 }));
 
 const mockHandleVoice = vi.fn();
-vi.mock("../../routes/AudioRoutes.ts", () => ({
+vi.mock("#src/routes/AudioRoutes", () => ({
   handleVoice: (...args: any[]) => mockHandleVoice(...args),
 }));
 
@@ -34,14 +34,14 @@ vi.mock("@google/genai", () => {
 });
 
 // ── Mock settings and dependencies ────────────────────────────────────
-vi.mock("../../services/ConversationService.ts", () => ({
+vi.mock("#src/services/ConversationService", () => ({
   default: {
     setGenerating: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
 const mockUploadFile = vi.fn().mockResolvedValue({ ref: "minio://uploaded-audio.wav" });
-vi.mock("../../services/FileService.ts", () => ({
+vi.mock("#src/services/FileService", () => ({
   default: {
     uploadFile: (...args: any[]) => mockUploadFile(...args),
   },
@@ -49,7 +49,7 @@ vi.mock("../../services/FileService.ts", () => ({
 
 const mockGetToolSchemas = vi.fn().mockReturnValue([]);
 const mockExecuteTool = vi.fn().mockResolvedValue({});
-vi.mock("../../services/ToolOrchestratorService.ts", () => ({
+vi.mock("#src/services/ToolOrchestratorService", () => ({
   default: {
     getToolSchemas: (...args: any[]) => mockGetToolSchemas(...args),
     executeTool: (...args: any[]) => mockExecuteTool(...args),
@@ -57,7 +57,7 @@ vi.mock("../../services/ToolOrchestratorService.ts", () => ({
 }));
 
 const mockGetSection = vi.fn().mockResolvedValue({ topology: "some-topology" });
-vi.mock("../../services/SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getSection: (...args: any[]) => mockGetSection(...args),
   },
@@ -66,27 +66,27 @@ vi.mock("../../services/SettingsService.ts", () => ({
 const mockConvertToolsToGoogle = vi.fn().mockImplementation((tools) => {
   return tools.map((t: any) => ({ functionDeclarations: [t] }));
 });
-vi.mock("../../providers/google.ts", () => ({
+vi.mock("#src/providers/google", () => ({
   convertToolsToGoogle: (...args: any[]) => mockConvertToolsToGoogle(...args),
 }));
 
 const mockLogChatGeneration = vi.fn().mockResolvedValue(undefined);
-vi.mock("../../services/RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: {
     logChatGeneration: (...args: any[]) => mockLogChatGeneration(...args),
   },
 }));
 
 const mockCalculateLiveCost = vi.fn().mockReturnValue(0.05);
-vi.mock("../../utils/CostCalculator.ts", () => ({
+vi.mock("#src/utils/CostCalculator", () => ({
   calculateLiveCost: (...args: any[]) => mockCalculateLiveCost(...args),
 }));
 
-vi.mock("../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {},
 }));
 
-import { setupWebSocket } from "../index.ts";
+import { setupWebSocket } from "#src/websocket/index";
 
 // ── Helper Mock Classes ───────────────────────────────────────────────
 class MockWebSocket {

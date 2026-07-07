@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import "./setup.ts";
-import { PROVIDERS, SYSTEM_STATUSES } from "../src/constants.ts";
-import OrchestratorService from "../src/services/OrchestratorService.ts";
-import type { SubAgentState } from "../src/types/orchestrator.ts";
+import { PROVIDERS, SYSTEM_STATUSES } from "#src/constants";
+import OrchestratorService from "#src/services/OrchestratorService";
+import type { SubAgentState } from "#src/types/orchestrator";
 
 // Mock dependencies to avoid actual loop execution and worktree creation
-vi.mock("../src/services/AgenticLoopService.ts", () => ({
+vi.mock("#src/services/AgenticLoopService", () => ({
   default: {
     runAgenticLoop: vi.fn().mockResolvedValue({
       messages: [{ role: "assistant", content: "Resumed output" }],
@@ -13,7 +13,7 @@ vi.mock("../src/services/AgenticLoopService.ts", () => ({
   },
 }));
 
-vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
+vi.mock("#src/services/orchestrator/GitWorktreeHelper", () => ({
   GitWorktreeHelper: {
     removeWorktree: vi.fn().mockResolvedValue({}),
     getWorktreeDiff: vi.fn().mockResolvedValue({

@@ -6,11 +6,11 @@
  * AgenticLoopState, and the AgenticLoopService façade.
  */
 
-import type { RepetitionVerdict } from "../../utils/RepetitionDetector.ts";
+import type { RepetitionVerdict } from "#src/utils/RepetitionDetector";
 
 // ── Usage & Cost ────────────────────────────────────────────
 
-import type { TokenUsage } from "../RequestLogger.ts";
+import type { TokenUsage } from "#src/services/RequestLogger";
 
 export interface UsageAccumulator extends TokenUsage {
   inputTokens: number;
@@ -160,7 +160,7 @@ export interface ModelDefinition {
   [key: string]: unknown;
 }
 
-import type { PolicyRule } from "../PolicyEngine.ts";
+import type { PolicyRule } from "#src/services/PolicyEngine";
 
 // ── Agentic Options ─────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-import type { PolicyRule } from "../PolicyEngine.ts";
+import type { PolicyRule } from "#src/services/PolicyEngine";
 
 export interface PersonaContext {
   enabledTools?: string[];

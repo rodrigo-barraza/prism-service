@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
-import { PROVIDERS } from "../src/constants.ts";
+import { PROVIDERS } from "#src/constants";
 import request from 'supertest';
 import { app } from './setup.ts';
-import ToolOrchestratorService from '../src/services/ToolOrchestratorService.ts';
+import ToolOrchestratorService from '#src/services/ToolOrchestratorService';
 import {
   getPricing,
   getDefaultModels,
@@ -11,7 +11,7 @@ import {
   getModels,
   getModelOptions,
   TYPES,
-} from "../src/config.ts";
+} from "#src/config";
 
 beforeAll(() => {
   vi.spyOn(ToolOrchestratorService, 'getClientToolSchemas').mockReturnValue([

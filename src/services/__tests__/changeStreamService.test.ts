@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { EventEmitter } from "node:events";
 
 // Mock dependencies
-vi.mock("../../../config.ts", () => ({
+vi.mock("#config", () => ({
   MONGO_DB_NAME: "prism-test",
 }));
 
@@ -16,7 +16,7 @@ const mockDatabase = {
   collection: mockCollection,
 };
 
-vi.mock("../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getDb: vi.fn((databaseName: string) => {
       if (databaseName === "prism-test") {
@@ -27,7 +27,7 @@ vi.mock("../../wrappers/MongoWrapper.ts", () => ({
   },
 }));
 
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -37,7 +37,7 @@ vi.mock("../../utils/logger.ts", () => ({
 }));
 
 // Import the service under test
-import ChangeStreamService from "../ChangeStreamService.ts";
+import ChangeStreamService from "#src/services/ChangeStreamService";
 
 class MockChangeStream extends EventEmitter {
   close = vi.fn().mockResolvedValue(undefined);
@@ -54,7 +54,7 @@ describe("ChangeStreamService", () => {
   });
 
   it("should warn and set available to false if database is not available during init", async () => {
-    const MongoWrapper = (await import("../../wrappers/MongoWrapper.ts")).default;
+    const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
     const getDatabaseSpy = vi.spyOn(MongoWrapper, "getDb").mockReturnValueOnce(null as any);
 
     await ChangeStreamService.init();

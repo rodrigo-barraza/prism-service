@@ -1,17 +1,17 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
-import { PROVIDERS } from "../../../constants.ts";
+import { PROVIDERS } from "#src/constants";
 import { TOPOLOGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import type {
   OrchestratorContext,
   SubAgentResult,
   OrchestratorSpawnParams,
-} from "../../../types/orchestrator.ts";
-import type { ChatMessage, ProviderOptions } from "../../../types/ProviderTypes.ts";
-import type { GenerateTextResult } from "../../../types/provider.ts";
-import type { ContinueSubAgentCallback } from "../TopologyRouter.ts";
+} from "#src/types/orchestrator";
+import type { ChatMessage, ProviderOptions } from "#src/types/ProviderTypes";
+import type { GenerateTextResult } from "#src/types/provider";
+import type { ContinueSubAgentCallback } from "#src/services/orchestrator/TopologyRouter";
 
 // Mock GitWorktreeHelper
-vi.mock("../GitWorktreeHelper.ts", () => ({
+vi.mock("#src/services/orchestrator/GitWorktreeHelper", () => ({
   GitWorktreeHelper: {
     getDefaultWorkspaceRoot: vi.fn().mockReturnValue("/workspace"),
     resolveRepositoryPath: vi.fn().mockReturnValue("/workspace"),
@@ -23,7 +23,7 @@ vi.mock("../GitWorktreeHelper.ts", () => ({
 }));
 
 // Mock SettingsService
-vi.mock("../../SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
     getSection: vi.fn().mockResolvedValue({
@@ -40,7 +40,7 @@ const mockGenerateText = vi.fn<(messages: ChatMessage[], model?: string, options
   usage: { inputTokens: 100, outputTokens: 50 },
 });
 
-vi.mock("../../../providers/index.ts", () => ({
+vi.mock("#src/providers/index", () => ({
   getProvider: vi.fn().mockImplementation(() => ({
     generateText: mockGenerateText,
   })),
@@ -48,16 +48,16 @@ vi.mock("../../../providers/index.ts", () => ({
 }));
 
 // Mock RequestLogger
-vi.mock("../../RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: {
     logBackgroundLlmCall: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
-import { CriticLoopRouter } from "../routers/CriticLoopRouter.ts";
-import { MCTSRouter } from "../routers/MCTSRouter.ts";
-import { DivideAndConquerRouter } from "../routers/DivideAndConquerRouter.ts";
-import { PeerToPeerRouter } from "../routers/PeerToPeerRouter.ts";
+import { CriticLoopRouter } from "#src/services/orchestrator/routers/CriticLoopRouter";
+import { MCTSRouter } from "#src/services/orchestrator/routers/MCTSRouter";
+import { DivideAndConquerRouter } from "#src/services/orchestrator/routers/DivideAndConquerRouter";
+import { PeerToPeerRouter } from "#src/services/orchestrator/routers/PeerToPeerRouter";
 
 describe("TopologyConfig Test Suite", () => {
   let orchestratorContext: OrchestratorContext;
@@ -887,7 +887,7 @@ describe("TopologyConfig Test Suite", () => {
 
   describe("TournamentRouter — Automated Verification", () => {
     it("should run verification phase when enableVerification=true", async () => {
-      const { TournamentRouter } = await import("../routers/TournamentRouter.ts");
+      const { TournamentRouter } = await import("#src/services/orchestrator/routers/TournamentRouter");
       const router = new TournamentRouter();
       const members = [
         { description: "Task A", prompt: "Prompt A" },
@@ -928,7 +928,7 @@ describe("TopologyConfig Test Suite", () => {
     });
 
     it("should NOT run verification when enableVerification=false (default)", async () => {
-      const { TournamentRouter } = await import("../routers/TournamentRouter.ts");
+      const { TournamentRouter } = await import("#src/services/orchestrator/routers/TournamentRouter");
       const router = new TournamentRouter();
       const members = [
         { description: "Task A", prompt: "Prompt A" },
@@ -950,7 +950,7 @@ describe("TopologyConfig Test Suite", () => {
     });
 
     it("should handle verification errors gracefully and mark candidates as unverified", async () => {
-      const { TournamentRouter } = await import("../routers/TournamentRouter.ts");
+      const { TournamentRouter } = await import("#src/services/orchestrator/routers/TournamentRouter");
       const router = new TournamentRouter();
       const members = [
         { description: "Task A", prompt: "Prompt A" },
@@ -987,7 +987,7 @@ describe("TopologyConfig Test Suite", () => {
     });
 
     it("should skip verification for candidates without file changes", async () => {
-      const { TournamentRouter } = await import("../routers/TournamentRouter.ts");
+      const { TournamentRouter } = await import("#src/services/orchestrator/routers/TournamentRouter");
       const router = new TournamentRouter();
       const members = [
         { description: "Research A", prompt: "Research prompt A" },

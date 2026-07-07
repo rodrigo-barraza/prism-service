@@ -1,5 +1,5 @@
-import logger from "../../utils/logger.ts";
-import { COMPACTION } from "../../constants.ts";
+import logger from "#src/utils/logger";
+import { COMPACTION } from "#src/constants";
 
 // ────────────────────────────────────────────────────────────
 // AutoCompactionTrigger — Threshold-Based Auto-Compact

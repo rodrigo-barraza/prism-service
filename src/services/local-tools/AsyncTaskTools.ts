@@ -1,11 +1,11 @@
-import logger from "../../utils/logger.ts";
+import logger from "#src/utils/logger";
 import { DOMAINS, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { INTERNAL_TOOL_EMOJIS } from "../tool-orchestrator/InternalToolEmojis.ts";
-import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
-import { ASYNC_TASK_TOOL_NAMES, MAXIMUM_CONCURRENT_ASYNC_TASKS } from "../AsyncTaskConstants.ts";
-import { ORCHESTRATOR, NOTIFICATION_SOURCES } from "../../constants.ts";
+import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { ASYNC_TASK_TOOL_NAMES, MAXIMUM_CONCURRENT_ASYNC_TASKS } from "#src/services/AsyncTaskConstants";
+import { ORCHESTRATOR, NOTIFICATION_SOURCES } from "#src/constants";
 import type { InternalToolContext } from "./InternalToolRegistry.ts";
-import PromptLocaleService from "../PromptLocaleService.ts";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 
 
 // ────────────────────────────────────────────────────────────
@@ -134,9 +134,9 @@ const runAsyncTask = {
 
     try {
       const { default: AsyncTaskRegistry } =
-        await import("../AsyncTaskRegistry.js");
+        await import("#src/services/AsyncTaskRegistry");
       const { default: ToolOrchestratorService } =
-        await import("../ToolOrchestratorService.js");
+        await import("#src/services/ToolOrchestratorService");
 
       // Build the executor that runs the tool through ToolOrchestratorService
       const taskExecutor = async (
@@ -261,7 +261,7 @@ const listAsyncTasks = {
 
     try {
       const { default: AsyncTaskRegistry } =
-        await import("../AsyncTaskRegistry.js");
+        await import("#src/services/AsyncTaskRegistry");
       const conversationTasks = AsyncTaskRegistry.listTasks(agentConversationId);
 
       return {
@@ -341,7 +341,7 @@ const cancelAsyncTask = {
 
     try {
       const { default: AsyncTaskRegistry } =
-        await import("../AsyncTaskRegistry.js");
+        await import("#src/services/AsyncTaskRegistry");
 
       const wasCancelled = AsyncTaskRegistry.cancelTask(taskId);
 
@@ -417,13 +417,13 @@ async function triggerAsyncTaskAutoResponse(
 ): Promise<void> {
   // Lazy imports to avoid circular dependencies
   const { default: WebSocketConnectionRegistry } =
-    await import("../../websocket/WebSocketConnectionRegistry.js");
-  const ConversationServiceModule = await import("../ConversationService.js");
+    await import("#src/websocket/WebSocketConnectionRegistry");
+  const ConversationServiceModule = await import("#src/services/ConversationService");
   const ConversationService = ConversationServiceModule.default;
-  const MongoWrapper = (await import("../../wrappers/MongoWrapper.js")).default;
+  const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
   const { MONGO_DB_NAME: databaseName } = await import("../../../config.js");
-  const { COLLECTIONS: collectionNames } = await import("../../constants.js");
-  const { handleAgent } = await import("../../routes/ChatRoutes.js");
+  const { COLLECTIONS: collectionNames } = await import("#src/constants");
+  const { handleAgent } = await import("#src/routes/ChatRoutes");
 
   // Find the parent conversation that dispatched this task.
   // The agentConversationId on the task points to the agentic loop session,

@@ -3,7 +3,7 @@ import {
   DEFAULT_PROJECT,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { Request, Response, NextFunction } from "express";
-import { requestContext } from "../utils/RequestContext.ts";
+import { requestContext } from "#src/utils/RequestContext";
 
 /**
  * Express middleware that attaches x-project, x-username, and x-workspace-id

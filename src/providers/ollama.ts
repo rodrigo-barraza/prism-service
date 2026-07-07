@@ -4,14 +4,14 @@ import {
   Provider,
   GenerateTextResult,
   StreamChunk,
-} from "../types/provider.ts";
-import { ProviderError } from "../utils/errors.ts";
-import { STREAMING_DISPATCHER } from "../utils/openai-compat.ts";
-import logger from "../utils/logger.ts";
-import { discoverContextLength } from "../utils/ContextLengthDiscovery.ts";
+} from "#src/types/provider";
+import { ProviderError } from "#src/utils/errors";
+import { STREAMING_DISPATCHER } from "#src/utils/openai-compat";
+import logger from "#src/utils/logger";
+import { discoverContextLength } from "#src/utils/ContextLengthDiscovery";
 
-import { MODALITY_TYPES, getDefaultModels } from "../config.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import { MODALITY_TYPES, getDefaultModels } from "#src/config";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 /**
  * Convert messages with images to Ollama's native format.

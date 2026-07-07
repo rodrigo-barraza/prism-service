@@ -1,7 +1,7 @@
 import { vi, describe, it, expect } from "vitest";
 
 // Suppress logger output during tests
-vi.mock("../logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -11,8 +11,8 @@ vi.mock("../logger.ts", () => ({
   },
 }));
 
-import ContextWindowManager from "../ContextWindowManager.ts";
-import { PROMPT_DELIMITERS } from "../../constants.ts";
+import ContextWindowManager from "#src/utils/ContextWindowManager";
+import { PROMPT_DELIMITERS } from "#src/constants";
 
 
 // ═══════════════════════════════════════════════════════════════

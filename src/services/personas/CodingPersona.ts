@@ -1,7 +1,7 @@
 import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { Persona } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
-import PromptLocaleService from "../PromptLocaleService.ts";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 
 const CODING_AVAILABLE_TOOLS = ["*"];
 

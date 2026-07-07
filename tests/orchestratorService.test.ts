@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import "./setup.ts";
-import ToolOrchestratorService from "../src/services/ToolOrchestratorService.ts";
-import { COLLECTIONS, PROVIDERS, ORCHESTRATOR } from "../src/constants.ts";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
+import { COLLECTIONS, PROVIDERS, ORCHESTRATOR } from "#src/constants";
 import { TOPOLOGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
-import SettingsService from "../src/services/SettingsService.ts";
-import localModelQueue from "../src/services/LocalModelQueue.ts";
-import { InstanceLoadBalancer } from "../src/services/orchestrator/InstanceLoadBalancer.ts";
+import SettingsService from "#src/services/SettingsService";
+import localModelQueue from "#src/services/LocalModelQueue";
+import { InstanceLoadBalancer } from "#src/services/orchestrator/InstanceLoadBalancer";
 import { existsSync } from "node:fs";
 
 let mockExistsSyncResult: boolean | undefined = undefined;
@@ -27,22 +27,22 @@ const mockRunAgenticLoop = vi.fn().mockResolvedValue({
   messages: [{ role: "assistant", content: "Mock sub-agent output" }],
 });
 
-vi.mock("../src/services/AgenticLoopService.ts", () => ({
+vi.mock("#src/services/AgenticLoopService", () => ({
   default: {
     runAgenticLoop: (...args: unknown[]) => mockRunAgenticLoop(...args),
   },
 }));
 
-import AgenticLoopService from "../src/services/AgenticLoopService.ts";
-import { runCleanupFunctions } from "../src/utils/CleanupRegistry.ts";
-import { GitWorktreeHelper } from "../src/services/orchestrator/GitWorktreeHelper.ts";
-import { SubAgentPersistenceService } from "../src/services/orchestrator/SubAgentPersistenceService.ts";
+import AgenticLoopService from "#src/services/AgenticLoopService";
+import { runCleanupFunctions } from "#src/utils/CleanupRegistry";
+import { GitWorktreeHelper } from "#src/services/orchestrator/GitWorktreeHelper";
+import { SubAgentPersistenceService } from "#src/services/orchestrator/SubAgentPersistenceService";
 
 // Mock the GitWorktreeHelper to avoid disk operations
 
 
 // Mock the GitWorktreeHelper to avoid disk operations
-vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
+vi.mock("#src/services/orchestrator/GitWorktreeHelper", () => ({
   GitWorktreeHelper: {
     getDefaultWorkspaceRoot: vi.fn().mockReturnValue("/workspace"),
     resolveRepositoryPath: vi.fn().mockReturnValue("/workspace"),
@@ -60,9 +60,9 @@ vi.mock("../src/services/orchestrator/GitWorktreeHelper.ts", () => ({
   },
 }));
 
-import type { OrchestratorContext } from "../src/types/orchestrator.ts";
-import OrchestratorService from "../src/services/OrchestratorService.ts";
-import AgentPersonaRegistry from "../src/services/AgentPersonaRegistry.ts";
+import type { OrchestratorContext } from "#src/types/orchestrator";
+import OrchestratorService from "#src/services/OrchestratorService";
+import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 import { afterEach } from "vitest";
 
 async function waitForCondition(condition: () => boolean, timeoutMilliseconds = 10000): Promise<void> {
@@ -283,7 +283,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
   });
 
   it("should update session topology in MongoDB when createTeam is called with a specific topology override", async () => {
-    const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+    const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
     const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true });
     const mockFindOne = vi.fn().mockResolvedValue({ id: "conv-id-789", settings: {} });
     const mockCollection = {
@@ -431,7 +431,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
 
     describe("hasSubAgents flag persistence", () => {
       it("should set hasSubAgents: true on the parent conversation when a sub-agent is spawned", async () => {
-        const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+        const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
         const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true, matchedCount: 1 });
         const mockCollection = { updateOne: mockUpdateOne };
 
@@ -459,7 +459,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       });
 
       it("should target the correct parent conversation ID from orchestratorContext.conversationId", async () => {
-        const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+        const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
         const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true, matchedCount: 1 });
         const mockCollection = { updateOne: mockUpdateOne };
 
@@ -488,7 +488,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       });
 
       it("should use the AGENT_CONVERSATIONS collection for the registration", async () => {
-        const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+        const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
         const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true, matchedCount: 1 });
         const mockCollection = { updateOne: mockUpdateOne };
 
@@ -514,7 +514,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       });
 
       it("should not throw when persistence service fails internally (original catch block)", async () => {
-        const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+        const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
         const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockImplementation(() => {
           throw new Error("Unexpected DB crash");
         });
@@ -533,7 +533,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       });
 
       it("should register each sub-agent spawned via createTeam", async () => {
-        const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+        const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
         const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true, matchedCount: 1 });
         const mockCollection = { updateOne: mockUpdateOne };
 
@@ -1457,7 +1457,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
     });
 
     it("should warn when hasSubAgents write matched 0 documents in MongoDB", async () => {
-      const MongoWrapper = (await import("../src/wrappers/MongoWrapper.ts")).default;
+      const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
       const mockUpdateOne = vi.fn().mockResolvedValue({ matchedCount: 0 });
       const mockCollection = { updateOne: mockUpdateOne };
 

@@ -1,4 +1,4 @@
-import { PROVIDERS, PARAMETER_SCHEMAS } from "../constants.ts";
+import { PROVIDERS, PARAMETER_SCHEMAS } from "#src/constants";
 
 // ─── Parameter Descriptor Interface ─────────────────────────
 

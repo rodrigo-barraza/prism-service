@@ -2,11 +2,11 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-import logger from "../utils/logger.ts";
-import { registerCleanup } from "../utils/CleanupRegistry.ts";
+import logger from "#src/utils/logger";
+import { registerCleanup } from "#src/utils/CleanupRegistry";
 import type { Db } from "mongodb";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import { COLLECTIONS } from "../constants.ts";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { COLLECTIONS } from "#src/constants";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

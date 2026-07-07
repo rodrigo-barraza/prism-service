@@ -1,11 +1,11 @@
-import AgentHooks, { type HookHandler } from "../../AgentHooks.ts";
-import AutoApprovalEngine from "../../AutoApprovalEngine.ts";
-import SystemPromptAssembler from "../../system-prompt/index.ts";
-import MemoryExtractor from "../../MemoryExtractor.ts";
-import ConversationEmbeddingService from "../../ConversationEmbeddingService.ts";
-import WorkflowMemoryService from "../../WorkflowMemoryService.ts";
+import AgentHooks, { type HookHandler } from "#src/services/AgentHooks";
+import AutoApprovalEngine from "#src/services/AutoApprovalEngine";
+import SystemPromptAssembler from "#src/services/system-prompt/index";
+import MemoryExtractor from "#src/services/MemoryExtractor";
+import ConversationEmbeddingService from "#src/services/ConversationEmbeddingService";
+import WorkflowMemoryService from "#src/services/WorkflowMemoryService";
 import CriticGate from "./CriticGate.ts";
-import type { PolicyRule } from "../../PolicyEngine.ts";
+import type { PolicyRule } from "#src/services/PolicyEngine";
 
 /**
  * HookInitializer — standardized lifecycle hook wiring for agentic harnesses.

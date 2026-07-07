@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import "./setup.ts";
-import MongoWrapper from "../src/wrappers/MongoWrapper.ts";
-import ConversationEmbeddingService from "../src/services/ConversationEmbeddingService.ts";
-import EmbeddingService from "../src/services/EmbeddingService.ts";
-import searchConversations from "../src/services/local-tools/ConversationSearchTool.ts";
-import { COLLECTIONS, MODEL_TYPES } from "../src/constants.ts";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import ConversationEmbeddingService from "#src/services/ConversationEmbeddingService";
+import EmbeddingService from "#src/services/EmbeddingService";
+import searchConversations from "#src/services/local-tools/ConversationSearchTool";
+import { COLLECTIONS, MODEL_TYPES } from "#src/constants";
 
 describe("ConversationEmbeddingService & ConversationSearchTool", () => {
   let mockUpdateOne: any;

@@ -9,7 +9,7 @@
  * Call `.getAll()` to get a snapshot of all providers/models.
  */
 
-import { MODELS } from "../config.ts";
+import { MODELS } from "#src/config";
 
 // Static Google Tier 2 limits — seeded on module load since Google
 // doesn't expose rate-limit headers in their SDK responses.

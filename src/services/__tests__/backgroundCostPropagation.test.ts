@@ -15,11 +15,11 @@
  *   3. Cost values are computed correctly using calculateTextCost
  */
 import { describe, it, expect, vi } from "vitest";
-import { PROVIDERS, TYPES } from "../../constants.ts";
+import { PROVIDERS, TYPES } from "#src/constants";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 const { CODING_MEMORY_TYPES } = await vi.hoisted(async () => {
-  const { CODING_MEMORY_TYPES } = await import("../MemoryService.ts");
+  const { CODING_MEMORY_TYPES } = await import("#src/services/MemoryService");
   return { CODING_MEMORY_TYPES };
 });
 
@@ -51,23 +51,23 @@ const configMock = {
 };
 
 // Root config.js — exports MONGO_DB_NAME (used by ConversationService etc.)
-vi.mock("../config.ts", () => configMock);
+vi.mock("#src/services/config", () => configMock);
 // src/config.js — exports TYPES, getPricing, model catalog (used by MemoryExtractor, etc.)
-vi.mock("../../config.ts", () => configMock);
+vi.mock("#src/config", () => configMock);
 
 // ── Mock providers ──────────────────────────────────────────────
 const mockGenerateText = vi.fn().mockResolvedValue({
   text: '[]', // Empty extraction result by default
 });
 
-vi.mock("../../providers/index.ts", () => ({
+vi.mock("#src/providers/index", () => ({
   getProvider: () => ({
     generateText: mockGenerateText,
   }),
 }));
 
 // ── Mock SettingsService ────────────────────────────────────────
-vi.mock("../SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getCached: vi.fn().mockReturnValue({ creative: { textToSpeechProvider: PROVIDERS.ELEVENLABS } }),
     getSection: vi.fn().mockResolvedValue({
@@ -91,7 +91,7 @@ vi.mock("../SettingsService.ts", () => ({
 }));
 
 // ── Mock RequestLogger (fire-and-forget, we don't test it here) ─
-vi.mock("../RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: {
     logBackgroundLlmCall: vi.fn(),
     log: vi.fn(),
@@ -99,7 +99,7 @@ vi.mock("../RequestLogger.ts", () => ({
 }));
 
 // ── Mock MemoryService ──────────────────────────────────────────
-vi.mock("../MemoryService.ts", () => ({
+vi.mock("#src/services/MemoryService", () => ({
   default: {
     store: vi.fn().mockResolvedValue({ id: "mem-1", title: "Test memory" }),
     search: vi.fn().mockResolvedValue([]),
@@ -108,21 +108,21 @@ vi.mock("../MemoryService.ts", () => ({
 }));
 
 // ── Mock MemoryConsolidationService (for MemoryExtractor tests) ─
-vi.mock("../MemoryConsolidationService.ts", () => ({
+vi.mock("#src/services/MemoryConsolidationService", () => ({
   default: {
     checkAndRun: vi.fn(),
   },
 }));
 
 // ── Mock AgentPersonaRegistry (for consolidation tests) ─────────
-vi.mock("../AgentPersonaRegistry.ts", () => ({
+vi.mock("#src/services/AgentPersonaRegistry", () => ({
   default: {
     get: vi.fn().mockReturnValue({ type: "coding" }),
   },
 }));
 
 // ── Mock MongoWrapper (for consolidation tests) ─────────────────
-vi.mock("../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getDb: vi.fn().mockReturnValue(null), // prevents actual DB calls
     getCollection: vi.fn(),
@@ -130,7 +130,7 @@ vi.mock("../../wrappers/MongoWrapper.ts", () => ({
 }));
 
 // ── Mock EmbeddingService (for consolidation's MemoryService) ───
-vi.mock("../EmbeddingService.ts", () => ({
+vi.mock("#src/services/EmbeddingService", () => ({
   default: {
     embed: vi.fn().mockResolvedValue([0.1, 0.2, 0.3]),
     generate: vi.fn().mockResolvedValue({ embedding: [0.1, 0.2, 0.3], dimensions: 3 }),
@@ -138,7 +138,7 @@ vi.mock("../EmbeddingService.ts", () => ({
 }));
 
 // ── Mock logger ─────────────────────────────────────────────────
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -148,8 +148,8 @@ vi.mock("../../utils/logger.ts", () => ({
 }));
 
 // ── Import AFTER mocks ─────────────────────────────────────────
-const { default: MemoryExtractor } = await import("../MemoryExtractor.ts");
-const { calculateTextCost } = await import("../../utils/CostCalculator.ts");
+const { default: MemoryExtractor } = await import("#src/services/MemoryExtractor");
+const { calculateTextCost } = await import("#src/utils/CostCalculator");
 
 // ═══════════════════════════════════════════════════════════════
 describe("Background Cost Propagation", () => {
@@ -298,7 +298,7 @@ describe("Background Cost Propagation", () => {
       const emit = (event: any) => emittedEvents.push(event);
 
       // Override settings to return a model not in our pricing table
-      const SettingsService = (await import("../SettingsService.ts")).default;
+      const SettingsService = (await import("#src/services/SettingsService")).default;
       (SettingsService.getSection as any).mockResolvedValueOnce({
         extractionProvider: "test-provider",
         extractionModel: "unknown-model-not-in-pricing",

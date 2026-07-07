@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS } from "../../constants.ts";
-import MemoryService, { CODING_MEMORY_TYPES } from "../MemoryService.ts";
-import MongoWrapper from "../../wrappers/MongoWrapper.ts";
-import EmbeddingService from "../EmbeddingService.ts";
-import SettingsService from "../SettingsService.ts";
+import { PROVIDERS } from "#src/constants";
+import MemoryService, { CODING_MEMORY_TYPES } from "#src/services/MemoryService";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import EmbeddingService from "#src/services/EmbeddingService";
+import SettingsService from "#src/services/SettingsService";
 
-vi.mock("../../wrappers/MongoWrapper.ts", () => {
+vi.mock("#src/wrappers/MongoWrapper", () => {
   const collection = {
     find: vi.fn().mockReturnThis(),
     project: vi.fn().mockReturnThis(),
@@ -31,13 +31,13 @@ vi.mock("../../wrappers/MongoWrapper.ts", () => {
   };
 });
 
-vi.mock("../EmbeddingService.ts", () => ({
+vi.mock("#src/services/EmbeddingService", () => ({
   default: {
     embed: vi.fn().mockResolvedValue([0.1, 0.2, 0.3]),
   },
 }));
 
-vi.mock("../SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getMemoryModelConfig: vi.fn().mockResolvedValue({
       provider: PROVIDERS.GOOGLE,
@@ -46,7 +46,7 @@ vi.mock("../SettingsService.ts", () => ({
   },
 }));
 
-vi.mock("../RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: {
     log: vi.fn(),
     logChatGeneration: vi.fn(),
@@ -55,7 +55,7 @@ vi.mock("../RequestLogger.ts", () => ({
 }));
 
 const mockGenerateText = vi.fn();
-vi.mock("../../providers/index.ts", () => ({
+vi.mock("#src/providers/index", () => ({
   getProvider: vi.fn().mockImplementation(() => ({
     generateText: mockGenerateText,
   })),

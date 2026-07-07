@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { checkCostBudget } from "../lifecycle/CostBudgetEnforcer.ts";
+import { checkCostBudget } from "#src/services/harnesses/lifecycle/CostBudgetEnforcer";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import type AgenticLoopState from "../../AgenticLoopState.ts";
-import type { EmitFunction } from "../types.ts";
+import type AgenticLoopState from "#src/services/AgenticLoopState";
+import type { EmitFunction } from "#src/services/harnesses/types";
 
-vi.mock("../../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -15,7 +15,7 @@ vi.mock("../../../utils/logger.ts", () => ({
   },
 }));
 
-vi.mock("../../../config.ts", async () => {
+vi.mock("#src/config", async () => {
   const actual = await vi.importActual<Record<string, unknown>>("../../../config.ts");
   return {
     ...actual,
@@ -30,7 +30,7 @@ vi.mock("../../../config.ts", async () => {
   };
 });
 
-vi.mock("../../../utils/CostCalculator.ts", async () => {
+vi.mock("#src/utils/CostCalculator", async () => {
   const actual = await vi.importActual<Record<string, unknown>>("../../../utils/CostCalculator.ts");
   return {
     ...actual,
@@ -38,7 +38,7 @@ vi.mock("../../../utils/CostCalculator.ts", async () => {
   };
 });
 
-import { calculateTextCost } from "../../../utils/CostCalculator.ts";
+import { calculateTextCost } from "#src/utils/CostCalculator";
 
 describe("CostBudgetEnforcer", () => {
   let emitMock: EmitFunction;

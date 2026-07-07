@@ -1,20 +1,20 @@
-import logger from "../../../utils/logger.ts";
+import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 
-import MicroCompactionService from "../../compact/MicroCompactionService.ts";
-import AutoCompactionTrigger from "../../compact/AutoCompactionTrigger.ts";
-import CompactionService from "../../compact/CompactionService.ts";
-import ConversationEmbeddingService from "../../ConversationEmbeddingService.ts";
-import ContextWindowManager from "../../../utils/ContextWindowManager.ts";
+import MicroCompactionService from "#src/services/compact/MicroCompactionService";
+import AutoCompactionTrigger from "#src/services/compact/AutoCompactionTrigger";
+import CompactionService from "#src/services/compact/CompactionService";
+import ConversationEmbeddingService from "#src/services/ConversationEmbeddingService";
+import ContextWindowManager from "#src/utils/ContextWindowManager";
 import {
   DEFAULT_MAX_INPUT_TOKENS,
   DEFAULT_MAX_OUTPUT_TOKENS,
-} from "../../../constants/TokenBudgetDefaults.ts";
-import { HARNESS } from "../../../constants.ts";
+} from "#src/constants/TokenBudgetDefaults";
+import { HARNESS } from "#src/constants";
 
-import type AgenticLoopState from "../../AgenticLoopState.ts";
-import type { ChatMessage } from "../../../types/admin.ts";
-import type { ConversationMessage, AgenticContext } from "../types.ts";
+import type AgenticLoopState from "#src/services/AgenticLoopState";
+import type { ChatMessage } from "#src/types/admin";
+import type { ConversationMessage, AgenticContext } from "#src/services/harnesses/types";
 
 /**
  * ContextPressureManager — unified context management pipeline.

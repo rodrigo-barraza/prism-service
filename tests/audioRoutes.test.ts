@@ -2,14 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import supertest from 'supertest';
 import { Readable } from 'node:stream';
 import { app, MOCK_GENERATE_SPEECH } from './setup.ts';
-import audioRouter from '../src/routes/AudioRoutes.ts';
-import { getProvider } from '../src/providers/index.ts';
-import { PROVIDERS } from "../src/constants.ts";
+import audioRouter from '#src/routes/AudioRoutes';
+import { getProvider } from '#src/providers/index';
+import { PROVIDERS } from "#src/constants";
 
 // Mount /audio-to-text local route (since setup.ts only mounts /text-to-audio)
 app.use('/audio-to-text', audioRouter);
 
-vi.mock('../src/services/FileService.ts', () => ({
+vi.mock('#src/services/FileService', () => ({
   default: {
     uploadFile: vi.fn().mockResolvedValue({ ref: 'minio://bucket/audio.mp3' }),
     isExternalStorage: vi.fn().mockReturnValue(true),

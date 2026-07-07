@@ -2,14 +2,14 @@ import { DEFAULT_USERNAME } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
 import { EventEmitter } from "node:events";
-import BenchmarkService from "../services/BenchmarkService.ts";
-import logger from "../utils/logger.ts";
-import { createAbortController } from "../utils/AbortController.ts";
-import { registerCleanup } from "../utils/CleanupRegistry.ts";
+import BenchmarkService from "#src/services/BenchmarkService";
+import logger from "#src/utils/logger";
+import { createAbortController } from "#src/utils/AbortController";
+import { registerCleanup } from "#src/utils/CleanupRegistry";
 import type { WithId, Document } from "mongodb";
-import type { TextAssertion } from "../types/benchmark.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import { BENCHMARK_PRESETS } from "../data/benchmarkPresets.ts";
+import type { TextAssertion } from "#src/types/benchmark";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { BENCHMARK_PRESETS } from "#src/data/benchmarkPresets";
 
 const router = express.Router();
 

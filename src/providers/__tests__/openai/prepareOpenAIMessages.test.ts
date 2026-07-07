@@ -9,7 +9,7 @@ import { describe, it, expect } from "vitest";
 import {
   prepareOpenAIMessages,
   type OpenAIMessage,
-} from "../../openai.ts";
+} from "#src/providers/openai";
 
 // ── Helpers ──────────────────────────────────────────────────
 function makeMessage(overrides: Partial<OpenAIMessage>): OpenAIMessage {

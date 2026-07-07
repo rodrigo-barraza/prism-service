@@ -1,13 +1,13 @@
 import { resolve, relative } from "node:path";
 import { existsSync } from "node:fs";
-import { TOOLS_SERVICE_URL } from "../../../config.ts";
-import ToolOrchestratorService from "../ToolOrchestratorService.ts";
+import { TOOLS_SERVICE_URL } from "#config";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import type {
   ToolsApiResponse,
   WorktreeCreateResponse,
   WorktreeDiff,
-} from "../../types/orchestrator.ts";
-import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
+} from "#src/types/orchestrator";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 export class GitWorktreeHelper {
   static getDefaultWorkspaceRoot(overrideRoot?: string): string {

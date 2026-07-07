@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
-import { PROVIDERS, TYPES } from "../src/constants.ts";
+import { PROVIDERS, TYPES } from "#src/constants";
 import {
   app,
   TEST_SECRET,

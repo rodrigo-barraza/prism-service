@@ -1,6 +1,6 @@
-import { VOICES, DEFAULT_VOICES, getDefaultModels, MODALITY_TYPES } from "../config.ts";
-import { PROVIDERS } from "../constants.ts";
-import PromptLocaleService from "../services/PromptLocaleService.ts";
+import { VOICES, DEFAULT_VOICES, getDefaultModels, MODALITY_TYPES } from "#src/config";
+import { PROVIDERS } from "#src/constants";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 
 type VoiceEntry = { name: string; gender: string; description: string };
 

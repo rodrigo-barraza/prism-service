@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PROVIDERS } from "../../constants.ts";
-import MongoWrapper from "../../wrappers/MongoWrapper.ts";
+import { PROVIDERS } from "#src/constants";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
 
 // ── Hoisted mocks for database and functions ───────────────────
 const { mockDatabase, resetMockDatabase } = vi.hoisted(() => {
@@ -116,7 +116,7 @@ const { mockDatabase, resetMockDatabase } = vi.hoisted(() => {
 });
 
 // ── Mock config ────────────────────────────────────────────────
-vi.mock("../config.ts", () => ({
+vi.mock("#src/services/config", () => ({
   MONGO_DB_NAME: "prism-test",
   getModelByName: vi.fn().mockReturnValue({
     name: "test-model",
@@ -126,7 +126,7 @@ vi.mock("../config.ts", () => ({
 }));
 
 // ── Mock logger (suppress output) ──────────────────────────────
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     debug: vi.fn(),
@@ -138,21 +138,21 @@ vi.mock("../../utils/logger.ts", () => ({
 }));
 
 // ── Mock CleanupRegistry (no-op) ───────────────────────────────
-vi.mock("../../utils/CleanupRegistry.ts", () => ({
+vi.mock("#src/utils/CleanupRegistry", () => ({
   registerCleanup: vi.fn(),
 }));
 
 // ── Track ConversationService/AgenticLoopService mock calls ──
 const mockRunAgenticLoop = vi.fn().mockResolvedValue(undefined);
 
-vi.mock("../AgenticLoopService.ts", () => ({
+vi.mock("#src/services/AgenticLoopService", () => ({
   default: {
     runAgenticLoop: (...callArguments: unknown[]) => mockRunAgenticLoop(...callArguments),
   },
 }));
 
 // ── Mock providers ─────────────────────────────────────────────
-vi.mock("../../providers/index.ts", () => ({
+vi.mock("#src/providers/index", () => ({
   getProvider: vi.fn().mockImplementation((providerName: string) => {
     if (providerName === "nonexistent") {
       return undefined;
@@ -165,7 +165,7 @@ vi.mock("../../providers/index.ts", () => ({
 }));
 
 // ── Mock MongoWrapper ──────────────────────────────────────────
-vi.mock("../../wrappers/MongoWrapper.ts", () => ({
+vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getDb: vi.fn().mockImplementation(() => mockDatabase),
   },
@@ -173,12 +173,12 @@ vi.mock("../../wrappers/MongoWrapper.ts", () => ({
 
 // ── Mock RecurrenceMatcher ─────────────────────────────────────
 const mockMatchRecurrenceRule = vi.fn().mockReturnValue(true);
-vi.mock("../../utils/RecurrenceMatcher.ts", () => ({
+vi.mock("#src/utils/RecurrenceMatcher", () => ({
   matchRecurrenceRule: (...callArguments: unknown[]) => mockMatchRecurrenceRule(...callArguments),
 }));
 
 // ── Mock AgentPersonaRegistry ──────────────────────────────────
-vi.mock("../AgentPersonaRegistry.ts", () => ({
+vi.mock("#src/services/AgentPersonaRegistry", () => ({
   default: {
     list: vi.fn().mockReturnValue([
       { id: "OMNI", name: "OmniAgent", project: "agent-project" },
@@ -194,7 +194,7 @@ vi.mock("../AgentPersonaRegistry.ts", () => ({
 
 // ── Import AFTER mocks are wired ───────────────────────────────
 const { default: ScheduledTaskService, matchCron } = await import(
-  "../ScheduledTaskService.ts"
+  "#src/services/ScheduledTaskService"
 );
 
 // ── Test fixtures ──────────────────────────────────────────────

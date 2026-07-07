@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ARENA_SCORES } from "../../arrays.ts";
+import { ARENA_SCORES } from "#src/arrays";
 
 describe("Arrays (Arena Scores Map)", () => {
   it("should export ARENA_SCORES with expected categories", () => {

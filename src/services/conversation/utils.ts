@@ -1,9 +1,9 @@
-import FileService from "../FileService.ts";
-import logger from "../../utils/logger.ts";
+import FileService from "#src/services/FileService";
+import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import { TOOL_NAMES } from "../ToolTaxonomyConstants.ts";
-import { FILE_CATEGORIES } from "../../constants.ts";
-import type { ChatMessage } from "../../types/admin.ts";
+import { TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
+import { FILE_CATEGORIES } from "#src/constants";
+import type { ChatMessage } from "#src/types/admin";
 import type {
   MessagePayload,
   ConversationSettings,

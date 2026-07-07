@@ -1,7 +1,7 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
 
 // Suppress logger output during tests
-vi.mock("../../utils/logger.ts", () => ({
+vi.mock("#src/utils/logger", () => ({
   default: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -17,8 +17,8 @@ import PolicyEngine, {
   askUser,
   allowAll,
   denyAll,
-} from "../PolicyEngine.ts";
-import type { PolicyRule } from "../PolicyEngine.ts";
+} from "#src/services/PolicyEngine";
+import type { PolicyRule } from "#src/services/PolicyEngine";
 
 // ═══════════════════════════════════════════════════════════════
 // Builder Functions
@@ -461,7 +461,7 @@ describe('PolicyEngine adversarial', () => {
 
 describe('PolicyEngine advanced adversarial', () => {
   it('should handle predicate that modifies the args object — mutation safety', async () => {
-    const PolicyEngine = (await import('../PolicyEngine.ts')).default;
+    const PolicyEngine = (await import('#src/services/PolicyEngine')).default;
     const mutatingPolicy = deny('tool', {
       when: (args) => {
         (args as Record<string, unknown>).injected = true;
@@ -481,7 +481,7 @@ describe('PolicyEngine advanced adversarial', () => {
   });
 
   it('should handle ASK_USER between specific deny and allow', async () => {
-    const PolicyEngine = (await import('../PolicyEngine.ts')).default;
+    const PolicyEngine = (await import('#src/services/PolicyEngine')).default;
     const policies = [
       deny('tool', { when: (args) => args.danger === true }),
       askUser('tool'),
@@ -501,7 +501,7 @@ describe('PolicyEngine advanced adversarial', () => {
   });
 
   it('should handle 100 wildcard policies efficiently — no exponential blowup', async () => {
-    const PolicyEngine = (await import('../PolicyEngine.ts')).default;
+    const PolicyEngine = (await import('#src/services/PolicyEngine')).default;
     const manyPolicies = Array.from({ length: 100 }, (_, index) =>
       allow('*', { name: `wildcard-${index}` }),
     );

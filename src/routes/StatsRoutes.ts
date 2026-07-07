@@ -1,13 +1,13 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { Router, Request, Response, NextFunction } from "express";
-import logger from "../utils/logger.ts";
-import requireDb from "../middleware/RequireDbMiddleware.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import logger from "#src/utils/logger";
+import requireDb from "#src/middleware/RequireDbMiddleware";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 import {
   COLLECTIONS,
   COST_SUMMATION_EXPRESSION,
   AVERAGE_TOKENS_PER_SECOND_EXPRESSION,
-} from "../constants.ts";
+} from "#src/constants";
 
 const router = Router();
 router.use(requireDb);

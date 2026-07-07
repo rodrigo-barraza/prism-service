@@ -8,7 +8,7 @@ import {
   EnsureModelLoadedResult,
   LmStudioModelEntry,
   LmStudioLoadConfig,
-} from "../types/provider.ts";
+} from "#src/types/provider";
 import { sleep } from "@rodrigo-barraza/utilities-library";
 // ─────────────────────────────────────────────────────────────
 // LM Studio provider — Fully native /api/v1/chat
@@ -17,16 +17,16 @@ import { sleep } from "@rodrigo-barraza/utilities-library";
 //   - `integrations[]` for MCP-based function calling via tools-api
 // Non-streaming + captionImage still use OpenAI-compat.
 // ─────────────────────────────────────────────────────────────
-import { ProviderError } from "../utils/errors.ts";
-import logger from "../utils/logger.ts";
-import { resolveArchParams } from "../utils/gguf-arch.ts";
+import { ProviderError } from "#src/utils/errors";
+import logger from "#src/utils/logger";
+import { resolveArchParams } from "#src/utils/gguf-arch";
 import {
   TOOLS_SERVICE_URL,
   LM_STUDIO_EVALUATION_BATCH_SIZE,
   LM_STUDIO_DEFAULT_MAX_CONTEXT,
-} from "../../config.ts";
-import { MODALITY_TYPES, getDefaultModels } from "../config.ts";
-import { SYSTEM_STATUSES, MESSAGE_ROLES } from "../constants.ts";
+} from "#config";
+import { MODALITY_TYPES, getDefaultModels } from "#src/config";
+import { SYSTEM_STATUSES, MESSAGE_ROLES } from "#src/constants";
 // Default MCP server URL for ephemeral tool integrations (vault-resolved)
 const DEFAULT_MCP_SERVER_URL = TOOLS_SERVICE_URL;
 import {
@@ -41,10 +41,10 @@ import {
   MEDIA_STRATEGIES,
   type PreparedMessage,
   type OpenAICompletionResponse,
-} from "../utils/openai-compat.ts";
-import { ORCHESTRATOR_ONLY_TOOLS } from "../services/OrchestratorPrompt.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import { PROVIDERS } from "../constants.ts";
+} from "#src/utils/openai-compat";
+import { ORCHESTRATOR_ONLY_TOOLS } from "#src/services/OrchestratorPrompt";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { PROVIDERS } from "#src/constants";
 // ── Native /api/v1/chat SSE stream parser ────────────────────
 // The native endpoint emits named SSE events: reasoning.start/delta/end,
 // message.start/delta/end, content.start/delta/end, chat.end.

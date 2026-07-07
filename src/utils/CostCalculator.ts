@@ -5,7 +5,7 @@
  * text-to-text, audio-to-text, live API sessions, and image generation.
  */
 
-import type { TokenUsage } from "../types/admin.ts";
+import type { TokenUsage } from "#src/types/admin";
 
 // ── Pricing interfaces ──────────────────────────────────────
 

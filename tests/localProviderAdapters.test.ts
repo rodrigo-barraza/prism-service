@@ -1,13 +1,13 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import './setup.ts';
-import { createOllamaProvider } from '../src/providers/ollama.ts';
-import { createVllmProvider } from '../src/providers/vllm.ts';
-import { createLlamaCppProvider } from '../src/providers/llama-cpp.ts';
-import { ChatMessage } from '../src/types/provider.ts';
+import { createOllamaProvider } from '#src/providers/ollama';
+import { createVllmProvider } from '#src/providers/vllm';
+import { createLlamaCppProvider } from '#src/providers/llama-cpp';
+import { ChatMessage } from '#src/types/provider';
 
 // Mock context length discovery so it doesn't consume fetch mocks.
 // Discovery is tested in its own dedicated test suite.
-vi.mock('../src/utils/ContextLengthDiscovery.ts', () => ({
+vi.mock('#src/utils/ContextLengthDiscovery', () => ({
   discoverContextLength: vi.fn().mockResolvedValue(undefined),
 }));
 

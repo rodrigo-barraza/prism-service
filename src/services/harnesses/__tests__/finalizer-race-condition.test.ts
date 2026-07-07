@@ -12,11 +12,11 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { swapMessageContent, assembleMessagesToAppend as assembleMessagesToAppendReal, sanitizeMessagesForPersistence } from "../lifecycle/Finalizer.ts";
-import { PROMPT_DELIMITERS, PROVIDERS, MESSAGE_ROLES, SYSTEM_STATUSES } from "../../../constants.ts";
-import type { MessagePayload, ToolCallPayload } from "../../conversation/types.ts";
-import type { ConversationMessage } from "../types.ts";
-import type { ChatMessage } from "../../../types/ProviderTypes.ts";
+import { swapMessageContent, assembleMessagesToAppend as assembleMessagesToAppendReal, sanitizeMessagesForPersistence } from "#src/services/harnesses/lifecycle/Finalizer";
+import { PROMPT_DELIMITERS, PROVIDERS, MESSAGE_ROLES, SYSTEM_STATUSES } from "#src/constants";
+import type { MessagePayload, ToolCallPayload } from "#src/services/conversation/types";
+import type { ConversationMessage } from "#src/services/harnesses/types";
+import type { ChatMessage } from "#src/types/ProviderTypes";
 
 type TestPayload = MessagePayload;
 

@@ -1,11 +1,11 @@
-import MemoryService from "../MemoryService.ts";
-import EmbeddingService from "../EmbeddingService.ts";
-import MongoWrapper from "../../wrappers/MongoWrapper.ts";
-import { MONGO_DB_NAME } from "../../../config.ts";
-import { COLLECTIONS, MEMORY } from "../../constants.ts";
-import logger from "../../utils/logger.ts";
+import MemoryService from "#src/services/MemoryService";
+import EmbeddingService from "#src/services/EmbeddingService";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import { MONGO_DB_NAME } from "#config";
+import { COLLECTIONS, MEMORY } from "#src/constants";
+import logger from "#src/utils/logger";
 import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
-import { getErrorMessage } from "../../utils/ErrorHelpers.ts";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 import { MemoryFetchOptions, SkillFetchOptions, ScoredSkill } from "./types.ts";
 
 const SKILL_RELEVANCE_THRESHOLD = MEMORY.SKILL_RELEVANCE_THRESHOLD;

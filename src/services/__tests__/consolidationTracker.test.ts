@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import MongoWrapper from '../../wrappers/MongoWrapper.ts';
+import MongoWrapper from '#src/wrappers/MongoWrapper';
 import {
   getRunCount,
   incrementRunCount,
@@ -9,8 +9,8 @@ import {
   getHistory,
   SESSIONS_BETWEEN_RUNS,
   DAILY_MAX_CONSOLIDATIONS
-} from '../memory/ConsolidationTracker.ts';
-import { COLLECTIONS } from "../../constants.ts";
+} from '#src/services/memory/ConsolidationTracker';
+import { COLLECTIONS } from "#src/constants";
 
 describe('Memory Consolidation Tracker Unit Tests', () => {
   let mockRuns: Array<{ project: string; sessionsSinceLastRun: number; lastConsolidatedAt?: string }> = [];

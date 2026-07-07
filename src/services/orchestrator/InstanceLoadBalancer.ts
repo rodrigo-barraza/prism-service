@@ -1,9 +1,9 @@
-import logger from "../../utils/logger.ts";
+import logger from "#src/utils/logger";
 import type {
   InstanceAssignment,
   SubAgentState,
-} from "../../types/orchestrator.ts";
-import type { InstanceEntry } from "../../types/ProviderTypes.ts";
+} from "#src/types/orchestrator";
+import type { InstanceEntry } from "#src/types/ProviderTypes";
 
 /**
  * Synchronous per-instance reservation counter.

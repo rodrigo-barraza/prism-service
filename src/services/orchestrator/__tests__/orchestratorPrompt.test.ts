@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { getOrchestratorPromptAddendum } from "../../OrchestratorPrompt.ts";
-import ToolOrchestratorService from "../../ToolOrchestratorService.ts";
+import { getOrchestratorPromptAddendum } from "#src/services/OrchestratorPrompt";
+import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 
 describe("getOrchestratorPromptAddendum", () => {
   it("should mark hierarchical as default when defaultTopology is hierarchical or omitted", () => {

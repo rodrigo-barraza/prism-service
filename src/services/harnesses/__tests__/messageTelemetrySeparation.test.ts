@@ -13,10 +13,10 @@ import { describe, it, expect } from "vitest";
 import {
   assembleMessagesToAppend as assembleMessagesToAppendReal,
   sanitizeMessagesForPersistence,
-} from "../lifecycle/Finalizer.ts";
-import { PROVIDERS } from "../../../constants.ts";
-import type { MessagePayload, ToolCallPayload } from "../../conversation/types.ts";
-import type { ConversationMessage } from "../types.ts";
+} from "#src/services/harnesses/lifecycle/Finalizer";
+import { PROVIDERS } from "#src/constants";
+import type { MessagePayload, ToolCallPayload } from "#src/services/conversation/types";
+import type { ConversationMessage } from "#src/services/harnesses/types";
 
 // ── Telemetry fields that must NEVER appear on persisted messages ────
 const TELEMETRY_FIELDS = [

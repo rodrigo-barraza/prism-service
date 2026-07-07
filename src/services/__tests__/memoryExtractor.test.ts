@@ -1,24 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS } from "../../constants.ts";
+import { PROVIDERS } from "#src/constants";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import MemoryExtractor from "../MemoryExtractor.ts";
-import MemoryService from "../MemoryService.ts";
-import SettingsService from "../SettingsService.ts";
-import MemoryConsolidationService from "../MemoryConsolidationService.ts";
-import RequestLogger from "../RequestLogger.ts";
+import MemoryExtractor from "#src/services/MemoryExtractor";
+import MemoryService from "#src/services/MemoryService";
+import SettingsService from "#src/services/SettingsService";
+import MemoryConsolidationService from "#src/services/MemoryConsolidationService";
+import RequestLogger from "#src/services/RequestLogger";
 
 const mockGenerateText = vi.fn();
-vi.mock("../../providers/index.ts", () => ({
+vi.mock("#src/providers/index", () => ({
   getProvider: vi.fn().mockImplementation(() => ({
     generateText: mockGenerateText,
   })),
   providers: {},
 }));
 
-vi.mock("../MemoryService.ts", async (importOriginal) => {
+vi.mock("#src/services/MemoryService", async (importOriginal) => {
   const actualModule = await importOriginal<typeof import("../MemoryService.ts")>();
   return {
     default: {
@@ -28,7 +28,7 @@ vi.mock("../MemoryService.ts", async (importOriginal) => {
   };
 });
 
-vi.mock("../SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getSection: vi.fn().mockResolvedValue({
       extractionProvider: PROVIDERS.GOOGLE,
@@ -38,13 +38,13 @@ vi.mock("../SettingsService.ts", () => ({
   },
 }));
 
-vi.mock("../MemoryConsolidationService.ts", () => ({
+vi.mock("#src/services/MemoryConsolidationService", () => ({
   default: {
     checkAndRun: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
-vi.mock("../RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: {
     logBackgroundLlmCall: vi.fn(),
   },

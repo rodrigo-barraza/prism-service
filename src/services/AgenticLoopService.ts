@@ -15,7 +15,7 @@ import {
 import ConversationGenerationTracker from "./ConversationGenerationTracker.ts";
 import ConversationStatusRegistry from "./ConversationStatusRegistry.ts";
 import ToolContext from "./ToolContext.ts";
-import logger from "../utils/logger.ts";
+import logger from "#src/utils/logger";
 
 import type { AgenticContext, ConversationMessage } from "./harnesses/types.ts";
 

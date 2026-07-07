@@ -1,4 +1,4 @@
-import type { SubAgentState } from "../../types/orchestrator.ts";
+import type { SubAgentState } from "#src/types/orchestrator";
 
 /**
  * Utility functions for navigating conversation hierarchies.

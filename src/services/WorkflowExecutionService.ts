@@ -1,14 +1,14 @@
 import crypto from "crypto";
-import { handleConversation, handleAgent } from "../routes/ChatRoutes.ts";
-import { getProvider } from "../providers/index.ts";
-import { resolveMediaReference } from "../services/MediaResolutionService.ts";
-import EmbeddingService from "../services/EmbeddingService.ts";
-import FileService from "../services/FileService.ts";
-import MinioWrapper from "../wrappers/MinioWrapper.ts";
-import logger from "../utils/logger.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
-import { WORKFLOW_ENDPOINTS, FILE_CATEGORIES } from "../constants.ts";
-import type { SseEvent } from "../types/SseTypes.ts";
+import { handleConversation, handleAgent } from "#src/routes/ChatRoutes";
+import { getProvider } from "#src/providers/index";
+import { resolveMediaReference } from "#src/services/MediaResolutionService";
+import EmbeddingService from "#src/services/EmbeddingService";
+import FileService from "#src/services/FileService";
+import MinioWrapper from "#src/wrappers/MinioWrapper";
+import logger from "#src/utils/logger";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { WORKFLOW_ENDPOINTS, FILE_CATEGORIES } from "#src/constants";
+import type { SseEvent } from "#src/types/SseTypes";
 
 // ── Types ────────────────────────────────────────────────────
 

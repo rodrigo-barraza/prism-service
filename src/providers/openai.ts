@@ -1,32 +1,32 @@
-import { ProviderOptions } from "../types/ProviderTypes.ts";
+import { ProviderOptions } from "#src/types/ProviderTypes";
 import OpenAI, { toFile } from "openai";
 import type { Stream } from "openai/streaming";
 import type { Reasoning, ReasoningEffort } from "openai/resources/shared";
-import { ProviderError } from "../utils/errors.ts";
-import logger from "../utils/logger.ts";
-import { extractOpenAIRateLimits } from "../utils/rateLimits.ts";
-import { OPENAI_API_KEY, OPENAI_TRANSCRIPTION_MODEL } from "../../config.ts";
+import { ProviderError } from "#src/utils/errors";
+import logger from "#src/utils/logger";
+import { extractOpenAIRateLimits } from "#src/utils/rateLimits";
+import { OPENAI_API_KEY, OPENAI_TRANSCRIPTION_MODEL } from "#config";
 import {
   MODALITY_TYPES,
   MODELS,
   DEFAULT_VOICES,
   getDefaultModels,
   getModelByName,
-} from "../config.ts";
+} from "#src/config";
 import {
   convertToolsToOpenAI,
   normalizeUsage,
-} from "../utils/openai-compat.ts";
-import type { TokenUsage } from "../types/admin.ts";
-import type { JsonValue } from "../types/index.ts";
+} from "#src/utils/openai-compat";
+import type { TokenUsage } from "#src/types/admin";
+import type { JsonValue } from "#src/types/index";
 import {
   getDataUrlMimeType,
   getUrlType,
   inferMimeFromUrl,
-} from "../utils/media.ts";
-import { LOG_PREVIEW } from "../constants.ts";
+} from "#src/utils/media";
+import { LOG_PREVIEW } from "#src/constants";
 
-import type { ToolSchema } from "../services/harnesses/types.ts";
+import type { ToolSchema } from "#src/services/harnesses/types";
 
 /**
  * OpenAI Chat Completions API enforces a hard maximum of 128 tools.

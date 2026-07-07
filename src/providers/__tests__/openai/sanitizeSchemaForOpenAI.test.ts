@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { sanitizeSchemaForOpenAI } from "../../openai.ts";
+import { sanitizeSchemaForOpenAI } from "#src/providers/openai";
 
 // ── Primitive / Edge Cases ───────────────────────────────────
 describe("sanitizeSchemaForOpenAI — edge cases", () => {

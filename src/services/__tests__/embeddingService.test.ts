@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS, TYPES } from "../../constants.ts";
-import EmbeddingService from "../EmbeddingService.ts";
-import SettingsService from "../SettingsService.ts";
-import RequestLogger from "../RequestLogger.ts";
+import { PROVIDERS, TYPES } from "#src/constants";
+import EmbeddingService from "#src/services/EmbeddingService";
+import SettingsService from "#src/services/SettingsService";
+import RequestLogger from "#src/services/RequestLogger";
 
 const mockGenerateEmbedding = vi.fn().mockResolvedValue({
   embedding: [0.1, 0.2, 0.3],
   dimensions: 3,
 });
 
-vi.mock("../../providers/index.ts", () => ({
+vi.mock("#src/providers/index", () => ({
   getProvider: vi.fn().mockImplementation((providerName: string) => {
     if (providerName === PROVIDERS.ANTHROPIC) {
       return {}; // Anthropic doesn't support embedding in our test
@@ -21,7 +21,7 @@ vi.mock("../../providers/index.ts", () => ({
   providers: {},
 }));
 
-vi.mock("../SettingsService.ts", () => ({
+vi.mock("#src/services/SettingsService", () => ({
   default: {
     getMemoryModelConfig: vi.fn().mockResolvedValue({
       provider: PROVIDERS.GOOGLE,
@@ -30,7 +30,7 @@ vi.mock("../SettingsService.ts", () => ({
   },
 }));
 
-vi.mock("../RequestLogger.ts", () => ({
+vi.mock("#src/services/RequestLogger", () => ({
   default: {
     log: vi.fn(),
   },

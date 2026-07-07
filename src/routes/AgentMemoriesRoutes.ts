@@ -4,10 +4,10 @@ import {
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response, NextFunction } from "express";
-import MemoryService from "../services/MemoryService.ts";
-import MemoryConsolidationService from "../services/MemoryConsolidationService.ts";
-import logger from "../utils/logger.ts";
-import { getErrorMessage } from "../utils/ErrorHelpers.ts";
+import MemoryService from "#src/services/MemoryService";
+import MemoryConsolidationService from "#src/services/MemoryConsolidationService";
+import logger from "#src/utils/logger";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 const router = express.Router();
 
