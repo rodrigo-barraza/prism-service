@@ -83,10 +83,10 @@ describe("CriticGate adversarial — tier bypass attacks", () => {
     expect(result.reason).toBe("below_danger_tier");
   });
 
-  it("READ tier should bypass review", async () => {
+  it("AUTO tier should bypass review", async () => {
     const gate = new CriticGate();
     const toolCall = createDangerToolCall({
-      _approval: { tier: APPROVAL_TIERS.READ, tierLabel: "READ" },
+      _approval: { tier: APPROVAL_TIERS.AUTO, tierLabel: "AUTO" },
     } as any);
 
     const result = await gate.review(toolCall, createMockContext());
