@@ -14,6 +14,7 @@ import FileService from "#src/services/FileService";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";
+import ToolContext from "#src/services/ToolContext";
 import { appendAndFinalize } from "#src/utils/ConversationUtilities";
 import {
   COLLECTIONS,
@@ -423,12 +424,21 @@ export async function finalizeTextGeneration(
       const existingToolConfig = existingSettings?.toolConfig as
         | Record<string, unknown>
         | undefined;
-      const disabledTools: string[] =
+      const rawDisabledTools: string[] =
         (Array.isArray(options.disabledTools) ? options.disabledTools : null) ||
         (Array.isArray(existingToolConfig?.disabledTools)
           ? (existingToolConfig.disabledTools as string[])
           : null) ||
         [];
+      // Remove dynamically enabled tools from the persisted disabled list.
+      // The agent may have called enable_tools / discover_and_enable_tools
+      // mid-generation, which adds tools to resolvedEnabledTools. Without
+      // this filter, the client restores a stale disabled list on
+      // change-stream refresh, reverting the UI checkboxes.
+      const dynamicEnabledSet = new Set(resolvedEnabledTools);
+      const disabledTools = rawDisabledTools.filter(
+        (toolName) => !dynamicEnabledSet.has(toolName),
+      );
       let availableTools: string[] = [];
       if (agent) {
         const persona = AgentPersonaRegistry.get(agent);
@@ -446,10 +456,17 @@ export async function finalizeTextGeneration(
           ToolOrchestratorService.getClientToolSchemas() || [];
         availableTools = clientSchemas.map((toolSchema) => toolSchema.name);
       }
+      // Persist the dynamically enabled tool names so the client can
+      // reconcile checkbox state on conversation restore using the same
+      // enableSpecificTools() flow as the live SSE TOOL_SET_CHANGED path.
+      const dynamicEnabledTools = agentConversationId
+        ? (ToolContext.get<string[]>(agentConversationId, "dynamicEnabledTools") || [])
+        : [];
       toolConfig = {
         availableTools,
         disabledTools,
         enabledTools: resolvedEnabledTools,
+        dynamicEnabledTools,
       };
     }
 
