@@ -17,10 +17,10 @@ import {
   type ToolMessageSlice,
   type ToolExecutionInput,
   type SegmentSnapshot,
-} from "../../prism-client/src/utils/toolCallStateUpdaters.ts";
+} from "../../../../prism-client/src/utils/toolCallStateUpdaters.ts";
 
-import type { Message as DisplayMessage, ToolCallEvent } from "../../prism-client/src/types/types.ts";
-import { prepareDisplayMessages } from "../../prism-client/src/utils/messageHelpers.ts";
+import type { Message as DisplayMessage, ToolCallEvent } from "../../../../prism-client/src/types/types.ts";
+import { prepareDisplayMessages } from "../../../../prism-client/src/utils/messageHelpers.ts";
 
 // prepareDisplayMessages is now imported directly from prism-client utils
 
