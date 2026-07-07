@@ -433,7 +433,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       it("should set hasSubAgents: true on the parent conversation when a sub-agent is spawned", async () => {
         const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
         const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true, matchedCount: 1 });
-        const mockCollection = { updateOne: mockUpdateOne };
+        const mockCollection = { updateOne: mockUpdateOne, findOne: vi.fn().mockResolvedValue(null) };
 
         const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
           mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>
@@ -461,7 +461,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       it("should target the correct parent conversation ID from orchestratorContext.conversationId", async () => {
         const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
         const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true, matchedCount: 1 });
-        const mockCollection = { updateOne: mockUpdateOne };
+        const mockCollection = { updateOne: mockUpdateOne, findOne: vi.fn().mockResolvedValue(null) };
 
         const customContext = { ...orchestratorContext, conversationId: "custom-parent-conv-abc" };
         const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
@@ -490,7 +490,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       it("should use the AGENT_CONVERSATIONS collection for the registration", async () => {
         const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
         const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true, matchedCount: 1 });
-        const mockCollection = { updateOne: mockUpdateOne };
+        const mockCollection = { updateOne: mockUpdateOne, findOne: vi.fn().mockResolvedValue(null) };
 
         const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
           mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>
@@ -535,7 +535,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       it("should register each sub-agent spawned via createTeam", async () => {
         const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
         const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true, matchedCount: 1 });
-        const mockCollection = { updateOne: mockUpdateOne };
+        const mockCollection = { updateOne: mockUpdateOne, findOne: vi.fn().mockResolvedValue(null) };
 
         const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
           mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>
@@ -1459,7 +1459,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
     it("should warn when hasSubAgents write matched 0 documents in MongoDB", async () => {
       const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
       const mockUpdateOne = vi.fn().mockResolvedValue({ matchedCount: 0 });
-      const mockCollection = { updateOne: mockUpdateOne };
+      const mockCollection = { updateOne: mockUpdateOne, findOne: vi.fn().mockResolvedValue(null) };
 
       const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
          mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>
