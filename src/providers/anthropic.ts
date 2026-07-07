@@ -154,7 +154,11 @@ async function prepareMessages(messages: ChatMessage[]) {
     ...chatMessage,
   }));
   if (conversation.length > 0 && conversation[0].role === "system") {
-    systemMessage = conversation.shift()?.content as string | undefined;
+    const extractedContent = conversation.shift()?.content as string | undefined;
+    // Anthropic rejects system text blocks containing only whitespace.
+    // Normalise empty/whitespace-only values to undefined so the field
+    // is omitted from the API payload entirely.
+    systemMessage = extractedContent?.trim() ? extractedContent : undefined;
   }
 
   // Build clean messages with ONLY the fields Anthropic's API accepts.
@@ -577,7 +581,7 @@ const anthropicProvider = {
     const prepared = await prepareMessages(messages);
     const payload: Record<string, unknown> = {
       cache_control: { type: "ephemeral" },
-      system: prepared.systemMessage,
+      ...(prepared.systemMessage && { system: prepared.systemMessage }),
       model,
       messages: prepared.messages,
       max_tokens: options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS,
@@ -809,7 +813,7 @@ const anthropicProvider = {
       const prepared = await prepareMessages(messages);
       const streamPayload: Record<string, unknown> = {
         cache_control: { type: "ephemeral" },
-        system: prepared.systemMessage,
+        ...(prepared.systemMessage && { system: prepared.systemMessage }),
         model,
         messages: prepared.messages,
         max_tokens: options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS,
