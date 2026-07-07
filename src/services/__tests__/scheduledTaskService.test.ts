@@ -493,7 +493,6 @@ describe("ScheduledTaskService — Comprehensive Tests", () => {
         enabled: true,
         username: "rodrigo",
         toolConfig: {
-          enabledTools: ["read_file", "write_file"],
           disabledTools: ["execute_shell"],
         },
       } as any);
@@ -503,18 +502,16 @@ describe("ScheduledTaskService — Comprehensive Tests", () => {
       
       expect(insertedDocument.name).toBe("Daily Health Check");
       expect(insertedDocument.toolConfig).toEqual({
-        enabledTools: ["read_file", "write_file"],
         disabledTools: ["execute_shell"],
       });
     });
 
-    it("should spawn background agents with the exact toolConfig and enabledTools propagated from the scheduled task", async () => {
+    it("should spawn background agents with disabledTools propagated from the scheduled task", async () => {
       mockRunAgenticLoop.mockResolvedValueOnce(undefined);
 
       const taskWithToolConfig = {
         ...TASK_FIXTURE,
         toolConfig: {
-          enabledTools: ["read_file", "write_file", "execute_javascript"],
           disabledTools: ["execute_shell"],
         },
       };
@@ -527,27 +524,24 @@ describe("ScheduledTaskService — Comprehensive Tests", () => {
 
       expect(mockRunAgenticLoop).toHaveBeenCalledTimes(1);
       const loopArguments = mockRunAgenticLoop.mock.calls[0][0];
-      
-      expect(loopArguments.options.enabledTools).toEqual(["read_file", "write_file", "execute_javascript"]);
+
+      expect(loopArguments.options.enabledTools).toBeUndefined();
       expect(loopArguments.options.disabledTools).toEqual(["execute_shell"]);
 
       expect(mockDatabase._collections.agent_conversations.length).toBe(1);
       const insertedSessionStub = mockDatabase._collections.agent_conversations[0];
       expect(insertedSessionStub.settings.toolConfig).toEqual({
-        enabledTools: ["read_file", "write_file", "execute_javascript"],
         disabledTools: ["execute_shell"],
       });
     });
 
-    it("should spawn background agent with only enabledTools when the parent agent (e.g. Omni) has wildcard availableTools but has a subset as enabledTools", async () => {
+    it("should spawn background agent with only disabledTools when the parent agent has wildcard availableTools", async () => {
       mockRunAgenticLoop.mockResolvedValueOnce(undefined);
 
       const taskWithOmniWildcard = {
         ...TASK_FIXTURE,
         toolConfig: {
-          availableTools: ["*"],
           disabledTools: ["search_web", "generate_image"],
-          enabledTools: ["read_file", "write_file", "evaluate_expression"],
         },
       };
 
@@ -560,7 +554,7 @@ describe("ScheduledTaskService — Comprehensive Tests", () => {
       expect(mockRunAgenticLoop).toHaveBeenCalledTimes(1);
       const loopArguments = mockRunAgenticLoop.mock.calls[0][0];
 
-      expect(loopArguments.options.enabledTools).toEqual(["read_file", "write_file", "evaluate_expression"]);
+      expect(loopArguments.options.enabledTools).toBeUndefined();
       expect(loopArguments.options.disabledTools).toEqual(["search_web", "generate_image"]);
     });
 

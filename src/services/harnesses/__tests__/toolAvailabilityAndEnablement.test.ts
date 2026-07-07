@@ -340,9 +340,9 @@ describe("Tool Availability & Enablement", () => {
       expect(toolNames).toContain("create_subagents");
     });
 
-    it("narrows to only enabled tools when client sends enabledTools", async () => {
+    it("narrows tool set when client sends disabledTools", async () => {
       const { finalTools } = await AgenticToolResolver.resolve({
-        options: { enabledTools: ["read_file", "write_file"] },
+        options: { disabledTools: ["get_weather", "get_stock_price", "get_weather_forecast"] },
         agent: "CODING",
         project: "test",
         username: "rodrigo",
@@ -352,7 +352,7 @@ describe("Tool Availability & Enablement", () => {
 
       expect(toolNames).toContain("read_file");
       expect(toolNames).toContain("write_file");
-      // Non-enabled non-core tool should be excluded
+      // Disabled tools should be excluded
       expect(toolNames).not.toContain("get_weather");
       expect(toolNames).not.toContain("get_stock_price");
     });
@@ -418,9 +418,9 @@ describe("Tool Availability & Enablement", () => {
       expect(toolNames).toContain("read_url");
     });
 
-    it("blockedTools removes tool when it is NOT in the explicit enabledSet", async () => {
+    it("blockedTools removes tools from persona availableTools", async () => {
       const { finalTools } = await AgenticToolResolver.resolve({
-        options: { enabledTools: ["get_weather", "read_url"] },
+        options: { disabledTools: ["get_weather_forecast"] },
         agent: "UNLOCKED_AGENT",
         project: "test",
         username: "rodrigo",
@@ -428,8 +428,7 @@ describe("Tool Availability & Enablement", () => {
 
       const toolNames = extractToolNames(finalTools);
 
-      // get_weather_forecast is in blockedTools and NOT in enabledTools
-      // → blockedTools denylist removes it
+      // get_weather_forecast is disabled by client AND in blockedTools
       expect(toolNames).not.toContain("get_weather_forecast");
       expect(toolNames).toContain("get_weather");
       expect(toolNames).toContain("read_url");
@@ -560,8 +559,8 @@ describe("Tool Availability & Enablement", () => {
 
     it("excludes orchestrator tools when isSubAgent is true", async () => {
       const { finalTools } = await AgenticToolResolver.resolve({
-        options: { enabledTools: ["read_file", "write_file"], isSubAgent: true },
-        agent: undefined,
+        options: { disabledTools: ["get_weather", "get_stock_price"], isSubAgent: true },
+        agent: "CODING",
         project: "test",
         username: "rodrigo",
       });
@@ -582,9 +581,9 @@ describe("Tool Availability & Enablement", () => {
   // ────────────────────────────────────────────────────────────
 
   describe("domain prefix expansion", () => {
-    it("expands domainKey: prefix to all tools in that domain", async () => {
+    it("disabledTools filters concrete tool names from the available set", async () => {
       const { finalTools } = await AgenticToolResolver.resolve({
-        options: { enabledTools: ["domainKey:weather"] },
+        options: { disabledTools: ["get_weather", "get_weather_forecast"] },
         agent: "CODING",
         project: "test",
         username: "rodrigo",
@@ -592,10 +591,11 @@ describe("Tool Availability & Enablement", () => {
 
       const toolNames = extractToolNames(finalTools);
 
-      expect(toolNames).toContain("get_weather");
-      expect(toolNames).toContain("get_weather_forecast");
-      // Non-weather tools excluded (except core/orchestrator/prism-local)
-      expect(toolNames).not.toContain("get_stock_price");
+      // Weather tools disabled by name
+      expect(toolNames).not.toContain("get_weather");
+      expect(toolNames).not.toContain("get_weather_forecast");
+      // Non-disabled tools should still be present
+      expect(toolNames).toContain("get_stock_price");
     });
 
     it("expands domain: prefix using display name", async () => {
@@ -681,14 +681,14 @@ describe("Tool Availability & Enablement", () => {
       ToolContext.cleanupInMemory(testSessionId);
     });
 
-    it("overrides client enabledTools when dynamicEnabledTools is set in ToolContext", async () => {
+    it("uses dynamicEnabledTools from ToolContext as the authoritative tool set", async () => {
       ToolContext.set(testSessionId, "dynamicEnabledTools", [
         "get_weather",
         "get_weather_forecast",
       ]);
 
       const { finalTools, resolvedEnabledTools } = await AgenticToolResolver.resolve({
-        options: { enabledTools: ["read_file", "write_file"] },
+        options: {},
         agent: "CODING",
         project: "test",
         username: "rodrigo",
@@ -697,10 +697,10 @@ describe("Tool Availability & Enablement", () => {
 
       const toolNames = extractToolNames(finalTools);
 
-      // Dynamic tools override client enabledTools
+      // Dynamic tools become the authoritative enabled set
       expect(toolNames).toContain("get_weather");
       expect(toolNames).toContain("get_weather_forecast");
-      // Original enabledTools should NOT be present (overridden)
+      // Tools not in the dynamic set should be excluded
       expect(toolNames).not.toContain("get_stock_price");
 
       // resolvedEnabledTools should reflect the dynamic set
@@ -717,7 +717,6 @@ describe("Tool Availability & Enablement", () => {
 
       const { finalTools } = await AgenticToolResolver.resolve({
         options: {
-          enabledTools: ["read_file"],
           disabledTools: ["get_weather_forecast"],
         },
         agent: "CODING",
@@ -734,10 +733,10 @@ describe("Tool Availability & Enablement", () => {
       expect(toolNames).not.toContain("get_weather_forecast");
     });
 
-    it("falls back to client enabledTools when no dynamicEnabledTools in ToolContext", async () => {
-      // No ToolContext set — should behave as normal
+    it("falls back to disabledTools mode when no dynamicEnabledTools in ToolContext", async () => {
+      // No ToolContext set — should use disabledTools mode
       const { finalTools } = await AgenticToolResolver.resolve({
-        options: { enabledTools: ["read_file"] },
+        options: { disabledTools: ["get_stock_price", "get_weather", "get_weather_forecast"] },
         agent: "CODING",
         project: "test",
         username: "rodrigo",
@@ -747,7 +746,7 @@ describe("Tool Availability & Enablement", () => {
       const toolNames = extractToolNames(finalTools);
 
       expect(toolNames).toContain("read_file");
-      // Non-enabled, non-core tool should be absent
+      // Disabled tools should be absent
       expect(toolNames).not.toContain("get_stock_price");
     });
   });
@@ -776,9 +775,9 @@ describe("Tool Availability & Enablement", () => {
       expect(toolNames).toContain("read_file");
     });
 
-    it("blockedTools removes tools NOT in enabledSet", async () => {
+    it("blockedTools removes tools from the resolved set", async () => {
       const { finalTools } = await AgenticToolResolver.resolve({
-        options: { enabledTools: ["read_file"] },
+        options: { disabledTools: ["read_file"] },
         agent: "SAFE_AGENT",
         project: "test",
         username: "rodrigo",
@@ -786,20 +785,17 @@ describe("Tool Availability & Enablement", () => {
 
       const toolNames = extractToolNames(finalTools);
 
-      // generate_image is in blockedTools (via domainKey:creative) and NOT in enabledTools
-      // But it IS a core agentic tool? No — let's check. generate_image is NOT a core agentic tool.
-      // It bypasses only if in enabledSet. Since it's not in enabledSet, blockedTools removes it.
-      expect(toolNames).not.toContain("generate_image");
-      expect(toolNames).not.toContain("describe_image");
-      // get_stock_price is in blockedTools and NOT in enabledTools
+      // read_file is disabled by client
+      expect(toolNames).not.toContain("read_file");
+      // get_stock_price is in blockedTools → removed
       expect(toolNames).not.toContain("get_stock_price");
-      // read_file is explicitly enabled and not blocked
-      expect(toolNames).toContain("read_file");
+      // write_file is not blocked and not disabled
+      expect(toolNames).toContain("write_file");
     });
 
-    it("explicitly enabled tools override blockedTools denylist", async () => {
+    it("disabledTools stacks with blockedTools", async () => {
       const { finalTools } = await AgenticToolResolver.resolve({
-        options: { enabledTools: ["generate_image", "read_file"] },
+        options: { disabledTools: ["read_file", "write_file"] },
         agent: "SAFE_AGENT",
         project: "test",
         username: "rodrigo",
@@ -807,13 +803,11 @@ describe("Tool Availability & Enablement", () => {
 
       const toolNames = extractToolNames(finalTools);
 
-      // generate_image is in blockedTools BUT also explicitly in enabledTools
-      // enabledSet protects it from blockedTools removal
-      expect(toolNames).toContain("generate_image");
-      expect(toolNames).toContain("read_file");
-
-      // describe_image is in blockedTools and NOT in enabledTools — should be removed
-      expect(toolNames).not.toContain("describe_image");
+      // read_file and write_file are disabled by client
+      expect(toolNames).not.toContain("read_file");
+      expect(toolNames).not.toContain("write_file");
+      // get_stock_price is in blockedTools → also removed
+      expect(toolNames).not.toContain("get_stock_price");
     });
   });
 
@@ -906,13 +900,13 @@ describe("Tool Availability & Enablement", () => {
       expect(toolNames).toContain("read_file");
     });
 
-    it("excludes MCP tools from enabledTools mode unless explicitly included", async () => {
+    it("includes MCP tools when using disabledTools mode (MCP not disabled)", async () => {
       (ToolOrchestratorService.getMCPToolSchemas as ReturnType<typeof vi.fn>).mockReturnValue(
         MOCK_MCP_SCHEMAS,
       );
 
       const { finalTools } = await AgenticToolResolver.resolve({
-        options: { enabledTools: ["read_file"] },
+        options: { disabledTools: ["get_stock_price"] },
         agent: "CODING",
         project: "test",
         username: "rodrigo",
@@ -920,7 +914,8 @@ describe("Tool Availability & Enablement", () => {
 
       const toolNames = extractToolNames(finalTools);
 
-      expect(toolNames).not.toContain("mcp__github__list_repos");
+      // MCP tools should be included (not disabled)
+      expect(toolNames).toContain("mcp__github__list_repos");
       expect(toolNames).toContain("read_file");
     });
 
@@ -944,13 +939,13 @@ describe("Tool Availability & Enablement", () => {
   });
 
   // ────────────────────────────────────────────────────────────
-  // 12. Empty enabledTools Array
+  // 12. All Tools Disabled via disabledTools
   // ────────────────────────────────────────────────────────────
 
-  describe("empty enabledTools array", () => {
-    it("results in only core + orchestrator + prism-local tools (no domain tools)", async () => {
+  describe("all domain tools disabled", () => {
+    it("core + orchestrator tools survive when all domain tools are disabled", async () => {
       const { finalTools } = await AgenticToolResolver.resolve({
-        options: { enabledTools: [] },
+        options: { disabledTools: ["read_file", "write_file", "get_weather", "get_weather_forecast", "get_stock_price", "generate_image", "describe_image", "read_url", "search_web"] },
         agent: "CODING",
         project: "test",
         username: "rodrigo",
@@ -960,17 +955,14 @@ describe("Tool Availability & Enablement", () => {
 
       // Core agentic tools still present via bypass
       expect(toolNames).toContain("evaluate_expression");
-      expect(toolNames).toContain("search_web");
       expect(toolNames).toContain("enable_tools");
 
       // Orchestrator tools still present via bypass
       expect(toolNames).toContain("create_subagents");
 
-      // Prism-local tools are NOT in getToolSchemas pool — they're internal-only
-      // The resolver handles tools from the pool, not from InternalToolRegistry
-
-      // Domain-specific tools with no explicit enable should be excluded
+      // Disabled tools should be excluded
       expect(toolNames).not.toContain("get_stock_price");
+      expect(toolNames).not.toContain("read_file");
     });
   });
 
@@ -997,9 +989,9 @@ describe("Tool Availability & Enablement", () => {
       expect(toolNames).toContain("create_subagents");
     });
 
-    it("applies enabledTools filter correctly even without a persona", async () => {
+    it("applies disabledTools filter correctly even without a persona", async () => {
       const { finalTools } = await AgenticToolResolver.resolve({
-        options: { enabledTools: ["read_file", "get_weather"] },
+        options: { disabledTools: ["get_stock_price"] },
         agent: "NONEXISTENT_AGENT",
         project: "test",
         username: "rodrigo",
@@ -1029,15 +1021,16 @@ describe("Tool Availability & Enablement", () => {
       expect(resolvedEnabledTools).toBeNull();
     });
 
-    it("returns the client enabledTools when explicitly provided", async () => {
+    it("returns the computed enabled set when disabledTools is provided", async () => {
       const { resolvedEnabledTools } = await AgenticToolResolver.resolve({
-        options: { enabledTools: ["read_file", "write_file"] },
+        options: { disabledTools: ["get_stock_price"] },
         agent: "CODING",
         project: "test",
         username: "rodrigo",
       });
 
-      expect(resolvedEnabledTools).toEqual(["read_file", "write_file"]);
+      expect(resolvedEnabledTools).toContain("read_file");
+      expect(resolvedEnabledTools).not.toContain("get_stock_price");
     });
 
     it("returns persona availableTools when no client filter is applied to restricted persona", async () => {
@@ -1053,15 +1046,13 @@ describe("Tool Availability & Enablement", () => {
   });
 
   // ────────────────────────────────────────────────────────────
-  // 15. Interaction: enabledTools + disabledTools Simultaneously
+  // 15. disabledTools is the sole client-side filter
   // ────────────────────────────────────────────────────────────
 
-  describe("enabledTools and disabledTools interaction", () => {
-    it("enabledTools takes precedence when both are provided (disabledTools ignored)", async () => {
-      // When enabledTools is provided, disabledTools is only applied to dynamic tools
+  describe("disabledTools is the sole client-side filter", () => {
+    it("disabledTools removes specified tools from the enabled set", async () => {
       const { finalTools } = await AgenticToolResolver.resolve({
         options: {
-          enabledTools: ["read_file", "write_file", "get_weather"],
           disabledTools: ["read_file"],
         },
         agent: "CODING",
@@ -1071,9 +1062,9 @@ describe("Tool Availability & Enablement", () => {
 
       const toolNames = extractToolNames(finalTools);
 
-      // enabledTools defines the set, disabledTools is not applied in this mode
-      // (disabledTools only applies when enabledTools is null/undefined)
-      expect(toolNames).toContain("read_file");
+      // read_file should be disabled
+      expect(toolNames).not.toContain("read_file");
+      // Other tools remain enabled
       expect(toolNames).toContain("write_file");
       expect(toolNames).toContain("get_weather");
     });
@@ -1086,7 +1077,7 @@ describe("Tool Availability & Enablement", () => {
   describe("system prompt tool count alignment", () => {
     it("finalTools count matches the set that should appear in the system prompt", async () => {
       const { finalTools, resolvedEnabledTools } = await AgenticToolResolver.resolve({
-        options: { enabledTools: ["read_file", "write_file"] },
+        options: { disabledTools: ["get_stock_price"] },
         agent: "CODING",
         project: "test",
         username: "rodrigo",
@@ -1098,15 +1089,12 @@ describe("Tool Availability & Enablement", () => {
       const resolvedToolNamesForPrompt = finalTools.map((tool: { name: string }) => tool.name);
       expect(resolvedToolNamesForPrompt.length).toBe(finalTools.length);
 
-      // The explicitly enabled tools should be a subset of the final tools
-      for (const enabledTool of ["read_file", "write_file"]) {
-        expect(resolvedToolNamesForPrompt).toContain(enabledTool);
-      }
+      // Non-disabled tools should be in the final set
+      expect(resolvedToolNamesForPrompt).toContain("read_file");
+      expect(resolvedToolNamesForPrompt).toContain("write_file");
 
-      // Core bypass tools should also appear in the resolved names
-      expect(resolvedToolNamesForPrompt).toContain("evaluate_expression");
-      // Note: think/sleep are internal tools NOT in getToolSchemas pool,
-      // so they won't be in resolver output — harnesses add them separately
+      // Disabled tools should be excluded
+      expect(resolvedToolNamesForPrompt).not.toContain("get_stock_price");
     });
 
     it("restricted persona finalTools count reflects actual usable tools", async () => {

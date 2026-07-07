@@ -44,7 +44,6 @@ export interface ScheduledTask {
   cronExpression?: string; // e.g. "0 9 * * *"
   recurrenceRule?: RecurrenceRule;
   toolConfig?: {
-    enabledTools?: string[];
     disabledTools?: string[];
   };
   enabled: boolean;
@@ -378,9 +377,6 @@ const ScheduledTaskService = {
           functionCallingEnabled: true,
           planFirst: false,
           autoApprove: true,
-          ...(task.toolConfig?.enabledTools && {
-            enabledTools: task.toolConfig.enabledTools,
-          }),
           ...(task.toolConfig?.disabledTools && {
             disabledTools: task.toolConfig.disabledTools,
           }),

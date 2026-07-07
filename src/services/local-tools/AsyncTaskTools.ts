@@ -614,8 +614,6 @@ async function triggerAsyncTaskAutoResponse(
         ...(typeof settings.toolConfig === "object" &&
         settings.toolConfig !== null
           ? {
-              enabledTools: (settings.toolConfig as Record<string, unknown>)
-                .enabledTools as string[] | undefined,
               disabledTools: (settings.toolConfig as Record<string, unknown>)
                 .disabledTools as string[] | undefined,
             }

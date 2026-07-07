@@ -642,10 +642,7 @@ export async function handleConversation(
         const builtInTools =
           ToolOrchestratorService.getToolSchemas(defaultTopology);
         let tools = builtInTools;
-        if (options.enabledTools && Array.isArray(options.enabledTools)) {
-          const enabledSet = new Set(options.enabledTools as string[]);
-          tools = tools.filter((toolItem) => enabledSet.has(toolItem.name));
-        } else if (
+        if (
           options.disabledTools &&
           Array.isArray(options.disabledTools)
         ) {
