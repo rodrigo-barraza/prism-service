@@ -179,7 +179,7 @@ export default class PolicyEngine {
             : `Approved by policy: ${rule.name || rule.tool}`;
 
       logger.info(
-        `[PolicyEngine] ${toolName}(${Object.keys(args).join(",")}) → ${rule.decision} [${rule.name}]`,
+        `[PolicyEngine] ${toolName}(${Object.keys(args ?? {}).join(",")}) → ${rule.decision} [${rule.name}]`,
       );
 
       return { decision: rule.decision, matchedPolicy: rule, reason };
