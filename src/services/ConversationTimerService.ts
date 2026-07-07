@@ -529,6 +529,9 @@ const ConversationTimerService = {
           ...(toolConfiguration?.disabledTools && {
             disabledTools: toolConfiguration.disabledTools,
           }),
+          ...(toolConfiguration?.enabledTools && {
+            enabledTools: toolConfiguration.enabledTools,
+          }),
         },
         agentConversationId: crypto.randomUUID(),
         conversationId: timer.conversationId,

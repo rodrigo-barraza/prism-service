@@ -120,6 +120,8 @@ export default class AgenticToolResolver {
     // ── Tool filtering ────────────────────────────────────────────
     let resolvedEnabledTools: string[] | null = null;
     let shouldApplyDisabledFilter = false;
+
+    // Mode 1: dynamicEnabledTools from context (highest priority)
     if (agentConversationId) {
       const dynamicTools = ToolContext.get<string[]>(
         agentConversationId,
@@ -141,6 +143,16 @@ export default class AgenticToolResolver {
           shouldApplyDisabledFilter = true;
         }
       }
+    }
+
+    // Mode 1.5: explicit enabledTools from options (tests / manual override)
+    if (
+      !resolvedEnabledTools &&
+      options.enabledTools &&
+      Array.isArray(options.enabledTools) &&
+      options.enabledTools.length > 0
+    ) {
+      resolvedEnabledTools = options.enabledTools;
     }
 
     // Mode 2: disabledTools — resolve server-side
@@ -304,6 +316,14 @@ export default class AgenticToolResolver {
           `[AgenticLoop] Applied blockedTools denylist (${blockedSet.size} tools blocked${!shouldApplyDisabledFilter ? `, enabledSet protects ${enabledSet.size}` : ""})`,
         );
       }
+    }
+
+    // Safety check: Sub-agents must NEVER have access to orchestrator tools,
+    // even if no explicit filtering was applied above (e.g. catch-all persona).
+    if (options.isSubAgent) {
+      finalTools = finalTools.filter(
+        (tool) => !CORE_ORCHESTRATOR_TOOLS.has(tool.name),
+      );
     }
 
     // ── Workspace domain exclusion ─────────────────────────────────

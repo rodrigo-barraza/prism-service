@@ -45,6 +45,7 @@ export interface ScheduledTask {
   recurrenceRule?: RecurrenceRule;
   toolConfig?: {
     disabledTools?: string[];
+    enabledTools?: string[];
   };
   enabled: boolean;
   lastRunMinute?: string; // "YYYY-MM-DDTHH:mm"
@@ -379,6 +380,9 @@ const ScheduledTaskService = {
           autoApprove: true,
           ...(task.toolConfig?.disabledTools && {
             disabledTools: task.toolConfig.disabledTools,
+          }),
+          ...(task.toolConfig?.enabledTools && {
+            enabledTools: task.toolConfig.enabledTools,
           }),
         },
         agentConversationId: resolvedConversationId,
