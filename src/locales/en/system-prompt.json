@@ -13,5 +13,6 @@
   "discordIdsHeader": "# Discord IDs",
   "discordGuildIdLine": "- Guild ID: {{guildId}}",
   "discordChannelIdLine": "\n- Channel ID: {{channelId}}",
-  "liveApiLanguageHint": "Always respond in the same language the user speaks. The user's primary language is English."
+  "liveApiLanguageHint": "Always respond in the same language the user speaks. The user's primary language is English.",
+  "constraintsHeader": "## Behavioral Constraints\nThe following rules are absolute and must never be violated:"
 }

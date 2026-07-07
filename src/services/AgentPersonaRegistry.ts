@@ -142,6 +142,9 @@ const AgentPersonaRegistry = {
           ? (doc.platformRules as Record<string, string>)
           : undefined,
       hasSomaticState: (doc.hasSomaticState as boolean) || false,
+      negativeConstraints: Array.isArray(doc.negativeConstraints)
+        ? (doc.negativeConstraints as string[])
+        : undefined,
       usesDirectoryTree: (doc.usesDirectoryTree as boolean) || false,
       usesCodingGuidelines: (doc.usesCodingGuidelines as boolean) || false,
     };

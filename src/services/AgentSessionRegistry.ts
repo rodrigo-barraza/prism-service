@@ -32,7 +32,12 @@ const AgentSessionRegistry = {
       logger.warn(
         `[AgentSessionRegistry] Overwriting existing session for ${conversationId}`,
       );
-      existingSession.stopController.abort();
+      try {
+        existingSession.stopController.abort();
+      } catch {
+        // AbortController.abort() can throw DOMException in Node 22+ when
+        // native APIs (fetch) have listeners attached to the signal.
+      }
     }
     const stopController = createAbortController();
     activeSessions.set(conversationId, {
@@ -53,7 +58,11 @@ const AgentSessionRegistry = {
     const session = activeSessions.get(conversationId);
     if (!session) return false;
     if (!session.stopController.signal.aborted) {
-      session.stopController.abort();
+      try {
+        session.stopController.abort();
+      } catch {
+        // AbortController.abort() can throw DOMException in Node 22+
+      }
       logger.info(`[AgentSessionRegistry] Stopped session ${conversationId}`);
     }
     return true;
