@@ -76,6 +76,7 @@ export interface WorktreeDiff {
   additions: number;
   deletions: number;
   files: string[];
+  diff?: string;
 }
 
 // ── Sub-Agent Result ───────────────────────────────────────

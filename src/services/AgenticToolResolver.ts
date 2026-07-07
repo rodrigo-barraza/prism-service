@@ -39,7 +39,7 @@ interface ModelDefinition {
   thinking?: boolean;
   supportsThinking?: boolean;
   thinkingLevels?: string[];
-  tools?: boolean;
+  tools?: boolean | string[];
 }
 
 interface ResolveOptions {

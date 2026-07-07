@@ -404,6 +404,7 @@ describe("Orchestrator Infrastructure Suite", () => {
       const emitter = new SubAgentTelemetryEmitter({
         subAgentId: "agent-123",
         subAgentDescription: "Test agent",
+        subAgentConversationId: "sub-conv-123",
         parentEmit,
         parentConversationId: "conv-123",
       });
@@ -433,6 +434,7 @@ describe("Orchestrator Infrastructure Suite", () => {
       const emitter = new SubAgentTelemetryEmitter({
         subAgentId: "agent-123",
         subAgentDescription: "Test agent",
+        subAgentConversationId: "sub-conv-123",
         parentEmit,
         parentConversationId: "conv-123",
       });

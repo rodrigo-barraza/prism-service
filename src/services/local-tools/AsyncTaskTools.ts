@@ -239,6 +239,7 @@ const listAsyncTasks = {
     parameters: {
       type: "object",
       properties: {},
+      required: [],
     },
   },
   labels: ["async", "background", "task"],
