@@ -269,8 +269,8 @@ export default class ContextBudgetTracker {
         typeof message.content === "string"
           ? message.content
           : Array.isArray(message.content)
-            ? (message.content as Array<{ text?: string }>)
-                .map((part) => part.text || "")
+            ? (message.content as Array<{ text?: string } | null | undefined>)
+                .map((part) => part?.text || "")
                 .join("")
             : "";
       messageTokens += estimateTokens(content);
