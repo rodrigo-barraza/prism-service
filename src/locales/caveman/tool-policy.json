@@ -7,7 +7,7 @@
     "searchSteps": "1. `discover_and_enable_tools` with query — finds AND enables\n2. Or `search_tools` then `enable_tools` to activate\n3. After enabling, tool ready next iteration",
     "noFallback": "**NEVER write raw code when dedicated tool may exist.** Search first.",
     "intentMatchingHeader": "**Match CAPABILITY INTENT, not keyword:**",
-    "intentMatchingRules": "- User mentions domain/protocol/data type without matching tool→search\n- Sounds like specialized API→search\n- 'look up', 'check', 'scan', 'analyze', 'convert' beyond basic text→search\n- Unsure? Search — one call.",
+    "intentMatchingRules": "- User mentions domain/protocol/data type without matching tool→search\n- Sounds like specialized API→search\n- 'look up', 'check', 'scan', 'analyze', 'convert', 'generate', 'mix', 'combine', 'merge', 'blend', 'mash up', 'fuse', 'remix', 'create', 'draw', 'render', 'synthesize', 'compose', 'manipulate', 'transform' beyond basic text→search\n- Unsure? Search — one call.",
     "triggerHeader": "**Trigger example:**",
     "triggerLineTemplate": "- {{keywords}} → search {{domain}}"
   },

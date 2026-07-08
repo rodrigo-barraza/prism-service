@@ -7,7 +7,7 @@
     "searchSteps": "1. Call `discover_and_enable_tools` with a relevant query — searches the full catalog AND enables matches in one step\n2. Alternatively: `search_tools` to browse, then `enable_tools` to activate\n3. After enabling, tools are available on your next iteration — call them directly",
     "noFallback": "**NEVER fall back to writing raw code, scripts, or manual API calls when a dedicated tool may exist.** Always search first.",
     "intentMatchingHeader": "**How to decide when to search — match by CAPABILITY INTENT, not just keywords:**",
-    "intentMatchingRules": "- User mentions a domain, protocol, or data type you don't have a tool for → search for it\n- User asks about something that sounds like it could be a specialized API → search for it\n- User asks to \"look up\", \"check\", \"scan\", \"analyze\", \"convert\", \"generate\", or \"get info about\" anything beyond basic text/code → search for it\n- When in doubt, search — it costs nothing and takes one call",
+    "intentMatchingRules": "- User mentions a domain, protocol, or data type you don't have a tool for → search for it\n- User asks about something that sounds like it could be a specialized API → search for it\n- User asks to \"look up\", \"check\", \"scan\", \"analyze\", \"convert\", \"generate\", \"mix\", \"combine\", \"merge\", \"blend\", \"mash up\", \"fuse\", \"remix\", \"create\", \"draw\", \"render\", \"synthesize\", \"compose\", \"manipulate\", \"transform\", or \"get info about\" anything beyond basic text/code → search for it\n- When in doubt, search — it costs nothing and takes one call",
     "triggerHeader": "**Trigger examples (derived from tool catalog, not exhaustive):**",
     "triggerLineTemplate": "- {{keywords}} → search for {{domain}} tools"
   },
