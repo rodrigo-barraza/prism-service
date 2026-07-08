@@ -630,6 +630,14 @@ const anthropicProvider = {
       delete payload.top_k;
     }
 
+    // Sonnet 5+ deprecated top_k — API rejects requests containing it
+    const hasDeprecatedTopK =
+      (modelDefinition as Record<string, unknown> | null)?.deprecatedTopK ===
+      true;
+    if (hasDeprecatedTopK) {
+      delete payload.top_k;
+    }
+
     // Server tools
     const tools = buildTools(options);
     if (tools) payload.tools = tools;
@@ -861,6 +869,14 @@ const anthropicProvider = {
         (modelDefinition as Record<string, unknown> | null)
           ?.adaptiveThinking === true;
       if (isAdaptiveThinking) {
+        delete streamPayload.top_k;
+      }
+
+      // Sonnet 5+ deprecated top_k — API rejects requests containing it
+      const hasDeprecatedTopK =
+        (modelDefinition as Record<string, unknown> | null)?.deprecatedTopK ===
+        true;
+      if (hasDeprecatedTopK) {
         delete streamPayload.top_k;
       }
 

@@ -581,6 +581,7 @@ const MODELS = {
     webSearch: true,
     webFetch: true,
     codeExecution: true,
+    deprecatedTopK: true,
     tools: [
       "Thinking",
       "Web Search",
@@ -1516,6 +1517,7 @@ export interface ModelOptionEntry {
   supportsSystemPrompt?: boolean;
   lockedSampling?: boolean;
   adaptiveThinking?: boolean;
+  deprecatedTopK?: boolean;
 }
 
 // ─── derive defaults, options, pricing from MODELS ──────────
