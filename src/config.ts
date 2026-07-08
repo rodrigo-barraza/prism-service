@@ -576,6 +576,7 @@ const MODELS = {
     },
     streaming: true,
     thinking: true,
+    adaptiveThinking: true,
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     assistantImages: false,
     webSearch: true,
