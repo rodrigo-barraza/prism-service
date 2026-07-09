@@ -375,6 +375,28 @@ export async function expandVideoToFrames(
 }
 
 /**
+ * Prepend the identity system prompt (persona, tool policy, guidelines)
+ * as a `system` role message at the start of the messages array.
+ *
+ * OpenAI-compatible providers consume system prompts as in-band messages.
+ * When the harness provides the identity prompt via `options.systemPrompt`
+ * (kept out of the messages array by design), providers must re-inject it
+ * at the start of the array so the model receives the persona identity.
+ *
+ * Returns the original array unchanged when no identity prompt is provided.
+ */
+export function prependIdentitySystemMessage<T extends { role: string; content?: string | unknown }>(
+  messages: T[],
+  identityPrompt: string | undefined,
+): T[] {
+  if (!identityPrompt) return messages;
+  return [
+    { role: "system", content: identityPrompt } as T,
+    ...messages,
+  ];
+}
+
+/**
  * Convert messages with media to OpenAI-compatible multipart content format.
  * Handles images, tool results, assistant tool calls, and optionally
  * audio/video/PDF based on the media strategy.

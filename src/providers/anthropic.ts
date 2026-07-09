@@ -568,6 +568,26 @@ export function buildUsage(
   };
 }
 
+/**
+ * Resolve the effective system prompt for Anthropic's `system:` field.
+ *
+ * The identity prompt (persona, tool policy, guidelines) flows through
+ * `options.systemPrompt` as a first-class parameter from the harness.
+ * Contextual injections (local time, agent memory) may also arrive via
+ * the messages array as a leading `role: "system"` message, extracted by
+ * `prepareMessages` into `prepared.systemMessage`. When both exist, the
+ * identity prompt takes precedence and the contextual block is appended.
+ */
+export function resolveSystemPrompt(
+  identityPrompt: string | undefined,
+  contextualSystemMessage: string | undefined,
+): string | undefined {
+  if (identityPrompt && contextualSystemMessage) {
+    return `${identityPrompt}\n\n${contextualSystemMessage}`;
+  }
+  return identityPrompt || contextualSystemMessage;
+}
+
 const anthropicProvider = {
   name: "anthropic",
 
@@ -579,9 +599,13 @@ const anthropicProvider = {
     logger.provider("Anthropic", `generateText model=${model}`);
 
     const prepared = await prepareMessages(messages);
+    const effectiveSystemPrompt = resolveSystemPrompt(
+      options.systemPrompt,
+      prepared.systemMessage,
+    );
     const payload: Record<string, unknown> = {
       cache_control: { type: "ephemeral" },
-      ...(prepared.systemMessage && { system: prepared.systemMessage }),
+      ...(effectiveSystemPrompt && { system: effectiveSystemPrompt }),
       model,
       messages: prepared.messages,
       max_tokens: options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS,
@@ -819,9 +843,13 @@ const anthropicProvider = {
     logger.provider("Anthropic", `generateTextStream model=${model}`);
     try {
       const prepared = await prepareMessages(messages);
+      const effectiveSystemPrompt = resolveSystemPrompt(
+        options.systemPrompt,
+        prepared.systemMessage,
+      );
       const streamPayload: Record<string, unknown> = {
         cache_control: { type: "ephemeral" },
-        ...(prepared.systemMessage && { system: prepared.systemMessage }),
+        ...(effectiveSystemPrompt && { system: effectiveSystemPrompt }),
         model,
         messages: prepared.messages,
         max_tokens: options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS,

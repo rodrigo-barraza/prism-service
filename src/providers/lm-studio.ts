@@ -33,6 +33,7 @@ import {
   convertToolsToOpenAI,
   buildPayloadParams,
   prepareOpenAICompatMessages,
+  prependIdentitySystemMessage,
   expandVideoToFrames,
   processNonStreamingResponse,
   fetchOpenAICompat,
@@ -454,7 +455,8 @@ export function createLmStudioProvider(
           throw new DOMException("The user aborted a request.", "AbortError");
         }
 
-        const prepared = prepareOpenAICompatMessages(messages, {
+        const effectiveMessages = prependIdentitySystemMessage(messages, options.systemPrompt);
+        const prepared = prepareOpenAICompatMessages(effectiveMessages, {
           mediaStrategy: MEDIA_STRATEGIES.IMAGES_ONLY,
         });
         const payload: Record<string, unknown> = {
@@ -970,7 +972,8 @@ export function createLmStudioProvider(
           yield { type: "status", message: "Extracting video frames…" };
           await expandVideoToFrames(messages);
         }
-        const prepared = prepareOpenAICompatMessages(messages, {
+        const effectiveMessages = prependIdentitySystemMessage(messages, options.systemPrompt);
+        const prepared = prepareOpenAICompatMessages(effectiveMessages, {
           mediaStrategy: MEDIA_STRATEGIES.IMAGES_ONLY,
         });
         // ── Determine tool-calling strategy ──────────────────────

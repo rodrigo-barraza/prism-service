@@ -16,6 +16,7 @@ import {
 import {
   convertToolsToOpenAI,
   normalizeUsage,
+  prependIdentitySystemMessage,
 } from "#src/utils/openai-compat";
 import type { TokenUsage } from "#src/types/admin";
 import type { JsonValue } from "#src/types/index";
@@ -404,6 +405,7 @@ export function normalizeResponsesUsage(
 
   return usage;
 }
+
 export function prepareOpenAIMessages(
   messages: OpenAIMessage[],
 ): OpenAI.Chat.ChatCompletionMessageParam[] {
@@ -743,11 +745,15 @@ const openaiProvider = {
     options: ProviderOptions = {},
   ) {
     logger.provider("OpenAI", `generateText model=${model}`);
+    // Prepend identity system prompt from the harness when available.
+    // OpenAI treats system prompts as in-band messages, so the identity
+    // prompt must be at the start of the array to take effect.
+    const effectiveMessages = prependIdentitySystemMessage(messages, options.systemPrompt);
     try {
       if (useResponsesAPI(model)) {
-        return await this._generateTextResponses(messages, model, options);
+        return await this._generateTextResponses(effectiveMessages, model, options);
       }
-      return await this._generateTextChatCompletions(messages, model, options);
+      return await this._generateTextChatCompletions(effectiveMessages, model, options);
     } catch (error: unknown) {
       toProviderError(error as Error);
     }
@@ -1098,11 +1104,13 @@ const openaiProvider = {
     options: ProviderOptions = {},
   ) {
     logger.provider("OpenAI", `generateTextStream model=${model}`);
+    // Prepend identity system prompt from the harness when available.
+    const effectiveMessages = prependIdentitySystemMessage(messages, options.systemPrompt);
     try {
       if (useResponsesAPI(model)) {
-        yield* this._streamResponses(messages, model, options);
+        yield* this._streamResponses(effectiveMessages, model, options);
       } else {
-        yield* this._streamChatCompletions(messages, model, options);
+        yield* this._streamChatCompletions(effectiveMessages, model, options);
       }
     } catch (error: unknown) {
       if (

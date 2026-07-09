@@ -44,6 +44,7 @@ import {
   convertToolsToOpenAI,
   buildPayloadParams,
   prepareOpenAICompatMessages,
+  prependIdentitySystemMessage,
   expandVideoToFrames,
   processNonStreamingResponse,
   parseSSEStream,
@@ -201,9 +202,10 @@ export function createLlamaCppProvider(
       await discoverContextLength(instanceId, baseUrl, model, options);
       try {
         // Expand video attachments to image frames (ffmpeg) before message prep
-        await expandVideoToFrames(messages);
+        const effectiveMessages = prependIdentitySystemMessage(messages, options.systemPrompt);
+        await expandVideoToFrames(effectiveMessages);
 
-        const prepared = prepareOpenAICompatMessages(messages, {
+        const prepared = prepareOpenAICompatMessages(effectiveMessages, {
           mediaStrategy: MEDIA_STRATEGIES.TEXT_FALLBACK,
         });
 
@@ -294,9 +296,10 @@ export function createLlamaCppProvider(
       await discoverContextLength(instanceId, baseUrl, model, options);
       try {
         // Expand video attachments to image frames (ffmpeg) before message prep
-        await expandVideoToFrames(messages);
+        const effectiveMessages = prependIdentitySystemMessage(messages, options.systemPrompt);
+        await expandVideoToFrames(effectiveMessages);
 
-        const prepared = prepareOpenAICompatMessages(messages, {
+        const prepared = prepareOpenAICompatMessages(effectiveMessages, {
           mediaStrategy: MEDIA_STRATEGIES.TEXT_FALLBACK,
         });
 
