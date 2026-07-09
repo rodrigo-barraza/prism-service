@@ -17,6 +17,7 @@ import {
   convertToolsToOpenAI,
   buildPayloadParams,
   prepareOpenAICompatMessages,
+  prependIdentitySystemMessage,
   processNonStreamingResponse,
   parseSSEStream,
   fetchOpenAICompat,
@@ -113,8 +114,9 @@ export function createVllmProvider(
       logger.provider("vLLM", `generateText model=${model} baseUrl=${baseUrl}`);
       await discoverContextLength(instanceId, baseUrl, model, options);
       try {
+        const effectiveMessages = prependIdentitySystemMessage(messages, options.systemPrompt);
         const rewrittenMessages = rewriteNonLeadingSystemMessages(
-          messages as InputMessage[],
+          effectiveMessages as InputMessage[],
           model,
         );
         const prepared = prepareOpenAICompatMessages(rewrittenMessages, {
@@ -201,8 +203,9 @@ export function createVllmProvider(
       );
       await discoverContextLength(instanceId, baseUrl, model, options);
       try {
+        const effectiveMessages = prependIdentitySystemMessage(messages, options.systemPrompt);
         const rewrittenMessages = rewriteNonLeadingSystemMessages(
-          messages as InputMessage[],
+          effectiveMessages as InputMessage[],
           model,
         );
         const prepared = prepareOpenAICompatMessages(rewrittenMessages, {

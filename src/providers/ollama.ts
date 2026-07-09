@@ -6,7 +6,10 @@ import {
   StreamChunk,
 } from "#src/types/provider";
 import { ProviderError } from "#src/utils/errors";
-import { STREAMING_DISPATCHER } from "#src/utils/openai-compat";
+import {
+  STREAMING_DISPATCHER,
+  prependIdentitySystemMessage,
+} from "#src/utils/openai-compat";
 import logger from "#src/utils/logger";
 import { discoverContextLength } from "#src/utils/ContextLengthDiscovery";
 
@@ -95,7 +98,8 @@ export function createOllamaProvider(
       );
       await discoverContextLength(instanceId, baseUrl, model, options);
       try {
-        const preparedMessages = prepareOllamaMessages(messages);
+        const effectiveMessages = prependIdentitySystemMessage(messages, options.systemPrompt);
+        const preparedMessages = prepareOllamaMessages(effectiveMessages);
 
         const requestBody = {
           model,
@@ -189,7 +193,8 @@ export function createOllamaProvider(
           );
         }
 
-        const preparedMessages = prepareOllamaMessages(messages);
+        const effectiveMessages = prependIdentitySystemMessage(messages, options.systemPrompt);
+        const preparedMessages = prepareOllamaMessages(effectiveMessages);
 
         const requestBody = {
           model,
