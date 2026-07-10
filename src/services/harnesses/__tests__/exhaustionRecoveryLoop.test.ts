@@ -521,4 +521,59 @@ describe("ReActHarness — Tool-Only Loop Until maxIterations Exhaustion", () =>
     await expect(harness.run()).rejects.toThrow("ECONNRESET");
     expect(state.conversationOutcome).toBe("error");
   });
+
+  it("should trigger exhaustion recovery when the last iteration produces only raw tool call markup (which gets cleaned to empty)", async () => {
+    const maxIterations = 3;
+    const { harness, state } = buildToolOnlyHarness(maxIterations);
+
+    let callCount = 0;
+    (harness as any).consumeStream = vi.fn().mockImplementation(
+      async (_stream: unknown, pass: PassState) => {
+        callCount++;
+        if (callCount < maxIterations) {
+          // Loop iterations: normal tool calls
+          pass.streamedText = "";
+          pass.finalStreamedText = "";
+          pass.streamedThinking = "";
+          pass.thinkingSignature = "";
+          pass.pendingToolCalls = [
+            {
+              id: `call-${callCount}`,
+              name: "search_web",
+              args: { query: `query ${callCount}` },
+            },
+          ];
+          state.streamedToolCalls.push({
+            id: `call-${callCount}`,
+            name: "search_web",
+            args: { query: `query ${callCount}` },
+          });
+        } else if (callCount === maxIterations) {
+          // Final iteration: model outputs raw tool call markup as text,
+          // which has no structured tool calls and gets cleaned to empty
+          pass.streamedText = "<|tool_call>call:search_web{}<tool_call|>";
+          pass.finalStreamedText = "";
+          pass.streamedThinking = "";
+          pass.thinkingSignature = "";
+          pass.pendingToolCalls = [];
+        } else {
+          // Recovery pass
+          pass.streamedText = "Based on my research, here are the engineers found...";
+          pass.finalStreamedText = "Based on my research, here are the engineers found...";
+          pass.streamedThinking = "";
+          pass.thinkingSignature = "";
+          pass.pendingToolCalls = [];
+          state.finalStreamedText = pass.streamedText;
+        }
+        pass.usage = { inputTokens: 5000, outputTokens: 100, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, reasoningOutputTokens: 0 };
+      },
+    );
+
+    await harness.run();
+
+    // The recovery pass should have fired (4th call)
+    expect(callCount).toBe(maxIterations + 1);
+    expect(state.conversationOutcome).toBe("exhausted");
+  });
 });
+

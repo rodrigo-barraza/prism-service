@@ -11,6 +11,7 @@ export interface ConversationMeta {
   synthetic?: boolean;
   agent?: string | null;
   contextBudget?: Record<string, unknown> | null;
+  conversationOutcome?: string | null;
   /** Runtime-only: memory IDs injected this turn, written via $addToSet to the document's injectedMemoryIds array. Not stored as a top-level field. */
   _newInjectedMemoryIds?: string[];
 }

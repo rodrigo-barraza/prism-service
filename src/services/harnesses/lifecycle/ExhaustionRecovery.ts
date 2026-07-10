@@ -112,7 +112,7 @@ export async function runExhaustionRecoveryPass(
   // and it fails to generate a coherent summary). When this happens, build
   // a synthetic fallback from the accumulated tool call results so the parent
   // orchestrator always receives actionable context instead of "[No output]".
-  const recoveryOutputText = (exhaustionPass.streamedText || "").trim();
+  const recoveryOutputText = (exhaustionPass.finalStreamedText || "").trim();
   if (!recoveryOutputText && state.streamedToolCalls?.length > 0) {
     logger.warn(
       `[ExhaustionRecovery] Recovery pass produced empty output after ${state.iterations} iterations. ` +

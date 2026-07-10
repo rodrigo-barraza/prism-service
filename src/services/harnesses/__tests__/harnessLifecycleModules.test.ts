@@ -1708,6 +1708,35 @@ describe("Harness Lifecycle Modules", () => {
           expect.any(Object)
         );
       });
+
+      it("should include conversationOutcome in the final metadata", async () => {
+        const appendAndFinalizeSpy = vi.mocked(appendAndFinalize);
+        const context = {
+          providerName: "google",
+          resolvedModel: "gemini-3.5-flash",
+          options: { agenticLoopEnabled: true },
+          conversationId: "conversation-id-123",
+          emit: vi.fn(),
+        };
+        const payload = {
+          text: "Response content",
+          thinking: null,
+          conversationOutcome: "exhausted",
+        };
+
+        await finalizeTextGeneration(context as any, payload as any);
+
+        expect(appendAndFinalizeSpy).toHaveBeenCalledWith(
+          "conversation-id-123",
+          "",
+          undefined,
+          expect.any(Array),
+          expect.objectContaining({
+            conversationOutcome: "exhausted",
+          }),
+          expect.any(Object)
+        );
+      });
     });
 
     describe("sanitizeMessagesForPersistence", () => {

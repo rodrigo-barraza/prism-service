@@ -1495,6 +1495,7 @@ export default class BaseAgenticHarness {
         contentDurationSeconds: state.overallContentDurationSeconds > 0
           ? roundMilliseconds(state.overallContentDurationSeconds)
           : null,
+        conversationOutcome: state.conversationOutcome || null,
       },
       newTurnMessages as MessagePayload[],
       finalizeOptions,

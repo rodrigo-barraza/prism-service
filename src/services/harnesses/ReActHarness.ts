@@ -736,28 +736,31 @@ export default class ReActHarness extends BaseAgenticHarness {
 
         // ── No tools — check if we should break ─────────────────
         if (pass.streamedText) {
-          if (state.planModeActive) {
-            currentMessages.push({
-              role: "assistant",
-              content: pass.finalStreamedText || pass.streamedText,
-              thinking: pass.streamedThinking.trim(),
-              thinkingSignature: pass.thinkingSignature,
-              ...computePassPhaseDurations(pass),
-            });
-            this.logIteration(pass, currentMessages);
-            continue;
-          }
+          const hasCleanResponse = (pass.finalStreamedText || "").trim().length > 0;
+          if (hasCleanResponse) {
+            if (state.planModeActive) {
+              currentMessages.push({
+                role: "assistant",
+                content: pass.finalStreamedText || pass.streamedText,
+                thinking: pass.streamedThinking.trim(),
+                thinkingSignature: pass.thinkingSignature,
+                ...computePassPhaseDurations(pass),
+              });
+              this.logIteration(pass, currentMessages);
+              continue;
+            }
 
-          const codexResult = handleCodexPlanningResponse(pass, currentMessages, context, state, this.tools.finalTools, "ReActHarness");
-          if (codexResult.shouldContinueLoop) {
-            this.logIteration(pass, currentMessages);
-            continue;
-          }
+            const codexResult = handleCodexPlanningResponse(pass, currentMessages, context, state, this.tools.finalTools, "ReActHarness");
+            if (codexResult.shouldContinueLoop) {
+              this.logIteration(pass, currentMessages);
+              continue;
+            }
 
-          this.logIteration(pass, currentMessages);
-          semanticStallDetector.recordIteration([], pass.streamedText);
-          hasCleanTextBreak = true;
-          break;
+            this.logIteration(pass, currentMessages);
+            semanticStallDetector.recordIteration([], pass.streamedText);
+            hasCleanTextBreak = true;
+            break;
+          }
         }
 
         if (!pass.streamedText && pass.streamedThinking.trim()) {
