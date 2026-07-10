@@ -87,6 +87,9 @@ const ConversationService: ConversationServiceInterface = {
       if (conversationMeta.agent) {
         setFields.agent = conversationMeta.agent;
       }
+      if (conversationMeta.conversationOutcome !== undefined) {
+        setFields.conversationOutcome = conversationMeta.conversationOutcome;
+      }
     }
 
     // Build $setOnInsert for auto-creation of new conversations
@@ -116,6 +119,9 @@ const ConversationService: ConversationServiceInterface = {
       }),
       ...(conversationMeta?.agent && {
         agent: conversationMeta.agent,
+      }),
+      ...(conversationMeta?.conversationOutcome && {
+        conversationOutcome: conversationMeta.conversationOutcome,
       }),
       createdAt: now,
     };

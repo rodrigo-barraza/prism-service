@@ -757,6 +757,41 @@ describe("ExhaustionRecovery — Tool-Only Subagent Failure Mode", () => {
       // finalStreamedText is only set by the fallback path, not by a successful consumeStream
       // (the real consumeStream updates it through processStreamChunk in BaseAgenticHarness)
     });
+
+    it("should inject synthetic fallback when recovery pass produces only raw tool call markup (which gets cleaned to empty)", async () => {
+      const rawMarkupProvider = createMockProvider("<|tool_call>call:search_web{}<tool_call|>");
+      const harness = createMockHarness({
+        consumeStream: vi.fn().mockImplementation(
+          async (_stream: unknown, passState: Record<string, unknown>) => {
+            // raw text containing tool call markup
+            passState.streamedText = "<|tool_call>call:search_web{}<tool_call|>";
+            // finalStreamedText is stripped by stripToolCallMarkup to ""
+            passState.finalStreamedText = "";
+          },
+        ),
+      });
+
+      const state = {
+        iterations: 13,
+        streamedToolCalls: Array.from({ length: 13 }, (_, index) => ({
+          id: `call-${index}`,
+          name: "search_web",
+          args: { query: `query ${index}` },
+        })),
+        finalStreamedText: "",
+      } as any;
+
+      await runExhaustionRecoveryPass(
+        harness as any,
+        createMockContext({ provider: rawMarkupProvider }) as any,
+        state,
+        buildToolOnlyConversation(13),
+      );
+
+      // The synthetic fallback SHOULD have been injected because the cleaned text is empty
+      expect(state.finalStreamedText).toBeTruthy();
+      expect(state.finalStreamedText).toContain("Iteration limit reached after 13 iterations");
+    });
   });
 });
 

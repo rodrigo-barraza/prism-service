@@ -80,6 +80,7 @@ export interface FinalizerPayload {
   thinkingDurationSeconds?: number | null;
   /** Accumulated content generation phase duration across all iterations (seconds). */
   contentDurationSeconds?: number | null;
+  conversationOutcome?: string | null;
 }
 
 /**
@@ -189,6 +190,7 @@ export async function finalizeTextGeneration(
     contextBudget,
     thinkingDurationSeconds,
     contentDurationSeconds,
+    conversationOutcome,
   }: FinalizerPayload,
   overrideMessagesToAppend: MessagePayload[] | null = null,
   finalizerOptions?: { deferDoneEmission?: boolean },
@@ -503,6 +505,9 @@ export async function finalizeTextGeneration(
     }
     if (agent) {
       finalMeta.agent = agent;
+    }
+    if (conversationOutcome !== undefined) {
+      finalMeta.conversationOutcome = conversationOutcome;
     }
     // Persist the latest context budget snapshot on the conversation document
     // so the client can display it when users switch between conversations.
