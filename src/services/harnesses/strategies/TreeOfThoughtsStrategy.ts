@@ -1107,6 +1107,28 @@ async function generateBranch(
   harness.registerTrackerRequest(passRequestId);
 
   const stream = await harness.createProviderStream(branchMessages, passOptions);
+
+  // Context exhaustion guard — return empty branch if budget is critically low
+  if (stream === null) {
+    logger.warn(
+      `[TreeOfThoughts] Context exhaustion on branch ${branchIndex} — returning empty branch.`,
+    );
+    return {
+      branchIndex,
+      text: "",
+      thinking: "",
+      thinkingSignature: "",
+      score: 0,
+      criteriaScores: {
+        correctness: 0,
+        risk: 0,
+        efficiency: 0,
+        completeness: 0,
+      },
+      pass,
+    };
+  }
+
   await harness.consumeStream(stream, pass, allowedToolNames);
 
   return {
@@ -1177,6 +1199,15 @@ async function runPlanningPhase(
       currentMessages,
       planPassOptions,
     );
+
+    // Context exhaustion guard — abort planning if budget is critically low
+    if (stream === null) {
+      logger.warn(
+        `[TreeOfThoughts] Context exhaustion during planning iteration ${planningIteration} — aborting.`,
+      );
+      break;
+    }
+
     await harness.consumeStream(stream, pass, allowedPlanToolNames);
 
     finalizePassTracker(pass, passRequestId);
