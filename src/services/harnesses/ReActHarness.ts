@@ -38,6 +38,7 @@ import {
   MAX_OUTPUT_TRUNCATION_RECOVERIES,
 } from "./lifecycle/OutputTruncationRecovery.ts";
 import { manageContextPressure } from "./lifecycle/ContextPressureManager.ts";
+import { buildContextExhaustedMessage } from "./lifecycle/ContextExhaustionGuard.ts";
 import { logKVCacheHitRate } from "./lifecycle/KVCacheReporter.ts";
 import { injectToolDiscoveryNudge } from "./lifecycle/ToolDiscoveryNudge.ts";
 import { finalizePassTracker } from "./lifecycle/TrackerFinalizer.ts";
@@ -396,6 +397,30 @@ export default class ReActHarness extends BaseAgenticHarness {
 
         // ── Stream LLM response ────────────────────────────────
         const stream = await this.createProviderStream(currentMessages, passOptions);
+
+        // ── Context exhaustion pre-flight ──────────────────────
+        // When the output budget is critically low, createProviderStream
+        // returns null instead of a stream. Break to the exhaustion
+        // recovery path below the loop.
+        if (stream === null) {
+          logger.warn(
+            `[ReActHarness] Context exhaustion guard fired on iteration ${state.iterations} — ` +
+              `skipping provider call, triggering exhaustion recovery.`,
+          );
+          injectErrorAsConversationMessage(
+            currentMessages,
+            buildContextExhaustedMessage(
+              0,
+              this.context.modelDefinition?.maxInputTokens || 0,
+              state.iterations,
+              this.context.options?.locale as string | undefined,
+            ),
+            context,
+          );
+          state.conversationOutcome = "exhausted";
+          break;
+        }
+
         await this.consumeStream(stream, pass, allowedToolNames);
 
         // ── Repetition detection recovery ──────────────────────
@@ -441,6 +466,16 @@ export default class ReActHarness extends BaseAgenticHarness {
               currentMessages,
               perturbedPassOptions,
             );
+
+            // Context exhaustion can also fire during repetition retries
+            if (retryStream === null) {
+              logger.warn(
+                `[ReActHarness] Context exhaustion during repetition retry ${repetitionRetry} — ` +
+                  `aborting repetition recovery.`,
+              );
+              break;
+            }
+
             await this.consumeStream(retryStream, retryPass, allowedToolNames);
 
             finalizePassTracker(retryPass, retryRequestId);

@@ -13,6 +13,11 @@ import { stripToolCallMarkup } from "#src/utils/StreamChunkDispatcher";
 import ContextWindowManager from "#src/utils/ContextWindowManager";
 import ContextBudgetTracker from "./ContextBudgetTracker.ts";
 import {
+  isContextExhausted,
+  logContextExhaustion,
+  emitContextExhaustedStatus,
+} from "./lifecycle/ContextExhaustionGuard.ts";
+import {
   DEFAULT_MAX_INPUT_TOKENS,
   DEFAULT_MAX_OUTPUT_TOKENS,
 } from "#src/constants/TokenBudgetDefaults";
@@ -551,6 +556,11 @@ export default class BaseAgenticHarness {
    * Handles liveAPI fallback, message expansion, and dynamic output
    * token clamping to prevent context window overflow.
    *
+   * Returns `null` when the pre-flight ContextExhaustionGuard determines
+   * that the output budget is critically low (below MINIMUM_VIABLE_OUTPUT_TOKENS).
+   * Callers must check for null and trigger exhaustion recovery instead
+   * of attempting to consume a non-existent stream.
+   *
    * Async because self-hosted providers (vLLM, llama-cpp, Ollama) may
    * need to query their model info endpoint to discover the context
    * window before clamping can run. This fixes the cold-start race
@@ -560,7 +570,7 @@ export default class BaseAgenticHarness {
   async createProviderStream(
     messages: ConversationMessage[],
     passOptions: AgenticOptions,
-  ): Promise<AsyncIterable<unknown>> {
+  ): Promise<AsyncIterable<unknown> | null> {
     const { provider, resolvedModel, modelDefinition, signal } = this.context;
 
     // Pre-discover context window for self-hosted providers so
@@ -576,6 +586,27 @@ export default class BaseAgenticHarness {
       messages,
       passOptions.maxTokens,
     );
+
+    // ── Pre-flight context exhaustion guard ──────────────────
+    // If the clamped output budget is below the minimum viable threshold,
+    // the model cannot produce a complete response (tool call JSON needs
+    // 500–2K tokens + reasoning overhead). Return null to signal the
+    // caller to skip the provider call and trigger exhaustion recovery.
+    const contextWindow = this.resolveContextWindow();
+    if (isContextExhausted(clampedMaxTokens)) {
+      logContextExhaustion(
+        clampedMaxTokens ?? 0,
+        contextWindow ?? 0,
+        "BaseAgenticHarness",
+      );
+      emitContextExhaustedStatus(
+        this.context.emit,
+        clampedMaxTokens ?? 0,
+        contextWindow ?? 0,
+      );
+      return null;
+    }
+
     const clampedPassOptions =
       clampedMaxTokens !== passOptions.maxTokens
         ? { ...passOptions, maxTokens: clampedMaxTokens }

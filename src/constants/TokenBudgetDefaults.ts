@@ -41,3 +41,13 @@ export const OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER = 0.10;
  * partial response rather than silently failing with 0 output.
  */
 export const MINIMUM_CLAMPED_OUTPUT_TOKENS = 1_024;
+
+/**
+ * Minimum output budget below which a provider request is considered doomed.
+ *
+ * A tool call JSON typically needs 500–2K tokens, and the model needs
+ * additional room for reasoning/thinking. Below this threshold, the risk
+ * of mid-tool-call truncation is too high — the harness should skip the
+ * provider call entirely and trigger exhaustion recovery instead.
+ */
+export const MINIMUM_VIABLE_OUTPUT_TOKENS = 4_096;

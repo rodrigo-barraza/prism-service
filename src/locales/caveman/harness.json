@@ -37,7 +37,8 @@
     "providerError": "Provider error on iteration {{iteration}}: `{{errorText}}`. Conversation preserved. Retry or try different model."
   },
   "contextWindow": {
-    "droppedMessages": "{{droppedCount}} old message removed — context window full."
+    "droppedMessages": "{{droppedCount}} old message removed — context window full.",
+    "contextExhausted": "Brain full — only {{availableTokens}} tokens left of {{contextWindow}}. Too many tool results from {{iterationCount}} rounds. Summarizing now."
   },
   "toolSetUpdated": {
     "header": "[NEW TOOL] {{count}} enabled: {{toolNames}}",
