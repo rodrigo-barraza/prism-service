@@ -150,9 +150,17 @@ router.get(
         };
       });
 
-      disambiguateWorkspaceNames(mappedWorkspaces);
+      // Exclude orphaned user-configured roots with no connected agent.
+      // Static (pinned) roots are always accessible via tools-service's local
+      // filesystem; agent-served roots are accessible through the WebSocket
+      // agent. Everything else is inaccessible and should not appear.
+      const accessibleWorkspaces = mappedWorkspaces.filter(
+        (workspace) => workspace.isPinned || workspace.isAgentServed,
+      );
 
-      res.json(mappedWorkspaces);
+      disambiguateWorkspaceNames(accessibleWorkspaces);
+
+      res.json(accessibleWorkspaces);
     } catch (error: unknown) {
       logger.error(`GET /workspaces error: ${getErrorMessage(error)}`);
       res.status(500).json({ error: "Failed to retrieve workspace roots" });
@@ -229,9 +237,14 @@ router.get(
         };
       });
 
-      disambiguateWorkspaceNames(workspaces);
+      // Exclude orphaned user-configured roots with no connected agent
+      const accessibleWorkspaces = workspaces.filter(
+        (workspace) => workspace.isPinned || workspace.isAgentServed,
+      );
 
-      res.json({ workspaces, agents, staticRoots });
+      disambiguateWorkspaceNames(accessibleWorkspaces);
+
+      res.json({ workspaces: accessibleWorkspaces, agents, staticRoots });
     } catch (error: unknown) {
       logger.error(`GET /workspaces/full error: ${getErrorMessage(error)}`);
       res
