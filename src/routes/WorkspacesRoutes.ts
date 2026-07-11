@@ -512,4 +512,38 @@ router.get(
   }),
 );
 
+/**
+ * DELETE /workspaces/agents/:id
+ * Disconnect a remote workspace agent by ID.
+ * Proxies to tools-service DELETE /agents/:id.
+ */
+router.delete(
+  "/agents/:id",
+  asyncHandler(async (req: Request, res: Response) => {
+    try {
+      const agentId = req.params.id;
+      const toolsResponse = await fetch(
+        `${TOOLS_SERVICE_URL}/agents/${agentId}`,
+        {
+          method: "DELETE",
+          signal: AbortSignal.timeout(TOOL_CONFIG_FETCH_TIMEOUT_MILLISECONDS),
+        },
+      );
+
+      if (!toolsResponse.ok) {
+        const errorBody = await toolsResponse.json().catch(() => ({}));
+        return res.status(toolsResponse.status).json(errorBody);
+      }
+
+      const responseBody = await toolsResponse.json();
+      res.json(responseBody);
+    } catch (error: unknown) {
+      logger.error(
+        `DELETE /workspaces/agents/:id error: ${getErrorMessage(error)}`,
+      );
+      res.status(502).json({ error: "Failed to disconnect agent" });
+    }
+  }),
+);
+
 export default router;
