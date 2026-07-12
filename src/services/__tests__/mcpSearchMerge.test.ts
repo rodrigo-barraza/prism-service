@@ -102,7 +102,7 @@ vi.mock("#src/services/SettingsService", () => ({
   },
 }));
 
-vi.mock("#src/services/local-tools/InternalToolRegistry", () => ({
+vi.mock("#src/services/tool-definitions/InternalToolRegistry", () => ({
   default: {
     has: vi.fn(() => false),
     getNames: vi.fn(() => new Set()),

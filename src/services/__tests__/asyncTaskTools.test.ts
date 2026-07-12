@@ -87,7 +87,7 @@ vi.mock("#src/routes/ChatRoutes", () => ({
 // Imports
 // ────────────────────────────────────────────────────────────
 
-import asyncTaskTools from "#src/services/local-tools/AsyncTaskTools";
+import asyncTaskTools from "#src/services/tool-definitions/AsyncTaskTools";
 import AsyncTaskRegistry from "#src/services/AsyncTaskRegistry";
 import { ASYNC_TASK_TOOL_NAMES } from "#src/services/AsyncTaskConstants";
 

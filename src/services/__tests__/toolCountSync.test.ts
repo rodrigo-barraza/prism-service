@@ -220,7 +220,7 @@ vi.mock("#src/services/AgentPersonaRegistry", () => ({
   },
 }));
 
-vi.mock("#src/services/local-tools/InternalToolRegistry", () => ({
+vi.mock("#src/services/tool-definitions/InternalToolRegistry", () => ({
   default: {
     getNames: vi.fn(() => MOCK_INTERNAL_NAMES),
   },

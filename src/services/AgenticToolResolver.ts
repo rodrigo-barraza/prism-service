@@ -4,7 +4,7 @@ import logger from "#src/utils/logger";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import ToolContext from "./ToolContext.ts";
 
-import InternalToolRegistry from "./local-tools/InternalToolRegistry.ts";
+import InternalToolRegistry from "./tool-definitions/InternalToolRegistry.ts";
 import {
   CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST,
   CORE_ORCHESTRATOR_TOOLS as CORE_ORCHESTRATOR_TOOLS_LIST,

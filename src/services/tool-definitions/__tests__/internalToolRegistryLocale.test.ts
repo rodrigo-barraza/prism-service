@@ -69,7 +69,7 @@ describe("InternalToolRegistry Locale Handling", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    const registryModule = await import("#src/services/local-tools/InternalToolRegistry");
+    const registryModule = await import("#src/services/tool-definitions/InternalToolRegistry");
     InternalToolRegistry = registryModule.default;
   });
 

@@ -40,7 +40,7 @@ vi.mock("#src/services/AgentPersonaRegistry", () => ({
   },
 }));
 
-vi.mock("#src/services/local-tools/InternalToolRegistry", () => ({
+vi.mock("#src/services/tool-definitions/InternalToolRegistry", () => ({
   default: {
     getClientSchemas: vi.fn().mockReturnValue([]),
     getAISchemas: vi.fn().mockReturnValue([]),
