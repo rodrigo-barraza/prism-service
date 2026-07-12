@@ -51,6 +51,9 @@ export interface SettingsData {
     emotionModel: string;
     [key: string]: string;
   };
+  workspace?: {
+    agentSecret: string;
+  };
   [key: string]: unknown;
 }
 
@@ -93,6 +96,9 @@ const DEFAULTS: SettingsData = {
   somatic: {
     emotionProvider: "",
     emotionModel: "",
+  },
+  workspace: {
+    agentSecret: "",
   },
 };
 
