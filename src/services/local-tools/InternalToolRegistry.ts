@@ -1,6 +1,6 @@
 import logger from "#src/utils/logger";
 import { DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { errorMessage } from "@rodrigo-barraza/utilities-library";
+import { errorMessage, type ToolDisplayMetadata } from "@rodrigo-barraza/utilities-library";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 
 // ────────────────────────────────────────────────────────────
@@ -42,6 +42,7 @@ export interface InternalToolSchema {
   description?: string;
   parameters?: InternalToolSchemaParameters;
   emoji?: string | string[];
+  display?: ToolDisplayMetadata;
 }
 
 export interface InternalToolContext {

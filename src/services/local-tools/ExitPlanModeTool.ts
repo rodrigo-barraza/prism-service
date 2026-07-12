@@ -24,6 +24,12 @@ export default {
       },
       required: [],
     },
+    display: {
+      activeVerb: "Exiting plan mode",
+      completedVerb: "Exited plan mode",
+      subjectParam: "summary",
+      subjectFormat: "truncate" as const,
+    },
   },
 
   labels: ["coding"],
