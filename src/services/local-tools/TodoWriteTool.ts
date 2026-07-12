@@ -78,6 +78,12 @@ export default {
       },
       required: ["items"],
     },
+    display: {
+      activeVerb: "Updating checklist",
+      completedVerb: "Updated checklist",
+      subjectParam: "items",
+      subjectFormat: "truncate" as const,
+    },
   },
 
   labels: ["coding"],
