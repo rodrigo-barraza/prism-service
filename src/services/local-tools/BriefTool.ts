@@ -46,6 +46,12 @@ export default {
       },
       required: ["summary"],
     },
+    display: {
+      activeVerb: "Summarizing conversation",
+      completedVerb: "Summarized conversation",
+      subjectParam: "summary",
+      subjectFormat: "truncate" as const,
+    },
   },
 
   labels: ["coding"],

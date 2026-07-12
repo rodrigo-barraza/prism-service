@@ -27,6 +27,12 @@ export default {
       },
       required: [],
     },
+    display: {
+      activeVerb: "Entering plan mode",
+      completedVerb: "Entered plan mode",
+      subjectParam: "reason",
+      subjectFormat: "truncate" as const,
+    },
   },
 
   labels: ["coding"],
