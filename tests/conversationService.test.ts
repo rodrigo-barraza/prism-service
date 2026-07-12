@@ -838,8 +838,7 @@ describe("Conversation Utilities (utils.ts)", () => {
       expect(patchFields.systemPrompt).toBe("You are a compiler");
       expect(patchFields.settings).toEqual({
         model: "gpt-4",
-        provider: PROVIDERS.OPENAI,
-        systemPrompt: "You are a compiler"
+        provider: PROVIDERS.OPENAI
       });
       expect(patchFields.messages).toEqual(messages);
       expect(patchFields.modalities?.textIn).toBe(true);
