@@ -501,4 +501,59 @@ describe("buildConversationPatchFields", () => {
     expect(fields).not.toHaveProperty("systemPrompt");
     expect(fields).not.toHaveProperty(COLLECTIONS.SETTINGS);
   });
+
+  describe("systemPrompt isolation — settings must never mirror systemPrompt", () => {
+    it("should NEVER embed systemPrompt into settings even when both are provided", () => {
+      const assembledPrompt = "<agent-identity>\n# Identity\nYou are the Omni Agent...\n</agent-identity>\n<tool-policy>...</tool-policy>";
+      const fields = buildConversationPatchFields({
+        systemPrompt: assembledPrompt,
+        settings: { provider: PROVIDERS.OPENAI, model: "gpt-5.4" },
+      });
+
+      expect(fields.systemPrompt).toBe(assembledPrompt);
+      expect(fields.settings).toBeDefined();
+      expect(fields.settings).not.toHaveProperty("systemPrompt");
+      expect(JSON.stringify(fields.settings)).not.toContain("agent-identity");
+    });
+
+    it("should keep settings clean when systemPrompt is empty string", () => {
+      const fields = buildConversationPatchFields({
+        systemPrompt: "",
+        settings: { provider: PROVIDERS.GOOGLE },
+      });
+
+      expect(fields.systemPrompt).toBe("");
+      expect(fields.settings).not.toHaveProperty("systemPrompt");
+    });
+
+    it("should keep settings clean when systemPrompt is undefined", () => {
+      const fields = buildConversationPatchFields({
+        settings: { provider: PROVIDERS.OPENAI },
+      });
+
+      expect(fields.settings).toBeDefined();
+      expect(fields.settings).not.toHaveProperty("systemPrompt");
+    });
+
+    it("should preserve settings fields without systemPrompt contamination (agent conversation)", () => {
+      const agentAssembledPrompt = "You are a coding agent with 87000 characters of identity, tools, and guidelines.";
+      const fields = buildConversationPatchFields({
+        title: "Agent Conversation",
+        systemPrompt: agentAssembledPrompt,
+        settings: {
+          provider: PROVIDERS.ANTHROPIC,
+          model: "claude-sonnet-4-5-20250929",
+        },
+      });
+
+      expect(fields.title).toBe("Agent Conversation");
+      expect(fields.systemPrompt).toBe(agentAssembledPrompt);
+      expect(fields.settings!.provider).toBe(PROVIDERS.ANTHROPIC);
+      expect(fields.settings!.model).toBe("claude-sonnet-4-5-20250929");
+      expect(Object.keys(fields.settings!)).toEqual(
+        expect.arrayContaining(["provider", "model"]),
+      );
+      expect(Object.keys(fields.settings!)).not.toContain("systemPrompt");
+    });
+  });
 });
