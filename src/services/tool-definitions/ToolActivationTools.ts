@@ -30,36 +30,33 @@ const PROTECTED_TOOL_NAMES = new Set<string>([
 // ── enable_tools ─────────────────────────────────────────────
 const enableTools = {
   name: TOOL_NAMES.ENABLE_TOOLS,
-  schema: {
-    name: TOOL_NAMES.ENABLE_TOOLS,
-    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.ENABLE_TOOLS],
-    description:
-      "REQUIRED after search_tools: Activate tools discovered by search_tools so you can call them. " +
-      "You MUST call this after search_tools returns results where isEnabled is false — without " +
-      "calling enable_tools first, discovered tools CANNOT be used. Accepts exact tool names " +
-      '(e.g. "get_weather") or domain prefixes (e.g. "domain:Finance", "domainKey:health") to ' +
-      "activate an entire domain at once. The newly enabled tools become available on the NEXT " +
-      "iteration — you do not need to call them in the same turn. Core cognitive tools (memory, " +
-      "tasks, planning) are always available.",
-    parameters: {
-      type: "object",
-      properties: {
-        tools: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Tool names or domain prefixes to enable. " +
-            'Examples: ["get_weather", "get_weather_forecast"] or ["domain:Weather & Environment"].',
-        },
+  emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.ENABLE_TOOLS],
+  description:
+    "REQUIRED after search_tools: Activate tools discovered by search_tools so you can call them. " +
+    "You MUST call this after search_tools returns results where isEnabled is false — without " +
+    "calling enable_tools first, discovered tools CANNOT be used. Accepts exact tool names " +
+    '(e.g. "get_weather") or domain prefixes (e.g. "domain:Finance", "domainKey:health") to ' +
+    "activate an entire domain at once. The newly enabled tools become available on the NEXT " +
+    "iteration — you do not need to call them in the same turn. Core cognitive tools (memory, " +
+    "tasks, planning) are always available.",
+  parameters: {
+    type: "object",
+    properties: {
+      tools: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Tool names or domain prefixes to enable. " +
+          'Examples: ["get_weather", "get_weather_forecast"] or ["domain:Weather & Environment"].',
       },
-      required: ["tools"],
     },
-    display: {
-      activeVerb: "Enabling tools",
-      completedVerb: "Enabled tools",
-      subjectParam: "tools",
-      subjectFormat: "truncate" as const,
-    },
+    required: ["tools"],
+  },
+  display: {
+    activeVerb: "Enabling tools",
+    completedVerb: "Enabled tools",
+    subjectParam: "tools",
+    subjectFormat: "truncate" as const,
   },
   labels: ["tools", "activation", "meta"],
   domain: DOMAINS.CORE_DISCOVER.displayName,
@@ -179,32 +176,29 @@ const enableTools = {
 // ── disable_tools ────────────────────────────────────────────
 const disableTools = {
   name: TOOL_NAMES.DISABLE_TOOLS,
-  schema: {
-    name: TOOL_NAMES.DISABLE_TOOLS,
-    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.DISABLE_TOOLS],
-    description:
-      "Dynamically disable tools from this conversation to reduce token usage and tool interference. " +
-      'Accepts exact tool names or domain prefixes (e.g. "domain:Finance"). ' +
-      "Core cognitive tools (memory, tasks, planning, orchestration) cannot be disabled.",
-    parameters: {
-      type: "object",
-      properties: {
-        tools: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Tool names or domain prefixes to disable. " +
-            'Examples: ["get_weather"] or ["domain:Weather & Environment"].',
-        },
+  emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.DISABLE_TOOLS],
+  description:
+    "Dynamically disable tools from this conversation to reduce token usage and tool interference. " +
+    'Accepts exact tool names or domain prefixes (e.g. "domain:Finance"). ' +
+    "Core cognitive tools (memory, tasks, planning, orchestration) cannot be disabled.",
+  parameters: {
+    type: "object",
+    properties: {
+      tools: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Tool names or domain prefixes to disable. " +
+          'Examples: ["get_weather"] or ["domain:Weather & Environment"].',
       },
-      required: ["tools"],
     },
-    display: {
-      activeVerb: "Disabling tools",
-      completedVerb: "Disabled tools",
-      subjectParam: "tools",
-      subjectFormat: "truncate" as const,
-    },
+    required: ["tools"],
+  },
+  display: {
+    activeVerb: "Disabling tools",
+    completedVerb: "Disabled tools",
+    subjectParam: "tools",
+    subjectFormat: "truncate" as const,
   },
   labels: ["tools", "activation", "meta"],
   domain: DOMAINS.CORE_DISCOVER.displayName,

@@ -27,39 +27,36 @@ const CRON_MINIMUM_DELAY_SECONDS = TIMERS.CRON_MINIMUM_DELAY_SECONDS;
 // execution within a single conversation turn.
 const setTimer = {
   name: TOOL_NAMES.SET_TIMER,
-  schema: {
-    name: TOOL_NAMES.SET_TIMER,
-    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.SET_TIMER],
-    description:
-      "Set a short one-shot timer to pause, wait, or defer execution within this conversation. " +
-      "Use this when you need to wait for an asynchronous process to finish, poll a build or deployment, " +
-      "retry after a transient failure, or yield briefly before continuing work. " +
-      "The timer fires the provided prompt back into this conversation after the specified duration. " +
-      "Duration must be between 30 and 599 seconds (under 10 minutes). " +
-      "This is an agent-internal tool for in-conversation waits only — " +
-      "do NOT use this for user-facing reminders, alarms, or scheduled events (use create_cron_job instead).",
-    parameters: {
-      type: "object",
-      properties: {
-        prompt: {
-          type: "string",
-          description:
-            "The instruction or context to inject back into this conversation when the timer fires.",
-        },
-        durationSeconds: {
-          type: "number",
-          description:
-            "Number of seconds to wait before firing (30–599). Must be under 10 minutes.",
-        },
+  emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.SET_TIMER],
+  description:
+    "Set a short one-shot timer to pause, wait, or defer execution within this conversation. " +
+    "Use this when you need to wait for an asynchronous process to finish, poll a build or deployment, " +
+    "retry after a transient failure, or yield briefly before continuing work. " +
+    "The timer fires the provided prompt back into this conversation after the specified duration. " +
+    "Duration must be between 30 and 599 seconds (under 10 minutes). " +
+    "This is an agent-internal tool for in-conversation waits only — " +
+    "do NOT use this for user-facing reminders, alarms, or scheduled events (use create_cron_job instead).",
+  parameters: {
+    type: "object",
+    properties: {
+      prompt: {
+        type: "string",
+        description:
+          "The instruction or context to inject back into this conversation when the timer fires.",
       },
-      required: ["prompt", "durationSeconds"],
+      durationSeconds: {
+        type: "number",
+        description:
+          "Number of seconds to wait before firing (30–599). Must be under 10 minutes.",
+      },
     },
-    display: {
-      activeVerb: "Setting timer",
-      completedVerb: "Set timer",
-      subjectParam: "prompt",
-      subjectFormat: "truncate" as const,
-    },
+    required: ["prompt", "durationSeconds"],
+  },
+  display: {
+    activeVerb: "Setting timer",
+    completedVerb: "Set timer",
+    subjectParam: "prompt",
+    subjectFormat: "truncate" as const,
   },
   labels: ["timer", "wait", "defer"],
   domain: DOMAINS.CORE_SCHEDULE.displayName,
@@ -150,23 +147,20 @@ const setTimer = {
 // Lists active agent-internal one-shot timers for this conversation.
 const listTimers = {
   name: TOOL_NAMES.LIST_TIMERS,
-  schema: {
-    name: TOOL_NAMES.LIST_TIMERS,
-    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.LIST_TIMERS],
-    description:
-      "List all active one-shot agent timers in the current conversation. " +
-      "Shows short-duration waits (30–599 seconds) set by set_timer. " +
-      "To view user-facing scheduled reminders, alarms, and recurring events, use list_cron_jobs instead.",
-    parameters: {
-      type: "object",
-      properties: {},
-    },
-    display: {
-      activeVerb: "Listing timers",
-      completedVerb: "Listed timers",
-      subjectParam: "",
-      subjectFormat: "truncate" as const,
-    },
+  emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.LIST_TIMERS],
+  description:
+    "List all active one-shot agent timers in the current conversation. " +
+    "Shows short-duration waits (30–599 seconds) set by set_timer. " +
+    "To view user-facing scheduled reminders, alarms, and recurring events, use list_cron_jobs instead.",
+  parameters: {
+    type: "object",
+    properties: {},
+  },
+  display: {
+    activeVerb: "Listing timers",
+    completedVerb: "Listed timers",
+    subjectParam: "",
+    subjectFormat: "truncate" as const,
   },
   labels: ["timer", "wait"],
   domain: DOMAINS.CORE_SCHEDULE.displayName,
@@ -221,28 +215,25 @@ const listTimers = {
 // Cancels an active agent-internal one-shot timer.
 const cancelTimer = {
   name: TOOL_NAMES.CANCEL_TIMER,
-  schema: {
-    name: TOOL_NAMES.CANCEL_TIMER,
-    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.CANCEL_TIMER],
-    description:
-      "Cancel an active one-shot agent timer in the current conversation. " +
-      "To delete a scheduled cron job, reminder, or alarm, use delete_cron_job instead.",
-    parameters: {
-      type: "object",
-      properties: {
-        timerId: {
-          type: "string",
-          description: "The unique ID of the timer to cancel.",
-        },
+  emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.CANCEL_TIMER],
+  description:
+    "Cancel an active one-shot agent timer in the current conversation. " +
+    "To delete a scheduled cron job, reminder, or alarm, use delete_cron_job instead.",
+  parameters: {
+    type: "object",
+    properties: {
+      timerId: {
+        type: "string",
+        description: "The unique ID of the timer to cancel.",
       },
-      required: ["timerId"],
     },
-    display: {
-      activeVerb: "Cancelling timer",
-      completedVerb: "Cancelled timer",
-      subjectParam: "timerId",
-      subjectFormat: "quoted" as const,
-    },
+    required: ["timerId"],
+  },
+  display: {
+    activeVerb: "Cancelling timer",
+    completedVerb: "Cancelled timer",
+    subjectParam: "timerId",
+    subjectFormat: "quoted" as const,
   },
   labels: ["timer", "wait"],
   domain: DOMAINS.CORE_SCHEDULE.displayName,

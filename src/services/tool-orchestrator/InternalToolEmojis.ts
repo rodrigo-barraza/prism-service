@@ -4,7 +4,7 @@
 // + InternalToolRegistry). Mirrors TOOL_EMOJIS in tools-service.
 // ────────────────────────────────────────────────────────────
 
-export const INTERNAL_TOOL_EMOJIS: Record<string, string | [string, string]> = {
+export const INTERNAL_TOOL_EMOJIS: Record<string, string[]> = {
   // Plan mode
   enter_plan_mode: ["📝", "🧠"],
   exit_plan_mode: ["🚀", "🧠"],

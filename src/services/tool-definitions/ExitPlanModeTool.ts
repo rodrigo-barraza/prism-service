@@ -8,28 +8,25 @@ import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalTo
 export default {
   name: TOOL_NAMES.EXIT_PLAN_MODE,
 
-  schema: {
-    name: TOOL_NAMES.EXIT_PLAN_MODE,
-    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.EXIT_PLAN_MODE],
-    description:
-      "Exit planning mode and resume normal tool execution. Call this after you have " +
-      "produced your plan and are ready to execute it with tools.",
-    parameters: {
-      type: "object",
-      properties: {
-        summary: {
-          type: "string",
-          description: "Brief summary of the plan you are about to execute.",
-        },
+  emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.EXIT_PLAN_MODE],
+  description:
+    "Exit planning mode and resume normal tool execution. Call this after you have " +
+    "produced your plan and are ready to execute it with tools.",
+  parameters: {
+    type: "object",
+    properties: {
+      summary: {
+        type: "string",
+        description: "Brief summary of the plan you are about to execute.",
       },
-      required: [],
     },
-    display: {
-      activeVerb: "Exiting plan mode",
-      completedVerb: "Exited plan mode",
-      subjectParam: "summary",
-      subjectFormat: "truncate" as const,
-    },
+    required: [],
+  },
+  display: {
+    activeVerb: "Exiting plan mode",
+    completedVerb: "Exited plan mode",
+    subjectParam: "summary",
+    subjectFormat: "truncate" as const,
   },
 
   labels: ["coding"],

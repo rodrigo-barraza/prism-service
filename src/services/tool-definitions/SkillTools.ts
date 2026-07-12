@@ -20,61 +20,58 @@ interface SkillCreateArgs extends Partial<SkillDocument> {
 
 const createSkill = {
   name: TOOL_NAMES.CREATE_SKILL,
-  schema: {
-    name: TOOL_NAMES.CREATE_SKILL,
-    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.CREATE_SKILL],
-    description:
-      "Create a reusable workflow skill. Skills are stored prompt templates with variable " +
-      "interpolation ({{variable}}) that can be invoked by name. Use this to capture " +
-      "multi-step workflows (refactor→test→commit, analyze→report, etc.) as reusable atomic operations. " +
-      "Skills persist across sessions and can be shared across agents.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description:
-            "Unique skill name (e.g. 'refactor_and_test', 'code_review'). Used as the skill ID.",
-        },
-        description: {
-          type: "string",
-          description: "What the skill does — shown when listing skills.",
-        },
-        prompt: {
-          type: "string",
-          description:
-            "The prompt template to execute. Use {{variable}} syntax for parameters.",
-        },
-        steps: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Optional: ordered list of step descriptions for documentation.",
-        },
-        tools: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Optional: specific tools to enable. If omitted, all tools are available.",
-        },
-        maxIterations: {
-          type: "number",
-          description:
-            "Optional: max agentic loop iterations for the skill run (1-100). Default: 25.",
-        },
-        model: {
-          type: "string",
-          description: "Optional: model override for the skill run.",
-        },
+  emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.CREATE_SKILL],
+  description:
+    "Create a reusable workflow skill. Skills are stored prompt templates with variable " +
+    "interpolation ({{variable}}) that can be invoked by name. Use this to capture " +
+    "multi-step workflows (refactor→test→commit, analyze→report, etc.) as reusable atomic operations. " +
+    "Skills persist across sessions and can be shared across agents.",
+  parameters: {
+    type: "object",
+    properties: {
+      name: {
+        type: "string",
+        description:
+          "Unique skill name (e.g. 'refactor_and_test', 'code_review'). Used as the skill ID.",
       },
-      required: ["name", "prompt"],
+      description: {
+        type: "string",
+        description: "What the skill does — shown when listing skills.",
+      },
+      prompt: {
+        type: "string",
+        description:
+          "The prompt template to execute. Use {{variable}} syntax for parameters.",
+      },
+      steps: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Optional: ordered list of step descriptions for documentation.",
+      },
+      tools: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Optional: specific tools to enable. If omitted, all tools are available.",
+      },
+      maxIterations: {
+        type: "number",
+        description:
+          "Optional: max agentic loop iterations for the skill run (1-100). Default: 25.",
+      },
+      model: {
+        type: "string",
+        description: "Optional: model override for the skill run.",
+      },
     },
-    display: {
-      activeVerb: "Creating skill",
-      completedVerb: "Created skill",
-      subjectParam: "name",
-      subjectFormat: "quoted" as const,
-    },
+    required: ["name", "prompt"],
+  },
+  display: {
+    activeVerb: "Creating skill",
+    completedVerb: "Created skill",
+    subjectParam: "name",
+    subjectFormat: "quoted" as const,
   },
   labels: ["coding", "automation"],
   domain: DOMAINS.CORE_SKILL.displayName,
@@ -123,34 +120,31 @@ const createSkill = {
 
 const executeSkill = {
   name: TOOL_NAMES.EXECUTE_SKILL,
-  schema: {
-    name: TOOL_NAMES.EXECUTE_SKILL,
-    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.EXECUTE_SKILL],
-    description:
-      "Execute a previously created skill by its ID. The skill's prompt template is " +
-      "interpolated with the provided variables and executed as an inline agentic task. " +
-      "Use list_skills to see available skills.",
-    parameters: {
-      type: "object",
-      properties: {
-        skillId: {
-          type: "string",
-          description: "The skill ID to execute (derived from the skill name).",
-        },
-        variables: {
-          type: "object",
-          description:
-            "Key-value pairs for {{variable}} interpolation in the skill's prompt template.",
-        },
+  emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.EXECUTE_SKILL],
+  description:
+    "Execute a previously created skill by its ID. The skill's prompt template is " +
+    "interpolated with the provided variables and executed as an inline agentic task. " +
+    "Use list_skills to see available skills.",
+  parameters: {
+    type: "object",
+    properties: {
+      skillId: {
+        type: "string",
+        description: "The skill ID to execute (derived from the skill name).",
       },
-      required: ["skillId"],
+      variables: {
+        type: "object",
+        description:
+          "Key-value pairs for {{variable}} interpolation in the skill's prompt template.",
+      },
     },
-    display: {
-      activeVerb: "Executing skill",
-      completedVerb: "Executed skill",
-      subjectParam: "skillId",
-      subjectFormat: "quoted" as const,
-    },
+    required: ["skillId"],
+  },
+  display: {
+    activeVerb: "Executing skill",
+    completedVerb: "Executed skill",
+    subjectParam: "skillId",
+    subjectFormat: "quoted" as const,
   },
   labels: ["coding", "automation"],
   domain: DOMAINS.CORE_SKILL.displayName,
@@ -203,27 +197,24 @@ const executeSkill = {
 
 const listSkills = {
   name: TOOL_NAMES.LIST_SKILLS,
-  schema: {
-    name: TOOL_NAMES.LIST_SKILLS,
-    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.LIST_SKILLS],
-    description:
-      "List all available skills. Skills are reusable workflow templates created with create_skill.",
-    parameters: {
-      type: "object",
-      properties: {
-        project: {
-          type: "string",
-          description: "Optional: filter by project scope.",
-        },
+  emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.LIST_SKILLS],
+  description:
+    "List all available skills. Skills are reusable workflow templates created with create_skill.",
+  parameters: {
+    type: "object",
+    properties: {
+      project: {
+        type: "string",
+        description: "Optional: filter by project scope.",
       },
-      required: [],
     },
-    display: {
-      activeVerb: "Listing skills",
-      completedVerb: "Listed skills",
-      subjectParam: "project",
-      subjectFormat: "quoted" as const,
-    },
+    required: [],
+  },
+  display: {
+    activeVerb: "Listing skills",
+    completedVerb: "Listed skills",
+    subjectParam: "project",
+    subjectFormat: "quoted" as const,
   },
   labels: ["coding", "automation"],
   domain: DOMAINS.CORE_SKILL.displayName,
@@ -242,23 +233,20 @@ const listSkills = {
 
 const deleteSkill = {
   name: TOOL_NAMES.DELETE_SKILL,
-  schema: {
-    name: TOOL_NAMES.DELETE_SKILL,
-    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.DELETE_SKILL],
-    description: "Delete a skill by its ID.",
-    parameters: {
-      type: "object",
-      properties: {
-        skillId: { type: "string", description: "The skill ID to delete." },
-      },
-      required: ["skillId"],
+  emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.DELETE_SKILL],
+  description: "Delete a skill by its ID.",
+  parameters: {
+    type: "object",
+    properties: {
+      skillId: { type: "string", description: "The skill ID to delete." },
     },
-    display: {
-      activeVerb: "Deleting skill",
-      completedVerb: "Deleted skill",
-      subjectParam: "skillId",
-      subjectFormat: "quoted" as const,
-    },
+    required: ["skillId"],
+  },
+  display: {
+    activeVerb: "Deleting skill",
+    completedVerb: "Deleted skill",
+    subjectParam: "skillId",
+    subjectFormat: "quoted" as const,
   },
   labels: ["coding", "automation"],
   domain: DOMAINS.CORE_SKILL.displayName,

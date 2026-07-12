@@ -3,6 +3,7 @@ import PromptLocaleService from "#src/services/PromptLocaleService";
 import {
   SERVER_SENT_EVENT_TYPES,
   TOOL_NAMES,
+  DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
 import { SYSTEM_STATUSES, TODO_PRIORITIES } from "#src/constants";
@@ -36,56 +37,54 @@ interface TodoContext extends InternalToolContext {
 export default {
   name: TOOL_NAMES.WRITE_TODO,
 
-  schema: {
-    name: TOOL_NAMES.WRITE_TODO,
-    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.WRITE_TODO],
-    description:
-      "Write or update a persistent TODO checklist for the current project. " +
-      "Maintains a structured list of items with completion status. " +
-      "Use this to track multi-step work, record progress, and keep a living " +
-      "checklist that persists across conversation turns. " +
-      "Each item has a status: 'pending', 'in_progress', or 'completed'. " +
-      "Call with the full updated list — it replaces the previous state.",
-    parameters: {
-      type: "object",
-      properties: {
+  emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.WRITE_TODO],
+  description:
+    "Write or update a persistent TODO checklist for the current project. " +
+    "Maintains a structured list of items with completion status. " +
+    "Use this to track multi-step work, record progress, and keep a living " +
+    "checklist that persists across conversation turns. " +
+    "Each item has a status: 'pending', 'in_progress', or 'completed'. " +
+    "Call with the full updated list — it replaces the previous state.",
+  parameters: {
+    type: "object",
+    properties: {
+      items: {
+        type: "array",
         items: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              content: { type: "string", description: "The todo item text." },
-              status: {
-                type: "string",
-                enum: [
-                  SYSTEM_STATUSES.PENDING,
-                  SYSTEM_STATUSES.IN_PROGRESS,
-                  SYSTEM_STATUSES.COMPLETED,
-                ],
-                description: "Item status. Default: 'pending'.",
-              },
-              priority: {
-                type: "string",
-                enum: ["high", "medium", "low"],
-                description: "Optional priority level.",
-              },
+          type: "object",
+          properties: {
+            content: { type: "string", description: "The todo item text." },
+            status: {
+              type: "string",
+              enum: [
+                SYSTEM_STATUSES.PENDING,
+                SYSTEM_STATUSES.IN_PROGRESS,
+                SYSTEM_STATUSES.COMPLETED,
+              ],
+              description: "Item status. Default: 'pending'.",
             },
-            required: ["content"],
+            priority: {
+              type: "string",
+              enum: ["high", "medium", "low"],
+              description: "Optional priority level.",
+            },
           },
-          description:
-            "Full list of todo items. Replaces the previous list entirely.",
+          required: ["content"],
         },
+        description:
+          "Full list of todo items. Replaces the previous list entirely.",
       },
-      required: ["items"],
     },
-    display: {
-      activeVerb: "Updating checklist",
-      completedVerb: "Updated checklist",
-      subjectParam: "items",
-      subjectFormat: "truncate" as const,
-    },
+    required: ["items"],
+  },
+  display: {
+    activeVerb: "Updating checklist",
+    completedVerb: "Updated checklist",
+    subjectParam: "items",
+    subjectFormat: "truncate" as const,
   },
 
+  domain: DOMAINS.CORE_HARNESS.displayName,
   labels: ["coding"],
 
   async execute(toolArguments: Record<string, unknown>, context: TodoContext) {

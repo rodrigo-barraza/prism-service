@@ -57,38 +57,35 @@ const DISALLOWED_ASYNC_TOOL_NAMES = new Set<string>([
 // ── run_async_task ─────────────────────────────────────────
 const runAsyncTask = {
   name: ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
-  schema: {
-    name: ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
-    emoji: INTERNAL_TOOL_EMOJIS[ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK],
-    description:
-      "Dispatch a tool to run asynchronously in the background. " +
-      "Returns immediately with a task ID — the tool executes in the background while you continue other work. " +
-      "Use this for long-running operations like shell commands, web scraping, file operations, or API calls " +
-      "when you don't need to wait for the result before proceeding. " +
-      "Query task status with list_async_tasks. Cancel with cancel_async_task. " +
-      "You will be automatically notified when the task completes.",
-    parameters: {
-      type: "object",
-      properties: {
-        toolName: {
-          type: "string",
-          description:
-            "The name of the tool to execute asynchronously (e.g., 'execute_command', 'search_web', 'read_url').",
-        },
-        toolArguments: {
-          type: "object",
-          description:
-            "The arguments to pass to the tool, exactly as you would pass them in a direct tool call.",
-        },
+  emoji: INTERNAL_TOOL_EMOJIS[ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK],
+  description:
+    "Dispatch a tool to run asynchronously in the background. " +
+    "Returns immediately with a task ID — the tool executes in the background while you continue other work. " +
+    "Use this for long-running operations like shell commands, web scraping, file operations, or API calls " +
+    "when you don't need to wait for the result before proceeding. " +
+    "Query task status with list_async_tasks. Cancel with cancel_async_task. " +
+    "You will be automatically notified when the task completes.",
+  parameters: {
+    type: "object",
+    properties: {
+      toolName: {
+        type: "string",
+        description:
+          "The name of the tool to execute asynchronously (e.g., 'execute_command', 'search_web', 'read_url').",
       },
-      required: ["toolName", "toolArguments"],
+      toolArguments: {
+        type: "object",
+        description:
+          "The arguments to pass to the tool, exactly as you would pass them in a direct tool call.",
+      },
     },
-    display: {
-      activeVerb: "Dispatching async task",
-      completedVerb: "Dispatched async task",
-      subjectParam: "toolName",
-      subjectFormat: "quoted" as const,
-    },
+    required: ["toolName", "toolArguments"],
+  },
+  display: {
+    activeVerb: "Dispatching async task",
+    completedVerb: "Dispatched async task",
+    subjectParam: "toolName",
+    subjectFormat: "quoted" as const,
   },
   labels: ["async", "background", "task"],
   domain: DOMAINS.CORE_HARNESS.displayName,
@@ -235,24 +232,21 @@ const runAsyncTask = {
 // ── list_async_tasks ───────────────────────────────────────
 const listAsyncTasks = {
   name: ASYNC_TASK_TOOL_NAMES.LIST_ASYNC_TASKS,
-  schema: {
-    name: ASYNC_TASK_TOOL_NAMES.LIST_ASYNC_TASKS,
-    emoji: INTERNAL_TOOL_EMOJIS[ASYNC_TASK_TOOL_NAMES.LIST_ASYNC_TASKS],
-    description:
-      "List all async background tasks dispatched in this conversation. " +
-      "Shows task ID, tool name, status, duration, and results for completed tasks. " +
-      "Use this to check on the progress of tasks dispatched with run_async_task.",
-    parameters: {
-      type: "object",
-      properties: {},
-      required: [],
-    },
-    display: {
-      activeVerb: "Listing async tasks",
-      completedVerb: "Listed async tasks",
-      subjectParam: "",
-      subjectFormat: "truncate" as const,
-    },
+  emoji: INTERNAL_TOOL_EMOJIS[ASYNC_TASK_TOOL_NAMES.LIST_ASYNC_TASKS],
+  description:
+    "List all async background tasks dispatched in this conversation. " +
+    "Shows task ID, tool name, status, duration, and results for completed tasks. " +
+    "Use this to check on the progress of tasks dispatched with run_async_task.",
+  parameters: {
+    type: "object",
+    properties: {},
+    required: [],
+  },
+  display: {
+    activeVerb: "Listing async tasks",
+    completedVerb: "Listed async tasks",
+    subjectParam: "",
+    subjectFormat: "truncate" as const,
   },
   labels: ["async", "background", "task"],
   domain: DOMAINS.CORE_HARNESS.displayName,
@@ -313,29 +307,26 @@ const listAsyncTasks = {
 // ── cancel_async_task ──────────────────────────────────────
 const cancelAsyncTask = {
   name: ASYNC_TASK_TOOL_NAMES.CANCEL_ASYNC_TASK,
-  schema: {
-    name: ASYNC_TASK_TOOL_NAMES.CANCEL_ASYNC_TASK,
-    emoji: INTERNAL_TOOL_EMOJIS[ASYNC_TASK_TOOL_NAMES.CANCEL_ASYNC_TASK],
-    description:
-      "Cancel a running async background task. " +
-      "The task's abort signal will be triggered, stopping execution if the tool supports cancellation. " +
-      "Use list_async_tasks to find the task ID.",
-    parameters: {
-      type: "object",
-      properties: {
-        taskId: {
-          type: "string",
-          description: "The unique ID of the async task to cancel.",
-        },
+  emoji: INTERNAL_TOOL_EMOJIS[ASYNC_TASK_TOOL_NAMES.CANCEL_ASYNC_TASK],
+  description:
+    "Cancel a running async background task. " +
+    "The task's abort signal will be triggered, stopping execution if the tool supports cancellation. " +
+    "Use list_async_tasks to find the task ID.",
+  parameters: {
+    type: "object",
+    properties: {
+      taskId: {
+        type: "string",
+        description: "The unique ID of the async task to cancel.",
       },
-      required: ["taskId"],
     },
-    display: {
-      activeVerb: "Cancelling async task",
-      completedVerb: "Cancelled async task",
-      subjectParam: "taskId",
-      subjectFormat: "quoted" as const,
-    },
+    required: ["taskId"],
+  },
+  display: {
+    activeVerb: "Cancelling async task",
+    completedVerb: "Cancelled async task",
+    subjectParam: "taskId",
+    subjectFormat: "quoted" as const,
   },
   labels: ["async", "background", "task"],
   domain: DOMAINS.CORE_HARNESS.displayName,

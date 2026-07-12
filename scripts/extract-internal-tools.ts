@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import InternalToolRegistry from "../src/services/local-tools/InternalToolRegistry.ts";
+import InternalToolRegistry from "../src/services/tool-definitions/InternalToolRegistry.ts";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirectory = path.dirname(currentFilePath);

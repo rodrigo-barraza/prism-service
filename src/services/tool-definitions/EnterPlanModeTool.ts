@@ -9,30 +9,27 @@ import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalTo
 export default {
   name: TOOL_NAMES.ENTER_PLAN_MODE,
 
-  schema: {
-    name: TOOL_NAMES.ENTER_PLAN_MODE,
-    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.ENTER_PLAN_MODE],
-    description:
-      "Switch into planning mode. While in plan mode, you will not have access to any tools — " +
-      "you can only output text. Use this to produce a structured implementation plan before " +
-      "executing changes. Call exit_plan_mode when you are ready to resume tool execution. " +
-      "Use this when the task is complex and benefits from upfront planning.",
-    parameters: {
-      type: "object",
-      properties: {
-        reason: {
-          type: "string",
-          description: "Why you are entering plan mode (shown to the user).",
-        },
+  emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.ENTER_PLAN_MODE],
+  description:
+    "Switch into planning mode. While in plan mode, you will not have access to any tools — " +
+    "you can only output text. Use this to produce a structured implementation plan before " +
+    "executing changes. Call exit_plan_mode when you are ready to resume tool execution. " +
+    "Use this when the task is complex and benefits from upfront planning.",
+  parameters: {
+    type: "object",
+    properties: {
+      reason: {
+        type: "string",
+        description: "Why you are entering plan mode (shown to the user).",
       },
-      required: [],
     },
-    display: {
-      activeVerb: "Entering plan mode",
-      completedVerb: "Entered plan mode",
-      subjectParam: "reason",
-      subjectFormat: "truncate" as const,
-    },
+    required: [],
+  },
+  display: {
+    activeVerb: "Entering plan mode",
+    completedVerb: "Entered plan mode",
+    subjectParam: "reason",
+    subjectFormat: "truncate" as const,
   },
 
   labels: ["coding"],

@@ -1,7 +1,7 @@
 import "./setup.ts";
 import { describe, it, expect, vi, beforeAll } from "vitest";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
-import InternalToolRegistry from "#src/services/local-tools/InternalToolRegistry";
+import InternalToolRegistry from "#src/services/tool-definitions/InternalToolRegistry";
 
 vi.mock("#src/services/FileService", () => ({
   default: {

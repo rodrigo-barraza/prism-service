@@ -119,12 +119,34 @@ function buildDiscoverAndEnableSchema(locale: string) {
 
 const discoverAndEnableTools = {
   name: "discover_and_enable_tools",
-  get schema() {
-    const activeLocale =
-      typeof SettingsService.getCached === "function"
-        ? SettingsService.getCached().agents?.locale || "en"
-        : "en";
-    return buildDiscoverAndEnableSchema(activeLocale);
+  emoji: INTERNAL_TOOL_EMOJIS["discover_and_enable_tools"],
+  description:
+    "Search the full tool catalog and automatically enable matches in one step. " +
+    "Combines search_tools and enable_tools — after calling this, discovered tools " +
+    "are immediately available on the next iteration without a separate enable_tools call.",
+  parameters: {
+    type: "object",
+    properties: {
+      query: {
+        type: "string",
+        description: "Search keyword(s) to match against tool names and descriptions.",
+      },
+      domain: {
+        type: "string",
+        description: "Filter by tool domain.",
+      },
+      limit: {
+        type: "number",
+        description: "Maximum results to return (1–50). Default: 20.",
+      },
+    },
+    required: [] as string[],
+  },
+  display: {
+    activeVerb: "Discovering tools",
+    completedVerb: "Discovered tools",
+    subjectParam: "query",
+    subjectFormat: "quoted" as const,
   },
   buildSchema(locale: string) {
     return buildDiscoverAndEnableSchema(locale);
