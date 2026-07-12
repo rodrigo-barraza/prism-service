@@ -120,6 +120,12 @@ export default {
       },
       required: ["questions"],
     },
+    display: {
+      activeVerb: "Asking user",
+      completedVerb: "Asked user",
+      subjectParam: "context",
+      subjectFormat: "truncate" as const,
+    },
   },
   labels: ["coding"],
   domain: DOMAINS.CORE_USER.displayName,

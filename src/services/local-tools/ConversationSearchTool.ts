@@ -57,6 +57,12 @@ const searchConversations = {
       },
       required: ["query"],
     },
+    display: {
+      activeVerb: "Searching conversations",
+      completedVerb: "Searched conversations",
+      subjectParam: "query",
+      subjectFormat: "quoted" as const,
+    },
   },
   labels: ["coding", "memory"],
   domain: DOMAINS.CORE_HARNESS.displayName,

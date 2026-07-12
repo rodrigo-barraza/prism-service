@@ -108,6 +108,12 @@ function buildDiscoverAndEnableSchema(locale: string) {
       },
       required: [],
     },
+    display: {
+      activeVerb: "Discovering tools",
+      completedVerb: "Discovered tools",
+      subjectParam: "query",
+      subjectFormat: "quoted" as const,
+    },
   };
 }
 
