@@ -66,10 +66,7 @@ const ConversationService: ConversationServiceInterface = {
         setFields.systemPrompt = conversationMeta.systemPrompt;
       }
       if (conversationMeta.settings !== undefined) {
-        setFields.settings = {
-          ...conversationMeta.settings,
-          systemPrompt: conversationMeta.systemPrompt || "",
-        };
+        setFields.settings = { ...conversationMeta.settings };
       }
       if (conversationMeta.parentAgentConversationId) {
         setFields.parentAgentConversationId =
@@ -101,10 +98,7 @@ const ConversationService: ConversationServiceInterface = {
     const setOnInsertBase: Partial<TransformedConversation> = {
       title: conversationMeta?.title || DEFAULT_CONVERSATION_TITLE,
       systemPrompt: metaSysPrompt,
-      settings: {
-        ...metaSettings,
-        systemPrompt: metaSysPrompt,
-      },
+      settings: { ...metaSettings },
       modalities: computeModalities([]),
       providers: extractProviders([], metaSettings as ConversationSettings),
       totalCost: 0,

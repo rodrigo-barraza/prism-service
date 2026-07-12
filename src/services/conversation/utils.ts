@@ -360,7 +360,7 @@ export function buildConversationPatchFields({
   }
   if (systemPrompt !== undefined) setFields.systemPrompt = systemPrompt;
   if (settings !== undefined) {
-    setFields.settings = { ...settings, systemPrompt: systemPrompt || "" };
+    setFields.settings = { ...settings };
   }
   return setFields;
 }

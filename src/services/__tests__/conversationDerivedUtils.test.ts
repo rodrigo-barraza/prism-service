@@ -471,7 +471,7 @@ describe("buildConversationPatchFields", () => {
     expect(fields.systemPrompt).toBe("You are a helpful assistant.");
   });
 
-  it("should include settings with systemPrompt embedded", () => {
+  it("should include settings without systemPrompt embedded", () => {
     const fields = buildConversationPatchFields({
       settings: { provider: PROVIDERS.GOOGLE, model: "gemini-3.5-flash" },
       systemPrompt: "Be concise.",
@@ -479,15 +479,8 @@ describe("buildConversationPatchFields", () => {
 
     expect(fields.settings).toBeDefined();
     expect(fields.settings!.provider).toBe(PROVIDERS.GOOGLE);
-    expect(fields.settings!.systemPrompt).toBe("Be concise.");
-  });
-
-  it("should set empty systemPrompt in settings when systemPrompt is not provided", () => {
-    const fields = buildConversationPatchFields({
-      settings: { provider: PROVIDERS.OPENAI },
-    });
-
-    expect(fields.settings!.systemPrompt).toBe("");
+    expect(fields.settings).not.toHaveProperty("systemPrompt");
+    expect(fields.systemPrompt).toBe("Be concise.");
   });
 
   it("should always include updatedAt", () => {
