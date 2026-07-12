@@ -19,7 +19,6 @@ export interface ConversationMeta {
 export interface ConversationSettings {
   provider?: string;
   model?: string;
-  systemPrompt?: string;
   [key: string]: unknown;
 }
 
