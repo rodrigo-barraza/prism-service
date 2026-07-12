@@ -31,32 +31,29 @@ interface WorktreeMergeResult {
 
 const enterWorktree = {
   name: TOOL_NAMES.ENTER_WORKTREE,
-  schema: {
-    name: TOOL_NAMES.ENTER_WORKTREE,
-    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.ENTER_WORKTREE],
-    description:
-      "Enter an isolated git worktree for the current conversation. Creates a new branch " +
-      "and redirects all file/git/shell tool calls to the worktree directory. " +
-      "Use this to try risky refactors, experimental changes, or speculative edits " +
-      "without affecting the main branch. Your full conversation context is preserved. " +
-      "Call exit_worktree to merge or discard when done.",
-    parameters: {
-      type: "object",
-      properties: {
-        reason: {
-          type: "string",
-          description:
-            "Why you're entering an isolated worktree (e.g. 'risky refactor', 'experimental approach').",
-        },
+  emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.ENTER_WORKTREE],
+  description:
+    "Enter an isolated git worktree for the current conversation. Creates a new branch " +
+    "and redirects all file/git/shell tool calls to the worktree directory. " +
+    "Use this to try risky refactors, experimental changes, or speculative edits " +
+    "without affecting the main branch. Your full conversation context is preserved. " +
+    "Call exit_worktree to merge or discard when done.",
+  parameters: {
+    type: "object",
+    properties: {
+      reason: {
+        type: "string",
+        description:
+          "Why you're entering an isolated worktree (e.g. 'risky refactor', 'experimental approach').",
       },
-      required: [],
     },
-    display: {
-      activeVerb: "Entering worktree",
-      completedVerb: "Entered worktree",
-      subjectParam: "reason",
-      subjectFormat: "truncate" as const,
-    },
+    required: [],
+  },
+  display: {
+    activeVerb: "Entering worktree",
+    completedVerb: "Entered worktree",
+    subjectParam: "reason",
+    subjectFormat: "truncate" as const,
   },
   domain: DOMAINS.CORE_WORKSPACE.displayName,
   labels: ["coding", "git"],
@@ -176,36 +173,33 @@ const enterWorktree = {
 
 const exitWorktree = {
   name: TOOL_NAMES.EXIT_WORKTREE,
-  schema: {
-    name: TOOL_NAMES.EXIT_WORKTREE,
-    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.EXIT_WORKTREE],
-    description:
-      "Exit the current isolated worktree and return to the main workspace. " +
-      "Choose to 'merge' changes back to the main branch or 'discard' them entirely. " +
-      "If merging, changes are committed and merged automatically.",
-    parameters: {
-      type: "object",
-      properties: {
-        action: {
-          type: "string",
-          enum: ["merge", "discard"],
-          description:
-            "'merge' to apply changes to main branch, 'discard' to throw them away.",
-        },
-        commitMessage: {
-          type: "string",
-          description:
-            "Commit message for the merge (used when action is 'merge'). Auto-generated if not provided.",
-        },
+  emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.EXIT_WORKTREE],
+  description:
+    "Exit the current isolated worktree and return to the main workspace. " +
+    "Choose to 'merge' changes back to the main branch or 'discard' them entirely. " +
+    "If merging, changes are committed and merged automatically.",
+  parameters: {
+    type: "object",
+    properties: {
+      action: {
+        type: "string",
+        enum: ["merge", "discard"],
+        description:
+          "'merge' to apply changes to main branch, 'discard' to throw them away.",
       },
-      required: ["action"],
+      commitMessage: {
+        type: "string",
+        description:
+          "Commit message for the merge (used when action is 'merge'). Auto-generated if not provided.",
+      },
     },
-    display: {
-      activeVerb: "Exiting worktree",
-      completedVerb: "Exited worktree",
-      subjectParam: "action",
-      subjectFormat: "quoted" as const,
-    },
+    required: ["action"],
+  },
+  display: {
+    activeVerb: "Exiting worktree",
+    completedVerb: "Exited worktree",
+    subjectParam: "action",
+    subjectFormat: "quoted" as const,
   },
   domain: DOMAINS.CORE_WORKSPACE.displayName,
   labels: ["coding", "git"],

@@ -32,37 +32,34 @@ const MAXIMUM_CANDIDATES = MEMORY.MAXIMUM_CANDIDATES;
 
 const searchConversations = {
   name: SEARCH_CONVERSATIONS_NAME,
-  schema: {
-    name: SEARCH_CONVERSATIONS_NAME,
-    emoji: INTERNAL_TOOL_EMOJIS[SEARCH_CONVERSATIONS_NAME],
-    description:
-      "Search past agent conversations using a natural language query. " +
-      "Finds previous sessions by semantic similarity to the query text. " +
-      "Returns conversation titles, summaries, dates, and linked memory counts. " +
-      "Use this when the user references a past session, asks 'remember when we...', " +
-      "or when you need context from a previous coding session.",
-    parameters: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
-          description:
-            "Natural language search query describing what you're looking for. " +
-            "Example: 'MCP connection debugging', 'the session where we fixed WebSocket drops'.",
-        },
-        limit: {
-          type: "number",
-          description: "Maximum number of results to return. Default: 10.",
-        },
+  emoji: INTERNAL_TOOL_EMOJIS[SEARCH_CONVERSATIONS_NAME],
+  description:
+    "Search past agent conversations using a natural language query. " +
+    "Finds previous sessions by semantic similarity to the query text. " +
+    "Returns conversation titles, summaries, dates, and linked memory counts. " +
+    "Use this when the user references a past session, asks 'remember when we...', " +
+    "or when you need context from a previous coding session.",
+  parameters: {
+    type: "object",
+    properties: {
+      query: {
+        type: "string",
+        description:
+          "Natural language search query describing what you're looking for. " +
+          "Example: 'MCP connection debugging', 'the session where we fixed WebSocket drops'.",
       },
-      required: ["query"],
+      limit: {
+        type: "number",
+        description: "Maximum number of results to return. Default: 10.",
+      },
     },
-    display: {
-      activeVerb: "Searching conversations",
-      completedVerb: "Searched conversations",
-      subjectParam: "query",
-      subjectFormat: "quoted" as const,
-    },
+    required: ["query"],
+  },
+  display: {
+    activeVerb: "Searching conversations",
+    completedVerb: "Searched conversations",
+    subjectParam: "query",
+    subjectFormat: "quoted" as const,
   },
   labels: ["coding", "memory"],
   domain: DOMAINS.CORE_HARNESS.displayName,

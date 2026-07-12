@@ -53,79 +53,76 @@ interface QuestionInput {
 
 export default {
   name: TOOL_NAMES.ASK_USER,
-  schema: {
-    name: TOOL_NAMES.ASK_USER,
-    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.ASK_USER],
-    description:
-      "Ask the user one or more questions and wait for their responses before continuing. " +
-      "Use this when you need clarification, a decision between options, or explicit " +
-      "confirmation before proceeding with a potentially impactful action. " +
-      "The agent loop pauses until the user responds. " +
-      "You can batch up to 4 related questions in a single call to reduce round-trips.",
-    parameters: {
-      type: "object",
-      properties: {
-        context: {
-          type: "string",
-          description:
-            "Optional: additional context shown below the questions.",
-        },
-        questions: {
-          type: "array",
-          maxItems: 4,
-          description:
-            "Batch of questions to ask the user (up to 4). Each item is a question object.",
-          items: {
-            type: "object",
-            properties: {
-              question: {
-                type: "string",
-                description: "The question text.",
-              },
-              header: {
-                type: "string",
-                maxLength: 16,
-                description:
-                  "Optional: short label chip displayed as a tag (e.g. 'Auth method', 'Database'). Max 16 chars.",
-              },
-              options: {
-                type: "array",
-                maxItems: 6,
-                description: "Optional: predefined choices (up to 6).",
-                items: {
-                  type: "object",
-                  properties: {
-                    label: {
-                      type: "string",
-                      description: "The choice label shown to the user.",
-                    },
-                    preview: {
-                      type: "string",
-                      description:
-                        "Optional: markdown or code preview content shown when this option is focused/hovered.",
-                    },
+  emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.ASK_USER],
+  description:
+    "Ask the user one or more questions and wait for their responses before continuing. " +
+    "Use this when you need clarification, a decision between options, or explicit " +
+    "confirmation before proceeding with a potentially impactful action. " +
+    "The agent loop pauses until the user responds. " +
+    "You can batch up to 4 related questions in a single call to reduce round-trips.",
+  parameters: {
+    type: "object",
+    properties: {
+      context: {
+        type: "string",
+        description:
+          "Optional: additional context shown below the questions.",
+      },
+      questions: {
+        type: "array",
+        maxItems: 4,
+        description:
+          "Batch of questions to ask the user (up to 4). Each item is a question object.",
+        items: {
+          type: "object",
+          properties: {
+            question: {
+              type: "string",
+              description: "The question text.",
+            },
+            header: {
+              type: "string",
+              maxLength: 16,
+              description:
+                "Optional: short label chip displayed as a tag (e.g. 'Auth method', 'Database'). Max 16 chars.",
+            },
+            options: {
+              type: "array",
+              maxItems: 6,
+              description: "Optional: predefined choices (up to 6).",
+              items: {
+                type: "object",
+                properties: {
+                  label: {
+                    type: "string",
+                    description: "The choice label shown to the user.",
                   },
-                  required: ["label"],
+                  preview: {
+                    type: "string",
+                    description:
+                      "Optional: markdown or code preview content shown when this option is focused/hovered.",
+                  },
                 },
-              },
-              multiSelect: {
-                type: "boolean",
-                description:
-                  "Optional: if true, the user can select multiple options (checkboxes). Default: false (single select).",
+                required: ["label"],
               },
             },
-            required: ["question"],
+            multiSelect: {
+              type: "boolean",
+              description:
+                "Optional: if true, the user can select multiple options (checkboxes). Default: false (single select).",
+            },
           },
+          required: ["question"],
         },
       },
-      required: ["questions"],
     },
-    display: {
-      activeVerb: "Asking user",
-      completedVerb: "Asked user",
-      subjectParam: "context",
-      subjectFormat: "truncate" as const,
-    },
+    required: ["questions"],
+  },
+  display: {
+    activeVerb: "Asking user",
+    completedVerb: "Asked user",
+    subjectParam: "context",
+    subjectFormat: "truncate" as const,
   },
   labels: ["coding"],
   domain: DOMAINS.CORE_USER.displayName,

@@ -123,28 +123,28 @@ describe("AsyncTaskTools", () => {
 
     it("should have emoji arrays on all schemas", () => {
       for (const tool of asyncTaskTools) {
-        expect(tool.schema.emoji).toBeDefined();
-        expect(Array.isArray(tool.schema.emoji)).toBe(true);
-        expect(tool.schema.emoji!.length).toBeGreaterThan(0);
+        expect(tool.emoji).toBeDefined();
+        expect(Array.isArray(tool.emoji)).toBe(true);
+        expect(tool.emoji!.length).toBeGreaterThan(0);
       }
     });
 
     it("should have descriptions on all schemas", () => {
       for (const tool of asyncTaskTools) {
-        expect(tool.schema.description).toBeDefined();
-        expect(typeof tool.schema.description).toBe("string");
-        expect(tool.schema.description!.length).toBeGreaterThan(20);
+        expect(tool.description).toBeDefined();
+        expect(typeof tool.description).toBe("string");
+        expect(tool.description!.length).toBeGreaterThan(20);
       }
     });
 
     it("should require toolName and toolArguments for run_async_task", () => {
-      const requiredParameters = runAsyncTask.schema.parameters?.required;
+      const requiredParameters = runAsyncTask.parameters?.required;
       expect(requiredParameters).toContain("toolName");
       expect(requiredParameters).toContain("toolArguments");
     });
 
     it("should require taskId for cancel_async_task", () => {
-      const requiredParameters = cancelAsyncTask.schema.parameters?.required;
+      const requiredParameters = cancelAsyncTask.parameters?.required;
       expect(requiredParameters).toContain("taskId");
     });
   });

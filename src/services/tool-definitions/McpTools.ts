@@ -9,26 +9,23 @@ import MCPClientService from "#src/services/MCPClientService";
 
 const listMcpResources = {
   name: TOOL_NAMES.LIST_MCP_RESOURCES,
-  schema: {
-    name: TOOL_NAMES.LIST_MCP_RESOURCES,
-    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.LIST_MCP_RESOURCES],
-    description: "List available resources from a connected MCP server.",
-    parameters: {
-      type: "object",
-      properties: {
-        server_name: {
-          type: "string",
-          description: "The MCP server name to query. If omitted, queries all.",
-        },
+  emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.LIST_MCP_RESOURCES],
+  description: "List available resources from a connected MCP server.",
+  parameters: {
+    type: "object",
+    properties: {
+      server_name: {
+        type: "string",
+        description: "The MCP server name to query. If omitted, queries all.",
       },
-      required: [],
     },
-    display: {
-      activeVerb: "Listing MCP resources",
-      completedVerb: "Listed MCP resources",
-      subjectParam: "server_name",
-      subjectFormat: "quoted" as const,
-    },
+    required: [],
+  },
+  display: {
+    activeVerb: "Listing MCP resources",
+    completedVerb: "Listed MCP resources",
+    subjectParam: "server_name",
+    subjectFormat: "quoted" as const,
   },
   domain: DOMAINS.MCP.displayName,
   labels: ["coding", "meta"],
@@ -82,28 +79,25 @@ const listMcpResources = {
 
 const readMcpResource = {
   name: TOOL_NAMES.READ_MCP_RESOURCE,
-  schema: {
-    name: TOOL_NAMES.READ_MCP_RESOURCE,
-    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.READ_MCP_RESOURCE],
-    description:
-      "Read a specific resource from a connected MCP server by its URI.",
-    parameters: {
-      type: "object",
-      properties: {
-        server_name: {
-          type: "string",
-          description: "The MCP server name that hosts the resource.",
-        },
-        uri: { type: "string", description: "The resource URI to read." },
+  emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.READ_MCP_RESOURCE],
+  description:
+    "Read a specific resource from a connected MCP server by its URI.",
+  parameters: {
+    type: "object",
+    properties: {
+      server_name: {
+        type: "string",
+        description: "The MCP server name that hosts the resource.",
       },
-      required: ["server_name", "uri"],
+      uri: { type: "string", description: "The resource URI to read." },
     },
-    display: {
-      activeVerb: "Reading MCP resource",
-      completedVerb: "Read MCP resource",
-      subjectParam: "uri",
-      subjectFormat: "truncate" as const,
-    },
+    required: ["server_name", "uri"],
+  },
+  display: {
+    activeVerb: "Reading MCP resource",
+    completedVerb: "Read MCP resource",
+    subjectParam: "uri",
+    subjectFormat: "truncate" as const,
   },
   domain: DOMAINS.MCP.displayName,
   labels: ["coding", "meta"],
@@ -131,40 +125,37 @@ const readMcpResource = {
 
 const mcpAuthenticate = {
   name: TOOL_NAMES.AUTHENTICATE_MCP_SERVER,
-  schema: {
-    name: TOOL_NAMES.AUTHENTICATE_MCP_SERVER,
-    emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.AUTHENTICATE_MCP_SERVER],
-    description:
-      "Authenticate with a connected MCP server by providing credentials.",
-    parameters: {
-      type: "object",
-      properties: {
-        server_name: {
-          type: "string",
-          description: "The MCP server name to authenticate with.",
-        },
-        token: {
-          type: "string",
-          description: "Bearer token for HTTP MCP servers.",
-        },
-        api_key: { type: "string", description: "API key value." },
-        api_key_header: {
-          type: "string",
-          description: "Header name for the API key (default: 'X-API-Key').",
-        },
-        env: {
-          type: "object",
-          description: "Additional environment variables to inject.",
-        },
+  emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.AUTHENTICATE_MCP_SERVER],
+  description:
+    "Authenticate with a connected MCP server by providing credentials.",
+  parameters: {
+    type: "object",
+    properties: {
+      server_name: {
+        type: "string",
+        description: "The MCP server name to authenticate with.",
       },
-      required: ["server_name"],
+      token: {
+        type: "string",
+        description: "Bearer token for HTTP MCP servers.",
+      },
+      api_key: { type: "string", description: "API key value." },
+      api_key_header: {
+        type: "string",
+        description: "Header name for the API key (default: 'X-API-Key').",
+      },
+      env: {
+        type: "object",
+        description: "Additional environment variables to inject.",
+      },
     },
-    display: {
-      activeVerb: "Authenticating MCP server",
-      completedVerb: "Authenticated MCP server",
-      subjectParam: "server_name",
-      subjectFormat: "quoted" as const,
-    },
+    required: ["server_name"],
+  },
+  display: {
+    activeVerb: "Authenticating MCP server",
+    completedVerb: "Authenticated MCP server",
+    subjectParam: "server_name",
+    subjectFormat: "quoted" as const,
   },
   domain: DOMAINS.MCP.displayName,
   labels: ["coding", "meta"],
