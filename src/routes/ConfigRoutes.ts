@@ -657,7 +657,7 @@ router.post(
         sections.push(result.prompt);
       }
 
-      if (userSystemPrompt) {
+      if (userSystemPrompt && !agent) {
         sections.push(`## User System Instruction\n${userSystemPrompt}`);
       }
 
