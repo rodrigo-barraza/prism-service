@@ -6,12 +6,12 @@ import PromptLocaleService from "#src/services/PromptLocaleService";
 // ────────────────────────────────────────────────────────────
 // Internal Tool Registry
 // ────────────────────────────────────────────────────────────
-// Provides a unified interface for tools that MUST execute within
-// Prism's process because they mutate orchestrator state (plan mode,
-// worktrees, approval gates, etc.).
+// Unified interface for tools that execute within Prism's process
+// (plan mode, worktrees, approval gates, subagents, etc.).
 //
-// Each tool module exports: { name, schema, domain, labels, execute }
-// The registry auto-imports everything in this directory on init().
+// Tool shape is flat — mirrors tools-service's ToolDefinition:
+//   name, description, parameters, emoji, display, domain, labels
+// with the addition of execute() for in-process dispatch.
 // ────────────────────────────────────────────────────────────
 
 import enterPlanModeTool from "./EnterPlanModeTool.ts";
@@ -28,22 +28,38 @@ import reminderTools from "./ReminderTools.ts";
 import conversationSearchTool from "./ConversationSearchTool.ts";
 import asyncTaskTools from "./AsyncTaskTools.ts";
 
-export interface InternalToolSchemaParameters {
-  type?: string;
-  properties?: Record<
-    string,
-    { type: string; description?: string; items?: { type: string } }
-  >;
+// ─── Parameter Types (aligned with tools-service) ──────────────
+
+export interface InternalToolParameterProperty {
+  type: string;
+  description?: string;
+  enum?: string[];
+  items?: InternalToolParameterProperty | {
+    type: string;
+    properties?: Record<string, InternalToolParameterProperty>;
+    required?: string[];
+  };
+  properties?: Record<string, InternalToolParameterProperty>;
   required?: string[];
 }
 
+export interface InternalToolParameters {
+  type: string;
+  properties: Record<string, InternalToolParameterProperty>;
+  required?: string[];
+}
+
+// ─── Schema (serializable subset sent to the AI) ───────────────
+
 export interface InternalToolSchema {
   name: string;
-  description?: string;
-  parameters?: InternalToolSchemaParameters;
-  emoji?: string | string[];
-  display?: ToolDisplayMetadata;
+  description: string;
+  parameters?: InternalToolParameters;
+  emoji: string[];
+  display: ToolDisplayMetadata;
 }
+
+// ─── Execution Context ─────────────────────────────────────────
 
 export interface InternalToolContext {
   agentConversationId?: string;
@@ -53,11 +69,16 @@ export interface InternalToolContext {
   enabledTools?: string[];
 }
 
-interface InternalTool {
+// ─── Tool Definition (flat — matches tools-service pattern) ────
+
+export interface InternalToolDefinition {
   name: string;
-  schema: InternalToolSchema;
-  domain?: string;
-  labels?: string[];
+  description: string;
+  parameters?: InternalToolParameters;
+  emoji: string[];
+  display: ToolDisplayMetadata;
+  domain: string;
+  labels: string[];
   buildSchema?: (locale: string) => InternalToolSchema;
   execute: (
     toolArguments: Record<string, unknown>,
@@ -65,8 +86,11 @@ interface InternalTool {
   ) => Promise<unknown>;
 }
 
-const registry = new Map<string, InternalTool>();
-function register(tool: InternalTool) {
+// ─── Registry ──────────────────────────────────────────────────
+
+const registry = new Map<string, InternalToolDefinition>();
+
+function register(tool: InternalToolDefinition) {
   if (!tool.name || !tool.execute) {
     logger.warn(
       `[InternalToolRegistry] Skipping invalid tool: missing name or execute`,
@@ -76,10 +100,6 @@ function register(tool: InternalTool) {
   registry.set(tool.name, tool);
 }
 
-/**
- * Initialize the registry by registering all imported tool modules.
- * Called immediately at module load — synchronous.
- */
 function initialize() {
   const toolModulesList = [
     enterPlanModeTool,
@@ -98,7 +118,6 @@ function initialize() {
   ];
 
   for (const toolOrTools of toolModulesList) {
-    // Modules can export a single tool or an array of tools
     if (Array.isArray(toolOrTools)) {
       for (const tool of toolOrTools) {
         register(tool);
@@ -119,18 +138,30 @@ try {
   logger.error(`[InternalToolRegistry] Init failed: ${errorMessage(error)}`);
 }
 
+// ─── Localization ──────────────────────────────────────────────
+
+function extractSchema(tool: InternalToolDefinition): InternalToolSchema {
+  return {
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters,
+    emoji: tool.emoji,
+    display: tool.display,
+  };
+}
+
 function localizeSchema(
-  schema: InternalToolSchema,
+  tool: InternalToolDefinition,
   locale: string,
-  tool?: InternalTool,
 ): InternalToolSchema {
-  const toolName = schema.name;
-  if (tool?.buildSchema) {
+  if (tool.buildSchema) {
     return tool.buildSchema(locale);
   }
+
+  const schema = extractSchema(tool);
   const localizedDescription = PromptLocaleService.get(
     locale,
-    `internal-tools.${toolName}.description`,
+    `internal-tools.${schema.name}.description`,
   );
 
   const parameters = schema.parameters
@@ -143,7 +174,7 @@ function localizeSchema(
       if (property && typeof property === "object") {
         const localizedPropertyDescription = PromptLocaleService.get(
           locale,
-          `internal-tools.${toolName}.parameters.${propertyName}`,
+          `internal-tools.${schema.name}.parameters.${propertyName}`,
         );
         if (
           localizedPropertyDescription &&
@@ -165,10 +196,13 @@ function localizeSchema(
   };
 }
 
+// ─── Public API ────────────────────────────────────────────────
+
 export default class InternalToolRegistry {
   static has(name: string) {
     return registry.has(name);
   }
+
   static async execute(
     name: string,
     toolArguments: Record<string, unknown>,
@@ -180,26 +214,23 @@ export default class InternalToolRegistry {
     }
     return tool.execute(toolArguments, context);
   }
+
   static getSchemas(locale?: string) {
     const activeLocale = locale || PromptLocaleService.getDefaultLocale();
     return [...registry.values()].map((tool) =>
-      localizeSchema(tool.schema, activeLocale, tool),
+      localizeSchema(tool, activeLocale),
     );
   }
+
   static getClientSchemas(locale?: string) {
     const activeLocale = locale || PromptLocaleService.getDefaultLocale();
     return [...registry.values()].map((tool) => ({
-      ...localizeSchema(tool.schema, activeLocale, tool),
-      domain: tool.domain || DOMAINS.CORE_HARNESS.displayName,
-      labels: tool.labels || ["coding"],
+      ...localizeSchema(tool, activeLocale),
+      domain: tool.domain,
+      labels: tool.labels,
     }));
   }
 
-  /**
-   * Get the Set of all registered internal tool names.
-   * Used by AgenticLoopService for bypass-filter logic.
-
-   */
   static getNames() {
     return new Set(registry.keys());
   }

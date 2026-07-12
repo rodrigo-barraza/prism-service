@@ -260,7 +260,7 @@ vi.mock("#src/services/AgentPersonaRegistry", () => ({
 
 // ── Mock InternalToolRegistry ────────────────────────────────
 
-vi.mock("#src/services/local-tools/InternalToolRegistry", () => ({
+vi.mock("#src/services/tool-definitions/InternalToolRegistry", () => ({
   default: {
     getNames: vi.fn(() => new Set(["think", "sleep", "enter_plan_mode", "exit_plan_mode"])),
   },
@@ -284,7 +284,7 @@ const { default: ToolOrchestratorService } = await import("#src/services/ToolOrc
 const { default: ToolContext } = await import("#src/services/ToolContext");
 const { default: SettingsService } = await import("#src/services/SettingsService");
 const { default: AgentPersonaRegistry } = await import("#src/services/AgentPersonaRegistry");
-const { default: InternalToolRegistry } = await import("#src/services/local-tools/InternalToolRegistry");
+const { default: InternalToolRegistry } = await import("#src/services/tool-definitions/InternalToolRegistry");
 
 // ── Helpers ─────────────────────────────────────────────────
 

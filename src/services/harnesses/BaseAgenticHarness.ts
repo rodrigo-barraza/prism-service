@@ -43,7 +43,7 @@ import {
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import ToolContext from "#src/services/ToolContext";
-import InternalToolRegistry from "#src/services/local-tools/InternalToolRegistry";
+import InternalToolRegistry from "#src/services/tool-definitions/InternalToolRegistry";
 
 import WebhookEventBus from "#src/services/WebhookEventBus";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";

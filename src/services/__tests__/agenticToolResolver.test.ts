@@ -179,7 +179,7 @@ vi.mock("#src/services/AgentPersonaRegistry", () => ({
 
 
 // Mock InternalToolRegistry
-vi.mock("#src/services/local-tools/InternalToolRegistry", () => ({
+vi.mock("#src/services/tool-definitions/InternalToolRegistry", () => ({
   default: {
     getNames: vi.fn(() => new Set(["think", "sleep"])),
   },

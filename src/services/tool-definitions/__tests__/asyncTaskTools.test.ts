@@ -157,7 +157,7 @@ vi.mock("#src/types/GlobalToolOrchestratorRegistry", () => ({
   }),
 }));
 
-import InternalToolRegistry from "#src/services/local-tools/InternalToolRegistry";
+import InternalToolRegistry from "#src/services/tool-definitions/InternalToolRegistry";
 import { ASYNC_TASK_TOOL_NAMES, MAXIMUM_CONCURRENT_ASYNC_TASKS } from "#src/services/AsyncTaskConstants";
 
 // ────────────────────────────────────────────────────────────

@@ -68,7 +68,7 @@ vi.mock("#src/services/RequestLogger", () => ({
   },
 }));
 
-vi.mock("#src/services/local-tools/InternalToolRegistry", () => ({
+vi.mock("#src/services/tool-definitions/InternalToolRegistry", () => ({
   default: {
     getNames: vi.fn().mockReturnValue(new Set()),
   },

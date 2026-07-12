@@ -45,7 +45,7 @@ vi.mock("#src/services/MCPClientService", () => ({
   },
 }));
 
-vi.mock("#src/services/local-tools/InternalToolRegistry", () => ({
+vi.mock("#src/services/tool-definitions/InternalToolRegistry", () => ({
   default: {
     has: vi.fn().mockReturnValue(false),
     getSchemas: vi.fn().mockReturnValue([]),

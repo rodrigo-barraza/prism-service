@@ -23,7 +23,7 @@ import {
   TOOL_SCHEMA_FETCH_RETRY_COOLDOWN_MILLISECONDS,
   TOOL_PROXY_TIMEOUT_MILLISECONDS,
 } from "#src/constants";
-import InternalToolRegistry from "#src/services/local-tools/InternalToolRegistry";
+import InternalToolRegistry from "#src/services/tool-definitions/InternalToolRegistry";
 import SettingsService from "#src/services/SettingsService";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import {
