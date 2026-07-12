@@ -1093,7 +1093,7 @@ describe("SystemPromptAssembler", () => {
 
       expect(prompt).toContain("<agent-identity>");
       expect(prompt).toContain("</agent-identity>");
-      expect(prompt).toContain("<agent-identity>\nYou are a coding agent.");
+      expect(prompt).toContain("<agent-identity>\n\nYou are a coding agent.");
     });
 
     it("wraps guidelines section in <coding-guidelines> tags", async () => {
@@ -1118,7 +1118,7 @@ describe("SystemPromptAssembler", () => {
 
       expect(prompt).toContain("<environment>");
       expect(prompt).toContain("</environment>");
-      expect(prompt).toMatch(/<environment>\n## Environment/);
+      expect(prompt).toMatch(/<environment>\n\n## Environment/);
     });
 
     it("wraps enabled tools section in <enabled-tools> tags", async () => {
@@ -1143,7 +1143,7 @@ describe("SystemPromptAssembler", () => {
 
       expect(prompt).toContain("<tool-policy>");
       expect(prompt).toContain("</tool-policy>");
-      expect(prompt).toContain("<tool-policy>\n## Lupos Tool Policy");
+      expect(prompt).toContain("<tool-policy>\n\n## Lupos Tool Policy");
     });
 
     it("wraps orchestrator section in <orchestrator-mode> tags", async () => {
@@ -1157,7 +1157,7 @@ describe("SystemPromptAssembler", () => {
 
       expect(prompt).toContain("<orchestrator-mode>");
       expect(prompt).toContain("</orchestrator-mode>");
-      expect(prompt).toContain("<orchestrator-mode>\n## Orchestrator Mode");
+      expect(prompt).toContain("<orchestrator-mode>\n\n## Orchestrator Mode");
     });
 
     it("wraps direct mode identity in <agent-identity> tags", async () => {

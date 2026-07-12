@@ -39,7 +39,7 @@ import PromptLocaleService from "#src/services/PromptLocaleService";
  * so existing substring assertions in tests continue to pass.
  */
 function wrapSection(tagName: string, content: string): string {
-  return `<${tagName}>\n${content}\n</${tagName}>`;
+  return `<${tagName}>\n\n${content}\n\n</${tagName}>`;
 }
 
 
