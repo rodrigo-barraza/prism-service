@@ -125,12 +125,12 @@ router.get(
 
       const mappedWorkspaces = workspaceRoots.map((rootPath: string) => {
         const servingAgent = rootToAgentMap.get(rootPath) || null;
-        const hostInfo =
+        const machineInfo =
           (
             servingAgent as WorkspaceAgent & {
-              hostInfo?: Record<string, unknown>;
+              machineInfo?: Record<string, unknown>;
             }
-          )?.hostInfo || null;
+          )?.machineInfo || null;
         return {
           id: rootPath,
           name: basename(rootPath),
@@ -140,10 +140,10 @@ router.get(
           agentId: servingAgent?.id || null,
           agentName: servingAgent?.name || null,
           hostname:
-            ((hostInfo as Record<string, unknown>)?.hostname as string) || null,
+            ((machineInfo as Record<string, unknown>)?.hostname as string) || null,
           platform:
-            ((hostInfo as Record<string, unknown>)?.platform as string) || null,
-          arch: ((hostInfo as Record<string, unknown>)?.arch as string) || null,
+            ((machineInfo as Record<string, unknown>)?.platform as string) || null,
+          arch: ((machineInfo as Record<string, unknown>)?.arch as string) || null,
           clientIp:
             (servingAgent as WorkspaceAgent & { clientIp?: string })
               ?.clientIp || null,
@@ -212,12 +212,12 @@ router.get(
 
       const workspaces: MappedWorkspace[] = roots.map((rootPath: string) => {
         const servingAgent = rootToAgentMap.get(rootPath) || null;
-        const hostInfo =
+        const machineInfo =
           (
             servingAgent as WorkspaceAgent & {
-              hostInfo?: Record<string, unknown>;
+              machineInfo?: Record<string, unknown>;
             }
-          )?.hostInfo || null;
+          )?.machineInfo || null;
         return {
           id: rootPath,
           name: basename(rootPath),
@@ -227,10 +227,10 @@ router.get(
           agentId: servingAgent?.id || null,
           agentName: servingAgent?.name || null,
           hostname:
-            ((hostInfo as Record<string, unknown>)?.hostname as string) || null,
+            ((machineInfo as Record<string, unknown>)?.hostname as string) || null,
           platform:
-            ((hostInfo as Record<string, unknown>)?.platform as string) || null,
-          arch: ((hostInfo as Record<string, unknown>)?.arch as string) || null,
+            ((machineInfo as Record<string, unknown>)?.platform as string) || null,
+          arch: ((machineInfo as Record<string, unknown>)?.arch as string) || null,
           clientIp:
             (servingAgent as WorkspaceAgent & { clientIp?: string })
               ?.clientIp || null,
