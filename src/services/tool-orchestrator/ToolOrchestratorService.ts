@@ -74,8 +74,7 @@ const toolMap = new Map<string, ToolSchemaFull>();
 /** @type {string[]} Allowed workspace root paths (fetched from tools-api) */
 let cachedWorkspaceRoots: string[] = [];
 
-/** @type {string[]} Static roots from config.js (immutable, for "pinned" UI) */
-let cachedStaticRoots: string[] = [];
+
 
 /** @type {boolean} Whether initial fetch has completed */
 let initialized = false;
@@ -169,9 +168,7 @@ async function fetchSchemas() {
             `[ToolOrchestrator] Workspace roots: ${cachedWorkspaceRoots.join(", ")}`,
           );
         }
-        if (Array.isArray(config.staticRoots)) {
-          cachedStaticRoots = config.staticRoots;
-        }
+
       }
     } catch (configError: unknown) {
       logger.warn(
@@ -1149,10 +1146,7 @@ export default class ToolOrchestratorService {
     return cachedWorkspaceRoots[0] || null;
   }
 
-  /** Static roots from config.js (immutable, for "pinned" UI distinction) */
-  static getStaticRoots() {
-    return [...cachedStaticRoots];
-  }
+
 
   /**
    * Check if any workspace agent is currently connected to tools-api.
@@ -1189,9 +1183,6 @@ export default class ToolOrchestratorService {
         if (Array.isArray(config.workspaceRoots)) {
           cachedWorkspaceRoots = config.workspaceRoots;
         }
-        if (Array.isArray(config.staticRoots)) {
-          cachedStaticRoots = config.staticRoots;
-        }
       }
     } catch (error: unknown) {
       logger.warn(
@@ -1219,9 +1210,7 @@ export default class ToolOrchestratorService {
     if (Array.isArray(result.workspaceRoots)) {
       cachedWorkspaceRoots = result.workspaceRoots;
     }
-    if (Array.isArray(result.staticRoots)) {
-      cachedStaticRoots = result.staticRoots;
-    }
+
     return result;
   }
   static async validateWorkspacePath(path: string) {

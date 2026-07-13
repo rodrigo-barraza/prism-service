@@ -17,7 +17,6 @@ interface MappedWorkspace {
   id: string;
   name: string;
   path: string;
-  isPinned: boolean;
   isAgentServed: boolean;
   agentId: string | null;
   agentName: string | null;
@@ -76,12 +75,8 @@ interface WorkspaceConfig {
 
 /**
  * GET /workspaces
- * Returns the list of configured workspace roots from tools-api.
- * Each entry has: { id, name, path, isPinned }
- *   - id: the full absolute path (used as stable identifier)
- *   - name: last path segment (e.g. "sun")
- *   - path: full absolute path
- *   - isPinned: true if from config.js (non-removable)
+ * Returns the list of workspace roots from connected agents.
+ * Each entry has: { id, name, path, isAgentServed, agentId, ... }
  *
  * Always refreshes from tools-api to pick up dynamically-registered
  * agent roots (workspace-service agents add roots at connection time).
@@ -92,9 +87,6 @@ router.get(
     try {
       // Refresh from tools-api to pick up agent-registered roots
       await ToolOrchestratorService.refreshWorkspaceRoots();
-
-      const staticWorkspaceRoots =
-        ToolOrchestratorService.getStaticRoots() as string[];
 
       let connectedAgents: WorkspaceAgent[] = [];
       try {
@@ -132,7 +124,6 @@ router.get(
             id: `${agent.id}:${displayPath}`,
             name: displayPath === "/" ? "/" : basename(displayPath),
             path: displayPath,
-            isPinned: false,
             isAgentServed: true,
             agentId: agent.id || null,
             agentName: agent.name || null,
@@ -147,29 +138,9 @@ router.get(
         }
       }
 
-      // Include pinned static roots that are not already covered by agents
-      const agentCoveredPaths = new Set(agentServedWorkspaces.map((workspace) => workspace.path));
-      const pinnedWorkspaces: MappedWorkspace[] = staticWorkspaceRoots
-        .filter((rootPath) => !agentCoveredPaths.has(rootPath))
-        .map((rootPath) => ({
-          id: rootPath,
-          name: basename(rootPath),
-          path: rootPath,
-          isPinned: true,
-          isAgentServed: false,
-          agentId: null,
-          agentName: null,
-          hostname: null,
-          platform: null,
-          arch: null,
-          clientIp: null,
-        }));
+      disambiguateWorkspaceNames(agentServedWorkspaces);
 
-      const accessibleWorkspaces = [...agentServedWorkspaces, ...pinnedWorkspaces];
-
-      disambiguateWorkspaceNames(accessibleWorkspaces);
-
-      res.json(accessibleWorkspaces);
+      res.json(agentServedWorkspaces);
     } catch (error: unknown) {
       logger.error(`GET /workspaces error: ${getErrorMessage(error)}`);
       res.status(500).json({ error: "Failed to retrieve workspace roots" });
@@ -181,7 +152,7 @@ router.get(
  * GET /workspaces/full
  * Returns the full workspace config including connected agent metadata.
  * Used by the Settings page for the richer workspace management UI.
- * Shape: { workspaces: [...], agents: [...], staticRoots: string[] }
+ * Shape: { workspaces: [...], agents: [...] }
  */
 router.get(
   "/full",
@@ -189,8 +160,6 @@ router.get(
     try {
       // Refresh from tools-api to pick up agent-registered roots
       await ToolOrchestratorService.refreshWorkspaceRoots();
-
-      const staticRoots = ToolOrchestratorService.getStaticRoots() as string[];
 
       // Fetch full config from tools-api to get agent metadata
       let agents: WorkspaceAgent[] = [];
@@ -227,7 +196,6 @@ router.get(
             id: `${agent.id}:${displayPath}`,
             name: displayPath === "/" ? "/" : basename(displayPath),
             path: displayPath,
-            isPinned: false,
             isAgentServed: true,
             agentId: agent.id || null,
             agentName: agent.name || null,
@@ -242,28 +210,9 @@ router.get(
         }
       }
 
-      const agentCoveredPaths = new Set(agentServedWorkspaces.map((workspace) => workspace.path));
-      const pinnedWorkspaces: MappedWorkspace[] = staticRoots
-        .filter((rootPath) => !agentCoveredPaths.has(rootPath))
-        .map((rootPath) => ({
-          id: rootPath,
-          name: basename(rootPath),
-          path: rootPath,
-          isPinned: true,
-          isAgentServed: false,
-          agentId: null,
-          agentName: null,
-          hostname: null,
-          platform: null,
-          arch: null,
-          clientIp: null,
-        }));
+      disambiguateWorkspaceNames(agentServedWorkspaces);
 
-      const accessibleWorkspaces = [...agentServedWorkspaces, ...pinnedWorkspaces];
-
-      disambiguateWorkspaceNames(accessibleWorkspaces);
-
-      res.json({ workspaces: accessibleWorkspaces, agents, staticRoots });
+      res.json({ workspaces: agentServedWorkspaces, agents });
     } catch (error: unknown) {
       logger.error(`GET /workspaces/full error: ${getErrorMessage(error)}`);
       res
@@ -277,7 +226,7 @@ router.get(
  * PUT /workspaces
  * Update user-configured workspace roots. Proxies to tools-api.
  * Body: { roots: string[] }
- * Returns the updated workspace list with isPinned metadata.
+ * Returns the updated workspace list.
  */
 router.put(
   "/",
