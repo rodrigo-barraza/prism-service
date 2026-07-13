@@ -54,8 +54,25 @@ export function getTotalInputTokens(
   );
 }
 
+/**
+ * Return a copy of the usage object with an authoritative, pre-summed
+ * `totalInputTokens` field attached. This is the server's single source of
+ * truth for prompt-token composition — the client renders `totalInputTokens`
+ * directly instead of re-deriving the split (new + cache_read + cache_write),
+ * so adding a future cache bucket never silently diverges the two.
+ *
+ * Applied at every usage emission/persistence boundary (SSE usage_update /
+ * done payloads, persisted request-log usage).
+ */
+export function withTotalInputTokens<T extends TokenUsage>(
+  usage: T | null | undefined,
+): (T & { totalInputTokens: number }) | null | undefined {
+  if (!usage) return usage as null | undefined;
+  return { ...usage, totalInputTokens: getTotalInputTokens(usage) };
+}
+
 export function createUsageAccumulator(): Required<
-  Omit<TokenUsage, "totalTokens">
+  Omit<TokenUsage, "totalTokens" | "totalInputTokens">
 > {
   return {
     inputTokens: 0,

@@ -247,6 +247,12 @@ export interface TokenUsage {
   cacheCreationInputTokens?: number;
   reasoningOutputTokens?: number;
   totalTokens?: number;
+  /**
+   * Authoritative pre-summed prompt tokens (new + cache_read + cache_write).
+   * Attached by CostCalculator.withTotalInputTokens at emission/persistence
+   * so the client never re-derives billing token composition.
+   */
+  totalInputTokens?: number;
   /** Provider-reported tokens/sec (llama.cpp, lm-studio). */
   tokensPerSec?: number;
 }

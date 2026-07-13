@@ -7,6 +7,7 @@ import {
   getTotalInputTokens,
   estimateTokens,
   calculateTextCost,
+  withTotalInputTokens,
 } from "#src/utils/CostCalculator";
 import { computeModalities } from "./conversation/index.ts";
 import { COLLECTIONS, SYSTEM_STATUSES } from "#src/constants";
@@ -455,7 +456,9 @@ const RequestLogger = {
               }))
             : null,
         ...(audioRef ? { audioRef } : {}),
-        usage,
+        // Attach the authoritative pre-summed totalInputTokens so the client
+        // renders it directly instead of re-deriving prompt-token composition.
+        usage: withTotalInputTokens(usage as TokenUsage | null | undefined),
       },
       modalities,
       rateLimits,

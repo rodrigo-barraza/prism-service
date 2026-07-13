@@ -7,6 +7,15 @@ export interface ParameterProviderOverride {
   min?: number;
   locked?: boolean;
   lockedReason?: string;
+  /**
+   * Lock this parameter (to its provider-required value) whenever the
+   * selected model is reasoning AND thinking is enabled. Models this on
+   * Anthropic, whose API requires temperature=1 with extended thinking —
+   * expressed here so the client doesn't hardcode `provider === "anthropic"`.
+   */
+  lockedWhenReasoning?: boolean;
+  /** Reason shown when lockedWhenReasoning is active. */
+  lockedWhenReasoningReason?: string;
 }
 
 export interface ParameterDescriptor {
@@ -83,7 +92,12 @@ const PARAMETER_DESCRIPTORS: ParameterDescriptor[] = [
     providers: ALL_TEXT_PROVIDERS,
     hideWhenReasoning: true,
     providerOverrides: {
-      [PROVIDERS.ANTHROPIC]: { max: 1 },
+      [PROVIDERS.ANTHROPIC]: {
+        max: 1,
+        // Anthropic requires temperature=1 while extended thinking is on.
+        lockedWhenReasoning: true,
+        lockedWhenReasoningReason: "Locked by Thinking (= 1)",
+      },
     },
   },
   {
