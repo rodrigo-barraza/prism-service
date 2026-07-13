@@ -20,7 +20,10 @@ import {
   computeTotalCost,
   computeTokenStats,
   computeToolCounts,
+  aggregateConversationTotalsFromRequests,
 } from "./utils.ts";
+import logger from "#src/utils/logger";
+import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 const DEFAULT_COLLECTION = COLLECTIONS.MODEL_CONVERSATIONS;
 
@@ -168,8 +171,35 @@ const ConversationService: ConversationServiceInterface = {
       throw new Error(`Conversation not found: ${conversationId}`);
     }
 
-    // 3. Recompute derived fields and persist
-    const modelNamesSet = new Set<string>();
+    // 3. Recompute derived fields and persist.
+    //
+    // Cost/token rollups come from the `requests` collection — the write-side
+    // source of truth. Persisted messages are deliberately telemetry-free
+    // (messageTelemetrySeparation), so message-derived stats only serve as a
+    // fallback for legacy/imported conversations and paths that still attach
+    // per-message estimatedCost (e.g. image chat).
+    let requestTotals: Awaited<
+      ReturnType<typeof aggregateConversationTotalsFromRequests>
+    > = null;
+    try {
+      requestTotals = await aggregateConversationTotalsFromRequests(
+        conversationId,
+        collection,
+        {
+          // Agent runs record a per-loop correlation ID on the doc; request
+          // rows are keyed by it (in addition to conversationId).
+          agentCorrelationId:
+            (conversation.agentConversationId as string | undefined) || null,
+        },
+      );
+    } catch (error: unknown) {
+      // A requests-collection hiccup must never block message persistence.
+      logger.warn(
+        `[ConversationService] requests rollup failed for ${conversationId}: ${getErrorMessage(error)} — falling back to message-derived stats`,
+      );
+    }
+
+    const modelNamesSet = new Set<string>(requestTotals?.modelNames || []);
     for (const model of (conversation.messages as ChatMessage[]) || []) {
       if (model.deleted) continue;
       if (model.role === "assistant" && model.model) {
@@ -180,20 +210,40 @@ const ConversationService: ConversationServiceInterface = {
       modelNamesSet.add(conversation.settings.model as string);
     }
 
-    const tokenStats = computeTokenStats(conversation.messages as ChatMessage[]);
-
-    const derived: Partial<TransformedConversation> = {
-      modalities: computeModalities(conversation.messages as ChatMessage[]),
-      providers: extractProviders(
+    const providersSet = new Set<string>(
+      extractProviders(
         conversation.messages as ChatMessage[],
         conversation.settings as ConversationSettings,
       ),
-      totalCost: computeTotalCost(conversation.messages as ChatMessage[]),
-      inputTokens: tokenStats.input,
-      outputTokens: tokenStats.output,
+    );
+    for (const provider of requestTotals?.providers || []) {
+      providersSet.add(provider.toLowerCase());
+    }
+
+    const tokenStats = computeTokenStats(conversation.messages as ChatMessage[]);
+    const messageDerivedCost = computeTotalCost(
+      conversation.messages as ChatMessage[],
+    );
+
+    const derived: Partial<TransformedConversation> = {
+      modalities: computeModalities(conversation.messages as ChatMessage[]),
+      providers: [...providersSet],
+      // Math.max mirrors the read-side enrichment semantics: request totals
+      // win once present; message-derived values cover legacy documents.
+      totalCost: Math.max(requestTotals?.totalCost || 0, messageDerivedCost),
+      inputTokens: requestTotals?.inputTokens || tokenStats.input,
+      outputTokens: requestTotals?.outputTokens || tokenStats.output,
       toolCounts: computeToolCounts(conversation.messages as ChatMessage[]),
       modelNames: Array.from(modelNamesSet),
     };
+
+    if (requestTotals) {
+      // Cache-efficiency visibility (new fields; only written when the
+      // requests aggregate is available so legacy docs stay untouched).
+      derived.cacheReadInputTokens = requestTotals.cacheReadInputTokens;
+      derived.cacheCreationInputTokens = requestTotals.cacheCreationInputTokens;
+      derived.reasoningOutputTokens = requestTotals.reasoningOutputTokens;
+    }
 
     // Auto-derive a descriptive title from the first user message if the current title is missing or is 'New Conversation'
     if (

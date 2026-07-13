@@ -349,8 +349,11 @@ export async function finalizeTextGeneration(
   // Placed after audio build so audioRef is available for modality detection.
   // Agentic requests are logged granularly per-iteration by AgenticLoopService,
   // so we only log here for non-agentic paths (chat, live).
+  //
+  // AWAITED: appendAndFinalize's rollup aggregates the requests collection,
+  // so this turn's request row must be written before persistence runs.
   if (!options.agenticLoopEnabled) {
-    RequestLogger.logChatGeneration({
+    await RequestLogger.logChatGeneration({
       requestId,
       endpoint: modelDefinition?.liveAPI ? "/live" : "/chat",
       operation: modelDefinition?.liveAPI ? "live" : "chat",

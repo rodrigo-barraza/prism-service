@@ -42,4 +42,18 @@ export function logKVCacheHitRate(
         `total=${totalPromptTokens}, hit=${cacheHitPercentage}%`,
     );
   }
+
+  // Wasted-write signature: from iteration 2 on, a large cache WRITE with a
+  // ZERO cache read means the previous iteration's cache write was thrown
+  // away (prefix mutated — e.g. a mid-loop tool-set change) and the full
+  // prefix is being re-prefilled at the cache-write premium.
+  const cacheWriteTokens = passUsage.cacheCreationInputTokens || 0;
+  if (iteration >= 2 && cacheWriteTokens > 0 && cachedInputTokens === 0) {
+    logger.warn(
+      `[${harnessLabel}] Iteration ${iteration} re-wrote ${cacheWriteTokens} ` +
+        `prefix tokens with ZERO cache reads — the previous iteration's cache ` +
+        `write was wasted (prefix mutation: tool-set change, system-prompt ` +
+        `edit, or history rewrite).`,
+    );
+  }
 }

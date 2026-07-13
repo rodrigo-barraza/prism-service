@@ -352,7 +352,7 @@ describe("RequestLogger Unit Tests Suite", () => {
       ).resolves.not.toThrow();
     });
 
-    it("should conditionally include cache and reasoning token fields only when positive", async () => {
+    it("should include cache and reasoning token fields unconditionally", async () => {
       const pendingDocumentId = "68tokens123" as any;
 
       await RequestLogger.completePending(pendingDocumentId, {
@@ -367,8 +367,59 @@ describe("RequestLogger Unit Tests Suite", () => {
 
       const setFields = mockUpdateOne.mock.calls[0][1].$set;
       expect(setFields.cacheReadInputTokens).toBe(150);
-      expect(setFields).not.toHaveProperty("cacheCreationInputTokens");
+      // Unconditional (0, not absent) — uniform schema for aggregations.
+      expect(setFields.cacheCreationInputTokens).toBe(0);
       expect(setFields.reasoningOutputTokens).toBe(42);
+    });
+
+    it("derives top-level token fields from usage — inputTokens is the cache-inclusive total", async () => {
+      const pendingDocumentId = "68usage456" as any;
+
+      // Anthropic-shaped usage: input_tokens is the UNCACHED remainder.
+      await RequestLogger.completePending(pendingDocumentId, {
+        requestId: "req-usage-1",
+        provider: PROVIDERS.ANTHROPIC,
+        model: "claude-fable-5",
+        success: true,
+        usage: {
+          inputTokens: 2,
+          outputTokens: 6107,
+          cacheReadInputTokens: 0,
+          cacheCreationInputTokens: 82108,
+        },
+        // Hand-passed numbers must be ignored when usage is present.
+        inputTokens: 2,
+        outputTokens: 6107,
+      });
+
+      const setFields = mockUpdateOne.mock.calls[0][1].$set;
+      expect(setFields.inputTokens).toBe(82110); // 2 + 0 + 82108
+      expect(setFields.outputTokens).toBe(6107);
+      expect(setFields.cacheReadInputTokens).toBe(0);
+      expect(setFields.cacheCreationInputTokens).toBe(82108);
+      expect(setFields.reasoningOutputTokens).toBe(0);
+    });
+
+    it("wraps responsePayload.usage with the authoritative totalInputTokens", async () => {
+      const pendingDocumentId = "68usage789" as any;
+
+      await RequestLogger.completePending(pendingDocumentId, {
+        requestId: "req-usage-2",
+        provider: PROVIDERS.ANTHROPIC,
+        model: "claude-fable-5",
+        success: true,
+        usage: { inputTokens: 5, outputTokens: 10, cacheReadInputTokens: 95 },
+        responsePayload: {
+          text: "hi",
+          usage: { inputTokens: 5, outputTokens: 10, cacheReadInputTokens: 95 },
+        },
+      });
+
+      const setFields = mockUpdateOne.mock.calls[0][1].$set;
+      expect(setFields.responsePayload.usage.totalInputTokens).toBe(100);
+      // Native split preserved
+      expect(setFields.responsePayload.usage.inputTokens).toBe(5);
+      expect(setFields.responsePayload.usage.cacheReadInputTokens).toBe(95);
     });
   });
 });

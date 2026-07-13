@@ -47,8 +47,17 @@ export interface SearchToolsResult {
  * and the tool count are never hardcoded.
  */
 function buildDiscoverAndEnableSchema(locale: string) {
-  const totalToolCount =
+  // Bucket the live count (nearest 10, e.g. "120+") — the exact number
+  // changes whenever an MCP server connects or tools-api redeploys, and
+  // because this schema sits in every conversation's tool block, an exact
+  // count would rewrite the block and invalidate provider prompt caches on
+  // every catalog fluctuation.
+  const exactToolCount =
     getToolOrchestratorService().getClientToolSchemas().length;
+  const totalToolCount =
+    exactToolCount >= 10
+      ? `${Math.floor(exactToolCount / 10) * 10}+`
+      : String(exactToolCount);
   const discoverableDomains = extractDiscoverableDomains();
   const domainListLowercase = discoverableDomains
     .map((domain) => domain.toLowerCase())
@@ -71,7 +80,7 @@ function buildDiscoverAndEnableSchema(locale: string) {
       locale,
       "internal-tools.discover_and_enable_tools.description",
       {
-        totalToolCount: String(totalToolCount),
+        totalToolCount,
         domainListLowercase,
       },
     ),

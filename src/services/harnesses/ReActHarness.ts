@@ -736,7 +736,7 @@ export default class ReActHarness extends BaseAgenticHarness {
           currentMessages = currentMessages.filter(m => !(m.role === "assistant" && !m.content?.trim() && !m.thinking?.trim() && (!m.toolCalls || m.toolCalls.length === 0)));
 
           injectToolDiscoveryNudge(pass.pendingToolCalls, results, currentMessages, context);
-          this.checkAndApplyToolSetChanges(currentMessages);
+          this.checkAndApplyToolSetChanges(currentMessages, pass.usage);
           this.logIteration(pass, currentMessages);
 
           const stallVerdict = semanticStallDetector.recordIteration(pass.pendingToolCalls);

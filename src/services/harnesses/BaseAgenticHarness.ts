@@ -69,6 +69,7 @@ import type {
   ConversationMessage,
   StreamChunk,
   ToolCall,
+  UsageAccumulator,
 } from "./types.ts";
 
 
@@ -157,6 +158,7 @@ export default class BaseAgenticHarness {
    */
   checkAndApplyToolSetChanges(
     currentMessages?: ConversationMessage[],
+    lastPassUsage?: UsageAccumulator | null,
   ): boolean {
     const conversationId = this.context.agentConversationId;
     const toolContextStore = ToolContext.getStore(conversationId);
@@ -219,16 +221,42 @@ export default class BaseAgenticHarness {
     // Tool definitions serialize AHEAD of messages in provider payloads, so a
     // mid-loop tool-set swap invalidates the entire prompt-cache prefix. The
     // cost was previously silent — surface it so cache-thrash is diagnosable.
+    // The last pass's total input (remainder + cache read + cache write) is
+    // the prefix the next iteration must re-prefill from scratch.
+    const estimatedInvalidatedTokens = lastPassUsage
+      ? (Number(lastPassUsage.inputTokens) || 0) +
+        (Number(lastPassUsage.cacheReadInputTokens) || 0) +
+        (Number(lastPassUsage.cacheCreationInputTokens) || 0)
+      : null;
     logger.warn(
-      `[AgenticLoop] Tool set changed mid-loop (${previousToolNames.size} → ${filteredTools.length} tools) — ` +
-        `this busts the provider prompt-cache prefix for subsequent iterations.`,
+      `[AgenticLoop] Tool set changed mid-loop at iteration ${this.state.iterations} ` +
+        `(${previousToolNames.size} → ${filteredTools.length} tools) — ` +
+        `this busts the provider prompt-cache prefix for subsequent iterations` +
+        (estimatedInvalidatedTokens !== null
+          ? ` (~${estimatedInvalidatedTokens} prefix tokens invalidated).`
+          : `.`),
     );
+
+    WebhookEventBus.emit("request.cache_invalidated", {
+      agentConversationId: conversationId,
+      conversationId: this.context.conversationId,
+      provider: this.context.providerName,
+      model: this.context.resolvedModel,
+      iteration: this.state.iterations,
+      previousToolCount: previousToolNames.size,
+      newToolCount: filteredTools.length,
+      estimatedInvalidatedTokens,
+      reason: "tool_set_changed",
+    });
 
     this.context.emit({
       type: SERVER_SENT_EVENT_TYPES.STATUS,
       message: STATUS_MESSAGES.TOOL_SET_CHANGED,
       enabledCount: filteredTools.length,
       dynamicTools: dynamicEnabledArray,
+      ...(estimatedInvalidatedTokens !== null && {
+        estimatedInvalidatedTokens,
+      }),
     });
 
     // Compute newly added tools and inject documentation addendum
@@ -1327,12 +1355,9 @@ export default class BaseAgenticHarness {
           ? [...new Set(pass.pendingToolCalls.map((toolCall) => toolCall.name))]
           : [],
       success: true,
-      inputTokens: Number(pass.usage.inputTokens) || 0,
-      outputTokens: Number(pass.usage.outputTokens) || 0,
-      cacheReadInputTokens: Number(pass.usage.cacheReadInputTokens) || 0,
-      cacheCreationInputTokens:
-        Number(pass.usage.cacheCreationInputTokens) || 0,
-      reasoningOutputTokens: Number(pass.usage.reasoningOutputTokens) || 0,
+      // RequestLogger derives the top-level token fields from usage
+      // (inputTokens = cache-inclusive total, cache fields unconditional).
+      usage: pass.usage,
       estimatedCost: passEstimatedCost,
       tokensPerSec: passTokensPerSec,
       temperature: (pass.options?.temperature as number) ?? null,
@@ -1385,10 +1410,13 @@ export default class BaseAgenticHarness {
       },
     };
 
-    pass.pendingRequestDocumentIdPromise
+    // Fire-and-forget for streaming latency, but track the full chain so
+    // finalize() can await it — the conversation rollup aggregates the
+    // requests collection and must see every iteration of this turn.
+    const requestLogWrite = pass.pendingRequestDocumentIdPromise
       .then((pendingRequestDocumentId) => {
         if (pendingRequestDocumentId) {
-          RequestLogger.completePending(
+          return RequestLogger.completePending(
             pendingRequestDocumentId,
             fullPayload,
           ).catch((error: Error) =>
@@ -1396,26 +1424,26 @@ export default class BaseAgenticHarness {
               `[AgenticLoopService] Failed to complete pending request: ${errorMessage(error)}`,
             ),
           );
-        } else {
-          RequestLogger.logChatGeneration(legacyPayload).catch(
-            (error: Error) =>
-              logger.error(
-                `[AgenticLoopService] Failed to log intermediate request: ${errorMessage(error)}`,
-              ),
-          );
         }
+        return RequestLogger.logChatGeneration(legacyPayload).catch(
+          (error: Error) =>
+            logger.error(
+              `[AgenticLoopService] Failed to log intermediate request: ${errorMessage(error)}`,
+            ),
+        );
       })
       .catch((error: Error) => {
         logger.error(
           `[BaseAgenticHarness] Error resolving pendingRequestDocumentIdPromise: ${errorMessage(error)}`,
         );
-        RequestLogger.logChatGeneration(legacyPayload).catch(
+        return RequestLogger.logChatGeneration(legacyPayload).catch(
           (loggingError: Error) =>
             logger.error(
               `[AgenticLoopService] Failed to log intermediate request on fallback: ${errorMessage(loggingError)}`,
             ),
         );
       });
+    this.state.pendingRequestLogWrites.push(requestLogWrite);
   }
 
   // ── Per-iteration pass state factory ──────────────────────
@@ -1499,6 +1527,13 @@ export default class BaseAgenticHarness {
 
     if (context.signal?.aborted) {
       state.conversationOutcome = "aborted";
+    }
+
+    // Ensure every iteration's request-log write has landed before
+    // persistence — the conversation rollup aggregates the requests
+    // collection, so a still-in-flight completePending would undercount.
+    if (state.pendingRequestLogWrites.length > 0) {
+      await Promise.allSettled(state.pendingRequestLogWrites);
     }
 
     const { agentConversationId, conversationId, project, username: _username } = context;

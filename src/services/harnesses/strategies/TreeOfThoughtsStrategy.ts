@@ -908,7 +908,7 @@ export async function runTreeOfThoughts(
           context,
         );
 
-        harness.checkAndApplyToolSetChanges(currentMessages);
+        harness.checkAndApplyToolSetChanges(currentMessages, selectedPass.usage);
 
         continue;
       }

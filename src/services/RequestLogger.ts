@@ -36,6 +36,13 @@ const API_TO_CANONICAL = {
   image_generation: "Image Generation",
 };
 export interface LogParams {
+  /**
+   * Normalized provider usage. When present, the top-level token fields
+   * (input/output/cache/reasoning tokens) are derived from it centrally —
+   * inputTokens becomes the cache-INCLUSIVE total via getTotalInputTokens —
+   * and any hand-passed token numbers are ignored.
+   */
+  usage?: TokenUsage | null;
   requestId?: string;
   endpoint?: string | null;
   operation?: string | null;
@@ -127,7 +134,8 @@ export interface LogChatGenerationParams extends LogParams {
   agenticIteration?: number | null;
 }
 
-export interface LogBackgroundLlmCallParams extends LogParams {
+export interface LogBackgroundLlmCallParams
+  extends Omit<LogParams, "usage"> {
   provider: string;
   aiMessages: MessagePayload[];
   resultText: string | null;
@@ -179,8 +187,32 @@ function sanitizeMessage(message: MessagePayload) {
     ...(message.name ? { name: message.name } : {}),
   };
 }
+/**
+ * Derive the top-level token fields for a requests row from a normalized
+ * usage object. `inputTokens` is the cache-INCLUSIVE total (uncached
+ * remainder + cache read + cache write) so aggregations over the requests
+ * collection weigh prompts consistently across providers and code paths;
+ * the provider-native split stays available in responsePayload.usage.
+ */
+function deriveTokenFields(usage: TokenUsage): {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+  reasoningOutputTokens: number;
+} {
+  return {
+    inputTokens: getTotalInputTokens(usage),
+    outputTokens: usage.outputTokens || 0,
+    cacheReadInputTokens: usage.cacheReadInputTokens || 0,
+    cacheCreationInputTokens: usage.cacheCreationInputTokens || 0,
+    reasoningOutputTokens: usage.reasoningOutputTokens || 0,
+  };
+}
+
 const RequestLogger = {
   async log({
+    usage = null,
     requestId,
     endpoint,
     operation = null,
@@ -234,6 +266,17 @@ const RequestLogger = {
         logger.error("RequestLogger: MongoDB client not available");
         return;
       }
+      // Central token normalization — a provided usage object wins over
+      // hand-passed token numbers so all code paths store the same shape.
+      if (usage) {
+        ({
+          inputTokens,
+          outputTokens,
+          cacheReadInputTokens,
+          cacheCreationInputTokens,
+          reasoningOutputTokens,
+        } = deriveTokenFields(usage));
+      }
       const document = {
         requestId,
         createdAt: new Date().toISOString(),
@@ -257,9 +300,11 @@ const RequestLogger = {
         errorMessage,
         inputTokens,
         outputTokens,
-        ...(cacheReadInputTokens > 0 && { cacheReadInputTokens }),
-        ...(cacheCreationInputTokens > 0 && { cacheCreationInputTokens }),
-        ...(reasoningOutputTokens > 0 && { reasoningOutputTokens }),
+        // Unconditional so the requests schema is uniform for aggregations
+        // and $exists-style queries (previously only written when > 0).
+        cacheReadInputTokens,
+        cacheCreationInputTokens,
+        reasoningOutputTokens,
         estimatedCost,
         tokensPerSec,
         temperature,
@@ -336,13 +381,6 @@ const RequestLogger = {
     agenticIteration = null,
     rateLimits = null,
   }: LogChatGenerationParams) {
-    const inputTokens = usage
-      ? getTotalInputTokens(usage as Parameters<typeof getTotalInputTokens>[0])
-      : 0;
-    const outputTokens = usage ? usage.outputTokens || 0 : 0;
-    const cacheReadInputTokens = usage?.cacheReadInputTokens || 0;
-    const cacheCreationInputTokens = usage?.cacheCreationInputTokens || 0;
-    const reasoningOutputTokens = usage?.reasoningOutputTokens || 0;
     // Build synthetic message array for computeModalities (same function used by conversations)
     const syntheticMessages = [
       ...messages,
@@ -393,17 +431,8 @@ const RequestLogger = {
           : [],
       success,
       errorMessage,
-      inputTokens: inputTokens as number,
-      outputTokens: outputTokens as number,
-      ...(Number(cacheReadInputTokens) > 0 && {
-        cacheReadInputTokens: Number(cacheReadInputTokens),
-      }),
-      ...(Number(cacheCreationInputTokens) > 0 && {
-        cacheCreationInputTokens: Number(cacheCreationInputTokens),
-      }),
-      ...(Number(reasoningOutputTokens) > 0 && {
-        reasoningOutputTokens: Number(reasoningOutputTokens),
-      }),
+      // Token fields derived centrally in log() from the usage object.
+      usage: usage || null,
       estimatedCost,
       tokensPerSec,
       temperature: options?.temperature ?? null,
@@ -527,9 +556,6 @@ const RequestLogger = {
       : resultText
         ? estimateTokens(resultText)
         : 0;
-    const cacheReadInputTokens = apiUsage?.cacheReadInputTokens || 0;
-    const cacheCreationInputTokens = apiUsage?.cacheCreationInputTokens || 0;
-
     const pricing = getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[model as string];
     let estimatedCost = null;
     if (pricing) {
@@ -556,14 +582,11 @@ const RequestLogger = {
       success,
       errorMessage,
       estimatedCost,
+      // Real API usage is normalized centrally in log(); the estimated
+      // token fields below only apply when no usage was reported.
+      usage: (apiUsage as TokenUsage) || null,
       inputTokens: inputTokens as number,
       outputTokens: outputTokens as number,
-      ...(Number(cacheReadInputTokens) > 0 && {
-        cacheReadInputTokens: Number(cacheReadInputTokens),
-      }),
-      ...(Number(cacheCreationInputTokens) > 0 && {
-        cacheCreationInputTokens: Number(cacheCreationInputTokens),
-      }),
       tokensPerSec: calculateTokensPerSec(outputTokens as number, totalSec),
       inputCharacters: inputText.length,
       totalTime: roundMilliseconds(totalSec),
@@ -683,11 +706,7 @@ const RequestLogger = {
         toolApiNames,
         success,
         errorMessage,
-        inputTokens,
-        outputTokens,
-        cacheReadInputTokens,
-        cacheCreationInputTokens,
-        reasoningOutputTokens,
+        usage,
         estimatedCost,
         tokensPerSec,
         temperature,
@@ -712,6 +731,35 @@ const RequestLogger = {
         physicalBatchSize,
       } = fullPayload;
 
+      // Central token normalization — a provided usage object wins over
+      // hand-passed token numbers (same convention as log()).
+      const tokenFields = usage
+        ? deriveTokenFields(usage)
+        : {
+            inputTokens: fullPayload.inputTokens ?? 0,
+            outputTokens: fullPayload.outputTokens ?? 0,
+            cacheReadInputTokens: fullPayload.cacheReadInputTokens ?? 0,
+            cacheCreationInputTokens:
+              fullPayload.cacheCreationInputTokens ?? 0,
+            reasoningOutputTokens: fullPayload.reasoningOutputTokens ?? 0,
+          };
+
+      // Keep the authoritative pre-summed totalInputTokens on the persisted
+      // usage split, matching logChatGeneration's responsePayload shape.
+      const normalizedResponsePayload =
+        responsePayload && typeof responsePayload === "object"
+          ? {
+              ...responsePayload,
+              ...("usage" in responsePayload
+                ? {
+                    usage: withTotalInputTokens(
+                      responsePayload.usage as TokenUsage | null | undefined,
+                    ),
+                  }
+                : {}),
+            }
+          : responsePayload;
+
       const updateFields: Record<string, unknown> = {
         status: SYSTEM_STATUSES.COMPLETED,
         requestId,
@@ -731,8 +779,8 @@ const RequestLogger = {
         toolApiNames,
         success,
         errorMessage,
-        inputTokens,
-        outputTokens,
+        // Unconditional token fields (uniform schema for aggregations)
+        ...tokenFields,
         estimatedCost,
         tokensPerSec,
         temperature,
@@ -749,7 +797,7 @@ const RequestLogger = {
         generationTime,
         totalTime,
         requestPayload,
-        responsePayload,
+        responsePayload: normalizedResponsePayload,
         modalities,
         rateLimits,
       };
@@ -758,14 +806,6 @@ const RequestLogger = {
         updateFields.agentConversationId = agentConversationId;
       if (parentAgentConversationId)
         updateFields.parentAgentConversationId = parentAgentConversationId;
-      if (Number(cacheReadInputTokens) > 0)
-        updateFields.cacheReadInputTokens = Number(cacheReadInputTokens);
-      if (Number(cacheCreationInputTokens) > 0)
-        updateFields.cacheCreationInputTokens = Number(
-          cacheCreationInputTokens,
-        );
-      if (Number(reasoningOutputTokens) > 0)
-        updateFields.reasoningOutputTokens = Number(reasoningOutputTokens);
       if (contextLength != null) updateFields.contextLength = contextLength;
       if (evalBatchSize != null) updateFields.evalBatchSize = evalBatchSize;
       if (physicalBatchSize != null)

@@ -350,7 +350,7 @@ describe("ConversationService.appendMessages", () => {
       expect(result.providers).toContain(PROVIDERS.ANTHROPIC);
     });
 
-    it("should compute totalCost from appended messages", async () => {
+    it("should compute totalCost from appended messages (legacy fallback — no requests rows)", async () => {
       const result = await ConversationService.appendMessages(
         "cost-test",
         BASE_ARGS.project,
@@ -365,6 +365,132 @@ describe("ConversationService.appendMessages", () => {
       );
 
       expect(result.totalCost).toBeCloseTo(0.004);
+    });
+
+    it("should roll up totalCost/tokens from the requests collection while messages stay telemetry-free", async () => {
+      // Requests collection is the write-side source of truth: persisted
+      // messages carry no telemetry (messageTelemetrySeparation), so the
+      // rollup must come from the per-request rows.
+      const requestsAggregate = vi.fn().mockReturnValue({
+        toArray: async () => [
+          {
+            totalCost: 3.650435,
+            inputTokens: 822377,
+            outputTokens: 23439,
+            cacheReadInputTokens: 673937,
+            cacheCreationInputTokens: 148373,
+            reasoningOutputTokens: 0,
+            modelNames: ["claude-fable-5", null],
+            providers: ["anthropic", ""],
+          },
+        ],
+      });
+      const requestsCollection = { aggregate: requestsAggregate };
+      (MongoWrapper.getCollection as any).mockImplementation(
+        (_db: string, name: string) =>
+          name === COLLECTIONS.REQUESTS ? requestsCollection : mockCollection,
+      );
+
+      const result = await ConversationService.appendMessages(
+        "rollup-from-requests",
+        BASE_ARGS.project,
+        BASE_ARGS.username,
+        [
+          { role: "user", content: "Make me a song" },
+          // Telemetry-free assistant message — the canonical persisted shape
+          { role: "assistant", content: "Done!" },
+        ],
+        { settings: { provider: PROVIDERS.ANTHROPIC, model: "claude-fable-5" } },
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS },
+      );
+
+      // Match covers all request keying shapes for this conversation
+      const pipeline = requestsAggregate.mock.calls[0][0];
+      expect(pipeline[0].$match.$or).toEqual(
+        expect.arrayContaining([
+          { conversationId: "rollup-from-requests" },
+          { agentConversationId: "rollup-from-requests" },
+        ]),
+      );
+
+      expect(result.totalCost).toBeCloseTo(3.650435);
+      expect(result.inputTokens).toBe(822377);
+      expect(result.outputTokens).toBe(23439);
+      expect(result.cacheReadInputTokens).toBe(673937);
+      expect(result.cacheCreationInputTokens).toBe(148373);
+      expect(result.modelNames).toContain("claude-fable-5");
+      expect(result.providers).toContain(PROVIDERS.ANTHROPIC);
+      // Persisted messages remain telemetry-free
+      for (const message of result.messages as any[]) {
+        expect(message).not.toHaveProperty("estimatedCost");
+        expect(message).not.toHaveProperty("usage");
+      }
+    });
+
+    it("should prefer the larger of request totals and message-derived cost (Math.max)", async () => {
+      const requestsCollection = {
+        aggregate: vi.fn().mockReturnValue({
+          toArray: async () => [
+            {
+              totalCost: 0.001,
+              inputTokens: 100,
+              outputTokens: 20,
+              cacheReadInputTokens: 0,
+              cacheCreationInputTokens: 0,
+              reasoningOutputTokens: 0,
+              modelNames: [],
+              providers: [],
+            },
+          ],
+        }),
+      };
+      (MongoWrapper.getCollection as any).mockImplementation(
+        (_db: string, name: string) =>
+          name === COLLECTIONS.REQUESTS ? requestsCollection : mockCollection,
+      );
+
+      // Image-path style message with per-message estimatedCost larger than
+      // the requests aggregate — the message-derived value must win.
+      const result = await ConversationService.appendMessages(
+        "rollup-max",
+        BASE_ARGS.project,
+        BASE_ARGS.username,
+        [
+          { role: "user", content: "Draw" },
+          { role: "assistant", content: "img", estimatedCost: 0.09 },
+        ],
+        null,
+        { collection: COLLECTIONS.MODEL_CONVERSATIONS },
+      );
+
+      expect(result.totalCost).toBeCloseTo(0.09);
+    });
+
+    it("should fall back to message-derived stats when the requests aggregation throws", async () => {
+      const requestsCollection = {
+        aggregate: vi.fn(() => {
+          throw new Error("requests collection unavailable");
+        }),
+      };
+      (MongoWrapper.getCollection as any).mockImplementation(
+        (_db: string, name: string) =>
+          name === COLLECTIONS.REQUESTS ? requestsCollection : mockCollection,
+      );
+
+      const result = await ConversationService.appendMessages(
+        "rollup-fallback",
+        BASE_ARGS.project,
+        BASE_ARGS.username,
+        [
+          { role: "user", content: "Hello" },
+          { role: "assistant", content: "Hi", estimatedCost: 0.002 },
+        ],
+        null,
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS },
+      );
+
+      // Aggregation failure must never block persistence
+      expect(result.totalCost).toBeCloseTo(0.002);
     });
   });
 
@@ -843,7 +969,12 @@ describe("Conversation Utilities (utils.ts)", () => {
       expect(patchFields.messages).toEqual(messages);
       expect(patchFields.modalities?.textIn).toBe(true);
       expect(patchFields.providers).toContain(PROVIDERS.OPENAI);
-      expect(patchFields.totalCost).toBe(0);
+      // totalCost/inputTokens/outputTokens are deliberately NOT set on PATCH:
+      // persisted messages are telemetry-free, and message edits must not
+      // zero (or "refund") spend recorded in the requests collection.
+      expect(patchFields).not.toHaveProperty("totalCost");
+      expect(patchFields).not.toHaveProperty("inputTokens");
+      expect(patchFields).not.toHaveProperty("outputTokens");
       expect(patchFields.modelNames).toContain("gpt-4");
     });
   });

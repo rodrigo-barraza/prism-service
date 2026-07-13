@@ -152,10 +152,67 @@ describe("Google Provider Adapter", () => {
       ]);
 
       expect(result.text).toBe("Google response text");
+      // promptTokenCount is cache-INCLUSIVE — normalizeGoogleUsage subtracts
+      // cached tokens so CostCalculator doesn't bill them twice.
       expect(result.usage).toEqual({
-        inputTokens: 150,
+        inputTokens: 140,
         outputTokens: 60,
         cacheReadInputTokens: 10,
+      });
+    });
+
+    it("maps thoughtsTokenCount into outputTokens and reasoningOutputTokens", async () => {
+      mockGenerateContent.mockResolvedValueOnce({
+        text: "Thought-out answer",
+        candidates: [
+          { content: { parts: [{ text: "Thought-out answer" }] }, finishReason: "STOP" },
+        ],
+        usageMetadata: {
+          promptTokenCount: 1000,
+          candidatesTokenCount: 200,
+          thoughtsTokenCount: 350,
+        },
+      });
+
+      const result = await googleProvider.generateText(
+        [{ role: "user", content: "Think hard" }],
+        "gemini-3.5-flash",
+      );
+
+      // Thoughts bill at the output rate → included in outputTokens (matches
+      // the OpenAI convention where completion_tokens includes reasoning),
+      // with the informational subset on reasoningOutputTokens.
+      expect(result.usage).toEqual({
+        inputTokens: 1000,
+        outputTokens: 550,
+        reasoningOutputTokens: 350,
+      });
+    });
+
+    it("subtracts a large cached prefix from cache-inclusive promptTokenCount", async () => {
+      mockGenerateContent.mockResolvedValueOnce({
+        text: "cached answer",
+        candidates: [
+          { content: { parts: [{ text: "cached answer" }] }, finishReason: "STOP" },
+        ],
+        usageMetadata: {
+          promptTokenCount: 82000,
+          candidatesTokenCount: 40,
+          cachedContentTokenCount: 80000,
+        },
+      });
+
+      const result = await googleProvider.generateText(
+        [{ role: "user", content: "hi" }],
+        "gemini-3.5-flash",
+      );
+
+      // Without the subtraction, calculateTextCost would bill the 80k cached
+      // tokens at BOTH the full input rate and the cached rate.
+      expect(result.usage).toEqual({
+        inputTokens: 2000,
+        outputTokens: 40,
+        cacheReadInputTokens: 80000,
       });
     });
 
@@ -369,8 +426,9 @@ describe("Google Provider Adapter", () => {
         (chunkItem) => typeof chunkItem === "object" && chunkItem.type === "usage"
       );
       expect(usageChunk).toBeDefined();
+      // Cache-inclusive promptTokenCount minus cachedContentTokenCount
       expect(usageChunk.usage).toEqual({
-        inputTokens: 150,
+        inputTokens: 140,
         outputTokens: 70,
         cacheReadInputTokens: 10,
       });

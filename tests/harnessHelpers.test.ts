@@ -787,8 +787,12 @@ describe('BaseAgenticHarness Helper Methods', () => {
             provider: PROVIDERS.GOOGLE,
             model: 'gemini-3-flash',
             success: true,
-            inputTokens: 250,
-            outputTokens: 120,
+            // logIteration passes the usage object; RequestLogger derives
+            // the top-level token fields from it centrally.
+            usage: expect.objectContaining({
+              inputTokens: 250,
+              outputTokens: 120,
+            }),
             outputCharacters: 400,
           }),
         );

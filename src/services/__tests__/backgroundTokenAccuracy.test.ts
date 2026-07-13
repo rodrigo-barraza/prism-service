@@ -243,7 +243,7 @@ describe("Background Token Accuracy", () => {
       // the full apiUsage object, so billing is correct.
     });
 
-    it("omits cacheReadInputTokens when zero", async () => {
+    it("writes cache token fields unconditionally (0 when no cache activity)", async () => {
       const noCacheUsage = {
         inputTokens: 989,
         outputTokens: 90,
@@ -257,10 +257,11 @@ describe("Background Token Accuracy", () => {
       });
 
       const doc = mockInsertOne.mock.calls[0][0];
-      // When 0, the spread operator `...(0 > 0 && {...})` evaluates to
-      // `...(false)` which spreads nothing → field should be absent
-      expect(doc).not.toHaveProperty("cacheReadInputTokens");
-      expect(doc).not.toHaveProperty("cacheCreationInputTokens");
+      // Cache fields are unconditional so the requests schema is uniform
+      // for aggregations and $exists-style queries.
+      expect(doc.cacheReadInputTokens).toBe(0);
+      expect(doc.cacheCreationInputTokens).toBe(0);
+      expect(doc.reasoningOutputTokens).toBe(0);
     });
 
     it("includes cacheCreationInputTokens when present", async () => {

@@ -30,6 +30,13 @@ export interface SettingsData {
     harness: string;
     topology: string;
     dynamicToolActivation: boolean;
+    /**
+     * Run a deterministic tool-catalog search against the user's message
+     * before iteration 1 and pre-enable the top matches so the tool set is
+     * stable from the first request (prompt-cache friendly). Kill switch
+     * for PreflightToolDiscovery.
+     */
+    preflightToolDiscovery: boolean;
     locale: string;
     [key: string]: string | boolean;
   };
@@ -78,6 +85,7 @@ const DEFAULTS: SettingsData = {
     harness: "standard",
     topology: DEFAULT_TOPOLOGY,
     dynamicToolActivation: true,
+    preflightToolDiscovery: true,
     locale: "en",
   },
   security: {
