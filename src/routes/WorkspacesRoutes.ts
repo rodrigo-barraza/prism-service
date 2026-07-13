@@ -180,14 +180,13 @@ router.get(
         );
       }
 
-      // Build workspace entries from each agent's displayRoots (same
-      // approach as GET /workspaces) so multi-agent setups are visible.
+      // For the Settings page, only show workspace entries when the agent
+      // provides explicit displayRoots. Docker containers register virtual
+      // root "/" with no displayRoots — those should not appear as workspace
+      // entries in the management UI.
       const agentServedWorkspaces: MappedWorkspace[] = [];
       for (const agent of agents) {
-        const displayPaths =
-          agent.displayRoots && agent.displayRoots.length > 0
-            ? agent.displayRoots
-            : agent.roots || [];
+        const displayPaths = agent.displayRoots || [];
         const machineInfo =
           (agent as WorkspaceAgent & { machineInfo?: Record<string, unknown> })
             ?.machineInfo || null;
