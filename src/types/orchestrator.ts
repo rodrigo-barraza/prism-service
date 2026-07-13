@@ -210,6 +210,22 @@ export interface OrchestratorContext {
   reasoningEffort?: string;
   /** Inherit parent's thinking token budget. */
   thinkingBudget?: number;
+  /**
+   * Parent loop's approval mode. Sub-agents inherit this instead of a
+   * hardcoded autoApprove — delegation must not bypass the user's
+   * approval choices.
+   */
+  autoApprove?: boolean;
+  /** Parent loop's declarative tool policies — inherited by sub-agents. */
+  policies?: import("#src/services/PolicyEngine").PolicyRule[];
+  /** Parent loop's CriticGate toggle — inherited by sub-agents. */
+  enableCriticGate?: boolean;
+  /** Parent loop's CriticGate model — inherited by sub-agents. */
+  criticModel?: string;
+  /** Parent loop's cost ceiling — inherited by sub-agents. */
+  maxCostDollars?: number;
+  /** Shared cost accumulator threaded through the whole sub-agent tree. */
+  sharedCostBudget?: import("#src/services/harnesses/lifecycle/CostBudgetEnforcer").SharedCostBudget;
   /** Extensibility for custom orchestrator data. */
   extensionData?: Record<string, string | number | boolean | null | undefined>;
 }

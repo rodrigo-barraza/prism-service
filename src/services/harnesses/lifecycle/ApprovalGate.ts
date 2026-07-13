@@ -24,13 +24,46 @@ export async function checkAndWaitForApproval(
   toolCalls: ToolCall[],
   context: AgenticContext,
   approvalEngine: AutoApprovalEngine,
-): Promise<{ isApproved: boolean; shouldApproveAll: boolean }> {
+): Promise<{
+  isApproved: boolean;
+  shouldApproveAll: boolean;
+  /** Policy-denied calls — terminal rejections that must not execute and are never user-approvable. */
+  deniedToolCalls: ToolCall[];
+}> {
   const { conversationId, emit, options } = context;
 
-  const { needsApproval } = approvalEngine.checkBatch(toolCalls);
+  const { needsApproval, denied = [] } = approvalEngine.checkBatch(toolCalls);
+
+  if (denied.length > 0) {
+    emit({
+      type: SERVER_SENT_EVENT_TYPES.STATUS,
+      message: `Tool execution denied by policy: ${denied.map((toolCall) => toolCall.name).join(", ")}`,
+    });
+  }
+
+  const deniedIds = new Set(denied.map((toolCall) => toolCall.id));
+  const deniedToolCalls = toolCalls.filter((toolCall) =>
+    deniedIds.has(toolCall.id),
+  );
 
   if (needsApproval.length === 0 || options.autoApprove) {
-    return { isApproved: true, shouldApproveAll: false };
+    // Mid-loop "approve all" (options.autoApprove flipped after engine
+    // construction) — stamp the skipped-over calls as approved so the
+    // decide-hook pass in ToolExecutor doesn't re-veto them.
+    if (options.autoApprove) {
+      for (const toolCall of toolCalls) {
+        if (toolCall._approval && !toolCall._approval.isDenied) {
+          toolCall._approval = {
+            ...toolCall._approval,
+            isApproved: true,
+            reason: toolCall._approval.isApproved
+              ? toolCall._approval.reason
+              : "approve_all",
+          };
+        }
+      }
+    }
+    return { isApproved: true, shouldApproveAll: false, deniedToolCalls };
   }
 
   // Emit approval_required events for each tool needing approval
@@ -92,12 +125,28 @@ export async function checkAndWaitForApproval(
       type: SERVER_SENT_EVENT_TYPES.STATUS,
       message: `Tool execution rejected: ${needsApproval.map((toolCall) => toolCall.name).join(", ")}`,
     });
-    return { isApproved: false, shouldApproveAll: false };
+    return { isApproved: false, shouldApproveAll: false, deniedToolCalls };
+  }
+
+  // Stamp the user's decision onto the original tool call objects so the
+  // decide-hook pass in ToolExecutor honors it instead of re-vetoing.
+  for (const toolCall of toolCalls) {
+    if (
+      toolCall._approval &&
+      !toolCall._approval.isDenied &&
+      !toolCall._approval.isApproved
+    ) {
+      toolCall._approval = {
+        ...toolCall._approval,
+        isApproved: true,
+        reason: "user_approved",
+      };
+    }
   }
 
   if (approvalResult.shouldApproveAll) {
-    return { isApproved: true, shouldApproveAll: true };
+    return { isApproved: true, shouldApproveAll: true, deniedToolCalls };
   }
 
-  return { isApproved: true, shouldApproveAll: false };
+  return { isApproved: true, shouldApproveAll: false, deniedToolCalls };
 }

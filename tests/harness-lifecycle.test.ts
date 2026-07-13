@@ -983,7 +983,7 @@ describe("CriticGate", () => {
     expect(reviewResult.reason).toBe("Contains destructive rm -rf command targeting critical directories.");
   });
 
-  it("should fail-open and approve with a fallback reason if the response is ambiguous", async () => {
+  it("should fail closed (deny) if the response is ambiguous", async () => {
     const criticGate = new CriticGate();
     const toolCall: ToolCall = {
       id: "call-1",
@@ -998,8 +998,8 @@ describe("CriticGate", () => {
     mockProvider.generateTextStream.mockReturnValue(mockStream);
 
     const reviewResult = await criticGate.review(toolCall, mockContext);
-    expect(reviewResult.isApproved).toBe(true);
-    expect(reviewResult.reason).toBe("critic_parse_fallback");
+    expect(reviewResult.isApproved).toBe(false);
+    expect(reviewResult.reason).toBe("critic_ambiguous_fail_closed");
   });
 
   it("should fail-open and approve if the critic model call throws an error", async () => {

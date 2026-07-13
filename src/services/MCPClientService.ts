@@ -306,11 +306,24 @@ const MCPClientService = {
 
   /**
    * Call a tool on a connected MCP server.
+   *
+   * @param options.signal - abort signal from the agentic loop (user stop /
+   *   per-tool timeout) so an in-flight MCP call can actually be cancelled.
+   * @param options.timeoutMilliseconds - per-call timeout override
+   *   (SDK default is 60s).
+   * @param options._reconnectAttempt - internal recursion guard. The
+   *   reconnect-retry used to recurse UNBOUNDED (callTool → catch →
+   *   reconnect → callTool …) when a server kept dropping the transport.
    */
   async callTool(
     serverName: string,
     toolName: string,
     args: Record<string, unknown> = {},
+    options: {
+      signal?: AbortSignal;
+      timeoutMilliseconds?: number;
+      _reconnectAttempt?: number;
+    } = {},
   ): Promise<TransformedMCPToolResult> {
     const conn = connections.get(serverName);
     if (!conn) {
@@ -318,10 +331,22 @@ const MCPClientService = {
     }
 
     try {
-      const result = await conn.client.callTool({
-        name: toolName,
-        arguments: args,
-      });
+      const result = await conn.client.callTool(
+        {
+          name: toolName,
+          arguments: args,
+        },
+        undefined,
+        {
+          ...(options.signal && { signal: options.signal }),
+          ...(options.timeoutMilliseconds && {
+            timeout: options.timeoutMilliseconds,
+          }),
+          // Long-running MCP tools that report progress shouldn't be killed
+          // by the flat timeout while they're demonstrably alive.
+          resetTimeoutOnProgress: true,
+        },
+      );
 
       // MCP returns { content: [{ type: "text", text: "..." }, ...], isError? }
       const content = (result.content || []) as MCPContentBlock[];
@@ -351,17 +376,34 @@ const MCPClientService = {
 
       return { result: textParts.join("\n") };
     } catch (error: unknown) {
-      // Attempt reconnect once on connection errors
+      // Never reconnect-retry an aborted call
+      if (options.signal?.aborted) {
+        return { error: `MCP tool call aborted: ${toolName}` };
+      }
+      // Attempt reconnect ONCE on connection errors (real depth guard — the
+      // recursion was previously unbounded). Note: the tool may have executed
+      // server-side before the transport dropped, so the retried result is
+      // annotated as possibly duplicated.
+      const reconnectAttempt = options._reconnectAttempt ?? 0;
       if (
-        getErrorMessage(error)?.includes("closed") ||
-        getErrorMessage(error)?.includes("transport")
+        reconnectAttempt < 1 &&
+        (getErrorMessage(error)?.includes("closed") ||
+          getErrorMessage(error)?.includes("transport"))
       ) {
         logger.warn(
-          `[MCP] Connection lost to "${serverName}", attempting reconnect...`,
+          `[MCP] Connection lost to "${serverName}", attempting reconnect (retry ${reconnectAttempt + 1}/1)...`,
         );
         try {
           await this.reconnect(serverName);
-          return this.callTool(serverName, toolName, args);
+          const retriedResult = await this.callTool(serverName, toolName, args, {
+            ...options,
+            _reconnectAttempt: reconnectAttempt + 1,
+          });
+          if (retriedResult && typeof retriedResult === "object" && !("error" in retriedResult)) {
+            (retriedResult as Record<string, unknown>)._possiblyDuplicated =
+              "This call was retried after a transport drop; if the tool has side effects they may have executed twice.";
+          }
+          return retriedResult;
         } catch (reconnectError: unknown) {
           return {
             error: `MCP server "${serverName}" connection lost and reconnect failed: ${getErrorMessage(reconnectError)}`,

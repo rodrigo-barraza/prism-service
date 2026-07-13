@@ -553,6 +553,7 @@ export async function runTreeOfThoughts(
           context.resolvedModel,
           options.maxCostDollars,
           emit,
+          { budget: options._sharedCostBudget, loopId: context.agentConversationId },
         )
       ) {
         break;
@@ -564,24 +565,43 @@ export async function runTreeOfThoughts(
           ...message,
         }));
 
-        const { isApproved, shouldApproveAll } = await checkAndWaitForApproval(
-          selectedPass.pendingToolCalls,
-          context,
-          approvalEngine,
+        const { isApproved, shouldApproveAll, deniedToolCalls = [] } =
+          await checkAndWaitForApproval(
+            selectedPass.pendingToolCalls,
+            context,
+            approvalEngine,
+          );
+
+        // Policy-denied calls are terminal — never executed, never approvable.
+        const deniedIds = new Set(deniedToolCalls.map((toolCall) => toolCall.id));
+        const deniedResults: ToolResult[] = deniedToolCalls.map((toolCall) => ({
+          name: toolCall.name,
+          id: toolCall.id,
+          result: {
+            success: false,
+            error: "POLICY_DENIED",
+            message: `Tool execution denied by policy: ${toolCall._approval?.reason || "policy rule"}`,
+          },
+        }));
+        const executableToolCalls = selectedPass.pendingToolCalls.filter(
+          (toolCall) => !deniedIds.has(toolCall.id),
         );
 
         let results: ToolResult[] = [];
         let sandboxCheckpointReference: string | null = null;
         if (!isApproved) {
-          results = selectedPass.pendingToolCalls.map((toolCall) => ({
-            name: toolCall.name,
-            id: toolCall.id,
-            result: {
-              success: false,
-              error: "USER_REJECTED",
-              message: "Tool execution was manually rejected by the user.",
-            },
-          }));
+          results = [
+            ...executableToolCalls.map((toolCall) => ({
+              name: toolCall.name,
+              id: toolCall.id,
+              result: {
+                success: false,
+                error: "USER_REJECTED",
+                message: "Tool execution was manually rejected by the user.",
+              },
+            })),
+            ...deniedResults,
+          ];
         } else {
           if (shouldApproveAll) {
             options.autoApprove = true;
@@ -594,13 +614,16 @@ export async function runTreeOfThoughts(
             ? createSandboxCheckpoint(workspaceRoot, emit)
             : null;
 
-          results = await executeToolBatch(
-            selectedPass.pendingToolCalls,
-            context,
-            tools,
-            hooks,
-            state,
-          );
+          results = [
+            ...(await executeToolBatch(
+              executableToolCalls,
+              context,
+              tools,
+              hooks,
+              state,
+            )),
+            ...deniedResults,
+          ];
         }
 
         // ── Post-execution processing ─────────────────────────

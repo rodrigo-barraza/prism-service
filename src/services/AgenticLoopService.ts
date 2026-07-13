@@ -99,6 +99,20 @@ export default class AgenticLoopService {
       planModeActive: !!options.planFirst,
     });
 
+    // Cost ceiling: create the tree-wide accumulator at the root loop.
+    // Sub-agents receive the SAME object through their options, so spend
+    // anywhere in the delegation tree counts against one budget.
+    if (
+      typeof options.maxCostDollars === "number" &&
+      options.maxCostDollars > 0 &&
+      !options._sharedCostBudget
+    ) {
+      const { SharedCostBudget } = await import(
+        "./harnesses/lifecycle/CostBudgetEnforcer.ts"
+      );
+      options._sharedCostBudget = new SharedCostBudget(options.maxCostDollars);
+    }
+
     // 3. Select harness, topology, and thought structure
     let harnessId = options.harness;
     let topologyId = options.topology;

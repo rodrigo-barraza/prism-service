@@ -528,7 +528,7 @@ describe("check — policy integration", () => {
     expect(result.reason).toBe("read_only");
   });
 
-  it("full auto mode takes precedence over policies", () => {
+  it("policy DENY holds even in full auto mode (terminal rejection)", () => {
     const engine = new AutoApprovalEngine({
       fullAuto: true,
       policies: [
@@ -536,7 +536,19 @@ describe("check — policy integration", () => {
       ],
     });
     const result = engine.check({ name: "execute_shell", args: {}, id: "tc7" });
-    // fullAuto short-circuits before policy evaluation
+    // A defensive DENY must never be bypassed by full-auto (or sub-agent) mode.
+    expect(result.isApproved).toBe(false);
+    expect(result.isDenied).toBe(true);
+  });
+
+  it("full auto mode auto-answers ASK_USER policies", () => {
+    const engine = new AutoApprovalEngine({
+      fullAuto: true,
+      policies: [
+        { tool: "execute_shell", decision: "ASK_USER", name: "ask-shell" },
+      ],
+    });
+    const result = engine.check({ name: "execute_shell", args: {}, id: "tc7b" });
     expect(result.isApproved).toBe(true);
     expect(result.reason).toBe("full_auto");
   });
@@ -574,13 +586,29 @@ describe("check — policy integration", () => {
       { name: "write_file", args: {}, id: "tc3" },       // Policy DENY
     ];
 
-    const { autoApproved, needsApproval } = engine.checkBatch(toolCalls);
+    const { autoApproved, needsApproval, denied } = engine.checkBatch(toolCalls);
     expect(autoApproved).toHaveLength(2);
     expect(autoApproved.map(tool => tool.name)).toEqual(
       expect.arrayContaining(["read_file", "execute_shell"]),
     );
-    expect(needsApproval).toHaveLength(1);
-    expect(needsApproval[0].name).toBe("write_file");
+    // Policy DENY is terminal — routed to `denied`, never offered for approval.
+    expect(needsApproval).toHaveLength(0);
+    expect(denied).toHaveLength(1);
+    expect(denied[0].name).toBe("write_file");
+    expect(denied[0]._approval.isDenied).toBe(true);
+  });
+
+  it("checkBatch stamps _approval onto the original tool call objects", () => {
+    const engine = new AutoApprovalEngine();
+    const toolCalls = [
+      { name: "read_file", args: {}, id: "tc1" },
+      { name: "execute_shell", args: {}, id: "tc2" },
+    ];
+    engine.checkBatch(toolCalls);
+    // The originals (which flow to ToolExecutor/CriticGate) must carry the
+    // tier — without this, CriticGate saw every call as WRITE and never fired.
+    expect((toolCalls[0] as { _approval?: { tier: number } })._approval?.tier).toBe(APPROVAL_TIERS.AUTO);
+    expect((toolCalls[1] as { _approval?: { tier: number } })._approval?.tier).toBe(APPROVAL_TIERS.DANGER);
   });
 });
 
@@ -620,15 +648,15 @@ describe('AutoApprovalEngine adversarial', () => {
     expect(result.tier).toBe(APPROVAL_TIERS.DANGER);
   });
 
-  it('should prioritize policy DENY over fullAuto — policies evaluated only when NOT fullAuto', () => {
+  it('should prioritize policy DENY over fullAuto — DENY is terminal in every mode', () => {
     const engine = new AutoApprovalEngine({
       fullAuto: true,
       policies: [deny('execute_shell')],
     });
     const result = engine.check({ name: 'execute_shell', args: {}, id: 'tc-1' });
-    // fullAuto returns immediately — policies are not checked
-    expect(result.isApproved).toBe(true);
-    expect(result.reason).toBe('full_auto');
+    // Policies are evaluated BEFORE fullAuto — a defensive deny always holds.
+    expect(result.isApproved).toBe(false);
+    expect(result.isDenied).toBe(true);
   });
 
   it('should apply policy DENY before tier system when NOT fullAuto', () => {

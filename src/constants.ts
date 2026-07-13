@@ -473,6 +473,20 @@ export const HARNESS = {
   /** Approval gate timeout — how long to wait for user response (milliseconds). */
   APPROVAL_TIMEOUT_MILLISECONDS: 120_000,
 
+  /** Default per-tool wall-clock timeout — a hung tool must not hang the turn forever (milliseconds). */
+  DEFAULT_TOOL_TIMEOUT_MILLISECONDS: 600_000,
+
+  /** Provider stream chunk-idle watchdog — fail the pass if no chunk arrives for this long.
+   *  Generous default: local providers (llama-cpp/vLLM) can spend minutes prefilling a
+   *  large context before the first token (milliseconds). */
+  STREAM_IDLE_TIMEOUT_MILLISECONDS: 300_000,
+
+  /** Max transient-error retries when starting a provider stream. */
+  PROVIDER_STREAM_MAX_RETRIES: 3,
+
+  /** Base delay for provider stream retry backoff (milliseconds, exponential with jitter). */
+  PROVIDER_STREAM_RETRY_BASE_MILLISECONDS: 1_000,
+
   /** Validation interceptor timeout (milliseconds). */
   VALIDATION_TIMEOUT_MILLISECONDS: 15_000,
 

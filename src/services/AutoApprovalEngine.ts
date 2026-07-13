@@ -110,6 +110,12 @@ const TIER_LABELS: Record<number, string> = {
 
 export interface ApprovalResult {
   isApproved: boolean;
+  /**
+   * Terminal rejection: a policy DENY that must never be presented to the
+   * user for approval. Denied calls are rejected outright, even in
+   * full-auto mode and inside sub-agents.
+   */
+  isDenied?: boolean;
   tier: ApprovalTier;
   tierLabel: string;
   reason: string;
@@ -155,12 +161,9 @@ export default class AutoApprovalEngine {
     const tier = this.getTier(toolCall.name);
     const tierLabel = TIER_LABELS[tier] || "write";
 
-    // Full Auto mode: everything runs
-    if (this.fullAuto) {
-      return { isApproved: true, tier, tierLabel, reason: "full_auto" };
-    }
-
-    // ── Policy evaluation (takes precedence over tier system) ──
+    // ── Policy evaluation (takes precedence over tier system AND full
+    // auto — a defensive DENY policy must hold even when everything else
+    // auto-approves, otherwise full-auto/sub-agent runs bypass it) ──
     if (this.policies.length > 0) {
       const policyResult = PolicyEngine.evaluate(
         this.policies,
@@ -177,13 +180,16 @@ export default class AutoApprovalEngine {
               reason: policyResult.reason,
             };
           case "DENY":
+            // Terminal rejection — never downgraded to an approval prompt.
             return {
               isApproved: false,
+              isDenied: true,
               tier,
               tierLabel,
               reason: policyResult.reason,
             };
           case "ASK_USER":
+            if (this.fullAuto) break; // full auto answers "ask user" with yes
             return {
               isApproved: false,
               tier,
@@ -192,7 +198,12 @@ export default class AutoApprovalEngine {
             };
         }
       }
-      // No policy matched — fall through to tier system
+      // No policy matched (or full-auto ASK_USER) — fall through to tier system
+    }
+
+    // Full Auto mode: everything not policy-denied runs
+    if (this.fullAuto) {
+      return { isApproved: true, tier, tierLabel, reason: "full_auto" };
     }
 
     // Tier 1: always auto-approve
@@ -206,29 +217,58 @@ export default class AutoApprovalEngine {
   checkBatch(toolCalls: ToolCall[]): {
     autoApproved: ApprovedToolCall[];
     needsApproval: ApprovedToolCall[];
+    denied: ApprovedToolCall[];
   } {
     const autoApproved: ApprovedToolCall[] = [];
     const needsApproval: ApprovedToolCall[] = [];
+    const denied: ApprovedToolCall[] = [];
 
     for (const toolCall of toolCalls) {
       const result = this.check(toolCall);
-      if (result.isApproved) {
+      // Stamp the approval onto the ORIGINAL tool call object, not just the
+      // categorized copy — downstream consumers (ToolExecutor's hook pass,
+      // CriticGate's tier check) receive the originals, and without the stamp
+      // CriticGate sees every call as WRITE tier and never reviews anything.
+      toolCall._approval = result;
+      if (result.isDenied) {
+        denied.push({ ...toolCall, _approval: result });
+      } else if (result.isApproved) {
         autoApproved.push({ ...toolCall, _approval: result });
       } else {
         needsApproval.push({ ...toolCall, _approval: result });
       }
     }
 
-    if (needsApproval.length > 0) {
+    if (needsApproval.length > 0 || denied.length > 0) {
       logger.info(
-        `[AutoApproval] ${autoApproved.length} auto-approved, ${needsApproval.length} need approval: ${needsApproval.map((approvedToolCall) => approvedToolCall.name).join(", ")}`,
+        `[AutoApproval] ${autoApproved.length} auto-approved, ${needsApproval.length} need approval` +
+          (needsApproval.length
+            ? `: ${needsApproval.map((approvedToolCall) => approvedToolCall.name).join(", ")}`
+            : "") +
+          (denied.length
+            ? `; ${denied.length} denied by policy: ${denied.map((deniedToolCall) => deniedToolCall.name).join(", ")}`
+            : ""),
       );
     }
 
-    return { autoApproved, needsApproval };
+    return { autoApproved, needsApproval, denied };
   }
   createHook() {
-    return async (toolCall: ToolCall, _context: AgenticContext) => {
+    return async (toolCall: ToolCall, context: AgenticContext) => {
+      // A prior explicit decision (user approval via the ApprovalGate, or a
+      // policy DENY) is authoritative — re-running check() here would
+      // wrongly veto calls the user just approved.
+      const priorApproval = toolCall._approval as ApprovalResult | undefined;
+      if (priorApproval && typeof priorApproval.isApproved === "boolean") {
+        return priorApproval;
+      }
+      // Mid-loop "approve all" flips options.autoApprove without rebuilding
+      // this engine — honor it so already-permitted calls aren't blocked.
+      if (context?.options?.autoApprove && !this.fullAuto) {
+        const result = this.check(toolCall);
+        if (result.isDenied) return result;
+        return { ...result, isApproved: true, reason: "approve_all" };
+      }
       return this.check(toolCall);
     };
   }

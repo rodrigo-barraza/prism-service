@@ -65,7 +65,7 @@ export type TransformedStreamEvent =
   | { type: "codeExecutionResult"; output: string; outcome: string }
   | { type: "webSearchResult"; results: Array<{ url?: string; title?: string; pageAge?: string }> }
   | { type: "executableCode"; code: string; language: string }
-  | { type: "toolCall"; id: string | null; name: string | null; args: Record<string, unknown> }
+  | { type: "toolCall"; id: string | null; name: string | null; args: Record<string, unknown>; argsParseError?: boolean; rawArgs?: string }
   | { type: "thinking"; content: string }
   | { type: "thinking_signature"; signature: string }
   | { type: "toolCallDelta"; characters: number }
@@ -588,6 +588,71 @@ export function resolveSystemPrompt(
   return identityPrompt || contextualSystemMessage;
 }
 
+const EPHEMERAL_CACHE = { type: "ephemeral" } as const;
+
+/**
+ * Attach real prompt-cache breakpoints to the request.
+ *
+ * The Anthropic API only honors `cache_control` on system blocks, tool
+ * definitions, and message content blocks — the previous top-level
+ * `cache_control` key on the payload root was silently ignored, so prompt
+ * caching was effectively disabled for every agentic turn.
+ *
+ * Breakpoints (≤4 allowed; we use up to 3):
+ *   1. Last tool definition   → caches the (large, stable) tool schema block
+ *   2. System prompt block    → caches the assembled system prompt
+ *   3. Last message block     → moving marker; each turn re-hits the prefix
+ *      cached by the previous turn's marker and extends it.
+ */
+export function applyCacheBreakpoints(payload: Record<string, unknown>): void {
+  // 1. Tools — serialize first in the prompt; mark the last definition
+  const tools = payload.tools as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(tools) && tools.length > 0) {
+    tools[tools.length - 1] = {
+      ...tools[tools.length - 1],
+      cache_control: EPHEMERAL_CACHE,
+    };
+  }
+
+  // 2. System — convert the plain string to a cacheable text block
+  if (typeof payload.system === "string" && payload.system.trim()) {
+    payload.system = [
+      { type: "text", text: payload.system, cache_control: EPHEMERAL_CACHE },
+    ];
+  }
+
+  // 3. Messages — moving breakpoint on the last cacheable content block
+  const messages = payload.messages as
+    | Array<{ content: unknown; [key: string]: unknown }>
+    | undefined;
+  if (!Array.isArray(messages) || messages.length === 0) return;
+  const lastMessage = messages[messages.length - 1];
+  if (typeof lastMessage.content === "string") {
+    if (!lastMessage.content.trim()) return; // empty text blocks are rejected
+    lastMessage.content = [
+      {
+        type: "text",
+        text: lastMessage.content,
+        cache_control: EPHEMERAL_CACHE,
+      },
+    ];
+    return;
+  }
+  if (Array.isArray(lastMessage.content)) {
+    const blocks = lastMessage.content as Array<Record<string, unknown>>;
+    // cache_control is not allowed on thinking blocks — walk back to the
+    // last block that accepts it.
+    for (let blockIndex = blocks.length - 1; blockIndex >= 0; blockIndex--) {
+      const block = blocks[blockIndex];
+      if (block.type === "thinking" || block.type === "redacted_thinking")
+        continue;
+      if (block.type === "text" && !String(block.text ?? "").trim()) continue;
+      blocks[blockIndex] = { ...block, cache_control: EPHEMERAL_CACHE };
+      return;
+    }
+  }
+}
+
 const anthropicProvider = {
   name: "anthropic",
 
@@ -604,7 +669,6 @@ const anthropicProvider = {
       prepared.systemMessage,
     );
     const payload: Record<string, unknown> = {
-      cache_control: { type: "ephemeral" },
       ...(effectiveSystemPrompt && { system: effectiveSystemPrompt }),
       model,
       messages: prepared.messages,
@@ -700,6 +764,8 @@ const anthropicProvider = {
       delete payload.top_p;
       delete payload.top_k;
     }
+
+    applyCacheBreakpoints(payload);
 
     let lastError: unknown;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -841,6 +907,10 @@ const anthropicProvider = {
     options: ProviderOptions = {},
   ): AsyncGenerator<TransformedStreamEvent> {
     logger.provider("Anthropic", `generateTextStream model=${model}`);
+    // Retry guard: once any chunk has been received, a retry would replay
+    // the whole response — duplicating streamed text and re-emitting tool
+    // calls that the harness would then execute twice.
+    let hasReceivedAnyChunk = false;
     try {
       const prepared = await prepareMessages(messages);
       const effectiveSystemPrompt = resolveSystemPrompt(
@@ -848,7 +918,6 @@ const anthropicProvider = {
         prepared.systemMessage,
       );
       const streamPayload: Record<string, unknown> = {
-        cache_control: { type: "ephemeral" },
         ...(effectiveSystemPrompt && { system: effectiveSystemPrompt }),
         model,
         messages: prepared.messages,
@@ -949,6 +1018,8 @@ const anthropicProvider = {
 
       await enforceImageSizeLimits(streamPayload.messages as ChatMessage[]);
 
+      applyCacheBreakpoints(streamPayload);
+
       const stream = getClient().messages.stream(
         streamPayload as unknown as Anthropic.MessageCreateParamsNonStreaming,
         {
@@ -972,6 +1043,7 @@ const anthropicProvider = {
         null;
 
       for await (const chunk of stream) {
+        hasReceivedAnyChunk = true;
         if (options.signal?.aborted) {
           stream.abort();
           break;
@@ -1090,11 +1162,16 @@ const anthropicProvider = {
           // Custom tool_use block ended — emit toolCall
           if (currentBlockType === "tool_use") {
             let args: Record<string, unknown> = {};
+            let argsParseError = false;
             if (codeInput) {
               try {
                 args = JSON.parse(codeInput);
               } catch {
-                // Not valid JSON, use empty
+                // Malformed/truncated tool-call JSON (common at output-token
+                // exhaustion). Flag it instead of silently executing with {}
+                // — the harness converts this into a synthetic error result
+                // telling the model its own JSON was broken.
+                argsParseError = true;
               }
             }
             yield {
@@ -1102,6 +1179,10 @@ const anthropicProvider = {
               id: currentToolUseId,
               name: currentBlockName,
               args,
+              ...(argsParseError && {
+                argsParseError: true,
+                rawArgs: codeInput.slice(0, 2000),
+              }),
             };
           }
           currentBlockType = null;
@@ -1195,8 +1276,15 @@ const anthropicProvider = {
       }
     } catch (error: unknown) {
       if (error instanceof Error && error.name === "AbortError") return;
-      // For streaming, retry overloaded errors with the same delay/attempts policy
-      if (error instanceof Error && isRetryableError(error as AnthropicSdkError)) {
+      // For streaming, retry overloaded errors — but ONLY when nothing was
+      // received yet. A mid-stream retry restarts the response from scratch:
+      // the user sees the text twice and tool calls get pushed (and executed)
+      // twice. Mid-stream failures surface as errors instead.
+      if (
+        !hasReceivedAnyChunk &&
+        error instanceof Error &&
+        isRetryableError(error as AnthropicSdkError)
+      ) {
         // Recursive retry with attempt tracking via options._retryAttempt
         const attempt = options._retryAttempt ?? 1;
         if (attempt < MAX_RETRIES) {

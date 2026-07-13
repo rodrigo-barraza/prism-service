@@ -206,6 +206,25 @@ export async function handleSseRequest(
   let stopController: AbortController;
 
   if (persistOnDisconnect && conversationId) {
+    // Admission control: one active turn per conversation. Previously a
+    // second request silently aborted the first via registry overwrite —
+    // both loops then raced each other's finalize ($push into the same
+    // document) and the first handler's cleanup deleted the second
+    // session's registry entry, breaking /agent/stop for the live turn.
+    if (AgentSessionRegistry.isActive(conversationId)) {
+      logger.warn(
+        `[SSE] Rejected concurrent agent turn for conversation ${conversationId} — a generation is already running`,
+      );
+      const emitRejection = createSseEmitter(res, connectionController.signal);
+      emitRejection({
+        type: "error",
+        code: "GENERATION_IN_PROGRESS",
+        message:
+          "A generation is already running for this conversation. Stop it first (POST /agent/stop) or wait for it to finish.",
+      } as unknown as SseEvent);
+      res.end();
+      return;
+    }
     stopController = AgentSessionRegistry.register(conversationId);
   } else {
     stopController = persistOnDisconnect
@@ -238,9 +257,10 @@ export async function handleSseRequest(
       signal: stopController.signal,
     });
   } finally {
-    // Cleanup session registry entry
+    // Cleanup session registry entry — identity-checked so a stale handler
+    // can never delete a newer session's entry.
     if (persistOnDisconnect && conversationId) {
-      AgentSessionRegistry.cleanup(conversationId);
+      AgentSessionRegistry.cleanup(conversationId, stopController);
     }
   }
 
@@ -266,9 +286,33 @@ export async function handleJsonRequest(
     onEvent: (event: SseEvent) => void,
     context: { signal: AbortSignal },
   ) => Promise<void> = handleConversation,
+  options: { registerAgentSession?: boolean } = {},
 ) {
-  const controller = createAbortController();
   const connectionStartTime = Date.now();
+  const conversationId = (params as Record<string, unknown>).conversationId as
+    | string
+    | undefined;
+
+  // Agent turns must register in the session registry even on the JSON
+  // (?stream=false) path — otherwise POST /agent/stop cannot find them and
+  // concurrent turns bypass admission control entirely.
+  let controller: AbortController;
+  let registeredSession = false;
+  if (options.registerAgentSession && conversationId) {
+    if (AgentSessionRegistry.isActive(conversationId)) {
+      res.status(409).json({
+        error: true,
+        code: "GENERATION_IN_PROGRESS",
+        message:
+          "A generation is already running for this conversation. Stop it first (POST /agent/stop) or wait for it to finish.",
+      });
+      return;
+    }
+    controller = AgentSessionRegistry.register(conversationId);
+    registeredSession = true;
+  } else {
+    controller = createAbortController();
+  }
 
   res.on("close", () => {
     if (!res.writableFinished) {
@@ -284,9 +328,15 @@ export async function handleJsonRequest(
   });
 
   const events: SseEvent[] = [];
-  await handler(params, (event: SseEvent) => events.push(event), {
-    signal: controller.signal,
-  });
+  try {
+    await handler(params, (event: SseEvent) => events.push(event), {
+      signal: controller.signal,
+    });
+  } finally {
+    if (registeredSession && conversationId) {
+      AgentSessionRegistry.cleanup(conversationId, controller);
+    }
+  }
 
   if (controller.signal.aborted) return;
 

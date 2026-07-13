@@ -54,6 +54,18 @@ export interface ToolExecutionContext {
   _workspaceEnabled?: boolean;
   clientIp?: string | null;
   _toolState?: unknown;
+  /** Parent loop's approval mode — inherited by spawned sub-agents. */
+  _autoApprove?: boolean;
+  /** Parent loop's declarative tool policies — inherited by spawned sub-agents. */
+  _policies?: import("#src/services/PolicyEngine").PolicyRule[];
+  /** Parent loop's CriticGate toggle — inherited by spawned sub-agents. */
+  _enableCriticGate?: boolean;
+  /** Parent loop's CriticGate model — inherited by spawned sub-agents. */
+  _criticModel?: string;
+  /** Parent loop's cost ceiling — inherited by spawned sub-agents. */
+  _maxCostDollars?: number;
+  /** Shared cost accumulator threaded through the whole sub-agent tree. */
+  _sharedCostBudget?: import("../harnesses/lifecycle/CostBudgetEnforcer.ts").SharedCostBudget;
 }
 
 export interface TransformedSearchToolsResult {

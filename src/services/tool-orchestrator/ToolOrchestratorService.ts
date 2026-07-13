@@ -1333,9 +1333,12 @@ export default class ToolOrchestratorService {
       );
     }
 
-    // Route MCP tools to MCPClientService
+    // Route MCP tools to MCPClientService — thread the loop's abort signal
+    // so user stops / per-tool timeouts actually cancel the in-flight call.
     if (MCPClientService.isMCPTool(name)) {
-      return ToolOrchestratorService.executeMCPTool(name, args);
+      return ToolOrchestratorService.executeMCPTool(name, args, {
+        signal: context.signal,
+      });
     }
 
     // Intercept search_tools to merge MCP tool results from connected servers.
@@ -1626,6 +1629,16 @@ export default class ToolOrchestratorService {
       thinkingEnabled: context._thinkingEnabled,
       reasoningEffort: context._reasoningEffort,
       thinkingBudget: context._thinkingBudget,
+
+      // Inherit the parent's approval mode, policies, critic settings, and
+      // cost budget — sub-agents must run under the same safety envelope as
+      // the loop that spawned them.
+      autoApprove: context._autoApprove === true,
+      policies: context._policies,
+      enableCriticGate: context._enableCriticGate,
+      criticModel: context._criticModel,
+      maxCostDollars: context._maxCostDollars,
+      sharedCostBudget: context._sharedCostBudget,
     };
 
     switch (name) {
@@ -1739,12 +1752,18 @@ export default class ToolOrchestratorService {
   static async executeMCPTool(
     fullName: string,
     args: Record<string, unknown> = {},
+    options: { signal?: AbortSignal; timeoutMilliseconds?: number } = {},
   ) {
     const parsed = MCPClientService.parseMCPToolName(fullName);
     if (!parsed) {
       return { error: `Invalid MCP tool name: ${fullName}` };
     }
-    return MCPClientService.callTool(parsed.serverName, parsed.toolName, args);
+    return MCPClientService.callTool(
+      parsed.serverName,
+      parsed.toolName,
+      args,
+      options,
+    );
   }
   static getMCPToolSchemas() {
     return MCPClientService.getToolSchemas();
