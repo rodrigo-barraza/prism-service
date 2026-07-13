@@ -42,7 +42,6 @@ vi.mock('#src/services/ToolOrchestratorService', () => ({
     getClientToolSchemas: vi.fn().mockReturnValue([{ name: 'get_weather' }]),
     refreshWorkspaceRoots: vi.fn(),
     getWorkspaceRoots: vi.fn().mockReturnValue(['/home/rodrigo/development']),
-    getStaticRoots: vi.fn().mockReturnValue(['/home/rodrigo/development']),
     updateWorkspaceRoots: vi.fn().mockResolvedValue({ success: true }),
     validateWorkspacePath: vi.fn().mockResolvedValue({ valid: true }),
   }
@@ -196,8 +195,7 @@ describe('Feature Routes Integration Tests', () => {
           status: 200,
           statusText: 'OK',
           json: async () => ({
-            workspaceRoots: ['/home/rodrigo/development'],
-            staticRoots: ['/home/rodrigo/development']
+            workspaceRoots: ['/home/rodrigo/development']
           }),
         } as any;
       }
