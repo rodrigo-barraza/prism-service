@@ -11,6 +11,35 @@ import { initSseResponse } from "#src/utils/SseUtilities";
 import { getErrorMessage } from "#src/utils/ErrorHelpers";
 import type { ProviderOptions } from "#src/types/provider";
 const router = express.Router();
+
+/**
+ * Build LM Studio load options from a request body, mapping the client's
+ * camelCase vocabulary to LM Studio's snake_case load keys. The backend owns
+ * this mapping so the client never has to speak provider load-option vocab.
+ * snake_case keys are still accepted for backward compatibility.
+ */
+function buildLmStudioLoadOptions(
+  body: Record<string, unknown>,
+): Record<string, unknown> {
+  const pick = (camel: string, snake: string) =>
+    body[camel] ?? body[snake];
+  const loadOptions: Record<string, unknown> = {};
+  const contextLength = pick("contextLength", "context_length");
+  const flashAttention = pick("flashAttention", "flash_attention");
+  const offloadKvCache = pick("offloadKvCache", "offload_kv_cache_to_gpu");
+  const evalBatchSize = pick("evalBatchSize", "eval_batch_size");
+  const unifiedKvCache = pick("unifiedKvCache", "unified_kv_cache");
+  const parallel = body.parallel;
+  if (contextLength != null) loadOptions.context_length = contextLength;
+  if (flashAttention != null) loadOptions.flash_attention = flashAttention;
+  if (offloadKvCache != null)
+    loadOptions.offload_kv_cache_to_gpu = offloadKvCache;
+  if (evalBatchSize != null) loadOptions.eval_batch_size = evalBatchSize;
+  if (parallel != null) loadOptions.parallel = parallel;
+  if (unifiedKvCache != null) loadOptions.unified_kv_cache = unifiedKvCache;
+  return loadOptions;
+}
+
 /** Resolve instance ID from request — supports ?instance=lm-studio-2 */
 function resolveInstanceId(req: Request) {
   const id =
@@ -48,15 +77,7 @@ router.post(
   "/load",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const {
-        model,
-        context_length,
-        flash_attention,
-        offload_kv_cache_to_gpu,
-        eval_batch_size,
-        parallel,
-        unified_kv_cache,
-      } = req.body;
+      const { model } = req.body;
       if (!model) {
         return res
           .status(400)
@@ -64,18 +85,9 @@ router.post(
       }
       const instanceId = resolveInstanceId(req);
       const provider = getProvider(instanceId) as LmStudioProvider;
-      // Build load options from request body
-      const loadOptions: ProviderOptions = {};
-      if (context_length != null) loadOptions.context_length = context_length;
-      if (flash_attention != null)
-        loadOptions.flash_attention = flash_attention;
-      if (offload_kv_cache_to_gpu != null)
-        loadOptions.offload_kv_cache_to_gpu = offload_kv_cache_to_gpu;
-      if (eval_batch_size != null)
-        loadOptions.eval_batch_size = eval_batch_size;
-      if (parallel != null) loadOptions.parallel = parallel;
-      if (unified_kv_cache != null)
-        loadOptions.unified_kv_cache = unified_kv_cache;
+      const loadOptions = buildLmStudioLoadOptions(
+        req.body as Record<string, unknown>,
+      ) as ProviderOptions;
       // ensureModelLoaded handles: skip if already loaded, unload others, then load
       const { alreadyLoaded } = await provider.ensureModelLoaded(
         model,
@@ -109,15 +121,7 @@ router.post(
 router.post(
   "/load-stream",
   asyncHandler(async (req: Request, res: Response) => {
-    const {
-      model,
-      context_length,
-      flash_attention,
-      offload_kv_cache_to_gpu,
-      eval_batch_size,
-      parallel,
-      unified_kv_cache,
-    } = req.body;
+    const { model } = req.body;
     if (!model) {
       return res.status(400).json({ error: "Missing 'model' in request body" });
     }
@@ -137,18 +141,9 @@ router.post(
       const instanceId = resolveInstanceId(req);
       const provider = getProvider(instanceId) as LmStudioProvider;
       send({ type: "start", model });
-      // Build load options
-      const loadOptions: Record<string, unknown> = {};
-      if (context_length != null) loadOptions.context_length = context_length;
-      if (flash_attention != null)
-        loadOptions.flash_attention = flash_attention;
-      if (offload_kv_cache_to_gpu != null)
-        loadOptions.offload_kv_cache_to_gpu = offload_kv_cache_to_gpu;
-      if (eval_batch_size != null)
-        loadOptions.eval_batch_size = eval_batch_size;
-      if (parallel != null) loadOptions.parallel = parallel;
-      if (unified_kv_cache != null)
-        loadOptions.unified_kv_cache = unified_kv_cache;
+      const loadOptions = buildLmStudioLoadOptions(
+        req.body as Record<string, unknown>,
+      );
       if (aborted) return res.end();
       // Check if model is already loaded and unload others if needed
       // (non-streaming part — quick check + unload)

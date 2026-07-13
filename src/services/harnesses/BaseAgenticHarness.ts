@@ -10,6 +10,7 @@ import {
   createUsageAccumulator,
   calculateTextCost,
   estimateTokens,
+  withTotalInputTokens,
 } from "#src/utils/CostCalculator";
 import { calculateTokensPerSec } from "#src/utils/math";
 import { getPricing, MODALITY_TYPES } from "#src/config";
@@ -401,7 +402,7 @@ export default class BaseAgenticHarness {
 
     emit({
       type: SERVER_SENT_EVENT_TYPES.USAGE_UPDATE,
-      usage,
+      usage: withTotalInputTokens(usage),
       estimatedCost,
     });
   }

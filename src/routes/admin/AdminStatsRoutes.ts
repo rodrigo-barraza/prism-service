@@ -705,7 +705,21 @@ router.get(
           totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
           totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
           totalRequests: { $sum: 1 },
+          // True per-request weighted average over raw docs — NOT a
+          // request-weighted average of per-model averages (which is what the
+          // client used to compute and is not arithmetically equivalent).
+          avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
           avgTokensPerSec: AVERAGE_TOKENS_PER_SECOND_EXPRESSION,
+        };
+
+        // Provider-grain rollup carries the extra fields the admin providers
+        // table renders (distinct model/conversation counts), computed once
+        // server-side so no consumer re-aggregates per-model rows by hand.
+        const providerGroupFields = {
+          ...groupFields,
+          _models: { $addToSet: "$model" },
+          _conversationIds: { $addToSet: "$conversationId" },
+          _traceIds: { $addToSet: "$traceId" },
         };
 
         const [result] = await req.db
@@ -720,7 +734,38 @@ router.get(
                   { $sort: { totalCost: -1 } },
                 ],
                 byProvider: [
-                  { $group: { _id: "$provider", ...groupFields } },
+                  { $group: { _id: "$provider", ...providerGroupFields } },
+                  {
+                    $addFields: {
+                      modelCount: {
+                        $size: {
+                          $filter: {
+                            input: "$_models",
+                            as: "m",
+                            cond: { $ne: ["$$m", null] },
+                          },
+                        },
+                      },
+                      conversationCount: {
+                        $size: {
+                          $filter: {
+                            input: "$_conversationIds",
+                            as: "id",
+                            cond: { $ne: ["$$id", null] },
+                          },
+                        },
+                      },
+                      traceCount: {
+                        $size: {
+                          $filter: {
+                            input: "$_traceIds",
+                            as: "id",
+                            cond: { $ne: ["$$id", null] },
+                          },
+                        },
+                      },
+                    },
+                  },
                   { $sort: { totalCost: -1 } },
                 ],
                 byModel: [
@@ -833,6 +878,7 @@ router.get(
                 totalInputTokens: totals[0].totalInputTokens,
                 totalOutputTokens: totals[0].totalOutputTokens,
                 totalRequests: totals[0].totalRequests,
+                avgLatency: totals[0].avgLatency,
                 avgTokensPerSec: totals[0].avgTokensPerSec,
               }
             : null,
@@ -844,6 +890,7 @@ router.get(
               totalInputTokens: row.totalInputTokens,
               totalOutputTokens: row.totalOutputTokens,
               totalRequests: row.totalRequests,
+              avgLatency: row.avgLatency,
               avgTokensPerSec: row.avgTokensPerSec,
               providers: providersByProject[proj] || [],
               endpoints: endpointsByProject[proj] || [],
@@ -856,7 +903,12 @@ router.get(
             totalInputTokens: row.totalInputTokens,
             totalOutputTokens: row.totalOutputTokens,
             totalRequests: row.totalRequests,
+            avgLatency: row.avgLatency,
             avgTokensPerSec: row.avgTokensPerSec,
+            modelCount: row.modelCount,
+            models: ((row._models || []) as string[]).filter(Boolean),
+            conversationCount: row.conversationCount,
+            traceCount: row.traceCount,
           })),
           models: byModel.map((row: Record<string, any>) => ({
             model: row._id.model || "any",
