@@ -107,15 +107,12 @@ router.get(
         );
       }
 
-      // Build workspace entries from each agent's displayRoots so that
-      // multiple agents sharing the same raw root (e.g. both "/") each
-      // contribute distinct workspace entries to the selector.
+      // Build workspace entries from each agent's displayRoots.
+      // Agents without displayRoots (e.g. Docker containers that register
+      // virtual root "/" with no meaningful paths) are excluded.
       const agentServedWorkspaces: MappedWorkspace[] = [];
       for (const agent of connectedAgents) {
-        const displayPaths =
-          agent.displayRoots && agent.displayRoots.length > 0
-            ? agent.displayRoots
-            : agent.roots || [];
+        const displayPaths = agent.displayRoots || [];
         const machineInfo =
           (agent as WorkspaceAgent & { machineInfo?: Record<string, unknown> })
             ?.machineInfo || null;
