@@ -48,11 +48,21 @@ export interface ToolCall {
     id: string;
     summary: Array<{ type: string; text: string }>;
   };
-  /** Populated by AutoApprovalEngine during beforeToolCall hook. */
-  _approval?: { tier: string; tierLabel: string };
+  /** Populated by AutoApprovalEngine.checkBatch / the ApprovalGate. */
+  _approval?: {
+    tier: number | string;
+    tierLabel: string;
+    isApproved?: boolean;
+    isDenied?: boolean;
+    reason?: string;
+  };
   result?: unknown;
   status?: string;
   durationMilliseconds?: number;
+  /** Set when the provider could not parse the model's tool-call JSON (e.g. truncated at output-token exhaustion). */
+  _argsParseError?: boolean;
+  /** Raw (unparseable) argument text excerpt, for the synthetic error result. */
+  _rawArgs?: string;
 }
 
 export interface ToolResult {
@@ -203,6 +213,14 @@ export interface AgenticOptions {
   skipSandbox?: boolean;
   /** Maximum cost in dollars before the loop terminates with an exhaustion recovery. */
   maxCostDollars?: number;
+  /**
+   * Shared cost accumulator spanning this loop and every sub-agent it spawns.
+   * Created by AgenticLoopService when maxCostDollars is set; threaded through
+   * the sub-agent tree so delegation cannot escape the budget.
+   */
+  _sharedCostBudget?: import("./lifecycle/CostBudgetEnforcer.ts").SharedCostBudget;
+  /** Per-tool wall-clock timeout in milliseconds. 0 disables. Defaults to HARNESS.DEFAULT_TOOL_TIMEOUT_MILLISECONDS. */
+  toolTimeoutMilliseconds?: number;
   /** Iteration interval at which abbreviated system prompt reminders are re-injected to counteract instruction fade-out. Default: 8. */
   reminderInterval?: number;
   /** Model for LLM-based system prompt distillation (instruction fade-out countermeasure). If empty, reminders are disabled. */

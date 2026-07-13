@@ -133,6 +133,9 @@ describe("Event-Driven Auto-Response", () => {
       conversationId: "parent-conv-id",
       enabledTools: ["read_file", "write_file", "search_web"],
       maxRecursionDepth: 2,
+      // Parent ran in auto-approve mode — the auto-response turn inherits it
+      // (a hardcoded autoApprove:true previously bypassed the user's choice).
+      autoApprove: true,
       emit: vi.fn(),
     };
   });

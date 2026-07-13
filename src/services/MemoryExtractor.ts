@@ -196,6 +196,9 @@ export default class MemoryExtractor {
         result = await provider.generateText(aiMessages, extractionModel, {
           maxTokens: 1000,
           temperature: 0.1,
+          // Utility call — never burn extended thinking on memory extraction.
+          thinkingEnabled: false,
+          reasoningEffort: "none",
         });
       } catch (error: unknown) {
         success = false;

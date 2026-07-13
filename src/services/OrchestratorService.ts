@@ -2278,7 +2278,25 @@ export class OrchestratorService {
         modelDefinition: subAgentModelDefinition,
         messages: subAgentMessages,
         options: {
-          autoApprove: true,
+          // Inherit the parent's approval mode — a hardcoded autoApprove here
+          // let any delegated tool call bypass the user's approval choices.
+          autoApprove: orchestratorContext.autoApprove === true,
+          ...(Array.isArray(orchestratorContext.policies) &&
+            orchestratorContext.policies.length > 0 && {
+              policies: orchestratorContext.policies,
+            }),
+          ...(orchestratorContext.enableCriticGate !== undefined && {
+            enableCriticGate: orchestratorContext.enableCriticGate,
+          }),
+          ...(orchestratorContext.criticModel && {
+            criticModel: orchestratorContext.criticModel,
+          }),
+          ...(typeof orchestratorContext.maxCostDollars === "number" && {
+            maxCostDollars: orchestratorContext.maxCostDollars,
+          }),
+          ...(orchestratorContext.sharedCostBudget
+            ? { _sharedCostBudget: orchestratorContext.sharedCostBudget }
+            : {}),
           agenticLoopEnabled: true,
           isSubAgent: true,
           enabledTools: subAgentEnabledTools,
@@ -2801,7 +2819,23 @@ export class OrchestratorService {
       clientIp: "auto-response",
       agenticLoopEnabled: true,
       functionCallingEnabled: true,
-      autoApprove: true,
+      // The auto-response is an unattended background turn — there is no user
+      // present to answer prompts, BUT it must still inherit the parent's
+      // policies/critic gate so policy-denied tools stay blocked. autoApprove
+      // inherits the parent's mode; when the parent required approval, tools
+      // in the auto-response turn go through the approval flow (and time out
+      // to rejection if unanswered) rather than silently executing.
+      autoApprove: orchestratorContext.autoApprove === true,
+      ...(Array.isArray(orchestratorContext.policies) &&
+        orchestratorContext.policies.length > 0 && {
+          policies: orchestratorContext.policies,
+        }),
+      ...(orchestratorContext.enableCriticGate !== undefined && {
+        enableCriticGate: orchestratorContext.enableCriticGate,
+      }),
+      ...(orchestratorContext.criticModel && {
+        criticModel: orchestratorContext.criticModel,
+      }),
       planFirst: false,
       minContextLength: 120_000,
       ...(workspaceRoot ? { workspaceRoot } : {}),

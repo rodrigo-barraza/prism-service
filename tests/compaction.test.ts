@@ -218,8 +218,14 @@ describe("CompactionService", () => {
       usage: { inputTokens: 50, outputTokens: 25 },
     });
 
+    // Long filler makes the dropped history genuinely large — the shrink
+    // guard discards compactions that don't reduce token count. The last
+    // 3 user turns (kept in the tail) stay small and pristine.
+    const filler = " lorem ipsum dolor sit amet".repeat(400);
     const messages: ChatMessage[] = [
       { role: "system", content: "You are an assistant." },
+      { role: "user", content: `Old Q0${filler}` },
+      { role: "assistant", content: `Old A0${filler}` },
       { role: "user", content: "Historical Q1" },
       { role: "assistant", content: "Historical A1" },
       { role: "user", content: "Historical Q2" },
@@ -261,7 +267,7 @@ describe("CompactionService", () => {
     );
   });
 
-  it("preserves active turns in recent tail when conversation has fewer than 3 user turns", async () => {
+  it("rejects non-shrinking compaction when fewer than 3 user turns (tail preserves everything)", async () => {
     const summaryContent = "Conversation summarized elegantly.";
     MOCK_GENERATE_TEXT.mockResolvedValueOnce({
       text: `<analysis>Drafting compaction...</analysis>\n<summary>${summaryContent}</summary>`,
@@ -284,18 +290,14 @@ describe("CompactionService", () => {
       emit: mockEmit,
     });
 
-    expect(result).not.toBeNull();
-    const compacted = result!.compactedMessages;
-    // With 2 user turns (< 3), all messages (except system) are preserved in the tail.
-    // So "Historical Q", "Historical A", and "Active Q" should all be in the tail!
-    expect(compacted[0].role).toBe("system");
-    expect(compacted[1].role).toBe("user");
-    expect(compacted[1].content).toContain(summaryContent);
-    
-    // The rest of the messages should be our preserved turns
-    expect(compacted[2].content).toBe("Historical Q");
-    expect(compacted[3].content).toBe("Historical A");
-    expect(compacted[4].content).toBe("Active Q");
+    // With 2 user turns (< 3), the recent tail preserves ALL messages, so a
+    // "compaction" would only ADD a summary on top of the full history. The
+    // shrink guard rejects that (post >= pre) — the conversation is left
+    // untouched instead of growing.
+    expect(result).toBeNull();
+    expect(mockEmit).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "status", message: "compaction_failed" }),
+    );
   });
 
   it("stops calling provider when circuit breaker is open", async () => {

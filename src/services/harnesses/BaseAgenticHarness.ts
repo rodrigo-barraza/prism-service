@@ -1,4 +1,8 @@
 import { expandMessagesForFunctionCall } from "#src/utils/FunctionCallingUtilities";
+import {
+  streamWithRetries,
+  withIdleTimeout,
+} from "#src/utils/ProviderStreamResilience";
 import { roundMilliseconds } from "@rodrigo-barraza/utilities-library";
 import RepetitionDetector from "#src/utils/RepetitionDetector";
 import {
@@ -210,6 +214,14 @@ export default class BaseAgenticHarness {
       finalTools: filteredTools,
       resolvedEnabledTools: dynamicEnabledArray,
     };
+
+    // Tool definitions serialize AHEAD of messages in provider payloads, so a
+    // mid-loop tool-set swap invalidates the entire prompt-cache prefix. The
+    // cost was previously silent — surface it so cache-thrash is diagnosable.
+    logger.warn(
+      `[AgenticLoop] Tool set changed mid-loop (${previousToolNames.size} → ${filteredTools.length} tools) — ` +
+        `this busts the provider prompt-cache prefix for subsequent iterations.`,
+    );
 
     this.context.emit({
       type: SERVER_SENT_EVENT_TYPES.STATUS,
@@ -641,17 +653,41 @@ export default class BaseAgenticHarness {
       });
     }
 
-    return modelDefinition?.liveAPI && provider.generateTextStreamLive
-      ? provider.generateTextStreamLive(
-          expandedMessages,
-          resolvedModel,
-          providerOptions,
-        )
-      : provider.generateTextStream(
-          expandedMessages,
-          resolvedModel,
-          providerOptions,
-        );
+    // Shared transient-error retry for ALL providers (fetch-based providers
+    // previously had none). Retries fire only when zero chunks were yielded —
+    // once output reached the consumer, a retry would duplicate streamed text
+    // and re-execute tool calls.
+    const createStream = () =>
+      modelDefinition?.liveAPI && provider.generateTextStreamLive
+        ? provider.generateTextStreamLive(
+            expandedMessages,
+            resolvedModel,
+            providerOptions,
+          )
+        : provider.generateTextStream(
+            expandedMessages,
+            resolvedModel,
+            providerOptions,
+          );
+
+    // Create the first stream eagerly (preserves call-time semantics for
+    // providers that validate/dispatch on invocation); retries create fresh
+    // streams via the factory.
+    let initialStream: AsyncIterable<unknown> | null = createStream();
+    return streamWithRetries(
+      () => {
+        if (initialStream) {
+          const firstStream = initialStream;
+          initialStream = null;
+          return firstStream;
+        }
+        return createStream();
+      },
+      {
+        signal,
+        label: this.context.providerName,
+      },
+    );
   }
 
   // ── Stream consumption ────────────────────────────────────
@@ -668,7 +704,20 @@ export default class BaseAgenticHarness {
     // Reset the detector for each new stream (each LLM response is independent)
     this.repetitionDetector.reset();
 
-    for await (const chunk of stream) {
+    // Chunk-idle watchdog: a provider that stalls without closing the socket
+    // must fail the pass instead of hanging the turn until the housekeeping
+    // sweep. Configurable per request; generous default for local prefill.
+    const idleTimeoutMilliseconds =
+      typeof this.context.options?.streamIdleTimeoutMilliseconds === "number"
+        ? (this.context.options.streamIdleTimeoutMilliseconds as number)
+        : undefined;
+    const watchedStream = withIdleTimeout(
+      stream,
+      idleTimeoutMilliseconds,
+      this.context.providerName,
+    );
+
+    for await (const chunk of watchedStream) {
       const result = await this.processStreamChunk(
         chunk as StreamChunk,
         pass,
@@ -1032,6 +1081,13 @@ export default class BaseAgenticHarness {
         args: streamChunk.args || {},
         thoughtSignature: streamChunk.thoughtSignature || undefined,
         reasoningItem: streamChunk.reasoningItem || undefined,
+        ...(streamChunk.argsParseError === true && {
+          _argsParseError: true,
+          _rawArgs:
+            typeof streamChunk.rawArgs === "string"
+              ? streamChunk.rawArgs
+              : undefined,
+        }),
       };
       pass.pendingToolCalls.push(toolCall);
       state.streamedToolCalls.push({ ...toolCall });

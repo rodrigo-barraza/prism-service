@@ -118,6 +118,10 @@ export async function manageContextPressure(
         agent: context.agent || null,
         emit,
         signal: signal || undefined,
+        // Compaction must not silently skip when no utility model is
+        // configured — fall back to the conversation's own model.
+        fallbackProvider: context.providerName,
+        fallbackModel: context.resolvedModel,
       },
     );
 

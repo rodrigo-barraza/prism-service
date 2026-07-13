@@ -117,7 +117,9 @@ router.post(
       if (req.query.stream !== "false") {
         await handleSseRequest(req, res, params, handleAgent);
       } else {
-        await handleJsonRequest(req, res, next, params, handleAgent);
+        await handleJsonRequest(req, res, next, params, handleAgent, {
+          registerAgentSession: true,
+        });
       }
     } else {
       const params = {

@@ -555,7 +555,7 @@ export default class ReActHarness extends BaseAgenticHarness {
         if (signal?.aborted) break;
         this.emitUsageUpdate();
 
-        if (checkCostBudget(state, context.resolvedModel, options.maxCostDollars, emit)) {
+        if (checkCostBudget(state, context.resolvedModel, options.maxCostDollars, emit, { budget: options._sharedCostBudget, loopId: agentConversationId })) {
           break;
         }
 
@@ -575,34 +575,55 @@ export default class ReActHarness extends BaseAgenticHarness {
             }
           }
 
-          const { isApproved, shouldApproveAll } =
+          const { isApproved, shouldApproveAll, deniedToolCalls = [] } =
             await checkAndWaitForApproval(
               pass.pendingToolCalls,
               context,
               approvalEngine,
             );
 
+          // Policy-denied calls are terminal — never executed, never approvable.
+          const deniedIds = new Set(deniedToolCalls.map((toolCall) => toolCall.id));
+          const deniedResults: ToolResult[] = deniedToolCalls.map((toolCall) => ({
+            name: toolCall.name,
+            id: toolCall.id,
+            result: {
+              success: false,
+              error: "POLICY_DENIED",
+              message: `Tool execution denied by policy: ${toolCall._approval?.reason || "policy rule"}`,
+            },
+          }));
+          const executableToolCalls = pass.pendingToolCalls.filter(
+            (toolCall) => !deniedIds.has(toolCall.id),
+          );
+
           let results: ToolResult[] = [];
           if (!isApproved) {
-            results = pass.pendingToolCalls.map((toolCall) => ({
-              name: toolCall.name,
-              id: toolCall.id,
-              result: {
-                success: false,
-                error: "USER_REJECTED",
-                message: "Tool execution was manually rejected by the user.",
-              },
-            }));
+            results = [
+              ...executableToolCalls.map((toolCall) => ({
+                name: toolCall.name,
+                id: toolCall.id,
+                result: {
+                  success: false,
+                  error: "USER_REJECTED",
+                  message: "Tool execution was manually rejected by the user.",
+                },
+              })),
+              ...deniedResults,
+            ];
           } else {
             if (shouldApproveAll) options.autoApprove = true;
             context._currentMessages = currentMessages;
-            results = await executeToolBatch(
-              pass.pendingToolCalls,
-              context,
-              this.tools,
-              hooks,
-              state,
-            );
+            results = [
+              ...(await executeToolBatch(
+                executableToolCalls,
+                context,
+                this.tools,
+                hooks,
+                state,
+              )),
+              ...deniedResults,
+            ];
           }
 
           await processToolResultMedia(
@@ -707,7 +728,12 @@ export default class ReActHarness extends BaseAgenticHarness {
           );
           if (retryGuidance) currentMessages.push(retryGuidance);
 
-          currentMessages = currentMessages.filter(m => !(m.role === "assistant" && !m.content?.trim() && (!m.toolCalls || m.toolCalls.length === 0)));
+          // Drop empty assistant messages — but NEVER thinking-only ones.
+          // Deleting a mid-history thinking message orphans its
+          // "[System: Reasoning preserved…]" nudge, loses the thinking
+          // signature, and mutates the prompt prefix (full re-prefill,
+          // busting the provider prompt cache).
+          currentMessages = currentMessages.filter(m => !(m.role === "assistant" && !m.content?.trim() && !m.thinking?.trim() && (!m.toolCalls || m.toolCalls.length === 0)));
 
           injectToolDiscoveryNudge(pass.pendingToolCalls, results, currentMessages, context);
           this.checkAndApplyToolSetChanges(currentMessages);

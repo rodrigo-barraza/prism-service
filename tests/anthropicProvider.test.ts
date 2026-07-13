@@ -116,11 +116,25 @@ describe('Anthropic Provider Adapter', () => {
 
     expect(mockMessagesCreate).toHaveBeenCalled();
     const payload = mockMessagesCreate.mock.calls[0][0];
-    expect(payload.system).toBe('You are a helpful assistant');
+    // System prompt becomes a cacheable text block (real cache_control lives
+    // on blocks — a payload-root cache_control key is ignored by the API).
+    expect(payload.system).toEqual([
+      {
+        type: 'text',
+        text: 'You are a helpful assistant',
+        cache_control: { type: 'ephemeral' },
+      },
+    ]);
     expect(payload.messages).toHaveLength(3);
     expect(payload.messages[0]).toEqual({ role: 'user', content: 'Hello' });
     expect(payload.messages[1]).toEqual({ role: 'assistant', content: 'Hi there' });
-    expect(payload.messages[2]).toEqual({ role: 'user', content: 'How are you?' });
+    // The last message carries the moving cache breakpoint
+    expect(payload.messages[2]).toEqual({
+      role: 'user',
+      content: [
+        { type: 'text', text: 'How are you?', cache_control: { type: 'ephemeral' } },
+      ],
+    });
 
     expect(result.text).toBe('Claude response');
     expect(result.usage).toEqual({
@@ -144,7 +158,10 @@ describe('Anthropic Provider Adapter', () => {
     const payload = mockMessagesCreate.mock.calls[0][0];
     expect(payload.messages).toHaveLength(1); // Consecutive user role messages will be merged!
     expect(payload.messages[0].role).toBe('user');
-    expect(payload.messages[0].content).toContain('Hello\n\n<tool-update>New tools registered</tool-update>\n\nContinue');
+    // Last (only) message becomes a cacheable text block carrying the moving breakpoint
+    const lastContent = payload.messages[0].content;
+    const lastText = Array.isArray(lastContent) ? lastContent[0].text : lastContent;
+    expect(lastText).toContain('Hello\n\n<tool-update>New tools registered</tool-update>\n\nContinue');
   });
 
   it('maps tool use and tool results correctly', async () => {
@@ -167,8 +184,14 @@ describe('Anthropic Provider Adapter', () => {
       { type: 'tool_use', id: 'call-1', name: 'my_tool', input: { arg1: 'val1' } },
     ]);
     expect(payload.messages[2].role).toBe('user');
+    // Last message's final block carries the moving cache breakpoint
     expect(payload.messages[2].content).toEqual([
-      { type: 'tool_result', tool_use_id: 'call-1', content: 'Tool outcome success' },
+      {
+        type: 'tool_result',
+        tool_use_id: 'call-1',
+        content: 'Tool outcome success',
+        cache_control: { type: 'ephemeral' },
+      },
     ]);
   });
 
@@ -199,8 +222,11 @@ describe('Anthropic Provider Adapter', () => {
       },
       { type: TYPES.TEXT, text: 'Look at this' }
     ]);
-    // Assistant message trailing spaces are trimmed
-    expect(payload.messages[1].content).toBe('Sure!');
+    // Assistant message trailing spaces are trimmed; as the last message it
+    // carries the moving cache breakpoint as a text block
+    expect(payload.messages[1].content).toEqual([
+      { type: 'text', text: 'Sure!', cache_control: { type: 'ephemeral' } },
+    ]);
   });
 
   it('correctly maps tool config schema', async () => {

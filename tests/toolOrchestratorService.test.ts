@@ -864,6 +864,14 @@ describe("ToolOrchestratorService", () => {
         reasoningEffort: "medium",
         thinkingBudget: 2000,
         workspaceEnabled: true,
+        // Safety envelope inherited by sub-agents (A1/C8): approval mode,
+        // policies, critic settings, and cost budget from the parent loop.
+        autoApprove: false,
+        policies: undefined,
+        enableCriticGate: undefined,
+        criticModel: undefined,
+        maxCostDollars: undefined,
+        sharedCostBudget: undefined,
       });
     });
 
@@ -942,7 +950,9 @@ describe("ToolOrchestratorService", () => {
       const result = await ToolOrchestratorService.executeTool("mcp__server__tool", { arg: 1 }, {} as any);
       expect(result).toEqual({ result: "ok" });
       expect(MCPClientService.parseMCPToolName).toHaveBeenCalledWith("mcp__server__tool");
-      expect(MCPClientService.callTool).toHaveBeenCalledWith("server", "tool", { arg: 1 });
+      expect(MCPClientService.callTool).toHaveBeenCalledWith("server", "tool", { arg: 1 }, {
+        signal: undefined,
+      });
     });
 
     it("returns error for invalid MCP tool name", async () => {

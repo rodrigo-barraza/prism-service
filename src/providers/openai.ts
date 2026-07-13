@@ -1354,10 +1354,14 @@ const openaiProvider = {
         const callId =
           tracked?.callId || typedEvent.call_id || typedEvent.item_id;
         let args: Record<string, unknown> = {};
+        let argsParseError = false;
         try {
           args = JSON.parse(typedEvent.arguments || tracked?.args || "{}");
         } catch {
-          /* ignore */
+          // Malformed/truncated tool-call JSON — flag it instead of silently
+          // executing with empty args (the harness converts the flag into a
+          // synthetic error result telling the model to re-emit the call).
+          argsParseError = true;
         }
         // Pop the most recent pending reasoning item and finalize its summary
         // text from the accumulated deltas. This pairs the reasoning item with
@@ -1385,6 +1389,10 @@ const openaiProvider = {
           responsesItemId: typedEvent.item_id,
           name,
           args,
+          ...(argsParseError && {
+            argsParseError: true,
+            rawArgs: String(typedEvent.arguments || tracked?.args || "").slice(0, 2000),
+          }),
           ...(pairedReasoningItem
             ? { reasoningItem: pairedReasoningItem }
             : {}),
@@ -1624,16 +1632,23 @@ const openaiProvider = {
       if (finishReason === "tool_calls") {
         for (const toolCall of Object.values(pendingToolCalls)) {
           let args: Record<string, unknown> = {};
+          let argsParseError = false;
           try {
             args = JSON.parse(toolCall.args || "{}");
           } catch {
-            /* ignore */
+            // Malformed/truncated tool-call JSON — flag instead of silently
+            // executing with empty args (see harness handling).
+            argsParseError = true;
           }
           yield {
             type: "toolCall",
             id: toolCall.id,
             name: toolCall.name,
             args,
+            ...(argsParseError && {
+              argsParseError: true,
+              rawArgs: String(toolCall.args || "").slice(0, 2000),
+            }),
           };
         }
       }

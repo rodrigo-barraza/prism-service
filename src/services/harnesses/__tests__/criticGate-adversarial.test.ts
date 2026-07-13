@@ -188,7 +188,7 @@ describe("CriticGate adversarial — parseReviewResponse attacks", () => {
     expect(result.isApproved).toBe(false);
   });
 
-  it("ambiguous response (no APPROVE/DENY) should default to approve (fail-open)", async () => {
+  it("ambiguous response (no APPROVE/DENY) should fail closed (deny)", async () => {
     const gate = new CriticGate();
     const toolCall = createDangerToolCall();
     const context = createMockContext({
@@ -200,11 +200,11 @@ describe("CriticGate adversarial — parseReviewResponse attacks", () => {
     });
 
     const result = await gate.review(toolCall, context);
-    expect(result.isApproved).toBe(true);
-    expect(result.reason).toBe("critic_parse_fallback");
+    expect(result.isApproved).toBe(false);
+    expect(result.reason).toBe("critic_ambiguous_fail_closed");
   });
 
-  it("empty response should default to approve (fail-open)", async () => {
+  it("empty response should fail closed (deny)", async () => {
     const gate = new CriticGate();
     const toolCall = createDangerToolCall();
     const context = createMockContext({
@@ -216,8 +216,8 @@ describe("CriticGate adversarial — parseReviewResponse attacks", () => {
     });
 
     const result = await gate.review(toolCall, context);
-    expect(result.isApproved).toBe(true);
-    expect(result.reason).toBe("critic_parse_fallback");
+    expect(result.isApproved).toBe(false);
+    expect(result.reason).toBe("critic_ambiguous_fail_closed");
   });
 
   it("DENY with no explanation should use 'critic_denied' as reason", async () => {
@@ -381,9 +381,11 @@ describe("CriticGate adversarial — prompt injection via tool arguments", () =>
     expect(result.isApproved).toBe(false);
   });
 
-  it("args with extremely long values should be truncated in the prompt", async () => {
+  it("dangerous tail hidden behind a long benign prefix is still shown to the critic", async () => {
     const gate = new CriticGate();
-    const longCommand = "x".repeat(5000);
+    // Padding attack: the old head-only 1000-char slice hid anything past
+    // the cut, so `"x".repeat(5000) + "; rm -rf /"` was reviewed as benign.
+    const longCommand = "x".repeat(5000) + "; rm -rf /";
     const toolCall = createDangerToolCall({
       args: { command: longCommand },
     });
@@ -402,8 +404,10 @@ describe("CriticGate adversarial — prompt injection via tool arguments", () =>
 
     await gate.review(toolCall, context);
 
-    // The buildReviewPrompt slices args to 1000 chars
-    expect(capturedPrompt.length).toBeLessThan(5000);
+    expect(capturedPrompt).toContain("rm -rf /");
+    // Args are fenced inside an explicit data boundary
+    expect(capturedPrompt).toContain("<<<BEGIN_TOOL_ARGUMENTS>>>");
+    expect(capturedPrompt).toContain("<<<END_TOOL_ARGUMENTS>>>");
   });
 });
 

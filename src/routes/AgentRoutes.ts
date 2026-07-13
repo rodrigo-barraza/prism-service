@@ -186,7 +186,9 @@ router.post(
         persistOnDisconnect: true,
       });
     } else {
-      await handleJsonRequest(request, response, next, params, handleAgent);
+      await handleJsonRequest(request, response, next, params, handleAgent, {
+        registerAgentSession: true,
+      });
     }
   }),
 );

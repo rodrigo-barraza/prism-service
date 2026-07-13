@@ -162,10 +162,14 @@ describe('MCPClientService Unit Tests', () => {
 
       const result = await MCPClientService.callTool('test-tools', 'add', { a: 4, b: 6 });
 
-      expect(mockCallTool).toHaveBeenCalledWith({
-        name: 'add',
-        arguments: { a: 4, b: 6 },
-      });
+      expect(mockCallTool).toHaveBeenCalledWith(
+        {
+          name: 'add',
+          arguments: { a: 4, b: 6 },
+        },
+        undefined,
+        expect.objectContaining({ resetTimeoutOnProgress: true }),
+      );
       expect(result).toEqual({ sum: 10 });
     });
 
@@ -200,7 +204,12 @@ describe('MCPClientService Unit Tests', () => {
 
       // 1 initial connection + 1 reconnection
       expect(mockConnect).toHaveBeenCalledTimes(2);
-      expect(result).toEqual({ retried: true });
+      expect(result).toEqual({
+        retried: true,
+        // Reconnect-retries are annotated: the tool may have executed
+        // server-side before the transport dropped.
+        _possiblyDuplicated: expect.any(String),
+      });
     });
   });
 

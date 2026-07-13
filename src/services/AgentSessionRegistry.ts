@@ -74,8 +74,24 @@ const AgentSessionRegistry = {
     return !!session && !session.stopController.signal.aborted;
   },
 
-  /** Remove a session entry after the handler completes. */
-  cleanup(conversationId: string): void {
+  /**
+   * Remove a session entry after the handler completes.
+   *
+   * Identity-checked: when `ownController` is provided, the entry is only
+   * deleted if it still belongs to the caller. Without this, a first
+   * handler's `finally` deleted the SECOND (live) session's entry after a
+   * registry overwrite — leaving `/agent/stop` unable to find the running
+   * turn.
+   */
+  cleanup(conversationId: string, ownController?: AbortController): void {
+    const session = activeSessions.get(conversationId);
+    if (!session) return;
+    if (ownController && session.stopController !== ownController) {
+      logger.debug(
+        `[AgentSessionRegistry] Skipped cleanup for ${conversationId} — entry belongs to a newer session`,
+      );
+      return;
+    }
     activeSessions.delete(conversationId);
     logger.debug(
       `[AgentSessionRegistry] Cleaned up session ${conversationId} (active=${activeSessions.size})`,

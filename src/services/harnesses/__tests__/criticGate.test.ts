@@ -190,8 +190,8 @@ describe("CriticGate", () => {
     });
   });
 
-  describe("review — ambiguous responses", () => {
-    it("should default to approve on ambiguous critic response", async () => {
+  describe("review — ambiguous responses (fail-closed)", () => {
+    it("should deny on ambiguous critic response", async () => {
       const gate = new CriticGate();
       const toolCall = createMockToolCall();
 
@@ -206,11 +206,11 @@ describe("CriticGate", () => {
 
       const result = await gate.review(toolCall, context);
 
-      expect(result.isApproved).toBe(true);
-      expect(result.reason).toBe("critic_parse_fallback");
+      expect(result.isApproved).toBe(false);
+      expect(result.reason).toBe("critic_ambiguous_fail_closed");
     });
 
-    it("should default to approve on empty critic response", async () => {
+    it("should deny on empty critic response", async () => {
       const gate = new CriticGate();
       const toolCall = createMockToolCall();
 
@@ -225,8 +225,8 @@ describe("CriticGate", () => {
 
       const result = await gate.review(toolCall, context);
 
-      expect(result.isApproved).toBe(true);
-      expect(result.reason).toBe("critic_parse_fallback");
+      expect(result.isApproved).toBe(false);
+      expect(result.reason).toBe("critic_ambiguous_fail_closed");
     });
   });
 
@@ -336,9 +336,11 @@ describe("CriticGate", () => {
       expect(promptContent).toContain("APPROVE or DENY");
     });
 
-    it("should truncate arguments longer than 1000 chars", async () => {
+    it("should include the FULL command in the prompt — no head-only truncation", async () => {
       const gate = new CriticGate();
-      const longCommand = "A".repeat(2000);
+      // A benign 2000-char prefix used to push the dangerous tail past the
+      // old 1000-char head-only slice, hiding it from the critic entirely.
+      const longCommand = "A".repeat(2000) + "; rm -rf /";
       const toolCall = createMockToolCall({
         args: { command: longCommand },
       });
@@ -357,8 +359,31 @@ describe("CriticGate", () => {
 
       const calledMessages = mockGenerateTextStream.mock.calls[0][0];
       const promptContent = calledMessages[0].content;
-      // The full JSON would be >2000 chars but should be sliced to 1000 max
-      expect(promptContent.length).toBeLessThan(1500);
+      expect(promptContent).toContain("rm -rf /");
+    });
+
+    it("should preserve head AND tail when args exceed the review cap", async () => {
+      const gate = new CriticGate();
+      const toolCall = createMockToolCall({
+        args: { command: "HEAD_MARKER " + "A".repeat(60_000) + " TAIL_MARKER; rm -rf /" },
+      });
+
+      async function* mockStream() {
+        yield "APPROVE";
+      }
+      const mockGenerateTextStream = vi.fn().mockReturnValue(mockStream());
+      const context = createMockContext({
+        provider: {
+          generateTextStream: mockGenerateTextStream,
+        } as any,
+      });
+
+      await gate.review(toolCall, context);
+
+      const promptContent = mockGenerateTextStream.mock.calls[0][0][0].content;
+      expect(promptContent).toContain("HEAD_MARKER");
+      expect(promptContent).toContain("TAIL_MARKER; rm -rf /");
+      expect(promptContent).toContain("chars omitted");
     });
   });
 

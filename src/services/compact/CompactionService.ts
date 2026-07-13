@@ -74,6 +74,10 @@ interface CompactionOptions {
   agent?: string | null;
   emit?: EmitFunction | null;
   signal?: AbortSignal;
+  /** Conversation's own provider — used when no compaction model is configured. */
+  fallbackProvider?: string;
+  /** Conversation's own model — used when no compaction model is configured. */
+  fallbackModel?: string;
 }
 
 interface MemorySettingsSection {
@@ -149,17 +153,28 @@ export default class CompactionService {
       compactionProvider = memorySettings?.extractionProvider;
       compactionModel = memorySettings?.extractionModel;
     } catch {
-      logger.info(
-        "[CompactionService] Settings not configured. Skipping compaction.",
-      );
-      return null;
+      /* Settings not configured — fall through to the fallback below */
     }
 
+    // Silently skipping compaction means silent context blowups (the loop
+    // keeps growing until the provider rejects the request). When no cheap
+    // compaction model is configured, fall back to the conversation's own
+    // provider/model rather than not compacting at all.
     if (!compactionProvider || !compactionModel) {
-      logger.info(
-        "[CompactionService] No compaction model configured in Settings → Memory Models. Skipping.",
-      );
-      return null;
+      if (options.fallbackProvider && options.fallbackModel) {
+        compactionProvider = options.fallbackProvider;
+        compactionModel = options.fallbackModel;
+        logger.warn(
+          `[CompactionService] No compaction model configured in Settings → Memory Models — ` +
+            `falling back to the conversation model (${compactionProvider}/${compactionModel}). ` +
+            `Configure a cheap utility model to reduce compaction cost.`,
+        );
+      } else {
+        logger.warn(
+          "[CompactionService] No compaction model configured and no fallback available. Skipping.",
+        );
+        return null;
+      }
     }
 
     const preCompactTokenCount = estimateTotalTokens(messages);
@@ -224,6 +239,9 @@ export default class CompactionService {
         {
           maxTokens: COMPACT_MAX_OUTPUT_TOKENS,
           temperature: 0.1,
+          // Utility call — never burn extended thinking on summarization.
+          thinkingEnabled: false,
+          reasoningEffort: "none",
         },
       );
     } catch (error: unknown) {
@@ -303,6 +321,24 @@ export default class CompactionService {
     compactedMessages.push(...recentTail);
 
     const postCompactTokenCount = estimateTotalTokens(compactedMessages);
+
+    // ── Shrink guard ───────────────────────────────────────────
+    // If the "compacted" conversation is not actually smaller (a tail-heavy
+    // history can produce summary-of-summary growth), keep the original
+    // messages — repeated compaction of a non-shrinking history only burns
+    // LLM calls and can loop.
+    if (postCompactTokenCount >= preCompactTokenCount) {
+      this.consecutiveFailures++;
+      logger.warn(
+        `[CompactionService] Compaction did not shrink the conversation ` +
+          `(${preCompactTokenCount} → ${postCompactTokenCount} tokens). Discarding result.`,
+      );
+      options.emit?.({
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.COMPACTION_FAILED,
+      });
+      return null;
+    }
 
     // ── Reset circuit breaker on success ──────────────────────
     this.consecutiveFailures = 0;

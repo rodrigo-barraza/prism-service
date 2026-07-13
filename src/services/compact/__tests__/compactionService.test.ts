@@ -169,10 +169,14 @@ describe("CompactionService", () => {
     CompactionService.resetCircuitBreaker();
   });
 
+  // Long filler makes the history genuinely large — the shrink guard
+  // discards compactions that don't reduce token count, so fixtures must
+  // represent a conversation actually worth compacting.
+  const filler = " lorem ipsum dolor sit amet".repeat(400);
   const sampleMessages = [
     { role: "system", content: "You are an assistant." },
-    { role: "user", content: "User turn 1" },
-    { role: "assistant", content: "Assistant response 1", toolCalls: [] },
+    { role: "user", content: `User turn 1${filler}` },
+    { role: "assistant", content: `Assistant response 1${filler}`, toolCalls: [] },
     { role: "user", content: "User turn 2" },
     { role: "assistant", content: "Assistant response 2" },
     { role: "user", content: "User turn 3" },

@@ -74,6 +74,9 @@ export async function extractReminderViaLLM(
     const extractionOptions: Record<string, unknown> = {
       maxTokens: EXTRACTION_MAX_TOKENS,
       temperature: 0,
+      // Utility call — never burn extended thinking on reminder distillation.
+      thinkingEnabled: false,
+      reasoningEffort: "none",
       signal: signal ?? AbortSignal.timeout(EXTRACTION_TIMEOUT_MILLISECONDS),
     };
 

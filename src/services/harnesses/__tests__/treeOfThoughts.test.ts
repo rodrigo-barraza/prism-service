@@ -58,7 +58,7 @@ vi.mock("#src/services/harnesses/lifecycle/CostBudgetEnforcer", () => ({
 }));
 
 vi.mock("#src/services/harnesses/lifecycle/ApprovalGate", () => ({
-  checkAndWaitForApproval: vi.fn().mockResolvedValue({ isApproved: true, shouldApproveAll: false }),
+  checkAndWaitForApproval: vi.fn().mockResolvedValue({ isApproved: true, shouldApproveAll: false, deniedToolCalls: [] }),
 }));
 
 vi.mock("#src/services/harnesses/lifecycle/CodexPlanningDetector", () => ({
@@ -593,7 +593,7 @@ describe("TreeOfThoughtsStrategy", () => {
       requestId: "req-reject",
     }));
 
-    vi.mocked(checkAndWaitForApproval).mockResolvedValueOnce({ isApproved: false, shouldApproveAll: false });
+    vi.mocked(checkAndWaitForApproval).mockResolvedValueOnce({ isApproved: false, shouldApproveAll: false, deniedToolCalls: [] });
 
     const result = await runTreeOfThoughts(mockHarnessInstance as any);
     expect(result).toBeDefined();

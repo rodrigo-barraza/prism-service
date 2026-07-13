@@ -323,7 +323,7 @@ describe("Harness Lifecycle Modules", () => {
       expect(reviewResult.reason).toBe("critic_denied");
     });
 
-    it("should return critic_parse_fallback if critic response is ambiguous", async () => {
+    it("should fail closed if critic response is ambiguous", async () => {
       const criticGate = new CriticGate();
       const toolCall = {
         id: "call-1",
@@ -345,8 +345,10 @@ describe("Harness Lifecycle Modules", () => {
       };
 
       const reviewResult = await criticGate.review(toolCall, contextMinimal as any);
-      expect(reviewResult.isApproved).toBe(true);
-      expect(reviewResult.reason).toBe("critic_parse_fallback");
+      // Ambiguous reviews fail closed — an unparseable verdict on a
+      // DANGER-tier call must not slip through on a parse fallback.
+      expect(reviewResult.isApproved).toBe(false);
+      expect(reviewResult.reason).toBe("critic_ambiguous_fail_closed");
     });
 
     it("should handle prompt without Tool heading when prompt is overridden", async () => {
