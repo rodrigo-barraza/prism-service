@@ -174,7 +174,6 @@ describe("ToolOrchestratorService — Per-Locale Cache Selection", () => {
             json: () =>
               Promise.resolve({
                 workspaceRoots: ["/home/test"],
-                staticRoots: [],
               }),
           });
         }
@@ -372,7 +371,6 @@ describe("ToolOrchestratorService — Per-Locale Cache Selection", () => {
               json: () =>
                 Promise.resolve({
                   workspaceRoots: ["/home/test"],
-                  staticRoots: [],
                 }),
             });
           }

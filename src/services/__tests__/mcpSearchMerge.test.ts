@@ -160,7 +160,7 @@ global.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit
     return {
       ok: true,
       status: 200,
-      json: async () => ({ workspaceRoots: [], staticRoots: [] }),
+      json: async () => ({ workspaceRoots: [] }),
     };
   }
 

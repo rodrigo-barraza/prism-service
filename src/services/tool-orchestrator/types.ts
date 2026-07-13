@@ -23,7 +23,6 @@ export interface ToolSchemaFull {
 /** tools-api /admin/config response */
 export interface ToolsApiConfig {
   workspaceRoots?: string[];
-  staticRoots?: string[];
   [key: string]: unknown;
 }
 
