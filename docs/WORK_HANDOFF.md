@@ -105,6 +105,10 @@ BaseAgenticHarness `StreamConsumer`/`IterationLogger` splits; ReAct `run()` priv
 
 Reference: `prism-client/business-logic-audit.md`. Suggested order was H1/H2 → M1 → H3 → M2–M8. **User chose: do M2–M8 first, then H3 last.**
 
+**STATUS 2026-07-13: H1, H2, M1–M8, H3 are ALL DONE.** Only the §Low cleanup items remain (below). Verified: prism-service 5121 tests / 235 files green, tsc clean; prism-client 495 tests / 36 files green, tsc shows only the 5 known pre-existing errors.
+
+**Design note (user asked "should the frontend never see minio://?"):** the frontend still sees `minio://` refs by design — the client's `resolveFileReference` is a pure prefix-swap to either the public bucket URL (`NEXT_PUBLIC_MINIO_PUBLIC_URL`, browser-reachable) or `/files` proxy. The server CAN'T emit absolute URLs reliably today: `MinioManager.getBucketUrl()` is built from the server's *connection* endpoint, which may be an internal address the browser can't reach. Making refs invisible to the client would require (1) plumbing a public-URL config into prism-service and (2) rewriting refs at every serving boundary including inside tool-result JSON strings — a separate decision, not attempted. What M8 did guarantee: served refs are clean (no `::ffff:`) and the server repairs historical keys at every read.
+
 ## ✅ DONE
 
 ### H1 — `getTotalInputTokens` billing duplication
@@ -170,7 +174,5 @@ Client self-elevates to admin (`IrisService.getAdminHeaders` stamps `x-username:
 - Don't touch the 5 pre-existing client typecheck errors or the eslint tooling issue.
 
 ## Suggested next steps for the fresh agent
-1. **Finish M4** (small, design above) — server `state` + client prefer-when-passed, live path untouched.
-2. **M8** then **M2** (both "server returns the clean/joined form, delete client copy").
-3. **H3** last (big; the user explicitly deferred it to the end).
-4. Then either continue the audit's Low items or pivot to the harness plan **Sprint 2** (start with D.3 assistant-message-builder — small and user-visible — then characterization tests, then F-4/F-8).
+1. **Manually verify H3 in the running app** (Synthesis page: generate, stream render, stop, history entry) — the only piece not verifiable headlessly.
+2. Then either continue the audit's **§Low items** (client self-elevating admin header is the security-relevant one) or pivot to the harness plan **Sprint 2** (start with D.3 assistant-message-builder — small and user-visible — then characterization tests, then F-4/F-8).
