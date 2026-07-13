@@ -166,6 +166,7 @@ export function createVllmProvider(
         const result: GenerateTextResult = {
           text,
           usage: {
+            ...usage, // preserve cacheReadInputTokens etc. from normalizeUsage
             inputTokens: usage.inputTokens || 0,
             outputTokens: usage.outputTokens || 0,
           },
@@ -258,6 +259,7 @@ export function createVllmProvider(
               yield {
                 type: "usage",
                 usage: {
+                  ...chunk.usage, // preserve cacheReadInputTokens etc. from normalizeUsage
                   inputTokens: chunk.usage.inputTokens || 0,
                   outputTokens: chunk.usage.outputTokens || 0,
                 },
@@ -325,6 +327,7 @@ export function createVllmProvider(
         return {
           text,
           usage: {
+            ...usage, // preserve cacheReadInputTokens etc. from normalizeUsage
             inputTokens: usage.inputTokens || 0,
             outputTokens: usage.outputTokens || 0,
           },

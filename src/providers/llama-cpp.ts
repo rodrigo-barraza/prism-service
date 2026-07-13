@@ -223,6 +223,11 @@ export function createLlamaCppProvider(
             options.repeatPenalty !== 1 && {
               repeat_penalty: options.repeatPenalty,
             }),
+          // llama.cpp extension: reuse the server-side KV cache for the
+          // common prompt prefix across turns — the local-provider analog
+          // of Anthropic prompt caching. Skips re-prefilling the whole
+          // conversation on every agentic iteration.
+          cache_prompt: true,
           stream: false,
         };
 
@@ -253,6 +258,7 @@ export function createLlamaCppProvider(
         const result: GenerateTextResult = {
           text,
           usage: {
+            ...usage, // preserve cacheReadInputTokens etc. from normalizeUsage
             inputTokens: usage.inputTokens || 0,
             outputTokens: usage.outputTokens || 0,
           },
@@ -317,6 +323,9 @@ export function createLlamaCppProvider(
             options.repeatPenalty !== 1 && {
               repeat_penalty: options.repeatPenalty,
             }),
+          // llama.cpp extension: reuse the server-side KV cache for the
+          // common prompt prefix across turns (see non-streaming payload).
+          cache_prompt: true,
           stream: true,
           // Per OpenAI spec: request usage stats in the final SSE chunk
           stream_options: { include_usage: true },
@@ -354,6 +363,7 @@ export function createLlamaCppProvider(
               yield {
                 type: "usage",
                 usage: {
+                  ...chunk.usage, // preserve cacheReadInputTokens etc. from normalizeUsage
                   inputTokens: chunk.usage.inputTokens || 0,
                   outputTokens: chunk.usage.outputTokens || 0,
                   ...(chunk.usage.tokensPerSec != null && {
@@ -437,6 +447,7 @@ export function createLlamaCppProvider(
         return {
           text,
           usage: {
+            ...usage, // preserve cacheReadInputTokens etc. from normalizeUsage
             inputTokens: usage.inputTokens || 0,
             outputTokens: usage.outputTokens || 0,
           },

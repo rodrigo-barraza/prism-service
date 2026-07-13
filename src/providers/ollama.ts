@@ -293,6 +293,7 @@ export function createOllamaProvider(
           yield {
             type: "usage",
             usage: {
+              ...usage, // preserve cacheReadInputTokens etc. from normalizeUsage
               inputTokens: usage.inputTokens || 0,
               outputTokens: usage.outputTokens || 0,
             },

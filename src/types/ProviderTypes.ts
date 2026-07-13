@@ -70,6 +70,12 @@ export interface ProviderOptions {
   thinkingBudget?: number | string;
   reasoningEffort?: "none" | "low" | "medium" | "high";
   signal?: AbortSignal;
+  /**
+   * Stable per-conversation key for provider prompt caching. OpenAI uses it
+   * as `prompt_cache_key` to route requests to the cache shard holding the
+   * conversation's prefix; providers without an equivalent ignore it.
+   */
+  promptCacheKey?: string;
   webSearch?: boolean | string;
   webFetch?: boolean;
   codeExecution?: boolean;
