@@ -7,7 +7,11 @@ import { COLLECTIONS } from "#src/constants";
 import {
   PostSynthesisBodySchema,
   PatchSynthesisBodySchema,
+  PostSynthesisGenerateBodySchema,
 } from "#src/types/index";
+import { handleSseRequest } from "#src/utils/SseUtilities";
+import { runSynthesisGeneration } from "#src/services/SynthesisOrchestrationService";
+import type { ChatRequest } from "#src/types/schemas";
 
 const router = express.Router();
 router.use(requireDb);
@@ -52,6 +56,55 @@ router.get(
       res.json(runs);
     } catch (error: unknown) {
       logger.error(`Error fetching synthesis runs: ${errorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+/**
+ * POST /synthesis/generate
+ * Run the full synthesis turn loop server-side, streaming role-tagged SSE
+ * events (synthesis_start / turn_start / chunk / thinking / turn_complete /
+ * done / error). The client is a thin stream consumer — see
+ * SynthesisOrchestrationService for the loop and event protocol (audit H3).
+ * Closing the SSE connection aborts generation (same as /chat).
+ */
+router.post(
+  "/generate",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = PostSynthesisGenerateBodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.format() });
+      }
+
+      const project = req.project || "any";
+      const username = req.username || "any";
+      const { db } = req;
+
+      await handleSseRequest(
+        req,
+        res,
+        parsed.data as unknown as ChatRequest,
+        (_params, emit, { signal }) =>
+          runSynthesisGeneration(
+            {
+              ...parsed.data,
+              project,
+              username,
+              clientIp: req.clientIp || null,
+            },
+            emit,
+            { signal },
+            {
+              saveSynthesisRun: async (document) => {
+                await db.collection(COLLECTION).insertOne(document);
+              },
+            },
+          ),
+      );
+    } catch (error: unknown) {
+      logger.error(`Error running synthesis generation: ${errorMessage(error)}`);
       next(error);
     }
   }),

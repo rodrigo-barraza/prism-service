@@ -46,6 +46,7 @@ export {
   PatchConversationBodySchema,
   PostSynthesisBodySchema,
   PatchSynthesisBodySchema,
+  PostSynthesisGenerateBodySchema,
   PostSkillSchema,
   PutSkillSchema,
   PostRuleSchema,
