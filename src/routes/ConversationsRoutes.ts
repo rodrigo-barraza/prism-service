@@ -5,8 +5,10 @@ import express, { Request, Response, NextFunction } from "express";
 import { ObjectId, type Document } from "mongodb";
 import requireDb from "#src/middleware/RequireDbMiddleware";
 import ConversationService, {
+  attachConversationState,
   buildConversationPatchFields,
   type ConversationPatchInput,
+  deriveAgentConversationState,
   enrichConversationsWithRequestCosts,
   enrichSingleConversationCost,
   prepareDisplayMessages,
@@ -386,6 +388,12 @@ router.get(
       deriveAndStripSubAgentsArray(modelConversations);
       deriveAndStripSubAgentsArray(agentConversations);
 
+      // Stamp the canonical activity state now that cost/error and sub-agent
+      // enrichment have run — the ladder reads the enriched fields.
+      for (const conversation of [...modelConversations, ...agentConversations]) {
+        attachConversationState(conversation as Record<string, unknown>);
+      }
+
       // Merge and sort in memory by updatedAt descending
       const merged = [
         ...modelConversations.map((conversation) => ({
@@ -494,6 +502,7 @@ router.get(
         return res.json({
           ...chat,
           type: "direct",
+          state: deriveAgentConversationState(chat),
           displayMessages: prepareDisplayMessages(
             (chat.messages as import("../types/admin.ts").ChatMessage[]) || [],
           ),
@@ -543,6 +552,9 @@ router.get(
           ...agentChat,
           stats: stats || undefined,
           type: "agent",
+          state: deriveAgentConversationState(
+            agentChatRecord as Parameters<typeof deriveAgentConversationState>[0],
+          ),
           displayMessages: prepareDisplayMessages(
             (agentChat.messages as import("../types/admin.ts").ChatMessage[]) || [],
           ),

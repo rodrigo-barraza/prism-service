@@ -17,6 +17,7 @@ import {
   CONVERSATION_LIST_BASE_PROJECTION,
 } from "#src/utils/QueryBuilders";
 import requireDb from "#src/middleware/RequireDbMiddleware";
+import { deriveAgentConversationState } from "#src/services/ConversationService";
 import { StatsCache } from "#src/caches/StatsCache";
 import {
   MILLISECONDS_PER_MINUTE,
@@ -329,6 +330,9 @@ router.get(
 
             return {
               ...document,
+              state: deriveAgentConversationState(
+                document as Parameters<typeof deriveAgentConversationState>[0],
+              ),
               totalCost,
               requestCount: associatedRequests.length,
               inputTokens,
@@ -584,7 +588,15 @@ router.get(
         .collection(CONVERSATIONS_COLLECTION)
         .findOne({ id: req.params.id });
       if (conversationDocument) {
-        return res.json({ ...conversationDocument, type: "direct" });
+        return res.json({
+          ...conversationDocument,
+          type: "direct",
+          state: deriveAgentConversationState(
+            conversationDocument as Parameters<
+              typeof deriveAgentConversationState
+            >[0],
+          ),
+        });
       }
 
       conversationDocument = await req.db
@@ -599,7 +611,15 @@ router.get(
         ) {
           agentRecord.hasSubAgents = true;
         }
-        return res.json({ ...conversationDocument, type: "agent" });
+        return res.json({
+          ...conversationDocument,
+          type: "agent",
+          state: deriveAgentConversationState(
+            conversationDocument as Parameters<
+              typeof deriveAgentConversationState
+            >[0],
+          ),
+        });
       }
 
       res.status(404).json({ error: "Conversation not found" });

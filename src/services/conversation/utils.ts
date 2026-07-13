@@ -366,6 +366,65 @@ export function buildConversationPatchFields({
 }
 
 /**
+ * Canonical activity state for a served conversation document, derived from
+ * persisted fields only. Fine-grained live phases (thinking, executing…)
+ * require a live SSE connection and never appear here.
+ */
+export type AgentConversationState =
+  | "completed"
+  | "completed-with-errors"
+  | "generating"
+  | "orchestrating"
+  | "background-tasks"
+  | "sub-agents-running"
+  | "active";
+
+/**
+ * Derive the canonical conversation activity state from persisted document
+ * fields, evaluated in priority order: generating → orchestrating →
+ * done → error → sub-agents → background-tasks → active.
+ *
+ * Mirrors the client-side ladder in
+ * prism-client/src/utils/agentConversationStates.ts — keep the two in sync.
+ * The client keeps its own copy because the live sidebar derives state from
+ * SSE-patched props, where a server snapshot would go stale.
+ *
+ * Call AFTER cost/sub-agent enrichment — the ladder reads the enriched
+ * `hasSubAgents`/`requestErrorCount` values.
+ */
+export function deriveAgentConversationState(conversation: {
+  isActive?: boolean;
+  isGenerating?: boolean;
+  pendingBackgroundTasks?: number;
+  hasSubAgents?: boolean;
+  requestErrorCount?: number;
+}): AgentConversationState {
+  if (conversation.isGenerating) {
+    return conversation.hasSubAgents ? "orchestrating" : "generating";
+  }
+  if (conversation.isActive === false) {
+    return (conversation.requestErrorCount ?? 0) > 0
+      ? "completed-with-errors"
+      : "completed";
+  }
+  if ((conversation.pendingBackgroundTasks ?? 0) > 0) {
+    return conversation.hasSubAgents ? "sub-agents-running" : "background-tasks";
+  }
+  return "active";
+}
+
+/**
+ * Stamp the derived `state` onto a conversation record about to be served.
+ */
+export function attachConversationState(
+  conversation: Record<string, unknown>,
+): void {
+  conversation.state = deriveAgentConversationState(
+    conversation as Parameters<typeof deriveAgentConversationState>[0],
+  );
+}
+
+/**
  * Enrich conversations list with authoritative totalCost from request logs.
  */
 export function enrichConversationsWithRequestCosts(
