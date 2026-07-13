@@ -106,4 +106,40 @@ describe("FileService", () => {
       expect(uploadedKey.endsWith(".bin")).toBe(true);
     });
   });
+
+  // Historical refs persisted before client-IP normalization contain
+  // "::ffff:" in the username path segment, but the objects were stored
+  // under the scrubbed key. Reads must normalize (M8).
+  describe("historical ::ffff: key normalization", () => {
+    it("extractKey scrubs the IPv4-mapped-IPv6 artifact", () => {
+      expect(
+        FileService.extractKey(
+          "minio://projects/prism/::ffff:192.168.1.5/uploads/a.png",
+        ),
+      ).toBe("projects/prism/192.168.1.5/uploads/a.png");
+      expect(FileService.extractKey("minio://uploads/clean.png")).toBe(
+        "uploads/clean.png",
+      );
+    });
+
+    it("getFile fetches under the normalized key", async () => {
+      vi.mocked(MinioWrapper.isAvailable).mockReturnValue(true);
+      vi.mocked(MinioWrapper.stat).mockResolvedValue({
+        metaData: { "content-type": "image/png" },
+      } as never);
+      vi.mocked(MinioWrapper.get).mockResolvedValue({} as never);
+
+      const result = await FileService.getFile(
+        "projects/prism/::ffff:192.168.1.5/uploads/a.png",
+      );
+
+      expect(result?.contentType).toBe("image/png");
+      expect(MinioWrapper.stat).toHaveBeenCalledWith(
+        "projects/prism/192.168.1.5/uploads/a.png",
+      );
+      expect(MinioWrapper.get).toHaveBeenCalledWith(
+        "projects/prism/192.168.1.5/uploads/a.png",
+      );
+    });
+  });
 });

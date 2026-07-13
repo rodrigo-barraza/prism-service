@@ -33,6 +33,19 @@ const MIME_TO_EXT: Record<string, string> = {
   "application/json": "json",
 };
 
+/**
+ * Normalize a MinIO object key before any read.
+ *
+ * Historical refs persisted before client-IP normalization can contain an
+ * IPv4-mapped IPv6 prefix ("::ffff:") in the username path segment
+ * (e.g. "projects/p/::ffff:192.168.1.5/uploads/x.png") while the object
+ * itself was stored under the scrubbed key. Uploads have been sanitized
+ * since (see safeUsername in uploadFile), so this only rescues old refs.
+ */
+function normalizeKey(key: string): string {
+  return key.replace(/::ffff:/g, "");
+}
+
 interface MinioStatResult {
   metaData?: Record<string, string>;
   size?: number;
@@ -123,6 +136,8 @@ const FileService: FileServiceInterface = {
   ): Promise<{ stream: Readable; contentType: string } | null> {
     if (!MinioWrapper.isAvailable()) return null;
 
+    const normalizedKey = normalizeKey(key);
+
     // Helper to fetch stat + stream for a given key
     const tryKey = async (k: string) => {
       const stat = (await MinioWrapper.stat(k)) as
@@ -138,9 +153,9 @@ const FileService: FileServiceInterface = {
     };
 
     try {
-      return await tryKey(key);
+      return await tryKey(normalizedKey);
     } catch {
-      logger.error(`FileService: failed to get ${key}`);
+      logger.error(`FileService: failed to get ${normalizedKey}`);
       return null;
     }
   },
@@ -148,7 +163,7 @@ const FileService: FileServiceInterface = {
     return typeof ref === "string" && ref.startsWith("minio://");
   },
   extractKey(ref: string): string {
-    return ref.replace("minio://", "");
+    return normalizeKey(ref.replace("minio://", ""));
   },
 };
 

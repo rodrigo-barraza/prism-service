@@ -1,6 +1,44 @@
 import type { ChatMessage } from "#src/types/admin";
 import type { ToolCallPayload } from "./types.ts";
 
+const MEDIA_REFERENCE_FIELDS = ["images", "audio", "video", "pdf"] as const;
+
+/**
+ * Scrub the historical IPv4-mapped-IPv6 artifact from a persisted minio://
+ * ref. Refs written before client-IP normalization can contain "::ffff:" in
+ * the username path segment while the object was stored under the scrubbed
+ * key (see normalizeKey in FileService.ts). Cleaning here hands the frontend
+ * a directly renderable ref without client-side repair.
+ */
+function cleanMediaReference(reference: unknown): unknown {
+  return typeof reference === "string" &&
+    reference.startsWith("minio://") &&
+    reference.includes("::ffff:")
+    ? reference.replace(/::ffff:/g, "")
+    : reference;
+}
+
+/**
+ * Return the message with malformed minio:// media refs cleaned, or the same
+ * object untouched when nothing needs cleaning.
+ */
+function cleanMessageMediaReferences(message: ChatMessage): ChatMessage {
+  let cleaned: Record<string, unknown> | null = null;
+  for (const field of MEDIA_REFERENCE_FIELDS) {
+    const value = (message as Record<string, unknown>)[field];
+    if (Array.isArray(value)) {
+      if (value.some((reference) => cleanMediaReference(reference) !== reference)) {
+        cleaned = cleaned || { ...message };
+        cleaned[field] = value.map(cleanMediaReference);
+      }
+    } else if (typeof value === "string" && cleanMediaReference(value) !== value) {
+      cleaned = cleaned || { ...message };
+      cleaned[field] = cleanMediaReference(value);
+    }
+  }
+  return (cleaned as ChatMessage | null) || message;
+}
+
 /**
  * Server-side display message serializer.
  *
@@ -165,5 +203,6 @@ export function prepareDisplayMessages(
     }
   }
 
-  return displayMessages;
+  // Pass 3: hand the frontend clean, renderable media refs
+  return displayMessages.map(cleanMessageMediaReferences);
 }

@@ -327,4 +327,59 @@ describe("prepareDisplayMessages", () => {
     // Result should be null since the id didn't match
     expect(result[0].toolCalls?.[0].result).toBeNull();
   });
+
+  describe("media reference cleaning (historical ::ffff: keys)", () => {
+    it("scrubs ::ffff: from minio:// refs in media arrays", () => {
+      const messages: ChatMessage[] = [
+        {
+          role: "user",
+          content: "look at this",
+          images: [
+            "minio://projects/prism/::ffff:192.168.1.5/uploads/a.png",
+            "minio://projects/prism/rodrigo/uploads/b.png",
+          ],
+        },
+      ];
+      const result = prepareDisplayMessages(messages);
+      expect(result[0].images).toEqual([
+        "minio://projects/prism/192.168.1.5/uploads/a.png",
+        "minio://projects/prism/rodrigo/uploads/b.png",
+      ]);
+    });
+
+    it("scrubs a string-valued audio ref", () => {
+      const messages: ChatMessage[] = [
+        {
+          role: "assistant",
+          content: "here you go",
+          audio:
+            "minio://projects/prism/::ffff:10.0.0.2/generations/a.wav" as unknown as string[],
+        },
+      ];
+      const result = prepareDisplayMessages(messages);
+      expect(result[0].audio).toBe(
+        "minio://projects/prism/10.0.0.2/generations/a.wav",
+      );
+    });
+
+    it("leaves non-minio refs and clean messages untouched (same object)", () => {
+      const messages: ChatMessage[] = [
+        {
+          role: "user",
+          content: "data url stays",
+          images: ["data:image/png;base64,abc", "minio://uploads/clean.png"],
+        },
+      ];
+      const result = prepareDisplayMessages(messages);
+      // No cleaning needed — the exact same object must be passed through
+      expect(result[0]).toBe(messages[0]);
+      // A data: URL containing the artifact is NOT a minio ref — untouched
+      const weird: ChatMessage[] = [
+        { role: "user", content: "x", images: ["data:text/plain;base64,::ffff:"] },
+      ];
+      expect(prepareDisplayMessages(weird)[0].images?.[0]).toBe(
+        "data:text/plain;base64,::ffff:",
+      );
+    });
+  });
 });
