@@ -628,7 +628,7 @@ export async function runGraphOfThoughts(
           context,
         );
 
-        harness.checkAndApplyToolSetChanges(currentMessages);
+        harness.checkAndApplyToolSetChanges(currentMessages, synthesizedPass.usage);
 
         continue;
       }

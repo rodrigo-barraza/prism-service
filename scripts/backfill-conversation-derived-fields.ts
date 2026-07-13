@@ -42,6 +42,38 @@ interface BackfillStatistics {
   errors: number;
 }
 
+/**
+ * Sum a conversation's own estimatedCost from the requests collection.
+ * Persisted messages are telemetry-free (post-1d751ae), so message-derived
+ * cost is only a fallback for legacy documents — the requests collection is
+ * the source of truth. Mirrors aggregateConversationTotalsFromRequests in
+ * src/services/conversation/utils.ts (which needs the service runtime's
+ * MongoWrapper and can't be imported here).
+ */
+async function sumRequestCosts(
+  database: Db,
+  conversationId: string,
+  agentCorrelationId: string | null,
+): Promise<number> {
+  const matchCondition = {
+    $or: [
+      { conversationId },
+      { agentConversationId: conversationId },
+      ...(agentCorrelationId && agentCorrelationId !== conversationId
+        ? [{ agentConversationId: agentCorrelationId }]
+        : []),
+    ],
+  };
+  const results = await database
+    .collection("requests")
+    .aggregate([
+      { $match: matchCondition },
+      { $group: { _id: null, totalCost: { $sum: { $ifNull: ["$estimatedCost", 0] } } } },
+    ])
+    .toArray();
+  return results[0]?.totalCost || 0;
+}
+
 async function backfillCollection(
   database: Db,
   collectionName: string,
@@ -78,7 +110,16 @@ async function backfillCollection(
       const settings = document.settings || null;
 
       const modalities = computeModalities(messages);
-      const totalCost = computeTotalCost(messages);
+      // Requests collection is the source of truth; message-derived cost is
+      // a legacy fallback (post-1d751ae messages carry no telemetry).
+      const totalCost = Math.max(
+        await sumRequestCosts(
+          database,
+          document.id,
+          (document.agentConversationId as string | undefined) || null,
+        ),
+        computeTotalCost(messages),
+      );
       const providers = extractProviders(messages, settings);
 
       bulkOperations.push({

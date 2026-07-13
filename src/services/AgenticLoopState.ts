@@ -72,6 +72,12 @@ export default class AgenticLoopState {
   // ── Error budget tracking ───────────────────────────────
   toolErrorCounts: Map<string, number>;
 
+  // ── Pending request-log writes ──────────────────────────
+  // logIteration's per-iteration request-log writes are fire-and-forget;
+  // finalize() awaits them (allSettled) before conversation persistence so
+  // the requests-collection rollup sees every iteration of this turn.
+  pendingRequestLogWrites: Promise<unknown>[];
+
   // ── Conversation outcome ───────────────────────────
   // Set by harnesses before finalization to indicate how the
   // conversation ended. Used by afterResponse hooks (e.g. AWM) to
@@ -144,6 +150,7 @@ export default class AgenticLoopState {
     this.postCompactTokenCount = null;
 
     this.toolErrorCounts = new Map();
+    this.pendingRequestLogWrites = [];
     this.conversationOutcome = "completed";
 
     this.branchesExplored = 0;

@@ -88,6 +88,9 @@ export interface TransformedConversation {
   totalCost: number;
   inputTokens: number;
   outputTokens: number;
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
+  reasoningOutputTokens?: number;
   toolCounts: Record<string, number>;
   modelNames: string[];
   isGenerating: boolean;

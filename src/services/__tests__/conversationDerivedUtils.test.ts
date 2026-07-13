@@ -442,7 +442,7 @@ describe("buildConversationPatchFields", () => {
     expect(fields.updatedAt).toBeDefined();
   });
 
-  it("should recompute modalities, providers, and totalCost when messages are provided", () => {
+  it("should recompute modalities and providers — but never cost/token rollups — when messages are provided", () => {
     const fields = buildConversationPatchFields({
       messages: [
         { role: "user", content: "Hello" },
@@ -460,7 +460,11 @@ describe("buildConversationPatchFields", () => {
     expect(fields.modalities!.textIn).toBe(true);
     expect(fields.modalities!.textOut).toBe(true);
     expect(fields.providers).toContain(PROVIDERS.OPENAI);
-    expect(fields.totalCost).toBeCloseTo(0.001);
+    // Cost/token rollups come from the requests collection; a PATCH that
+    // replaces messages must not zero or "refund" recorded spend.
+    expect(fields).not.toHaveProperty("totalCost");
+    expect(fields).not.toHaveProperty("inputTokens");
+    expect(fields).not.toHaveProperty("outputTokens");
   });
 
   it("should include systemPrompt when provided", () => {

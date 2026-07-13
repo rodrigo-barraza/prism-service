@@ -15,6 +15,11 @@ import {
 import ConversationGenerationTracker from "./ConversationGenerationTracker.ts";
 import ConversationStatusRegistry from "./ConversationStatusRegistry.ts";
 import ToolContext from "./ToolContext.ts";
+import { runPreflightToolDiscovery } from "./harnesses/lifecycle/PreflightToolDiscovery.ts";
+import {
+  SERVER_SENT_EVENT_TYPES,
+  STATUS_MESSAGES,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import logger from "#src/utils/logger";
 
 import type { AgenticContext, ConversationMessage } from "./harnesses/types.ts";
@@ -55,7 +60,7 @@ export default class AgenticLoopService {
     await ToolContext.ensureLoaded(resolvedAgentConversationId);
 
     // 1. Resolve tools (passing agentConversationId so dynamicEnabledTools is merged)
-    const resolvedTools = await AgenticToolResolver.resolve({
+    let resolvedTools = await AgenticToolResolver.resolve({
       options,
       agent: agent || undefined,
       project,
@@ -77,6 +82,39 @@ export default class AgenticLoopService {
         "dynamicEnabledTools",
         initialNames,
       );
+    }
+
+    // 1.5. Pre-flight tool discovery: search the catalog against the user's
+    // message and pre-enable the top matches BEFORE the first provider call,
+    // so the tool set stays stable across the loop (prompt-cache friendly)
+    // and the model skips the discover_and_enable_tools round-trip in the
+    // common case. Runs AFTER the seeding block above so the merge preserves
+    // the full resolved base set (dynamicEnabledTools now holds it).
+    // Fail-open — any error and the loop proceeds with the original tools.
+    const preflight = await runPreflightToolDiscovery({
+      context,
+      resolvedTools,
+    });
+    if (preflight.enabledTools.length > 0) {
+      // Re-resolve so the enlarged dynamic set flows through the exact same
+      // filter pipeline (blocked/disabled/native-collision/sub-agent rules).
+      resolvedTools = await AgenticToolResolver.resolve({
+        options,
+        agent: agent || undefined,
+        project,
+        username,
+        modelDefinition: modelDefinition || undefined,
+        agentConversationId: resolvedAgentConversationId,
+        providerName: context.providerName,
+        resolvedModel: context.resolvedModel,
+      });
+      context.emit({
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.TOOL_SET_CHANGED,
+        enabledCount: resolvedTools.finalTools.length,
+        dynamicTools: preflight.enabledTools,
+        preflight: true,
+      });
     }
 
     // If this is a top-level agent request with an existing conversation,

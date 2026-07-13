@@ -749,6 +749,27 @@ export const TOOLS = {
    * blindly enabling every search result.
    */
   MAX_DYNAMIC_TOOLS_PER_ACTIVATION: 10,
+
+  /**
+   * Maximum tools auto-enabled by pre-flight discovery (the BM25 search run
+   * against the user's message before iteration 1). Deliberately below
+   * MAX_DYNAMIC_TOOLS_PER_ACTIVATION — prose queries are noisier than
+   * model-authored ones — and each pre-enabled tool costs prompt tokens.
+   */
+  MAX_PREFLIGHT_TOOLS: 5,
+
+  /**
+   * Soft cap on the persisted dynamic tool set. Pre-flight discovery skips
+   * when the conversation has already accumulated this many dynamic tools —
+   * the marginal match is unlikely to be worth further prompt growth.
+   */
+  MAX_PREFLIGHT_DYNAMIC_TOOL_TOTAL: 30,
+
+  /** Pre-flight search query is truncated to this many characters. */
+  MAX_PREFLIGHT_QUERY_CHARACTERS: 500,
+
+  /** Hard latency bound on the pre-flight search call (milliseconds). */
+  PREFLIGHT_SEARCH_TIMEOUT_MILLISECONDS: 1500,
 } as const;
 
 // ─── Benchmark Constants ────────────────────────────────────

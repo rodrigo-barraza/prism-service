@@ -248,6 +248,53 @@ export function convertToolsToGoogle(
   ];
 }
 
+/** Loose view of Google usage metadata across the standard and live APIs. */
+interface GoogleUsageMetadata {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+  responseTokenCount?: number;
+  cachedContentTokenCount?: number;
+  thoughtsTokenCount?: number;
+}
+
+/**
+ * Normalize Google usageMetadata into the internal TokenUsage convention:
+ * - `inputTokens` is the UNCACHED remainder. Google's promptTokenCount is
+ *   cache-INCLUSIVE (unlike Anthropic/OpenAI-normalized usage), so cached
+ *   tokens must be subtracted or CostCalculator bills them twice (full
+ *   input rate + cached rate) and getTotalInputTokens double-counts them.
+ * - `outputTokens` is the billable total including thinking: Gemini reports
+ *   thoughtsTokenCount separately from candidatesTokenCount but bills both
+ *   at the output rate (OpenAI's completion_tokens already includes
+ *   reasoning, so this matches the internal convention).
+ * - `reasoningOutputTokens` is the informational thinking subset.
+ *
+ * `outputField` selects the output counter: the live API reports
+ * `responseTokenCount` instead of `candidatesTokenCount`.
+ */
+function normalizeGoogleUsage(
+  usageMetadata: GoogleUsageMetadata | null | undefined,
+  { outputField = "candidatesTokenCount" }: {
+    outputField?: "candidatesTokenCount" | "responseTokenCount";
+  } = {},
+): {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens?: number;
+  reasoningOutputTokens?: number;
+} {
+  const promptTokens = usageMetadata?.promptTokenCount ?? 0;
+  const cachedTokens = usageMetadata?.cachedContentTokenCount ?? 0;
+  const thoughtTokens = usageMetadata?.thoughtsTokenCount ?? 0;
+  const outputTokens = usageMetadata?.[outputField] ?? 0;
+  return {
+    inputTokens: Math.max(0, promptTokens - cachedTokens),
+    outputTokens: outputTokens + thoughtTokens,
+    ...(cachedTokens > 0 ? { cacheReadInputTokens: cachedTokens } : {}),
+    ...(thoughtTokens > 0 ? { reasoningOutputTokens: thoughtTokens } : {}),
+  };
+}
+
 /**
  * Build a GoogleGenerateConfig from ProviderOptions.
  * Centralizes the repeated config-building pattern across generateText,
@@ -521,16 +568,7 @@ const googleProvider = {
 
       const result: GenerateTextResult = {
         text: textParts.join("") || response.text || "",
-        usage: {
-          inputTokens: response.usageMetadata?.promptTokenCount ?? 0,
-          outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
-          ...(response.usageMetadata?.cachedContentTokenCount
-            ? {
-                cacheReadInputTokens:
-                  response.usageMetadata.cachedContentTokenCount,
-              }
-            : {}),
-        },
+        usage: normalizeGoogleUsage(response.usageMetadata),
       };
       if (toolCalls.length > 0) result.toolCalls = toolCalls;
       if (images.length > 0) result.images = images;
@@ -647,16 +685,7 @@ const googleProvider = {
           yield chunk.text;
         }
         if (chunk.usageMetadata) {
-          usage = {
-            inputTokens: chunk.usageMetadata.promptTokenCount ?? 0,
-            outputTokens: chunk.usageMetadata.candidatesTokenCount ?? 0,
-            ...(chunk.usageMetadata.cachedContentTokenCount
-              ? {
-                  cacheReadInputTokens:
-                    chunk.usageMetadata.cachedContentTokenCount,
-                }
-              : {}),
-          };
+          usage = normalizeGoogleUsage(chunk.usageMetadata);
         }
       }
       // Surface max_tokens truncation so harnesses can detect and warn the user
@@ -866,18 +895,9 @@ const googleProvider = {
               if (user.promptTokenCount || user.responseTokenCount) {
                 enqueue({
                   type: "usage",
-                  usage: {
-                    inputTokens: user.promptTokenCount ?? 0,
-                    outputTokens: user.responseTokenCount ?? 0,
-                    ...((user as Record<string, unknown>)
-                      .cachedContentTokenCount
-                      ? {
-                          cacheReadInputTokens: (
-                            user as Record<string, unknown>
-                          ).cachedContentTokenCount as number,
-                        }
-                      : {}),
-                  },
+                  usage: normalizeGoogleUsage(user as GoogleUsageMetadata, {
+                    outputField: "responseTokenCount",
+                  }),
                 });
               }
             }
@@ -1061,16 +1081,7 @@ const googleProvider = {
         contents,
         config: Object.keys(config).length > 0 ? config : undefined,
       });
-      const usage = {
-        inputTokens: response.usageMetadata?.promptTokenCount || 0,
-        outputTokens: response.usageMetadata?.candidatesTokenCount || 0,
-        ...(response.usageMetadata?.cachedContentTokenCount
-          ? {
-              cacheReadInputTokens:
-                response.usageMetadata.cachedContentTokenCount,
-            }
-          : {}),
-      };
+      const usage = normalizeGoogleUsage(response.usageMetadata);
       return { text: response.text, usage };
     } catch (error: unknown) {
       throw new ProviderError("google", getErrorMessage(error), 500, error as Error);
@@ -1243,16 +1254,7 @@ const googleProvider = {
 
       return {
         text: response.text || "",
-        usage: {
-          inputTokens: response.usageMetadata?.promptTokenCount ?? 0,
-          outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
-          ...(response.usageMetadata?.cachedContentTokenCount
-            ? {
-                cacheReadInputTokens:
-                  response.usageMetadata.cachedContentTokenCount,
-              }
-            : {}),
-        },
+        usage: normalizeGoogleUsage(response.usageMetadata),
       };
     } catch (error: unknown) {
       throw new ProviderError("google", getErrorMessage(error), 500, error as Error);

@@ -1,8 +1,14 @@
 import FileService from "#src/services/FileService";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import { MONGO_DB_NAME } from "#config";
 import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
-import { FILE_CATEGORIES } from "#src/constants";
+import {
+  COLLECTIONS,
+  COST_SUMMATION_EXPRESSION,
+  FILE_CATEGORIES,
+} from "#src/constants";
 import type { ChatMessage } from "#src/types/admin";
 import type {
   MessagePayload,
@@ -321,6 +327,110 @@ export function computeToolCounts(messages: ChatMessage[]): Record<string, numbe
   return counts;
 }
 
+/** Write-side rollup totals aggregated from the requests collection. */
+export interface ConversationRequestTotals {
+  totalCost: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+  reasoningOutputTokens: number;
+  modelNames: string[];
+  providers: string[];
+}
+
+/**
+ * Aggregate a conversation's own usage totals from the `requests` collection
+ * (the write-side source of truth for cost/tokens — persisted messages are
+ * telemetry-free by design, see messageTelemetrySeparation.test.ts).
+ *
+ * Match semantics mirror the read-side enrichment (ConversationsRoutes):
+ * request rows carry `conversationId` (the doc id) and/or an
+ * `agentConversationId` — which is sometimes the doc id itself and sometimes
+ * a separate per-loop correlation ID recorded on the doc's own
+ * `agentConversationId` field. The $or covers all three keying shapes.
+ * Child conversations (`parentAgentConversationId`) are NOT folded in; the
+ * stored rollup means "this conversation's own spend" and the read-side
+ * child rollup keeps adding descendants for display.
+ *
+ * Returns null when no matching requests exist (callers fall back to
+ * message-derived stats for legacy/imported conversations).
+ */
+export async function aggregateConversationTotalsFromRequests(
+  conversationId: string,
+  collection: string,
+  {
+    agentCorrelationId = null,
+  }: { agentCorrelationId?: string | null } = {},
+): Promise<ConversationRequestTotals | null> {
+  const requestsCollection = MongoWrapper.getCollection(
+    MONGO_DB_NAME,
+    COLLECTIONS.REQUESTS,
+  );
+  void collection; // same match for both conversation collections
+
+  const matchCondition = {
+    $or: [
+      { conversationId },
+      { agentConversationId: conversationId },
+      ...(agentCorrelationId && agentCorrelationId !== conversationId
+        ? [{ agentConversationId: agentCorrelationId }]
+        : []),
+    ],
+  };
+
+  const results = await requestsCollection
+    .aggregate<{
+      totalCost: number;
+      inputTokens: number;
+      outputTokens: number;
+      cacheReadInputTokens: number;
+      cacheCreationInputTokens: number;
+      reasoningOutputTokens: number;
+      modelNames: Array<string | null>;
+      providers: Array<string | null>;
+    }>([
+      { $match: matchCondition },
+      {
+        $group: {
+          _id: null,
+          totalCost: COST_SUMMATION_EXPRESSION,
+          inputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
+          outputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
+          cacheReadInputTokens: {
+            $sum: { $ifNull: ["$cacheReadInputTokens", 0] },
+          },
+          cacheCreationInputTokens: {
+            $sum: { $ifNull: ["$cacheCreationInputTokens", 0] },
+          },
+          reasoningOutputTokens: {
+            $sum: { $ifNull: ["$reasoningOutputTokens", 0] },
+          },
+          modelNames: { $addToSet: "$model" },
+          providers: { $addToSet: "$provider" },
+        },
+      },
+    ])
+    .toArray();
+
+  if (results.length === 0) return null;
+  const totals = results[0];
+  return {
+    totalCost: totals.totalCost || 0,
+    inputTokens: totals.inputTokens || 0,
+    outputTokens: totals.outputTokens || 0,
+    cacheReadInputTokens: totals.cacheReadInputTokens || 0,
+    cacheCreationInputTokens: totals.cacheCreationInputTokens || 0,
+    reasoningOutputTokens: totals.reasoningOutputTokens || 0,
+    modelNames: (totals.modelNames || []).filter(
+      (name): name is string => typeof name === "string" && name.length > 0,
+    ),
+    providers: (totals.providers || []).filter(
+      (name): name is string => typeof name === "string" && name.length > 0,
+    ),
+  };
+}
+
 /**
  * Build the $set fields for a conversation/agent-session PATCH request.
  * Centralises the identical logic shared by conversations.js and agent-sessions.js.
@@ -339,11 +449,10 @@ export function buildConversationPatchFields({
     setFields.messages = messages;
     setFields.modalities = computeModalities(messages);
     setFields.providers = extractProviders(messages, settings || null);
-    setFields.totalCost = computeTotalCost(messages);
-
-    const tokenStats = computeTokenStats(messages);
-    setFields.inputTokens = tokenStats.input;
-    setFields.outputTokens = tokenStats.output;
+    // Deliberately NOT recomputing totalCost/inputTokens/outputTokens here:
+    // persisted messages are telemetry-free, so message-derived totals are
+    // always 0 — a PATCH that replaces messages must not zero (or "refund")
+    // spend already recorded in the requests collection.
     setFields.toolCounts = computeToolCounts(messages);
 
     const modelNamesSet = new Set<string>();
