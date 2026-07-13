@@ -11,6 +11,7 @@ import {
   parsePaginationParams,
 } from "#src/utils/QueryBuilders";
 import requireDb from "#src/middleware/RequireDbMiddleware";
+import { reconstructRequestDisplayMessages } from "#src/services/ConversationService";
 
 const router = express.Router();
 const {
@@ -137,7 +138,21 @@ router.get(
       if (!document)
         return res.status(404).json({ error: "Request not found" });
 
-      res.json(document);
+      // Serve a display-ready chat preview so the frontend doesn't have to
+      // re-implement provider tool-call normalization (audit M2).
+      const reconstruction = reconstructRequestDisplayMessages(
+        document as Parameters<typeof reconstructRequestDisplayMessages>[0],
+      );
+
+      res.json({
+        ...document,
+        ...(reconstruction
+          ? {
+              displayMessages: reconstruction.displayMessages,
+              displaySystemPrompt: reconstruction.systemPrompt,
+            }
+          : {}),
+      });
     } catch (error: unknown) {
       logger.error(`Admin /requests/:id error: ${getErrorMessage(error)}`);
       next(error);

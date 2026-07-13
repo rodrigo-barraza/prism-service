@@ -17,7 +17,11 @@ import {
   CONVERSATION_LIST_BASE_PROJECTION,
 } from "#src/utils/QueryBuilders";
 import requireDb from "#src/middleware/RequireDbMiddleware";
-import { deriveAgentConversationState } from "#src/services/ConversationService";
+import {
+  deriveAgentConversationState,
+  prepareDisplayMessages,
+} from "#src/services/ConversationService";
+import type { ChatMessage } from "#src/types/admin";
 import { StatsCache } from "#src/caches/StatsCache";
 import {
   MILLISECONDS_PER_MINUTE,
@@ -596,6 +600,9 @@ router.get(
               typeof deriveAgentConversationState
             >[0],
           ),
+          displayMessages: prepareDisplayMessages(
+            (conversationDocument.messages as ChatMessage[]) || [],
+          ),
         });
       }
 
@@ -618,6 +625,9 @@ router.get(
             conversationDocument as Parameters<
               typeof deriveAgentConversationState
             >[0],
+          ),
+          displayMessages: prepareDisplayMessages(
+            (conversationDocument.messages as ChatMessage[]) || [],
           ),
         });
       }
