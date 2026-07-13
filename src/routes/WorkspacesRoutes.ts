@@ -65,6 +65,7 @@ interface WorkspaceAgent {
   id: string;
   name: string;
   roots?: string[];
+  displayRoots?: string[];
   [key: string]: unknown;
 }
 
@@ -92,8 +93,6 @@ router.get(
       // Refresh from tools-api to pick up agent-registered roots
       await ToolOrchestratorService.refreshWorkspaceRoots();
 
-      const workspaceRoots =
-        ToolOrchestratorService.getWorkspaceRoots() as string[];
       const staticWorkspaceRoots =
         ToolOrchestratorService.getStaticRoots() as string[];
 
@@ -116,47 +115,57 @@ router.get(
         );
       }
 
-      const rootToAgentMap = new Map<string, WorkspaceAgent>();
+      // Build workspace entries from each agent's displayRoots so that
+      // multiple agents sharing the same raw root (e.g. both "/") each
+      // contribute distinct workspace entries to the selector.
+      const agentServedWorkspaces: MappedWorkspace[] = [];
       for (const agent of connectedAgents) {
-        for (const root of agent.roots || []) {
-          rootToAgentMap.set(root, agent);
+        const displayPaths =
+          agent.displayRoots && agent.displayRoots.length > 0
+            ? agent.displayRoots
+            : agent.roots || [];
+        const machineInfo =
+          (agent as WorkspaceAgent & { machineInfo?: Record<string, unknown> })
+            ?.machineInfo || null;
+        for (const displayPath of displayPaths) {
+          agentServedWorkspaces.push({
+            id: `${agent.id}:${displayPath}`,
+            name: displayPath === "/" ? "/" : basename(displayPath),
+            path: displayPath,
+            isPinned: false,
+            isAgentServed: true,
+            agentId: agent.id || null,
+            agentName: agent.name || null,
+            hostname:
+              ((machineInfo as Record<string, unknown>)?.hostname as string) || null,
+            platform:
+              ((machineInfo as Record<string, unknown>)?.platform as string) || null,
+            arch: ((machineInfo as Record<string, unknown>)?.arch as string) || null,
+            clientIp:
+              (agent as WorkspaceAgent & { clientIp?: string })?.clientIp || null,
+          });
         }
       }
 
-      const mappedWorkspaces = workspaceRoots.map((rootPath: string) => {
-        const servingAgent = rootToAgentMap.get(rootPath) || null;
-        const machineInfo =
-          (
-            servingAgent as WorkspaceAgent & {
-              machineInfo?: Record<string, unknown>;
-            }
-          )?.machineInfo || null;
-        return {
+      // Include pinned static roots that are not already covered by agents
+      const agentCoveredPaths = new Set(agentServedWorkspaces.map((workspace) => workspace.path));
+      const pinnedWorkspaces: MappedWorkspace[] = staticWorkspaceRoots
+        .filter((rootPath) => !agentCoveredPaths.has(rootPath))
+        .map((rootPath) => ({
           id: rootPath,
           name: basename(rootPath),
           path: rootPath,
-          isPinned: staticWorkspaceRoots.includes(rootPath),
-          isAgentServed: !!servingAgent,
-          agentId: servingAgent?.id || null,
-          agentName: servingAgent?.name || null,
-          hostname:
-            ((machineInfo as Record<string, unknown>)?.hostname as string) || null,
-          platform:
-            ((machineInfo as Record<string, unknown>)?.platform as string) || null,
-          arch: ((machineInfo as Record<string, unknown>)?.arch as string) || null,
-          clientIp:
-            (servingAgent as WorkspaceAgent & { clientIp?: string })
-              ?.clientIp || null,
-        };
-      });
+          isPinned: true,
+          isAgentServed: false,
+          agentId: null,
+          agentName: null,
+          hostname: null,
+          platform: null,
+          arch: null,
+          clientIp: null,
+        }));
 
-      // Exclude orphaned user-configured roots with no connected agent.
-      // Static (pinned) roots are always accessible via tools-service's local
-      // filesystem; agent-served roots are accessible through the WebSocket
-      // agent. Everything else is inaccessible and should not appear.
-      const accessibleWorkspaces = mappedWorkspaces.filter(
-        (workspace) => workspace.isPinned || workspace.isAgentServed,
-      );
+      const accessibleWorkspaces = [...agentServedWorkspaces, ...pinnedWorkspaces];
 
       disambiguateWorkspaceNames(accessibleWorkspaces);
 
@@ -181,7 +190,6 @@ router.get(
       // Refresh from tools-api to pick up agent-registered roots
       await ToolOrchestratorService.refreshWorkspaceRoots();
 
-      const roots = ToolOrchestratorService.getWorkspaceRoots() as string[];
       const staticRoots = ToolOrchestratorService.getStaticRoots() as string[];
 
       // Fetch full config from tools-api to get agent metadata
@@ -203,44 +211,55 @@ router.get(
         );
       }
 
-      const rootToAgentMap = new Map<string, WorkspaceAgent>();
+      // Build workspace entries from each agent's displayRoots (same
+      // approach as GET /workspaces) so multi-agent setups are visible.
+      const agentServedWorkspaces: MappedWorkspace[] = [];
       for (const agent of agents) {
-        for (const root of agent.roots || []) {
-          rootToAgentMap.set(root, agent);
+        const displayPaths =
+          agent.displayRoots && agent.displayRoots.length > 0
+            ? agent.displayRoots
+            : agent.roots || [];
+        const machineInfo =
+          (agent as WorkspaceAgent & { machineInfo?: Record<string, unknown> })
+            ?.machineInfo || null;
+        for (const displayPath of displayPaths) {
+          agentServedWorkspaces.push({
+            id: `${agent.id}:${displayPath}`,
+            name: displayPath === "/" ? "/" : basename(displayPath),
+            path: displayPath,
+            isPinned: false,
+            isAgentServed: true,
+            agentId: agent.id || null,
+            agentName: agent.name || null,
+            hostname:
+              ((machineInfo as Record<string, unknown>)?.hostname as string) || null,
+            platform:
+              ((machineInfo as Record<string, unknown>)?.platform as string) || null,
+            arch: ((machineInfo as Record<string, unknown>)?.arch as string) || null,
+            clientIp:
+              (agent as WorkspaceAgent & { clientIp?: string })?.clientIp || null,
+          });
         }
       }
 
-      const workspaces: MappedWorkspace[] = roots.map((rootPath: string) => {
-        const servingAgent = rootToAgentMap.get(rootPath) || null;
-        const machineInfo =
-          (
-            servingAgent as WorkspaceAgent & {
-              machineInfo?: Record<string, unknown>;
-            }
-          )?.machineInfo || null;
-        return {
+      const agentCoveredPaths = new Set(agentServedWorkspaces.map((workspace) => workspace.path));
+      const pinnedWorkspaces: MappedWorkspace[] = staticRoots
+        .filter((rootPath) => !agentCoveredPaths.has(rootPath))
+        .map((rootPath) => ({
           id: rootPath,
           name: basename(rootPath),
           path: rootPath,
-          isPinned: staticRoots.includes(rootPath),
-          isAgentServed: !!servingAgent,
-          agentId: servingAgent?.id || null,
-          agentName: servingAgent?.name || null,
-          hostname:
-            ((machineInfo as Record<string, unknown>)?.hostname as string) || null,
-          platform:
-            ((machineInfo as Record<string, unknown>)?.platform as string) || null,
-          arch: ((machineInfo as Record<string, unknown>)?.arch as string) || null,
-          clientIp:
-            (servingAgent as WorkspaceAgent & { clientIp?: string })
-              ?.clientIp || null,
-        };
-      });
+          isPinned: true,
+          isAgentServed: false,
+          agentId: null,
+          agentName: null,
+          hostname: null,
+          platform: null,
+          arch: null,
+          clientIp: null,
+        }));
 
-      // Exclude orphaned user-configured roots with no connected agent
-      const accessibleWorkspaces = workspaces.filter(
-        (workspace) => workspace.isPinned || workspace.isAgentServed,
-      );
+      const accessibleWorkspaces = [...agentServedWorkspaces, ...pinnedWorkspaces];
 
       disambiguateWorkspaceNames(accessibleWorkspaces);
 
