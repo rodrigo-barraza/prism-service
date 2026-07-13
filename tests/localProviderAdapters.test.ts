@@ -117,7 +117,9 @@ describe('Local Provider Adapters (Ollama, vLLM, Llama-cpp)', () => {
       expect(chunks[1]).toBe('Hello');
       expect(chunks[2]).toEqual({
         type: 'usage',
-        usage: { inputTokens: 30, outputTokens: 15 }
+        // tokensPerSec is preserved since the cache-token passthrough fix
+        // (usage fields spread through instead of being rebuilt).
+        usage: { inputTokens: 30, outputTokens: 15, tokensPerSec: 15 }
       });
       
       // Verify unloading call was made

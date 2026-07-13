@@ -634,6 +634,12 @@ export default class BaseAgenticHarness {
     const providerOptions = {
       ...clampedPassOptions,
       signal,
+      // Stable per-conversation prompt-cache key (used by OpenAI as
+      // prompt_cache_key for cache-shard routing; ignored elsewhere).
+      promptCacheKey:
+        this.context.agentConversationId ||
+        (this.context.conversationId as string | undefined) ||
+        undefined,
     };
 
     for (const optionKey of [

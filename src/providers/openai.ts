@@ -771,6 +771,13 @@ const openaiProvider = {
       stop?: string[];
     } = { model, input };
 
+    // Stable per-conversation cache key improves OpenAI's automatic
+    // prompt-cache hit-rate routing (caching itself is automatic ≥1024 tokens).
+    if (options.promptCacheKey) {
+      (payload as unknown as Record<string, unknown>).prompt_cache_key =
+        options.promptCacheKey;
+    }
+
     // Reasoning
     const reasoning: Reasoning = {};
     if (options.reasoningEffort) {
@@ -1137,6 +1144,13 @@ const openaiProvider = {
       stop?: string[];
     } = { model, input, stream: true };
 
+    // Stable per-conversation cache key improves OpenAI's automatic
+    // prompt-cache hit-rate routing (caching itself is automatic ≥1024 tokens).
+    if (options.promptCacheKey) {
+      (payload as unknown as Record<string, unknown>).prompt_cache_key =
+        options.promptCacheKey;
+    }
+
     // Reasoning
     const reasoning: Reasoning = {};
     if (options.reasoningEffort) {
@@ -1452,6 +1466,12 @@ const openaiProvider = {
       stream: true,
       stream_options: { include_usage: true },
     };
+    // Stable per-conversation cache key improves OpenAI's automatic
+    // prompt-cache hit-rate routing (caching itself is automatic ≥1024 tokens).
+    if (options.promptCacheKey) {
+      (payload as unknown as Record<string, unknown>).prompt_cache_key =
+        options.promptCacheKey;
+    }
     if (isReasoning) {
       if (options.maxTokens) payload.max_completion_tokens = options.maxTokens;
       if (options.reasoningEffort) {
