@@ -16,6 +16,8 @@ import {
   setGraphInCache,
 } from "#src/services/conversation/ConversationGraphCache";
 import requireDb from "#src/middleware/RequireDbMiddleware";
+import { prepareDisplayMessages } from "#src/services/ConversationService";
+import type { ChatMessage } from "#src/types/admin";
 
 const conversationStatsRouter = express.Router();
 const agentConversationRouter = express.Router();
@@ -469,7 +471,12 @@ agentConversationRouter.get(
       if (!document)
         return res.status(404).json({ error: "Agent conversation not found" });
 
-      res.json(document);
+      res.json({
+        ...document,
+        displayMessages: prepareDisplayMessages(
+          (document.messages as ChatMessage[]) || [],
+        ),
+      });
     } catch (error: unknown) {
       logger.error(
         `Admin /agent-conversations/:id error: ${getErrorMessage(error)}`,
