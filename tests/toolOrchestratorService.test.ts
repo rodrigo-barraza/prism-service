@@ -1746,15 +1746,13 @@ describe("ToolOrchestratorService", () => {
       vi.mocked(global.fetch).mockResolvedValue({
         ok: true,
         json: async () => ({
-          workspaceRoots: ["/new-root"],
-          staticRoots: ["/new-static"]
+          workspaceRoots: ["/new-root"]
         })
       } as any);
 
       await ToolOrchestratorService.refreshWorkspaceRoots();
 
       expect(ToolOrchestratorService.getEffectiveWorkspaceRoot(null)).toBe("/new-root");
-      expect(ToolOrchestratorService.getStaticRoots()).toEqual(["/new-static"]);
     });
 
     it("updateWorkspaceRoots sends PUT and updates cache", async () => {
@@ -1766,8 +1764,7 @@ describe("ToolOrchestratorService", () => {
         return {
           ok: true,
           json: async () => ({
-            workspaceRoots: ["/updated-root"],
-            staticRoots: ["/updated-static"]
+            workspaceRoots: ["/updated-root"]
           })
         } as any;
       });

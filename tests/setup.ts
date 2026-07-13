@@ -51,8 +51,7 @@ global.fetch = vi.fn().mockImplementation(async (url, init) => {
             status: 200,
             statusText: 'OK',
             json: async () => ({
-                workspaceRoots: [process.cwd()],
-                staticRoots: [process.cwd()]
+                workspaceRoots: [process.cwd()]
             }),
         } as any;
     }
