@@ -289,6 +289,32 @@ export const PatchSynthesisBodySchema = z.object({
   settings: z.record(z.string(), z.unknown()).optional(),
   conversationId: z.string().nullable().optional(),
 });
+
+const SynthesisModelSettingsSchema = z.object({
+  provider: sanitizedString(),
+  model: z.string().min(1, "model is required"),
+  temperature: z.number().nullable().optional(),
+  maxTokens: z.number().nullable().optional(),
+  thinkingEnabled: z.boolean().nullable().optional(),
+  reasoningEffort: z.string().nullable().optional(),
+  thinkingLevel: z.string().nullable().optional(),
+  thinkingBudget: z.union([z.number(), z.string()]).nullable().optional(),
+});
+
+export const PostSynthesisGenerateBodySchema = z.object({
+  conversationId: z.string().nullable().optional().default(null),
+  title: z.string().optional(),
+  systemPrompt: z.string().optional().default(""),
+  userPersona: z.string().optional().default(""),
+  category: z.string().optional().default("Chat"),
+  targetTurns: z.number().int().min(1).max(500).optional().default(4),
+  seedMessages: z.array(ChatMessageSchema).optional().default([]),
+  settings: SynthesisModelSettingsSchema,
+  /** Optional separate model for simulated-user turns */
+  userSimSettings: SynthesisModelSettingsSchema.nullable().optional(),
+  /** Persist the run to the synthesis collection when finished (default true) */
+  saveRun: z.boolean().optional().default(true),
+});
 export const PostSkillSchema = z.object({
   name: z.string().min(1, "name is required"),
   description: z.string().optional().default(""),
