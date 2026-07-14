@@ -20,6 +20,18 @@ import {
   swapMessageContent,
 } from "#src/services/harnesses/lifecycle/Finalizer";
 import { PROMPT_DELIMITERS } from "#src/constants";
+import {
+  SYSTEM_MESSAGE_TAGS,
+  wrapSystemMessage,
+} from "#src/utils/SystemMessageTags";
+
+// injectSystemPromptContext wraps injected system messages in their semantic
+// XML tags — these helpers mirror that so assertions compare final content.
+const wrapPlatform = (content: string) =>
+  wrapSystemMessage(SYSTEM_MESSAGE_TAGS.PLATFORM_CONTEXT, content);
+const wrapSelf = (content: string) =>
+  wrapSystemMessage(SYSTEM_MESSAGE_TAGS.SELF_CONTEXT, content);
+const SYSTEM_CONTEXT_OPEN_TAG = `<${SYSTEM_MESSAGE_TAGS.SYSTEM_CONTEXT}>`;
 
 interface HarnessPayload
   extends
@@ -123,19 +135,19 @@ describe("Message Array Construction", () => {
 
     it("should place platform context at index 0", () => {
       expect(currentMessages[0].role).toBe("system");
-      expect(currentMessages[0].content).toBe(PLATFORM_CONTEXT);
+      expect(currentMessages[0].content).toBe(wrapPlatform(PLATFORM_CONTEXT));
     });
 
     it("should place somatic state at index 1 (before user message)", () => {
       expect(currentMessages[1].role).toBe("system");
-      expect(currentMessages[1].content).toBe(SOMATIC_STATE);
+      expect(currentMessages[1].content).toBe(wrapSelf(SOMATIC_STATE));
     });
 
     it("should place injected context at index 2 and user message at index 3 (clean, no system context)", () => {
       expect(currentMessages[2].role).toBe("system");
       expect(currentMessages[2]._isInjectedContext).toBe(true);
       expect(currentMessages[2].content).toContain(
-        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+        SYSTEM_CONTEXT_OPEN_TAG,
       );
 
       expect(currentMessages[3].role).toBe("user");
@@ -189,10 +201,10 @@ describe("Message Array Construction", () => {
         (message) => message.role === "system",
       );
       expect(systemMessages).toHaveLength(3);
-      expect(systemMessages[0].content).toBe(PLATFORM_CONTEXT);
-      expect(systemMessages[1].content).toBe(SOMATIC_STATE);
+      expect(systemMessages[0].content).toBe(wrapPlatform(PLATFORM_CONTEXT));
+      expect(systemMessages[1].content).toBe(wrapSelf(SOMATIC_STATE));
       expect(systemMessages[2].content).toContain(
-        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+        SYSTEM_CONTEXT_OPEN_TAG,
       );
     });
   });
@@ -231,7 +243,7 @@ describe("Message Array Construction", () => {
       expect(currentMessages[0].role).toBe("system");
       expect(currentMessages[0]._isInjectedContext).toBe(true);
       expect(currentMessages[0].content).toContain(
-        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+        SYSTEM_CONTEXT_OPEN_TAG,
       );
 
       expect(currentMessages[1].role).toBe("user");
@@ -313,7 +325,7 @@ describe("Message Array Construction", () => {
       );
       // Order before user: ...platform, somatic, injected_context, user
       expect(currentMessages[lastUserIndex - 3].role).toBe("system");
-      expect(currentMessages[lastUserIndex - 3].content).toBe(PLATFORM_CONTEXT);
+      expect(currentMessages[lastUserIndex - 3].content).toBe(wrapPlatform(PLATFORM_CONTEXT));
     });
 
     it("should insert somatic state before the last user message", () => {
@@ -324,7 +336,7 @@ describe("Message Array Construction", () => {
       );
       // Order: ...platform, somatic, injected_context, user
       expect(currentMessages[lastUserIndex - 2].role).toBe("system");
-      expect(currentMessages[lastUserIndex - 2].content).toBe(SOMATIC_STATE);
+      expect(currentMessages[lastUserIndex - 2].content).toBe(wrapSelf(SOMATIC_STATE));
     });
 
     it("should persist somatic state and user message from the current turn via finalize", () => {
@@ -351,13 +363,13 @@ describe("Message Array Construction", () => {
       expect(
         newTurnMessages.some(
           (message) =>
-            message.role === "system" && message.content === PLATFORM_CONTEXT,
+            message.role === "system" && message.content === wrapPlatform(PLATFORM_CONTEXT),
         ),
       ).toBe(true);
       expect(
         newTurnMessages.some(
           (message) =>
-            message.role === "system" && message.content === SOMATIC_STATE,
+            message.role === "system" && message.content === wrapSelf(SOMATIC_STATE),
         ),
       ).toBe(true);
       expect(newTurnMessages.some((message) => message.role === "user")).toBe(
@@ -413,7 +425,7 @@ describe("Message Array Construction", () => {
       );
       // Order: ...platform, somatic, injected_context, user
       expect(currentMessages[lastUserIndex - 3].role).toBe("system");
-      expect(currentMessages[lastUserIndex - 3].content).toBe(PLATFORM_CONTEXT);
+      expect(currentMessages[lastUserIndex - 3].content).toBe(wrapPlatform(PLATFORM_CONTEXT));
 
       // The old somatic state from history should still exist
       const oldSomaticMessage = currentMessages.find(
@@ -424,7 +436,7 @@ describe("Message Array Construction", () => {
 
       // New somatic state should be interleaved before the last user message
       expect(currentMessages[lastUserIndex - 2].role).toBe("system");
-      expect(currentMessages[lastUserIndex - 2].content).toBe(SOMATIC_STATE);
+      expect(currentMessages[lastUserIndex - 2].content).toBe(wrapSelf(SOMATIC_STATE));
     });
 
     it("should persist platform context on subsequent turns when it was missing from history", () => {
@@ -477,13 +489,13 @@ describe("Message Array Construction", () => {
       expect(
         newTurnMessages.some(
           (message) =>
-            message.role === "system" && message.content === PLATFORM_CONTEXT,
+            message.role === "system" && message.content === wrapPlatform(PLATFORM_CONTEXT),
         ),
       ).toBe(true);
       expect(
         newTurnMessages.some(
           (message) =>
-            message.role === "system" && message.content === SOMATIC_STATE,
+            message.role === "system" && message.content === wrapSelf(SOMATIC_STATE),
         ),
       ).toBe(true);
       expect(newTurnMessages.some((message) => message.role === "user")).toBe(
@@ -524,16 +536,16 @@ describe("Message Array Construction", () => {
       });
       expect(currentMessages[2]).toMatchObject({
         role: "system",
-        content: PLATFORM_CONTEXT,
+        content: wrapPlatform(PLATFORM_CONTEXT),
       });
       expect(currentMessages[3]).toMatchObject({
         role: "system",
-        content: SOMATIC_STATE,
+        content: wrapSelf(SOMATIC_STATE),
       });
       expect(currentMessages[4].role).toBe("system");
       expect(currentMessages[4]._isInjectedContext).toBe(true);
       expect(currentMessages[4].content).toContain(
-        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+        SYSTEM_CONTEXT_OPEN_TAG,
       );
       expect(currentMessages[5].role).toBe("user");
       expect(currentMessages[5].content).toBe("draw me a wolf");
@@ -568,7 +580,7 @@ describe("Message Array Construction", () => {
         -1,
       );
       // Order: ...platform, somatic, injected_context, user
-      expect(currentMessages[lastUserIndex - 3].content).toBe(PLATFORM_CONTEXT);
+      expect(currentMessages[lastUserIndex - 3].content).toBe(wrapPlatform(PLATFORM_CONTEXT));
     });
   });
 
@@ -791,10 +803,10 @@ describe("Message Array Construction", () => {
 
       expect(currentMessages[0].content).toBe("Old identity");
       expect(currentMessages[platformIndex].content).toBe(
-        "Updated platform context",
+        wrapPlatform("Updated platform context"),
       );
       expect(currentMessages[somaticIndex].content).toBe(
-        "Updated somatic state",
+        wrapSelf("Updated somatic state"),
       );
       expect(currentMessages[injectedContextIndex]._isInjectedContext).toBe(
         true,
@@ -821,8 +833,14 @@ describe("Message Array Construction", () => {
         systemPrompt: "You are a coding agent.",
         platformContextMessage: null,
         selfContextMessage: null,
-        skillsText: `${PROMPT_DELIMITERS.PROJECT_SKILLS}\n### deploy.sh\nRun deploy script with --env flag`,
-        memoriesText: `${PROMPT_DELIMITERS.AGENT_MEMORY}\nUser prefers blue-green deployments`,
+        skillsText: wrapSystemMessage(
+          SYSTEM_MESSAGE_TAGS.PROJECT_SKILLS,
+          "### deploy.sh\nRun deploy script with --env flag",
+        ),
+        memoriesText: wrapSystemMessage(
+          SYSTEM_MESSAGE_TAGS.AGENT_MEMORY,
+          "User prefers blue-green deployments",
+        ),
       });
 
       const userMessage = currentMessages.find(
@@ -835,13 +853,13 @@ describe("Message Array Construction", () => {
       )!;
 
       expect(injectedContextMessage.content).toContain(
-        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+        SYSTEM_CONTEXT_OPEN_TAG,
       );
       expect(injectedContextMessage.content).toContain(
-        PROMPT_DELIMITERS.PROJECT_SKILLS,
+        `<${SYSTEM_MESSAGE_TAGS.PROJECT_SKILLS}>`,
       );
       expect(injectedContextMessage.content).toContain(
-        PROMPT_DELIMITERS.AGENT_MEMORY,
+        `<${SYSTEM_MESSAGE_TAGS.AGENT_MEMORY}>`,
       );
 
       // User message stays clean
@@ -918,7 +936,7 @@ describe("Message Array Construction", () => {
       expect(newTurnMessages[0].content).toContain("Discord");
       expect(newTurnMessages[1].content).toContain("Somatic State");
       expect(newTurnMessages[2].content).toContain(
-        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+        SYSTEM_CONTEXT_OPEN_TAG,
       );
     });
   });
@@ -2039,7 +2057,10 @@ describe("Message Array Construction", () => {
         platformContextMessage:
           "Platform: Discord\nServer: Rod's Lab\nChannel: #art\nGuild ID: 123456789\nChannel ID: 987654321",
         selfContextMessage: `${PROMPT_DELIMITERS.SOMATIC_STATE_PREFIX} — Lupos]\ncurrent_emotion: inspired\nemotional_valence: 0.85\narousal: 0.75\ndominance: 0.7`,
-        memoriesText: `${PROMPT_DELIMITERS.AGENT_MEMORY}\nrodrigo likes epic fantasy art`,
+        memoriesText: wrapSystemMessage(
+          SYSTEM_MESSAGE_TAGS.AGENT_MEMORY,
+          "rodrigo likes epic fantasy art",
+        ),
       });
 
       // Iteration 1: think → generate_image tool call
@@ -2123,7 +2144,7 @@ describe("Message Array Construction", () => {
       expect(newTurnMessages[0].content).toContain("Guild ID: 123456789");
       expect(newTurnMessages[1].content).toContain("current_emotion: inspired");
       expect(newTurnMessages[2].content).toContain(
-        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+        SYSTEM_CONTEXT_OPEN_TAG,
       );
 
       // User message is now clean — memories are in the injected context system message
@@ -2183,7 +2204,7 @@ describe("Message Array Construction", () => {
       expect(currentMessages).toHaveLength(2);
       expect(currentMessages[0]._isInjectedContext).toBe(true);
       expect(currentMessages[0].content).toContain(
-        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+        SYSTEM_CONTEXT_OPEN_TAG,
       );
       expect(currentMessages[1].role).toBe("user");
       expect(currentMessages[1].content).toBe("what time is it?");
@@ -3510,14 +3531,14 @@ describe("Message Array Construction", () => {
 
     it("should still inject somatic state as interleaved system message", () => {
       expect(currentMessages[0].role).toBe("system");
-      expect(currentMessages[0].content).toBe(SOMATIC_STATE);
+      expect(currentMessages[0].content).toBe(wrapSelf(SOMATIC_STATE));
     });
 
     it("should place injected context and user message last (clean, no system context prepended)", () => {
       expect(currentMessages[1].role).toBe("system");
       expect(currentMessages[1]._isInjectedContext).toBe(true);
       expect(currentMessages[1].content).toContain(
-        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+        SYSTEM_CONTEXT_OPEN_TAG,
       );
 
       expect(currentMessages[2].role).toBe("user");
@@ -3756,7 +3777,7 @@ describe("Message Array Construction", () => {
       // Injected context, user message and assistant response should follow
       expect(newTurnMessages[1].role).toBe("system"); // injected context
       expect(newTurnMessages[1].content).toContain(
-        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+        SYSTEM_CONTEXT_OPEN_TAG,
       );
       expect(newTurnMessages[2].role).toBe("user");
       expect(newTurnMessages[3].role).toBe("assistant");
@@ -3916,7 +3937,7 @@ describe("Message Array Construction", () => {
       // First message should be the injected context, then user message
       expect(newTurnMessages[0].role).toBe("system"); // injected context
       expect(newTurnMessages[0].content).toContain(
-        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+        SYSTEM_CONTEXT_OPEN_TAG,
       );
       expect(newTurnMessages[1].role).toBe("user");
       expect(newTurnMessages[2].role).toBe("assistant");
@@ -3961,7 +3982,7 @@ describe("Message Array Construction", () => {
       // Should include injected context + new user message + assistant response (not prior persisted turns)
       expect(newTurnMessages[0].role).toBe("system"); // injected context
       expect(newTurnMessages[0].content).toContain(
-        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+        SYSTEM_CONTEXT_OPEN_TAG,
       );
       expect(newTurnMessages[1].role).toBe("user");
       expect(newTurnMessages[1].content).toContain("weather");
@@ -4017,7 +4038,7 @@ describe("Message Array Construction", () => {
       // The operational context was already persisted in the first turn
       expect(newTurnMessages[0].role).toBe("system"); // injected context
       expect(newTurnMessages[0].content).toContain(
-        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
+        SYSTEM_CONTEXT_OPEN_TAG,
       );
       expect(newTurnMessages[1].role).toBe("user");
       expect(newTurnMessages[1].content).toContain("update the tests");
