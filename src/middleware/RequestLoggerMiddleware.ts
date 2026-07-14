@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { formatBytes } from "@rodrigo-barraza/utilities-library";
+import { IDENTITY_HEADERS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import logger from "#src/utils/logger";
 import { requestContext } from "#src/utils/RequestContext";
 
@@ -19,8 +20,8 @@ export function requestLoggerMiddleware(
 
   // Resolve identity + IP early (before authMiddleware for admin/files routes)
   // Fall back to headers, then to path-based extraction for /files/projects/{project}/{username}/
-  let project = req.project || (req.headers["x-project"] as string) || "any";
-  let username = req.username || (req.headers["x-username"] as string) || "any";
+  let project = req.project || (req.headers[IDENTITY_HEADERS.project] as string) || "any";
+  let username = req.username || (req.headers[IDENTITY_HEADERS.username] as string) || "any";
   if (project === "any" && req.originalUrl.startsWith("/files/projects/")) {
     const segments = req.originalUrl.split("/");
     // /files/projects/{project}/{username}/...
@@ -29,7 +30,7 @@ export function requestLoggerMiddleware(
       username = segments[4]?.split("?")[0] || "any";
     }
   }
-  const forwardedFor = req.headers["x-forwarded-for"];
+  const forwardedFor = req.headers[IDENTITY_HEADERS.forwardedFor];
   const forwardedIp =
     typeof forwardedFor === "string"
       ? forwardedFor.split(",")[0]?.trim()
@@ -37,7 +38,7 @@ export function requestLoggerMiddleware(
   const rawIp = req.clientIp || forwardedIp || req.ip || null;
   // Normalize IPv4-mapped IPv6 (::ffff:127.0.0.1 → 127.0.0.1)
   const clientIp = rawIp?.replace(/^::ffff:/, "") || rawIp;
-  const agent = (req.headers["x-agent"] as string) || null;
+  const agent = (req.headers[IDENTITY_HEADERS.agent] as string) || null;
 
   // Log on response finish
   res.on("finish", () => {

@@ -1,4 +1,4 @@
-import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { AGENT_IDS, CORS_ALLOWED_HEADERS_STRING } from "@rodrigo-barraza/utilities-library/taxonomy";
 import express, { Request, Response } from "express";
 import cors from "cors";
 import http from "http";
@@ -106,15 +106,7 @@ app.use(
   cors({
     origin: true, // reflect request origin (equivalent to *)
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "x-project",
-      "x-username",
-      "x-workspace-id",
-      "x-workspace-root",
-      "x-api-secret",
-      "x-admin-secret",
-    ],
+    allowedHeaders: CORS_ALLOWED_HEADERS_STRING,
     maxAge: CROSS_ORIGIN_RESOURCE_SHARING_MAXIMUM_AGE_SECONDS, // cache preflight for 24h — eliminates burst OPTIONS storms
   }),
 );
