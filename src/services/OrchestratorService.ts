@@ -7,10 +7,6 @@ import {
 } from "#src/utils/SystemMessageTags";
 
 import { getProvider } from "#src/providers/index";
-import {
-  getInstancesByType,
-  getInstanceType,
-} from "#src/providers/instance-registry";
 
 import {
   SERVER_SENT_EVENT_TYPES,
@@ -31,11 +27,14 @@ import AgentSessionRegistry from "./AgentSessionRegistry.ts";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import { createAbortController } from "#src/utils/AbortController";
 import { registerCleanup } from "#src/utils/CleanupRegistry";
-import { resolveModelForInstances } from "#src/utils/ModelResolution";
 import { stripToolCallMarkup } from "#src/utils/StreamChunkDispatcher";
 
 // Extracted Domain Helpers
 import { InstanceLoadBalancer } from "./orchestrator/InstanceLoadBalancer.ts";
+import {
+  resolveSiblingInstances,
+  selectInstanceForMember,
+} from "./orchestrator/InstanceResolver.ts";
 import { GitWorktreeHelper } from "./orchestrator/GitWorktreeHelper.ts";
 import {
   getLastAssistantText,
@@ -45,6 +44,7 @@ import { SubAgentTelemetryEmitter } from "./orchestrator/SubAgentTelemetryEmitte
 import { evictIdleSecondaryModel } from "./orchestrator/VramEvictionPolicy.ts";
 import type { TopologyRouter } from "./orchestrator/TopologyRouter.ts";
 import { SubAgentIdGenerator } from "./orchestrator/SubAgentIdGenerator.ts";
+import { getTopologyPromptSummary } from "./orchestrator/TopologyRegistry.ts";
 import { ConversationUtils } from "./orchestrator/ConversationUtils.ts";
 import { SubAgentPersistenceService } from "./orchestrator/SubAgentPersistenceService.ts";
 
@@ -76,33 +76,6 @@ type AgenticLoopServiceModule = typeof import("./AgenticLoopService.ts");
 // ────────────────────────────────────────────────────────────
 
 
-/**
- * Resolve the user-configured sub-agent provider/model from settings.
- * Returns null when no sub-agent model is configured — callers should
- * keep the local provider (queuing) when this returns null.
- */
-async function getSubAgentFallback(): Promise<{
-  provider: string;
-  model: string;
-} | null> {
-  try {
-    const agentSettings = await SettingsService.getSection("agents");
-    if (
-      agentSettings &&
-      typeof agentSettings.subAgentProvider === "string" &&
-      typeof agentSettings.subAgentModel === "string"
-    ) {
-      return {
-        provider: agentSettings.subAgentProvider,
-        model: agentSettings.subAgentModel,
-      };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 import type { ToolCall } from "./harnesses/types.ts";
 
 function buildToolNamesMap(
@@ -119,9 +92,6 @@ function buildToolNamesMap(
 
 /** Active sub-agents spawned via chat tools, keyed by agentId */
 const activeSubAgents = new Map<string, SubAgentState>();
-
-/** Per-conversation counters for generating sequential agent IDs relative to each conversation */
-const agentCountersByConversation = new Map<string, number>();
 
 /**
  * Pending non-blocking router promises keyed by agentConversationId.
@@ -334,68 +304,39 @@ export class OrchestratorService {
         `[Orchestrator] spawnFromTool: pre-assigned to ${subAgentProvider} — model "${subAgentModel}" (skipping instance selection)`,
       );
     }
-    if (!isPreAssigned && localModelQueue.isLocal(providerName)) {
-      const providerType = getInstanceType(providerName) || providerName;
-      let siblingInstances = getInstancesByType(providerType);
-
-      // ── Model availability filter ─────────────────────────────
-      // Shared logic with /chat route: verify model availability per
-      // instance with quant-level fallback for heterogeneous GPU setups.
-      let instanceModelOverrides = new Map();
-
-      if (siblingInstances.length > 1) {
-        const { usable, modelOverrides } = await resolveModelForInstances(
-          subAgentModel,
-          siblingInstances,
-        );
-        instanceModelOverrides = modelOverrides;
-
-        if (usable.length > 0) {
-          siblingInstances = usable;
-        } else {
-          logger.warn(
-            `[Orchestrator] Model "${subAgentModel}" not available on any ${getInstanceType(providerName) || providerName} instance`,
-          );
-          siblingInstances = [];
-        }
-      }
-
-      // ── Instance selection: respect concurrency per instance ──
-      // concurrency is the max parallel inference requests an instance handles.
-      // The orchestrator's inference is IDLE while sub-agents run (it finished
-      // generating team_create tool calls), but we reserve 1 slot on its
-      // instance for the continuation turn after sub-agents complete.
-      //
-      // instanceReservations prevents race conditions when multiple team_create
-      // calls fire concurrently — the counter is incremented synchronously.
-      const assignedInstance = InstanceLoadBalancer.selectAndReserveInstance(
-        siblingInstances,
-        providerName,
-        instanceModelOverrides,
-        subAgentModel,
+    if (!isPreAssigned && isLocal) {
+      // ── Instance selection via the shared resolver ─────────────
+      // Same availability-filter + least-connections + reservation flow
+      // the topology routers use (InstanceResolver / InstanceLoadBalancer).
+      // Passing activeSubAgents lets load accounting see already-running
+      // agents in addition to synchronous reservations.
+      const instanceContext = { providerName, resolvedModel: subAgentModel };
+      const resolvedSiblings = await resolveSiblingInstances(
+        instanceContext,
+        "Orchestrator",
+      );
+      const selection = selectInstanceForMember(
+        { description, prompt, model: subAgentModel },
+        resolvedSiblings,
+        instanceContext,
         activeSubAgents,
       );
+      subAgentProvider = selection.assignedProvider;
+      subAgentModel = selection.assignedModel;
 
-      if (assignedInstance) {
-        subAgentProvider = assignedInstance.provider;
-        subAgentModel = assignedInstance.model;
+      if (selection.assignment) {
+        const pooledCount = resolvedSiblings.siblings.length;
         logger.info(
-          `[Orchestrator] Assigned sub-agent to ${assignedInstance.provider} (${assignedInstance.slotsAvailable} slots free, ${siblingInstances.length} instance${siblingInstances.length > 1 ? "s" : ""} pooled) — model "${assignedInstance.model}"`,
+          `[Orchestrator] Assigned sub-agent to ${selection.assignment.provider} (${selection.assignment.slotsAvailable} slots free, ${pooledCount} instance${pooledCount > 1 ? "s" : ""} pooled) — model "${selection.assignment.model}"`,
+        );
+      } else if (selection.usedFallback) {
+        logger.info(
+          `[Orchestrator] All instances at capacity — sub-agent will use ${selection.assignedModel}`,
         );
       } else {
-        // Resolve the user-configured (or hardcoded) sub-agent fallback
-        const subAgentFallback = await getSubAgentFallback();
-        if (subAgentFallback) {
-          subAgentProvider = subAgentFallback.provider;
-          subAgentModel = subAgentFallback.model;
-          logger.info(
-            `[Orchestrator] All instances at capacity — sub-agent will use ${subAgentFallback.model}`,
-          );
-        } else {
-          logger.info(
-            `[Orchestrator] All instances at capacity and no sub-agent model configured — sub-agent will queue on local provider`,
-          );
-        }
+        logger.info(
+          `[Orchestrator] All instances at capacity and no sub-agent model configured — sub-agent will queue on local provider`,
+        );
       }
     }
 
@@ -1158,7 +1099,7 @@ export class OrchestratorService {
     for (const key of keysToRemove) {
       activeSubAgents.delete(key);
     }
-    // Only clean conversation counters when no running or resumable agents remain for that conversation
+    // Only clean conversation ID counters when no running or resumable agents remain for that conversation
     for (const conversationId of conversationIdsToClean) {
       const hasActiveAgentsForConversation = Array.from(
         activeSubAgents.values(),
@@ -1168,7 +1109,7 @@ export class OrchestratorService {
           (subAgent.status === SYSTEM_STATUSES.RUNNING || subAgent.status === SYSTEM_STATUSES.COMPLETE || subAgent.status === SYSTEM_STATUSES.IDLE),
       );
       if (!hasActiveAgentsForConversation) {
-        agentCountersByConversation.delete(conversationId);
+        SubAgentIdGenerator.deleteConversationCounter(conversationId);
       }
     }
     const totalPreserved = keysPreservedRunning.length + keysPreservedResumable.length;
@@ -1183,10 +1124,6 @@ export class OrchestratorService {
     }
     // Clean up pending router dispatch tracking
     pendingRouterDispatches.delete(parentAgentConversationId);
-  }
-
-  static cleanupSession(parentAgentConversationId: string): void {
-    return this.cleanupConversation(parentAgentConversationId);
   }
 
   /**
@@ -1211,7 +1148,6 @@ export class OrchestratorService {
 
   static clearAllActiveSubAgents(): void {
     activeSubAgents.clear();
-    agentCountersByConversation.clear();
     pendingRouterDispatches.clear();
     SubAgentIdGenerator.resetCounters();
     logger.info("[Orchestrator] Cleared all active sub-agents from registry");
@@ -1999,56 +1935,7 @@ export class OrchestratorService {
 
     const activeTopology = orchestratorContext.topology || DEFAULT_TOPOLOGY;
 
-    const topologyMetadata: Record<
-      string,
-      { name: string; description: string }
-    > = {
-      [TOPOLOGIES.HIERARCHICAL]: {
-        name: "Hierarchical (Parallel)",
-        description:
-          "All sub-agents run in parallel, each independently working on their own task. No shared state between agents.",
-      },
-      [TOPOLOGIES.HIERARCHICAL_AGGREGATION]: {
-        name: "Hierarchical Aggregation (Parallel + Synthesis)",
-        description:
-          "All sub-agents run in parallel, then a final synthesis pass merges their outputs into a unified result.",
-      },
-      [TOPOLOGIES.SEQUENTIAL]: {
-        name: "Sequential (Pipeline)",
-        description:
-          "Sub-agents run one at a time in order, each receiving the previous agent's output as context before starting.",
-      },
-      [TOPOLOGIES.PEER_TO_PEER]: {
-        name: "Peer-to-Peer (Mesh / MAD)",
-        description:
-          "Turn-based discussion where agents take turns on a shared thread. Each agent reads all prior contributions before responding.",
-      },
-      [TOPOLOGIES.TOURNAMENT]: {
-        name: "Tournament (Best-of-N)",
-        description:
-          "All sub-agents run in parallel, then a judge evaluates and selects the single best result. Compete to produce the highest quality output.",
-      },
-      [TOPOLOGIES.CRITIC_LOOP]: {
-        name: "Critic Loop (Actor-Critic)",
-        description:
-          "Actor produces output, critic evaluates and provides pass/fail feedback. If failed, actor revises. Iterates until critic approves or max rounds reached.",
-      },
-      [TOPOLOGIES.DIVIDE_AND_CONQUER]: {
-        name: "Divide & Conquer (GoT)",
-        description:
-          "A planner decomposes the task into independent subtasks, each dispatched to a sub-agent in parallel, then synthesized into a unified result.",
-      },
-      [TOPOLOGIES.MCTS]: {
-        name: "MCTS-Guided Search (LATS)",
-        description:
-          "Monte Carlo Tree Search — expands N branches in parallel, evaluates and scores each, selects the best, and refines iteratively until complete.",
-      },
-    };
-
-    const resolvedTopologyMetadata = topologyMetadata[activeTopology] ?? {
-      name: activeTopology,
-      description: "Custom or unknown topology.",
-    };
+    const resolvedTopologyMetadata = getTopologyPromptSummary(activeTopology);
 
     const agentPositionLine =
       subAgent.agentIndex != null && subAgent.teamSize != null
