@@ -1,7 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { getLastAssistantText, buildSubAgentResult, buildToolCallFallbackSummary } from "#src/services/orchestrator/SubAgentResultBuilder";
+import {
+  getLastAssistantText,
+  buildSubAgentResult,
+  buildToolCallFallbackSummary,
+  toLiveSubAgentSummary,
+  toPersistedSubAgentSummary,
+} from "#src/services/orchestrator/SubAgentResultBuilder";
 import type { ConversationMessage } from "#src/services/harnesses/types";
-import type { SubAgentResult } from "#src/types/orchestrator";
+import type { SubAgentResult, SubAgentState } from "#src/types/orchestrator";
 
 describe("getLastAssistantText", () => {
   it("returns the text from the last assistant message with string content", () => {
@@ -706,5 +712,130 @@ describe("buildSubAgentResult — channel token stripping", () => {
     );
     expect(systemMessages).toHaveLength(0);
     expect(result.messages).toHaveLength(2);
+  });
+});
+
+describe("toLiveSubAgentSummary", () => {
+  function baseState(overrides: Partial<SubAgentState> = {}): SubAgentState {
+    return {
+      agentId: "agent-1",
+      subAgentConversationId: "sub-conv-1",
+      parentAgentConversationId: "parent-conv-1",
+      description: "Live agent",
+      branchName: "orchestrator/agent-1",
+      worktreePath: null,
+      repositoryPath: "/workspace",
+      isolated: false,
+      status: "complete",
+      output: "",
+      toolCalls: [
+        { id: "1", name: "read_file", args: {} },
+        { id: "2", name: "read_file", args: {} },
+        { id: "3", name: "write_file", args: {} },
+      ],
+      diff: { hasChanges: true, additions: 3, deletions: 1, files: ["a.ts"] },
+      error: null,
+      startedAt: Date.now() - 5000,
+      durationMilliseconds: 5000,
+      totalCost: 0.02,
+      usage: null,
+      abortController: null,
+      messages: [],
+      files: ["a.ts"],
+      providerName: "lm-studio",
+      resolvedModel: "gemma-4-12b",
+      recursionDepth: 1,
+      globalSpawnIndex: 2,
+      ...overrides,
+    } as SubAgentState;
+  }
+
+  it("maps state fields and aggregates tool-name counts", () => {
+    const summary = toLiveSubAgentSummary(baseState());
+    expect(summary).toMatchObject({
+      agentId: "agent-1",
+      description: "Live agent",
+      status: "complete",
+      providerName: "lm-studio",
+      resolvedModel: "gemma-4-12b",
+      toolUses: 3,
+      toolCallCount: 3,
+      hasChanges: true,
+      totalCost: 0.02,
+      recursionDepth: 1,
+      globalSpawnIndex: 2,
+      toolNames: { read_file: 2, write_file: 1 },
+    });
+  });
+
+  it("computes live duration for running agents from startedAt", () => {
+    const startedAt = Date.now() - 3000;
+    const summary = toLiveSubAgentSummary(
+      baseState({ status: "running", startedAt, durationMilliseconds: 0 }),
+    );
+    expect(summary.durationMilliseconds).toBeGreaterThanOrEqual(3000);
+  });
+
+  it("uses the recorded duration for terminal agents", () => {
+    const summary = toLiveSubAgentSummary(
+      baseState({ status: "complete", durationMilliseconds: 5000 }),
+    );
+    expect(summary.durationMilliseconds).toBe(5000);
+  });
+
+  it("omits toolNames when there are no tool calls", () => {
+    const summary = toLiveSubAgentSummary(baseState({ toolCalls: [] }));
+    expect(summary.toolNames).toBeUndefined();
+    expect(summary.toolUses).toBe(0);
+  });
+});
+
+describe("toPersistedSubAgentSummary", () => {
+  it("maps persisted document fields, preferring subAgentId over id", () => {
+    const summary = toPersistedSubAgentSummary({
+      id: "sub-conv-9",
+      subAgentId: "agent-9",
+      subAgentDescription: "Persisted agent",
+      subAgentStatus: "completed",
+      subAgentProviderName: "openai",
+      subAgentResolvedModel: "gpt-5",
+      subAgentDurationMilliseconds: 4200,
+      subAgentToolUses: 7,
+      subAgentHasChanges: true,
+      subAgentTotalCost: 0.5,
+      subAgentBranchName: "orchestrator/agent-9",
+      subAgentFiles: ["b.ts"],
+      subAgentRecursionDepth: 2,
+      subAgentGlobalSpawnIndex: 4,
+      subAgentToolNames: { grep: 7 },
+    });
+    expect(summary).toMatchObject({
+      agentId: "agent-9",
+      description: "Persisted agent",
+      status: "completed",
+      providerName: "openai",
+      resolvedModel: "gpt-5",
+      durationMilliseconds: 4200,
+      toolUses: 7,
+      toolCallCount: 7,
+      hasChanges: true,
+      totalCost: 0.5,
+      recursionDepth: 2,
+      globalSpawnIndex: 4,
+      toolNames: { grep: 7 },
+      subAgentConversationId: "sub-conv-9",
+    });
+  });
+
+  it("falls back to id and defaults for a sparse document", () => {
+    const summary = toPersistedSubAgentSummary({ id: "sub-conv-3" });
+    expect(summary.agentId).toBe("sub-conv-3");
+    expect(summary.description).toBe("");
+    expect(summary.status).toBe("unknown");
+    expect(summary.durationMilliseconds).toBe(0);
+    expect(summary.toolUses).toBe(0);
+    expect(summary.hasChanges).toBe(false);
+    expect(summary.providerName).toBeUndefined();
+    expect(summary.subAgentConversationId).toBe("sub-conv-3");
   });
 });
