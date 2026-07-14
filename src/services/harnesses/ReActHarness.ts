@@ -61,7 +61,7 @@ import SemanticStallDetector from "./lifecycle/SemanticStallDetector.ts";
 import PlanningModeService from "#src/services/PlanningModeService";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import ConversationStatusRegistry from "#src/services/ConversationStatusRegistry";
-import { HARNESS } from "#src/constants";
+import { HARNESS, AGENT_DIRECTIVES } from "#src/constants";
 
 import type {
   ConversationMessage,
@@ -778,7 +778,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             }
           }
 
-          const hasNonBlockingDispatch = results.some(r => (r.result as any)?._directive === "NON_BLOCKING_DISPATCH");
+          const hasNonBlockingDispatch = results.some(r => (r.result as any)?._directive === AGENT_DIRECTIVES.NON_BLOCKING_DISPATCH);
           if (hasNonBlockingDispatch) {
             hasCleanTextBreak = true;
             hasNonBlockingDispatchBreak = true;

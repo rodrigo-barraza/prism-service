@@ -3,7 +3,7 @@ import { DOMAINS, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy
 import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { ASYNC_TASK_TOOL_NAMES, MAXIMUM_CONCURRENT_ASYNC_TASKS } from "#src/services/AsyncTaskConstants";
-import { ORCHESTRATOR, NOTIFICATION_SOURCES } from "#src/constants";
+import { ORCHESTRATOR, NOTIFICATION_SOURCES, AGENT_DIRECTIVES } from "#src/constants";
 import type { InternalToolContext } from "./InternalToolRegistry.ts";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 
@@ -210,7 +210,7 @@ const runAsyncTask = {
       );
 
       return {
-        _directive: "NON_BLOCKING_DISPATCH",
+        _directive: AGENT_DIRECTIVES.NON_BLOCKING_DISPATCH,
         instruction:
           "An async task has been dispatched in the background. You will be automatically notified with a [ASYNC TASK COMPLETED] message when it finishes. " +
           "END YOUR TURN NOW — do not poll or loop. Simply inform the user that the task has been dispatched and you will report back when it completes.",

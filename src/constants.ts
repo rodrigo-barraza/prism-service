@@ -85,6 +85,17 @@ export const APPROVAL_STATUS = {
   REJECTED: "rejected",
 } as const;
 
+/**
+ * Control directives returned in a tool result's `_directive` field.
+ * NON_BLOCKING_DISPATCH tells the harness to exit its loop immediately
+ * (the dispatched work notifies the parent asynchronously on completion).
+ * Producers (orchestrator / async-task / tool-orchestrator) and the
+ * consumer (ReActHarness loop-break check) MUST share this literal.
+ */
+export const AGENT_DIRECTIVES = {
+  NON_BLOCKING_DISPATCH: "NON_BLOCKING_DISPATCH",
+} as const;
+
 /** Priorities specifically for Todo items and task ranking. */
 export const TODO_PRIORITIES = {
   HIGH: "high",

@@ -4,9 +4,105 @@ import type {
   SubtreeMetrics,
   SubAgentChildSummary,
 } from "#src/types/orchestrator";
-import type { ConversationMessage } from "#src/services/harnesses/types";
+import type {
+  ConversationMessage,
+  ToolCall,
+} from "#src/services/harnesses/types";
 import { stripToolCallMarkup } from "#src/utils/StreamChunkDispatcher";
-import { ORCHESTRATOR } from "#src/constants";
+import { ORCHESTRATOR, SYSTEM_STATUSES } from "#src/constants";
+
+/**
+ * Condensed sub-agent view returned by the list/query endpoints. Both the
+ * live-registry and persisted-document sources map into this one shape via
+ * toLiveSubAgentSummary / toPersistedSubAgentSummary. providerName and
+ * resolvedModel are optional because older persisted documents may omit them.
+ */
+export interface SubAgentSummary {
+  agentId: string;
+  description: string;
+  status: string;
+  providerName?: string;
+  resolvedModel?: string;
+  durationMilliseconds: number;
+  toolUses: number;
+  hasChanges: boolean;
+  totalCost?: number | null;
+  branchName?: string | null;
+  files?: string[];
+  toolCallCount?: number;
+  recursionDepth?: number;
+  globalSpawnIndex?: number;
+  toolNames?: Record<string, number>;
+  subAgentConversationId?: string;
+}
+
+/** Count tool invocations by name from a tool-call list. */
+export function buildToolNamesMap(
+  toolCalls: ToolCall[] | null | undefined,
+): Record<string, number> {
+  const toolNames: Record<string, number> = {};
+  if (!toolCalls?.length) return toolNames;
+  for (const toolCall of toolCalls) {
+    const name = toolCall.name || "unknown";
+    toolNames[name] = (toolNames[name] || 0) + 1;
+  }
+  return toolNames;
+}
+
+/** Map a live in-registry sub-agent to its list-endpoint summary. */
+export function toLiveSubAgentSummary(
+  subAgent: SubAgentState,
+): SubAgentSummary {
+  const toolNames = buildToolNamesMap(subAgent.toolCalls);
+  return {
+    agentId: subAgent.agentId,
+    description: subAgent.description,
+    status: subAgent.status,
+    providerName: subAgent.providerName,
+    resolvedModel: subAgent.resolvedModel,
+    durationMilliseconds:
+      subAgent.status === SYSTEM_STATUSES.RUNNING
+        ? Date.now() - subAgent.startedAt
+        : subAgent.durationMilliseconds,
+    toolUses: subAgent.toolCalls?.length || 0,
+    hasChanges: subAgent.diff?.hasChanges || false,
+    totalCost: subAgent.totalCost,
+    branchName: subAgent.branchName,
+    files: subAgent.files,
+    toolCallCount: subAgent.toolCalls?.length || 0,
+    recursionDepth: subAgent.recursionDepth,
+    globalSpawnIndex: subAgent.globalSpawnIndex,
+    toolNames: Object.keys(toolNames).length > 0 ? toolNames : undefined,
+  };
+}
+
+/** Map a persisted agent_conversations document to its list-endpoint summary. */
+export function toPersistedSubAgentSummary(
+  document: Record<string, unknown>,
+): SubAgentSummary {
+  return {
+    agentId:
+      (document.subAgentId as string) || (document.id as string),
+    description: (document.subAgentDescription as string) || "",
+    status: (document.subAgentStatus as string) || "unknown",
+    providerName: document.subAgentProviderName as string | undefined,
+    resolvedModel: document.subAgentResolvedModel as string | undefined,
+    durationMilliseconds:
+      (document.subAgentDurationMilliseconds as number) || 0,
+    toolUses: (document.subAgentToolUses as number) || 0,
+    hasChanges: (document.subAgentHasChanges as boolean) || false,
+    totalCost: document.subAgentTotalCost as number | null | undefined,
+    branchName: document.subAgentBranchName as string | null | undefined,
+    files: document.subAgentFiles as string[] | undefined,
+    toolCallCount: (document.subAgentToolUses as number) || 0,
+    recursionDepth: document.subAgentRecursionDepth as number | undefined,
+    globalSpawnIndex: document.subAgentGlobalSpawnIndex as number | undefined,
+    toolNames: document.subAgentToolNames as
+      | Record<string, number>
+      | undefined,
+    subAgentConversationId: document.id as string,
+  };
+}
 
 /*
  * Extract the text content from the last assistant message in a conversation.
