@@ -708,6 +708,7 @@ export default class SystemPromptAssembler {
         if (!systemPrompt) return;
 
         context._injectedSkills = skillNames;
+        context._skillsText = skillsText;
         context._assembledSystemPrompt = systemPrompt;
 
         // Propagate newly injected memory IDs to the hook context so the

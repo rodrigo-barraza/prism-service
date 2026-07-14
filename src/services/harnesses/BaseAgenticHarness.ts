@@ -551,6 +551,12 @@ export default class BaseAgenticHarness {
     // 3. Tool schemas (serialized JSON function definitions)
     const toolSchemas = this.tools.finalTools;
 
+    // 4. Injected skills text (lives inside the messages array; the tracker
+    //    carves it out of the message estimate as its own budget category)
+    const skillsText =
+      (this.context.options?._skillsText as string | undefined) || "";
+    const skillTokens = skillsText ? estimateTokens(skillsText) : 0;
+
     // Delegate budget computation and SSE emission to the tracker
     if (tracker) {
       const { clampedMaxTokens, adjustedInput, availableForOutput } =
@@ -559,6 +565,7 @@ export default class BaseAgenticHarness {
           systemPromptText,
           toolSchemas,
           requestedMaxTokens,
+          skillTokens,
         );
 
       const calibrationRatio = tracker.getCalibrationRatio();
@@ -569,6 +576,7 @@ export default class BaseAgenticHarness {
           `messages=${estimatedMessageTokens}${calibrationRatio !== null ? ` (calibrated ×${calibrationRatio.toFixed(3)})` : ""}, ` +
           `systemPrompt=${estimateTokens(systemPromptText)} (${systemPromptText.length} chars), ` +
           `toolSchemas=${toolSchemas.length > 0 ? estimateTokens(JSON.stringify(toolSchemas)) : 0} (${toolSchemas.length} tools), ` +
+          `skills=${skillTokens}, ` +
           `adjusted=${adjustedInput}, available=${availableForOutput}, ` +
           `requested=${requestedMaxTokens}, ` +
           `willClamp=${requestedMaxTokens ? requestedMaxTokens > availableForOutput : false}`,

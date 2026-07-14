@@ -674,7 +674,14 @@ router.post(
       }
 
       const fullPrompt = sections.join("\n\n");
-      const systemPromptTokens = estimateTokens(fullPrompt);
+      const fullPromptTokens = estimateTokens(fullPrompt);
+
+      // Skills are reported as their own budget category, so carve them
+      // out of the assembled prompt's token estimate.
+      const skillTokens = result.skillsText
+        ? estimateTokens(result.skillsText)
+        : 0;
+      const systemPromptTokens = Math.max(fullPromptTokens - skillTokens, 0);
 
       // ── Baseline context budget estimation ──
       const toolSchemaTokens =
@@ -690,7 +697,8 @@ router.post(
         (modelDefinition?.maxInputTokens as number | undefined) ||
         DEFAULT_MAX_INPUT_TOKENS;
 
-      const totalEstimatedInput = systemPromptTokens + toolSchemaTokens;
+      const totalEstimatedInput =
+        systemPromptTokens + skillTokens + toolSchemaTokens;
       const safetyMarginTokens = Math.ceil(
         totalEstimatedInput * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
       );
@@ -703,12 +711,13 @@ router.post(
       res.json({
         prompt: fullPrompt,
         characterCount: fullPrompt.length,
-        estimatedTokens: systemPromptTokens,
+        estimatedTokens: fullPromptTokens,
         baselineBudget: {
           contextWindow,
           messageTokens: 0,
           systemPromptTokens,
           toolSchemaTokens,
+          skillTokens,
           safetyMarginTokens,
           totalInputTokens,
           availableOutputTokens,

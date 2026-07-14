@@ -231,6 +231,12 @@ export async function runTreeOfThoughts(
     }
   }
 
+  // Expose injected skills text to the context budget tracker so
+  // skill tokens can be reported as their own budget category.
+  if (typeof hookContext._skillsText === "string") {
+    options._skillsText = hookContext._skillsText;
+  }
+
   if (
     Array.isArray(hookContext._injectedSkills) &&
     hookContext._injectedSkills.length > 0

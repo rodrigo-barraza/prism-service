@@ -311,6 +311,12 @@ export default class ReActHarness extends BaseAgenticHarness {
             }
           }
 
+          // Expose injected skills text to the context budget tracker so
+          // skill tokens can be reported as their own budget category.
+          if (typeof hookContext._skillsText === "string") {
+            options._skillsText = hookContext._skillsText;
+          }
+
           // ── Persist newly injected memory IDs to conversationMeta ──
           // The Finalizer will $addToSet these onto the agent_conversations
           // document so subsequent turns can exclude already-seen memories.

@@ -20,6 +20,7 @@ export interface ContextBudgetSnapshot {
   messageTokens: number;
   systemPromptTokens: number;
   toolSchemaTokens: number;
+  skillTokens: number;
   safetyMarginTokens: number;
   totalInputTokens: number;
   availableOutputTokens: number;
@@ -55,6 +56,7 @@ export default class ContextBudgetTracker {
   // Cached static components (stable across iterations)
   private systemPromptTokensEstimate = 0;
   private toolSchemaTokensEstimate = 0;
+  private skillTokensEstimate = 0;
   private toolCount = 0;
 
   constructor(emit: EmitFunction, contextWindow: number) {
@@ -73,6 +75,7 @@ export default class ContextBudgetTracker {
     systemPromptText: string,
     toolSchemas: unknown[],
     requestedMaxTokens: number | undefined,
+    skillTokens = 0,
   ): {
     clampedMaxTokens: number | undefined;
     adjustedInput: number;
@@ -83,12 +86,19 @@ export default class ContextBudgetTracker {
       toolSchemas.length > 0
         ? estimateTokens(JSON.stringify(toolSchemas))
         : 0;
+    // Skills are injected into the messages array (system context message),
+    // so their tokens are a carve-out of the message estimate — never
+    // additive on top of it.
+    this.skillTokensEstimate = Math.min(skillTokens, estimatedMessageTokens);
     this.toolCount = toolSchemas.length;
 
     // Apply calibration ratio to the heuristic estimate if we have one
     const calibratedMessageTokens = this.calibrationRatio !== null
       ? Math.ceil(estimatedMessageTokens * this.calibrationRatio)
       : estimatedMessageTokens;
+    const calibratedSkillTokens = this.calibrationRatio !== null
+      ? Math.ceil(this.skillTokensEstimate * this.calibrationRatio)
+      : this.skillTokensEstimate;
 
     const totalEstimatedInput =
       calibratedMessageTokens +
@@ -103,9 +113,13 @@ export default class ContextBudgetTracker {
 
     const snapshot: ContextBudgetSnapshot = {
       contextWindow: this.contextWindow,
-      messageTokens: calibratedMessageTokens,
+      messageTokens: Math.max(
+        calibratedMessageTokens - calibratedSkillTokens,
+        0,
+      ),
       systemPromptTokens: this.systemPromptTokensEstimate,
       toolSchemaTokens: this.toolSchemaTokensEstimate,
+      skillTokens: calibratedSkillTokens,
       safetyMarginTokens: safetyMargin,
       totalInputTokens: adjustedInput,
       availableOutputTokens: Math.max(availableForOutput, 0),
@@ -176,19 +190,31 @@ export default class ContextBudgetTracker {
     const adjustedInput = realInputTokens + safetyMargin;
     const availableForOutput = this.contextWindow - adjustedInput;
 
-    // Decompose the real input into components using the ratio of estimates
+    // Decompose the real input into components using the ratio of estimates.
+    // Skills live inside the message estimate, so they are carved out of the
+    // message share rather than added as an extra component.
     const estimatedTotal =
       estimatedMessageTokensForThisPass +
       this.systemPromptTokensEstimate +
       this.toolSchemaTokensEstimate;
+    const estimatedMessagesExcludingSkills = Math.max(
+      estimatedMessageTokensForThisPass - this.skillTokensEstimate,
+      0,
+    );
 
     const realMessageTokens =
       estimatedTotal > 0
         ? Math.round(
-            (estimatedMessageTokensForThisPass / estimatedTotal) *
+            (estimatedMessagesExcludingSkills / estimatedTotal) *
               realInputTokens,
           )
         : realInputTokens;
+    const realSkillTokens =
+      estimatedTotal > 0
+        ? Math.round(
+            (this.skillTokensEstimate / estimatedTotal) * realInputTokens,
+          )
+        : 0;
     const realSystemPromptTokens =
       estimatedTotal > 0
         ? Math.round(
@@ -211,6 +237,7 @@ export default class ContextBudgetTracker {
       messageTokens: realMessageTokens,
       systemPromptTokens: realSystemPromptTokens,
       toolSchemaTokens: realToolSchemaTokens,
+      skillTokens: realSkillTokens,
       safetyMarginTokens: safetyMargin,
       totalInputTokens: adjustedInput,
       availableOutputTokens: Math.max(availableForOutput, 0),
@@ -300,6 +327,7 @@ export default class ContextBudgetTracker {
       messageTokens,
       systemPromptTokens,
       toolSchemaTokens: 0,
+      skillTokens: 0,
       safetyMarginTokens: safetyMargin,
       totalInputTokens: adjustedInput,
       availableOutputTokens: Math.max(availableForOutput, 0),

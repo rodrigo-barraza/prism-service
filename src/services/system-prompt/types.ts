@@ -60,6 +60,7 @@ export interface AssemblerContext {
   workspaceEnabled?: boolean;
   locale?: string;
   _injectedSkills?: string[];
+  _skillsText?: string;
   _currentMessages?: Array<Record<string, unknown>>;
   [key: string]: unknown;
 }
