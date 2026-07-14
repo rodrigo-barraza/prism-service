@@ -434,11 +434,9 @@ agentConversationRouter.get(
             }
           } catch (costError: unknown) {
             logger.warn(
-              `Failed to enrich admin agent conversation costs: ${
-                costError instanceof Error
-                  ? costError.message
-                  : String(costError)
-              }`,
+              `Failed to enrich admin agent conversation costs: ${getErrorMessage(
+                costError,
+              )}`,
             );
           }
         }

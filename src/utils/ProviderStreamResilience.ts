@@ -1,3 +1,4 @@
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import logger from "./logger.ts";
 import { ProviderError } from "./errors.ts";
 import { HARNESS } from "#src/constants";
@@ -166,7 +167,7 @@ export async function* streamWithRetries<T>(
       );
       logger.warn(
         `[StreamRetry] Transient ${label} error on attempt ${attempt}/${maxRetries + 1} ` +
-          `(${error instanceof Error ? error.message : String(error)}). ` +
+          `(${getErrorMessage(error)}). ` +
           `Retrying in ${Math.round(delayMilliseconds / 100) / 10}s...`,
       );
       await new Promise((resolve) => setTimeout(resolve, delayMilliseconds));

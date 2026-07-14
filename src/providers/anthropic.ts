@@ -7,11 +7,10 @@ import { EMPTY_USAGE } from "#src/utils/openai-compat";
 import { ANTHROPIC_API_KEY } from "#config";
 import { MODALITY_TYPES, getDefaultModels, getModelByName } from "#src/config";
 import { DEFAULT_MAX_OUTPUT_TOKENS } from "#src/constants/TokenBudgetDefaults";
-import { sleep } from "@rodrigo-barraza/utilities-library";
+import { sleep, getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 import { ProviderOptions, ChatMessage } from "#src/types/ProviderTypes";
 import type { TokenUsage } from "#src/types/admin";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
 
 export interface AnthropicBlock {
   type: string;
@@ -865,7 +864,7 @@ const anthropicProvider = {
     // Should never reach here, but safety net
     throw new ProviderError(
       "anthropic",
-      lastError instanceof Error ? lastError.message : "Max retries exceeded",
+      getErrorMessage(lastError, "Max retries exceeded"),
       (lastError as AnthropicSdkError)?.status || 500,
       lastError as Error,
     );

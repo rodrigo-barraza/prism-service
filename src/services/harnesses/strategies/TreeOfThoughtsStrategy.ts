@@ -1073,7 +1073,7 @@ export async function runTreeOfThoughts(
     return { messages: currentMessages };
   } catch (loopError: unknown) {
     logger.error(
-      `[TreeOfThoughts] Loop error on iteration ${state.iterations}: ${loopError instanceof Error ? loopError.message : String(loopError)}. Persisting ${currentMessages.length - state.originalMessageCount} accumulated message(s).`,
+      `[TreeOfThoughts] Loop error on iteration ${state.iterations}: ${getErrorMessage(loopError)}. Persisting ${currentMessages.length - state.originalMessageCount} accumulated message(s).`,
     );
 
     injectErrorAsConversationMessage(
@@ -1092,7 +1092,7 @@ export async function runTreeOfThoughts(
       await harness["finalize"](currentMessages, hooks);
     } catch (persistError: unknown) {
       logger.error(
-        `[TreeOfThoughts] Failed to persist messages on error path: ${persistError instanceof Error ? persistError.message : String(persistError)}`,
+        `[TreeOfThoughts] Failed to persist messages on error path: ${getErrorMessage(persistError)}`,
       );
     }
     throw loopError;

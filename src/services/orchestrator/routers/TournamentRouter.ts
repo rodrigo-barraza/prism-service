@@ -536,8 +536,7 @@ export class TournamentRouter implements TopologyRouter {
 
       return [...memberResults, judgeSubAgentResult];
     } catch (judgeError: unknown) {
-      const errorMessage =
-        judgeError instanceof Error ? judgeError.message : String(judgeError);
+      const errorMessage = getErrorMessage(judgeError);
       logger.error(`[TournamentRouter] Judge pass failed: ${errorMessage}`);
       // ── Synthesis telemetry: mark virtual sub-agent as failed
       if (parentEmit) {

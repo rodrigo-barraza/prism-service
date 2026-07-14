@@ -359,10 +359,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
           });
         }
       } catch (synthesisError: unknown) {
-        const errorMessage =
-          synthesisError instanceof Error
-            ? synthesisError.message
-            : String(synthesisError);
+        const errorMessage = getErrorMessage(synthesisError);
         logger.error(
           `[HierarchicalAggregationRouter]${layerLabel} Synthesis failed: ${errorMessage}`,
         );
