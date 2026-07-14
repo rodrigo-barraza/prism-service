@@ -16,7 +16,7 @@
  *   MONGO_DB_NAME (or PRISM_MONGO_DB_NAME) — database name (default: "prism")
  */
 
-import { connectDatabase, getDatabase, disconnectDatabase } from "@rodrigo-barraza/service-library/mongo";
+import { connectDatabase, getDatabase, disconnectDatabase } from "@rodrigo-barraza/utilities-library/service/mongo";
 import { computeModalities, computeTotalCost, extractProviders } from "../src/services/conversation/utils.ts";
 import type { Db, Document } from "mongodb";
 

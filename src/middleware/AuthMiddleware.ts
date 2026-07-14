@@ -2,7 +2,7 @@ import {
   DEFAULT_USERNAME,
   DEFAULT_PROJECT,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { createAuthMiddleware } from "@rodrigo-barraza/service-library";
+import { createAuthMiddleware } from "@rodrigo-barraza/utilities-library/service";
 import { Request, Response, NextFunction } from "express";
 import { requestContext } from "#src/utils/RequestContext";
 
