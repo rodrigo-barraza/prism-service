@@ -1,5 +1,9 @@
 import { expandMessagesForFunctionCall } from "#src/utils/FunctionCallingUtilities";
 import {
+  SYSTEM_MESSAGE_TAGS,
+  wrapSystemMessage,
+} from "#src/utils/SystemMessageTags";
+import {
   streamWithRetries,
   withIdleTimeout,
 } from "#src/utils/ProviderStreamResilience";
@@ -319,15 +323,15 @@ export default class BaseAgenticHarness {
 
         currentMessages.push({
           role: "system",
-          content:
-            `<tool-update>\n` +
+          content: wrapSystemMessage(
+            SYSTEM_MESSAGE_TAGS.TOOL_UPDATE,
             `${headerText}\n\n` +
-            `${availableText}\n\n` +
-            addendumDocumentation +
-            (policyAddendum
-              ? `\n\n${guidelinesHeader}\n\n${policyAddendum}`
-              : "") +
-            `\n</tool-update>`,
+              `${availableText}\n\n` +
+              addendumDocumentation +
+              (policyAddendum
+                ? `\n\n${guidelinesHeader}\n\n${policyAddendum}`
+                : ""),
+          ),
         });
 
         logger.info(

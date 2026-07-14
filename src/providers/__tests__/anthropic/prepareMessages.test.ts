@@ -461,3 +461,146 @@ describe("prepareMessages — empty content handling", () => {
     expect(result.messages[0].content).toBeTruthy();
   });
 });
+
+// ── Mid-Conversation System Message Retention (Opus 4.8) ────
+describe("prepareMessages — mid-conversation system role retention", () => {
+  it("keeps mid-conversation system messages as system role on claude-opus-4-8", async () => {
+    const result = await prepareMessages(
+      [
+        makeMessage({ role: "system", content: "Identity prompt" }),
+        makeMessage({ role: "user", content: "Hello" }),
+        makeMessage({ role: "assistant", content: "Hi there" }),
+        makeMessage({ role: "user", content: "Do the thing" }),
+        makeMessage({
+          role: "system",
+          content: "<tool-update>New tool available</tool-update>",
+        }),
+      ],
+      "claude-opus-4-8",
+    );
+
+    const lastMessage = result.messages[result.messages.length - 1];
+    expect(lastMessage.role).toBe("system");
+    expect(lastMessage.content).toContain("tool-update");
+  });
+
+  it("recognizes provider-prefixed Opus 4.8 model IDs", async () => {
+    const result = await prepareMessages(
+      [
+        makeMessage({ role: "user", content: "Hello" }),
+        makeMessage({ role: "system", content: "<system-reminder>Stay focused</system-reminder>" }),
+      ],
+      "anthropic.claude-opus-4-8",
+    );
+
+    expect(result.messages[result.messages.length - 1].role).toBe("system");
+  });
+
+  it("demotes mid-conversation system messages on non-supporting models", async () => {
+    const result = await prepareMessages(
+      [
+        makeMessage({ role: "user", content: "Hello" }),
+        makeMessage({
+          role: "system",
+          content: "<tool-update>New tool available</tool-update>",
+        }),
+      ],
+      "claude-sonnet-4-5",
+    );
+
+    expect(result.messages.every((message) => message.role !== "system")).toBe(
+      true,
+    );
+  });
+
+  it("demotes when no model is provided (legacy call shape)", async () => {
+    const result = await prepareMessages([
+      makeMessage({ role: "user", content: "Hello" }),
+      makeMessage({ role: "system", content: "Mid-conv note" }),
+    ]);
+
+    expect(result.messages.every((message) => message.role !== "system")).toBe(
+      true,
+    );
+  });
+
+  it("keeps system role when followed by an assistant turn", async () => {
+    const result = await prepareMessages(
+      [
+        makeMessage({ role: "user", content: "Hello" }),
+        makeMessage({ role: "system", content: "<system-reminder>Rule</system-reminder>" }),
+        makeMessage({ role: "assistant", content: "Understood" }),
+        makeMessage({ role: "user", content: "Continue" }),
+      ],
+      "claude-opus-4-8",
+    );
+
+    expect(result.messages.map((message) => message.role)).toEqual([
+      "user",
+      "system",
+      "assistant",
+      "user",
+    ]);
+  });
+
+  it("demotes a system message followed by a user turn (invalid position)", async () => {
+    const result = await prepareMessages(
+      [
+        makeMessage({ role: "user", content: "Hello" }),
+        makeMessage({ role: "assistant", content: "Hi" }),
+        makeMessage({
+          role: "system",
+          content: "<operational-context>Topology info</operational-context>",
+        }),
+        makeMessage({ role: "user", content: "Start now" }),
+      ],
+      "claude-opus-4-8",
+    );
+
+    // system followed by user is invalid AND it follows an assistant turn —
+    // it must be demoted and merged into the adjacent user message.
+    expect(result.messages.every((message) => message.role !== "system")).toBe(
+      true,
+    );
+    const mergedUser = result.messages[result.messages.length - 1];
+    expect(mergedUser.role).toBe("user");
+    expect(mergedUser.content).toContain("operational-context");
+    expect(mergedUser.content).toContain("Start now");
+  });
+
+  it("demotes a system message that does not follow a user turn", async () => {
+    const result = await prepareMessages(
+      [
+        makeMessage({ role: "user", content: "Hello" }),
+        makeMessage({ role: "assistant", content: "Working on it" }),
+        makeMessage({
+          role: "system",
+          content: "<empty-output-recovery>Respond again</empty-output-recovery>",
+        }),
+      ],
+      "claude-opus-4-8",
+    );
+
+    expect(result.messages.every((message) => message.role !== "system")).toBe(
+      true,
+    );
+  });
+
+  it("merges consecutive mid-conversation system messages into one system turn", async () => {
+    const result = await prepareMessages(
+      [
+        makeMessage({ role: "user", content: "Hello" }),
+        makeMessage({ role: "system", content: "<system-reminder>A</system-reminder>" }),
+        makeMessage({ role: "system", content: "<tool-update>B</tool-update>" }),
+      ],
+      "claude-opus-4-8",
+    );
+
+    const systemMessages = result.messages.filter(
+      (message) => message.role === "system",
+    );
+    expect(systemMessages).toHaveLength(1);
+    expect(systemMessages[0].content).toContain("system-reminder");
+    expect(systemMessages[0].content).toContain("tool-update");
+  });
+});

@@ -49,6 +49,10 @@ import {
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import logger from "#src/utils/logger";
 import PromptLocaleService from "#src/services/PromptLocaleService";
+import {
+  SYSTEM_MESSAGE_TAGS,
+  wrapSystemMessage,
+} from "#src/utils/SystemMessageTags";
 import { getErrorMessage } from "#src/utils/ErrorHelpers";
 import RequestLogger from "#src/services/RequestLogger";
 import { createStandardHooks } from "#src/services/harnesses/lifecycle/HookInitializer";
@@ -517,15 +521,18 @@ export async function runTreeOfThoughts(
 
         currentMessages.push({
           role: "system",
-          content: PromptLocaleService.get(
-            (options?.locale as string | undefined) ||
-              PromptLocaleService.getDefaultLocale(),
-            "harness.treeOfThoughts.proactiveBacktrack",
-            {
-              branchCount: String(scoredBranches.length),
-              bestScore: selectedBranch.score.toFixed(1),
-              threshold: String(valueThreshold),
-            },
+          content: wrapSystemMessage(
+            SYSTEM_MESSAGE_TAGS.BACKTRACK,
+            PromptLocaleService.get(
+              (options?.locale as string | undefined) ||
+                PromptLocaleService.getDefaultLocale(),
+              "harness.treeOfThoughts.proactiveBacktrack",
+              {
+                branchCount: String(scoredBranches.length),
+                bestScore: selectedBranch.score.toFixed(1),
+                threshold: String(valueThreshold),
+              },
+            ),
           ),
         });
 
@@ -719,15 +726,18 @@ export async function runTreeOfThoughts(
 
             currentMessages.push({
               role: "system",
-              content: PromptLocaleService.get(
-                (options?.locale as string | undefined) ||
-                  PromptLocaleService.getDefaultLocale(),
-                "harness.treeOfThoughts.frontierFallback",
-                {
-                  branchIndex: String(selectedBranch.branchIndex + 1),
-                  errorCount: String(validationFeedback.length),
-                  errorBlock,
-                },
+              content: wrapSystemMessage(
+                SYSTEM_MESSAGE_TAGS.VALIDATION_ERRORS,
+                PromptLocaleService.get(
+                  (options?.locale as string | undefined) ||
+                    PromptLocaleService.getDefaultLocale(),
+                  "harness.treeOfThoughts.frontierFallback",
+                  {
+                    branchIndex: String(selectedBranch.branchIndex + 1),
+                    errorCount: String(validationFeedback.length),
+                    errorBlock,
+                  },
+                ),
               ),
             });
 
@@ -781,15 +791,18 @@ export async function runTreeOfThoughts(
 
             currentMessages.push({
               role: "system",
-              content: PromptLocaleService.get(
-                (options?.locale as string | undefined) ||
-                  PromptLocaleService.getDefaultLocale(),
-                "harness.treeOfThoughts.reflexion",
-                {
-                  branchIndex: String(selectedBranch.branchIndex + 1),
-                  errorCount: String(validationFeedback.length),
-                  errorBlock,
-                },
+              content: wrapSystemMessage(
+                SYSTEM_MESSAGE_TAGS.VALIDATION_ERRORS,
+                PromptLocaleService.get(
+                  (options?.locale as string | undefined) ||
+                    PromptLocaleService.getDefaultLocale(),
+                  "harness.treeOfThoughts.reflexion",
+                  {
+                    branchIndex: String(selectedBranch.branchIndex + 1),
+                    errorCount: String(validationFeedback.length),
+                    errorBlock,
+                  },
+                ),
               ),
             });
           } else {
@@ -825,11 +838,14 @@ export async function runTreeOfThoughts(
 
             currentMessages.push({
               role: "system",
-              content: PromptLocaleService.get(
-                (options?.locale as string | undefined) ||
-                  PromptLocaleService.getDefaultLocale(),
-                "harness.treeOfThoughts.budgetExhausted",
-                { errorBlock },
+              content: wrapSystemMessage(
+                SYSTEM_MESSAGE_TAGS.VALIDATION_ERRORS,
+                PromptLocaleService.get(
+                  (options?.locale as string | undefined) ||
+                    PromptLocaleService.getDefaultLocale(),
+                  "harness.treeOfThoughts.budgetExhausted",
+                  { errorBlock },
+                ),
               ),
             });
           }
@@ -1319,11 +1335,14 @@ async function runPlanningPhase(
       }
       currentMessages.push({
         role: "system",
-        content: PromptLocaleService.get(
-          (options?.locale as string | undefined) ||
-            PromptLocaleService.getDefaultLocale(),
-          "harness.planningMode.blocked",
-          { blockedNames },
+        content: wrapSystemMessage(
+          SYSTEM_MESSAGE_TAGS.PLAN_MODE,
+          PromptLocaleService.get(
+            (options?.locale as string | undefined) ||
+              PromptLocaleService.getDefaultLocale(),
+            "harness.planningMode.blocked",
+            { blockedNames },
+          ),
         ),
       });
       continue;

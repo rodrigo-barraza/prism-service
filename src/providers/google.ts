@@ -463,9 +463,10 @@ export async function convertMessages(
     }
 
     // Mid-conversation system messages (e.g. dynamic tool updates from the
-    // harness) — Gemini does not support role: "system" mid-conversation,
-    // so convert to "user" role. The harness already wraps these in
-    // <tool-update> XML tags for semantic clarity.
+    // harness) — Gemini's contents array only accepts "user" and "model"
+    // roles (verified 2026-07), so convert to "user" role. The harness wraps
+    // these in semantic XML tags (see utils/SystemMessageTags.ts), so the
+    // model can distinguish them from actual user messages.
     if (item.role === "system") {
       if (item.content) {
         result.push({

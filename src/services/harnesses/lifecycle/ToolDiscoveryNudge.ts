@@ -1,5 +1,9 @@
 import logger from "#src/utils/logger";
 import PromptLocaleService from "#src/services/PromptLocaleService";
+import {
+  SYSTEM_MESSAGE_TAGS,
+  wrapSystemMessage,
+} from "#src/utils/SystemMessageTags";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import ToolContext from "#src/services/ToolContext";
@@ -77,8 +81,8 @@ export function injectToolDiscoveryNudge(
 
       currentMessages.push({
         role: "system",
-        content:
-          `<tool-update>\n` +
+        content: wrapSystemMessage(
+          SYSTEM_MESSAGE_TAGS.TOOL_UPDATE,
           PromptLocaleService.get(
             (context.options?.locale as string | undefined) ||
               PromptLocaleService.getDefaultLocale(),
@@ -87,8 +91,8 @@ export function injectToolDiscoveryNudge(
               count: String(disabledToolNames.length),
               toolNames: disabledToolNames.join(", "),
             },
-          ) +
-          `\n</tool-update>`,
+          ),
+        ),
       });
       logger.info(
         `[ToolDiscoveryNudge] Auto-enabled ${disabledToolNames.length} tools for lower-tier model "${context.resolvedModel}": [${disabledToolNames.join(", ")}]`,
@@ -96,8 +100,8 @@ export function injectToolDiscoveryNudge(
     } else {
       currentMessages.push({
         role: "system",
-        content:
-          `<tool-update>\n` +
+        content: wrapSystemMessage(
+          SYSTEM_MESSAGE_TAGS.TOOL_UPDATE,
           PromptLocaleService.get(
             (context.options?.locale as string | undefined) ||
               PromptLocaleService.getDefaultLocale(),
@@ -106,8 +110,8 @@ export function injectToolDiscoveryNudge(
               count: String(disabledToolNames.length),
               toolNames: disabledToolNames.join(", "),
             },
-          ) +
-          `\n</tool-update>`,
+          ),
+        ),
       });
       logger.info(
         `[ToolDiscoveryNudge] Injected post-search nudge for ${disabledToolNames.length} disabled tools: [${disabledToolNames.join(", ")}]`,

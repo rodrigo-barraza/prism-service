@@ -30,6 +30,10 @@ import {
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import logger from "#src/utils/logger";
 import PromptLocaleService from "#src/services/PromptLocaleService";
+import {
+  SYSTEM_MESSAGE_TAGS,
+  wrapSystemMessage,
+} from "#src/utils/SystemMessageTags";
 import { getErrorMessage } from "#src/utils/ErrorHelpers";
 import RequestLogger from "#src/services/RequestLogger";
 import { createStandardHooks } from "#src/services/harnesses/lifecycle/HookInitializer";
@@ -366,14 +370,17 @@ export async function runGraphOfThoughts(
 
         currentMessages.push({
           role: "system",
-          content: PromptLocaleService.get(
-            (options?.locale as string | undefined) ||
-              PromptLocaleService.getDefaultLocale(),
-            "harness.graphOfThoughts.proactiveBacktrack",
-            {
-              bestScore: (scoredBranches[0]?.score ?? 0).toFixed(1),
-              threshold: String(valueThreshold),
-            },
+          content: wrapSystemMessage(
+            SYSTEM_MESSAGE_TAGS.BACKTRACK,
+            PromptLocaleService.get(
+              (options?.locale as string | undefined) ||
+                PromptLocaleService.getDefaultLocale(),
+              "harness.graphOfThoughts.proactiveBacktrack",
+              {
+                bestScore: (scoredBranches[0]?.score ?? 0).toFixed(1),
+                threshold: String(valueThreshold),
+              },
+            ),
           ),
         });
 
@@ -543,15 +550,18 @@ export async function runGraphOfThoughts(
 
           currentMessages.push({
             role: "system",
-            content: PromptLocaleService.get(
-              (options?.locale as string | undefined) ||
-                PromptLocaleService.getDefaultLocale(),
-              "harness.graphOfThoughts.synthesizedValidationError",
-              {
-                errorCount: String(validationFeedback.length),
-                errorBlock,
-                branchCount: String(scoredBranches.length),
-              },
+            content: wrapSystemMessage(
+              SYSTEM_MESSAGE_TAGS.VALIDATION_ERRORS,
+              PromptLocaleService.get(
+                (options?.locale as string | undefined) ||
+                  PromptLocaleService.getDefaultLocale(),
+                "harness.graphOfThoughts.synthesizedValidationError",
+                {
+                  errorCount: String(validationFeedback.length),
+                  errorBlock,
+                  branchCount: String(scoredBranches.length),
+                },
+              ),
             ),
           });
 
@@ -1156,11 +1166,14 @@ async function runPlanningPhase(
       }
       currentMessages.push({
         role: "system",
-        content: PromptLocaleService.get(
-          (options?.locale as string | undefined) ||
-            PromptLocaleService.getDefaultLocale(),
-          "harness.planningMode.blocked",
-          { blockedNames },
+        content: wrapSystemMessage(
+          SYSTEM_MESSAGE_TAGS.PLAN_MODE,
+          PromptLocaleService.get(
+            (options?.locale as string | undefined) ||
+              PromptLocaleService.getDefaultLocale(),
+            "harness.planningMode.blocked",
+            { blockedNames },
+          ),
         ),
       });
       continue;
