@@ -1,4 +1,5 @@
 import { TOOLS_SERVICE_URL } from "#config";
+import { IDENTITY_HEADERS } from "@rodrigo-barraza/service-library";
 import MCPClientService from "#src/services/MCPClientService";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 import logger from "#src/utils/logger";
@@ -394,7 +395,8 @@ async function executeToolGeneric(
       if (body.directory) body.directory = rewritePath(body.directory as string);
 
       // Inject workspace override header so tools-api sandbox validation passes
-      contextHeaders["X-Workspace-Override"] = worktreeState.worktreePath;
+      contextHeaders[IDENTITY_HEADERS.workspaceOverride] =
+        worktreeState.worktreePath;
     }
 
     return fetchJsonWithBody(
@@ -419,21 +421,22 @@ function buildContextHeaders(
   context: ToolExecutionContext = {},
 ): Record<string, string> {
   const headers: Record<string, string> = {};
-  if (context.project) headers["X-Project"] = context.project;
-  if (context.username) headers["X-Username"] = context.username;
-  if (context.agent) headers["X-Agent"] = context.agent;
-  if (context.requestId) headers["X-Request-Id"] = context.requestId;
+  if (context.project) headers[IDENTITY_HEADERS.project] = context.project;
+  if (context.username) headers[IDENTITY_HEADERS.username] = context.username;
+  if (context.agent) headers[IDENTITY_HEADERS.agent] = context.agent;
+  if (context.requestId)
+    headers[IDENTITY_HEADERS.requestId] = context.requestId;
   if (context.traceId) headers["X-Trace-Id"] = context.traceId;
   if (context.agentConversationId)
     headers["X-Agent-Conversation-Id"] = context.agentConversationId;
   if (context.conversationId)
-    headers["X-Conversation-Id"] = context.conversationId;
+    headers[IDENTITY_HEADERS.conversationId] = context.conversationId;
   if (context.iteration !== undefined && context.iteration !== null)
-    headers["X-Iteration"] = String(context.iteration);
+    headers[IDENTITY_HEADERS.iteration] = String(context.iteration);
   // Multi-workspace: when the user has selected a non-default workspace root,
   // send it to tools-api so file/git/shell tools resolve within it.
   if (context.workspaceRoot)
-    headers["X-Workspace-Root"] = context.workspaceRoot;
+    headers[IDENTITY_HEADERS.workspaceRoot] = context.workspaceRoot;
   if (context.enabledTools && Array.isArray(context.enabledTools)) {
     headers["X-Enabled-Tools"] = context.enabledTools.join(",");
   }

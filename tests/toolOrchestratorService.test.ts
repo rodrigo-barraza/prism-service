@@ -2162,11 +2162,11 @@ describe("ToolOrchestratorService", () => {
       expect(capturedBody.cwd).toBe("/worktree-path/dir");
       expect(capturedBody.directory).toBe("/worktree-path/sub");
 
-      expect(capturedHeaders["X-Workspace-Override"]).toBe("/worktree-path");
-      expect(capturedHeaders["X-Request-Id"]).toBe("req-1");
-      expect(capturedHeaders["X-Iteration"]).toBe("2");
-      expect(capturedHeaders["X-Workspace-Root"]).toBe("/original-root");
-      expect(capturedHeaders["X-Agent"]).toBe("my-agent");
+      expect(capturedHeaders["x-workspace-override"]).toBe("/worktree-path");
+      expect(capturedHeaders["x-request-id"]).toBe("req-1");
+      expect(capturedHeaders["x-iteration"]).toBe("2");
+      expect(capturedHeaders["x-workspace-root"]).toBe("/original-root");
+      expect(capturedHeaders["x-agent"]).toBe("my-agent");
 
       ToolOrchestratorService._clearWorktree(agentConversationId);
     });
