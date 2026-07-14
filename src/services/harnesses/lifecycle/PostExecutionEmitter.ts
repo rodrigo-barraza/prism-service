@@ -153,7 +153,7 @@ export async function processToolResultMedia(
     }
 
     const imageResult = resultObject?.image;
-    if (imageResult?.data) {
+    if (resultObject && imageResult?.data) {
       const toolImgRef =
         imageResult.minioRef ||
         `data:${imageResult.mimeType};base64,${imageResult.data}`;
