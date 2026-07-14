@@ -143,7 +143,12 @@ router.get(
           .toArray(),
         req.db
           .collection(REQUESTS_COLLECTION)
-          .find({ createdAt: { $gte: since } })
+          .find(
+            { createdAt: { $gte: since } },
+            // Payloads can be megabytes each; the dashboard table fetches the
+            // full request on row click, so exclude them here like /requests
+            { projection: { requestPayload: 0, responsePayload: 0 } },
+          )
           .sort({ createdAt: -1 })
           .limit(20)
           .toArray(),

@@ -294,6 +294,18 @@ setupWebSocket(wss);
           collection: COLLECTIONS.REQUESTS,
           keys: { success: 1, createdAt: -1 },
         },
+        // requests — admin list filters (agent/operation/provider) with time sort
+        { collection: COLLECTIONS.REQUESTS, keys: { agent: 1, createdAt: -1 } },
+        {
+          collection: COLLECTIONS.REQUESTS,
+          keys: { operation: 1, createdAt: -1 },
+        },
+        {
+          collection: COLLECTIONS.REQUESTS,
+          keys: { provider: 1, createdAt: -1 },
+        },
+        // requests — admin conversation search by client IP
+        { collection: COLLECTIONS.REQUESTS, keys: { clientIp: 1 } },
         // conversations — used by findOne lookups and list queries
         {
           collection: COLLECTIONS.MODEL_CONVERSATIONS,
@@ -323,6 +335,16 @@ setupWebSocket(wss);
         {
           collection: COLLECTIONS.MODEL_CONVERSATIONS,
           keys: { parentConversationId: 1 },
+        },
+        // conversations — task-scoped listing
+        {
+          collection: COLLECTIONS.MODEL_CONVERSATIONS,
+          keys: { taskId: 1, updatedAt: -1 },
+        },
+        // conversations — admin filter dropdown distinct("username")
+        {
+          collection: COLLECTIONS.MODEL_CONVERSATIONS,
+          keys: { username: 1 },
         },
         // agent_conversations — same indexes as conversations
         {
@@ -358,11 +380,41 @@ setupWebSocket(wss);
           collection: COLLECTIONS.AGENT_CONVERSATIONS,
           keys: { parentConversationId: 1 },
         },
+        // agent_conversations — task-scoped listing
+        {
+          collection: COLLECTIONS.AGENT_CONVERSATIONS,
+          keys: { taskId: 1, updatedAt: -1 },
+        },
         // workflows — used by conversationIds lookup
         {
           collection: COLLECTIONS.WORKFLOWS,
           keys: { id: 1 },
           options: { unique: true },
+        },
+        // workflows — reverse lookup: which workflow contains a conversation
+        // (multikey; used by ConversationsRoutes and admin request/content joins)
+        { collection: COLLECTIONS.WORKFLOWS, keys: { conversationIds: 1 } },
+        // workflows — source-scoped listing sorted by recency
+        {
+          collection: COLLECTIONS.WORKFLOWS,
+          keys: { source: 1, updatedAt: -1 },
+        },
+        // conversation_timers — 1s daemon tick: active timers due to fire
+        {
+          collection: COLLECTIONS.CONVERSATION_TIMERS,
+          keys: { status: 1, firesAt: 1 },
+        },
+        // conversation_timers — per-conversation active timer listing
+        {
+          collection: COLLECTIONS.CONVERSATION_TIMERS,
+          keys: { conversationId: 1, status: 1 },
+        },
+        // scheduled_tasks — daemon tick scans enabled tasks every minute
+        { collection: COLLECTIONS.SCHEDULED_TASKS, keys: { enabled: 1 } },
+        // favorites — scoped listing sorted by recency
+        {
+          collection: COLLECTIONS.FAVORITES,
+          keys: { project: 1, username: 1, createdAt: -1 },
         },
         // benchmarks
         {
@@ -673,42 +725,34 @@ setupWebSocket(wss);
       const db = MongoWrapper.getDb(MONGO_DB_NAME);
       if (!db) return;
 
-      // Find all distinct projects with at least some memories
-      const projects = await db
-        .collection(COLLECTIONS.MEMORIES)
-        .distinct("project");
+      // Single $group aggregation replaces the former distinct-per-project +
+      // count-per-agent N+1 sweep.
+      const combos = await MemoryService.discoverCombos();
 
-      // Process projects sequentially — each consolidation loads the full
+      // Process combos sequentially — each consolidation loads the full
       // memory corpus with embeddings (~12KB/memory). Running them concurrently
       // compounds heap usage and can cause OOM on large collections.
-      for (const project of projects) {
-        // Find all distinct agents within this project
-        const agents = await db
-          .collection(COLLECTIONS.MEMORIES)
-          .distinct("agent", { project });
-        if (!agents.length) continue;
+      for (const { project, agent, count } of combos as Array<{
+        project: string;
+        agent: string;
+        count: number;
+      }>) {
+        if (count < 10) continue; // Skip agent/project combos with few memories
 
-        for (const agent of agents) {
-          const count = await db
-            .collection(COLLECTIONS.MEMORIES)
-            .countDocuments({ project, agent });
-          if (count < 10) continue; // Skip agent/project combos with few memories
-
-          logger.info(
-            `[AutoDream] Scheduled consolidation for agent "${agent}", project "${project}" (${count} memories)`,
+        logger.info(
+          `[AutoDream] Scheduled consolidation for agent "${agent}", project "${project}" (${count} memories)`,
+        );
+        try {
+          await MemoryConsolidationService.consolidate({
+            agent,
+            project,
+            username: "system",
+            trigger: "scheduled",
+          });
+        } catch (error: unknown) {
+          logger.error(
+            `[AutoDream] Scheduled consolidation failed for "${agent}/${project}": ${getErrorMessage(error)}`,
           );
-          try {
-            await MemoryConsolidationService.consolidate({
-              agent,
-              project,
-              username: "system",
-              trigger: "scheduled",
-            });
-          } catch (error: unknown) {
-            logger.error(
-              `[AutoDream] Scheduled consolidation failed for "${agent}/${project}": ${getErrorMessage(error)}`,
-            );
-          }
         }
       }
     } catch (error: unknown) {

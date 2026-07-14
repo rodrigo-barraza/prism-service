@@ -20,6 +20,7 @@ vi.mock("#src/wrappers/MongoWrapper", () => {
     countDocuments: vi.fn().mockResolvedValue(0),
     aggregate: vi.fn().mockReturnThis(),
     createIndex: vi.fn().mockResolvedValue(undefined),
+    dropIndex: vi.fn().mockResolvedValue(undefined),
   };
   return {
     default: {

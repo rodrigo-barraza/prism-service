@@ -61,7 +61,39 @@ const WATCHED_COLLECTIONS = [
 function openStream(db: Db, collectionName: string) {
   try {
     const collection = db.collection(collectionName);
-    const stream = collection.watch([], { fullDocument: "updateLookup" });
+    // Project events down to the fields the payload below actually uses.
+    // Without this, every event ships the entire document (including
+    // requestPayload/responsePayload and full message arrays) over the wire.
+    // Inclusion projection keeps the resume token (_id) implicitly.
+    const stream = collection.watch(
+      [
+        {
+          $project: {
+            operationType: 1,
+            documentKey: 1,
+            updatedFieldKeys: {
+              $map: {
+                input: {
+                  $objectToArray: {
+                    $ifNull: ["$updateDescription.updatedFields", {}],
+                  },
+                },
+                as: "field",
+                in: "$$field.k",
+              },
+            },
+            "updateDescription.updatedFields.isGenerating": 1,
+            "updateDescription.updatedFields.isActive": 1,
+            "fullDocument.id": 1,
+            "fullDocument.isGenerating": 1,
+            "fullDocument.isActive": 1,
+            "fullDocument.conversationId": 1,
+            "fullDocument.parentAgentConversationId": 1,
+          },
+        },
+      ],
+      { fullDocument: "updateLookup" },
+    );
 
     stream.on("change", (event: ChangeStreamDocument) => {
       const documentKey =
@@ -79,15 +111,22 @@ function openStream(db: Db, collectionName: string) {
             } | null)
           : null;
 
+      // The watch pipeline replaces updateDescription.updatedFields with a
+      // server-computed key list so field values never leave the server.
+      const updatedFieldKeys =
+        "updatedFieldKeys" in event
+          ? ((event as unknown as Record<string, unknown>)
+              .updatedFieldKeys as string[])
+          : null;
+
       const payload: ChangeStreamEventPayload = {
         collection: collectionName,
         operationType: event.operationType,
         documentId: documentKey?._id?.toString() || null,
         // For inserts/updates, include the document ID field if available
         id: (fullDocument?.id as string) || null,
-        updatedFields: updateDescription?.updatedFields
-          ? Object.keys(updateDescription.updatedFields)
-          : null,
+        updatedFields:
+          event.operationType === "update" ? (updatedFieldKeys ?? []) : null,
         timestamp: new Date().toISOString(),
       };
 
