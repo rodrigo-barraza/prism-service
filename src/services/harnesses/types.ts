@@ -376,5 +376,6 @@ export interface BeforePromptHookContext {
   workspaceEnabled?: boolean;
   locale?: string;
   _injectedSkills?: string[];
+  _skillsText?: string;
   [key: string]: unknown;
 }
