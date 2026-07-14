@@ -1,6 +1,7 @@
 import {
   DEFAULT_TOPOLOGY,
   DEFAULT_USERNAME,
+  IDENTITY_HEADERS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { handleConversation } from "#src/routes/ChatRoutes";
 import { handleVoice } from "#src/routes/AudioRoutes";
@@ -103,20 +104,20 @@ export function setupWebSocket(webSocketServer: WebSocketServer) {
     const pathname = url.pathname;
 
     const project =
-      (request.headers["x-project"] as string) ||
+      (request.headers[IDENTITY_HEADERS.project] as string) ||
       url.searchParams.get("project") ||
       "any";
-    const xForwardedFor = request.headers["x-forwarded-for"];
+    const xForwardedFor = request.headers[IDENTITY_HEADERS.forwardedFor];
     const rawIp =
       (Array.isArray(xForwardedFor) ? xForwardedFor[0] : xForwardedFor)?.split(",")[0]?.trim() ||
       request.socket.remoteAddress;
     // Normalize IPv4-mapped IPv6 (::ffff:127.0.0.1 → 127.0.0.1)
     const clientIp = rawIp?.replace(/^::ffff:/, "") || rawIp;
     const username =
-      (request.headers["x-username"] as string) ||
+      (request.headers[IDENTITY_HEADERS.username] as string) ||
       url.searchParams.get("username") ||
       DEFAULT_USERNAME;
-    const agent = (request.headers["x-agent"] as string) || null;
+    const agent = (request.headers[IDENTITY_HEADERS.agent] as string) || null;
     logger.info(
       `WebSocket connection on ${pathname} (project: ${project}, user: ${username})`,
     );
