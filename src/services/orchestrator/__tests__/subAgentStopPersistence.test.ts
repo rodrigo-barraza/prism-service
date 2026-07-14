@@ -382,4 +382,110 @@ describe("SubAgentLifecycleService — Stop / Abort Persistence", () => {
       expect(subAgentState.status).toBe(SYSTEM_STATUSES.STOPPED);
     });
   });
+
+  // ── emitSpawnedStatus ─────────────────────────────────────
+
+  describe("emitSpawnedStatus", () => {
+    it("emits a running sub_agent_status event with the agent's identity", () => {
+      const emit = vi.fn();
+      const subAgent = createMockSubAgentState({
+        agentId: "agent-spawn-1",
+        agentIndex: 1,
+        globalSpawnIndex: 3,
+      });
+
+      SubAgentLifecycleService.emitSpawnedStatus(emit, subAgent);
+
+      expect(emit).toHaveBeenCalledTimes(1);
+      expect(emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "sub_agent_status",
+          subAgentId: "agent-spawn-1",
+          status: SYSTEM_STATUSES.RUNNING,
+          conversationId: "sub-conv-1",
+          agentConversationId: "parent-agent-conv-1",
+          provider: "test-provider",
+          model: "test-model",
+          agentIndex: 1,
+          globalSpawnIndex: 3,
+        }),
+      );
+    });
+
+    it("is a no-op when no emit function is provided", () => {
+      expect(() =>
+        SubAgentLifecycleService.emitSpawnedStatus(
+          undefined,
+          createMockSubAgentState(),
+        ),
+      ).not.toThrow();
+    });
+  });
+
+  // ── markSubAgentFailed ────────────────────────────────────
+
+  describe("markSubAgentFailed", () => {
+    it("sets terminal status/error/duration and emits FAILED", () => {
+      const emit = vi.fn();
+      const subAgent = createMockSubAgentState({ agentId: "agent-fail-1" });
+
+      SubAgentLifecycleService.markSubAgentFailed(
+        subAgent,
+        new Error("boom"),
+        { emit },
+      );
+
+      expect(subAgent.status).toBe(SYSTEM_STATUSES.FAILED);
+      expect(subAgent.error).toBe("boom");
+      expect(subAgent.durationMilliseconds).toBeGreaterThan(0);
+      expect(emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "sub_agent_status",
+          subAgentId: "agent-fail-1",
+          message: SYSTEM_STATUSES.FAILED,
+          error: "boom",
+        }),
+      );
+    });
+
+    it("skips worktree cleanup and DB persistence when cleanupResources is unset", async () => {
+      const { GitWorktreeHelper } = await import(
+        "#src/services/orchestrator/GitWorktreeHelper"
+      );
+      const subAgent = createMockSubAgentState({
+        agentId: "agent-fail-2",
+        isolated: true,
+        worktreePath: "/repo/.worktrees/agent-fail-2",
+      });
+
+      SubAgentLifecycleService.markSubAgentFailed(subAgent, new Error("x"));
+
+      expect(GitWorktreeHelper.removeWorktree).not.toHaveBeenCalled();
+      expect(mockUpdateOne).not.toHaveBeenCalled();
+    });
+
+    it("removes the worktree and persists the terminal status when cleanupResources is set", async () => {
+      const { GitWorktreeHelper } = await import(
+        "#src/services/orchestrator/GitWorktreeHelper"
+      );
+      const subAgent = createMockSubAgentState({
+        agentId: "agent-fail-3",
+        isolated: true,
+        worktreePath: "/repo/.worktrees/agent-fail-3",
+      });
+
+      SubAgentLifecycleService.markSubAgentFailed(subAgent, new Error("x"), {
+        cleanupResources: true,
+      });
+      // Let the fire-and-forget cleanup/persist microtasks settle.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(GitWorktreeHelper.removeWorktree).toHaveBeenCalledWith(
+        "/repo",
+        "/repo/.worktrees/agent-fail-3",
+      );
+      expect(mockUpdateOne).toHaveBeenCalled();
+    });
+  });
 });

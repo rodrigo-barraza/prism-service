@@ -64,7 +64,7 @@ import type {
 import type { ConversationMessage, LLMProvider } from "./harnesses/types.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import ConversationService from "./ConversationService.ts";
-import { COLLECTIONS, ORCHESTRATOR, NOTIFICATION_SOURCES, SYSTEM_STATUSES, DEFAULT_LOCALE } from "#src/constants";
+import { COLLECTIONS, ORCHESTRATOR, NOTIFICATION_SOURCES, SYSTEM_STATUSES, DEFAULT_LOCALE, AGENT_DIRECTIVES } from "#src/constants";
 
 type AgenticLoopServiceModule = typeof import("./AgenticLoopService.ts");
 
@@ -77,6 +77,25 @@ type AgenticLoopServiceModule = typeof import("./AgenticLoopService.ts");
 // Entry point: Chat tools — spawnFromTool() / sendMessage() / stopAgent()
 // Called when the LLM invokes create_subagents / send_subagent_message / stop_subagent
 // ────────────────────────────────────────────────────────────
+
+/**
+ * Clamp a sub-agent's output to the notification character budget, appending
+ * the localized truncation suffix when it overflows. Used when embedding a
+ * completed agent's output into the parent-facing completion notification.
+ */
+function truncateAgentOutput(agentOutput: string, locale: string): string {
+  if (agentOutput.length <= ORCHESTRATOR.AGENT_OUTPUT_TRUNCATION_LIMIT) {
+    return agentOutput;
+  }
+  const truncationSuffix = PromptLocaleService.get(
+    locale,
+    "orchestrator.notifications.truncated",
+  );
+  return (
+    agentOutput.slice(0, ORCHESTRATOR.AGENT_OUTPUT_TRUNCATION_LIMIT) +
+    truncationSuffix
+  );
+}
 
 /** Active sub-agents spawned via chat tools, keyed by agentId */
 const activeSubAgents = new Map<string, SubAgentState>();
@@ -1340,21 +1359,10 @@ export class OrchestratorService {
       `[Orchestrator] Continuing sub-agent ${agentId} (stateful session reuse)`,
     );
 
-    if (orchestratorContext.emit) {
-      orchestratorContext.emit({
-        type: "sub_agent_status",
-        subAgentId: agentId,
-        message: STATUS_MESSAGES.SPAWNED,
-        description: subAgent.description,
-        status: SYSTEM_STATUSES.RUNNING,
-        conversationId: subAgent.subAgentConversationId,
-        parentConversationId: subAgent.parentConversationId || null,
-        model: subAgent.resolvedModel,
-        provider: subAgent.providerName,
-        agentIndex: subAgent.agentIndex ?? null,
-        globalSpawnIndex: subAgent.globalSpawnIndex ?? null,
-      });
-    }
+    SubAgentLifecycleService.emitSpawnedStatus(
+      orchestratorContext.emit,
+      subAgent,
+    );
 
     try {
       await OrchestratorService._runSubAgentLoop(
@@ -1367,19 +1375,9 @@ export class OrchestratorService {
       logger.error(
         `[Orchestrator] Sub-agent ${agentId} continuation error: ${getErrorMessage(error)}`,
       );
-      subAgent.status = SYSTEM_STATUSES.FAILED;
-      subAgent.error = getErrorMessage(error);
-      subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
-
-      if (orchestratorContext.emit) {
-        orchestratorContext.emit({
-          type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
-          subAgentId: agentId,
-          message: SYSTEM_STATUSES.FAILED,
-          conversationId: subAgent.subAgentConversationId || null,
-          error: getErrorMessage(error),
-        });
-      }
+      SubAgentLifecycleService.markSubAgentFailed(subAgent, error, {
+        emit: orchestratorContext.emit,
+      });
     }
 
     if (orchestratorContext.emit) {
@@ -1453,21 +1451,10 @@ export class OrchestratorService {
       `[Orchestrator] Resuming sub-agent ${agentId} with new prompt (non-blocking)`,
     );
 
-    if (orchestratorContext.emit) {
-      orchestratorContext.emit({
-        type: "sub_agent_status",
-        subAgentId: agentId,
-        message: STATUS_MESSAGES.SPAWNED,
-        description: subAgent.description,
-        status: SYSTEM_STATUSES.RUNNING,
-        conversationId: subAgent.subAgentConversationId,
-        parentConversationId: subAgent.parentConversationId || null,
-        model: subAgent.resolvedModel,
-        provider: subAgent.providerName,
-        agentIndex: subAgent.agentIndex ?? null,
-        globalSpawnIndex: subAgent.globalSpawnIndex ?? null,
-      });
-    }
+    SubAgentLifecycleService.emitSpawnedStatus(
+      orchestratorContext.emit,
+      subAgent,
+    );
 
     // Fire detached background promise — same pattern as non-blocking spawnFromTool
     OrchestratorService._runSubAgentLoop(
@@ -1505,18 +1492,10 @@ export class OrchestratorService {
         logger.error(
           `[Orchestrator] Resumed sub-agent ${agentId} error: ${getErrorMessage(error)}`,
         );
-        subAgent.status = SYSTEM_STATUSES.FAILED;
-        subAgent.error = getErrorMessage(error);
-        subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
-
+        SubAgentLifecycleService.markSubAgentFailed(subAgent, error, {
+          emit: orchestratorContext.emit,
+        });
         if (orchestratorContext.emit) {
-          orchestratorContext.emit({
-            type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
-            subAgentId: agentId,
-            message: SYSTEM_STATUSES.FAILED,
-            conversationId: subAgent.subAgentConversationId || null,
-            error: getErrorMessage(error),
-          });
           orchestratorContext.emit({
             type: SERVER_SENT_EVENT_TYPES.STATUS,
             message: STATUS_MESSAGES.SUB_AGENTS_UPDATED,
@@ -1537,7 +1516,7 @@ export class OrchestratorService {
       });
 
     return {
-      _directive: "NON_BLOCKING_DISPATCH",
+      _directive: AGENT_DIRECTIVES.NON_BLOCKING_DISPATCH,
       instruction:
         "A sub-agent has been resumed in the background. You will be automatically notified with a [SUB-AGENT RESUMED COMPLETED] message when it finishes. " +
         "END YOUR TURN NOW — do not poll or loop. Simply inform the user that the agent has been resumed and you will report back when it completes.",
@@ -1569,11 +1548,7 @@ export class OrchestratorService {
         : JSON.stringify(agentResult.result)
       : noOutputFallback;
 
-    const truncationSuffix = PromptLocaleService.get(locale, "orchestrator.notifications.truncated");
-    const truncatedOutput =
-      agentOutput.length > ORCHESTRATOR.AGENT_OUTPUT_TRUNCATION_LIMIT
-        ? agentOutput.slice(0, ORCHESTRATOR.AGENT_OUTPUT_TRUNCATION_LIMIT) + truncationSuffix
-        : agentOutput;
+    const truncatedOutput = truncateAgentOutput(agentOutput, locale);
 
     const resumedAgentCompletedSummary = PromptLocaleService.get(
       locale,
@@ -2229,11 +2204,7 @@ export class OrchestratorService {
           ? result.result
           : JSON.stringify(result.result)
         : noOutputFallback;
-      const truncationSuffix = PromptLocaleService.get(locale, "orchestrator.notifications.truncated");
-      const truncatedOutput =
-        agentOutput.length > ORCHESTRATOR.AGENT_OUTPUT_TRUNCATION_LIMIT
-          ? agentOutput.slice(0, ORCHESTRATOR.AGENT_OUTPUT_TRUNCATION_LIMIT) + truncationSuffix
-          : agentOutput;
+      const truncatedOutput = truncateAgentOutput(agentOutput, locale);
       return [
         PromptLocaleService.get(locale, "orchestrator.notifications.agentStatus", {
           agentNumber,
