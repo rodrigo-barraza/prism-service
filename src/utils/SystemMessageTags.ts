@@ -10,6 +10,16 @@
  *
  * Naming follows the existing <tool-update> / <task-notification> convention:
  * semantic, kebab-case, one tag per message family.
+ *
+ * Canonical wrap format (shared with the system prompt's section tags via
+ * wrapTag): tags sit on their own lines with a blank line between tag and
+ * content, so every tagged block reads identically everywhere:
+ *
+ *   <tag-name>
+ *
+ *   content
+ *
+ *   </tag-name>
  */
 export const SYSTEM_MESSAGE_TAGS = {
   /** Dynamic tool-set changes (tools enabled/disabled mid-conversation). */
@@ -38,15 +48,37 @@ export const SYSTEM_MESSAGE_TAGS = {
   PLAN_MODE: "plan-mode",
   /** Sub-agent operational context (topology, position, workspace). */
   OPERATIONAL_CONTEXT: "operational-context",
+  /** Per-turn injected context header (local time, runtime facts). */
+  SYSTEM_CONTEXT: "system-context",
+  /** Relevance-filtered project skills injected alongside system context. */
+  PROJECT_SKILLS: "project-skills",
+  /** Embedding-matched long-term memories injected alongside system context. */
+  AGENT_MEMORY: "agent-memory",
+  /** Cross-conversation procedural workflows injected alongside system context. */
+  PAST_WORKFLOWS: "past-workflows",
+  /** Runtime platform data (server/channel/participant info, image captions). */
+  PLATFORM_CONTEXT: "platform-context",
+  /** Agent self context (somatic/emotional state). */
+  SELF_CONTEXT: "self-context",
 } as const;
 
 export type SystemMessageTag =
   (typeof SYSTEM_MESSAGE_TAGS)[keyof typeof SYSTEM_MESSAGE_TAGS];
+
+/**
+ * Wrap content in an XML tag using the canonical block format: tag lines
+ * above and below the content, separated by blank lines. Single source of
+ * truth for tag formatting — used by both the system prompt assembler's
+ * section tags and mid-conversation system messages.
+ */
+export function wrapTag(tagName: string, content: string): string {
+  return `<${tagName}>\n\n${content}\n\n</${tagName}>`;
+}
 
 /** Wrap system-message content in its semantic XML tag. */
 export function wrapSystemMessage(
   tag: SystemMessageTag,
   content: string,
 ): string {
-  return `<${tag}>\n${content}\n</${tag}>`;
+  return wrapTag(tag, content);
 }

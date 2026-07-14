@@ -10,21 +10,28 @@ import { describe, it, expect } from "vitest";
 import {
   SYSTEM_MESSAGE_TAGS,
   wrapSystemMessage,
+  wrapTag,
 } from "#src/utils/SystemMessageTags";
 
 describe("wrapSystemMessage", () => {
-  it("wraps content in the given tag with newline padding", () => {
+  it("wraps content in the given tag with blank-line padding", () => {
     expect(
       wrapSystemMessage(SYSTEM_MESSAGE_TAGS.TOOL_UPDATE, "New tool enabled"),
-    ).toBe("<tool-update>\nNew tool enabled\n</tool-update>");
+    ).toBe("<tool-update>\n\nNew tool enabled\n\n</tool-update>");
   });
 
   it("preserves multi-line content verbatim", () => {
     const body = "line one\n\nline two";
     const wrapped = wrapSystemMessage(SYSTEM_MESSAGE_TAGS.TOOL_RETRY, body);
-    expect(wrapped.startsWith("<tool-retry-guidance>\n")).toBe(true);
-    expect(wrapped.endsWith("\n</tool-retry-guidance>")).toBe(true);
+    expect(wrapped.startsWith("<tool-retry-guidance>\n\n")).toBe(true);
+    expect(wrapped.endsWith("\n\n</tool-retry-guidance>")).toBe(true);
     expect(wrapped).toContain(body);
+  });
+
+  it("matches the system prompt section format (wrapTag)", () => {
+    expect(
+      wrapSystemMessage(SYSTEM_MESSAGE_TAGS.TOOL_UPDATE, "body"),
+    ).toBe(wrapTag("tool-update", "body"));
   });
 });
 

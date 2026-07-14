@@ -856,7 +856,7 @@ describe("SystemPromptAssembler", () => {
       );
       expect(injectedContextMessage).toBeDefined();
       expect(injectedContextMessage?.role).toBe("system");
-      expect(injectedContextMessage?.content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(injectedContextMessage?.content).toContain("<system-context>");
 
       expect(context._assembledSystemPrompt).toBeTruthy();
       expect(context._assembledSystemPrompt).toContain("coding agent");
@@ -904,7 +904,7 @@ describe("SystemPromptAssembler", () => {
       const injectedMessage = context.messages.find(
         (message) => (message as Record<string, unknown>)._isInjectedContext === true,
       );
-      expect(injectedMessage?.content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
+      expect(injectedMessage?.content).toContain("<system-context>");
       expect(injectedMessage?.content).toContain("Local Time:");
 
       // User message stays clean

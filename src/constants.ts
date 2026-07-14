@@ -273,6 +273,20 @@ export const SYSTEM_PROMPT_SECTIONS = {
   PROJECT_STRUCTURE: "project-structure",
 } as const;
 
+/**
+ * Square-bracket prompt markers.
+ *
+ * System-role injections now use the XML tags in SYSTEM_MESSAGE_TAGS
+ * (utils/SystemMessageTags.ts) — `[System Context]`, `[Project Skills]`,
+ * `[Agent Memory]`, and `[Somatic State` are LEGACY markers kept only so
+ * read-side parsers (Finalizer.swapMessageContent, prism-client) can
+ * recognize messages persisted before the tag standardization. Do not use
+ * them when building new system messages.
+ *
+ * CONTEXT_NOTE_PREFIX and CONVERSATION_SUMMARY_PREFIX remain live: they
+ * mark deliberately user-role messages (context-window drops, compaction
+ * summaries), not system messages.
+ */
 export const PROMPT_DELIMITERS = {
   SYSTEM_CONTEXT: "[System Context]",
   SYSTEM_CONTEXT_LOCAL_TIME_PREFIX: "[System Context - Local Time:",

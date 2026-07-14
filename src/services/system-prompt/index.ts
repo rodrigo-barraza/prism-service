@@ -27,8 +27,13 @@ import { SkillMemoryScorer } from "./SkillMemoryScorer.ts";
 import { AssemblerContext } from "./types.ts";
 import SomaticStateService from "#src/services/somatic/SomaticStateService";
 import WorkflowMemoryService from "#src/services/WorkflowMemoryService";
-import { PROMPT_DELIMITERS, SYSTEM_PROMPT_SECTIONS, COLLECTIONS } from "#src/constants";
+import { SYSTEM_PROMPT_SECTIONS, COLLECTIONS } from "#src/constants";
 import PromptLocaleService from "#src/services/PromptLocaleService";
+import {
+  SYSTEM_MESSAGE_TAGS,
+  wrapSystemMessage,
+  wrapTag,
+} from "#src/utils/SystemMessageTags";
 
 /**
  * Wrap a system prompt section in XML semantic tags.
@@ -37,9 +42,12 @@ import PromptLocaleService from "#src/services/PromptLocaleService";
  * reducing "instruction bleed" where the model confuses which section a
  * constraint belongs to. The content inside the tags is preserved verbatim,
  * so existing substring assertions in tests continue to pass.
+ *
+ * Delegates to wrapTag so system prompt sections and mid-conversation
+ * system messages share one canonical tag format.
  */
 function wrapSection(tagName: string, content: string): string {
-  return `<${tagName}>\n\n${content}\n\n</${tagName}>`;
+  return wrapTag(tagName, content);
 }
 
 
@@ -659,8 +667,10 @@ export default class SystemPromptAssembler {
           skillNames.push(s.name);
           return `### ${s.name}\n${s.content}`;
         });
-        skillsText =
-          `${PROMPT_DELIMITERS.PROJECT_SKILLS}\n` + skillBlocks.join("\n\n");
+        skillsText = wrapSystemMessage(
+          SYSTEM_MESSAGE_TAGS.PROJECT_SKILLS,
+          skillBlocks.join("\n\n"),
+        );
       }
     }
 
@@ -702,7 +712,10 @@ export default class SystemPromptAssembler {
         },
       );
       if (memoryResult.memoriesText) {
-        memoriesText = `${PROMPT_DELIMITERS.AGENT_MEMORY}\n` + memoryResult.memoriesText;
+        memoriesText = wrapSystemMessage(
+          SYSTEM_MESSAGE_TAGS.AGENT_MEMORY,
+          memoryResult.memoriesText,
+        );
         injectedMemoryIds = memoryResult.injectedMemoryIds;
       }
     }
@@ -726,7 +739,10 @@ export default class SystemPromptAssembler {
           },
         );
         if (workflows) {
-          workflowsText = workflows;
+          workflowsText = wrapSystemMessage(
+            SYSTEM_MESSAGE_TAGS.PAST_WORKFLOWS,
+            workflows,
+          );
         }
       } catch (error: unknown) {
         logger.error(
@@ -849,7 +865,10 @@ export function injectSystemPromptContext(
     if (lastUserMessageIndex >= 0) {
       messages.splice(lastUserMessageIndex, 0, {
         role: "system",
-        content: platformContextMessage,
+        content: wrapSystemMessage(
+          SYSTEM_MESSAGE_TAGS.PLATFORM_CONTEXT,
+          platformContextMessage,
+        ),
       });
     }
   }
@@ -866,7 +885,10 @@ export function injectSystemPromptContext(
     if (lastUserMessageIndex >= 0) {
       messages.splice(lastUserMessageIndex, 0, {
         role: "system",
-        content: selfContextMessage,
+        content: wrapSystemMessage(
+          SYSTEM_MESSAGE_TAGS.SELF_CONTEXT,
+          selfContextMessage,
+        ),
       });
     }
   }
@@ -895,7 +917,13 @@ export function injectSystemPromptContext(
     );
     const contextLines = [localTimeLabel];
 
-    let systemContextBlock = `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\n${contextLines.join("\n")}`;
+    // The message is a flat sequence of tagged sections — same structure as
+    // the assembled system prompt. skillsText/memoriesText/workflowsText
+    // arrive pre-wrapped in their own tags by assemble().
+    let systemContextBlock = wrapSystemMessage(
+      SYSTEM_MESSAGE_TAGS.SYSTEM_CONTEXT,
+      contextLines.join("\n"),
+    );
 
     if (skillsText) {
       systemContextBlock += `\n\n${skillsText}`;
