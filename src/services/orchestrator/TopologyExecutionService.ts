@@ -1,6 +1,6 @@
 import logger from "#src/utils/logger";
 import { TOPOLOGIES, DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import SettingsService from "#src/services/SettingsService";
 import type {
   TeamMember,

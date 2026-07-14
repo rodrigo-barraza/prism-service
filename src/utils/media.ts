@@ -8,7 +8,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import sharp from "sharp";
 import logger from "./logger.ts";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { UNITS, ENCODINGS } from "#src/constants";
 
 // ── ffmpeg availability (cached per process) ────────────────

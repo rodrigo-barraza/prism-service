@@ -5,7 +5,7 @@ import { MONGO_DB_NAME } from "#config";
 import { COLLECTIONS, MEMORY } from "#src/constants";
 import logger from "#src/utils/logger";
 import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { MemoryFetchOptions, SkillFetchOptions, ScoredSkill } from "./types.ts";
 
 const SKILL_RELEVANCE_THRESHOLD = MEMORY.SKILL_RELEVANCE_THRESHOLD;

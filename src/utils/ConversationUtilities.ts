@@ -3,7 +3,7 @@ import logger from "./logger.ts";
 import type { ChatMessage } from "#src/types/admin";
 import type { MessagePayload } from "#src/services/RequestLogger";
 import { COLLECTIONS } from "#src/constants";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 // ─── Conversation persistence helpers ───────────────────────
 

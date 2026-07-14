@@ -53,7 +53,7 @@ import {
   type OpenAICompletionResponse,
 } from "#src/utils/openai-compat";
 import type { TokenUsage } from "#src/types/admin";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 // ── Types ────────────────────────────────────────────────────
 

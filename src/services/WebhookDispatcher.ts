@@ -5,7 +5,7 @@ import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { MONGO_DB_NAME } from "#config";
 import { COLLECTIONS, WEBHOOK } from "#src/constants";
 import logger from "#src/utils/logger";
-import { errorMessage } from "@rodrigo-barraza/utilities-library";
+import { errorMessage, sleep } from "@rodrigo-barraza/utilities-library";
 import { registerCleanup } from "#src/utils/CleanupRegistry";
 
 interface WebhookSubscription {
@@ -92,7 +92,7 @@ async function dispatchToSubscription(
 
     if (attempt < MAX_RETRY_ATTEMPTS - 1) {
       const delay = RETRY_BASE_DELAY_MILLISECONDS * Math.pow(4, attempt);
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      await sleep(delay);
     }
   }
 

@@ -19,7 +19,7 @@ import RequestLogger from "#src/services/RequestLogger";
 import { MONGO_DB_NAME } from "#config";
 import { COLLECTIONS, SOMATIC, LOG_PREVIEW } from "#src/constants";
 import logger from "#src/utils/logger";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 interface SomaticStatEntry {
   level: number;

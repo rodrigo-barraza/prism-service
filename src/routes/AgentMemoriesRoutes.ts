@@ -7,7 +7,7 @@ import express, { Request, Response, NextFunction } from "express";
 import MemoryService from "#src/services/MemoryService";
 import MemoryConsolidationService from "#src/services/MemoryConsolidationService";
 import logger from "#src/utils/logger";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 const router = express.Router();
 

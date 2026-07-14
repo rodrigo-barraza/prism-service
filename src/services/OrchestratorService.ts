@@ -59,7 +59,7 @@ import type {
 } from "#src/types/orchestrator";
 
 import type { ConversationMessage, LLMProvider } from "./harnesses/types.ts";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import ConversationService from "./ConversationService.ts";
 import { COLLECTIONS, ORCHESTRATOR, NOTIFICATION_SOURCES, SYSTEM_STATUSES, DEFAULT_LOCALE } from "#src/constants";
 

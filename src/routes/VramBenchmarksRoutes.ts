@@ -4,7 +4,7 @@ import logger from "#src/utils/logger";
 import requireDb from "#src/middleware/RequireDbMiddleware";
 import { COLLECTIONS } from "#src/constants";
 import { MongoFilter, GetVramBenchmarksQuerySchema } from "#src/types/index";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 const router = Router();
 router.use(requireDb);

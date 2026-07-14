@@ -1,4 +1,4 @@
-import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { getErrorMessage, sleep } from "@rodrigo-barraza/utilities-library";
 import logger from "./logger.ts";
 import { ProviderError } from "./errors.ts";
 import { HARNESS } from "#src/constants";
@@ -170,7 +170,7 @@ export async function* streamWithRetries<T>(
           `(${getErrorMessage(error)}). ` +
           `Retrying in ${Math.round(delayMilliseconds / 100) / 10}s...`,
       );
-      await new Promise((resolve) => setTimeout(resolve, delayMilliseconds));
+      await sleep(delayMilliseconds);
     }
   }
 }

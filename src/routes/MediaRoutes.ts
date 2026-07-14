@@ -4,7 +4,7 @@ import requireDb from "#src/middleware/RequireDbMiddleware";
 import logger from "#src/utils/logger";
 import { COLLECTIONS } from "#src/constants";
 import { GetMediaQuerySchema } from "#src/types/index";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 const router = express.Router();
 router.use(requireDb);

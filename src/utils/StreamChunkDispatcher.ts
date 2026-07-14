@@ -12,7 +12,7 @@ import {
   STATUS_MESSAGES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import type { TokenUsage, ToolCallEntry } from "#src/types/admin";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { FILE_CATEGORIES } from "#src/constants";
 
 // ── Types ────────────────────────────────────────────────────

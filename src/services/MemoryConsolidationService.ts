@@ -47,7 +47,7 @@ import {
   findStaleConversationalMemories,
 } from "./memory/ConversationalMemoryPartitioner.ts";
 
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import type {
   MemoryDoc,
   ConsolidationAction,

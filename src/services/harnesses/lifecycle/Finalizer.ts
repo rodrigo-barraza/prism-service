@@ -30,7 +30,7 @@ import {
   ToolCallPayload,
   LlmOptions,
 } from "#src/services/RequestLogger";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 export interface FinalizerContext {
   providerName: string;

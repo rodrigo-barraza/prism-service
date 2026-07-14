@@ -1,7 +1,7 @@
 import logger from "#src/utils/logger";
 import { COLLECTIONS, SYSTEM_STATUSES } from "#src/constants";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { MONGO_DB_NAME } from "#config";
 
 /**

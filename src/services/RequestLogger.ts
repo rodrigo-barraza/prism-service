@@ -116,7 +116,7 @@ export interface LlmOptions {
 }
 
 import type { ToolCallPayload, MessagePayload } from "./conversation/index.ts";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 export type { ToolCallPayload, MessagePayload };
 
 export interface LogChatGenerationParams extends LogParams {

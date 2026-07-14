@@ -21,7 +21,7 @@ import { handleConversation } from "#src/routes/ChatRoutes";
 import { appendAndFinalize } from "#src/utils/ConversationUtilities";
 import type { SseEvent } from "#src/types/SseTypes";
 import logger from "#src/utils/logger";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 export interface SynthesisModelSettings {
   provider: string;

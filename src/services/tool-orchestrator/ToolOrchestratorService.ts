@@ -3,7 +3,7 @@ import { IDENTITY_HEADERS } from "@rodrigo-barraza/service-library";
 import MCPClientService from "#src/services/MCPClientService";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 import logger from "#src/utils/logger";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { ORCHESTRATOR_ONLY_TOOLS } from "#src/services/OrchestratorPrompt";
 import { createAbortController } from "#src/utils/AbortController";
 import {

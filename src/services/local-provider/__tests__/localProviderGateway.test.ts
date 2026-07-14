@@ -69,7 +69,8 @@ vi.mock("#src/services/local-provider/hfMetadata", () => ({
   })),
 }));
 
-vi.mock("@rodrigo-barraza/utilities-library", () => ({
+vi.mock("@rodrigo-barraza/utilities-library", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   withTimeoutFallback: vi.fn().mockImplementation((promise) => promise),
 }));
 

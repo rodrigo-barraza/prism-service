@@ -6,7 +6,7 @@ import EmbeddingService from "#src/services/EmbeddingService";
 import FileService from "#src/services/FileService";
 import MinioWrapper from "#src/wrappers/MinioWrapper";
 import logger from "#src/utils/logger";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { WORKFLOW_ENDPOINTS, FILE_CATEGORIES } from "#src/constants";
 import type { SseEvent } from "#src/types/SseTypes";
 

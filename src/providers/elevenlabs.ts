@@ -4,7 +4,7 @@ import { ProviderError } from "#src/utils/errors";
 import logger from "#src/utils/logger";
 import { ELEVENLABS_API_KEY } from "#config";
 import { MODALITY_TYPES, DEFAULT_VOICES, getDefaultModels } from "#src/config";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 function getApiKey() {
   if (!ELEVENLABS_API_KEY) {

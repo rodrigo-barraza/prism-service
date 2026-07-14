@@ -53,7 +53,7 @@ import {
   SYSTEM_MESSAGE_TAGS,
   wrapSystemMessage,
 } from "#src/utils/SystemMessageTags";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import RequestLogger from "#src/services/RequestLogger";
 import { createStandardHooks } from "#src/services/harnesses/lifecycle/HookInitializer";
 import { executeToolBatch } from "#src/services/harnesses/lifecycle/ToolExecutor";

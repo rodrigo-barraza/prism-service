@@ -19,7 +19,7 @@ import ToolContext from "#src/services/ToolContext";
 import SettingsService from "#src/services/SettingsService";
 import ToolOrchestratorService from "#src/services/tool-orchestrator/ToolOrchestratorService";
 import { getCurrentDynamicTools } from "#src/services/tool-definitions/utils/DynamicToolHelpers";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import type { AgenticContext, ConversationMessage } from "../types.ts";
 
 interface PreflightParams {

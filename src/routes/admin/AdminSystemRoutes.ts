@@ -7,7 +7,7 @@ import { MONGO_DB_NAME } from "#config";
 import { COLLECTIONS, SERVER_SENT_EVENTS_KEEPALIVE_INTERVAL_MILLISECONDS } from "#src/constants";
 import ChangeStreamService from "#src/services/ChangeStreamService";
 import logger from "#src/utils/logger";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import requireDb from "#src/middleware/RequireDbMiddleware";
 import { MILLISECONDS_PER_MINUTE } from "@rodrigo-barraza/utilities-library";
 

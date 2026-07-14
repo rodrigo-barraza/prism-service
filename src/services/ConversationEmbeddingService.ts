@@ -4,7 +4,7 @@ import { COLLECTIONS } from "#src/constants";
 import EmbeddingService from "./EmbeddingService.ts";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import logger from "#src/utils/logger";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import type { AgenticContext, ConversationMessage } from "./harnesses/types.ts";
 
 // ────────────────────────────────────────────────────────────

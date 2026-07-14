@@ -9,7 +9,7 @@ import { getProvider } from "#src/providers/index";
 import { getModelByName } from "#src/config";
 import { matchCron } from "./ScheduledTaskService.ts";
 import { registerCleanup } from "#src/utils/CleanupRegistry";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import type { ConversationMessage, LLMProvider } from "./harnesses/types.ts";
 import type { TransformedConversation, ConversationSettings } from "./conversation/types.ts";
 import type { ChatMessage } from "#src/types/admin";

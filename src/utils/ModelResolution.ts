@@ -7,7 +7,7 @@
 import logger from "./logger.ts";
 import { getProvider } from "#src/providers/index";
 import type { InstanceEntry } from "#src/types/ProviderTypes";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { TOOL_API_HEALTH_TIMEOUT_MILLISECONDS } from "#src/constants";
 
 // ── Types ────────────────────────────────────────────────────

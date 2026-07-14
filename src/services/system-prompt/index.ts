@@ -1,7 +1,7 @@
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 import logger from "#src/utils/logger";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import {
   getOrchestratorPromptAddendum,
   ORCHESTRATOR_ONLY_TOOLS,

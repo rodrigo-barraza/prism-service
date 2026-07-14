@@ -11,7 +11,7 @@ import {
 } from "#src/utils/media";
 
 import type { ConversationMessage } from "./harnesses/types.ts";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { FILE_CATEGORIES } from "#src/constants";
 
 // ─── Compress oversized data URLs ───────────────────────────

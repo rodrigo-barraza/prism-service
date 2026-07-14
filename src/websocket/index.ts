@@ -17,7 +17,7 @@ import logger from "#src/utils/logger";
 import RequestLogger from "#src/services/RequestLogger";
 import ConversationService from "#src/services/ConversationService";
 import { calculateLiveCost } from "#src/utils/CostCalculator";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { FILE_CATEGORIES } from "#src/constants";
 import { getModelByName, MODELS } from "#src/config";
 import { calculateTokensPerSec } from "#src/utils/math";

@@ -3,7 +3,7 @@ import express, { Request, Response, NextFunction } from "express";
 import SettingsService from "#src/services/SettingsService";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import logger from "#src/utils/logger";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 const router = express.Router();
 

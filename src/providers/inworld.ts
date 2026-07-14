@@ -4,7 +4,7 @@ import { ProviderError } from "#src/utils/errors";
 import logger from "#src/utils/logger";
 import { INWORLD_BASIC } from "#config";
 import { DEFAULT_VOICES, getDefaultModels, MODALITY_TYPES } from "#src/config";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 const INWORLD_TTS_URL = "https://api.inworld.ai/tts/v1/voice:stream";
 

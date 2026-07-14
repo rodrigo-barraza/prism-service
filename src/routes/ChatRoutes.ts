@@ -67,7 +67,7 @@ import type {
   ToolSchema,
 } from "#src/services/harnesses/types";
 import type { ChatMessage } from "#src/types/ProviderTypes";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import {
   PROVIDERS,
   FILE_CATEGORIES,

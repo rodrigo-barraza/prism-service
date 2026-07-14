@@ -1,5 +1,5 @@
 import logger from "#src/utils/logger";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 /**
  * PolicyEngine — declarative tool call policy system.
