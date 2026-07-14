@@ -833,11 +833,17 @@ export async function commitToolCallResults(
     currentMessages.push(retryGuidanceMessage);
   }
 
-  let updatedMessages = currentMessages.filter(
+  // Drop empty assistant messages — but NEVER thinking-only ones.
+  // Deleting a mid-history thinking message orphans its
+  // "[System: …]" continuation nudge, loses the thinking signature,
+  // and mutates the prompt prefix (full re-prefill, busting the
+  // provider prompt cache).
+  const updatedMessages = currentMessages.filter(
     (message) =>
       !(
         message.role === "assistant" &&
         !message.content?.trim() &&
+        !message.thinking?.trim() &&
         (!message.toolCalls || message.toolCalls.length === 0)
       ),
   );

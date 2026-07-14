@@ -1,10 +1,8 @@
 import BaseAgenticHarness from "./BaseAgenticHarness.ts";
 import { runTreeOfThoughts } from "./strategies/TreeOfThoughtsStrategy.ts";
 import { runGraphOfThoughts } from "./strategies/GraphOfThoughtsStrategy.ts";
-import {
-  roundMilliseconds,
-  getErrorMessage,
-} from "@rodrigo-barraza/utilities-library";
+import { persistLoopError } from "./strategies/branchingCommon.ts";
+import { roundMilliseconds } from "@rodrigo-barraza/utilities-library";
 import logger from "#src/utils/logger";
 import {
   SYSTEM_MESSAGE_TAGS,
@@ -41,7 +39,6 @@ import {
   injectContinuationContext,
   injectErrorAsConversationMessage,
   buildExhaustedRecoveryMessage,
-  buildProviderErrorMessage,
   MAX_OUTPUT_TRUNCATION_RECOVERIES,
 } from "./lifecycle/OutputTruncationRecovery.ts";
 import { manageContextPressure } from "./lifecycle/ContextPressureManager.ts";
@@ -217,13 +214,14 @@ export default class ReActHarness extends BaseAgenticHarness {
     const semanticStallDetector = new SemanticStallDetector();
 
     // ── Initialize lifecycle hooks ──────────────────────────
-    const { hooks, approvalEngine } = createStandardHooks({
+    const standardHooks = createStandardHooks({
       workspaceRoot: workspaceRoot || undefined,
       autoApprove: options.autoApprove === true,
       policies: options.policies,
       enableCriticGate: options.enableCriticGate === true,
       criticModel: options.criticModel || undefined,
     });
+    const { hooks, approvalEngine } = standardHooks;
 
     if (options.planFirst) {
       emit({
@@ -885,30 +883,13 @@ export default class ReActHarness extends BaseAgenticHarness {
       // the conversation isn't left as an empty stub in MongoDB.
       // Also inject the error as a conversation message so the LLM
       // has context about the failure on the next turn.
-      logger.error(
-        `[ReActHarness] Loop error on iteration ${state.iterations}: ${getErrorMessage(loopError)}. Persisting ${currentMessages.length - state.originalMessageCount} accumulated message(s).`,
-      );
-
-      injectErrorAsConversationMessage(
+      return await persistLoopError(
+        this,
         currentMessages,
-        buildProviderErrorMessage(
-          loopError,
-          state.iterations,
-          this.context.options?.locale as string | undefined,
-        ),
-        context,
+        standardHooks,
+        loopError,
+        "ReActHarness",
       );
-
-      state.conversationOutcome = "error";
-
-      try {
-        await this.finalize(currentMessages, hooks);
-      } catch (persistError: unknown) {
-        logger.error(
-          `[ReActHarness] Failed to persist messages on error path: ${getErrorMessage(persistError)}`,
-        );
-      }
-      throw loopError;
     }
   }
 }
