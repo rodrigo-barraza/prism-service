@@ -456,6 +456,9 @@ export class SubAgentTelemetryEmitter {
         type: "sub_agent_status",
         subAgentId: this.subAgentId,
         message: "complete",
+        // conversationId lets the client clear per-conversation running state
+        // even when it never saw the "spawned" event (refresh/reconnect mid-run)
+        conversationId: this.subAgentConversationId || null,
         durationMilliseconds,
         toolCount: this.toolCalls.length,
         usage: usage || null,

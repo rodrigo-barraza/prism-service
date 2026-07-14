@@ -82,6 +82,33 @@ describe("BackgroundHousekeepingService", () => {
       expect(updateManyMock).toHaveBeenCalledTimes(4); // 4 updates in clearStaleConversations
     });
 
+    it("should clear isActive and isGenerating when sweeping stale running sub-agents", async () => {
+      const updateManyMock = vi.fn().mockResolvedValue({ modifiedCount: 1 });
+      const collectionMock = vi.fn().mockReturnValue({
+        updateMany: updateManyMock,
+        deleteMany: vi.fn().mockResolvedValue({ deletedCount: 0 }),
+        find: vi.fn().mockReturnValue({ [Symbol.asyncIterator]: async function* () {} })
+      });
+      const databaseMock = { collection: collectionMock };
+      vi.spyOn(MongoWrapper, "getDb").mockReturnValue(databaseMock as any);
+
+      await BackgroundHousekeepingService.run({ trigger: "test" });
+
+      // A crashed sub-agent left at isActive:true reads as "still running" to
+      // the client (live-stream subscribe gate), so the sweep must lower the
+      // lifecycle flags alongside subAgentStatus.
+      const subAgentSweepCall = updateManyMock.mock.calls.find(
+        (call) => call[0]?.subAgentStatus === "running",
+      );
+      expect(subAgentSweepCall).toBeDefined();
+      expect(subAgentSweepCall![1].$set).toMatchObject({
+        subAgentStatus: "stopped",
+        isActive: false,
+        isGenerating: false,
+      });
+      expect(subAgentSweepCall![1].$set.subAgentCompletedAt).toBeDefined();
+    });
+
     it("should handle MongoDB connection errors gracefully", async () => {
       vi.spyOn(MongoWrapper, "getDb").mockImplementation(() => {
         throw new Error("MongoDB down");

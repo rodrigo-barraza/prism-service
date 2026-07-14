@@ -590,17 +590,20 @@ export class OrchestratorService {
         }
 
         // Update sub-agent metadata on the child conversation document
-        OrchestratorService._updateSubAgentDocument(subAgentState.subAgentConversationId, {
-          subAgentStatus: SYSTEM_STATUSES.FAILED,
-          subAgentDurationMilliseconds: subAgentState.durationMilliseconds,
-          subAgentCompletedAt: new Date().toISOString(),
-        }).catch(() => {});
+        void SubAgentPersistenceService.markSubAgentTerminal({
+          subAgentConversationId: subAgentState.subAgentConversationId,
+          status: SYSTEM_STATUSES.FAILED,
+          extraFields: {
+            subAgentDurationMilliseconds: subAgentState.durationMilliseconds,
+          },
+        });
 
         if (orchestratorContext.emit) {
           orchestratorContext.emit({
             type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
             subAgentId: agentId,
             message: SYSTEM_STATUSES.FAILED,
+            conversationId: subAgentState.subAgentConversationId || null,
             error: getErrorMessage(error),
           });
         }
@@ -666,17 +669,20 @@ export class OrchestratorService {
         }
 
         // Update sub-agent metadata on the child conversation document
-        OrchestratorService._updateSubAgentDocument(subAgentState.subAgentConversationId, {
-          subAgentStatus: SYSTEM_STATUSES.FAILED,
-          subAgentDurationMilliseconds: subAgentState.durationMilliseconds,
-          subAgentCompletedAt: new Date().toISOString(),
-        }).catch(() => {});
+        void SubAgentPersistenceService.markSubAgentTerminal({
+          subAgentConversationId: subAgentState.subAgentConversationId,
+          status: SYSTEM_STATUSES.FAILED,
+          extraFields: {
+            subAgentDurationMilliseconds: subAgentState.durationMilliseconds,
+          },
+        });
 
         if (orchestratorContext.emit) {
           orchestratorContext.emit({
             type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
             subAgentId: agentId,
             message: SYSTEM_STATUSES.FAILED,
+            conversationId: subAgentState.subAgentConversationId || null,
             error: getErrorMessage(error),
           });
           orchestratorContext.emit({
@@ -725,6 +731,9 @@ export class OrchestratorService {
     // Re-activate the sub-agent with the follow-up prompt
     subAgent.status = SYSTEM_STATUSES.RUNNING;
     subAgent.startedAt = Date.now();
+    void SubAgentPersistenceService.markSubAgentActive(
+      subAgent.subAgentConversationId,
+    );
 
     logger.info(
       `[Orchestrator] Continuing sub-agent ${agentId} with follow-up`,
@@ -1604,6 +1613,9 @@ export class OrchestratorService {
     subAgent.status = SYSTEM_STATUSES.RUNNING;
     subAgent.startedAt = Date.now();
     subAgent.abortController = createAbortController();
+    void SubAgentPersistenceService.markSubAgentActive(
+      subAgent.subAgentConversationId,
+    );
 
     logger.info(
       `[Orchestrator] Continuing sub-agent ${agentId} (stateful session reuse)`,
@@ -1645,6 +1657,7 @@ export class OrchestratorService {
           type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
           subAgentId: agentId,
           message: SYSTEM_STATUSES.FAILED,
+          conversationId: subAgent.subAgentConversationId || null,
           error: getErrorMessage(error),
         });
       }
@@ -1713,6 +1726,9 @@ export class OrchestratorService {
     subAgent.completedAt = undefined;
     subAgent.abortController = createAbortController();
     subAgent.error = null;
+    void SubAgentPersistenceService.markSubAgentActive(
+      subAgent.subAgentConversationId,
+    );
 
     logger.info(
       `[Orchestrator] Resuming sub-agent ${agentId} with new prompt (non-blocking)`,
@@ -1779,6 +1795,7 @@ export class OrchestratorService {
             type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
             subAgentId: agentId,
             message: SYSTEM_STATUSES.FAILED,
+            conversationId: subAgent.subAgentConversationId || null,
             error: getErrorMessage(error),
           });
           orchestratorContext.emit({
@@ -2486,15 +2503,17 @@ export class OrchestratorService {
         }, {})
       : null;
 
-    OrchestratorService._updateSubAgentDocument(subAgent.subAgentConversationId, {
-      subAgentStatus: subAgent.status,
-      subAgentDurationMilliseconds: subAgent.durationMilliseconds,
-      subAgentToolUses: telemetry.toolCalls.length,
-      subAgentTotalCost: subAgent.totalCost,
-      subAgentHasChanges: subAgent.diff?.hasChanges || false,
-      subAgentToolNames: toolNamesSummary,
-      subAgentCompletedAt: new Date().toISOString(),
-    }).catch(() => {});
+    void SubAgentPersistenceService.markSubAgentTerminal({
+      subAgentConversationId: subAgent.subAgentConversationId,
+      status: subAgent.status,
+      extraFields: {
+        subAgentDurationMilliseconds: subAgent.durationMilliseconds,
+        subAgentToolUses: telemetry.toolCalls.length,
+        subAgentTotalCost: subAgent.totalCost,
+        subAgentHasChanges: subAgent.diff?.hasChanges || false,
+        subAgentToolNames: toolNamesSummary,
+      },
+    });
 
     // Release the active worktree registration if we don't want to preserve it
     if (!preserveWorktree && subAgent.isolated) {
@@ -2929,37 +2948,5 @@ export class OrchestratorService {
     }
   }
 
-  // ── Sub-Agent Document Update ───────────────────────────────
-  // Updates sub-agent metadata on the child's agent_conversations document.
-  // Fire-and-forget — callers should .catch() to suppress unhandled rejections.
-  static async _updateSubAgentDocument(
-    conversationId: string,
-    updateFields: Record<string, unknown>,
-  ): Promise<void> {
-    try {
-      const { MONGO_DB_NAME: databaseName } = await import("#config");
-      const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
-      const conversationCollection = MongoWrapper.getCollection(
-        databaseName,
-        COLLECTIONS.AGENT_CONVERSATIONS,
-      );
-      if (!conversationCollection) return;
-
-      const updateResult = await conversationCollection.updateOne(
-        { id: conversationId },
-        { $set: updateFields },
-      );
-
-      if (updateResult.matchedCount === 0) {
-        logger.debug(
-          `[Orchestrator] Sub-agent conversation not found for update: ${conversationId}`,
-        );
-      }
-    } catch (error: unknown) {
-      logger.warn(
-        `[Orchestrator] Failed to update sub-agent conversation ${conversationId}: ${getErrorMessage(error)}`,
-      );
-    }
-  }
 }
 export default OrchestratorService;

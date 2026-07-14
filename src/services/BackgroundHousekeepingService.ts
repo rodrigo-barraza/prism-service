@@ -139,6 +139,8 @@ async function clearStaleConversations(): Promise<HousekeepingConversationResult
         {
           $set: {
             subAgentStatus: "stopped",
+            isActive: false,
+            isGenerating: false,
             subAgentCompletedAt: new Date().toISOString(),
           },
         },

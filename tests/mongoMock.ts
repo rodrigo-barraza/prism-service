@@ -162,6 +162,7 @@ export function createMockCollection(initialData: any[] = []) {
       const $setOnInsert = update.$setOnInsert || {};
       const $push = update.$push || {};
       const $inc = update.$inc || {};
+      const $addToSet = update.$addToSet || {};
 
       // Enforce disjoint-path constraint
       const setKeys = new Set(Object.keys($set));
@@ -195,6 +196,17 @@ export function createMockCollection(initialData: any[] = []) {
 
         for (const [field, val] of Object.entries($inc)) {
           doc[field] = (doc[field] || 0) + (val as number);
+        }
+
+        for (const [field, val] of Object.entries($addToSet)) {
+          if (!doc[field]) doc[field] = [];
+          const values = (val as any)?.$each ? (val as any).$each : [val];
+          for (const value of values) {
+            const exists = doc[field].some(
+              (existing: any) => JSON.stringify(existing) === JSON.stringify(value),
+            );
+            if (!exists) doc[field].push(value);
+          }
         }
 
         return { matchedCount: 1, modifiedCount: 1, upsertedCount: isInsert ? 1 : 0 };

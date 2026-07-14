@@ -562,6 +562,169 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       });
     });
 
+    describe("sub-agent isActive lifecycle persistence (live-stream gate contract)", () => {
+      // The client only opens the live WebSocket stream for a viewed sub-agent
+      // conversation when the persisted document says isActive === true, so the
+      // spawn write must raise the flag and every terminal write must clear it.
+      type UpdateCall = [Record<string, unknown>, { $set?: Record<string, unknown> }];
+
+      function createTrackingCollection() {
+        const mockUpdateOne = vi.fn().mockResolvedValue({ acknowledged: true, matchedCount: 1 });
+        return {
+          mockUpdateOne,
+          mockCollection: { updateOne: mockUpdateOne, findOne: vi.fn().mockResolvedValue(null) },
+        };
+      }
+
+      const findRegistrationCall = (calls: UpdateCall[]) =>
+        calls.find((call) => call[1]?.$set?.isSubAgent === true);
+
+      const findTerminalCall = (calls: UpdateCall[], childConversationId: unknown) =>
+        calls.find(
+          (call) =>
+            call[0]?.id === childConversationId && call[1]?.$set?.isActive === false,
+        );
+
+      it("raises isActive + isGenerating on the child document at spawn", async () => {
+        const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
+        const { mockUpdateOne, mockCollection } = createTrackingCollection();
+        const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
+          mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>,
+        );
+
+        await OrchestratorService.spawnFromTool({
+          description: "Live-stream gate spawn",
+          prompt: "Do work",
+          files: [],
+          orchestratorContext,
+          awaitCompletion: true,
+        });
+
+        const registrationCall = findRegistrationCall(mockUpdateOne.mock.calls as UpdateCall[]);
+        expect(registrationCall).toBeDefined();
+        expect(registrationCall![1].$set?.isActive).toBe(true);
+        expect(registrationCall![1].$set?.isGenerating).toBe(true);
+        expect(registrationCall![1].$set?.subAgentStatus).toBe("running");
+
+        getCollectionSpy.mockRestore();
+      });
+
+      it("clears the flags and persists a terminal status when the loop completes", async () => {
+        const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
+        const { mockUpdateOne, mockCollection } = createTrackingCollection();
+        const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
+          mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>,
+        );
+
+        await OrchestratorService.spawnFromTool({
+          description: "Live-stream gate completion",
+          prompt: "Do work",
+          files: [],
+          orchestratorContext,
+          awaitCompletion: true,
+        });
+
+        const registrationCall = findRegistrationCall(mockUpdateOne.mock.calls as UpdateCall[]);
+        expect(registrationCall).toBeDefined();
+        const childConversationId = registrationCall![0].id;
+
+        // The terminal write is fire-and-forget — poll until it lands.
+        await waitForCondition(() =>
+          Boolean(findTerminalCall(mockUpdateOne.mock.calls as UpdateCall[], childConversationId)),
+        );
+
+        const terminalCall = findTerminalCall(
+          mockUpdateOne.mock.calls as UpdateCall[],
+          childConversationId,
+        )!;
+        expect(terminalCall[1].$set?.isActive).toBe(false);
+        expect(terminalCall[1].$set?.isGenerating).toBe(false);
+        expect(terminalCall[1].$set?.subAgentStatus).toBe("complete");
+        expect(terminalCall[1].$set?.subAgentCompletedAt).toBeDefined();
+
+        getCollectionSpy.mockRestore();
+      });
+
+      it("clears the flags with a failed status when the loop throws", async () => {
+        const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
+        const { mockUpdateOne, mockCollection } = createTrackingCollection();
+        const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
+          mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>,
+        );
+        mockRunAgenticLoop.mockRejectedValueOnce(new Error("loop exploded"));
+
+        await OrchestratorService.spawnFromTool({
+          description: "Live-stream gate failure",
+          prompt: "Do work",
+          files: [],
+          orchestratorContext,
+          awaitCompletion: true,
+        });
+
+        const registrationCall = findRegistrationCall(mockUpdateOne.mock.calls as UpdateCall[]);
+        expect(registrationCall).toBeDefined();
+        const childConversationId = registrationCall![0].id;
+
+        await waitForCondition(() =>
+          Boolean(findTerminalCall(mockUpdateOne.mock.calls as UpdateCall[], childConversationId)),
+        );
+
+        const terminalCall = findTerminalCall(
+          mockUpdateOne.mock.calls as UpdateCall[],
+          childConversationId,
+        )!;
+        expect(terminalCall[1].$set?.isActive).toBe(false);
+        expect(terminalCall[1].$set?.subAgentStatus).toBe("failed");
+
+        getCollectionSpy.mockRestore();
+      });
+
+      it("clears the flags with a stopped status when aborted mid-run", async () => {
+        const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
+        const { mockUpdateOne, mockCollection } = createTrackingCollection();
+        const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
+          mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>,
+        );
+
+        const deferredPromise = new Promise((resolve) => {
+          resolveDeferredPromise = resolve;
+        });
+        mockRunAgenticLoop.mockReturnValueOnce(deferredPromise);
+
+        const spawnPromise = OrchestratorService.spawnFromTool({
+          description: "Live-stream gate abort",
+          prompt: "Do work",
+          files: [],
+          orchestratorContext,
+          awaitCompletion: true,
+        });
+
+        await waitForAgentRegistration();
+        const registrationCall = findRegistrationCall(mockUpdateOne.mock.calls as UpdateCall[]);
+        expect(registrationCall).toBeDefined();
+        const childConversationId = registrationCall![0].id;
+
+        await OrchestratorService.abortSubAgentsByConversation("conv-id-789");
+
+        await waitForCondition(() =>
+          Boolean(findTerminalCall(mockUpdateOne.mock.calls as UpdateCall[], childConversationId)),
+        );
+        const terminalCall = findTerminalCall(
+          mockUpdateOne.mock.calls as UpdateCall[],
+          childConversationId,
+        )!;
+        expect(terminalCall[1].$set?.isActive).toBe(false);
+        expect(terminalCall[1].$set?.subAgentStatus).toBe("stopped");
+
+        if (resolveDeferredPromise) {
+          resolveDeferredPromise({ messages: [] });
+          resolveDeferredPromise = undefined;
+        }
+        await spawnPromise;
+        getCollectionSpy.mockRestore();
+      });
+    });
+
   describe("Peer-to-Peer Router 0-Based Agent Naming", () => {
     it("should use 0-based speaker names and correctly tag shared discussion entries", async () => {
       mockRunAgenticLoop.mockClear();
