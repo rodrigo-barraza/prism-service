@@ -62,6 +62,7 @@ import { finalizePassTracker } from "#src/services/harnesses/lifecycle/TrackerFi
 import { handleCodexPlanningResponse } from "#src/services/harnesses/lifecycle/CodexPlanningDetector";
 import { cleanupReminderCache } from "#src/services/harnesses/lifecycle/SystemReminderInjector";
 import { createSandboxCheckpoint } from "#src/services/harnesses/lifecycle/SandboxExecutor";
+import { streamWithRetries } from "#src/utils/ProviderStreamResilience";
 import PlanningModeService from "#src/services/PlanningModeService";
 import { HARNESS } from "#src/constants";
 
@@ -527,18 +528,23 @@ export async function scoreBranchesMultiCriteria(
 
     const scoringMessages = [{ role: "user" as const, content: scoringPrompt }];
 
+    const scoringSignal = AbortSignal.timeout(15_000);
     const scoringOptions = {
       maxTokens: 200,
       temperature: 0,
-      signal: AbortSignal.timeout(15_000),
+      signal: scoringSignal,
     };
 
     let scoreResponseText = "";
     const scoringRequestStartMilliseconds = performance.now();
-    const scoringStream = context.provider.generateTextStream(
-      scoringMessages,
-      context.resolvedModel,
-      scoringOptions,
+    const scoringStream = streamWithRetries(
+      () =>
+        context.provider.generateTextStream(
+          scoringMessages,
+          context.resolvedModel,
+          scoringOptions,
+        ),
+      { signal: scoringSignal, label: context.providerName },
     );
 
     for await (const chunk of scoringStream) {

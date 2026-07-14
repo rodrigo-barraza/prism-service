@@ -7,7 +7,8 @@ import { EMPTY_USAGE } from "#src/utils/openai-compat";
 import { ANTHROPIC_API_KEY } from "#config";
 import { MODALITY_TYPES, getDefaultModels, getModelByName } from "#src/config";
 import { DEFAULT_MAX_OUTPUT_TOKENS } from "#src/constants/TokenBudgetDefaults";
-import { sleep, getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { callWithRetries } from "#src/utils/ProviderStreamResilience";
 
 import { ProviderOptions, ChatMessage } from "#src/types/ProviderTypes";
 import type { TokenUsage } from "#src/types/admin";
@@ -81,17 +82,6 @@ const EFFORT_BUDGET_MAP: Record<string, number> = {
   xhigh: 100000,
   max: 128000,
 };
-
-// Retry config for transient Anthropic errors (overloaded, rate limit)
-const RETRY_DELAY_MILLISECONDS = 10_000;
-const MAX_RETRIES = 3;
-function isRetryableError(error: AnthropicSdkError | null | undefined): boolean {
-  if (!error) return false;
-  const errorType = error.error?.type || error.type;
-  if (errorType === "overloaded_error") return true;
-  if (error.status === 529) return true;
-  return false;
-}
 
 let client: Anthropic | null = null;
 
@@ -813,61 +803,46 @@ const anthropicProvider = {
 
     applyCacheBreakpoints(payload);
 
-    let lastError: unknown;
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        const { data: response, response: rawResponse } = await getClient()
-          .messages.create(
-            payload as unknown as Anthropic.MessageCreateParamsNonStreaming,
-          )
-          .withResponse();
-        const rateLimits = extractAnthropicRateLimits(rawResponse, model);
-        const message = response as Anthropic.Messages.Message;
+    try {
+      // Transient failures (overloaded, rate limit, network) retry via the
+      // shared provider resilience policy — same classification and jittered
+      // backoff the harness applies to streams.
+      const { data: response, response: rawResponse } = await callWithRetries(
+        () =>
+          getClient()
+            .messages.create(
+              payload as unknown as Anthropic.MessageCreateParamsNonStreaming,
+            )
+            .withResponse(),
+        { signal: options.signal, label: "anthropic" },
+      );
+      const rateLimits = extractAnthropicRateLimits(rawResponse, model);
+      const message = response as Anthropic.Messages.Message;
 
-        const { text, thinking, thinkingSignature, citations, toolCalls } =
-          extractResponseContent(message.content as AnthropicBlock[]);
-        const result: AnthropicGenerateResult = {
-          text,
-          usage: buildUsage(message.usage),
-        };
-        if (thinking) result.thinking = thinking;
-        if (thinkingSignature) result.thinkingSignature = thinkingSignature;
-        if (citations.length > 0) result.citations = citations;
-        if (toolCalls.length > 0) result.toolCalls = toolCalls;
-        if (rateLimits) result.rateLimits = rateLimits;
-        // Forward structured stop details for observability (SDK 0.82+)
-        if (message.stop_reason) result.stopReason = message.stop_reason;
-        if ("stop_details" in message && message.stop_details)
-          result.stopDetails = { ...message.stop_details };
-        return result;
-      } catch (error: unknown) {
-        lastError = error;
-        if (
-          error instanceof Error &&
-          isRetryableError(error as AnthropicSdkError) &&
-          attempt < MAX_RETRIES
-        ) {
-          logger.warn(
-            `[anthropic] Overloaded on attempt ${attempt}/${MAX_RETRIES} for generateText model=${model}. Retrying in ${RETRY_DELAY_MILLISECONDS / 1000}s...`,
-          );
-          await sleep(RETRY_DELAY_MILLISECONDS);
-          continue;
-        }
-        throw new ProviderError(
-          "anthropic",
-          getErrorMessage(error),
-          (error as AnthropicSdkError)?.status || 500,
-          error as Error,
-        );
-      }
+      const { text, thinking, thinkingSignature, citations, toolCalls } =
+        extractResponseContent(message.content as AnthropicBlock[]);
+      const result: AnthropicGenerateResult = {
+        text,
+        usage: buildUsage(message.usage),
+      };
+      if (thinking) result.thinking = thinking;
+      if (thinkingSignature) result.thinkingSignature = thinkingSignature;
+      if (citations.length > 0) result.citations = citations;
+      if (toolCalls.length > 0) result.toolCalls = toolCalls;
+      if (rateLimits) result.rateLimits = rateLimits;
+      // Forward structured stop details for observability (SDK 0.82+)
+      if (message.stop_reason) result.stopReason = message.stop_reason;
+      if ("stop_details" in message && message.stop_details)
+        result.stopDetails = { ...message.stop_details };
+      return result;
+    } catch (error: unknown) {
+      throw new ProviderError(
+        "anthropic",
+        getErrorMessage(error),
+        (error as AnthropicSdkError)?.status || 500,
+        error as Error,
+      );
     }
-    // Should never reach here, but safety net
-    throw new ProviderError(
-      "anthropic",
-      getErrorMessage(lastError, "Max retries exceeded"),
-      (lastError as AnthropicSdkError)?.status || 500,
-      lastError as Error,
-    );
   },
   async captionImage(
     images: string[],
@@ -953,10 +928,6 @@ const anthropicProvider = {
     options: ProviderOptions = {},
   ): AsyncGenerator<TransformedStreamEvent> {
     logger.provider("Anthropic", `generateTextStream model=${model}`);
-    // Retry guard: once any chunk has been received, a retry would replay
-    // the whole response — duplicating streamed text and re-emitting tool
-    // calls that the harness would then execute twice.
-    let hasReceivedAnyChunk = false;
     try {
       const prepared = await prepareMessages(messages, model);
       const effectiveSystemPrompt = resolveSystemPrompt(
@@ -1089,7 +1060,6 @@ const anthropicProvider = {
         null;
 
       for await (const chunk of stream) {
-        hasReceivedAnyChunk = true;
         if (options.signal?.aborted) {
           stream.abort();
           break;
@@ -1322,29 +1292,9 @@ const anthropicProvider = {
       }
     } catch (error: unknown) {
       if (error instanceof Error && error.name === "AbortError") return;
-      // For streaming, retry overloaded errors — but ONLY when nothing was
-      // received yet. A mid-stream retry restarts the response from scratch:
-      // the user sees the text twice and tool calls get pushed (and executed)
-      // twice. Mid-stream failures surface as errors instead.
-      if (
-        !hasReceivedAnyChunk &&
-        error instanceof Error &&
-        isRetryableError(error as AnthropicSdkError)
-      ) {
-        // Recursive retry with attempt tracking via options._retryAttempt
-        const attempt = options._retryAttempt ?? 1;
-        if (attempt < MAX_RETRIES) {
-          logger.warn(
-            `[anthropic] Overloaded on attempt ${attempt}/${MAX_RETRIES} for generateTextStream model=${model}. Retrying in ${RETRY_DELAY_MILLISECONDS / 1000}s...`,
-          );
-          await sleep(RETRY_DELAY_MILLISECONDS);
-          yield* this.generateTextStream(messages, model, {
-            ...options,
-            _retryAttempt: attempt + 1,
-          });
-          return;
-        }
-      }
+      // No provider-level retry: transient stream failures are retried by the
+      // shared streamWithRetries wrapper at the call site (zero-chunk only,
+      // so a retry never replays text or re-executes tool calls).
       throw new ProviderError(
         "anthropic",
         getErrorMessage(error),

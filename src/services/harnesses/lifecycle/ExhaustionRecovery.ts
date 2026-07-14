@@ -14,6 +14,7 @@ import {
 import type BaseAgenticHarness from "#src/services/harnesses/BaseAgenticHarness";
 import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type { AgenticContext, ConversationMessage } from "#src/services/harnesses/types";
+import { streamWithRetries } from "#src/utils/ProviderStreamResilience";
 
 /**
  * ExhaustionRecovery — handles the iteration-limit summary pass.
@@ -91,7 +92,9 @@ export async function runExhaustionRecoveryPass(
   const exhaustionRequestId = `${context.requestId || context.agentConversationId}-exhaustion`;
   harness.registerTrackerRequest(exhaustionRequestId);
 
-  const exhaustionStream =
+  // Shared transient-error retry (zero-chunk only) — providers no longer
+  // retry internally, so unwrapped call sites must wrap here.
+  const createExhaustionStream = () =>
     modelDefinition?.liveAPI && provider.generateTextStreamLive
       ? provider.generateTextStreamLive(expandedMessages, resolvedModel, {
           ...augmentedOptions,
@@ -101,6 +104,23 @@ export async function runExhaustionRecoveryPass(
           ...augmentedOptions,
           signal,
         });
+
+  // Create the first stream eagerly (preserves call-time semantics for
+  // providers that validate/dispatch on invocation); retries create fresh
+  // streams via the factory.
+  let initialExhaustionStream: AsyncIterable<unknown> | null =
+    createExhaustionStream();
+  const exhaustionStream = streamWithRetries(
+    () => {
+      if (initialExhaustionStream) {
+        const firstStream = initialExhaustionStream;
+        initialExhaustionStream = null;
+        return firstStream;
+      }
+      return createExhaustionStream();
+    },
+    { signal, label: context.providerName },
+  );
 
   // Create a pass state for chunk routing through the shared processStreamChunk
   const exhaustionPass = harness.createPassState(augmentedOptions);

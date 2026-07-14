@@ -622,7 +622,8 @@ describe("ExhaustionRecovery", () => {
     await runExhaustionRecoveryPass(mockHarness, mockContext, mockState, currentMessages);
 
     expect(mockProvider.generateTextStreamLive).toHaveBeenCalled();
-    expect(mockHarness.consumeStream).toHaveBeenCalledWith("mock-live-stream", expect.any(Object), expect.any(Set));
+    // The stream is wrapped in the shared retry generator before being consumed
+    expect(mockHarness.consumeStream).toHaveBeenCalledWith(expect.anything(), expect.any(Object), expect.any(Set));
   });
 });
 

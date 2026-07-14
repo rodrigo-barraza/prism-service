@@ -67,6 +67,7 @@ import type {
   ToolSchema,
 } from "#src/services/harnesses/types";
 import type { ChatMessage } from "#src/types/ProviderTypes";
+import { streamWithRetries } from "#src/utils/ProviderStreamResilience";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import {
   PROVIDERS,
@@ -1145,27 +1146,32 @@ async function handleStreamingText(context: GenerationContext) {
         ? conversationMeta.title
         : undefined,
   });
-  const stream =
-    (modelDefinition as Record<string, unknown> | null)?.liveAPI &&
-    provider.generateTextStreamLive
-      ? provider.generateTextStreamLive(
-          messages as ChatMessage[],
-          resolvedModel,
-          {
+  // Shared transient-error retry (zero-chunk only) — providers no longer
+  // retry internally, so unwrapped call sites must wrap here.
+  const stream = streamWithRetries(
+    () =>
+      (modelDefinition as Record<string, unknown> | null)?.liveAPI &&
+      provider.generateTextStreamLive
+        ? provider.generateTextStreamLive(
+            messages as ChatMessage[],
+            resolvedModel,
+            {
+              ...options,
+              signal,
+            },
+          )
+        : provider.generateTextStream(messages as ChatMessage[], resolvedModel, {
             ...options,
             signal,
-          },
-        )
-      : provider.generateTextStream(messages as ChatMessage[], resolvedModel, {
-          ...options,
-          signal,
-        });
+          }),
+    { signal, label: providerName as string },
+  );
   const streamState = createStreamState();
   streamState.requestStart = requestStart;
   for await (const chunk of stream) {
     // Client disconnected — abort the upstream provider stream
     if (signal?.aborted) {
-      if (typeof stream.return === "function") stream.return();
+      if (typeof stream.return === "function") stream.return(undefined);
       logger.info(
         `[chat] Client disconnected, aborting stream for ${providerName} ${resolvedModel}`,
       );
@@ -1315,13 +1321,13 @@ async function handleStreamingText(context: GenerationContext) {
     streamState.thinking = "";
     streamState.thinkingSignature = "";
     streamState.toolCalls.length = 0;
-    const followUpStream = provider.generateTextStream(
-      updatedMessages as ChatMessage[],
-      resolvedModel,
-      {
-        ...options,
-        signal,
-      },
+    const followUpStream = streamWithRetries(
+      () =>
+        provider.generateTextStream(updatedMessages as ChatMessage[], resolvedModel, {
+          ...options,
+          signal,
+        }),
+      { signal, label: providerName as string },
     );
     // Use dispatchChunk with a custom usage merger for follow-up iteration
     const usageMerger = (followUpUsage: TokenUsage) => {
@@ -1334,7 +1340,7 @@ async function handleStreamingText(context: GenerationContext) {
     for await (const chunk of followUpStream) {
       if (signal?.aborted) {
         if (typeof followUpStream.return === "function")
-          followUpStream.return();
+          followUpStream.return(undefined);
         break;
       }
       await dispatchChunk(

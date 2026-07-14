@@ -95,9 +95,16 @@ const WebSocketConnectionRegistry = {
    * Returns an emit that sends to ALL connected clients for this conversation,
    * or null if no active connections exist.
    *
+   * Pass `excludeWebsocket` to skip a specific connection — used when the
+   * generation is driven over a WebSocket and that driving socket already
+   * receives events directly (avoids double delivery).
+   *
    * Automatically prunes closed WebSockets during lookup.
    */
-  getEmitFunction(conversationId: string): EmitFunction | null {
+  getEmitFunction(
+    conversationId: string,
+    options: { excludeWebsocket?: WebSocket } = {},
+  ): EmitFunction | null {
     const connectionSet = connectionsByConversation.get(conversationId);
     if (!connectionSet || connectionSet.size === 0) return null;
 
@@ -113,9 +120,20 @@ const WebSocketConnectionRegistry = {
       return null;
     }
 
+    const { excludeWebsocket } = options;
+    if (
+      excludeWebsocket &&
+      ![...connectionSet].some(
+        (connection) => connection.websocket !== excludeWebsocket,
+      )
+    ) {
+      return null;
+    }
+
     // Return a broadcast emit that sends to all connected clients
     return (event: { type: string; [key: string]: unknown }) => {
       for (const connection of connectionSet) {
+        if (connection.websocket === excludeWebsocket) continue;
         try {
           if (connection.websocket.readyState === connection.websocket.OPEN) {
             connection.emit(event);

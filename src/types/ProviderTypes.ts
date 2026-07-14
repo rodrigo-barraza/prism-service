@@ -85,7 +85,6 @@ export interface ProviderOptions {
     description?: string;
     parameters?: Record<string, unknown>;
   }>;
-  _retryAttempt?: number;
   reasoningSummary?: boolean | string;
   verbosity?: string;
   seed?: number | string;
