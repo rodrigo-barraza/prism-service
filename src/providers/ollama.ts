@@ -227,7 +227,9 @@ export function createOllamaProvider(
 
         while (true) {
           if (options.signal?.aborted) {
-            reader.cancel();
+            void reader.cancel().catch(() => {
+              /* reader teardown is best-effort */
+            });
             break;
           }
           const { done: isDone, value } = await reader.read();

@@ -36,6 +36,8 @@ import {
   type FinalizerContext,
   type DeferredDoneEvent,
   computeNewTurnMessages,
+  sanitizeMessagesForPersistence,
+  getCollectionOpts,
 } from "./lifecycle/Finalizer.ts";
 import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
@@ -767,18 +769,33 @@ export default class BaseAgenticHarness {
         allowedToolNames,
       );
       if (result.action === "break") {
-        const returnable = stream as AsyncGenerator<unknown>;
-        if (typeof returnable.return === "function")
-          returnable.return(undefined);
+        this._teardownStream(stream);
         break;
       }
       if (result.action === "repetitionDetected") {
         pass.repetitionDetected = true;
-        const returnable = stream as AsyncGenerator<unknown>;
-        if (typeof returnable.return === "function")
-          returnable.return(undefined);
+        this._teardownStream(stream);
         break;
       }
+    }
+  }
+
+  /**
+   * Tear down a provider stream after an early exit (abort, repetition).
+   * The return() promise is intentionally not awaited — a wedged stream's
+   * return() may never resolve — but it MUST carry a rejection handler:
+   * an unhandled rejection here kills the whole process (observed when
+   * users stop a generation mid-tool-call), wiping every in-flight turn.
+   */
+  private _teardownStream(stream: AsyncIterable<unknown>): void {
+    const returnable = stream as AsyncGenerator<unknown>;
+    if (typeof returnable.return !== "function") return;
+    try {
+      void Promise.resolve(returnable.return(undefined)).catch(() => {
+        /* stream teardown is best-effort */
+      });
+    } catch {
+      /* stream teardown is best-effort */
     }
   }
 
@@ -1514,6 +1531,54 @@ export default class BaseAgenticHarness {
     };
 
     return passState;
+  }
+
+  // ── Crash-safety checkpoint ───────────────────────────────
+
+  /**
+   * Persist a shadow copy of the turn's accumulated messages so far.
+   *
+   * Messages only reach MongoDB at finalize — before this checkpoint
+   * existed, a process crash/restart mid-turn (observed when users stop a
+   * generation mid-tool-call) lost the ENTIRE turn including the user's
+   * message, leaving the conversation as an empty stub.
+   *
+   * Called at the top of each loop iteration. Writes to a transient
+   * `turnCheckpoint` field (never `messages`, so live clients see no
+   * mid-turn duplication); the finalize append atomically clears it, and
+   * startup recovery merges any orphaned checkpoint into `messages`.
+   *
+   * Best-effort: a failed checkpoint must never break the turn.
+   */
+  protected async checkpointTurnProgress(
+    currentMessages: ConversationMessage[],
+  ): Promise<void> {
+    const { conversationId, project, username, agent } = this.context;
+    if (!conversationId) return;
+    try {
+      const newTurnMessages = computeNewTurnMessages(
+        this.context.messages,
+        currentMessages,
+        this.state.originalMessageCount,
+      );
+      const sanitizedMessages = sanitizeMessagesForPersistence(
+        newTurnMessages as MessagePayload[],
+      );
+      if (sanitizedMessages.length === 0) return;
+      const { default: ConversationService } =
+        await import("#src/services/ConversationService");
+      await ConversationService.saveTurnCheckpoint(
+        conversationId,
+        project,
+        username,
+        sanitizedMessages,
+        getCollectionOpts(project, agent) || {},
+      );
+    } catch (error: unknown) {
+      logger.warn(
+        `[BaseAgenticHarness] Turn checkpoint failed for ${conversationId}: ${errorMessage(error)}`,
+      );
+    }
   }
 
   // ── Finalization ──────────────────────────────────────────

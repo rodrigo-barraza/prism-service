@@ -146,6 +146,9 @@ const ConversationService: ConversationServiceInterface = {
       $push: { messages: { $each: processedMessages } },
       $set: setFields,
       $setOnInsert: setOnInsert,
+      // The turn's messages are now durably in `messages` — atomically drop
+      // the crash-safety shadow copy so recovery can never double-append.
+      $unset: { turnCheckpoint: "" },
     };
 
     if (newInjectedMemoryIds && newInjectedMemoryIds.length > 0) {
@@ -274,6 +277,83 @@ const ConversationService: ConversationServiceInterface = {
       ...conversation,
       ...derived,
     } as unknown as TransformedConversation;
+  },
+
+  /**
+   * Overwrite the crash-safety shadow copy of the in-flight turn's messages.
+   *
+   * Messages only land in `messages` at finalize — a crash/restart mid-turn
+   * previously lost the entire turn (user message included), leaving the
+   * conversation as an empty stub. Each agentic iteration overwrites this
+   * field with the accumulated sanitized turn messages; the next successful
+   * appendMessages atomically $unsets it, and startup recovery appends any
+   * orphaned checkpoint left behind by a dead process.
+   *
+   * Lightweight by design: plain $set on the existing document (the eager
+   * markGenerating stub), no upsert, no derived-field recompute.
+   */
+  async saveTurnCheckpoint(
+    conversationId: string,
+    project: string,
+    username: string,
+    messages: Array<ChatMessage | MessagePayload>,
+    { collection = DEFAULT_COLLECTION }: { collection?: string } = {},
+  ): Promise<void> {
+    if (!conversationId || messages.length === 0) return;
+    const dbCollection = MongoWrapper.getCollection(MONGO_DB_NAME, collection);
+    await dbCollection.updateOne(
+      { id: conversationId, project, username },
+      {
+        $set: {
+          turnCheckpoint: {
+            messages,
+            savedAt: new Date().toISOString(),
+          },
+        },
+      },
+    );
+  },
+
+  /**
+   * Recover orphaned turn checkpoints left behind by a crash/restart.
+   *
+   * Any surviving turnCheckpoint at process start is orphaned by definition
+   * (no turn can be in flight yet), so its messages are appended for real
+   * via appendMessages — which also recomputes derived fields, derives the
+   * title, and atomically clears the checkpoint.
+   */
+  async recoverOrphanedTurnCheckpoints({
+    collection = DEFAULT_COLLECTION,
+  }: { collection?: string } = {}): Promise<number> {
+    const dbCollection = MongoWrapper.getCollection(MONGO_DB_NAME, collection);
+    const orphanedConversations = await dbCollection
+      .find({ "turnCheckpoint.messages.0": { $exists: true } })
+      .project({ id: 1, project: 1, username: 1, turnCheckpoint: 1 })
+      .toArray();
+
+    let recoveredCount = 0;
+    for (const orphaned of orphanedConversations) {
+      try {
+        await ConversationService.appendMessages(
+          orphaned.id as string,
+          (orphaned.project as string) || "any",
+          (orphaned.username as string) || "any",
+          (orphaned.turnCheckpoint as { messages: ChatMessage[] }).messages,
+          null,
+          { collection },
+        );
+        recoveredCount++;
+        logger.info(
+          `[ConversationService] Recovered ${(orphaned.turnCheckpoint as { messages: ChatMessage[] }).messages.length} ` +
+            `checkpointed message(s) into conversation ${orphaned.id} after unclean shutdown`,
+        );
+      } catch (error: unknown) {
+        logger.error(
+          `[ConversationService] Failed to recover turn checkpoint for ${orphaned.id}: ${getErrorMessage(error)}`,
+        );
+      }
+    }
+    return recoveredCount;
   },
 
   /**

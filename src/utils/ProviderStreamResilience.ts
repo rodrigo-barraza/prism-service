@@ -190,8 +190,9 @@ export async function* withIdleTimeout<T>(
   try {
     while (true) {
       let timeoutId: NodeJS.Timeout | undefined;
+      const nextPromise = iterator.next();
       const result = await Promise.race([
-        iterator.next(),
+        nextPromise,
         new Promise<typeof STALLED>((resolve) => {
           timeoutId = setTimeout(() => resolve(STALLED), idleTimeoutMilliseconds);
         }),
@@ -200,6 +201,13 @@ export async function* withIdleTimeout<T>(
       });
 
       if (result === STALLED) {
+        // The abandoned next() promise may still reject long after we throw
+        // (e.g. the user's stop aborts the underlying fetch). Without a
+        // rejection handler that becomes an unhandled rejection and kills
+        // the process, wiping every in-flight turn.
+        nextPromise.catch(() => {
+          /* abandoned after stall — rejection is expected on teardown */
+        });
         logger.error(
           `[StreamWatchdog] ${label} stream produced no chunk for ${Math.round(idleTimeoutMilliseconds / 1000)}s — aborting pass.`,
         );

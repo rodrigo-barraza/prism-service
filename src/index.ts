@@ -34,6 +34,26 @@ import {
 // Install process-level shutdown handlers (SIGTERM, SIGINT → runCleanupFunctions)
 installShutdownHandlers();
 
+// ── Process-level crash guards ─────────────────────────────────────
+// Node ≥15 kills the process on any unhandled promise rejection. In this
+// service that meant a single stray rejection (e.g. stream teardown when a
+// user stops a generation mid-tool-call) crashed the whole server and wiped
+// every in-flight agentic turn — conversations were left as empty stubs in
+// MongoDB because messages only persist at finalize. Log loudly instead of
+// dying; the per-request error paths already handle their own failures.
+process.on("unhandledRejection", (reason: unknown) => {
+  const detail =
+    reason instanceof Error
+      ? `${reason.message}\n${reason.stack}`
+      : JSON.stringify(reason);
+  logger.error(`[process] Unhandled promise rejection (survived): ${detail}`);
+});
+process.on("uncaughtException", (error: Error, origin: string) => {
+  logger.error(
+    `[process] Uncaught exception (${origin}, survived): ${error.message}\n${error.stack}`,
+  );
+});
+
 // Routes
 import chatRouter from "./routes/ChatRoutes.ts";
 import agentRouter from "./routes/AgentRoutes.ts";
@@ -476,6 +496,34 @@ setupWebSocket(wss);
     }
   } catch (error: unknown) {
     logger.error(`Failed to ensure indexes: ${getErrorMessage(error)}`);
+  }
+
+  // Recover turn checkpoints orphaned by a crash/restart BEFORE clearing
+  // stale flags — a checkpoint surviving to startup means the process died
+  // mid-turn and the shadow-persisted messages must be merged into the
+  // conversation, otherwise the turn (user message included) is lost and
+  // the conversation appears as an empty stub.
+  try {
+    const { default: ConversationService } =
+      await import("./services/ConversationService.ts");
+    for (const collection of [
+      COLLECTIONS.AGENT_CONVERSATIONS,
+      COLLECTIONS.MODEL_CONVERSATIONS,
+    ]) {
+      const recoveredCount =
+        await ConversationService.recoverOrphanedTurnCheckpoints({
+          collection,
+        });
+      if (recoveredCount > 0) {
+        logger.info(
+          `Recovered ${recoveredCount} interrupted turn(s) in ${collection} from crash checkpoints`,
+        );
+      }
+    }
+  } catch (error: unknown) {
+    logger.error(
+      `Failed to recover orphaned turn checkpoints: ${getErrorMessage(error)}`,
+    );
   }
 
   // Clear any stale isGenerating flags left over from a previous crash/restart

@@ -401,6 +401,12 @@ export default class ReActHarness extends BaseAgenticHarness {
 
         this.registerTrackerRequest(passRequestId);
 
+        // ── Crash-safety checkpoint ────────────────────────────
+        // Shadow-persist everything accumulated so far (user message on
+        // iteration 1, tool-call/result messages afterward) so a process
+        // crash or restart mid-iteration cannot wipe the turn from MongoDB.
+        await this.checkpointTurnProgress(currentMessages);
+
         // ── Stream LLM response ────────────────────────────────
         const stream = await this.createProviderStream(currentMessages, passOptions);
 
