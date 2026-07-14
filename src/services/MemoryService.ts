@@ -625,12 +625,26 @@ const MemoryService = {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) return;
     const collection = db.collection(COLLECTION);
-    // Primary lookup: by agent + project (covers CODING queries)
-    await collection.createIndex({ agent: 1, project: 1 });
-    // LUPOS queries: agent + guild + user
-    await collection.createIndex({ agent: 1, guildId: 1, aboutUserId: 1 });
+    // Primary lookup: by agent + project, with createdAt suffix so the
+    // dedup/search paths' sort({createdAt:-1}).limit(N) walks the index
+    // instead of fetching every ~12KB embedding doc and sorting in memory
+    await collection.createIndex({ agent: 1, project: 1, createdAt: -1 });
+    // LUPOS queries: agent + guild + user, same createdAt-suffix rationale
+    await collection.createIndex({
+      agent: 1,
+      guildId: 1,
+      aboutUserId: 1,
+      createdAt: -1,
+    });
     // Type-filtered queries
     await collection.createIndex({ agent: 1, project: 1, type: 1 });
+    // Drop the old prefix-redundant variants superseded by the indexes above
+    for (const staleIndex of [
+      "agent_1_project_1",
+      "agent_1_guildId_1_aboutUserId_1",
+    ]) {
+      await collection.dropIndex(staleIndex).catch(() => {});
+    }
     // Conversation backlinks: memory → conversation provenance lookup
     await collection.createIndex({ agent: 1, conversationId: 1 });
     // Unique ID

@@ -109,7 +109,11 @@ router.get(
           .skip(skip)
           .limit(limit)
           .toArray(),
-        req.db.collection(REQUESTS_COLLECTION).countDocuments(filter),
+        // Unfiltered count would scan the whole collection; metadata estimate
+        // is instant and exact-enough for pagination
+        Object.keys(filter).length === 0
+          ? req.db.collection(REQUESTS_COLLECTION).estimatedDocumentCount()
+          : req.db.collection(REQUESTS_COLLECTION).countDocuments(filter),
       ]);
 
       res.json({ data: docs, total, page, limit });
