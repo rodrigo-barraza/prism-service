@@ -1,10 +1,9 @@
 import logger from "#src/utils/logger";
-import { SYSTEM_STATUSES, COLLECTIONS, ORCHESTRATOR } from "#src/constants";
+import { SYSTEM_STATUSES, ORCHESTRATOR } from "#src/constants";
 import { GitWorktreeHelper } from "./GitWorktreeHelper.ts";
 import { buildSubAgentResult } from "./SubAgentResultBuilder.ts";
+import { SubAgentPersistenceService } from "./SubAgentPersistenceService.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
-import MongoWrapper from "#src/wrappers/MongoWrapper";
-import { MONGO_DB_NAME } from "#config";
 import type {
   SubAgentState,
   SubAgentResult,
@@ -23,28 +22,13 @@ export class SubAgentLifecycleService {
   private static async persistSubAgentTerminalStatus(
     subAgent: SubAgentState,
   ): Promise<void> {
-    try {
-      const conversationCollection = MongoWrapper.getCollection(
-        MONGO_DB_NAME,
-        COLLECTIONS.AGENT_CONVERSATIONS,
-      );
-      if (!conversationCollection) return;
-
-      await conversationCollection.updateOne(
-        { id: subAgent.subAgentConversationId },
-        {
-          $set: {
-            subAgentStatus: subAgent.status,
-            subAgentDurationMilliseconds: subAgent.durationMilliseconds,
-            subAgentCompletedAt: new Date().toISOString(),
-          },
-        },
-      );
-    } catch (error: unknown) {
-      logger.warn(
-        `[SubAgentLifecycle] Failed to persist terminal status for ${subAgent.agentId}: ${getErrorMessage(error)}`,
-      );
-    }
+    await SubAgentPersistenceService.markSubAgentTerminal({
+      subAgentConversationId: subAgent.subAgentConversationId,
+      status: subAgent.status,
+      extraFields: {
+        subAgentDurationMilliseconds: subAgent.durationMilliseconds,
+      },
+    });
   }
 
   /**
