@@ -12,7 +12,7 @@
 import { describe, it, expect } from "vitest";
 
 import MicroCompactionService from "#src/services/compact/MicroCompactionService";
-import ContextWindowManager from "#src/utils/ContextWindowManager";
+import ContextWindowManager from "#src/services/ContextWindowManager";
 import type { ChatMessage } from "#src/types/admin";
 import { TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
 

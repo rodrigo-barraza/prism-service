@@ -7,7 +7,7 @@
 import { describe, it, expect } from "vitest";
 
 import { rewriteNonLeadingSystemMessages } from "#src/providers/vllm";
-import type { InputMessage } from "#src/utils/openai-compat";
+import type { InputMessage } from "#src/providers/openai-compat";
 
 // ── Helpers ──────────────────────────────────────────────────
 function makeMessage(overrides: Partial<InputMessage>): InputMessage {

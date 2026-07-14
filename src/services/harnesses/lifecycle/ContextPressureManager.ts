@@ -5,7 +5,7 @@ import MicroCompactionService from "#src/services/compact/MicroCompactionService
 import AutoCompactionTrigger from "#src/services/compact/AutoCompactionTrigger";
 import CompactionService from "#src/services/compact/CompactionService";
 import ConversationEmbeddingService from "#src/services/ConversationEmbeddingService";
-import ContextWindowManager from "#src/utils/ContextWindowManager";
+import ContextWindowManager from "#src/services/ContextWindowManager";
 import {
   DEFAULT_MAX_INPUT_TOKENS,
   DEFAULT_MAX_OUTPUT_TOKENS,

@@ -53,7 +53,7 @@ vi.mock("#src/services/ConversationEmbeddingService", () => ({
 
 const mockEstimateTokens = vi.fn().mockReturnValue(5000);
 
-vi.mock("#src/utils/ContextWindowManager", () => ({
+vi.mock("#src/services/ContextWindowManager", () => ({
   default: {
     estimateTokens: (...arguments_: unknown[]) => mockEstimateTokens(...arguments_),
   },

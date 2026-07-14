@@ -6,7 +6,7 @@
  * AgenticLoopState, and the AgenticLoopService façade.
  */
 
-import type { RepetitionVerdict } from "#src/utils/RepetitionDetector";
+import type { RepetitionVerdict } from "#src/services/RepetitionDetector";
 
 // ── Usage & Cost ────────────────────────────────────────────
 

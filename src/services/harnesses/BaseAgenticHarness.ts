@@ -8,7 +8,7 @@ import {
   withIdleTimeout,
 } from "#src/utils/ProviderStreamResilience";
 import { roundMilliseconds } from "@rodrigo-barraza/utilities-library";
-import RepetitionDetector from "#src/utils/RepetitionDetector";
+import RepetitionDetector from "#src/services/RepetitionDetector";
 import {
   createUsageAccumulator,
   calculateTextCost,
@@ -17,7 +17,7 @@ import {
 } from "#src/utils/CostCalculator";
 import { calculateTokensPerSec } from "#src/utils/math";
 import { getPricing, MODALITY_TYPES } from "#src/config";
-import ContextWindowManager from "#src/utils/ContextWindowManager";
+import ContextWindowManager from "#src/services/ContextWindowManager";
 import ContextBudgetTracker from "./ContextBudgetTracker.ts";
 import {
   isContextExhausted,

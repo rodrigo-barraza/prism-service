@@ -23,8 +23,8 @@ import {
   fetchOpenAICompat,
   MEDIA_STRATEGIES,
   type OpenAICompletionResponse,
-} from "#src/utils/openai-compat";
-import type { InputMessage } from "#src/utils/openai-compat";
+} from "#src/providers/openai-compat";
+import type { InputMessage } from "#src/providers/openai-compat";
 
 // ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 // ┃  TEMPORARY PATCH — Remove when vLLM fixes Qwen3.6 chat     ┃

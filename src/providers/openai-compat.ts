@@ -5,8 +5,8 @@
 // API format: lm-studio, vllm, llama-cpp, and openai itself.
 
 import { Agent } from "undici";
-import { getDataUrlMimeType } from "./media.ts";
-import { ThinkTagParser, extractThinkTags } from "./ThinkTagParser.ts";
+import { getDataUrlMimeType } from "#src/utils/media";
+import { ThinkTagParser, extractThinkTags } from "#src/utils/ThinkTagParser";
 import type {
   ProviderOptions,
   ChatMessageContent,
@@ -322,7 +322,7 @@ export async function expandVideoToFrames(
   messages: InputMessage[],
   options: ExpandVideoOptions = {},
 ): Promise<InputMessage[]> {
-  const { extractVideoFrames, getDataUrlMimeType } = await import("./media.js");
+  const { extractVideoFrames, getDataUrlMimeType } = await import("#src/utils/media");
 
   for (const message of messages) {
     // Collect video data URLs from both `video` and `images` arrays.

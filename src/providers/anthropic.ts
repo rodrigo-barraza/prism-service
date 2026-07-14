@@ -3,7 +3,7 @@ import { ProviderError } from "#src/utils/errors";
 import logger from "#src/utils/logger";
 import { extractAnthropicRateLimits } from "#src/utils/rateLimits";
 import { compressImageForSizeLimit } from "#src/utils/media";
-import { EMPTY_USAGE } from "#src/utils/openai-compat";
+import { EMPTY_USAGE } from "#src/providers/openai-compat";
 import { ANTHROPIC_API_KEY } from "#config";
 import { MODALITY_TYPES, getDefaultModels, getModelByName } from "#src/config";
 import { DEFAULT_MAX_OUTPUT_TOKENS } from "#src/constants/TokenBudgetDefaults";

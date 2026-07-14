@@ -8,8 +8,8 @@ import {
   processNonStreamingResponse,
   EMPTY_USAGE,
   MEDIA_STRATEGIES,
-} from '#src/utils/openai-compat';
-import type { InputMessage } from '#src/utils/openai-compat';
+} from '#src/providers/openai-compat';
+import type { InputMessage } from '#src/providers/openai-compat';
 import { TYPES } from "#src/constants";
 
 vi.mock('#src/utils/logger', () => ({

@@ -11,7 +11,7 @@ vi.mock("#src/utils/logger", () => ({
   },
 }));
 
-import ContextWindowManager from "#src/utils/ContextWindowManager";
+import ContextWindowManager from "#src/services/ContextWindowManager";
 import { PROMPT_DELIMITERS } from "#src/constants";
 
 
