@@ -789,7 +789,7 @@ export async function runGraphOfThoughts(
     return { messages: currentMessages };
   } catch (loopError: unknown) {
     logger.error(
-      `[GraphOfThoughts] Loop error on iteration ${state.iterations}: ${loopError instanceof Error ? loopError.message : String(loopError)}. Persisting ${currentMessages.length - state.originalMessageCount} accumulated message(s).`,
+      `[GraphOfThoughts] Loop error on iteration ${state.iterations}: ${getErrorMessage(loopError)}. Persisting ${currentMessages.length - state.originalMessageCount} accumulated message(s).`,
     );
 
     injectErrorAsConversationMessage(
@@ -808,7 +808,7 @@ export async function runGraphOfThoughts(
       await harness["finalize"](currentMessages, hooks);
     } catch (persistError: unknown) {
       logger.error(
-        `[GraphOfThoughts] Failed to persist messages on error path: ${persistError instanceof Error ? persistError.message : String(persistError)}`,
+        `[GraphOfThoughts] Failed to persist messages on error path: ${getErrorMessage(persistError)}`,
       );
     }
     throw loopError;

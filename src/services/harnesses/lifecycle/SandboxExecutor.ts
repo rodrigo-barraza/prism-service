@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import logger from "#src/utils/logger";
 import {
   SERVER_SENT_EVENT_TYPES,
@@ -92,7 +93,7 @@ export function createSandboxCheckpoint(
     return stashReference;
   } catch (checkpointError: unknown) {
     logger.warn(
-      `[SandboxExecutor] Checkpoint creation failed: ${checkpointError instanceof Error ? checkpointError.message : String(checkpointError)}. Proceeding without sandbox.`,
+      `[SandboxExecutor] Checkpoint creation failed: ${getErrorMessage(checkpointError)}. Proceeding without sandbox.`,
     );
     return null;
   }
@@ -134,7 +135,7 @@ export function restoreSandboxCheckpoint(
   } catch (restoreError: unknown) {
     logger.error(
       `[SandboxExecutor] Checkpoint restore FAILED for ${stashReference.slice(0, 12)}: ` +
-        `${restoreError instanceof Error ? restoreError.message : String(restoreError)}. ` +
+        `${getErrorMessage(restoreError)}. ` +
         `Filesystem may be in an inconsistent state.`,
     );
     return false;

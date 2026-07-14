@@ -1,7 +1,10 @@
 import BaseAgenticHarness from "./BaseAgenticHarness.ts";
 import { runTreeOfThoughts } from "./strategies/TreeOfThoughtsStrategy.ts";
 import { runGraphOfThoughts } from "./strategies/GraphOfThoughtsStrategy.ts";
-import { roundMilliseconds } from "@rodrigo-barraza/utilities-library";
+import {
+  roundMilliseconds,
+  getErrorMessage,
+} from "@rodrigo-barraza/utilities-library";
 import logger from "#src/utils/logger";
 import {
   SYSTEM_MESSAGE_TAGS,
@@ -883,7 +886,7 @@ export default class ReActHarness extends BaseAgenticHarness {
       // Also inject the error as a conversation message so the LLM
       // has context about the failure on the next turn.
       logger.error(
-        `[ReActHarness] Loop error on iteration ${state.iterations}: ${loopError instanceof Error ? loopError.message : String(loopError)}. Persisting ${currentMessages.length - state.originalMessageCount} accumulated message(s).`,
+        `[ReActHarness] Loop error on iteration ${state.iterations}: ${getErrorMessage(loopError)}. Persisting ${currentMessages.length - state.originalMessageCount} accumulated message(s).`,
       );
 
       injectErrorAsConversationMessage(
@@ -902,7 +905,7 @@ export default class ReActHarness extends BaseAgenticHarness {
         await this.finalize(currentMessages, hooks);
       } catch (persistError: unknown) {
         logger.error(
-          `[ReActHarness] Failed to persist messages on error path: ${persistError instanceof Error ? persistError.message : String(persistError)}`,
+          `[ReActHarness] Failed to persist messages on error path: ${getErrorMessage(persistError)}`,
         );
       }
       throw loopError;

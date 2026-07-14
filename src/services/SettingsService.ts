@@ -1,6 +1,6 @@
 import { DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
-import { deepMerge } from "@rodrigo-barraza/utilities-library";
+import { deepMerge, getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { MONGO_DB_NAME } from "#config";
 import { COLLECTIONS, PROVIDERS } from "#src/constants";
 import { MODELS } from "#src/config";
@@ -144,9 +144,9 @@ const SettingsService = {
       return _cache;
     } catch (error) {
       logger.warn(
-        `[SettingsService] Failed to load settings from database: ${
-          error instanceof Error ? error.message : String(error)
-        }. Falling back to defaults.`,
+        `[SettingsService] Failed to load settings from database: ${getErrorMessage(
+          error,
+        )}. Falling back to defaults.`,
       );
       return { ...DEFAULTS };
     }

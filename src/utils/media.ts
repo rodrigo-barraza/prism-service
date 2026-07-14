@@ -88,7 +88,7 @@ export async function compressImageForSizeLimit(
     return await compressWithSharp(base64Data, maxBytes);
   } catch (error: unknown) {
     logger.warn(
-      `[media] Image compression failed (${error instanceof Error ? getErrorMessage(error) : String(error)}), returning original data`,
+      `[media] Image compression failed (${getErrorMessage(error)}), returning original data`,
     );
     return { data: base64Data, mediaType };
   }
@@ -158,7 +158,7 @@ export async function constrainImageDimensions(
     return { data: resizedB64, mediaType: outputMime };
   } catch (error: unknown) {
     logger.warn(
-      `[media] Dimension check failed (${error instanceof Error ? getErrorMessage(error) : String(error)}), passing through`,
+      `[media] Dimension check failed (${getErrorMessage(error)}), passing through`,
     );
     return { data: base64Data, mediaType };
   }
@@ -284,7 +284,7 @@ async function compressGifWithFfmpeg(base64Data: string, maxBytes: number) {
     };
   } catch (error: unknown) {
     logger.warn(
-      `[media] ffmpeg GIF compression failed (${error instanceof Error ? getErrorMessage(error) : String(error)}), falling back to static JPEG via sharp`,
+      `[media] ffmpeg GIF compression failed (${getErrorMessage(error)}), falling back to static JPEG via sharp`,
     );
     return compressWithSharp(base64Data, maxBytes);
   } finally {
