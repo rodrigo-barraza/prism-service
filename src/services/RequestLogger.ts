@@ -1,4 +1,5 @@
 import { roundMilliseconds } from "@rodrigo-barraza/utilities-library";
+import { resolveCapabilityName } from "@rodrigo-barraza/utilities-library/taxonomy";
 import type { ObjectId } from "mongodb";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { MONGO_DB_NAME } from "#config";
@@ -15,26 +16,9 @@ import { MODALITY_TYPES, getPricing } from "#src/config";
 import { calculateTokensPerSec } from "#src/utils/math";
 import WebhookEventBus from "./WebhookEventBus.ts";
 const COLLECTION = COLLECTIONS.REQUESTS;
-// Maps provider-native API tool/feature names to human-readable display names.
-// These are NOT our custom tool names — they are keys from Anthropic/OpenAI/Google APIs.
-const API_TO_CANONICAL = {
-  googleSearch: "Google Search",
-  googleSearchRetrieval: "Google Search",
-  web_search: "Web Search",
-  webSearch: "Web Search",
-  webFetch: "Web Fetch",
-  codeExecution: "Code Execution",
-  code_execution: "Code Execution",
-  computerUse: "Computer Use",
-  computer_use: "Computer Use",
-  fileSearch: "File Search",
-  file_search: "File Search",
-  urlContext: "URL Context",
-  url_context: "URL Context",
-  thinking: "Thinking",
-  imageGeneration: "Image Generation",
-  image_generation: "Image Generation",
-};
+// Provider-native API tool/feature name → canonical display name is resolved
+// via the shared capability taxonomy (resolveCapabilityName). These are NOT our
+// custom tool names — they are keys from Anthropic/OpenAI/Google APIs.
 export interface LogParams {
   /**
    * Normalized provider usage. When present, the top-level token fields
@@ -416,12 +400,7 @@ const RequestLogger = {
         toolCalls && toolCalls.length > 0
           ? [
               ...new Set(
-                toolCalls.map(
-                  (toolCall) =>
-                    (API_TO_CANONICAL as Record<string, string>)[
-                      toolCall.name
-                    ] || toolCall.name,
-                ),
+                toolCalls.map((toolCall) => resolveCapabilityName(toolCall.name)),
               ),
             ]
           : [],
@@ -477,9 +456,7 @@ const RequestLogger = {
         toolCalls:
           toolCalls && toolCalls.length > 0
             ? toolCalls.map((toolCall) => ({
-                name:
-                  (API_TO_CANONICAL as Record<string, string>)[toolCall.name] ||
-                  toolCall.name,
+                name: resolveCapabilityName(toolCall.name),
                 id: toolCall.id,
                 args: toolCall.args,
               }))
