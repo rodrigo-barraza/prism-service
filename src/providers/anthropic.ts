@@ -143,11 +143,59 @@ async function enforceImageSizeLimits(messages: ChatMessage[]) {
 }
 
 /**
+ * Whether the model natively accepts `role: "system"` messages mid-conversation.
+ *
+ * Per Anthropic's docs (verified 2026-07): Claude Opus 4.8 only — no beta
+ * header required. All other Claude models return a 400
+ * ("role 'system' is not supported on this model"). Matched with includes()
+ * so provider-prefixed IDs (e.g. Bedrock's "anthropic.claude-opus-4-8")
+ * are also recognized.
+ */
+export function supportsMidConversationSystemMessages(model?: string): boolean {
+  return !!model && model.includes("claude-opus-4-8");
+}
+
+/** Merge consecutive same-role messages into a single turn. */
+function mergeConsecutiveSameRole(messages: ChatMessage[]): ChatMessage[] {
+  return messages.reduce((acc: ChatMessage[], current: ChatMessage) => {
+    if (acc.length && acc[acc.length - 1].role === current.role) {
+      const previous = acc[acc.length - 1];
+      // Handle merging when content might be string or array
+      if (
+        typeof previous.content === "string" &&
+        typeof current.content === "string"
+      ) {
+        previous.content += `\n\n${current.content}`;
+      } else {
+        // Convert both to arrays and concat
+        const previousBlocks =
+          typeof previous.content === "string"
+            ? [{ type: "text", text: previous.content }]
+            : previous.content || [];
+        const currentBlocks =
+          typeof current.content === "string"
+            ? [{ type: "text", text: current.content }]
+            : current.content || [];
+        previous.content = [...previousBlocks, ...currentBlocks];
+      }
+    } else {
+      acc.push({ ...current });
+    }
+    return acc;
+  }, []);
+}
+
+/**
  * Anthropic requires alternating user/assistant roles and handles system messages separately.
  * This helper extracts the system message and merges consecutive same-role messages.
+ *
+ * Pass `model` so mid-conversation system messages can be kept as
+ * `role: "system"` on models that support them (Opus 4.8) instead of being
+ * demoted to user role.
  */
-export async function prepareMessages(messages: ChatMessage[]) {
+export async function prepareMessages(messages: ChatMessage[], model?: string) {
   let systemMessage: string | undefined;
+  const keepSystemRole = supportsMidConversationSystemMessages(model);
 
   // Extract system message
   const conversation = messages.map((chatMessage: ChatMessage) => ({
@@ -166,10 +214,11 @@ export async function prepareMessages(messages: ChatMessage[]) {
   // destructuring + ...rest, which leaks any new internal fields (e.g.
   // _ttftSamples, _liveGenProgress, _workerTokens) into the API payload.
   //
-  // Mid-conversation system messages (e.g. dynamic tool updates) are
-  // converted to user role with XML scaffolding. Anthropic Opus 4.8+
-  // natively supports role: "system" mid-conversation, but converting
-  // to user ensures compatibility across all Claude model versions.
+  // Mid-conversation system messages are kept as role: "system" on models
+  // that support them (Opus 4.8) and demoted to user role everywhere else.
+  // Either way the harness wraps their content in semantic XML tags
+  // (see utils/SystemMessageTags.ts), so demoted messages remain
+  // distinguishable from genuine user input.
   const cleaned = await Promise.all(
     conversation
       .filter(
@@ -202,12 +251,13 @@ export async function prepareMessages(messages: ChatMessage[]) {
         }
 
         // Mid-conversation system messages (e.g. dynamic tool updates from
-        // the harness) — convert to user role for Anthropic API compatibility.
-        // The harness wraps these in <tool-update> XML tags, so the model
-        // can distinguish them from actual user messages.
+        // the harness). On models with native support they stay system-role
+        // (position constraints are enforced after merging); elsewhere they
+        // are demoted to user role — the harness's XML tags let the model
+        // distinguish them from actual user messages.
         if (message.role === "system") {
           return {
-            role: "user",
+            role: keepSystemRole ? "system" : "user",
             content:
               typeof message.content === "string"
                 ? message.content
@@ -375,32 +425,29 @@ export async function prepareMessages(messages: ChatMessage[]) {
   );
 
   // Merge consecutive same-role messages
-  const merged = cleaned.reduce((acc: ChatMessage[], current: ChatMessage) => {
-    if (acc.length && acc[acc.length - 1].role === current.role) {
-      const previous = acc[acc.length - 1];
-      // Handle merging when content might be string or array
-      if (
-        typeof previous.content === "string" &&
-        typeof current.content === "string"
-      ) {
-        previous.content += `\n\n${current.content}`;
-      } else {
-        // Convert both to arrays and concat
-        const previousBlocks =
-          typeof previous.content === "string"
-            ? [{ type: "text", text: previous.content }]
-            : previous.content || [];
-        const currentBlocks =
-          typeof current.content === "string"
-            ? [{ type: "text", text: current.content }]
-            : current.content || [];
-        previous.content = [...previousBlocks, ...currentBlocks];
+  let merged = mergeConsecutiveSameRole(cleaned);
+
+  // Enforce Anthropic's placement rules for retained mid-conversation
+  // system messages: a system message cannot be messages[0], must follow a
+  // user message, and must be either the last entry or followed by an
+  // assistant turn. Demote any message violating these to user role, then
+  // re-merge in case the demotion created adjacent user messages.
+  if (keepSystemRole) {
+    let demotedAny = false;
+    for (let i = 0; i < merged.length; i++) {
+      if (merged[i].role !== "system") continue;
+      const followsUser = i > 0 && merged[i - 1].role === "user";
+      const validSuccessor =
+        i === merged.length - 1 || merged[i + 1].role === "assistant";
+      if (!followsUser || !validSuccessor) {
+        merged[i].role = "user";
+        demotedAny = true;
       }
-    } else {
-      acc.push({ ...current });
     }
-    return acc;
-  }, []);
+    if (demotedAny) {
+      merged = mergeConsecutiveSameRole(merged);
+    }
+  }
 
   // Deduplicate tool_result blocks within merged user messages.
   // Anthropic requires exactly one tool_result per tool_use_id.
@@ -663,7 +710,7 @@ const anthropicProvider = {
   ) {
     logger.provider("Anthropic", `generateText model=${model}`);
 
-    const prepared = await prepareMessages(messages);
+    const prepared = await prepareMessages(messages, model);
     const effectiveSystemPrompt = resolveSystemPrompt(
       options.systemPrompt,
       prepared.systemMessage,
@@ -912,7 +959,7 @@ const anthropicProvider = {
     // calls that the harness would then execute twice.
     let hasReceivedAnyChunk = false;
     try {
-      const prepared = await prepareMessages(messages);
+      const prepared = await prepareMessages(messages, model);
       const effectiveSystemPrompt = resolveSystemPrompt(
         options.systemPrompt,
         prepared.systemMessage,

@@ -3,6 +3,10 @@ import ConversationGenerationTracker from "#src/services/ConversationGenerationT
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import logger from "#src/utils/logger";
 import {
+  SYSTEM_MESSAGE_TAGS,
+  wrapSystemMessage,
+} from "#src/utils/SystemMessageTags";
+import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
@@ -64,7 +68,10 @@ export async function runExhaustionRecoveryPass(
 
   currentMessages.push({
     role: "system",
-    content: PromptLocaleService.get(activeLocale, recoveryMessageKey),
+    content: wrapSystemMessage(
+      SYSTEM_MESSAGE_TAGS.ITERATION_LIMIT,
+      PromptLocaleService.get(activeLocale, recoveryMessageKey),
+    ),
   });
 
   const { tools: _tools, ...exhaustionOptions } = options;

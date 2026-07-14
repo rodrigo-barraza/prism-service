@@ -22,6 +22,10 @@ import logger from "#src/utils/logger";
 import { LOG_PREVIEW } from "#src/constants";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import {
+  SYSTEM_MESSAGE_TAGS,
+  wrapSystemMessage,
+} from "#src/utils/SystemMessageTags";
+import {
   DEFAULT_MAX_OUTPUT_TOKENS,
   TOKEN_ESCALATION_MULTIPLIER,
   MAX_OUTPUT_TRUNCATION_RECOVERIES,
@@ -115,7 +119,10 @@ export function injectContinuationContext(
 
   currentMessages.push({
     role: "system",
-    content: getContinuationPrompt(activeLocale),
+    content: wrapSystemMessage(
+      SYSTEM_MESSAGE_TAGS.TRUNCATION_RECOVERY,
+      getContinuationPrompt(activeLocale),
+    ),
   });
 
   const baseMaxTokens = context.options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS;

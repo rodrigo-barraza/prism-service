@@ -6,6 +6,10 @@ import {
 import { extractReminderViaLLM } from "./SystemReminderExtractor.ts";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import { HARNESS } from "#src/constants";
+import {
+  SYSTEM_MESSAGE_TAGS,
+  wrapSystemMessage,
+} from "#src/utils/SystemMessageTags";
 
 import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type { ConversationMessage, AgenticContext } from "#src/services/harnesses/types";
@@ -101,15 +105,20 @@ export async function maybeInjectSystemReminder(
 
   currentMessages.push({
     role: "system",
-    content:
+    content: wrapSystemMessage(
+      SYSTEM_MESSAGE_TAGS.SYSTEM_REMINDER,
       PromptLocaleService.get(activeLocale, "harness.systemReminder.header", {
         currentIteration: String(currentIteration),
       }) +
-      `\n` +
-      PromptLocaleService.get(activeLocale, "harness.systemReminder.preamble") +
-      `\n\n` +
-      `${reminderContent}\n\n` +
-      PromptLocaleService.get(activeLocale, "harness.systemReminder.footer"),
+        `\n` +
+        PromptLocaleService.get(
+          activeLocale,
+          "harness.systemReminder.preamble",
+        ) +
+        `\n\n` +
+        `${reminderContent}\n\n` +
+        PromptLocaleService.get(activeLocale, "harness.systemReminder.footer"),
+    ),
   });
 
   emit({

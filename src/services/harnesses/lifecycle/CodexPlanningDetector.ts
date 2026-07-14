@@ -1,5 +1,9 @@
 import logger from "#src/utils/logger";
 import PromptLocaleService from "#src/services/PromptLocaleService";
+import {
+  SYSTEM_MESSAGE_TAGS,
+  wrapSystemMessage,
+} from "#src/utils/SystemMessageTags";
 
 import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type {
@@ -78,10 +82,13 @@ export function handleCodexPlanningResponse(
 
   currentMessages.push({
     role: "system",
-    content: PromptLocaleService.get(
-      (context.options?.locale as string | undefined) ||
-        PromptLocaleService.getDefaultLocale(),
-      "harness.codexPlanningDetector.continuePrompt",
+    content: wrapSystemMessage(
+      SYSTEM_MESSAGE_TAGS.CONTINUATION_NUDGE,
+      PromptLocaleService.get(
+        (context.options?.locale as string | undefined) ||
+          PromptLocaleService.getDefaultLocale(),
+        "harness.codexPlanningDetector.continuePrompt",
+      ),
     ),
   });
 

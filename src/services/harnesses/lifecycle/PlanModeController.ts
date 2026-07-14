@@ -4,6 +4,10 @@ import PromptLocaleService from "#src/services/PromptLocaleService";
 import logger from "#src/utils/logger";
 import { HARNESS } from "#src/constants";
 import {
+  SYSTEM_MESSAGE_TAGS,
+  wrapSystemMessage,
+} from "#src/utils/SystemMessageTags";
+import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
   TOOL_NAMES,
@@ -83,10 +87,13 @@ export function blockUnauthorizedToolCalls(
 
     currentMessages.push({
       role: "system",
-      content: PromptLocaleService.get(
-        locale || PromptLocaleService.getDefaultLocale(),
-        "harness.planningMode.blocked",
-        { blockedNames: blockedToolNames },
+      content: wrapSystemMessage(
+        SYSTEM_MESSAGE_TAGS.PLAN_MODE,
+        PromptLocaleService.get(
+          locale || PromptLocaleService.getDefaultLocale(),
+          "harness.planningMode.blocked",
+          { blockedNames: blockedToolNames },
+        ),
       ),
     });
 

@@ -4,6 +4,10 @@ import { runGraphOfThoughts } from "./strategies/GraphOfThoughtsStrategy.ts";
 import { roundMilliseconds } from "@rodrigo-barraza/utilities-library";
 import logger from "#src/utils/logger";
 import {
+  SYSTEM_MESSAGE_TAGS,
+  wrapSystemMessage,
+} from "#src/utils/SystemMessageTags";
+import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
   type StatusMessage,
@@ -681,7 +685,10 @@ export default class ReActHarness extends BaseAgenticHarness {
 
             currentMessages.push({
               role: "system",
-              content: `Validation Errors:\n\n${errorBlock}`,
+              content: wrapSystemMessage(
+                SYSTEM_MESSAGE_TAGS.VALIDATION_ERRORS,
+                `Validation Errors:\n\n${errorBlock}`,
+              ),
             });
 
             this.logIteration(pass, currentMessages);
@@ -759,7 +766,13 @@ export default class ReActHarness extends BaseAgenticHarness {
             }
             if (!semanticStallDetector.hasWarningBeenIssued) {
               semanticStallDetector.markWarningIssued();
-              currentMessages.push({ role: "system", content: "You are in a behavioral loop. Try a different approach." });
+              currentMessages.push({
+                role: "system",
+                content: wrapSystemMessage(
+                  SYSTEM_MESSAGE_TAGS.BEHAVIORAL_LOOP,
+                  "You are in a behavioral loop. Try a different approach.",
+                ),
+              });
             }
           }
 
@@ -823,7 +836,13 @@ export default class ReActHarness extends BaseAgenticHarness {
         if (emptyOutputRetryCount <= MAX_EMPTY_OUTPUT_RETRIES) {
           const curTemp = context.options.temperature ?? 0.7;
           context.options.temperature = Math.min(curTemp + EMPTY_OUTPUT_TEMPERATURE_BUMP, 1.5);
-          currentMessages.push({ role: "system", content: "Your previous response was empty. Please provide output." });
+          currentMessages.push({
+            role: "system",
+            content: wrapSystemMessage(
+              SYSTEM_MESSAGE_TAGS.EMPTY_OUTPUT,
+              "Your previous response was empty. Please provide output.",
+            ),
+          });
           this.logIteration(pass, currentMessages);
           continue;
         }

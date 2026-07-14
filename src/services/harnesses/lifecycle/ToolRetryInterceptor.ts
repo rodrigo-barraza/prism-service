@@ -1,5 +1,9 @@
 import logger from "#src/utils/logger";
 import PromptLocaleService from "#src/services/PromptLocaleService";
+import {
+  SYSTEM_MESSAGE_TAGS,
+  wrapSystemMessage,
+} from "#src/utils/SystemMessageTags";
 
 import { LOG_PREVIEW } from "#src/constants";
 import type AgenticLoopState from "#src/services/AgenticLoopState";
@@ -133,7 +137,10 @@ export function buildToolRetryGuidance(
 
   const retryMessage: ConversationMessage = {
     role: "system",
-    content: `${headerText}\n\n` + `${retryGuidanceBlocks}\n\n` + analyzeSteps,
+    content: wrapSystemMessage(
+      SYSTEM_MESSAGE_TAGS.TOOL_RETRY,
+      `${headerText}\n\n${retryGuidanceBlocks}\n\n${analyzeSteps}`,
+    ),
   };
 
   logger.info(

@@ -1,6 +1,10 @@
 import { existsSync } from "node:fs";
 import logger from "#src/utils/logger";
 import PromptLocaleService from "./PromptLocaleService.ts";
+import {
+  SYSTEM_MESSAGE_TAGS,
+  wrapSystemMessage,
+} from "#src/utils/SystemMessageTags";
 
 import { getProvider } from "#src/providers/index";
 import {
@@ -2176,7 +2180,10 @@ export class OrchestratorService {
       })),
       {
         role: "system",
-        content: operationalContextParts.join("\n"),
+        content: wrapSystemMessage(
+          SYSTEM_MESSAGE_TAGS.OPERATIONAL_CONTEXT,
+          operationalContextParts.join("\n"),
+        ),
       },
       {
         role: "user",
