@@ -265,6 +265,8 @@ export const SYSTEM_PROMPT_SECTIONS = {
   TOOL_POLICY: "tool-policy",
   ENABLED_TOOLS: "enabled-tools",
   GUIDELINES: "coding-guidelines",
+  /** User-pinned per-turn rules (slash-command badges in the client) */
+  ACTIVE_RULES: "active-rules",
   ORCHESTRATOR: "orchestrator-mode",
   CONSTRAINTS: "constraints",
   ENVIRONMENT: "environment",

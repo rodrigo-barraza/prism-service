@@ -59,6 +59,8 @@ export interface AssemblerContext {
   options?: Record<string, unknown>;
   workspaceEnabled?: boolean;
   locale?: string;
+  /** Names of user-pinned rules to inject as an <active-rules> section */
+  activeRuleNames?: string[];
   _injectedSkills?: string[];
   _skillsText?: string;
   _currentMessages?: Array<Record<string, unknown>>;

@@ -49,6 +49,41 @@ function wrapSection(tagName: string, content: string): string {
  * load the full messages array. Returns an empty Set when the conversation
  * doesn't exist yet or has no injected memories recorded.
  */
+/**
+ * Fetch the enabled rules matching the names the client pinned to this
+ * turn. Scoped to project + username like RulesRoutes; only `enabled`
+ * rules are injected regardless of what the client claims.
+ */
+async function fetchActiveRules(
+  project: string | null | undefined,
+  username: string | undefined,
+  names: string[],
+): Promise<Array<{ name: string; content: string }>> {
+  try {
+    const collection = MongoWrapper.getCollection(
+      MONGO_DB_NAME,
+      COLLECTIONS.AGENT_RULES,
+    );
+    const rules = await collection
+      .find(
+        {
+          project: project || "any",
+          username: username || "any",
+          name: { $in: names },
+          enabled: true,
+        },
+        { projection: { name: 1, content: 1, _id: 0 } },
+      )
+      .toArray();
+    return rules as unknown as Array<{ name: string; content: string }>;
+  } catch (error: unknown) {
+    logger.warn(
+      `[SystemPromptAssembler] Could not load active rules [${names.join(", ")}]: ${getErrorMessage(error)}`,
+    );
+    return [];
+  }
+}
+
 async function fetchAlreadyInjectedMemoryIds(
   conversationId: string | null | undefined,
 ): Promise<Set<string>> {
@@ -434,6 +469,32 @@ export default class SystemPromptAssembler {
                 "system-prompt.commandExecutionGuidelines",
               ),
           ),
+        );
+      }
+    }
+
+    // ── 5c. Active Rules (user-pinned per-turn directives) ────────
+    // The client sends the names of the slash-command rules pinned to
+    // this turn; the rule CONTENT is resolved here from the rules
+    // collection so prompt assembly stays server-owned.
+    if (
+      Array.isArray(context.activeRuleNames) &&
+      context.activeRuleNames.length > 0
+    ) {
+      const activeRules = await fetchActiveRules(
+        context.project,
+        context.username,
+        context.activeRuleNames,
+      );
+      if (activeRules.length > 0) {
+        const rulesText = activeRules
+          .map((rule) => `## /${rule.name}\n${rule.content}`)
+          .join("\n\n");
+        sections.push(
+          wrapSection(SYSTEM_PROMPT_SECTIONS.ACTIVE_RULES, rulesText),
+        );
+        logger.info(
+          `[SystemPromptAssembler] Injected ${activeRules.length} active rule(s): ${activeRules.map((rule) => rule.name).join(", ")}`,
         );
       }
     }

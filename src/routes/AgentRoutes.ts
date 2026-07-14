@@ -1,10 +1,12 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
+import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import express, { Request, Response, NextFunction } from "express";
 import AgenticLoopService from "#src/services/AgenticLoopService";
 import AgentSessionRegistry from "#src/services/AgentSessionRegistry";
 import { handleAgent } from "./ChatRoutes.ts";
 import logger from "#src/utils/logger";
 import { handleSseRequest, handleJsonRequest } from "#src/utils/SseUtilities";
+import { TIMERS } from "#src/constants";
 
 const router = express.Router();
 
@@ -173,7 +175,12 @@ router.post(
       project: request.project,
       username: request.username,
       clientIp: request.clientIp,
-      agent: request.body.agent || request.agent || null,
+      // Server-owned defaults (policy lives here, not in clients):
+      // the coding agent is the default persona, and agentic turns need
+      // enough context for MCP tool schemas + conversation history.
+      agent: request.body.agent || request.agent || AGENT_IDS.CODING,
+      minContextLength:
+        request.body.minContextLength ?? TIMERS.MINIMUM_CONTEXT_LENGTH,
       // Multi-workspace: override the default workspace root when the user has
       // selected a non-default workspace in the Prism Client sidebar. Sources:
       //   1. x-workspace-root header (set by Prism Client's serviceHeaders.js)
