@@ -679,6 +679,56 @@ describe("OrchestratorService Spawning & Agent Types", () => {
         getCollectionSpy.mockRestore();
       });
 
+      it("raises and clears the flags for NESTED sub-agents (sub-agent spawning a grandchild)", async () => {
+        const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
+        const { mockUpdateOne, mockCollection } = createTrackingCollection();
+        const getCollectionSpy = vi.spyOn(MongoWrapper, "getCollection").mockReturnValue(
+          mockCollection as unknown as ReturnType<typeof MongoWrapper.getCollection>,
+        );
+
+        // Context as the ToolExecutor builds it when a RUNNING SUB-AGENT calls
+        // create_subagents: conversationId is the sub-agent's own conversation,
+        // recursionDepth is the sub-agent's depth (1).
+        const nestedContext = {
+          ...orchestratorContext,
+          conversationId: "sub-conv-parent",
+          agentConversationId: "sub-conv-parent",
+          recursionDepth: 1,
+        };
+
+        await OrchestratorService.spawnFromTool({
+          description: "Grandchild sub-agent",
+          prompt: "Do nested work",
+          files: [],
+          orchestratorContext: nestedContext,
+          awaitCompletion: true,
+        });
+        OrchestratorService.cleanupConversation("sub-conv-parent");
+
+        const registrationCall = findRegistrationCall(mockUpdateOne.mock.calls as UpdateCall[]);
+        expect(registrationCall).toBeDefined();
+        expect(registrationCall![1].$set?.isActive).toBe(true);
+        expect(registrationCall![1].$set?.isGenerating).toBe(true);
+        expect(registrationCall![1].$set?.subAgentStatus).toBe("running");
+        expect(registrationCall![1].$set?.subAgentRecursionDepth).toBe(2);
+        // Registered under the SUB-AGENT parent, so the grandchild doc links
+        // back up the tree (client sub-agent detection)
+        expect(registrationCall![1].$set?.parentConversationId).toBe("sub-conv-parent");
+
+        const childConversationId = registrationCall![0].id;
+        await waitForCondition(() =>
+          Boolean(findTerminalCall(mockUpdateOne.mock.calls as UpdateCall[], childConversationId)),
+        );
+        const terminalCall = findTerminalCall(
+          mockUpdateOne.mock.calls as UpdateCall[],
+          childConversationId,
+        )!;
+        expect(terminalCall[1].$set?.isActive).toBe(false);
+        expect(terminalCall[1].$set?.subAgentStatus).toBe("complete");
+
+        getCollectionSpy.mockRestore();
+      });
+
       it("clears the flags with a stopped status when aborted mid-run", async () => {
         const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
         const { mockUpdateOne, mockCollection } = createTrackingCollection();
