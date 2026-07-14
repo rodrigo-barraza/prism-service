@@ -196,6 +196,21 @@ export async function handleSseRequest(
   const connectionStartTime = Date.now();
   const connectionController = createAbortController();
 
+  // Heartbeat: SSE comment frames every 15s so clients can distinguish a
+  // quiet-but-alive stream (long prefill, slow tool) from a dead socket.
+  // Comment lines are invisible to the JSON event protocol — old clients
+  // skip them in their `data: ` line filter.
+  const HEARTBEAT_INTERVAL_MS = 15_000;
+  const heartbeatInterval = setInterval(() => {
+    if (
+      !connectionController.signal.aborted &&
+      !res.destroyed &&
+      !res.writableEnded
+    ) {
+      res.write(`: ping\n\n`);
+    }
+  }, HEARTBEAT_INTERVAL_MS);
+
   // For persistent sessions (/agent), register a separate stop controller
   // in the session registry so POST /agent/stop can abort it explicitly.
   // For non-persistent sessions (/chat), reuse the connection controller
@@ -222,6 +237,7 @@ export async function handleSseRequest(
         message:
           "A generation is already running for this conversation. Stop it first (POST /agent/stop) or wait for it to finish.",
       } as unknown as SseEvent);
+      clearInterval(heartbeatInterval);
       res.end();
       return;
     }
@@ -257,6 +273,7 @@ export async function handleSseRequest(
       signal: stopController.signal,
     });
   } finally {
+    clearInterval(heartbeatInterval);
     // Cleanup session registry entry — identity-checked so a stale handler
     // can never delete a newer session's entry.
     if (persistOnDisconnect && conversationId) {
