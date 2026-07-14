@@ -11,6 +11,10 @@ export interface SseEvent {
     result?: unknown;
   };
   status?: string;
+  /** Message role for `user_message` turn-start events */
+  role?: string;
+  /** Emission time (epoch ms) for viewer-facing events */
+  timestamp?: number;
   provider?: string;
   model?: string;
   usage?: Record<string, unknown>;

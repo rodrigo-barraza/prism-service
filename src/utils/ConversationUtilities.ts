@@ -8,6 +8,54 @@ import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 // ─── Conversation persistence helpers ───────────────────────
 
 /**
+ * Extract the display text of the LATEST user message in a raw message
+ * array — the prompt that started the current turn.
+ *
+ * Used to emit the `user_message` stream event at turn start so direct
+ * viewers (the /admin/chat viewer, a second tab) can render the user's
+ * prompt immediately: the message itself is only PERSISTED at finalize,
+ * so a mid-turn document refetch cannot see it.
+ *
+ * Prefers `rawContent` (the user's verbatim text) over `content`, which
+ * may carry injected context blocks. Multimodal array content is reduced
+ * to its text parts.
+ */
+export function extractLatestUserMessageText(
+  rawMessages: unknown,
+): string {
+  if (!Array.isArray(rawMessages)) return "";
+  const latestUserMessage = [...rawMessages]
+    .reverse()
+    .find(
+      (message): message is Record<string, unknown> =>
+        !!message &&
+        typeof message === "object" &&
+        (message as Record<string, unknown>).role === "user",
+    );
+  if (!latestUserMessage) return "";
+
+  if (
+    typeof latestUserMessage.rawContent === "string" &&
+    latestUserMessage.rawContent.trim()
+  ) {
+    return latestUserMessage.rawContent;
+  }
+
+  const { content } = latestUserMessage;
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) =>
+        part && typeof part === "object" && typeof (part as Record<string, unknown>).text === "string"
+          ? ((part as Record<string, unknown>).text as string)
+          : "",
+      )
+      .join("");
+  }
+  return "";
+}
+
+/**
  * Mark a conversation as generating (or not). Fire-and-forget with
  * error logging — the caller should not await or chain on this.
  */
