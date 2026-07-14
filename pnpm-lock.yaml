@@ -19,7 +19,7 @@ importers:
         version: 1.29.0(zod@4.4.3)
       '@rodrigo-barraza/service-library':
         specifier: github:rodrigo-barraza/service-library
-        version: https://codeload.github.com/rodrigo-barraza/service-library/tar.gz/3bf2ed15d74ecb049444fda0b707f83bbeb9a7a7(express@5.2.1)(mongodb@7.3.0)
+        version: https://codeload.github.com/rodrigo-barraza/service-library/tar.gz/447b6fb4bc9dadd8f6e0b9ee62d3964c65d4b023(express@5.2.1)(mongodb@7.3.0)
       '@rodrigo-barraza/utilities-library':
         specifier: github:rodrigo-barraza/utilities-library
         version: https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/e16f415e82ca21aef685a91bff3b7caf274814cb
@@ -601,15 +601,19 @@ packages:
   '@protobufjs/utf8@1.1.1':
     resolution: {integrity: sha512-oOAWABowe8EAbMyWKM0tYDKi8Yaox52D+HWZhAIJqQXbqe0xI/GV7FhLWqlEKreMkfDjshR5FKgi3mnle0h6Eg==}
 
-  '@rodrigo-barraza/service-library@https://codeload.github.com/rodrigo-barraza/service-library/tar.gz/3bf2ed15d74ecb049444fda0b707f83bbeb9a7a7':
-    resolution: {gitHosted: true, integrity: sha512-vG+unTFhOPsS++E8vn1qjFhNnv8BK2iFNIUqnTVLywNDMCrgRClYrppmk5w8aLijr1OTgezqIX9oxJ5simk4KQ==, tarball: https://codeload.github.com/rodrigo-barraza/service-library/tar.gz/3bf2ed15d74ecb049444fda0b707f83bbeb9a7a7}
-    version: 0.2.0
+  '@rodrigo-barraza/service-library@https://codeload.github.com/rodrigo-barraza/service-library/tar.gz/447b6fb4bc9dadd8f6e0b9ee62d3964c65d4b023':
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/rodrigo-barraza/service-library/tar.gz/447b6fb4bc9dadd8f6e0b9ee62d3964c65d4b023}
+    version: 0.3.0
     peerDependencies:
       express: '>=5.0.0'
       mongodb: '>=7.0.0'
     peerDependenciesMeta:
       mongodb:
         optional: true
+
+  '@rodrigo-barraza/utilities-library@https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/dc470b7b96cc52edcdff6e811a309305bb34568f':
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/dc470b7b96cc52edcdff6e811a309305bb34568f}
+    version: 0.3.0
 
   '@rodrigo-barraza/utilities-library@https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/e16f415e82ca21aef685a91bff3b7caf274814cb':
     resolution: {gitHosted: true, tarball: https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/e16f415e82ca21aef685a91bff3b7caf274814cb}
@@ -2562,12 +2566,26 @@ snapshots:
 
   '@protobufjs/utf8@1.1.1': {}
 
-  '@rodrigo-barraza/service-library@https://codeload.github.com/rodrigo-barraza/service-library/tar.gz/3bf2ed15d74ecb049444fda0b707f83bbeb9a7a7(express@5.2.1)(mongodb@7.3.0)':
+  '@rodrigo-barraza/service-library@https://codeload.github.com/rodrigo-barraza/service-library/tar.gz/447b6fb4bc9dadd8f6e0b9ee62d3964c65d4b023(express@5.2.1)(mongodb@7.3.0)':
     dependencies:
-      '@rodrigo-barraza/utilities-library': https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/e16f415e82ca21aef685a91bff3b7caf274814cb
+      '@rodrigo-barraza/utilities-library': https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/dc470b7b96cc52edcdff6e811a309305bb34568f
       express: 5.2.1
     optionalDependencies:
       mongodb: 7.3.0
+    transitivePeerDependencies:
+      - '@aws-sdk/credential-providers'
+      - '@mongodb-js/zstd'
+      - gcp-metadata
+      - kerberos
+      - mongodb-client-encryption
+      - snappy
+      - socks
+
+  '@rodrigo-barraza/utilities-library@https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/dc470b7b96cc52edcdff6e811a309305bb34568f':
+    dependencies:
+      mongodb: 7.3.0
+      nanoid: 5.1.16
+      zod: 4.4.3
     transitivePeerDependencies:
       - '@aws-sdk/credential-providers'
       - '@mongodb-js/zstd'

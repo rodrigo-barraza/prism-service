@@ -2,57 +2,55 @@ import {
   DEFAULT_USERNAME,
   DEFAULT_PROJECT,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { createAuthMiddleware } from "@rodrigo-barraza/service-library";
 import { Request, Response, NextFunction } from "express";
 import { requestContext } from "#src/utils/RequestContext";
 
 /**
- * Express middleware that attaches x-project, x-username, and x-workspace-id
- * headers to the request object for downstream route handlers.
+ * Express middleware that resolves project, username, client IP, and
+ * workspace scoping onto the request object for downstream route handlers.
+ *
+ * Built on the shared identity-resolution factory from service-library:
+ * - project: query param → body → x-project header → DEFAULT_PROJECT
+ * - username: x-username header → DEFAULT_USERNAME (never the client IP —
+ *   IPs in MinIO object keys cause path duplication once the same user
+ *   sends a real username)
+ * - clientIp: first x-forwarded-for entry → req.ip, with IPv4-mapped
+ *   IPv6 normalization (::ffff:127.0.0.1 → 127.0.0.1)
  */
+const sharedAuthMiddleware = createAuthMiddleware({
+  defaultProject: DEFAULT_PROJECT,
+  defaultUsername: DEFAULT_USERNAME,
+  onResolved: (identity) => {
+    // Sync auth-resolved values into prism's AsyncLocalStorage context
+    // (store fields use null, matching the previous middleware exactly).
+    const store = requestContext.getStore();
+    if (store) {
+      store.project = identity.project;
+      store.username = identity.username;
+      store.clientIp = identity.clientIp || null;
+      store.workspaceId = identity.workspaceId;
+      store.workspaceRoot = identity.workspaceRoot;
+    }
+  },
+});
+
 export function authMiddleware(
   req: Request,
   res: Response,
   next: NextFunction,
 ) {
-  // Single source of truth for project resolution.
-  // Priority: query param → body → x-project header → DEFAULT_PROJECT
-  req.project =
-    (req.query?.project as string) ||
-    req.body?.project ||
-    (req.headers["x-project"] as string) ||
-    DEFAULT_PROJECT;
-
-  const forwardedFor = req.headers["x-forwarded-for"];
-  const forwardedIp =
-    typeof forwardedFor === "string"
-      ? forwardedFor.split(",")[0]?.trim()
-      : null;
-  const rawIp = forwardedIp || req.ip || null;
-  // Normalize IPv4-mapped IPv6 addresses (::ffff:127.0.0.1 → 127.0.0.1)
-  req.clientIp = rawIp?.replace(/^::ffff:/, "") || rawIp || undefined;
-
-  // Use x-username header when provided; otherwise fall back to DEFAULT_USERNAME.
-  // Never use the raw client IP as the username — IPs in MinIO object keys
-  // (e.g. projects/lupos/127.0.0.1/...) cause path duplication when the
-  // same logical user is later identified by a proper username header.
-  req.username = (req.headers["x-username"] as string) || DEFAULT_USERNAME;
-
-  // Workspace ID for multi-workspace scoping (optional — null means default workspace)
-  req.workspaceId = (req.headers["x-workspace-id"] as string) || undefined;
-
-  // Workspace root path — absolute filesystem path selected by the user.
-  // Takes precedence over workspaceId for routing agent tools to the correct directory.
-  req.workspaceRoot = (req.headers["x-workspace-root"] as string) || undefined;
-
-  // Update AsyncLocalStorage context with auth-resolved values
-  const store = requestContext.getStore();
-  if (store) {
-    store.project = req.project || DEFAULT_PROJECT;
-    store.username = req.username || DEFAULT_USERNAME;
-    store.clientIp = req.clientIp || null;
-    store.workspaceId = req.workspaceId || null;
-    store.workspaceRoot = req.workspaceRoot || null;
-  }
-
-  next();
+  sharedAuthMiddleware(req, res, () => {
+    // The shared middleware attaches null (and "" for clientIp) when a
+    // value is absent; prism's request contract is undefined. Normalize
+    // so downstream handlers and serialized payloads see the same shape
+    // as before (e.g. `clientIp: req.clientIp` must omit, not "").
+    req.clientIp = req.clientIp || undefined;
+    req.workspaceId = req.workspaceId || undefined;
+    req.workspaceRoot = req.workspaceRoot || undefined;
+    // requestLoggerMiddleware (which runs earlier) only sets req.agent
+    // when the x-agent header is present — keep that shape.
+    req.agent = req.agent || undefined;
+    next();
+  });
 }
