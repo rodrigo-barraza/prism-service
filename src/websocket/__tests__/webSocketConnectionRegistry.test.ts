@@ -49,6 +49,43 @@ describe("WebSocketConnectionRegistry", () => {
       expect(registeredEmit).toBeNull();
     });
 
+    it("should skip the excluded WebSocket but still broadcast to other viewers", () => {
+      const drivingWebsocket = createMockWebSocket();
+      const viewerWebsocket = createMockWebSocket();
+      const drivingEmit = vi.fn();
+      const viewerEmit = vi.fn();
+
+      WebSocketConnectionRegistry.register(
+        "conversation-1", drivingWebsocket as unknown as import("ws").WebSocket, drivingEmit,
+      );
+      WebSocketConnectionRegistry.register(
+        "conversation-1", viewerWebsocket as unknown as import("ws").WebSocket, viewerEmit,
+      );
+
+      const broadcast = WebSocketConnectionRegistry.getEmitFunction("conversation-1", {
+        excludeWebsocket: drivingWebsocket as unknown as import("ws").WebSocket,
+      });
+      expect(broadcast).not.toBeNull();
+
+      broadcast!({ type: "chunk", content: "hello" });
+      expect(viewerEmit).toHaveBeenCalledWith({ type: "chunk", content: "hello" });
+      expect(drivingEmit).not.toHaveBeenCalled();
+    });
+
+    it("should return null when the only registered connection is the excluded one", () => {
+      const drivingWebsocket = createMockWebSocket();
+      const drivingEmit = vi.fn();
+
+      WebSocketConnectionRegistry.register(
+        "conversation-1", drivingWebsocket as unknown as import("ws").WebSocket, drivingEmit,
+      );
+
+      const broadcast = WebSocketConnectionRegistry.getEmitFunction("conversation-1", {
+        excludeWebsocket: drivingWebsocket as unknown as import("ws").WebSocket,
+      });
+      expect(broadcast).toBeNull();
+    });
+
     it("should support multiple connections per conversation (multi-tab broadcast)", () => {
       const websocketA = createMockWebSocket();
       const websocketB = createMockWebSocket();

@@ -2,6 +2,7 @@ import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import RequestLogger from "#src/services/RequestLogger";
+import { streamWithRetries } from "#src/utils/ProviderStreamResilience";
 import { HARNESS } from "#src/constants";
 
 import type { LLMProvider } from "#src/services/harnesses/types";
@@ -71,22 +72,26 @@ export async function extractReminderViaLLM(
       },
     ];
 
+    const extractionSignal =
+      signal ?? AbortSignal.timeout(EXTRACTION_TIMEOUT_MILLISECONDS);
     const extractionOptions: Record<string, unknown> = {
       maxTokens: EXTRACTION_MAX_TOKENS,
       temperature: 0,
       // Utility call — never burn extended thinking on reminder distillation.
       thinkingEnabled: false,
       reasoningEffort: "none",
-      signal: signal ?? AbortSignal.timeout(EXTRACTION_TIMEOUT_MILLISECONDS),
+      signal: extractionSignal,
     };
 
     let responseText = "";
     const requestStartMilliseconds = performance.now();
 
-    const stream = provider.generateTextStream(
-      extractionMessages,
-      model,
-      extractionOptions,
+    const stream = streamWithRetries(
+      () => provider.generateTextStream(extractionMessages, model, extractionOptions),
+      {
+        signal: extractionSignal,
+        label: loggingContext?.providerName || "provider",
+      },
     );
 
     for await (const chunk of stream) {

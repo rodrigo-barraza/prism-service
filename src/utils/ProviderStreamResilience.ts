@@ -176,6 +176,46 @@ export async function* streamWithRetries<T>(
 }
 
 /**
+ * Non-streaming analog of streamWithRetries: wrap a provider call with
+ * transient-error retries using the same classification and jittered
+ * backoff. Safe for non-streaming calls only — nothing has been delivered
+ * to the consumer when the call rejects, so a retry never duplicates output.
+ */
+export async function callWithRetries<T>(
+  call: () => Promise<T>,
+  {
+    maxRetries = HARNESS.PROVIDER_STREAM_MAX_RETRIES,
+    baseDelayMilliseconds = HARNESS.PROVIDER_STREAM_RETRY_BASE_MILLISECONDS,
+    signal,
+    label = "provider",
+  }: StreamRetryOptions = {},
+): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await call();
+    } catch (error: unknown) {
+      const isRetryable =
+        !signal?.aborted &&
+        attempt <= maxRetries &&
+        isTransientProviderError(error);
+      if (!isRetryable) throw error;
+
+      const delayMilliseconds = computeRetryDelayMilliseconds(
+        attempt,
+        baseDelayMilliseconds,
+        error,
+      );
+      logger.warn(
+        `[CallRetry] Transient ${label} error on attempt ${attempt}/${maxRetries + 1} ` +
+          `(${getErrorMessage(error)}). ` +
+          `Retrying in ${Math.round(delayMilliseconds / 100) / 10}s...`,
+      );
+      await sleep(delayMilliseconds);
+    }
+  }
+}
+
+/**
  * Chunk-idle watchdog: throws if no chunk arrives within
  * `idleTimeoutMilliseconds`. Guards against providers that stall without
  * closing the socket — previously such a stall hung the turn until the

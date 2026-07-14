@@ -5,6 +5,7 @@ import RequestLogger from "#src/services/RequestLogger";
 
 import type { ToolCall, AgenticContext } from "#src/services/harnesses/types";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { streamWithRetries } from "#src/utils/ProviderStreamResilience";
 import { HARNESS } from "#src/constants";
 
 /**
@@ -144,22 +145,22 @@ export default class CriticGate {
 
     const criticMessages = [{ role: "user", content: prompt }];
 
+    const criticSignal = AbortSignal.timeout(CRITIC_TIMEOUT_MILLISECONDS);
     const criticOptions = {
       maxTokens: CRITIC_MAX_TOKENS,
       temperature: 0,
       // Utility call — never burn extended thinking on a 200-token verdict.
       thinkingEnabled: false,
       reasoningEffort: "none",
-      signal: AbortSignal.timeout(CRITIC_TIMEOUT_MILLISECONDS),
+      signal: criticSignal,
     };
 
     let responseText = "";
     const requestStartMilliseconds = performance.now();
 
-    const stream = provider.generateTextStream(
-      criticMessages,
-      activeModel,
-      criticOptions,
+    const stream = streamWithRetries(
+      () => provider.generateTextStream(criticMessages, activeModel, criticOptions),
+      { signal: criticSignal, label: context.providerName },
     );
 
     for await (const chunk of stream) {

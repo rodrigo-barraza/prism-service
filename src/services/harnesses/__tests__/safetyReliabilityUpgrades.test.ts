@@ -18,6 +18,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import {
   streamWithRetries,
+  callWithRetries,
   withIdleTimeout,
   isTransientProviderError,
 } from "#src/utils/ProviderStreamResilience";
@@ -334,6 +335,73 @@ describe("C4/C5 — streamWithRetries zero-yield invariant", () => {
     expect(isTransientProviderError(Object.assign(new Error("fetch failed"), {}))).toBe(true);
     expect(isTransientProviderError(new ProviderError("x", "bad request", 400))).toBe(false);
     expect(isTransientProviderError(Object.assign(new Error("stop"), { name: "AbortError" }))).toBe(false);
+  });
+});
+
+describe("callWithRetries — non-streaming provider retry", () => {
+  it("retries a transient failure and returns the eventual result", async () => {
+    let attempts = 0;
+    const result = await callWithRetries(
+      async () => {
+        attempts++;
+        if (attempts === 1) {
+          throw new ProviderError("test", "overloaded", 529);
+        }
+        return "ok";
+      },
+      { maxRetries: 2, baseDelayMilliseconds: 1, label: "test" },
+    );
+    expect(attempts).toBe(2);
+    expect(result).toBe("ok");
+  });
+
+  it("does not retry non-transient errors", async () => {
+    let attempts = 0;
+    await expect(
+      callWithRetries(
+        async () => {
+          attempts++;
+          throw new ProviderError("test", "invalid_request", 400);
+        },
+        { maxRetries: 3, baseDelayMilliseconds: 1, label: "test" },
+      ),
+    ).rejects.toThrow("invalid_request");
+    expect(attempts).toBe(1);
+  });
+
+  it("throws after exhausting maxRetries on persistent transient errors", async () => {
+    let attempts = 0;
+    await expect(
+      callWithRetries(
+        async () => {
+          attempts++;
+          throw new ProviderError("test", "overloaded", 529);
+        },
+        { maxRetries: 2, baseDelayMilliseconds: 1, label: "test" },
+      ),
+    ).rejects.toThrow("overloaded");
+    expect(attempts).toBe(3);
+  });
+
+  it("does not retry once the abort signal has fired", async () => {
+    const abortController = new AbortController();
+    let attempts = 0;
+    await expect(
+      callWithRetries(
+        async () => {
+          attempts++;
+          abortController.abort();
+          throw new ProviderError("test", "overloaded", 529);
+        },
+        {
+          maxRetries: 3,
+          baseDelayMilliseconds: 1,
+          signal: abortController.signal,
+          label: "test",
+        },
+      ),
+    ).rejects.toThrow("overloaded");
+    expect(attempts).toBe(1);
   });
 });
 

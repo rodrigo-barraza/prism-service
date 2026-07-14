@@ -6,6 +6,47 @@ import { Request, Response, NextFunction } from "express";
 import { SseEvent } from "#src/types/SseTypes";
 import type { ChatRequest } from "#src/types/schemas";
 import AgentSessionRegistry from "#src/services/AgentSessionRegistry";
+import WebSocketConnectionRegistry from "#src/websocket/WebSocketConnectionRegistry";
+
+/**
+ * Mirror a generation event to any WebSocket clients subscribed directly to
+ * this conversation (admin viewer, second browser tab). Counterpart of
+ * SubAgentTelemetryEmitter.broadcastToDirectViewers, which does the same for
+ * sub-agent conversations. Best-effort — direct-viewer delivery must never
+ * break the primary stream.
+ */
+export function broadcastEventToDirectViewers(
+  conversationId: string,
+  event: SseEvent,
+): void {
+  try {
+    const broadcast = WebSocketConnectionRegistry.getEmitFunction(conversationId);
+    if (!broadcast) return;
+    if (event.type === "image" && event.minioRef && event.data) {
+      const { data: _stripped, ...lightweightEvent } = event;
+      broadcast(lightweightEvent as { type: string; [key: string]: unknown });
+    } else {
+      broadcast(event as unknown as { type: string; [key: string]: unknown });
+    }
+  } catch {
+    // Never let viewer fan-out break the generating request
+  }
+}
+
+/**
+ * Wrap a primary emit so every event is also mirrored to direct WebSocket
+ * viewers of the conversation. No-op wrapper when there is no conversationId.
+ */
+export function withDirectViewerBroadcast(
+  conversationId: string | undefined,
+  emit: (event: SseEvent) => void,
+): (event: SseEvent) => void {
+  if (!conversationId) return emit;
+  return (event: SseEvent) => {
+    emit(event);
+    broadcastEventToDirectViewers(conversationId, event);
+  };
+}
 
 // ─── shared by /chat and /agent routes ──────────────────────
 
@@ -269,9 +310,16 @@ export async function handleSseRequest(
   });
 
   try {
-    await handler(params, createSseEmitter(res, connectionController.signal), {
-      signal: stopController.signal,
-    });
+    await handler(
+      params,
+      withDirectViewerBroadcast(
+        conversationId,
+        createSseEmitter(res, connectionController.signal),
+      ),
+      {
+        signal: stopController.signal,
+      },
+    );
   } finally {
     clearInterval(heartbeatInterval);
     // Cleanup session registry entry — identity-checked so a stale handler
@@ -346,9 +394,15 @@ export async function handleJsonRequest(
 
   const events: SseEvent[] = [];
   try {
-    await handler(params, (event: SseEvent) => events.push(event), {
-      signal: controller.signal,
-    });
+    await handler(
+      params,
+      withDirectViewerBroadcast(conversationId, (event: SseEvent) =>
+        events.push(event),
+      ),
+      {
+        signal: controller.signal,
+      },
+    );
   } finally {
     if (registeredSession && conversationId) {
       AgentSessionRegistry.cleanup(conversationId, controller);

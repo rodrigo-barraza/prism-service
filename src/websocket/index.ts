@@ -200,9 +200,21 @@ function handleWebsocketChat(
       return;
     }
 
+    // Mirror generation events to OTHER WebSocket viewers of this
+    // conversation (admin viewer, second tab). The driving socket is
+    // excluded — it already receives events via emitFunction.
+    const emitWithDirectViewers = conversationId
+      ? (event: Record<string, unknown>) => {
+          emitFunction(event);
+          WebSocketConnectionRegistry.getEmitFunction(conversationId, {
+            excludeWebsocket: websocket,
+          })?.(event as { type: string; [key: string]: unknown });
+        }
+      : emitFunction;
+
     await handleConversation(
       { ...data, project, username, clientIp, agent },
-      emitFunction,
+      emitWithDirectViewers,
     );
   });
 

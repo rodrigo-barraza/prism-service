@@ -63,9 +63,12 @@ vi.mock("#src/providers/index", () => ({
   listProviders: () => [],
 }));
 
-const { buildJsonResponseFromEvents } = await import(
+const { buildJsonResponseFromEvents, withDirectViewerBroadcast } = await import(
   "#src/utils/SseUtilities"
 );
+const WebSocketConnectionRegistry = (
+  await import("#src/websocket/WebSocketConnectionRegistry")
+).default;
 
 import type { SseEvent } from "#src/types/SseTypes";
 import type { ChatRequest } from "#src/types/schemas";
@@ -387,5 +390,100 @@ describe("buildJsonResponseFromEvents", () => {
       minioRef: "minio://audio/1.wav",
     });
     expect(result.response!.audioRef).toBe("audio-ref-789");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// withDirectViewerBroadcast — mirrors generation events to WebSocket
+// clients subscribed directly to the conversation (admin viewer,
+// second tab). Regression: /admin/chat showed no live content for
+// main-agent conversations because tokens only ever reached the
+// initiating client's SSE response.
+// ═══════════════════════════════════════════════════════════════
+
+describe("withDirectViewerBroadcast", () => {
+  function createMockWebSocket() {
+    return { readyState: 1, OPEN: 1, send: vi.fn() };
+  }
+
+  it("returns the primary emit unchanged when there is no conversationId", () => {
+    const primaryEmit = vi.fn();
+    expect(withDirectViewerBroadcast(undefined, primaryEmit)).toBe(primaryEmit);
+  });
+
+  it("delivers each event to the primary emit AND registered direct viewers", () => {
+    WebSocketConnectionRegistry.clear();
+    const viewerEmit = vi.fn();
+    WebSocketConnectionRegistry.register(
+      "conv-live-1",
+      createMockWebSocket() as unknown as import("ws").WebSocket,
+      viewerEmit,
+    );
+
+    const primaryEmit = vi.fn();
+    const emit = withDirectViewerBroadcast("conv-live-1", primaryEmit);
+
+    const chunkEvent = { type: "chunk", content: "hello" } as unknown as TestEvent;
+    emit(chunkEvent);
+
+    expect(primaryEmit).toHaveBeenCalledWith(chunkEvent);
+    expect(viewerEmit).toHaveBeenCalledWith(chunkEvent);
+    WebSocketConnectionRegistry.clear();
+  });
+
+  it("still emits to the primary consumer when no viewers are registered", () => {
+    WebSocketConnectionRegistry.clear();
+    const primaryEmit = vi.fn();
+    const emit = withDirectViewerBroadcast("conv-live-2", primaryEmit);
+
+    const event = { type: "thinking", content: "…" } as unknown as TestEvent;
+    emit(event);
+
+    expect(primaryEmit).toHaveBeenCalledWith(event);
+  });
+
+  it("strips heavy base64 image data for viewers when a minioRef exists", () => {
+    WebSocketConnectionRegistry.clear();
+    const viewerEmit = vi.fn();
+    WebSocketConnectionRegistry.register(
+      "conv-live-3",
+      createMockWebSocket() as unknown as import("ws").WebSocket,
+      viewerEmit,
+    );
+
+    const primaryEmit = vi.fn();
+    const emit = withDirectViewerBroadcast("conv-live-3", primaryEmit);
+    emit({
+      type: "image",
+      data: "hugebase64",
+      minioRef: "minio://images/1.png",
+    } as unknown as TestEvent);
+
+    expect(viewerEmit).toHaveBeenCalledWith({
+      type: "image",
+      minioRef: "minio://images/1.png",
+    });
+    WebSocketConnectionRegistry.clear();
+  });
+
+  it("never lets a failing viewer break the primary stream", () => {
+    WebSocketConnectionRegistry.clear();
+    const explodingViewer = vi.fn(() => {
+      throw new Error("viewer socket died");
+    });
+    WebSocketConnectionRegistry.register(
+      "conv-live-4",
+      createMockWebSocket() as unknown as import("ws").WebSocket,
+      explodingViewer,
+    );
+
+    const primaryEmit = vi.fn();
+    const emit = withDirectViewerBroadcast("conv-live-4", primaryEmit);
+
+    expect(() =>
+      emit({ type: "chunk", content: "x" } as unknown as TestEvent),
+    ).not.toThrow();
+    expect(primaryEmit).toHaveBeenCalled();
+    WebSocketConnectionRegistry.clear();
   });
 });
