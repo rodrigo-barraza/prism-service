@@ -156,6 +156,28 @@ export interface ConversationServiceInterface {
     username: string,
   ): Promise<TransformedConversationStats | null>;
   /**
+   * Overwrite the crash-safety shadow copy of the in-flight turn's messages.
+   * Written once per agentic iteration; cleared atomically by the next
+   * successful appendMessages. Recovered into `messages` on startup when a
+   * crash/restart orphaned it.
+   */
+  saveTurnCheckpoint(
+    conversationId: string,
+    project: string,
+    username: string,
+    messages: Array<ChatMessage | MessagePayload>,
+    options?: { collection?: string },
+  ): Promise<void>;
+  /**
+   * Recover orphaned turn checkpoints: for every conversation that still has
+   * a turnCheckpoint (meaning the process died before finalize could append
+   * the turn), append the checkpointed messages for real. Returns the number
+   * of conversations recovered.
+   */
+  recoverOrphanedTurnCheckpoints(options?: {
+    collection?: string;
+  }): Promise<number>;
+  /**
    * Atomically increment or decrement the pendingBackgroundTasks counter.
    * Use +1 when dispatching an async tool, -1 when it completes.
    * MongoDB $inc ensures correctness under concurrent completions.
