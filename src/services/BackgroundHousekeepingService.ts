@@ -24,7 +24,7 @@ import MinioWrapper from "#src/wrappers/MinioWrapper";
 import { MONGO_DB_NAME } from "#config";
 import { COLLECTIONS, FILE_CATEGORIES } from "#src/constants";
 import logger from "#src/utils/logger";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

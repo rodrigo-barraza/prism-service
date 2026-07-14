@@ -6,7 +6,7 @@ import WebhookEventBus from "#src/services/WebhookEventBus";
 import type { WebhookEvent } from "#src/services/WebhookEventBus";
 import { COLLECTIONS, SERVER_SENT_EVENTS_KEEPALIVE_INTERVAL_MILLISECONDS } from "#src/constants";
 import logger from "#src/utils/logger";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import requireDb from "#src/middleware/RequireDbMiddleware";
 
 const router = express.Router();

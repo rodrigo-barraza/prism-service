@@ -22,7 +22,7 @@ import {
   GOOGLE_EMBEDDING_MODEL,
 } from "#config";
 import { MODALITY_TYPES, MODELS, DEFAULT_VOICES, getDefaultModels } from "#src/config";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 /** Shape of a model definition from the MODELS catalog. */
 interface ModelDefinition {

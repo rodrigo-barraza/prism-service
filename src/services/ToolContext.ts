@@ -2,7 +2,7 @@ import logger from "#src/utils/logger";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { MONGO_DB_NAME } from "#config";
 import { COLLECTIONS } from "#src/constants";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 /**
  * ToolContext — per-conversation key-value state store for stateful tool chains.

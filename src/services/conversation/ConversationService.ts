@@ -23,7 +23,7 @@ import {
   aggregateConversationTotalsFromRequests,
 } from "./utils.ts";
 import logger from "#src/utils/logger";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 const DEFAULT_COLLECTION = COLLECTIONS.MODEL_CONVERSATIONS;
 

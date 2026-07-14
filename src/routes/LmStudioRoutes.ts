@@ -8,7 +8,7 @@ import { PROVIDERS } from "#src/constants";
 import logger from "#src/utils/logger";
 import LocalProviderGateway from "#src/services/local-provider/index";
 import { initSseResponse } from "#src/utils/SseUtilities";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import type { ProviderOptions } from "#src/types/provider";
 const router = express.Router();
 

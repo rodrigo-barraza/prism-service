@@ -14,7 +14,7 @@ import logger from "#src/utils/logger";
 import { discoverContextLength } from "#src/utils/ContextLengthDiscovery";
 
 import { MODALITY_TYPES, getDefaultModels } from "#src/config";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 /**
  * Convert messages with images to Ollama's native format.

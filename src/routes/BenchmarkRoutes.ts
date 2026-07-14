@@ -8,7 +8,7 @@ import { createAbortController } from "#src/utils/AbortController";
 import { registerCleanup } from "#src/utils/CleanupRegistry";
 import type { WithId, Document } from "mongodb";
 import type { TextAssertion } from "#src/types/benchmark";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { BENCHMARK_PRESETS } from "#src/data/benchmarkPresets";
 
 const router = express.Router();

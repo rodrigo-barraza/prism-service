@@ -11,7 +11,7 @@ import RequestLogger from "./RequestLogger.ts";
 import logger from "#src/utils/logger";
 import { calculateTokensPerSec } from "#src/utils/math";
 import SettingsService from "./SettingsService.ts";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import type {
   EmbeddingContent,
 } from "#src/types/provider";

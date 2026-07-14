@@ -6,7 +6,7 @@
 import { getProvider } from "#src/providers/index";
 import logger from "#src/utils/logger";
 import type { SubAgentState } from "#src/types/orchestrator";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 /*
  * Evict the model from a secondary GPU instance when no other sub-agents

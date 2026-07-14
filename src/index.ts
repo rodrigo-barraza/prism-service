@@ -11,7 +11,7 @@ import { setupWebSocket } from "./websocket/index.ts";
 import { authMiddleware } from "./middleware/AuthMiddleware.ts";
 import { requestLoggerMiddleware } from "./middleware/RequestLoggerMiddleware.ts";
 import { MODALITY_TYPES, COLLECTIONS, CROSS_ORIGIN_RESOURCE_SHARING_MAXIMUM_AGE_SECONDS } from "./constants.ts";
-import { getErrorMessage } from "./utils/ErrorHelpers.ts";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import {
   PRISM_SERVICE_PORT as PORT,
   MONGO_URI,

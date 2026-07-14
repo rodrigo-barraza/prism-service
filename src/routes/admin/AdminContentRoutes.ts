@@ -3,7 +3,7 @@ import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { COLLECTIONS } from "#src/constants";
 import logger from "#src/utils/logger";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import {
   applyDateRangeFilter,
   parsePaginationParams,

@@ -7,7 +7,7 @@ import {
   DEFAULT_PROJECT,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { TIMERS } from "#src/constants";
 
 import { InternalToolContext } from "./InternalToolRegistry.ts";

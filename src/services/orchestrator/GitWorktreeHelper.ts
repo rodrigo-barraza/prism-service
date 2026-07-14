@@ -7,7 +7,7 @@ import type {
   WorktreeCreateResponse,
   WorktreeDiff,
 } from "#src/types/orchestrator";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 export class GitWorktreeHelper {
   static getDefaultWorkspaceRoot(overrideRoot?: string): string {

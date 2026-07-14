@@ -12,7 +12,7 @@ import {
   RecurrenceRule,
   matchRecurrenceRule,
 } from "#src/utils/RecurrenceMatcher";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 export interface TransformedScheduledTaskFilter {
   id?: string;

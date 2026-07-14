@@ -6,7 +6,7 @@ import type { LmStudioProvider } from "#src/providers/lm-studio";
 import { PROVIDERS } from "#src/constants";
 import { resolveArchParams, estimateMemory } from "#src/utils/gguf-arch";
 import logger from "#src/utils/logger";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import type { ProviderOptions } from "#src/types/provider";
 
 const router = express.Router();

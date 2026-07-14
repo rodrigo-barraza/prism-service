@@ -10,7 +10,7 @@ import {
   listInstanceTypes,
 } from "#src/providers/instance-registry";
 import { MODALITY_TYPES } from "#src/config";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 import {
   LOCAL_PROVIDER_TYPES,

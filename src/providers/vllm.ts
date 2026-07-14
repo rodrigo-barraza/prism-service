@@ -12,7 +12,7 @@ import { TOOL_API_HEALTH_TIMEOUT_MILLISECONDS } from "#src/constants";
 import { discoverContextLength } from "#src/utils/ContextLengthDiscovery";
 
 import { MODALITY_TYPES, getDefaultModels } from "#src/config";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import {
   convertToolsToOpenAI,
   buildPayloadParams,

@@ -4,7 +4,7 @@ import { getProvider } from "#src/providers/index";
 import { isInstance } from "#src/providers/instance-registry";
 import { PROVIDERS } from "#src/constants";
 import logger from "#src/utils/logger";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 const router = express.Router();
 

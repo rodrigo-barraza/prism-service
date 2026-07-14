@@ -13,7 +13,8 @@ vi.mock("#src/utils/logger", () => ({
   },
 }));
 
-vi.mock("#src/utils/ErrorHelpers", () => ({
+vi.mock("@rodrigo-barraza/utilities-library", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getErrorMessage: (error: unknown) => String(error),
 }));
 

@@ -19,7 +19,7 @@ import logger from "#src/utils/logger";
 import { buildToolCallFallbackSummary } from "#src/services/orchestrator/SubAgentResultBuilder";
 import RequestLogger from "#src/services/RequestLogger";
 import PromptLocaleService from "#src/services/PromptLocaleService";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { ORCHESTRATOR, SYSTEM_STATUSES } from "#src/constants";
 
 const MAXIMUM_EVALUATION_CHARACTERS = ORCHESTRATOR.MAXIMUM_SYNTHESIS_CHARACTERS;

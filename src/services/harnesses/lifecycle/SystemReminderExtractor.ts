@@ -1,5 +1,5 @@
 import logger from "#src/utils/logger";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import RequestLogger from "#src/services/RequestLogger";
 import { HARNESS } from "#src/constants";

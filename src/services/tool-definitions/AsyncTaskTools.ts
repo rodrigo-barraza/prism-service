@@ -1,7 +1,7 @@
 import logger from "#src/utils/logger";
 import { DOMAINS, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { ASYNC_TASK_TOOL_NAMES, MAXIMUM_CONCURRENT_ASYNC_TASKS } from "#src/services/AsyncTaskConstants";
 import { ORCHESTRATOR, NOTIFICATION_SOURCES } from "#src/constants";
 import type { InternalToolContext } from "./InternalToolRegistry.ts";

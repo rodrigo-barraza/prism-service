@@ -5,7 +5,7 @@ import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import logger from "#src/utils/logger";
 import { registerCleanup } from "#src/utils/CleanupRegistry";
 import type { Db } from "mongodb";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { COLLECTIONS } from "#src/constants";
 
 // ─── Types ────────────────────────────────────────────────────────────────────

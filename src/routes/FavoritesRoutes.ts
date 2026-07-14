@@ -3,7 +3,7 @@ import express, { Request, Response, NextFunction } from "express";
 import requireDb from "#src/middleware/RequireDbMiddleware";
 import logger from "#src/utils/logger";
 import { COLLECTIONS } from "#src/constants";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import {
   GetFavoritesQuerySchema,
   PostFavoritesBodySchema,

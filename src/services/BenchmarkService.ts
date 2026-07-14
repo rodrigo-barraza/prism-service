@@ -11,7 +11,7 @@ import { MONGO_DB_NAME } from "#config";
 import logger from "#src/utils/logger";
 import { COLLECTIONS, BENCHMARK, BENCHMARK_MATCH_MODES } from "#src/constants";
 import type { SseEvent } from "#src/types/SseTypes";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 const BENCHMARKS_COLLECTION = COLLECTIONS.BENCHMARKS;
 const RUNS_COLLECTION = COLLECTIONS.BENCHMARK_RUNS;

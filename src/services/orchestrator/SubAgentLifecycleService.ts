@@ -2,7 +2,7 @@ import logger from "#src/utils/logger";
 import { SYSTEM_STATUSES, COLLECTIONS, ORCHESTRATOR } from "#src/constants";
 import { GitWorktreeHelper } from "./GitWorktreeHelper.ts";
 import { buildSubAgentResult } from "./SubAgentResultBuilder.ts";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { MONGO_DB_NAME } from "#config";
 import type {

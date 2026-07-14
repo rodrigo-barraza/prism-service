@@ -1,6 +1,6 @@
 import logger from "#src/utils/logger";
 import { createAbortController } from "#src/utils/AbortController";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { TOOLS_SERVICE_URL } from "#config";
 import {
   DIRECTORY_CACHE_TIME_TO_LIVE_MILLISECONDS,

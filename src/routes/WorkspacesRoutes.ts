@@ -8,7 +8,7 @@ import {
   PutWorkspacesSchema,
   ValidateWorkspaceSchema,
 } from "#src/types/index";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { TOOL_CONFIG_FETCH_TIMEOUT_MILLISECONDS } from "#src/constants";
 
 const router = express.Router();

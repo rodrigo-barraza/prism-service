@@ -8,7 +8,7 @@ import {
   PatchPromptSchema,
   GetPromptsQuerySchema,
 } from "#src/types/index";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { generateUUID } from "@rodrigo-barraza/utilities-library";
 
 const router = express.Router();

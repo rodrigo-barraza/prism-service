@@ -4,7 +4,7 @@ import {
   roundMilliseconds,
   errorMessage,
 } from "@rodrigo-barraza/utilities-library";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import express, { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
 import { getProvider } from "#src/providers/index";

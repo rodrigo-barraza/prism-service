@@ -11,7 +11,7 @@ import WorkflowExecutionService from "#src/services/WorkflowExecutionService";
 import { createAbortController } from "#src/utils/AbortController";
 import { registerCleanup } from "#src/utils/CleanupRegistry";
 import { COLLECTIONS, FILE_CATEGORIES } from "#src/constants";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 interface CustomRequest extends Request {
   db: Db;

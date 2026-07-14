@@ -2,7 +2,7 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { Request, Response } from "express";
 import ScheduledTaskService from "#src/services/ScheduledTaskService";
 import logger from "#src/utils/logger";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { PROVIDERS } from "#src/constants";
 import { MODELS } from "#src/config";
 

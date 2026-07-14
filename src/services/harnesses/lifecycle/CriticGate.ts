@@ -4,7 +4,7 @@ import PromptLocaleService from "#src/services/PromptLocaleService";
 import RequestLogger from "#src/services/RequestLogger";
 
 import type { ToolCall, AgenticContext } from "#src/services/harnesses/types";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { HARNESS } from "#src/constants";
 
 /**

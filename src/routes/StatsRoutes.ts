@@ -2,7 +2,7 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { Router, Request, Response, NextFunction } from "express";
 import logger from "#src/utils/logger";
 import requireDb from "#src/middleware/RequireDbMiddleware";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import {
   COLLECTIONS,
   COST_SUMMATION_EXPRESSION,

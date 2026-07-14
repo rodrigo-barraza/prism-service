@@ -3,7 +3,7 @@ import express, { Request, Response, NextFunction } from "express";
 import CustomAgentService from "#src/services/CustomAgentService";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 import logger from "#src/utils/logger";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 const router = express.Router();
 

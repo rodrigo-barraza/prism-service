@@ -22,7 +22,8 @@ vi.mock("#src/utils/CleanupRegistry", () => ({
   registerCleanup: vi.fn(),
 }));
 
-vi.mock("#src/utils/ErrorHelpers", () => ({
+vi.mock("@rodrigo-barraza/utilities-library", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getErrorMessage: (error: unknown) =>
     error instanceof Error ? error.message : String(error),
 }));

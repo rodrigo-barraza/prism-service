@@ -44,7 +44,7 @@ import {
   type OpenAICompletionResponse,
 } from "#src/utils/openai-compat";
 import { ORCHESTRATOR_ONLY_TOOLS } from "#src/services/OrchestratorPrompt";
-import { getErrorMessage } from "#src/utils/ErrorHelpers";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { PROVIDERS } from "#src/constants";
 // ── Native /api/v1/chat SSE stream parser ────────────────────
 // The native endpoint emits named SSE events: reasoning.start/delta/end,
