@@ -57,6 +57,7 @@ import { resolveModelForInstances } from "#src/utils/ModelResolution";
 import {
   markGenerating,
   appendAndFinalize,
+  extractLatestUserMessageText,
 } from "#src/utils/ConversationUtilities";
 import { handleSseRequest, handleJsonRequest } from "#src/utils/SseUtilities";
 import { SseEvent } from "#src/types/SseTypes";
@@ -619,6 +620,25 @@ export async function handleConversation(
     conversationMeta,
     traceId,
   };
+  // Mirror the turn's user prompt into the event stream. The message is
+  // only persisted at finalize, so direct viewers (/admin/chat, a second
+  // tab) refetching the document mid-turn cannot see it — this event lets
+  // them render it immediately. `user_message` is a literal-string event
+  // type like the synthesis turn framing (turn_start/turn_complete).
+  {
+    const latestUserMessageText = extractLatestUserMessageText(
+      context.rawMessages,
+    );
+    if (latestUserMessageText) {
+      emit({
+        type: "user_message",
+        role: "user",
+        content: latestUserMessageText,
+        conversationId: conversationId || null,
+        timestamp: Date.now(),
+      });
+    }
+  }
   try {
     try {
       if (context.isImageAPIModel) {
@@ -816,6 +836,22 @@ export async function handleAgent(
         ? conversationMeta.title
         : undefined,
   });
+  // Mirror the turn's user prompt into the event stream for direct viewers
+  // (/admin/chat, second tab) — see the matching emit in handleConversation.
+  {
+    const latestUserMessageText = extractLatestUserMessageText(
+      context.rawMessages,
+    );
+    if (latestUserMessageText) {
+      emit({
+        type: "user_message",
+        role: "user",
+        content: latestUserMessageText,
+        conversationId,
+        timestamp: Date.now(),
+      });
+    }
+  }
   try {
     try {
       if (

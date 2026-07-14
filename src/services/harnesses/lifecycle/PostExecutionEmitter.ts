@@ -24,7 +24,22 @@ interface ToolResultPayload {
   audioRef?: string;
   audio?: { data: string; mimeType?: string };
   image?: { data: string; mimeType?: string; minioRef?: string };
+  display?: ToolResultDisplay;
   [key: string]: unknown;
+}
+
+/**
+ * Self-describing display metadata on visual tool results. Tools-service
+ * emits this for embed/image tools; for tools whose media is produced as
+ * raw base64 (generate_image, browser screenshots) it is stamped here
+ * after the MinIO upload, so every visual result reaches the client with
+ * a uniform `display` the UI can render without per-tool knowledge.
+ */
+interface ToolResultDisplay {
+  kind: "embed" | "image";
+  url: string;
+  height?: number;
+  title?: string;
 }
 
 /**
@@ -125,6 +140,39 @@ export async function processToolResultMedia(
       }
     }
 
+    // Promote raw image payloads to refs + display BEFORE emitting the
+    // tool_execution event, so the event carries `display` instead of base64.
+    if (resultObject?.screenshotRef) {
+      resultObject.display ??= {
+        kind: "image",
+        url: resultObject.screenshotRef,
+        title: "Screenshot",
+      };
+      state.streamedImages.push(resultObject.screenshotRef);
+      pass.streamedImages.push(resultObject.screenshotRef);
+    }
+
+    const imageResult = resultObject?.image;
+    if (imageResult?.data) {
+      const toolImgRef =
+        imageResult.minioRef ||
+        `data:${imageResult.mimeType};base64,${imageResult.data}`;
+      state.streamedImages.push(toolImgRef);
+      pass.streamedImages.push(toolImgRef);
+      resultObject.display = {
+        kind: "image",
+        url: toolImgRef,
+        title: "Generated Image",
+      };
+      emit({
+        type: SERVER_SENT_EVENT_TYPES.IMAGE,
+        data: imageResult.data,
+        mimeType: imageResult.mimeType,
+        minioRef: imageResult.minioRef,
+      });
+      delete resultObject.image;
+    }
+
     emit({
       type: SERVER_SENT_EVENT_TYPES.TOOL_EXECUTION,
       tool: {
@@ -156,27 +204,6 @@ export async function processToolResultMedia(
       provider: context?.providerName || null,
       model: context?.resolvedModel || null,
     });
-
-    if (resultObject?.screenshotRef) {
-      state.streamedImages.push(resultObject.screenshotRef as string);
-      pass.streamedImages.push(resultObject.screenshotRef as string);
-    }
-
-    const imageResult = resultObject?.image;
-    if (imageResult?.data) {
-      const toolImgRef =
-        imageResult.minioRef ||
-        `data:${imageResult.mimeType};base64,${imageResult.data}`;
-      state.streamedImages.push(toolImgRef);
-      pass.streamedImages.push(toolImgRef);
-      emit({
-        type: SERVER_SENT_EVENT_TYPES.IMAGE,
-        data: imageResult.data,
-        mimeType: imageResult.mimeType,
-        minioRef: imageResult.minioRef,
-      });
-      if (resultObject) delete resultObject.image;
-    }
   }
 }
 

@@ -202,3 +202,64 @@ describe("markGenerating", () => {
     }).not.toThrow();
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+// extractLatestUserMessageText — source text for the `user_message`
+// turn-start stream event. Regression: /admin/chat viewers only saw
+// the user's prompt once the agent replied, because the message is
+// persisted at finalize and nothing mirrored it into the event stream.
+// ═══════════════════════════════════════════════════════════════
+
+describe("extractLatestUserMessageText", () => {
+  const importUtilities = async () =>
+    (await import("#src/utils/ConversationUtilities"))
+      .extractLatestUserMessageText;
+
+  it("returns the LATEST user message, not an earlier one", async () => {
+    const extractLatestUserMessageText = await importUtilities();
+    expect(
+      extractLatestUserMessageText([
+        { role: "user", content: "first question" },
+        { role: "assistant", content: "first answer" },
+        { role: "user", content: "second question" },
+      ]),
+    ).toBe("second question");
+  });
+
+  it("prefers rawContent (verbatim prompt) over content with injected context", async () => {
+    const extractLatestUserMessageText = await importUtilities();
+    expect(
+      extractLatestUserMessageText([
+        {
+          role: "user",
+          rawContent: "what time is it?",
+          content: "[System Context]\n- Local Time…\n\n[User Message]\nwhat time is it?",
+        },
+      ]),
+    ).toBe("what time is it?");
+  });
+
+  it("reduces multimodal array content to its text parts", async () => {
+    const extractLatestUserMessageText = await importUtilities();
+    expect(
+      extractLatestUserMessageText([
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "describe " },
+            { type: "image", data: "…base64…" },
+            { type: "text", text: "this image" },
+          ],
+        },
+      ]),
+    ).toBe("describe this image");
+  });
+
+  it("returns an empty string when there is no user message", async () => {
+    const extractLatestUserMessageText = await importUtilities();
+    expect(extractLatestUserMessageText([{ role: "assistant", content: "hi" }])).toBe("");
+    expect(extractLatestUserMessageText([])).toBe("");
+    expect(extractLatestUserMessageText(undefined)).toBe("");
+    expect(extractLatestUserMessageText("not-an-array")).toBe("");
+  });
+});
