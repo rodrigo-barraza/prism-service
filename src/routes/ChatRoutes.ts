@@ -213,6 +213,7 @@ async function prepareGenerationContext(
     harness,
     topology,
     thoughtStructure,
+    activeRuleNames,
     // Generation options — flat at top-level (OpenAI-style)
     tools,
     temperature,
@@ -318,6 +319,8 @@ async function prepareGenerationContext(
     ...(harness != null && { harness }),
     ...(topology != null && { topology }),
     ...(thoughtStructure != null && { thoughtStructure }),
+    ...(Array.isArray(activeRuleNames) &&
+      activeRuleNames.length > 0 && { activeRuleNames }),
     ...(parallelToolCalls != null && { parallelToolCalls }),
     ...(candidateCount != null && { candidateCount }),
     ...(branchCount != null && { branchCount }),
@@ -597,7 +600,9 @@ export async function handleConversation(
     const titleSnippet =
       (firstUserMessage?.content || "").slice(0, 100).trim() ||
       DEFAULT_CONVERSATION_TITLE;
-    conversationMeta = conversationMeta || { title: titleSnippet };
+    // Fill the title even when the client sent other meta (e.g. only a
+    // systemPrompt) — title policy is server-owned.
+    conversationMeta = { title: titleSnippet, ...(conversationMeta || {}) };
   }
   const traceId = incomingTraceId || null;
   if (traceId && conversationMeta) {
@@ -778,7 +783,25 @@ export async function handleAgent(
     agentConversationId || crypto.randomUUID();
   const conversationId = incomingConversationId || crypto.randomUUID();
   const traceId = incomingTraceId || null;
-  const conversationMeta = incomingConversationMeta || null;
+  let conversationMeta = incomingConversationMeta || null;
+  // Title policy is server-owned: when the client didn't send one (new
+  // conversations), derive it from the user message — same snippet rule
+  // as the /chat path. `rawContent` is preferred so injected context
+  // blocks never leak into titles.
+  if (!incomingConversationId && !conversationMeta?.title) {
+    const firstUserMessage = (context.rawMessages as ConversationMessage[])
+      ?.filter((conversationMessage) => conversationMessage.role === "user")
+      .pop();
+    const titleSource =
+      typeof firstUserMessage?.rawContent === "string"
+        ? firstUserMessage.rawContent
+        : typeof firstUserMessage?.content === "string"
+          ? firstUserMessage.content
+          : "";
+    const titleSnippet =
+      titleSource.slice(0, 100).trim() || DEFAULT_CONVERSATION_TITLE;
+    conversationMeta = { ...(conversationMeta || {}), title: titleSnippet };
+  }
   // ── Eager conversation stub ───────────────────────────────────────
   // Create the conversation document immediately via upsert so that
   // GET /agent-conversations/:id never 404s while the loop is running

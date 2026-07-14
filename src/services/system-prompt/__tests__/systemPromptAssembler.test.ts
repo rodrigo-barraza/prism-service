@@ -308,6 +308,23 @@ vi.mock("#src/services/SettingsService", () => ({
 vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getDb: vi.fn(() => null),
+    getCollection: vi.fn((_dbName: string, collection: string) => {
+      if (collection === "agent_rules") {
+        return {
+          find: vi.fn(() => ({
+            toArray: vi
+              .fn()
+              .mockResolvedValue([
+                { name: "tdd", content: "Always write tests first." },
+              ]),
+          })),
+        };
+      }
+      return {
+        findOne: vi.fn().mockResolvedValue(null),
+        find: vi.fn(() => ({ toArray: vi.fn().mockResolvedValue([]) })),
+      };
+    }),
   },
 }));
 
@@ -403,6 +420,41 @@ describe("SystemPromptAssembler", () => {
   // ──────────────────────────────────────────────────────────
   // Orchestrator Mode Prompt Injection
   // ──────────────────────────────────────────────────────────
+
+  // ──────────────────────────────────────────────────────────
+  // Active Rules Injection (server-owned rule content resolution)
+  // ──────────────────────────────────────────────────────────
+
+  describe("active rules injection", () => {
+    it("injects an <active-rules> section when activeRuleNames is provided", async () => {
+      const assembler = createAssembler();
+      const { prompt } = await assembler.assemble({
+        agent: "CODING",
+        project: "prism-chat",
+        username: "rodrigo",
+        messages: [{ role: "user", content: "Hello" }],
+        enabledTools: ["read_file"],
+        activeRuleNames: ["tdd"],
+      });
+
+      expect(prompt).toContain("<active-rules>");
+      expect(prompt).toContain("## /tdd");
+      expect(prompt).toContain("Always write tests first.");
+    });
+
+    it("omits the <active-rules> section when no rule names are sent", async () => {
+      const assembler = createAssembler();
+      const { prompt } = await assembler.assemble({
+        agent: "CODING",
+        project: "prism-chat",
+        username: "rodrigo",
+        messages: [{ role: "user", content: "Hello" }],
+        enabledTools: ["read_file"],
+      });
+
+      expect(prompt).not.toContain("<active-rules>");
+    });
+  });
 
   describe("orchestrator mode prompt injection", () => {
     it("injects orchestrator prompt when enabledTools contains explicit orchestrator tool names", async () => {
