@@ -636,7 +636,13 @@ export default class SystemPromptAssembler {
           locale,
           "system-prompt.projectStructureHeader",
         );
-        sections.push(wrapSection(SYSTEM_PROMPT_SECTIONS.PROJECT_STRUCTURE, header + "\n" + dirTree));
+        // Fence the tree so markdown renderers preserve line breaks and indentation
+        sections.push(
+          wrapSection(
+            SYSTEM_PROMPT_SECTIONS.PROJECT_STRUCTURE,
+            header + "\n```\n" + dirTree + "\n```",
+          ),
+        );
       }
     }
 
