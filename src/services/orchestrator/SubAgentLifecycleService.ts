@@ -1,5 +1,9 @@
 import logger from "#src/utils/logger";
 import { SYSTEM_STATUSES, ORCHESTRATOR } from "#src/constants";
+import {
+  SERVER_SENT_EVENT_TYPES,
+  STATUS_MESSAGES,
+} from "@rodrigo-barraza/utilities-library/taxonomy";
 import { GitWorktreeHelper } from "./GitWorktreeHelper.ts";
 import { buildSubAgentResult } from "./SubAgentResultBuilder.ts";
 import { SubAgentPersistenceService } from "./SubAgentPersistenceService.ts";
@@ -9,6 +13,7 @@ import type {
   SubAgentResult,
   SubAgentStopResult,
 } from "#src/types/orchestrator";
+import type { EmitFunction } from "#src/services/harnesses/types";
 
 /**
  * Service for managing the lifecycle of sub-agents (stopping, aborting, output retrieval).
@@ -29,6 +34,83 @@ export class SubAgentLifecycleService {
         subAgentDurationMilliseconds: subAgent.durationMilliseconds,
       },
     });
+  }
+
+  /**
+   * Emit the initial live-status SSE event for a freshly spawned, continued,
+   * or resumed sub-agent so the frontend can render it immediately — before
+   * the agentic loop starts and before any result exists.
+   */
+  static emitSpawnedStatus(
+    emit: EmitFunction | undefined,
+    subAgent: SubAgentState,
+  ): void {
+    if (!emit) return;
+    emit({
+      type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
+      subAgentId: subAgent.agentId,
+      message: STATUS_MESSAGES.SPAWNED,
+      description: subAgent.description,
+      status: SYSTEM_STATUSES.RUNNING,
+      agentConversationId: subAgent.parentAgentConversationId,
+      conversationId: subAgent.subAgentConversationId,
+      parentConversationId: subAgent.parentConversationId || null,
+      model: subAgent.resolvedModel,
+      provider: subAgent.providerName,
+      agentIndex: subAgent.agentIndex ?? null,
+      globalSpawnIndex: subAgent.globalSpawnIndex ?? null,
+    });
+  }
+
+  /**
+   * Mark a sub-agent as failed on an error path: set terminal status/error/
+   * duration, emit the FAILED status event, and — when `cleanupResources` is
+   * set (the spawn paths, which own a worktree and a persisted document) —
+   * remove the worktree and persist the terminal status. Resource cleanup is
+   * best-effort and fire-and-forget so the caller's error handling never
+   * blocks on it.
+   */
+  static markSubAgentFailed(
+    subAgent: SubAgentState,
+    error: unknown,
+    options: { emit?: EmitFunction; cleanupResources?: boolean } = {},
+  ): void {
+    const { emit, cleanupResources = false } = options;
+    const errorMessage = getErrorMessage(error);
+
+    subAgent.status = SYSTEM_STATUSES.FAILED;
+    subAgent.error = errorMessage;
+    subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
+
+    if (cleanupResources) {
+      if (subAgent.isolated && subAgent.worktreePath) {
+        void GitWorktreeHelper.removeWorktree(
+          subAgent.repositoryPath,
+          subAgent.worktreePath,
+        ).catch((cleanupError: unknown) =>
+          logger.warn(
+            `[SubAgentLifecycle] Worktree cleanup failed for ${subAgent.agentId}: ${getErrorMessage(cleanupError)}`,
+          ),
+        );
+      }
+      void SubAgentPersistenceService.markSubAgentTerminal({
+        subAgentConversationId: subAgent.subAgentConversationId,
+        status: SYSTEM_STATUSES.FAILED,
+        extraFields: {
+          subAgentDurationMilliseconds: subAgent.durationMilliseconds,
+        },
+      });
+    }
+
+    if (emit) {
+      emit({
+        type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
+        subAgentId: subAgent.agentId,
+        message: SYSTEM_STATUSES.FAILED,
+        conversationId: subAgent.subAgentConversationId || null,
+        error: errorMessage,
+      });
+    }
   }
 
   /**

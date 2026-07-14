@@ -39,6 +39,9 @@ import { GitWorktreeHelper } from "./orchestrator/GitWorktreeHelper.ts";
 import {
   getLastAssistantText,
   buildSubAgentResult,
+  toLiveSubAgentSummary,
+  toPersistedSubAgentSummary,
+  type SubAgentSummary,
 } from "./orchestrator/SubAgentResultBuilder.ts";
 import { SubAgentTelemetryEmitter } from "./orchestrator/SubAgentTelemetryEmitter.ts";
 import { evictIdleSecondaryModel } from "./orchestrator/VramEvictionPolicy.ts";
@@ -74,21 +77,6 @@ type AgenticLoopServiceModule = typeof import("./AgenticLoopService.ts");
 // Entry point: Chat tools — spawnFromTool() / sendMessage() / stopAgent()
 // Called when the LLM invokes create_subagents / send_subagent_message / stop_subagent
 // ────────────────────────────────────────────────────────────
-
-
-import type { ToolCall } from "./harnesses/types.ts";
-
-function buildToolNamesMap(
-  toolCalls: ToolCall[] | null | undefined,
-): Record<string, number> {
-  const toolNames: Record<string, number> = {};
-  if (!toolCalls?.length) return toolNames;
-  for (const toolCall of toolCalls) {
-    const name = toolCall.name || "unknown";
-    toolNames[name] = (toolNames[name] || 0) + 1;
-  }
-  return toolNames;
-}
 
 /** Active sub-agents spawned via chat tools, keyed by agentId */
 const activeSubAgents = new Map<string, SubAgentState>();
@@ -470,22 +458,10 @@ export class OrchestratorService {
 
     // Emit early so the frontend can show live status immediately
     // (before the blocking loop starts and before a result is available)
-    if (orchestratorContext.emit) {
-      orchestratorContext.emit({
-        type: "sub_agent_status",
-        subAgentId: agentId,
-        message: STATUS_MESSAGES.SPAWNED,
-        description,
-        status: SYSTEM_STATUSES.RUNNING,
-        agentConversationId,
-        conversationId: subAgentConversationId,
-        parentConversationId: parentConversationId || null,
-        model: subAgentModel,
-        provider: subAgentProvider,
-        agentIndex: agentIndex ?? null,
-        globalSpawnIndex: globalSpawnIndex ?? null,
-      });
-    }
+    SubAgentLifecycleService.emitSpawnedStatus(
+      orchestratorContext.emit,
+      subAgentState,
+    );
 
     // ── Registration callback ─────────────────────────────────────
     // Fires BEFORE the agentic loop starts, so createTeam's barrier
@@ -515,39 +491,10 @@ export class OrchestratorService {
         logger.error(
           `[Orchestrator] Sub-agent ${agentId} loop error: ${getErrorMessage(error)}`,
         );
-        subAgentState.status = SYSTEM_STATUSES.FAILED;
-        subAgentState.error = getErrorMessage(error);
-        subAgentState.durationMilliseconds = Date.now() - subAgentState.startedAt;
-
-        if (subAgentState.isolated && subAgentState.worktreePath) {
-          await GitWorktreeHelper.removeWorktree(
-            subAgentState.repositoryPath,
-            subAgentState.worktreePath,
-          ).catch((cleanupError: Error) =>
-            logger.warn(
-              `[Orchestrator] Worktree cleanup failed for ${agentId}: ${getErrorMessage(cleanupError)}`,
-            ),
-          );
-        }
-
-        // Update sub-agent metadata on the child conversation document
-        void SubAgentPersistenceService.markSubAgentTerminal({
-          subAgentConversationId: subAgentState.subAgentConversationId,
-          status: SYSTEM_STATUSES.FAILED,
-          extraFields: {
-            subAgentDurationMilliseconds: subAgentState.durationMilliseconds,
-          },
+        SubAgentLifecycleService.markSubAgentFailed(subAgentState, error, {
+          emit: orchestratorContext.emit,
+          cleanupResources: true,
         });
-
-        if (orchestratorContext.emit) {
-          orchestratorContext.emit({
-            type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
-            subAgentId: agentId,
-            message: SYSTEM_STATUSES.FAILED,
-            conversationId: subAgentState.subAgentConversationId || null,
-            error: getErrorMessage(error),
-          });
-        }
       }
 
       if (orchestratorContext.emit) {
@@ -594,38 +541,11 @@ export class OrchestratorService {
         logger.error(
           `[Orchestrator] Sub-agent ${agentId} loop error: ${getErrorMessage(error)}`,
         );
-        subAgentState.status = SYSTEM_STATUSES.FAILED;
-        subAgentState.error = getErrorMessage(error);
-        subAgentState.durationMilliseconds = Date.now() - subAgentState.startedAt;
-
-        if (subAgentState.isolated && subAgentState.worktreePath) {
-          GitWorktreeHelper.removeWorktree(
-            subAgentState.repositoryPath,
-            subAgentState.worktreePath,
-          ).catch((cleanupError: Error) =>
-            logger.warn(
-              `[Orchestrator] Worktree cleanup failed for ${agentId}: ${getErrorMessage(cleanupError)}`,
-            ),
-          );
-        }
-
-        // Update sub-agent metadata on the child conversation document
-        void SubAgentPersistenceService.markSubAgentTerminal({
-          subAgentConversationId: subAgentState.subAgentConversationId,
-          status: SYSTEM_STATUSES.FAILED,
-          extraFields: {
-            subAgentDurationMilliseconds: subAgentState.durationMilliseconds,
-          },
+        SubAgentLifecycleService.markSubAgentFailed(subAgentState, error, {
+          emit: orchestratorContext.emit,
+          cleanupResources: true,
         });
-
         if (orchestratorContext.emit) {
-          orchestratorContext.emit({
-            type: SERVER_SENT_EVENT_TYPES.SUB_AGENT_STATUS,
-            subAgentId: agentId,
-            message: SYSTEM_STATUSES.FAILED,
-            conversationId: subAgentState.subAgentConversationId || null,
-            error: getErrorMessage(error),
-          });
           orchestratorContext.emit({
             type: SERVER_SENT_EVENT_TYPES.STATUS,
             message: STATUS_MESSAGES.SUB_AGENTS_UPDATED,
@@ -775,87 +695,21 @@ export class OrchestratorService {
 
   static listSubAgents({
     parentConversationId,
-  }: { parentConversationId?: string } = {}): Array<{
-    agentId: string;
-    description: string;
-    status: string;
-    providerName: string;
-    resolvedModel: string;
-    durationMilliseconds: number;
-    toolUses: number;
-    hasChanges: boolean;
-    totalCost?: number | null;
-    branchName?: string | null;
-    files?: string[];
-    toolCallCount?: number;
-    recursionDepth?: number;
-    toolNames?: Record<string, number>;
-  }> {
+  }: { parentConversationId?: string } = {}): SubAgentSummary[] {
     let list = Array.from(activeSubAgents.values());
     if (parentConversationId) {
       list = list.filter(
         (subAgent) => subAgent.parentConversationId === parentConversationId,
       );
     }
-    return list.map((subAgent) => {
-      const toolNames = buildToolNamesMap(subAgent.toolCalls);
-      return {
-        agentId: subAgent.agentId,
-        description: subAgent.description,
-        status: subAgent.status,
-        providerName: subAgent.providerName,
-        resolvedModel: subAgent.resolvedModel,
-        durationMilliseconds:
-          subAgent.status === SYSTEM_STATUSES.RUNNING
-            ? Date.now() - subAgent.startedAt
-            : subAgent.durationMilliseconds,
-        toolUses: subAgent.toolCalls?.length || 0,
-        hasChanges: subAgent.diff?.hasChanges || false,
-        totalCost: subAgent.totalCost,
-        branchName: subAgent.branchName,
-        files: subAgent.files,
-        toolCallCount: subAgent.toolCalls?.length || 0,
-        recursionDepth: subAgent.recursionDepth,
-        toolNames: Object.keys(toolNames).length > 0 ? toolNames : undefined,
-      };
-    });
+    return list.map(toLiveSubAgentSummary);
   }
 
-  static listAllDescendantSubAgents(rootConversationId: string): Array<{
-    agentId: string;
-    description: string;
-    status: string;
-    providerName: string;
-    resolvedModel: string;
-    durationMilliseconds: number;
-    toolUses: number;
-    hasChanges: boolean;
-    totalCost?: number | null;
-    branchName?: string | null;
-    files?: string[];
-    toolCallCount?: number;
-    recursionDepth?: number;
-    globalSpawnIndex?: number;
-    toolNames?: Record<string, number>;
-  }> {
+  static listAllDescendantSubAgents(
+    rootConversationId: string,
+  ): SubAgentSummary[] {
     const collectedSubAgentIds = new Set<string>();
-    const results: Array<{
-      agentId: string;
-      description: string;
-      status: string;
-      providerName: string;
-      resolvedModel: string;
-      durationMilliseconds: number;
-      toolUses: number;
-      hasChanges: boolean;
-      totalCost?: number | null;
-      branchName?: string | null;
-      files?: string[];
-      toolCallCount?: number;
-      recursionDepth?: number;
-      globalSpawnIndex?: number;
-      toolNames?: Record<string, number>;
-    }> = [];
+    const results: SubAgentSummary[] = [];
 
     let frontier = [rootConversationId];
     const visitedParentConversationIds = new Set<string>([rootConversationId]);
@@ -869,27 +723,7 @@ export class OrchestratorService {
           continue;
         }
         collectedSubAgentIds.add(subAgentState.agentId);
-        const toolNames = buildToolNamesMap(subAgentState.toolCalls);
-        results.push({
-          agentId: subAgentState.agentId,
-          description: subAgentState.description,
-          status: subAgentState.status,
-          providerName: subAgentState.providerName,
-          resolvedModel: subAgentState.resolvedModel,
-          durationMilliseconds:
-            subAgentState.status === SYSTEM_STATUSES.RUNNING
-              ? Date.now() - subAgentState.startedAt
-              : subAgentState.durationMilliseconds,
-          toolUses: subAgentState.toolCalls?.length || 0,
-          hasChanges: subAgentState.diff?.hasChanges || false,
-          totalCost: subAgentState.totalCost,
-          branchName: subAgentState.branchName,
-          files: subAgentState.files,
-          toolCallCount: subAgentState.toolCalls?.length || 0,
-          recursionDepth: subAgentState.recursionDepth,
-          globalSpawnIndex: subAgentState.globalSpawnIndex,
-          toolNames: Object.keys(toolNames).length > 0 ? toolNames : undefined,
-        });
+        results.push(toLiveSubAgentSummary(subAgentState));
         if (
           subAgentState.subAgentConversationId &&
           !visitedParentConversationIds.has(
@@ -907,42 +741,10 @@ export class OrchestratorService {
 
     return results;
   }
-  static async getPersistedDescendantSubAgents(rootConversationId: string): Promise<Array<{
-    agentId: string;
-    description: string;
-    status: string;
-    providerName?: string;
-    resolvedModel?: string;
-    durationMilliseconds: number;
-    toolUses: number;
-    hasChanges: boolean;
-    totalCost?: number | null;
-    branchName?: string | null;
-    files?: string[];
-    toolCallCount?: number;
-    recursionDepth?: number;
-    globalSpawnIndex?: number;
-    toolNames?: Record<string, number>;
-    subAgentConversationId?: string;
-  }>> {
-    const results: Array<{
-      agentId: string;
-      description: string;
-      status: string;
-      providerName?: string;
-      resolvedModel?: string;
-      durationMilliseconds: number;
-      toolUses: number;
-      hasChanges: boolean;
-      totalCost?: number | null;
-      branchName?: string | null;
-      files?: string[];
-      toolCallCount?: number;
-      recursionDepth?: number;
-      globalSpawnIndex?: number;
-      toolNames?: Record<string, number>;
-      subAgentConversationId?: string;
-    }> = [];
+  static async getPersistedDescendantSubAgents(
+    rootConversationId: string,
+  ): Promise<SubAgentSummary[]> {
+    const results: SubAgentSummary[] = [];
 
     try {
       const { default: MongoWrapper } = await import("#src/wrappers/MongoWrapper");
@@ -1016,26 +818,7 @@ export class OrchestratorService {
 
         const nextFrontier: string[] = [];
         for (const subAgentDocument of subAgentDocuments) {
-          results.push({
-            agentId:
-              (subAgentDocument.subAgentId as string) ||
-              (subAgentDocument.id as string),
-            description: (subAgentDocument.subAgentDescription as string) || "",
-            status: (subAgentDocument.subAgentStatus as string) || "unknown",
-            providerName: subAgentDocument.subAgentProviderName as string | undefined,
-            resolvedModel: subAgentDocument.subAgentResolvedModel as string | undefined,
-            durationMilliseconds: (subAgentDocument.subAgentDurationMilliseconds as number) || 0,
-            toolUses: (subAgentDocument.subAgentToolUses as number) || 0,
-            hasChanges: (subAgentDocument.subAgentHasChanges as boolean) || false,
-            totalCost: subAgentDocument.subAgentTotalCost as number | null | undefined,
-            branchName: subAgentDocument.subAgentBranchName as string | null | undefined,
-            files: subAgentDocument.subAgentFiles as string[] | undefined,
-            toolCallCount: (subAgentDocument.subAgentToolUses as number) || 0,
-            recursionDepth: subAgentDocument.subAgentRecursionDepth as number | undefined,
-            globalSpawnIndex: subAgentDocument.subAgentGlobalSpawnIndex as number | undefined,
-            toolNames: subAgentDocument.subAgentToolNames as Record<string, number> | undefined,
-            subAgentConversationId: subAgentDocument.id as string,
-          });
+          results.push(toPersistedSubAgentSummary(subAgentDocument));
 
           // If this sub-agent itself has children, add them to the next frontier
           const childSubAgentIds = subAgentDocument.subAgentIds as string[] | undefined;
