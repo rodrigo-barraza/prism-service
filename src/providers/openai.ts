@@ -5,6 +5,7 @@ import type { Reasoning, ReasoningEffort } from "openai/resources/shared";
 import { ProviderError } from "#src/utils/errors";
 import logger from "#src/utils/logger";
 import { extractOpenAIRateLimits } from "#src/utils/rateLimits";
+import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { OPENAI_API_KEY, OPENAI_TRANSCRIPTION_MODEL } from "#config";
 import {
   MODALITY_TYPES,
@@ -37,10 +38,10 @@ import type { ToolSchema } from "#src/services/harnesses/types";
  */
 const OPENAI_CHAT_COMPLETIONS_MAX_TOOLS = 128;
 
-const PRIORITY_TOOL_NAMES = new Set([
-  "discover_and_enable_tools",
-  "search_tools",
-  "enable_tools",
+const PRIORITY_TOOL_NAMES = new Set<string>([
+  TOOL_NAMES.DISCOVER_AND_ENABLE_TOOLS,
+  TOOL_NAMES.SEARCH_TOOLS,
+  TOOL_NAMES.ENABLE_TOOLS,
 ]);
 
 function useResponsesAPI(model: string): boolean {
