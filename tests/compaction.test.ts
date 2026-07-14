@@ -20,7 +20,7 @@ import {
   stripImagesFromMessages,
 } from "#src/services/compact/CompactionPrompt";
 import CompactionService from "#src/services/compact/CompactionService";
-import ContextWindowManager from "#src/utils/ContextWindowManager";
+import ContextWindowManager from "#src/services/ContextWindowManager";
 import AgenticLoopState from "#src/services/AgenticLoopState";
 import RequestLogger from "#src/services/RequestLogger";
 import BaseAgenticHarness from "#src/services/harnesses/BaseAgenticHarness";

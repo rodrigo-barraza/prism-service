@@ -18,7 +18,7 @@ import {
   convertToolsToOpenAI,
   normalizeUsage,
   prependIdentitySystemMessage,
-} from "#src/utils/openai-compat";
+} from "#src/providers/openai-compat";
 import type { TokenUsage } from "#src/types/admin";
 import type { JsonValue } from "#src/types/index";
 import {

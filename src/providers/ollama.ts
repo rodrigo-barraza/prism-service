@@ -9,7 +9,7 @@ import { ProviderError } from "#src/utils/errors";
 import {
   STREAMING_DISPATCHER,
   prependIdentitySystemMessage,
-} from "#src/utils/openai-compat";
+} from "#src/providers/openai-compat";
 import logger from "#src/utils/logger";
 import { discoverContextLength } from "#src/utils/ContextLengthDiscovery";
 

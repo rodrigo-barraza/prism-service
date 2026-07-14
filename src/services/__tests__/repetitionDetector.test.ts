@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import RepetitionDetector from "#src/utils/RepetitionDetector";
-import type { RepetitionVerdict } from "#src/utils/RepetitionDetector";
+import RepetitionDetector from "#src/services/RepetitionDetector";
+import type { RepetitionVerdict } from "#src/services/RepetitionDetector";
 
 // ═══════════════════════════════════════════════════════════════
 // RepetitionDetector — Comprehensive Test Suite

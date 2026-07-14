@@ -23,7 +23,7 @@ import { prepareOpenAIMessages } from "#src/providers/openai";
 import {
   prependIdentitySystemMessage,
   prepareOpenAICompatMessages,
-} from "#src/utils/openai-compat";
+} from "#src/providers/openai-compat";
 
 import type { ChatMessage } from "#src/types/ProviderTypes";
 

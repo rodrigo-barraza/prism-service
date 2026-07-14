@@ -51,7 +51,7 @@ import {
   fetchOpenAICompat,
   MEDIA_STRATEGIES,
   type OpenAICompletionResponse,
-} from "#src/utils/openai-compat";
+} from "#src/providers/openai-compat";
 import type { TokenUsage } from "#src/types/admin";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 

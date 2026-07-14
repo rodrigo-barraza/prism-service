@@ -9,8 +9,8 @@ import {
     mergeUsage,
     createUsageAccumulator,
 } from "#src/utils/CostCalculator";
-import ContextWindowManager from "#src/utils/ContextWindowManager";
-import { normalizeUsage } from "#src/utils/openai-compat";
+import ContextWindowManager from "#src/services/ContextWindowManager";
+import { normalizeUsage } from "#src/providers/openai-compat";
 import { normalizeResponsesUsage } from "#src/providers/openai";
 import { TYPES, getPricing, getModelByName } from "#src/config";
 

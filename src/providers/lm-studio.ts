@@ -42,7 +42,7 @@ import {
   MEDIA_STRATEGIES,
   type PreparedMessage,
   type OpenAICompletionResponse,
-} from "#src/utils/openai-compat";
+} from "#src/providers/openai-compat";
 import { ORCHESTRATOR_ONLY_TOOLS } from "#src/services/OrchestratorPrompt";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { PROVIDERS } from "#src/constants";
