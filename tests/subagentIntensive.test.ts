@@ -101,7 +101,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
     mockToolsApiPost.mockClear();
 
     // Reset the global orchestrator registry to guarantee test isolation
-    OrchestratorService.cleanupSession("session-id-def");
+    OrchestratorService.cleanupConversation("session-id-def");
     OrchestratorService.clearAllActiveSubAgents();
     InstanceLoadBalancer.getReservations().clear();
 

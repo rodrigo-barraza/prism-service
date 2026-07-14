@@ -28,6 +28,12 @@ export interface TopologyDefinition {
   displayName: string;
   abbreviation: string;
   description: string;
+  /**
+   * Concise name + description injected into sub-agent system prompts
+   * (see OrchestratorService sub-agent prompt assembly). Kept short —
+   * this is model-facing context, not UI copy.
+   */
+  promptSummary: { name: string; description: string };
   paperTitle: string | null;
   paperAuthors: string | null;
   paperYear: number | null;
@@ -43,6 +49,11 @@ export interface TopologyDefinition {
 export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
   {
     id: TOPOLOGIES.SEQUENTIAL,
+    promptSummary: {
+      name: "Sequential (Pipeline)",
+      description:
+        "Sub-agents run one at a time in order, each receiving the previous agent's output as context before starting.",
+    },
     displayName: "Sequential Pipeline",
     abbreviation: "SP",
     description:
@@ -91,6 +102,11 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
   },
   {
     id: TOPOLOGIES.HIERARCHICAL,
+    promptSummary: {
+      name: "Hierarchical (Parallel)",
+      description:
+        "All sub-agents run in parallel, each independently working on their own task. No shared state between agents.",
+    },
     displayName: "Hierarchical Parallel",
     abbreviation: "HP",
     description:
@@ -134,6 +150,11 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
   },
   {
     id: TOPOLOGIES.HIERARCHICAL_AGGREGATION,
+    promptSummary: {
+      name: "Hierarchical Aggregation (Parallel + Synthesis)",
+      description:
+        "All sub-agents run in parallel, then a final synthesis pass merges their outputs into a unified result.",
+    },
     displayName: "Hierarchical Aggregation",
     abbreviation: "MoA",
     description:
@@ -190,6 +211,11 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
   },
   {
     id: TOPOLOGIES.PEER_TO_PEER,
+    promptSummary: {
+      name: "Peer-to-Peer (Mesh / MAD)",
+      description:
+        "Turn-based discussion where agents take turns on a shared thread. Each agent reads all prior contributions before responding.",
+    },
     displayName: "Peer-to-Peer Mesh",
     abbreviation: "MAD",
     description:
@@ -252,6 +278,11 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
   },
   {
     id: TOPOLOGIES.TOURNAMENT,
+    promptSummary: {
+      name: "Tournament (Best-of-N)",
+      description:
+        "All sub-agents run in parallel, then a judge evaluates and selects the single best result. Compete to produce the highest quality output.",
+    },
     displayName: "Tournament",
     abbreviation: "BoN",
     description:
@@ -314,6 +345,11 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
   },
   {
     id: TOPOLOGIES.CRITIC_LOOP,
+    promptSummary: {
+      name: "Critic Loop (Actor-Critic)",
+      description:
+        "Actor produces output, critic evaluates and provides pass/fail feedback. If failed, actor revises. Iterates until critic approves or max rounds reached.",
+    },
     displayName: "Critic Loop",
     abbreviation: "MAR",
     description:
@@ -388,6 +424,11 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
   },
   {
     id: TOPOLOGIES.DIVIDE_AND_CONQUER,
+    promptSummary: {
+      name: "Divide & Conquer (GoT)",
+      description:
+        "A planner decomposes the task into independent subtasks, each dispatched to a sub-agent in parallel, then synthesized into a unified result.",
+    },
     displayName: "Divide & Conquer",
     abbreviation: "GoT",
     description:
@@ -462,6 +503,11 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
   },
   {
     id: TOPOLOGIES.MCTS,
+    promptSummary: {
+      name: "MCTS-Guided Search (LATS)",
+      description:
+        "Monte Carlo Tree Search — expands N branches in parallel, evaluates and scores each, selects the best, and refines iteratively until complete.",
+    },
     displayName: "MCTS-Guided Search",
     abbreviation: "LATS",
     description:
@@ -561,5 +607,22 @@ export function getTopologyById(
 ): TopologyDefinition | undefined {
   return TOPOLOGY_DEFINITIONS.find(
     (definition) => definition.id === topologyId,
+  );
+}
+
+/**
+ * Prompt-facing name + description for a topology, with a safe fallback
+ * for custom/unknown topology ids. Used when assembling sub-agent
+ * system prompts.
+ */
+export function getTopologyPromptSummary(topologyId: string): {
+  name: string;
+  description: string;
+} {
+  return (
+    getTopologyById(topologyId)?.promptSummary ?? {
+      name: topologyId,
+      description: "Custom or unknown topology.",
+    }
   );
 }

@@ -1,4 +1,8 @@
-import type { TeamMember } from "#src/types/orchestrator";
+import type {
+  TeamMember,
+  InstanceAssignment,
+  SubAgentState,
+} from "#src/types/orchestrator";
 import type { InstanceEntry } from "#src/types/ProviderTypes";
 import { InstanceLoadBalancer } from "./InstanceLoadBalancer.ts";
 import { resolveModelForInstances } from "#src/utils/ModelResolution";
@@ -18,6 +22,10 @@ export interface InstanceResolutionContext {
 export interface ResolvedInstance {
   assignedProvider: string;
   assignedModel: string;
+  /** Load-balancer assignment when an instance slot was reserved (null on fallback/queue). */
+  assignment: InstanceAssignment | null;
+  /** True when the configured sub-agent fallback model was used instead of an instance. */
+  usedFallback: boolean;
 }
 
 interface ResolvedSiblings {
@@ -69,11 +77,16 @@ export async function resolveSiblingInstances(
  * Select an instance for a single team member using the pre-resolved
  * sibling context. Returns the final { assignedProvider, assignedModel }
  * after load-balancing and fallback.
+ *
+ * Pass `activeSubAgents` so load accounting sees already-running agents
+ * in addition to synchronous reservations — otherwise the balancer only
+ * counts reservations made this batch.
  */
 export function selectInstanceForMember(
   member: TeamMember,
   resolvedSiblings: ResolvedSiblings,
   context: InstanceResolutionContext,
+  activeSubAgents: Map<string, SubAgentState> = new Map(),
 ): ResolvedInstance {
   const { providerName, resolvedModel } = context;
   const { isLocal, siblings, instanceModelOverrides, orchestratorFallback } =
@@ -81,23 +94,31 @@ export function selectInstanceForMember(
 
   let assignedProvider = providerName;
   let assignedModel = member.model || resolvedModel;
+  let assignment: InstanceAssignment | null = null;
+  let usedFallback = false;
 
-  if (isLocal && siblings.length > 0) {
-    const assigned = InstanceLoadBalancer.selectAndReserveInstance(
-      siblings,
-      providerName,
-      instanceModelOverrides,
-      assignedModel,
-      new Map(),
-    );
-    if (assigned) {
-      assignedProvider = assigned.provider;
-      assignedModel = assigned.model;
+  if (isLocal) {
+    assignment =
+      siblings.length > 0
+        ? InstanceLoadBalancer.selectAndReserveInstance(
+            siblings,
+            providerName,
+            instanceModelOverrides,
+            assignedModel,
+            activeSubAgents,
+          )
+        : null;
+    if (assignment) {
+      assignedProvider = assignment.provider;
+      assignedModel = assignment.model;
     } else if (orchestratorFallback) {
+      // No usable instance (model unavailable everywhere) — use the
+      // configured sub-agent fallback instead of queuing on the local provider.
       assignedProvider = orchestratorFallback.provider;
       assignedModel = orchestratorFallback.model;
+      usedFallback = true;
     }
   }
 
-  return { assignedProvider, assignedModel };
+  return { assignedProvider, assignedModel, assignment, usedFallback };
 }

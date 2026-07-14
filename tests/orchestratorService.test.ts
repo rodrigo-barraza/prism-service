@@ -1574,7 +1574,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
 
     it("should cleanup session as a wrapper for cleanupConversation", () => {
       const spy = vi.spyOn(OrchestratorService, "cleanupConversation");
-      OrchestratorService.cleanupSession("some-conv-id");
+      OrchestratorService.cleanupConversation("some-conv-id");
       expect(spy).toHaveBeenCalledWith("some-conv-id");
       spy.mockRestore();
     });

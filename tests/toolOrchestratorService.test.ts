@@ -116,14 +116,7 @@ describe("ToolOrchestratorService", () => {
   describe("executeTool image-to-texture data injection", () => {
     const mockSchemas = [
       {
-        name: "create_3d_model",
-        description: "Create a 3D model",
-        parameters: { type: "object", properties: {} },
-        domain: "Workspace",
-        endpoint: { path: "/compute/3d/model", method: "POST" },
-      },
-      {
-        name: "create_3d_scene",
+        name: "create_3d",
         description: "Create a 3D scene",
         parameters: { type: "object", properties: {} },
         domain: "Workspace",
@@ -136,7 +129,7 @@ describe("ToolOrchestratorService", () => {
 
       vi.mocked(global.fetch).mockImplementation(async (url, requestOptions) => {
         const urlString = String(url);
-        if (urlString.includes("/compute/3d/model")) {
+        if (urlString.includes("/compute/3d/scene")) {
           if (requestOptions && requestOptions.body) {
             capturedBody = JSON.parse(requestOptions.body as string);
           }
@@ -166,7 +159,7 @@ describe("ToolOrchestratorService", () => {
       await ToolOrchestratorService.refreshSchemas();
 
       await ToolOrchestratorService.executeTool(
-        "create_3d_model",
+        "create_3d",
         { objects: [] },
         {
           messages: [
@@ -187,7 +180,7 @@ describe("ToolOrchestratorService", () => {
 
       vi.mocked(global.fetch).mockImplementation(async (url, requestOptions) => {
         const urlString = String(url);
-        if (urlString.includes("/compute/3d/model")) {
+        if (urlString.includes("/compute/3d/scene")) {
           if (requestOptions && requestOptions.body) {
             capturedBody = JSON.parse(requestOptions.body as string);
           }
@@ -218,7 +211,7 @@ describe("ToolOrchestratorService", () => {
 
       const fakeDataUrl = "data:image/png;base64,fakebase64data";
       await ToolOrchestratorService.executeTool(
-        "create_3d_model",
+        "create_3d",
         { objects: [] },
         {
           messages: [
@@ -270,7 +263,7 @@ describe("ToolOrchestratorService", () => {
 
       const fakeHttpUrl = "https://example.com/texture.png";
       await ToolOrchestratorService.executeTool(
-        "create_3d_scene",
+        "create_3d",
         { objects: [] },
         {
           messages: [
@@ -291,7 +284,7 @@ describe("ToolOrchestratorService", () => {
 
       vi.mocked(global.fetch).mockImplementation(async (url, requestOptions) => {
         const urlString = String(url);
-        if (urlString.includes("/compute/3d/model")) {
+        if (urlString.includes("/compute/3d/scene")) {
           if (requestOptions && requestOptions.body) {
             capturedBody = JSON.parse(requestOptions.body as string);
           }
@@ -322,7 +315,7 @@ describe("ToolOrchestratorService", () => {
 
       const minioReference = "minio://valid-image.png";
       await ToolOrchestratorService.executeTool(
-        "create_3d_model",
+        "create_3d",
         { objects: [] },
         {
           messages: [
