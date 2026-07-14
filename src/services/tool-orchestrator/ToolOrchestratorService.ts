@@ -1,5 +1,5 @@
 import { TOOLS_SERVICE_URL } from "#config";
-import { IDENTITY_HEADERS } from "@rodrigo-barraza/service-library";
+import { IDENTITY_HEADERS } from "@rodrigo-barraza/utilities-library/service";
 import MCPClientService from "#src/services/MCPClientService";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 import logger from "#src/utils/logger";
@@ -23,6 +23,7 @@ import {
   FILE_CATEGORIES,
   TOOL_SCHEMA_FETCH_RETRY_COOLDOWN_MILLISECONDS,
   TOOL_PROXY_TIMEOUT_MILLISECONDS,
+  AGENT_DIRECTIVES,
 } from "#src/constants";
 import InternalToolRegistry from "#src/services/tool-definitions/InternalToolRegistry";
 import SettingsService from "#src/services/SettingsService";
@@ -1675,7 +1676,7 @@ export default class ToolOrchestratorService {
         }
 
         return {
-          _directive: "NON_BLOCKING_DISPATCH",
+          _directive: AGENT_DIRECTIVES.NON_BLOCKING_DISPATCH,
           instruction: "Sub-agent is running in the background. You will be automatically notified with a [SUB-AGENT TEAM COMPLETED] message when it finishes. END YOUR TURN NOW — do not call get_subagent_output or delay_execution. Simply respond to the user that the sub-agent has been dispatched and you will report back when it completes.",
           agents: singleResult,
         };
@@ -1708,7 +1709,7 @@ export default class ToolOrchestratorService {
         // Wrap with a stop directive so the LLM knows to end its turn
         // instead of polling get_subagent_output in a loop.
         return {
-          _directive: "NON_BLOCKING_DISPATCH",
+          _directive: AGENT_DIRECTIVES.NON_BLOCKING_DISPATCH,
           instruction: "Sub-agents are running in the background. You will be automatically notified with a [SUB-AGENT TEAM COMPLETED] message when they finish. END YOUR TURN NOW — do not call get_subagent_output or delay_execution. Simply respond to the user that the sub-agents have been dispatched and you will report back when they complete.",
           agents: createTeamResults,
         };

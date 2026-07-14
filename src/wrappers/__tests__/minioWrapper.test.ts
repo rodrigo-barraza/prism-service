@@ -12,7 +12,7 @@ const mockMinioManager = {
   listObjects: vi.fn().mockResolvedValue([{ name: 'file1.txt' }]),
 };
 
-vi.mock('@rodrigo-barraza/service-library/minio', () => ({
+vi.mock('@rodrigo-barraza/utilities-library/service/minio', () => ({
   MinioManager: mockMinioManager,
 }));
 

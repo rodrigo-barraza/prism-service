@@ -9,7 +9,7 @@
 // This adapter bridges the positional-args API to the config-object API.
 // ─────────────────────────────────────────────────────────────────────
 
-import { MinioManager } from "@rodrigo-barraza/service-library/minio";
+import { MinioManager } from "@rodrigo-barraza/utilities-library/service/minio";
 import logger from "#src/utils/logger";
 
 const MinioWrapper = {

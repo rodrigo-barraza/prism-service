@@ -8,7 +8,7 @@ const mockGetDatabase = vi.fn().mockReturnValue(mockDatabaseHandle);
 const mockGetCollection = vi.fn().mockReturnValue(mockCollectionHandle);
 const mockDisconnectDatabase = vi.fn().mockResolvedValue(undefined);
 
-vi.mock('@rodrigo-barraza/service-library/mongo', () => ({
+vi.mock('@rodrigo-barraza/utilities-library/service/mongo', () => ({
   connectDatabase: mockConnectDatabase,
   getDatabase: mockGetDatabase,
   getCollection: mockGetCollection,

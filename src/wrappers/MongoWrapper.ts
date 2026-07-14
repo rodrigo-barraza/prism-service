@@ -17,7 +17,7 @@ import {
   getDatabase,
   getCollection,
   disconnectDatabase,
-} from "@rodrigo-barraza/service-library/mongo";
+} from "@rodrigo-barraza/utilities-library/service/mongo";
 import logger from "#src/utils/logger";
 
 const MongoWrapper = {
