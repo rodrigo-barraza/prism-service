@@ -138,6 +138,29 @@ describe("Persona Utilities", () => {
       expect(resultPolicy).not.toContain("## Tool Discovery (CRITICAL)");
     });
 
+    it("omits the Tool Discovery section when the trio is in enabledTools but was stripped from the resolved set", () => {
+      // Regression (2026-07-14): the resolver stripped the discovery trio
+      // (no headroom) while Mode-2 resolvedEnabledTools still listed it —
+      // the section rendered and commanded calling a tool that was absent
+      // from the native array, sending models into infinite retry loops.
+      // requiresResolved gates the section strictly on the callable set.
+      mockGetClientToolSchemas.mockReturnValue([
+        { name: "read_file", domain: "Filesystem" },
+      ]);
+
+      const resultPolicy = buildToolPolicy([], {
+        enabledTools: [
+          "read_file",
+          TOOL_NAMES.SEARCH_TOOLS,
+          TOOL_NAMES.ENABLE_TOOLS,
+          TOOL_NAMES.DISCOVER_AND_ENABLE_TOOLS,
+        ],
+        resolvedToolNames: ["read_file"],
+      });
+
+      expect(resultPolicy).not.toContain("## Tool Discovery (CRITICAL)");
+    });
+
     it("expands domainKey-prefixed enabledTools entries when matching section requirements", () => {
       mockGetClientToolSchemas.mockReturnValue([
         { name: "search_discord_messages", domain: "Discord", domainKey: "discord" },

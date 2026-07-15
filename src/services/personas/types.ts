@@ -25,6 +25,13 @@ export interface ToolPolicySection {
   content: string | ((locale: string) => string);
   /** Tool names or prefix globs (e.g. `"discord_*"`). Section is included when ANY match. */
   requires?: string[];
+  /** When true, `requires` matches ONLY against the resolver's final callable
+   *  tool names (`resolvedToolNames`), never the broader enabledTools entries.
+   *  Use for sections that instruct calling a specific tool — the instruction
+   *  must not render when the tool is absent from the native tool array.
+   *  Falls back to the default union when resolvedToolNames is not provided
+   *  (e.g. preview paths). */
+  requiresResolved?: boolean;
 }
 
 /**

@@ -973,11 +973,12 @@ describe("Tool Availability & Enablement", () => {
       // Core agentic tools still present via bypass
       expect(toolNames).toContain("evaluate_expression");
 
-      // Discovery tools are dropped: every remaining catalog tool was
-      // client-disabled (unreachable), so there is no discovery headroom
-      // and enable_tools would be useless.
-      expect(toolNames).not.toContain("enable_tools");
-      expect(toolNames).not.toContain("search_tools");
+      // Discovery tools survive: client-disabled tools are "not currently
+      // enabled", not unreachable — the client prunes its disabledTools list
+      // as tools get enabled, so everything it disabled still counts as
+      // discovery headroom and the trio stays available to re-enable them.
+      expect(toolNames).toContain("enable_tools");
+      expect(toolNames).toContain("search_tools");
 
       // Orchestrator tools still present via bypass
       expect(toolNames).toContain("create_subagents");

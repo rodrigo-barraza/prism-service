@@ -199,6 +199,7 @@ export default class ReActHarness extends BaseAgenticHarness {
     let currentMessages: ConversationMessage[] = [...context.messages];
     let truncationRecoveryCount = 0;
     let emptyOutputRetryCount = 0;
+    let droppedToolFeedbackCount = 0;
     let hasCleanTextBreak = false;
     let hasNonBlockingDispatchBreak = false;
 
@@ -776,6 +777,54 @@ export default class ReActHarness extends BaseAgenticHarness {
             hasNonBlockingDispatchBreak = true;
             break;
           }
+          continue;
+        }
+
+        // ── Dropped tool calls, nothing else usable ─────────────
+        // The model emitted tool calls that were dropped for not being in
+        // the native schema, and produced no surviving calls or text. A
+        // silent drop looks like a no-op to the model — it will retry the
+        // same call forever. Name the unavailable tools explicitly, then
+        // let normal recovery take over if the model keeps insisting.
+        if (
+          pass.droppedToolCallNames?.length &&
+          pass.pendingToolCalls.length === 0 &&
+          !(pass.finalStreamedText || "").trim()
+        ) {
+          droppedToolFeedbackCount++;
+          if (droppedToolFeedbackCount > MAX_EMPTY_OUTPUT_RETRIES) {
+            logger.warn(
+              `[AgenticLoop] Model kept calling unavailable tools after ${droppedToolFeedbackCount - 1} corrections — breaking.`,
+            );
+            injectErrorAsConversationMessage(
+              currentMessages,
+              `Requested tools are not available: ${[...new Set(pass.droppedToolCallNames)].join(", ")}.`,
+              context,
+            );
+            break;
+          }
+          const droppedNames = [...new Set(pass.droppedToolCallNames)];
+          const discoveryAvailable = this.tools.finalTools.some(
+            (tool: ToolSchema) => tool.name === TOOL_NAMES.DISCOVER_AND_ENABLE_TOOLS,
+          );
+          currentMessages.push({
+            role: "assistant",
+            content: pass.finalStreamedText || "",
+            thinking: pass.streamedThinking.trim(),
+            thinkingSignature: pass.thinkingSignature,
+            ...computePassPhaseDurations(pass),
+          });
+          currentMessages.push({
+            role: "system",
+            content: wrapSystemMessage(
+              SYSTEM_MESSAGE_TAGS.VALIDATION_ERRORS,
+              `The following tool(s) are NOT available in this conversation and the call was discarded: ${droppedNames.join(", ")}. ` +
+                (discoveryAvailable
+                  ? `Only call tools present in your tool definitions. To activate additional capabilities, call ${TOOL_NAMES.DISCOVER_AND_ENABLE_TOOLS} with a descriptive query.`
+                  : `Only call tools present in your tool definitions. Tool discovery is not available here — work with your current tools, or tell the user this capability is unavailable.`),
+            ),
+          });
+          this.logIteration(pass, currentMessages);
           continue;
         }
 
