@@ -21,7 +21,7 @@ import { errorMessage } from "@rodrigo-barraza/utilities-library";
  *   decide     — Read-only, blocking. Returns { isApproved: boolean }.
  *                Short-circuits on first deny. For policy enforcement & guardrails.
  *   transform  — Modifying, blocking. Can mutate context/args and return control objects.
- *                Default category for backwards compatibility.
+ *                The default category when a caller does not specify one.
  *
  * Execution order within an event:
  *   1. decide hooks  (blocking — aborts if any deny)
@@ -51,7 +51,7 @@ type HookEvent =
  * Hook category determines execution semantics.
  *   inspect   — fire-and-forget, non-blocking, errors swallowed
  *   decide    — blocking, returns {isApproved}, short-circuits on deny
- *   transform — blocking, can mutate context (default for backwards compat)
+ *   transform — blocking, can mutate context (the default when none is specified)
  */
 type HookCategory = "inspect" | "decide" | "transform";
 
@@ -80,7 +80,7 @@ export default class AgentHooks {
 
   /**
    * Register a named hook for a lifecycle event.
-   * @param category - Hook category (default: "transform" for backwards compat)
+   * @param category - Hook category (defaults to "transform" when omitted)
    */
   register(
     event: HookEvent,
