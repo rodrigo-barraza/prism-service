@@ -65,6 +65,8 @@ router.post(
 /**
  * GET /agent-memories?project=<project>&agent=<agent>&limit=100&skip=0
  * List all agent memories for a project (read-only).
+ * Optional aboutUserId/sourceUserId narrow to Discord memories about or
+ * revealed by a specific user (LUPOS-style memories).
  */
 router.get(
   "/",
@@ -75,6 +77,8 @@ router.get(
       const limit = parseInt(req.query.limit as string) || 100;
       const skip = parseInt(req.query.skip as string) || 0;
       const type = (req.query.type as string) || null;
+      const aboutUserId = (req.query.aboutUserId as string) || undefined;
+      const sourceUserId = (req.query.sourceUserId as string) || undefined;
 
       const result = await MemoryService.list({
         agent: agent as string,
@@ -82,10 +86,36 @@ router.get(
         limit: Number(limit),
         skip: Number(skip),
         type: type ? String(type) : undefined,
+        aboutUserId,
+        sourceUserId,
       });
       res.json(result);
     } catch (error: unknown) {
       logger.error(`[agent-memories] ${getErrorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+/**
+ * GET /agent-memories/facets?project=<project>&agent=<agent>
+ * Distinct memory types and Discord users (about/source) with counts,
+ * for populating the Memories tab filter dropdown.
+ */
+router.get(
+  "/facets",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const project = req.project;
+      const agent = (req.query.agent as string) || undefined;
+
+      const result = await MemoryService.facets({
+        agent,
+        project: project as string,
+      });
+      res.json(result);
+    } catch (error: unknown) {
+      logger.error(`[agent-memories] FACETS ${getErrorMessage(error)}`);
       next(error);
     }
   }),
