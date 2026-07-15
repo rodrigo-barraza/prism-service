@@ -59,6 +59,7 @@ interface ModelTarget {
   toolsEnabled?: boolean;
   agent?: string;
   locale?: string;
+  enabledTools?: string[];
 }
 
 interface ModelEntry {
@@ -69,6 +70,7 @@ interface ModelEntry {
   toolsEnabled: boolean;
   agent?: string;
   locale?: string;
+  enabledTools?: string[];
 }
 
 interface BenchmarkEvent {
@@ -389,6 +391,10 @@ async function runSingleModel(
           functionCallingEnabled: true,
           enabledTools: [TOOL_NAMES.CALCULATE_PRECISE],
         }),
+        ...(model.enabledTools?.length && {
+          functionCallingEnabled: true,
+          enabledTools: model.enabledTools,
+        }),
       },
       (event: SseEvent) => {
         const benchmarkEvent = event as SseEvent & BenchmarkEvent;
@@ -614,6 +620,7 @@ const BenchmarkService = {
           toolsEnabled: tool.toolsEnabled || false,
           ...(tool.agent && { agent: tool.agent }),
           ...(tool.locale && { locale: tool.locale }),
+          ...(tool.enabledTools?.length && { enabledTools: tool.enabledTools }),
         };
       });
     } else {
