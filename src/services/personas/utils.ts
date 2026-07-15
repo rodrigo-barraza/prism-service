@@ -2,6 +2,8 @@ import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { PersonaContext, ToolPolicySection } from "./types.ts";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import PromptLocaleService from "#src/services/PromptLocaleService";
+import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";
+import { resolveBlockedToolNames } from "#src/services/ToolDiscoveryScope";
 
 // ────────────────────────────────────────────────────────────
 // Tool Catalog Introspection Helpers
@@ -22,15 +24,20 @@ function isDiscoverableDomain(domain: string): boolean {
 /**
  * Extract unique discoverable domain names from the tool catalog.
  * Filters out always-on system domains (Core Workspace, Core Harness, etc.)
+ * and any tools in `excludedToolNames` (a persona's blocked tools), so a
+ * scoped agent is never told about domains it cannot reach.
  * Returns a sorted array of domain display names.
  */
-export function extractDiscoverableDomains(): string[] {
+export function extractDiscoverableDomains(
+  excludedToolNames?: ReadonlySet<string>,
+): string[] {
   const schemas = ToolOrchestratorService.getClientToolSchemas();
   const domainSet = new Set<string>();
   for (const schema of schemas) {
     const domain = (schema as Record<string, unknown>).domain as
       | string
       | undefined;
+    if (excludedToolNames?.has(schema.name as string)) continue;
     if (domain && isDiscoverableDomain(domain)) {
       domainSet.add(domain);
     }
@@ -42,8 +49,12 @@ export function extractDiscoverableDomains(): string[] {
  * Build a map of domain → representative humanized tool keywords.
  * Takes up to `maxPerDomain` keywords per domain for concise display.
  * Keywords are derived from tool names with verb prefixes stripped.
+ * Tools in `excludedToolNames` are skipped.
  */
-export function extractDomainKeywords(maxPerDomain = 4): Map<string, string[]> {
+export function extractDomainKeywords(
+  maxPerDomain = 4,
+  excludedToolNames?: ReadonlySet<string>,
+): Map<string, string[]> {
   const schemas = ToolOrchestratorService.getClientToolSchemas();
   const domainToolKeywords = new Map<string, string[]>();
   for (const schema of schemas) {
@@ -51,6 +62,7 @@ export function extractDomainKeywords(maxPerDomain = 4): Map<string, string[]> {
       | string
       | undefined;
     const toolName = schema.name as string;
+    if (excludedToolNames?.has(toolName)) continue;
     if (domain && isDiscoverableDomain(domain) && toolName) {
       if (!domainToolKeywords.has(domain)) {
         domainToolKeywords.set(domain, []);
@@ -71,14 +83,23 @@ export function extractDomainKeywords(maxPerDomain = 4): Map<string, string[]> {
 /**
  * Build the tool discovery system prompt section at runtime.
  * Domain list, tool count, and trigger examples are all derived
- * from the live catalog — nothing is hardcoded.
+ * from the live catalog — nothing is hardcoded. When the assembling
+ * persona has blockedTools, the counts, domains, and examples are
+ * scoped to the universe that persona can actually reach.
  */
-function buildToolDiscoveryContent(locale: string): string {
-  const totalToolCount = ToolOrchestratorService.getClientToolSchemas().length;
-  const discoverableDomains = extractDiscoverableDomains();
+function buildToolDiscoveryContent(
+  locale: string,
+  context?: PersonaContext,
+): string {
+  const schemas = ToolOrchestratorService.getClientToolSchemas();
+  const blockedToolNames = resolveBlockedToolNames(context?._persona, schemas);
+  const totalToolCount = schemas.filter(
+    (schema) => !blockedToolNames.has(schema.name as string),
+  ).length;
+  const discoverableDomains = extractDiscoverableDomains(blockedToolNames);
   const domainList = discoverableDomains.join(", ");
 
-  const domainKeywords = extractDomainKeywords(4);
+  const domainKeywords = extractDomainKeywords(4, blockedToolNames);
   const triggerExampleLines = [...domainKeywords.entries()]
     .map(([domain, keywords]) => {
       const quotedKeywords = keywords
@@ -136,8 +157,12 @@ function buildToolDiscoveryContent(locale: string): string {
   return `${headerLine}\n${introLine}\n\n${domainsHeader}\n${domainList}\n\n${searchRule}\n${searchSteps}\n\n${noFallback}\n\n${intentHeader}\n${intentRules}\n\n${triggerHeader}\n${triggerExampleLines}`;
 }
 
+// Gated on the Core Discover tools being present in the agent's resolved
+// tool set. AgenticToolResolver includes them iff the agent has discovery
+// headroom (more tools available than enabled), so this section renders
+// exactly when the agent can actually discover something.
 const TOOL_DISCOVERY_POLICY_SECTION: ToolPolicySection & {
-  dynamicContent?: (locale: string) => string;
+  dynamicContent?: (locale: string, context?: PersonaContext) => string;
 } = {
   content: "",
   dynamicContent: buildToolDiscoveryContent,
@@ -207,7 +232,26 @@ export function buildToolPolicy(
     AUDIO_TRACKER_POLICY_SECTION,
     ...sections,
   ];
-  const enabled = new Set(context.enabledTools || []);
+
+  // The effective callable set: the resolver's final tool names (which
+  // include core-locked and innate discovery tools) unioned with the
+  // enabledTools entries, expanded when they use domain:/domainKey:
+  // prefixes so sections gated on a concrete tool name (e.g.
+  // "search_discord_messages") match a persona that enables the whole
+  // domain (e.g. "domainKey:discord").
+  const enabledEntries = context.enabledTools || [];
+  const hasPrefixedEntries = enabledEntries.some(
+    (entry) => entry.startsWith("domain:") || entry.startsWith("domainKey:"),
+  );
+  const enabled = hasPrefixedEntries
+    ? resolveToolEntriesToSet(
+        enabledEntries,
+        ToolOrchestratorService.getClientToolSchemas(),
+      )
+    : new Set(enabledEntries);
+  for (const toolName of context.resolvedToolNames || []) {
+    enabled.add(toolName);
+  }
   const enabledArray = [...enabled];
 
   const filtered = allSections.filter((section) => {
@@ -224,10 +268,10 @@ export function buildToolPolicy(
   return filtered
     .map((section) => {
       const dynamicSection = section as ToolPolicySection & {
-        dynamicContent?: (locale: string) => string;
+        dynamicContent?: (locale: string, context?: PersonaContext) => string;
       };
       if (dynamicSection.dynamicContent)
-        return dynamicSection.dynamicContent(locale);
+        return dynamicSection.dynamicContent(locale, context);
       if (typeof section.content === "function") return section.content(locale);
       return section.content;
     })

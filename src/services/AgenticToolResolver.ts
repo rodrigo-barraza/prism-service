@@ -15,6 +15,11 @@ import {
 import { MODALITY_TYPES } from "#src/config";
 import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";
 import {
+  DISCOVERY_TOOL_NAMES,
+  hasDiscoveryHeadroom,
+  isDiscoveryTool,
+} from "./ToolDiscoveryScope.ts";
+import {
   THINKING_PATTERNS,
   LOCAL_PROVIDER_TYPES,
 } from "./local-provider/constants.ts";
@@ -235,6 +240,11 @@ export default class AgenticToolResolver {
       }
     }
 
+    // Tools the agent cannot reach in this context no matter what it
+    // enables — accumulated by the filters below and consulted by the
+    // innate-discovery headroom check so they never count as discoverable.
+    const unreachableToolNames = new Set<string>();
+
     let finalTools = dynamicTools;
     if (resolvedEnabledTools && Array.isArray(resolvedEnabledTools)) {
       const hasPrefixed = resolvedEnabledTools.some(
@@ -325,6 +335,9 @@ export default class AgenticToolResolver {
       finalTools = finalTools.filter(
         (tool) => !CORE_ORCHESTRATOR_TOOLS.has(tool.name),
       );
+      for (const toolName of CORE_ORCHESTRATOR_TOOLS) {
+        unreachableToolNames.add(toolName);
+      }
     }
 
     // ── Workspace domain exclusion ─────────────────────────────────
@@ -341,6 +354,9 @@ export default class AgenticToolResolver {
       finalTools = finalTools.filter(
         (tool) => !workspaceToolNames.has(tool.name),
       );
+      for (const toolName of workspaceToolNames) {
+        unreachableToolNames.add(toolName as string);
+      }
       if (finalTools.length < previousCount) {
         logger.info(
           `[AgenticToolResolver] Workspace disabled: removed ${previousCount - finalTools.length} workspace-domain tools`,
@@ -353,18 +369,21 @@ export default class AgenticToolResolver {
       finalTools = finalTools.filter(
         (tool) => tool.name !== TOOL_NAMES.SEARCH_WEB,
       );
+      unreachableToolNames.add(TOOL_NAMES.SEARCH_WEB);
     }
 
     if (modelDefinition?.outputTypes?.includes(MODALITY_TYPES.IMAGE)) {
       finalTools = finalTools.filter(
         (tool) => tool.name !== TOOL_NAMES.GENERATE_IMAGE,
       );
+      unreachableToolNames.add(TOOL_NAMES.GENERATE_IMAGE);
     }
 
     if (modelDefinition?.inputTypes?.includes(MODALITY_TYPES.IMAGE)) {
       finalTools = finalTools.filter(
         (tool) => tool.name !== TOOL_NAMES.DESCRIBE_IMAGE,
       );
+      unreachableToolNames.add(TOOL_NAMES.DESCRIBE_IMAGE);
     }
 
     // When the model has native thinking as a built-in capability, the think
@@ -378,6 +397,62 @@ export default class AgenticToolResolver {
     );
     if (hasNativeThinking) {
       finalTools = finalTools.filter((tool) => tool.name !== TOOL_NAMES.THINK);
+      unreachableToolNames.add(TOOL_NAMES.THINK);
+    }
+
+    // ── Innate tool discovery ────────────────────────────────────
+    // Discovery is not persona-opt-in: any agent whose reachable universe
+    // (catalog minus persona blockedTools, minus context-unreachable and
+    // client-disabled tools) exceeds its current tool set keeps the Core
+    // Discover tools — even when a persona blocklist would strip them.
+    // Conversely, an agent with nothing left to discover drops them, which
+    // also drops the tool-discovery system-prompt section (it is gated on
+    // their presence in the resolved set).
+    {
+      if (options.disabledTools && Array.isArray(options.disabledTools)) {
+        for (const toolName of options.disabledTools) {
+          unreachableToolNames.add(toolName);
+        }
+      }
+
+      const discoveryPersona = agent ? AgentPersonaRegistry.get(agent) : null;
+      const catalogSchemas =
+        ToolOrchestratorService.getClientToolSchemas(defaultTopology) || [];
+      const finalToolNames = new Set(finalTools.map((tool) => tool.name));
+      const discoveryHeadroom = hasDiscoveryHeadroom(
+        discoveryPersona,
+        catalogSchemas,
+        finalToolNames,
+        unreachableToolNames,
+      );
+
+      if (discoveryHeadroom) {
+        const restoredTools: string[] = [];
+        for (const discoveryToolName of DISCOVERY_TOOL_NAMES) {
+          if (finalToolNames.has(discoveryToolName)) continue;
+          if (unreachableToolNames.has(discoveryToolName)) continue;
+          const schema = dynamicTools.find(
+            (tool) => tool.name === discoveryToolName,
+          );
+          if (schema) {
+            finalTools.push(schema);
+            restoredTools.push(discoveryToolName);
+          }
+        }
+        if (restoredTools.length > 0) {
+          logger.info(
+            `[AgenticToolResolver] Discovery headroom for agent "${agent}" — restored innate discovery tools: [${restoredTools.join(", ")}]`,
+          );
+        }
+      } else {
+        const previousCount = finalTools.length;
+        finalTools = finalTools.filter((tool) => !isDiscoveryTool(tool.name));
+        if (finalTools.length < previousCount) {
+          logger.info(
+            `[AgenticToolResolver] No discovery headroom for agent "${agent || "DIRECT"}" — removed ${previousCount - finalTools.length} discovery tools`,
+          );
+        }
+      }
     }
 
     logger.info(`[AgenticToolResolver] Final: ${finalTools.length} tools`);

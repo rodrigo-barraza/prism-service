@@ -64,6 +64,8 @@ export interface InternalToolContext {
   agentConversationId?: string;
   project?: string;
   username?: string;
+  /** Persona id of the calling agent — used to scope tool discovery/activation to the persona's reachable universe. */
+  agent?: string | null;
   isSubAgent?: boolean;
   enabledTools?: string[];
 }

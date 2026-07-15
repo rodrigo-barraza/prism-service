@@ -348,8 +348,14 @@ describe("Tool Count Sync — Sidebar ↔ System Prompt", () => {
     const inClientNotResolver = [...clientNames].filter((name) => !resolverNames.has(name));
 
     expect(inResolverNotClient).toEqual([]);
-    expect(inClientNotResolver).toEqual([]);
-    expect(finalTools.length).toBe(clientSchemas.length);
+
+    // Expected divergence: with EVERY catalog tool already enabled, the
+    // wildcard persona has no discovery headroom, so the resolver drops the
+    // Core Discover trio (search_tools / enable_tools /
+    // discover_and_enable_tools) — there is nothing left to discover.
+    const DISCOVERY_TRIO = new Set(["search_tools", "enable_tools", "discover_and_enable_tools"]);
+    expect(inClientNotResolver.every((name) => DISCOVERY_TRIO.has(name))).toBe(true);
+    expect(finalTools.length).toBe(clientSchemas.length - inClientNotResolver.length);
   });
 
   // ── Count parity for restricted persona (coreToolsLocked) ──
@@ -439,7 +445,11 @@ describe("Tool Count Sync — Sidebar ↔ System Prompt", () => {
       const orchestratorSet = new Set<string>(CORE_ORCHESTRATOR_TOOLS);
       const isOrchestrator = orchestratorSet.has(toolName);
       const isInternal = MOCK_INTERNAL_NAMES.has(toolName);
-      expect(isOrchestrator || isInternal).toBe(true);
+      // Innate discovery: the resolver also keeps the Core Discover tools
+      // for any persona with headroom (catalog tools outside its enabled
+      // set), regardless of coreToolsLocked.
+      const isDiscovery = ["search_tools", "enable_tools", "discover_and_enable_tools"].includes(toolName);
+      expect(isOrchestrator || isInternal || isDiscovery).toBe(true);
     }
   });
 

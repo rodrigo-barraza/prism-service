@@ -107,6 +107,77 @@ describe("Persona Utilities", () => {
       expect(resultPolicy).not.toContain("Write-only guidelines content.");
       expect(resultPolicy).not.toContain("## Tool Discovery (CRITICAL)");
     });
+
+    it("renders the Tool Discovery section when the Core Discover tools are in resolvedToolNames", () => {
+      mockGetClientToolSchemas.mockReturnValue([
+        { name: "read_file", domain: "Filesystem" },
+        { name: "get_weather", domain: "Weather" },
+      ]);
+
+      // The resolver includes search_tools/discover_and_enable_tools iff the
+      // agent has discovery headroom — the prompt section simply follows
+      // their presence in the final (callable) tool set.
+      const resultPolicy = buildToolPolicy([], {
+        enabledTools: ["read_file"],
+        resolvedToolNames: ["read_file", TOOL_NAMES.SEARCH_TOOLS, TOOL_NAMES.DISCOVER_AND_ENABLE_TOOLS],
+      });
+
+      expect(resultPolicy).toContain("## Tool Discovery (CRITICAL)");
+    });
+
+    it("omits the Tool Discovery section when the Core Discover tools are absent from the resolved set", () => {
+      mockGetClientToolSchemas.mockReturnValue([
+        { name: "read_file", domain: "Filesystem" },
+      ]);
+
+      const resultPolicy = buildToolPolicy([], {
+        enabledTools: ["read_file"],
+        resolvedToolNames: ["read_file"],
+      });
+
+      expect(resultPolicy).not.toContain("## Tool Discovery (CRITICAL)");
+    });
+
+    it("expands domainKey-prefixed enabledTools entries when matching section requirements", () => {
+      mockGetClientToolSchemas.mockReturnValue([
+        { name: "search_discord_messages", domain: "Discord", domainKey: "discord" },
+        { name: "send_discord_message", domain: "Discord", domainKey: "discord" },
+      ]);
+
+      const customSections = [
+        {
+          content: "Discord guidelines content.",
+          requires: ["search_discord_messages"],
+        },
+      ];
+
+      const resultPolicy = buildToolPolicy(customSections, {
+        enabledTools: ["domainKey:discord"],
+      });
+
+      expect(resultPolicy).toContain("Discord guidelines content.");
+    });
+
+    it("scopes Tool Discovery counts and domains to the persona's reachable universe", () => {
+      mockGetClientToolSchemas.mockReturnValue([
+        { name: "read_file", domain: "Filesystem", domainKey: "filesystem" },
+        { name: "get_weather", domain: "Weather", domainKey: "weather" },
+        { name: "get_stock_price", domain: "Finance", domainKey: "finance" },
+      ]);
+
+      const resultPolicy = buildToolPolicy([], {
+        enabledTools: [],
+        resolvedToolNames: [TOOL_NAMES.SEARCH_TOOLS, TOOL_NAMES.DISCOVER_AND_ENABLE_TOOLS],
+        _persona: { blockedTools: ["domainKey:finance"] } as never,
+      });
+
+      // Finance is blocked for this persona — its domain must not be
+      // advertised as discoverable, and the tool count excludes it.
+      expect(resultPolicy).toContain("## Tool Discovery (CRITICAL)");
+      expect(resultPolicy).toContain("You have access to 2 tools");
+      expect(resultPolicy).toContain("Filesystem");
+      expect(resultPolicy).not.toContain("Finance");
+    });
   });
 
   describe("getToolPolicyAddendum", () => {

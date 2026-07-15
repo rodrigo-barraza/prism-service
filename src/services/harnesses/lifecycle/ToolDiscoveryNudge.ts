@@ -7,6 +7,9 @@ import {
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 import ToolContext from "#src/services/ToolContext";
+import ToolOrchestratorService from "#src/services/tool-orchestrator/ToolOrchestratorService";
+import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
+import { partitionByDiscoverableUniverse } from "#src/services/ToolDiscoveryScope";
 
 import type {
   ToolCall,
@@ -55,10 +58,24 @@ export function injectToolDiscoveryNudge(
       | undefined;
     if (!Array.isArray(searchMatches)) continue;
 
-    const disabledToolNames = searchMatches
+    let disabledToolNames = searchMatches
       .filter((matchEntry) => matchEntry.isEnabled === false)
       .map((matchEntry) => matchEntry.name)
       .filter(Boolean) as string[];
+
+    // Never nudge toward (or auto-enable) tools outside the persona's
+    // reachable universe — the resolver would strip them anyway.
+    if (disabledToolNames.length > 0 && context.agent) {
+      const persona = AgentPersonaRegistry.get(context.agent);
+      if (persona?.blockedTools?.length) {
+        const { allowed } = partitionByDiscoverableUniverse(
+          persona,
+          ToolOrchestratorService.getClientToolSchemas(),
+          disabledToolNames,
+        );
+        disabledToolNames = allowed;
+      }
+    }
 
     if (disabledToolNames.length === 0) continue;
 

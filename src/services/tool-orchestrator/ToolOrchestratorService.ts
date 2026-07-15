@@ -2,6 +2,7 @@ import { TOOLS_SERVICE_URL } from "#config";
 import { IDENTITY_HEADERS } from "@rodrigo-barraza/utilities-library/service";
 import MCPClientService from "#src/services/MCPClientService";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
+import { partitionByDiscoverableUniverse } from "#src/services/ToolDiscoveryScope";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { ORCHESTRATOR_ONLY_TOOLS } from "#src/services/OrchestratorPrompt";
@@ -1784,6 +1785,42 @@ export default class ToolOrchestratorService {
       context,
     )) as unknown as TransformedSearchToolsResult;
 
+    // Scope results to the calling persona's reachable universe — matches
+    // on the persona denylist are dropped so a scoped agent never sees
+    // tools it cannot enable. Applied before the MCP merge so every
+    // return path below carries the filtered set.
+    const scopePersona = context.agent
+      ? AgentPersonaRegistry.get(context.agent)
+      : null;
+    if (
+      scopePersona?.blockedTools?.length &&
+      Array.isArray(toolsApiResult?.matches)
+    ) {
+      const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
+      const { blocked } = partitionByDiscoverableUniverse(
+        scopePersona,
+        clientSchemas,
+        toolsApiResult.matches.map(
+          (matchEntry) => matchEntry.name as string,
+        ),
+      );
+      if (blocked.length > 0) {
+        const blockedSet = new Set(blocked);
+        toolsApiResult.matches = toolsApiResult.matches.filter(
+          (matchEntry) => !blockedSet.has(matchEntry.name as string),
+        );
+        if (typeof toolsApiResult.total === "number") {
+          toolsApiResult.total = Math.max(
+            0,
+            toolsApiResult.total - blocked.length,
+          );
+        }
+        logger.info(
+          `[ToolOrchestrator] search_tools: agent=${context.agent} filtered ${blocked.length} out-of-universe matches`,
+        );
+      }
+    }
+
     const mcpSchemas = MCPClientService.getToolSchemas();
     if (mcpSchemas.length === 0) return toolsApiResult;
 
@@ -1826,7 +1863,7 @@ export default class ToolOrchestratorService {
       ? new Set(enabledToolsArray)
       : null;
 
-    const mcpMatches = indexResults.map((matchEntry) => ({
+    let mcpMatches = indexResults.map((matchEntry) => ({
       name: matchEntry.document.name,
       description: matchEntry.document.description,
       domain:
@@ -1837,6 +1874,22 @@ export default class ToolOrchestratorService {
         isEnabled: enabledToolsSet.has(matchEntry.document.name),
       }),
     }));
+
+    // Same persona universe scoping for MCP matches as for catalog matches.
+    if (scopePersona?.blockedTools?.length && mcpMatches.length > 0) {
+      const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
+      const { blocked } = partitionByDiscoverableUniverse(
+        scopePersona,
+        clientSchemas,
+        mcpMatches.map((matchEntry) => matchEntry.name),
+      );
+      if (blocked.length > 0) {
+        const blockedSet = new Set(blocked);
+        mcpMatches = mcpMatches.filter(
+          (matchEntry) => !blockedSet.has(matchEntry.name),
+        );
+      }
+    }
 
     const existingMatches = Array.isArray(toolsApiResult.matches)
       ? (toolsApiResult.matches as TransformedSearchToolsResult["matches"])

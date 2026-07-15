@@ -10,6 +10,8 @@ import {
   extractDiscoverableDomains,
   extractDomainKeywords,
 } from "#src/services/personas/utils";
+import { partitionByDiscoverableUniverse } from "#src/services/ToolDiscoveryScope";
+import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 
 import { InternalToolContext } from "./InternalToolRegistry.ts";
 import { TOOLS } from "#src/constants";
@@ -216,6 +218,7 @@ const discoverAndEnableTools = {
       {
         project: context.project,
         username: context.username,
+        agent: context.agent,
         agentConversationId: agentConversationId,
         enabledTools: context.enabledTools || [],
       },
@@ -268,7 +271,32 @@ const discoverAndEnableTools = {
       }
     }
 
-    const matches = searchResult.matches;
+    let matches = searchResult.matches;
+
+    // Scope discovery to the persona's reachable universe: matches on the
+    // persona denylist are dropped entirely, so the agent never sees —
+    // let alone enables — tools it cannot reach.
+    if (Array.isArray(matches) && matches.length > 0 && context.agent) {
+      const persona = AgentPersonaRegistry.get(context.agent);
+      if (persona?.blockedTools?.length) {
+        const clientSchemas =
+          getToolOrchestratorService().getClientToolSchemas();
+        const { blocked } = partitionByDiscoverableUniverse(
+          persona,
+          clientSchemas,
+          matches.map((matchEntry) => matchEntry.name),
+        );
+        if (blocked.length > 0) {
+          const blockedSet = new Set(blocked);
+          matches = matches.filter(
+            (matchEntry) => !blockedSet.has(matchEntry.name),
+          );
+          logger.info(
+            `[DiscoverAndEnable] agent=${context.agent} filtered ${blocked.length} out-of-universe matches: [${blocked.join(", ")}]`,
+          );
+        }
+      }
+    }
 
     if (!Array.isArray(matches) || matches.length === 0) {
       return {
