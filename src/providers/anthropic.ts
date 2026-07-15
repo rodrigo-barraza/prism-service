@@ -776,7 +776,9 @@ const anthropicProvider = {
           effort: options.reasoningEffort,
         };
       }
-      payload.temperature = 1;
+      // Sampling params are deprecated on adaptive-thinking models — omit
+      // entirely rather than sending the tolerated default value.
+      delete payload.temperature;
       delete payload.top_p;
       delete payload.top_k;
     } else if (
@@ -1008,7 +1010,9 @@ const anthropicProvider = {
             effort: options.reasoningEffort,
           };
         }
-        streamPayload.temperature = 1;
+        // Sampling params are deprecated on adaptive-thinking models — omit
+        // entirely rather than sending the tolerated default value.
+        delete streamPayload.temperature;
         delete streamPayload.top_p;
         delete streamPayload.top_k;
       } else if (
