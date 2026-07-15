@@ -2,6 +2,10 @@ import type { PolicyRule } from "#src/services/PolicyEngine";
 
 export interface PersonaContext {
   enabledTools?: string[];
+  /** Final resolved (callable) tool names from AgenticToolResolver — includes core-locked and innate discovery tools. Policy sections gate on these, so the prompt only ever references tools the model can actually call. */
+  resolvedToolNames?: string[];
+  /** The persona being assembled — injected by SystemPromptAssembler so shared policy builders can scope catalog-derived content (tool counts, domains) to it. */
+  _persona?: Persona;
   agentContext?: Record<string, unknown>;
   locale?: string;
   [key: string]: unknown;

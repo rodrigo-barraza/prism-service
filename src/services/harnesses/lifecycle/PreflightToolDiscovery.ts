@@ -107,6 +107,9 @@ export async function runPreflightToolDiscovery({
       {
         project: context.project,
         username: context.username,
+        // Persona id scopes the search to the agent's reachable universe —
+        // blocked-domain tools are filtered from matches server-side.
+        agent: context.agent,
         agentConversationId,
         enabledTools: resolvedTools.resolvedEnabledTools,
       },

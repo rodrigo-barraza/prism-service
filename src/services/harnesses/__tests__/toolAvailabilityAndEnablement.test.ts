@@ -246,6 +246,15 @@ const blockedToolsPersona = {
   blockedTools: ["domainKey:creative", "get_stock_price"],
 };
 
+// Persona that blocks the discovery tools' own domains — innate discovery
+// must restore them anyway while it still has headroom.
+const discoveryBlockedPersona = {
+  id: "NO_DISCOVER_AGENT",
+  availableTools: ["get_weather"],
+  coreToolsLocked: true,
+  blockedTools: ["domainKey:tools", "domainKey:meta"],
+};
+
 vi.mock("#src/services/AgentPersonaRegistry", () => ({
   default: {
     get: vi.fn((agentId: string) => {
@@ -253,6 +262,7 @@ vi.mock("#src/services/AgentPersonaRegistry", () => ({
       if (agentId === "UNLOCKED_AGENT") return restrictedPersona;
       if (agentId === "DOMAIN_AGENT") return domainPersona;
       if (agentId === "SAFE_AGENT") return blockedToolsPersona;
+      if (agentId === "NO_DISCOVER_AGENT") return discoveryBlockedPersona;
       return null;
     }),
   },
@@ -308,6 +318,7 @@ describe("Tool Availability & Enablement", () => {
       if (agentId === "UNLOCKED_AGENT") return restrictedPersona;
       if (agentId === "DOMAIN_AGENT") return domainPersona;
       if (agentId === "SAFE_AGENT") return blockedToolsPersona;
+      if (agentId === "NO_DISCOVER_AGENT") return discoveryBlockedPersona;
       return null;
     });
     (InternalToolRegistry.getNames as ReturnType<typeof vi.fn>).mockReturnValue(
@@ -395,8 +406,12 @@ describe("Tool Availability & Enablement", () => {
 
       // Core agentic tools should NOT be bypassed for restricted persona
       expect(toolNames).not.toContain("evaluate_expression");
-      expect(toolNames).not.toContain("search_tools");
-      expect(toolNames).not.toContain("enable_tools");
+
+      // EXCEPT the discovery tools: discovery is innate for any agent with
+      // headroom (catalog tools outside its enabled set), even when
+      // coreToolsLocked is false.
+      expect(toolNames).toContain("search_tools");
+      expect(toolNames).toContain("enable_tools");
     });
 
     it("applies blockedTools denylist when enabledTools filter is active", async () => {
@@ -955,7 +970,12 @@ describe("Tool Availability & Enablement", () => {
 
       // Core agentic tools still present via bypass
       expect(toolNames).toContain("evaluate_expression");
-      expect(toolNames).toContain("enable_tools");
+
+      // Discovery tools are dropped: every remaining catalog tool was
+      // client-disabled (unreachable), so there is no discovery headroom
+      // and enable_tools would be useless.
+      expect(toolNames).not.toContain("enable_tools");
+      expect(toolNames).not.toContain("search_tools");
 
       // Orchestrator tools still present via bypass
       expect(toolNames).toContain("create_subagents");
@@ -963,6 +983,66 @@ describe("Tool Availability & Enablement", () => {
       // Disabled tools should be excluded
       expect(toolNames).not.toContain("get_stock_price");
       expect(toolNames).not.toContain("read_file");
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────
+  // 12b. Innate Tool Discovery
+  // ────────────────────────────────────────────────────────────
+  // Discovery is not persona-opt-in: the Core Discover tools are present
+  // iff the agent has headroom (catalog tools outside its enabled set and
+  // persona denylist), and the discovery system-prompt section follows
+  // their presence.
+
+  describe("innate tool discovery", () => {
+    it("restores discovery tools for a persona that blocks their domains while it has headroom", async () => {
+      const { finalTools } = await AgenticToolResolver.resolve({
+        options: {},
+        agent: "NO_DISCOVER_AGENT",
+        project: "test",
+        username: "rodrigo",
+      });
+
+      const toolNames = extractToolNames(finalTools);
+
+      // blockedTools covers domainKey:tools (enable/disable) and
+      // domainKey:meta (search_tools) — but the persona only has
+      // get_weather enabled, so discovery headroom restores the trio.
+      expect(toolNames).toContain("search_tools");
+      expect(toolNames).toContain("enable_tools");
+
+      // disable_tools is not part of the innate trio — the persona block
+      // still applies to it.
+      expect(toolNames).not.toContain("disable_tools");
+
+      // Blocked-by-domain tools are otherwise still stripped.
+      expect(toolNames).toContain("get_weather");
+    });
+
+    it("drops discovery tools for a wildcard persona whose only unreached tools are its own blocked ones", async () => {
+      // SAFE_AGENT enables the whole catalog except domainKey:creative and
+      // get_stock_price — blocked tools never count as headroom, so there
+      // is nothing discoverable and the trio is removed. (The blocked tools
+      // are deliberately NOT in enabledTools: explicit inclusion would
+      // override blockedTools by design.)
+      const blockedNames = new Set(["generate_image", "describe_image", "get_stock_price"]);
+      const { finalTools } = await AgenticToolResolver.resolve({
+        options: {
+          enabledTools: MOCK_CLIENT_SCHEMAS.map((tool) => tool.name).filter(
+            (name) => !blockedNames.has(name),
+          ),
+        },
+        agent: "SAFE_AGENT",
+        project: "test",
+        username: "rodrigo",
+      });
+
+      const toolNames = extractToolNames(finalTools);
+
+      expect(toolNames).not.toContain("generate_image");
+      expect(toolNames).not.toContain("get_stock_price");
+      expect(toolNames).not.toContain("search_tools");
+      expect(toolNames).not.toContain("enable_tools");
     });
   });
 

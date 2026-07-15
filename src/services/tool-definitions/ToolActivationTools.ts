@@ -8,6 +8,8 @@ import {
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
 import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";
+import { partitionByDiscoverableUniverse } from "#src/services/ToolDiscoveryScope";
+import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 import SettingsService from "#src/services/SettingsService";
 import { TOOLS } from "#src/constants";
 import { InternalToolContext } from "./InternalToolRegistry.ts";
@@ -113,11 +115,33 @@ const enableTools = {
       };
     }
 
+    // Scope activation to the persona's reachable universe — tools on the
+    // persona denylist cannot be enabled, no matter how they were requested.
+    const persona = context.agent ? AgentPersonaRegistry.get(context.agent) : null;
+    const { allowed: reachableRequestedNames, blocked: unavailableToolNames } =
+      partitionByDiscoverableUniverse(persona, clientSchemas, [
+        ...resolvedRequestedNames,
+      ]);
+    if (unavailableToolNames.length > 0) {
+      logger.info(
+        `[ToolActivation] enable_tools: agent=${context.agent} requested ${unavailableToolNames.length} tools outside its universe: [${unavailableToolNames.join(", ")}]`,
+      );
+    }
+    if (reachableRequestedNames.length === 0) {
+      return {
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.enable_tools.notAvailable",
+          { toolNames: unavailableToolNames.join(", ") },
+        ),
+      };
+    }
+
     const currentDynamicTools = getCurrentDynamicTools(agentConversationId);
     const mergedToolSet = new Set(currentDynamicTools);
     const newlyActivatedTools: string[] = [];
 
-    for (const toolName of resolvedRequestedNames) {
+    for (const toolName of reachableRequestedNames) {
       if (!mergedToolSet.has(toolName)) {
         mergedToolSet.add(toolName);
         newlyActivatedTools.push(toolName);
@@ -132,6 +156,9 @@ const enableTools = {
           "internal-tools-runtime.enable_tools.alreadyEnabled",
         ),
         enabledToolCount: mergedToolSet.size,
+        ...(unavailableToolNames.length > 0 && {
+          notAvailable: unavailableToolNames,
+        }),
       };
     }
 
@@ -160,6 +187,9 @@ const enableTools = {
       success: true,
       activated: cappedActivatedTools,
       totalEnabled: mergedToolSet.size,
+      ...(unavailableToolNames.length > 0 && {
+        notAvailable: unavailableToolNames,
+      }),
       ...(droppedTools.length > 0 && {
         dropped: droppedTools,
         droppedReason: `Only ${maxPerActivation} tools can be enabled per call to avoid exceeding the model's context window. Call enable_tools again for the remaining tools if needed.`,

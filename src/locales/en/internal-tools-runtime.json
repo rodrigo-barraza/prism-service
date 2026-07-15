@@ -9,7 +9,8 @@
   "enable_tools": {
     "noValidTools": "None of the requested entries resolved to valid tool names. Check spelling or use search_tools to discover available tools.",
     "alreadyEnabled": "All requested tools are already enabled and available — you can call them directly right now.",
-    "activated": "Activated {{count}} tool(s). They will be available on the next iteration."
+    "activated": "Activated {{count}} tool(s). They will be available on the next iteration.",
+    "notAvailable": "None of the requested tools are available to this agent: {{toolNames}}. They are outside this agent's tool universe and cannot be enabled."
   },
 
   "disable_tools": {

@@ -297,9 +297,12 @@ export default class SystemPromptAssembler {
 
     // ── 3. Tool Policy (persona-specific) ────────────────────────
     if (persona?.toolPolicy) {
+      // _persona lets shared policy builders (buildToolPolicy) scope
+      // catalog-derived content (discovery tool counts/domains) to the
+      // persona's reachable universe without a registry lookup.
       const policyText =
         typeof persona.toolPolicy === "function"
-          ? persona.toolPolicy({ ...context, locale })
+          ? persona.toolPolicy({ ...context, locale, _persona: persona })
           : persona.toolPolicy;
       if (policyText) sections.push(wrapSection(SYSTEM_PROMPT_SECTIONS.TOOL_POLICY, policyText));
     }

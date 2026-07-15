@@ -9,7 +9,8 @@
   "enable_tools": {
     "noValidTools": "No match found. Check spelling or use search_tools.",
     "alreadyEnabled": "All requested already enabled — use now.",
-    "activated": "Enabled {{count}} tool. Ready next turn."
+    "activated": "Enabled {{count}} tool. Ready next turn.",
+    "notAvailable": "These tools not for you: {{toolNames}}. Cannot enable."
   },
 
   "disable_tools": {

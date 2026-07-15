@@ -227,7 +227,6 @@ export const LuposPersona: Persona = {
   project: "lupos",
   avatar: "/lupos-agent-avatar.png",
   color: "#7c3aed",
-  compactToolDocs: true,
   identity: (context) => {
     const isAprilFools = context?.agentContext?.aprilFoolsMode === true;
     const isClockCrew = context?.agentContext?.guildId === "249010731910037507";
@@ -270,12 +269,14 @@ export const LuposPersona: Persona = {
   },
   toolPolicy: (context) => buildToolPolicy(LUPOS_TOOL_POLICY_SECTIONS, context),
   availableTools: LUPOS_AVAILABLE_TOOLS,
+  // CORE_DISCOVER is deliberately NOT blocked: Lupos starts lean (see
+  // enabledByDefaultTools) and relies on innate tool discovery to reach
+  // the rest of his availableTools mid-conversation.
   blockedTools: [
     DOMAIN_KEY_TAGS.CORE_ORCHESTRATOR,
     DOMAIN_KEY_TAGS.CORE_WORKSPACE,
     DOMAIN_KEY_TAGS.CORE_SCHEDULE,
     DOMAIN_KEY_TAGS.CORE_USER,
-    DOMAIN_KEY_TAGS.CORE_DISCOVER,
     DOMAIN_KEY_TAGS.CORE_PLAN,
     DOMAIN_KEY_TAGS.SKILLS,
     DOMAIN_KEY_TAGS.CONTROL,
@@ -287,7 +288,15 @@ export const LuposPersona: Persona = {
     DOMAIN_KEY_TAGS.BROWSER,
     DOMAIN_KEY_TAGS.META,
   ],
-  enabledByDefaultTools: ["*"],
+  // Lean first-iteration set — his conversational signature (Discord
+  // platform tools + generative art/audio/voice). Everything else in
+  // LUPOS_AVAILABLE_TOOLS is reachable via discovery or pre-flight.
+  enabledByDefaultTools: [
+    DOMAIN_KEY_TAGS.DISCORD,
+    TOOL_NAMES.GENERATE_IMAGE,
+    TOOL_NAMES.GENERATE_AUDIO,
+    TOOL_NAMES.SYNTHESIZE_SPEECH,
+  ],
   capabilities: "",
   hasSomaticState: true,
   usesDirectoryTree: false,
