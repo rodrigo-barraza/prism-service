@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { PROVIDERS } from "#src/constants";
 import { runTreeOfThoughts } from "#src/services/harnesses/strategies/TreeOfThoughtsStrategy";
-import BaseAgenticHarness from "#src/services/harnesses/BaseAgenticHarness";
-import { APPROVAL_TIERS } from "#src/services/AutoApprovalEngine";
 import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { runExhaustionRecoveryPass } from "#src/services/harnesses/lifecycle/ExhaustionRecovery";
 import { validateAfterToolExecution } from "#src/services/harnesses/lifecycle/ValidationInterceptor";

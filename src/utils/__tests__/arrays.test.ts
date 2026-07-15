@@ -26,7 +26,7 @@ describe("Arrays (Arena Scores Map)", () => {
   });
 
   it("should verify that scores are integers", () => {
-    for (const [modelName, score] of Object.entries(ARENA_SCORES.text)) {
+    for (const [, score] of Object.entries(ARENA_SCORES.text)) {
       expect(typeof score).toBe("number");
       expect(Number.isInteger(score)).toBe(true);
     }

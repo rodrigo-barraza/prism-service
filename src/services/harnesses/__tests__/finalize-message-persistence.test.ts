@@ -210,10 +210,6 @@ describe("newTurnMessages slice — compaction mid-loop (BUG SCENARIO)", () => {
         ],
       },
     ];
-    // After compaction, originalMessageCount is set to compacted array length
-    const originalMessageCountAfterCompaction =
-      currentMessagesAfterCompaction.length - 1; // 5 (before tool iteration appends)
-
     // Actually, let me re-trace. Compaction happens BEFORE the iteration starts.
     // originalMessageCount is set to currentMessages.length at compaction time.
     // At compaction time, currentMessages = [system, summary, user1, assistant1, user2]
@@ -223,7 +219,6 @@ describe("newTurnMessages slice — compaction mid-loop (BUG SCENARIO)", () => {
     //   = [user2, assistant2_with_tools]
     // This IS correct.
 
-    const sliceFromIndex = Math.max(0, 5 - 1); // 4
     const newTurnMessages = extractNewTurnMessages(
       currentMessagesAfterCompaction,
       5,
@@ -601,13 +596,6 @@ describe("Generate Audio tool flow — second turn message persistence", () => {
   it("compaction flow realistically preserves user message from the tail", () => {
     // Realistically verify that a pre-compaction messages array retains the user message
     // after compaction, and that finalize/sanitize properly extracts it for persistence.
-    const preCompactionMessages: TestMessage[] = [
-      { role: MESSAGE_ROLES.SYSTEM, content: "System" },
-      { role: MESSAGE_ROLES.USER, content: "hey whats up" },
-      { role: MESSAGE_ROLES.ASSISTANT, content: "Hey! What's up?" },
-      { role: MESSAGE_ROLES.USER, content: "make me a song" },
-    ];
-
     // Simulate compaction by preserving the recent user turn (make me a song)
     const compactedMessages: TestMessage[] = [
       { role: MESSAGE_ROLES.SYSTEM, content: "System" },

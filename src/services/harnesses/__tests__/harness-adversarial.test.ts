@@ -1,11 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import ReActHarness from "#src/services/harnesses/ReActHarness";
 import AgenticLoopState from "#src/services/AgenticLoopState";
-import { SYSTEM_STATUSES } from "#src/constants";
 
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
-import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
-import ConversationStatusRegistry from "#src/services/ConversationStatusRegistry";
 
 vi.mock("#src/services/conversation/ConversationService");
 vi.mock("#src/services/ConversationStatusRegistry", () => ({

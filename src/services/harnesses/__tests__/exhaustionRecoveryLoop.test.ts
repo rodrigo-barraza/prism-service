@@ -484,7 +484,7 @@ describe("ReActHarness — Tool-Only Loop Until maxIterations Exhaustion", () =>
 
   it("should handle the scenario where the recovery provider stream throws an error", async () => {
     const maxIterations = 3;
-    const { harness, state, mockProvider } = buildToolOnlyHarness(maxIterations);
+    const { harness, state } = buildToolOnlyHarness(maxIterations);
 
     // Make the recovery pass provider throw
     let callCount = 0;

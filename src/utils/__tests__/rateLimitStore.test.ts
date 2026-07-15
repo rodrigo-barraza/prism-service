@@ -5,7 +5,7 @@
  * If update() silently discards data or getAll() misgroups providers,
  * the admin sees stale or incorrect limits.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { PROVIDERS } from "#src/constants";
 
 // Import the singleton — tests exercise its public interface

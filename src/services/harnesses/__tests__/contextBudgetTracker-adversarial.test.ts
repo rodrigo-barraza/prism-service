@@ -13,7 +13,6 @@ vi.mock("#src/utils/logger", () => ({
 import ContextBudgetTracker from "#src/services/harnesses/ContextBudgetTracker";
 import type { ContextBudgetSnapshot } from "#src/services/harnesses/ContextBudgetTracker";
 import {
-  OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
   MINIMUM_CLAMPED_OUTPUT_TOKENS,
 } from "#src/constants/TokenBudgetDefaults";
 
@@ -52,7 +51,7 @@ describe("ContextBudgetTracker adversarial — boundary clamping", () => {
     const tracker = new ContextBudgetTracker(emit, 100);
 
     // Message tokens alone exceed the context window
-    const result = tracker.computeAndEmitEstimate(5000, "huge system prompt".repeat(100), [], 16384);
+    tracker.computeAndEmitEstimate(5000, "huge system prompt".repeat(100), [], 16384);
 
     const snapshot = emittedEvents[0] as unknown as ContextBudgetSnapshot;
     expect(snapshot.availableOutputTokens).toBe(0);
@@ -60,7 +59,7 @@ describe("ContextBudgetTracker adversarial — boundary clamping", () => {
   });
 
   it("extremely large context window (10M tokens) should not cause numeric overflow", () => {
-    const { emit, emittedEvents } = createMockEmit();
+    const { emit } = createMockEmit();
     const contextWindow = 10_000_000;
     const tracker = new ContextBudgetTracker(emit, contextWindow);
 
@@ -171,7 +170,7 @@ describe("ContextBudgetTracker adversarial — calibration ratio edge cases", ()
   });
 
   it("extremely skewed calibration ratio (100:1) should produce valid snapshots", () => {
-    const { emit, emittedEvents } = createMockEmit();
+    const { emit } = createMockEmit();
     const tracker = new ContextBudgetTracker(emit, 1_000_000);
 
     // Provider reports 100x what heuristic estimated

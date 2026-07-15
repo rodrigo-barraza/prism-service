@@ -6,7 +6,7 @@
  * unknown harness IDs with graceful fallback.
  */
 import { describe, it, expect, vi } from "vitest";
-import { HARNESS_IDS, PROVIDERS } from "#src/constants";
+import { HARNESS_IDS } from "#src/constants";
 
 // ── Mock heavy dependencies that ReActHarness transitively imports ──
 vi.mock("#src/utils/logger", () => ({

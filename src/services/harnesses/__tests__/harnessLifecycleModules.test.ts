@@ -18,7 +18,6 @@ import {
 } from "#src/services/harnesses/lifecycle/PlanModeController";
 import {
   emitPostExecutionStatus,
-  processToolResultMedia,
   trackToolErrors,
 } from "#src/services/harnesses/lifecycle/PostExecutionEmitter";
 import { buildToolRetryGuidance } from "#src/services/harnesses/lifecycle/ToolRetryInterceptor";
@@ -49,16 +48,12 @@ import { execSync } from "node:child_process";
 import logger from "#src/utils/logger";
 import RequestLogger from "#src/services/RequestLogger";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
-import MicroCompactionService from "#src/services/compact/MicroCompactionService";
 import AutoCompactionTrigger from "#src/services/compact/AutoCompactionTrigger";
 import CompactionService from "#src/services/compact/CompactionService";
 import ConversationEmbeddingService from "#src/services/ConversationEmbeddingService";
-import MemoryExtractor from "#src/services/MemoryExtractor";
-import WorkflowMemoryService from "#src/services/WorkflowMemoryService";
 import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
 import AgentHooks from "#src/services/AgentHooks";
 import AutoApprovalEngine from "#src/services/AutoApprovalEngine";
-import SystemPromptAssembler from "#src/services/system-prompt/index";
 
 // Mock child_process.execSync
 vi.mock("node:child_process", () => ({
@@ -1149,7 +1144,7 @@ describe("Harness Lifecycle Modules", () => {
 
     it("should execute streaming tools", async () => {
       vi.mocked(ToolOrchestratorService.isStreamable).mockReturnValueOnce(true);
-      const executeToolStreamingMock = vi.fn().mockImplementation(async (name, args, onProgress, context) => {
+      const executeToolStreamingMock = vi.fn().mockImplementation(async (name, args, onProgress) => {
         onProgress("chunk", "progress data", { progress: 50 });
         return "streaming-result";
       });

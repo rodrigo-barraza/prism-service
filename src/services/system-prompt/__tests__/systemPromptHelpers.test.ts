@@ -6,7 +6,6 @@ import MemoryService from "#src/services/MemoryService";
 import EmbeddingService from "#src/services/EmbeddingService";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
-import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 
 // ── Mocks ──────────────────────────────────────────────────────
 vi.mock("#src/services/MemoryService", () => ({

@@ -1076,7 +1076,7 @@ describe("Tool Availability & Enablement", () => {
 
   describe("system prompt tool count alignment", () => {
     it("finalTools count matches the set that should appear in the system prompt", async () => {
-      const { finalTools, resolvedEnabledTools } = await AgenticToolResolver.resolve({
+      const { finalTools } = await AgenticToolResolver.resolve({
         options: { disabledTools: ["get_stock_price"] },
         agent: "CODING",
         project: "test",

@@ -224,7 +224,6 @@ describe("Dynamic Output Token Clamping", () => {
 
     it("should produce adjusted estimate that exceeds the provider-reported 26,001 tokens", () => {
       const systemPrompt = createSystemPromptWithTokenCount(13_915);
-      const messages = createMessagesWithTokenCount(8_749);
       const toolSchemas = createToolSchemas(18);
 
       const rawEstimate =

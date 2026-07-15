@@ -158,7 +158,7 @@ describe("Divide & Conquer Router — Adversarial Test Suite", () => {
         usage: { inputTokens: 50, outputTokens: 30 },
       });
 
-      const result = await router.execute(
+      await router.execute(
         "test-team",
         members,
         orchestratorContext,
@@ -242,7 +242,7 @@ describe("Divide & Conquer Router — Adversarial Test Suite", () => {
         usage: { inputTokens: 50, outputTokens: 20 },
       });
 
-      const result = await router.execute(
+      await router.execute(
         "test-team",
         members,
         orchestratorContext,

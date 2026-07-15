@@ -5,8 +5,6 @@ import {
   constrainImageDimensions,
   compressImageForSizeLimit,
   extractVideoFrames,
-  getDataUrlMimeType,
-  getUrlType,
   inferMimeFromUrl,
 } from "#src/utils/media";
 import { TYPES } from "#src/constants";
@@ -29,7 +27,6 @@ vi.mock("child_process", async (importOriginal) => {
 
 describe("Media Utilities — Adversarial Test Suite", () => {
   let smallPngBase64: string;
-  let largePngBase64: string;
 
   beforeAll(async () => {
     const smallPngBuffer = await sharp({
@@ -43,18 +40,6 @@ describe("Media Utilities — Adversarial Test Suite", () => {
       .png()
       .toBuffer();
     smallPngBase64 = smallPngBuffer.toString("base64");
-
-    const largePngBuffer = await sharp({
-      create: {
-        width: 2500,
-        height: 2500,
-        channels: 4,
-        background: { r: 255, g: 0, b: 0, alpha: 1 },
-      },
-    })
-      .png()
-      .toBuffer();
-    largePngBase64 = largePngBuffer.toString("base64");
   });
 
   // 1. Boundary & Edge Cases

@@ -487,7 +487,7 @@ describe("Topology Routers Test Suite", () => {
         messages: [],
       }));
 
-      const results = await router.execute(
+      await router.execute(
         "test-team", members, orchestratorContext, spawnSubAgentMock, continueSubAgentMock,
       );
 

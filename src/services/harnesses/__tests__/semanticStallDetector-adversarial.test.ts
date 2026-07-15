@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import SemanticStallDetector from "#src/services/harnesses/lifecycle/SemanticStallDetector";
-import type { StallVerdict } from "#src/services/harnesses/lifecycle/SemanticStallDetector";
 import type { ToolCall } from "#src/services/harnesses/types";
 
 // ═══════════════════════════════════════════════════════════════
