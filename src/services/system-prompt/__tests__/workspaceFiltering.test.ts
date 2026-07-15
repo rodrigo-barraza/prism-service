@@ -75,17 +75,17 @@ describe("Workspace Tool Filtering Integration", () => {
     // --- CRITICAL ASSERTIONS ---
     // These are the exact strings the user is seeing in production
     expect(prompt).not.toContain("Core Workspace Tools");
-    expect(prompt).not.toContain("### read_file");
-    expect(prompt).not.toContain("### write_file");
-    expect(prompt).not.toContain("### replace_in_file");
-    expect(prompt).not.toContain("### execute_command");
-    expect(prompt).not.toContain("### list_directory");
+    expect(prompt).not.toContain("- read_file:");
+    expect(prompt).not.toContain("- write_file:");
+    expect(prompt).not.toContain("- replace_in_file:");
+    expect(prompt).not.toContain("- execute_command:");
+    expect(prompt).not.toContain("- list_directory:");
     expect(prompt).not.toContain("Workspace: /workspace");
 
     // Non-workspace tools MUST still be present
-    expect(prompt).toContain("### write_todo");
-    expect(prompt).toContain("### search_web");
-    expect(prompt).toContain("### search_tools");
+    expect(prompt).toContain("- write_todo:");
+    expect(prompt).toContain("- search_web:");
+    expect(prompt).toContain("- search_tools:");
     expect(prompt).toContain("Core Harness Tools");
 
     // --- DESCRIPTION TEXT SCRUBBING (defense-in-depth) ---
@@ -96,8 +96,6 @@ describe("Workspace Tool Filtering Integration", () => {
     // Workspace tool name examples must be scrubbed from query descriptions
     expect(prompt).not.toContain("'read_file'");
     expect(prompt).not.toContain("'write_file'");
-    // Non-workspace tool examples must be preserved
-    expect(prompt).toContain("'get_weather'");
 
     // Coding guidelines reference workspace tools — must also be excluded
     expect(prompt).not.toContain("## Coding Guidelines");
@@ -129,22 +127,64 @@ describe("Workspace Tool Filtering Integration", () => {
     const prompt = result.prompt;
 
     expect(prompt).toContain("Core Workspace Tools");
-    expect(prompt).toContain("### read_file");
-    expect(prompt).toContain("### write_file");
-    expect(prompt).toContain("### replace_in_file");
-    expect(prompt).toContain("### execute_command");
-    expect(prompt).toContain("### list_directory");
-    expect(prompt).toContain("### search_tools");
+    expect(prompt).toContain("- read_file:");
+    expect(prompt).toContain("- write_file:");
+    expect(prompt).toContain("- replace_in_file:");
+    expect(prompt).toContain("- execute_command:");
+    expect(prompt).toContain("- list_directory:");
+    expect(prompt).toContain("- search_tools:");
     expect(prompt).toContain("Workspace:");
     expect(prompt).toContain("Enabled Tools (8)");
 
-    // Workspace domain references in description text MUST be preserved when enabled
-    expect(prompt).toContain("'Core Workspace Tools'");
-    expect(prompt).toContain("'read_file'");
-    expect(prompt).toContain("'write_file'");
+    // Index mode drops parameter descriptions from the prompt, so quoted
+    // in-description references are exercised at the formatter level below.
 
     console.log("\n=== PROMPT DUMP (workspaceEnabled: true) ===\n");
     console.log(prompt);
     console.log("\n=== END PROMPT DUMP ===\n");
+  });
+
+  // Full-mode rendering (used by on-demand tool doc addendums) still carries
+  // parameter descriptions — quoted in-description references must be
+  // scrubbed when workspace is off and preserved when it is on.
+  it("formatter full mode scrubs quoted workspace references when workspace is off", async () => {
+    const { ToolDocFormatter } = await import(
+      "#src/services/system-prompt/ToolDocFormatter"
+    );
+    const formatter = new ToolDocFormatter();
+    const output = formatter.buildToolDescriptions(
+      ALL_TOOL_NAMES,
+      null,
+      undefined,
+      ALL_TOOL_NAMES,
+      undefined,
+      "full",
+      "en",
+      false,
+    );
+    expect(output).not.toContain("Core Workspace Tools");
+    expect(output).not.toContain("'read_file'");
+    expect(output).not.toContain("'write_file'");
+    expect(output).toContain("'get_weather'");
+  });
+
+  it("formatter full mode preserves quoted workspace references when workspace is on", async () => {
+    const { ToolDocFormatter } = await import(
+      "#src/services/system-prompt/ToolDocFormatter"
+    );
+    const formatter = new ToolDocFormatter();
+    const output = formatter.buildToolDescriptions(
+      ALL_TOOL_NAMES,
+      null,
+      undefined,
+      ALL_TOOL_NAMES,
+      undefined,
+      "full",
+      "en",
+      true,
+    );
+    expect(output).toContain("'Core Workspace Tools'");
+    expect(output).toContain("'read_file'");
+    expect(output).toContain("'get_weather'");
   });
 });

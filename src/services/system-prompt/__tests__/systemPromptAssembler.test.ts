@@ -975,10 +975,10 @@ describe("SystemPromptAssembler", () => {
         messages: [{ role: "user", content: "Hello" }],
       });
 
-      expect(prompt).not.toContain(`### ${TOOL_NAMES.SAVE_MEMORY}`);
-      expect(prompt).not.toContain(`### ${TOOL_NAMES.EXTRACT_MEMORIES}`);
-      expect(prompt).not.toContain(`### ${TOOL_NAMES.CONSOLIDATE_MEMORIES}`);
-      expect(prompt).not.toContain(`### ${TOOL_NAMES.SEARCH_MEMORIES}`);
+      expect(prompt).not.toContain(`- ${TOOL_NAMES.SAVE_MEMORY}:`);
+      expect(prompt).not.toContain(`- ${TOOL_NAMES.EXTRACT_MEMORIES}:`);
+      expect(prompt).not.toContain(`- ${TOOL_NAMES.CONSOLIDATE_MEMORIES}:`);
+      expect(prompt).not.toContain(`- ${TOOL_NAMES.SEARCH_MEMORIES}:`);
     });
 
     it("excludes unconfigured creative tools from system prompt when models are not set", async () => {
@@ -1000,10 +1000,10 @@ describe("SystemPromptAssembler", () => {
         messages: [{ role: "user", content: "Hello" }],
       });
 
-      expect(prompt).not.toContain(`### ${TOOL_NAMES.GENERATE_IMAGE}`);
-      expect(prompt).not.toContain(`### ${TOOL_NAMES.DESCRIBE_IMAGE}`);
-      expect(prompt).not.toContain(`### ${TOOL_NAMES.SYNTHESIZE_SPEECH}`);
-      expect(prompt).not.toContain(`### ${TOOL_NAMES.TRANSCRIBE_AUDIO}`);
+      expect(prompt).not.toContain(`- ${TOOL_NAMES.GENERATE_IMAGE}:`);
+      expect(prompt).not.toContain(`- ${TOOL_NAMES.DESCRIBE_IMAGE}:`);
+      expect(prompt).not.toContain(`- ${TOOL_NAMES.SYNTHESIZE_SPEECH}:`);
+      expect(prompt).not.toContain(`- ${TOOL_NAMES.TRANSCRIBE_AUDIO}:`);
     });
 
     it("includes memory tools in system prompt when all memory models are configured", async () => {
@@ -1023,7 +1023,7 @@ describe("SystemPromptAssembler", () => {
         messages: [{ role: "user", content: "Hello" }],
       });
 
-      expect(prompt).toContain(`### ${TOOL_NAMES.SAVE_MEMORY}`);
+      expect(prompt).toContain(`- ${TOOL_NAMES.SAVE_MEMORY}:`);
     });
 
     it("includes creative tools in system prompt when image/vision models are configured", async () => {
@@ -1045,8 +1045,8 @@ describe("SystemPromptAssembler", () => {
         messages: [{ role: "user", content: "Hello" }],
       });
 
-      expect(prompt).toContain(`### ${TOOL_NAMES.GENERATE_IMAGE}`);
-      expect(prompt).toContain(`### ${TOOL_NAMES.DESCRIBE_IMAGE}`);
+      expect(prompt).toContain(`- ${TOOL_NAMES.GENERATE_IMAGE}:`);
+      expect(prompt).toContain(`- ${TOOL_NAMES.DESCRIBE_IMAGE}:`);
     });
 
     it("system prompt Enabled Tools count matches actual tool description sections", async () => {
@@ -1080,7 +1080,7 @@ describe("SystemPromptAssembler", () => {
       expect(countMatch).toBeTruthy();
       const declaredCount = parseInt(countMatch![1], 10);
 
-      const toolDescriptionSections = prompt.match(/### [a-z_]+/g) || [];
+      const toolDescriptionSections = prompt.match(/^- [a-z_0-9]+:/gm) || [];
       const actualToolCount = toolDescriptionSections.length;
 
       expect(declaredCount).toBe(actualToolCount);
@@ -1103,10 +1103,10 @@ describe("SystemPromptAssembler", () => {
         messages: [{ role: "user", content: "Hello" }],
       });
 
-      expect(prompt).not.toContain(`### ${TOOL_NAMES.SAVE_MEMORY}`);
-      expect(prompt).toContain(`### ${TOOL_NAMES.EXTRACT_MEMORIES}`);
-      expect(prompt).not.toContain(`### ${TOOL_NAMES.CONSOLIDATE_MEMORIES}`);
-      expect(prompt).toContain(`### ${TOOL_NAMES.SEARCH_MEMORIES}`);
+      expect(prompt).not.toContain(`- ${TOOL_NAMES.SAVE_MEMORY}:`);
+      expect(prompt).toContain(`- ${TOOL_NAMES.EXTRACT_MEMORIES}:`);
+      expect(prompt).not.toContain(`- ${TOOL_NAMES.CONSOLIDATE_MEMORIES}:`);
+      expect(prompt).toContain(`- ${TOOL_NAMES.SEARCH_MEMORIES}:`);
     });
 
     it("workspace-down: excludes all workspace-domain tools from count and descriptions", async () => {
@@ -1119,17 +1119,17 @@ describe("SystemPromptAssembler", () => {
         messages: [{ role: "user", content: "Hello" }],
       });
 
-      expect(prompt).not.toContain("### read_file");
-      expect(prompt).not.toContain("### write_file");
+      expect(prompt).not.toContain("- read_file:");
+      expect(prompt).not.toContain("- write_file:");
 
-      expect(prompt).toContain("### search_web");
-      expect(prompt).toContain("### think");
+      expect(prompt).toContain("- search_web:");
+      expect(prompt).toContain("- think:");
 
       const countMatch = prompt.match(/## Enabled Tools \((\d+)\)/);
       expect(countMatch).toBeTruthy();
       const declaredCount = parseInt(countMatch![1], 10);
 
-      const toolDescriptionSections = prompt.match(/### [a-z_]+/g) || [];
+      const toolDescriptionSections = prompt.match(/^- [a-z_0-9]+:/gm) || [];
       const actualToolCount = toolDescriptionSections.length;
       expect(declaredCount).toBe(actualToolCount);
 

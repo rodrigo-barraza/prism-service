@@ -28,13 +28,23 @@ interface ToolSchemaDescriptor {
   [key: string]: unknown;
 }
 
+export type ToolDocMode = "full" | "compact" | "index";
+
 export class ToolDocFormatter {
   /**
    * Build domain-grouped tool descriptions from current schemas.
    *
-   * Groups tools by their `domain` field, then for each tool shows:
-   *   - Name + first sentence of description (capability summary)
-   *   - Full parameter listing with required markers
+   * Rendering depends on `mode`:
+   *   - "full" (default): name + full description + full parameter listing.
+   *     Used for on-demand doc addendums injected when tools are enabled
+   *     mid-conversation — the second tier of the two-tier scheme.
+   *   - "compact": name + first sentence + required parameters only.
+   *   - "index": one line per tool (name — first sentence, no parameters).
+   *     The system-prompt tier: full parameter schemas travel in the native
+   *     tool definitions, so the prompt only needs a selection index.
+   *
+   * `mode` also accepts a boolean for backward compatibility
+   * (true = "compact", false/undefined = "full").
    */
   buildToolDescriptions(
     enabledTools?: string[] | null,
@@ -42,10 +52,12 @@ export class ToolDocFormatter {
     defaultTopology?: string,
     resolvedToolNames?: string[] | null,
     lockedOffToolNames?: Set<string>,
-    compact?: boolean,
+    mode?: boolean | ToolDocMode,
     locale = "en",
     workspaceEnabled = true,
   ): string {
+    const renderMode: ToolDocMode =
+      mode === "index" ? "index" : mode === true || mode === "compact" ? "compact" : "full";
     const schemas = ToolOrchestratorService.getClientToolSchemas(
       defaultTopology,
       locale,
@@ -70,7 +82,7 @@ export class ToolDocFormatter {
         );
       }
       return this._scrubWorkspaceDomainReferences(
-        this._formatToolDescriptions(filteredSchemas, compact, locale),
+        this._formatToolDescriptions(filteredSchemas, renderMode, locale),
         workspaceEnabled,
       );
     }
@@ -88,7 +100,7 @@ export class ToolDocFormatter {
         );
       }
       return this._scrubWorkspaceDomainReferences(
-        this._formatToolDescriptions(allSchemas, compact, locale),
+        this._formatToolDescriptions(allSchemas, renderMode, locale),
         workspaceEnabled,
       );
     }
@@ -139,17 +151,18 @@ export class ToolDocFormatter {
     }
 
     return this._scrubWorkspaceDomainReferences(
-      this._formatToolDescriptions(filteredSchemas, compact, locale),
+      this._formatToolDescriptions(filteredSchemas, renderMode, locale),
       workspaceEnabled,
     );
   }
 
   private _formatToolDescriptions(
     filteredSchemas: ToolSchemaDescriptor[],
-    compact?: boolean,
+    mode: ToolDocMode = "full",
     locale = "en",
   ): string {
     if (filteredSchemas.length === 0) return "";
+    const compact = mode === "compact";
 
     // Group by domain
     const groups = new Map<string, ToolSchemaDescriptor[]>();
@@ -157,6 +170,22 @@ export class ToolDocFormatter {
       const domain = (tool.domain || "Other").replace(/^Agentic:\s*/i, "");
       if (!groups.has(domain)) groups.set(domain, []);
       groups.get(domain)!.push(tool);
+    }
+
+    // Index mode: one line per tool — name + first sentence, no parameters.
+    // Full parameter schemas travel in the native tool definitions.
+    if (mode === "index") {
+      const sections: string[] = [];
+      for (const [domain, domainTools] of groups) {
+        const lines = domainTools.map((tool) => {
+          const fullDescription = tool.description || "";
+          const firstSentence =
+            fullDescription.split(/(?<=[.!?])\s/)[0] || fullDescription;
+          return `- ${tool.name}: ${firstSentence}`;
+        });
+        sections.push(`**${domain}**\n${lines.join("\n")}`);
+      }
+      return sections.join("\n\n");
     }
 
     // Build categorised sections with parameter details

@@ -5,6 +5,7 @@
   "codingGuidelines": "## Coding Guidelines\n- read file before editing\n- replace_in_file for targeted edit — safer. write_file only for new or full rewrite\n- patch_file for multi-hunk non-adjacent edit\n- verify by reading modified section\n- concise, technical",
   "commandExecutionGuidelines": "\n## Command Execution\n- dev server, long-running (npm run dev, next dev, vite, nodemon): ALWAYS run_in_background: true\n- first ~2.5s output confirms started\n- one-shot (install, test, git status, eslint, tsc): let complete. no background.",
   "enabledToolsHeader": "## Enabled Tool ({{count}})",
+  "toolIndexNote": "One line per tool below. Full parameter schema in tool definition — call tool directly, no guess parameter from index.",
   "environmentHeader": "## Environment",
   "environmentOsLine": "- OS: Linux (WSL2)",
   "environmentWorkspaceLine": "- Workspace: {{workspaceRoot}}",

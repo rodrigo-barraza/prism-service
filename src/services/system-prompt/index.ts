@@ -22,7 +22,7 @@ import {
 const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
 
 import { DirectoryTreeFormatter } from "./DirectoryTreeFormatter.ts";
-import { ToolDocFormatter } from "./ToolDocFormatter.ts";
+import { ToolDocFormatter, type ToolDocMode } from "./ToolDocFormatter.ts";
 import { SkillMemoryScorer } from "./SkillMemoryScorer.ts";
 import { AssemblerContext } from "./types.ts";
 import SomaticStateService from "#src/services/somatic/SomaticStateService";
@@ -143,7 +143,7 @@ export default class SystemPromptAssembler {
     defaultTopology?: string,
     resolvedToolNames?: string[],
     lockedOffToolNames?: Set<string>,
-    compact?: boolean,
+    mode?: boolean | ToolDocMode,
     locale = "en",
     workspaceEnabled = true,
   ): string {
@@ -153,7 +153,7 @@ export default class SystemPromptAssembler {
       defaultTopology,
       resolvedToolNames,
       lockedOffToolNames,
-      compact,
+      mode,
       locale,
       workspaceEnabled,
     );
@@ -314,7 +314,15 @@ export default class SystemPromptAssembler {
       // before the synchronous buildToolDescriptions() reads them.
       await ToolOrchestratorService.ensureSchemas(locale);
       const lockedOffToolNames = await resolveLockedOffToolNames();
-      const isCompactToolDocs = persona?.compactToolDocs === true;
+      // Two-tier tool docs: the system prompt carries a one-line selection
+      // index by default; full parameter schemas travel in the native tool
+      // definitions, and full docs are injected on-demand when tools are
+      // enabled mid-conversation. Personas can opt back into heavier
+      // rendering via toolDocMode ("full" | "compact") or the legacy
+      // compactToolDocs flag.
+      const toolDocMode: boolean | ToolDocMode =
+        persona?.toolDocMode ??
+        (persona?.compactToolDocs === true ? "compact" : "index");
 
       // Defense-in-depth: strip workspace-domain tools from the lists
       // passed to buildToolDescriptions regardless of upstream filtering.
@@ -357,7 +365,7 @@ export default class SystemPromptAssembler {
         defaultTopology,
         effectiveResolvedToolNames,
         lockedOffToolNames,
-        isCompactToolDocs,
+        toolDocMode,
         locale,
         isWorkspaceEnabled,
       );
@@ -439,7 +447,17 @@ export default class SystemPromptAssembler {
           "system-prompt.enabledToolsHeader",
           { count: String(count) },
         );
-        sections.push(wrapSection(SYSTEM_PROMPT_SECTIONS.ENABLED_TOOLS, header + "\n" + toolDescriptions));
+        const indexNote =
+          toolDocMode === "index"
+            ? PromptLocaleService.get(locale, "system-prompt.toolIndexNote") +
+              "\n"
+            : "";
+        sections.push(
+          wrapSection(
+            SYSTEM_PROMPT_SECTIONS.ENABLED_TOOLS,
+            header + "\n" + indexNote + toolDescriptions,
+          ),
+        );
       }
     }
 
