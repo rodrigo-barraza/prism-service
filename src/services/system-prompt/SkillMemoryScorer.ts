@@ -36,6 +36,7 @@ export class SkillMemoryScorer {
       guildId,
       userIds,
       excludeMemoryIds,
+      conversationalStyle,
     }: MemoryFetchOptions = {},
   ): Promise<{ memoriesText: string; injectedMemoryIds: string[] }> {
     try {
@@ -73,10 +74,26 @@ export class SkillMemoryScorer {
         return { memoriesText: "", injectedMemoryIds: [] };
       }
 
-      const injectedMemoryIds = novelMemories.map(
+      // Conversational personas: keep the most relevant few guaranteed, then
+      // rotate the rest randomly so consecutive replies don't riff on the
+      // exact same set of remembered facts (which reads as recycled jokes).
+      let selectedMemories = novelMemories;
+      if (conversationalStyle && novelMemories.length > 6) {
+        const anchors = novelMemories.slice(0, 3);
+        const rotating = [...novelMemories.slice(3)];
+        for (let index = rotating.length - 1; index > 0; index--) {
+          const swap = Math.floor(Math.random() * (index + 1));
+          [rotating[index], rotating[swap]] = [rotating[swap], rotating[index]];
+        }
+        selectedMemories = [...anchors, ...rotating.slice(0, 3)];
+      }
+
+      const injectedMemoryIds = selectedMemories.map(
         (memory) => memory.id as string,
       );
-      const memoriesText = MemoryService.formatForPrompt(novelMemories);
+      const memoriesText = MemoryService.formatForPrompt(selectedMemories, {
+        plainCaveats: conversationalStyle === true,
+      });
       return { memoriesText, injectedMemoryIds };
     } catch (error: unknown) {
       logger.warn(

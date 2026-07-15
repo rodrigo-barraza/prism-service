@@ -7,6 +7,7 @@ import {
   VALID_EMOTIONS,
   EMOTION_CLASSIFICATION_PROMPT,
   getEmotionBehaviorPrompt,
+  type EmotionPersonality,
   type PrimaryEmotion,
   type DominantEmotionResult,
 } from "./SomaticConstants.ts";
@@ -66,6 +67,16 @@ type PhysicalStatName =
   | "substance"
   | "bathroom";
 
+type SomaticKeywordKind = keyof typeof SOMATIC.KEYWORD_EFFECTS;
+
+/** A user-caused stat change worth reacting to (keyword-triggered, ≥1 point). */
+export interface SomaticStateEvent {
+  kind: SomaticKeywordKind;
+  stat: PhysicalStatName;
+  from: number;
+  to: number;
+}
+
 interface AgentSomaticState {
   emotionalState: EmotionalStateEngine;
   hunger: StatInstance;
@@ -75,6 +86,8 @@ interface AgentSomaticState {
   alcohol: StatInstance;
   substance: StatInstance;
   bathroom: StatInstance;
+  /** Dominant mood at the previous prompt render — used to surface mood shifts. */
+  lastRenderedMood: string | null;
   isDirty: boolean;
 }
 
@@ -151,15 +164,28 @@ function resolveEnergyLabel(level: number): string {
 
 const PASSIVE_DRIFT_INTERVAL_MILLISECONDS = SOMATIC.PASSIVE_DRIFT_INTERVAL_MILLISECONDS;
 const PERSIST_INTERVAL_MILLISECONDS = SOMATIC.PERSIST_INTERVAL_MILLISECONDS;
+const TICK_MINUTES = PASSIVE_DRIFT_INTERVAL_MILLISECONDS / 60_000;
+/** Cap for catch-up drift applied for time elapsed while the service was down. */
+const MAX_OFFLINE_CATCHUP_TICKS = (14 * 24 * 60) / TICK_MINUTES;
 
 const agentStates = new Map<string, AgentSomaticState>();
 
+/**
+ * Somatic state is keyed by agentId. Callers reach this service with ids of
+ * varying casing ("LUPOS" from the persona registry, "lupos" from ad-hoc API
+ * calls), which used to split one agent's state across two documents.
+ */
+function normalizeAgentId(agentId: string): string {
+  return (agentId || "").trim().toUpperCase();
+}
+
 function createStatInstances(
-  levels?: Partial<SomaticLevels>,
-): Omit<AgentSomaticState, "isDirty"> {
+  levels: Partial<SomaticLevels> | undefined,
+  emotionPersonality: Partial<EmotionPersonality>,
+): Omit<AgentSomaticState, "isDirty" | "lastRenderedMood"> {
   const emotionalState = levels?.emotionalState
-    ? EmotionalStateEngine.deserialize(levels.emotionalState)
-    : new EmotionalStateEngine();
+    ? EmotionalStateEngine.deserialize(levels.emotionalState, emotionPersonality)
+    : new EmotionalStateEngine(emotionPersonality);
 
   return {
     emotionalState,
@@ -182,7 +208,6 @@ function createStatInstances(
       min: 0,
       max: 100,
       initial: levels?.sickness ?? 0,
-      step: 10,
     }),
     alcohol: StatFactory.create("alcohol", {
       min: 0,
@@ -216,50 +241,54 @@ function getPhysicalLevelsFromState(
   };
 }
 
-function applyPassiveDrift(state: AgentSomaticState): void {
-  state.hunger.increase();
-  state.thirst.increase();
-  state.energy.decrease();
+/**
+ * Apply `ticks` worth of passive drift (30s per tick). Used both by the live
+ * timer (ticks=1) and for offline catch-up on load.
+ */
+function applyPassiveDrift(state: AgentSomaticState, ticks: number = 1): void {
+  if (!Number.isFinite(ticks) || ticks <= 0) return;
 
-  if (state.alcohol.getLevel() > 0) state.alcohol.decrease();
-  if (state.substance.getLevel() > 0) state.substance.decrease();
-  if (state.sickness.getLevel() > 0)
-    state.sickness.setLevel(state.sickness.getLevel() - 5);
+  for (const [statName, perTick] of Object.entries(SOMATIC.DRIFT_PER_TICK)) {
+    const stat = state[statName as PhysicalStatName];
+    stat.setLevel(stat.getLevel() + perTick * ticks);
+  }
 
-  // Emotional decay only runs when the engine is in 'decay' mode;
-  // in 'reactive' mode this is a no-op inside the engine.
-  state.emotionalState.decay();
+  state.emotionalState.decay(ticks * TICK_MINUTES);
 
   state.isDirty = true;
 }
 
+/** Per-message homeostasis: conversation is activity. */
 function applyHomeostaticDrift(state: AgentSomaticState): void {
-  const energy = state.energy.getLevel();
-  if (energy < 100) state.energy.setLevel(energy + 2);
-
-  const sickness = state.sickness.getLevel();
-  if (sickness > 0) state.sickness.setLevel(sickness - 5);
-
-  const alcohol = state.alcohol.getLevel();
-  if (alcohol > 0) state.alcohol.setLevel(alcohol - 1);
-
-  const substance = state.substance.getLevel();
-  if (substance > 0) state.substance.setLevel(substance - 1);
+  for (const [statName, delta] of Object.entries(SOMATIC.MESSAGE_DRIFT)) {
+    const stat = state[statName as PhysicalStatName];
+    stat.setLevel(stat.getLevel() + delta);
+  }
 }
 
 function getCollection() {
   return MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTIONS.SOMATIC_STATE);
 }
 
+interface LoadedSomaticDocument {
+  levels: Partial<SomaticLevels>;
+  updatedAt: string | null;
+  lastRenderedMood: string | null;
+}
+
 async function loadFromDatabase(
   agentId: string,
-): Promise<Partial<SomaticLevels> | null> {
+): Promise<LoadedSomaticDocument | null> {
   try {
     const collection = getCollection();
     if (!collection) return null;
     const document = await collection.findOne({ agentId });
     if (!document?.levels) return null;
-    return document.levels as Partial<SomaticLevels>;
+    return {
+      levels: document.levels as Partial<SomaticLevels>,
+      updatedAt: (document.updatedAt as string) || null,
+      lastRenderedMood: (document.lastRenderedMood as string) || null,
+    };
   } catch (error: unknown) {
     logger.warn(
       `[SomaticStateService] Failed to load state for "${agentId}": ${getErrorMessage(error)}`,
@@ -290,6 +319,7 @@ async function persistToDatabase(
           levels,
           dominantEmotion: dominantEmotion.emotion,
           emotionIntensity: Math.round(dominantEmotion.intensity),
+          lastRenderedMood: state.lastRenderedMood,
           updatedAt: new Date().toISOString(),
         },
         $setOnInsert: {
@@ -308,29 +338,67 @@ async function persistToDatabase(
   }
 }
 
+/**
+ * Personas can tune their emotional dynamics (baseline temperament, decay
+ * half-life, volatility) via `somaticPersonality`. Resolved lazily to avoid
+ * a static import cycle (registry → personas → locale service).
+ */
+async function resolveEmotionPersonality(
+  agentId: string,
+): Promise<Partial<EmotionPersonality>> {
+  try {
+    const AgentPersonaRegistry = (
+      await import("#src/services/AgentPersonaRegistry")
+    ).default;
+    const persona = AgentPersonaRegistry.get(agentId);
+    return persona?.somaticPersonality || {};
+  } catch {
+    return {};
+  }
+}
+
 async function initializeAgentState(
   agentId: string,
 ): Promise<AgentSomaticState> {
-  const savedLevels = await loadFromDatabase(agentId);
-  const stats = createStatInstances(savedLevels ?? undefined);
+  const savedDocument = await loadFromDatabase(agentId);
+  const emotionPersonality = await resolveEmotionPersonality(agentId);
+  const stats = createStatInstances(
+    savedDocument?.levels,
+    emotionPersonality,
+  );
 
   const state: AgentSomaticState = {
     ...stats,
+    lastRenderedMood: savedDocument?.lastRenderedMood ?? null,
     isDirty: false,
   };
+
+  // Catch up on time that passed while the service was down or the agent
+  // was unloaded: hunger built up, moods faded back toward baseline.
+  if (savedDocument?.updatedAt) {
+    const elapsedMilliseconds = Date.now() - Date.parse(savedDocument.updatedAt);
+    if (Number.isFinite(elapsedMilliseconds) && elapsedMilliseconds > 0) {
+      const elapsedTicks = Math.min(
+        elapsedMilliseconds / PASSIVE_DRIFT_INTERVAL_MILLISECONDS,
+        MAX_OFFLINE_CATCHUP_TICKS,
+      );
+      applyPassiveDrift(state, elapsedTicks);
+    }
+  }
 
   setInterval(() => {
     applyPassiveDrift(state);
   }, PASSIVE_DRIFT_INTERVAL_MILLISECONDS);
 
-  const loadedFrom = savedLevels ? "database" : "defaults";
+  const loadedFrom = savedDocument ? "database" : "defaults";
   logger.info(
     `[SomaticStateService] Initialized somatic state for agent "${agentId}" (loaded from ${loadedFrom})`,
   );
   return state;
 }
 
-async function ensureState(agentId: string): Promise<AgentSomaticState> {
+async function ensureState(rawAgentId: string): Promise<AgentSomaticState> {
+  const agentId = normalizeAgentId(rawAgentId);
   let state = agentStates.get(agentId);
   if (!state) {
     state = await initializeAgentState(agentId);
@@ -483,17 +551,19 @@ async function analyzeEmotionFromText(
   return detectedEmotion;
 }
 
+// Matches both the legacy <message_content> wrapper and the current
+// <discord-message> envelope's <content>/<transcription> bodies.
 const MESSAGE_CONTENT_TAG_PATTERN =
-  /<message_content>\s*([\s\S]*?)\s*<\/message_content>/gi;
+  /<(message_content|content|transcription)>\s*([\s\S]*?)\s*<\/\1>/gi;
 const DISCORD_MENTION_PATTERN = /<@!?\d+>/g;
 
 function extractMessageContent(formattedText: string): string {
   const tagMatches = [...formattedText.matchAll(MESSAGE_CONTENT_TAG_PATTERN)];
 
   if (tagMatches.length > 0) {
-    // Extract content from the last <message_content> tag (the current message,
-    // since earlier tags are replied-to messages in the Discord format)
-    const lastMatchContent = tagMatches[tagMatches.length - 1][1];
+    // The current message's body is the LAST content/transcription tag —
+    // earlier matches belong to <replying-to> quotes.
+    const lastMatchContent = tagMatches[tagMatches.length - 1][2];
     return lastMatchContent
       .replace(DISCORD_MENTION_PATTERN, "")
       .replace(/\s+/g, " ")
@@ -502,6 +572,11 @@ function extractMessageContent(formattedText: string): string {
 
   // Non-Discord source (prism-client, API) — pass through as-is
   return formattedText.trim();
+}
+
+/** Round for display/deltas: physical levels are floats internally. */
+function roundLevel(value: number): number {
+  return Math.round(value);
 }
 
 const SomaticStateService = {
@@ -522,37 +597,37 @@ const SomaticStateService = {
         components: dominantEmotion.components,
       },
       hunger: {
-        level: state.hunger.getLevel(),
+        level: roundLevel(state.hunger.getLevel()),
         label: resolveLabelDescending(state.hunger.getLevel(), HUNGER_LABELS),
       },
       thirst: {
-        level: state.thirst.getLevel(),
+        level: roundLevel(state.thirst.getLevel()),
         label: resolveLabelDescending(state.thirst.getLevel(), THIRST_LABELS),
       },
       energy: {
-        level: state.energy.getLevel(),
+        level: roundLevel(state.energy.getLevel()),
         label: resolveEnergyLabel(state.energy.getLevel()),
       },
       sickness: {
-        level: state.sickness.getLevel(),
+        level: roundLevel(state.sickness.getLevel()),
         label: resolveLabelDescending(
           state.sickness.getLevel(),
           SICKNESS_LABELS,
         ),
       },
       alcohol: {
-        level: state.alcohol.getLevel(),
+        level: roundLevel(state.alcohol.getLevel()),
         label: resolveLabelDescending(state.alcohol.getLevel(), ALCOHOL_LABELS),
       },
       substance: {
-        level: state.substance.getLevel(),
+        level: roundLevel(state.substance.getLevel()),
         label: resolveLabelDescending(
           state.substance.getLevel(),
           SUBSTANCE_LABELS,
         ),
       },
       bathroom: {
-        level: state.bathroom.getLevel(),
+        level: roundLevel(state.bathroom.getLevel()),
         label: resolveLabelDescending(
           state.bathroom.getLevel(),
           BATHROOM_LABELS,
@@ -577,7 +652,7 @@ const SomaticStateService = {
     const state = await ensureState(agentId);
     const result = state[statName].setLevel(level);
     state.isDirty = true;
-    await persistToDatabase(agentId, state);
+    await persistToDatabase(normalizeAgentId(agentId), state);
     return result;
   },
 
@@ -633,7 +708,7 @@ const SomaticStateService = {
 
   async getAlcoholSystemPrompt(agentId: string): Promise<string> {
     const state = await ensureState(agentId);
-    const level = state.alcohol.getLevel();
+    const level = roundLevel(state.alcohol.getLevel());
     const locale =
       typeof SettingsService.getCached === "function"
         ? SettingsService.getCached().agents?.locale || "en"
@@ -655,12 +730,19 @@ const SomaticStateService = {
     return description + alcoholSuffix + levelInfo;
   },
 
+  /**
+   * Update state from the triggering user message: run the emotion
+   * classifier into the Plutchik wheel and apply keyword-driven physical
+   * effects. Returns the list of noticeable keyword-caused stat changes so
+   * the prompt can surface them ("someone just fed you") and the agent can
+   * react in character — the feedback loop that makes the tamagotchi real.
+   */
   async adaptFromMessage(
     agentId: string,
     text: string,
     requestContext: EmotionAnalysisContext = {},
-  ): Promise<void> {
-    if (!text) return;
+  ): Promise<SomaticStateEvent[]> {
+    if (!text) return [];
     const state = await ensureState(agentId);
 
     // Extract the actual human message content from Discord-formatted text.
@@ -671,11 +753,11 @@ const SomaticStateService = {
 
     applyHomeostaticDrift(state);
 
-    // LLM-based emotion analysis — detect user emotion and feed the Plutchik wheel.
-    // In 'reactive' mode, addEmotion is the sole mechanism for emotional shifts.
-    // In 'decay' mode, the 30s passive timer also applies continuous time-based decay.
+    // LLM-based emotion analysis — detect the message's emotional charge and
+    // feed the Plutchik wheel. Time-based decay (passive drift) pulls the
+    // wheel back toward the persona's baseline between stimuli.
     const detectedEmotion = await analyzeEmotionFromText(
-      agentId,
+      normalizeAgentId(agentId),
       extractedContent,
       requestContext,
     );
@@ -691,165 +773,187 @@ const SomaticStateService = {
       );
     }
 
-    if (SOMATIC_KEYWORDS.food.test(cleanText)) {
-      state.hunger.decrease();
-      state.bathroom.increase();
-      logger.debug(
-        `[SomaticStateService] 🍖 Food keyword for "${agentId}". Hunger: ${state.hunger.getLevel()}`,
-      );
-    }
+    const events: SomaticStateEvent[] = [];
+    for (const [kind, effects] of Object.entries(SOMATIC.KEYWORD_EFFECTS) as [
+      SomaticKeywordKind,
+      Record<string, number>,
+    ][]) {
+      if (!SOMATIC_KEYWORDS[kind]?.test(cleanText)) continue;
 
-    if (SOMATIC_KEYWORDS.drink.test(cleanText)) {
-      state.thirst.decrease();
-      state.bathroom.increase();
+      for (const [statName, delta] of Object.entries(effects)) {
+        const stat = state[statName as PhysicalStatName];
+        const from = stat.getLevel();
+        const to = stat.setLevel(from + delta);
+        // Only the primary stat of the keyword is worth reacting to —
+        // side effects (e.g. bathroom creep from food) stay silent.
+        const isPrimaryStat = Object.keys(effects)[0] === statName;
+        if (isPrimaryStat && Math.abs(roundLevel(to) - roundLevel(from)) >= 1) {
+          events.push({
+            kind,
+            stat: statName as PhysicalStatName,
+            from: roundLevel(from),
+            to: roundLevel(to),
+          });
+        }
+      }
       logger.debug(
-        `[SomaticStateService] 💧 Drink keyword for "${agentId}". Thirst: ${state.thirst.getLevel()}`,
-      );
-    }
-
-    if (SOMATIC_KEYWORDS.rest.test(cleanText)) {
-      state.energy.increase();
-      logger.debug(
-        `[SomaticStateService] 💤 Rest keyword for "${agentId}". Energy: ${state.energy.getLevel()}`,
-      );
-    }
-
-    if (SOMATIC_KEYWORDS.work.test(cleanText)) {
-      state.energy.decrease();
-      logger.debug(
-        `[SomaticStateService] 🔨 Work keyword for "${agentId}". Energy: ${state.energy.getLevel()}`,
-      );
-    }
-
-    if (SOMATIC_KEYWORDS.sick.test(cleanText)) {
-      state.sickness.increase();
-      logger.debug(
-        `[SomaticStateService] 🤮 Sickness keyword for "${agentId}". Sickness: ${state.sickness.getLevel()}`,
-      );
-    }
-
-    if (SOMATIC_KEYWORDS.alcohol.test(cleanText)) {
-      state.alcohol.increase();
-      logger.debug(
-        `[SomaticStateService] 🍺 Alcohol keyword for "${agentId}". Alcohol: ${state.alcohol.getLevel()}`,
-      );
-    }
-
-    if (SOMATIC_KEYWORDS.substance.test(cleanText)) {
-      state.substance.increase();
-      logger.debug(
-        `[SomaticStateService] 🌿 Substance keyword for "${agentId}". Substance: ${state.substance.getLevel()}`,
-      );
-    }
-
-    if (SOMATIC_KEYWORDS.bathroom.test(cleanText)) {
-      state.bathroom.decrease();
-      logger.debug(
-        `[SomaticStateService] 🚽 Bathroom keyword for "${agentId}". Bathroom: ${state.bathroom.getLevel()}`,
+        `[SomaticStateService] 🎯 "${kind}" keyword for "${agentId}"`,
       );
     }
 
     state.isDirty = true;
+    return events;
   },
 
+  /**
+   * Render the somatic self-context block: current mood as evocative color
+   * (not a script), compact body readout, and anything that just happened.
+   * Intensity scales the framing; wording stays the model's job.
+   */
   async renderSystemMessage(
     agentId: string,
     locale = PromptLocaleService.getDefaultLocale(),
+    events: SomaticStateEvent[] = [],
   ): Promise<string | null> {
+    const state = await ensureState(agentId);
     const snapshot = await this.getSnapshot(agentId);
     const dominantEmotion = snapshot.emotion;
 
-    const intensityBracket =
+    const bracketKey =
       dominantEmotion.intensity >= 75
-        ? "OVERWHELMING"
+        ? "Overwhelming"
         : dominantEmotion.intensity >= 50
-          ? "STRONG"
+          ? "Strong"
           : dominantEmotion.intensity >= 25
-            ? "MODERATE"
-            : "MILD";
+            ? "Moderate"
+            : "Mild";
+
+    const template = (key: string, variables?: Record<string, string>) =>
+      PromptLocaleService.get(locale, `somatic.moodTemplate.${key}`, variables);
 
     const behaviorPrompt =
       getEmotionBehaviorPrompt(dominantEmotion.dominant, locale) ||
       getEmotionBehaviorPrompt("neutral", locale);
 
-    const emotionDetailsLines = Object.entries(dominantEmotion.all)
-      .map(
-        ([emotionName, value]) =>
-          `  - ${emotionName.charAt(0).toUpperCase() + emotionName.slice(1)}: ${Math.round(value)}/100`,
+    // Undercurrents: secondary emotions strong enough to leak through.
+    const dominantComponents = new Set(
+      dominantEmotion.components && dominantEmotion.components.length > 0
+        ? dominantEmotion.components
+        : [dominantEmotion.dominant],
+    );
+    const undercurrents = Object.entries(dominantEmotion.all)
+      .filter(
+        ([name, value]) => !dominantComponents.has(name) && value >= 15,
       )
-      .join("\n");
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
+      .map(([name, value]) => `${name} ${Math.round(value)}`)
+      .join(", ");
 
-    const moodHeader = PromptLocaleService.get(
-      locale,
-      "somatic.moodTemplate.header",
-    );
-    const currentMood = PromptLocaleService.get(
-      locale,
-      "somatic.moodTemplate.currentMood",
-      {
-        emotion: dominantEmotion.dominant.toUpperCase(),
-        intensityBracket,
+    const lines: string[] = [];
+    lines.push(template("header"));
+    lines.push(
+      template("moodLine", {
+        emotion: dominantEmotion.dominant,
+        bracket: template(`bracket${bracketKey}`),
         intensity: String(Math.round(dominantEmotion.intensity)),
-      },
+      }),
     );
-    const moodDirective = PromptLocaleService.get(
-      locale,
-      "somatic.moodTemplate.directive",
-    );
-    const moodFilter = PromptLocaleService.get(
-      locale,
-      "somatic.moodTemplate.filter",
-    );
-    const spectrumHeader = PromptLocaleService.get(
-      locale,
-      "somatic.moodTemplate.spectrumHeader",
-    );
-    const intensityRulesHeader = PromptLocaleService.get(
-      locale,
-      "somatic.moodTemplate.intensityRulesHeader",
-    );
-    const intensityMild = PromptLocaleService.get(
-      locale,
-      "somatic.moodTemplate.intensityMild",
-    );
-    const intensityModerate = PromptLocaleService.get(
-      locale,
-      "somatic.moodTemplate.intensityModerate",
-    );
-    const intensityStrong = PromptLocaleService.get(
-      locale,
-      "somatic.moodTemplate.intensityStrong",
-    );
-    const intensityOverwhelming = PromptLocaleService.get(
-      locale,
-      "somatic.moodTemplate.intensityOverwhelming",
-    );
-    const physicalStateHeader = PromptLocaleService.get(
-      locale,
-      "somatic.moodTemplate.physicalStateHeader",
-    );
+    if (undercurrents) {
+      lines.push(template("undercurrentsLine", { list: undercurrents }));
+    }
+    lines.push("");
+    lines.push(`${behaviorPrompt} ${template(`framing${bracketKey}`)}`);
+    lines.push("");
+    lines.push(template("expressionRules"));
 
-    let block = `${moodHeader}\n${currentMood}\n${moodDirective}\n${moodFilter}\n\n${behaviorPrompt}\n\n${spectrumHeader}\n${emotionDetailsLines}\n\n${intensityRulesHeader}\n${intensityMild}\n${intensityModerate}\n${intensityStrong}\n${intensityOverwhelming}`;
+    // ── Body ────────────────────────────────────────────────────────
+    lines.push("");
+    lines.push(template("physicalHeader"));
 
-    block += `\n\n${physicalStateHeader}`;
-
-    const physicalStats: [string, SomaticStatEntry, number][] = [
-      ["Hunger", snapshot.hunger, STAT_MAX_VALUES.hunger],
-      ["Thirst", snapshot.thirst, STAT_MAX_VALUES.thirst],
-      ["Energy", snapshot.energy, STAT_MAX_VALUES.energy],
-      ["Sickness", snapshot.sickness, STAT_MAX_VALUES.sickness],
-      ["Alcohol", snapshot.alcohol, STAT_MAX_VALUES.alcohol],
-      ["Substance", snapshot.substance, STAT_MAX_VALUES.substance],
-      ["Bathroom", snapshot.bathroom, STAT_MAX_VALUES.bathroom],
+    const corePhysical = [
+      `Hunger ${snapshot.hunger.level}/${STAT_MAX_VALUES.hunger} (${snapshot.hunger.label})`,
+      `Thirst ${snapshot.thirst.level}/${STAT_MAX_VALUES.thirst} (${snapshot.thirst.label})`,
+      `Energy ${snapshot.energy.level}/${STAT_MAX_VALUES.energy} (${snapshot.energy.label})`,
     ];
+    if (snapshot.sickness.level > 0) {
+      corePhysical.push(
+        `Sickness ${snapshot.sickness.level}/${STAT_MAX_VALUES.sickness} (${snapshot.sickness.label})`,
+      );
+    }
+    if (snapshot.alcohol.level >= 1) {
+      corePhysical.push(
+        `Alcohol ${snapshot.alcohol.level}/${STAT_MAX_VALUES.alcohol} (${snapshot.alcohol.label})`,
+      );
+    }
+    if (snapshot.substance.level >= 1) {
+      corePhysical.push(
+        `Substance ${snapshot.substance.level}/${STAT_MAX_VALUES.substance} (${snapshot.substance.label})`,
+      );
+    }
+    if (snapshot.bathroom.level >= 40) {
+      corePhysical.push(
+        `Bathroom ${snapshot.bathroom.level}/${STAT_MAX_VALUES.bathroom} (${snapshot.bathroom.label})`,
+      );
+    }
+    lines.push(corePhysical.join(" · "));
 
-    for (const [statName, statState, maxValue] of physicalStats) {
-      const display =
-        statState.label || statState.name || `Level ${statState.level}`;
-      block += `\n- ${statName}: ${display} (${statState.level}/${maxValue})`;
+    // Notable physical conditions get one line of color each — only when
+    // they're actually in play, so the block isn't constant wallpaper.
+    const condition = (key: string) => {
+      const value = PromptLocaleService.get(locale, `somatic.conditions.${key}`);
+      if (value && !value.startsWith("[MISSING:")) lines.push(`- ${value}`);
+    };
+    if (snapshot.hunger.level >= 80) condition("hungerHigh");
+    if (snapshot.thirst.level >= 80) condition("thirstHigh");
+    if (snapshot.energy.level <= 20) condition("energyLow");
+    if (snapshot.sickness.level >= 30) condition("sicknessHigh");
+    if (snapshot.substance.level >= 4) condition("substanceHigh");
+    if (snapshot.bathroom.level >= 80) condition("bathroomHigh");
+    if (snapshot.alcohol.level >= 1) {
+      const drunkDescription = PromptLocaleService.get(
+        locale,
+        `somatic.alcohol.${snapshot.alcohol.level}`,
+      );
+      if (drunkDescription && !drunkDescription.startsWith("[MISSING:")) {
+        lines.push(`- ${drunkDescription}`);
+      }
     }
 
-    return block;
+    // ── Just now ────────────────────────────────────────────────────
+    const eventLines: string[] = [];
+    for (const event of events) {
+      const eventText = PromptLocaleService.get(
+        locale,
+        `somatic.events.${event.kind}`,
+        { from: String(event.from), to: String(event.to) },
+      );
+      if (eventText && !eventText.startsWith("[MISSING:")) {
+        eventLines.push(`- ${eventText}`);
+      }
+    }
+
+    if (
+      state.lastRenderedMood &&
+      state.lastRenderedMood !== dominantEmotion.dominant
+    ) {
+      eventLines.push(
+        `- ${PromptLocaleService.get(locale, "somatic.events.moodShift", {
+          fromMood: state.lastRenderedMood,
+          toMood: dominantEmotion.dominant,
+        })}`,
+      );
+    }
+    state.lastRenderedMood = dominantEmotion.dominant;
+    state.isDirty = true;
+
+    if (eventLines.length > 0) {
+      lines.push("");
+      lines.push(template("eventsHeader"));
+      lines.push(...eventLines);
+    }
+
+    return lines.join("\n");
   },
 
   async persistAll(): Promise<void> {
@@ -861,18 +965,19 @@ const SomaticStateService = {
   },
 
   async destroyAgent(agentId: string): Promise<void> {
-    const state = agentStates.get(agentId);
+    const normalizedId = normalizeAgentId(agentId);
+    const state = agentStates.get(normalizedId);
     if (state) {
-      await persistToDatabase(agentId, state);
-      agentStates.delete(agentId);
+      await persistToDatabase(normalizedId, state);
+      agentStates.delete(normalizedId);
     }
     logger.info(
-      `[SomaticStateService] Destroyed somatic state for agent "${agentId}"`,
+      `[SomaticStateService] Destroyed somatic state for agent "${normalizedId}"`,
     );
   },
 
   hasAgent(agentId: string): boolean {
-    return agentStates.has(agentId);
+    return agentStates.has(normalizeAgentId(agentId));
   },
 
   getLoadedAgentIds(): string[] {

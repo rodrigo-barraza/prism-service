@@ -25,7 +25,10 @@ import { DirectoryTreeFormatter } from "./DirectoryTreeFormatter.ts";
 import { ToolDocFormatter, type ToolDocMode } from "./ToolDocFormatter.ts";
 import { SkillMemoryScorer } from "./SkillMemoryScorer.ts";
 import { AssemblerContext } from "./types.ts";
-import SomaticStateService from "#src/services/somatic/SomaticStateService";
+import SomaticStateService, {
+  type SomaticStateEvent,
+} from "#src/services/somatic/SomaticStateService";
+import ResponseVarietyService from "#src/services/ResponseVarietyService";
 import WorkflowMemoryService from "#src/services/WorkflowMemoryService";
 import { SYSTEM_PROMPT_SECTIONS, COLLECTIONS } from "#src/constants";
 import PromptLocaleService from "#src/services/PromptLocaleService";
@@ -269,29 +272,51 @@ export default class SystemPromptAssembler {
     // Sub-agents are ephemeral workers — they don't maintain emotional
     // continuity, so somatic adaptation is skipped entirely.
     if (persona?.hasSomaticState && agentId && !isSubAgent) {
+      let somaticEvents: SomaticStateEvent[] = [];
       const userMessages =
         context.messages?.filter((message) => message.role === "user") || [];
       const latestUserMessage = userMessages[userMessages.length - 1];
       if (latestUserMessage && typeof latestUserMessage.content === "string") {
-        await SomaticStateService.adaptFromMessage(
-          agentId,
-          latestUserMessage.content,
-          {
-            traceId: context.traceId,
-            agentConversationId: context.agentConversationId,
-            endpoint: context.agentContext?.endpoint || "/agent",
-            project: context.project,
-            username: context.username,
-          },
-        );
+        somaticEvents =
+          (await SomaticStateService.adaptFromMessage(
+            agentId,
+            latestUserMessage.content,
+            {
+              traceId: context.traceId,
+              agentConversationId: context.agentConversationId,
+              endpoint: context.agentContext?.endpoint || "/agent",
+              project: context.project,
+              username: context.username,
+            },
+          )) || [];
       }
 
       const somaticMessage = await SomaticStateService.renderSystemMessage(
         agentId,
         locale,
+        somaticEvents,
       );
       if (somaticMessage) {
         selfContextSections.push(somaticMessage);
+      }
+    }
+
+    // ── 2c. Response Variety (separate SELF-CONTEXT section) ─────
+    // Conversational personas hold a separate conversation per user, so
+    // without this they never see what they just said to other people and
+    // every reply converges on the same openers and jokes.
+    if (persona?.usesResponseVariety && agentId && !isSubAgent) {
+      const varietyBlock = await ResponseVarietyService.renderBlock({
+        agentId,
+        project: context.project || persona.project || null,
+        currentConversationId:
+          (context.conversationId as string | null) ||
+          context.agentConversationId ||
+          null,
+        locale,
+      });
+      if (varietyBlock) {
+        selfContextSections.push(varietyBlock);
       }
     }
 
@@ -719,6 +744,7 @@ export default class SystemPromptAssembler {
           guildId: memoryGuildId,
           userIds: memoryUserIds,
           excludeMemoryIds: alreadyInjectedMemoryIds,
+          conversationalStyle: persona?.type === "conversational",
         },
       );
       if (memoryResult.memoriesText) {

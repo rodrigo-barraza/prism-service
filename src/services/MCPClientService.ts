@@ -71,6 +71,8 @@ interface MCPAuthOptions {
 interface MCPContentBlock {
   type: string;
   text?: string;
+  /** Base64 payload of image/audio content blocks. */
+  data?: string;
   blob?: string;
   uri?: string;
   mimeType?: string;
@@ -364,17 +366,42 @@ const MCPClientService = {
         .filter((item) => item.type === "text")
         .map((item) => item.text || "");
 
+      // Preserve image content instead of dropping it: the first image
+      // block is surfaced as `image: { data, mimeType }`, which
+      // PostExecutionEmitter uploads to MinIO and stamps with `display`
+      // like any other image-producing tool result.
+      const firstImage = content.find(
+        (item) => item.type === "image" && item.data,
+      );
+      const imagePayload = firstImage
+        ? {
+            image: {
+              data: firstImage.data as string,
+              mimeType: firstImage.mimeType || "image/png",
+            },
+          }
+        : null;
+
       // If there's only one text part, return it directly for cleaner output
       if (textParts.length === 1) {
         // Try to parse as JSON (many MCP tools return JSON as text)
         try {
-          return JSON.parse(textParts[0]);
+          const parsed = JSON.parse(textParts[0]);
+          if (!imagePayload) return parsed;
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            return { ...parsed, ...imagePayload };
+          }
+          return { result: parsed, ...imagePayload };
         } catch {
-          return { result: textParts[0] };
+          return { result: textParts[0], ...(imagePayload || {}) };
         }
       }
 
-      return { result: textParts.join("\n") };
+      const joinedText = textParts.join("\n");
+      if (imagePayload) {
+        return { ...(joinedText && { result: joinedText }), ...imagePayload };
+      }
+      return { result: joinedText };
     } catch (error: unknown) {
       // Never reconnect-retry an aborted call
       if (options.signal?.aborted) {

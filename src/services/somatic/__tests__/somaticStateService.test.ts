@@ -102,24 +102,25 @@ describe("EmotionalStateEngine — basic mechanics", () => {
     expect(dominant.emotion).toBe("anger");
     expect(dominant.intensity).toBeGreaterThan(0);
   });
-  it("decay reduces all emotion values toward 0 in decay mode", () => {
-    const engine = new EmotionalStateEngine({ emotionalModel: "decay" });
+  it("decay pulls emotion values toward baseline over time", () => {
+    const engine = new EmotionalStateEngine();
     engine.addEmotion("joy", 50);
     const valueBefore = engine.emotions.joy;
-    engine.decay();
+    engine.decay(30);
     expect(engine.emotions.joy).toBeLessThan(valueBefore);
+    expect(engine.emotions.joy).toBeGreaterThan(0);
   });
 
-  it("decay is a no-op in reactive mode", () => {
-    const engine = new EmotionalStateEngine({ emotionalModel: "reactive" });
+  it("decay with disabled half-life is a no-op", () => {
+    const engine = new EmotionalStateEngine({ decayHalfLifeMinutes: 0 });
     engine.addEmotion("joy", 50);
     const valueBefore = engine.emotions.joy;
-    engine.decay();
+    engine.decay(30);
     expect(engine.emotions.joy).toBe(valueBefore);
   });
 
 
-  it("reset sets all emotions back to 0", () => {
+  it("reset sets all emotions back to baseline", () => {
     const engine = new EmotionalStateEngine();
     engine.addEmotion("joy", 50);
     engine.addEmotion("anger", 30);
@@ -418,11 +419,10 @@ describe("SomaticStateService — stat manipulation", () => {
     expect(result.emotion).toBe("joy");
   });
 
-  it("getEmotionBehaviorPrompt returns mood override text", async () => {
+  it("getEmotionBehaviorPrompt returns mood color text", async () => {
     await SomaticStateService.addEmotion(AGENT, "anger", 50);
     const prompt = await SomaticStateService.getEmotionBehaviorPrompt(AGENT);
-    expect(prompt).toContain("ANGER");
-    expect(prompt).toContain("VOLCANIC FURY");
+    expect(prompt).toContain("heat under your fur");
   });
 
   it("getAlcoholSystemPrompt returns empty for sober agent", async () => {
@@ -557,51 +557,66 @@ describe("SomaticStateService — renderSystemMessage", () => {
     }
   });
 
-  it("returns the emotion behavioral override directive", async () => {
+  it("renders the mood header, mood line, and expression rules", async () => {
     const message = await SomaticStateService.renderSystemMessage(AGENT);
     expect(message).not.toBeNull();
-    expect(message).toContain("ACTIVE MOOD STATE");
-    expect(message).toContain("NEUTRAL");
-    expect(message).toContain("MOOD OVERRIDE");
+    expect(message).toContain("# How you're feeling right now");
+    expect(message).toContain("Mood: neutral");
+    expect(message).toContain("unfiltered default self");
+    expect(message).toContain("fresh wording of your own");
   });
 
-  it("includes physical stat section with correct labels", async () => {
+  it("includes a compact body line with core stats", async () => {
     const message = await SomaticStateService.renderSystemMessage(AGENT);
-    expect(message).toContain("Your Current Physical State");
-    expect(message).toContain("Hunger:");
-    expect(message).toContain("Thirst:");
-    expect(message).toContain("Energy:");
-    expect(message).toContain("Sickness:");
-    expect(message).toContain("Alcohol:");
-    expect(message).toContain("Substance:");
-    expect(message).toContain("Bathroom:");
+    expect(message).toContain("# Your body right now");
+    expect(message).toContain("Hunger 0/100 (Satisfied)");
+    expect(message).toContain("Thirst 0/100 (Quenched)");
+    expect(message).toContain("Energy 100/100 (Energized)");
   });
 
-  it("includes human-readable labels in the output", async () => {
+  it("omits sickness/alcohol/substance/bathroom lines when they are at rest", async () => {
     const message = await SomaticStateService.renderSystemMessage(AGENT);
-    expect(message).toContain("Satisfied");
-    expect(message).toContain("Energized");
-    expect(message).toContain("Sober");
-    expect(message).toContain("Healthy");
+    expect(message).not.toContain("Sickness");
+    expect(message).not.toContain("Alcohol");
+    expect(message).not.toContain("Substance");
+    expect(message).not.toContain("Bathroom");
   });
 
-  it("shows correct max values per stat", async () => {
+  it("includes alcohol readout and drunk narration when drinking", async () => {
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "alcohol", 5);
     const message = await SomaticStateService.renderSystemMessage(AGENT);
-    expect(message).toContain("0/100");
-    expect(message).toContain("100/100");
-    expect(message).toContain("0/10");
+    expect(message).toContain("Alcohol 5/10 (Drunk)");
+    expect(message).toContain("inhibitions");
   });
 
-  it("updates emotion section after addEmotion", async () => {
+  it("adds a starving condition line when hunger is extreme", async () => {
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "hunger", 90);
+    const message = await SomaticStateService.renderSystemMessage(AGENT);
+    expect(message).toContain("Hunger 90/100 (Starving)");
+    expect(message).toContain("genuinely starving");
+  });
+
+  it("updates mood section after addEmotion, scaled by intensity bracket", async () => {
     await SomaticStateService.addEmotion(AGENT, "anger", 50);
     const message = await SomaticStateService.renderSystemMessage(AGENT);
-    expect(message).toContain("ANGER");
-    expect(message).toContain("VOLCANIC FURY");
+    expect(message).toContain("Mood: anger");
+    expect(message).toContain("heat under your fur");
+    expect(message).toMatch(/mild|moderate|strong|overwhelming/);
   });
 
-  it("includes intensity bracket labels", async () => {
+  it("renders keyword events in a Just now section", async () => {
+    const message = await SomaticStateService.renderSystemMessage(AGENT, "en", [
+      { kind: "food", stat: "hunger", from: 82, to: 57 },
+    ]);
+    expect(message).toContain("# Just now");
+    expect(message).toContain("hunger 82 → 57");
+  });
+
+  it("surfaces mood shifts between consecutive renders", async () => {
+    await SomaticStateService.renderSystemMessage(AGENT);
+    await SomaticStateService.addEmotion(AGENT, "joy", 60);
     const message = await SomaticStateService.renderSystemMessage(AGENT);
-    expect(message).toMatch(/MILD|MODERATE|STRONG|OVERWHELMING/);
+    expect(message).toContain("shifted from neutral to joy");
   });
 });
 
