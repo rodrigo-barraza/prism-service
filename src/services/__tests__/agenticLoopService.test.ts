@@ -3,7 +3,7 @@ import AgenticLoopService from "#src/services/AgenticLoopService";
 import ContextWindowManager from "#src/services/ContextWindowManager";
 import SettingsService from "#src/services/SettingsService";
 import { PROVIDERS, MESSAGE_ROLES } from "#src/constants";
-import { TYPES } from "#src/config";
+import { MODALITY_TYPES } from "#src/config";
 
 vi.mock("#src/utils/logger", () => ({
   default: {
@@ -183,8 +183,8 @@ describe("AgenticLoopService", () => {
       resolvedModel: "test-model",
       modelDefinition: {
         maxInputTokens: 10000,
-        inputTypes: [TYPES.TEXT],
-        outputTypes: [TYPES.TEXT],
+        inputTypes: [MODALITY_TYPES.TEXT],
+        outputTypes: [MODALITY_TYPES.TEXT],
       },
       messages: [{ role: MESSAGE_ROLES.USER, content: "Hi" }],
       options: {
@@ -226,7 +226,7 @@ describe("AgenticLoopService", () => {
   });
 
   it("should filter out generate_image if model natively outputs images", async () => {
-    mockContext.modelDefinition.outputTypes = [TYPES.TEXT, TYPES.IMAGE];
+    mockContext.modelDefinition.outputTypes = [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE];
     mockContext.options.disabledTools = ["search_web", "describe_image"];
 
     await AgenticLoopService.runAgenticLoop(mockContext);
@@ -239,7 +239,7 @@ describe("AgenticLoopService", () => {
   });
 
   it("should filter out describe_image if model natively inputs images", async () => {
-    mockContext.modelDefinition.inputTypes = [TYPES.TEXT, TYPES.IMAGE];
+    mockContext.modelDefinition.inputTypes = [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE];
     mockContext.options.disabledTools = ["search_web", "generate_image"];
 
     await AgenticLoopService.runAgenticLoop(mockContext);

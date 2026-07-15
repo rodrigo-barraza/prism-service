@@ -571,7 +571,9 @@ describe("Finalizer Lifecycle Timing — Persist-Before-Emit Invariant", () => {
 // swapMessageContent is imported from Finalizer.ts
 
 describe("swapMsgContent — system context injection handling", () => {
-  it("swaps injected system context to rawContent", () => {
+  it("leaves delimiter-prefixed content untouched when no rawContent exists", () => {
+    // Legacy regex parsing of injected content was removed — messages
+    // without rawContent are passed through as-is.
     const message: TestPayload = {
       role: MESSAGE_ROLES.USER,
       content:
@@ -580,13 +582,13 @@ describe("swapMsgContent — system context injection handling", () => {
 
     swapMessageContent(message);
 
-    expect(message.content).toBe("make a song about the war");
-    expect(message.rawContent).toBe(
+    expect(message.content).toBe(
       `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\nYou are helpful.\n\n${PROMPT_DELIMITERS.USER_MESSAGE}\nmake a song about the war`,
     );
+    expect(message.rawContent).toBeUndefined();
   });
 
-  it("swaps Local Time context format", () => {
+  it("leaves Local Time context format untouched when no rawContent exists", () => {
     const message: TestPayload = {
       role: MESSAGE_ROLES.USER,
       content:
@@ -595,8 +597,8 @@ describe("swapMsgContent — system context injection handling", () => {
 
     swapMessageContent(message);
 
-    expect(message.content).toBe("hey whats up");
-    expect(message.rawContent).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX);
+    expect(message.content).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX);
+    expect(message.rawContent).toBeUndefined();
   });
 
   it("uses rawContent swap when rawContent has system context prefix", () => {

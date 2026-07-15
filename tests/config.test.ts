@@ -10,7 +10,7 @@ import {
   resolveRecommendedDefault,
   getModels,
   getModelOptions,
-  TYPES,
+  MODALITY_TYPES,
 } from "#src/config";
 
 beforeAll(() => {
@@ -47,7 +47,7 @@ describe('GET /config', () => {
     expect(res.body).toHaveProperty('textToSpeech');
     expect(res.body).toHaveProperty('textToImage');
     expect(res.body).toHaveProperty('imageToText');
-    expect(res.body).toHaveProperty(TYPES.EMBEDDING);
+    expect(res.body).toHaveProperty(MODALITY_TYPES.EMBEDDING);
   });
 
   it('textToText has models and defaults', async () => {
@@ -183,15 +183,15 @@ describe('GET /config/tools', () => {
 describe("Config Utility Functions", () => {
   describe("getModels", () => {
     it("should return models that support the input and output type combination", () => {
-      const models = getModels(TYPES.TEXT, TYPES.TEXT);
+      const models = getModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT);
       expect(models.length).toBeGreaterThan(0);
-      expect(models.every(model => model.inputTypes.includes(TYPES.TEXT) && model.outputTypes.includes(TYPES.TEXT))).toBe(true);
+      expect(models.every(model => model.inputTypes.includes(MODALITY_TYPES.TEXT) && model.outputTypes.includes(MODALITY_TYPES.TEXT))).toBe(true);
     });
   });
 
   describe("getModelOptions", () => {
     it("should return grouped options by provider", () => {
-      const options = getModelOptions(TYPES.TEXT, TYPES.TEXT);
+      const options = getModelOptions(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT);
       expect(options).toHaveProperty(PROVIDERS.OPENAI);
       expect(options).toHaveProperty(PROVIDERS.GOOGLE);
       expect(options).toHaveProperty(PROVIDERS.ANTHROPIC);
@@ -202,7 +202,7 @@ describe("Config Utility Functions", () => {
 
   describe("getDefaultModels", () => {
     it("should return default model names for each provider", () => {
-      const defaults = getDefaultModels(TYPES.TEXT, TYPES.TEXT);
+      const defaults = getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT);
       expect(defaults).toHaveProperty(PROVIDERS.GOOGLE);
       expect(defaults).toHaveProperty(PROVIDERS.ANTHROPIC);
       expect(defaults).toHaveProperty(PROVIDERS.OPENAI);
@@ -212,7 +212,7 @@ describe("Config Utility Functions", () => {
 
   describe("getPricing", () => {
     it("should return pricing objects map for models", () => {
-      const pricing = getPricing(TYPES.TEXT, TYPES.TEXT);
+      const pricing = getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT);
       const modelNames = Object.keys(pricing);
       expect(modelNames.length).toBeGreaterThan(0);
       expect(pricing[modelNames[0]]).toHaveProperty("inputPerMillion");
@@ -236,8 +236,8 @@ describe("Config Utility Functions", () => {
   describe("resolveRecommendedDefault", () => {
     it("should resolve Gemini 3.5 Flash first if google is available", () => {
       const recommendation = resolveRecommendedDefault(
-        TYPES.TEXT,
-        TYPES.TEXT,
+        MODALITY_TYPES.TEXT,
+        MODALITY_TYPES.TEXT,
         new Set([PROVIDERS.GOOGLE, PROVIDERS.OPENAI, PROVIDERS.ANTHROPIC])
       );
       expect(recommendation).not.toBeNull();
@@ -247,8 +247,8 @@ describe("Config Utility Functions", () => {
 
     it("should fallback to Anthropic Haiku if google is not available", () => {
       const recommendation = resolveRecommendedDefault(
-        TYPES.TEXT,
-        TYPES.TEXT,
+        MODALITY_TYPES.TEXT,
+        MODALITY_TYPES.TEXT,
         new Set([PROVIDERS.ANTHROPIC, PROVIDERS.OPENAI])
       );
       expect(recommendation).not.toBeNull();
@@ -258,8 +258,8 @@ describe("Config Utility Functions", () => {
 
     it("should fallback to OpenAI if google and anthropic are not available", () => {
       const recommendation = resolveRecommendedDefault(
-        TYPES.TEXT,
-        TYPES.TEXT,
+        MODALITY_TYPES.TEXT,
+        MODALITY_TYPES.TEXT,
         new Set([PROVIDERS.OPENAI])
       );
       expect(recommendation).not.toBeNull();
@@ -269,8 +269,8 @@ describe("Config Utility Functions", () => {
 
     it("should respect fcOnly filter and only return models supporting Tool Calling", () => {
       const recommendation = resolveRecommendedDefault(
-        TYPES.TEXT,
-        TYPES.TEXT,
+        MODALITY_TYPES.TEXT,
+        MODALITY_TYPES.TEXT,
         new Set([PROVIDERS.GOOGLE]),
         true
       );
@@ -280,8 +280,8 @@ describe("Config Utility Functions", () => {
 
     it("should return null if no providers are available", () => {
       const recommendation = resolveRecommendedDefault(
-        TYPES.TEXT,
-        TYPES.TEXT,
+        MODALITY_TYPES.TEXT,
+        MODALITY_TYPES.TEXT,
         new Set()
       );
       expect(recommendation).toBeNull();

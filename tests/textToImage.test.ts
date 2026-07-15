@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
-import { PROVIDERS, TYPES } from "#src/constants";
+import { PROVIDERS, MODALITY_TYPES } from "#src/constants";
 import {
   app,
   TEST_SECRET,
@@ -57,7 +57,7 @@ describe("POST /chat (text-to-image via imageAPI model)", () => {
       .expect(200);
 
     // The response aggregates chunk + image + done events
-    expect(res.body).toHaveProperty(TYPES.TEXT);
+    expect(res.body).toHaveProperty(MODALITY_TYPES.TEXT);
     expect(res.body).toHaveProperty("images");
     expect(res.body.images).toHaveLength(1);
     // When MinIO is unavailable, FileService returns the inline dataUrl as the ref
@@ -173,7 +173,7 @@ describe("POST /chat (text-to-image via imageAPI model)", () => {
 
     // imageAPI won't be dispatched since the provider lacks generateImage
     // It falls through to text generation which will succeed
-    expect(res.body).toHaveProperty(TYPES.TEXT);
+    expect(res.body).toHaveProperty(MODALITY_TYPES.TEXT);
   });
 
   it("returns 500 when provider throws", async () => {

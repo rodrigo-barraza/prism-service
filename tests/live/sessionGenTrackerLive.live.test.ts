@@ -19,7 +19,7 @@
  * ═══════════════════════════════════════════════════════════════
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { PROVIDERS, TYPES } from "#src/constants";
+import { PROVIDERS, MODALITY_TYPES } from "#src/constants";
 
 const PRISM_SERVICE_URL = "http://localhost:7777";
 const LM_STUDIO_URL = "http://localhost:1234";
@@ -54,11 +54,11 @@ async function findTargetModel() {
 
   // Fallback: any loaded conversational model
   const loaded = models.find(
-    (m: any) => m.loaded_instances?.length > 0 && m.type !== TYPES.EMBEDDING,
+    (m: any) => m.loaded_instances?.length > 0 && m.type !== MODALITY_TYPES.EMBEDDING,
   );
   if (loaded) return loaded.key || loaded.id;
 
-  const first = models.find((m: any) => m.type !== TYPES.EMBEDDING);
+  const first = models.find((m: any) => m.type !== MODALITY_TYPES.EMBEDDING);
   return first ? first.key || first.id : null;
 }
 

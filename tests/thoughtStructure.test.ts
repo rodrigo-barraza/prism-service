@@ -1,6 +1,6 @@
 import "./setup.ts";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { HARNESS_IDS, THOUGHT_STRUCTURES, TYPES } from "#src/constants";
+import { HARNESS_IDENTIFIERS, THOUGHT_STRUCTURES, MODALITY_TYPES } from "#src/constants";
 import { TOPOLOGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import AgenticLoopService from "#src/services/AgenticLoopService";
 import ReActHarness from "#src/services/harnesses/ReActHarness";
@@ -38,12 +38,12 @@ describe("Thought Structure Routing & Migration Tests", () => {
     vi.clearAllMocks();
     // Configure default SettingsService mock responses
     vi.mocked(SettingsService.getSection).mockResolvedValue({
-      harness: HARNESS_IDS.STANDARD,
+      harness: HARNESS_IDENTIFIERS.STANDARD,
       thoughtStructure: THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT,
     });
     vi.mocked(SettingsService.getCached).mockReturnValue({
       agents: {
-        harness: HARNESS_IDS.STANDARD,
+        harness: HARNESS_IDENTIFIERS.STANDARD,
         topology: "default",
         dynamicToolActivation: true,
       },
@@ -55,8 +55,8 @@ describe("Thought Structure Routing & Migration Tests", () => {
       resolvedModel: "test-model",
       modelDefinition: {
         maxInputTokens: 10000,
-        inputTypes: [TYPES.TEXT],
-        outputTypes: [TYPES.TEXT],
+        inputTypes: [MODALITY_TYPES.TEXT],
+        outputTypes: [MODALITY_TYPES.TEXT],
       },
       messages: [{ role: "user", content: "Hi" }],
       options: {
@@ -77,7 +77,7 @@ describe("Thought Structure Routing & Migration Tests", () => {
   describe("AgenticLoopService Settings & Migration Resolution", () => {
     it("should use thoughtStructure from options if explicitly provided", async () => {
       mockContext.options.thoughtStructure = THOUGHT_STRUCTURES.TREE_OF_THOUGHTS;
-      mockContext.options.harness = HARNESS_IDS.STANDARD;
+      mockContext.options.harness = HARNESS_IDENTIFIERS.STANDARD;
 
       await AgenticLoopService.runAgenticLoop(mockContext);
 
@@ -88,12 +88,12 @@ describe("Thought Structure Routing & Migration Tests", () => {
     it("should resolve thoughtStructure from SettingsService if missing in options", async () => {
       // Mock SettingsService to return tree_of_thoughts
       vi.mocked(SettingsService.getSection).mockResolvedValue({
-        harness: HARNESS_IDS.STANDARD,
+        harness: HARNESS_IDENTIFIERS.STANDARD,
         thoughtStructure: THOUGHT_STRUCTURES.TREE_OF_THOUGHTS,
       });
 
       mockContext.options.thoughtStructure = undefined;
-      mockContext.options.harness = HARNESS_IDS.STANDARD;
+      mockContext.options.harness = HARNESS_IDENTIFIERS.STANDARD;
 
       await AgenticLoopService.runAgenticLoop(mockContext);
 
@@ -103,7 +103,7 @@ describe("Thought Structure Routing & Migration Tests", () => {
 
     it("should dispatch to GoT when thoughtStructure is graph_of_thoughts", async () => {
       mockContext.options.thoughtStructure = THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS;
-      mockContext.options.harness = HARNESS_IDS.STANDARD;
+      mockContext.options.harness = HARNESS_IDENTIFIERS.STANDARD;
 
       await AgenticLoopService.runAgenticLoop(mockContext);
 
@@ -114,12 +114,12 @@ describe("Thought Structure Routing & Migration Tests", () => {
 
     it("should resolve GoT from SettingsService when options omit thoughtStructure", async () => {
       vi.mocked(SettingsService.getSection).mockResolvedValue({
-        harness: HARNESS_IDS.STANDARD,
+        harness: HARNESS_IDENTIFIERS.STANDARD,
         thoughtStructure: THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS,
       });
 
       mockContext.options.thoughtStructure = undefined;
-      mockContext.options.harness = HARNESS_IDS.STANDARD;
+      mockContext.options.harness = HARNESS_IDENTIFIERS.STANDARD;
 
       await AgenticLoopService.runAgenticLoop(mockContext);
 
@@ -130,7 +130,7 @@ describe("Thought Structure Routing & Migration Tests", () => {
 
   describe("ReActHarness ThoughtStructure Dispatch", () => {
     it("should dispatch to runTreeOfThoughts when thoughtStructure is tree_of_thoughts", async () => {
-      mockContext.options.harness = HARNESS_IDS.STANDARD;
+      mockContext.options.harness = HARNESS_IDENTIFIERS.STANDARD;
       mockContext.options.thoughtStructure = THOUGHT_STRUCTURES.TREE_OF_THOUGHTS;
 
       const harness = new ReActHarness(mockContext, {} as any, {
@@ -144,7 +144,7 @@ describe("Thought Structure Routing & Migration Tests", () => {
     });
 
     it("should dispatch to runGraphOfThoughts when thoughtStructure is graph_of_thoughts", async () => {
-      mockContext.options.harness = HARNESS_IDS.STANDARD;
+      mockContext.options.harness = HARNESS_IDENTIFIERS.STANDARD;
       mockContext.options.thoughtStructure = THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS;
 
       const harness = new ReActHarness(mockContext, {} as any, {
@@ -159,7 +159,7 @@ describe("Thought Structure Routing & Migration Tests", () => {
     });
 
     it("should run the standard CoT loop when thoughtStructure is chain_of_thought", async () => {
-      mockContext.options.harness = HARNESS_IDS.STANDARD;
+      mockContext.options.harness = HARNESS_IDENTIFIERS.STANDARD;
       mockContext.options.thoughtStructure = THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT;
 
       const state = new AgenticLoopState({
@@ -179,7 +179,7 @@ describe("Thought Structure Routing & Migration Tests", () => {
     });
 
     it("should NOT dispatch to any strategy for undefined thoughtStructure (falls through to CoT loop)", async () => {
-      mockContext.options.harness = HARNESS_IDS.STANDARD;
+      mockContext.options.harness = HARNESS_IDENTIFIERS.STANDARD;
       mockContext.options.thoughtStructure = undefined;
 
       const state = new AgenticLoopState({
@@ -227,13 +227,13 @@ describe("ThoughtStructure × Topology Combination Matrix", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(SettingsService.getSection).mockResolvedValue({
-      harness: HARNESS_IDS.STANDARD,
+      harness: HARNESS_IDENTIFIERS.STANDARD,
       thoughtStructure: THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT,
       topology: TOPOLOGIES.HIERARCHICAL,
     });
     vi.mocked(SettingsService.getCached).mockReturnValue({
       agents: {
-        harness: HARNESS_IDS.STANDARD,
+        harness: HARNESS_IDENTIFIERS.STANDARD,
         topology: TOPOLOGIES.HIERARCHICAL,
         dynamicToolActivation: true,
       },
@@ -250,8 +250,8 @@ describe("ThoughtStructure × Topology Combination Matrix", () => {
       resolvedModel: "test-model",
       modelDefinition: {
         maxInputTokens: 10000,
-        inputTypes: [TYPES.TEXT],
-        outputTypes: [TYPES.TEXT],
+        inputTypes: [MODALITY_TYPES.TEXT],
+        outputTypes: [MODALITY_TYPES.TEXT],
       },
       messages: [{ role: "user", content: "Matrix test" }],
       options: {
@@ -272,7 +272,7 @@ describe("ThoughtStructure × Topology Combination Matrix", () => {
   for (const thoughtStructureEntry of THOUGHT_STRUCTURE_ENTRIES) {
     for (const topology of TOPOLOGY_ENTRIES) {
       it(`should resolve ${thoughtStructureEntry.key} + ${topology.key} and persist both on options`, async () => {
-        mockContext.options.harness = HARNESS_IDS.STANDARD;
+        mockContext.options.harness = HARNESS_IDENTIFIERS.STANDARD;
         mockContext.options.thoughtStructure = thoughtStructureEntry.value;
         mockContext.options.topology = topology.value;
 
@@ -280,7 +280,7 @@ describe("ThoughtStructure × Topology Combination Matrix", () => {
 
         expect(mockContext.options.thoughtStructure).toBe(thoughtStructureEntry.value);
         expect(mockContext.options.topology).toBe(topology.value);
-        expect(mockContext.options.harness).toBe(HARNESS_IDS.STANDARD);
+        expect(mockContext.options.harness).toBe(HARNESS_IDENTIFIERS.STANDARD);
 
         if (thoughtStructureEntry.value === THOUGHT_STRUCTURES.TREE_OF_THOUGHTS) {
           expect(runTreeOfThoughts).toHaveBeenCalled();
@@ -298,7 +298,7 @@ describe("ThoughtStructure × Topology Combination Matrix", () => {
 
   it("should fall back to SettingsService defaults when neither thoughtStructure nor topology is provided", async () => {
     vi.mocked(SettingsService.getSection).mockResolvedValue({
-      harness: HARNESS_IDS.STANDARD,
+      harness: HARNESS_IDENTIFIERS.STANDARD,
       thoughtStructure: THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS,
       topology: TOPOLOGIES.PEER_TO_PEER,
     });
@@ -311,18 +311,18 @@ describe("ThoughtStructure × Topology Combination Matrix", () => {
 
     expect(mockContext.options.thoughtStructure).toBe(THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS);
     expect(mockContext.options.topology).toBe(TOPOLOGIES.PEER_TO_PEER);
-    expect(mockContext.options.harness).toBe(HARNESS_IDS.STANDARD);
+    expect(mockContext.options.harness).toBe(HARNESS_IDENTIFIERS.STANDARD);
     expect(runGraphOfThoughts).toHaveBeenCalled();
   });
 
   it("should prefer explicit options over SettingsService defaults for both thoughtStructure and topology", async () => {
     vi.mocked(SettingsService.getSection).mockResolvedValue({
-      harness: HARNESS_IDS.STANDARD,
+      harness: HARNESS_IDENTIFIERS.STANDARD,
       thoughtStructure: THOUGHT_STRUCTURES.CHAIN_OF_THOUGHT,
       topology: TOPOLOGIES.HIERARCHICAL,
     });
 
-    mockContext.options.harness = HARNESS_IDS.STANDARD;
+    mockContext.options.harness = HARNESS_IDENTIFIERS.STANDARD;
     mockContext.options.thoughtStructure = THOUGHT_STRUCTURES.TREE_OF_THOUGHTS;
     mockContext.options.topology = TOPOLOGIES.SEQUENTIAL;
 

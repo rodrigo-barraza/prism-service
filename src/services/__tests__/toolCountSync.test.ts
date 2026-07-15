@@ -176,7 +176,7 @@ vi.mock("#src/config", async (importOriginal) => {
 
 vi.mock("#src/services/config", () => ({
   MONGO_DB_NAME: "prism-test",
-  TYPES: { IMAGE: "image" },
+  MODALITY_TYPES: { IMAGE: "image" },
 }));
 
 // Wildcard persona

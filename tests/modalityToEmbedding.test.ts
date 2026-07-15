@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { app, MOCK_GENERATE_EMBEDDING } from "./setup.ts";
-import { PROVIDERS, TYPES } from "#src/constants";
+import { PROVIDERS, MODALITY_TYPES } from "#src/constants";
 
 describe("POST /modality-to-embedding", () => {
     beforeEach(() => {
@@ -42,7 +42,7 @@ describe("POST /modality-to-embedding", () => {
             .send({ provider: PROVIDERS.GOOGLE, text: "What is the meaning of life?" })
             .expect(200);
 
-        expect(res.body).toHaveProperty(TYPES.EMBEDDING);
+        expect(res.body).toHaveProperty(MODALITY_TYPES.EMBEDDING);
         expect(Array.isArray(res.body.embedding)).toBe(true);
         expect(res.body).toHaveProperty("dimensions", 3);
         expect(res.body).toHaveProperty("provider", PROVIDERS.GOOGLE);
@@ -57,7 +57,7 @@ describe("POST /modality-to-embedding", () => {
             })
             .expect(200);
 
-        expect(res.body).toHaveProperty(TYPES.EMBEDDING);
+        expect(res.body).toHaveProperty(MODALITY_TYPES.EMBEDDING);
         expect(res.body).toHaveProperty("provider", PROVIDERS.GOOGLE);
     });
 
@@ -71,7 +71,7 @@ describe("POST /modality-to-embedding", () => {
             })
             .expect(200);
 
-        expect(res.body).toHaveProperty(TYPES.EMBEDDING);
+        expect(res.body).toHaveProperty(MODALITY_TYPES.EMBEDDING);
         // Multimodal should pass an array of parts to provider
         const args = MOCK_GENERATE_EMBEDDING.mock.calls[0];
         expect(Array.isArray(args[0])).toBe(true);
