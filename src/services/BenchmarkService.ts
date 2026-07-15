@@ -58,6 +58,7 @@ interface ModelTarget {
   thinkingEnabled?: boolean;
   toolsEnabled?: boolean;
   agent?: string;
+  locale?: string;
 }
 
 interface ModelEntry {
@@ -67,6 +68,7 @@ interface ModelEntry {
   thinkingEnabled: boolean;
   toolsEnabled: boolean;
   agent?: string;
+  locale?: string;
 }
 
 interface BenchmarkEvent {
@@ -96,6 +98,7 @@ interface ModelResult {
   thinkingEnabled: boolean;
   toolsEnabled: boolean;
   agent?: string;
+  locale?: string;
   response: string | null;
   thinking: string | null;
   toolCalls?: ToolCallResult[] | null;
@@ -329,6 +332,7 @@ async function runSingleModel(
     thinkingEnabled: model.thinkingEnabled || false,
     toolsEnabled: model.toolsEnabled || false,
     ...(model.agent && { agent: model.agent }),
+    ...(model.locale && { locale: model.locale }),
   };
   // Bail immediately if already aborted
   if (signal?.aborted) {
@@ -374,6 +378,7 @@ async function runSingleModel(
         username,
         skipConversation: true,
         thinkingEnabled: model.thinkingEnabled || false,
+        ...(model.locale && { locale: model.locale }),
         ...((model.agent || model.toolsEnabled) && {
           ...(model.agent && { agent: model.agent }),
           agenticLoopEnabled: true,
@@ -608,6 +613,7 @@ const BenchmarkService = {
           thinkingEnabled: tool.thinkingEnabled || false,
           toolsEnabled: tool.toolsEnabled || false,
           ...(tool.agent && { agent: tool.agent }),
+          ...(tool.locale && { locale: tool.locale }),
         };
       });
     } else {

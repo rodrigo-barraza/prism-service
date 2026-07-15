@@ -68,7 +68,7 @@ let cachedClientSchemas: ToolSchemaFull[] = [];
  */
 const localizedClientSchemasCache = new Map<string, ToolSchemaFull[]>();
 const localizedAISchemasCache = new Map<string, ToolSchemaFull[]>();
-const attemptedLocales = new Set<string>();
+const localeFetchAttemptTimes = new Map<string, number>();
 
 /** @type {Map<string, ToolSchemaFull>} Tool name → full schema (for routing) */
 const toolMap = new Map<string, ToolSchemaFull>();
@@ -190,13 +190,11 @@ async function fetchSchemas() {
  * returns tool descriptions in the correct language.
  */
 async function fetchSchemasForLocale(locale: string) {
-  if (
-    locale === "en" ||
-    localizedClientSchemasCache.has(locale) ||
-    attemptedLocales.has(locale)
-  )
+  if (locale === "en" || localizedClientSchemasCache.has(locale)) return;
+  const lastAttempt = localeFetchAttemptTimes.get(locale) || 0;
+  if (Date.now() - lastAttempt < TOOL_SCHEMA_FETCH_RETRY_COOLDOWN_MILLISECONDS)
     return;
-  attemptedLocales.add(locale);
+  localeFetchAttemptTimes.set(locale, Date.now());
   try {
     const localeParam = `?locale=${encodeURIComponent(locale)}`;
     const response = await fetch(
@@ -2070,7 +2068,7 @@ export default class ToolOrchestratorService {
     cachedClientSchemas = [];
     localizedClientSchemasCache.clear();
     localizedAISchemasCache.clear();
-    attemptedLocales.clear();
+    localeFetchAttemptTimes.clear();
     toolMap.clear();
     initialized = false;
     lastFetchAttemptTime = 0;
