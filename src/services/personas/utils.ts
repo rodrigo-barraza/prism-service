@@ -3,7 +3,7 @@ import { PersonaContext, ToolPolicySection } from "./types.ts";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";
-import { resolveBlockedToolNames } from "#src/services/ToolDiscoveryScope";
+import { resolveDiscoverableUniverse } from "#src/services/ToolDiscoveryScope";
 
 // ────────────────────────────────────────────────────────────
 // Tool Catalog Introspection Helpers
@@ -92,14 +92,20 @@ function buildToolDiscoveryContent(
   context?: PersonaContext,
 ): string {
   const schemas = ToolOrchestratorService.getClientToolSchemas();
-  const blockedToolNames = resolveBlockedToolNames(context?._persona, schemas);
-  const totalToolCount = schemas.filter(
-    (schema) => !blockedToolNames.has(schema.name as string),
-  ).length;
-  const discoverableDomains = extractDiscoverableDomains(blockedToolNames);
+  // The persona's universe: availableTools (whole catalog for wildcard
+  // personas) minus blockedTools. Counts, domains, and trigger examples
+  // never advertise tools the agent cannot reach.
+  const universe = resolveDiscoverableUniverse(context?._persona, schemas);
+  const outOfUniverseNames = new Set<string>(
+    schemas
+      .map((schema) => schema.name as string)
+      .filter((name) => !universe.has(name)),
+  );
+  const totalToolCount = universe.size;
+  const discoverableDomains = extractDiscoverableDomains(outOfUniverseNames);
   const domainList = discoverableDomains.join(", ");
 
-  const domainKeywords = extractDomainKeywords(4, blockedToolNames);
+  const domainKeywords = extractDomainKeywords(4, outOfUniverseNames);
   const triggerExampleLines = [...domainKeywords.entries()]
     .map(([domain, keywords]) => {
       const quotedKeywords = keywords

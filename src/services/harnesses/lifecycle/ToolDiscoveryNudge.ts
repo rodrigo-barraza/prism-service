@@ -9,7 +9,10 @@ import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import ToolContext from "#src/services/ToolContext";
 import ToolOrchestratorService from "#src/services/tool-orchestrator/ToolOrchestratorService";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
-import { partitionByDiscoverableUniverse } from "#src/services/ToolDiscoveryScope";
+import {
+  partitionByDiscoverableUniverse,
+  isScopedPersona,
+} from "#src/services/ToolDiscoveryScope";
 
 import type {
   ToolCall,
@@ -67,7 +70,7 @@ export function injectToolDiscoveryNudge(
     // reachable universe — the resolver would strip them anyway.
     if (disabledToolNames.length > 0 && context.agent) {
       const persona = AgentPersonaRegistry.get(context.agent);
-      if (persona?.blockedTools?.length) {
+      if (isScopedPersona(persona)) {
         const { allowed } = partitionByDiscoverableUniverse(
           persona,
           ToolOrchestratorService.getClientToolSchemas(),

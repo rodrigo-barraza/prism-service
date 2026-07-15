@@ -178,6 +178,27 @@ describe("Persona Utilities", () => {
       expect(resultPolicy).toContain("Filesystem");
       expect(resultPolicy).not.toContain("Finance");
     });
+
+    it("caps the Tool Discovery universe at an enumerated availableTools list", () => {
+      mockGetClientToolSchemas.mockReturnValue([
+        { name: "read_file", domain: "Filesystem", domainKey: "filesystem" },
+        { name: "get_weather", domain: "Weather", domainKey: "weather" },
+        { name: "get_stock_price", domain: "Finance", domainKey: "finance" },
+      ]);
+
+      const resultPolicy = buildToolPolicy([], {
+        enabledTools: [],
+        resolvedToolNames: [TOOL_NAMES.SEARCH_TOOLS, TOOL_NAMES.DISCOVER_AND_ENABLE_TOOLS],
+        _persona: { availableTools: ["domainKey:weather"] } as never,
+      });
+
+      // The persona can only ever reach its availableTools — the prompt
+      // must not claim access to the full catalog.
+      expect(resultPolicy).toContain("You have access to 1 tools");
+      expect(resultPolicy).toContain("Weather");
+      expect(resultPolicy).not.toContain("Filesystem");
+      expect(resultPolicy).not.toContain("Finance");
+    });
   });
 
   describe("getToolPolicyAddendum", () => {

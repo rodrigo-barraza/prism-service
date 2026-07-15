@@ -43,7 +43,7 @@ describe("GET /config/agents — coreToolsLocked field", () => {
     }
   });
 
-  it("returns resolved enabledByDefaultToolNames for LUPOS without '*' wildcard", async () => {
+  it("returns an empty enabledByDefaultToolNames for LUPOS — core tools only, the rest available but not enabled", async () => {
     const response = await authenticatedGet("/config/agents").expect(200);
     const agents = response.body as AgentConfigResponse[];
 
@@ -51,12 +51,9 @@ describe("GET /config/agents — coreToolsLocked field", () => {
     expect(lupos).toBeDefined();
     expect(lupos!.enabledByDefaultToolNames).toBeDefined();
     expect(lupos!.enabledByDefaultToolNames).not.toContain("*");
-    expect(lupos!.enabledByDefaultToolNames.length).toBeGreaterThan(0);
-
-    const enabledSet = new Set(lupos!.enabledToolNames);
-    for (const toolName of lupos!.enabledByDefaultToolNames) {
-      expect(enabledSet.has(toolName)).toBe(true);
-    }
+    // Lupos starts with ONLY the always-on core tools; his availableTools
+    // are reachable via innate discovery, not enabled by default.
+    expect(lupos!.enabledByDefaultToolNames).toEqual([]);
   });
 });
 
