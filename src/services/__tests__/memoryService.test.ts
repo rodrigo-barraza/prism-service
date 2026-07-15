@@ -179,6 +179,62 @@ describe("MemoryService", () => {
       expect(mockCollection.skip).toHaveBeenCalledWith(0);
       expect(mockCollection.limit).toHaveBeenCalledWith(5);
     });
+
+    it("should filter by aboutUserId and sourceUserId", async () => {
+      await MemoryService.list({
+        agent: "LUPOS",
+        aboutUserId: "discord-user-1",
+        sourceUserId: "discord-user-2",
+      });
+
+      expect(mockCollection.find).toHaveBeenCalledWith(
+        {
+          agent: "LUPOS",
+          aboutUserId: "discord-user-1",
+          sourceUserId: "discord-user-2",
+        },
+        expect.any(Object),
+      );
+    });
+
+    it("should keep supporting the legacy userId param as aboutUserId", async () => {
+      await MemoryService.list({ agent: "LUPOS", userId: "discord-user-1" });
+
+      expect(mockCollection.find).toHaveBeenCalledWith(
+        { agent: "LUPOS", aboutUserId: "discord-user-1" },
+        expect.any(Object),
+      );
+    });
+  });
+
+  describe("facets", () => {
+    it("should aggregate types, aboutUsers and sourceUsers scoped to project/agent", async () => {
+      const result = await MemoryService.facets({
+        agent: "LUPOS",
+        project: "lupos",
+      });
+
+      expect(mockCollection.aggregate).toHaveBeenCalledTimes(3);
+      const pipelines = mockCollection.aggregate.mock.calls.map(
+        (call: any[]) => call[0],
+      );
+      for (const pipeline of pipelines) {
+        expect(pipeline[0].$match).toMatchObject({
+          agent: "LUPOS",
+          project: "lupos",
+        });
+      }
+      // User facets exclude docs without the id field
+      expect(pipelines[1][0].$match.aboutUserId).toEqual({
+        $type: "string",
+        $ne: "",
+      });
+      expect(pipelines[2][0].$match.sourceUserId).toEqual({
+        $type: "string",
+        $ne: "",
+      });
+      expect(result).toEqual({ types: [], aboutUsers: [], sourceUsers: [] });
+    });
   });
 
   describe("delete and remove", () => {
