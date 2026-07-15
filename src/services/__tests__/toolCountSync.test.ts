@@ -393,8 +393,13 @@ describe("Tool Count Sync — Sidebar ↔ System Prompt", () => {
 
     // Sidebar may have extra tools that are system:true Core Workspace but not
     // in the persona's enabledTools or any bypass set. These are acceptable.
+    // The Core Discover trio is also acceptable: RESTRICTED's entire
+    // availableTools universe is enabled, so the resolver drops the
+    // discovery tools (no headroom) while the sidebar still lists them.
+    const DISCOVERY_TRIO = new Set(["search_tools", "enable_tools", "discover_and_enable_tools"]);
     const inSidebarNotResolver = [...sidebarNames].filter((name) => !resolverNames.has(name));
     for (const toolName of inSidebarNotResolver) {
+      if (DISCOVERY_TRIO.has(toolName)) continue;
       const tool = clientSchemas.find((tool: Record<string, unknown>) => tool.name === toolName);
       expect(tool?.system).toBe(true);
       expect(tool?.domain).toBe(DOMAINS.CORE_WORKSPACE.displayName);

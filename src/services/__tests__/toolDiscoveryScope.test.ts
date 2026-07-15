@@ -11,7 +11,9 @@ import { describe, it, expect } from "vitest";
 import {
   DISCOVERY_TOOL_NAMES,
   isDiscoveryTool,
+  isScopedPersona,
   resolveBlockedToolNames,
+  resolveDiscoverableUniverse,
   hasDiscoveryHeadroom,
   partitionByDiscoverableUniverse,
 } from "#src/services/ToolDiscoveryScope";
@@ -56,6 +58,50 @@ describe("ToolDiscoveryScope", () => {
     });
   });
 
+  describe("isScopedPersona", () => {
+    it("is false for missing/wildcard personas without a denylist", () => {
+      expect(isScopedPersona(null)).toBe(false);
+      expect(isScopedPersona({ availableTools: ["*"] })).toBe(false);
+    });
+
+    it("is true for enumerated availableTools or a blockedTools denylist", () => {
+      expect(isScopedPersona({ availableTools: ["get_weather"] })).toBe(true);
+      expect(
+        isScopedPersona({ availableTools: ["*"], blockedTools: ["domainKey:creative"] }),
+      ).toBe(true);
+    });
+  });
+
+  describe("resolveDiscoverableUniverse", () => {
+    it("is the whole catalog for wildcard personas", () => {
+      const universe = resolveDiscoverableUniverse({ availableTools: ["*"] }, SCHEMAS);
+      expect(universe.size).toBe(SCHEMAS.length);
+    });
+
+    it("is capped at availableTools for enumerated personas — discovery never extends past the curated set", () => {
+      const universe = resolveDiscoverableUniverse(
+        { availableTools: ["domainKey:weather", "generate_image"] },
+        SCHEMAS,
+      );
+      expect([...universe].sort()).toEqual([
+        "generate_image",
+        "get_weather",
+        "get_weather_forecast",
+      ]);
+    });
+
+    it("subtracts blockedTools from the available set", () => {
+      const universe = resolveDiscoverableUniverse(
+        {
+          availableTools: ["domainKey:weather"],
+          blockedTools: ["get_weather_forecast"],
+        },
+        SCHEMAS,
+      );
+      expect([...universe]).toEqual(["get_weather"]);
+    });
+  });
+
   describe("hasDiscoveryHeadroom", () => {
     it("is true when catalog tools exist outside the current set", () => {
       expect(
@@ -83,6 +129,23 @@ describe("ToolDiscoveryScope", () => {
           current,
         ),
       ).toBe(false);
+    });
+
+    it("is false for an enumerated persona whose whole availableTools set is enabled — even though the catalog has more", () => {
+      expect(
+        hasDiscoveryHeadroom(
+          { availableTools: ["get_weather"] },
+          SCHEMAS,
+          new Set(["get_weather"]),
+        ),
+      ).toBe(false);
+      expect(
+        hasDiscoveryHeadroom(
+          { availableTools: ["get_weather", "generate_image"] },
+          SCHEMAS,
+          new Set(["get_weather"]),
+        ),
+      ).toBe(true);
     });
 
     it("does not count context-unreachable tools as headroom", () => {
@@ -119,6 +182,19 @@ describe("ToolDiscoveryScope", () => {
       );
       expect(allowed).toEqual(["get_weather", "get_stock_price"]);
       expect(blocked).toEqual(["generate_image"]);
+    });
+
+    it("restricts enumerated personas to their availableTools", () => {
+      const { allowed, blocked } = partitionByDiscoverableUniverse(
+        { availableTools: ["domainKey:weather", "mcp__custom__listed"] },
+        SCHEMAS,
+        ["get_weather", "generate_image", "mcp__custom__listed", "mcp__custom__other"],
+      );
+      // Catalog tools outside availableTools and unlisted non-catalog
+      // names are both out of universe; exact-listed non-catalog names
+      // (e.g. an MCP tool the persona names) survive.
+      expect(allowed).toEqual(["get_weather", "mcp__custom__listed"]);
+      expect(blocked).toEqual(["generate_image", "mcp__custom__other"]);
     });
 
     it("allows names absent from the catalog (e.g. MCP tools) unless named directly", () => {

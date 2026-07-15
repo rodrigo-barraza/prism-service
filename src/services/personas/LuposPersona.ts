@@ -288,15 +288,10 @@ export const LuposPersona: Persona = {
     DOMAIN_KEY_TAGS.BROWSER,
     DOMAIN_KEY_TAGS.META,
   ],
-  // Lean first-iteration set — his conversational signature (Discord
-  // platform tools + generative art/audio/voice). Everything else in
-  // LUPOS_AVAILABLE_TOOLS is reachable via discovery or pre-flight.
-  enabledByDefaultTools: [
-    DOMAIN_KEY_TAGS.DISCORD,
-    TOOL_NAMES.GENERATE_IMAGE,
-    TOOL_NAMES.GENERATE_AUDIO,
-    TOOL_NAMES.SYNTHESIZE_SPEECH,
-  ],
+  // Core tools only on the first iteration — everything in
+  // LUPOS_AVAILABLE_TOOLS is available but NOT enabled, reachable via
+  // innate discovery or pre-flight (same shape as Omni).
+  enabledByDefaultTools: [],
   capabilities: "",
   hasSomaticState: true,
   usesDirectoryTree: false,

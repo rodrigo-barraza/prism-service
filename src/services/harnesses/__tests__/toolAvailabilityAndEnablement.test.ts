@@ -247,10 +247,12 @@ const blockedToolsPersona = {
 };
 
 // Persona that blocks the discovery tools' own domains — innate discovery
-// must restore them anyway while it still has headroom.
+// must restore them anyway while it still has headroom (get_weather_forecast
+// is available but not enabled by default).
 const discoveryBlockedPersona = {
   id: "NO_DISCOVER_AGENT",
-  availableTools: ["get_weather"],
+  availableTools: ["get_weather", "get_weather_forecast"],
+  enabledByDefaultTools: ["get_weather"],
   coreToolsLocked: true,
   blockedTools: ["domainKey:tools", "domainKey:meta"],
 };
@@ -407,11 +409,11 @@ describe("Tool Availability & Enablement", () => {
       // Core agentic tools should NOT be bypassed for restricted persona
       expect(toolNames).not.toContain("evaluate_expression");
 
-      // EXCEPT the discovery tools: discovery is innate for any agent with
-      // headroom (catalog tools outside its enabled set), even when
-      // coreToolsLocked is false.
-      expect(toolNames).toContain("search_tools");
-      expect(toolNames).toContain("enable_tools");
+      // No discovery tools either: the persona's entire universe
+      // (availableTools minus blockedTools) is already enabled, so there
+      // is no discovery headroom.
+      expect(toolNames).not.toContain("search_tools");
+      expect(toolNames).not.toContain("enable_tools");
     });
 
     it("applies blockedTools denylist when enabledTools filter is active", async () => {
@@ -1006,10 +1008,11 @@ describe("Tool Availability & Enablement", () => {
       const toolNames = extractToolNames(finalTools);
 
       // blockedTools covers domainKey:tools (enable/disable) and
-      // domainKey:meta (search_tools) — but the persona only has
-      // get_weather enabled, so discovery headroom restores the trio.
+      // domainKey:meta (search_tools) — but get_weather_forecast is
+      // available and not enabled, so discovery headroom restores the trio.
       expect(toolNames).toContain("search_tools");
       expect(toolNames).toContain("enable_tools");
+      expect(toolNames).not.toContain("get_weather_forecast");
 
       // disable_tools is not part of the innate trio — the persona block
       // still applies to it.

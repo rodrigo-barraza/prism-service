@@ -10,7 +10,10 @@ import {
   extractDiscoverableDomains,
   extractDomainKeywords,
 } from "#src/services/personas/utils";
-import { partitionByDiscoverableUniverse } from "#src/services/ToolDiscoveryScope";
+import {
+  partitionByDiscoverableUniverse,
+  isScopedPersona,
+} from "#src/services/ToolDiscoveryScope";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 
 import { InternalToolContext } from "./InternalToolRegistry.ts";
@@ -278,7 +281,7 @@ const discoverAndEnableTools = {
     // let alone enables — tools it cannot reach.
     if (Array.isArray(matches) && matches.length > 0 && context.agent) {
       const persona = AgentPersonaRegistry.get(context.agent);
-      if (persona?.blockedTools?.length) {
+      if (isScopedPersona(persona)) {
         const clientSchemas =
           getToolOrchestratorService().getClientToolSchemas();
         const { blocked } = partitionByDiscoverableUniverse(

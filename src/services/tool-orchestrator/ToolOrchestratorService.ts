@@ -2,7 +2,10 @@ import { TOOLS_SERVICE_URL } from "#config";
 import { IDENTITY_HEADERS } from "@rodrigo-barraza/utilities-library/service";
 import MCPClientService from "#src/services/MCPClientService";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
-import { partitionByDiscoverableUniverse } from "#src/services/ToolDiscoveryScope";
+import {
+  partitionByDiscoverableUniverse,
+  isScopedPersona,
+} from "#src/services/ToolDiscoveryScope";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { ORCHESTRATOR_ONLY_TOOLS } from "#src/services/OrchestratorPrompt";
@@ -1793,7 +1796,7 @@ export default class ToolOrchestratorService {
       ? AgentPersonaRegistry.get(context.agent)
       : null;
     if (
-      scopePersona?.blockedTools?.length &&
+      isScopedPersona(scopePersona) &&
       Array.isArray(toolsApiResult?.matches)
     ) {
       const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
@@ -1876,7 +1879,7 @@ export default class ToolOrchestratorService {
     }));
 
     // Same persona universe scoping for MCP matches as for catalog matches.
-    if (scopePersona?.blockedTools?.length && mcpMatches.length > 0) {
+    if (isScopedPersona(scopePersona) && mcpMatches.length > 0) {
       const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
       const { blocked } = partitionByDiscoverableUniverse(
         scopePersona,

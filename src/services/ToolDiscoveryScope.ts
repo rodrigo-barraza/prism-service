@@ -55,9 +55,50 @@ export function resolveBlockedToolNames(
   return resolveToolEntriesToSet(persona.blockedTools, schemas);
 }
 
+/** Whether the persona restricts discovery at all — either an enumerated (non-wildcard) availableTools list or a blockedTools denylist. */
+export function isScopedPersona(
+  persona: PersonaScope | null | undefined,
+): boolean {
+  if (!persona) return false;
+  if (persona.blockedTools?.length) return true;
+  return (
+    Array.isArray(persona.availableTools) &&
+    persona.availableTools.length > 0 &&
+    !persona.availableTools.includes("*")
+  );
+}
+
 /**
- * Whether the agent can still discover something: at least one catalog
- * tool is outside both its current tool set and its persona denylist.
+ * The persona's discoverable universe: its availableTools (the whole
+ * catalog for wildcard/undefined personas) minus its blockedTools.
+ * availableTools is the ceiling of what a persona can ever reach —
+ * discovery never extends an agent beyond its curated set.
+ */
+export function resolveDiscoverableUniverse(
+  persona: PersonaScope | null | undefined,
+  schemas: SchemaLike[],
+): Set<string> {
+  const blocked = resolveBlockedToolNames(persona, schemas);
+  const hasEnumeratedAvailable =
+    Array.isArray(persona?.availableTools) &&
+    persona!.availableTools!.length > 0 &&
+    !persona!.availableTools!.includes("*");
+  const availableSet = hasEnumeratedAvailable
+    ? resolveToolEntriesToSet(persona!.availableTools!, schemas)
+    : null;
+
+  const universe = new Set<string>();
+  for (const schema of schemas) {
+    if (blocked.has(schema.name)) continue;
+    if (availableSet && !availableSet.has(schema.name)) continue;
+    universe.add(schema.name);
+  }
+  return universe;
+}
+
+/**
+ * Whether the agent can still discover something: at least one universe
+ * tool (availableTools minus blockedTools) is outside its current set.
  * `excludedToolNames` carries context-unreachable tools (client-disabled,
  * workspace-off, native-collision, orchestrator-for-sub-agent) so they
  * never count as headroom.
@@ -68,32 +109,58 @@ export function hasDiscoveryHeadroom(
   currentToolNames: ReadonlySet<string>,
   excludedToolNames?: ReadonlySet<string>,
 ): boolean {
-  const blocked = resolveBlockedToolNames(persona, schemas);
-  for (const schema of schemas) {
-    if (currentToolNames.has(schema.name)) continue;
-    if (blocked.has(schema.name)) continue;
-    if (excludedToolNames?.has(schema.name)) continue;
+  const universe = resolveDiscoverableUniverse(persona, schemas);
+  for (const toolName of universe) {
+    if (currentToolNames.has(toolName)) continue;
+    if (excludedToolNames?.has(toolName)) continue;
     return true;
   }
   return false;
 }
 
 /**
- * Split candidate tool names into those the agent may reach and those its
- * persona denylist forbids. Names absent from the catalog (e.g. MCP tools)
- * are allowed unless the denylist names them directly.
+ * Split candidate tool names into those inside the persona's discoverable
+ * universe and those outside it. Unscoped personas pass everything
+ * through — including names absent from the catalog (e.g. MCP tools).
+ * Scoped personas additionally admit exact availableTools entries that
+ * aren't in the catalog, so explicitly listed MCP/remote tools survive.
  */
 export function partitionByDiscoverableUniverse(
   persona: PersonaScope | null | undefined,
   schemas: SchemaLike[],
   toolNames: string[],
 ): { allowed: string[]; blocked: string[] } {
+  if (!isScopedPersona(persona)) {
+    return { allowed: [...toolNames], blocked: [] };
+  }
+
+  const universe = resolveDiscoverableUniverse(persona, schemas);
   const blockedSet = resolveBlockedToolNames(persona, schemas);
-  if (blockedSet.size === 0) return { allowed: [...toolNames], blocked: [] };
+  const catalogNames = new Set(schemas.map((schema) => schema.name));
+  const hasEnumeratedAvailable =
+    Array.isArray(persona?.availableTools) &&
+    persona!.availableTools!.length > 0 &&
+    !persona!.availableTools!.includes("*");
+
   const allowed: string[] = [];
   const blocked: string[] = [];
   for (const toolName of toolNames) {
-    (blockedSet.has(toolName) ? blocked : allowed).push(toolName);
+    if (universe.has(toolName)) {
+      allowed.push(toolName);
+      continue;
+    }
+    // Names outside the catalog: wildcard personas admit them unless
+    // deny-listed; enumerated personas admit only exact listed entries.
+    if (!catalogNames.has(toolName) && !blockedSet.has(toolName)) {
+      const isExplicitlyAvailable = hasEnumeratedAvailable
+        ? persona!.availableTools!.includes(toolName)
+        : true;
+      if (isExplicitlyAvailable) {
+        allowed.push(toolName);
+        continue;
+      }
+    }
+    blocked.push(toolName);
   }
   return { allowed, blocked };
 }
