@@ -294,6 +294,26 @@ export const LuposPersona: Persona = {
   enabledByDefaultTools: [],
   capabilities: "",
   hasSomaticState: true,
+  // Lupos's resting temperament: mildly cynical, restless, a buried streak
+  // of joy. Moods flare off this baseline and fade back within a few hours,
+  // so his register tracks the conversation instead of freezing at one
+  // saturated emotion.
+  somaticPersonality: {
+    baselineLevels: {
+      joy: 20,
+      trust: 8,
+      fear: 8,
+      surprise: 12,
+      sadness: 10,
+      disgust: 30,
+      anger: 26,
+      anticipation: 34,
+    },
+    decayHalfLifeMinutes: 150,
+    volatility: 0.8,
+    emotionalInertia: 0.25,
+  },
+  usesResponseVariety: true,
   usesDirectoryTree: false,
   usesCodingGuidelines: false,
 };

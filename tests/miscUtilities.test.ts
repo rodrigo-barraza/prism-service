@@ -628,22 +628,18 @@ describe('SomaticConstants', () => {
 
   describe('DEFAULT_EMOTION_PERSONALITY', () => {
     it('should have all required numeric fields in valid ranges', () => {
-      expect(DEFAULT_EMOTION_PERSONALITY.emotionalModel).toBe('reactive');
-      expect(DEFAULT_EMOTION_PERSONALITY.decayRate).toBeGreaterThan(0);
-      expect(DEFAULT_EMOTION_PERSONALITY.decayRate).toBeLessThan(1);
-      expect(DEFAULT_EMOTION_PERSONALITY.linearDecay).toBeGreaterThan(0);
       expect(DEFAULT_EMOTION_PERSONALITY.sensitivity).toBeGreaterThan(0);
       expect(DEFAULT_EMOTION_PERSONALITY.volatility).toBeGreaterThanOrEqual(0);
       expect(DEFAULT_EMOTION_PERSONALITY.volatility).toBeLessThanOrEqual(1);
       expect(DEFAULT_EMOTION_PERSONALITY.emotionalInertia).toBeGreaterThanOrEqual(0);
       expect(DEFAULT_EMOTION_PERSONALITY.emotionalInertia).toBeLessThanOrEqual(1);
-      expect(DEFAULT_EMOTION_PERSONALITY.baselinePull).toBeGreaterThan(0);
+      expect(DEFAULT_EMOTION_PERSONALITY.decayHalfLifeMinutes).toBeGreaterThan(0);
       expect(DEFAULT_EMOTION_PERSONALITY.threshold).toBeGreaterThanOrEqual(0);
       expect(DEFAULT_EMOTION_PERSONALITY.dyadThreshold).toBeGreaterThanOrEqual(0);
     });
 
-    it('should have null baseline emotion by default', () => {
-      expect(DEFAULT_EMOTION_PERSONALITY.baselineEmotion).toBeNull();
+    it('should have an empty baseline (agents rest at 0) by default', () => {
+      expect(DEFAULT_EMOTION_PERSONALITY.baselineLevels).toEqual({});
     });
   });
 
@@ -685,9 +681,13 @@ describe('SomaticConstants', () => {
       }
     });
 
-    it('should contain MOOD OVERRIDE header in every prompt', () => {
+    it('should be evocative color, not a prescriptive script, in every prompt', () => {
       for (const [emotion, prompt] of Object.entries(EMOTION_BEHAVIOR_PROMPTS)) {
-        expect(prompt).toContain('MOOD OVERRIDE');
+        expect(prompt.length).toBeGreaterThan(40);
+        // Scripted VOCABULARY/TONE lists caused verbatim catchphrase
+        // parroting in production — moods must describe interior state only.
+        expect(prompt).not.toContain('MOOD OVERRIDE');
+        expect(prompt).not.toContain('VOCABULARY');
       }
     });
   });

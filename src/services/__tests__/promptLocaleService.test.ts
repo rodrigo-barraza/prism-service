@@ -403,8 +403,12 @@ describe("PromptLocaleService — Somatic Mood Nesting (moods.*)", () => {
     it(`should resolve nested mood key: somatic.moods.${mood}`, () => {
       expect(englishLocaleKeys.has(`somatic.moods.${mood}`)).toBe(true);
       const value = englishLocaleKeys.get(`somatic.moods.${mood}`)!;
-      expect(value.length).toBeGreaterThan(20);
-      expect(value).toContain("MOOD OVERRIDE");
+      // Evocative interior-state color, not a prescriptive script: no
+      // VOCABULARY lists or "MOOD OVERRIDE" directives (they caused
+      // verbatim catchphrase parroting in production).
+      expect(value.length).toBeGreaterThan(40);
+      expect(value).not.toContain("MOOD OVERRIDE");
+      expect(value).not.toContain("VOCABULARY");
     });
   }
 

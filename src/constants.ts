@@ -755,6 +755,52 @@ export const SOMATIC = {
 
   /** Persistence interval (milliseconds). */
   PERSIST_INTERVAL_MILLISECONDS: 60_000,
+
+  /**
+   * Passive drift per 30s tick, in stat points (also applied pro-rata for
+   * time elapsed while the service was down). Paced so physical states play
+   * out over hours/days — fast enough to matter, slow enough that feeding
+   * the agent produces a change that visibly lasts.
+   * Positive = rises over time, negative = recovers over time.
+   */
+  DRIFT_PER_TICK: {
+    hunger: 0.03, // empty → starving in ~28h
+    thirst: 0.045, // quenched → dehydrated in ~18h
+    energy: 0.06, // idle rest: exhausted → energized in ~14h
+    sickness: -0.4, // full recovery in ~2h of quiet
+    alcohol: -0.05, // 10/10 wasted → sober in ~100min
+    substance: -0.04, // 10/10 tripping → sober in ~2h
+    bathroom: 0.005,
+  },
+
+  /**
+   * Homeostatic drift applied once per processed message: conversation is
+   * activity, so it costs a little energy and works substances through the
+   * system slightly faster.
+   */
+  MESSAGE_DRIFT: {
+    energy: -0.4,
+    sickness: -1,
+    alcohol: -0.05,
+    substance: -0.05,
+  },
+
+  /**
+   * Stat effects of somatic keyword hits in the triggering message, in
+   * absolute stat points. Sized so a single interaction produces a change
+   * the agent (and users) can actually notice — this is what makes the
+   * tamagotchi loop worth playing.
+   */
+  KEYWORD_EFFECTS: {
+    food: { hunger: -28, bathroom: 6 },
+    drink: { thirst: -35, bathroom: 8 },
+    rest: { energy: 30 },
+    work: { energy: -12 },
+    sick: { sickness: 25 },
+    alcohol: { alcohol: 2, thirst: -10 },
+    substance: { substance: 2 },
+    bathroom: { bathroom: -50 },
+  },
 } as const;
 
 // ─── Tool Management & Keywords Constants ───────────────────

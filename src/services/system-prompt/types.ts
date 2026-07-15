@@ -76,6 +76,12 @@ export interface MemoryFetchOptions {
   guildId?: string;
   userIds?: string[];
   excludeMemoryIds?: Set<string>;
+  /**
+   * Conversational personas: use plain-language staleness caveats (no
+   * "verify against current code") and jitter which memories are injected
+   * so the agent doesn't riff on the identical facts every single turn.
+   */
+  conversationalStyle?: boolean;
 }
 
 export interface SkillFetchOptions {

@@ -1,4 +1,5 @@
 import type { PolicyRule } from "#src/services/PolicyEngine";
+import type { EmotionPersonality } from "#src/services/somatic/SomaticConstants";
 
 export interface PersonaContext {
   enabledTools?: string[];
@@ -100,6 +101,19 @@ export interface Persona {
   >;
   /** When true, the assembler injects the agent's somatic state (from agentContext.selfContext) as an interleaved system message before the last user message. */
   hasSomaticState?: boolean;
+  /**
+   * Emotional dynamics tuning for hasSomaticState agents: resting baseline
+   * levels (the persona's temperament), decay half-life, volatility, etc.
+   * Omitted fields fall back to DEFAULT_EMOTION_PERSONALITY.
+   */
+  somaticPersonality?: Partial<EmotionPersonality>;
+  /**
+   * When true, the assembler injects a response-variety block (the agent's
+   * recent replies across ALL conversations plus a per-turn delivery
+   * seasoning) into self-context so consecutive replies don't converge on
+   * the same openers, jokes, and rhythms.
+   */
+  usesResponseVariety?: boolean;
   /**
    * Explicit "thou shalt not" rules injected as a dedicated `<constraints>` block.
    * LLMs respond more reliably to explicit negative constraints than positive-only

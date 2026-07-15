@@ -124,10 +124,13 @@ function memoryAge(createdAt: string) {
 /**
  * Staleness caveat for memories >1 day old.
  * Returns empty string for fresh memories.
+ * Plain style is for conversational personas — "verify against current
+ * code" is coding-agent language that leaks oddly into chat prompts.
  */
-function freshnessCaveat(createdAt: string) {
+function freshnessCaveat(createdAt: string, plain: boolean = false) {
   const ageDays = memoryAgeDays(createdAt);
   if (ageDays <= 1) return "";
+  if (plain) return ` (may be out of date — noted ${ageDays} days ago)`;
   return ` ⚠️ ${ageDays} days old — verify against current code before acting on this.`;
 }
 interface ExtractedFact {
@@ -606,14 +609,19 @@ const MemoryService = {
    * Format memories for injection into the system prompt.
    * Adds type badges and staleness caveats.
    */
-  formatForPrompt(memories: Record<string, unknown>[]) {
+  formatForPrompt(
+    memories: Record<string, unknown>[],
+    options: { plainCaveats?: boolean } = {},
+  ) {
     if (!memories || memories.length === 0) return "";
     return memories
       .filter((memory) => !!memory)
       .map((memory: Record<string, unknown>) => {
         const badge = `[${memory.type || "other"}]`;
-        const age = memory.age !== "today" ? ` (${memory.age || ""})` : "";
-        const caveat = freshnessCaveat(memory.createdAt as string);
+        const plain = options.plainCaveats === true;
+        const age =
+          !plain && memory.age !== "today" ? ` (${memory.age || ""})` : "";
+        const caveat = freshnessCaveat(memory.createdAt as string, plain);
         const title = memory.title || "Untitled";
         const content = memory.content || "";
         return `- ${badge} **${title}**${age}: ${content}${caveat}`;

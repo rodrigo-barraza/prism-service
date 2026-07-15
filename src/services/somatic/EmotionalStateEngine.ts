@@ -22,6 +22,16 @@ export class EmotionalStateEngine {
   personality: EmotionPersonality;
 
   constructor(personalityOverrides: Partial<EmotionPersonality> = {}) {
+    this.personality = {
+      ...DEFAULT_EMOTION_PERSONALITY,
+      ...personalityOverrides,
+      baselineLevels: {
+        ...DEFAULT_EMOTION_PERSONALITY.baselineLevels,
+        ...(personalityOverrides.baselineLevels || {}),
+      },
+    };
+
+    // A fresh agent wakes up at its resting personality, not emotionally blank.
     this.emotions = {
       joy: 0,
       trust: 0,
@@ -32,30 +42,37 @@ export class EmotionalStateEngine {
       anger: 0,
       anticipation: 0,
     };
-
-    this.personality = {
-      ...DEFAULT_EMOTION_PERSONALITY,
-      ...personalityOverrides,
-    };
+    for (const emotion of PRIMARY_EMOTIONS) {
+      this.emotions[emotion] = this.getBaseline(emotion);
+    }
   }
 
-  decay(): void {
-    if (this.personality.emotionalModel !== "decay") return;
+  private getBaseline(emotion: PrimaryEmotion): number {
+    return this.personality.baselineLevels[emotion] ?? 0;
+  }
 
-    const { decayRate, linearDecay, zeroClamp, baselineEmotion, baselinePull } =
-      this.personality;
+  /**
+   * Time-based decay toward the personality's baseline levels.
+   *
+   * Deviations from baseline halve every `decayHalfLifeMinutes`, so spikes
+   * (in either direction) are temporary states, not permanent ratchets.
+   * Without this, a busy channel pumps a handful of emotions to 100 where
+   * they sit forever and the dominant mood never changes.
+   */
+  decay(elapsedMinutes: number): void {
+    const { decayHalfLifeMinutes } = this.personality;
+    if (!decayHalfLifeMinutes || decayHalfLifeMinutes <= 0) return;
+    if (!Number.isFinite(elapsedMinutes) || elapsedMinutes <= 0) return;
+
+    const retention = Math.pow(0.5, elapsedMinutes / decayHalfLifeMinutes);
 
     for (const emotion of PRIMARY_EMOTIONS) {
-      const proportional = this.emotions[emotion] * decayRate;
-      this.emotions[emotion] -= Math.max(proportional, linearDecay);
-
-      if (baselineEmotion && emotion === baselineEmotion) {
-        this.emotions[emotion] += baselinePull * (100 - this.emotions[emotion]);
-      }
-
-      if (this.emotions[emotion] < zeroClamp) {
-        this.emotions[emotion] = 0;
-      }
+      const baseline = this.getBaseline(emotion);
+      const deviation = this.emotions[emotion] - baseline;
+      const next = baseline + deviation * retention;
+      // Snap near-baseline residue so values settle exactly at rest.
+      this.emotions[emotion] =
+        Math.abs(next - baseline) < 0.05 ? baseline : next;
     }
   }
 
@@ -135,7 +152,7 @@ export class EmotionalStateEngine {
 
   reset(): void {
     for (const emotion of PRIMARY_EMOTIONS) {
-      this.emotions[emotion] = 0;
+      this.emotions[emotion] = this.getBaseline(emotion);
     }
   }
 
@@ -155,8 +172,14 @@ export class EmotionalStateEngine {
     };
   }
 
-  static deserialize(data: SerializedEmotionalState): EmotionalStateEngine {
-    const engine = new EmotionalStateEngine(data.personality);
+  static deserialize(
+    data: SerializedEmotionalState,
+    personalityOverrides: Partial<EmotionPersonality> = {},
+  ): EmotionalStateEngine {
+    const engine = new EmotionalStateEngine({
+      ...(data.personality || {}),
+      ...personalityOverrides,
+    });
     for (const emotion of PRIMARY_EMOTIONS) {
       if (typeof data.emotions[emotion] === "number") {
         engine.emotions[emotion] = Math.max(

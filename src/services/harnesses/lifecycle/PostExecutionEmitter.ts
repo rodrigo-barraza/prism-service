@@ -30,16 +30,19 @@ interface ToolResultPayload {
 
 /**
  * Self-describing display metadata on visual tool results. Tools-service
- * emits this for embed/image tools; for tools whose media is produced as
- * raw base64 (generate_image, browser screenshots) it is stamped here
- * after the MinIO upload, so every visual result reaches the client with
- * a uniform `display` the UI can render without per-tool knowledge.
+ * emits this for embed/image/video/audio tools; for tools whose media is
+ * produced as raw base64 (generate_image, TTS/audio tools, browser
+ * screenshots) it is stamped here after the MinIO upload, so every visual
+ * result reaches the client with a uniform `display` the UI can render
+ * without per-tool knowledge.
  */
 interface ToolResultDisplay {
-  kind: "embed" | "image";
+  kind: "embed" | "image" | "video" | "audio";
   url: string;
   height?: number;
   title?: string;
+  /** Poster image shown before a video plays (video only). */
+  poster?: string;
 }
 
 /**
@@ -117,6 +120,13 @@ export async function processToolResultMedia(
         if (resultObject) {
           resultObject.audioRef = uploadResult.ref;
           delete resultObject.audio;
+          // Stamp display so audio results render an inline player via
+          // the generic display path (same convention as image/embed).
+          resultObject.display ??= {
+            kind: "audio",
+            url: uploadResult.ref,
+            title: "Audio",
+          };
         }
         emit({
           type: SERVER_SENT_EVENT_TYPES.AUDIO,
@@ -146,6 +156,24 @@ export async function processToolResultMedia(
 
     const imageResult = resultObject?.image;
     if (resultObject && imageResult?.data) {
+      // Upload raw image payloads that arrived without a ref (e.g. MCP
+      // image content blocks) so the display URL and the stored result
+      // stay lightweight — generate_image is uploaded upstream in
+      // ToolOrchestratorService and already carries minioRef.
+      if (!imageResult.minioRef) {
+        try {
+          const uploadResult = await FileService.uploadFile(
+            `data:${imageResult.mimeType || "image/png"};base64,${imageResult.data}`,
+            FILE_CATEGORIES.GENERATIONS,
+          );
+          imageResult.minioRef = uploadResult.ref;
+        } catch (uploadError) {
+          logger.error(
+            `[PostExecutionEmitter] Failed to upload image:`,
+            uploadError,
+          );
+        }
+      }
       const toolImgRef =
         imageResult.minioRef ||
         `data:${imageResult.mimeType};base64,${imageResult.data}`;

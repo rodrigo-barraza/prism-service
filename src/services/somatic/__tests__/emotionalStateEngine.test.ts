@@ -3,13 +3,24 @@ import { EmotionalStateEngine } from '#src/services/somatic/EmotionalStateEngine
 import { PRIMARY_EMOTIONS } from '#src/services/somatic/SomaticConstants';
 
 describe('EmotionalStateEngine Unit Tests', () => {
-  it('should initialize with default emotions at 0', () => {
+  it('should initialize with default emotions at 0 when no baseline is set', () => {
     const engine = new EmotionalStateEngine();
     const values = engine.getEmotionValues();
 
     for (const emotion of PRIMARY_EMOTIONS) {
       expect(values[emotion]).toBe(0);
     }
+  });
+
+  it('should initialize at the personality baseline levels', () => {
+    const engine = new EmotionalStateEngine({
+      baselineLevels: { disgust: 30, anticipation: 34, joy: 20 },
+    });
+
+    expect(engine.emotions.disgust).toBe(30);
+    expect(engine.emotions.anticipation).toBe(34);
+    expect(engine.emotions.joy).toBe(20);
+    expect(engine.emotions.fear).toBe(0);
   });
 
   it('should apply personality overrides in the constructor', () => {
@@ -32,83 +43,92 @@ describe('EmotionalStateEngine Unit Tests', () => {
     expect(engine.emotions.fear).toBe(0);
   });
 
-  it('should reset all emotions to 0', () => {
-    const engine = new EmotionalStateEngine();
+  it('should reset all emotions to baseline', () => {
+    const engine = new EmotionalStateEngine({
+      baselineLevels: { anger: 26 },
+    });
     engine.setEmotion('joy', 50);
     engine.setEmotion('anger', 80);
     engine.reset();
 
-    const values = engine.getEmotionValues();
-    for (const emotion of PRIMARY_EMOTIONS) {
-      expect(values[emotion]).toBe(0);
-    }
-  });
-
-  it('should decay emotions over time in decay mode', () => {
-    const engine = new EmotionalStateEngine({
-      emotionalModel: 'decay',
-      decayRate: 0.1,
-      linearDecay: 1.0,
-      zeroClamp: 0.5,
-    });
-
-    engine.setEmotion('joy', 80);
-    engine.decay();
-
-    // 80 - Max(8, 1) = 72
-    expect(engine.emotions.joy).toBe(72);
-
-    engine.setEmotion('joy', 0.4);
-    engine.decay();
-    // 0.4 - Max(0.04, 1) = -0.6. Clamps to 0 since -0.6 < zeroClamp (0.5)
     expect(engine.emotions.joy).toBe(0);
+    expect(engine.emotions.anger).toBe(26);
   });
 
-  it('should apply baseline pull on baselineEmotion during decay', () => {
+  it('should decay deviations toward baseline with a half-life', () => {
     const engine = new EmotionalStateEngine({
-      emotionalModel: 'decay',
-      baselineEmotion: 'anticipation',
-      baselinePull: 0.05,
-      decayRate: 0.1,
-      linearDecay: 1.0,
-      zeroClamp: 0.1,
-    });
-
-    engine.setEmotion('anticipation', 50);
-    engine.decay();
-    // Decay: 50 - Max(5, 1) = 45
-    // Pull: 45 + 0.05 * (100 - 45) = 45 + 2.75 = 47.75
-    expect(engine.emotions.anticipation).toBe(47.75);
-  });
-
-  it('should not decay emotions in reactive mode', () => {
-    const engine = new EmotionalStateEngine({
-      emotionalModel: 'reactive',
+      baselineLevels: { joy: 20 },
+      decayHalfLifeMinutes: 60,
     });
 
     engine.setEmotion('joy', 80);
-    engine.decay();
-    engine.decay();
-    engine.decay();
+    engine.decay(60); // exactly one half-life
 
-    // Reactive mode: decay() is a no-op, value stays unchanged
+    // deviation 60 halves to 30 → 20 + 30 = 50
+    expect(engine.emotions.joy).toBeCloseTo(50, 5);
+
+    engine.decay(60);
+    expect(engine.emotions.joy).toBeCloseTo(35, 5);
+  });
+
+  it('should decay upward when below baseline', () => {
+    const engine = new EmotionalStateEngine({
+      baselineLevels: { anticipation: 40 },
+      decayHalfLifeMinutes: 60,
+    });
+
+    engine.setEmotion('anticipation', 0);
+    engine.decay(60);
+
+    // deviation -40 halves to -20 → 40 - 20 = 20
+    expect(engine.emotions.anticipation).toBeCloseTo(20, 5);
+  });
+
+  it('should snap tiny residual deviations exactly to baseline', () => {
+    const engine = new EmotionalStateEngine({
+      baselineLevels: { joy: 20 },
+      decayHalfLifeMinutes: 1,
+    });
+
+    engine.setEmotion('joy', 21);
+    engine.decay(600); // many half-lives
+
+    expect(engine.emotions.joy).toBe(20);
+  });
+
+  it('should not decay when decayHalfLifeMinutes is disabled', () => {
+    const engine = new EmotionalStateEngine({
+      decayHalfLifeMinutes: 0,
+    });
+
+    engine.setEmotion('joy', 80);
+    engine.decay(600);
+
     expect(engine.emotions.joy).toBe(80);
   });
 
-  it('should shift emotions only through addEmotion in reactive mode', () => {
+  it('should ignore invalid elapsed durations', () => {
     const engine = new EmotionalStateEngine({
-      emotionalModel: 'reactive',
+      decayHalfLifeMinutes: 60,
     });
+
+    engine.setEmotion('joy', 80);
+    engine.decay(0);
+    engine.decay(-5);
+    engine.decay(Number.NaN);
+
+    expect(engine.emotions.joy).toBe(80);
+  });
+
+  it('should shift emotions through addEmotion', () => {
+    const engine = new EmotionalStateEngine();
 
     engine.setEmotion('joy', 80);
     const valueBefore = engine.emotions.joy;
 
-    // Only addEmotion shifts the spectrum
     engine.addEmotion('sadness', 40);
     expect(engine.emotions.joy).toBeLessThan(valueBefore);
   });
-
-
 
   it('should add emotions adjusting for personality thresholds', () => {
     const engine = new EmotionalStateEngine({
@@ -178,7 +198,7 @@ describe('EmotionalStateEngine Unit Tests', () => {
       dyadThreshold: 0.8,
     });
 
-    // Joy and Trust are opposites? No, Joy + Trust = Love dyad
+    // Joy + Trust = Love dyad
     engine.setEmotion('joy', 80);
     engine.setEmotion('trust', 75);
 
@@ -221,5 +241,19 @@ describe('EmotionalStateEngine Unit Tests', () => {
     const deserialized = EmotionalStateEngine.deserialize(serialized);
     expect(deserialized.emotions.joy).toBe(65);
     expect(deserialized.emotions.anger).toBe(40);
+  });
+
+  it('should apply personality overrides during deserialize', () => {
+    const engine = new EmotionalStateEngine();
+    engine.setEmotion('joy', 65);
+
+    const deserialized = EmotionalStateEngine.deserialize(engine.serialize(), {
+      baselineLevels: { joy: 20 },
+      decayHalfLifeMinutes: 60,
+    });
+
+    expect(deserialized.emotions.joy).toBe(65);
+    deserialized.decay(60);
+    expect(deserialized.emotions.joy).toBeCloseTo(42.5, 5);
   });
 });

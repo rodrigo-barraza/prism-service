@@ -66,33 +66,34 @@ export const PLUTCHIK_DYADS: Record<string, string> = {
   "anticipation+fear": "anxiety",
 };
 
-export type EmotionalModel = "decay" | "reactive";
-
 export interface EmotionPersonality {
-  emotionalModel: EmotionalModel;
-  decayRate: number;
-  linearDecay: number;
-  zeroClamp: number;
+  /** Multiplier on incoming emotional stimuli. */
   sensitivity: number;
+  /** Scales how large a single stimulus swing can be. */
   volatility: number;
+  /** 0-1 resistance to switching away from the current dominant emotion. */
   emotionalInertia: number;
-  baselineEmotion: PrimaryEmotion | null;
-  baselinePull: number;
+  /**
+   * Resting emotional levels the agent drifts back to over time.
+   * Unlisted emotions rest at 0. This is what keeps a persona's default
+   * temperament (e.g. a mildly cynical wolf) without freezing it there.
+   */
+  baselineLevels: Partial<Record<PrimaryEmotion, number>>;
+  /** Minutes for a deviation from baseline to halve. <=0 disables decay. */
+  decayHalfLifeMinutes: number;
+  /** Minimum level for an emotion to register as dominant (else neutral). */
   threshold: number;
+  /** Second-emotion ratio (vs top) required to form a dyad mood. */
   dyadThreshold: number;
 }
 
 export const DEFAULT_EMOTION_PERSONALITY: EmotionPersonality = {
-  emotionalModel: "reactive",
-  decayRate: 0.04,
-  linearDecay: 0.3,
-  zeroClamp: 0.1,
   sensitivity: 2.0,
-  volatility: 0.6,
-  emotionalInertia: 0.45,
-  baselineEmotion: null,
-  baselinePull: 0.01,
-  threshold: 0.1,
+  volatility: 0.7,
+  emotionalInertia: 0.3,
+  baselineLevels: {},
+  decayHalfLifeMinutes: 180,
+  threshold: 5,
   dyadThreshold: 0.6,
 };
 
@@ -166,7 +167,7 @@ export const ALCOHOL_DESCRIPTIONS: Record<number, string> = Object.fromEntries(
 ) as Record<number, string>;
 
 export const SOMATIC_KEYWORDS = {
-  food: /\b(pizza|burger|taco|food|eat|eating|ramen|snack|cookie|lunch|dinner|breakfast|feast|delicious|yum|yummy|hungry|starving)\b|🍔|🍕|🌮|🍜|🍪/i,
+  food: /\b(pizza|burger|taco|food|eat|eating|ramen|snack|cookie|donut|doughnut|steak|meat|sandwich|fries|lunch|dinner|breakfast|feast|delicious|yum|yummy|hungry|starving)\b|🍔|🍕|🌮|🍜|🍪|🥩|🍩|🌭|🍗|🍖/i,
   drink:
     /\b(water|soda|juice|tea|drink|drinking|sips|hydrate|coffee|fluid|quenched|thirsty|dehydrated)\b|🥛|🥤|🧃|☕/i,
   rest: /\b(sleep|nap|tired|rest|goodnight|bed|exhausted|sleepy|lazy)\b|😴|💤/i,
