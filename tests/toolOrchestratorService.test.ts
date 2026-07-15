@@ -1,7 +1,7 @@
 import "./setup.ts";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import ToolOrchestratorService, { ARG_REMAPS } from "#src/services/ToolOrchestratorService";
-import { TYPES, MODEL_TYPES, FILE_CATEGORIES, MESSAGE_ROLES } from "#src/constants";
+import { MODALITY_TYPES, MODEL_TYPES, FILE_CATEGORIES, MESSAGE_ROLES } from "#src/constants";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { TOOLS_SERVICE_URL } from "#config";
 import { TTS_VOICE_CATALOG_PLACEHOLDER } from "#src/utils/VoiceCatalog";
@@ -101,7 +101,7 @@ describe("ToolOrchestratorService", () => {
 
       const generateImageSchema = clientSchemas.find((tool) => tool.name === "generate_image") as any;
       expect(generateImageSchema).toBeDefined();
-      expect(generateImageSchema?.inputModalities).toEqual([TYPES.IMAGE]);
+      expect(generateImageSchema?.inputModalities).toEqual([MODALITY_TYPES.IMAGE]);
 
       const transcribeAudioSchema = clientSchemas.find((tool) => tool.name === "transcribe_audio") as any;
       expect(transcribeAudioSchema).toBeDefined();

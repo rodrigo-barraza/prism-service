@@ -20,7 +20,7 @@
  * ════════════════════════════════════════════════════════════════
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { HARNESS_IDS } from "#src/constants";
+import { HARNESS_IDENTIFIERS } from "#src/constants";
 import {
   discoverProviders,
   agentStreamWithRetry,
@@ -301,7 +301,7 @@ describe("Suite 1: Tool Calling Capability", () => {
           maxTokens: 1000,
           autoApprove: true,
           maxIterations: 5,
-          harness: HARNESS_IDS.STANDARD,
+          harness: HARNESS_IDENTIFIERS.STANDARD,
         },
         { timeoutMilliseconds: getTimeout(target) },
       );

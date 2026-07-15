@@ -6,7 +6,7 @@ import {
   MOCK_GENERATE_TEXT_STREAM,
 } from "./setup.ts";
 import { calculateTextCost } from "#src/utils/CostCalculator";
-import { TYPES, getPricing, MODELS } from "#src/config";
+import { MODALITY_TYPES, getPricing, MODELS } from "#src/config";
 import { PROVIDERS } from "#src/constants";
 
 
@@ -22,7 +22,7 @@ import { PROVIDERS } from "#src/constants";
 //   • Google:    gemini-3-flash-preview    ($0.50/$3.00 per M)
 // ═══════════════════════════════════════════════════════════════
 
-const TEXT_PRICING = getPricing(TYPES.TEXT, TYPES.TEXT);
+const TEXT_PRICING = getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT);
 
 // ── 10 real tool definitions from tools.rod.dev ────────
 // Sourced from GET /admin/tool-schemas — covers Weather,

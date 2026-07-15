@@ -22,10 +22,10 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { PROVIDERS } from "#src/constants";
 import { calculateTextCost } from "#src/utils/CostCalculator";
-import { TYPES, getPricing } from "#src/config";
+import { MODALITY_TYPES, getPricing } from "#src/config";
 
 const PRISM_SERVICE_URL = "http://localhost:7777";
-const TEXT_PRICING = getPricing(TYPES.TEXT, TYPES.TEXT);
+const TEXT_PRICING = getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT);
 const SIMPLE_PROMPT = "Reply with exactly one word: hello.";
 
 // ── 10 real tool definitions from tools.rod.dev ────────

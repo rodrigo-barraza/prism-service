@@ -213,7 +213,7 @@ vi.mock("#src/config", async (importOriginal) => {
 
 vi.mock("#src/services/harnesses/config", () => ({
   MONGO_DB_NAME: "prism-test",
-  TYPES: { IMAGE: "image" },
+  MODALITY_TYPES: { IMAGE: "image" },
 }));
 
 // ── Mock personas ────────────────────────────────────────────

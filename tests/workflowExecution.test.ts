@@ -5,7 +5,7 @@ import { handleConversation, handleAgent } from "#src/routes/ChatRoutes";
 import * as providersModule from "#src/providers/index";
 import EmbeddingService from "#src/services/EmbeddingService";
 import FileService from "#src/services/FileService";
-import { PROVIDERS, TYPES, WORKFLOW_ENDPOINTS } from "#src/constants";
+import { PROVIDERS, MODALITY_TYPES, WORKFLOW_ENDPOINTS } from "#src/constants";
 
 vi.mock("#src/routes/ChatRoutes", () => ({
   default: vi.fn(),
@@ -63,8 +63,8 @@ describe("WorkflowExecutionService", () => {
         { id: "node-a", nodeType: "input" },
       ];
       const edges = [
-        { sourceNodeId: "node-a", targetNodeId: "node-b", sourceModality: TYPES.TEXT, targetModality: TYPES.TEXT },
-        { sourceNodeId: "node-b", targetNodeId: "node-c", sourceModality: TYPES.TEXT, targetModality: TYPES.TEXT },
+        { sourceNodeId: "node-a", targetNodeId: "node-b", sourceModality: MODALITY_TYPES.TEXT, targetModality: MODALITY_TYPES.TEXT },
+        { sourceNodeId: "node-b", targetNodeId: "node-c", sourceModality: MODALITY_TYPES.TEXT, targetModality: MODALITY_TYPES.TEXT },
       ];
 
       const sortedIds = WorkflowExecutionService.topologicalSort(nodes as any, edges);
@@ -79,10 +79,10 @@ describe("WorkflowExecutionService", () => {
         { id: "node-a", nodeType: "input" },
       ];
       const edges = [
-        { sourceNodeId: "node-a", targetNodeId: "node-b", sourceModality: TYPES.TEXT, targetModality: TYPES.TEXT },
-        { sourceNodeId: "node-a", targetNodeId: "node-c", sourceModality: TYPES.TEXT, targetModality: TYPES.TEXT },
-        { sourceNodeId: "node-b", targetNodeId: "node-d", sourceModality: TYPES.TEXT, targetModality: TYPES.TEXT },
-        { sourceNodeId: "node-c", targetNodeId: "node-d", sourceModality: TYPES.TEXT, targetModality: TYPES.TEXT },
+        { sourceNodeId: "node-a", targetNodeId: "node-b", sourceModality: MODALITY_TYPES.TEXT, targetModality: MODALITY_TYPES.TEXT },
+        { sourceNodeId: "node-a", targetNodeId: "node-c", sourceModality: MODALITY_TYPES.TEXT, targetModality: MODALITY_TYPES.TEXT },
+        { sourceNodeId: "node-b", targetNodeId: "node-d", sourceModality: MODALITY_TYPES.TEXT, targetModality: MODALITY_TYPES.TEXT },
+        { sourceNodeId: "node-c", targetNodeId: "node-d", sourceModality: MODALITY_TYPES.TEXT, targetModality: MODALITY_TYPES.TEXT },
       ];
 
       const sortedIds = WorkflowExecutionService.topologicalSort(nodes as any, edges);
@@ -105,7 +105,7 @@ describe("WorkflowExecutionService", () => {
         { id: "node-c", nodeType: "model" },
       ];
       const edges = [
-        { sourceNodeId: "node-a", targetNodeId: "node-c", sourceModality: TYPES.TEXT, targetModality: TYPES.TEXT },
+        { sourceNodeId: "node-a", targetNodeId: "node-c", sourceModality: MODALITY_TYPES.TEXT, targetModality: MODALITY_TYPES.TEXT },
       ];
 
       const sortedIds = WorkflowExecutionService.topologicalSort(nodes as any, edges);
@@ -122,7 +122,7 @@ describe("WorkflowExecutionService", () => {
         nodeType: "model",
         provider: "google",
         modelName: "gemini-3-flash-preview",
-        outputTypes: [TYPES.TEXT],
+        outputTypes: [MODALITY_TYPES.TEXT],
       };
       const inputData = [{ type: "text", data: "Hello", sourceNodeId: null }];
       const context = { project: "test-project", username: "test-user" };
@@ -151,7 +151,7 @@ describe("WorkflowExecutionService", () => {
         nodeType: "model",
         provider: "google",
         modelName: "gemini-3-flash-preview",
-        outputTypes: [TYPES.TEXT],
+        outputTypes: [MODALITY_TYPES.TEXT],
       };
       const inputData = [
         {
@@ -186,7 +186,7 @@ describe("WorkflowExecutionService", () => {
         nodeType: "model",
         provider: "google",
         modelName: "gemini-3-flash-preview",
-        outputTypes: [TYPES.TEXT],
+        outputTypes: [MODALITY_TYPES.TEXT],
       };
       const inputData = [
         { type: "text", data: "Hello", sourceNodeId: null },
@@ -221,7 +221,7 @@ describe("WorkflowExecutionService", () => {
         nodeType: "model",
         provider: "google",
         modelName: "gemini-3-flash-preview",
-        outputTypes: [TYPES.TEXT],
+        outputTypes: [MODALITY_TYPES.TEXT],
       };
       const inputData = [{ type: "text", data: "Hello", sourceNodeId: null }];
       const context = { project: "test-project", username: "test-user" };
@@ -254,7 +254,7 @@ describe("WorkflowExecutionService", () => {
         nodeType: "model",
         provider: "google",
         modelName: "gemini-3-flash-preview",
-        outputTypes: [TYPES.TEXT],
+        outputTypes: [MODALITY_TYPES.TEXT],
       };
       const inputData = [{ type: "text", data: "Hello", sourceNodeId: null }];
       const context = { project: "test-project", username: "test-user" };
@@ -273,7 +273,7 @@ describe("WorkflowExecutionService", () => {
         nodeType: "model",
         provider: "google",
         modelName: "gemini-3-flash-preview",
-        outputTypes: [TYPES.TEXT],
+        outputTypes: [MODALITY_TYPES.TEXT],
       };
       const inputData = [{ type: "text", data: "Hello", sourceNodeId: null }];
       const context = { project: "test-project", username: "test-user" };
@@ -293,7 +293,7 @@ describe("WorkflowExecutionService", () => {
         nodeType: "model",
         provider: "google",
         modelName: "gemini-3-flash-preview",
-        outputTypes: [TYPES.TEXT],
+        outputTypes: [MODALITY_TYPES.TEXT],
       };
       const inputData = [{ type: "text", data: "Hello", sourceNodeId: null }];
       const context = { project: "test-project", username: "test-user" };
@@ -308,7 +308,7 @@ describe("WorkflowExecutionService", () => {
         nodeType: "model",
         provider: "google",
         modelName: "gemini-3-flash-preview",
-        outputTypes: [TYPES.TEXT],
+        outputTypes: [MODALITY_TYPES.TEXT],
         messages: [{ role: "user", content: "from node" }],
       };
       const inputData = [{ type: "text", data: "appended-prompt", sourceNodeId: null }];
@@ -338,7 +338,7 @@ describe("WorkflowExecutionService", () => {
         nodeType: "model",
         provider: "openai",
         modelName: "dall-e-3",
-        outputTypes: [TYPES.IMAGE],
+        outputTypes: [MODALITY_TYPES.IMAGE],
       };
       const inputData = [{ type: "text", data: "A beautiful sunset", sourceNodeId: null }];
       const context = { project: "test-project", username: "test-user" };
@@ -370,7 +370,7 @@ describe("WorkflowExecutionService", () => {
         nodeType: "model",
         provider: "openai",
         modelName: "dall-e-3",
-        outputTypes: [TYPES.IMAGE],
+        outputTypes: [MODALITY_TYPES.IMAGE],
       };
       const inputData = [{ type: "text", data: "A beautiful sunset", sourceNodeId: null }];
       const context = { project: "test-project", username: "test-user" };
@@ -385,7 +385,7 @@ describe("WorkflowExecutionService", () => {
         nodeType: "model",
         provider: "openai",
         modelName: "dall-e-3",
-        outputTypes: [TYPES.IMAGE],
+        outputTypes: [MODALITY_TYPES.IMAGE],
       };
       const inputData = [
         {
@@ -478,7 +478,7 @@ describe("WorkflowExecutionService", () => {
         nodeType: "model",
         provider: "elevenlabs",
         modelName: "eleven_monolingual_v1",
-        outputTypes: [TYPES.AUDIO],
+        outputTypes: [MODALITY_TYPES.AUDIO],
       };
       const inputData = [{ type: "text", data: "Speak this text", sourceNodeId: null }];
       const context = { project: "test-project", username: "test-user" };
@@ -520,7 +520,7 @@ describe("WorkflowExecutionService", () => {
         nodeType: "model",
         provider: "elevenlabs",
         modelName: "eleven_monolingual_v1",
-        outputTypes: [TYPES.AUDIO],
+        outputTypes: [MODALITY_TYPES.AUDIO],
       };
       const inputData = [{ type: "text", data: "Speak this text", sourceNodeId: null }];
       const context = { project: "test-project", username: "test-user" };
@@ -552,11 +552,11 @@ describe("WorkflowExecutionService", () => {
   describe("executeWorkflow() — main DAG execution", () => {
     it("executes a single model node workflow", async () => {
       const nodes = [
-        { id: "node-a", nodeType: "input", modality: TYPES.TEXT, content: "hello input" },
-        { id: "node-b", nodeType: "model", provider: PROVIDERS.OPENAI, modelName: "gpt-4", outputTypes: [TYPES.TEXT] },
+        { id: "node-a", nodeType: "input", modality: MODALITY_TYPES.TEXT, content: "hello input" },
+        { id: "node-b", nodeType: "model", provider: PROVIDERS.OPENAI, modelName: "gpt-4", outputTypes: [MODALITY_TYPES.TEXT] },
       ];
       const edges = [
-        { sourceNodeId: "node-a", targetNodeId: "node-b", sourceModality: TYPES.TEXT, targetModality: TYPES.TEXT },
+        { sourceNodeId: "node-a", targetNodeId: "node-b", sourceModality: MODALITY_TYPES.TEXT, targetModality: MODALITY_TYPES.TEXT },
       ];
 
       vi.mocked(handleConversation).mockImplementation(async (parameters, emit) => {
@@ -582,13 +582,13 @@ describe("WorkflowExecutionService", () => {
 
     it("executes a multi-node chain", async () => {
       const nodes = [
-        { id: "node-input", nodeType: "input", modality: TYPES.TEXT, content: "start" },
-        { id: "node-model1", nodeType: "model", provider: PROVIDERS.OPENAI, modelName: "gpt-4", outputTypes: [TYPES.TEXT] },
-        { id: "node-model2", nodeType: "model", provider: PROVIDERS.OPENAI, modelName: "gpt-4", outputTypes: [TYPES.TEXT] },
+        { id: "node-input", nodeType: "input", modality: MODALITY_TYPES.TEXT, content: "start" },
+        { id: "node-model1", nodeType: "model", provider: PROVIDERS.OPENAI, modelName: "gpt-4", outputTypes: [MODALITY_TYPES.TEXT] },
+        { id: "node-model2", nodeType: "model", provider: PROVIDERS.OPENAI, modelName: "gpt-4", outputTypes: [MODALITY_TYPES.TEXT] },
       ];
       const edges = [
-        { sourceNodeId: "node-input", targetNodeId: "node-model1", sourceModality: TYPES.TEXT, targetModality: TYPES.TEXT },
-        { sourceNodeId: "node-model1", targetNodeId: "node-model2", sourceModality: TYPES.TEXT, targetModality: TYPES.TEXT },
+        { sourceNodeId: "node-input", targetNodeId: "node-model1", sourceModality: MODALITY_TYPES.TEXT, targetModality: MODALITY_TYPES.TEXT },
+        { sourceNodeId: "node-model1", targetNodeId: "node-model2", sourceModality: MODALITY_TYPES.TEXT, targetModality: MODALITY_TYPES.TEXT },
       ];
 
       vi.mocked(handleConversation).mockImplementation(async (parameters, emit) => {
@@ -610,11 +610,11 @@ describe("WorkflowExecutionService", () => {
 
     it("skips nodes with errored upstream dependencies", async () => {
       const nodes = [
-        { id: "node-a", nodeType: "model", provider: PROVIDERS.OPENAI, modelName: "gpt-4", outputTypes: [TYPES.TEXT] },
-        { id: "node-b", nodeType: "model", provider: PROVIDERS.OPENAI, modelName: "gpt-4", outputTypes: [TYPES.TEXT] },
+        { id: "node-a", nodeType: "model", provider: PROVIDERS.OPENAI, modelName: "gpt-4", outputTypes: [MODALITY_TYPES.TEXT] },
+        { id: "node-b", nodeType: "model", provider: PROVIDERS.OPENAI, modelName: "gpt-4", outputTypes: [MODALITY_TYPES.TEXT] },
       ];
       const edges = [
-        { sourceNodeId: "node-a", targetNodeId: "node-b", sourceModality: TYPES.TEXT, targetModality: TYPES.TEXT },
+        { sourceNodeId: "node-a", targetNodeId: "node-b", sourceModality: MODALITY_TYPES.TEXT, targetModality: MODALITY_TYPES.TEXT },
       ];
 
       vi.mocked(handleConversation).mockRejectedValue(new Error("API Timeout"));
@@ -641,11 +641,11 @@ describe("WorkflowExecutionService", () => {
 
     it("handles abort signal", async () => {
       const nodes = [
-        { id: "node-a", nodeType: "input", modality: TYPES.TEXT, content: "input content" },
-        { id: "node-b", nodeType: "model", provider: PROVIDERS.OPENAI, modelName: "gpt-4", outputTypes: [TYPES.TEXT] },
+        { id: "node-a", nodeType: "input", modality: MODALITY_TYPES.TEXT, content: "input content" },
+        { id: "node-b", nodeType: "model", provider: PROVIDERS.OPENAI, modelName: "gpt-4", outputTypes: [MODALITY_TYPES.TEXT] },
       ];
       const edges = [
-        { sourceNodeId: "node-a", targetNodeId: "node-b", sourceModality: TYPES.TEXT, targetModality: TYPES.TEXT },
+        { sourceNodeId: "node-a", targetNodeId: "node-b", sourceModality: MODALITY_TYPES.TEXT, targetModality: MODALITY_TYPES.TEXT },
       ];
 
       const abortController = new AbortController();
@@ -672,7 +672,7 @@ describe("WorkflowExecutionService", () => {
 
     it("processes input nodes (text modality)", async () => {
       const nodes = [
-        { id: "node-input", nodeType: "input", modality: TYPES.TEXT, content: "hello" },
+        { id: "node-input", nodeType: "input", modality: MODALITY_TYPES.TEXT, content: "hello" },
       ];
 
       const result = await WorkflowExecutionService.executeWorkflow(
@@ -687,7 +687,7 @@ describe("WorkflowExecutionService", () => {
 
     it("processes input nodes (conversation modality)", async () => {
       const nodes = [
-        { id: "node-source", nodeType: "input", modality: TYPES.TEXT, content: "piped to index" },
+        { id: "node-source", nodeType: "input", modality: MODALITY_TYPES.TEXT, content: "piped to index" },
         {
           id: "node-input",
           nodeType: "input",
@@ -696,7 +696,7 @@ describe("WorkflowExecutionService", () => {
         },
       ];
       const edges = [
-        { sourceNodeId: "node-source", targetNodeId: "node-input", sourceModality: TYPES.TEXT, targetModality: "0.text" },
+        { sourceNodeId: "node-source", targetNodeId: "node-input", sourceModality: MODALITY_TYPES.TEXT, targetModality: "0.text" },
       ];
 
       const result = await WorkflowExecutionService.executeWorkflow(
@@ -713,10 +713,10 @@ describe("WorkflowExecutionService", () => {
 
     it("processes input nodes with all modalities inside conversation messages", async () => {
       const nodes = [
-        { id: "node-source-image", nodeType: "input", modality: TYPES.IMAGE, content: "image-data" },
-        { id: "node-source-audio", nodeType: "input", modality: TYPES.AUDIO, content: "audio-data" },
-        { id: "node-source-video", nodeType: "input", modality: TYPES.VIDEO, content: "video-data" },
-        { id: "node-source-pdf", nodeType: "input", modality: TYPES.PDF, content: "pdf-data" },
+        { id: "node-source-image", nodeType: "input", modality: MODALITY_TYPES.IMAGE, content: "image-data" },
+        { id: "node-source-audio", nodeType: "input", modality: MODALITY_TYPES.AUDIO, content: "audio-data" },
+        { id: "node-source-video", nodeType: "input", modality: MODALITY_TYPES.VIDEO, content: "video-data" },
+        { id: "node-source-pdf", nodeType: "input", modality: MODALITY_TYPES.PDF, content: "pdf-data" },
         {
           id: "node-input",
           nodeType: "input",
@@ -725,10 +725,10 @@ describe("WorkflowExecutionService", () => {
         },
       ];
       const edges = [
-        { sourceNodeId: "node-source-image", targetNodeId: "node-input", sourceModality: TYPES.IMAGE, targetModality: "0.image" },
-        { sourceNodeId: "node-source-audio", targetNodeId: "node-input", sourceModality: TYPES.AUDIO, targetModality: "0.audio" },
-        { sourceNodeId: "node-source-video", targetNodeId: "node-input", sourceModality: TYPES.VIDEO, targetModality: "0.video" },
-        { sourceNodeId: "node-source-pdf", targetNodeId: "node-input", sourceModality: TYPES.PDF, targetModality: "0.pdf" },
+        { sourceNodeId: "node-source-image", targetNodeId: "node-input", sourceModality: MODALITY_TYPES.IMAGE, targetModality: "0.image" },
+        { sourceNodeId: "node-source-audio", targetNodeId: "node-input", sourceModality: MODALITY_TYPES.AUDIO, targetModality: "0.audio" },
+        { sourceNodeId: "node-source-video", targetNodeId: "node-input", sourceModality: MODALITY_TYPES.VIDEO, targetModality: "0.video" },
+        { sourceNodeId: "node-source-pdf", targetNodeId: "node-input", sourceModality: MODALITY_TYPES.PDF, targetModality: "0.pdf" },
       ];
 
       const result = await WorkflowExecutionService.executeWorkflow(
@@ -808,11 +808,11 @@ describe("WorkflowExecutionService", () => {
 
     it("processes viewer nodes (collects upstream outputs)", async () => {
       const nodes = [
-        { id: "node-model", nodeType: "model", provider: "openai", modelName: "gpt-4", outputTypes: [TYPES.TEXT] },
+        { id: "node-model", nodeType: "model", provider: "openai", modelName: "gpt-4", outputTypes: [MODALITY_TYPES.TEXT] },
         { id: "node-viewer", nodeType: "viewer" },
       ];
       const edges = [
-        { sourceNodeId: "node-model", targetNodeId: "node-viewer", sourceModality: TYPES.TEXT, targetModality: TYPES.TEXT },
+        { sourceNodeId: "node-model", targetNodeId: "node-viewer", sourceModality: MODALITY_TYPES.TEXT, targetModality: MODALITY_TYPES.TEXT },
       ];
 
       vi.mocked(handleConversation).mockImplementation(async (parameters, emit) => {
@@ -827,17 +827,17 @@ describe("WorkflowExecutionService", () => {
       );
 
       expect(result.nodeOutputs["node-viewer"]).toEqual({
-        [TYPES.TEXT]: "text output",
+        [MODALITY_TYPES.TEXT]: "text output",
       });
     });
 
     it("pushes viewer partial updates", async () => {
       const nodes = [
-        { id: "node-model", nodeType: "model", provider: "openai", modelName: "gpt-4", outputTypes: [TYPES.TEXT] },
+        { id: "node-model", nodeType: "model", provider: "openai", modelName: "gpt-4", outputTypes: [MODALITY_TYPES.TEXT] },
         { id: "node-viewer", nodeType: "viewer" },
       ];
       const edges = [
-        { sourceNodeId: "node-model", targetNodeId: "node-viewer", sourceModality: TYPES.TEXT, targetModality: TYPES.TEXT },
+        { sourceNodeId: "node-model", targetNodeId: "node-viewer", sourceModality: MODALITY_TYPES.TEXT, targetModality: MODALITY_TYPES.TEXT },
       ];
 
       vi.mocked(handleConversation).mockImplementation(async (parameters, emit) => {
@@ -854,7 +854,7 @@ describe("WorkflowExecutionService", () => {
       );
 
       expect(onViewerPartial).toHaveBeenCalledWith("node-viewer", {
-        [TYPES.TEXT]: "partial-update",
+        [MODALITY_TYPES.TEXT]: "partial-update",
       });
     });
 
@@ -865,7 +865,7 @@ describe("WorkflowExecutionService", () => {
           nodeType: "model",
           provider: "openai",
           modelName: "gpt-4",
-          outputTypes: [TYPES.TEXT],
+          outputTypes: [MODALITY_TYPES.TEXT],
           staticInputs: { text: "extra static content" },
         },
       ];

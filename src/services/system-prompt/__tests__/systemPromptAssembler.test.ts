@@ -793,7 +793,10 @@ describe("SystemPromptAssembler", () => {
         project: "lupos",
         messages: [{ role: "user", content: "Hello" }],
         agentContext: {
-          discordContext: "## Discord Server\n- Server: Test Server",
+          platform: "discord",
+          platformContext: {
+            description: "## Discord Server\n- Server: Test Server",
+          },
         },
       });
 

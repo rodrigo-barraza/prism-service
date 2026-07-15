@@ -133,13 +133,13 @@ vi.mock("#src/config", async (importOriginal) => {
   return {
     ...actual,
     MONGO_DB_NAME: "prism-test",
-    TYPES: MODALITY_TYPES,
+    MODALITY_TYPES: MODALITY_TYPES,
   };
 });
 
 vi.mock("#src/services/config", () => ({
   MONGO_DB_NAME: "prism-test",
-  TYPES: MODALITY_TYPES,
+  MODALITY_TYPES: MODALITY_TYPES,
 }));
 
 // Mock AgentPersonaRegistry

@@ -5,7 +5,7 @@ import openaiProvider, {
   prepareResponsesInput,
 } from "#src/providers/openai";
 import { OpenAIMessage } from "#src/providers/openai";
-import { PROVIDERS, TYPES, MESSAGE_ROLES } from "#src/constants";
+import { PROVIDERS, MODALITY_TYPES, MESSAGE_ROLES } from "#src/constants";
 
 const mockChatCreate = vi.fn();
 const mockResponsesCreate = vi.fn();
@@ -540,7 +540,7 @@ describe("OpenAI Provider Adapter", () => {
         args: { id: 42 },
         reasoningItem: {
           id: "reasoning_item_1",
-          summary: [{ type: TYPES.TEXT, text: "Reasoned content" }],
+          summary: [{ type: MODALITY_TYPES.TEXT, text: "Reasoned content" }],
         },
       });
     });

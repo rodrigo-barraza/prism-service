@@ -54,7 +54,7 @@ vi.mock('#src/services/RequestLogger', () => ({
 }));
 
 import RequestLogger from '#src/services/RequestLogger';
-import { PROVIDERS, TYPES, MODEL_TYPES } from "#src/constants";
+import { PROVIDERS, MODALITY_TYPES, MODEL_TYPES } from "#src/constants";
 
 class TestHarness extends BaseAgenticHarness {
   public getContext() { return this.context; }
@@ -159,7 +159,7 @@ describe('BaseAgenticHarness Helper Methods', () => {
       const allowedTools = new Set(['read_file']);
 
       const result = harness.processStreamChunk(
-        { type: TYPES.TEXT, content: 'hello' },
+        { type: MODALITY_TYPES.TEXT, content: 'hello' },
         passState,
         allowedTools,
       );
@@ -922,9 +922,9 @@ describe('BaseAgenticHarness Helper Methods', () => {
       const state = harness.getState();
       expect(state.displaySegments).toHaveLength(4);
       expect(state.displaySegments[0].type).toBe('thinking');
-      expect(state.displaySegments[1].type).toBe(TYPES.TEXT);
+      expect(state.displaySegments[1].type).toBe(MODALITY_TYPES.TEXT);
       expect(state.displaySegments[2].type).toBe('thinking');
-      expect(state.displaySegments[3].type).toBe(TYPES.TEXT);
+      expect(state.displaySegments[3].type).toBe(MODALITY_TYPES.TEXT);
 
       expect(state.displayThinkingFragments).toHaveLength(2);
       expect(state.displayTextFragments).toHaveLength(2);

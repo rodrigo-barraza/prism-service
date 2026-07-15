@@ -42,7 +42,7 @@ const MOCK_EMBEDDING_PRICING = {
 
 const configMock = {
   MONGO_DB_NAME: "prism-test",
-  TYPES: MODALITY_TYPES,
+  MODALITY_TYPES: MODALITY_TYPES,
   MODALITY_TYPES: MODALITY_TYPES,
   getPricing: (_inputType: any, outputType: any) => {
     if (outputType === MODALITY_TYPES.EMBEDDING) return MOCK_EMBEDDING_PRICING;
@@ -52,7 +52,7 @@ const configMock = {
 
 // Root config.js — exports MONGO_DB_NAME (used by ConversationService etc.)
 vi.mock("#src/services/config", () => configMock);
-// src/config.js — exports TYPES, getPricing, model catalog (used by MemoryExtractor, etc.)
+// src/config.js — exports MODALITY_TYPES, getPricing, model catalog (used by MemoryExtractor, etc.)
 vi.mock("#src/config", () => configMock);
 
 // ── Mock providers ──────────────────────────────────────────────
