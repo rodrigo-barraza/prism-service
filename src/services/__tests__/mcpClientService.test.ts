@@ -46,7 +46,7 @@ vi.mock('@modelcontextprotocol/sdk/client/sse.js', () => {
 });
 
 import MCPClientService, { type MCPServerConfig } from '#src/services/MCPClientService';
-import { TYPES } from "#src/constants";
+import { MODALITY_TYPES } from "#src/constants";
 
 describe('MCPClientService Unit Tests', () => {
   beforeEach(() => {
@@ -157,7 +157,7 @@ describe('MCPClientService Unit Tests', () => {
 
     it('should call tool and parse single text block as JSON if possible', async () => {
       mockCallTool.mockResolvedValue({
-        content: [{ type: TYPES.TEXT, text: '{"sum": 10}' }],
+        content: [{ type: MODALITY_TYPES.TEXT, text: '{"sum": 10}' }],
       });
 
       const result = await MCPClientService.callTool('test-tools', 'add', { a: 4, b: 6 });
@@ -175,7 +175,7 @@ describe('MCPClientService Unit Tests', () => {
 
     it('should call tool and return raw text result if not JSON', async () => {
       mockCallTool.mockResolvedValue({
-        content: [{ type: TYPES.TEXT, text: 'Success message' }],
+        content: [{ type: MODALITY_TYPES.TEXT, text: 'Success message' }],
       });
 
       const result = await MCPClientService.callTool('test-tools', 'add');
@@ -185,7 +185,7 @@ describe('MCPClientService Unit Tests', () => {
     it('should return error property if client returns isError', async () => {
       mockCallTool.mockResolvedValue({
         isError: true,
-        content: [{ type: TYPES.TEXT, text: 'Failed calculation' }],
+        content: [{ type: MODALITY_TYPES.TEXT, text: 'Failed calculation' }],
       });
 
       const result = await MCPClientService.callTool('test-tools', 'add');
@@ -197,7 +197,7 @@ describe('MCPClientService Unit Tests', () => {
       mockCallTool.mockRejectedValueOnce(new Error('Connection transport closed'));
       // Second call succeeds
       mockCallTool.mockResolvedValueOnce({
-        content: [{ type: TYPES.TEXT, text: '{"retried": true}' }],
+        content: [{ type: MODALITY_TYPES.TEXT, text: '{"retried": true}' }],
       });
 
       const result = await MCPClientService.callTool('test-tools', 'add');

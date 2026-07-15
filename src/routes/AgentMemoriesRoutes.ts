@@ -65,7 +65,6 @@ router.post(
 /**
  * GET /agent-memories?project=<project>&agent=<agent>&limit=100&skip=0
  * List all agent memories for a project (read-only).
- * Defaults to agent="CODING" for backward compatibility.
  */
 router.get(
   "/",

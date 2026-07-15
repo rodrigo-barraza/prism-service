@@ -7,7 +7,7 @@ import {
   extractVideoFrames,
   inferMimeFromUrl,
 } from "#src/utils/media";
-import { TYPES } from "#src/constants";
+import { MODALITY_TYPES } from "#src/constants";
 
 vi.mock("#src/utils/logger", () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -74,7 +74,7 @@ describe("Media Utilities — Adversarial Test Suite", () => {
 
       const massiveUrl = "https://example.com/" + "a".repeat(50000) + ".png";
       const resultWithMassiveUrl = inferMimeFromUrl(massiveUrl);
-      expect(resultWithMassiveUrl).toBe(TYPES.IMAGE);
+      expect(resultWithMassiveUrl).toBe(MODALITY_TYPES.IMAGE);
     });
   });
 

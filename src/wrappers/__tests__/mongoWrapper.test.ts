@@ -49,18 +49,6 @@ describe('MongoWrapper', () => {
     });
   });
 
-  describe('getClient (deprecated)', () => {
-    it('throws a deprecation error directing callers to use getDb instead', () => {
-      expect(() => MongoWrapper.getClient('prism')).toThrow(
-        'MongoWrapper.getClient() is deprecated',
-      );
-    });
-
-    it('includes the recommendation to use getDb in the error message', () => {
-      expect(() => MongoWrapper.getClient('prism')).toThrow('use MongoWrapper.getDb()');
-    });
-  });
-
   describe('getDb', () => {
     it('delegates to getDatabase with the provided name', () => {
       const result = MongoWrapper.getDb('prism');

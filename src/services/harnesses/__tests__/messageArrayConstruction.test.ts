@@ -2246,19 +2246,6 @@ describe("Message Array Construction", () => {
       expect(cloned.rawContent).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
     });
 
-    it("should handle legacy messages without rawContent by parsing [System Context] block", () => {
-      const legacyMessage: HarnessPayload = {
-        role: "user",
-        content: `${PROMPT_DELIMITERS.SYSTEM_CONTEXT}\n- Local Time: Sunday\n\n${PROMPT_DELIMITERS.USER_MESSAGE}\nlegacy question here`,
-      };
-
-      swapMessageContent(legacyMessage);
-
-      expect(legacyMessage.content).toBe("legacy question here");
-      expect(legacyMessage.rawContent).toContain(
-        PROMPT_DELIMITERS.SYSTEM_CONTEXT,
-      );
-    });
   });
 
   // ────────────────────────────────────────────────────────────

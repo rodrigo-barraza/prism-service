@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { extractThinkTags, ThinkTagParser } from "#src/utils/ThinkTagParser";
-import { TYPES } from "#src/constants";
+import { MODALITY_TYPES } from "#src/constants";
 
 describe("ThinkTagParser", () => {
   describe("extractThinkTags", () => {
@@ -58,9 +58,9 @@ describe("ThinkTagParser", () => {
       const parser = new ThinkTagParser();
       const firstResult = parser.feed("Before <think>thinking</think> After");
       expect(firstResult).toEqual([
-        { type: TYPES.TEXT, content: "Before " },
+        { type: MODALITY_TYPES.TEXT, content: "Before " },
         { type: "thinking", content: "thinking" },
-        { type: TYPES.TEXT, content: " After" }
+        { type: MODALITY_TYPES.TEXT, content: " After" }
       ]);
       expect(parser.flush()).toEqual([]);
     });
@@ -70,7 +70,7 @@ describe("ThinkTagParser", () => {
       
       const firstResult = parser.feed("Before <thi");
       expect(firstResult).toEqual([
-        { type: TYPES.TEXT, content: "Before " }
+        { type: MODALITY_TYPES.TEXT, content: "Before " }
       ]);
 
       const secondResult = parser.feed("nk>thinking</thi");
@@ -80,7 +80,7 @@ describe("ThinkTagParser", () => {
 
       const thirdResult = parser.feed("nk> After");
       expect(thirdResult).toEqual([
-        { type: TYPES.TEXT, content: " After" }
+        { type: MODALITY_TYPES.TEXT, content: " After" }
       ]);
 
       expect(parser.flush()).toEqual([]);
@@ -90,9 +90,9 @@ describe("ThinkTagParser", () => {
       const parser = new ThinkTagParser();
       const firstResult = parser.feed("text <think>thinking</think> text2 <think>thinking2");
       expect(firstResult).toEqual([
-        { type: TYPES.TEXT, content: "text " },
+        { type: MODALITY_TYPES.TEXT, content: "text " },
         { type: "thinking", content: "thinking" },
-        { type: TYPES.TEXT, content: " text2 " },
+        { type: MODALITY_TYPES.TEXT, content: " text2 " },
         { type: "thinking", content: "thinking2" }
       ]);
     });
@@ -106,7 +106,7 @@ describe("ThinkTagParser", () => {
       const parser = new ThinkTagParser();
       const feedResult = parser.feed("Before <think>thinking without close");
       expect(feedResult).toEqual([
-        { type: TYPES.TEXT, content: "Before " },
+        { type: MODALITY_TYPES.TEXT, content: "Before " },
         { type: "thinking", content: "thinking without close" }
       ]);
       expect(parser.flush()).toEqual([]);
@@ -114,7 +114,7 @@ describe("ThinkTagParser", () => {
       const parserWithPartial = new ThinkTagParser();
       const feedResultWithPartial = parserWithPartial.feed("Before <think>thinking</thi");
       expect(feedResultWithPartial).toEqual([
-        { type: TYPES.TEXT, content: "Before " },
+        { type: MODALITY_TYPES.TEXT, content: "Before " },
         { type: "thinking", content: "thinking" }
       ]);
       expect(parserWithPartial.flush()).toEqual([
@@ -126,7 +126,7 @@ describe("ThinkTagParser", () => {
       const parser = new ThinkTagParser();
       const result = parser.feed("Before </think> After");
       expect(result).toEqual([
-        { type: TYPES.TEXT, content: "Before </think> After" }
+        { type: MODALITY_TYPES.TEXT, content: "Before </think> After" }
       ]);
     });
 

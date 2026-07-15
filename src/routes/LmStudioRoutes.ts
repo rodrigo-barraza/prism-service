@@ -16,19 +16,16 @@ const router = express.Router();
  * Build LM Studio load options from a request body, mapping the client's
  * camelCase vocabulary to LM Studio's snake_case load keys. The backend owns
  * this mapping so the client never has to speak provider load-option vocab.
- * snake_case keys are still accepted for backward compatibility.
  */
 function buildLmStudioLoadOptions(
   body: Record<string, unknown>,
 ): Record<string, unknown> {
-  const pick = (camel: string, snake: string) =>
-    body[camel] ?? body[snake];
   const loadOptions: Record<string, unknown> = {};
-  const contextLength = pick("contextLength", "context_length");
-  const flashAttention = pick("flashAttention", "flash_attention");
-  const offloadKvCache = pick("offloadKvCache", "offload_kv_cache_to_gpu");
-  const evalBatchSize = pick("evalBatchSize", "eval_batch_size");
-  const unifiedKvCache = pick("unifiedKvCache", "unified_kv_cache");
+  const contextLength = body.contextLength;
+  const flashAttention = body.flashAttention;
+  const offloadKvCache = body.offloadKvCache;
+  const evalBatchSize = body.evalBatchSize;
+  const unifiedKvCache = body.unifiedKvCache;
   const parallel = body.parallel;
   if (contextLength != null) loadOptions.context_length = contextLength;
   if (flashAttention != null) loadOptions.flash_attention = flashAttention;

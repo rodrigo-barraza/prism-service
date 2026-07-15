@@ -9,7 +9,7 @@
 // ────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS, TYPES } from "#src/constants";
+import { PROVIDERS, MODALITY_TYPES } from "#src/constants";
 
 // ── Mock dependencies ────────────────────────────────────────
 
@@ -133,13 +133,13 @@ vi.mock("#src/config", async (importOriginal) => {
   return {
     ...actual,
     MONGO_DB_NAME: "prism-test",
-    TYPES,
+    TYPES: MODALITY_TYPES,
   };
 });
 
 vi.mock("#src/services/config", () => ({
   MONGO_DB_NAME: "prism-test",
-  TYPES,
+  TYPES: MODALITY_TYPES,
 }));
 
 // Mock AgentPersonaRegistry
@@ -540,7 +540,7 @@ describe("AgenticToolResolver — native thinking collision", () => {
       agent: undefined,
       project: "coding",
       username: "anonymous",
-      modelDefinition: { outputTypes: [TYPES.TEXT] },
+      modelDefinition: { outputTypes: [MODALITY_TYPES.TEXT] },
     });
 
     const toolNames = finalTools.map((tool) => tool.name);

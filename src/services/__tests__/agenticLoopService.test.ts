@@ -122,17 +122,17 @@ vi.mock("#src/services/system-prompt/index", () => ({
 }));
 
 vi.mock("#src/services/SettingsService", async () => {
-  const { HARNESS_IDS } = await import("#src/constants");
+  const { HARNESS_IDENTIFIERS } = await import("#src/constants");
   return {
     default: {
       getCached: vi.fn(),
       get: vi.fn().mockResolvedValue({
         agents: {
-          harness: HARNESS_IDS.STANDARD,
+          harness: HARNESS_IDENTIFIERS.STANDARD,
         },
       }),
       getSection: vi.fn().mockResolvedValue({
-        harness: HARNESS_IDS.STANDARD,
+        harness: HARNESS_IDENTIFIERS.STANDARD,
       }),
     },
   };

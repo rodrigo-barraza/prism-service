@@ -57,13 +57,7 @@ export function emitPostExecutionStatus(
   toolCalls: ToolCall[],
   emit: EmitFunction,
 ): void {
-  if (
-    toolCalls.some(
-      (toolCall) =>
-        // TODO(cleanup): Remove "task_" startsWith once historical sessions have aged out
-        toolCall.name.includes("_task") || toolCall.name.startsWith("task_"),
-    )
-  ) {
+  if (toolCalls.some((toolCall) => toolCall.name.includes("_task"))) {
     emit({
       type: SERVER_SENT_EVENT_TYPES.STATUS,
       message: STATUS_MESSAGES.TASKS_UPDATED,
@@ -75,8 +69,6 @@ export function emitPostExecutionStatus(
       (toolCall) =>
         toolCall.name === TOOL_NAMES.CREATE_SUBAGENT ||
         toolCall.name === TOOL_NAMES.CREATE_SUBAGENTS ||
-        // TODO(cleanup): Remove "team_create" once historical sessions have aged out
-        toolCall.name === "team_create" ||
         toolCall.name === TOOL_NAMES.STOP_SUBAGENT,
     )
   ) {

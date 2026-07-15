@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS, TYPES } from "#src/constants";
+import { PROVIDERS, MODALITY_TYPES } from "#src/constants";
 import EmbeddingService from "#src/services/EmbeddingService";
 import SettingsService from "#src/services/SettingsService";
 import RequestLogger from "#src/services/RequestLogger";
@@ -48,7 +48,7 @@ describe("EmbeddingService", () => {
     expect(result.provider).toBe(PROVIDERS.GOOGLE);
     expect(result.model).toBe("gemini-embedding-2-preview");
 
-    expect(SettingsService.getMemoryModelConfig).toHaveBeenCalledWith(TYPES.EMBEDDING);
+    expect(SettingsService.getMemoryModelConfig).toHaveBeenCalledWith(MODALITY_TYPES.EMBEDDING);
     expect(RequestLogger.log).toHaveBeenCalledTimes(1);
     expect(vi.mocked(RequestLogger.log).mock.calls[0][0]).toMatchObject({
       success: true,

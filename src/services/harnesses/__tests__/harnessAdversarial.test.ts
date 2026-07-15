@@ -19,7 +19,7 @@
  */
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { HARNESS_IDS, PROVIDERS, TYPES } from "#src/constants";
+import { HARNESS_IDENTIFIERS, PROVIDERS, MODALITY_TYPES } from "#src/constants";
 import { ChatRequestSchema } from "#src/types/schemas";
 import AgenticLoopState from "#src/services/AgenticLoopState";
 import ToolContext from "#src/services/ToolContext";
@@ -253,7 +253,7 @@ describe("Flow 1: ChatRequestSchema Trust Boundary", () => {
       messages: [{
         role: "user",
         content: [
-          { type: TYPES.TEXT, text: "a".repeat(10_000) },
+          { type: MODALITY_TYPES.TEXT, text: "a".repeat(10_000) },
           { type: "image_url", image_url: { url: "data:image/png;base64," + "A".repeat(10_000) } },
         ],
       }],
@@ -405,27 +405,27 @@ describe("Flow 3: HarnessRegistry Dispatch", () => {
   it("should return standard harness for unknown harness id (fallback)", () => {
     const harness = HarnessRegistry.get("nonexistent-harness-xyz");
     expect(harness).toBeDefined();
-    // Should fallback to HARNESS_IDS.STANDARD (ReActHarness)
-    expect(harness!.id).toBe(HARNESS_IDS.STANDARD);
+    // Should fallback to HARNESS_IDENTIFIERS.STANDARD (ReActHarness)
+    expect(harness!.id).toBe(HARNESS_IDENTIFIERS.STANDARD);
   });
 
   it("should return standard harness for empty string id", () => {
     const harness = HarnessRegistry.get("");
     expect(harness).toBeDefined();
-    expect(harness!.id).toBe(HARNESS_IDS.STANDARD);
+    expect(harness!.id).toBe(HARNESS_IDENTIFIERS.STANDARD);
   });
 
   it("should return standard harness for id with special characters", () => {
     const harness = HarnessRegistry.get("../../../etc/passwd");
     expect(harness).toBeDefined();
-    expect(harness!.id).toBe(HARNESS_IDS.STANDARD);
+    expect(harness!.id).toBe(HARNESS_IDENTIFIERS.STANDARD);
   });
 
-  it("should have HARNESS_IDS.STANDARD harness registered", () => {
-    expect(HarnessRegistry.has(HARNESS_IDS.STANDARD)).toBe(true);
+  it("should have HARNESS_IDENTIFIERS.STANDARD harness registered", () => {
+    expect(HarnessRegistry.has(HARNESS_IDENTIFIERS.STANDARD)).toBe(true);
   });
 
-  it("should not have HARNESS_IDS.TREE_OF_THOUGHT as a harness (now a strategy)", () => {
+  it("should not have HARNESS_IDENTIFIERS.TREE_OF_THOUGHT as a harness (now a strategy)", () => {
     expect(HarnessRegistry.has("tree_of_thought")).toBe(false);
     expect(HarnessRegistry.has("tree_of_thought")).toBe(false);
   });
@@ -443,13 +443,13 @@ describe("Flow 3: HarnessRegistry Dispatch", () => {
   // ── State Machine Violation: Legacy Harness Migration ──────────
 
   it("should confirm legacy tree-of-thought harness is not in the registry (migration handled by AgenticLoopService)", () => {
-    // Legacy HARNESS_IDS.TREE_OF_THOUGHT and HARNESS_IDS.TREE_OF_THOUGHT harness IDs are now
+    // Legacy HARNESS_IDENTIFIERS.TREE_OF_THOUGHT and HARNESS_IDENTIFIERS.TREE_OF_THOUGHT harness IDs are now
     // migrated to standard + tree_of_thoughts strategy in AgenticLoopService.
     // HarnessRegistry.get() falls back to standard for any unknown ID,
     // but the intent is that the migration code in AgenticLoopService
     // catches these BEFORE they reach the registry.
     const harness = HarnessRegistry.get("tree_of_thought");
-    expect(harness!.id).toBe(HARNESS_IDS.STANDARD);
+    expect(harness!.id).toBe(HARNESS_IDENTIFIERS.STANDARD);
   });
 });
 
@@ -872,7 +872,7 @@ describe("Flow 8: Schema Edge Cases — Adversarial Payloads", () => {
       messages: [{
         role: "user",
         content: [
-          { type: TYPES.TEXT, text: "describe this image" },
+          { type: MODALITY_TYPES.TEXT, text: "describe this image" },
           { type: "image_url", image_url: { url: "https://example.com/img.png" } },
         ],
       }],

@@ -1599,27 +1599,6 @@ describe("Harness Lifecycle Modules", () => {
         expect(message.rawContent).toBe("Clean content text");
       });
 
-      it("should parse clean content from SYSTEM_CONTEXT prefix with altSplit", () => {
-        const message = {
-          role: "user",
-          content: `${PROMPT_DELIMITERS.SYSTEM_CONTEXT} System context\n${PROMPT_DELIMITERS.USER_MESSAGE}\nExpected clean content`,
-          rawContent: undefined,
-        };
-        swapMessageContent(message as any);
-        expect(message.content).toBe("Expected clean content");
-        expect(message.rawContent).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT);
-      });
-
-      it("should parse clean content from local time prefix index split", () => {
-        const message = {
-          role: "user",
-          content: `${PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX} 2026-06-22]\n\nExpected clean content text value`,
-          rawContent: undefined,
-        };
-        swapMessageContent(message as any);
-        expect(message.content).toBe("Expected clean content text value");
-        expect(message.rawContent).toContain(PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX);
-      });
     });
 
     describe("finalizeTextGeneration", () => {

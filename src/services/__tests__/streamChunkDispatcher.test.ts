@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { TYPES, MODEL_TYPES } from "#src/constants";
+import { MODALITY_TYPES, MODEL_TYPES } from "#src/constants";
 
 vi.mock("#src/services/FileService", () => ({
   default: {
@@ -611,7 +611,7 @@ describe('StreamChunkDispatcher adversarial', () => {
 
   it('should handle image chunk with no data — MinIO upload skipped', async () => {
     await dispatchChunk(
-      { type: TYPES.IMAGE, data: undefined, mimeType: 'image/png' },
+      { type: MODALITY_TYPES.IMAGE, data: undefined, mimeType: 'image/png' },
       streamState,
       streamContext,
     );

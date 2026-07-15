@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { getProvider, listProviders } from "#src/providers/index";
-import { PROVIDERS, TYPES } from "#src/constants";
+import { PROVIDERS, MODALITY_TYPES } from "#src/constants";
 import { convertToolsToGoogle } from "#src/providers/google";
 import {
   normalizeResponsesUsage,
@@ -134,7 +134,7 @@ describe("Provider Helpers and Adapters Suite", () => {
                 args: { city: "San Francisco" },
                 reasoningItem: {
                   id: "reason-1",
-                  summary: [{ type: TYPES.TEXT, text: "Reasoning about weather tool call." }],
+                  summary: [{ type: MODALITY_TYPES.TEXT, text: "Reasoning about weather tool call." }],
                 },
               },
             ],

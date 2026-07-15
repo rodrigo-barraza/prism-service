@@ -15,7 +15,7 @@
  *   3. Cost values are computed correctly using calculateTextCost
  */
 import { describe, it, expect, vi } from "vitest";
-import { PROVIDERS, TYPES } from "#src/constants";
+import { PROVIDERS, MODALITY_TYPES } from "#src/constants";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 const { CODING_MEMORY_TYPES } = await vi.hoisted(async () => {
@@ -42,10 +42,10 @@ const MOCK_EMBEDDING_PRICING = {
 
 const configMock = {
   MONGO_DB_NAME: "prism-test",
-  TYPES,
-  MODALITY_TYPES: TYPES,
+  TYPES: MODALITY_TYPES,
+  MODALITY_TYPES: MODALITY_TYPES,
   getPricing: (_inputType: any, outputType: any) => {
-    if (outputType === TYPES.EMBEDDING) return MOCK_EMBEDDING_PRICING;
+    if (outputType === MODALITY_TYPES.EMBEDDING) return MOCK_EMBEDDING_PRICING;
     return MOCK_TEXT_PRICING;
   },
 };

@@ -75,7 +75,7 @@ vi.mock("@rodrigo-barraza/utilities-library", async (importOriginal) => ({
 }));
 
 import LocalProviderGateway from "#src/services/local-provider/index";
-import { PROVIDERS, TYPES, MODEL_TYPES } from "#src/constants";
+import { PROVIDERS, MODALITY_TYPES, MODEL_TYPES } from "#src/constants";
 
 describe("LocalProviderGateway Unit Tests", () => {
   beforeEach(() => {
@@ -197,7 +197,7 @@ describe("LocalProviderGateway Unit Tests", () => {
         thinking: true,
         vision: true,
         tools: ["Tool Calling"],
-        inputTypes: [TYPES.TEXT, TYPES.VIDEO, MODEL_TYPES.AUDIO],
+        inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.VIDEO, MODEL_TYPES.AUDIO],
         modelType: MODEL_TYPES.CONVERSATION,
       };
 
