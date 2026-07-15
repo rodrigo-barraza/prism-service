@@ -116,7 +116,7 @@ describe("ToolOrchestratorService", () => {
   describe("executeTool image-to-texture data injection", () => {
     const mockSchemas = [
       {
-        name: "create_3d",
+        name: "create_3d_scene",
         description: "Create a 3D scene",
         parameters: { type: "object", properties: {} },
         domain: "Workspace",
@@ -159,7 +159,7 @@ describe("ToolOrchestratorService", () => {
       await ToolOrchestratorService.refreshSchemas();
 
       await ToolOrchestratorService.executeTool(
-        "create_3d",
+        "create_3d_scene",
         { objects: [] },
         {
           messages: [
@@ -211,7 +211,7 @@ describe("ToolOrchestratorService", () => {
 
       const fakeDataUrl = "data:image/png;base64,fakebase64data";
       await ToolOrchestratorService.executeTool(
-        "create_3d",
+        "create_3d_scene",
         { objects: [] },
         {
           messages: [
@@ -263,7 +263,7 @@ describe("ToolOrchestratorService", () => {
 
       const fakeHttpUrl = "https://example.com/texture.png";
       await ToolOrchestratorService.executeTool(
-        "create_3d",
+        "create_3d_scene",
         { objects: [] },
         {
           messages: [
@@ -315,7 +315,7 @@ describe("ToolOrchestratorService", () => {
 
       const minioReference = "minio://valid-image.png";
       await ToolOrchestratorService.executeTool(
-        "create_3d",
+        "create_3d_scene",
         { objects: [] },
         {
           messages: [

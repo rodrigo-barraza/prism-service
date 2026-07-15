@@ -8,6 +8,7 @@ export const BenderPersona: Persona = {
   name: "Bender",
   type: "universal",
   description: PromptLocaleService.get("en", "personas.bender.description"),
+  avatar: "/bender-agent-avatar.jpg",
   project: "prism-chat",
   displayOrder: 5,
   identity: (context) => {

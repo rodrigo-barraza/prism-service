@@ -1447,7 +1447,7 @@ export default class ToolOrchestratorService {
     // conversation context but have no mechanism to pass it into the deeply-nested
     // properties. Resolve the image to a browser-loadable data URL
     // and inject it as a top-level reference argument.
-    const THREE_DIMENSIONAL_TEXTURE_TOOLS = ["create_3d"];
+    const THREE_DIMENSIONAL_TEXTURE_TOOLS = ["create_3d_scene"];
     const VECTOR_ANIMATION_TOOLS = ["create_vector_animation"];
     const isThreeDimensionalTextureTool =
       THREE_DIMENSIONAL_TEXTURE_TOOLS.includes(name);
