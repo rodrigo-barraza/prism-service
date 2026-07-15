@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { buildToolRetryGuidance } from "#src/services/harnesses/lifecycle/ToolRetryInterceptor";
 import type { ToolCall, ToolResult } from "#src/services/harnesses/types";
 import type AgenticLoopState from "#src/services/AgenticLoopState";

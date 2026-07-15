@@ -15,7 +15,6 @@ function createMockWebSocket(readyState: number = 1): {
   };
 }
 
-type MockWebSocket = ReturnType<typeof createMockWebSocket>;
 
 // ── Test Suite ──────────────────────────────────────────────────
 

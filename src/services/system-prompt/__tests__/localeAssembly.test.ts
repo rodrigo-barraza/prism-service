@@ -135,9 +135,6 @@ const ENGLISH_RESPONSE_GUIDELINES_MARKER =
   "use tools proactively rather than asking if the user wants you to";
 
 const ALL_TOOL_NAMES = MOCK_CLIENT_TOOL_SCHEMAS.map((schema) => schema.name);
-const NON_WORKSPACE_TOOL_NAMES = MOCK_CLIENT_TOOL_SCHEMAS
-  .filter((schema) => schema.domain !== "Core Workspace Tools")
-  .map((schema) => schema.name);
 
 function buildMinimalAssemblerContext(
   overrides: Partial<AssemblerContext> = {},

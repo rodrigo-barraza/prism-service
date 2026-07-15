@@ -18,8 +18,8 @@
  * Every test has a clear "this SHOULD break" thesis and targets real bugs.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { HARNESS_IDS, PROVIDERS, THOUGHT_STRUCTURES, TYPES } from "#src/constants";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { HARNESS_IDS, PROVIDERS, TYPES } from "#src/constants";
 import { ChatRequestSchema } from "#src/types/schemas";
 import AgenticLoopState from "#src/services/AgenticLoopState";
 import ToolContext from "#src/services/ToolContext";

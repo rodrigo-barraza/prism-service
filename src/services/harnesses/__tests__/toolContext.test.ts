@@ -1,4 +1,4 @@
-import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
+import { vi, describe, it, expect, afterEach } from "vitest";
 
 // Suppress logger output during tests
 vi.mock("#src/utils/logger", () => ({

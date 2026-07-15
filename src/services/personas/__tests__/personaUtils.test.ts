@@ -6,7 +6,6 @@ import {
   buildToolPolicy,
   getToolPolicyAddendum,
 } from "#src/services/personas/utils";
-import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 
 const mockGetClientToolSchemas = vi.fn();
 

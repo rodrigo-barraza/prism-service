@@ -1,11 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { PROVIDERS } from "#src/constants";
 import { runGraphOfThoughts } from "#src/services/harnesses/strategies/GraphOfThoughtsStrategy";
-import { APPROVAL_TIERS } from "#src/services/AutoApprovalEngine";
 import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { runExhaustionRecoveryPass } from "#src/services/harnesses/lifecycle/ExhaustionRecovery";
 import { validateAfterToolExecution } from "#src/services/harnesses/lifecycle/ValidationInterceptor";
-import { isOutputTruncated } from "#src/services/harnesses/lifecycle/OutputTruncationRecovery";
 import { checkCostBudget } from "#src/services/harnesses/lifecycle/CostBudgetEnforcer";
 import { checkAndWaitForApproval } from "#src/services/harnesses/lifecycle/ApprovalGate";
 import { handleCodexPlanningResponse } from "#src/services/harnesses/lifecycle/CodexPlanningDetector";

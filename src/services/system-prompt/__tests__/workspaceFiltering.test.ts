@@ -3,7 +3,6 @@
  * workspace tool descriptions are stripped when workspaceEnabled: false.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import PromptLocaleService from "#src/services/PromptLocaleService";
 
 vi.mock("#src/services/SettingsService", () => ({
   default: {

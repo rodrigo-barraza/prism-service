@@ -8,7 +8,6 @@ import {
 import { GitWorktreeHelper } from "#src/services/orchestrator/GitWorktreeHelper";
 import { SubAgentTelemetryEmitter } from "#src/services/orchestrator/SubAgentTelemetryEmitter";
 import { evictIdleSecondaryModel } from "#src/services/orchestrator/VramEvictionPolicy";
-import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
 
 // ── Mock providers ────────────────────────────────────────────────────
 const mockGetProvider = vi.fn();

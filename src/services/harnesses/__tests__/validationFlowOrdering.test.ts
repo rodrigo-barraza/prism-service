@@ -99,10 +99,7 @@ vi.mock("#src/services/ToolOrchestratorService", () => ({
 
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import { validateAfterToolExecution } from "#src/services/harnesses/lifecycle/ValidationInterceptor";
-import {
-  checkForPlanModeEntry,
-  blockUnauthorizedToolCalls,
-} from "#src/services/harnesses/lifecycle/PlanModeController";
+import { checkForPlanModeEntry } from "#src/services/harnesses/lifecycle/PlanModeController";
 
 import type { ToolCall, ToolResult, AgenticContext, ValidationFeedback, ConversationMessage } from "#src/services/harnesses/types";
 import type AgenticLoopState from "#src/services/AgenticLoopState";

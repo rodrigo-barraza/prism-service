@@ -132,7 +132,7 @@ describe("TopologyConfig Test Suite", () => {
         );
       }
 
-      const results = await router.execute(
+      await router.execute(
         "test-team", members, orchestratorContext,
         spawnSubAgentMock, continueSubAgentMock,
       );
@@ -154,7 +154,7 @@ describe("TopologyConfig Test Suite", () => {
         .mockResolvedValueOnce(actorResult)
         .mockResolvedValue(createMockResult("Critic", "FAIL — incomplete"));
 
-      const results = await router.execute(
+      await router.execute(
         "test-team", members, orchestratorContext,
         spawnSubAgentMock, continueSubAgentMock,
         { maxRounds: 1 },
@@ -187,7 +187,7 @@ describe("TopologyConfig Test Suite", () => {
         );
       }
 
-      const results = await router.execute(
+      await router.execute(
         "test-team", members, orchestratorContext,
         spawnSubAgentMock, continueSubAgentMock,
         { maxRounds: 5 },
@@ -212,7 +212,7 @@ describe("TopologyConfig Test Suite", () => {
         .mockResolvedValueOnce(createMockResult("Critic A", "PASS — facts correct"))
         .mockResolvedValueOnce(createMockResult("Critic B", "PASS — logic sound"));
 
-      const results = await router.execute(
+      await router.execute(
         "test-team", members, orchestratorContext,
         spawnSubAgentMock, continueSubAgentMock,
         { maxRounds: 10 },
@@ -241,7 +241,7 @@ describe("TopologyConfig Test Suite", () => {
         .mockResolvedValueOnce(createMockResult("Fact Checker", "PASS — still correct"))
         .mockResolvedValueOnce(createMockResult("Style Critic", "PASS — naming fixed"));
 
-      const results = await router.execute(
+      await router.execute(
         "test-team", members, orchestratorContext,
         spawnSubAgentMock, continueSubAgentMock,
         { maxRounds: 3 },
@@ -279,7 +279,7 @@ describe("TopologyConfig Test Suite", () => {
         usage: { inputTokens: 100, outputTokens: 50 },
       });
 
-      const results = await router.execute(
+      await router.execute(
         "test-team", members, orchestratorContext,
         spawnSubAgentMock, continueSubAgentMock,
         { actorCount: 3 },
@@ -314,7 +314,7 @@ describe("TopologyConfig Test Suite", () => {
           usage: { inputTokens: 100, outputTokens: 50 },
         });
 
-      const results = await router.execute(
+      await router.execute(
         "test-team", members, orchestratorContext,
         spawnSubAgentMock, continueSubAgentMock,
         { actorCount: 2, maxRounds: 3 },
@@ -342,7 +342,7 @@ describe("TopologyConfig Test Suite", () => {
         usage: { inputTokens: 100, outputTokens: 50 },
       });
 
-      const results = await router.execute(
+      await router.execute(
         "test-team", members, orchestratorContext,
         spawnSubAgentMock, continueSubAgentMock,
         { actorCount: 5 },
@@ -373,7 +373,7 @@ describe("TopologyConfig Test Suite", () => {
         usage: { inputTokens: 100, outputTokens: 50 },
       }));
 
-      const results = await router.execute(
+      await router.execute(
         "test-team", members, orchestratorContext,
         spawnSubAgentMock, continueSubAgentMock,
         { actorCount: 2, maxRounds: 2 },
@@ -399,7 +399,7 @@ describe("TopologyConfig Test Suite", () => {
         .mockResolvedValueOnce(actorResult)
         .mockResolvedValueOnce(createMockResult("Critic", "PASS — looks good"));
 
-      const results = await router.execute(
+      await router.execute(
         "test-team", members, orchestratorContext,
         spawnSubAgentMock, continueSubAgentMock,
       );
@@ -422,7 +422,7 @@ describe("TopologyConfig Test Suite", () => {
         .mockResolvedValueOnce(actorResult)
         .mockResolvedValueOnce(createMockResult("Auto Critic", "PASS — feature works"));
 
-      const results = await router.execute(
+      await router.execute(
         "test-team", members, orchestratorContext,
         spawnSubAgentMock, continueSubAgentMock,
       );
@@ -449,7 +449,7 @@ describe("TopologyConfig Test Suite", () => {
         .mockResolvedValueOnce(createMockResult("Write Code", "Code written", "dev-001"))
         .mockResolvedValueOnce(createMockResult("Verify Code", "Tests pass", "qa-001"));
 
-      const results = await router.execute(
+      await router.execute(
         "test-team", members, orchestratorContext,
         spawnSubAgentMock, continueSubAgentMock,
         { maxRounds: 1 },
@@ -471,7 +471,7 @@ describe("TopologyConfig Test Suite", () => {
         .mockResolvedValueOnce(createMockResult("Write Code", "Code written", "dev-001"))
         .mockResolvedValueOnce(createMockResult("Verify Code", "Tests pass", "qa-001"));
 
-      const results = await router.execute(
+      await router.execute(
         "test-team", members, orchestratorContext,
         spawnSubAgentMock, continueSubAgentMock,
         { maxRounds: 4 },
@@ -493,7 +493,7 @@ describe("TopologyConfig Test Suite", () => {
         .mockResolvedValueOnce(createMockResult("Write Code", "Code written", "dev-001"))
         .mockResolvedValueOnce(createMockResult("Verify Code", "Tests pass", "qa-001"));
 
-      const results = await router.execute(
+      await router.execute(
         "test-team", members, orchestratorContext,
         spawnSubAgentMock, continueSubAgentMock,
       );
@@ -553,7 +553,7 @@ describe("TopologyConfig Test Suite", () => {
       }));
 
       // Capture the decomposition prompt
-      mockGenerateText.mockImplementation(async (messages: ChatMessage[]) => {
+      mockGenerateText.mockImplementation(async (_messages: ChatMessage[]) => {
         return {
           text: JSON.stringify([
             { description: "Subtask 1", prompt: "Do part 1" },
@@ -912,7 +912,7 @@ describe("TopologyConfig Test Suite", () => {
         usage: { inputTokens: 200, outputTokens: 80 },
       });
 
-      const results = await router.execute(
+      await router.execute(
         "test-team", members, orchestratorContext,
         spawnSubAgentMock, continueSubAgentMock,
         { enableVerification: true },
