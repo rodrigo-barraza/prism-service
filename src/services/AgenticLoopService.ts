@@ -98,8 +98,23 @@ export default class AgenticLoopService {
     if (preflight.enabledTools.length > 0) {
       // Re-resolve so the enlarged dynamic set flows through the exact same
       // filter pipeline (blocked/disabled/native-collision/sub-agent rules).
+      // The client's disabledTools list is a snapshot of "not enabled when
+      // the request was sent" — it necessarily still lists the tools
+      // preflight just enabled, so prune them from the copy passed to the
+      // re-resolve or Mode 1's client-disabled filter would immediately
+      // strip every preflight enablement.
+      const preflightEnabledSet = new Set(preflight.enabledTools);
+      const reResolveOptions =
+        Array.isArray(options.disabledTools) && options.disabledTools.length > 0
+          ? {
+              ...options,
+              disabledTools: options.disabledTools.filter(
+                (toolName: string) => !preflightEnabledSet.has(toolName),
+              ),
+            }
+          : options;
       resolvedTools = await AgenticToolResolver.resolve({
-        options,
+        options: reResolveOptions,
         agent: agent || undefined,
         project,
         username,

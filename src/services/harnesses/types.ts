@@ -273,6 +273,11 @@ export interface PassState {
   streamedThinking: string;
   thinkingSignature: string;
   pendingToolCalls: ToolCall[];
+  /** Tool calls the model emitted but that were dropped because the tool is
+   *  not in the current native schema. Used to give the model explicit
+   *  corrective feedback instead of a generic "provide output" nudge (a
+   *  silent drop reads as a no-op to the model and causes retry loops). */
+  droppedToolCallNames?: string[];
   streamedImages: string[];
   start: number;
   firstTokenTime: number | null;

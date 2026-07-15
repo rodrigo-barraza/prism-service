@@ -294,6 +294,12 @@ export function routeStreamChunk(
       logger.warn(
         `[AgenticLoop] Dropped tool call "${toolName}" — not in schema: [${[...allowedToolNames].join(", ")}]`,
       );
+      // Record the drop so the harness can tell the model the tool is
+      // unavailable — a silent skip leaves the pass looking thinking-only
+      // and the model retries the same call forever.
+      if (toolName) {
+        (pass.droppedToolCallNames ??= []).push(toolName);
+      }
       return { action: "skip" };
     }
 

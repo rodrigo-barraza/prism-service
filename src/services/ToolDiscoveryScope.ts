@@ -99,9 +99,11 @@ export function resolveDiscoverableUniverse(
 /**
  * Whether the agent can still discover something: at least one universe
  * tool (availableTools minus blockedTools) is outside its current set.
- * `excludedToolNames` carries context-unreachable tools (client-disabled,
- * workspace-off, native-collision, orchestrator-for-sub-agent) so they
- * never count as headroom.
+ * `excludedToolNames` carries context-unreachable tools (workspace-off,
+ * native-collision, orchestrator-for-sub-agent) so they never count as
+ * headroom. Client `disabledTools` must NOT be passed here — that list is
+ * the client's "not currently enabled" sidebar state, which is exactly
+ * what discovery exists to enable.
  */
 export function hasDiscoveryHeadroom(
   persona: PersonaScope | null | undefined,

@@ -402,19 +402,19 @@ export default class AgenticToolResolver {
 
     // ── Innate tool discovery ────────────────────────────────────
     // Discovery is not persona-opt-in: any agent whose reachable universe
-    // (catalog minus persona blockedTools, minus context-unreachable and
-    // client-disabled tools) exceeds its current tool set keeps the Core
-    // Discover tools — even when a persona blocklist would strip them.
-    // Conversely, an agent with nothing left to discover drops them, which
-    // also drops the tool-discovery system-prompt section (it is gated on
-    // their presence in the resolved set).
+    // (catalog minus persona blockedTools, minus context-unreachable tools)
+    // exceeds its current tool set keeps the Core Discover tools — even
+    // when a persona blocklist would strip them. Conversely, an agent with
+    // nothing left to discover drops them, which also drops the
+    // tool-discovery system-prompt section (it is gated on their presence
+    // in the resolved set).
+    //
+    // Client `disabledTools` deliberately do NOT count as unreachable here:
+    // the client sends every not-currently-enabled tool in that list (its
+    // sidebar state, pruned as tools get enabled), so treating it as a veto
+    // would zero the headroom for every client conversation and strip the
+    // very tools that exist to enable the rest.
     {
-      if (options.disabledTools && Array.isArray(options.disabledTools)) {
-        for (const toolName of options.disabledTools) {
-          unreachableToolNames.add(toolName);
-        }
-      }
-
       const discoveryPersona = agent ? AgentPersonaRegistry.get(agent) : null;
       const catalogSchemas =
         ToolOrchestratorService.getClientToolSchemas(defaultTopology) || [];
@@ -426,11 +426,21 @@ export default class AgenticToolResolver {
         unreachableToolNames,
       );
 
+      // An explicit client toggle-off of a discovery tool itself still wins
+      // (only reachable for coreToolsLocked:false personas — system tools
+      // cannot be toggled off in the client otherwise).
+      const clientDisabledDiscoveryTools = new Set(
+        (Array.isArray(options.disabledTools) ? options.disabledTools : []).filter(
+          (toolName) => isDiscoveryTool(toolName),
+        ),
+      );
+
       if (discoveryHeadroom) {
         const restoredTools: string[] = [];
         for (const discoveryToolName of DISCOVERY_TOOL_NAMES) {
           if (finalToolNames.has(discoveryToolName)) continue;
           if (unreachableToolNames.has(discoveryToolName)) continue;
+          if (clientDisabledDiscoveryTools.has(discoveryToolName)) continue;
           const schema = dynamicTools.find(
             (tool) => tool.name === discoveryToolName,
           );

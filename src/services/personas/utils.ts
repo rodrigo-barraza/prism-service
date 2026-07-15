@@ -173,6 +173,11 @@ const TOOL_DISCOVERY_POLICY_SECTION: ToolPolicySection & {
   content: "",
   dynamicContent: buildToolDiscoveryContent,
   requires: [TOOL_NAMES.SEARCH_TOOLS, TOOL_NAMES.DISCOVER_AND_ENABLE_TOOLS],
+  // The section commands calling these tools, so it must only render when
+  // they are actually in the native tool array — enabledTools entries that
+  // did not survive resolution (e.g. stripped for lack of discovery
+  // headroom) must not satisfy the gate.
+  requiresResolved: true,
 };
 // ────────────────────────────────────────────────────────────
 // Shared Tool Policy Sections (auto-injected for all personas)
@@ -260,14 +265,27 @@ export function buildToolPolicy(
   }
   const enabledArray = [...enabled];
 
+  const resolvedOnly = context.resolvedToolNames
+    ? new Set(context.resolvedToolNames)
+    : null;
+
   const filtered = allSections.filter((section) => {
     if (!section.requires || section.requires.length === 0) return true;
+    // requiresResolved sections gate strictly on the final callable set —
+    // enabledTools entries that were stripped during resolution must not
+    // render an instruction to call a tool the model cannot reach.
+    const matchSet =
+      section.requiresResolved && resolvedOnly ? resolvedOnly : enabled;
+    const matchArray =
+      section.requiresResolved && resolvedOnly
+        ? context.resolvedToolNames!
+        : enabledArray;
     return section.requires.some((requirement) => {
       if (requirement.endsWith("*")) {
         const prefix = requirement.slice(0, -1);
-        return enabledArray.some((toolName) => toolName.startsWith(prefix));
+        return matchArray.some((toolName) => toolName.startsWith(prefix));
       }
-      return enabled.has(requirement);
+      return matchSet.has(requirement);
     });
   });
 
