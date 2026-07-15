@@ -32,7 +32,7 @@ describe("buildTools — server tools", () => {
     expect(result).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          type: "web_fetch_20250910",
+          type: "web_fetch_20260209",
           name: "web_fetch",
         }),
       ]),
@@ -46,7 +46,7 @@ describe("buildTools — server tools", () => {
     expect(result).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          type: "code_execution_20250825",
+          type: "code_execution_20260120",
           name: "code_execution",
         }),
       ]),

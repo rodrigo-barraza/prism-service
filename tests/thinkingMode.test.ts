@@ -636,7 +636,8 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
       const args = mockMessagesCreate.mock.calls[0][0] as any;
       expect(args.thinking).toBeDefined();
       expect(args.thinking.type).toBe("adaptive");
-      expect(args.temperature).toBe(1);
+      // Sampling params are deprecated on adaptive-thinking models — omitted
+      expect(args.temperature).toBeUndefined();
       expect(args.top_p).toBeUndefined();
       expect(args.top_k).toBeUndefined();
     });

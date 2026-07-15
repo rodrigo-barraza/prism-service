@@ -520,14 +520,14 @@ export function buildTools(options: ProviderOptions) {
   }
   if (options.webFetch) {
     tools.push({
-      type: "web_fetch_20250910",
+      type: "web_fetch_20260209",
       name: "web_fetch",
       max_uses: 10,
     });
   }
   if (options.codeExecution) {
     tools.push({
-      type: "code_execution_20250825",
+      type: "code_execution_20260120",
       name: "code_execution",
     });
   }
@@ -1111,8 +1111,13 @@ const anthropicProvider = {
             };
           }
 
-          // Code execution tool result
-          if (block?.type === "code_execution_tool_result") {
+          // Code execution tool result — legacy (code_execution_tool_result)
+          // and current bash variant (code_execution_20260120 emits
+          // bash_code_execution_tool_result) share the stdout/stderr shape.
+          if (
+            block?.type === "code_execution_tool_result" ||
+            block?.type === "bash_code_execution_tool_result"
+          ) {
             const result = (
               block as {
                 content?: {
@@ -1131,27 +1136,36 @@ const anthropicProvider = {
             }
           }
 
-          // Web search / web fetch tool result — extract citations
+          // Web search / web fetch tool result — extract citations.
+          // Search success content is a list of web_search_result blocks;
+          // fetch success content is a single web_fetch_result object
+          // (error content is an object with error_code — skipped by the
+          // type filter either way).
           if (
             block?.type === "web_search_tool_result" ||
             block?.type === "web_fetch_tool_result"
           ) {
-            const content = (block as { content?: AnthropicBlock[] }).content;
-            if (Array.isArray(content)) {
-              const results = content
-                .filter(
-                  (r: AnthropicBlock) =>
-                    r.type === "web_search_result" ||
-                    r.type === "web_fetch_result",
-                )
-                .map((r: AnthropicBlock) => ({
-                  url: r.url,
-                  title: r.title,
-                  pageAge: r.page_age,
-                }));
-              if (results.length > 0) {
-                yield { type: "webSearchResult", results };
-              }
+            const content = (
+              block as { content?: AnthropicBlock[] | AnthropicBlock }
+            ).content;
+            const blocks = Array.isArray(content)
+              ? content
+              : content
+                ? [content]
+                : [];
+            const results = blocks
+              .filter(
+                (r: AnthropicBlock) =>
+                  r.type === "web_search_result" ||
+                  r.type === "web_fetch_result",
+              )
+              .map((r: AnthropicBlock) => ({
+                url: r.url,
+                title: r.title,
+                pageAge: r.page_age,
+              }));
+            if (results.length > 0) {
+              yield { type: "webSearchResult", results };
             }
           }
 
@@ -1160,18 +1174,22 @@ const anthropicProvider = {
 
         // Content block stop
         if (chunk.type === "content_block_stop") {
-          // Server code execution — yield code
+          // Server code execution — yield code. Legacy tool sends
+          // name "code_execution" with {code}; code_execution_20260120
+          // sends the "bash_code_execution" sub-tool with {command}.
           if (
             currentBlockType === "server_tool_use" &&
-            currentBlockName === "code_execution" &&
+            (currentBlockName === "code_execution" ||
+              currentBlockName === "bash_code_execution") &&
             codeInput
           ) {
             try {
               const parsed = JSON.parse(codeInput);
-              if (parsed.code) {
+              const code = parsed.code || parsed.command;
+              if (code) {
                 yield {
                   type: "executableCode",
-                  code: parsed.code,
+                  code,
                   language: parsed.language || "bash",
                 };
               }
