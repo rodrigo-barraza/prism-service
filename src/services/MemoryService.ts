@@ -82,9 +82,17 @@ export interface MemoryListParams {
   project?: string | null;
   guildId?: string;
   userId?: string;
+  aboutUserId?: string;
+  sourceUserId?: string;
   limit?: number;
   skip?: number;
   type?: string;
+}
+
+export interface MemoryFacetsParams {
+  agent?: string;
+  project?: string | null;
+  guildId?: string;
 }
 
 export interface MemoryUpdateParams {
@@ -510,6 +518,8 @@ const MemoryService = {
     project,
     guildId,
     userId,
+    aboutUserId,
+    sourceUserId,
     limit = 50,
     skip = 0,
     type,
@@ -519,7 +529,8 @@ const MemoryService = {
     if (agent) filter.agent = agent;
     if (project) filter.project = project;
     if (guildId) filter.guildId = guildId;
-    if (userId) filter.aboutUserId = userId;
+    if (userId || aboutUserId) filter.aboutUserId = userId || aboutUserId;
+    if (sourceUserId) filter.sourceUserId = sourceUserId;
     if (type) filter.type = type;
     const [memories, total] = await Promise.all([
       collection
@@ -531,6 +542,56 @@ const MemoryService = {
       collection.countDocuments(filter),
     ]);
     return { memories, total };
+  },
+  // ── Facets ──────────────────────────────────────────────────────────────────
+  /**
+   * Distinct filter facets for a project/agent scope: memory types plus the
+   * Discord users memories are about (aboutUserId) and revealed by
+   * (sourceUserId), each with counts. Powers the Memories tab filter dropdown.
+   */
+  async facets({ agent, project, guildId }: MemoryFacetsParams) {
+    const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
+    const match: Record<string, unknown> = {};
+    if (agent) match.agent = agent;
+    if (project) match.project = project;
+    if (guildId) match.guildId = guildId;
+
+    const userFacet = (idField: string, usernameField: string) =>
+      collection
+        .aggregate([
+          { $match: { ...match, [idField]: { $type: "string", $ne: "" } } },
+          {
+            $group: {
+              _id: `$${idField}`,
+              username: { $max: `$${usernameField}` },
+              count: { $sum: 1 },
+            },
+          },
+          { $project: { _id: 0, userId: "$_id", username: 1, count: 1 } },
+          { $sort: { count: -1, username: 1 } },
+          { $limit: 100 },
+        ])
+        .toArray();
+
+    const [types, aboutUsers, sourceUsers] = await Promise.all([
+      collection
+        .aggregate([
+          { $match: match },
+          { $group: { _id: "$type", count: { $sum: 1 } } },
+          {
+            $project: {
+              _id: 0,
+              type: { $ifNull: ["$_id", "other"] },
+              count: 1,
+            },
+          },
+          { $sort: { count: -1, type: 1 } },
+        ])
+        .toArray(),
+      userFacet("aboutUserId", "aboutUsername"),
+      userFacet("sourceUserId", "sourceUsername"),
+    ]);
+    return { types, aboutUsers, sourceUsers };
   },
   // ── Discover ───────────────────────────────────────────────────────────────
   /**
