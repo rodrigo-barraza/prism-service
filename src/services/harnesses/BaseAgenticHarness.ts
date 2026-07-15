@@ -62,7 +62,7 @@ import { getToolPolicyAddendum } from "#src/services/personas/utils";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type AgentHooks from "#src/services/AgentHooks";
-import type { ChatMessage, TokenUsage } from "#src/types/admin";
+import type { ChatMessage } from "#src/types/admin";
 import type { MessagePayload, ToolCallPayload } from "#src/services/conversation/types";
 import type {
   AgenticContext,
@@ -72,7 +72,6 @@ import type {
   ChunkAction,
   ConversationMessage,
   StreamChunk,
-  ToolCall,
   UsageAccumulator,
 } from "./types.ts";
 

@@ -6,7 +6,7 @@
  * If register/update/complete lifecycle is broken, the frontend shows
  * stale or incorrect tok/s. If cleanup leaks, memory grows unbounded.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 const { default: ConversationGenerationTracker } = await import(
   "#src/services/ConversationGenerationTracker"

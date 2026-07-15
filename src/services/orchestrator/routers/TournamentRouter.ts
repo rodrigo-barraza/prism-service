@@ -109,7 +109,7 @@ function parseVerificationResponse(
     const matchingLine = lines.find((line) =>
       line.toLowerCase().includes(lowerCommand),
     );
-    let isPassing = false;
+    let isPassing: boolean;
 
     if (matchingLine) {
       const lowerLine = matchingLine.toLowerCase();

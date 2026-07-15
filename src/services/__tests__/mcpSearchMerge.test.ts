@@ -119,7 +119,7 @@ vi.mock("#src/services/AgentPersonaRegistry", () => ({
 
 // Mock global fetch: return search_tools schema from /admin/tool-schemas
 // and controlled search results from the /meta/search endpoint
-global.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+global.fetch = vi.fn().mockImplementation(async (url: string, _init?: RequestInit) => {
   const urlString = String(url);
 
   // search_tools POST endpoint (tools-api agentic search)

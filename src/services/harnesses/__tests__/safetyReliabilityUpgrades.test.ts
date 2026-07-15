@@ -276,7 +276,7 @@ describe("C4/C5 — streamWithRetries zero-yield invariant", () => {
   it("retries a transient failure when nothing was yielded", async () => {
     let attempts = 0;
     const stream = streamWithRetries(
-      // eslint-disable-next-line require-yield
+       
       async function* () {
         attempts++;
         if (attempts === 1) {

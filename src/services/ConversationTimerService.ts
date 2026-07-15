@@ -126,7 +126,7 @@ const ConversationTimerService = {
     const timestampString = currentTimestamp.toISOString();
 
     // Input validation
-    let firesAt = timestampString;
+    let firesAt: string;
     if (mode === TIMER_MODES.ONE_SHOT) {
       const seconds = data.durationSeconds ?? 0;
       if (seconds <= 0 || seconds > ONE_SHOT_MAXIMUM_DURATION_SECONDS) {

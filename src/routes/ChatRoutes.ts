@@ -563,8 +563,7 @@ export async function handleConversation(
   emit: EmitFunction,
   { signal }: { signal?: AbortSignal } = {},
 ) {
-  let context: Awaited<ReturnType<typeof prepareGenerationContext>> | null =
-    null;
+  let context: Awaited<ReturnType<typeof prepareGenerationContext>> | null;
   try {
     context = await prepareGenerationContext(params, emit, { signal });
   } catch (error: unknown) {
@@ -771,8 +770,7 @@ export async function handleAgent(
   emit: (event: SseEvent) => void,
   { signal }: { signal?: AbortSignal } = {},
 ) {
-  let context: Awaited<ReturnType<typeof prepareGenerationContext>> | null =
-    null;
+  let context: Awaited<ReturnType<typeof prepareGenerationContext>> | null;
   try {
     context = await prepareGenerationContext(params, emit, { signal });
   } catch (error: unknown) {

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import { PROVIDERS } from "#src/constants";
+import { ProviderError } from "#src/utils/errors";
 
 /**
  * Streaming resilience tests — verifies that all providers and SSE parsers
@@ -393,7 +394,6 @@ describe("parseSSEStream — partial usage on premature termination", () => {
 
 describe("ProviderError enrichment", () => {
   it("ProviderError.toJSON includes provider and message", () => {
-    const { ProviderError } = require("../../utils/errors.ts");
     const enrichedError = new ProviderError(
       PROVIDERS.LM_STUDIO,
       "LM Studio (lm-studio-1) stream error: terminated, model=gemma-4-12b-qat",
@@ -408,7 +408,6 @@ describe("ProviderError enrichment", () => {
   });
 
   it("ProviderError preserves structured errorType from original error", () => {
-    const { ProviderError } = require("../../utils/errors.ts");
     const originalError = { type: "rate_limit_error", message: "Too many requests" };
     const enrichedError = new ProviderError(PROVIDERS.ANTHROPIC, "Rate limited", 429, originalError);
     expect(enrichedError.errorType).toBe("rate_limit_error");

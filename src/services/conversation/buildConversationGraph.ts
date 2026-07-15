@@ -453,7 +453,6 @@ function applyHierarchicalLayout(graphData: GraphData, canvasWidth: number, canv
   }
 
   // Topologically sort nodes within each tier (Kahn's algorithm)
-  const nodeIdSet = new Set(graphNodes.map((node) => node.id));
   for (const [, tierNodes] of tierBuckets) {
     if (tierNodes.length <= 1) continue;
 

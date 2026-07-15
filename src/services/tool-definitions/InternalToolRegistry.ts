@@ -1,5 +1,4 @@
 import logger from "#src/utils/logger";
-import { DOMAINS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { errorMessage, type ToolDisplayMetadata } from "@rodrigo-barraza/utilities-library";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 

@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { PROVIDERS } from "#src/constants";
-import MemoryService, { CODING_MEMORY_TYPES } from "#src/services/MemoryService";
+import MemoryService from "#src/services/MemoryService";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import EmbeddingService from "#src/services/EmbeddingService";
-import SettingsService from "#src/services/SettingsService";
 
 vi.mock("#src/wrappers/MongoWrapper", () => {
   const collection = {

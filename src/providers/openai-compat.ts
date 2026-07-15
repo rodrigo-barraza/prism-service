@@ -812,7 +812,6 @@ export async function* parseSSEStream(
     options.signal?.removeEventListener("abort", abortHandler);
     // Happy path: yield final usage if stream completed normally
     if (!usageYielded) {
-      usageYielded = true;
       if (usage) {
         yield { type: "usage", usage };
       } else {

@@ -17,7 +17,7 @@ import PolicyEngine, {
   allowAll,
   denyAll,
 } from "#src/services/PolicyEngine";
-import type { PolicyRule, PolicyDecision } from "#src/services/PolicyEngine";
+import type { PolicyRule } from "#src/services/PolicyEngine";
 
 // ═══════════════════════════════════════════════════════════════
 // ADVERSARIAL TESTS — PolicyEngine
@@ -149,7 +149,7 @@ describe("PolicyEngine adversarial — predicate fault isolation", () => {
   it("predicate that returns a truthy non-boolean should still match", () => {
     const policies: PolicyRule[] = [
       deny("tool", {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         when: () => "yes" as any,
         name: "deny-truthy-string",
       }),
@@ -161,7 +161,7 @@ describe("PolicyEngine adversarial — predicate fault isolation", () => {
   it("predicate that returns 0 (falsy) should NOT match", () => {
     const policies: PolicyRule[] = [
       deny("tool", {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         when: () => 0 as any,
         name: "deny-zero",
       }),

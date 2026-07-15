@@ -1531,7 +1531,7 @@ const openaiProvider = {
     }
 
     let stream: Stream<OpenAI.Chat.ChatCompletionChunk>;
-    let rateLimits = null;
+    let rateLimits: ReturnType<typeof extractOpenAIRateLimits>;
     try {
       const { data: streamData, response: rawStreamResponse } =
         await getClient()

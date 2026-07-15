@@ -201,7 +201,7 @@ async function queryLlamaCppContextLength(
  */
 export function parseOllamaResponse(
   payload: any,
-  model: string,
+  _model: string,
 ): number | null {
   if (!payload) return null;
 

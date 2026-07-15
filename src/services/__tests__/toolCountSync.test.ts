@@ -113,7 +113,7 @@ vi.mock("#src/services/ToolOrchestratorService", () => ({
   default: {
     ensureSchemas: vi.fn().mockResolvedValue(undefined),
     getToolSchemas: vi.fn(() => [
-      ...MOCK_TOOLS_API_SCHEMAS.map(({ endpoint, domain, labels, ...schema }) => schema),
+      ...MOCK_TOOLS_API_SCHEMAS.map(({ endpoint: _endpoint, domain: _domain, labels: _labels, ...schema }) => schema),
       ...MOCK_INTERNAL_SCHEMAS,
       ...MOCK_ORCHESTRATOR_SCHEMAS,
     ]),

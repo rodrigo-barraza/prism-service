@@ -11,7 +11,6 @@ import {
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
-  type StatusMessage,
   TOOL_NAMES,
   THOUGHT_STRUCTURES,
   MAX_TOOL_ITERATIONS,
@@ -23,7 +22,6 @@ import { checkAndWaitForApproval } from "./lifecycle/ApprovalGate.ts";
 import {
   emitPostExecutionStatus,
   processToolResultMedia,
-  trackToolErrors,
 } from "./lifecycle/PostExecutionEmitter.ts";
 import { runExhaustionRecoveryPass } from "./lifecycle/ExhaustionRecovery.ts";
 import {
@@ -52,20 +50,14 @@ import {
   cleanupReminderCache,
 } from "./lifecycle/SystemReminderInjector.ts";
 import { checkCostBudget } from "./lifecycle/CostBudgetEnforcer.ts";
-import {
-  createSandboxCheckpoint,
-  restoreSandboxCheckpoint,
-} from "./lifecycle/SandboxExecutor.ts";
 import SemanticStallDetector from "./lifecycle/SemanticStallDetector.ts";
 
 import PlanningModeService from "#src/services/PlanningModeService";
-import PromptLocaleService from "#src/services/PromptLocaleService";
 import ConversationStatusRegistry from "#src/services/ConversationStatusRegistry";
 import { HARNESS, AGENT_DIRECTIVES } from "#src/constants";
 
 import type {
   ConversationMessage,
-  ToolCall,
   ToolSchema,
   ToolResult,
   AgenticOptions,
@@ -865,7 +857,9 @@ export default class ReActHarness extends BaseAgenticHarness {
           const { default: ConversationService } = await import("#src/services/conversation/ConversationService");
           const { COLLECTIONS } = await import("#src/constants");
           await ConversationService.adjustPendingBackgroundTasks(conversationId, project, username, 1, { collection: COLLECTIONS.AGENT_CONVERSATIONS });
-        } catch (e) {}
+        } catch {
+          /* best-effort counter adjustment — ignore failures */
+        }
       }
 
       if (hasNonBlockingDispatchBreak && agentConversationId) {

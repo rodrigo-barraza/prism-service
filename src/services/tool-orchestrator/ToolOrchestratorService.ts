@@ -1276,7 +1276,7 @@ export default class ToolOrchestratorService {
   static async checkApiHealth() {
     const toolNames = cachedSchemas.map((tool) => tool.name);
 
-    let online = false;
+    let online: boolean;
     try {
       const controller = new AbortController();
       const timeout = setTimeout(

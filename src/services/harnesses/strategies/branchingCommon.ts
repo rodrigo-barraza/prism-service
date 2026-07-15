@@ -700,7 +700,7 @@ export async function executeApprovedToolBatch(
     (toolCall) => !deniedIds.has(toolCall.id),
   );
 
-  let results: ToolResult[] = [];
+  let results: ToolResult[];
   let sandboxCheckpointReference: string | null = null;
   if (!isApproved) {
     results = [

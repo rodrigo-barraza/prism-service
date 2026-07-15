@@ -94,9 +94,9 @@ class MockWebSocket {
   close = vi.fn();
   readyState = 1; // OPEN
   OPEN = 1;
-  listeners: Record<string, Function[]> = {};
+  listeners: Record<string, ((...args: any[]) => void)[]> = {};
 
-  on(event: string, callback: Function) {
+  on(event: string, callback: (...args: any[]) => void) {
     if (!this.listeners[event]) this.listeners[event] = [];
     this.listeners[event].push(callback);
   }
@@ -119,7 +119,7 @@ describe("WebSocket Handler Suite", () => {
       return Promise.resolve(mockLiveSession);
     });
 
-    const wssListeners: Record<string, Function[]> = {};
+    const wssListeners: Record<string, ((...args: any[]) => void)[]> = {};
     mockWss = {
       on: vi.fn().mockImplementation((event, callback) => {
         if (!wssListeners[event]) wssListeners[event] = [];
