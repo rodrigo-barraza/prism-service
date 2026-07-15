@@ -55,7 +55,7 @@ vi.mock("#src/services/SettingsService", () => ({
   },
 }));
 
-import { PROVIDERS, TYPES, MODEL_TYPES } from "#src/constants";
+import { PROVIDERS, MODALITY_TYPES, MODEL_TYPES } from "#src/constants";
 
 
 vi.mock("#src/providers/index", () => ({
@@ -156,7 +156,7 @@ describe("buildJsonResponseFromEvents", () => {
   it("should collect images from image events", () => {
     const events: TestEvent[] = [
       {
-        type: TYPES.IMAGE,
+        type: MODALITY_TYPES.IMAGE,
         data: "base64data",
         mimeType: "image/png",
         minioRef: "minio://images/1.png",

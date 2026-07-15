@@ -425,13 +425,6 @@ describe("SomaticStateService — stat manipulation", () => {
     expect(prompt).toContain("VOLCANIC FURY");
   });
 
-  it("legacy setStatLevel('mood') warns and no-ops", async () => {
-    const logger = (await import("#src/utils/logger")).default;
-    await SomaticStateService.getSnapshot(AGENT);
-    await SomaticStateService.setStatLevel(AGENT, "mood", 5);
-    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining("deprecated"));
-  });
-
   it("getAlcoholSystemPrompt returns empty for sober agent", async () => {
     await SomaticStateService.getSnapshot(AGENT);
     const prompt = await SomaticStateService.getAlcoholSystemPrompt(AGENT);

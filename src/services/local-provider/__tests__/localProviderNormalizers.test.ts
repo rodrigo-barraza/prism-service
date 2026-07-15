@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { PROVIDERS, MODEL_TYPES, TYPES } from '#src/constants';
+import { PROVIDERS, MODEL_TYPES, MODALITY_TYPES } from '#src/constants';
 
 vi.mock('#src/config', () => ({
   MODALITY_TYPES: {
@@ -80,13 +80,13 @@ describe('normalizers', () => {
     it('normalizes an embedding model correctly', () => {
       const raw: LmStudioRawModel = {
         key: 'nomic-embed-text-v1.5',
-        type: TYPES.EMBEDDING,
+        type: MODALITY_TYPES.EMBEDDING,
       };
       const entry = normalizeLmStudioModel(raw);
 
       expect(entry.modelType).toBe(MODEL_TYPES.EMBED);
-      expect(entry.inputTypes).toEqual([TYPES.TEXT]);
-      expect(entry.outputTypes).toEqual([TYPES.EMBEDDING]);
+      expect(entry.inputTypes).toEqual([MODALITY_TYPES.TEXT]);
+      expect(entry.outputTypes).toEqual([MODALITY_TYPES.EMBEDDING]);
       expect(entry.supportsSystemPrompt).toBe(false);
       expect(entry.streaming).toBe(false);
       expect(entry.defaultTemperature).toBeUndefined();
@@ -115,7 +115,7 @@ describe('normalizers', () => {
       const entry = normalizeLmStudioModel(raw);
 
       expect(entry.vision).toBe(true);
-      expect(entry.inputTypes).toContain(TYPES.IMAGE);
+      expect(entry.inputTypes).toContain(MODALITY_TYPES.IMAGE);
     });
   });
 

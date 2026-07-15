@@ -422,13 +422,6 @@ router.post(
 
       const validModes = Object.values(BenchmarkService.BENCHMARK_MATCH_MODES);
 
-      // Validate top-level matchMode (backward compat)
-      if (matchMode && !validModes.includes(matchMode)) {
-        return res.status(400).json({
-          error: `Invalid matchMode. Must be one of: ${validModes.join(", ")}`,
-        });
-      }
-
       // Validate assertions array if provided
       if (assertions && Array.isArray(assertions)) {
         for (const assertion of assertions) {

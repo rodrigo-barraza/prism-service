@@ -927,7 +927,7 @@ export default class BaseAgenticHarness {
 
     // Two-phase completion: if we pre-inserted a pending skeleton on
     // iteration start, update it in-place instead of inserting a new doc.
-    const legacyPayload = {
+    const requestLogPayload = {
       requestId: `${this.context.requestId}-${state.iterations}`,
       endpoint: "/agent",
       operation: "agent:iteration",
@@ -1054,7 +1054,7 @@ export default class BaseAgenticHarness {
             ),
           );
         }
-        return RequestLogger.logChatGeneration(legacyPayload).catch(
+        return RequestLogger.logChatGeneration(requestLogPayload).catch(
           (error: Error) =>
             logger.error(
               `[AgenticLoopService] Failed to log intermediate request: ${errorMessage(error)}`,
@@ -1065,7 +1065,7 @@ export default class BaseAgenticHarness {
         logger.error(
           `[BaseAgenticHarness] Error resolving pendingRequestDocumentIdPromise: ${errorMessage(error)}`,
         );
-        return RequestLogger.logChatGeneration(legacyPayload).catch(
+        return RequestLogger.logChatGeneration(requestLogPayload).catch(
           (loggingError: Error) =>
             logger.error(
               `[AgenticLoopService] Failed to log intermediate request on fallback: ${errorMessage(loggingError)}`,

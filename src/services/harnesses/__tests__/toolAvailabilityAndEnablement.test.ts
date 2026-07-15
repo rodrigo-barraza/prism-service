@@ -30,7 +30,7 @@
 // ────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PROVIDERS, TYPES } from "#src/constants";
+import { PROVIDERS, MODALITY_TYPES } from "#src/constants";
 
 // ── Mock tool schemas ────────────────────────────────────────
 
@@ -836,7 +836,7 @@ describe("Tool Availability & Enablement", () => {
         agent: "CODING",
         project: "test",
         username: "rodrigo",
-        modelDefinition: { outputTypes: [TYPES.IMAGE] },
+        modelDefinition: { outputTypes: [MODALITY_TYPES.IMAGE] },
       });
 
       const toolNames = extractToolNames(finalTools);
@@ -850,7 +850,7 @@ describe("Tool Availability & Enablement", () => {
         agent: "CODING",
         project: "test",
         username: "rodrigo",
-        modelDefinition: { inputTypes: [TYPES.IMAGE] },
+        modelDefinition: { inputTypes: [MODALITY_TYPES.IMAGE] },
       });
 
       const toolNames = extractToolNames(finalTools);

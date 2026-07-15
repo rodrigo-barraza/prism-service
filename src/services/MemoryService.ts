@@ -548,7 +548,7 @@ const MemoryService = {
           $project: {
             _id: 0,
             project: { $ifNull: ["$_id.project", DEFAULT_PROJECT] },
-            agent: { $ifNull: ["$_id.agent", AGENT_IDS.CODING] },
+            agent: "$_id.agent",
             count: 1,
           },
         },

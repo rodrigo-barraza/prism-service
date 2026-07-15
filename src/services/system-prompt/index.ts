@@ -240,23 +240,6 @@ export default class SystemPromptAssembler {
         if (platformContext.ids) {
           platformContextSections.push(platformContext.ids);
         }
-      } else {
-        // Legacy flat fields — backward compatible
-        if (agentContext.discordContext) {
-          platformContextSections.push(agentContext.discordContext);
-        }
-        if (agentContext.serverContext) {
-          platformContextSections.push(agentContext.serverContext);
-        }
-        if (agentContext.imageContext) {
-          platformContextSections.push(agentContext.imageContext);
-        }
-        if (agentContext.guildId) {
-          let idsBlock = `# Discord IDs\n- Guild ID: ${agentContext.guildId}`;
-          if (agentContext.channelId)
-            idsBlock += `\n- Channel ID: ${agentContext.channelId}`;
-          platformContextSections.push(idsBlock);
-        }
       }
 
       // Agent-specific runtime context (non-platform, non-self)

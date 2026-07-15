@@ -116,35 +116,6 @@ export function swapMessageContent(message: MessagePayload) {
       const dirty = message.content;
       message.content = message.rawContent;
       message.rawContent = dirty;
-    } else if (message.content.startsWith(PROMPT_DELIMITERS.SYSTEM_CONTEXT)) {
-      const dirty = message.content;
-      let clean = message.content;
-      const splitDelimiter = "\n\n" + PROMPT_DELIMITERS.USER_MESSAGE + "\n";
-      const splitIndex = message.content.indexOf(splitDelimiter);
-      if (splitIndex !== -1) {
-        clean = message.content.substring(splitIndex + splitDelimiter.length);
-      } else {
-        const altDelimiter = PROMPT_DELIMITERS.USER_MESSAGE + "\n";
-        const altSplit = message.content.indexOf(altDelimiter);
-        if (altSplit !== -1) {
-          clean = message.content.substring(altSplit + altDelimiter.length);
-        }
-      }
-      message.content = clean;
-      message.rawContent = dirty;
-    } else if (
-      message.content.startsWith(
-        PROMPT_DELIMITERS.SYSTEM_CONTEXT_LOCAL_TIME_PREFIX,
-      )
-    ) {
-      const dirty = message.content;
-      let clean = message.content;
-      const index = message.content.indexOf("]\n\n");
-      if (index !== -1) {
-        clean = message.content.slice(index + 3);
-      }
-      message.content = clean;
-      message.rawContent = dirty;
     }
   }
 }

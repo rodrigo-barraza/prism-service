@@ -1,6 +1,5 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import { DEFAULT_USERNAME } from "@rodrigo-barraza/utilities-library/taxonomy";
 import express, { Request, Response, NextFunction } from "express";
 import { ObjectId, type Document } from "mongodb";
 import requireDb from "#src/middleware/RequireDbMiddleware";
@@ -95,20 +94,12 @@ router.get(
       } = parsed.data;
       const project = queryProject || req.project || "any";
 
-      // Include conversations created under DEFAULT_USERNAME ("anonymous")
-      // as a fallback — handles the migration scenario where conversations
-      // were created before the x-username header was introduced.
-      const usernameFilter =
-        username !== DEFAULT_USERNAME
-          ? { $in: [username, DEFAULT_USERNAME] }
-          : username;
-
       const filter: Record<string, unknown> = {};
       if (taskId) {
         filter.taskId = taskId;
       } else {
         filter.project = project;
-        filter.username = usernameFilter;
+        filter.username = username;
       }
       if (cursor) {
         filter.updatedAt = { $lt: cursor };
@@ -261,7 +252,7 @@ router.get(
                 $match: {
                   ...matchCondition,
                   project,
-                  username: usernameFilter,
+                  username,
                 },
               },
               {
@@ -319,7 +310,7 @@ router.get(
           const parentFieldQuery = {
             parentConversationId: { $in: conversationIds },
             project,
-            username: usernameFilter,
+            username,
           };
           const [agentParents, modelParents] = await Promise.all([
             db
@@ -441,10 +432,7 @@ router.get(
       const { db } = req;
       const conversationId = req.params.id as string;
 
-      const usernameFilter =
-        username !== DEFAULT_USERNAME
-          ? { $in: [username, DEFAULT_USERNAME] }
-          : username;
+      const usernameFilter = username;
 
       // Check conversations first
       const chat = await db
@@ -638,10 +626,7 @@ router.post(
       const username = req.username || "any";
       const { db } = req;
       const conversationId = req.params.id as string;
-      const usernameFilter =
-        username !== DEFAULT_USERNAME
-          ? { $in: [username, DEFAULT_USERNAME] }
-          : username;
+      const usernameFilter = username;
 
       const parsed = PostConversationMessagesBodySchema.safeParse(req.body);
       if (!parsed.success) {
@@ -707,10 +692,7 @@ router.patch(
       const username = req.username || "any";
       const { db } = req;
       const conversationId = req.params.id as string;
-      const usernameFilter =
-        username !== DEFAULT_USERNAME
-          ? { $in: [username, DEFAULT_USERNAME] }
-          : username;
+      const usernameFilter = username;
 
       const parsed = PatchConversationBodySchema.safeParse(req.body);
       if (!parsed.success) {
@@ -778,10 +760,7 @@ router.delete(
       const username = req.username || "any";
       const { db } = req;
       const conversationId = req.params.id as string;
-      const usernameFilter =
-        username !== DEFAULT_USERNAME
-          ? { $in: [username, DEFAULT_USERNAME] }
-          : username;
+      const usernameFilter = username;
 
       // Try deleting from conversations first
       let result = await db

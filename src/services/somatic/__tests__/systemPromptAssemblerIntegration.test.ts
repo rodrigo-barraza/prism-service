@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
-import { HARNESS_IDS } from "#src/constants";
+import { HARNESS_IDENTIFIERS } from "#src/constants";
 
 // ─── Mock everything the SystemPromptAssembler touches ──────────
 
@@ -56,7 +56,7 @@ vi.mock("#src/services/ToolOrchestratorService", () => ({
 vi.mock("#src/services/SettingsService", () => ({
   default: {
     getSection: vi.fn().mockResolvedValue({
-      topology: HARNESS_IDS.STANDARD,
+      topology: HARNESS_IDENTIFIERS.STANDARD,
       dynamicToolActivation: false,
     }),
     get: vi.fn().mockResolvedValue({}),
