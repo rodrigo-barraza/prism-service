@@ -8,6 +8,7 @@ import { OogPersona } from "./OogPersona.ts";
 import { DigestPersona } from "./DigestPersona.ts";
 import { MetaPersona } from "./MetaPersona.ts";
 import { OmniPersona } from "./OmniPersona.ts";
+import { BenderPersona } from "./BenderPersona.ts";
 import { ImagePersona } from "./ImagePersona.ts";
 import { MeepoPersona } from "./MeepoPersona.ts";
 
@@ -23,6 +24,7 @@ export const BUILT_IN_PERSONAS = new Map<string, Persona>([
   [AGENT_IDS.DIGEST, DigestPersona],
   [AGENT_IDS.META, MetaPersona],
   [AGENT_IDS.OMNI, OmniPersona],
+  [AGENT_IDS.BENDER, BenderPersona],
   [AGENT_IDS.IMAGE, ImagePersona],
   [AGENT_IDS.MEEPO, MeepoPersona],
 ]);
