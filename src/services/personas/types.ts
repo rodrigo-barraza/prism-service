@@ -70,6 +70,14 @@ export interface Persona {
   /** When true, tool descriptions in the system prompt are truncated to the first sentence and optional parameters are omitted. Saves ~1,500 tokens for conversational agents that don't need full parameter docs. */
   compactToolDocs?: boolean;
   /**
+   * System-prompt tool doc rendering tier. Default is "index" (one line per
+   * tool — full parameter schemas travel in the native tool definitions and
+   * full docs are injected on-demand when tools are enabled mid-turn).
+   * Set "full" or "compact" to opt a persona back into heavier rendering.
+   * Takes precedence over the legacy compactToolDocs flag.
+   */
+  toolDocMode?: "full" | "compact" | "index";
+  /**
    * Platform-specific interaction rules, keyed by platform identifier.
    * Only the section matching the current platform (from agentContext.platform)
    * is injected into the system prompt. When absent, the agent has no

@@ -65,9 +65,12 @@ const ENGLISH_ASK_USER_MARKER = "Ask the user one or more questions";
 const CAVEMAN_SUMMARIZE_MARKER = "compress conversation into summary";
 const ENGLISH_SUMMARIZE_MARKER = "Compress the current conversation";
 
-// Required label suffix
+// Required label suffix (full/compact formatter modes only)
 const CAVEMAN_REQUIRED_LABEL = "(required)";
 const ENGLISH_REQUIRED_LABEL = "(required)";
+
+// Index-mode note (assembled prompts render the one-line tool index)
+const CAVEMAN_INDEX_NOTE_MARKER = "no guess parameter from index";
 
 // Orchestrator tools
 const CAVEMAN_CREATE_TEAM_MARKER = "spawn multi-agent team";
@@ -524,7 +527,7 @@ describe("Tool Description Locale Threading", () => {
       expect(result.prompt.toLowerCase()).toContain(CAVEMAN_WRITE_TODO_MARKER);
       expect(result.prompt).not.toContain(ENGLISH_WRITE_TODO_MARKER);
       // Required label must also be localized
-      expect(result.prompt).toContain(CAVEMAN_REQUIRED_LABEL);
+      expect(result.prompt).toContain(CAVEMAN_INDEX_NOTE_MARKER);
     });
 
     it("should produce caveman tool descriptions in the assembled prompt", async () => {
@@ -584,7 +587,7 @@ describe("Tool Description Locale Threading", () => {
       const assembler = new SystemPromptAssembler();
       const result = await assembler.assemble(buildAssemblerContext("caveman"));
 
-      expect(result.prompt).toContain(CAVEMAN_REQUIRED_LABEL);
+      expect(result.prompt).toContain(CAVEMAN_INDEX_NOTE_MARKER);
     });
 
     it("should default to english when locale is undefined", async () => {
@@ -717,7 +720,7 @@ describe("Tool Description Locale Threading", () => {
       // Both the tool description AND required suffix must be in caveman.
       expect(result.prompt.toLowerCase()).toContain(CAVEMAN_SUMMARIZE_MARKER);
       expect(result.prompt).not.toContain(ENGLISH_SUMMARIZE_MARKER);
-      expect(result.prompt).toContain(CAVEMAN_REQUIRED_LABEL);
+      expect(result.prompt).toContain(CAVEMAN_INDEX_NOTE_MARKER);
       expect(result.prompt).toContain(CAVEMAN_TOOL_HEADER);
       expect(result.prompt).not.toContain(ENGLISH_TOOL_HEADER);
     });
@@ -791,7 +794,7 @@ describe("Tool Description Locale Threading", () => {
       // ALL of them must forward locale to produce correct output.
       expect(result.prompt.toLowerCase()).toContain(CAVEMAN_SUMMARIZE_MARKER);
       expect(result.prompt).not.toContain(ENGLISH_SUMMARIZE_MARKER);
-      expect(result.prompt).toContain(CAVEMAN_REQUIRED_LABEL);
+      expect(result.prompt).toContain(CAVEMAN_INDEX_NOTE_MARKER);
     });
   });
 });

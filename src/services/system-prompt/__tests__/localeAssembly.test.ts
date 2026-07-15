@@ -388,9 +388,9 @@ describe("Locale Assembly", () => {
       const result = await assembler.assemble(context);
 
       expect(result.prompt).not.toContain(WORKSPACE_DOMAIN_HEADER);
-      expect(result.prompt).not.toContain("### read_file");
-      expect(result.prompt).not.toContain("### write_file");
-      expect(result.prompt).not.toContain("### replace_in_file");
+      expect(result.prompt).not.toContain("- read_file:");
+      expect(result.prompt).not.toContain("- write_file:");
+      expect(result.prompt).not.toContain("- replace_in_file:");
     });
 
     it("should include workspace-domain tools in tool descriptions when workspaceEnabled is true", async () => {
@@ -403,9 +403,9 @@ describe("Locale Assembly", () => {
       const result = await assembler.assemble(context);
 
       expect(result.prompt).toContain(WORKSPACE_DOMAIN_HEADER);
-      expect(result.prompt).toContain("### read_file");
-      expect(result.prompt).toContain("### write_file");
-      expect(result.prompt).toContain("### replace_in_file");
+      expect(result.prompt).toContain("- read_file:");
+      expect(result.prompt).toContain("- write_file:");
+      expect(result.prompt).toContain("- replace_in_file:");
     });
 
     it("should still include non-workspace tools when workspaceEnabled is false", async () => {
@@ -417,8 +417,8 @@ describe("Locale Assembly", () => {
 
       const result = await assembler.assemble(context);
 
-      expect(result.prompt).toContain("### write_todo");
-      expect(result.prompt).toContain("### search_web");
+      expect(result.prompt).toContain("- write_todo:");
+      expect(result.prompt).toContain("- search_web:");
       expect(result.prompt).toContain("Core Harness Tools");
     });
 
@@ -474,7 +474,7 @@ describe("Locale Assembly", () => {
       expect(result.prompt).toContain(CODING_GUIDELINES_MARKER);
       expect(result.prompt).toContain(COMMAND_EXECUTION_MARKER);
       expect(result.prompt).toContain(WORKSPACE_DOMAIN_HEADER);
-      expect(result.prompt).toContain("### read_file");
+      expect(result.prompt).toContain("- read_file:");
     });
 
     it("should produce correct tool count excluding workspace tools", async () => {
