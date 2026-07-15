@@ -5,7 +5,7 @@ import {
   GenerateTextResult,
   StreamChunk,
 } from "#src/types/provider";
-import { TOOL_API_HEALTH_TIMEOUT_MILLISECONDS, SYSTEM_STATUSES, MESSAGE_ROLES } from "#src/constants";
+import { TOOL_API_HEALTH_TIMEOUT_MILLISECONDS } from "#src/constants";
 // ─────────────────────────────────────────────────────────────
 // llama.cpp Provider (llama-server)
 // ─────────────────────────────────────────────────────────────

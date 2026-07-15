@@ -390,7 +390,6 @@ export class CriticLoopRouter implements TopologyRouter {
     const totalTeamSize = 1 + criticCount;
     const allResults: (SubAgentResult | { error: string })[] = [];
     let previousAggregatedFeedback: string | null = null;
-    let actorAgentId: string | null = null;
 
     logger.info(
       `[CriticLoopRouter] Council mode: team "${teamName}" (${criticCount} critic(s), max ${maximumRounds} rounds)...`,
@@ -448,7 +447,7 @@ export class CriticLoopRouter implements TopologyRouter {
       return allResults;
     }
 
-    actorAgentId = actorResult.agent_id;
+    const actorAgentId = actorResult.agent_id;
 
     // ── Critic evaluation rounds ────────────────────────────────────────
 
@@ -810,7 +809,7 @@ export class CriticLoopRouter implements TopologyRouter {
     );
     const winnerActorIndex =
       successfulActors[selection.bestActorIndex]?.actorIndex ?? 0;
-    let winnerResult = successfulActors[selection.bestActorIndex]?.result;
+    const winnerResult = successfulActors[selection.bestActorIndex]?.result;
 
     if (!winnerResult) {
       logger.error(
@@ -880,8 +879,6 @@ export class CriticLoopRouter implements TopologyRouter {
         );
         return allResults;
       }
-
-      winnerResult = revisedResult;
 
       const revisedOutput = extractActorOutputText(revisedResult);
       const reevaluationPrompt = buildJurySelectionPrompt(originalTask, [

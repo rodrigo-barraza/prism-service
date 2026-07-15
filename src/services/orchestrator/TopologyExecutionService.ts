@@ -1,14 +1,7 @@
 import logger from "#src/utils/logger";
-import { TOPOLOGIES, DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { TOPOLOGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
-import SettingsService from "#src/services/SettingsService";
-import type {
-  TeamMember,
-  OrchestratorContext,
-  SubAgentResult,
-  OrchestratorSpawnParams,
-} from "#src/types/orchestrator";
-import type { TopologyRouter, ContinueSubAgentCallback } from "./TopologyRouter.ts";
+import type { TopologyRouter } from "./TopologyRouter.ts";
 
 /**
  * Service for executing multi-agent team topologies.

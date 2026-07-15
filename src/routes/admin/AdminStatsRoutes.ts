@@ -485,7 +485,6 @@ router.get(
           .toArray();
 
         return results.map((r: Record<string, unknown>) => {
-          const modelKey = `${(r._id as { model: string }).model}|${(r._id as { provider: string }).provider}`;
           return {
             model: (r._id as { model: string }).model,
             provider: (r._id as { provider: string }).provider,
@@ -1490,8 +1489,7 @@ router.get(
         }
 
         // Re-calculate alignment based on granularity specifically
-        const startId = getBucketIdFromDate(alignedSince, granularity);
-        let cursor = new Date(alignedSince);
+        const cursor = new Date(alignedSince);
         // Ensure the cursor starts exactly at the bucket start for sub-hourly granularities
         if (granularity.endsWith("s")) {
           const interval = parseInt(granularity.replace("s", ""), 10);

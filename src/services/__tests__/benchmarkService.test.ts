@@ -42,7 +42,7 @@ describe("BenchmarkService", () => {
 
   it("should preserve the display_name from model targets as the label", async () => {
     (handleConversation as any).mockImplementation(
-      async (parameters: any, emitCallback: any, options: any) => {
+      async (parameters: any, emitCallback: any, _options: any) => {
         emitCallback({ type: "chunk", content: "Response text" });
         emitCallback({ type: "done", usage: { inputTokens: 10, outputTokens: 5 } });
       }
@@ -80,7 +80,7 @@ describe("BenchmarkService", () => {
 
   it("should route non-agent LLMilliseconds to handleAgent if tools are enabled", async () => {
     (handleAgent as any).mockImplementation(
-      async (parameters: any, emitCallback: any, options: any) => {
+      async (parameters: any, emitCallback: any, _options: any) => {
         emitCallback({ type: "chunk", content: "Agentic answer" });
         emitCallback({ type: "done", usage: { inputTokens: 20, outputTokens: 10 } });
       }
@@ -118,7 +118,7 @@ describe("BenchmarkService", () => {
 
   it("should route to handleConversation if neither tools nor agent is specified", async () => {
     (handleConversation as any).mockImplementation(
-      async (parameters: any, emitCallback: any, options: any) => {
+      async (parameters: any, emitCallback: any, _options: any) => {
         emitCallback({ type: "chunk", content: "Normal answer" });
         emitCallback({ type: "done", usage: { inputTokens: 5, outputTokens: 2 } });
       }

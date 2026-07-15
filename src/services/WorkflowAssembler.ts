@@ -157,7 +157,6 @@ function assembleGraph(steps: WorkflowStep[]): AssembledGraph {
         outputTypes: ["text"],
         position: { x: baseX + INPUT_X_OFFSET, y: inputY },
       } as InputNode);
-      inputY += 200;
     }
 
     // ── 3. Conversation Node ──

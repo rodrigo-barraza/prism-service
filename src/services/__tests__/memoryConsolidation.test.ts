@@ -3,7 +3,6 @@ import { PROVIDERS } from "#src/constants";
 import MemoryConsolidationService from "#src/services/MemoryConsolidationService";
 import MemoryService from "#src/services/MemoryService";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
-import SettingsService from "#src/services/SettingsService";
 
 vi.mock("#src/services/MemoryService", () => ({
   default: {

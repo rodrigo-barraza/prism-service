@@ -288,7 +288,6 @@ async function* parseNativeSSEStream(
     options.signal?.removeEventListener("abort", abortHandler);
     // Happy path: yield usage if the stream completed normally without error.
     if (!usageYielded) {
-      usageYielded = true;
       if (usage) {
         yield { type: "usage", usage };
       } else {

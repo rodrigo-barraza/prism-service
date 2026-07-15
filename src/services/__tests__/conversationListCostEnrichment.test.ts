@@ -15,7 +15,7 @@
  *   3. The single-item GET /:id endpoint enriches model conversations
  *   4. Edge cases: empty arrays, zero costs, missing request logs
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   enrichConversationsWithRequestCosts,
   enrichSingleConversationCost,

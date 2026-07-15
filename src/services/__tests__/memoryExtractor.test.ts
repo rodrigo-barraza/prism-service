@@ -8,7 +8,6 @@ import MemoryExtractor from "#src/services/MemoryExtractor";
 import MemoryService from "#src/services/MemoryService";
 import SettingsService from "#src/services/SettingsService";
 import MemoryConsolidationService from "#src/services/MemoryConsolidationService";
-import RequestLogger from "#src/services/RequestLogger";
 
 const mockGenerateText = vi.fn();
 vi.mock("#src/providers/index", () => ({

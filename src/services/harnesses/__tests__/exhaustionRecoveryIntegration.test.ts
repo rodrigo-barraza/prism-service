@@ -274,6 +274,7 @@ describe("ExhaustionRecovery — Tool-Only Subagent Failure Mode", () => {
 
     it("should NOT crash when provider.generateTextStream throws", async () => {
       const failingProvider = {
+        // eslint-disable-next-line require-yield -- mock stream that fails before producing any chunk
         generateTextStream: vi.fn().mockImplementation(async function* () {
           throw new Error("ECONNRESET: Connection reset by peer");
         }),

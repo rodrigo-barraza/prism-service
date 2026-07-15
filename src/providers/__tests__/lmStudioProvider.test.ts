@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createLmStudioProvider } from "#src/providers/lm-studio";
-import { PROVIDERS } from "#src/constants";
 import type { ChatMessage } from "#src/types/ProviderTypes";
 
 describe("LM Studio Provider generateText unit tests", () => {

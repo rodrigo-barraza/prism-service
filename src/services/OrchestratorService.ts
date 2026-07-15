@@ -23,7 +23,6 @@ import { TopologyExecutionService } from "./orchestrator/TopologyExecutionServic
 import { ORCHESTRATOR_ONLY_TOOLS } from "./OrchestratorPrompt.ts";
 import SettingsService from "./SettingsService.ts";
 import AgentNotificationService from "./AgentNotificationService.ts";
-import AgentSessionRegistry from "./AgentSessionRegistry.ts";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import { createAbortController } from "#src/utils/AbortController";
 import { registerCleanup } from "#src/utils/CleanupRegistry";
@@ -45,7 +44,6 @@ import {
 } from "./orchestrator/SubAgentResultBuilder.ts";
 import { SubAgentTelemetryEmitter } from "./orchestrator/SubAgentTelemetryEmitter.ts";
 import { evictIdleSecondaryModel } from "./orchestrator/VramEvictionPolicy.ts";
-import type { TopologyRouter } from "./orchestrator/TopologyRouter.ts";
 import { SubAgentIdGenerator } from "./orchestrator/SubAgentIdGenerator.ts";
 import { getTopologyPromptSummary } from "./orchestrator/TopologyRegistry.ts";
 import { ConversationUtils } from "./orchestrator/ConversationUtils.ts";
@@ -64,7 +62,7 @@ import type {
 import type { ConversationMessage, LLMProvider } from "./harnesses/types.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import ConversationService from "./ConversationService.ts";
-import { COLLECTIONS, ORCHESTRATOR, NOTIFICATION_SOURCES, SYSTEM_STATUSES, DEFAULT_LOCALE, AGENT_DIRECTIVES } from "#src/constants";
+import { COLLECTIONS, ORCHESTRATOR, NOTIFICATION_SOURCES, SYSTEM_STATUSES, AGENT_DIRECTIVES } from "#src/constants";
 
 type AgenticLoopServiceModule = typeof import("./AgenticLoopService.ts");
 
@@ -367,7 +365,7 @@ export class OrchestratorService {
 
     // Attempt git worktree creation — best-effort
     // Non-git workspaces gracefully degrade to shared directory mode
-    let worktreePath = null;
+    let worktreePath: string;
     const worktreeResult = await GitWorktreeHelper.createWorktree(
       repositoryPath,
       branchName,

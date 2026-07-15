@@ -7,7 +7,6 @@
  * (or humans) to understand the status and results of delegated work.
  */
 
-import { NOTIFICATION_SOURCES } from "#src/constants";
 import type { ConversationMessage } from "./harnesses/types.ts";
 
 export interface TaskNotificationOptions {

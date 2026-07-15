@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as fsPromises from "node:fs/promises";
 import BackgroundHousekeepingService from "#src/services/BackgroundHousekeepingService";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
@@ -159,7 +159,7 @@ describe("BackgroundHousekeepingService", () => {
 
       // Mock MinIO Wrapper
       vi.spyOn(MinioWrapper, "isAvailable").mockReturnValue(true);
-      const listObjectsMock = vi.spyOn(MinioWrapper, "listObjects").mockResolvedValue([
+      vi.spyOn(MinioWrapper, "listObjects").mockResolvedValue([
         { name: "conv-active/file1.png" },
         { name: "conv-orphaned/file2.png" },
         { name: "projects/proj-1/file3.png" } // Should be skipped (structural prefix)

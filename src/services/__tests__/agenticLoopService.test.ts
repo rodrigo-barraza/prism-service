@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import AgenticLoopService from "#src/services/AgenticLoopService";
 import ContextWindowManager from "#src/services/ContextWindowManager";
 import SettingsService from "#src/services/SettingsService";
-import { HARNESS_IDS, PROVIDERS, MESSAGE_ROLES } from "#src/constants";
+import { PROVIDERS, MESSAGE_ROLES } from "#src/constants";
 import { TYPES } from "#src/config";
 
 vi.mock("#src/utils/logger", () => ({

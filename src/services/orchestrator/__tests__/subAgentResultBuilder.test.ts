@@ -5,6 +5,7 @@ import {
   buildToolCallFallbackSummary,
   toLiveSubAgentSummary,
   toPersistedSubAgentSummary,
+  extractSubtreeMetrics,
 } from "#src/services/orchestrator/SubAgentResultBuilder";
 import type { ConversationMessage } from "#src/services/harnesses/types";
 import type { SubAgentResult, SubAgentState } from "#src/types/orchestrator";
@@ -299,13 +300,11 @@ describe("extractSubtreeMetrics", () => {
       { role: "assistant", content: "hi" },
       { role: "tool", content: "some random tool result" },
     ];
-    const { extractSubtreeMetrics } = require("../SubAgentResultBuilder.ts");
     const result = extractSubtreeMetrics(messages);
     expect(result).toBeNull();
   });
 
   it("should parse a single SubAgentResult object (non-array) from a tool result", () => {
-    const { extractSubtreeMetrics } = require("../SubAgentResultBuilder.ts");
     const messages: ConversationMessage[] = [
       {
         role: "tool_result",
@@ -334,7 +333,6 @@ describe("extractSubtreeMetrics", () => {
   });
 
   it("should parse an array of SubAgentResults and aggregate metrics", () => {
-    const { extractSubtreeMetrics } = require("../SubAgentResultBuilder.ts");
     const messages: ConversationMessage[] = [
       {
         role: "tool",
@@ -375,7 +373,6 @@ describe("extractSubtreeMetrics", () => {
   });
 
   it("should aggregate nested subtree metrics from grandchildren recursively", () => {
-    const { extractSubtreeMetrics } = require("../SubAgentResultBuilder.ts");
     const messages: ConversationMessage[] = [
       {
         role: "tool",
@@ -408,7 +405,6 @@ describe("extractSubtreeMetrics", () => {
   });
 
   it("should skip malformed JSON or JSON without agent_id and handle errors gracefully", () => {
-    const { extractSubtreeMetrics } = require("../SubAgentResultBuilder.ts");
     const messages: ConversationMessage[] = [
       { role: "tool", content: "{invalid json" },
       { role: "tool", content: JSON.stringify({ name: "not an agent" }) }, // no agent_id
@@ -431,7 +427,6 @@ describe("extractSubtreeMetrics", () => {
   });
 
   it("should truncate result text exceeding 2000 characters", () => {
-    const { extractSubtreeMetrics } = require("../SubAgentResultBuilder.ts");
     const longResult = "A".repeat(3000);
     const messages: ConversationMessage[] = [
       {
@@ -455,7 +450,6 @@ describe("extractSubtreeMetrics", () => {
   });
 
   it("should set result to null when result field is empty or whitespace", () => {
-    const { extractSubtreeMetrics } = require("../SubAgentResultBuilder.ts");
     const messages: ConversationMessage[] = [
       {
         role: "tool",
@@ -488,7 +482,6 @@ describe("extractSubtreeMetrics", () => {
   });
 
   it("should propagate both result and error when both are present on a child", () => {
-    const { extractSubtreeMetrics } = require("../SubAgentResultBuilder.ts");
     const messages: ConversationMessage[] = [
       {
         role: "tool",

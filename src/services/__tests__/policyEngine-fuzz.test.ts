@@ -15,8 +15,6 @@ import PolicyEngine, {
   allow,
   deny,
   askUser,
-  allowAll,
-  denyAll,
 } from "#src/services/PolicyEngine";
 import type { PolicyRule, PolicyDecision } from "#src/services/PolicyEngine";
 
