@@ -640,12 +640,16 @@ export default class BaseAgenticHarness {
     );
 
     // ── Pre-flight context exhaustion guard ──────────────────
-    // If the clamped output budget is below the minimum viable threshold,
-    // the model cannot produce a complete response (tool call JSON needs
-    // 500–2K tokens + reasoning overhead). Return null to signal the
-    // caller to skip the provider call and trigger exhaustion recovery.
+    // If clamping had to reduce the output budget below the minimum viable
+    // threshold, the model cannot produce a complete response (tool call
+    // JSON needs 500–2K tokens + reasoning overhead). Return null to signal
+    // the caller to skip the provider call and trigger exhaustion recovery.
+    // A caller-requested maxTokens below the threshold is NOT exhaustion —
+    // only fire when window pressure forced the reduction.
     const contextWindow = this.resolveContextWindow();
-    if (isContextExhausted(clampedMaxTokens)) {
+    const wasClampedByWindow =
+      passOptions.maxTokens != null && clampedMaxTokens !== passOptions.maxTokens;
+    if (wasClampedByWindow && isContextExhausted(clampedMaxTokens)) {
       logContextExhaustion(
         clampedMaxTokens ?? 0,
         contextWindow ?? 0,
