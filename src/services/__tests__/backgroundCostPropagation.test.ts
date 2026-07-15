@@ -43,7 +43,6 @@ const MOCK_EMBEDDING_PRICING = {
 const configMock = {
   MONGO_DB_NAME: "prism-test",
   MODALITY_TYPES: MODALITY_TYPES,
-  MODALITY_TYPES: MODALITY_TYPES,
   getPricing: (_inputType: any, outputType: any) => {
     if (outputType === MODALITY_TYPES.EMBEDDING) return MOCK_EMBEDDING_PRICING;
     return MOCK_TEXT_PRICING;

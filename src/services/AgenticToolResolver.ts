@@ -220,7 +220,8 @@ export default class AgenticToolResolver {
           }
         } else {
           // enabledByDefaultTools: ["*"] means "enable everything in availableTools"
-          // enabledByDefaultTools: undefined also falls back to availableTools (backward-compatible)
+          // enabledByDefaultTools undefined is treated the same as ["*"]: a persona with
+          // no explicit default subset gets all of availableTools (defensive default, not legacy).
           const useFullAvailable =
             persona.enabledByDefaultTools === undefined ||
             persona.enabledByDefaultTools.includes("*");
