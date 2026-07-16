@@ -23,6 +23,14 @@ export interface StreamState {
   generationEnd: number | null;
   requestStart: number | null;
   outputCharacters: number;
+  /**
+   * How many characters of the sanitized text accumulator have been emitted
+   * as chunk events. MUST be separate from outputCharacters: that counter
+   * also accumulates thinking/tool-delta characters (for throughput stats),
+   * and using it as the text slice cursor chops the start of the text when
+   * thinking precedes it (e.g. Gemini adaptive thinking).
+   */
+  emittedTextCharacters?: number;
   text: string;
   thinking: string;
   thinkingSignature: string;
@@ -200,8 +208,10 @@ export async function dispatchChunk(
     state.text += rawString;
     // Strip tool call XML markup leaked by some local models (Gemma 4)
     const cleanText = stripToolCallMarkup(state.text);
-    const chunkString = cleanText.slice(state.outputCharacters);
-    state.outputCharacters = cleanText.length;
+    const emittedSoFar = state.emittedTextCharacters ?? 0;
+    const chunkString = cleanText.slice(emittedSoFar);
+    state.emittedTextCharacters = cleanText.length;
+    state.outputCharacters += chunkString.length;
     if (chunkString)
       emit({
         type: SERVER_SENT_EVENT_TYPES.CHUNK,
@@ -365,8 +375,10 @@ export async function dispatchChunk(
       state.text += rawString;
       // Strip tool call XML markup leaked by some local models (Gemma 4)
       const cleanText = stripToolCallMarkup(state.text);
-      const chunkString = cleanText.slice(state.outputCharacters);
-      state.outputCharacters = cleanText.length;
+      const emittedSoFar = state.emittedTextCharacters ?? 0;
+      const chunkString = cleanText.slice(emittedSoFar);
+      state.emittedTextCharacters = cleanText.length;
+      state.outputCharacters += chunkString.length;
       if (chunkString)
         emit({
           type: SERVER_SENT_EVENT_TYPES.CHUNK,
