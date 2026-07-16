@@ -195,6 +195,11 @@ const LUPOS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
       PromptLocaleService.get(locale, "personas.lupos.toolPolicyVoiceSteering"),
     requires: [TOOL_NAMES.SYNTHESIZE_SPEECH],
   },
+  {
+    content: (locale) =>
+      PromptLocaleService.get(locale, "personas.lupos.toolPolicyVideo"),
+    requires: [TOOL_NAMES.TRIM_VIDEO],
+  },
 ];
 
 const LUPOS_AVAILABLE_TOOLS = [
@@ -212,6 +217,11 @@ const LUPOS_AVAILABLE_TOOLS = [
   TOOL_NAMES.GET_TOP_TRENDS,
   TOOL_NAMES.GET_ON_THIS_DAY,
   TOOL_NAMES.GET_WIKIPEDIA_SUMMARY,
+  // Video clipping (Knowledge domain isn't in this list — expose just the
+  // one tool). lupos-bot attaches the resulting display.kind === "video"
+  // clip to Discord, falling back to the download URL when it exceeds the
+  // guild's upload cap.
+  TOOL_NAMES.TRIM_VIDEO,
   TOOL_NAMES.SEARCH_PRODUCTS,
   TOOL_NAMES.GET_TRENDING_PRODUCTS,
   TOOL_NAMES.GET_WEATHER,

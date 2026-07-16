@@ -245,22 +245,31 @@ export default class SystemPromptAssembler {
         }
       }
 
-      // Agent-specific runtime context (non-platform, non-self)
-      // These remain in the main system prompt for now
+      // Agent-specific runtime state (clock crew, stickers, emotion,
+      // visual appearance, lights). These change turn-to-turn, so they
+      // must NOT live in the main system prompt: that block sits under
+      // a prompt-cache breakpoint, and any byte change re-prices the
+      // whole cached prefix every turn. They ride the tail-injected
+      // self-context system message instead, keeping the cached system
+      // prompt byte-stable across turns.
+      // Research basis (harness_landscape_survey_2026-07.md, I2): keep
+      // volatile content out of the cached prefix — Manus, "Context
+      // Engineering for AI Agents"
+      // (https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus).
       if (agentContext.clockCrewContext) {
-        sections.push(agentContext.clockCrewContext);
+        selfContextSections.push(agentContext.clockCrewContext);
       }
       if (agentContext.stickersContext) {
-        sections.push(agentContext.stickersContext);
+        selfContextSections.push(agentContext.stickersContext);
       }
       if (agentContext.emotionContext) {
-        sections.push(agentContext.emotionContext);
+        selfContextSections.push(agentContext.emotionContext);
       }
       if (agentContext.visualContext) {
-        sections.push(agentContext.visualContext);
+        selfContextSections.push(agentContext.visualContext);
       }
       if (agentContext.lightsContext) {
-        sections.push(agentContext.lightsContext);
+        selfContextSections.push(agentContext.lightsContext);
       }
     }
 
