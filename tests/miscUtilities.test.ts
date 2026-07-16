@@ -458,17 +458,23 @@ describe('BENCHMARK_PRESETS', () => {
   it('should have the correct shape for every preset', () => {
     for (const preset of BENCHMARK_PRESETS) {
       expect(preset).toHaveProperty('name');
+      expect(preset).toHaveProperty('category');
       expect(preset).toHaveProperty('systemPrompt');
       expect(preset).toHaveProperty('prompt');
-      expect(preset).toHaveProperty('assertions');
-      expect(preset).toHaveProperty('assertionOperator');
 
       expect(typeof preset.name).toBe('string');
+      expect(typeof preset.category).toBe('string');
+      expect(preset.category.trim().length).toBeGreaterThan(0);
       expect(typeof preset.systemPrompt).toBe('string');
       expect(typeof preset.prompt).toBe('string');
-      expect(Array.isArray(preset.assertions)).toBe(true);
-      expect(preset.assertions.length).toBeGreaterThan(0);
-      expect(typeof preset.assertionOperator).toBe('string');
+
+      // Every preset asserts SOMETHING: text assertions or behavioral ones
+      const textAssertionCount = preset.assertions?.length || 0;
+      const behaviorAssertionCount = preset.agentAssertions?.length || 0;
+      expect(textAssertionCount + behaviorAssertionCount).toBeGreaterThan(0);
+      if (preset.assertions) {
+        expect(typeof preset.assertionOperator).toBe('string');
+      }
     }
   });
 
@@ -476,9 +482,12 @@ describe('BENCHMARK_PRESETS', () => {
     const validMatchModes = Object.values(MATCH_MODES);
 
     for (const preset of BENCHMARK_PRESETS) {
-      for (const assertion of preset.assertions) {
+      for (const assertion of preset.assertions || []) {
         expect(validMatchModes).toContain(assertion.matchMode);
-        expect(assertion.expectedValue.length).toBeGreaterThan(0);
+        // jsonValid needs no expected value; every other mode does
+        if (assertion.matchMode !== MATCH_MODES.JSON_VALID) {
+          expect(assertion.expectedValue.length).toBeGreaterThan(0);
+        }
       }
     }
   });
@@ -487,7 +496,35 @@ describe('BENCHMARK_PRESETS', () => {
     const validOperators = ['AND', 'OR'];
 
     for (const preset of BENCHMARK_PRESETS) {
-      expect(validOperators).toContain(preset.assertionOperator);
+      if (preset.assertions?.length) {
+        expect(validOperators).toContain(preset.assertionOperator);
+      }
+      if (preset.agentAssertions?.length && preset.agentAssertionOperator) {
+        expect(validOperators).toContain(preset.agentAssertionOperator);
+      }
+    }
+  });
+
+  it('should have well-formed behavioral assertions', () => {
+    const toolScopedTypes = new Set(['used_tool', 'first_tool', 'tool_sequence']);
+
+    for (const preset of BENCHMARK_PRESETS) {
+      for (const assertion of preset.agentAssertions || []) {
+        expect(typeof assertion.type).toBe('string');
+        if (toolScopedTypes.has(assertion.type)) {
+          expect(assertion.toolName?.trim().length).toBeGreaterThan(0);
+        }
+        if (assertion.type === 'llm_judge') {
+          expect(assertion.rubric?.trim().length).toBeGreaterThan(10);
+        }
+        if (assertion.type === 'tool_args_match' || assertion.type === 'tool_result_match') {
+          expect(assertion.expectedValue?.trim().length).toBeGreaterThan(0);
+        }
+      }
+      // Tool-scoped presets must scope their enabled tools
+      if (preset.agentAssertions?.some((assertion) => toolScopedTypes.has(assertion.type))) {
+        expect(preset.enabledTools?.length).toBeGreaterThan(0);
+      }
     }
   });
 
@@ -527,7 +564,7 @@ describe('BENCHMARK_PRESETS', () => {
 
   it('should have valid regex patterns for regex matchMode assertions', () => {
     const regexAssertions = BENCHMARK_PRESETS
-      .flatMap((preset) => preset.assertions)
+      .flatMap((preset) => preset.assertions || [])
       .filter((assertion) => assertion.matchMode === 'regex');
 
     for (const assertion of regexAssertions) {

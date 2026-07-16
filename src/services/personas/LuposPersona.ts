@@ -202,6 +202,12 @@ const LUPOS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   },
 ];
 
+// Lupos lives on Discord, so his tool surface is bounded by what lupos-bot
+// can actually render there: text, verbatim code blocks, and attached
+// images / audio / video clips (raw payloads or display-envelope URLs).
+// Interactive `kind: "embed"` tools (3D, maps, diagrams, …) are granted at
+// the domain level but blocked individually below — Discord can't show
+// them. Audit: 2026-07-16 full tools-service output-kind sweep.
 const LUPOS_AVAILABLE_TOOLS = [
   DOMAIN_KEY_TAGS.DISCORD,
   DOMAIN_KEY_TAGS.MOVIES,
@@ -209,29 +215,42 @@ const LUPOS_AVAILABLE_TOOLS = [
   DOMAIN_KEY_TAGS.CORE_HARNESS,
   DOMAIN_KEY_TAGS.CORE_SKILL,
   DOMAIN_KEY_TAGS.CORE_TASK,
-  TOOL_NAMES.GENERATE_IMAGE,
-  TOOL_NAMES.GENERATE_AUDIO,
-  TOOL_NAMES.SYNTHESIZE_SPEECH,
-  TOOL_NAMES.GET_TRENDS,
+  // Community surface — all-text or Discord-attachable domains
+  DOMAIN_KEY_TAGS.KNOWLEDGE, // youtube/anime/books/dictionary/classifieds/trim_video…
+  DOMAIN_KEY_TAGS.CREATIVE, // image gen/edit, emoji kitchen, QR, TTS, remixing…
+  DOMAIN_KEY_TAGS.COMPUTE, // diff/hash/regex/units/gif conversion…
+  DOMAIN_KEY_TAGS.UTILITIES, // currency, timezones, places, charts…
+  DOMAIN_KEY_TAGS.REDDIT,
+  DOMAIN_KEY_TAGS.GAMING, // dota + steam profiles
+  DOMAIN_KEY_TAGS.WEATHER, // full env/space pack (aurora, launches, APOD…)
+  DOMAIN_KEY_TAGS.EVENTS,
+  DOMAIN_KEY_TAGS.TRENDS,
   TOOL_NAMES.GET_HOT_TRENDS,
   TOOL_NAMES.GET_TOP_TRENDS,
-  TOOL_NAMES.GET_ON_THIS_DAY,
-  TOOL_NAMES.GET_WIKIPEDIA_SUMMARY,
-  // Video clipping (Knowledge domain isn't in this list — expose just the
-  // one tool). lupos-bot attaches the resulting display.kind === "video"
-  // clip to Discord, falling back to the download URL when it exceeds the
-  // guild's upload cap.
-  TOOL_NAMES.TRIM_VIDEO,
   TOOL_NAMES.SEARCH_PRODUCTS,
   TOOL_NAMES.GET_TRENDING_PRODUCTS,
-  TOOL_NAMES.GET_WEATHER,
-  TOOL_NAMES.GET_WEATHER_FORECAST,
-  TOOL_NAMES.GET_LOCAL_ENVIRONMENT,
-  TOOL_NAMES.GET_EARTHQUAKES,
-  TOOL_NAMES.GET_WILDFIRES,
-  TOOL_NAMES.GET_ISS_LOCATION,
-  TOOL_NAMES.GET_NEAR_EARTH_OBJECTS,
-  TOOL_NAMES.GET_SOLAR_ACTIVITY,
+  // Finance/Health singles — stonks banter + seasonal misery, without the
+  // rest of those personal-dashboard domains.
+  TOOL_NAMES.GET_STOCK,
+  TOOL_NAMES.GET_FEAR_GREED_INDEX,
+  TOOL_NAMES.GET_POLLEN_FORECAST,
+];
+
+// Embed-only visuals inside granted domains — invisible on Discord, so
+// blocked to keep Lupos from "showing" things nobody can see. execute_shell
+// is blocked as a plain no-need (he already has python/js sandboxes).
+const LUPOS_DISCORD_INCOMPATIBLE_TOOLS = [
+  TOOL_NAMES.CREATE_VECTOR_ANIMATION,
+  TOOL_NAMES.CONVERT_IMAGE_TO_ASCII,
+  TOOL_NAMES.DRAW_TURTLE_GRAPHICS,
+  TOOL_NAMES.CREATE_3D_MESH,
+  TOOL_NAMES.CREATE_3D_SCENE,
+  TOOL_NAMES.CREATE_3D_VOXEL,
+  TOOL_NAMES.CREATE_BONFIRE,
+  TOOL_NAMES.GENERATE_MAP,
+  TOOL_NAMES.RENDER_LATEX,
+  TOOL_NAMES.GENERATE_DIAGRAM,
+  TOOL_NAMES.EXECUTE_SHELL,
 ];
 
 // ────────────────────────────────────────────────────────────
@@ -306,6 +325,7 @@ export const LuposPersona: Persona = {
     DOMAIN_KEY_TAGS.MCP,
     DOMAIN_KEY_TAGS.BROWSER,
     DOMAIN_KEY_TAGS.META,
+    ...LUPOS_DISCORD_INCOMPATIBLE_TOOLS,
   ],
   // Core tools only on the first iteration — everything in
   // LUPOS_AVAILABLE_TOOLS is available but NOT enabled, reachable via

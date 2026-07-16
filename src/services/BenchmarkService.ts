@@ -1,6 +1,6 @@
 import { sleep, roundMilliseconds } from "@rodrigo-barraza/utilities-library";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
-// ─── Custom LLM Accuracy Benchmarking ───────────────────────
+// ─── Custom LLM Accuracy & Behavior Benchmarking ─────────────
 import crypto from "crypto";
 import { handleConversation, handleAgent } from "#src/routes/ChatRoutes";
 import { MODELS, MODEL_TYPES, getModelByName } from "#src/config";
@@ -10,7 +10,20 @@ import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { MONGO_DB_NAME } from "#config";
 import logger from "#src/utils/logger";
 import { COLLECTIONS, BENCHMARK, BENCHMARK_MATCH_MODES } from "#src/constants";
+import {
+  matchText,
+  evaluateBenchmark,
+  collectBehaviorAssertions,
+} from "#src/services/benchmark/BenchmarkEvaluator";
+import { runJudge } from "#src/services/benchmark/BenchmarkJudge";
 import type { SseEvent } from "#src/types/SseTypes";
+import type {
+  AgentAssertion,
+  AssertionResult,
+  BenchmarkToolCall,
+  JudgeVerdict,
+  TextAssertion,
+} from "#src/types/benchmark";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 const BENCHMARKS_COLLECTION = COLLECTIONS.BENCHMARKS;
@@ -21,17 +34,6 @@ let activeGenerationCount = 0;
 
 // ── Types ────────────────────────────────────────────────────
 
-interface Assertion {
-  expectedValue: string;
-  matchMode?: string;
-}
-
-interface AgentAssertion {
-  type: string;
-  operator?: string;
-  operand?: string;
-}
-
 interface BenchmarkDoc {
   id: string;
   name: string;
@@ -40,10 +42,12 @@ interface BenchmarkDoc {
   expectedValue?: string;
   matchMode?: string;
   benchmarkMode?: "model" | "agent" | "combined";
-  assertions?: Assertion[];
+  assertions?: TextAssertion[];
   assertionOperator?: "AND" | "OR";
   agentAssertions?: AgentAssertion[];
   agentAssertionOperator?: "AND" | "OR";
+  enabledTools?: string[];
+  trials?: number;
   temperature?: number;
   maxTokens?: number;
   tags?: string[];
@@ -71,6 +75,8 @@ interface ModelEntry {
   agent?: string;
   locale?: string;
   enabledTools?: string[];
+  trial?: number;
+  trialCount?: number;
 }
 
 interface BenchmarkEvent {
@@ -80,6 +86,7 @@ interface BenchmarkEvent {
   status?: string;
   usage?: Record<string, number>;
   estimatedCost?: number | null;
+  tokensPerSecond?: number | null;
   id?: string;
   name?: string;
   args?: Record<string, unknown>;
@@ -103,177 +110,52 @@ interface ModelResult {
   locale?: string;
   response: string | null;
   thinking: string | null;
-  toolCalls?: ToolCallResult[] | null;
+  toolCalls?: BenchmarkToolCall[] | null;
   toolNames?: string[];
   passed: boolean;
   matchMode: string;
+  assertionResults?: AssertionResult[];
   turnCount?: number;
+  trial?: number;
+  trialCount?: number;
   latency: number;
+  ttftMs?: number | null;
+  tokensPerSecond?: number | null;
   usage: Record<string, number> | null;
   estimatedCost: number | null;
+  judgeCost?: number;
   error: string | null;
   completedAt: string;
 }
 
-interface ToolCallResult {
-  id?: string;
-  name?: string;
-  args?: Record<string, unknown>;
-  result?: unknown;
-  status: string;
-}
-
-interface RunBenchmarkCallbacks {
+interface RunBenchmarkOptions {
   onRunStart?: (info: { totalModels: number }) => void;
   onModelStart?: (model: ModelEntry & { isLocal: boolean }) => void;
   onModelComplete?: (result: ModelResult) => void;
   onEvent?: (event: BenchmarkEvent) => void;
   signal?: AbortSignal;
+  /** Repeated executions per target (defaults to the benchmark's own `trials`). */
+  trials?: number;
 }
 
-interface BenchmarkCreateData {
+interface BenchmarkWriteData {
   name: string;
   prompt: string;
   systemPrompt?: string | null;
   expectedValue?: string;
   matchMode?: string;
   benchmarkMode?: string;
-  assertions?: Assertion[];
+  assertions?: TextAssertion[];
   assertionOperator?: string;
   agentAssertions?: AgentAssertion[];
   agentAssertionOperator?: string;
+  enabledTools?: string[];
+  trials?: number;
   temperature?: number;
   maxTokens?: number;
   tags?: string[];
 }
 
-// ─── evaluate model response against expected value ─────────
-type MatchMode = (typeof BENCHMARK_MATCH_MODES)[keyof typeof BENCHMARK_MATCH_MODES];
-
-function evaluate(
-  response: string,
-  expected: string,
-  matchMode: MatchMode | string = BENCHMARK_MATCH_MODES.CONTAINS,
-): boolean {
-  if (!response || !expected) return false;
-  const norm = (s: string) => s.trim().toLowerCase();
-  switch (matchMode) {
-    case BENCHMARK_MATCH_MODES.EXACT:
-      return norm(response) === norm(expected);
-    case BENCHMARK_MATCH_MODES.STARTS_WITH:
-      return norm(response).startsWith(norm(expected));
-    case BENCHMARK_MATCH_MODES.REGEX: {
-      try {
-        const regex = new RegExp(expected, "i");
-        return regex.test(response);
-      } catch {
-        logger.warn(`[benchmark] Invalid regex: ${expected}`);
-        return false;
-      }
-    }
-    case BENCHMARK_MATCH_MODES.CONTAINS:
-    default:
-      return norm(response).includes(norm(expected));
-  }
-}
-function evaluateAssertions(
-  response: string,
-  benchmark: BenchmarkDoc,
-): boolean {
-  const assertions = benchmark.assertions;
-  if (!assertions || assertions.length === 0) {
-    return false;
-  }
-  const operator = benchmark.assertionOperator || "AND";
-  if (operator === "OR") {
-    // Disjunction: ANY assertion must pass
-    return assertions.some((assertion) =>
-      evaluate(
-        response,
-        assertion.expectedValue,
-        assertion.matchMode || BENCHMARK_MATCH_MODES.CONTAINS,
-      ),
-    );
-  }
-  // Conjunction (AND): ALL assertions must pass
-  return assertions.every((assertion) =>
-    evaluate(
-      response,
-      assertion.expectedValue,
-      assertion.matchMode || BENCHMARK_MATCH_MODES.CONTAINS,
-    ),
-  );
-}
-// ─── behavioral assertions ──────────────────────────────────
-const COMPARATORS: Record<
-  string,
-  (firstValue: number, secondValue: number) => boolean
-> = {
-  gte: (firstValue, secondValue) => firstValue >= secondValue,
-  lte: (firstValue, secondValue) => firstValue <= secondValue,
-  gt: (firstValue, secondValue) => firstValue > secondValue,
-  lt: (firstValue, secondValue) => firstValue < secondValue,
-  eq: (firstValue, secondValue) => firstValue === secondValue,
-};
-
-interface ExecutionData {
-  response: string | null;
-  thinking: string | null;
-  toolCalls: ToolCallResult[];
-  turnCount: number;
-}
-
-function evaluateSingleAgentAssertion(
-  assertion: AgentAssertion,
-  executionData: ExecutionData,
-): boolean {
-  const { type, operator, operand } = assertion;
-  switch (type) {
-    case "replied":
-      return (
-        !!executionData.response && executionData.response.trim().length > 0
-      );
-    case "used_tool_calls": {
-      const count = executionData.toolCalls?.length || 0;
-      const target = parseInt(operand || "", 10);
-      if (isNaN(target)) return count > 0; // Fallback: any tool calls
-      const compareFunction = COMPARATORS[operator || "gte"];
-      return compareFunction ? compareFunction(count, target) : count >= target;
-    }
-    case "thought":
-      return (
-        !!executionData.thinking && executionData.thinking.trim().length > 0
-      );
-    case "max_turns": {
-      const turns = executionData.turnCount || 1;
-      const limit = parseInt(operand || "", 10);
-      if (isNaN(limit)) return true; // No limit specified
-      const compareFunction = COMPARATORS[operator || "lte"];
-      return compareFunction ? compareFunction(turns, limit) : turns <= limit;
-    }
-    default:
-      logger.warn(`[benchmark] Unknown agent assertion type: ${type}`);
-      return false;
-  }
-}
-function evaluateAgentAssertions(
-  benchmark: BenchmarkDoc,
-  executionData: ExecutionData,
-): boolean {
-  const assertions = benchmark.agentAssertions;
-  if (!assertions || assertions.length === 0) {
-    return true; // No agent assertions = pass by default
-  }
-  const operator = benchmark.agentAssertionOperator || "AND";
-  if (operator === "OR") {
-    return assertions.some((assertion) =>
-      evaluateSingleAgentAssertion(assertion, executionData),
-    );
-  }
-  return assertions.every((assertion) =>
-    evaluateSingleAgentAssertion(assertion, executionData),
-  );
-}
 // ─── list available conversation models ─────────────────────
 /**
  * Get all listed conversation-type models grouped by provider.
@@ -318,6 +200,63 @@ function filterAvailableModels(models: ModelEntry[]): ModelEntry[] {
     }
   });
 }
+
+/**
+ * Resolve which tools a target runs with. Per-target selection wins, then
+ * the benchmark's own tool set, then the legacy calculator-only default.
+ */
+function resolveEnabledTools(
+  benchmark: BenchmarkDoc,
+  model: ModelEntry,
+): string[] | undefined {
+  if (model.enabledTools?.length) return model.enabledTools;
+  if (benchmark.enabledTools?.length) return benchmark.enabledTools;
+  if (model.toolsEnabled) return [TOOL_NAMES.CALCULATE_PRECISE];
+  return undefined;
+}
+
+/** Run the llm_judge assertions of a benchmark and map verdicts by index. */
+async function collectJudgeVerdicts(
+  benchmark: BenchmarkDoc,
+  executionData: {
+    response: string | null;
+    thinking: string | null;
+    toolCalls: BenchmarkToolCall[];
+    turnCount: number;
+  },
+  project: string | null,
+  username: string,
+  signal?: AbortSignal,
+): Promise<Map<number, JudgeVerdict>> {
+  const verdicts = new Map<number, JudgeVerdict>();
+  const assertions = benchmark.agentAssertions || [];
+  for (let index = 0; index < assertions.length; index++) {
+    const assertion = assertions[index];
+    if (assertion?.type !== "llm_judge") continue;
+    if (signal?.aborted) {
+      verdicts.set(index, { passed: false, error: "Aborted" });
+      continue;
+    }
+    if (!assertion.rubric?.trim()) {
+      verdicts.set(index, { passed: false, error: "Missing rubric" });
+      continue;
+    }
+    const verdict = await runJudge({
+      rubric: assertion.rubric,
+      judgeModel: assertion.judgeModel,
+      prompt: benchmark.prompt,
+      systemPrompt: benchmark.systemPrompt,
+      response: executionData.response || "",
+      toolCalls: executionData.toolCalls,
+      project,
+      username,
+      signal,
+    });
+    verdicts.set(index, verdict);
+  }
+  return verdicts;
+}
+
 // ─── Run a single model against a benchmark prompt ──────────
 async function runSingleModel(
   benchmark: BenchmarkDoc,
@@ -335,29 +274,39 @@ async function runSingleModel(
     toolsEnabled: model.toolsEnabled || false,
     ...(model.agent && { agent: model.agent }),
     ...(model.locale && { locale: model.locale }),
+    ...(model.trialCount &&
+      model.trialCount > 1 && {
+        trial: model.trial,
+        trialCount: model.trialCount,
+      }),
   };
+  const failureShell = (latencySeconds: number, error: string): ModelResult => ({
+    provider: model.provider,
+    model: model.model,
+    label: model.label,
+    ...configFlags,
+    response: null,
+    thinking: null,
+    passed: false,
+    matchMode: benchmark.matchMode || BENCHMARK_MATCH_MODES.CONTAINS,
+    latency: roundMilliseconds(latencySeconds),
+    ttftMs: null,
+    tokensPerSecond: null,
+    usage: null,
+    estimatedCost: null,
+    error,
+    completedAt: new Date().toISOString(),
+  });
+
   // Bail immediately if already aborted
   if (signal?.aborted) {
     logger.info(
       `[benchmark] ⏭ Skipping ${model.provider}/${model.model} — already aborted`,
     );
-    return {
-      provider: model.provider,
-      model: model.model,
-      label: model.label,
-      ...configFlags,
-      response: null,
-      thinking: null,
-      passed: false,
-      matchMode: benchmark.matchMode || BENCHMARK_MATCH_MODES.CONTAINS,
-      latency: 0,
-      usage: null,
-      estimatedCost: null,
-      error: "Aborted",
-      completedAt: new Date().toISOString(),
-    };
+    return failureShell(0, "Aborted");
   }
   const start = performance.now();
+  let firstContentAt: number | null = null;
   const messages: Array<{ role: string; content: string }> = [];
   // Optional system prompt
   if (benchmark.systemPrompt) {
@@ -367,8 +316,9 @@ async function runSingleModel(
   logger.info(`[benchmark] ▶ Running ${model.provider}/${model.model}`);
   try {
     const events: BenchmarkEvent[] = [];
-    const handler =
-      model.agent || model.toolsEnabled ? handleAgent : handleConversation;
+    const useAgentHandler = !!(model.agent || model.toolsEnabled);
+    const handler = useAgentHandler ? handleAgent : handleConversation;
+    const enabledTools = resolveEnabledTools(benchmark, model);
     await handler(
       {
         provider: model.provider,
@@ -381,32 +331,41 @@ async function runSingleModel(
         skipConversation: true,
         thinkingEnabled: model.thinkingEnabled || false,
         ...(model.locale && { locale: model.locale }),
-        ...((model.agent || model.toolsEnabled) && {
+        ...(useAgentHandler && {
           ...(model.agent && { agent: model.agent }),
           agenticLoopEnabled: true,
           autoApprove: true,
           maxIterations: 10,
         }),
-        ...(model.toolsEnabled && {
-          functionCallingEnabled: true,
-          enabledTools: [TOOL_NAMES.CALCULATE_PRECISE],
-        }),
-        ...(model.enabledTools?.length && {
-          functionCallingEnabled: true,
-          enabledTools: model.enabledTools,
-        }),
+        // Plain models with tools get an explicit tool set; agents keep
+        // their persona's tools unless the benchmark constrains them.
+        ...(model.toolsEnabled &&
+          !model.agent &&
+          enabledTools && {
+            functionCallingEnabled: true,
+            enabledTools,
+          }),
+        ...(model.agent &&
+          enabledTools &&
+          (model.enabledTools?.length || benchmark.enabledTools?.length) && {
+            enabledTools,
+          }),
       },
       (event: SseEvent) => {
         const benchmarkEvent = event as SseEvent & BenchmarkEvent;
         events.push(benchmarkEvent);
-        // Forward chunk/thinking/tool events in real-time for live preview
-        if (
+        const isContentEvent =
           benchmarkEvent.type === "chunk" ||
           benchmarkEvent.type === "thinking" ||
           benchmarkEvent.type === "toolCall" ||
           benchmarkEvent.type === "tool_execution" ||
-          benchmarkEvent.type === "tool_output"
-        ) {
+          benchmarkEvent.type === "tool_output";
+        // Time-to-first-token: first streamed content of any kind
+        if (isContentEvent && firstContentAt === null) {
+          firstContentAt = performance.now();
+        }
+        // Forward chunk/thinking/tool events in real-time for live preview
+        if (isContentEvent) {
           if (onEvent) {
             try {
               onEvent(benchmarkEvent);
@@ -448,21 +407,7 @@ async function runSingleModel(
       logger.warn(
         `[benchmark]   ⚠ ${model.model} returned error event: ${errorEvent.message}`,
       );
-      return {
-        provider: model.provider,
-        model: model.model,
-        label: model.label,
-        ...configFlags,
-        response: null,
-        thinking: null,
-        passed: false,
-        matchMode: benchmark.matchMode || BENCHMARK_MATCH_MODES.CONTAINS,
-        latency: roundMilliseconds(latency),
-        usage: null,
-        estimatedCost: null,
-        error: errorEvent.message || "Unknown error",
-        completedAt: new Date().toISOString(),
-      };
+      return failureShell(latency, errorEvent.message || "Unknown error");
     }
     // Extract text response
     const text = events
@@ -484,8 +429,8 @@ async function runSingleModel(
       .join("");
     // Extract tool calls from both event paths:
     // - "toolCall" with status "done" — native MCP path (e.g. LM Studio)
-    // - "tool_execution" with status "done" — standard agentic path (cloud providers)
-    const nativeToolCalls: ToolCallResult[] = events
+    // - "tool_execution" with status "done"/"error" — standard agentic path
+    const nativeToolCalls: BenchmarkToolCall[] = events
       .filter((e) => e.type === "toolCall" && e.status === "done")
       .map((toolCall) => ({
         id: toolCall.id,
@@ -494,7 +439,7 @@ async function runSingleModel(
         result: toolCall.result,
         status: "done",
       }));
-    const agenticToolCalls: ToolCallResult[] = events
+    const agenticToolCalls: BenchmarkToolCall[] = events
       .filter(
         (eventItem) =>
           eventItem.type === "tool_execution" &&
@@ -519,31 +464,50 @@ async function runSingleModel(
     // Count agentic loop turns (each chunk of tool calls + response = 1 turn)
     // A turn is roughly: user→model→(tools)→model. Count "done" events as turn markers.
     const turnCount = events.filter((e) => e.type === "done").length || 1;
-    // ── Mode-aware pass/fail evaluation ──────────────────────
-    const mode = benchmark.benchmarkMode || "model";
-    let passed: boolean;
-    if (mode === "agent") {
-      // Agent mode: only behavioral assertions
-      passed = evaluateAgentAssertions(benchmark, {
-        response: text,
-        thinking: thinkingText,
-        toolCalls,
-        turnCount,
-      });
-    } else if (mode === "combined") {
-      // Combined mode: both text + behavioral assertions must pass
-      const textPassed = evaluateAssertions(text, benchmark);
-      const agentPassed = evaluateAgentAssertions(benchmark, {
-        response: text,
-        thinking: thinkingText,
-        toolCalls,
-        turnCount,
-      });
-      passed = textPassed && agentPassed;
-    } else {
-      // Model mode (default): text assertions only
-      passed = evaluateAssertions(text, benchmark);
+
+    // ── Timing metrics ────────────────────────────────────────
+    const ttftMs =
+      firstContentAt !== null ? Math.round(firstContentAt - start) : null;
+    const usage = (doneEvent.usage as Record<string, number>) || null;
+    let tokensPerSecond =
+      typeof doneEvent.tokensPerSecond === "number" &&
+      doneEvent.tokensPerSecond > 0
+        ? doneEvent.tokensPerSecond
+        : null;
+    if (tokensPerSecond === null && usage?.outputTokens) {
+      const generationSeconds =
+        ttftMs !== null ? Math.max(latency - ttftMs / 1000, 0.001) : latency;
+      if (generationSeconds > 0) {
+        tokensPerSecond =
+          Math.round((usage.outputTokens / generationSeconds) * 10) / 10;
+      }
     }
+
+    // ── Evaluation: text + behavioral assertions (+ LLM judge) ─
+    const executionData = {
+      response: text,
+      thinking: thinkingText,
+      toolCalls,
+      turnCount,
+    };
+    const hasJudge = collectBehaviorAssertions(benchmark).some(
+      (assertion) => assertion.type === "llm_judge",
+    );
+    const judgeVerdicts = hasJudge
+      ? await collectJudgeVerdicts(
+          benchmark,
+          executionData,
+          project,
+          username,
+          signal,
+        )
+      : new Map<number, JudgeVerdict>();
+    const evaluation = evaluateBenchmark(benchmark, executionData, judgeVerdicts);
+    const judgeCost = [...judgeVerdicts.values()].reduce(
+      (sum, verdict) => sum + (verdict.cost || 0),
+      0,
+    );
+
     return {
       provider: model.provider,
       model: model.model,
@@ -553,12 +517,16 @@ async function runSingleModel(
       thinking: thinkingText || null,
       toolCalls: toolCallsResult,
       toolNames,
-      passed,
+      passed: evaluation.passed,
       matchMode,
+      assertionResults: evaluation.assertionResults,
       turnCount,
       latency: roundMilliseconds(latency),
-      usage: (doneEvent.usage as Record<string, number>) || null,
+      ttftMs,
+      tokensPerSecond,
+      usage,
       estimatedCost: (doneEvent.estimatedCost as number) ?? null,
+      ...(judgeCost > 0 && { judgeCost }),
       error: null,
       completedAt: new Date().toISOString(),
     };
@@ -567,27 +535,13 @@ async function runSingleModel(
     logger.error(
       `[benchmark]   💥 ${model.model} threw: ${getErrorMessage(error)}`,
     );
-    return {
-      provider: model.provider,
-      model: model.model,
-      label: model.label,
-      ...configFlags,
-      response: null,
-      thinking: null,
-      passed: false,
-      matchMode: benchmark.matchMode || BENCHMARK_MATCH_MODES.CONTAINS,
-      latency: roundMilliseconds(latency),
-      usage: null,
-      estimatedCost: null,
-      error: getErrorMessage(error),
-      completedAt: new Date().toISOString(),
-    };
+    return failureShell(latency, getErrorMessage(error));
   }
 }
 // ─── public API ─────────────────────────────────────────────
 const BenchmarkService = {
   BENCHMARK_MATCH_MODES,
-  evaluate,
+  evaluate: matchText,
   getConversationModels,
   /** Number of benchmark model calls currently in-flight. */
   get activeGenerationCount() {
@@ -604,7 +558,8 @@ const BenchmarkService = {
       onModelComplete,
       onEvent,
       signal,
-    }: RunBenchmarkCallbacks = {},
+      trials,
+    }: RunBenchmarkOptions = {},
   ) {
     // Resolve target models
     let models: ModelEntry[];
@@ -629,6 +584,25 @@ const BenchmarkService = {
     if (models.length === 0) {
       throw new Error("No models available for benchmarking");
     }
+
+    // ── Trials: repeat every target N times (consistency / pass-rate) ──
+    const trialCount = Math.max(
+      1,
+      Math.min(
+        Math.floor(trials ?? benchmark.trials ?? 1) || 1,
+        BENCHMARK.MAX_TRIALS,
+      ),
+    );
+    if (trialCount > 1) {
+      models = models.flatMap((model) =>
+        Array.from({ length: trialCount }, (_, trialIndex) => ({
+          ...model,
+          trial: trialIndex + 1,
+          trialCount,
+        })),
+      );
+    }
+
     // Notify caller of total model count (used for live reconnection state)
     if (onRunStart) {
       try {
@@ -640,7 +614,8 @@ const BenchmarkService = {
     const runId = crypto.randomUUID();
     const startedAt = new Date().toISOString();
     logger.info(
-      `[benchmark] Starting run ${runId} — "${benchmark.name}" against ${models.length} model(s)`,
+      `[benchmark] Starting run ${runId} — "${benchmark.name}" against ${models.length} model(s)` +
+        (trialCount > 1 ? ` (${trialCount} trials each)` : ""),
     );
     // ── Instance-aware concurrent execution ─────────────────────
     // Cloud providers: all models under the same provider run sequentially
@@ -753,8 +728,12 @@ const BenchmarkService = {
     const errored = results.filter(
       (benchmarkResult) => benchmarkResult.error,
     ).length;
+    // Total spend includes LLM-judge calls (tracked per-result as judgeCost)
     const totalCost = results.reduce(
-      (sum, benchmarkResult) => sum + (benchmarkResult.estimatedCost || 0),
+      (sum, benchmarkResult) =>
+        sum +
+        (benchmarkResult.estimatedCost || 0) +
+        (benchmarkResult.judgeCost || 0),
       0,
     );
     const run = {
@@ -763,6 +742,7 @@ const BenchmarkService = {
       project,
       models: results,
       aborted: wasAborted || false,
+      ...(trialCount > 1 && { trials: trialCount }),
       summary: {
         total: results.length,
         passed,
@@ -788,7 +768,7 @@ const BenchmarkService = {
   },
   // ── CRUD Helpers ────────────────────────────────────────────
   async create(
-    data: BenchmarkCreateData,
+    data: BenchmarkWriteData,
     project: string | null,
     username: string,
   ) {
@@ -809,6 +789,8 @@ const BenchmarkService = {
       assertionOperator: data.assertionOperator || "AND",
       agentAssertions: data.agentAssertions || [],
       agentAssertionOperator: data.agentAssertionOperator || "AND",
+      enabledTools: data.enabledTools || [],
+      trials: data.trials ?? 1,
       temperature: data.temperature ?? 0,
       maxTokens: data.maxTokens ?? 256,
       tags: data.tags || [],
@@ -817,6 +799,41 @@ const BenchmarkService = {
     };
     await db.collection(BENCHMARKS_COLLECTION).insertOne(document);
     return document;
+  },
+  async update(
+    id: string,
+    data: Partial<BenchmarkWriteData>,
+    project: string | null,
+  ) {
+    const db = MongoWrapper.getDb(MONGO_DB_NAME);
+    if (!db) throw new Error("Database not available");
+    const updates: Record<string, unknown> = {
+      updatedAt: new Date().toISOString(),
+    };
+    const editableFields: Array<keyof BenchmarkWriteData> = [
+      "name",
+      "prompt",
+      "systemPrompt",
+      "expectedValue",
+      "matchMode",
+      "benchmarkMode",
+      "assertions",
+      "assertionOperator",
+      "agentAssertions",
+      "agentAssertionOperator",
+      "enabledTools",
+      "trials",
+      "temperature",
+      "maxTokens",
+      "tags",
+    ];
+    for (const field of editableFields) {
+      if (data[field] !== undefined) updates[field] = data[field];
+    }
+    await db
+      .collection(BENCHMARKS_COLLECTION)
+      .updateOne({ id, project }, { $set: updates });
+    return db.collection(BENCHMARKS_COLLECTION).findOne({ id, project });
   },
   async list(project: string | null) {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
@@ -853,6 +870,14 @@ const BenchmarkService = {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not available");
     return db.collection(RUNS_COLLECTION).findOne({ id: runId, project });
+  },
+  async removeRun(runId: string, project: string | null) {
+    const db = MongoWrapper.getDb(MONGO_DB_NAME);
+    if (!db) throw new Error("Database not available");
+    const outcome = await db
+      .collection(RUNS_COLLECTION)
+      .deleteOne({ id: runId, project });
+    return outcome.deletedCount > 0;
   },
   async getLatestRun(benchmarkId: string, project: string | null) {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
