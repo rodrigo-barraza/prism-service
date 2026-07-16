@@ -41,6 +41,7 @@ import {
   getCollectionOpts,
 } from "./lifecycle/Finalizer.ts";
 import { routeStreamChunk } from "./lifecycle/StreamChunkRouter.ts";
+import { substituteToolOutputTokens } from "./lifecycle/ToolOutputSubstituter.ts";
 import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import {
@@ -1234,6 +1235,28 @@ export default class BaseAgenticHarness {
       currentMessages,
       state.originalMessageCount,
     );
+
+    // Verbatim tool-output substitution ({{tool_output:field}} → exact tool
+    // result value) — must run before the done event, persistence, and the
+    // in-memory assistant push, since all three read this text.
+    state.finalStreamedText = substituteToolOutputTokens(
+      state.finalStreamedText,
+      currentMessages,
+    );
+    for (let i = 0; i < cleanTextFragments.length; i++) {
+      cleanTextFragments[i] = substituteToolOutputTokens(
+        cleanTextFragments[i],
+        currentMessages,
+      );
+    }
+    for (const message of newTurnMessages) {
+      if (message.role === "assistant" && typeof message.content === "string") {
+        message.content = substituteToolOutputTokens(
+          message.content,
+          currentMessages,
+        );
+      }
+    }
 
     logger.info(
       `[AgenticLoop] finalize: conversation=${agentConversationId} conversationId=${conversationId} project=${project} ` +
