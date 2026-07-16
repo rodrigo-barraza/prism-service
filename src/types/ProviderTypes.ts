@@ -127,6 +127,10 @@ export interface ProviderOptions {
   // Image generation
   forceImageGeneration?: boolean;
   imageCount?: number;
+  /** Gemini imageConfig.aspectRatio, e.g. "1:1", "16:9", "9:16", "21:9" */
+  aspectRatio?: string;
+  /** Gemini imageConfig.imageSize: "512" | "1K" | "2K" | "4K" */
+  imageSize?: string;
   // System prompt
   systemPrompt?: string;
   // OpenAI Responses API
