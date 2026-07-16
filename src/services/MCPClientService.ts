@@ -1,5 +1,8 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import {
+  StdioClientTransport,
+  getDefaultEnvironment,
+} from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import logger from "#src/utils/logger";
@@ -173,6 +176,27 @@ function parseMCPToolName(
 /**
  * Create the appropriate transport based on server config.
  */
+/**
+ * Environment for stdio MCP child processes.
+ *
+ * SECURITY: never spread process.env here — that hands every stdio server
+ * (often an arbitrary npx package) the full secret set (MONGO_URI, provider
+ * API keys, MinIO credentials). MCP packages are a live supply-chain
+ * surface: VIPER-MCP found 106 zero-days across ~40k MCP repos
+ * (arXiv 2605.21392, https://arxiv.org/abs/2605.21392), and Unit 42
+ * documented malicious marketplace extensions in the wild
+ * (https://unit42.paloaltonetworks.com/openclaw-ai-supply-chain-risk/).
+ *
+ * The SDK's getDefaultEnvironment() inherits only vars deemed safe
+ * (PATH/HOME/USER/SHELL/TERM/LOGNAME on POSIX); anything a specific server
+ * genuinely needs belongs in that server's own config.env.
+ */
+export function buildStdioEnvironment(
+  configEnv: Record<string, string> | undefined,
+): Record<string, string> {
+  return { ...getDefaultEnvironment(), ...(configEnv || {}) };
+}
+
 function createTransport(
   config: MCPServerConfig,
 ): StdioClientTransport | StreamableHTTPClientTransport | SSEClientTransport {
@@ -180,7 +204,7 @@ function createTransport(
     return new StdioClientTransport({
       command: config.command!,
       args: config.args || [],
-      env: { ...process.env, ...(config.env || {}) } as Record<string, string>,
+      env: buildStdioEnvironment(config.env),
     });
   }
 

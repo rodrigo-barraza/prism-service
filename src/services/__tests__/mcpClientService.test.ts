@@ -26,6 +26,9 @@ vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => {
     StdioClientTransport: class StdioClientTransport {
       close = vi.fn();
     },
+    // Safe-inheritance env builder (PATH/HOME/... only) used by
+    // buildStdioEnvironment — the env-leak fix
+    getDefaultEnvironment: vi.fn().mockReturnValue({ PATH: "/usr/bin" }),
   };
 });
 
