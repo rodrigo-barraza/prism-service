@@ -15,11 +15,22 @@ vi.mock("#src/utils/logger", () => ({
 // Mock MongoWrapper — SomaticStateService depends on it for persistence
 const mockFindOne = vi.fn().mockResolvedValue(null);
 const mockUpdateOne = vi.fn().mockResolvedValue({ modifiedCount: 1 });
+const mockInsertOne = vi.fn().mockResolvedValue({ insertedId: "sample" });
+const mockCreateIndex = vi.fn().mockResolvedValue("index");
+const mockHistoryToArray = vi.fn().mockResolvedValue([]);
+const mockFind = vi.fn(() => ({
+  sort: vi.fn(() => ({
+    limit: vi.fn(() => ({ toArray: mockHistoryToArray })),
+  })),
+}));
 vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getCollection: vi.fn(() => ({
       findOne: mockFindOne,
       updateOne: mockUpdateOne,
+      insertOne: mockInsertOne,
+      createIndex: mockCreateIndex,
+      find: mockFind,
     })),
     getDb: vi.fn(() => null),
   },
@@ -868,5 +879,65 @@ describe("SomaticStateService — label threshold accuracy", () => {
 
     await SomaticStateService.setPhysicalStatLevel(AGENT, "alcohol", 10);
     expect((await SomaticStateService.getSnapshot(AGENT)).alcohol.label).toBe("Wasted");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// SomaticStateService — emotion history (time series)
+// ═══════════════════════════════════════════════════════════════
+
+describe("SomaticStateService — emotion history", () => {
+  const AGENT = "HISTORY_AGENT";
+
+  beforeEach(() => {
+    mockFindOne.mockResolvedValue(null);
+    mockInsertOne.mockClear();
+    mockFind.mockClear();
+    mockHistoryToArray.mockResolvedValue([]);
+  });
+
+  afterEach(async () => {
+    if (SomaticStateService.hasAgent(AGENT)) {
+      await SomaticStateService.destroyAgent(AGENT);
+    }
+  });
+
+  it("appends a history sample on every persist", async () => {
+    await SomaticStateService.getSnapshot(AGENT);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "hunger", 70);
+    expect(mockInsertOne).toHaveBeenCalled();
+    const sample = mockInsertOne.mock.calls[0][0];
+    expect(sample.agentId).toBe(AGENT);
+    expect(sample.at).toBeInstanceOf(Date);
+    expect(typeof sample.dominant).toBe("string");
+    expect(sample.wheel).toBeTypeOf("object");
+    expect(sample.physical.hunger).toBe(70);
+  });
+
+  it("history samples survive an insert failure (persist still completes)", async () => {
+    mockInsertOne.mockRejectedValueOnce(new Error("mongo down"));
+    await SomaticStateService.getSnapshot(AGENT);
+    await expect(
+      SomaticStateService.setPhysicalStatLevel(AGENT, "hunger", 30),
+    ).resolves.not.toThrow();
+    expect(mockUpdateOne).toHaveBeenCalled();
+  });
+
+  it("getHistory queries the requested window ascending", async () => {
+    const point = {
+      at: new Date("2026-07-16T10:00:00Z"),
+      dominant: "anger",
+      intensity: 62,
+      wheel: { anger: 62, joy: 10 },
+      physical: { hunger: 40 },
+    };
+    mockHistoryToArray.mockResolvedValue([point]);
+    const points = await SomaticStateService.getHistory(AGENT, 24);
+    expect(points).toEqual([point]);
+    const [filter] = mockFind.mock.calls[0] as unknown[];
+    expect((filter as { agentId: string }).agentId).toBe(AGENT);
+    const since = (filter as { at: { $gte: Date } }).at.$gte;
+    expect(since).toBeInstanceOf(Date);
+    expect(Date.now() - since.getTime()).toBeGreaterThan(23 * 60 * 60 * 1000);
   });
 });

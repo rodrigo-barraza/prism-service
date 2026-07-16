@@ -156,6 +156,12 @@ export async function runJudge(request: JudgeRequest): Promise<JudgeVerdict> {
         project: request.project,
         username: request.username,
         skipConversation: true,
+        // Deterministic verdict plumbing: JSON mode where the provider
+        // supports it, and no thinking — adaptive-thinking models (e.g.
+        // Gemini Flash) can otherwise stream the start of the JSON verdict
+        // inside a thought part, truncating the parseable text.
+        responseFormat: "json_object",
+        thinkingEnabled: false,
       },
       (event: SseEvent) => {
         events.push(event as SseEvent & { estimatedCost?: number | null });
@@ -187,14 +193,22 @@ export async function runJudge(request: JudgeRequest): Promise<JudgeVerdict> {
     .filter((event) => event.type === "chunk")
     .map((event) => (event as { content?: string }).content || "")
     .join("");
+  const thinkingText = events
+    .filter((event) => event.type === "thinking")
+    .map((event) => (event as { content?: string }).content || "")
+    .join("");
   const doneEvent = events.find((event) => event.type === "done") as
     | { estimatedCost?: number | null }
     | undefined;
   const cost = doneEvent?.estimatedCost ?? undefined;
 
-  const parsed = extractJson(text) as
-    | { pass?: unknown; score?: unknown; reasoning?: unknown }
-    | undefined;
+  // Parse the verdict from the response text; if the model leaked part of
+  // the JSON into thinking content, retry on the combined stream.
+  type RawVerdict = { pass?: unknown; score?: unknown; reasoning?: unknown };
+  let parsed = extractJson(text) as RawVerdict | undefined;
+  if ((!parsed || typeof parsed.pass !== "boolean") && thinkingText) {
+    parsed = extractJson(thinkingText + text) as RawVerdict | undefined;
+  }
   if (!parsed || typeof parsed.pass !== "boolean") {
     return {
       passed: false,

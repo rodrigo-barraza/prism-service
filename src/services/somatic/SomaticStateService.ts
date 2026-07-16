@@ -276,6 +276,60 @@ function getCollection() {
   return MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTIONS.SOMATIC_STATE);
 }
 
+function getHistoryCollection() {
+  return MongoWrapper.getCollection(
+    MONGO_DB_NAME,
+    COLLECTIONS.SOMATIC_HISTORY,
+  );
+}
+
+// Emotion/physical time series — one sample per dirty persist (≤1/min),
+// TTL-expired after 30 days. Powers the lupos-client history charts.
+const HISTORY_RETENTION_SECONDS = 30 * 24 * 60 * 60;
+const HISTORY_MAX_POINTS = 5000;
+let historyIndexesEnsured = false;
+
+async function appendHistorySample(
+  agentId: string,
+  state: AgentSomaticState,
+): Promise<void> {
+  try {
+    const collection = getHistoryCollection();
+    if (!collection) return;
+    if (!historyIndexesEnsured) {
+      historyIndexesEnsured = true;
+      // Fire-and-forget: index creation is idempotent and a failure here
+      // must never block a persist tick.
+      collection
+        .createIndex(
+          { at: 1 },
+          { expireAfterSeconds: HISTORY_RETENTION_SECONDS },
+        )
+        .catch(() => {});
+      collection.createIndex({ agentId: 1, at: -1 }).catch(() => {});
+    }
+    const dominantEmotion = state.emotionalState.getDominantEmotion();
+    const physicalLevels = getPhysicalLevelsFromState(state);
+    await collection.insertOne({
+      agentId,
+      at: new Date(),
+      dominant: dominantEmotion.emotion,
+      intensity: Math.round(dominantEmotion.intensity),
+      wheel: dominantEmotion.all,
+      physical: Object.fromEntries(
+        Object.entries(physicalLevels).map(([stat, level]) => [
+          stat,
+          Math.round(level as number),
+        ]),
+      ),
+    });
+  } catch (error: unknown) {
+    logger.warn(
+      `[SomaticStateService] Failed to append history sample for "${agentId}": ${getErrorMessage(error)}`,
+    );
+  }
+}
+
 interface LoadedSomaticDocument {
   levels: Partial<SomaticLevels>;
   updatedAt: string | null;
@@ -335,6 +389,8 @@ async function persistToDatabase(
       },
       { upsert: true },
     );
+
+    await appendHistorySample(agentId, state);
 
     state.isDirty = false;
   } catch (error: unknown) {
@@ -644,6 +700,43 @@ function roundLevel(value: number): number {
 const SomaticStateService = {
   initialize(): void {
     startPersistenceLoop();
+  },
+
+  /**
+   * Emotion/physical time series for an agent, ascending by time.
+   * One point per dirty persist tick (≤1/min while active; silent while
+   * fully idle). 30-day retention via TTL index.
+   */
+  async getHistory(
+    agentId: string,
+    hours: number,
+  ): Promise<
+    Array<{
+      at: Date;
+      dominant: string;
+      intensity: number;
+      wheel: Record<string, number>;
+      physical: Record<string, number>;
+    }>
+  > {
+    const collection = getHistoryCollection();
+    if (!collection) return [];
+    const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+    const documents = await collection
+      .find(
+        { agentId, at: { $gte: since } },
+        { projection: { _id: 0, agentId: 0 } },
+      )
+      .sort({ at: 1 })
+      .limit(HISTORY_MAX_POINTS)
+      .toArray();
+    return documents as unknown as Array<{
+      at: Date;
+      dominant: string;
+      intensity: number;
+      wheel: Record<string, number>;
+      physical: Record<string, number>;
+    }>;
   },
 
   async getSnapshot(agentId: string): Promise<SomaticSnapshot> {
