@@ -62,6 +62,11 @@
     "noEmbeddings": "No conversations with embeddings found. Conversations are automatically embedded after agent sessions with 6+ messages."
   },
 
+  "retrieve_offloaded_content": {
+    "idRequired": "offloadId is required",
+    "notFound": "No offloaded content found for this offload_id. It may predate the offload system or belong to another environment — re-run the original tool if the data is still needed."
+  },
+
   "summarize_conversation": {
     "summaryRequired": "'summary' is required and must be a non-empty string"
   },

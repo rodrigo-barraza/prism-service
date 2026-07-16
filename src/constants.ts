@@ -59,6 +59,7 @@ export const COLLECTIONS = {
   WEBHOOK_SUBSCRIPTIONS: "webhook_subscriptions",
   SOMATIC_STATE: "somatic_state",
   WORKFLOW_MEMORIES: "workflow_memories",
+  OFFLOADED_TOOL_RESULTS: "offloaded_tool_results",
 };
 
 /** Shared system-wide statuses for agents, tasks, and workflows. */
@@ -566,6 +567,28 @@ export const COMPACTION = {
 
   /** Number of recent turns always preserved (never compressed). */
   PROTECTED_RECENT_TURNS: 4,
+} as const;
+
+// ─── Tool Result Offload Constants ──────────────────────────
+
+export const OFFLOAD = {
+  /** Lines of the original result shown in the inline pointer stub. */
+  PREVIEW_LINES: 6,
+
+  /** Per-line character cap inside the stub preview. */
+  PREVIEW_LINE_MAX_CHARS: 160,
+
+  /** In-memory offload cache entries kept while Mongo persistence settles. */
+  MEMORY_CACHE_MAX_ENTRIES: 128,
+
+  /** Character cap on a single retrieval response (keeps re-flood bounded). */
+  RETRIEVAL_MAX_CHARS: 24_000,
+
+  /** Default number of lines returned when no slice options are given. */
+  DEFAULT_HEAD_LINES: 100,
+
+  /** Default context lines around each regex match. */
+  DEFAULT_CONTEXT_LINES: 2,
 } as const;
 
 // ─── Context Window Constants ───────────────────────────────

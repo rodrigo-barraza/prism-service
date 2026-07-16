@@ -48,7 +48,7 @@
     "suffix": " Let drunkenness show natural — looser typing, bolder swing, worse judgment as number climbs — without announcing number.",
     "levelInfo": " You {{level}}/10 drunk right now."
   },
-  "classificationPrompt": "Classify emotion. Output ONE word from:\n{{validEmotionsList}}\n\nRule: only emotion word. \"neutral\" only for purely factual.\n\nExample:\n\"I'm so excited!\" -> anticipation\n\"That's disgusting\" -> disgust\n\"I don't know anymore...\" -> sadness\n\"Haha hilarious!\" -> joy\n\"I love you!\" -> joy\n\"H2O is water\" -> neutral\n\nClassify: \"{{textToClassify}}\"\nEmotion:",
+  "classificationPrompt": "You are emotional appraisal of character in group chat. Appraise how EVENT hits CHARACTER'S own goals, comfort, standing — NOT emotion text itself shows. Speaker excitement about thing irrelevant to character not character excitement; insult aimed at character matters way more than tone.\n\nOutput STRICT JSON one line: {\"emotion\": \"<one word from: {{validEmotionsList}}>\", \"why\": \"<trigger, under 12 word, character's view>\"}\n\nRule:\n- \"emotion\" exactly one word from list.\n- \"neutral\" only when event no touch character's goals or standing; then \"why\" is \"\".\n- Keep \"why\" concrete, event-shaped (\"they mock my favorite game\"), never restatement of emotion.\n\nExample:\n\"You useless, you know that?\" -> {\"emotion\": \"anger\", \"why\": \"they call me useless\"}\n\"I love this game!!\" -> {\"emotion\": \"anticipation\", \"why\": \"they hype game around me\"}\n\"Here, saved you ribs\" -> {\"emotion\": \"joy\", \"why\": \"they save me ribs\"}\n\"H2O is water\" -> {\"emotion\": \"neutral\", \"why\": \"\"}\n\nAppraise: \"{{textToClassify}}\"\nJSON:",
   "moodTemplate": {
     "header": "# How you feel right now",
     "moodLine": "Mood: {{emotion}} — {{bracket}} ({{intensity}}/100)",
@@ -82,6 +82,7 @@
     "alcohol": "Just had drink of fun kind — drunkenness {{from}} → {{to}} of 10. Let it loosen you.",
     "substance": "Just partook — substance level {{from}} → {{to}} of 10. Feel however you feel about that.",
     "bathroom": "Just relieved yourself — bathroom {{from}} → {{to}}. Better.",
-    "moodShift": "Mood just shifted from {{fromMood}} to {{toMood}} — let the turn show in this reply."
+    "moodShift": "Mood just shifted from {{fromMood}} to {{toMood}} — let the turn show in this reply.",
+    "moodShiftReason": "Mood just shifted from {{fromMood}} to {{toMood}} because {{reason}} — let the turn show in this reply."
   }
 }

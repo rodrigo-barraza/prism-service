@@ -142,6 +142,17 @@
       "limit": "Maximum number of results to return. Default: 10."
     }
   },
+  "retrieve_offloaded_content": {
+    "description": "Recover the verbatim content of an old tool result that was offloaded during context compaction. Offloaded results appear inline as '[Tool result offloaded — recoverable]' stubs with an offload_id. Pass that offload_id plus either a regex pattern (grep-style, with context lines), a startLine/endLine range, or headLines. Prefer a narrow slice over re-running the original tool.",
+    "parameters": {
+      "offloadId": "The offload_id from the pointer stub, e.g. 'toolu_01AbC...' or a UUID.",
+      "pattern": "Case-insensitive regex to search the offloaded content. Matching lines are returned with surrounding context. Invalid regex falls back to literal substring match.",
+      "contextLines": "Lines of context around each pattern match. Default: 2.",
+      "startLine": "First line to return (1-based, inclusive).",
+      "endLine": "Last line to return (1-based, inclusive).",
+      "headLines": "Return the first N lines. Used when no pattern or line range is given. Default: 100."
+    }
+  },
   "run_async_task": {
     "description": "Dispatch a tool to run asynchronously in the background. Returns immediately with a task ID — the tool executes in the background while you continue other work. Use this for long-running operations like shell commands, web scraping, file operations, or API calls when you don't need to wait for the result before proceeding. Query task status with list_async_tasks. Cancel with cancel_async_task. You will be automatically notified when the task completes.",
     "parameters": {

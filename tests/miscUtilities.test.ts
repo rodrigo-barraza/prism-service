@@ -550,7 +550,7 @@ import {
   EMOTION_BEHAVIOR_PROMPTS,
   ALCOHOL_DESCRIPTIONS,
   SOMATIC_KEYWORDS,
-  EMOTION_CLASSIFICATION_PROMPT,
+  EMOTION_APPRAISAL_PROMPT,
   type PrimaryEmotion,
 } from '#src/services/somatic/SomaticConstants';
 import { PROVIDERS } from "#src/constants";
@@ -753,26 +753,29 @@ describe('SomaticConstants', () => {
     });
   });
 
-  describe('EMOTION_CLASSIFICATION_PROMPT', () => {
+  describe('EMOTION_APPRAISAL_PROMPT', () => {
     it('should return a string containing the valid emotions list', () => {
       const emotionsList = 'joy, trust, fear, surprise, sadness, disgust, anger, anticipation, neutral';
-      const result = EMOTION_CLASSIFICATION_PROMPT(emotionsList, 'I am happy');
+      const result = EMOTION_APPRAISAL_PROMPT(emotionsList, 'I am happy');
 
       expect(result).toContain(emotionsList);
     });
 
-    it('should include the text to classify', () => {
-      const textToClassify = 'I am absolutely furious about this!';
-      const result = EMOTION_CLASSIFICATION_PROMPT('joy, anger', textToClassify);
+    it('should include the text to appraise', () => {
+      const textToAppraise = 'I am absolutely furious about this!';
+      const result = EMOTION_APPRAISAL_PROMPT('joy, anger', textToAppraise);
 
-      expect(result).toContain(textToClassify);
+      expect(result).toContain(textToAppraise);
     });
 
-    it('should include classification instructions and examples', () => {
-      const result = EMOTION_CLASSIFICATION_PROMPT('joy', 'Hello');
+    // Appraisal contract (arXiv:2607.07824): judge the event's bearing on
+    // the character's own goals/standing, output strict JSON {emotion, why}
+    it('should include appraisal instructions, the JSON contract, and examples', () => {
+      const result = EMOTION_APPRAISAL_PROMPT('joy', 'Hello');
 
-      expect(result).toContain('Classify the emotion');
-      expect(result).toContain('Output EXACTLY ONE word');
+      expect(result).toContain('Appraise how the EVENT');
+      expect(result).toContain('STRICT JSON');
+      expect(result).toContain('"why"');
       expect(result).toContain('Examples:');
     });
   });

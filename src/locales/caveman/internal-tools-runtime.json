@@ -62,6 +62,11 @@
     "noEmbeddings": "No embedded session. Embedding starts after 6+ message."
   },
 
+  "retrieve_offloaded_content": {
+    "idRequired": "Need offloadId.",
+    "notFound": "No stored content for this id. Maybe too old. Re-run tool if still need."
+  },
+
   "summarize_conversation": {
     "summaryRequired": "'summary' required, non-empty string."
   },

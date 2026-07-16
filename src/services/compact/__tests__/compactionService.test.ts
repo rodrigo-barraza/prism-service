@@ -3,6 +3,7 @@ import { PROVIDERS } from "#src/constants";
 import CompactionService from "#src/services/compact/CompactionService";
 import AutoCompactionTrigger from "#src/services/compact/AutoCompactionTrigger";
 import MicroCompactionService from "#src/services/compact/MicroCompactionService";
+import { OFFLOAD_STUB_HEADER } from "#src/services/compact/ToolResultOffloadService";
 import SettingsService from "#src/services/SettingsService";
 import RequestLogger from "#src/services/RequestLogger";
 import { TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
@@ -138,13 +139,16 @@ describe("MicroCompactionService", () => {
     const result = MicroCompactionService.microcompactMessages(messages, 4);
 
     expect(result.clearedResultCount).toBe(1);
+    expect(result.offloadedResultCount).toBe(1);
     expect(result.freedTokens).toBeGreaterThan(0);
 
     const firstMessageToolCalls = result.messages[1].toolCalls;
     expect(firstMessageToolCalls).toBeDefined();
     if (firstMessageToolCalls) {
-      // First tool call result in old turn should be cleared
-      expect(firstMessageToolCalls[0].result).toBe("[Old tool result content cleared]");
+      // First tool call result in old turn should be evicted to a
+      // recoverable pointer stub carrying the offload id
+      expect(firstMessageToolCalls[0].result).toContain(OFFLOAD_STUB_HEADER);
+      expect(firstMessageToolCalls[0].result).toContain("offload_id: call-1");
       // Second tool call (short) should remain
       expect(firstMessageToolCalls[1].result).toBe("short");
       // Third tool call (non-compactable tool) should remain
