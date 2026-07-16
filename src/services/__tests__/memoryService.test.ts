@@ -189,6 +189,7 @@ describe("MemoryService", () => {
 
       expect(mockCollection.find).toHaveBeenCalledWith(
         {
+          validTo: null,
           agent: "LUPOS",
           aboutUserId: "discord-user-1",
           sourceUserId: "discord-user-2",
@@ -201,7 +202,7 @@ describe("MemoryService", () => {
       await MemoryService.list({ agent: "LUPOS", userId: "discord-user-1" });
 
       expect(mockCollection.find).toHaveBeenCalledWith(
-        { agent: "LUPOS", aboutUserId: "discord-user-1" },
+        { validTo: null, agent: "LUPOS", aboutUserId: "discord-user-1" },
         expect.any(Object),
       );
     });

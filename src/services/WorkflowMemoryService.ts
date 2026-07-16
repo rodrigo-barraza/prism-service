@@ -2,6 +2,7 @@ import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { MONGO_DB_NAME } from "#config";
 import { COLLECTIONS, WORKFLOW_MEMORY, LOG_PREVIEW } from "#src/constants";
 import EmbeddingService from "./EmbeddingService.ts";
+import { scoreHybrid } from "./memory/HybridRetrieval.ts";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
@@ -41,6 +42,7 @@ const MAXIMUM_WORKFLOW_STEPS = WORKFLOW_MEMORY.MAXIMUM_STEPS;
 const MAXIMUM_WORKFLOWS_PER_QUERY = WORKFLOW_MEMORY.MAXIMUM_PER_QUERY;
 const WORKFLOW_TEXT_MAXIMUM_CHARACTERS = WORKFLOW_MEMORY.TEXT_MAXIMUM_CHARACTERS;
 const WORKFLOW_COOLDOWN_MILLISECONDS = WORKFLOW_MEMORY.COOLDOWN_MILLISECONDS;
+const WORKFLOW_RELEVANCE_THRESHOLD = WORKFLOW_MEMORY.RELEVANCE_THRESHOLD;
 
 interface WorkflowStep {
   toolName: string;
@@ -319,20 +321,37 @@ const WorkflowMemoryService = {
       .limit(50)
       .toArray();
 
-    const scoredWorkflows = allWorkflows
-      .filter(
-        (workflow) =>
-          Array.isArray(workflow.embedding) && workflow.embedding.length > 0,
-      )
-      .map((workflow) => ({
+    // Hybrid multi-signal scoring (semantic + BM25 + exact + recency, RRF-
+    // fused) — a workflow whose userRequest shares exact keywords with the
+    // new request is retrievable even when embeddings disagree. See
+    // memory/HybridRetrieval.ts for the research basis (Mem0 2026, B2).
+    const hybridScores = scoreHybrid(
+      allWorkflows.map((workflow, index) => ({
+        key: index,
+        title: (workflow.userRequest as string) || "",
+        content: (workflow.summary as string) || "",
+        embedding:
+          Array.isArray(workflow.embedding) && workflow.embedding.length > 0
+            ? (workflow.embedding as number[])
+            : null,
+        createdAt: (workflow.createdAt as string) || null,
+      })),
+      queryText,
+      queryEmbedding,
+      {
+        relevanceThreshold: WORKFLOW_RELEVANCE_THRESHOLD,
+        limit: maximumResults,
+      },
+    );
+    const scoredWorkflows = hybridScores.map((hybrid) => {
+      const workflow = allWorkflows[hybrid.key];
+      return {
         summary: workflow.summary as string,
         userRequest: workflow.userRequest as string,
         stepCount: workflow.stepCount as number,
-        score: cosineSimilarity(queryEmbedding, workflow.embedding as number[]),
-      }))
-      .filter((scored) => scored.score > 0.4)
-      .sort((workflowA, workflowB) => workflowB.score - workflowA.score)
-      .slice(0, maximumResults);
+        score: hybrid.semantic,
+      };
+    });
 
     if (scoredWorkflows.length === 0) return null;
 
@@ -365,19 +384,5 @@ const WorkflowMemoryService = {
     );
   },
 };
-
-function cosineSimilarity(vectorA: number[], vectorB: number[]): number {
-  if (vectorA.length !== vectorB.length || vectorA.length === 0) return 0;
-  let dotProduct = 0;
-  let magnitudeA = 0;
-  let magnitudeB = 0;
-  for (let i = 0; i < vectorA.length; i++) {
-    dotProduct += vectorA[i] * vectorB[i];
-    magnitudeA += vectorA[i] * vectorA[i];
-    magnitudeB += vectorB[i] * vectorB[i];
-  }
-  const denominator = Math.sqrt(magnitudeA) * Math.sqrt(magnitudeB);
-  return denominator === 0 ? 0 : dotProduct / denominator;
-}
 
 export default WorkflowMemoryService;

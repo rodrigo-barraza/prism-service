@@ -79,6 +79,8 @@ router.get(
       const type = (req.query.type as string) || null;
       const aboutUserId = (req.query.aboutUserId as string) || undefined;
       const sourceUserId = (req.query.sourceUserId as string) || undefined;
+      // History view: include soft-closed (superseded/invalidated) rows
+      const includeSuperseded = req.query.includeSuperseded === "true";
 
       const result = await MemoryService.list({
         agent: agent as string,
@@ -88,6 +90,7 @@ router.get(
         type: type ? String(type) : undefined,
         aboutUserId,
         sourceUserId,
+        includeSuperseded,
       });
       res.json(result);
     } catch (error: unknown) {
@@ -231,6 +234,29 @@ router.post(
       res.json(result);
     } catch (error: unknown) {
       logger.error(`[agent-memories] CONSOLIDATE ${getErrorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+/**
+ * POST /agent-memories/consolidation-rollback
+ * Undo a consolidation run by runId (from consolidation-history): reopens
+ * the memories it soft-closed and invalidates the merged docs it created.
+ */
+router.post(
+  "/consolidation-rollback",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const runId = req.body.runId as string;
+      if (!runId) {
+        res.status(400).json({ error: "runId is required" });
+        return;
+      }
+      const result = await MemoryConsolidationService.rollbackRun(runId);
+      res.json(result);
+    } catch (error: unknown) {
+      logger.error(`[agent-memories] ROLLBACK ${getErrorMessage(error)}`);
       next(error);
     }
   }),

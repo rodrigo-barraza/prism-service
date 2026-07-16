@@ -8,7 +8,10 @@ vi.mock("#src/services/MemoryService", () => ({
   default: {
     store: vi.fn().mockResolvedValue({ id: "merged-uuid" }),
     remove: vi.fn().mockResolvedValue(true),
+    invalidate: vi.fn().mockResolvedValue(true),
+    reopen: vi.fn().mockResolvedValue(true),
   },
+  CURRENT_MEMORY_FILTER: { validTo: null },
 }));
 
 vi.mock("#src/services/SettingsService", () => ({
@@ -46,6 +49,7 @@ vi.mock("#src/wrappers/MongoWrapper", () => {
     toArray: vi.fn().mockResolvedValue([]),
     insertOne: vi.fn().mockResolvedValue(undefined),
     updateOne: vi.fn().mockResolvedValue({ modifiedCount: 1 }),
+    findOneAndUpdate: vi.fn().mockResolvedValue({ project: "test-proj" }),
     findOne: vi.fn().mockResolvedValue(null),
     countDocuments: vi.fn().mockResolvedValue(0),
     aggregate: vi.fn().mockReturnThis(),
@@ -141,12 +145,20 @@ describe("MemoryConsolidationService", () => {
       expect(result).toBeDefined();
       expect((result as any)?.merged).toBe(2);
       expect((result as any)?.deleted).toBe(0);
-      expect(MemoryService.remove).toHaveBeenCalledTimes(2);
+      // Non-destructive merge: sources are soft-closed pointing at the
+      // merged doc, never hard-removed
+      expect(MemoryService.remove).not.toHaveBeenCalled();
+      expect(MemoryService.invalidate).toHaveBeenCalledTimes(2);
+      expect(MemoryService.invalidate).toHaveBeenCalledWith(
+        "mem-1",
+        expect.objectContaining({ supersededBy: "merged-uuid" }),
+      );
       expect(MemoryService.store).toHaveBeenCalledTimes(1);
       expect(MemoryService.store).toHaveBeenCalledWith(expect.objectContaining({
         type: "project",
         title: "Do not mock database in tests",
-        content: "Avoid database mocking in integration tests to prevent masked migrations."
+        content: "Avoid database mocking in integration tests to prevent masked migrations.",
+        dedupe: false
       }));
     });
 
@@ -192,7 +204,12 @@ describe("MemoryConsolidationService", () => {
       });
 
       expect((result as any)?.deleted).toBe(1);
-      expect(MemoryService.remove).toHaveBeenCalledWith("mem-2");
+      // Legacy "delete" actions are applied as soft invalidation
+      expect(MemoryService.remove).not.toHaveBeenCalled();
+      expect(MemoryService.invalidate).toHaveBeenCalledWith(
+        "mem-2",
+        expect.objectContaining({ reason: "Outdated project memory" }),
+      );
       expect(MemoryService.store).not.toHaveBeenCalled();
     });
 
