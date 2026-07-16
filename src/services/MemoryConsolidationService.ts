@@ -82,7 +82,8 @@ function daysSince(isoDate: string) {
  * Apply consolidation actions. For conversational agent merges, memoryLookup
  * is used to preserve source attribution metadata on the merged document.
  *
- * NON-DESTRUCTIVE (Graphiti-style edge invalidation): merge and delete/
+ * NON-DESTRUCTIVE (Graphiti-style edge invalidation,
+ * https://github.com/getzep/graphiti): merge and delete/
  * invalidate soft-close the affected memories (validTo + supersededBy +
  * closedReason) instead of hard-deleting, so a bad LLM decision is
  * recoverable via rollbackRun(). closedIds/createdIds are returned for the

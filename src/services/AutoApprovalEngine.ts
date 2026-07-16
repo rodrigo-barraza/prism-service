@@ -163,6 +163,10 @@ export default class AutoApprovalEngine {
     // side effects — they default to DANGER (Tier 3) so common
     // WRITE-auto settings never silently auto-approve them. Trusted
     // servers can be relaxed per-tool via tierOverrides.
+    // Research basis (harness_landscape_survey_2026-07.md, D4): VIPER-MCP
+    // found 106 zero-days across ~40k MCP repos (arXiv 2605.21392,
+    // https://arxiv.org/abs/2605.21392); see also Unit 42's OpenClaw
+    // supply-chain report (cited in MCPClientService).
     if (toolName.startsWith("mcp__")) {
       return APPROVAL_TIERS.DANGER;
     }

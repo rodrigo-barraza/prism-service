@@ -1,7 +1,16 @@
 // ─── Memory Consolidation Tracker ────────────────────────────
-// Run counting, daily cost guard, and history recording for
-// the memory consolidation pipeline.
+// Run counting, daily cost guard, single-writer lock, and history
+// recording (rollback support) for the memory consolidation pipeline.
 // Extracted from MemoryConsolidationService.ts
+//
+// Research basis (harness_landscape_survey_2026-07.md, B3): background
+// ("sleep-time") consolidation must be governed before it mutates the
+// live store — SSGM prescribes verification/guard rails prior to
+// consolidation (arXiv 2603.11768, https://arxiv.org/abs/2603.11768),
+// and HEARTBEAT shows unguarded background passes silently corrupt
+// agent memory (arXiv 2603.23064, https://arxiv.org/abs/2603.23064).
+// The lock, daily cap, sanity cap, and per-run history/rollback here
+// are that governance layer.
 
 import crypto from "crypto";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
