@@ -68,6 +68,17 @@ export default class AgenticLoopState {
   compactionPerformed: boolean;
   preCompactTokenCount: number | null;
   postCompactTokenCount: number | null;
+  /**
+   * Model-invoked compaction request (compact_context tool directive).
+   * Consumed and cleared by ContextPressureManager at the next boundary.
+   */
+  compactionRequested: boolean;
+  /**
+   * Iteration at which the last behavioral-stall warning was issued —
+   * suppresses compaction for the following few iterations
+   * (CompactionDeferralGuard).
+   */
+  lastStallWarningIteration: number | null;
 
   // ── Error budget tracking ───────────────────────────────
   toolErrorCounts: Map<string, number>;
@@ -148,6 +159,8 @@ export default class AgenticLoopState {
     this.compactionPerformed = false;
     this.preCompactTokenCount = null;
     this.postCompactTokenCount = null;
+    this.compactionRequested = false;
+    this.lastStallWarningIteration = null;
 
     this.toolErrorCounts = new Map();
     this.pendingRequestLogWrites = [];

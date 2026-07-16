@@ -238,10 +238,55 @@ describe("CompactionService", () => {
     expect(SettingsService.getSection).not.toHaveBeenCalled();
   });
 
+  it("should append judge additions when the summary drops critical facts", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: "<summary>A summary that forgot the config path.</summary>",
+      usage: { inputTokens: 100, outputTokens: 50 },
+    });
+    // Judge flags a missing fact (Slipstream trajectory-grounded judge)
+    mockGenerateText.mockResolvedValueOnce({
+      text: "<additions>\n- Config lives at /etc/prism/config.yaml\n</additions>",
+      usage: { inputTokens: 50, outputTokens: 20 },
+    });
+
+    const result = await CompactionService.compactConversation(sampleMessages, {
+      project: "test-proj",
+      username: "rodrigo",
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.summaryText).toContain("A summary that forgot the config path.");
+    expect(result!.summaryText).toContain("Validation additions");
+    expect(result!.summaryText).toContain("/etc/prism/config.yaml");
+  });
+
+  it("keeps the original summary when the judge call fails (fail-open)", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: "<summary>Original summary text that is long enough to survive.</summary>",
+      usage: { inputTokens: 100, outputTokens: 50 },
+    });
+    mockGenerateText.mockRejectedValueOnce(new Error("judge model down"));
+
+    const result = await CompactionService.compactConversation(sampleMessages, {
+      project: "test-proj",
+      username: "rodrigo",
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.summaryText).toBe(
+      "Original summary text that is long enough to survive.",
+    );
+  });
+
   it("should compact conversation successfully on LLM success", async () => {
     mockGenerateText.mockResolvedValueOnce({
       text: "<analysis>Thinking about the summary...</analysis><summary>This is the conversation summary.</summary>",
       usage: { inputTokens: 100, outputTokens: 50 },
+    });
+    // Second call is the summary judge (Slipstream) — approves as-is
+    mockGenerateText.mockResolvedValueOnce({
+      text: "<ok/>",
+      usage: { inputTokens: 50, outputTokens: 5 },
     });
 
     const emitFunctionSpy = vi.fn();
@@ -276,11 +321,17 @@ describe("CompactionService", () => {
       expect(result.compactedMessages[userTurnTwoIndex + 1].content).toBe("Assistant response 2");
     }
 
-    expect(RequestLogger.logBackgroundLlmCall).toHaveBeenCalledTimes(1);
+    // Two background calls: compact:summarize + compact:judge
+    expect(RequestLogger.logBackgroundLlmCall).toHaveBeenCalledTimes(2);
     expect(RequestLogger.logBackgroundLlmCall).toHaveBeenCalledWith(expect.objectContaining({
+      operation: "compact:summarize",
       success: true,
       provider: PROVIDERS.GOOGLE,
       model: "gemini-3-flash-preview",
+    }));
+    expect(RequestLogger.logBackgroundLlmCall).toHaveBeenCalledWith(expect.objectContaining({
+      operation: "compact:judge",
+      success: true,
     }));
 
     // Expecting statuses and usage updates

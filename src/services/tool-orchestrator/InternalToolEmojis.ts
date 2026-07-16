@@ -25,6 +25,7 @@ export const INTERNAL_TOOL_EMOJIS: Record<string, string[]> = {
   ask_user: ["💬", "❓"],
   search_conversations: ["🔍", "💬"],
   retrieve_offloaded_content: ["📦", "🔎"],
+  compact_context: ["🗜️", "🧠"],
 
   // MCP
   list_mcp_resources: ["🔌", "📋"],

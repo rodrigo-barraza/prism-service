@@ -95,6 +95,8 @@ export const APPROVAL_STATUS = {
  */
 export const AGENT_DIRECTIVES = {
   NON_BLOCKING_DISPATCH: "NON_BLOCKING_DISPATCH",
+  /** compact_context tool → compact at the next iteration boundary. */
+  REQUEST_COMPACTION: "REQUEST_COMPACTION",
 } as const;
 
 /** Priorities specifically for Todo items and task ranking. */
@@ -518,6 +520,37 @@ export const HARNESS = {
   /** Context pressure threshold — fraction of context window triggering compaction. */
   CONTEXT_PRESSURE_THRESHOLD: 0.7,
 
+  // ─── Compaction Deferral (rubric-gated compaction, survey A1) ──
+  // The pressure threshold is PERMISSION to compact, not a command:
+  // compaction defers while the model has unread tool results at the
+  // tail or recently stalled, up to a hard ceiling where pressure wins.
+
+  /** Suppress compaction for this many iterations after a stall warning. */
+  COMPACTION_STALL_SUPPRESSION_ITERATIONS: 3,
+
+  /** Pressure ratio above which micro-compaction ignores deferral guards. */
+  MICRO_COMPACTION_FORCE_RATIO: 0.85,
+
+  /**
+   * LLM compaction ignores deferral once tokens exceed
+   * threshold + AUTOCOMPACT_BUFFER_TOKENS × this fraction.
+   */
+  AUTOCOMPACT_FORCE_BUFFER_FRACTION: 0.5,
+
+  // ─── Context Ledger Injection (VISTA proprioception, survey A3) ──
+
+  /** Iterations between context-ledger injections. */
+  CONTEXT_LEDGER_INTERVAL: 8,
+
+  /** Minimum iterations before the first ledger fires (offset from reminders). */
+  MINIMUM_ITERATIONS_BEFORE_FIRST_LEDGER: 6,
+
+  /** Only inject the ledger above this pressure ratio (unless stubs exist). */
+  CONTEXT_LEDGER_PRESSURE_FLOOR: 0.5,
+
+  /** Largest inline tool results listed in the ledger. */
+  CONTEXT_LEDGER_MAX_INLINE_ENTRIES: 8,
+
   // ─── System Reminder Injection ─────────────────────────────
 
   /** Iterations between system reminder injections. */
@@ -546,6 +579,9 @@ export const HARNESS = {
 export const COMPACTION = {
   /** Max output tokens for the compaction LLM call. */
   COMPACT_MAX_OUTPUT_TOKENS: 16_384,
+
+  /** Max output tokens for the summary-judge validation call. */
+  JUDGE_MAX_OUTPUT_TOKENS: 1_024,
 
   /** Circuit breaker: stop retrying after this many consecutive compact failures. */
   MAX_CONSECUTIVE_COMPACT_FAILURES: 3,

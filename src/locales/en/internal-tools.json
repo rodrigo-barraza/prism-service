@@ -153,6 +153,12 @@
       "headLines": "Return the first N lines. Used when no pattern or line range is given. Default: 100."
     }
   },
+  "compact_context": {
+    "description": "Compress this conversation's older context into a summary at the next step. Call this when a sub-task has just RESOLVED (tests pass, a question is answered, a deliverable is done) and its detailed context is no longer needed — that is the cheapest, safest moment to compact. Do NOT call it mid-derivation (while you still need details from recent tool results), while stuck or debugging (the failed attempts are the context you need), or when the conversation is short. Recent turns are always preserved verbatim, and evicted tool results remain recoverable via retrieve_offloaded_content.",
+    "parameters": {
+      "reason": "One line on why now is a good boundary, e.g. 'auth refactor sub-task complete, tests green'."
+    }
+  },
   "run_async_task": {
     "description": "Dispatch a tool to run asynchronously in the background. Returns immediately with a task ID — the tool executes in the background while you continue other work. Use this for long-running operations like shell commands, web scraping, file operations, or API calls when you don't need to wait for the result before proceeding. Query task status with list_async_tasks. Cancel with cancel_async_task. You will be automatically notified when the task completes.",
     "parameters": {

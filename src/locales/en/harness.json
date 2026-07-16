@@ -54,6 +54,13 @@
     "preamble": "The following core behavioral constraints from your system instructions remain in effect:",
     "footer": "Continue to follow these constraints strictly throughout the remainder of this session."
   },
+  "contextLedger": {
+    "header": "[CONTEXT LEDGER — iteration {{iteration}}] ~{{tokens}} of ~{{budget}} input tokens used ({{percent}}%). Current tool results held in context:",
+    "inlineHeader": "Largest inline results ({{count}} total):",
+    "inlineOverflow": "- … and {{count}} smaller inline results.",
+    "offloadedHeader": "Offloaded results ({{count}}) — evicted but fully recoverable:",
+    "guidance": "Results marked 'offloaded' are NOT lost — recover any slice with retrieve_offloaded_content and the offload_id. If a completed sub-task's context is no longer needed, you may call compact_context to free space at a safe boundary."
+  },
   "codexPlanningDetector": {
     "continuePrompt": "Please proceed with the next step using the appropriate tools to implement your plan. If you have fully completed the user's request, please output a final message stating that you are done without calling any tools."
   },
