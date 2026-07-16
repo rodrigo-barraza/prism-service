@@ -283,11 +283,40 @@ function getHistoryCollection() {
   );
 }
 
-// Emotion/physical time series — one sample per dirty persist (≤1/min),
+// Emotion/physical time series — the persist loop offers a sample every
+// tick (passive drift marks state dirty each 30s, so decay is captured
+// minute-by-minute), but a point is only WRITTEN when the rounded values
+// actually changed since the last stored sample. Once everything settles
+// at baseline the fingerprint stops moving and writes stop with it.
 // TTL-expired after 30 days. Powers the lupos-client history charts.
 const HISTORY_RETENTION_SECONDS = 30 * 24 * 60 * 60;
-const HISTORY_MAX_POINTS = 5000;
+/** Responses are downsampled to at most ~this many points per request. */
+const HISTORY_TARGET_POINTS = 720;
 let historyIndexesEnsured = false;
+const lastHistoryFingerprints = new Map<string, string>();
+
+function buildHistorySample(agentId: string, state: AgentSomaticState) {
+  const dominantEmotion = state.emotionalState.getDominantEmotion();
+  const physicalLevels = getPhysicalLevelsFromState(state);
+  return {
+    agentId,
+    at: new Date(),
+    dominant: dominantEmotion.emotion,
+    intensity: Math.round(dominantEmotion.intensity),
+    wheel: Object.fromEntries(
+      Object.entries(dominantEmotion.all ?? {}).map(([emotion, level]) => [
+        emotion,
+        Math.round(level as number),
+      ]),
+    ),
+    physical: Object.fromEntries(
+      Object.entries(physicalLevels).map(([stat, level]) => [
+        stat,
+        Math.round(level as number),
+      ]),
+    ),
+  };
+}
 
 async function appendHistorySample(
   agentId: string,
@@ -308,21 +337,18 @@ async function appendHistorySample(
         .catch(() => {});
       collection.createIndex({ agentId: 1, at: -1 }).catch(() => {});
     }
-    const dominantEmotion = state.emotionalState.getDominantEmotion();
-    const physicalLevels = getPhysicalLevelsFromState(state);
-    await collection.insertOne({
-      agentId,
-      at: new Date(),
-      dominant: dominantEmotion.emotion,
-      intensity: Math.round(dominantEmotion.intensity),
-      wheel: dominantEmotion.all,
-      physical: Object.fromEntries(
-        Object.entries(physicalLevels).map(([stat, level]) => [
-          stat,
-          Math.round(level as number),
-        ]),
-      ),
-    });
+    const sample = buildHistorySample(agentId, state);
+    // Rounding gives natural hysteresis: sub-integer decay steps don't
+    // count as change, so a settled agent writes nothing.
+    const fingerprint = JSON.stringify([
+      sample.dominant,
+      sample.intensity,
+      sample.wheel,
+      sample.physical,
+    ]);
+    if (lastHistoryFingerprints.get(agentId) === fingerprint) return;
+    await collection.insertOne(sample);
+    lastHistoryFingerprints.set(agentId, fingerprint);
   } catch (error: unknown) {
     logger.warn(
       `[SomaticStateService] Failed to append history sample for "${agentId}": ${getErrorMessage(error)}`,
@@ -704,8 +730,11 @@ const SomaticStateService = {
 
   /**
    * Emotion/physical time series for an agent, ascending by time.
-   * One point per dirty persist tick (≤1/min while active; silent while
-   * fully idle). 30-day retention via TTL index.
+   * Samples land whenever a rounded value changed (including passive
+   * decay, one point per 60s persist tick), so windows with lots of
+   * movement are dense. Responses are bucket-averaged server-side down
+   * to ≤ HISTORY_TARGET_POINTS so a 7-day request stays dashboard-sized.
+   * 30-day retention via TTL index.
    */
   async getHistory(
     agentId: string,
@@ -722,21 +751,81 @@ const SomaticStateService = {
     const collection = getHistoryCollection();
     if (!collection) return [];
     const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+    const bucketMilliseconds = Math.max(
+      60_000,
+      Math.ceil((hours * 60 * 60 * 1000) / HISTORY_TARGET_POINTS / 60_000) *
+        60_000,
+    );
+
+    const averageOf = (field: string) => ({ $avg: `$${field}` });
+    const wheelKeys = [
+      "joy",
+      "trust",
+      "fear",
+      "surprise",
+      "sadness",
+      "disgust",
+      "anger",
+      "anticipation",
+    ];
+    const physicalKeys = [
+      "hunger",
+      "thirst",
+      "energy",
+      "sickness",
+      "alcohol",
+      "substance",
+      "bathroom",
+    ];
+
+    // Epoch-math bucketing ($toLong/$floor) instead of $dateTrunc so this
+    // works on any MongoDB ≥ 4.0.
     const documents = await collection
-      .find(
-        { agentId, at: { $gte: since } },
-        { projection: { _id: 0, agentId: 0 } },
-      )
-      .sort({ at: 1 })
-      .limit(HISTORY_MAX_POINTS)
+      .aggregate([
+        { $match: { agentId, at: { $gte: since } } },
+        { $sort: { at: 1 } },
+        {
+          $group: {
+            _id: {
+              $floor: {
+                $divide: [{ $toLong: "$at" }, bucketMilliseconds],
+              },
+            },
+            at: { $min: "$at" },
+            dominant: { $last: "$dominant" },
+            intensity: averageOf("intensity"),
+            ...Object.fromEntries(
+              wheelKeys.map((key) => [`wheel_${key}`, averageOf(`wheel.${key}`)]),
+            ),
+            ...Object.fromEntries(
+              physicalKeys.map((key) => [
+                `physical_${key}`,
+                averageOf(`physical.${key}`),
+              ]),
+            ),
+          },
+        },
+        { $sort: { at: 1 } },
+      ])
       .toArray();
-    return documents as unknown as Array<{
-      at: Date;
-      dominant: string;
-      intensity: number;
-      wheel: Record<string, number>;
-      physical: Record<string, number>;
-    }>;
+
+    return documents.map((document) => ({
+      at: document.at as Date,
+      dominant: document.dominant as string,
+      intensity: Math.round((document.intensity as number) ?? 0),
+      wheel: Object.fromEntries(
+        wheelKeys.map((key) => [
+          key,
+          Math.round((document[`wheel_${key}`] as number) ?? 0),
+        ]),
+      ),
+      physical: Object.fromEntries(
+        physicalKeys.map((key) => [
+          key,
+          Math.round((document[`physical_${key}`] as number) ?? 0),
+        ]),
+      ),
+    }));
   },
 
   async getSnapshot(agentId: string): Promise<SomaticSnapshot> {

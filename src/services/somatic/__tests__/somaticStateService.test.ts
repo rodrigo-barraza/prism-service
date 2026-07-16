@@ -18,11 +18,7 @@ const mockUpdateOne = vi.fn().mockResolvedValue({ modifiedCount: 1 });
 const mockInsertOne = vi.fn().mockResolvedValue({ insertedId: "sample" });
 const mockCreateIndex = vi.fn().mockResolvedValue("index");
 const mockHistoryToArray = vi.fn().mockResolvedValue([]);
-const mockFind = vi.fn(() => ({
-  sort: vi.fn(() => ({
-    limit: vi.fn(() => ({ toArray: mockHistoryToArray })),
-  })),
-}));
+const mockAggregate = vi.fn(() => ({ toArray: mockHistoryToArray }));
 vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getCollection: vi.fn(() => ({
@@ -30,7 +26,7 @@ vi.mock("#src/wrappers/MongoWrapper", () => ({
       updateOne: mockUpdateOne,
       insertOne: mockInsertOne,
       createIndex: mockCreateIndex,
-      find: mockFind,
+      aggregate: mockAggregate,
     })),
     getDb: vi.fn(() => null),
   },
@@ -892,7 +888,7 @@ describe("SomaticStateService — emotion history", () => {
   beforeEach(() => {
     mockFindOne.mockResolvedValue(null);
     mockInsertOne.mockClear();
-    mockFind.mockClear();
+    mockAggregate.mockClear();
     mockHistoryToArray.mockResolvedValue([]);
   });
 
@@ -902,16 +898,29 @@ describe("SomaticStateService — emotion history", () => {
     }
   });
 
-  it("appends a history sample on every persist", async () => {
+  it("appends a history sample when values change on persist", async () => {
     await SomaticStateService.getSnapshot(AGENT);
     await SomaticStateService.setPhysicalStatLevel(AGENT, "hunger", 70);
     expect(mockInsertOne).toHaveBeenCalled();
-    const sample = mockInsertOne.mock.calls[0][0];
+    const sample =
+      mockInsertOne.mock.calls[mockInsertOne.mock.calls.length - 1][0];
     expect(sample.agentId).toBe(AGENT);
     expect(sample.at).toBeInstanceOf(Date);
     expect(typeof sample.dominant).toBe("string");
     expect(sample.wheel).toBeTypeOf("object");
     expect(sample.physical.hunger).toBe(70);
+  });
+
+  it("skips the sample when nothing changed since the last one", async () => {
+    await SomaticStateService.getSnapshot(AGENT);
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "hunger", 70);
+    const insertsAfterChange = mockInsertOne.mock.calls.length;
+    // Same value again — persist runs, but the fingerprint is unchanged.
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "hunger", 70);
+    expect(mockInsertOne.mock.calls.length).toBe(insertsAfterChange);
+    // A real change writes again.
+    await SomaticStateService.setPhysicalStatLevel(AGENT, "hunger", 71);
+    expect(mockInsertOne.mock.calls.length).toBe(insertsAfterChange + 1);
   });
 
   it("history samples survive an insert failure (persist still completes)", async () => {
@@ -923,21 +932,34 @@ describe("SomaticStateService — emotion history", () => {
     expect(mockUpdateOne).toHaveBeenCalled();
   });
 
-  it("getHistory queries the requested window ascending", async () => {
-    const point = {
-      at: new Date("2026-07-16T10:00:00Z"),
-      dominant: "anger",
-      intensity: 62,
-      wheel: { anger: 62, joy: 10 },
-      physical: { hunger: 40 },
-    };
-    mockHistoryToArray.mockResolvedValue([point]);
+  it("getHistory bucket-averages the requested window ascending", async () => {
+    mockHistoryToArray.mockResolvedValue([
+      {
+        at: new Date("2026-07-16T10:00:00Z"),
+        dominant: "anger",
+        intensity: 61.7,
+        wheel_anger: 61.5,
+        wheel_joy: 10.2,
+        physical_hunger: 40.4,
+      },
+    ]);
     const points = await SomaticStateService.getHistory(AGENT, 24);
-    expect(points).toEqual([point]);
-    const [filter] = mockFind.mock.calls[0] as unknown[];
-    expect((filter as { agentId: string }).agentId).toBe(AGENT);
-    const since = (filter as { at: { $gte: Date } }).at.$gte;
-    expect(since).toBeInstanceOf(Date);
-    expect(Date.now() - since.getTime()).toBeGreaterThan(23 * 60 * 60 * 1000);
+    expect(points).toHaveLength(1);
+    expect(points[0].dominant).toBe("anger");
+    expect(points[0].intensity).toBe(62);
+    expect(points[0].wheel.anger).toBe(62);
+    expect(points[0].wheel.joy).toBe(10);
+    expect(points[0].wheel.trust).toBe(0);
+    expect(points[0].physical.hunger).toBe(40);
+
+    const [pipeline] = mockAggregate.mock.calls[0] as unknown as [
+      Array<Record<string, unknown>>,
+    ];
+    const match = pipeline[0].$match as { agentId: string; at: { $gte: Date } };
+    expect(match.agentId).toBe(AGENT);
+    expect(match.at.$gte).toBeInstanceOf(Date);
+    expect(Date.now() - match.at.$gte.getTime()).toBeGreaterThan(
+      23 * 60 * 60 * 1000,
+    );
   });
 });
