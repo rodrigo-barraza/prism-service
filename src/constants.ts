@@ -211,9 +211,13 @@ export const FILE_CATEGORIES = {
 
 export const BENCHMARK_MATCH_MODES = {
   CONTAINS: "contains",
+  NOT_CONTAINS: "notContains",
   EXACT: "exact",
   STARTS_WITH: "startsWith",
   REGEX: "regex",
+  JSON_VALID: "jsonValid",
+  JSON_MATCH: "jsonMatch",
+  NUMERIC_EQUALS: "numericEquals",
 } as const;
 
 // ─── Localization Constants ──────────────────────────────────
@@ -939,6 +943,15 @@ export const BENCHMARK = {
 
   /** Default/minimum token budget for benchmark execution. */
   DEFAULT_MAX_TOKENS: 2048,
+
+  /** Maximum trials (repeated executions) per model target in a single run. */
+  MAX_TRIALS: 10,
+
+  /** Token budget for LLM-judge verdict calls. */
+  JUDGE_MAX_TOKENS: 1024,
+
+  /** Judge sampling temperature — deterministic grading. */
+  JUDGE_TEMPERATURE: 0,
 } as const;
 
 // ─── Miscellaneous Conversation & Routing Constants ──────────

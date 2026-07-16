@@ -6,8 +6,9 @@ import BenchmarkService from "#src/services/BenchmarkService";
 import logger from "#src/utils/logger";
 import { createAbortController } from "#src/utils/AbortController";
 import { registerCleanup } from "#src/utils/CleanupRegistry";
+import { BENCHMARK } from "#src/constants";
 import type { WithId, Document } from "mongodb";
-import type { TextAssertion } from "#src/types/benchmark";
+import type { AgentAssertion, TextAssertion } from "#src/types/benchmark";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { BENCHMARK_PRESETS } from "#src/data/benchmarkPresets";
 
@@ -39,7 +40,9 @@ interface BenchmarkResult {
   passed: boolean;
   error: string | null;
   estimatedCost?: number | null;
+  judgeCost?: number;
   latency?: number;
+  ttftMs?: number | null;
   [key: string]: unknown;
 }
 
@@ -76,6 +79,8 @@ interface PerBenchmarkStat {
 interface RunTotal {
   totalCost: number;
   totalLatency: number;
+  totalTtftMs: number;
+  ttftCount: number;
   runCount: number;
 }
 
@@ -90,6 +95,179 @@ interface LatestResult {
   agent: string | null;
   passed: boolean;
   error: string | null;
+}
+
+// ── Shared write validation ─────────────────────────────────
+
+const AGENT_ASSERTION_TYPES = new Set([
+  "replied",
+  "thought",
+  "max_turns",
+  "used_tool_calls",
+  "used_tool",
+  "not_used_tool",
+  "first_tool",
+  "tool_sequence",
+  "tool_args_match",
+  "tool_result_match",
+  "tool_calls_ok",
+  "llm_judge",
+]);
+
+/** Assertion types that require a toolName to be meaningful. */
+const TOOL_NAME_REQUIRED_TYPES = new Set([
+  "used_tool",
+  "first_tool",
+  "tool_sequence",
+]);
+
+interface BenchmarkWriteBody {
+  name?: string;
+  prompt?: string;
+  expectedValue?: string;
+  assertions?: TextAssertion[];
+  assertionOperator?: string;
+  agentAssertions?: AgentAssertion[];
+  agentAssertionOperator?: string;
+  enabledTools?: unknown;
+  trials?: unknown;
+  [key: string]: unknown;
+}
+
+/**
+ * Validate a benchmark create/update body. Returns an error string or null.
+ * When `requireComplete` is true (create), name/prompt/≥1 assertion are
+ * mandatory; updates only validate the fields present.
+ */
+function validateBenchmarkWrite(
+  body: BenchmarkWriteBody,
+  requireComplete: boolean,
+): string | null {
+  if (requireComplete && (!body.name || !body.prompt)) {
+    return "Missing required fields: name, prompt";
+  }
+
+  const validModes = Object.values(BenchmarkService.BENCHMARK_MATCH_MODES);
+  if (body.assertions !== undefined) {
+    if (!Array.isArray(body.assertions)) return "assertions must be an array";
+    for (const assertion of body.assertions) {
+      if (assertion.matchMode && !validModes.includes(assertion.matchMode)) {
+        return `Invalid matchMode in assertion. Must be one of: ${validModes.join(", ")}`;
+      }
+    }
+  }
+
+  for (const field of ["assertionOperator", "agentAssertionOperator"] as const) {
+    if (body[field] !== undefined && !["AND", "OR"].includes(String(body[field]))) {
+      return `Invalid ${field}. Must be AND or OR.`;
+    }
+  }
+
+  if (body.agentAssertions !== undefined) {
+    if (!Array.isArray(body.agentAssertions)) {
+      return "agentAssertions must be an array";
+    }
+    for (const assertion of body.agentAssertions) {
+      if (!assertion?.type || !AGENT_ASSERTION_TYPES.has(assertion.type)) {
+        return `Invalid agent assertion type: ${assertion?.type}. Must be one of: ${[...AGENT_ASSERTION_TYPES].join(", ")}`;
+      }
+      if (
+        TOOL_NAME_REQUIRED_TYPES.has(assertion.type) &&
+        !assertion.toolName?.trim()
+      ) {
+        return `Agent assertion "${assertion.type}" requires a toolName`;
+      }
+      if (assertion.type === "llm_judge" && !assertion.rubric?.trim()) {
+        return `Agent assertion "llm_judge" requires a rubric`;
+      }
+      if (
+        (assertion.type === "tool_args_match" ||
+          assertion.type === "tool_result_match") &&
+        !assertion.expectedValue?.trim()
+      ) {
+        return `Agent assertion "${assertion.type}" requires an expectedValue`;
+      }
+      if (assertion.matchMode && !validModes.includes(assertion.matchMode)) {
+        return `Invalid matchMode in agent assertion. Must be one of: ${validModes.join(", ")}`;
+      }
+    }
+  }
+
+  if (body.enabledTools !== undefined) {
+    if (
+      !Array.isArray(body.enabledTools) ||
+      body.enabledTools.some((tool) => typeof tool !== "string")
+    ) {
+      return "enabledTools must be an array of tool names";
+    }
+  }
+
+  if (body.trials !== undefined && body.trials !== null) {
+    const trialCount = Number(body.trials);
+    if (
+      !Number.isInteger(trialCount) ||
+      trialCount < 1 ||
+      trialCount > BENCHMARK.MAX_TRIALS
+    ) {
+      return `trials must be an integer between 1 and ${BENCHMARK.MAX_TRIALS}`;
+    }
+  }
+
+  if (requireComplete) {
+    const hasTextAssertion =
+      !!body.expectedValue ||
+      (Array.isArray(body.assertions) &&
+        body.assertions.some(
+          (assertion) =>
+            assertion.expectedValue?.trim() ||
+            assertion.matchMode === "jsonValid",
+        ));
+    const hasBehaviorAssertion =
+      Array.isArray(body.agentAssertions) && body.agentAssertions.length > 0;
+    if (!hasTextAssertion && !hasBehaviorAssertion) {
+      return "Benchmarks require at least one assertion (output match or behavior)";
+    }
+  }
+
+  return null;
+}
+
+/** Pick only the benchmark-editable fields from a request body. */
+function pickBenchmarkFields(body: Record<string, unknown>) {
+  const {
+    name,
+    prompt,
+    systemPrompt,
+    expectedValue,
+    matchMode,
+    temperature,
+    maxTokens,
+    tags,
+    assertions,
+    assertionOperator,
+    benchmarkMode,
+    agentAssertions,
+    agentAssertionOperator,
+    enabledTools,
+    trials,
+  } = body;
+  return {
+    name,
+    prompt,
+    systemPrompt,
+    expectedValue,
+    matchMode,
+    temperature,
+    maxTokens,
+    tags,
+    assertions,
+    assertionOperator,
+    benchmarkMode,
+    agentAssertions,
+    agentAssertionOperator,
+    enabledTools,
+    trials,
+  } as Record<string, unknown>;
 }
 
 // Process-level registry of in-flight benchmark runs → AbortControllers
@@ -211,12 +389,19 @@ router.get(
               allRunTotals.set(modelKey, {
                 totalCost: 0,
                 totalLatency: 0,
+                totalTtftMs: 0,
+                ttftCount: 0,
                 runCount: 0,
               });
             }
             const runTotal = allRunTotals.get(modelKey)!;
-            runTotal.totalCost += result.estimatedCost || 0;
+            runTotal.totalCost +=
+              (result.estimatedCost || 0) + (result.judgeCost || 0);
             runTotal.totalLatency += result.latency || 0;
+            if (typeof result.ttftMs === "number" && result.ttftMs > 0) {
+              runTotal.totalTtftMs += result.ttftMs;
+              runTotal.ttftCount++;
+            }
             runTotal.runCount++;
 
             // Accumulate ALL-run per-benchmark stats (for detail cards)
@@ -267,6 +452,8 @@ router.get(
           const runTotal = allRunTotals.get(modelKey) || {
             totalCost: 0,
             totalLatency: 0,
+            totalTtftMs: 0,
+            ttftCount: 0,
             runCount: 0,
           };
 
@@ -321,6 +508,10 @@ router.get(
               runTotal.runCount > 0
                 ? runTotal.totalLatency / runTotal.runCount
                 : 0,
+            avgTtftMs:
+              runTotal.ttftCount > 0
+                ? Math.round(runTotal.totalTtftMs / runTotal.ttftCount)
+                : 0,
             benchmarks: perBenchmark,
           };
         },
@@ -373,91 +564,18 @@ router.post(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const {
-        name,
-        prompt,
-        systemPrompt,
-        expectedValue,
-        matchMode,
-        temperature,
-        maxTokens,
-        tags,
-        assertions,
-        assertionOperator,
-        benchmarkMode,
-        agentAssertions,
-        agentAssertionOperator,
-      } = req.body;
-
-      if (!name || !prompt) {
-        return res
-          .status(400)
-          .json({ error: "Missing required fields: name, prompt" });
-      }
-
-      // Model and combined benchmarks require at least an expectedValue or assertions
-      if (
-        benchmarkMode !== "agent" &&
-        !expectedValue &&
-        (!assertions ||
-          !assertions.some(
-            (assertion: TextAssertion) => assertion.expectedValue,
-          ))
-      ) {
-        return res.status(400).json({
-          error:
-            "Model/combined benchmarks require at least one text assertion (expectedValue)",
-        });
-      }
-
-      // Agent benchmarks require at least one agent assertion
-      if (
-        benchmarkMode === "agent" &&
-        (!agentAssertions || agentAssertions.length === 0)
-      ) {
-        return res.status(400).json({
-          error: "Agent benchmarks require at least one behavioral assertion",
-        });
-      }
-
-      const validModes = Object.values(BenchmarkService.BENCHMARK_MATCH_MODES);
-
-      // Validate assertions array if provided
-      if (assertions && Array.isArray(assertions)) {
-        for (const assertion of assertions) {
-          if (
-            assertion.matchMode &&
-            !validModes.includes(assertion.matchMode)
-          ) {
-            return res.status(400).json({
-              error: `Invalid matchMode in assertion. Must be one of: ${validModes.join(", ")}`,
-            });
-          }
-        }
-      }
-
-      if (assertionOperator && !["AND", "OR"].includes(assertionOperator)) {
-        return res.status(400).json({
-          error: "Invalid assertionOperator. Must be AND or OR.",
-        });
+      const validationError = validateBenchmarkWrite(
+        req.body as BenchmarkWriteBody,
+        true,
+      );
+      if (validationError) {
+        return res.status(400).json({ error: validationError });
       }
 
       const benchmark = await BenchmarkService.create(
-        {
-          name,
-          prompt,
-          systemPrompt,
-          expectedValue,
-          matchMode,
-          temperature,
-          maxTokens,
-          tags,
-          assertions,
-          assertionOperator,
-          benchmarkMode,
-          agentAssertions,
-          agentAssertionOperator,
-        },
+        pickBenchmarkFields(req.body) as unknown as Parameters<
+          typeof BenchmarkService.create
+        >[0],
         req.project || null,
         req.username || DEFAULT_USERNAME,
       );
@@ -465,6 +583,43 @@ router.post(
       res.status(201).json(benchmark);
     } catch (error: unknown) {
       logger.error(`POST /benchmark error: ${getErrorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+// ─── PUT /benchmark/:id — Update an existing benchmark test ─
+
+router.put(
+  "/:id",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const existing = await BenchmarkService.getById(
+        String(req.params.id),
+        req.project || null,
+      );
+      if (!existing) {
+        return res.status(404).json({ error: "Benchmark not found" });
+      }
+
+      // Validate the merged document so an update can't strip every assertion
+      const merged = { ...existing, ...req.body } as BenchmarkWriteBody;
+      const validationError = validateBenchmarkWrite(merged, true);
+      if (validationError) {
+        return res.status(400).json({ error: validationError });
+      }
+
+      const updated = await BenchmarkService.update(
+        String(req.params.id),
+        pickBenchmarkFields(req.body) as Parameters<
+          typeof BenchmarkService.update
+        >[1],
+        req.project || null,
+      );
+
+      res.json(updated);
+    } catch (error: unknown) {
+      logger.error(`PUT /benchmark/:id error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -604,7 +759,7 @@ router.post(
         }
       };
 
-      const { models: modelTargets } = req.body || {};
+      const { models: modelTargets, trials } = req.body || {};
 
       const run = await BenchmarkService.runBenchmark(
         benchmark as unknown as Parameters<
@@ -615,6 +770,7 @@ router.post(
         req.username || DEFAULT_USERNAME,
         {
           signal: abortController.signal,
+          ...(trials != null && { trials: Number(trials) }),
           onRunStart: (info: { totalModels: number }) => {
             // Store total model count for reconnecting clients
             const state = runStates.get(registryKey);
@@ -832,6 +988,29 @@ router.get(
   }),
 );
 
+// ─── DELETE /benchmark/:id/runs/:runId — Delete a single run ─
+
+router.delete(
+  "/:id/runs/:runId",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const deleted = await BenchmarkService.removeRun(
+        String(req.params.runId),
+        req.project || null,
+      );
+      if (!deleted) {
+        return res.status(404).json({ error: "Run not found" });
+      }
+      res.json({ deleted: true, id: req.params.runId });
+    } catch (error: unknown) {
+      logger.error(
+        `DELETE /benchmark/:id/runs/:runId error: ${getErrorMessage(error)}`,
+      );
+      next(error);
+    }
+  }),
+);
+
 // ─── POST /benchmark/:id/runs/:runId/rerun — Re-run with same models ─
 
 router.post(
@@ -854,17 +1033,28 @@ router.post(
         return res.status(404).json({ error: "Run not found" });
       }
 
-      // Re-run with the same model set from the previous run
-      const modelTargets = (previousRun.models || []).map(
-        (modelResult: BenchmarkResult) => ({
+      // Re-run with the same model set from the previous run. Trial
+      // repetitions are deduped back to unique targets — the previous
+      // run's trial count is re-applied via the `trials` option.
+      const seenTargets = new Set<string>();
+      const modelTargets = (previousRun.models || [])
+        .filter((modelResult: BenchmarkResult) => {
+          const key = `${modelResult.provider}:${modelResult.model}:${modelResult.thinkingEnabled ? "T" : ""}:${modelResult.toolsEnabled ? "F" : ""}:${modelResult.agent || ""}`;
+          if (seenTargets.has(key)) return false;
+          seenTargets.add(key);
+          return true;
+        })
+        .map((modelResult: BenchmarkResult) => ({
           provider: modelResult.provider,
           model: modelResult.model,
           display_name: modelResult.label,
           thinkingEnabled: modelResult.thinkingEnabled,
           toolsEnabled: modelResult.toolsEnabled,
           agent: modelResult.agent || undefined,
-        }),
-      );
+          locale: (modelResult.locale as string) || undefined,
+          enabledTools:
+            (modelResult.enabledTools as string[] | undefined) || undefined,
+        }));
 
       const run = await BenchmarkService.runBenchmark(
         benchmark as unknown as Parameters<
@@ -873,6 +1063,11 @@ router.post(
         modelTargets,
         req.project || null,
         req.username || DEFAULT_USERNAME,
+        {
+          ...(typeof previousRun.trials === "number" && {
+            trials: previousRun.trials,
+          }),
+        },
       );
 
       res.json(run);
