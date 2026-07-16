@@ -64,6 +64,10 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   // string literal until utilities-library ships the taxonomy constant)
   retrieve_offloaded_content: APPROVAL_TIERS.AUTO,
 
+  // Tier 1 — model-invoked compaction (summarizes the agent's own
+  // context; no external side effects)
+  compact_context: APPROVAL_TIERS.AUTO,
+
   // Tier 2 — scheduling / notebook (creates persistent state)
   [TOOL_NAMES.CREATE_CRON]: APPROVAL_TIERS.WRITE,
   [TOOL_NAMES.REMOTE_TRIGGER]: APPROVAL_TIERS.WRITE,

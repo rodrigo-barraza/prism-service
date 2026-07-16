@@ -761,6 +761,9 @@ export default class ReActHarness extends BaseAgenticHarness {
             }
             if (!semanticStallDetector.hasWarningBeenIssued) {
               semanticStallDetector.markWarningIssued();
+              // Stamp the warning iteration — CompactionDeferralGuard
+              // suppresses compaction while the model recovers from a stall
+              state.lastStallWarningIteration = state.iterations;
               currentMessages.push({
                 role: "system",
                 content: wrapSystemMessage(
@@ -769,6 +772,13 @@ export default class ReActHarness extends BaseAgenticHarness {
                 ),
               });
             }
+          }
+
+          // Model-invoked compaction (compact_context) — consume at the
+          // next iteration boundary via ContextPressureManager
+          const hasCompactionRequest = results.some(r => (r.result as any)?._directive === AGENT_DIRECTIVES.REQUEST_COMPACTION);
+          if (hasCompactionRequest) {
+            state.compactionRequested = true;
           }
 
           const hasNonBlockingDispatch = results.some(r => (r.result as any)?._directive === AGENT_DIRECTIVES.NON_BLOCKING_DISPATCH);

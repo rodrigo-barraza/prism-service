@@ -34,6 +34,23 @@ export const COMPACTION_USER_PROMPT = PromptLocaleService.get(
   },
 );
 
+// Judge pass (Slipstream, arXiv 2605.08580): validate the candidate
+// summary against the verbatim tail the agent continues from.
+export const COMPACTION_JUDGE_SYSTEM_PROMPT = PromptLocaleService.get(
+  "en",
+  "compaction.judgeSystemPrompt",
+);
+
+export function buildCompactionJudgeUserPrompt(
+  summary: string,
+  tail: string,
+): string {
+  return PromptLocaleService.get("en", "compaction.judgeUserPrompt", {
+    summary,
+    tail,
+  });
+}
+
 /**
  * Extract only the <summary> content from the LLM's compaction response.
  * Strips the <analysis> drafting block which is purely a scratchpad.

@@ -54,6 +54,13 @@
     "preamble": "Critical rule still active:",
     "footer": "Follow for remainder."
   },
+  "contextLedger": {
+    "header": "[CONTEXT LEDGER — iteration {{iteration}}] ~{{tokens}} of ~{{budget}} token used ({{percent}}%). Tool result in context:",
+    "inlineHeader": "Biggest inline result ({{count}} total):",
+    "inlineOverflow": "- … plus {{count}} smaller.",
+    "offloadedHeader": "Stored result ({{count}}) — gone from view, still recoverable:",
+    "guidance": "'offloaded' not lost — grab slice with retrieve_offloaded_content + offload_id. Sub-task done and old detail not needed? Call compact_context to free space."
+  },
   "codexPlanningDetector": {
     "continuePrompt": "Execute next step with tool. If complete, report done without tool call."
   },

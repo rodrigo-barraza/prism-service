@@ -78,6 +78,7 @@ import mcpServersRouter from "./routes/McpServersRoutes.ts";
 import favoritesRouter from "./routes/FavoritesRoutes.ts";
 import conversationRouter from "./routes/ConversationExecutionRoute.ts";
 import statsRouter from "./routes/StatsRoutes.ts";
+import somaticRouter from "./routes/SomaticRoutes.ts";
 import benchmarkRouter from "./routes/BenchmarkRoutes.ts";
 import synthesisRouter from "./routes/SynthesisRoutes.ts";
 import vramBenchmarksRouter from "./routes/VramBenchmarksRoutes.ts";
@@ -204,6 +205,7 @@ app.use("/favorites", favoritesRouter);
 app.use("/conversation", conversationRouter);
 
 app.use("/stats", statsRouter);
+app.use("/somatic", somaticRouter);
 app.use("/benchmark", benchmarkRouter);
 app.use("/synthesis", synthesisRouter);
 app.use("/vram-benchmarks", vramBenchmarksRouter);

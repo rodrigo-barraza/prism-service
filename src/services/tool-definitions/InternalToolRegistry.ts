@@ -26,6 +26,7 @@ import mcpTools from "./McpTools.ts";
 import reminderTools from "./ReminderTools.ts";
 import conversationSearchTool from "./ConversationSearchTool.ts";
 import retrieveOffloadedContentTool from "./RetrieveOffloadedContentTool.ts";
+import compactContextTool from "./CompactContextTool.ts";
 import asyncTaskTools from "./AsyncTaskTools.ts";
 
 // ─── Parameter Types (aligned with tools-service) ──────────────
@@ -117,6 +118,7 @@ function initialize() {
     reminderTools,
     conversationSearchTool,
     retrieveOffloadedContentTool,
+    compactContextTool,
     asyncTaskTools,
   ];
 

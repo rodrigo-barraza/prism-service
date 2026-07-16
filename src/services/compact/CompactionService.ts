@@ -17,6 +17,8 @@ import { MODALITY_TYPES, getPricing } from "#src/config";
 import {
   COMPACTION_SYSTEM_PROMPT,
   COMPACTION_USER_PROMPT,
+  COMPACTION_JUDGE_SYSTEM_PROMPT,
+  buildCompactionJudgeUserPrompt,
   extractSummaryFromResponse,
   stripImagesFromMessages,
 } from "./CompactionPrompt.ts";
@@ -287,7 +289,7 @@ export default class CompactionService {
     }
 
     // ── Extract summary from response ─────────────────────────
-    const summaryText = extractSummaryFromResponse(result!.text);
+    let summaryText = extractSummaryFromResponse(result!.text);
     if (!summaryText) {
       this.consecutiveFailures++;
       logger.warn(
@@ -299,6 +301,19 @@ export default class CompactionService {
       });
       return null;
     }
+
+    // ── Judge pass: validate the summary before adopting it ───
+    // One cheap synchronous call that checks the candidate summary
+    // against the verbatim tail the agent will continue from, and
+    // patches critical omissions (Slipstream's trajectory-grounded
+    // judge, arXiv 2605.08580 — synchronous slice only; the async
+    // compactor half is deliberately skipped). Fail-open: any judge
+    // error keeps the original summary.
+    summaryText = await validateSummaryAgainstTail(
+      summaryText,
+      extractRecentTail(messages),
+      { compactionProvider, compactionModel, options, preCompactTokenCount },
+    );
 
     // ── Build compacted message array ─────────────────────────
     // Structure: [system prompt, summary as user message, ...recent tail]
@@ -435,4 +450,116 @@ function extractRecentTail(messages: AdminChatMessage[]): AdminChatMessage[] {
   return messages
     .slice(tailStartIndex)
     .filter((message) => message.role !== "system");
+}
+
+// ─── Summary Judge (Slipstream, arXiv 2605.08580) ───────────
+/**
+ * Validate a candidate compaction summary against the verbatim tail the
+ * agent will continue from, and patch critical omissions by appending
+ * them. This is Slipstream's trajectory-grounded judge reduced to its
+ * synchronous slice — one cheap utility call at a moment we are already
+ * paying for a compaction. The judge sees the summary + tail (not the
+ * full pre-compaction conversation — re-reading that would double the
+ * compaction's input cost), so it catches reference gaps: facts the
+ * continuation visibly depends on that the summary dropped.
+ *
+ * Fail-open: any error, timeout, or malformed reply keeps the original
+ * summary — the judge can only ever add, never block a compaction.
+ * https://arxiv.org/abs/2605.08580
+ */
+async function validateSummaryAgainstTail(
+  summaryText: string,
+  recentTail: AdminChatMessage[],
+  {
+    compactionProvider,
+    compactionModel,
+    options,
+    preCompactTokenCount,
+  }: {
+    compactionProvider: string;
+    compactionModel: string;
+    options: CompactionOptions;
+    preCompactTokenCount: number;
+  },
+): Promise<string> {
+  const tailText = recentTail
+    .map((message) => {
+      const content =
+        typeof message.content === "string" ? message.content : "";
+      const tools = message.toolCalls?.length
+        ? ` [tools: ${message.toolCalls.map((toolCall) => toolCall.name).join(", ")}]`
+        : "";
+      return `${message.role}: ${content}${tools}`;
+    })
+    .join("\n\n");
+  if (!tailText.trim()) return summaryText;
+
+  const judgeMessages: ChatMessage[] = [
+    { role: "system", content: COMPACTION_JUDGE_SYSTEM_PROMPT },
+    {
+      role: "user",
+      content: buildCompactionJudgeUserPrompt(summaryText, tailText),
+    },
+  ];
+
+  const requestId = crypto.randomUUID();
+  const requestStart = performance.now();
+  let judgeResult: GenerateTextResult | undefined;
+  let success = true;
+  let judgeError: string | null = null;
+
+  try {
+    const provider = getProvider(compactionProvider);
+    judgeResult = await provider.generateText(judgeMessages, compactionModel, {
+      maxTokens: COMPACTION.JUDGE_MAX_OUTPUT_TOKENS,
+      temperature: 0,
+      thinkingEnabled: false,
+      reasoningEffort: "none",
+    });
+  } catch (error: unknown) {
+    success = false;
+    judgeError = errorMessage(error);
+    logger.warn(
+      `[CompactionService] Summary judge failed (keeping original summary): ${judgeError}`,
+    );
+    return summaryText;
+  } finally {
+    RequestLogger.logBackgroundLlmCall({
+      requestId,
+      endpoint: "/agent",
+      operation: "compact:judge",
+      project: options.project,
+      username: options.username,
+      agent: options.agent || null,
+      provider: compactionProvider,
+      model: compactionModel,
+      traceId: options.traceId || null,
+      agentConversationId: options.agentConversationId || null,
+      aiMessages: judgeMessages as Parameters<
+        typeof RequestLogger.logBackgroundLlmCall
+      >[0]["aiMessages"],
+      resultText: judgeResult?.text || "",
+      usage: judgeResult?.usage || null,
+      success,
+      errorMessage: judgeError,
+      requestStartMilliseconds: requestStart,
+      extraRequestPayload: {
+        operation: "compact:judge",
+        preCompactTokenCount,
+      },
+    });
+  }
+
+  const responseText = judgeResult?.text || "";
+  const additionsMatch = responseText.match(
+    /<additions>([\s\S]*?)<\/additions>/i,
+  );
+  if (!additionsMatch?.[1]?.trim()) {
+    return summaryText;
+  }
+  const additions = additionsMatch[1].trim();
+  logger.info(
+    `[CompactionService] Summary judge patched ${additions.split("\n").length} omission(s) into the summary`,
+  );
+  return `${summaryText}\n\n## Validation additions (facts the continuation depends on)\n${additions}`;
 }

@@ -70,6 +70,11 @@ export default class AutoCompactionTrigger {
   /**
    * Check whether auto-compaction should trigger for the current token usage.
    *
+   * `requestedByModel` (the compact_context tool directive) bypasses the
+   * token threshold — the model chose this boundary itself (Self-Compacting
+   * LM Agents, arXiv 2606.23525) — but the minimum-message floor still
+   * applies so a trivial conversation can't be compacted into nothing.
+   *
    * Returns a result object with the threshold, usage percentage, and decision.
    */
   static evaluate(
@@ -77,6 +82,7 @@ export default class AutoCompactionTrigger {
     contextWindowSize: number,
     maxOutputTokens: number,
     messageCount: number,
+    requestedByModel: boolean = false,
   ): AutoCompactThresholdResult {
     const effectiveContextWindow = this.getEffectiveContextWindowSize(
       contextWindowSize,
@@ -92,13 +98,16 @@ export default class AutoCompactionTrigger {
         : 0;
 
     const shouldCompact =
-      estimatedTokens >= threshold &&
+      (estimatedTokens >= threshold || requestedByModel) &&
       messageCount >= MINIMUM_MESSAGES_FOR_COMPACTION;
 
     if (shouldCompact) {
       logger.info(
-        `[AutoCompaction] Threshold exceeded: ${estimatedTokens} tokens >= ${threshold} threshold ` +
-          `(${percentUsed}% of ${effectiveContextWindow} effective window, ${messageCount} messages)`,
+        requestedByModel && estimatedTokens < threshold
+          ? `[AutoCompaction] Model-requested compaction at ${estimatedTokens} tokens ` +
+              `(below ${threshold} threshold, ${messageCount} messages)`
+          : `[AutoCompaction] Threshold exceeded: ${estimatedTokens} tokens >= ${threshold} threshold ` +
+              `(${percentUsed}% of ${effectiveContextWindow} effective window, ${messageCount} messages)`,
       );
     }
 

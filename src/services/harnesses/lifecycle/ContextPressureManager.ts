@@ -10,7 +10,9 @@ import {
   DEFAULT_MAX_INPUT_TOKENS,
   DEFAULT_MAX_OUTPUT_TOKENS,
 } from "#src/constants/TokenBudgetDefaults";
-import { HARNESS } from "#src/constants";
+import { HARNESS, COMPACTION } from "#src/constants";
+import { evaluateCompactionDeferral } from "./CompactionDeferralGuard.ts";
+import { maybeInjectContextLedger } from "./ContextLedgerInjector.ts";
 
 import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type { ChatMessage } from "#src/types/admin";
@@ -19,13 +21,22 @@ import type { ConversationMessage, AgenticContext } from "#src/services/harnesse
 /**
  * ContextPressureManager — unified context management pipeline.
  *
- * Orchestrates three sequential operations that must run in this
+ * Orchestrates four sequential operations that must run in this
  * exact order every iteration to keep the context window healthy:
  *
- *   1. Micro-compaction (pressure-gated at >70%) — clears old tool
- *      results when the context is near capacity, but skips when
- *      pressure is low to preserve the append-only prefix property
- *      required for KV cache reuse across iterations.
+ *   0. Deferral guard — the pressure thresholds below are PERMISSION
+ *      to compact, not a command: compaction defers while the model
+ *      has unread tool results or recently stalled, up to hard
+ *      ceilings (rubric-gated compaction — Self-Compacting LM Agents,
+ *      arXiv 2606.23525; see CompactionDeferralGuard.ts). A
+ *      compact_context tool request bypasses the guard and forces
+ *      LLM compaction at this boundary.
+ *
+ *   1. Micro-compaction (pressure-gated at >70%) — evicts old tool
+ *      results (losslessly, via ToolResultOffloadService) when the
+ *      context is near capacity, but skips when pressure is low to
+ *      preserve the append-only prefix property required for KV
+ *      cache reuse across iterations.
  *
  *   2. Auto-compaction trigger — evaluates whether LLM-powered
  *      summarization is needed (even after micro-compaction) and
@@ -72,6 +83,19 @@ export async function manageContextPressure(
     messages as ChatMessage[],
   );
 
+  // ── 0. Deferral guard (rubric-gated compaction, survey A1) ──
+  // The pressure threshold is permission to compact, not a command:
+  // defer while the model has unread tool results at the tail or is
+  // mid-recovery from a stall — compacting at those moments destroys
+  // exactly the context the next step needs (Self-Compacting LM
+  // Agents, arXiv 2606.23525). A model-requested compaction
+  // (compact_context tool) bypasses the guard; hard pressure ceilings
+  // below override it so deferral can never exhaust the window.
+  const deferral =
+    state.compactionRequested === true
+      ? { defer: false, reason: null }
+      : evaluateCompactionDeferral(currentMessages, state);
+
   // ── 1. Micro-compaction (pressure-gated) ────────────────────
   // Only run when context usage exceeds 70% of the available input
   // budget. Running unconditionally mutates tool results in the
@@ -80,7 +104,25 @@ export async function manageContextPressure(
   const contextPressureRatio =
     availableInputBudget > 0 ? currentTokenEstimate / availableInputBudget : 0;
 
-  if (contextPressureRatio > CONTEXT_PRESSURE_THRESHOLD) {
+  const microCompactionDeferred =
+    deferral.defer &&
+    contextPressureRatio < HARNESS.MICRO_COMPACTION_FORCE_RATIO;
+
+  if (
+    contextPressureRatio > CONTEXT_PRESSURE_THRESHOLD &&
+    microCompactionDeferred
+  ) {
+    logger.info(
+      `[${harnessLabel}] Micro-compaction deferred (${deferral.reason}) at ` +
+        `${(contextPressureRatio * 100).toFixed(0)}% pressure — will force above ` +
+        `${HARNESS.MICRO_COMPACTION_FORCE_RATIO * 100}%`,
+    );
+  }
+
+  if (
+    contextPressureRatio > CONTEXT_PRESSURE_THRESHOLD &&
+    !microCompactionDeferred
+  ) {
     const microCompactionResult = MicroCompactionService.microcompactMessages(
       messages as ChatMessage[],
       undefined,
@@ -109,15 +151,36 @@ export async function manageContextPressure(
   // ── 2. Auto-compaction trigger ──────────────────────────────
   // After potential micro-compaction, check if LLM-powered
   // compaction is also needed. This produces an intelligent
-  // summary instead of just dropping messages.
+  // summary instead of just dropping messages. A model-invoked
+  // compact_context request forces it regardless of the threshold.
   const autoCompactEvaluation = AutoCompactionTrigger.evaluate(
     currentTokenEstimate,
     contextWindowSize,
     maxOutputTokens,
     messages.length,
+    state.compactionRequested === true,
   );
 
-  if (autoCompactEvaluation.shouldCompact) {
+  // Deferral holds until tokens push half the buffer past the
+  // threshold — beyond that, exhaustion risk outweighs timing.
+  const autoCompactForceThreshold =
+    autoCompactEvaluation.threshold +
+    COMPACTION.AUTOCOMPACT_BUFFER_TOKENS *
+      HARNESS.AUTOCOMPACT_FORCE_BUFFER_FRACTION;
+  const autoCompactDeferred =
+    deferral.defer && currentTokenEstimate < autoCompactForceThreshold;
+
+  if (autoCompactEvaluation.shouldCompact && autoCompactDeferred) {
+    logger.info(
+      `[${harnessLabel}] Auto-compaction deferred (${deferral.reason}) at ` +
+        `${currentTokenEstimate} tokens — will force at ${Math.round(autoCompactForceThreshold)}`,
+    );
+  }
+
+  if (autoCompactEvaluation.shouldCompact && !autoCompactDeferred) {
+    const wasModelRequested = state.compactionRequested;
+    // Consume the request — one compact_context call, one compaction
+    state.compactionRequested = false;
     const compactionResult = await CompactionService.compactConversation(
       messages as ChatMessage[],
       {
@@ -163,12 +226,25 @@ export async function manageContextPressure(
       }
 
       logger.info(
-        `[${harnessLabel}] Auto-compacted: ${compactionResult.preCompactTokenCount} → ` +
+        `[${harnessLabel}] ${wasModelRequested ? "Model-requested compaction" : "Auto-compacted"}: ` +
+          `${compactionResult.preCompactTokenCount} → ` +
           `${compactionResult.postCompactTokenCount} tokens ` +
           `(${messages.length} messages remain)`,
       );
     }
   }
+
+  // ── 4. Context ledger (VISTA proprioception, survey A3) ─────
+  // Periodically show the model what occupies its own context —
+  // largest inline tool results + every offloaded stub with its
+  // recovery id — as a tail system message (cache-safe, no LLM call).
+  maybeInjectContextLedger(
+    messages as ConversationMessage[],
+    state,
+    currentTokenEstimate,
+    availableInputBudget,
+    harnessLabel,
+  );
 
   return { messages, tokenEstimate: currentTokenEstimate };
 }

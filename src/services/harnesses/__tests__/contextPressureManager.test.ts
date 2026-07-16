@@ -123,7 +123,7 @@ describe("ContextPressureManager — manageContextPressure", () => {
 
       await manageContextPressure(messages, mockContext, mockState, "TestHarness");
 
-      expect(mockEvaluate).toHaveBeenCalledWith(10000, 128000, 8192, 5);
+      expect(mockEvaluate).toHaveBeenCalledWith(10000, 128000, 8192, 5, false);
     });
   });
 
@@ -329,7 +329,7 @@ describe("ContextPressureManager — manageContextPressure", () => {
       await manageContextPressure(messages, contextWithoutModelDefinition, mockState, "TestHarness");
 
       // Should have evaluated with 128000 context window
-      expect(mockEvaluate).toHaveBeenCalledWith(5000, 128000, 8192, 5);
+      expect(mockEvaluate).toHaveBeenCalledWith(5000, 128000, 8192, 5, false);
     });
 
     it("should use 16384 as default maxTokens when not configured", async () => {
@@ -343,7 +343,7 @@ describe("ContextPressureManager — manageContextPressure", () => {
 
       await manageContextPressure(messages, contextWithoutMaxTokens, mockState, "TestHarness");
 
-      expect(mockEvaluate).toHaveBeenCalledWith(5000, 128000, 16384, 5);
+      expect(mockEvaluate).toHaveBeenCalledWith(5000, 128000, 16384, 5, false);
     });
   });
 });

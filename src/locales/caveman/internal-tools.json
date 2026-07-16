@@ -153,6 +153,12 @@
       "headLines": "First N line when no pattern/range. Default: 100."
     }
   },
+  "compact_context": {
+    "description": "Squeeze old chat into summary next step. Call when sub-task DONE (test pass, question answered) and old detail not needed. NOT when mid-work, stuck, debugging, or chat short. Recent turn kept whole. Stored tool result still recoverable with retrieve_offloaded_content.",
+    "parameters": {
+      "reason": "One line why now good moment. e.g. 'auth work done, test green'."
+    }
+  },
   "run_async_task": {
     "description": "Run tool in background. Returns task ID immediately. Tool run behind while you work. Query with list_async_tasks, stop with cancel_async_task. System notify when done.",
     "parameters": {

@@ -44,6 +44,8 @@ export const SYSTEM_MESSAGE_TAGS = {
   CONTINUATION_NUDGE: "continuation-nudge",
   /** Periodic re-injection of core behavioral constraints. */
   SYSTEM_REMINDER: "system-reminder",
+  /** Periodic proprioceptive ledger of the context window's contents. */
+  CONTEXT_LEDGER: "context-ledger",
   /** Plan-mode state changes and blocked-tool notices. */
   PLAN_MODE: "plan-mode",
   /** Sub-agent operational context (topology, position, workspace). */
