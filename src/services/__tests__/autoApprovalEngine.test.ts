@@ -115,8 +115,8 @@ describe("getTier — default assignments", () => {
     expect(engine.getTier("custom_unknown_tool")).toBe(APPROVAL_TIERS.WRITE);
   });
 
-  it("MCP-namespaced tool defaults to Tier 2", () => {
-    expect(engine.getTier("mcp__server__tool")).toBe(APPROVAL_TIERS.WRITE);
+  it("MCP-namespaced tool defaults to Tier 3 (third-party code)", () => {
+    expect(engine.getTier("mcp__server__tool")).toBe(APPROVAL_TIERS.DANGER);
   });
 });
 

@@ -160,6 +160,13 @@ export default class AutoApprovalEngine {
     if (this.tierOverrides[toolName] !== undefined) {
       return this.tierOverrides[toolName];
     }
+    // SECURITY: MCP-namespaced tools are third-party code with unknown
+    // side effects — they default to DANGER (Tier 3) so common
+    // WRITE-auto settings never silently auto-approve them. Trusted
+    // servers can be relaxed per-tool via tierOverrides.
+    if (toolName.startsWith("mcp__")) {
+      return APPROVAL_TIERS.DANGER;
+    }
     return DEFAULT_TIER_MAP[toolName] ?? APPROVAL_TIERS.WRITE; // Unknown tools default to Tier 2
   }
   getTierLabel(toolName: string): string {
