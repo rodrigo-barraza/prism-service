@@ -367,13 +367,32 @@ function buildGenerateConfig(
     config.systemInstruction = options.systemPrompt;
   }
 
+  // Image output config — only valid on models that can output images.
+  // Gemini expects imageSize uppercase ("1K"/"2K"/"4K"/"512").
+  if (
+    modelDefinition?.outputTypes &&
+    (modelDefinition.outputTypes as string[]).includes(MODALITY_TYPES.IMAGE) &&
+    (options.aspectRatio || options.imageSize)
+  ) {
+    config.imageConfig = {
+      ...(options.aspectRatio && { aspectRatio: options.aspectRatio }),
+      ...(options.imageSize && {
+        imageSize: String(options.imageSize).toUpperCase(),
+      }),
+    };
+  }
+
   return config;
 }
+
+/** Gemini accepts at most 14 reference images per request */
+const MAX_INLINE_IMAGES = 14;
 
 export async function convertMessages(
   messages: ConversationMessage[],
 ): Promise<Content[]> {
   const result: Content[] = [];
+  let inlineImageCount = 0;
 
   for (let i = 0; i < messages.length; i++) {
     const item = messages[i];
@@ -413,6 +432,15 @@ export async function convertMessages(
         const array = item[field];
         if (array && Array.isArray(array)) {
           for (const mediaRef of array) {
+            if (field === "images") {
+              if (inlineImageCount >= MAX_INLINE_IMAGES) {
+                logger.warn(
+                  `[Google] Dropping reference image beyond the ${MAX_INLINE_IMAGES}-image Gemini limit`,
+                );
+                continue;
+              }
+              inlineImageCount++;
+            }
             const match = (mediaRef as string).match(
               /^data:([\w-]+\/[\w.+-]+);base64,(.+)$/,
             );

@@ -336,3 +336,31 @@ describe("convertMessages — full conversation flow", () => {
     expect(result[1].role).toBe("user");
   });
 });
+
+// ── Inline Image Cap ─────────────────────────────────────────
+describe("convertMessages — inline image cap", () => {
+  const pixel =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+  it("caps inline reference images at the 14-image Gemini limit", async () => {
+    const result = await convertMessages([
+      makeMessage({ images: Array(20).fill(pixel) } as never),
+    ]);
+
+    const imageParts = result
+      .flatMap((content) => content.parts ?? [])
+      .filter((part) => "inlineData" in part);
+    expect(imageParts.length).toBe(14);
+  });
+
+  it("keeps all images when under the limit", async () => {
+    const result = await convertMessages([
+      makeMessage({ images: [pixel, pixel, pixel] } as never),
+    ]);
+
+    const imageParts = result
+      .flatMap((content) => content.parts ?? [])
+      .filter((part) => "inlineData" in part);
+    expect(imageParts.length).toBe(3);
+  });
+});
