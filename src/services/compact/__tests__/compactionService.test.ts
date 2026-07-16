@@ -260,6 +260,44 @@ describe("CompactionService", () => {
     expect(result!.summaryText).toContain("/etc/prism/config.yaml");
   });
 
+  it("offloads large dropped-span tool results and indexes them in the summary", async () => {
+    const bigResult = "ROW ".repeat(2000); // well over the offload threshold
+    const messagesWithDroppedResult = [
+      { role: "system", content: "You are an assistant." },
+      {
+        role: "assistant",
+        content: `Fetched the data${filler}`,
+        toolCalls: [
+          { id: "call-dropped", name: "read_web_page", args: {}, result: bigResult },
+        ],
+      },
+      { role: "user", content: "User turn 2" },
+      { role: "assistant", content: "Assistant response 2" },
+      { role: "user", content: "User turn 3" },
+      { role: "assistant", content: "Assistant response 3" },
+      { role: "user", content: "User turn 4" },
+      { role: "assistant", content: "Assistant response 4" },
+    ];
+    mockGenerateText.mockResolvedValueOnce({
+      text: "<summary>Data was fetched and processed.</summary>",
+      usage: { inputTokens: 100, outputTokens: 50 },
+    });
+    mockGenerateText.mockResolvedValueOnce({ text: "<ok/>", usage: { inputTokens: 10, outputTokens: 2 } });
+
+    const result = await CompactionService.compactConversation(
+      messagesWithDroppedResult,
+      { project: "test-proj", username: "rodrigo", agentConversationId: "conv-x" },
+    );
+
+    expect(result).not.toBeNull();
+    const summaryMessage = result!.compactedMessages.find(
+      (message) => (message as { isCompactSummary?: boolean }).isCompactSummary,
+    );
+    expect(summaryMessage!.content).toContain("Recoverable offloaded tool results");
+    expect(summaryMessage!.content).toContain("offload_id: call-dropped");
+    expect(summaryMessage!.content).toContain("read_web_page");
+  });
+
   it("keeps the original summary when the judge call fails (fail-open)", async () => {
     mockGenerateText.mockResolvedValueOnce({
       text: "<summary>Original summary text that is long enough to survive.</summary>",

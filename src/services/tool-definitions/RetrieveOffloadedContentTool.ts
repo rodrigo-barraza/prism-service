@@ -6,11 +6,7 @@ import {
 import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
 import type { InternalToolContext } from "./InternalToolRegistry.ts";
 
-// Use the taxonomy constant when available, fall back to string literal
-// until utilities-library ships the constant.
-const RETRIEVE_OFFLOADED_CONTENT_NAME =
-  (TOOL_NAMES as Record<string, string>).RETRIEVE_OFFLOADED_CONTENT ||
-  "retrieve_offloaded_content";
+const RETRIEVE_OFFLOADED_CONTENT_NAME = TOOL_NAMES.RETRIEVE_OFFLOADED_CONTENT;
 
 // ────────────────────────────────────────────────────────────
 // RetrieveOffloadedContentTool — recover evicted tool results

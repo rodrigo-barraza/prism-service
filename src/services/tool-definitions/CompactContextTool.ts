@@ -3,10 +3,7 @@ import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalTo
 import { AGENT_DIRECTIVES } from "#src/constants";
 import type { InternalToolContext } from "./InternalToolRegistry.ts";
 
-// Use the taxonomy constant when available, fall back to string literal
-// until utilities-library ships the constant.
-const COMPACT_CONTEXT_NAME =
-  (TOOL_NAMES as Record<string, string>).COMPACT_CONTEXT || "compact_context";
+const COMPACT_CONTEXT_NAME = TOOL_NAMES.COMPACT_CONTEXT;
 
 // ────────────────────────────────────────────────────────────
 // CompactContextTool — model-invoked compaction
