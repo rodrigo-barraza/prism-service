@@ -531,6 +531,29 @@ describe("SomaticStateService — adaptFromMessage", () => {
     expect(dominant.intensity).toBeGreaterThan(0);
   });
 
+  // Appraisal contract (arXiv:2607.07824): strict JSON {emotion, why}
+  it("parses the JSON appraisal contract and feeds the Plutchik wheel", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: '{"emotion": "anger", "why": "they mocked my favorite game"}',
+    });
+    await SomaticStateService.getSnapshot(AGENT);
+    await SomaticStateService.adaptFromMessage(AGENT, "your favorite game is boring");
+    const dominant = await SomaticStateService.getDominantEmotion(AGENT);
+    expect(dominant.emotion).toBe("anger");
+    expect(dominant.intensity).toBeGreaterThan(0);
+  });
+
+  it("treats a JSON neutral appraisal as no emotional gain", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      text: '{"emotion": "neutral", "why": ""}',
+    });
+    await SomaticStateService.getSnapshot(AGENT);
+    const before = await SomaticStateService.getDominantEmotion(AGENT);
+    await SomaticStateService.adaptFromMessage(AGENT, "H2O is water");
+    const after = await SomaticStateService.getDominantEmotion(AGENT);
+    expect(after.emotion).toBe(before.emotion);
+  });
+
   it("handles multiple keyword categories in one message", async () => {
     await SomaticStateService.setPhysicalStatLevel(AGENT, "hunger", 50);
     await SomaticStateService.setPhysicalStatLevel(AGENT, "thirst", 50);
@@ -617,6 +640,28 @@ describe("SomaticStateService — renderSystemMessage", () => {
     await SomaticStateService.addEmotion(AGENT, "joy", 60);
     const message = await SomaticStateService.renderSystemMessage(AGENT);
     expect(message).toContain("shifted from neutral to joy");
+  });
+
+  it("captions appraised mood shifts with their trigger", async () => {
+    await SomaticStateService.renderSystemMessage(AGENT);
+    mockGenerateText.mockResolvedValueOnce({
+      text: '{"emotion": "anger", "why": "they mocked my favorite game"}',
+    });
+    await SomaticStateService.adaptFromMessage(AGENT, "your favorite game is boring");
+    const message = await SomaticStateService.renderSystemMessage(AGENT);
+    expect(message).toContain(
+      "shifted from neutral to anger because they mocked my favorite game",
+    );
+  });
+
+  it("renders plain mood shifts when no appraised trigger explains them", async () => {
+    await SomaticStateService.renderSystemMessage(AGENT);
+    // addEmotion (decay/manual path) never sets a cause — the "because"
+    // clause must stay honest and absent
+    await SomaticStateService.addEmotion(AGENT, "joy", 60);
+    const message = await SomaticStateService.renderSystemMessage(AGENT);
+    expect(message).toContain("shifted from neutral to joy");
+    expect(message).not.toContain("shifted from neutral to joy because");
   });
 });
 

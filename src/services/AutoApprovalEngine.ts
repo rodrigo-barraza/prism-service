@@ -60,6 +60,10 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   [TOOL_NAMES.EXIT_PLAN_MODE]: APPROVAL_TIERS.AUTO,
   [TOOL_NAMES.SEARCH_TOOLS]: APPROVAL_TIERS.AUTO,
 
+  // Tier 1 — context recovery (read-only over offloaded tool results;
+  // string literal until utilities-library ships the taxonomy constant)
+  retrieve_offloaded_content: APPROVAL_TIERS.AUTO,
+
   // Tier 2 — scheduling / notebook (creates persistent state)
   [TOOL_NAMES.CREATE_CRON]: APPROVAL_TIERS.WRITE,
   [TOOL_NAMES.REMOTE_TRIGGER]: APPROVAL_TIERS.WRITE,

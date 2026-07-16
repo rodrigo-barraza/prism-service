@@ -12,6 +12,7 @@
 import { describe, it, expect } from "vitest";
 
 import MicroCompactionService from "#src/services/compact/MicroCompactionService";
+import { OFFLOAD_STUB_HEADER } from "#src/services/compact/ToolResultOffloadService";
 import ContextWindowManager from "#src/services/ContextWindowManager";
 import type { ChatMessage } from "#src/types/admin";
 import { TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
@@ -227,7 +228,7 @@ describe("Micro-Compaction Context Pressure Gating", () => {
       expect(result.messages).not.toBe(messages);
     });
 
-    it("should replace old tool results with cleared marker at high pressure", () => {
+    it("should replace old tool results with recoverable offload stubs at high pressure", () => {
       const messages = buildAgenticConversation(8000, 8);
       const contextWindowSize = 16_000;
       const maxOutputTokens = 2048;
@@ -242,14 +243,20 @@ describe("Micro-Compaction Context Pressure Gating", () => {
         (message) => message.role === "assistant" && message.toolCalls?.length,
       );
 
-      // At least some old tool results should be cleared
-      const clearedResults = compactedAssistantMessages.flatMap((message) =>
+      // At least some old tool results should be evicted to pointer stubs
+      const evictedResults = compactedAssistantMessages.flatMap((message) =>
         message.toolCalls!.filter(
-          (toolCall) => toolCall.result === "[Old tool result content cleared]",
+          (toolCall) =>
+            typeof toolCall.result === "string" &&
+            toolCall.result.startsWith(OFFLOAD_STUB_HEADER),
         ),
       );
 
-      expect(clearedResults.length).toBeGreaterThan(0);
+      expect(evictedResults.length).toBeGreaterThan(0);
+      // Every stub must carry a dereferenceable offload id
+      for (const toolCall of evictedResults) {
+        expect(toolCall.result).toContain("offload_id:");
+      }
     });
 
     it("should still protect recent tool results even at high pressure", () => {
@@ -275,8 +282,8 @@ describe("Micro-Compaction Context Pressure Gating", () => {
       if (lastAssistantWithTools) {
         for (const toolCall of lastAssistantWithTools.toolCalls!) {
           if (toolCall.result && typeof toolCall.result === "string") {
-            expect(toolCall.result).not.toBe(
-              "[Old tool result content cleared]",
+            expect(toolCall.result.startsWith(OFFLOAD_STUB_HEADER)).toBe(
+              false,
             );
           }
         }

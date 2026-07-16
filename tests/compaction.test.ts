@@ -15,6 +15,7 @@ vi.mock("#src/utils/logger", () => ({
 
 import AutoCompactionTrigger from "#src/services/compact/AutoCompactionTrigger";
 import MicroCompactionService from "#src/services/compact/MicroCompactionService";
+import { OFFLOAD_STUB_HEADER } from "#src/services/compact/ToolResultOffloadService";
 import {
   extractSummaryFromResponse,
   stripImagesFromMessages,
@@ -114,8 +115,12 @@ describe("MicroCompactionService", () => {
     // The "First turn" assistant message is before the boundary, so it should be micro-compacted!
     const result = MicroCompactionService.microcompactMessages(messages);
     expect(result.clearedResultCount).toBe(1);
+    expect(result.offloadedResultCount).toBe(1);
     expect(result.freedTokens).toBeGreaterThan(0);
-    expect(result.messages[1].toolCalls![0].result).toBe("[Old tool result content cleared]");
+    // Evicted to a recoverable offload stub, not destroyed
+    expect(result.messages[1].toolCalls![0].result).toContain(
+      OFFLOAD_STUB_HEADER,
+    );
   });
 
   it("does not clear small tool results even if outside the boundary", () => {
@@ -412,6 +417,9 @@ describe("Compaction Integration with Harness and WindowManager", () => {
 
     expect(result.truncated).toBe(true);
     expect(result.strategy).toBe("micro_compaction");
-    expect(result.messages[2].toolCalls![0].result).toBe("[Old tool result content cleared]");
+    // Evicted to a recoverable offload stub, not destroyed
+    expect(result.messages[2].toolCalls![0].result).toContain(
+      OFFLOAD_STUB_HEADER,
+    );
   });
 });

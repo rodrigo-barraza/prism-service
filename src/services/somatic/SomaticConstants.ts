@@ -181,7 +181,17 @@ export const SOMATIC_KEYWORDS = {
     /\b(toilet|bathroom|restroom|pee|poop|piss|shit|flush|lavatory|washroom)\b|🚽|🧻/i,
 };
 
-export const EMOTION_CLASSIFICATION_PROMPT = (
+/**
+ * Appraisal prompt for the background emotion model. Rather than mirroring
+ * the emotion the text expresses, the model judges how the event bears on
+ * the character's OWN goals and standing before naming a Plutchik primary,
+ * and returns a short "why" trigger used to caption the mood shift.
+ * Single-call downscoping of the appraisal loop (Scherer's Component
+ * Process Model) from "From Triggers to Emotions" — arXiv:2607.07824
+ * (https://arxiv.org/abs/2607.07824).
+ * Locale key stays `classificationPrompt` for locale-key stability.
+ */
+export const EMOTION_APPRAISAL_PROMPT = (
   validEmotionsList: string,
   textToClassify: string,
 ): string =>

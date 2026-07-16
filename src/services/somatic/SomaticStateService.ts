@@ -5,7 +5,7 @@ import StatFactory, { type StatInstance } from "./StatFactory.ts";
 import {
   SOMATIC_KEYWORDS,
   VALID_EMOTIONS,
-  EMOTION_CLASSIFICATION_PROMPT,
+  EMOTION_APPRAISAL_PROMPT,
   getEmotionBehaviorPrompt,
   type EmotionPersonality,
   type PrimaryEmotion,
@@ -88,6 +88,12 @@ interface AgentSomaticState {
   bathroom: StatInstance;
   /** Dominant mood at the previous prompt render — used to surface mood shifts. */
   lastRenderedMood: string | null;
+  /**
+   * Trigger of the most recent appraised (event-driven) emotion, consumed by
+   * the next render's mood-shift line. Passive decay never sets a cause, so
+   * the "because" clause only appears on genuine event-driven shifts.
+   */
+  pendingMoodCause: { emotion: PrimaryEmotion; why: string } | null;
   isDirty: boolean;
 }
 
@@ -182,7 +188,7 @@ function normalizeAgentId(agentId: string): string {
 function createStatInstances(
   levels: Partial<SomaticLevels> | undefined,
   emotionPersonality: Partial<EmotionPersonality>,
-): Omit<AgentSomaticState, "isDirty" | "lastRenderedMood"> {
+): Omit<AgentSomaticState, "isDirty" | "lastRenderedMood" | "pendingMoodCause"> {
   const emotionalState = levels?.emotionalState
     ? EmotionalStateEngine.deserialize(levels.emotionalState, emotionPersonality)
     : new EmotionalStateEngine(emotionPersonality);
@@ -370,6 +376,7 @@ async function initializeAgentState(
   const state: AgentSomaticState = {
     ...stats,
     lastRenderedMood: savedDocument?.lastRenderedMood ?? null,
+    pendingMoodCause: null,
     isDirty: false,
   };
 
@@ -443,22 +450,57 @@ async function resolveEmotionModel(): Promise<{
   }
 }
 
-function extractEmotionFromResponse(
-  responseText: string,
-): PrimaryEmotion | "neutral" {
-  const trimmedResponse = responseText.trim().toLowerCase();
+interface EmotionAppraisal {
+  emotion: PrimaryEmotion | "neutral";
+  /** Short event-shaped trigger ("they mocked my favorite game") — null when unavailable. */
+  why: string | null;
+}
 
-  // Fast path: the model returned exactly a valid emotion word (ideal case)
-  if (VALID_EMOTIONS.includes(trimmedResponse)) {
-    return trimmedResponse as PrimaryEmotion | "neutral";
+const APPRAISAL_WHY_MAX_LENGTH = 120;
+
+/**
+ * Parse the appraisal model's response. The primary path is the strict-JSON
+ * `{"emotion", "why"}` contract; the word-scan fallbacks keep looser model
+ * outputs (a bare emotion word, or one wrapped in prose) working.
+ */
+function extractAppraisalFromResponse(responseText: string): EmotionAppraisal {
+  const trimmedResponse = responseText.trim();
+
+  // Primary path: strict JSON, possibly wrapped in a markdown code fence
+  const jsonMatch = trimmedResponse.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+      const emotion = String(parsed.emotion ?? "")
+        .trim()
+        .toLowerCase();
+      if (VALID_EMOTIONS.includes(emotion)) {
+        const why = String(parsed.why ?? "")
+          .trim()
+          .slice(0, APPRAISAL_WHY_MAX_LENGTH);
+        return {
+          emotion: emotion as PrimaryEmotion | "neutral",
+          why: emotion !== "neutral" && why ? why : null,
+        };
+      }
+    } catch {
+      // Malformed JSON — fall through to the word-scan fallbacks
+    }
+  }
+
+  const loweredResponse = trimmedResponse.toLowerCase();
+
+  // Fallback: the model returned exactly a valid emotion word
+  if (VALID_EMOTIONS.includes(loweredResponse)) {
+    return { emotion: loweredResponse as PrimaryEmotion | "neutral", why: null };
   }
 
   // Strip non-alpha and check if the cleaned single-token matches
   // Only valid for short responses (< 30 chars) to avoid collapsing garbage
-  if (trimmedResponse.length < 30) {
-    const strippedResponse = trimmedResponse.replace(/[^a-z]/g, "");
+  if (loweredResponse.length < 30) {
+    const strippedResponse = loweredResponse.replace(/[^a-z]/g, "");
     if (VALID_EMOTIONS.includes(strippedResponse)) {
-      return strippedResponse as PrimaryEmotion | "neutral";
+      return { emotion: strippedResponse as PrimaryEmotion | "neutral", why: null };
     }
   }
 
@@ -466,41 +508,53 @@ function extractEmotionFromResponse(
   // Handles cases where the model wraps the emotion in quotes or a sentence
   for (const emotion of VALID_EMOTIONS) {
     const emotionBoundaryPattern = new RegExp(`\\b${emotion}\\b`);
-    if (emotionBoundaryPattern.test(trimmedResponse)) {
-      return emotion as PrimaryEmotion | "neutral";
+    if (emotionBoundaryPattern.test(loweredResponse)) {
+      return { emotion: emotion as PrimaryEmotion | "neutral", why: null };
     }
   }
 
-  return "neutral";
+  return { emotion: "neutral", why: null };
 }
 
+/**
+ * Appraisal-driven emotion analysis: instead of mirroring the emotion the
+ * text expresses, the model judges how the event bears on the CHARACTER's
+ * own goals and standing before naming a Plutchik primary, and returns a
+ * short "why" trigger used to caption the resulting mood shift.
+ * Single-call downscoping of the appraisal loop (Scherer's Component
+ * Process Model) from "From Triggers to Emotions" — arXiv:2607.07824
+ * (https://arxiv.org/abs/2607.07824).
+ */
 async function analyzeEmotionFromText(
   agentId: string,
   text: string,
   requestContext: EmotionAnalysisContext = {},
-): Promise<PrimaryEmotion | "neutral"> {
+): Promise<EmotionAppraisal> {
+  const neutralAppraisal: EmotionAppraisal = { emotion: "neutral", why: null };
   const emotionModel = await resolveEmotionModel();
-  if (!emotionModel) return "neutral";
+  if (!emotionModel) return neutralAppraisal;
 
   const { getProvider } = await import("#src/providers/index");
   const { provider: providerName, model: modelName } = emotionModel;
   const provider = getProvider(providerName);
-  const classificationPrompt = EMOTION_CLASSIFICATION_PROMPT(
+  const appraisalPrompt = EMOTION_APPRAISAL_PROMPT(
     VALID_EMOTIONS.join(", "),
     text,
   );
   const requestId = crypto.randomUUID();
   const requestStart = performance.now();
 
-  const aiMessages = [{ role: "user", content: classificationPrompt }];
+  const aiMessages = [{ role: "user", content: appraisalPrompt }];
 
   let result: { text: string; usage?: Record<string, unknown> } | undefined;
   let success = true;
   let errorMessage = null;
 
   try {
+    // ~80 tokens covers the JSON envelope plus a short "why" clause —
+    // still a cheap single background call per incoming message
     result = await provider.generateText(aiMessages, modelName, {
-      maxTokens: 10,
+      maxTokens: 80,
       temperature: 0,
       thinkingEnabled: false,
     });
@@ -512,9 +566,9 @@ async function analyzeEmotionFromText(
     );
   }
 
-  const detectedEmotion = success
-    ? extractEmotionFromResponse(result?.text || "")
-    : "neutral";
+  const appraisal = success
+    ? extractAppraisalFromResponse(result?.text || "")
+    : neutralAppraisal;
 
   RequestLogger.logBackgroundLlmCall({
     requestId,
@@ -537,18 +591,26 @@ async function analyzeEmotionFromText(
       inputTextLength: text.length,
       textPreview: text.slice(0, LOG_PREVIEW.MEDIUM),
     },
-    extraResponsePayload: success ? { detectedEmotion } : undefined,
+    extraResponsePayload: success
+      ? { detectedEmotion: appraisal.emotion, appraisalWhy: appraisal.why }
+      : undefined,
   });
 
-  if (!success) return "neutral";
+  if (!success) return neutralAppraisal;
 
-  if (detectedEmotion === "neutral" && result?.text?.trim()) {
+  // A deliberate neutral appraisal names "neutral" in its JSON — only warn
+  // when the response never mentioned it (i.e. nothing was recognized)
+  if (
+    appraisal.emotion === "neutral" &&
+    result?.text?.trim() &&
+    !/\bneutral\b/i.test(result.text)
+  ) {
     logger.warn(
-      `[SomaticStateService] Emotion analysis returned unrecognized value: "${result.text.trim()}" — defaulting to neutral`,
+      `[SomaticStateService] Emotion appraisal returned unrecognized value: "${result.text.trim()}" — defaulting to neutral`,
     );
   }
 
-  return detectedEmotion;
+  return appraisal;
 }
 
 // Matches both the legacy <message_content> wrapper and the current
@@ -753,19 +815,28 @@ const SomaticStateService = {
 
     applyHomeostaticDrift(state);
 
-    // LLM-based emotion analysis — detect the message's emotional charge and
-    // feed the Plutchik wheel. Time-based decay (passive drift) pulls the
-    // wheel back toward the persona's baseline between stimuli.
-    const detectedEmotion = await analyzeEmotionFromText(
+    // LLM-based emotion appraisal (arXiv:2607.07824) — judge how the event
+    // bears on the character's own goals/standing and feed the Plutchik
+    // wheel. Time-based decay (passive drift) pulls the wheel back toward
+    // the persona's baseline between stimuli.
+    const appraisal = await analyzeEmotionFromText(
       normalizeAgentId(agentId),
       extractedContent,
       requestContext,
     );
+    const detectedEmotion = appraisal.emotion;
     if (detectedEmotion !== "neutral") {
       state.emotionalState.addEmotion(detectedEmotion as PrimaryEmotion);
+      // Remember the trigger so the next render can caption the mood shift
+      if (appraisal.why) {
+        state.pendingMoodCause = {
+          emotion: detectedEmotion as PrimaryEmotion,
+          why: appraisal.why,
+        };
+      }
       const dominant = state.emotionalState.getDominantEmotion();
       logger.info(
-        `[SomaticStateService] 🎭 Emotion "${detectedEmotion}" detected for "${agentId}" → dominant: ${dominant.emotion} (${Math.round(dominant.intensity)}/100)`,
+        `[SomaticStateService] 🎭 Emotion "${detectedEmotion}" appraised for "${agentId}"${appraisal.why ? ` (${appraisal.why})` : ""} → dominant: ${dominant.emotion} (${Math.round(dominant.intensity)}/100)`,
       );
     } else {
       logger.debug(
@@ -937,14 +1008,30 @@ const SomaticStateService = {
       state.lastRenderedMood &&
       state.lastRenderedMood !== dominantEmotion.dominant
     ) {
-      eventLines.push(
-        `- ${PromptLocaleService.get(locale, "somatic.events.moodShift", {
-          fromMood: state.lastRenderedMood,
-          toMood: dominantEmotion.dominant,
-        })}`,
-      );
+      // Event-driven shifts carry their appraised trigger ("because they
+      // mocked my favorite game"); decay drift renders the plain line so
+      // the "because" clause stays honest (arXiv:2607.07824).
+      const cause = state.pendingMoodCause;
+      if (cause && dominantComponents.has(cause.emotion)) {
+        eventLines.push(
+          `- ${PromptLocaleService.get(locale, "somatic.events.moodShiftReason", {
+            fromMood: state.lastRenderedMood,
+            toMood: dominantEmotion.dominant,
+            reason: cause.why,
+          })}`,
+        );
+      } else {
+        eventLines.push(
+          `- ${PromptLocaleService.get(locale, "somatic.events.moodShift", {
+            fromMood: state.lastRenderedMood,
+            toMood: dominantEmotion.dominant,
+          })}`,
+        );
+      }
     }
     state.lastRenderedMood = dominantEmotion.dominant;
+    // A cause explains at most one render's shift — consume it either way
+    state.pendingMoodCause = null;
     state.isDirty = true;
 
     if (eventLines.length > 0) {

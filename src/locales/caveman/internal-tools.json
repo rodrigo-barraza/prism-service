@@ -142,6 +142,17 @@
       "limit": "Max result. Default: 10."
     }
   },
+  "retrieve_offloaded_content": {
+    "description": "Old tool result got stored away, not lost. Stub in chat shows offload_id. Give offload_id plus pattern (regex) or startLine/endLine or headLines. Grab small slice, no re-run tool.",
+    "parameters": {
+      "offloadId": "offload_id from stub.",
+      "pattern": "Regex to search. Bad regex become plain text match.",
+      "contextLines": "Extra line around match. Default: 2.",
+      "startLine": "First line (1-based).",
+      "endLine": "Last line (1-based).",
+      "headLines": "First N line when no pattern/range. Default: 100."
+    }
+  },
   "run_async_task": {
     "description": "Run tool in background. Returns task ID immediately. Tool run behind while you work. Query with list_async_tasks, stop with cancel_async_task. System notify when done.",
     "parameters": {

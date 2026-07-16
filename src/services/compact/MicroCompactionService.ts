@@ -1,17 +1,35 @@
 import logger from "#src/utils/logger";
 import { estimateTokens } from "#src/utils/CostCalculator";
 import { TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
+import ToolResultOffloadService, {
+  OFFLOAD_STUB_HEADER,
+  type OffloadMetadata,
+} from "#src/services/compact/ToolResultOffloadService";
 import type { ChatMessage, ToolCallEntry } from "#src/types/admin";
 import { COMPACTION } from "#src/constants";
 
 // ────────────────────────────────────────────────────────────
-// MicroCompactionService — In-Memory Tool Result Clearing
+// MicroCompactionService — In-Memory Tool Result Eviction
 // ────────────────────────────────────────────────────────────
 // Modeled after claude-code/src/services/compact/microCompact.ts
 //
-// Before sending messages to the LLM, this service clears large
+// Before sending messages to the LLM, this service evicts large
 // tool results from COMPACTABLE tools in old (unprotected) turns.
 // This is the lightest compaction layer — no LLM call required.
+//
+// Eviction is LOSSLESS: each result is offloaded verbatim through
+// ToolResultOffloadService and replaced inline with a pointer stub
+// (offload id + first-lines preview) the model can dereference via
+// retrieve_offloaded_content. The legacy destructive marker remains
+// only as a fallback when offloading fails.
+//
+// Research basis (harness_landscape_survey_2026-07.md, A2 + A3):
+//  - Strands Agents ContextOffloader (threshold-gated offload with
+//    preview + retrieval pointers)
+//  - LangChain DeepAgents FilesystemMiddleware (pointer + preview
+//    substitution for oversized tool results)
+//  - LCM, arXiv 2605.04050 (lossless pointers to originals)
+//  - VISTA, arXiv 2606.30005 (recoverable eviction beats deletion)
 //
 // Claude Code equivalent:
 //   const COMPACTABLE_TOOLS = new Set([
@@ -22,6 +40,7 @@ import { COMPACTION } from "#src/constants";
 //   ]);
 // ────────────────────────────────────────────────────────────
 
+/** Legacy destructive marker — used only when offloading fails. */
 const CLEARED_RESULT_MARKER = "[Old tool result content cleared]";
 
 const MINIMUM_RESULT_TOKEN_THRESHOLD = COMPACTION.MINIMUM_RESULT_TOKEN_THRESHOLD;
@@ -54,6 +73,8 @@ export interface MicroCompactionResult {
   messages: ChatMessage[];
   freedTokens: number;
   clearedResultCount: number;
+  /** How many of the cleared results were losslessly offloaded (vs destroyed). */
+  offloadedResultCount: number;
 }
 
 /**
@@ -90,7 +111,8 @@ function findProtectionBoundary(
 
 export default class MicroCompactionService {
   /**
-   * Clear old compactable tool results in-memory.
+   * Evict old compactable tool results in-memory, offloading each
+   * verbatim payload so it stays retrievable.
    *
    * Returns the modified messages array and the number of tokens freed.
    * Does NOT mutate the original array — returns a new one.
@@ -98,6 +120,7 @@ export default class MicroCompactionService {
   static microcompactMessages(
     messages: ChatMessage[],
     protectedTurnCount: number = PROTECTED_RECENT_TURNS,
+    offloadMetadata: OffloadMetadata = {},
   ): MicroCompactionResult {
     const protectionBoundary = findProtectionBoundary(
       messages,
@@ -106,6 +129,7 @@ export default class MicroCompactionService {
 
     let freedTokens = 0;
     let clearedResultCount = 0;
+    let offloadedResultCount = 0;
 
     const compactedMessages = messages.map((message, index) => {
       // Never touch protected (recent) messages
@@ -123,16 +147,42 @@ export default class MicroCompactionService {
 
           // Skip tool calls with no result or small results
           if (!toolCall.result) return toolCall;
+
+          // Skip results already evicted to a pointer stub
+          if (
+            typeof toolCall.result === "string" &&
+            toolCall.result.startsWith(OFFLOAD_STUB_HEADER)
+          )
+            return toolCall;
+
           const resultTokens = estimateToolResultTokens(toolCall.result);
           if (resultTokens < MINIMUM_RESULT_TOKEN_THRESHOLD) return toolCall;
 
-          // Clear the result
+          // Evict: offload verbatim, replace inline with the pointer stub.
+          // Fall back to the legacy destructive marker if offloading throws.
+          let replacement: string;
+          try {
+            replacement = ToolResultOffloadService.offloadToolResult(
+              toolCall,
+              offloadMetadata,
+            );
+            offloadedResultCount++;
+          } catch (error) {
+            logger.error(
+              `[MicroCompaction] Offload failed for ${toolCall.name} — falling back to destructive clear: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            replacement = CLEARED_RESULT_MARKER;
+          }
+
           messageModified = true;
-          freedTokens += resultTokens;
+          freedTokens += Math.max(
+            0,
+            resultTokens - estimateTokens(replacement),
+          );
           clearedResultCount++;
           return {
             ...toolCall,
-            result: CLEARED_RESULT_MARKER,
+            result: replacement,
           };
         },
       );
@@ -147,7 +197,8 @@ export default class MicroCompactionService {
 
     if (clearedResultCount > 0) {
       logger.info(
-        `[MicroCompaction] Cleared ${clearedResultCount} old tool results, freed ~${freedTokens} tokens`,
+        `[MicroCompaction] Evicted ${clearedResultCount} old tool results ` +
+          `(${offloadedResultCount} offloaded losslessly), freed ~${freedTokens} tokens`,
       );
     }
 
@@ -155,6 +206,7 @@ export default class MicroCompactionService {
       messages: compactedMessages,
       freedTokens,
       clearedResultCount,
+      offloadedResultCount,
     };
   }
 }

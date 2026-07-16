@@ -83,6 +83,15 @@ export async function manageContextPressure(
   if (contextPressureRatio > CONTEXT_PRESSURE_THRESHOLD) {
     const microCompactionResult = MicroCompactionService.microcompactMessages(
       messages as ChatMessage[],
+      undefined,
+      // Offload metadata — evicted results are persisted losslessly and
+      // scoped to this conversation (retrieve_offloaded_content recovers them).
+      {
+        conversationId:
+          context.agentConversationId || context.conversationId || null,
+        project: context.project || null,
+        username: context.username || null,
+      },
     );
     if (microCompactionResult.clearedResultCount > 0) {
       messages = microCompactionResult.messages as ConversationMessage[];
@@ -91,7 +100,8 @@ export async function manageContextPressure(
       );
       logger.info(
         `[${harnessLabel}] Micro-compaction at ${(contextPressureRatio * 100).toFixed(0)}% context pressure — ` +
-          `freed ~${microCompactionResult.freedTokens} tokens`,
+          `evicted ${microCompactionResult.clearedResultCount} results ` +
+          `(${microCompactionResult.offloadedResultCount} offloaded), freed ~${microCompactionResult.freedTokens} tokens`,
       );
     }
   }

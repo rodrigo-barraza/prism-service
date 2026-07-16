@@ -114,6 +114,10 @@ function buildCorePersonality(flags: VariantFlags, locale = "en"): string {
   return personalityBlock;
 }
 
+// The footer's human-texting cadence rules (anti-postamble, one-joke cap,
+// lowercase mirroring) and the default interaction rules' anti-sycophancy
+// line adapt the leaked Poke product guidelines (Interaction Co., 2025-09-15):
+// https://github.com/EliFuzz/awesome-system-prompts/blob/main/leaks/poke/2025-09-15_prompt_guidelines.md
 function buildResponseGuidelines(isAprilFools: boolean, locale = "en"): string {
   const header = PromptLocaleService.get(
     locale,
@@ -172,6 +176,11 @@ const LUPOS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
     requires: ["search_discord_messages"],
   },
   {
+    // Includes the self-portrait rules: stay faithful to the attached
+    // canonical reference (lupos-bot attaches it on self-portrait intent)
+    // and fold live somatic state into the prompt. Reference-conditioned
+    // character consistency per Gemini image generation ("Nano Banana"):
+    // https://ai.google.dev/gemini-api/docs/image-generation
     content: (locale) =>
       PromptLocaleService.get(locale, "personas.lupos.toolPolicyImagePrompt"),
     requires: [TOOL_NAMES.GENERATE_IMAGE],
