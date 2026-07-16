@@ -14,6 +14,7 @@ import logger from "#src/utils/logger";
 import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
 import { parseJsonFromLargeLanguageModelResponse } from "@rodrigo-barraza/utilities-library";
 import { COLLECTIONS, MEMORY, LOG_PREVIEW } from "#src/constants";
+import { scoreHybrid } from "./memory/HybridRetrieval.ts";
 import SettingsService from "./SettingsService.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -51,6 +52,19 @@ export interface MemoryStoreParams {
   traceId?: string;
   agentConversationId?: string;
   endpoint?: string;
+  /**
+   * Skip write-time duplicate detection. Used by consolidation when storing
+   * a merged memory whose content is intentionally similar to the (about to
+   * be soft-closed) sources.
+   */
+  dedupe?: boolean;
+}
+
+export interface MemoryInvalidateParams {
+  /** Id of the memory that replaces this one (merge target or newer fact). */
+  supersededBy?: string | null;
+  /** Why the memory was closed — "merged", "invalidated", "rollback", ... */
+  reason?: string | null;
 }
 
 export interface MemoryExtractAndStoreParams {
@@ -87,6 +101,8 @@ export interface MemoryListParams {
   limit?: number;
   skip?: number;
   type?: string;
+  /** Include soft-closed (superseded/invalidated) rows — history view. */
+  includeSuperseded?: boolean;
 }
 
 export interface MemoryFacetsParams {
@@ -254,7 +270,35 @@ async function extractFactsFromConversation(
  *
  * LUPOS memories: personal facts about Discord users (guild-scoped)
  * CODING memories: project knowledge from coding sessions (project-scoped)
+ *
+ * Temporal model (bi-temporal-lite): memories are versioned, not destroyed.
+ * `createdAt` doubles as valid-from; a superseded/invalidated memory gets
+ * `validTo` (close of its valid-time window), `supersededBy` (id of the
+ * replacement), and `closedReason` — never a delete. All read paths filter
+ * to current rows ({ validTo: null } matches both null and missing).
+ * Write-time dedup is ADD-only above the exact-duplicate bar: similar-but-
+ * different facts are stored, and contradiction resolution is deferred to
+ * retrieval ranking + consolidation.
+ *
+ * Research basis (harness_landscape_survey_2026-07.md, B1):
+ *  - Graphiti (Zep) — on contradiction, close the old edge's valid-time
+ *    window and open a new edge; history stays queryable, nothing deleted:
+ *    https://github.com/getzep/graphiti
+ *  - Mem0 v3 — single-pass ADD-only extraction; conflict resolution moves
+ *    to retrieval-time ranking (LoCoMo 71.4→91.6):
+ *    https://docs.mem0.ai/migration/platform-v2-to-v3
+ *  - TOKI (Wang, arXiv 2606.06240) — contradiction resolution as write-time
+ *    concurrency control over a bitemporal schema:
+ *    https://arxiv.org/abs/2606.06240
  */
+
+/**
+ * Filter clause selecting only CURRENT (not superseded/invalidated) rows.
+ * `{ validTo: null }` matches documents where the field is null OR missing,
+ * so legacy documents predating the temporal model remain visible.
+ */
+export const CURRENT_MEMORY_FILTER = { validTo: null } as const;
+
 const MemoryService = {
   // ── Store ──────────────────────────────────────────────────────────────────
   async store({
@@ -270,6 +314,7 @@ const MemoryService = {
     traceId,
     agentConversationId,
     endpoint,
+    dedupe = true,
   }: MemoryStoreParams) {
     if (!agent)
       throw new Error("MemoryService.store requires an agent identifier");
@@ -296,31 +341,46 @@ const MemoryService = {
       if (username) embedOpts.username = username;
       embedding = await generateEmbedding(embedText, embedOpts);
     }
-    // Duplicate detection — compare against existing memories for the same agent
-    const dedupFilter: Record<string, unknown> = { agent };
-    if (project) dedupFilter.project = project;
-    if (metadata.guildId) dedupFilter.guildId = metadata.guildId;
-    if (metadata.aboutUserId) dedupFilter.aboutUserId = metadata.aboutUserId;
-    const existing = await collection
-      .find(dedupFilter)
-      .project({ embedding: 1 })
-      .sort({ createdAt: -1 })
-      .limit(200)
-      .toArray();
-    const isDuplicate = existing.some((document: Record<string, unknown>) => {
-      if (!document.embedding) return false;
-      return (
-        cosineSimilarity(
+    // Write-time duplicate detection — ADD-only policy (Mem0 v3):
+    // only a verbatim re-extraction (similarity above the exact bar) is
+    // skipped. A similar-but-different memory (e.g. "moved to Victoria" vs
+    // "lives in Vancouver") is STORED — dropping it was silent data loss.
+    // Contradiction resolution belongs to retrieval ranking + consolidation.
+    if (dedupe) {
+      const dedupFilter: Record<string, unknown> = {
+        agent,
+        ...CURRENT_MEMORY_FILTER,
+      };
+      if (project) dedupFilter.project = project;
+      if (metadata.guildId) dedupFilter.guildId = metadata.guildId;
+      if (metadata.aboutUserId) dedupFilter.aboutUserId = metadata.aboutUserId;
+      const existing = await collection
+        .find(dedupFilter)
+        .project({ embedding: 1 })
+        .sort({ createdAt: -1 })
+        .limit(200)
+        .toArray();
+      let maximumSimilarity = 0;
+      for (const document of existing as Record<string, unknown>[]) {
+        if (!document.embedding) continue;
+        const similarity = cosineSimilarity(
           embedding as number[],
           document.embedding as number[],
-        ) > DUPLICATE_THRESHOLD
-      );
-    });
-    if (isDuplicate) {
-      logger.info(
-        `[MemoryService] Skipping duplicate for ${agent}: "${(title || content).substring(0, LOG_PREVIEW.SHORT)}"`,
-      );
-      return null;
+        );
+        if (similarity > maximumSimilarity) maximumSimilarity = similarity;
+      }
+      if (maximumSimilarity > MEMORY.EXACT_DUPLICATE_THRESHOLD) {
+        logger.info(
+          `[MemoryService] Skipping verbatim duplicate for ${agent}: "${(title || content).substring(0, LOG_PREVIEW.SHORT)}"`,
+        );
+        return null;
+      }
+      if (maximumSimilarity > DUPLICATE_THRESHOLD) {
+        logger.info(
+          `[MemoryService] Storing near-duplicate for ${agent} (similarity ${maximumSimilarity.toFixed(3)}, ADD-only policy): ` +
+            `"${(title || content).substring(0, LOG_PREVIEW.SHORT)}"`,
+        );
+      }
     }
     const now = new Date().toISOString();
     const memory = {
@@ -339,6 +399,10 @@ const MemoryService = {
       agentConversationId: agentConversationId || null,
       createdAt: now,
       updatedAt: now,
+      // Bi-temporal validity — createdAt doubles as valid-from; a soft-close
+      // sets validTo + supersededBy + closedReason instead of deleting.
+      validTo: null,
+      supersededBy: null,
     };
     await collection.insertOne(memory);
     logger.info(
@@ -451,8 +515,8 @@ const MemoryService = {
     if (agent) embeddingOpts.agent = agent;
     if (username) embeddingOpts.username = username;
     const queryEmbedding = await generateEmbedding(queryText, embeddingOpts);
-    // Build the filter — always scoped by agent
-    const filter: Record<string, unknown> = { agent };
+    // Build the filter — always scoped by agent, current rows only
+    const filter: Record<string, unknown> = { agent, ...CURRENT_MEMORY_FILTER };
     if (project) filter.project = project;
     if (guildId) filter.guildId = guildId;
     if (userIds && userIds.length > 0) {
@@ -476,15 +540,27 @@ const MemoryService = {
       .limit(500)
       .toArray();
     if (memories.length === 0) return [];
-    // Compute cosine similarity and sort
-    const scored = memories
-      .filter(
-        (memory: Record<string, unknown>) =>
-          memory &&
-          memory.embedding &&
-          (memory.embedding as number[]).length > 0,
-      )
-      .map((memory: Record<string, unknown>) => ({
+    // Hybrid multi-signal scoring (semantic + BM25 + exact + recency, RRF-
+    // fused) — recovers exact-attribute/keyword hits cosine alone misses.
+    // Candidates without embeddings are still eligible via keyword channels.
+    const hybridScores = scoreHybrid(
+      memories.map((memory: Record<string, unknown>, index: number) => ({
+        key: index,
+        title: (memory.title as string) || "",
+        content: (memory.content as string) || "",
+        embedding:
+          memory.embedding && (memory.embedding as number[]).length > 0
+            ? (memory.embedding as number[])
+            : null,
+        createdAt: (memory.createdAt as string) || null,
+      })),
+      queryText,
+      queryEmbedding as number[],
+      { relevanceThreshold: RELEVANCE_THRESHOLD, limit },
+    );
+    const scored = hybridScores.map((hybrid) => {
+      const memory = memories[hybrid.key] as Record<string, unknown>;
+      return {
         id: memory._id,
         type: memory.type || "other",
         title:
@@ -499,16 +575,18 @@ const MemoryService = {
         createdAt: memory.createdAt,
         age: memoryAge(memory.createdAt as string),
         ageDays: memoryAgeDays(memory.createdAt as string),
-        score: cosineSimilarity(
-          queryEmbedding as number[],
-          memory.embedding as number[],
-        ),
-      }))
-      .filter((message) => message.score > RELEVANCE_THRESHOLD)
-      .sort((firstItem, secondItem) => secondItem.score - firstItem.score)
-      .slice(0, limit);
+        // score stays cosine similarity for consumer compatibility;
+        // ordering comes from the fused rank
+        score: hybrid.semantic,
+        matchSignals: {
+          bm25: hybrid.bm25Hit,
+          exact: hybrid.exactHit,
+          fused: hybrid.fused,
+        },
+      };
+    });
     logger.info(
-      `[MemoryService] Search found ${scored.length} relevant memories for ${agent} (from ${memories.length} total)`,
+      `[MemoryService] Hybrid search found ${scored.length} relevant memories for ${agent} (from ${memories.length} candidates)`,
     );
     return scored;
   },
@@ -523,9 +601,12 @@ const MemoryService = {
     limit = 50,
     skip = 0,
     type,
+    includeSuperseded = false,
   }: MemoryListParams) {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
-    const filter: Record<string, unknown> = {};
+    const filter: Record<string, unknown> = includeSuperseded
+      ? {}
+      : { ...CURRENT_MEMORY_FILTER };
     if (agent) filter.agent = agent;
     if (project) filter.project = project;
     if (guildId) filter.guildId = guildId;
@@ -551,7 +632,7 @@ const MemoryService = {
    */
   async facets({ agent, project, guildId }: MemoryFacetsParams) {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
-    const match: Record<string, unknown> = {};
+    const match: Record<string, unknown> = { ...CURRENT_MEMORY_FILTER };
     if (agent) match.agent = agent;
     if (project) match.project = project;
     if (guildId) match.guildId = guildId;
@@ -602,6 +683,7 @@ const MemoryService = {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
     return collection
       .aggregate([
+        { $match: { ...CURRENT_MEMORY_FILTER } },
         {
           $group: {
             _id: { project: "$project", agent: "$agent" },
@@ -620,7 +702,48 @@ const MemoryService = {
       ])
       .toArray();
   },
-  // ── Delete / Remove ────────────────────────────────────────────────────────
+  // ── Invalidate (soft-close) ────────────────────────────────────────────────
+  /**
+   * Close a memory's valid-time window instead of deleting it (Graphiti-style
+   * edge invalidation). The row stays queryable for history/rollback but is
+   * excluded from every current-rows read path. Reversible via reopen().
+   */
+  async invalidate(
+    memoryId: string,
+    { supersededBy = null, reason = null }: MemoryInvalidateParams = {},
+  ) {
+    const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
+    const now = new Date().toISOString();
+    const result = await collection.updateOne(
+      { id: memoryId, ...CURRENT_MEMORY_FILTER },
+      {
+        $set: {
+          validTo: now,
+          supersededBy,
+          closedReason: reason,
+          updatedAt: now,
+        },
+      },
+    );
+    return result.modifiedCount > 0;
+  },
+  /** Reverse an invalidate() — used by consolidation rollback. */
+  async reopen(memoryId: string) {
+    const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
+    const result = await collection.updateOne(
+      { id: memoryId, validTo: { $ne: null } },
+      {
+        $set: {
+          validTo: null,
+          supersededBy: null,
+          closedReason: null,
+          updatedAt: new Date().toISOString(),
+        },
+      },
+    );
+    return result.modifiedCount > 0;
+  },
+  // ── Delete / Remove (hard — user-initiated purges only) ────────────────────
   async delete(memoryId: string) {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
     const result = await collection.deleteOne({ id: memoryId });
@@ -720,6 +843,8 @@ const MemoryService = {
     await collection.createIndex({ id: 1 }, { unique: true });
     // Chronological listing
     await collection.createIndex({ createdAt: -1 });
+    // Current-rows scans (validTo: null matches null + missing)
+    await collection.createIndex({ agent: 1, validTo: 1, createdAt: -1 });
     logger.info(
       "[MemoryService] Indexes ensured on unified memories collection.",
     );

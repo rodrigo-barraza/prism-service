@@ -3,6 +3,7 @@
 // the memory consolidation pipeline.
 // Extracted from MemoryConsolidationService.ts
 
+import crypto from "crypto";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { MONGO_DB_NAME } from "#config";
 import logger from "#src/utils/logger";
@@ -54,6 +55,66 @@ export async function resetRunCount(project: string): Promise<void> {
   );
 }
 
+// ─── Single-Writer Lock ─────────────────────────────────────
+// The threshold trigger (checkAndRun) and the 24h AutoDream sweep can
+// both consolidate the same scope concurrently; both mutate memories,
+// so a race can double-close or double-merge. An advisory Mongo lock on
+// the runs document (atomic findOneAndUpdate) makes consolidation
+// single-writer per scope; a stale lock (crashed holder) is taken over
+// after CONSOLIDATION_LOCK_STALE_MINUTES.
+
+const LOCK_STALE_MILLISECONDS =
+  MEMORY.CONSOLIDATION_LOCK_STALE_MINUTES * 60 * 1000;
+
+export async function acquireConsolidationLock(
+  project: string,
+): Promise<boolean> {
+  const db = MongoWrapper.getDb(MONGO_DB_NAME);
+  if (!db) return true; // no DB — nothing to race against
+  const collection = db.collection(RUNS_COLLECTION);
+  // Ensure the scope document exists (idempotent)
+  await collection.updateOne(
+    { project },
+    { $setOnInsert: { project } },
+    { upsert: true },
+  );
+  const staleBefore = new Date(
+    Date.now() - LOCK_STALE_MILLISECONDS,
+  ).toISOString();
+  const result = await collection.findOneAndUpdate(
+    {
+      project,
+      $or: [
+        { isConsolidating: { $ne: true } },
+        { lockAcquiredAt: { $lt: staleBefore } },
+      ],
+    },
+    {
+      $set: {
+        isConsolidating: true,
+        lockAcquiredAt: new Date().toISOString(),
+      },
+    },
+  );
+  const acquired = result !== null;
+  if (!acquired) {
+    logger.info(
+      `[MemoryConsolidation] Lock held for "${project}" — skipping concurrent run`,
+    );
+  }
+  return acquired;
+}
+
+export async function releaseConsolidationLock(
+  project: string,
+): Promise<void> {
+  const db = MongoWrapper.getDb(MONGO_DB_NAME);
+  if (!db) return;
+  await db
+    .collection(RUNS_COLLECTION)
+    .updateOne({ project }, { $set: { isConsolidating: false } });
+}
+
 // ─── History Recording ──────────────────────────────────────
 
 export async function recordHistory(
@@ -63,16 +124,19 @@ export async function recordHistory(
   actions: ConsolidationAction[],
   summary: string,
   durationMilliseconds: number,
-): Promise<void> {
+  applied?: { closedIds?: string[]; createdIds?: string[] },
+): Promise<string | null> {
   const db = MongoWrapper.getDb(MONGO_DB_NAME);
-  if (!db) return;
+  if (!db) return null;
   const mergeCount = actions
     .filter((action) => action.type === "merge")
     .reduce((sum, action) => sum + (action.sourceIds?.length || 0), 0);
   const deleteCount = actions.filter(
-    (action) => action.type === "delete",
+    (action) => action.type === "delete" || action.type === "invalidate",
   ).length;
+  const runId = crypto.randomUUID();
   await db.collection(HISTORY_COLLECTION).insertOne({
+    runId,
     project,
     runAt: new Date().toISOString(),
     trigger,
@@ -90,9 +154,30 @@ export async function recordHistory(
       ...(action.id && { deletedId: action.id }),
       reason: action.reason || "",
     })),
+    // Soft-close bookkeeping — powers rollbackRun()
+    closedIds: applied?.closedIds || [],
+    createdIds: applied?.createdIds || [],
     summary,
     durationMilliseconds,
   });
+  return runId;
+}
+
+export async function getHistoryRun(runId: string) {
+  const db = MongoWrapper.getDb(MONGO_DB_NAME);
+  if (!db) return null;
+  return db.collection(HISTORY_COLLECTION).findOne({ runId });
+}
+
+export async function markRunRolledBack(runId: string): Promise<void> {
+  const db = MongoWrapper.getDb(MONGO_DB_NAME);
+  if (!db) return;
+  await db
+    .collection(HISTORY_COLLECTION)
+    .updateOne(
+      { runId },
+      { $set: { rolledBackAt: new Date().toISOString() } },
+    );
 }
 
 // ─── Cost Guard ─────────────────────────────────────────────

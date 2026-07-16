@@ -610,6 +610,24 @@ export const MEMORY = {
   /** Cosine similarity above which two memories are considered duplicates. */
   DUPLICATE_THRESHOLD: 0.92,
 
+  /**
+   * Cosine similarity above which a NEW memory is treated as a verbatim
+   * re-extraction and skipped at write time. Between DUPLICATE_THRESHOLD and
+   * this value the new memory is stored anyway (single-pass ADD-only policy,
+   * Mem0 v3) — conflict resolution is deferred to retrieval ranking and
+   * consolidation instead of silently dropping fresh facts.
+   */
+  EXACT_DUPLICATE_THRESHOLD: 0.97,
+
+  /**
+   * Abort a consolidation run that tries to close more than this fraction of
+   * the loaded corpus — sanity cap against a runaway LLM merge/delete batch.
+   */
+  CONSOLIDATION_MAX_AFFECTED_FRACTION: 0.5,
+
+  /** Consolidation lock is considered stale (crashed holder) after this. */
+  CONSOLIDATION_LOCK_STALE_MINUTES: 10,
+
   /** Minimum cosine similarity for a memory to be considered relevant. */
   RELEVANCE_THRESHOLD: 0.3,
 
@@ -657,6 +675,18 @@ export const MEMORY = {
 
   /** Maximum stale memories per consolidation batch. */
   BATCH_MAX_STALE: 10,
+
+  /** Reciprocal-rank-fusion constant K (standard RRF default). */
+  HYBRID_RRF_K: 60,
+
+  /** Per-channel RRF weights for hybrid memory retrieval. */
+  HYBRID_WEIGHT_SEMANTIC: 1.0,
+  HYBRID_WEIGHT_BM25: 1.0,
+  HYBRID_WEIGHT_EXACT: 1.2,
+  HYBRID_WEIGHT_RECENCY: 0.3,
+
+  /** Minimum token length for the exact-match channel's per-token hits. */
+  HYBRID_EXACT_MIN_TOKEN_LENGTH: 4,
 
   /** Input token budget per consolidation batch. */
   BATCH_INPUT_TOKEN_BUDGET: 12_000,
@@ -730,6 +760,9 @@ export const WORKFLOW_MEMORY = {
 
   /** Maximum workflows returned per similarity query. */
   MAXIMUM_PER_QUERY: 3,
+
+  /** Semantic gate for workflow retrieval (bm25/exact hits bypass it). */
+  RELEVANCE_THRESHOLD: 0.4,
 
   /** Maximum characters of workflow text embedded for similarity search. */
   TEXT_MAXIMUM_CHARACTERS: 1500,

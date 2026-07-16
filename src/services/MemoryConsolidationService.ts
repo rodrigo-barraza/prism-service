@@ -5,7 +5,7 @@ import crypto from "crypto";
 import { getProvider } from "#src/providers/index";
 import type { ChatMessage } from "#src/types/provider";
 import type { MessagePayload } from "./conversation/types.ts";
-import MemoryService from "./MemoryService.ts";
+import MemoryService, { CURRENT_MEMORY_FILTER } from "./MemoryService.ts";
 import RequestLogger from "./RequestLogger.ts";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { MONGO_DB_NAME } from "#config";
@@ -41,6 +41,10 @@ import {
   recordHistory,
   canRunToday,
   getHistory,
+  getHistoryRun,
+  markRunRolledBack,
+  acquireConsolidationLock,
+  releaseConsolidationLock,
 } from "./memory/ConsolidationTracker.ts";
 import {
   partitionConversationalMemories,
@@ -77,6 +81,12 @@ function daysSince(isoDate: string) {
 /**
  * Apply consolidation actions. For conversational agent merges, memoryLookup
  * is used to preserve source attribution metadata on the merged document.
+ *
+ * NON-DESTRUCTIVE (Graphiti-style edge invalidation): merge and delete/
+ * invalidate soft-close the affected memories (validTo + supersededBy +
+ * closedReason) instead of hard-deleting, so a bad LLM decision is
+ * recoverable via rollbackRun(). closedIds/createdIds are returned for the
+ * history record that powers that rollback.
  */
 async function applyActions(
   actions: ConsolidationAction[],
@@ -86,7 +96,13 @@ async function applyActions(
   username: string,
   { traceId, endpoint, memoryLookup }: ApplyActionsOptions = {},
 ) {
-  const results = { merged: 0, deleted: 0, errors: 0 };
+  const results = {
+    merged: 0,
+    deleted: 0,
+    errors: 0,
+    closedIds: [] as string[],
+    createdIds: [] as string[],
+  };
   const isConversational = agentType === "conversational";
 
   for (const action of actions) {
@@ -136,12 +152,10 @@ async function applyActions(
           }
         }
 
-        // Delete source memories
-        for (const id of action.sourceIds) {
-          await MemoryService.remove(id);
-        }
-        // Store consolidated memory
-        await MemoryService.store({
+        // Store the consolidated memory FIRST (dedupe off — it is
+        // intentionally similar to its still-current sources), then
+        // soft-close each source pointing at it.
+        const merged = await MemoryService.store({
           agent,
           project,
           username: username || "system",
@@ -151,17 +165,36 @@ async function applyActions(
           conversationId: null,
           traceId: traceId || undefined,
           endpoint: endpoint || undefined,
+          dedupe: false,
           ...attributionMetadata,
         });
+        if (!merged) {
+          throw new Error("merge target store returned null");
+        }
+        results.createdIds.push(merged.id as string);
+        for (const id of action.sourceIds) {
+          const closed = await MemoryService.invalidate(id, {
+            supersededBy: merged.id as string,
+            reason: action.reason || "merged",
+          });
+          if (closed) results.closedIds.push(id);
+        }
         results.merged += action.sourceIds.length;
         logger.info(
           `[MemoryConsolidation] Merged ${action.sourceIds.length} → "${action.merged.title || action.merged.content?.substring(0, LOG_PREVIEW.SHORT)}" (${action.reason || ""})`,
         );
-      } else if (action.type === "delete" && action.id) {
-        await MemoryService.remove(action.id);
+      } else if (
+        (action.type === "delete" || action.type === "invalidate") &&
+        action.id
+      ) {
+        const closed = await MemoryService.invalidate(action.id, {
+          supersededBy: action.supersededById || null,
+          reason: action.reason || "invalidated",
+        });
+        if (closed) results.closedIds.push(action.id);
         results.deleted++;
         logger.info(
-          `[MemoryConsolidation] Deleted "${action.id}" (${action.reason || ""})`,
+          `[MemoryConsolidation] Invalidated "${action.id}" (${action.reason || ""})`,
         );
       }
     } catch (error: unknown) {
@@ -328,23 +361,22 @@ async function processBatch(
   return parsed.actions || [];
 }
 
-// ─── Public API ──────────────────────────────────────────────────────────────
-const MemoryConsolidationService = {
-  /**
-   * Run memory consolidation for a specific agent within a project.
-   * Processes memories in batches to avoid context window overflow.
-   */
-  async consolidate({
-    agent = AGENT_IDS.CODING,
-    project,
-    username,
-    trigger = "manual",
-    broadcast,
-    endpoint,
-    traceId,
-    agentConversationId,
-    guildId,
-  }: ConsolidateOptions) {
+// ─── Consolidation Run (lock-protected — see consolidate()) ─────────────────
+/**
+ * Run memory consolidation for a specific agent within a project.
+ * Processes memories in batches to avoid context window overflow.
+ */
+async function runConsolidation({
+  agent = AGENT_IDS.CODING,
+  project,
+  username,
+  trigger = "manual",
+  broadcast,
+  endpoint,
+  traceId,
+  agentConversationId,
+  guildId,
+}: ConsolidateOptions) {
     const startTime = performance.now();
     const agentId = agent || AGENT_IDS.CODING;
     const persona = AgentPersonaRegistry.get(agentId);
@@ -363,7 +395,11 @@ const MemoryConsolidationService = {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not available");
 
-    const query: Record<string, unknown> = { agent: agentId };
+    // Current rows only — soft-closed memories are history, not candidates
+    const query: Record<string, unknown> = {
+      agent: agentId,
+      ...CURRENT_MEMORY_FILTER,
+    };
     if (project) query.project = project;
     if (isConversational && guildId) query.guildId = guildId;
 
@@ -576,6 +612,34 @@ const MemoryConsolidationService = {
       };
     }
 
+    // Sanity cap — abort a runaway batch that would close most of the corpus
+    // (a hallucinated merge-everything response must not hide the store).
+    const affectedCount = allActions.reduce(
+      (sum, action) =>
+        sum + (action.type === "merge" ? action.sourceIds?.length || 0 : 1),
+      0,
+    );
+    const maximumAffected = Math.max(
+      5,
+      Math.ceil(
+        allMemories.length * MEMORY.CONSOLIDATION_MAX_AFFECTED_FRACTION,
+      ),
+    );
+    if (affectedCount > maximumAffected) {
+      logger.warn(
+        `[MemoryConsolidation] Sanity cap: LLM proposed closing ${affectedCount}/${allMemories.length} memories ` +
+          `(cap ${maximumAffected}) — aborting run without applying`,
+      );
+      await resetRunCount(project || guildId || "global");
+      return {
+        skipped: true,
+        reason: "sanity_cap_exceeded",
+        proposedActions: allActions.length,
+        affectedCount,
+        total: allMemories.length,
+      };
+    }
+
     // Apply all accumulated actions
     logger.info(
       `[MemoryConsolidation] Applying ${allActions.length} actions from ${batches.length} batch(es)`,
@@ -593,11 +657,11 @@ const MemoryConsolidationService = {
       },
     );
     await resetRunCount(project || guildId || "global");
-    const summary = `Merged ${results.merged}, deleted ${results.deleted} (${batches.length} batches)`;
+    const summary = `Merged ${results.merged}, invalidated ${results.deleted} (${batches.length} batches)`;
     const durationMilliseconds = Math.round(performance.now() - startTime);
     logger.info(`[MemoryConsolidation] Complete: ${summary} (${durationMilliseconds}ms)`);
 
-    // Record history for audit trail
+    // Record history for audit trail — closedIds/createdIds power rollbackRun
     await recordHistory(
       project || guildId || "global",
       trigger || "manual",
@@ -605,6 +669,7 @@ const MemoryConsolidationService = {
       allActions,
       summary,
       durationMilliseconds,
+      { closedIds: results.closedIds, createdIds: results.createdIds },
     );
     const consolidationResult = {
       ...results,
@@ -630,6 +695,62 @@ const MemoryConsolidationService = {
       }
     }
     return consolidationResult;
+}
+
+// ─── Public API ──────────────────────────────────────────────────────────────
+const MemoryConsolidationService = {
+  /**
+   * Lock-protected consolidation entry point. The threshold trigger
+   * (checkAndRun) and the 24h AutoDream sweep can race on the same scope —
+   * the advisory Mongo lock makes runs single-writer per scope, and the
+   * finally guarantees release on every exit path.
+   */
+  async consolidate(options: ConsolidateOptions) {
+    const lockScope = options.project || options.guildId || "global";
+    if (!(await acquireConsolidationLock(lockScope))) {
+      return {
+        skipped: true,
+        reason: "concurrent_run_in_progress",
+        total: 0,
+      };
+    }
+    try {
+      return await runConsolidation(options);
+    } finally {
+      await releaseConsolidationLock(lockScope);
+    }
+  },
+  /**
+   * Undo a consolidation run: reopen the memories it soft-closed and
+   * invalidate the merged documents it created. Possible because
+   * applyActions never hard-deletes.
+   */
+  async rollbackRun(runId: string) {
+    const run = await getHistoryRun(runId);
+    if (!run) return { rolledBack: false, reason: "run_not_found" };
+    if (run.rolledBackAt)
+      return { rolledBack: false, reason: "already_rolled_back" };
+
+    const closedIds = (run.closedIds as string[]) || [];
+    const createdIds = (run.createdIds as string[]) || [];
+    if (closedIds.length === 0 && createdIds.length === 0) {
+      return { rolledBack: false, reason: "run_predates_soft_close_history" };
+    }
+
+    let reopened = 0;
+    for (const id of closedIds) {
+      if (await MemoryService.reopen(id)) reopened++;
+    }
+    let closed = 0;
+    for (const id of createdIds) {
+      if (await MemoryService.invalidate(id, { reason: "rollback" })) closed++;
+    }
+    await markRunRolledBack(runId);
+    logger.info(
+      `[MemoryConsolidation] Rolled back run ${runId}: reopened ${reopened}/${closedIds.length}, ` +
+        `closed ${closed}/${createdIds.length} merged docs`,
+    );
+    return { rolledBack: true, reopened, closedMergedDocs: closed };
   },
   /**
    * Check if consolidation should run and trigger if needed.

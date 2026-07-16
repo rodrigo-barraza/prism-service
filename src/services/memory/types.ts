@@ -17,12 +17,20 @@ export interface MemoryDoc {
   [key: string]: unknown;
 }
 
-/** Consolidation action from the LLM */
+/**
+ * Consolidation action from the LLM.
+ *
+ * "invalidate" soft-closes a memory's valid-time window (bi-temporal model —
+ * nothing is hard-deleted). "delete" is the legacy alias and is applied with
+ * identical invalidate semantics.
+ */
 export interface ConsolidationAction {
-  type: "merge" | "delete";
+  type: "merge" | "delete" | "invalidate";
   sourceIds?: string[];
   merged?: { type: string; title?: string; content: string };
   id?: string;
+  /** For invalidate-on-contradiction: id of the memory that supersedes it. */
+  supersededById?: string;
   reason?: string;
 }
 
