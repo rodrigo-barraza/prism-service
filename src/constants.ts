@@ -924,9 +924,12 @@ export const TOOLS = {
   MAX_PREFLIGHT_TOOLS: 5,
 
   /**
-   * Soft cap on the persisted dynamic tool set. Pre-flight discovery skips
-   * when the conversation has already accumulated this many dynamic tools —
-   * the marginal match is unlikely to be worth further prompt growth.
+   * Soft cap on DISCOVERY GROWTH of the dynamic tool set — tools added
+   * beyond the seeded client/persona baseline (`dynamicSeedTools`).
+   * Pre-flight discovery skips once a conversation has accumulated this
+   * many discovered tools — the marginal match is unlikely to be worth
+   * further prompt growth. The baseline itself never counts (a >30-tool
+   * baseline must not disable preflight).
    */
   MAX_PREFLIGHT_DYNAMIC_TOOL_TOTAL: 30,
 
