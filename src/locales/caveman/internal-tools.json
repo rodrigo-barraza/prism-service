@@ -142,6 +142,30 @@
       "limit": "Max result. Default: 10."
     }
   },
+  "create_artifact": {
+    "description": "Make big standalone document (markdown or html). Saved to Artifacts gallery, shown in chat. For big keepable thing: report, guide, story, styled page. NOT for normal chat answer or small snippet. html must be self-contained (inline CSS/JS, no outside network) — runs in sandbox iframe. Returns artifactId for update_artifact later.",
+    "parameters": {
+      "title": "Short document title. e.g. 'Q3 Marketing Plan'.",
+      "kind": "'markdown' for prose/report (GFM, math, code). 'html' for styled/interactive page (self-contained, sandboxed).",
+      "content": "Whole document body."
+    }
+  },
+  "update_artifact": {
+    "description": "Replace document artifact content with new full version (old version kept). Give artifactId from create_artifact or list_artifacts, plus WHOLE new document — no diff, no fragment. Use when user want revise document made earlier. No make duplicate artifact for revision.",
+    "parameters": {
+      "artifactId": "Id of artifact to update.",
+      "content": "Whole replacement document body.",
+      "title": "New title, or skip to keep old."
+    }
+  },
+  "list_artifacts": {
+    "description": "List recent artifacts in project gallery — documents (markdown/html) and captured visual output (image, embed, video, audio). Use to find artifactId when user mean document from earlier chat.",
+    "parameters": {
+      "search": "Title filter, case no matter.",
+      "kind": "Filter by artifact kind.",
+      "limit": "Max results. Default: 20."
+    }
+  },
   "retrieve_offloaded_content": {
     "description": "Old tool result got stored away, not lost. Stub in chat shows offload_id. Give offload_id plus pattern (regex) or startLine/endLine or headLines. Grab small slice, no re-run tool.",
     "parameters": {

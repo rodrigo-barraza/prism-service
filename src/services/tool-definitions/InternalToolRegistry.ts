@@ -28,6 +28,7 @@ import conversationSearchTool from "./ConversationSearchTool.ts";
 import retrieveOffloadedContentTool from "./RetrieveOffloadedContentTool.ts";
 import compactContextTool from "./CompactContextTool.ts";
 import asyncTaskTools from "./AsyncTaskTools.ts";
+import artifactTools from "./ArtifactTools.ts";
 
 // ─── Parameter Types (aligned with tools-service) ──────────────
 
@@ -64,6 +65,7 @@ export interface InternalToolSchema {
 
 export interface InternalToolContext {
   agentConversationId?: string;
+  conversationId?: string | null;
   project?: string;
   username?: string;
   /** Persona id of the calling agent — used to scope tool discovery/activation to the persona's reachable universe. */
@@ -120,6 +122,7 @@ function initialize() {
     retrieveOffloadedContentTool,
     compactContextTool,
     asyncTaskTools,
+    artifactTools,
   ];
 
   for (const toolOrTools of toolModulesList) {

@@ -67,6 +67,7 @@ import MemoryService from "./services/MemoryService.ts";
 import adminRouter from "./routes/AdminRoutes.ts";
 import workflowsRouter from "./routes/WorkflowsRoutes.ts";
 import mediaRouter from "./routes/MediaRoutes.ts";
+import artifactsRouter from "./routes/ArtifactsRoutes.ts";
 import textRouter from "./routes/TextRoutes.ts";
 import lmStudioRouter from "./routes/LmStudioRoutes.ts";
 import ollamaRouter from "./routes/OllamaRoutes.ts";
@@ -193,6 +194,7 @@ app.use("/conversations", conversationsRouter);
 app.use("/memory", memoryRouter);
 app.use("/workflows", workflowsRouter);
 app.use("/media", mediaRouter);
+app.use("/artifacts", artifactsRouter);
 app.use("/text", textRouter);
 app.use("/lm-studio", lmStudioRouter);
 app.use("/ollama", ollamaRouter);
@@ -409,6 +411,20 @@ setupWebSocket(wss);
         {
           collection: COLLECTIONS.FAVORITES,
           keys: { project: 1, username: 1, createdAt: -1 },
+        },
+        // agent_artifacts — gallery listing + id lookup + url-dedup upsert
+        {
+          collection: COLLECTIONS.AGENT_ARTIFACTS,
+          keys: { id: 1 },
+          options: { unique: true },
+        },
+        {
+          collection: COLLECTIONS.AGENT_ARTIFACTS,
+          keys: { project: 1, createdAt: -1 },
+        },
+        {
+          collection: COLLECTIONS.AGENT_ARTIFACTS,
+          keys: { project: 1, url: 1 },
         },
         // benchmarks
         {

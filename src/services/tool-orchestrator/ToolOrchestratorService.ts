@@ -1619,6 +1619,22 @@ export default class ToolOrchestratorService {
       }
     }
 
+    // Register visual outputs (display{kind,url} media/embeds, generated
+    // images) in the artifacts gallery. Fire-and-forget — never blocks or
+    // fails the tool call.
+    if (name !== TOOL_NAMES.BROWSER_ACTION) {
+      const { default: ArtifactsService } = await import(
+        "#src/services/ArtifactsService"
+      );
+      ArtifactsService.captureToolResult(name, result, {
+        project: context.project,
+        username: context.username,
+        agent: context.agent,
+        conversationId: context.conversationId,
+        agentConversationId: context.agentConversationId,
+      });
+    }
+
     return result;
   }
 

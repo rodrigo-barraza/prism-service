@@ -27,6 +27,11 @@ export const INTERNAL_TOOL_EMOJIS: Record<string, string[]> = {
   retrieve_offloaded_content: ["📦", "🔎"],
   compact_context: ["🗜️", "🧠"],
 
+  // Artifacts
+  create_artifact: ["📄", "✨"],
+  update_artifact: ["📄", "✏️"],
+  list_artifacts: ["📄", "📋"],
+
   // MCP
   list_mcp_resources: ["🔌", "📋"],
   read_mcp_resource: ["🔌", "📄"],

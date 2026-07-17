@@ -61,6 +61,7 @@ export const COLLECTIONS = {
   SOMATIC_HISTORY: "somatic_history",
   WORKFLOW_MEMORIES: "workflow_memories",
   OFFLOADED_TOOL_RESULTS: "offloaded_tool_results",
+  AGENT_ARTIFACTS: "agent_artifacts",
 };
 
 /** Shared system-wide statuses for agents, tasks, and workflows. */
