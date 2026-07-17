@@ -36,6 +36,7 @@ export {
   PutCustomToolSchema,
   GetTextQuerySchema,
   GetMediaQuerySchema,
+  GetArtifactsQuerySchema,
   GetFavoritesQuerySchema,
   PostFavoritesBodySchema,
   DeleteFavoritesQuerySchema,

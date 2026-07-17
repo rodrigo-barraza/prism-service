@@ -206,6 +206,17 @@ export const GetMediaQuerySchema = z.object({
   to: z.string().optional(),
 });
 
+export const GetArtifactsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(500).default(60),
+  kind: z.enum(["markdown", "html", "image", "video", "audio", "embed"]).optional(),
+  source: z.enum(["document", "tool"]).optional(),
+  search: z.string().optional(),
+  conversationId: z.string().optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+});
+
 export const GetFavoritesQuerySchema = z.object({
   type: z.string().optional(),
 });

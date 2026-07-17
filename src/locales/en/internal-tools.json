@@ -142,6 +142,30 @@
       "limit": "Maximum number of results to return. Default: 10."
     }
   },
+  "create_artifact": {
+    "description": "Create a standalone document artifact (markdown or html) that is saved to the user's Artifacts gallery and rendered in the chat. Use this for substantial, self-contained deliverables the user will want to keep, reference, or iterate on — reports, guides, specs, stories, styled pages. Do NOT use it for ordinary conversational answers, short snippets, or explanations that belong in the chat itself. html artifacts must be self-contained (inline CSS/JS, no external network dependencies) — they render in a sandboxed iframe. Returns an artifactId; pass it to update_artifact to revise the document later.",
+    "parameters": {
+      "title": "Short human-readable document title, e.g. 'Q3 Marketing Plan'.",
+      "kind": "Document format: 'markdown' for prose/reports (GFM, math, code blocks supported), 'html' for styled or interactive pages (self-contained, sandboxed).",
+      "content": "The complete document body in the chosen format."
+    }
+  },
+  "update_artifact": {
+    "description": "Replace the content of an existing document artifact with a new complete version (the previous version is kept in history). Pass the artifactId returned by create_artifact or found via list_artifacts, plus the FULL revised document — not a diff or fragment. Use this when the user asks to revise, extend, or fix a document you created earlier; do not create a duplicate artifact for a revision.",
+    "parameters": {
+      "artifactId": "The id of the artifact to update.",
+      "content": "The complete replacement document body.",
+      "title": "Optional new title; omit to keep the current one."
+    }
+  },
+  "list_artifacts": {
+    "description": "List recent artifacts in this project's gallery — agent-authored documents (markdown/html) and captured visual outputs (images, embeds, video, audio). Use this to find an artifactId when the user refers to a document from an earlier conversation ('update that report from yesterday').",
+    "parameters": {
+      "search": "Optional case-insensitive title filter.",
+      "kind": "Optional filter by artifact kind.",
+      "limit": "Maximum results. Default: 20."
+    }
+  },
   "retrieve_offloaded_content": {
     "description": "Recover the verbatim content of an old tool result that was offloaded during context compaction. Offloaded results appear inline as '[Tool result offloaded — recoverable]' stubs with an offload_id. Pass that offload_id plus either a regex pattern (grep-style, with context lines), a startLine/endLine range, or headLines. Prefer a narrow slice over re-running the original tool.",
     "parameters": {
