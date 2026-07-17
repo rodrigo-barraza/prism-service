@@ -7,7 +7,12 @@ import {
   isScopedPersona,
 } from "#src/services/ToolDiscoveryScope";
 import logger from "#src/utils/logger";
-import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import {
+  getErrorMessage,
+  resolveToolDisplaySummary,
+  humanizeToolName,
+  type ToolDisplayMetadata,
+} from "@rodrigo-barraza/utilities-library";
 import { ORCHESTRATOR_ONLY_TOOLS } from "#src/services/OrchestratorPrompt";
 import { createAbortController } from "#src/utils/AbortController";
 import {
@@ -1263,6 +1268,39 @@ export default class ToolOrchestratorService {
       return emojiValue[0];
     }
     return emojiValue;
+  }
+
+  /**
+   * Human-readable label for a tool call, argument-aware when the tool's
+   * display metadata names a subject param — "Searching Spotify for
+   * \"phonk\"" instead of `search_spotify`. Falls back to the bare verb
+   * (trailing preposition trimmed) before args stream in, then to a
+   * humanized tool name for tools without display metadata. Stamped on
+   * tool_execution SSE frames so consumers (lupos-bot presence, admin
+   * live view) never have to render raw snake_case names.
+   */
+  static getToolLabel(
+    toolName: string,
+    args: Record<string, unknown> | undefined,
+    isActive: boolean,
+  ): string {
+    const display =
+      (toolMap.get(toolName)?.display as ToolDisplayMetadata | undefined) ??
+      InternalToolRegistry.getDisplay(toolName);
+    const summary = resolveToolDisplaySummary(toolName, args || {}, {
+      isActive,
+      display,
+    });
+    if (summary?.verb) {
+      return summary.subject
+        ? `${summary.verb} ${summary.subject}`
+        : summary.verb;
+    }
+    if (display) {
+      const verb = isActive ? display.activeVerb : display.completedVerb;
+      return verb.replace(/\s+(for|to|from|in|of|with|on|about)$/i, "");
+    }
+    return humanizeToolName(toolName);
   }
 
   static getToolFields(toolName: string) {
