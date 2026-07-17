@@ -1353,6 +1353,98 @@ export default class ToolOrchestratorService {
     return initialized;
   }
 
+  /**
+   * Image-consuming tools → the argument naming their image source.
+   * Names not yet in the shared taxonomy are literals until the next
+   * utilities-library taxonomy bump.
+   */
+  static IMAGE_INPUT_TOOL_ARGS: Record<string, string> = {
+    [TOOL_NAMES.CONVERT_IMAGE_TO_ASCII]: "input",
+    [TOOL_NAMES.MANIPULATE_IMAGE]: "input",
+    scan_barcode: "input",
+    read_image_text: "input",
+    detect_objects: "image",
+    remove_background: "image",
+  };
+
+  /**
+   * Resolve the image-source argument of image-consuming tools from
+   * conversation context. Clients attach images to messages as pixels
+   * (`messages[].images`), so the model can SEE an image while having no
+   * URL/handle in text to pass as a tool argument. The tool docs allow the
+   * model to pass the sentinel "attached" (or omit the arg) and the
+   * harness substitutes the most recent attached image here. A model-typed
+   * base64 data URI is also replaced — models cannot reproduce base64
+   * faithfully. Anything else the model passes (http URL, imageId from a
+   * previous call, workspace path) is respected so chained edit pipelines
+   * keep working.
+   */
+  static resolveImageInputArg(
+    name: string,
+    args: Record<string, unknown>,
+    messages?: Array<{ role: string; images?: string[] }>,
+  ): Record<string, unknown> {
+    const imageArgName = ToolOrchestratorService.IMAGE_INPUT_TOOL_ARGS[name];
+    if (!imageArgName || !messages) return args;
+
+    const currentValue = args[imageArgName];
+    const needsResolution =
+      currentValue == null ||
+      (typeof currentValue === "string" &&
+        (currentValue.trim() === "" ||
+          currentValue.trim().toLowerCase() === "attached" ||
+          currentValue.startsWith("data:")));
+    if (!needsResolution) return args;
+
+    const conversationImage =
+      ToolOrchestratorService.findLastUserImage(messages);
+    if (conversationImage) {
+      logger.info(
+        `[ToolOrchestrator] ${name}: resolving '${imageArgName}' from conversation context (${conversationImage.startsWith("data:") ? `${(conversationImage.length / 1024).toFixed(0)} KB base64` : conversationImage.substring(0, 80)})`,
+      );
+      return { ...args, [imageArgName]: conversationImage };
+    }
+    if (typeof currentValue === "string" && currentValue.startsWith("data:")) {
+      // No conversation image to substitute — let the model-typed data URI
+      // through as a last resort rather than dropping the call.
+      logger.warn(
+        `[ToolOrchestrator] ${name}: no conversation image found; passing model-provided data URI through unchanged`,
+      );
+      return args;
+    }
+    logger.warn(
+      `[ToolOrchestrator] ${name}: '${imageArgName}' unresolved (value=${JSON.stringify(currentValue)}) and no image found on any user message`,
+    );
+    return args;
+  }
+
+  /**
+   * Most recent usable image attached to a user message (http URL or data
+   * URI), scanning backwards. Used to resolve image-source tool arguments
+   * the model cannot supply itself — it sees attached images as pixels but
+   * has no text handle for them.
+   */
+  static findLastUserImage(
+    messages: Array<{ role: string; images?: string[] }>,
+  ): string | null {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const message = messages[i];
+      if (
+        message.role === "user" &&
+        Array.isArray(message.images) &&
+        message.images.length > 0
+      ) {
+        const firstImage = message.images.find(
+          (image) =>
+            typeof image === "string" &&
+            (image.startsWith("http") || image.startsWith("data:")),
+        );
+        return firstImage || null;
+      }
+    }
+    return null;
+  }
+
   static async executeTool(
     name: string,
     args: Record<string, unknown> = {},
@@ -1448,37 +1540,13 @@ export default class ToolOrchestratorService {
       }
     }
 
-    // Inject the actual image from conversation context into image-consuming tools.
-    // Models cannot reliably reproduce base64 data in tool arguments — they truncate it,
-    // producing corrupt image buffers. Extract the real image from the last user message
-    // and set it as the `input` arg so the tools-service receives valid data.
-    const IMAGE_INPUT_TOOLS: string[] = [
-      TOOL_NAMES.CONVERT_IMAGE_TO_ASCII,
-      TOOL_NAMES.MANIPULATE_IMAGE,
-    ];
-    if (IMAGE_INPUT_TOOLS.includes(name) && context.messages) {
-      for (let i = context.messages.length - 1; i >= 0; i--) {
-        const message = context.messages[i];
-        if (
-          message.role === "user" &&
-          message.images &&
-          Array.isArray(message.images) &&
-          message.images.length > 0
-        ) {
-          const firstImage = message.images[0];
-          if (
-            typeof firstImage === "string" &&
-            (firstImage.startsWith("http") || firstImage.startsWith("data:"))
-          ) {
-            logger.info(
-              `[ToolOrchestrator] ${name}: injecting conversation image as 'input' (${firstImage.startsWith("data:") ? `${(firstImage.length / 1024).toFixed(0)} KB base64` : firstImage.substring(0, 80)})`,
-            );
-            args = { ...args, input: firstImage };
-          }
-          break;
-        }
-      }
-    }
+    // Resolve the image-source argument of image-consuming tools from
+    // conversation context (see resolveImageInputArg).
+    args = ToolOrchestratorService.resolveImageInputArg(
+      name,
+      args,
+      context.messages,
+    );
 
     // Inject the user's attached image as a texture URL or default image URL.
     // Models cannot reproduce base64 data in tool arguments — they see the image in
