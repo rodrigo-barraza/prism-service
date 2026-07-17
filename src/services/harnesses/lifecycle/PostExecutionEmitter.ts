@@ -205,6 +205,11 @@ export async function processToolResultMedia(
         durationMs: toolResult?.durationMilliseconds,
       },
       toolEmoji: ToolOrchestratorService.getToolEmoji(toolCall.name),
+      toolLabel: ToolOrchestratorService.getToolLabel(
+        toolCall.name,
+        toolCall.args || {},
+        false,
+      ),
       status: hasError ? "error" : "done",
     });
 
