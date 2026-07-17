@@ -239,4 +239,8 @@ export default class InternalToolRegistry {
   static getNames() {
     return new Set(registry.keys());
   }
+
+  static getDisplay(name: string): ToolDisplayMetadata | undefined {
+    return registry.get(name)?.display;
+  }
 }
