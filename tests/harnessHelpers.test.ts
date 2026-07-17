@@ -34,6 +34,7 @@ vi.mock('#src/services/ToolOrchestratorService', () => ({
     getToolSchemas: vi.fn().mockReturnValue([]),
     getMCPToolSchemas: vi.fn().mockReturnValue([]),
     getToolEmoji: vi.fn().mockReturnValue(null),
+    getToolLabel: vi.fn().mockReturnValue("Using Tool"),
     getClientToolSchemas: vi.fn().mockReturnValue([]),
   },
 }));

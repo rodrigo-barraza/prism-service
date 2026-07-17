@@ -33,6 +33,7 @@ vi.mock("#src/services/ToolOrchestratorService", () => ({
     executeTool: vi.fn().mockResolvedValue({ success: true, result: "mocked" }),
     isStreamable: vi.fn().mockReturnValue(false),
     getToolEmoji: vi.fn().mockReturnValue(null),
+    getToolLabel: vi.fn().mockReturnValue("Using Tool"),
   },
 }));
 

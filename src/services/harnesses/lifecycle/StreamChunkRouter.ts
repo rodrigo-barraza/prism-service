@@ -180,6 +180,11 @@ export function routeStreamChunk(
         args: {},
         id: streamChunk.id || "",
       },
+      toolLabel: ToolOrchestratorService.getToolLabel(
+        streamChunk.name || "",
+        {},
+        true,
+      ),
       status: "streaming",
       timestamp: Date.now(),
     });
@@ -331,6 +336,11 @@ export function routeStreamChunk(
         id: standardToolCallId,
       },
       toolEmoji: ToolOrchestratorService.getToolEmoji(toolName),
+      toolLabel: ToolOrchestratorService.getToolLabel(
+        toolName,
+        streamChunk.args || {},
+        true,
+      ),
       status: "calling",
       timestamp: Date.now(),
     });

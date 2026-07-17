@@ -39,6 +39,7 @@ vi.mock("#src/services/ToolOrchestratorService", () => ({
     executeTool: vi.fn(),
     isStreamable: vi.fn().mockReturnValue(false),
     getToolEmoji: vi.fn().mockReturnValue(null),
+    getToolLabel: vi.fn().mockReturnValue("Using Tool"),
     getWorkspaceRoot: vi.fn().mockReturnValue(process.cwd()),
     getClientToolSchemas: vi.fn().mockReturnValue([]),
   },
