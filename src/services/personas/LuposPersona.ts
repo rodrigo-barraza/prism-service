@@ -200,6 +200,11 @@ const LUPOS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
       PromptLocaleService.get(locale, "personas.lupos.toolPolicyVideo"),
     requires: [TOOL_NAMES.TRIM_VIDEO],
   },
+  {
+    content: (locale) =>
+      PromptLocaleService.get(locale, "personas.lupos.toolPolicyMusic"),
+    requires: [TOOL_NAMES.SEARCH_SPOTIFY],
+  },
 ];
 
 // Lupos lives on Discord, so his tool surface is bounded by what lupos-bot
@@ -239,7 +244,10 @@ const LUPOS_AVAILABLE_TOOLS = [
 // Embed-only visuals inside granted domains — invisible on Discord, so
 // blocked to keep Lupos from "showing" things nobody can see. execute_shell
 // is blocked as a plain no-need (he already has python/js sandboxes).
+// control_spotify drives Rodrigo's personal playback via his OAuth grant —
+// not something arbitrary Discord users should reach through Lupos.
 const LUPOS_DISCORD_INCOMPATIBLE_TOOLS = [
+  TOOL_NAMES.CONTROL_SPOTIFY,
   TOOL_NAMES.CREATE_VECTOR_ANIMATION,
   TOOL_NAMES.CONVERT_IMAGE_TO_ASCII,
   TOOL_NAMES.DRAW_TURTLE_GRAPHICS,
