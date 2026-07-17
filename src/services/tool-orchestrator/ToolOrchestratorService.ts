@@ -964,6 +964,17 @@ function getOrchestratorToolSchemas(
   ];
 }
 
+/** Conversation-message media fields the input resolver can draw from. */
+type MediaMessageField = "images" | "audio" | "video";
+
+/** Minimal message shape for media-input resolution. */
+interface MediaMessage {
+  role: string;
+  images?: string[];
+  audio?: string[];
+  video?: string[];
+}
+
 export default class ToolOrchestratorService {
   /**
    * Ensure tool schemas are loaded from tools-api.
@@ -1354,40 +1365,49 @@ export default class ToolOrchestratorService {
   }
 
   /**
-   * Image-consuming tools → the argument naming their image source.
+   * Media-consuming tools → the argument naming their media source and
+   * which conversation message fields can satisfy it, in priority order.
+   * trim_video also falls back to `images` because Discord clients attach
+   * videos through `images[]` (providers handle video natively there).
    * Names not yet in the shared taxonomy are literals until the next
    * utilities-library taxonomy bump.
    */
-  static IMAGE_INPUT_TOOL_ARGS: Record<string, string> = {
-    [TOOL_NAMES.CONVERT_IMAGE_TO_ASCII]: "input",
-    [TOOL_NAMES.MANIPULATE_IMAGE]: "input",
-    scan_barcode: "input",
-    read_image_text: "input",
-    detect_objects: "image",
-    remove_background: "image",
+  static MEDIA_INPUT_TOOL_ARGS: Record<
+    string,
+    { arg: string; fields: MediaMessageField[] }
+  > = {
+    [TOOL_NAMES.CONVERT_IMAGE_TO_ASCII]: { arg: "input", fields: ["images"] },
+    [TOOL_NAMES.MANIPULATE_IMAGE]: { arg: "input", fields: ["images"] },
+    scan_barcode: { arg: "input", fields: ["images"] },
+    read_image_text: { arg: "input", fields: ["images"] },
+    detect_objects: { arg: "image", fields: ["images"] },
+    remove_background: { arg: "image", fields: ["images"] },
+    remix_audio: { arg: "input", fields: ["audio"] },
+    transcribe_audio: { arg: "audioUrl", fields: ["audio"] },
+    [TOOL_NAMES.TRIM_VIDEO]: { arg: "url", fields: ["video", "images"] },
   };
 
   /**
-   * Resolve the image-source argument of image-consuming tools from
-   * conversation context. Clients attach images to messages as pixels
-   * (`messages[].images`), so the model can SEE an image while having no
-   * URL/handle in text to pass as a tool argument. The tool docs allow the
-   * model to pass the sentinel "attached" (or omit the arg) and the
-   * harness substitutes the most recent attached image here. A model-typed
-   * base64 data URI is also replaced — models cannot reproduce base64
-   * faithfully. Anything else the model passes (http URL, imageId from a
-   * previous call, workspace path) is respected so chained edit pipelines
-   * keep working.
+   * Resolve the media-source argument of media-consuming tools from
+   * conversation context. Clients attach media to messages as raw content
+   * (`messages[].images` / `audio` / `video`), so the model can perceive an
+   * attachment while having no URL/handle in text to pass as a tool
+   * argument. The tool docs allow the model to pass the sentinel
+   * "attached" (or omit the arg) and the harness substitutes the most
+   * recent attached media here. A model-typed base64 data URI is also
+   * replaced — models cannot reproduce base64 faithfully. Anything else
+   * the model passes (http URL, imageId from a previous call, workspace
+   * path) is respected so chained edit pipelines keep working.
    */
-  static resolveImageInputArg(
+  static resolveMediaInputArg(
     name: string,
     args: Record<string, unknown>,
-    messages?: Array<{ role: string; images?: string[] }>,
+    messages?: MediaMessage[],
   ): Record<string, unknown> {
-    const imageArgName = ToolOrchestratorService.IMAGE_INPUT_TOOL_ARGS[name];
-    if (!imageArgName || !messages) return args;
+    const mapping = ToolOrchestratorService.MEDIA_INPUT_TOOL_ARGS[name];
+    if (!mapping || !messages) return args;
 
-    const currentValue = args[imageArgName];
+    const currentValue = args[mapping.arg];
     const needsResolution =
       currentValue == null ||
       (typeof currentValue === "string" &&
@@ -1396,50 +1416,58 @@ export default class ToolOrchestratorService {
           currentValue.startsWith("data:")));
     if (!needsResolution) return args;
 
-    const conversationImage =
-      ToolOrchestratorService.findLastUserImage(messages);
-    if (conversationImage) {
+    const conversationMedia = ToolOrchestratorService.findLastUserMedia(
+      messages,
+      mapping.fields,
+    );
+    if (conversationMedia) {
       logger.info(
-        `[ToolOrchestrator] ${name}: resolving '${imageArgName}' from conversation context (${conversationImage.startsWith("data:") ? `${(conversationImage.length / 1024).toFixed(0)} KB base64` : conversationImage.substring(0, 80)})`,
+        `[ToolOrchestrator] ${name}: resolving '${mapping.arg}' from conversation context (${conversationMedia.startsWith("data:") ? `${(conversationMedia.length / 1024).toFixed(0)} KB base64` : conversationMedia.substring(0, 80)})`,
       );
-      return { ...args, [imageArgName]: conversationImage };
+      return { ...args, [mapping.arg]: conversationMedia };
     }
     if (typeof currentValue === "string" && currentValue.startsWith("data:")) {
-      // No conversation image to substitute — let the model-typed data URI
+      // No conversation media to substitute — let the model-typed data URI
       // through as a last resort rather than dropping the call.
       logger.warn(
-        `[ToolOrchestrator] ${name}: no conversation image found; passing model-provided data URI through unchanged`,
+        `[ToolOrchestrator] ${name}: no conversation media found; passing model-provided data URI through unchanged`,
       );
       return args;
     }
     logger.warn(
-      `[ToolOrchestrator] ${name}: '${imageArgName}' unresolved (value=${JSON.stringify(currentValue)}) and no image found on any user message`,
+      `[ToolOrchestrator] ${name}: '${mapping.arg}' unresolved (value=${JSON.stringify(currentValue)}) and no ${mapping.fields.join("/")} found on any user message`,
     );
     return args;
   }
 
   /**
-   * Most recent usable image attached to a user message (http URL or data
-   * URI), scanning backwards. Used to resolve image-source tool arguments
-   * the model cannot supply itself — it sees attached images as pixels but
-   * has no text handle for them.
+   * Most recent usable media entry (http URL or data URI) attached to a
+   * user message, scanning messages backwards and the given fields in
+   * priority order within each message. Used to resolve media-source tool
+   * arguments the model cannot supply itself — it perceives attachments
+   * as raw content but has no text handle for them.
    */
-  static findLastUserImage(
-    messages: Array<{ role: string; images?: string[] }>,
+  static findLastUserMedia(
+    messages: MediaMessage[],
+    fields: MediaMessageField[],
   ): string | null {
     for (let i = messages.length - 1; i >= 0; i--) {
       const message = messages[i];
-      if (
-        message.role === "user" &&
-        Array.isArray(message.images) &&
-        message.images.length > 0
-      ) {
-        const firstImage = message.images.find(
-          (image) =>
-            typeof image === "string" &&
-            (image.startsWith("http") || image.startsWith("data:")),
+      if (message.role !== "user") continue;
+      for (const field of fields) {
+        const entries = message[field];
+        if (!Array.isArray(entries) || entries.length === 0) continue;
+        const firstUsable = entries.find(
+          (entry) =>
+            typeof entry === "string" &&
+            (entry.startsWith("http") || entry.startsWith("data:")),
         );
-        return firstImage || null;
+        if (firstUsable) return firstUsable;
+      }
+      // Stop at the most recent user message carrying any of the fields —
+      // older messages are stale context, same rule as before.
+      if (fields.some((field) => (message[field]?.length ?? 0) > 0)) {
+        return null;
       }
     }
     return null;
@@ -1540,9 +1568,9 @@ export default class ToolOrchestratorService {
       }
     }
 
-    // Resolve the image-source argument of image-consuming tools from
-    // conversation context (see resolveImageInputArg).
-    args = ToolOrchestratorService.resolveImageInputArg(
+    // Resolve the media-source argument of media-consuming tools from
+    // conversation context (see resolveMediaInputArg).
+    args = ToolOrchestratorService.resolveMediaInputArg(
       name,
       args,
       context.messages,
