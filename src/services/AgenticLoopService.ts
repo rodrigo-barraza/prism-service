@@ -73,14 +73,27 @@ export default class AgenticLoopService {
 
     // If dynamicEnabledTools is not in ToolContext, populate it with the resolved tools
     const toolContextStore = ToolContext.getStore(resolvedAgentConversationId);
+    const baselineNames =
+      resolvedTools.resolvedEnabledTools ||
+      resolvedTools.finalTools.map((tool) => tool.name);
     if (!toolContextStore.has("dynamicEnabledTools")) {
-      const initialNames =
-        resolvedTools.resolvedEnabledTools ||
-        resolvedTools.finalTools.map((tool) => tool.name);
       ToolContext.set(
         resolvedAgentConversationId,
         "dynamicEnabledTools",
-        initialNames,
+        baselineNames,
+      );
+    }
+    // Record the seeded baseline once, so discovery caps count only the tools
+    // discovery ADDED, not the baseline itself (a >30-tool client baseline
+    // used to trip MAX_PREFLIGHT_DYNAMIC_TOOL_TOTAL and permanently disable
+    // preflight). Pre-existing conversations get today's resolved set as a
+    // stand-in seed — over-counting the seed only errs toward keeping
+    // preflight alive.
+    if (!toolContextStore.has("dynamicSeedTools")) {
+      ToolContext.set(
+        resolvedAgentConversationId,
+        "dynamicSeedTools",
+        baselineNames,
       );
     }
 

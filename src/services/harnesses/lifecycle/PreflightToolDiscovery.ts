@@ -18,7 +18,10 @@ import { TOOLS } from "#src/constants";
 import ToolContext from "#src/services/ToolContext";
 import SettingsService from "#src/services/SettingsService";
 import ToolOrchestratorService from "#src/services/tool-orchestrator/ToolOrchestratorService";
-import { getCurrentDynamicTools } from "#src/services/tool-definitions/utils/DynamicToolHelpers";
+import {
+  getCurrentDynamicTools,
+  getDynamicSeedTools,
+} from "#src/services/tool-definitions/utils/DynamicToolHelpers";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import type { AgenticContext, ConversationMessage } from "../types.ts";
 
@@ -97,8 +100,16 @@ export async function runPreflightToolDiscovery({
     if (!query) return none;
 
     const currentDynamicTools = getCurrentDynamicTools(agentConversationId);
-    if (currentDynamicTools.length >= TOOLS.MAX_PREFLIGHT_DYNAMIC_TOOL_TOTAL) {
-      return none; // dynamic set already large — marginal matches not worth prompt growth
+    // Cap DISCOVERY GROWTH, not total set size: dynamicEnabledTools is seeded
+    // with the full client/persona baseline (often >30 tools), so counting it
+    // raw would permanently gate preflight off for exactly the conversations
+    // that need it.
+    const seedTools = new Set(getDynamicSeedTools(agentConversationId));
+    const discoveredCount = currentDynamicTools.filter(
+      (name) => !seedTools.has(name),
+    ).length;
+    if (discoveredCount >= TOOLS.MAX_PREFLIGHT_DYNAMIC_TOOL_TOTAL) {
+      return none; // discovery already grew the set a lot — marginal matches not worth further prompt growth
     }
 
     // ── Search (bounded — must never delay time-to-first-token) ──

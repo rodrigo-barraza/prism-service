@@ -193,7 +193,7 @@ describe("runPreflightToolDiscovery", () => {
     expect(mockSearchToolsWithMCP).not.toHaveBeenCalled();
   });
 
-  it("skips when the dynamic tool set is already at the soft cap", async () => {
+  it("skips when discovery growth is already at the soft cap", async () => {
     toolContextData.set(
       "dynamicEnabledTools",
       Array.from(
@@ -201,6 +201,41 @@ describe("runPreflightToolDiscovery", () => {
         (_, index) => `tool_${index}`,
       ),
     );
+    const result = await runPreflightToolDiscovery({
+      context: makeContext(),
+      resolvedTools: makeResolvedTools(),
+    });
+    expect(result.enabledTools).toEqual([]);
+    expect(mockSearchToolsWithMCP).not.toHaveBeenCalled();
+  });
+
+  it("runs when the set is large but it is all seeded baseline (cap counts growth, not baseline)", async () => {
+    // Regression: a >cap client baseline used to trip the gate and disable
+    // preflight for the whole conversation, forcing a mid-run
+    // discover_and_enable_tools call that invalidates provider prompt caches.
+    const baseline = Array.from(
+      { length: TOOLS.MAX_PREFLIGHT_DYNAMIC_TOOL_TOTAL + 24 },
+      (_, index) => `baseline_tool_${index}`,
+    );
+    toolContextData.set("dynamicEnabledTools", baseline);
+    toolContextData.set("dynamicSeedTools", baseline);
+    mockSearchToolsWithMCP.mockResolvedValue(searchResultOf("create_3d_voxel"));
+    const result = await runPreflightToolDiscovery({
+      context: makeContext(),
+      resolvedTools: makeResolvedTools(baseline.slice(0, 2)),
+    });
+    expect(result.enabledTools).toEqual(["create_3d_voxel"]);
+    expect(mockSearchToolsWithMCP).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips when growth beyond the seed reaches the cap even with a large seed", async () => {
+    const seed = Array.from({ length: 40 }, (_, index) => `seed_${index}`);
+    const discovered = Array.from(
+      { length: TOOLS.MAX_PREFLIGHT_DYNAMIC_TOOL_TOTAL },
+      (_, index) => `discovered_${index}`,
+    );
+    toolContextData.set("dynamicEnabledTools", [...seed, ...discovered]);
+    toolContextData.set("dynamicSeedTools", seed);
     const result = await runPreflightToolDiscovery({
       context: makeContext(),
       resolvedTools: makeResolvedTools(),
