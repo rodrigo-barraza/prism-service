@@ -381,12 +381,6 @@ setupWebSocket(wss);
           collection: COLLECTIONS.AGENT_CONVERSATIONS,
           keys: { taskId: 1, updatedAt: -1 },
         },
-        // workflows — used by conversationIds lookup
-        {
-          collection: COLLECTIONS.WORKFLOWS,
-          keys: { id: 1 },
-          options: { unique: true },
-        },
         // workflows — reverse lookup: which workflow contains a conversation
         // (multikey; used by ConversationsRoutes and admin request/content joins)
         { collection: COLLECTIONS.WORKFLOWS, keys: { conversationIds: 1 } },
