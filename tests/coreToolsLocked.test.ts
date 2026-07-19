@@ -43,7 +43,7 @@ describe("GET /config/agents — coreToolsLocked field", () => {
     }
   });
 
-  it("returns an empty enabledByDefaultToolNames for LUPOS — core tools only, the rest available but not enabled", async () => {
+  it("returns only react_to_discord_message in enabledByDefaultToolNames for LUPOS — the rest available but not enabled", async () => {
     const response = await authenticatedGet("/config/agents").expect(200);
     const agents = response.body as AgentConfigResponse[];
 
@@ -51,9 +51,13 @@ describe("GET /config/agents — coreToolsLocked field", () => {
     expect(lupos).toBeDefined();
     expect(lupos!.enabledByDefaultToolNames).toBeDefined();
     expect(lupos!.enabledByDefaultToolNames).not.toContain("*");
-    // Lupos starts with ONLY the always-on core tools; his availableTools
-    // are reachable via innate discovery, not enabled by default.
-    expect(lupos!.enabledByDefaultToolNames).toEqual([]);
+    // Lupos starts lean: always-on core tools plus react_to_discord_message
+    // (which replaced lupos-bot's unconditional per-reply emoji reaction, so
+    // it can't depend on mid-conversation discovery). Everything else in his
+    // availableTools is reachable via innate discovery, not enabled by default.
+    expect(lupos!.enabledByDefaultToolNames).toEqual([
+      "react_to_discord_message",
+    ]);
   });
 });
 
