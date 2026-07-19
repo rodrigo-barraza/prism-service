@@ -8,6 +8,7 @@ import {
   withIdleTimeout,
   parseContextOverflowError,
 } from "#src/utils/ProviderStreamResilience";
+import { getDocumentContextText } from "#src/utils/documentContext";
 import { roundMilliseconds } from "@rodrigo-barraza/utilities-library";
 import RepetitionDetector from "#src/services/RepetitionDetector";
 import {
@@ -535,6 +536,20 @@ export default class BaseAgenticHarness {
       ) {
         totalTokens +=
           ((message as ChatMessage).images as unknown[]).length * UNITS.MILLISECONDS_PER_SECOND;
+      }
+      // Document attachments inline their primed text (or a pointer) at the
+      // provider layer — invisible in message.content, so count it here.
+      // Verified failure without this: a 30KB inlined JSON left the clamp
+      // estimating 34 message tokens while the provider saw ~10K.
+      const documents = (message as ChatMessage).documents;
+      if (Array.isArray(documents)) {
+        for (const documentReference of documents) {
+          if (typeof documentReference === "string") {
+            totalTokens += estimateTokens(
+              getDocumentContextText(documentReference),
+            );
+          }
+        }
       }
     }
     return totalTokens;
