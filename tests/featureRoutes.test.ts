@@ -162,6 +162,7 @@ describe('Feature Routes Integration Tests', () => {
           status: 200,
           statusText: 'OK',
           json: async () => ({ files: [] }),
+          text: async () => JSON.stringify({ files: [] }),
         } as any;
       }
       if (urlString.includes('/agents/download/agent') || urlString.includes('/agents/download/tray-app')) {
@@ -197,12 +198,16 @@ describe('Feature Routes Integration Tests', () => {
           json: async () => ({
             workspaceRoots: ['/home/rodrigo/development']
           }),
+          text: async () => JSON.stringify({
+            workspaceRoots: ['/home/rodrigo/development']
+          }),
         } as any;
       }
       return {
         ok: true,
         status: 200,
         json: async () => ({}),
+        text: async () => JSON.stringify({}),
       } as any;
     });
 
