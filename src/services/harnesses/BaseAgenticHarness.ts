@@ -6,6 +6,7 @@ import {
 import {
   streamWithRetries,
   withIdleTimeout,
+  parseContextOverflowError,
 } from "#src/utils/ProviderStreamResilience";
 import { roundMilliseconds } from "@rodrigo-barraza/utilities-library";
 import RepetitionDetector from "#src/services/RepetitionDetector";
@@ -27,6 +28,8 @@ import {
 import {
   DEFAULT_MAX_INPUT_TOKENS,
   DEFAULT_MAX_OUTPUT_TOKENS,
+  MINIMUM_CLAMPED_OUTPUT_TOKENS,
+  OUTPUT_TOKEN_CLAMP_FIXED_HEADROOM_TOKENS,
 } from "#src/constants/TokenBudgetDefaults";
 import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
 import ConversationStatusRegistry from "#src/services/ConversationStatusRegistry";
@@ -775,6 +778,45 @@ export default class BaseAgenticHarness {
             providerOptions,
           );
 
+    // Context-overflow recovery: the pre-flight clamp works from a chars/4
+    // heuristic that dense content (JSON, hex, code) can undershoot far
+    // beyond any fixed margin, and vLLM's rejection only reports a LOWER
+    // BOUND on the real prompt size (window - max_tokens + 1). So on an
+    // overflow rejection, shrink maxTokens — halving guarantees geometric
+    // convergence even when the reported numbers understate the overshoot —
+    // and retry. The factory below re-reads providerOptions on every call,
+    // so the mutation reaches the next attempt.
+    const recoverFromContextOverflow = (error: unknown): boolean => {
+      const overflow = parseContextOverflowError(error);
+      if (!overflow) return false;
+      const currentMaxTokens = providerOptions.maxTokens;
+      if (
+        typeof currentMaxTokens !== "number" ||
+        currentMaxTokens <= MINIMUM_CLAMPED_OUTPUT_TOKENS
+      ) {
+        return false;
+      }
+      const halvedMaxTokens = Math.floor(currentMaxTokens / 2);
+      const boundFromReport =
+        overflow.inputTokens !== null
+          ? overflow.contextWindow -
+            overflow.inputTokens -
+            OUTPUT_TOKEN_CLAMP_FIXED_HEADROOM_TOKENS
+          : Number.POSITIVE_INFINITY;
+      const reducedMaxTokens = Math.max(
+        Math.min(halvedMaxTokens, boundFromReport),
+        MINIMUM_CLAMPED_OUTPUT_TOKENS,
+      );
+      if (reducedMaxTokens >= currentMaxTokens) return false;
+      logger.warn(
+        `[ContextOverflowRecovery] ${this.context.providerName} rejected the request ` +
+          `(window=${overflow.contextWindow}, reported input≥${overflow.inputTokens ?? "?"}). ` +
+          `Retrying with maxTokens ${currentMaxTokens} → ${reducedMaxTokens}.`,
+      );
+      providerOptions.maxTokens = reducedMaxTokens;
+      return true;
+    };
+
     // Create the first stream eagerly (preserves call-time semantics for
     // providers that validate/dispatch on invocation); retries create fresh
     // streams via the factory.
@@ -791,6 +833,7 @@ export default class BaseAgenticHarness {
       {
         signal,
         label: this.context.providerName,
+        tryRecoverFromError: recoverFromContextOverflow,
       },
     );
   }

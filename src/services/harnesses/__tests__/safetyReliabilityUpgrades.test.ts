@@ -21,6 +21,7 @@ import {
   callWithRetries,
   withIdleTimeout,
   isTransientProviderError,
+  parseContextOverflowError,
 } from "#src/utils/ProviderStreamResilience";
 import { ProviderError } from "#src/utils/errors";
 import { SharedCostBudget } from "#src/services/harnesses/lifecycle/CostBudgetEnforcer";
@@ -326,6 +327,110 @@ describe("C4/C5 — streamWithRetries zero-yield invariant", () => {
       }
     }).rejects.toThrow("invalid_request");
     expect(attempts).toBe(1);
+  });
+
+  it("tryRecoverFromError forces a retry on otherwise non-retryable errors", async () => {
+    let attempts = 0;
+    let maxTokens = 58_082;
+    const stream = streamWithRetries(
+      async function* () {
+        attempts++;
+        if (maxTokens > 30_000) {
+          throw new ProviderError(
+            "test",
+            "This model's maximum context length is 90000 tokens. However, you requested " +
+              `${maxTokens} output tokens and your prompt contains at least ${90_000 - maxTokens + 1} input tokens, ` +
+              "for a total of at least 90001 tokens.",
+            400,
+          );
+        }
+        yield "ok";
+      },
+      {
+        maxRetries: 2,
+        baseDelayMilliseconds: 1,
+        label: "test",
+        tryRecoverFromError: (error) => {
+          const overflow = parseContextOverflowError(error);
+          if (!overflow) return false;
+          maxTokens = Math.floor(maxTokens / 2);
+          return true;
+        },
+      },
+    );
+    const chunks: unknown[] = [];
+    for await (const chunk of stream) chunks.push(chunk);
+    expect(attempts).toBe(2);
+    expect(chunks).toEqual(["ok"]);
+    expect(maxTokens).toBe(29_041);
+  });
+
+  it("tryRecoverFromError wins over transient classification (no unchanged replay)", async () => {
+    let attempts = 0;
+    const recoveries: number[] = [];
+    const stream = streamWithRetries(
+      async function* () {
+        attempts++;
+        if (attempts === 1) {
+          // 500 would classify transient — the recovery hook must still run first
+          throw new ProviderError(
+            "test",
+            "This model's maximum context length is 90000 tokens. However, you requested 60000 output tokens and your prompt contains at least 30001 input tokens, for a total of at least 90001 tokens.",
+            500,
+          );
+        }
+        yield "ok";
+      },
+      {
+        maxRetries: 2,
+        baseDelayMilliseconds: 1,
+        label: "test",
+        tryRecoverFromError: (_error, attempt) => {
+          recoveries.push(attempt);
+          return true;
+        },
+      },
+    );
+    for await (const _chunk of stream) {
+      /* consume */
+    }
+    expect(recoveries).toEqual([1]);
+  });
+
+  it("parseContextOverflowError extracts vLLM and OpenAI formats", () => {
+    expect(
+      parseContextOverflowError(
+        new Error(
+          "This model's maximum context length is 90000 tokens. However, you requested 58082 output tokens and your prompt contains at least 31919 input tokens, for a total of at least 90001 tokens.",
+        ),
+      ),
+    ).toEqual({
+      contextWindow: 90_000,
+      requestedOutputTokens: 58_082,
+      inputTokens: 31_919,
+    });
+    expect(
+      parseContextOverflowError(
+        new Error(
+          "This model's maximum context length is 8192 tokens. However, you requested 9000 tokens (7000 in the messages, 2000 in the completion).",
+        ),
+      ),
+    ).toEqual({
+      contextWindow: 8_192,
+      requestedOutputTokens: 2_000,
+      inputTokens: 7_000,
+    });
+    expect(
+      parseContextOverflowError(
+        new Error("This model's maximum context length is 4096 tokens."),
+      ),
+    ).toEqual({
+      contextWindow: 4_096,
+      requestedOutputTokens: null,
+      inputTokens: null,
+    });
+    expect(parseContextOverflowError(new Error("rate limited"))).toBeNull();
+    expect(parseContextOverflowError(null)).toBeNull();
   });
 
   it("classifies transient errors across providers (status, type, network code)", () => {
