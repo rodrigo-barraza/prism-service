@@ -61,6 +61,10 @@ export const MINIO_SECRET_KEY = process.env.MINIO_SECRET_KEY;
 export const MINIO_BUCKET_NAME = process.env.PRISM_SERVICE_MINIO_BUCKET_NAME ||
     process.env.PRISM_MINIO_BUCKET_NAME ||
     process.env.MINIO_BUCKET_NAME;
+// Public gateway for direct object access (e.g. https://storage.rod.dev).
+// When set, minio:// refs resolve to shareable URLs on this host instead of
+// the internal MINIO_ENDPOINT address.
+export const MINIO_PUBLIC_URL = process.env.MINIO_PUBLIC_URL;
 // ── Tools API ──────────────────────────────────────────────────
 export const TOOLS_SERVICE_URL = process.env.TOOLS_SERVICE_URL;
 // ── Anthropic Files API ───────────────────────────────────────

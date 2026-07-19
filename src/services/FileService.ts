@@ -4,6 +4,7 @@ import type { Readable } from "stream";
 import MinioWrapper from "#src/wrappers/MinioWrapper";
 import logger from "#src/utils/logger";
 import { FILE_CATEGORIES } from "#src/constants";
+import { MINIO_PUBLIC_URL, MINIO_BUCKET_NAME } from "#config";
 const MIME_TO_EXT: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
@@ -168,13 +169,19 @@ const FileService: FileServiceInterface = {
   },
   /**
    * Resolve a minio:// ref to a direct public bucket URL (bucket is
-   * provisioned with publicRead). Null when MinIO is unavailable or the
-   * ref is not a minio reference.
+   * provisioned with publicRead). Prefers the MINIO_PUBLIC_URL gateway
+   * (e.g. https://storage.rod.dev) so the URL is shareable and safe to
+   * surface to models and users; falls back to the internal endpoint URL.
+   * Null when nothing is configured or the ref is not a minio reference.
    */
   getPublicUrl(ref: string): string | null {
-    if (!FileService.isMinioRef(ref) || !MinioWrapper.isAvailable())
-      return null;
-    return MinioWrapper.getPublicUrl(FileService.extractKey(ref));
+    if (!FileService.isMinioRef(ref)) return null;
+    const key = FileService.extractKey(ref);
+    if (MINIO_PUBLIC_URL && MINIO_BUCKET_NAME) {
+      return `${MINIO_PUBLIC_URL.replace(/\/+$/, "")}/${MINIO_BUCKET_NAME}/${key}`;
+    }
+    if (!MinioWrapper.isAvailable()) return null;
+    return MinioWrapper.getPublicUrl(key);
   },
 };
 

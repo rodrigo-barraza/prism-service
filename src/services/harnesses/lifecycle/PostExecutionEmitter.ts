@@ -117,14 +117,19 @@ export async function processToolResultMedia(
           dataUrl,
           FILE_CATEGORIES.GENERATIONS,
         );
+        // The model reads this result and reuses audioRef as a handle in
+        // later tool calls (e.g. generate_audio sampleSource), so it must
+        // be a fetchable public URL — never the internal minio:// ref.
+        const publicAudioUrl =
+          FileService.getPublicUrl(uploadResult.ref) ?? uploadResult.ref;
         if (resultObject) {
-          resultObject.audioRef = uploadResult.ref;
+          resultObject.audioRef = publicAudioUrl;
           delete resultObject.audio;
           // Stamp display so audio results render an inline player via
           // the generic display path (same convention as image/embed).
           resultObject.display ??= {
             kind: "audio",
-            url: uploadResult.ref,
+            url: publicAudioUrl,
             title: "Audio",
           };
         }
