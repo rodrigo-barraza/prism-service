@@ -455,7 +455,7 @@ describe("Dynamic Output Token Clamping", () => {
   });
 
   describe("createProviderStream — integration with clamping", () => {
-    it("should pass clamped maxTokens to the provider when system prompt causes overflow", () => {
+    it("should pass clamped maxTokens to the provider when system prompt causes overflow", async () => {
       const mockGenerateTextStream = vi.fn().mockReturnValue((async function* () {})());
       const systemPrompt = createSystemPromptWithTokenCount(20_000);
 
@@ -468,13 +468,13 @@ describe("Dynamic Output Token Clamping", () => {
       (harness as any).context.provider.generateTextStream = mockGenerateTextStream;
 
       const messages = createMessagesWithTokenCount(5_000);
-      harness.createProviderStream(messages, { maxTokens: 64_000 } as any);
+      await harness.createProviderStream(messages, { maxTokens: 64_000 } as any);
 
       const passedOptions = mockGenerateTextStream.mock.calls[0][2];
       expect(passedOptions.maxTokens).toBeLessThan(64_000);
     });
 
-    it("should pass original maxTokens when no clamping is needed", () => {
+    it("should pass original maxTokens when no clamping is needed", async () => {
       const mockGenerateTextStream = vi.fn().mockReturnValue((async function* () {})());
 
       harness = createHarnessWithFullContext({
@@ -484,7 +484,7 @@ describe("Dynamic Output Token Clamping", () => {
       (harness as any).context.provider.generateTextStream = mockGenerateTextStream;
 
       const messages = createMessagesWithTokenCount(10_000);
-      harness.createProviderStream(messages, { maxTokens: 16_384 } as any);
+      await harness.createProviderStream(messages, { maxTokens: 16_384 } as any);
 
       const passedOptions = mockGenerateTextStream.mock.calls[0][2];
       expect(passedOptions.maxTokens).toBe(16_384);
