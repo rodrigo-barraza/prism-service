@@ -21,6 +21,10 @@ vi.mock('#config', () => ({
     MONGO_URI: 'mongodb://test:test@localhost:27017/?directConnection=true&replicaSet=rs0&authSource=admin',
     MONGO_DB_NAME: 'prism-test',
     LIVE_AUDIO_MODEL: 'gemini-2.0-flash-live-001',
+    // Anthropic Files API — disabled in tests (no real uploads)
+    ANTHROPIC_FILES_API_ENABLED: false,
+    ANTHROPIC_BASE_URL: undefined,
+    HIGH_RES_IMAGE_MAX_DIMENSION: 2576,
 }));
 
 

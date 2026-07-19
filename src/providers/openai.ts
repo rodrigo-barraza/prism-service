@@ -521,10 +521,14 @@ export function prepareOpenAIMessages(
               } as OpenAI.Chat.ChatCompletionContentPart);
             }
           } else {
-            // Unknown ref type (e.g. minio://) — skip with warning
+            // Unknown ref type (e.g. minio://) — placeholder, never silent
             logger.warn(
-              `[openai] Skipping unresolved media ref in Chat Completions input: ${mediaRef.substring(0, LOG_PREVIEW.SHORT)}...`,
+              `[openai] Unresolved media ref in Chat Completions input: ${mediaRef.substring(0, LOG_PREVIEW.SHORT)}...`,
             );
+            content.push({
+              type: "text",
+              text: `[Attached file (unresolved reference "${mediaRef.substring(0, 80)}") — content unavailable to this model]`,
+            });
           }
         }
         if (message.content) {
@@ -711,10 +715,14 @@ export function prepareResponsesInput(
             content.push({ type: "input_file", file_url: mediaRef });
           }
         } else {
-          // Unknown ref type (e.g. minio://) — skip with warning
+          // Unknown ref type (e.g. minio://) — placeholder, never silent
           logger.warn(
-            `[openai] Skipping unresolved media ref in Responses API input: ${mediaRef.substring(0, LOG_PREVIEW.SHORT)}...`,
+            `[openai] Unresolved media ref in Responses API input: ${mediaRef.substring(0, LOG_PREVIEW.SHORT)}...`,
           );
+          content.push({
+            type: "input_text",
+            text: `[Attached file (unresolved reference "${mediaRef.substring(0, 80)}") — content unavailable to this model]`,
+          });
         }
       }
       if (message.content) {

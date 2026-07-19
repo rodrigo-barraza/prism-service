@@ -66,6 +66,7 @@ export interface FileServiceInterface {
   ): Promise<{ stream: Readable; contentType: string } | null>;
   isMinioRef(ref: string | number | boolean | object | null | undefined): ref is string;
   extractKey(ref: string): string;
+  getPublicUrl(ref: string): string | null;
 }
 
 /**
@@ -164,6 +165,16 @@ const FileService: FileServiceInterface = {
   },
   extractKey(ref: string): string {
     return normalizeKey(ref.replace("minio://", ""));
+  },
+  /**
+   * Resolve a minio:// ref to a direct public bucket URL (bucket is
+   * provisioned with publicRead). Null when MinIO is unavailable or the
+   * ref is not a minio reference.
+   */
+  getPublicUrl(ref: string): string | null {
+    if (!FileService.isMinioRef(ref) || !MinioWrapper.isAvailable())
+      return null;
+    return MinioWrapper.getPublicUrl(FileService.extractKey(ref));
   },
 };
 

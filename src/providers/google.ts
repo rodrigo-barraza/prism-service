@@ -393,6 +393,7 @@ export async function convertMessages(
 ): Promise<Content[]> {
   const result: Content[] = [];
   let inlineImageCount = 0;
+  let droppedImageCount = 0;
 
   for (let i = 0; i < messages.length; i++) {
     const item = messages[i];
@@ -437,6 +438,7 @@ export async function convertMessages(
                 logger.warn(
                   `[Google] Dropping reference image beyond the ${MAX_INLINE_IMAGES}-image Gemini limit`,
                 );
+                droppedImageCount++;
                 continue;
               }
               inlineImageCount++;
@@ -512,6 +514,22 @@ export async function convertMessages(
       role: item.role === "assistant" ? "model" : "user",
       parts,
     });
+  }
+
+  // Surface capped-out images to the MODEL, not just the server log —
+  // otherwise it silently reasons over an incomplete set.
+  if (droppedImageCount > 0) {
+    const notePart: Part = {
+      text: `[${droppedImageCount} additional image(s) omitted — this model accepts at most ${MAX_INLINE_IMAGES} images per request]`,
+    };
+    const lastUserContent = [...result]
+      .reverse()
+      .find((content) => content.role === "user");
+    if (lastUserContent?.parts) {
+      lastUserContent.parts.push(notePart);
+    } else {
+      result.push({ role: "user", parts: [notePart] });
+    }
   }
 
   return result;

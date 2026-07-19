@@ -146,6 +146,56 @@ describe("resolveMediaInputArg", () => {
     }
   });
 
+  it("resolves read_pdf from the pdf field first, then documents", () => {
+    const PDF_URL = "https://cdn.example.com/files/report.pdf";
+    const DOC_URL = "https://cdn.example.com/files/report.docx";
+
+    const viaPdfField = ToolOrchestratorService.resolveMediaInputArg(
+      "read_pdf",
+      { url: "attached" },
+      [{ role: "user", pdf: [PDF_URL], documents: [DOC_URL] }],
+    );
+    expect(viaPdfField.url).toBe(PDF_URL);
+
+    const viaDocumentsFallback = ToolOrchestratorService.resolveMediaInputArg(
+      "read_pdf",
+      { url: "attached" },
+      [{ role: "user", documents: [PDF_URL] }],
+    );
+    expect(viaDocumentsFallback.url).toBe(PDF_URL);
+  });
+
+  it("resolves read_docx and read_spreadsheet from the documents field", () => {
+    const DOC_URL = "https://cdn.example.com/files/notes.docx";
+    for (const tool of ["read_docx", "read_spreadsheet"]) {
+      const args = ToolOrchestratorService.resolveMediaInputArg(
+        tool,
+        {},
+        [{ role: "user", documents: [DOC_URL] }],
+      );
+      expect(args.url).toBe(DOC_URL);
+    }
+  });
+
+  it("resolves read_csv's source arg from the documents field", () => {
+    const CSV_URL = "https://cdn.example.com/files/data.csv";
+    const args = ToolOrchestratorService.resolveMediaInputArg(
+      "read_csv",
+      { source: "attached" },
+      [{ role: "user", documents: [CSV_URL] }],
+    );
+    expect(args.source).toBe(CSV_URL);
+  });
+
+  it("does NOT feed images to document readers", () => {
+    const args = ToolOrchestratorService.resolveMediaInputArg(
+      "read_csv",
+      { source: "attached" },
+      messagesWithImage,
+    );
+    expect(args.source).toBe("attached");
+  });
+
   it("leaves non-media tools untouched", () => {
     const args = ToolOrchestratorService.resolveMediaInputArg(
       "search_web",

@@ -28,6 +28,11 @@ export interface ChatMessage {
   content?: string | ChatMessageContent[];
   name?: string;
   images?: string[];
+  audio?: string[];
+  video?: string[];
+  pdf?: string[];
+  /** Non-inlined document attachments (CSV/DOCX/XLSX…) — URLs or data URIs for reader tools. */
+  documents?: string[];
   toolCalls?: Array<{
     id?: string | null;
     name: string;
@@ -90,6 +95,8 @@ export interface ProviderOptions {
   seed?: number | string;
   responseFormat?: string | { type: string };
   responseSchema?: Record<string, unknown>;
+  /** Internal: skip Anthropic Files API substitution (fallback retry path). */
+  disableAnthropicFileSources?: boolean;
   frequencyPenalty?: number;
   presencePenalty?: number;
   repeatPenalty?: number;

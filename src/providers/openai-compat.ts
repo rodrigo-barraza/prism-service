@@ -47,6 +47,8 @@ export interface InputMessage {
   audio?: string[];
   video?: string[];
   pdf?: string[];
+  /** Non-inlined document attachments (CSV/DOCX/XLSX…) — read via reader tools. */
+  documents?: string[];
   // Thinking
   thinking?: string;
   thinkingSignature?: string;
@@ -451,83 +453,86 @@ export function prepareOpenAICompatMessages(
       } as PreparedMessage;
     }
 
-    // Collect media content based on strategy
+    // Collect media content — shared across ALL strategies so nothing is
+    // dropped silently. IMAGES_ONLY (lm-studio) previously ignored the
+    // audio/video/pdf fields entirely; it now emits the same TEXT_FALLBACK
+    // placeholders so the model knows an attachment existed.
     const content: ContentPart[] = [];
 
-    if (mediaStrategy === MEDIA_STRATEGIES.IMAGES_ONLY) {
-      // Simple image-only handling (lm-studio)
-      if (message.images && message.images.length > 0) {
-        for (const dataUrl of message.images) {
+    const mediaFields: Array<{ key: string; values: string[] | undefined }> = [
+      { key: "images", values: message.images },
+      { key: "audio", values: message.audio },
+      { key: "video", values: message.video },
+      { key: "pdf", values: message.pdf },
+    ];
+    for (const { values: array } of mediaFields) {
+      if (!array || array.length === 0) continue;
+
+      for (const dataUrl of array) {
+        const mime = getDataUrlMimeType(dataUrl);
+
+        if (mime && mime.startsWith("image/")) {
+          content.push({ type: "image_url", image_url: { url: dataUrl } });
+        } else if (mime && mime.startsWith("video/")) {
+          if (mediaStrategy === MEDIA_STRATEGIES.FULL_MULTIMODAL) {
+            content.push({ type: "video_url", video_url: { url: dataUrl } });
+          } else {
+            content.push({
+              type: "text",
+              text: "[Attached video file — video input not supported by this model]",
+            });
+          }
+        } else if (mime && mime.startsWith("audio/")) {
+          if (mediaStrategy === MEDIA_STRATEGIES.FULL_MULTIMODAL) {
+            const base64Data = dataUrl.split(";base64,")[1] || "";
+            const audioFormat = mime.split("/")[1] || "wav";
+            content.push({
+              type: "input_audio",
+              input_audio: { data: base64Data, format: audioFormat },
+            });
+          } else {
+            content.push({
+              type: "text",
+              text: "[Attached audio file — audio input not supported by this model]",
+            });
+          }
+        } else if (mime === "application/pdf") {
+          content.push({
+            type: "text",
+            text: "[Attached PDF document — PDF input not supported by this model]",
+          });
+        } else if (
+          mime &&
+          (mime.startsWith("text/") || mime === "application/json")
+        ) {
+          try {
+            const base64 = dataUrl.split(";base64,")[1];
+            const decoded = Buffer.from(base64, "base64").toString("utf-8");
+            content.push({
+              type: "text",
+              text: `[Attached file (${mime})]:\n${decoded}`,
+            });
+          } catch {
+            content.push({
+              type: "text",
+              text: `[Attached file (${mime}): unable to decode]`,
+            });
+          }
+        } else {
+          // Fallback — try image_url passthrough for any types
           content.push({ type: "image_url", image_url: { url: dataUrl } });
         }
       }
-    } else {
-      // Full media handling (vllm, llama-cpp)
-      const mediaFields: Array<{ key: string; values: string[] | undefined }> =
-        [
-          { key: "images", values: message.images },
-          { key: "audio", values: message.audio },
-          { key: "video", values: message.video },
-          { key: "pdf", values: message.pdf },
-        ];
-      for (const { values: array } of mediaFields) {
-        if (!array || array.length === 0) continue;
+    }
 
-        for (const dataUrl of array) {
-          const mime = getDataUrlMimeType(dataUrl);
-
-          if (mime && mime.startsWith("image/")) {
-            content.push({ type: "image_url", image_url: { url: dataUrl } });
-          } else if (mime && mime.startsWith("video/")) {
-            if (mediaStrategy === MEDIA_STRATEGIES.FULL_MULTIMODAL) {
-              content.push({ type: "video_url", video_url: { url: dataUrl } });
-            } else {
-              content.push({
-                type: "text",
-                text: "[Attached video file — video input not supported by this model]",
-              });
-            }
-          } else if (mime && mime.startsWith("audio/")) {
-            if (mediaStrategy === MEDIA_STRATEGIES.FULL_MULTIMODAL) {
-              const base64Data = dataUrl.split(";base64,")[1] || "";
-              const audioFormat = mime.split("/")[1] || "wav";
-              content.push({
-                type: "input_audio",
-                input_audio: { data: base64Data, format: audioFormat },
-              });
-            } else {
-              content.push({
-                type: "text",
-                text: "[Attached audio file — audio input not supported by this model]",
-              });
-            }
-          } else if (mime === "application/pdf") {
-            content.push({
-              type: "text",
-              text: "[Attached PDF document — PDF input not supported by this model]",
-            });
-          } else if (
-            mime &&
-            (mime.startsWith("text/") || mime === "application/json")
-          ) {
-            try {
-              const base64 = dataUrl.split(";base64,")[1];
-              const decoded = Buffer.from(base64, "base64").toString("utf-8");
-              content.push({
-                type: "text",
-                text: `[Attached file (${mime})]:\n${decoded}`,
-              });
-            } catch {
-              content.push({
-                type: "text",
-                text: `[Attached file (${mime}): unable to decode]`,
-              });
-            }
-          } else {
-            // Fallback — try image_url passthrough for any types
-            content.push({ type: "image_url", image_url: { url: dataUrl } });
-          }
-        }
+    // Document attachments (CSV/DOCX/XLSX…) are never inlined — surface a
+    // pointer so the model reaches for the reader tools instead.
+    if (message.documents && message.documents.length > 0) {
+      for (const documentReference of message.documents) {
+        content.push({
+          type: "text",
+          text: `[Attached document: ${documentReference.startsWith("data:") ? "(data URI)" : documentReference.substring(0, 200)} — use a document reader tool (read_csv, read_docx, read_spreadsheet, read_pdf) with "attached" to read it.]`,
+        });
       }
     }
 
