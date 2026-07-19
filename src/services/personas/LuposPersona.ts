@@ -176,6 +176,14 @@ const LUPOS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
     requires: ["search_discord_messages"],
   },
   {
+    // Slim-envelope contract: lupos-bot sends one-line roster entries for
+    // non-primary participants; deep per-user context (presence, roles,
+    // voice state, timeout) is pulled on demand via the profile tool.
+    content: (locale) =>
+      PromptLocaleService.get(locale, "personas.lupos.toolPolicyParticipants"),
+    requires: ["get_discord_user_profile"],
+  },
+  {
     // Includes the self-portrait rules: stay faithful to the attached
     // canonical reference (lupos-bot attaches it on self-portrait intent)
     // and fold live somatic state into the prompt. Reference-conditioned
