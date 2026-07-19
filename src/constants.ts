@@ -2,6 +2,8 @@
 // Prism — Application Constants
 // ─────────────────────────────────────────────────────────────
 
+import { COLLECTIONS as TAXONOMY_COLLECTIONS } from "@rodrigo-barraza/utilities-library/taxonomy";
+
 // ─── Timing Constants ───────────────────────────────────────
 
 /** SERVER_SENT_EVENTS keep-alive ping interval for admin streaming endpoints. */
@@ -34,7 +36,7 @@ export const TOOL_PROXY_TIMEOUT_MILLISECONDS = 65_000;
  * Import from here instead of defining local `const COLLECTION = "..."`.
  */
 export const COLLECTIONS = {
-  REQUESTS: "requests",
+  REQUESTS: TAXONOMY_COLLECTIONS.requests,
   MODEL_CONVERSATIONS: "model_conversations",
   AGENT_CONVERSATIONS: "agent_conversations",
   WORKFLOWS: "workflows",
