@@ -31,6 +31,8 @@ import {
 import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
 import ConversationStatusRegistry from "#src/services/ConversationStatusRegistry";
 import RequestLogger from "#src/services/RequestLogger";
+import { resolveMessageMediaReferences } from "#src/services/MediaResolutionService";
+import { getMaxImageDimensionForModel } from "#src/utils/media";
 import { UNITS, DEFAULT_LOCALE } from "#src/constants";
 import {
   finalizeTextGeneration,
@@ -643,6 +645,30 @@ export default class BaseAgenticHarness {
   ): Promise<AsyncIterable<unknown> | null> {
     const { provider, resolvedModel, modelDefinition, signal } = this.context;
 
+    // Resolve media/attachments for the provider payload — folds client
+    // `files[]` into resolvable media fields, resolves minio:// refs to
+    // provider-ready data, and primes small text documents for inlining.
+    // The /chat path does this in prepareGenerationContext; the agent path
+    // must do it here since the message array evolves across iterations
+    // (resolution is idempotent, and priming/conversion are cached).
+    // Mutates `messages` in place to compact storage refs and returns the
+    // provider copy. A resolution failure must never kill the turn — fall
+    // back to the unresolved messages.
+    let resolvedMessages = messages;
+    try {
+      resolvedMessages = await resolveMessageMediaReferences(
+        messages,
+        this.context.project,
+        this.context.username,
+        { maxImageDimension: getMaxImageDimensionForModel(resolvedModel) },
+      );
+    } catch (error) {
+      console.warn(
+        "[BaseAgenticHarness] media resolution failed; sending unresolved messages:",
+        error instanceof Error ? error.message : error,
+      );
+    }
+
     // Pre-discover context window for self-hosted providers so
     // clampOutputTokens has the budget available on the first iteration
     if (provider.discoverContextWindow) {
@@ -653,7 +679,7 @@ export default class BaseAgenticHarness {
     }
 
     const clampedMaxTokens = this.clampOutputTokens(
-      messages,
+      resolvedMessages,
       passOptions.maxTokens,
     );
 
@@ -698,7 +724,7 @@ export default class BaseAgenticHarness {
         : passOptions;
 
     const expandedMessages = expandMessagesForFunctionCall(
-      messages as ChatMessage[],
+      resolvedMessages as ChatMessage[],
       {
         filterDeleted: false,
       },
