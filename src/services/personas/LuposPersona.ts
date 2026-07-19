@@ -205,6 +205,14 @@ const LUPOS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
       PromptLocaleService.get(locale, "personas.lupos.toolPolicyMusic"),
     requires: [TOOL_NAMES.SEARCH_SPOTIFY],
   },
+  {
+    // Wolf economy: hoard-funded gifts, provoked muggings, fumble
+    // scatters. Amount/frequency caps are enforced server-side in
+    // lupos-bot (luposAgentGold) — this section is behavioral guidance.
+    content: (locale) =>
+      PromptLocaleService.get(locale, "personas.lupos.toolPolicyGold"),
+    requires: ["mug_discord_gold"],
+  },
 ];
 
 // Lupos lives on Discord, so his tool surface is bounded by what lupos-bot
