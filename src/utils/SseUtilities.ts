@@ -1,3 +1,8 @@
+import {
+  initSseResponse as initSseResponseLibrary,
+  createSseEmitter as createSseEmitterLibrary,
+  startSseHeartbeat,
+} from "@rodrigo-barraza/utilities-library/express";
 import { handleConversation } from "#src/routes/ChatRoutes";
 import { ProviderError } from "./errors.ts";
 import { createAbortController } from "./AbortController.ts";
@@ -55,43 +60,26 @@ export function withDirectViewerBroadcast(
  * Sets the required headers and flushes them immediately.
  */
 export function initSseResponse(res: Response) {
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.flushHeaders();
+  initSseResponseLibrary(res);
 }
 
 /**
  * Create an SSE emit callback that writes events to the response.
- * Strips heavy base64 data from image events when minioRef is available.
+ * Thin wrapper over the library emitter (guarded writes, setNoDelay,
+ * force-flush) that strips heavy base64 data from image events when a
+ * minioRef is available.
  */
 export function createSseEmitter(res: Response, connectionSignal: AbortSignal) {
-  // Disable Nagle's algorithm for minimal SSE latency.
-  // Without this, small SSE events can sit in the TCP buffer when
-  // the server blocks on await (e.g. plan approval promise).
-  if (res.socket) res.socket.setNoDelay(true);
+  const emitToResponse = createSseEmitterLibrary(res, {
+    signal: connectionSignal,
+  });
 
   return (event: SseEvent) => {
-    if (!connectionSignal.aborted && !res.destroyed && !res.writableEnded) {
-      if (event.type === "image" && event.minioRef && event.data) {
-        const { data: _stripped, ...lightweight } = event;
-        res.write(`data: ${JSON.stringify(lightweight)}\n\n`);
-      } else {
-        res.write(`data: ${JSON.stringify(event)}\n\n`);
-      }
-      // Force-flush the write buffer. Without compression middleware,
-      // res.flush() doesn't exist — use cork()/uncork() to guarantee
-      // Node flushes pending writes to the socket immediately. Critical
-      // for events emitted before an await block (plan_proposal,
-      // approval_required) where no further writes push the buffer.
-      const responseWithFlush = res as Response & { flush?: () => void };
-      if (typeof responseWithFlush.flush === "function") {
-        responseWithFlush.flush();
-      } else if (res.socket && !res.socket.destroyed) {
-        res.socket.uncork?.();
-        res.socket.cork?.();
-        res.socket.uncork?.();
-      }
+    if (event.type === "image" && event.minioRef && event.data) {
+      const { data: _stripped, ...lightweight } = event;
+      emitToResponse(lightweight);
+    } else {
+      emitToResponse(event);
     }
   };
 }
@@ -241,16 +229,9 @@ export async function handleSseRequest(
   // quiet-but-alive stream (long prefill, slow tool) from a dead socket.
   // Comment lines are invisible to the JSON event protocol — old clients
   // skip them in their `data: ` line filter.
-  const HEARTBEAT_INTERVAL_MS = 15_000;
-  const heartbeatInterval = setInterval(() => {
-    if (
-      !connectionController.signal.aborted &&
-      !res.destroyed &&
-      !res.writableEnded
-    ) {
-      res.write(`: ping\n\n`);
-    }
-  }, HEARTBEAT_INTERVAL_MS);
+  const stopHeartbeat = startSseHeartbeat(res, {
+    signal: connectionController.signal,
+  });
 
   // For persistent sessions (/agent), register a separate stop controller
   // in the session registry so POST /agent/stop can abort it explicitly.
@@ -278,7 +259,7 @@ export async function handleSseRequest(
         message:
           "A generation is already running for this conversation. Stop it first (POST /agent/stop) or wait for it to finish.",
       } as unknown as SseEvent);
-      clearInterval(heartbeatInterval);
+      stopHeartbeat();
       res.end();
       return;
     }
@@ -321,7 +302,7 @@ export async function handleSseRequest(
       },
     );
   } finally {
-    clearInterval(heartbeatInterval);
+    stopHeartbeat();
     // Cleanup session registry entry — identity-checked so a stale handler
     // can never delete a newer session's entry.
     if (persistOnDisconnect && conversationId) {

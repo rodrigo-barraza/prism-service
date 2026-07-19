@@ -5,7 +5,7 @@ import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { MONGO_DB_NAME } from "#config";
 import { COLLECTIONS, WEBHOOK } from "#src/constants";
 import logger from "#src/utils/logger";
-import { errorMessage, sleep } from "@rodrigo-barraza/utilities-library";
+import { errorMessage, retry } from "@rodrigo-barraza/utilities-library";
 import { registerCleanup } from "#src/utils/CleanupRegistry";
 
 interface WebhookSubscription {
@@ -47,6 +47,9 @@ export function matchesEventTypes(
   return subscribedEvents.includes(eventType);
 }
 
+/** Marker for non-2xx responses so the retry wrapper doesn't double-log them. */
+class NonSuccessStatusError extends Error {}
+
 async function dispatchToSubscription(
   subscription: WebhookSubscription,
   event: WebhookEvent,
@@ -54,51 +57,61 @@ async function dispatchToSubscription(
   const jsonPayload = JSON.stringify(event);
   const signature = signPayload(jsonPayload, subscription.secret);
 
-  for (let attempt = 0; attempt < MAX_RETRY_ATTEMPTS; attempt++) {
-    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
-    try {
-      const controller = new AbortController();
-      timeoutHandle = setTimeout(() => controller.abort(), DISPATCH_TIMEOUT_MILLISECONDS);
+  try {
+    await retry(
+      async (attempt) => {
+        let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+        try {
+          const controller = new AbortController();
+          timeoutHandle = setTimeout(() => controller.abort(), DISPATCH_TIMEOUT_MILLISECONDS);
 
-      const response = await fetch(subscription.url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Webhook-Signature": `sha256=${signature}`,
-          "X-Webhook-Event": event.eventType,
-          "X-Webhook-Id": event.webhookEventId,
-          "User-Agent": "Prism-Webhook/1.0",
-        },
-        body: jsonPayload,
-        signal: controller.signal,
-      });
+          const response = await fetch(subscription.url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Webhook-Signature": `sha256=${signature}`,
+              "X-Webhook-Event": event.eventType,
+              "X-Webhook-Id": event.webhookEventId,
+              "User-Agent": "Prism-Webhook/1.0",
+            },
+            body: jsonPayload,
+            signal: controller.signal,
+          });
 
-      if (response.ok || (response.status >= 200 && response.status < 300)) {
-        return;
-      }
+          if (response.ok || (response.status >= 200 && response.status < 300)) {
+            return;
+          }
 
-      logger.warn(
-        `Webhook dispatch to ${subscription.url} returned ${response.status} (attempt ${attempt + 1}/${MAX_RETRY_ATTEMPTS})`,
-      );
-    } catch (error: unknown) {
-      logger.warn(
-        `Webhook dispatch to ${subscription.url} failed (attempt ${attempt + 1}/${MAX_RETRY_ATTEMPTS}): ${errorMessage(error)}`,
-      );
-    } finally {
-      if (timeoutHandle) {
-        clearTimeout(timeoutHandle);
-      }
-    }
-
-    if (attempt < MAX_RETRY_ATTEMPTS - 1) {
-      const delay = RETRY_BASE_DELAY_MILLISECONDS * Math.pow(4, attempt);
-      await sleep(delay);
-    }
+          logger.warn(
+            `Webhook dispatch to ${subscription.url} returned ${response.status} (attempt ${attempt + 1}/${MAX_RETRY_ATTEMPTS})`,
+          );
+          throw new NonSuccessStatusError(
+            `Webhook returned ${response.status}`,
+          );
+        } catch (error: unknown) {
+          if (!(error instanceof NonSuccessStatusError)) {
+            logger.warn(
+              `Webhook dispatch to ${subscription.url} failed (attempt ${attempt + 1}/${MAX_RETRY_ATTEMPTS}): ${errorMessage(error)}`,
+            );
+          }
+          throw error;
+        } finally {
+          if (timeoutHandle) {
+            clearTimeout(timeoutHandle);
+          }
+        }
+      },
+      {
+        retries: MAX_RETRY_ATTEMPTS - 1,
+        delay: RETRY_BASE_DELAY_MILLISECONDS,
+        backoff: 4,
+      },
+    );
+  } catch {
+    logger.error(
+      `Webhook dispatch to ${subscription.url} failed after ${MAX_RETRY_ATTEMPTS} attempts for event ${event.webhookEventId}`,
+    );
   }
-
-  logger.error(
-    `Webhook dispatch to ${subscription.url} failed after ${MAX_RETRY_ATTEMPTS} attempts for event ${event.webhookEventId}`,
-  );
 }
 
 async function refreshSubscriptions() {
