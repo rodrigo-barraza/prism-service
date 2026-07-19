@@ -184,6 +184,13 @@ const LUPOS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
     requires: ["get_discord_user_profile"],
   },
   {
+    // Reactions are agent-driven: lupos-bot no longer pre-generates an
+    // emoji reaction per reply (the old per-message mini-brain LLM call).
+    content: (locale) =>
+      PromptLocaleService.get(locale, "personas.lupos.toolPolicyReactions"),
+    requires: ["react_to_discord_message"],
+  },
+  {
     // Includes the self-portrait rules: stay faithful to the attached
     // canonical reference (lupos-bot attaches it on self-portrait intent)
     // and fold live somatic state into the prompt. Reference-conditioned
@@ -360,8 +367,11 @@ export const LuposPersona: Persona = {
   ],
   // Core tools only on the first iteration — everything in
   // LUPOS_AVAILABLE_TOOLS is available but NOT enabled, reachable via
-  // innate discovery or pre-flight (same shape as Omni).
-  enabledByDefaultTools: [],
+  // innate discovery or pre-flight (same shape as Omni). Exception:
+  // react_to_discord_message is always on — it replaces lupos-bot's old
+  // unconditional per-reply emoji reaction, so it must not depend on
+  // mid-conversation discovery.
+  enabledByDefaultTools: ["react_to_discord_message"],
   capabilities: "",
   hasSomaticState: true,
   // Lupos's resting temperament: mildly cynical, restless, a buried streak
