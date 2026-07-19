@@ -1,4 +1,4 @@
-import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { AGENT_IDS, DISCORD_GUILDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { DOMAIN_KEY_TAGS, TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
 import { Persona, ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
@@ -290,7 +290,7 @@ export const LuposPersona: Persona = {
   color: "#7c3aed",
   identity: (context) => {
     const isAprilFools = context?.agentContext?.aprilFoolsMode === true;
-    const isClockCrew = context?.agentContext?.guildId === "249010731910037507";
+    const isClockCrew = context?.agentContext?.guildId === DISCORD_GUILDS.whitemane;
     const activeLocale = context.locale || "en";
 
     const sections = [

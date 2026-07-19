@@ -17,6 +17,7 @@
  */
 
 import { connectDatabase, getDatabase, disconnectDatabase } from "@rodrigo-barraza/utilities-library/service/mongo";
+import { COLLECTIONS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { computeModalities, computeTotalCost, extractProviders } from "../src/services/conversation/utils.ts";
 import type { Db, Document } from "mongodb";
 
@@ -65,7 +66,7 @@ async function sumRequestCosts(
     ],
   };
   const results = await database
-    .collection("requests")
+    .collection(COLLECTIONS.requests)
     .aggregate([
       { $match: matchCondition },
       { $group: { _id: null, totalCost: { $sum: { $ifNull: ["$estimatedCost", 0] } } } },
