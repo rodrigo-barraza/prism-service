@@ -267,6 +267,13 @@ const LUPOS_DISCORD_INCOMPATIBLE_TOOLS = [
   TOOL_NAMES.RENDER_LATEX,
   TOOL_NAMES.GENERATE_DIAGRAM,
   TOOL_NAMES.EXECUTE_SHELL,
+  // Artifact documents render only in prism-client (artifactId display, no
+  // public URL) — lupos-bot has no handler for kind:"artifact", so Lupos
+  // would claim he made a document while Discord shows nothing. Unblock once
+  // lupos-bot posts artifacts as file attachments.
+  TOOL_NAMES.CREATE_ARTIFACT,
+  TOOL_NAMES.UPDATE_ARTIFACT,
+  TOOL_NAMES.LIST_ARTIFACTS,
 ];
 
 // ────────────────────────────────────────────────────────────
