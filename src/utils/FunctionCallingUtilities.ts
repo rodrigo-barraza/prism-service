@@ -179,6 +179,7 @@ interface ExpandedMessage {
   video?: string[];
   audio?: string | string[];
   pdf?: string[];
+  documents?: string[];
 }
 
 /**
@@ -377,6 +378,9 @@ export function expandMessagesForFunctionCall(
           ? { audio: message.audio }
           : {}),
         ...(message.pdf && message.pdf.length > 0 ? { pdf: message.pdf } : {}),
+        ...(message.documents && message.documents.length > 0
+          ? { documents: message.documents }
+          : {}),
         ...(message.role === "assistant" && message.thinking
           ? { thinking: message.thinking }
           : {}),

@@ -396,6 +396,25 @@ describe("expandMessagesForFunctionCall", () => {
       expect(expanded[0].pdf).toHaveLength(1);
     });
 
+    it("preserves document attachments on user messages", () => {
+      const messages = [
+        {
+          role: "user",
+          content: "what is this file?",
+          documents: ["https://storage.example.com/uploads/speedtest.json"],
+        },
+      ] as any;
+
+      const expanded = expandMessagesForFunctionCall(messages, {
+        filterDeleted: false,
+      });
+
+      expect(expanded[0].documents).toHaveLength(1);
+      expect(expanded[0].documents![0]).toBe(
+        "https://storage.example.com/uploads/speedtest.json",
+      );
+    });
+
     it("omits empty media arrays from output", () => {
       const messages = [
         { role: "user", content: "No attachments", images: [], video: [] },
