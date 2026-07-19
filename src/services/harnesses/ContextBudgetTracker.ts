@@ -4,6 +4,7 @@ import {
 } from "#src/utils/CostCalculator";
 import {
   OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
+  OUTPUT_TOKEN_CLAMP_FIXED_HEADROOM_TOKENS,
   MINIMUM_CLAMPED_OUTPUT_TOKENS,
 } from "#src/constants/TokenBudgetDefaults";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
@@ -105,9 +106,9 @@ export default class ContextBudgetTracker {
       this.systemPromptTokensEstimate +
       this.toolSchemaTokensEstimate;
 
-    const safetyMargin = Math.ceil(
-      totalEstimatedInput * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
-    );
+    const safetyMargin =
+      Math.ceil(totalEstimatedInput * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER) +
+      OUTPUT_TOKEN_CLAMP_FIXED_HEADROOM_TOKENS;
     const adjustedInput = totalEstimatedInput + safetyMargin;
     const availableForOutput = this.contextWindow - adjustedInput;
 
@@ -184,9 +185,9 @@ export default class ContextBudgetTracker {
     }
 
     // Re-compute the budget with real numbers
-    const safetyMargin = Math.ceil(
-      realInputTokens * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
-    );
+    const safetyMargin =
+      Math.ceil(realInputTokens * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER) +
+      OUTPUT_TOKEN_CLAMP_FIXED_HEADROOM_TOKENS;
     const adjustedInput = realInputTokens + safetyMargin;
     const availableForOutput = this.contextWindow - adjustedInput;
 
@@ -316,9 +317,9 @@ export default class ContextBudgetTracker {
 
     const systemPromptTokens = estimateTokens(systemPromptText);
     const totalEstimatedInput = messageTokens + systemPromptTokens;
-    const safetyMargin = Math.ceil(
-      totalEstimatedInput * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
-    );
+    const safetyMargin =
+      Math.ceil(totalEstimatedInput * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER) +
+      OUTPUT_TOKEN_CLAMP_FIXED_HEADROOM_TOKENS;
     const adjustedInput = totalEstimatedInput + safetyMargin;
     const availableForOutput = contextWindow - adjustedInput;
 

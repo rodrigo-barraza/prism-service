@@ -35,6 +35,22 @@ export const MAX_OUTPUT_TRUNCATION_RECOVERIES = 3;
 export const OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER = 0.10;
 
 /**
+ * Fixed token headroom added ON TOP of the multiplicative margin when
+ * clamping output tokens.
+ *
+ * The multiplicative margin scales with prompt size but leaves ZERO
+ * absolute slack when the clamp grants all remaining window to output:
+ * clamped = window − estimate×1.10, so any real input exceeding the
+ * adjusted estimate fails hard. Verified in production (2026-07-19,
+ * Gemma 4 12B on vLLM, 90K window): a 30KB inlined JSON pushed the
+ * heuristic 9.1% under the real count — the request died at 90,001/90,000,
+ * over by literally one token. Dense JSON/hex content tokenizes worse
+ * than the ~4 chars/token prose heuristic, and vLLM also counts chat
+ * template tokens the estimate cannot see.
+ */
+export const OUTPUT_TOKEN_CLAMP_FIXED_HEADROOM_TOKENS = 1_024;
+
+/**
  * Minimum output tokens to allow after clamping. If the remaining budget
  * after input is below this threshold, the clamp still permits at least
  * this many tokens so the model can produce a meaningful error or
