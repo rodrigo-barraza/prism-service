@@ -292,7 +292,15 @@ export default class AgenticToolResolver {
 
       const shouldBypassOrchestratorTools = !options.isSubAgent;
       finalTools = finalTools.filter((tool) => {
-        if (clientDisabledSet?.has(tool.name)) return false;
+        // Internal tools are system-locked in the client for coreToolsLocked
+        // personas, so a disabledTools entry for one can only be stale state
+        // from before the tool was marked system — ignore it. An unlocked
+        // persona's explicit toggle-off still wins.
+        if (
+          clientDisabledSet?.has(tool.name) &&
+          !(isCoreToolsLocked && PRISM_LOCAL_TOOL_NAMES.has(tool.name))
+        )
+          return false;
         if (
           options.isSubAgent &&
           CORE_ORCHESTRATOR_TOOLS.has(tool.name)

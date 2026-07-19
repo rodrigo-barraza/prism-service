@@ -141,7 +141,9 @@ vi.mock("#src/services/ToolOrchestratorService", () => ({
       const internalClient = MOCK_INTERNAL_CLIENT_SCHEMAS.map((tool) => ({
         ...tool,
         domainKey: resolveDomainKey(tool.domain || DOMAINS.CORE_HARNESS.displayName),
-        system: isCoreDomain(tool.domain || DOMAINS.CORE_HARNESS.displayName),
+        // Mirrors production: internal tools are always system:true regardless
+        // of display domain (see ToolOrchestratorService.getClientToolSchemas)
+        system: true,
       }));
 
       const orchestratorClient = MOCK_ORCHESTRATOR_SCHEMAS.map((tool) => ({

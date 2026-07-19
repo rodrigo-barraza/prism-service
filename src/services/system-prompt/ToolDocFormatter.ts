@@ -1,5 +1,6 @@
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
+import InternalToolRegistry from "#src/services/tool-definitions/InternalToolRegistry";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";
 import {
@@ -124,7 +125,11 @@ export class ToolDocFormatter {
         (isCoreToolsLocked &&
           ((isCoreDomain(toolSchema.domain || "") &&
             (workspaceEnabled || !isWorkspaceDomain(toolSchema.domain || ""))) ||
-            CORE_AGENTIC_TOOLS.has(toolSchema.name))),
+            CORE_AGENTIC_TOOLS.has(toolSchema.name) ||
+            // Internal tools are always-on even outside core domains (e.g.
+            // artifact tools under Creative) — mirror the resolver's
+            // PRISM_LOCAL_TOOL_NAMES bypass so they get documented.
+            InternalToolRegistry.has(toolSchema.name))),
     );
 
     if (persona?.blockedTools?.length) {

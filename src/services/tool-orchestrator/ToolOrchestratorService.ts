@@ -1105,7 +1105,11 @@ export default class ToolOrchestratorService {
         domainKey: resolveDomainKey(
           tool.domain || DOMAINS.CORE_HARNESS.displayName,
         ),
-        system: isCoreDomain(tool.domain || DOMAINS.CORE_HARNESS.displayName),
+        // Internal tools are always-on regardless of display domain (artifact
+        // tools group under Creative, MCP tools under MCP) — system:true keeps
+        // them out of the client's toggle/disabledTools flow, matching the
+        // resolver's PRISM_LOCAL_TOOL_NAMES bypass.
+        system: true,
       }));
 
       const localeClientSchemas =
