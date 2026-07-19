@@ -1,4 +1,8 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
+import {
+  createApiClient,
+  ApiError,
+} from "@rodrigo-barraza/utilities-library/http";
 import express, { Request, Response } from "express";
 import { basename } from "node:path";
 import { TOOLS_SERVICE_URL } from "#config";
@@ -12,6 +16,10 @@ import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { TOOL_CONFIG_FETCH_TIMEOUT_MILLISECONDS } from "#src/constants";
 
 const router = express.Router();
+
+// String() matches the previous template-literal coercion of the
+// (possibly undefined) env-derived base URL.
+const toolsClient = createApiClient(String(TOOLS_SERVICE_URL), {});
 
 interface MappedWorkspace {
   id: string;
@@ -90,17 +98,11 @@ router.get(
 
       let connectedAgents: WorkspaceAgent[] = [];
       try {
-        const configApiResponse = await fetch(
-          `${TOOLS_SERVICE_URL}/admin/config`,
-          {
-            signal: AbortSignal.timeout(TOOL_CONFIG_FETCH_TIMEOUT_MILLISECONDS),
-          },
+        const workspaceConfig = await toolsClient.get<WorkspaceConfig>(
+          "/admin/config",
+          { timeoutMilliseconds: TOOL_CONFIG_FETCH_TIMEOUT_MILLISECONDS },
         );
-        if (configApiResponse.ok) {
-          const workspaceConfig =
-            (await configApiResponse.json()) as WorkspaceConfig;
-          connectedAgents = workspaceConfig.agents || [];
-        }
+        connectedAgents = workspaceConfig.agents || [];
       } catch (error: unknown) {
         logger.warn(
           `GET /workspaces agent fetch failed: ${getErrorMessage(error)}`,
@@ -161,16 +163,11 @@ router.get(
       // Fetch full config from tools-api to get agent metadata
       let agents: WorkspaceAgent[] = [];
       try {
-        const configResponse = await fetch(
-          `${TOOLS_SERVICE_URL}/admin/config`,
-          {
-            signal: AbortSignal.timeout(TOOL_CONFIG_FETCH_TIMEOUT_MILLISECONDS),
-          },
+        const config = await toolsClient.get<WorkspaceConfig>(
+          "/admin/config",
+          { timeoutMilliseconds: TOOL_CONFIG_FETCH_TIMEOUT_MILLISECONDS },
         );
-        if (configResponse.ok) {
-          const config = (await configResponse.json()) as WorkspaceConfig;
-          agents = config.agents || [];
-        }
+        agents = config.agents || [];
       } catch (agentError: unknown) {
         logger.warn(
           `GET /workspaces/full agent fetch failed: ${getErrorMessage(agentError)}`,
@@ -292,32 +289,22 @@ router.get(
     }
 
     try {
-      const toolsResponse = await fetch(
-        `${TOOLS_SERVICE_URL}/agentic/project/summary`,
+      const result = await toolsClient.post(
+        "/agentic/project/summary",
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            path: workspacePath,
-            maxDepth: maxDepth ? parseInt(String(maxDepth), 10) : 3,
-          }),
-          signal: AbortSignal.timeout(30_000),
+          path: workspacePath,
+          maxDepth: maxDepth ? parseInt(String(maxDepth), 10) : 3,
         },
+        { timeoutMilliseconds: 30_000 },
       );
-
-      if (!toolsResponse.ok) {
-        const errorBody = (await toolsResponse.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        return res.status(toolsResponse.status).json({
-          error:
-            errorBody.error || `tools-service returned ${toolsResponse.status}`,
-        });
-      }
-
-      const result = await toolsResponse.json();
       res.json(result);
     } catch (error: unknown) {
+      if (error instanceof ApiError) {
+        const errorBody = error.body as { error?: string } | undefined;
+        return res.status(error.status).json({
+          error: errorBody?.error || `tools-service returned ${error.status}`,
+        });
+      }
       const errorDetail = getErrorMessage(error);
       logger.error(`GET /workspaces/tree error: ${errorDetail}`);
       const isTimeout = error instanceof Error && error.name === "TimeoutError";
@@ -340,12 +327,12 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     try {
       const platform = req.query.platform;
-      const toolsUrl = platform
-        ? `${TOOLS_SERVICE_URL}/agents/download/agent?platform=${encodeURIComponent(String(platform))}`
-        : `${TOOLS_SERVICE_URL}/agents/download/agent`;
+      const toolsPath = platform
+        ? `/agents/download/agent?platform=${encodeURIComponent(String(platform))}`
+        : `/agents/download/agent`;
 
-      const toolsResponse = await fetch(toolsUrl, {
-        signal: AbortSignal.timeout(60_000),
+      const toolsResponse = await toolsClient.requestRaw(toolsPath, {
+        timeoutMilliseconds: 60_000,
       });
 
       if (!toolsResponse.ok) {
@@ -418,11 +405,10 @@ router.get(
         });
       }
 
-      const toolsUrl = `${TOOLS_SERVICE_URL}/agents/download/tray-app?platform=${encodeURIComponent(String(platform))}`;
-
-      const toolsResponse = await fetch(toolsUrl, {
-        signal: AbortSignal.timeout(120_000),
-      });
+      const toolsResponse = await toolsClient.requestRaw(
+        `/agents/download/tray-app?platform=${encodeURIComponent(String(platform))}`,
+        { timeoutMilliseconds: 120_000 },
+      );
 
       if (!toolsResponse.ok) {
         const errorBody = (await toolsResponse.json().catch(() => ({}))) as {
@@ -486,22 +472,20 @@ router.delete(
   asyncHandler(async (req: Request, res: Response) => {
     try {
       const agentId = req.params.id;
-      const toolsResponse = await fetch(
-        `${TOOLS_SERVICE_URL}/agents/${agentId}`,
-        {
-          method: "DELETE",
-          signal: AbortSignal.timeout(TOOL_CONFIG_FETCH_TIMEOUT_MILLISECONDS),
-        },
-      );
-
-      if (!toolsResponse.ok) {
-        const errorBody = await toolsResponse.json().catch(() => ({}));
-        return res.status(toolsResponse.status).json(errorBody);
-      }
-
-      const responseBody = await toolsResponse.json();
+      const responseBody = await toolsClient.delete(`/agents/${agentId}`, {
+        timeoutMilliseconds: TOOL_CONFIG_FETCH_TIMEOUT_MILLISECONDS,
+      });
       res.json(responseBody);
     } catch (error: unknown) {
+      if (error instanceof ApiError) {
+        // Pass the upstream error body through verbatim, matching the
+        // previous proxy behavior ({} when the body was not JSON).
+        const errorBody =
+          typeof error.body === "object" && error.body !== null
+            ? error.body
+            : {};
+        return res.status(error.status).json(errorBody);
+      }
       logger.error(
         `DELETE /workspaces/agents/:id error: ${getErrorMessage(error)}`,
       );
