@@ -114,6 +114,7 @@ export default class AgenticLoopState {
   hwmInputTokens: number;
   hwmTotalTokens: number;
   hwmOutputCharacters: number;
+  hwmEstimatedCost: number;
 
   // ── Accumulated phase durations ──────────────────────────
   // Sum of all per-pass thinking/content durations, passed to
@@ -176,6 +177,7 @@ export default class AgenticLoopState {
     this.hwmInputTokens = 0;
     this.hwmTotalTokens = 0;
     this.hwmOutputCharacters = 0;
+    this.hwmEstimatedCost = 0;
 
     this.overallThinkingDurationSeconds = 0;
     this.overallContentDurationSeconds = 0;

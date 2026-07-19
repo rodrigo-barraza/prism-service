@@ -19,6 +19,7 @@ vi.mock("#src/services/ConversationGenerationTracker", () => ({
     trackUsage: vi.fn(),
     register: vi.fn(),
     update: vi.fn(),
+    setEstimatedInputTokens: vi.fn(),
     recordChunkTiming: vi.fn(),
     getConversationStats: vi.fn(() => ({ activeRequests: 0, totalOutputTokens: 0 })),
     complete: vi.fn(),

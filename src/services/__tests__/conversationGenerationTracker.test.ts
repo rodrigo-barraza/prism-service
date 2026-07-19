@@ -302,3 +302,90 @@ describe('ConversationGenerationTracker adversarial', () => {
     expect(stats.tokPerSec).toBeNull();
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+describe("ConversationGenerationTracker — live cost estimation", () => {
+  // Resolve a priced model dynamically from config so the test doesn't
+  // break when the model catalog changes.
+  let pricedModel: string;
+  let inputPerMillion: number;
+  let outputPerMillion: number;
+
+  beforeEach(async () => {
+    ConversationGenerationTracker.cleanup("cost-session");
+    const { getPricing, MODALITY_TYPES } = await import("#src/config");
+    const pricingMap = getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT);
+    const entry = Object.entries(pricingMap).find(
+      ([, pricing]) =>
+        (pricing.inputPerMillion || 0) > 0 && (pricing.outputPerMillion || 0) > 0,
+    );
+    expect(entry).toBeDefined();
+    pricedModel = entry![0];
+    inputPerMillion = entry![1].inputPerMillion;
+    outputPerMillion = entry![1].outputPerMillion;
+  });
+
+  afterEach(() => {
+    ConversationGenerationTracker.cleanup("cost-session");
+  });
+
+  it("estimates cost from streamed characters + estimated input before usage arrives", () => {
+    ConversationGenerationTracker.register("cost-session", "cost-req-1", {
+      model: pricedModel,
+    });
+    ConversationGenerationTracker.setEstimatedInputTokens("cost-req-1", 1000);
+    // 4000 chars ≈ 1000 output tokens via the chars/4 heuristic
+    ConversationGenerationTracker.recordChunkTiming("cost-req-1", 4000);
+
+    const stats = ConversationGenerationTracker.getConversationStats("cost-session");
+    const expected =
+      (1000 / 1_000_000) * inputPerMillion + (1000 / 1_000_000) * outputPerMillion;
+    expect(stats.estimatedCost).toBeCloseTo(expected, 8);
+  });
+
+  it("prefers provider-reported usage over estimates once it arrives", () => {
+    ConversationGenerationTracker.register("cost-session", "cost-req-2", {
+      model: pricedModel,
+    });
+    ConversationGenerationTracker.setEstimatedInputTokens("cost-req-2", 9999);
+    ConversationGenerationTracker.recordChunkTiming("cost-req-2", 4000);
+    ConversationGenerationTracker.update("cost-req-2", {
+      inputTokens: 2000,
+      outputTokens: 500,
+    });
+
+    const stats = ConversationGenerationTracker.getConversationStats("cost-session");
+    const expected =
+      (2000 / 1_000_000) * inputPerMillion + (500 / 1_000_000) * outputPerMillion;
+    expect(stats.estimatedCost).toBeCloseTo(expected, 8);
+  });
+
+  it("rolls cost into the accumulator on complete (monotonic across iterations)", () => {
+    ConversationGenerationTracker.register("cost-session", "cost-req-3", {
+      model: pricedModel,
+    });
+    ConversationGenerationTracker.update("cost-req-3", {
+      inputTokens: 1000,
+      outputTokens: 1000,
+    });
+    const before =
+      ConversationGenerationTracker.getConversationStats("cost-session").estimatedCost;
+    ConversationGenerationTracker.complete("cost-req-3");
+    const after =
+      ConversationGenerationTracker.getConversationStats("cost-session").estimatedCost;
+
+    expect(before).toBeGreaterThan(0);
+    expect(after).toBeCloseTo(before, 8);
+  });
+
+  it("reports zero cost for unpriced (local) models", () => {
+    ConversationGenerationTracker.register("cost-session", "cost-req-4", {
+      model: "some-local-unpriced-model",
+    });
+    ConversationGenerationTracker.setEstimatedInputTokens("cost-req-4", 5000);
+    ConversationGenerationTracker.recordChunkTiming("cost-req-4", 8000);
+
+    const stats = ConversationGenerationTracker.getConversationStats("cost-session");
+    expect(stats.estimatedCost).toBe(0);
+  });
+});

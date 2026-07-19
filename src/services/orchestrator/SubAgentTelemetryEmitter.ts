@@ -73,6 +73,7 @@ export class SubAgentTelemetryEmitter {
   private highWaterMarkOutputTokens = 0;
   private highWaterMarkInputTokens = 0;
   private highWaterMarkTotalTokens = 0;
+  private highWaterMarkEstimatedCost = 0;
 
   // Emit on every chunk — LM Studio batches SSE deltas heavily under continuous batching
   private static readonly PROGRESS_INTERVAL = 1;
@@ -160,6 +161,10 @@ export class SubAgentTelemetryEmitter {
         this.highWaterMarkTotalTokens,
         stats.totalTokens,
       );
+      this.highWaterMarkEstimatedCost = Math.max(
+        this.highWaterMarkEstimatedCost,
+        stats.estimatedCost || 0,
+      );
       this.parentEmit({
         type: SERVER_SENT_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.GENERATION_PROGRESS,
@@ -169,6 +174,7 @@ export class SubAgentTelemetryEmitter {
         inputTokens: this.highWaterMarkInputTokens,
         totalTokens: this.highWaterMarkTotalTokens,
         avgTtft: stats.avgTtft,
+        estimatedCost: this.highWaterMarkEstimatedCost,
       });
     }
   }
