@@ -20,6 +20,12 @@
 // so cumulative counts never decrease.
 // ─────────────────────────────────────────────────────────────
 
+import { getPricing, MODALITY_TYPES } from "#src/config";
+import {
+  calculateTextCost,
+  type TextPricing,
+} from "#src/utils/CostCalculator";
+
 // ── Rate computation guards ─────────────────────────────────
 // Prevent anomalous spikes from single large chunks or very
 // short elapsed windows. Rate is only reported once enough
@@ -42,6 +48,8 @@ interface ActiveRequest {
   chunkCount: number;
   outputCharacters: number;
   inputTokens: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
   ttft: number | null;
   provider: string;
   model: string;
@@ -53,6 +61,7 @@ interface ActiveRequest {
 interface ConversationAccumulator {
   completedOutputTokens: number;
   completedInputTokens: number;
+  completedCost: number;
   ttftSamples: number[];
   completedTokPerSecSamples: number[];
 }
@@ -67,6 +76,8 @@ interface RegisterOptions {
 interface UpdateParams {
   outputTokens?: number;
   inputTokens?: number;
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
   ttft?: number;
   providerTokPerSec?: number;
 }
@@ -78,6 +89,7 @@ interface ConversationGenerationStats {
   totalInputTokens: number;
   totalTokens: number;
   avgTtft: number | null;
+  estimatedCost: number;
 }
 
 interface ConversationGenerationTrackerInterface {
@@ -104,6 +116,53 @@ const activeRequests = new Map<string, ActiveRequest>();
 const conversationIndex = new Map<string, Set<string>>();
 const conversationAccumulators = new Map<string, ConversationAccumulator>();
 
+// ── Live cost estimation ────────────────────────────────────
+// Model pricing is static config — resolve the text→text pricing map
+// once and reuse it for every stats computation.
+let textPricingMap: Record<string, TextPricing> | null = null;
+
+function getModelPricing(model: string): TextPricing | undefined {
+  if (!textPricingMap) {
+    textPricingMap = getPricing(
+      MODALITY_TYPES.TEXT,
+      MODALITY_TYPES.TEXT,
+    ) as Record<string, TextPricing>;
+  }
+  return textPricingMap[model];
+}
+
+/**
+ * Estimate output tokens for a request: provider-reported usage when
+ * available (authoritative), otherwise ~4 chars/token from the streamed
+ * characters. This keeps token counts (and cost) ticking mid-stream even
+ * for providers that only report usage at the end of a request.
+ */
+function effectiveOutputTokens(entry: ActiveRequest): number {
+  if (entry.outputTokens > 0) return entry.outputTokens;
+  if (entry.outputCharacters > 0) return Math.ceil(entry.outputCharacters / 4);
+  return entry.chunkCount;
+}
+
+/**
+ * Estimate the cost of a single tracked request from its model pricing
+ * and current token counts. Free/local models (no pricing) cost 0.
+ */
+function estimateRequestCost(entry: ActiveRequest): number {
+  const pricing = getModelPricing(entry.model);
+  if (!pricing) return 0;
+  return (
+    calculateTextCost(
+      {
+        inputTokens: entry.inputTokens,
+        outputTokens: effectiveOutputTokens(entry),
+        cacheReadInputTokens: entry.cacheReadInputTokens,
+        cacheCreationInputTokens: entry.cacheCreationInputTokens,
+      },
+      pricing,
+    ) || 0
+  );
+}
+
 const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
   register(
     agentConversationId: string,
@@ -127,6 +186,8 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
       chunkCount: 0,
       outputCharacters: 0,
       inputTokens: 0,
+      cacheReadInputTokens: 0,
+      cacheCreationInputTokens: 0,
       ttft: null,
       provider: provider || "any",
       model: model || "any",
@@ -148,6 +209,7 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
       conversationAccumulators.set(agentConversationId, {
         completedOutputTokens: 0,
         completedInputTokens: 0,
+        completedCost: 0,
         ttftSamples: [],
         completedTokPerSecSamples: [],
       });
@@ -160,7 +222,14 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
    */
   update(
     requestId: string,
-    { outputTokens, inputTokens, ttft, providerTokPerSec }: UpdateParams = {},
+    {
+      outputTokens,
+      inputTokens,
+      cacheReadInputTokens,
+      cacheCreationInputTokens,
+      ttft,
+      providerTokPerSec,
+    }: UpdateParams = {},
   ) {
     const entry = activeRequests.get(requestId);
     if (!entry) return;
@@ -174,6 +243,12 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
     }
     if (inputTokens != null) {
       entry.inputTokens = inputTokens;
+    }
+    if (cacheReadInputTokens != null) {
+      entry.cacheReadInputTokens = cacheReadInputTokens;
+    }
+    if (cacheCreationInputTokens != null) {
+      entry.cacheCreationInputTokens = cacheCreationInputTokens;
     }
     if (ttft != null) {
       entry.ttft = ttft;
@@ -216,7 +291,7 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
     // Use provider-reported output tokens when available (authoritative).
     // Fall back to chars/4 estimation when the provider didn't report usage
     // (e.g. OpenAI response.completed event intermittently missing).
-    const effectiveOutputTokens =
+    const finalOutputTokens =
       entry.outputTokens > 0
         ? entry.outputTokens
         : entry.outputCharacters > 0
@@ -229,21 +304,22 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
     if (entry.providerTokPerSec != null && entry.providerTokPerSec > 0) {
       requestTokPerSec = entry.providerTokPerSec;
     } else if (
-      effectiveOutputTokens > 0 &&
+      finalOutputTokens > 0 &&
       entry.firstTokenTime &&
       entry.lastTokenTime
     ) {
       const elapsed = (entry.lastTokenTime - entry.firstTokenTime) / 1000;
       if (elapsed >= MIN_ELAPSED_SEC) {
-        requestTokPerSec = effectiveOutputTokens / elapsed;
+        requestTokPerSec = finalOutputTokens / elapsed;
       }
     }
 
     // Roll completed metrics into the conversation accumulator
     const accumulator = conversationAccumulators.get(entry.agentConversationId);
     if (accumulator) {
-      accumulator.completedOutputTokens += effectiveOutputTokens;
+      accumulator.completedOutputTokens += finalOutputTokens;
       accumulator.completedInputTokens += entry.inputTokens;
+      accumulator.completedCost += estimateRequestCost(entry);
       if (entry.ttft != null) {
         accumulator.ttftSamples.push(entry.ttft);
       }
@@ -278,6 +354,7 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
     const accumulator = conversationAccumulators.get(agentConversationId);
     const completedOutputTokens = accumulator?.completedOutputTokens || 0;
     const completedInputTokens = accumulator?.completedInputTokens || 0;
+    const completedCost = accumulator?.completedCost || 0;
     const ttftSamples = accumulator?.ttftSamples || [];
 
     if (!requestIds || requestIds.size === 0) {
@@ -303,6 +380,7 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
         totalInputTokens: totalIn,
         totalTokens: totalIn + totalOut,
         avgTtft,
+        estimatedCost: parseFloat(completedCost.toFixed(8)),
       };
     }
 
@@ -310,6 +388,7 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
     let generatingCount = 0;
     let activeOutputTokens = 0;
     let activeInputTokens = 0;
+    let activeCost = 0;
     let activeTtftSum = 0;
     let activeTtftCount = 0;
 
@@ -317,8 +396,13 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
       const request = activeRequests.get(rid);
       if (!request) continue;
 
-      activeOutputTokens += request.outputTokens;
+      // Effective tokens use the chars/4 estimate until the provider
+      // reports real usage — this keeps token counts (and the live cost
+      // estimate) advancing mid-stream for providers that only report
+      // usage at the end of a request (OpenAI, most local runtimes).
+      activeOutputTokens += effectiveOutputTokens(request);
       activeInputTokens += request.inputTokens;
+      activeCost += estimateRequestCost(request);
 
       if (request.ttft != null) {
         activeTtftSum += request.ttft;
