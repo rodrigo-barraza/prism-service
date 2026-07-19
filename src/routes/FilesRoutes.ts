@@ -12,16 +12,44 @@ const router = express.Router();
 /** Maximum decoded upload size — 40 MB. */
 const MAX_UPLOAD_DECODED_BYTES = 40 * 1024 * 1024;
 
-/** MIME prefixes accepted for upload. */
-const ALLOWED_MIME_PREFIXES = ["image/", "audio/", "video/"];
+/**
+ * MIME prefixes accepted for upload. `image/` covers HEIC/HEIF and SVG —
+ * both are normalized for vision providers downstream (HEIC → JPEG,
+ * SVG → PNG raster; see utils/media.ts). `text/` accepts any text format
+ * (plain, markdown, source code, configs …).
+ */
+const ALLOWED_MIME_PREFIXES = ["image/", "audio/", "video/", "text/"];
 
-/** Exact MIME types accepted for upload (documents + text formats). */
+/**
+ * Exact MIME types accepted for upload (documents + code/config formats).
+ * `application/octet-stream` stays BLOCKED on purpose: the client rewrites
+ * generic MIME to text/plain for recognized text extensions, so anything
+ * still arriving as octet-stream is genuinely unidentified binary.
+ */
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
-  "text/plain",
-  "text/csv",
-  "text/tab-separated-values",
   "application/json",
+  "application/ld+json",
+  "application/json5",
+  "application/xml",
+  "application/xhtml+xml",
+  "application/javascript",
+  "application/x-javascript",
+  "application/ecmascript",
+  "application/typescript",
+  "application/x-typescript",
+  "application/x-yaml",
+  "application/yaml",
+  "application/toml",
+  "application/x-toml",
+  "application/x-sh",
+  "application/x-shellscript",
+  "application/x-python-code",
+  "application/x-python",
+  "application/sql",
+  "application/graphql",
+  "application/x-httpd-php",
+  "application/csv",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/msword",
@@ -56,7 +84,7 @@ export function validateUploadDataUrl(data: unknown): string | null {
     ALLOWED_MIME_PREFIXES.some((prefix) => mimeType.startsWith(prefix)) ||
     ALLOWED_MIME_TYPES.has(mimeType);
   if (!isAllowed) {
-    return `File type "${mimeType}" is not allowed. Supported: images, audio, video, PDF, plain text, CSV/TSV, JSON, and Word/Excel documents`;
+    return `File type "${mimeType}" is not allowed. Supported: images (incl. HEIC/SVG), audio, video, PDF, any text/code file (plain text, Markdown, CSV/TSV, JSON, XML, YAML, source code …), and Word/Excel documents`;
   }
   const base64Length = data.length - markerIndex - base64Marker.length;
   if (base64Length === 0) {

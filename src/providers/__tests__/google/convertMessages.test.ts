@@ -11,6 +11,10 @@ import {
   convertMessages,
   type ConversationMessage,
 } from "#src/providers/google";
+import {
+  clearDocumentContextCache,
+  primeDocumentContext,
+} from "#src/utils/documentContext";
 
 // ── Helpers ──────────────────────────────────────────────────
 function makeMessage(
@@ -362,5 +366,40 @@ describe("convertMessages — inline image cap", () => {
       .flatMap((content) => content.parts ?? [])
       .filter((part) => "inlineData" in part);
     expect(imageParts.length).toBe(3);
+  });
+});
+
+// ── Document Attachments ─────────────────────────────────────
+describe("convertMessages — document attachments", () => {
+  it("emits reader-tool pointers for unprimed document references (previously dropped silently)", async () => {
+    clearDocumentContextCache();
+    const result = await convertMessages([
+      makeMessage({
+        documents: ["https://minio.example.com/bucket/uploads/report.xlsx"],
+      } as never),
+    ]);
+    const texts = result
+      .flatMap((content) => content.parts ?? [])
+      .filter((part) => "text" in part)
+      .map((part) => (part as { text: string }).text);
+    const pointer = texts.find((text) => text.includes("read_spreadsheet"));
+    expect(pointer).toContain(
+      "https://minio.example.com/bucket/uploads/report.xlsx",
+    );
+  });
+
+  it("inlines primed small text documents", async () => {
+    clearDocumentContextCache();
+    const reference = `data:text/plain;base64,${Buffer.from("hello doc").toString("base64")}`;
+    await primeDocumentContext(reference);
+    const result = await convertMessages([
+      makeMessage({ documents: [reference] } as never),
+    ]);
+    const texts = result
+      .flatMap((content) => content.parts ?? [])
+      .filter((part) => "text" in part)
+      .map((part) => (part as { text: string }).text);
+    const inline = texts.find((text) => text.includes("Attached file"));
+    expect(inline).toContain("hello doc");
   });
 });

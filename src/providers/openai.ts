@@ -26,6 +26,7 @@ import {
   getUrlType,
   inferMimeFromUrl,
 } from "#src/utils/media";
+import { getDocumentContextText } from "#src/utils/documentContext";
 import { LOG_PREVIEW } from "#src/constants";
 
 import type { ToolSchema } from "#src/services/harnesses/types";
@@ -110,6 +111,7 @@ export interface OpenAIMessage {
   content?: string;
   name?: string;
   images?: string[];
+  documents?: string[];
   toolCalls?: Array<{
     id?: string;
     name: string;
@@ -468,9 +470,9 @@ export function prepareOpenAIMessages(
       }
 
       // User messages (can be multimodal)
-      if (message.images && message.images.length > 0) {
+      if (message.images?.length || message.documents?.length) {
         const content: OpenAI.Chat.ChatCompletionContentPart[] = [];
-        for (const mediaRef of message.images) {
+        for (const mediaRef of message.images ?? []) {
           const urlType = getUrlType(mediaRef);
 
           if (urlType === "data") {
@@ -530,6 +532,15 @@ export function prepareOpenAIMessages(
               text: `[Attached file (unresolved reference "${mediaRef.substring(0, 80)}") — content unavailable to this model]`,
             });
           }
+        }
+        // Document attachments — small text-like documents were primed at
+        // resolution time and inline their content directly; binary or
+        // oversized documents get a reader-tool pointer.
+        for (const documentReference of message.documents ?? []) {
+          content.push({
+            type: "text",
+            text: getDocumentContextText(documentReference),
+          });
         }
         if (message.content) {
           content.push({ type: "text", text: message.content });
@@ -652,9 +663,9 @@ export function prepareResponsesInput(
         : (message.role as "developer" | "user" | "assistant");
     const nameObject = message.name ? { name: message.name } : {};
 
-    if (message.images && message.images.length > 0) {
+    if (message.images?.length || message.documents?.length) {
       const content: OpenAI.Responses.ResponseInputContent[] = [];
-      for (const mediaRef of message.images) {
+      for (const mediaRef of message.images ?? []) {
         const urlType = getUrlType(mediaRef);
 
         if (urlType === "data") {
@@ -724,6 +735,15 @@ export function prepareResponsesInput(
             text: `[Attached file (unresolved reference "${mediaRef.substring(0, 80)}") — content unavailable to this model]`,
           });
         }
+      }
+      // Document attachments — small text-like documents were primed at
+      // resolution time and inline their content directly; binary or
+      // oversized documents get a reader-tool pointer.
+      for (const documentReference of message.documents ?? []) {
+        content.push({
+          type: "input_text",
+          text: getDocumentContextText(documentReference),
+        });
       }
       if (message.content) {
         content.push({ type: "input_text", text: message.content });

@@ -113,6 +113,48 @@ interface ExpandOptions {
   filterDeleted?: boolean;
 }
 
+// ── Model-visible tool media ─────────────────────────────────
+// Tool results reach the model as JSON text, so a tool that renders
+// something visual (an animation snapshot, a generated image, a browser
+// screenshot) is invisible to the model that produced it — it only reads a
+// URL. For the current (latest) tool round, we attach those images to a
+// clearly-marked synthetic user message so vision models can SEE their own
+// output and self-correct without a describe_image round-trip.
+
+const MAXIMUM_MODEL_VISIBLE_IMAGES = 3;
+
+/**
+ * Extract model-visible image URLs from a tool result. Tools opt in
+ * explicitly via `modelImageUrl`/`modelImageUrls`; the known visual fields
+ * (vector-animation `snapshot.url`, generated-image `image.minioRef`,
+ * browser `screenshotRef`) are recognized directly. Only http(s) URLs —
+ * inline base64 would blow up the request payload.
+ */
+export function extractModelVisibleImages(result: ToolResultValue): string[] {
+  if (!result || typeof result !== "object" || Array.isArray(result)) return [];
+  const record = result as Record<string, unknown>;
+  const snapshot = record.snapshot as Record<string, unknown> | undefined;
+  const image = record.image as Record<string, unknown> | undefined;
+  const candidates: unknown[] = [
+    record.modelImageUrl,
+    ...(Array.isArray(record.modelImageUrls) ? record.modelImageUrls : []),
+    snapshot && typeof snapshot === "object" ? snapshot.url : undefined,
+    image && typeof image === "object" ? image.minioRef : undefined,
+    record.screenshotRef,
+  ];
+  const urls: string[] = [];
+  for (const candidate of candidates) {
+    if (
+      typeof candidate === "string" &&
+      /^https?:\/\//.test(candidate) &&
+      !urls.includes(candidate)
+    ) {
+      urls.push(candidate);
+    }
+  }
+  return urls.slice(0, MAXIMUM_MODEL_VISIBLE_IMAGES);
+}
+
 interface ExpandedToolCall {
   id?: string | null;
   name: string;
@@ -172,7 +214,22 @@ export function expandMessagesForFunctionCall(
     }
   }
 
-  return filtered.flatMap((message) => {
+  // Only the LAST embedded-result tool round gets model-visible media
+  // attached — re-attaching images for every historical round would grow
+  // each request by the whole session's renders.
+  let lastEmbeddedResultIndex = -1;
+  filtered.forEach((messageItem, index) => {
+    if (
+      messageItem.role === "assistant" &&
+      messageItem.toolCalls?.some(
+        (toolCall: ToolCallEntry) => toolCall.result !== undefined,
+      )
+    ) {
+      lastEmbeddedResultIndex = index;
+    }
+  });
+
+  return filtered.flatMap((message, messageIndex) => {
     // Expand assistant messages with toolCalls into
     // [assistant(tool_calls), tool(result1), tool(result2), ...]
     if (
@@ -250,7 +307,35 @@ export function expandMessagesForFunctionCall(
               : serializedResult,
           };
         });
-      return [assistantMessage, ...toolMessages];
+
+      // Attach visual tool outputs (latest round only) as a synthetic user
+      // message so the model can see what it just rendered.
+      const syntheticMediaMessages: ExpandedMessage[] = [];
+      if (messageIndex === lastEmbeddedResultIndex) {
+        const visibleImages: string[] = [];
+        const sourceToolNames: string[] = [];
+        for (const toolCall of message.toolCalls) {
+          if (toolCall.result === undefined) continue;
+          const urls = extractModelVisibleImages(toolCall.result as ToolResultValue);
+          if (urls.length > 0) {
+            for (const url of urls) {
+              if (!visibleImages.includes(url)) visibleImages.push(url);
+            }
+            if (!sourceToolNames.includes(toolCall.name)) sourceToolNames.push(toolCall.name);
+          }
+        }
+        if (visibleImages.length > 0) {
+          syntheticMediaMessages.push({
+            role: "user",
+            content:
+              `[system: attached ${visibleImages.length > 1 ? "images are" : "image is"} the rendered visual ` +
+              `output of ${sourceToolNames.join(", ")} — inspect it to verify your work. Not a user message.]`,
+            images: visibleImages.slice(0, MAXIMUM_MODEL_VISIBLE_IMAGES),
+          });
+        }
+      }
+
+      return [assistantMessage, ...toolMessages, ...syntheticMediaMessages];
     }
 
     // Pass through tool messages with their required fields

@@ -6,6 +6,7 @@
 
 import { Agent } from "undici";
 import { getDataUrlMimeType } from "#src/utils/media";
+import { getDocumentContextText } from "#src/utils/documentContext";
 import { ThinkTagParser, extractThinkTags } from "#src/utils/ThinkTagParser";
 import type {
   ProviderOptions,
@@ -525,13 +526,15 @@ export function prepareOpenAICompatMessages(
       }
     }
 
-    // Document attachments (CSV/DOCX/XLSX…) are never inlined — surface a
-    // pointer so the model reaches for the reader tools instead.
+    // Document attachments — small text-like documents were primed at
+    // resolution time and inline their content directly; binary or
+    // oversized documents surface a pointer so the model reaches for the
+    // reader tools instead.
     if (message.documents && message.documents.length > 0) {
       for (const documentReference of message.documents) {
         content.push({
           type: "text",
-          text: `[Attached document: ${documentReference.startsWith("data:") ? "(data URI)" : documentReference.substring(0, 200)} — use a document reader tool (read_csv, read_docx, read_spreadsheet, read_pdf) with "attached" to read it.]`,
+          text: getDocumentContextText(documentReference),
         });
       }
     }

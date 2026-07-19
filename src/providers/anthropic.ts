@@ -6,7 +6,9 @@ import {
   compressImageForSizeLimit,
   extractVideoFramesCached,
   getMaxImageDimensionForModel,
+  normalizeImageFormatForProvider,
 } from "#src/utils/media";
+import { getDocumentContextText } from "#src/utils/documentContext";
 import AnthropicFileCacheService, {
   ANTHROPIC_FILES_API_BETA,
   type FileSourceApplication,
@@ -184,8 +186,41 @@ async function buildMediaBlocksForReference(
     ];
   }
 
-  const mimeType = match[1];
+  let mimeType = match[1];
   let data = match[2];
+
+  // Normalize provider-hostile formats (HEIC/HEIF → JPEG, SVG → PNG) —
+  // safety belt for references that bypassed MediaResolutionService.
+  // text/plain results are visible conversion fallbacks: emit them as
+  // text blocks, never as broken image blocks.
+  if (
+    mimeType.startsWith("image/") ||
+    mimeType === "application/octet-stream"
+  ) {
+    try {
+      const normalized = await normalizeImageFormatForProvider(
+        data,
+        mimeType,
+        maxDimension,
+      );
+      if (normalized.converted) {
+        if (normalized.mediaType === "text/plain") {
+          return [
+            {
+              type: "text",
+              text: Buffer.from(normalized.data, "base64").toString("utf-8"),
+            },
+          ];
+        }
+        data = normalized.data;
+        mimeType = normalized.mediaType;
+      }
+    } catch (error: unknown) {
+      logger.warn(
+        `[anthropic] Image format normalization failed: ${getErrorMessage(error)} — continuing with original data`,
+      );
+    }
+  }
 
   if (mimeType.startsWith("image/")) {
     // Image content block
@@ -472,12 +507,14 @@ export async function prepareMessages(messages: ChatMessage[], model?: string) {
               )),
             );
           }
-          // Document attachments (CSV/DOCX/XLSX…) are not inlined — the
-          // model reads them via reader tools using the "attached" input.
+          // Document attachments — small text-like documents were primed
+          // at resolution time and inline their content directly; binary
+          // or oversized documents keep the reader-tool pointer (the model
+          // reads those via reader tools using the "attached" input).
           for (const documentReference of documentReferences) {
             contentBlocks.push({
               type: "text",
-              text: `[Attached document: ${documentReference.startsWith("data:") ? "(data URI)" : documentReference.substring(0, 200)} — use a document reader tool (read_csv, read_docx, read_spreadsheet, read_pdf) with "attached" to read it.]`,
+              text: getDocumentContextText(documentReference),
             });
           }
           const textContent =

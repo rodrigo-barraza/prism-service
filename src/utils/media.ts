@@ -610,3 +610,223 @@ export async function extractVideoFramesCached(
 export function clearVideoFrameCache(): void {
   videoFrameCache.clear();
 }
+
+// ── Image Input-Format Normalization (HEIC/HEIF, SVG) ───────
+// Vision providers reject iPhone photos (image/heic|heif) and vector
+// graphics (image/svg+xml). Normalize them at the entry of the image
+// pipeline: HEIC → JPEG via the pure-JS `heic-convert` package (sharp's
+// prebuilt binaries omit the patent-encumbered HEVC decoder — only AVIF
+// is compiled in), SVG → PNG raster via sharp/librsvg.
+//
+// Output is deterministic (fixed quality, no timestamps) and cached
+// in-memory keyed by a sha256 of the source bytes, so identical inputs
+// produce byte-identical provider payloads across turns — required for
+// provider prompt-cache stability (same concern as video frames).
+
+/** ftyp major brands identifying HEIC/HEIF containers (AVIF excluded — sharp decodes it). */
+const HEIC_FTYP_BRANDS = new Set([
+  "heic",
+  "heix",
+  "hevc",
+  "hevx",
+  "heim",
+  "heis",
+  "hevm",
+  "hevs",
+  "mif1",
+  "msf1",
+]);
+
+/** Fixed JPEG quality for HEIC conversion — must stay constant for determinism. */
+const HEIC_JPEG_QUALITY = 0.85;
+
+/**
+ * Target long edge for rasterized SVGs — large enough that text inside
+ * the SVG stays legible, small enough to respect token budgets. The
+ * model-aware dimension cap still applies on top of this.
+ */
+export const SVG_RASTER_TARGET_LONG_EDGE = 1600;
+
+/** SVG sources up to this decoded size are inlined as text when rasterization fails. */
+const SVG_SOURCE_INLINE_MAX_BYTES = 64 * 1024;
+
+const NORMALIZED_IMAGE_CACHE_MAX_ENTRIES = 24;
+const normalizedImageCache = new Map<
+  string,
+  { data: string; mediaType: string }
+>();
+
+/**
+ * Identify provider-hostile image formats from declared MIME type and/or
+ * the first bytes of the payload. Byte sniffing covers generic MIME types
+ * (application/octet-stream) and mislabeled uploads:
+ *  - ISO-BMFF `ftyp` box with a HEIC/HEIF brand → "heic"
+ *  - leading `<svg` / XML prologue containing `<svg` → "svg"
+ */
+export function sniffSpecialImageFormat(
+  head: Buffer,
+  mediaType: string,
+): "heic" | "svg" | null {
+  const mime = mediaType.split(";")[0].trim().toLowerCase();
+  if (
+    mime === "image/heic" ||
+    mime === "image/heif" ||
+    mime === "image/heic-sequence" ||
+    mime === "image/heif-sequence"
+  ) {
+    return "heic";
+  }
+  if (mime === "image/svg+xml") return "svg";
+  if (head.length >= 12 && head.toString("latin1", 4, 8) === "ftyp") {
+    const brand = head.toString("latin1", 8, 12).toLowerCase();
+    if (HEIC_FTYP_BRANDS.has(brand)) return "heic";
+  }
+  const textHead = head
+    .toString("utf-8")
+    .replace(/^\uFEFF/, "")
+    .trimStart()
+    .toLowerCase();
+  if (
+    textHead.startsWith("<svg") ||
+    ((textHead.startsWith("<?xml") || textHead.startsWith("<!doctype")) &&
+      textHead.includes("<svg"))
+  ) {
+    return "svg";
+  }
+  return null;
+}
+
+/** Wrap a visible fallback message (or inlined source) as a text/plain result. */
+function textPlainFallback(text: string): { data: string; mediaType: string } {
+  return {
+    data: Buffer.from(text, "utf-8").toString(ENCODINGS.BASE64),
+    mediaType: "text/plain",
+  };
+}
+
+/** Convert a HEIC/HEIF buffer to JPEG. Falls back to a visible text placeholder. */
+async function convertHeicToJpeg(
+  buffer: Buffer,
+): Promise<{ data: string; mediaType: string }> {
+  try {
+    const { default: heicConvert } = await import("heic-convert");
+    const output = await heicConvert({
+      buffer,
+      format: "JPEG",
+      quality: HEIC_JPEG_QUALITY,
+    });
+    const jpeg = Buffer.from(output);
+    logger.info(
+      `[media] Converted HEIC/HEIF → JPEG: ${(buffer.length / UNITS.BYTES_PER_MB).toFixed(2)} MB → ${(jpeg.length / UNITS.BYTES_PER_MB).toFixed(2)} MB`,
+    );
+    return { data: jpeg.toString(ENCODINGS.BASE64), mediaType: "image/jpeg" };
+  } catch (error: unknown) {
+    logger.warn(
+      `[media] HEIC → JPEG conversion failed (${getErrorMessage(error)}) — inserting text placeholder`,
+    );
+    return textPlainFallback(
+      `[Attached image (image/heic) — this HEIC photo could not be converted for this model. Ask the user to re-send it as JPEG or PNG.]`,
+    );
+  }
+}
+
+/**
+ * Rasterize an SVG buffer to PNG at a density that renders text legibly.
+ * Never silent on failure: small sources are inlined as text, large ones
+ * become a visible placeholder.
+ */
+async function rasterizeSvgToPng(
+  buffer: Buffer,
+  maxDimension: number,
+): Promise<{ data: string; mediaType: string }> {
+  try {
+    const target = Math.min(maxDimension, SVG_RASTER_TARGET_LONG_EDGE);
+    // Scale the render density so the intrinsic long edge lands near the
+    // target — rendering at density beats upscaling a 72dpi raster.
+    let density = 300;
+    try {
+      const metadata = await sharp(buffer).metadata();
+      const longEdge = Math.max(metadata.width || 0, metadata.height || 0);
+      if (longEdge > 0) {
+        density = Math.min(2400, Math.max(1, (72 * target) / longEdge));
+      }
+    } catch {
+      /* keep default density */
+    }
+    const png = await sharp(buffer, { density })
+      .resize(target, target, { fit: "inside", withoutEnlargement: false })
+      .png()
+      .toBuffer();
+    logger.info(
+      `[media] Rasterized SVG → PNG (${(png.length / 1024).toFixed(0)} KB, target ${target}px, density ${density.toFixed(0)})`,
+    );
+    return { data: png.toString(ENCODINGS.BASE64), mediaType: "image/png" };
+  } catch (error: unknown) {
+    logger.warn(
+      `[media] SVG rasterization failed (${getErrorMessage(error)}) — falling back to text`,
+    );
+    if (buffer.length <= SVG_SOURCE_INLINE_MAX_BYTES) {
+      return textPlainFallback(
+        `[Attached SVG image — rasterization failed; SVG source follows]\n${buffer.toString("utf-8")}`,
+      );
+    }
+    return textPlainFallback(
+      `[Attached SVG image (${(buffer.length / 1024).toFixed(0)} KB) — rasterization failed and the source is too large to inline]`,
+    );
+  }
+}
+
+/**
+ * Normalize provider-hostile image payloads before the standard
+ * constrain/compress pipeline:
+ *  - HEIC/HEIF → JPEG (fixed quality, deterministic)
+ *  - SVG → PNG raster (~SVG_RASTER_TARGET_LONG_EDGE long edge, capped by
+ *    the model-aware maxDimension)
+ *
+ * Returns `converted: false` with the input untouched for every other
+ * format. Failed conversions come back as `mediaType: "text/plain"`
+ * carrying a visible fallback (placeholder or inlined SVG source) —
+ * callers must surface that as text, never as an image block.
+ */
+export async function normalizeImageFormatForProvider(
+  base64Data: string,
+  mediaType: string,
+  maxDimension: number = MAX_IMAGE_DIMENSION,
+): Promise<{ data: string; mediaType: string; converted: boolean }> {
+  // Only the first bytes are needed for detection — avoid decoding
+  // multi-MB payloads for the common (non-HEIC/SVG) case.
+  const head = Buffer.from(base64Data.slice(0, 512), ENCODINGS.BASE64);
+  const kind = sniffSpecialImageFormat(head, mediaType);
+  if (!kind) return { data: base64Data, mediaType, converted: false };
+
+  const cacheKey = crypto
+    .createHash("sha256")
+    .update(`${kind}|${maxDimension}|`)
+    .update(base64Data)
+    .digest("hex");
+  const cached = normalizedImageCache.get(cacheKey);
+  if (cached) {
+    // Refresh LRU position
+    normalizedImageCache.delete(cacheKey);
+    normalizedImageCache.set(cacheKey, cached);
+    return { ...cached, converted: true };
+  }
+
+  const buffer = Buffer.from(base64Data, ENCODINGS.BASE64);
+  const result =
+    kind === "heic"
+      ? await convertHeicToJpeg(buffer)
+      : await rasterizeSvgToPng(buffer, maxDimension);
+
+  normalizedImageCache.set(cacheKey, result);
+  while (normalizedImageCache.size > NORMALIZED_IMAGE_CACHE_MAX_ENTRIES) {
+    const oldestKey = normalizedImageCache.keys().next().value as string;
+    normalizedImageCache.delete(oldestKey);
+  }
+  return { ...result, converted: true };
+}
+
+/** Test hook — clear the cached normalized images. */
+export function clearNormalizedImageCache(): void {
+  normalizedImageCache.clear();
+}

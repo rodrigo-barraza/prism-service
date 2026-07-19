@@ -11,6 +11,10 @@ import {
 } from '#src/providers/openai-compat';
 import type { InputMessage } from '#src/providers/openai-compat';
 import { MODALITY_TYPES } from "#src/constants";
+import {
+  clearDocumentContextCache,
+  primeDocumentContext,
+} from '#src/utils/documentContext';
 
 vi.mock('#src/utils/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -306,7 +310,8 @@ describe('prepareOpenAICompatMessages', () => {
     expect(contentParts.some(part => part.type === 'video_url')).toBe(false);
   });
 
-  it('emits reader-tool pointers for document attachments', () => {
+  it('emits reader-tool pointers for unprimed document attachments', () => {
+    clearDocumentContextCache();
     const messages: InputMessage[] = [
       {
         role: 'user',
@@ -320,6 +325,23 @@ describe('prepareOpenAICompatMessages', () => {
     const contentParts = prepared[0].content as Array<{ type: string; text?: string }>;
     const pointer = contentParts.find(part => part.text?.includes('read_spreadsheet'));
     expect(pointer?.text).toContain('https://minio.example.com/bucket/uploads/data.xlsx');
+  });
+
+  it('inlines primed small text documents instead of the pointer', async () => {
+    clearDocumentContextCache();
+    const reference = `data:application/json;base64,${Buffer.from('{"a":1}').toString('base64')}`;
+    await primeDocumentContext(reference);
+    const messages: InputMessage[] = [
+      { role: 'user', content: 'Check the config', documents: [reference] },
+    ];
+    const prepared = prepareOpenAICompatMessages(messages, {
+      mediaStrategy: MEDIA_STRATEGIES.IMAGES_ONLY,
+    });
+    const contentParts = prepared[0].content as Array<{ type: string; text?: string }>;
+    const inline = contentParts.find(part => part.text?.includes('Attached file'));
+    expect(inline?.text).toContain('application/json');
+    expect(inline?.text).toContain('{"a":1}');
+    expect(contentParts.some(part => part.text?.includes('read_csv'))).toBe(false);
   });
 
   it('handles FULL_MULTIMODAL strategy for video attachments', () => {
