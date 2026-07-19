@@ -11,6 +11,7 @@ import ContextBudgetTracker from "#src/services/harnesses/ContextBudgetTracker";
 import type { ContextBudgetSnapshot } from "#src/services/harnesses/ContextBudgetTracker";
 import {
   OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
+  OUTPUT_TOKEN_CLAMP_FIXED_HEADROOM_TOKENS,
   MINIMUM_CLAMPED_OUTPUT_TOKENS,
 } from "#src/constants/TokenBudgetDefaults";
 import { estimateTokens } from "#src/utils/CostCalculator";
@@ -101,9 +102,9 @@ describe("ContextBudgetTracker", () => {
       tracker.computeAndEmitEstimate(messageTokens, "", [], 16_384);
 
       const event = emittedEvents[0];
-      const expectedSafetyMargin = Math.ceil(
-        messageTokens * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
-      );
+      const expectedSafetyMargin =
+        Math.ceil(messageTokens * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER) +
+        OUTPUT_TOKEN_CLAMP_FIXED_HEADROOM_TOKENS;
       expect(event.safetyMarginTokens).toBe(expectedSafetyMargin);
       expect(event.totalInputTokens).toBe(
         messageTokens + expectedSafetyMargin,
@@ -342,7 +343,11 @@ describe("ContextBudgetTracker", () => {
 
       expect(emittedEvents).toHaveLength(1);
       expect(emittedEvents[0].messageTokens).toBe(0);
-      expect(emittedEvents[0].availableOutputTokens).toBe(CONTEXT_WINDOW);
+      // Even an empty prompt reserves the fixed headroom — the provider
+      // still prepends chat template tokens the estimate cannot see.
+      expect(emittedEvents[0].availableOutputTokens).toBe(
+        CONTEXT_WINDOW - OUTPUT_TOKEN_CLAMP_FIXED_HEADROOM_TOKENS,
+      );
     });
 
     it("should handle empty system prompt and zero tools", () => {
@@ -396,9 +401,9 @@ describe("ContextBudgetTracker", () => {
       const messageTokens = 50_000;
       tracker.computeAndEmitEstimate(messageTokens, "", [], 16_384);
 
-      const expectedMargin = Math.ceil(
-        messageTokens * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
-      );
+      const expectedMargin =
+        Math.ceil(messageTokens * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER) +
+        OUTPUT_TOKEN_CLAMP_FIXED_HEADROOM_TOKENS;
       expect(emittedEvents[0].safetyMarginTokens).toBe(expectedMargin);
     });
 
@@ -410,9 +415,9 @@ describe("ContextBudgetTracker", () => {
       tracker.recordRealUsage({ inputTokens: 12_000 }, 10_000);
 
       const reportedEvent = emittedEvents[1];
-      const expectedMargin = Math.ceil(
-        12_000 * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER,
-      );
+      const expectedMargin =
+        Math.ceil(12_000 * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER) +
+        OUTPUT_TOKEN_CLAMP_FIXED_HEADROOM_TOKENS;
       expect(reportedEvent.safetyMarginTokens).toBe(expectedMargin);
     });
 
