@@ -32,7 +32,11 @@ vi.mock("#src/services/ConversationStatusRegistry", () => ({
 }));
 
 vi.mock("#src/services/ConversationGenerationTracker", () => ({
-  default: { register: vi.fn(), complete: vi.fn() },
+  default: {
+    register: vi.fn(),
+    complete: vi.fn(),
+    setEstimatedInputTokens: vi.fn(),
+  },
 }));
 
 vi.mock("#src/services/PlanningModeService", () => ({

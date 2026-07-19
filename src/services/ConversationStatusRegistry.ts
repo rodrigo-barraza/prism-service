@@ -33,6 +33,8 @@ export interface LiveConversationStatus {
   outputTokens: number;
   inputTokens: number;
   totalTokens: number;
+  /** Live server-estimated cost of the in-flight generation (USD). */
+  estimatedCost?: number;
   subAgents: Record<string, LiveSubAgentStatus>;
 }
 
@@ -80,6 +82,7 @@ const ConversationStatusRegistry = {
         outputTokens: 0,
         inputTokens: 0,
         totalTokens: 0,
+        estimatedCost: 0,
         subAgents: {},
         ...partial,
       });

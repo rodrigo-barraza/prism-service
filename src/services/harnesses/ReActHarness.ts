@@ -240,6 +240,7 @@ export default class ReActHarness extends BaseAgenticHarness {
         outputTokens: 0,
         inputTokens: 0,
         totalTokens: 0,
+        estimatedCost: 0,
         subAgents: {},
       });
     }

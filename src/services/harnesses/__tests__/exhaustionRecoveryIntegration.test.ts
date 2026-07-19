@@ -47,6 +47,7 @@ vi.mock("#src/utils/FunctionCallingUtilities", () => ({
 vi.mock("#src/services/ConversationGenerationTracker", () => ({
   default: {
     complete: vi.fn(),
+    setEstimatedInputTokens: vi.fn(),
   },
 }));
 

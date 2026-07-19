@@ -48,6 +48,7 @@ interface ActiveRequest {
   chunkCount: number;
   outputCharacters: number;
   inputTokens: number;
+  estimatedInputTokens: number;
   cacheReadInputTokens: number;
   cacheCreationInputTokens: number;
   ttft: number | null;
@@ -99,6 +100,7 @@ interface ConversationGenerationTrackerInterface {
     options?: RegisterOptions,
   ): void;
   update(requestId: string, params?: UpdateParams): void;
+  setEstimatedInputTokens(requestId: string, tokens: number): void;
   recordChunkTiming(requestId: string, charCount?: number): void;
   complete(requestId: string): void;
   getConversationStats(
@@ -150,13 +152,20 @@ function effectiveOutputTokens(entry: ActiveRequest): number {
 function estimateRequestCost(entry: ActiveRequest): number {
   const pricing = getModelPricing(entry.model);
   if (!pricing) return 0;
+  // Until the provider reports real input usage, fall back to the
+  // harness-estimated prompt size (billed at the full input rate — the
+  // cache split isn't known yet). Real usage replaces it on arrival.
+  const inputTokens =
+    entry.inputTokens > 0 ? entry.inputTokens : entry.estimatedInputTokens;
   return (
     calculateTextCost(
       {
-        inputTokens: entry.inputTokens,
+        inputTokens,
         outputTokens: effectiveOutputTokens(entry),
-        cacheReadInputTokens: entry.cacheReadInputTokens,
-        cacheCreationInputTokens: entry.cacheCreationInputTokens,
+        cacheReadInputTokens:
+          entry.inputTokens > 0 ? entry.cacheReadInputTokens : 0,
+        cacheCreationInputTokens:
+          entry.inputTokens > 0 ? entry.cacheCreationInputTokens : 0,
       },
       pricing,
     ) || 0
@@ -186,6 +195,7 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
       chunkCount: 0,
       outputCharacters: 0,
       inputTokens: 0,
+      estimatedInputTokens: 0,
       cacheReadInputTokens: 0,
       cacheCreationInputTokens: 0,
       ttft: null,
@@ -256,6 +266,18 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
     if (providerTokPerSec != null) {
       entry.providerTokPerSec = providerTokPerSec;
     }
+  },
+
+  /**
+   * Set the harness-estimated prompt size for a request (pre-stream).
+   * Used for live cost estimation until the provider reports real input
+   * usage. Deliberately does NOT stamp first/last token timing — the
+   * estimate arrives before generation starts and must not skew tok/s.
+   */
+  setEstimatedInputTokens(requestId: string, tokens: number) {
+    const entry = activeRequests.get(requestId);
+    if (!entry) return;
+    if (tokens > 0) entry.estimatedInputTokens = tokens;
   },
 
   /**
@@ -480,6 +502,7 @@ const ConversationGenerationTracker: ConversationGenerationTrackerInterface = {
       totalInputTokens: totalIn,
       totalTokens: totalIn + totalOut,
       avgTtft: avgTtft != null ? parseFloat(avgTtft.toFixed(3)) : null,
+      estimatedCost: parseFloat((completedCost + activeCost).toFixed(8)),
     };
   },
   getSessionStats(agentConversationId: string): ConversationGenerationStats {

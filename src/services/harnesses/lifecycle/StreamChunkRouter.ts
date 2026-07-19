@@ -65,6 +65,14 @@ export function routeStreamChunk(
       const trackerUpdate: Record<string, number> = {};
       if (reportedInput > 0) trackerUpdate.inputTokens = reportedInput;
       if (reportedOutput > 0) trackerUpdate.outputTokens = reportedOutput;
+      const reportedCacheRead = usageChunk?.cacheReadInputTokens || 0;
+      const reportedCacheWrite = usageChunk?.cacheCreationInputTokens || 0;
+      if (reportedCacheRead > 0) {
+        trackerUpdate.cacheReadInputTokens = reportedCacheRead;
+      }
+      if (reportedCacheWrite > 0) {
+        trackerUpdate.cacheCreationInputTokens = reportedCacheWrite;
+      }
       if (usageChunk?.tokensPerSec != null && usageChunk.tokensPerSec > 0) {
         trackerUpdate.providerTokPerSec = usageChunk.tokensPerSec;
       }

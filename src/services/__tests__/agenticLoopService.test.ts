@@ -91,6 +91,7 @@ vi.mock("#src/services/ConversationGenerationTracker", () => ({
   default: {
     register: vi.fn(),
     update: vi.fn(),
+    setEstimatedInputTokens: vi.fn(),
     recordChunkTiming: vi.fn(),
     complete: vi.fn(),
     cleanup: vi.fn(),
@@ -101,6 +102,7 @@ vi.mock("#src/services/ConversationGenerationTracker", () => ({
       totalTokens: 15,
       tokPerSec: 20,
       avgTtft: 0.5,
+      estimatedCost: 0.001,
     }),
     getConversationStats: vi.fn().mockReturnValue({
       activeRequests: 0,
@@ -109,6 +111,7 @@ vi.mock("#src/services/ConversationGenerationTracker", () => ({
       totalTokens: 15,
       tokPerSec: 20,
       avgTtft: 0.5,
+      estimatedCost: 0.001,
     }),
   },
 }));

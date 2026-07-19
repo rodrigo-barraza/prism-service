@@ -110,6 +110,14 @@ export default class BaseAgenticHarness {
    *  Used by the usage handler to compute calibration ratio. */
   private lastEstimatedMessageTokens = 0;
 
+  /** Calibrated full-prompt estimate (messages + system + tools + skills)
+   *  from the last clampOutputTokens call — seeds the tracker's live cost
+   *  estimate before the provider reports real input usage. */
+  private lastEstimatedTotalInputTokens = 0;
+
+  /** Most recently registered tracker request id for this harness. */
+  private lastTrackerRequestId: string | null = null;
+
   constructor(
     context: AgenticContext,
     state: AgenticLoopState,
@@ -373,6 +381,10 @@ export default class BaseAgenticHarness {
         state.hwmOutputCharacters,
         state.overallOutputCharacters,
       );
+      state.hwmEstimatedCost = Math.max(
+        state.hwmEstimatedCost,
+        stats.estimatedCost || 0,
+      );
       emit({
         type: SERVER_SENT_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.GENERATION_PROGRESS,
@@ -383,6 +395,7 @@ export default class BaseAgenticHarness {
         totalTokens: state.hwmTotalTokens,
         outputCharacters: state.hwmOutputCharacters,
         avgTtft: stats.avgTtft,
+        estimatedCost: state.hwmEstimatedCost,
       });
 
       // Mirror throughput data to the live status registry so clients
@@ -396,6 +409,7 @@ export default class BaseAgenticHarness {
           outputTokens: state.hwmOutputTokens,
           inputTokens: state.hwmInputTokens,
           totalTokens: state.hwmTotalTokens,
+          estimatedCost: state.hwmEstimatedCost,
         });
       }
     }
@@ -547,6 +561,7 @@ export default class BaseAgenticHarness {
     // 1. Conversation messages (raw heuristic, before calibration)
     const estimatedMessageTokens = this.estimateInputTokens(messages);
     this.lastEstimatedMessageTokens = estimatedMessageTokens;
+    this.lastEstimatedTotalInputTokens = estimatedMessageTokens;
 
     // 2. System prompt (sent as systemInstruction, invisible to messages)
     const systemPromptText =
@@ -571,6 +586,8 @@ export default class BaseAgenticHarness {
           requestedMaxTokens,
           skillTokens,
         );
+
+      this.lastEstimatedTotalInputTokens = adjustedInput;
 
       const calibrationRatio = tracker.getCalibrationRatio();
 
@@ -639,6 +656,17 @@ export default class BaseAgenticHarness {
       messages,
       passOptions.maxTokens,
     );
+
+    // Seed the tracker's live cost estimate with the calibrated prompt
+    // size so input-side cost ticks immediately, before the provider
+    // reports real usage (OpenAI and most local runtimes only report
+    // usage at the end of the stream).
+    if (this.lastTrackerRequestId && this.lastEstimatedTotalInputTokens > 0) {
+      ConversationGenerationTracker.setEstimatedInputTokens(
+        this.lastTrackerRequestId,
+        this.lastEstimatedTotalInputTokens,
+      );
+    }
 
     // ── Pre-flight context exhaustion guard ──────────────────
     // If clamping had to reduce the output budget below the minimum viable
@@ -827,6 +855,7 @@ export default class BaseAgenticHarness {
         subAgentId: resolvedParent ? (resolvedAgent as string) : null,
       },
     );
+    this.lastTrackerRequestId = passRequestId;
   }
 
   // ── Context budget tracking ───────────────────────────────

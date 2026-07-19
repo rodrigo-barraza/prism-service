@@ -112,6 +112,7 @@ vi.mock("#src/services/ConversationGenerationTracker", () => ({
   default: {
     update: vi.fn(),
     complete: vi.fn(),
+    setEstimatedInputTokens: vi.fn(),
   },
 }));
 
