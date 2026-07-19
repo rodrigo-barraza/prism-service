@@ -299,6 +299,8 @@ export interface ChatMessage {
   audio?: string | string[];
   video?: string[];
   pdf?: string[];
+  /** Non-inlined document attachments — URLs/data URIs resolved by MediaResolutionService. */
+  documents?: string[];
   toolCalls?: ToolCallEntry[];
   thinking?: string;
   thinkingSignature?: string;
