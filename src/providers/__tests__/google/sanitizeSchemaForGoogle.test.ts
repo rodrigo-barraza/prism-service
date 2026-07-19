@@ -159,3 +159,64 @@ describe("sanitizeSchemaForGoogle — recursive sanitization", () => {
     expect(items).not.toHaveProperty("title");
   });
 });
+
+describe("sanitizeSchemaForGoogle — object-constraint keywords (Gemini 400 regression)", () => {
+  // Gemini rejects propertyNames with 400 INVALID_ARGUMENT ("Unknown name
+  // \"propertyNames\" ... Cannot find field") — seen live 2026-07-19 from a
+  // dynamically-sourced tool schema.
+  it("strips propertyNames and other object-constraint keywords", () => {
+    const result = sanitizeSchemaForGoogle({
+      type: "object",
+      propertyNames: { pattern: "^[a-z]+$" },
+      minProperties: 1,
+      maxProperties: 10,
+      dependentRequired: { a: ["b"] },
+      unevaluatedProperties: false,
+      properties: {
+        value: {
+          type: "object",
+          propertyNames: { maxLength: 20 },
+          description: "keyed map",
+        },
+      },
+    }) as Record<string, unknown>;
+    expect(result.propertyNames).toBeUndefined();
+    expect(result.minProperties).toBeUndefined();
+    expect(result.maxProperties).toBeUndefined();
+    expect(result.dependentRequired).toBeUndefined();
+    expect(result.unevaluatedProperties).toBeUndefined();
+    const value = (result.properties as Record<string, Record<string, unknown>>).value;
+    expect(value.propertyNames).toBeUndefined();
+    expect(value.description).toBe("keyed map");
+  });
+
+  it("keeps user-defined property fields that share unsupported keyword names", () => {
+    const result = sanitizeSchemaForGoogle({
+      type: "object",
+      properties: {
+        propertyNames: { type: "string", description: "a field literally named propertyNames" },
+        definitions: { type: "number" },
+      },
+    }) as Record<string, unknown>;
+    const properties = result.properties as Record<string, unknown>;
+    expect(properties.propertyNames).toBeDefined();
+    expect(properties.definitions).toBeDefined();
+  });
+
+  it("strips array/content-constraint keywords Gemini rejects", () => {
+    const result = sanitizeSchemaForGoogle({
+      type: "array",
+      prefixItems: [{ type: "string" }],
+      additionalItems: false,
+      contains: { type: "number" },
+      minContains: 1,
+      items: { type: "string", contentEncoding: "base64" },
+    }) as Record<string, unknown>;
+    expect(result.prefixItems).toBeUndefined();
+    expect(result.additionalItems).toBeUndefined();
+    expect(result.contains).toBeUndefined();
+    expect(result.minContains).toBeUndefined();
+    expect((result.items as Record<string, unknown>).contentEncoding).toBeUndefined();
+    expect((result.items as Record<string, unknown>).type).toBe("string");
+  });
+});
