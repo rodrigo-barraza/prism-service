@@ -16,6 +16,11 @@ vi.mock("#src/wrappers/MinioWrapper", () => ({
   },
 }));
 
+vi.mock("#config", () => ({
+  MINIO_PUBLIC_URL: "https://storage.example.dev/",
+  MINIO_BUCKET_NAME: "prism",
+}));
+
 describe("FileService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -140,6 +145,27 @@ describe("FileService", () => {
       expect(MinioWrapper.get).toHaveBeenCalledWith(
         "projects/prism/192.168.1.5/uploads/a.png",
       );
+    });
+  });
+
+  describe("getPublicUrl", () => {
+    it("builds a public-gateway URL from MINIO_PUBLIC_URL (never the internal endpoint)", () => {
+      const url = FileService.getPublicUrl("minio://generations/a.wav");
+      expect(url).toBe("https://storage.example.dev/prism/generations/a.wav");
+      // The internal-endpoint fallback must not be consulted at all
+      expect(MinioWrapper.getPublicUrl).not.toHaveBeenCalled();
+    });
+
+    it("does not require MinIO connectivity when the gateway is configured", () => {
+      vi.mocked(MinioWrapper.isAvailable).mockReturnValue(false);
+      expect(FileService.getPublicUrl("minio://generations/b.mp3")).toBe(
+        "https://storage.example.dev/prism/generations/b.mp3",
+      );
+    });
+
+    it("returns null for non-minio references", () => {
+      expect(FileService.getPublicUrl("https://example.com/a.wav")).toBeNull();
+      expect(FileService.getPublicUrl("data:audio/wav;base64,AAAA")).toBeNull();
     });
   });
 });
