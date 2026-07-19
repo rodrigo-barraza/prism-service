@@ -2,7 +2,15 @@ import Anthropic from "@anthropic-ai/sdk";
 import { ProviderError } from "#src/utils/errors";
 import logger from "#src/utils/logger";
 import { extractAnthropicRateLimits } from "#src/utils/rateLimits";
-import { compressImageForSizeLimit } from "#src/utils/media";
+import {
+  compressImageForSizeLimit,
+  extractVideoFramesCached,
+  getMaxImageDimensionForModel,
+} from "#src/utils/media";
+import AnthropicFileCacheService, {
+  ANTHROPIC_FILES_API_BETA,
+  type FileSourceApplication,
+} from "#src/services/AnthropicFileCacheService";
 import { EMPTY_USAGE } from "#src/providers/openai-compat";
 import { ANTHROPIC_API_KEY } from "#config";
 import { MODALITY_TYPES, getDefaultModels, getModelByName } from "#src/config";
@@ -101,7 +109,10 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
  * Walk all Anthropic-format message content blocks and compress any
  * base64 image that exceeds 5 MB. Mutates the messages array in-place.
  */
-async function enforceImageSizeLimits(messages: ChatMessage[]) {
+async function enforceImageSizeLimits(
+  messages: ChatMessage[],
+  maxDimension?: number,
+) {
   for (const message of messages) {
     if (!Array.isArray(message.content)) continue;
     for (const block of message.content as AnthropicBlock[]) {
@@ -119,6 +130,8 @@ async function enforceImageSizeLimits(messages: ChatMessage[]) {
       const result = await compressImageForSizeLimit(
         data,
         block.source.media_type || "image/png",
+        undefined,
+        maxDimension,
       );
       block.source.data = result.data;
       block.source.media_type = result.mediaType;
@@ -142,6 +155,148 @@ async function enforceImageSizeLimits(messages: ChatMessage[]) {
  */
 export function supportsMidConversationSystemMessages(model?: string): boolean {
   return !!model && model.includes("claude-opus-4-8");
+}
+
+/**
+ * Convert one attachment reference into Anthropic content blocks,
+ * routed by MIME type. NOTHING is dropped silently: media the model
+ * cannot perceive natively (audio, unresolved refs, failed video
+ * extraction) becomes a visible text placeholder that also points the
+ * model at the tool-side "attached" escape hatch.
+ */
+async function buildMediaBlocksForReference(
+  reference: string,
+  maxDimension: number,
+): Promise<AnthropicBlock[]> {
+  const match = reference.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) {
+    // Non-data references. HTTP(S) image URLs are supported natively via
+    // url sources; anything else (e.g. an unresolved minio:// ref) gets a
+    // visible placeholder instead of a silent drop.
+    if (reference.startsWith("http://") || reference.startsWith("https://")) {
+      return [{ type: "image", source: { type: "url", url: reference } }];
+    }
+    return [
+      {
+        type: "text",
+        text: `[Attached file (unresolved reference "${reference.substring(0, 80)}") — content unavailable to this model]`,
+      },
+    ];
+  }
+
+  const mimeType = match[1];
+  let data = match[2];
+
+  if (mimeType.startsWith("image/")) {
+    // Image content block
+    let mediaType = mimeType;
+    if (data.startsWith("/9j/")) mediaType = "image/jpeg";
+    else if (data.startsWith("iVBOR")) mediaType = "image/png";
+    else if (data.startsWith("R0lG")) mediaType = "image/gif";
+    else if (data.startsWith("UklG")) mediaType = "image/webp";
+
+    // Enforce Anthropic's 5 MB per-image limit
+    logger.info(
+      `[anthropic] Image block: ${mediaType}, b64_len=${data.length} (${(data.length / 1024 / 1024).toFixed(2)} MB), decoded=${(Buffer.byteLength(data, "base64") / 1024 / 1024).toFixed(2)} MB`,
+    );
+    const compressed = await compressImageForSizeLimit(
+      data,
+      mediaType,
+      undefined,
+      maxDimension,
+    );
+    data = compressed.data;
+    mediaType = compressed.mediaType;
+
+    return [
+      {
+        type: "image",
+        source: { type: "base64", media_type: mediaType, data },
+      },
+    ];
+  }
+
+  if (mimeType === "application/pdf") {
+    // PDF document content block
+    return [
+      {
+        type: "document",
+        source: { type: "base64", media_type: "application/pdf", data },
+      },
+    ];
+  }
+
+  if (mimeType.startsWith("text/") || mimeType === "application/json") {
+    // Text-based files — decode and inline as text
+    try {
+      const decoded = Buffer.from(data, "base64").toString("utf-8");
+      return [
+        { type: "text", text: `[Attached file (${mimeType})]:\n${decoded}` },
+      ];
+    } catch {
+      return [
+        {
+          type: "text",
+          text: `[Attached file (${mimeType}): unable to decode]`,
+        },
+      ];
+    }
+  }
+
+  if (mimeType.startsWith("audio/")) {
+    // Anthropic models cannot hear audio — visible placeholder, never silent
+    return [
+      {
+        type: "text",
+        text: `[Attached audio file (${mimeType}) — this model cannot hear audio directly. Audio tools (e.g. transcribe_audio) can access it via their "attached" input.]`,
+      },
+    ];
+  }
+
+  if (mimeType.startsWith("video/")) {
+    // Expand into sampled frames (cache-stable across turns); if ffmpeg is
+    // unavailable or extraction fails, fall back to a text placeholder.
+    try {
+      const frames = await extractVideoFramesCached(reference);
+      const blocks: AnthropicBlock[] = [
+        {
+          type: "text",
+          text: `[Attached video (${mimeType}) — showing ${frames.length} sampled frame${frames.length === 1 ? "" : "s"} at 1fps; video tools can access the full file via "attached"]`,
+        },
+      ];
+      for (const frameDataUrl of frames) {
+        const frameMatch = frameDataUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (!frameMatch) continue;
+        blocks.push({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: frameMatch[1],
+            data: frameMatch[2],
+          },
+        });
+      }
+      return blocks;
+    } catch (error: unknown) {
+      logger.warn(
+        `[anthropic] Video frame extraction failed: ${getErrorMessage(error)} — inserting placeholder`,
+      );
+      return [
+        {
+          type: "text",
+          text: `[Attached video file (${mimeType}) — this model cannot watch video directly and frame extraction is unavailable. Video tools can access it via their "attached" input.]`,
+        },
+      ];
+    }
+  }
+
+  // Unknown MIME type — visible placeholder, never silent
+  return [
+    {
+      type: "text",
+      text: `[Attached file (${mimeType}) — this file type is not directly readable by this model. Tools may access it via their "attached" input.]`,
+    },
+  ];
 }
 
 /** Merge consecutive same-role messages into a single turn. */
@@ -185,6 +340,9 @@ function mergeConsecutiveSameRole(messages: ChatMessage[]): ChatMessage[] {
 export async function prepareMessages(messages: ChatMessage[], model?: string) {
   let systemMessage: string | undefined;
   const keepSystemRole = supportsMidConversationSystemMessages(model);
+  // High-res Anthropic vision models accept a 2576px long edge; everything
+  // else keeps the conservative 2000px default.
+  const maxImageDimension = getMaxImageDimensionForModel(model);
 
   // Extract system message
   const conversation = messages.map((chatMessage: ChatMessage) => ({
@@ -290,69 +448,37 @@ export async function prepareMessages(messages: ChatMessage[], model?: string) {
           };
         }
 
-        // Convert messages with media to Anthropic content block format
-        const images = message.images;
-        if (images && images.length > 0) {
+        // Convert messages with media to Anthropic content block format.
+        // All media array fields participate — images (which may also carry
+        // PDFs/text files/videos routed by MIME type), plus the dedicated
+        // audio/video/pdf arrays. Unsupported media becomes visible text
+        // placeholders instead of being dropped silently.
+        const mediaReferences: string[] = [
+          ...(message.images || []),
+          ...(Array.isArray(message.audio) ? message.audio : []),
+          ...(Array.isArray(message.video) ? message.video : []),
+          ...(Array.isArray(message.pdf) ? message.pdf : []),
+        ];
+        const documentReferences = Array.isArray(message.documents)
+          ? message.documents
+          : [];
+        if (mediaReferences.length > 0 || documentReferences.length > 0) {
           const contentBlocks: AnthropicBlock[] = [];
-          for (const dataUrl of images) {
-            const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-            if (!match) continue;
-            const mimeType = match[1];
-            let data = match[2];
-
-            if (mimeType.startsWith("image/")) {
-              // Image content block
-              let mediaType = mimeType;
-              if (data.startsWith("/9j/")) mediaType = "image/jpeg";
-              else if (data.startsWith("iVBOR")) mediaType = "image/png";
-              else if (data.startsWith("R0lG")) mediaType = "image/gif";
-              else if (data.startsWith("UklG")) mediaType = "image/webp";
-
-              // Enforce Anthropic's 5 MB per-image limit
-              logger.info(
-                `[anthropic] Image block: ${mediaType}, b64_len=${data.length} (${(data.length / 1024 / 1024).toFixed(2)} MB), decoded=${(Buffer.byteLength(data, "base64") / 1024 / 1024).toFixed(2)} MB`,
-              );
-              const compressed = await compressImageForSizeLimit(
-                data,
-                mediaType,
-              );
-              data = compressed.data;
-              mediaType = compressed.mediaType;
-
-              contentBlocks.push({
-                type: "image",
-                source: {
-                  type: "base64",
-                  media_type: mediaType,
-                  data,
-                },
-              });
-            } else if (mimeType === "application/pdf") {
-              // PDF document content block
-              contentBlocks.push({
-                type: "document",
-                source: {
-                  type: "base64",
-                  media_type: "application/pdf",
-                  data,
-                },
-              });
-            } else if (
-              mimeType.startsWith("text/") ||
-              mimeType === "application/json"
-            ) {
-              // Text-based files — decode and inline as text
-              try {
-                const decoded = Buffer.from(data, "base64").toString("utf-8");
-                contentBlocks.push({
-                  type: "text",
-                  text: `[Attached file (${mimeType})]:\n${decoded}`,
-                });
-              } catch {
-                // Skip if decoding fails
-              }
-            }
-            // Other MIME types (audio, video) are not supported by Anthropic — skip
+          for (const reference of mediaReferences) {
+            contentBlocks.push(
+              ...(await buildMediaBlocksForReference(
+                reference,
+                maxImageDimension,
+              )),
+            );
+          }
+          // Document attachments (CSV/DOCX/XLSX…) are not inlined — the
+          // model reads them via reader tools using the "attached" input.
+          for (const documentReference of documentReferences) {
+            contentBlocks.push({
+              type: "text",
+              text: `[Attached document: ${documentReference.startsWith("data:") ? "(data URI)" : documentReference.substring(0, 200)} — use a document reader tool (read_csv, read_docx, read_spreadsheet, read_pdf) with "attached" to read it.]`,
+            });
           }
           const textContent =
             typeof message.content === "string" ? message.content : "";
@@ -696,7 +822,7 @@ const anthropicProvider = {
     messages: ChatMessage[],
     model: string = getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT).anthropic,
     options: ProviderOptions = {},
-  ) {
+  ): Promise<AnthropicGenerateResult> {
     logger.provider("Anthropic", `generateText model=${model}`);
 
     const prepared = await prepareMessages(messages, model);
@@ -803,6 +929,20 @@ const anthropicProvider = {
       delete payload.top_k;
     }
 
+    // Upload-once media: swap large inline base64 image/PDF blocks for
+    // Files API file_id references (first-party API only). Falls back to
+    // inline base64 on any Files API failure.
+    let fileSources: FileSourceApplication = {
+      applied: false,
+      substitutions: [],
+      fileIds: [],
+    };
+    if (!options.disableAnthropicFileSources) {
+      fileSources = await AnthropicFileCacheService.applyFileSources(
+        prepared.messages as Array<{ content?: unknown }>,
+      );
+    }
+
     applyCacheBreakpoints(payload);
 
     try {
@@ -814,6 +954,9 @@ const anthropicProvider = {
           getClient()
             .messages.create(
               payload as unknown as Anthropic.MessageCreateParamsNonStreaming,
+              fileSources.applied
+                ? { headers: { "anthropic-beta": ANTHROPIC_FILES_API_BETA } }
+                : undefined,
             )
             .withResponse(),
         { signal: options.signal, label: "anthropic" },
@@ -838,6 +981,18 @@ const anthropicProvider = {
         result.stopDetails = { ...message.stop_details };
       return result;
     } catch (error: unknown) {
+      // A rejected file_id (deleted server-side, beta unavailable) —
+      // invalidate the stale cache entries and retry once fully inline.
+      if (AnthropicFileCacheService.isFileSourceError(error, fileSources)) {
+        logger.warn(
+          `[anthropic] Files API reference rejected (${getErrorMessage(error)}) — retrying with inline media`,
+        );
+        await AnthropicFileCacheService.revertFileSources(fileSources);
+        return anthropicProvider.generateText(messages, model, {
+          ...options,
+          disableAnthropicFileSources: true,
+        });
+      }
       throw new ProviderError(
         "anthropic",
         getErrorMessage(error),
@@ -930,6 +1085,12 @@ const anthropicProvider = {
     options: ProviderOptions = {},
   ): AsyncGenerator<TransformedStreamEvent> {
     logger.provider("Anthropic", `generateTextStream model=${model}`);
+    let fileSources: FileSourceApplication = {
+      applied: false,
+      substitutions: [],
+      fileIds: [],
+    };
+    let receivedAnyStreamChunk = false;
     try {
       const prepared = await prepareMessages(messages, model);
       const effectiveSystemPrompt = resolveSystemPrompt(
@@ -1037,7 +1198,19 @@ const anthropicProvider = {
         delete streamPayload.top_k;
       }
 
-      await enforceImageSizeLimits(streamPayload.messages as ChatMessage[]);
+      await enforceImageSizeLimits(
+        streamPayload.messages as ChatMessage[],
+        getMaxImageDimensionForModel(model),
+      );
+
+      // Upload-once media: swap large inline base64 image/PDF blocks for
+      // Files API file_id references (first-party API only). Falls back to
+      // inline base64 on any Files API failure.
+      if (!options.disableAnthropicFileSources) {
+        fileSources = await AnthropicFileCacheService.applyFileSources(
+          streamPayload.messages as Array<{ content?: unknown }>,
+        );
+      }
 
       applyCacheBreakpoints(streamPayload);
 
@@ -1045,6 +1218,9 @@ const anthropicProvider = {
         streamPayload as unknown as Anthropic.MessageCreateParamsNonStreaming,
         {
           ...(options.signal && { signal: options.signal }),
+          ...(fileSources.applied && {
+            headers: { "anthropic-beta": ANTHROPIC_FILES_API_BETA },
+          }),
         },
       );
 
@@ -1064,6 +1240,7 @@ const anthropicProvider = {
         null;
 
       for await (const chunk of stream) {
+        receivedAnyStreamChunk = true;
         if (options.signal?.aborted) {
           stream.abort();
           break;
@@ -1314,6 +1491,24 @@ const anthropicProvider = {
       }
     } catch (error: unknown) {
       if (error instanceof Error && error.name === "AbortError") return;
+      // A rejected file_id (deleted server-side, beta unavailable) surfaces
+      // at request validation — before any chunk. Invalidate the stale cache
+      // entries and retry once fully inline. Zero-chunk guard ensures the
+      // retry never replays text or re-executes tool calls.
+      if (
+        !receivedAnyStreamChunk &&
+        AnthropicFileCacheService.isFileSourceError(error, fileSources)
+      ) {
+        logger.warn(
+          `[anthropic] Files API reference rejected (${getErrorMessage(error)}) — retrying stream with inline media`,
+        );
+        await AnthropicFileCacheService.revertFileSources(fileSources);
+        yield* anthropicProvider.generateTextStream(messages, model, {
+          ...options,
+          disableAnthropicFileSources: true,
+        });
+        return;
+      }
       // No provider-level retry: transient stream failures are retried by the
       // shared streamWithRetries wrapper at the call site (zero-chunk only,
       // so a retry never replays text or re-executes tool calls).

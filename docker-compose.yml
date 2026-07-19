@@ -3,6 +3,9 @@ services:
     image: prism-service:latest
     container_name: prism-service
     restart: unless-stopped
+    depends_on:
+      - playwright-mcp
+      - markitdown-mcp
     ports:
       - "7777:7777"
     env_file:
@@ -27,3 +30,49 @@ services:
       resources:
         limits:
           memory: 2G
+
+  # MCP sidecars — reached by prism-service over the compose network via
+  # streamable HTTP (seeded through DEFAULT_MCP_SERVERS in vault config).
+  # No published ports: they are intentionally unreachable from the LAN.
+  playwright-mcp:
+    image: mcr.microsoft.com/playwright/mcp:v0.0.78
+    container_name: playwright-mcp
+    restart: unless-stopped
+    init: true
+    # --allowed-hosts is a literal host:port match; prism reaches this
+    # container as playwright-mcp:8931 on the compose network.
+    command: ["--headless", "--host", "0.0.0.0", "--port", "8931", "--allowed-hosts", "playwright-mcp:8931,localhost:8931"]
+    environment:
+      - TZ=America/Los_Angeles
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+
+  markitdown-mcp:
+    image: python:3.13-slim
+    container_name: markitdown-mcp
+    restart: unless-stopped
+    init: true
+    # Installed at container start (only on recreate, not every restart);
+    # version pinned per MCP supply-chain guidance in
+    # docs/mcp_server_recommendations_2026-07.md.
+    command: >
+      sh -c "pip install --no-cache-dir -q markitdown-mcp==0.0.1a4
+      && exec markitdown-mcp --http --host 0.0.0.0 --port 3001"
+    environment:
+      - TZ=America/Los_Angeles
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 1G

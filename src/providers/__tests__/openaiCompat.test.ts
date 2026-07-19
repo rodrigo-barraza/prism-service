@@ -276,6 +276,52 @@ describe('prepareOpenAICompatMessages', () => {
     expect(contentParts.some(part => part.type === MODALITY_TYPES.TEXT)).toBe(true);
   });
 
+  it('emits placeholders for audio/video/pdf under IMAGES_ONLY instead of dropping them', () => {
+    const messages: InputMessage[] = [
+      {
+        role: 'user',
+        content: 'What about these?',
+        images: ['data:image/png;base64,iVBOR...'],
+        audio: ['data:audio/wav;base64,UklGR...'],
+        video: ['data:video/mp4;base64,AABB...'],
+        pdf: ['data:application/pdf;base64,JVBERi0...'],
+      },
+    ];
+    const prepared = prepareOpenAICompatMessages(messages, {
+      mediaStrategy: MEDIA_STRATEGIES.IMAGES_ONLY,
+    });
+    const contentParts = prepared[0].content as Array<{ type: string; text?: string }>;
+    expect(contentParts.some(part => part.type === 'image_url')).toBe(true);
+    expect(
+      contentParts.some(part => part.text?.includes('audio input not supported')),
+    ).toBe(true);
+    expect(
+      contentParts.some(part => part.text?.includes('video input not supported')),
+    ).toBe(true);
+    expect(
+      contentParts.some(part => part.text?.includes('PDF input not supported')),
+    ).toBe(true);
+    // No native audio/video parts under IMAGES_ONLY
+    expect(contentParts.some(part => part.type === 'input_audio')).toBe(false);
+    expect(contentParts.some(part => part.type === 'video_url')).toBe(false);
+  });
+
+  it('emits reader-tool pointers for document attachments', () => {
+    const messages: InputMessage[] = [
+      {
+        role: 'user',
+        content: 'Check the spreadsheet',
+        documents: ['https://minio.example.com/bucket/uploads/data.xlsx'],
+      },
+    ];
+    const prepared = prepareOpenAICompatMessages(messages, {
+      mediaStrategy: MEDIA_STRATEGIES.IMAGES_ONLY,
+    });
+    const contentParts = prepared[0].content as Array<{ type: string; text?: string }>;
+    const pointer = contentParts.find(part => part.text?.includes('read_spreadsheet'));
+    expect(pointer?.text).toContain('https://minio.example.com/bucket/uploads/data.xlsx');
+  });
+
   it('handles FULL_MULTIMODAL strategy for video attachments', () => {
     const messages: InputMessage[] = [
       {

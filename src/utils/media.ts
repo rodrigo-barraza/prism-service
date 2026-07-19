@@ -4,12 +4,14 @@
 
 import { execFile } from "child_process";
 import { writeFile, readFile, mkdtemp, rm } from "fs/promises";
+import crypto from "crypto";
 import { tmpdir } from "os";
 import { join } from "path";
 import sharp from "sharp";
 import logger from "./logger.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { UNITS, ENCODINGS } from "#src/constants";
+import { HIGH_RES_IMAGE_MAX_DIMENSION } from "#config";
 
 // ── ffmpeg availability (cached per process) ────────────────
 let _ffmpegAvailable: boolean | null = null;
@@ -44,7 +46,34 @@ const ANTHROPIC_IMAGE_MAX_BYTES = 5 * UNITS.BYTES_PER_MB; // 5 MB
  * beyond ~1500px. Capping at 2000px saves bandwidth, memory, and tokens
  * while preserving enough detail for accurate captioning/analysis.
  */
-const MAX_IMAGE_DIMENSION = 2000;
+export const MAX_IMAGE_DIMENSION = 2000;
+
+/**
+ * Anthropic high-resolution vision models accept a longer 2576px edge.
+ * Matches Opus 4.7/4.8 (and later), Sonnet 5+, Fable 5+, Mythos 5+ —
+ * including provider-prefixed IDs (e.g. "anthropic.claude-opus-4-8").
+ * Conservative by design: unmatched models keep the 2000px default
+ * (higher resolution costs up to ~3× image tokens).
+ */
+const HIGH_RES_VISION_MODEL_PATTERN =
+  /claude-(?:opus-4-(?:[7-9]|\d{2,})|opus-(?:[5-9]|\d{2,})(?!\d)|sonnet-(?:[5-9]|\d{2,})(?!\d)|fable-(?:[5-9]|\d{2,})(?!\d)|mythos-(?:[5-9]|\d{2,})(?!\d))/;
+
+/** Whether a model ID belongs to an Anthropic high-resolution vision model. */
+export function isHighResolutionVisionModel(model?: string | null): boolean {
+  return !!model && HIGH_RES_VISION_MODEL_PATTERN.test(model);
+}
+
+/**
+ * Long-edge pixel cap appropriate for a given model.
+ * High-res Anthropic models get HIGH_RES_IMAGE_MAX_DIMENSION (config
+ * override: HIGH_RES_IMAGE_MAX_DIMENSION env); everything else keeps
+ * the conservative MAX_IMAGE_DIMENSION default.
+ */
+export function getMaxImageDimensionForModel(model?: string | null): number {
+  return isHighResolutionVisionModel(model)
+    ? HIGH_RES_IMAGE_MAX_DIMENSION
+    : MAX_IMAGE_DIMENSION;
+}
 
 /**
  * Compress a base64-encoded image to fit within a byte-size limit.
@@ -57,12 +86,14 @@ export async function compressImageForSizeLimit(
   base64Data: string,
   mediaType: string,
   maxBytes: number = ANTHROPIC_IMAGE_MAX_BYTES,
+  maxDimension: number = MAX_IMAGE_DIMENSION,
 ) {
   try {
     // Step 0: enforce pixel dimension limits first (avoids sending oversized pixels)
     const dimensionResult = await constrainImageDimensions(
       base64Data,
       mediaType,
+      maxDimension,
     );
     base64Data = dimensionResult.data;
     mediaType = dimensionResult.mediaType;
@@ -511,4 +542,71 @@ export async function extractVideoFrames(
       rm(temporaryDirectory, { recursive: true, force: true }).catch(() => {});
     }
   }
+}
+
+// ── Cached Video Frame Extraction ───────────────────────────
+// Prompt-cache stability: providers that expand video into image
+// blocks (Anthropic) must emit byte-identical frames on every turn,
+// otherwise the provider's prompt cache misses on each request.
+// Frames are cached in-memory keyed by a sha256 of the source bytes
+// and extraction options; entries are evicted LRU-style.
+
+const VIDEO_FRAME_CACHE_MAX_ENTRIES = 16;
+const videoFrameCache = new Map<string, string[]>();
+
+/**
+ * Extract video frames with a stable, cache-backed result.
+ *
+ * Identical (source, options) inputs return the exact same frame data
+ * URLs for the lifetime of the process. Frames are dimension-constrained
+ * deterministically before caching so consumers can embed them directly.
+ *
+ * Throws when ffmpeg is unavailable or extraction fails — callers must
+ * fall back to a visible text placeholder, never a silent drop.
+ */
+export async function extractVideoFramesCached(
+  videoDataUrl: string,
+  options: { fps?: number; maxFrames?: number; quality?: number } = {},
+): Promise<string[]> {
+  const { fps = 1, maxFrames = 8, quality = 5 } = options;
+  const cacheKey = crypto
+    .createHash("sha256")
+    .update(`${fps}|${maxFrames}|${quality}|`)
+    .update(videoDataUrl)
+    .digest("hex");
+
+  const cached = videoFrameCache.get(cacheKey);
+  if (cached) {
+    // Refresh LRU position
+    videoFrameCache.delete(cacheKey);
+    videoFrameCache.set(cacheKey, cached);
+    return cached;
+  }
+
+  const rawFrames = await extractVideoFrames(videoDataUrl, {
+    fps,
+    maxFrames,
+    quality,
+  });
+
+  // Deterministic post-processing: constrain frame dimensions so the
+  // cached output is final (no per-turn re-compression downstream).
+  const frames: string[] = [];
+  for (const frameDataUrl of rawFrames) {
+    const base64 = frameDataUrl.split(";base64,")[1] || "";
+    const constrained = await constrainImageDimensions(base64, "image/jpeg");
+    frames.push(`data:${constrained.mediaType};base64,${constrained.data}`);
+  }
+
+  videoFrameCache.set(cacheKey, frames);
+  while (videoFrameCache.size > VIDEO_FRAME_CACHE_MAX_ENTRIES) {
+    const oldestKey = videoFrameCache.keys().next().value as string;
+    videoFrameCache.delete(oldestKey);
+  }
+  return frames;
+}
+
+/** Test hook — clear the cached video frames. */
+export function clearVideoFrameCache(): void {
+  videoFrameCache.clear();
 }

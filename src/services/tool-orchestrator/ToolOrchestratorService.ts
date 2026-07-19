@@ -965,7 +965,7 @@ function getOrchestratorToolSchemas(
 }
 
 /** Conversation-message media fields the input resolver can draw from. */
-type MediaMessageField = "images" | "audio" | "video";
+type MediaMessageField = "images" | "audio" | "video" | "pdf" | "documents";
 
 /** Minimal message shape for media-input resolution. */
 interface MediaMessage {
@@ -973,6 +973,8 @@ interface MediaMessage {
   images?: string[];
   audio?: string[];
   video?: string[];
+  pdf?: string[];
+  documents?: string[];
 }
 
 export default class ToolOrchestratorService {
@@ -1395,6 +1397,13 @@ export default class ToolOrchestratorService {
     transcribe_audio: { arg: "audioUrl", fields: ["audio"] },
     generate_audio: { arg: "sampleSource", fields: ["audio"], explicitOnly: true },
     [TOOL_NAMES.TRIM_VIDEO]: { arg: "url", fields: ["video", "images"] },
+    // Document readers (tools-service /agentic/web/*-read + read_csv) —
+    // accept http(s) URLs and data: URIs, so uploaded documents resolve
+    // directly via the "attached" sentinel or an omitted arg.
+    read_pdf: { arg: "url", fields: ["pdf", "documents"] },
+    read_docx: { arg: "url", fields: ["documents"] },
+    read_spreadsheet: { arg: "url", fields: ["documents"] },
+    read_csv: { arg: "source", fields: ["documents"] },
   };
 
   /**

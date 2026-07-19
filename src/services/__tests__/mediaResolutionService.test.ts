@@ -7,6 +7,7 @@ vi.mock('#src/services/FileService', () => {
       isMinioRef: vi.fn(),
       extractKey: vi.fn(),
       getFile: vi.fn(),
+      getPublicUrl: vi.fn(),
     },
   };
 });
@@ -20,6 +21,8 @@ vi.mock('#src/utils/media', () => {
 
 import {
   compressDataUrlIfOversized,
+  normalizeFileAttachments,
+  resolveDocumentReference,
   resolveMediaReference,
   resolveMessageMediaReferences,
 } from '#src/services/MediaResolutionService';
@@ -68,7 +71,7 @@ describe('MediaResolutionService Unit Tests', () => {
       const input = 'data:image/png;base64,smallbase64';
       const output = await compressDataUrlIfOversized(input);
       expect(output).toBe('data:image/png;base64,constrained-base64');
-      expect(constrainImageDimensions).toHaveBeenCalledWith('smallbase64', 'image/png');
+      expect(constrainImageDimensions).toHaveBeenCalledWith('smallbase64', 'image/png', undefined);
       expect(compressImageForSizeLimit).not.toHaveBeenCalled();
     });
 
@@ -79,7 +82,7 @@ describe('MediaResolutionService Unit Tests', () => {
 
       const output = await compressDataUrlIfOversized(input);
       expect(output).toBe('data:image/jpeg;base64,compressed-data');
-      expect(compressImageForSizeLimit).toHaveBeenCalledWith(oversizedBase64, 'image/jpeg');
+      expect(compressImageForSizeLimit).toHaveBeenCalledWith(oversizedBase64, 'image/jpeg', undefined, undefined);
     });
 
     it('should fall back to original image if dimension constraint or compression fails', async () => {
@@ -230,6 +233,103 @@ describe('MediaResolutionService Unit Tests', () => {
       // Verify original messages array has been mutated in-place to use MinIO upload and original HTTP links for storage
       expect(messages[0].images).toEqual(['minio://bucket/uploaded-file-key']);
       expect(messages[0].audio).toEqual(['https://example.com/voice.mp3']);
+    });
+
+    it('should fold client files[] attachments into media fields and resolve documents as URLs', async () => {
+      const messages: any[] = [
+        {
+          role: 'user',
+          content: 'Analyze this data',
+          files: [
+            { url: 'https://minio.example.com/bucket/projects/p/u/uploads/data.csv', name: 'data.csv', mimeType: 'text/csv', modality: 'document' },
+            { url: 'https://minio.example.com/bucket/projects/p/u/uploads/voice.mp3', name: 'voice.mp3', mimeType: 'audio/mpeg', modality: 'audio' },
+          ],
+        },
+      ];
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: { get: () => 'audio/mpeg' },
+        arrayBuffer: async () => Buffer.from('audio-bytes'),
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+
+      const providerMessages = await resolveMessageMediaReferences(messages, 'p', 'u');
+
+      // Documents keep their lightweight URL (no fetch, no base64 inlining)
+      expect(providerMessages[0].documents).toEqual([
+        'https://minio.example.com/bucket/projects/p/u/uploads/data.csv',
+      ]);
+      expect(messages[0].documents).toEqual([
+        'https://minio.example.com/bucket/projects/p/u/uploads/data.csv',
+      ]);
+      // Audio was folded into the audio field and resolved for the provider
+      const audioBase64 = Buffer.from('audio-bytes').toString('base64');
+      expect(providerMessages[0].audio).toEqual([`data:audio/mpeg;base64,${audioBase64}`]);
+      // The files field itself is preserved for the client UI
+      expect(messages[0].files).toHaveLength(2);
+    });
+  });
+
+  describe('normalizeFileAttachments', () => {
+    it('routes attachments to fields by modality/mime and is idempotent', () => {
+      const message: any = {
+        role: 'user',
+        files: [
+          { url: 'https://x/doc.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', modality: 'document' },
+          { url: 'https://x/doc.pdf', mimeType: 'application/pdf', modality: 'pdf' },
+          { url: 'https://x/clip.mp4', mimeType: 'video/mp4', modality: 'video' },
+          { url: 'https://x/pic.png', mimeType: 'image/png', modality: 'image' },
+          { name: 'no-url.csv', mimeType: 'text/csv', modality: 'document' },
+        ],
+      };
+      normalizeFileAttachments([message]);
+      normalizeFileAttachments([message]); // second run must not duplicate
+
+      expect(message.documents).toEqual(['https://x/doc.docx']);
+      expect(message.pdf).toEqual(['https://x/doc.pdf']);
+      expect(message.video).toEqual(['https://x/clip.mp4']);
+      expect(message.images).toEqual(['https://x/pic.png']);
+    });
+
+    it('leaves messages without files untouched', () => {
+      const message: any = { role: 'user', content: 'hi' };
+      normalizeFileAttachments([message]);
+      expect(message.documents).toBeUndefined();
+    });
+  });
+
+  describe('resolveDocumentReference', () => {
+    it('uploads data URIs to MinIO and prefers the public URL for the provider side', async () => {
+      vi.mocked(FileService.getPublicUrl).mockReturnValue('https://minio/bucket/projects/p/u/uploads/x.csv');
+      const result = await resolveDocumentReference('data:text/csv;base64,QQ==', 'p', 'u');
+      expect(FileService.uploadFile).toHaveBeenCalled();
+      expect(result.storageRef).toBe('minio://bucket/uploaded-file-key');
+      expect(result.providerRef).toBe('https://minio/bucket/projects/p/u/uploads/x.csv');
+    });
+
+    it('falls back to the data URI when no public URL is available', async () => {
+      vi.mocked(FileService.getPublicUrl).mockReturnValue(null);
+      const result = await resolveDocumentReference('data:text/csv;base64,QQ==', 'p', 'u');
+      expect(result.providerRef).toBe('data:text/csv;base64,QQ==');
+      expect(result.storageRef).toBe('minio://bucket/uploaded-file-key');
+    });
+
+    it('passes http(s) references through without fetching', async () => {
+      const fetchSpy = vi.fn();
+      vi.stubGlobal('fetch', fetchSpy);
+      const result = await resolveDocumentReference('https://example.com/report.xlsx', 'p', 'u');
+      expect(result.providerRef).toBe('https://example.com/report.xlsx');
+      expect(result.storageRef).toBe('https://example.com/report.xlsx');
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('maps minio refs to public URLs for the provider side, keeping the ref for storage', async () => {
+      vi.mocked(FileService.isMinioRef).mockImplementation(((ref: unknown) =>
+        typeof ref === 'string' && ref.startsWith('minio://')) as any);
+      vi.mocked(FileService.getPublicUrl).mockReturnValue('https://minio/bucket/projects/p/u/uploads/y.csv');
+      const result = await resolveDocumentReference('minio://projects/p/u/uploads/y.csv', 'p', 'u');
+      expect(result.providerRef).toBe('https://minio/bucket/projects/p/u/uploads/y.csv');
+      expect(result.storageRef).toBe('minio://projects/p/u/uploads/y.csv');
     });
   });
 });

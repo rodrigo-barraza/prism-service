@@ -7,6 +7,9 @@ import {
   constrainImageDimensions,
   compressImageForSizeLimit,
   extractVideoFrames,
+  isHighResolutionVisionModel,
+  getMaxImageDimensionForModel,
+  MAX_IMAGE_DIMENSION,
 } from '#src/utils/media';
 import { MODALITY_TYPES } from "#src/constants";
 
@@ -99,6 +102,43 @@ describe('getUrlType', () => {
 
   it('returns "any" for empty strings', () => {
     expect(getUrlType('')).toBe('any');
+  });
+});
+
+describe('isHighResolutionVisionModel / getMaxImageDimensionForModel', () => {
+  it('matches high-res Anthropic model families (and later versions)', () => {
+    for (const model of [
+      'claude-opus-4-7',
+      'claude-opus-4-8',
+      'claude-opus-4-9',
+      'claude-sonnet-5',
+      'claude-fable-5',
+      'claude-mythos-5',
+      'claude-sonnet-6',
+      'anthropic.claude-opus-4-8', // provider-prefixed IDs
+      'claude-sonnet-5-20260301', // dated IDs
+    ]) {
+      expect(isHighResolutionVisionModel(model), model).toBe(true);
+      expect(getMaxImageDimensionForModel(model)).toBe(2576);
+    }
+  });
+
+  it('keeps the conservative default for everything else', () => {
+    for (const model of [
+      'claude-opus-4-5-20251101',
+      'claude-opus-4-6',
+      'claude-sonnet-4-5-20250929',
+      'claude-sonnet-4-6',
+      'claude-haiku-4-5-20251001',
+      'gpt-5.2',
+      'gemini-3.5-pro',
+      undefined,
+      null,
+      '',
+    ]) {
+      expect(isHighResolutionVisionModel(model), String(model)).toBe(false);
+      expect(getMaxImageDimensionForModel(model)).toBe(MAX_IMAGE_DIMENSION);
+    }
   });
 });
 

@@ -63,6 +63,19 @@ export const MINIO_BUCKET_NAME = process.env.PRISM_SERVICE_MINIO_BUCKET_NAME ||
     process.env.MINIO_BUCKET_NAME;
 // ── Tools API ──────────────────────────────────────────────────
 export const TOOLS_SERVICE_URL = process.env.TOOLS_SERVICE_URL;
+// ── Anthropic Files API ───────────────────────────────────────
+// Upload-once media caching against Anthropic's Files API
+// (beta: files-api-2025-04-14). Default ON for the first-party API;
+// set ANTHROPIC_FILES_API_ENABLED=false to force inline base64.
+export const ANTHROPIC_FILES_API_ENABLED = process.env.ANTHROPIC_FILES_API_ENABLED !== "false";
+// The Files API only exists on the first-party API — the SDK reads
+// ANTHROPIC_BASE_URL, so a Bedrock/Vertex-style override disables it.
+export const ANTHROPIC_BASE_URL = process.env.ANTHROPIC_BASE_URL;
+// ── Media Limits ──────────────────────────────────────────────
+// Long-edge pixel cap for images sent to high-resolution Anthropic
+// vision models (Opus 4.7+, Sonnet 5+, Fable 5, Mythos 5). Higher
+// resolution costs up to ~3× image tokens — override to tune.
+export const HIGH_RES_IMAGE_MAX_DIMENSION = parseInt(process.env.HIGH_RES_IMAGE_MAX_DIMENSION ?? "", 10) || 2576;
 // ── Default Model Names ───────────────────────────────────────
 // Vault-backed model identifiers — swap models without code deploys.
 export const LIVE_AUDIO_MODEL = process.env.LIVE_AUDIO_MODEL;

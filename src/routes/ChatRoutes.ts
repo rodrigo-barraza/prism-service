@@ -43,6 +43,7 @@ import {
   dispatchChunk,
 } from "#src/utils/StreamChunkDispatcher";
 import { resolveMessageMediaReferences } from "#src/services/MediaResolutionService";
+import { getMaxImageDimensionForModel } from "#src/utils/media";
 
 import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
@@ -392,10 +393,20 @@ async function prepareGenerationContext(
   // ── Strip soft-deleted messages ──────────────────────────────
   const activeMessages = messages.filter((message) => !message.deleted);
   // ── Resolve image refs ─────────────────────────────────────
+  // High-res Anthropic vision models keep a larger long-edge cap during
+  // resolution so the provider-side 2576px path isn't pre-shrunk to 2000px.
+  // Only the requested model ID matters here (quant/load-balancing later
+  // never changes the Anthropic model family).
+  const mediaModelHint =
+    (requestedModel as string | null | undefined) ||
+    getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[
+      providerName as string
+    ];
   const providerMessages = await resolveMessageMediaReferences(
     activeMessages as ConversationMessage[],
     project,
     username,
+    { maxImageDimension: getMaxImageDimensionForModel(mediaModelHint) },
   );
   // ── Multi-instance load balancing ─────────────────────────
   // When the caller sends a base provider type (e.g. "lm-studio") and

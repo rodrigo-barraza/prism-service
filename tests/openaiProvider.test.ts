@@ -1060,7 +1060,14 @@ describe("OpenAI Provider Adapter", () => {
       const payload = mockChatCreate.mock.calls[0][0];
       const userMessage = payload.messages[0];
       expect(userMessage.role).toBe(MESSAGE_ROLES.USER);
-      expect(userMessage.content).toHaveLength(7); // 6 valid parts + 1 content text
+      // 6 valid parts + 1 unresolved-ref placeholder + 1 content text
+      expect(userMessage.content).toHaveLength(8);
+      // Unresolved minio:// refs surface as visible placeholders, never silent drops
+      const placeholder = userMessage.content.find(
+        (part: { type: string; text?: string }) =>
+          part.type === "text" && part.text?.includes("unresolved reference"),
+      );
+      expect(placeholder?.text).toContain("minio://bucket/image.png");
     });
   });
 });
