@@ -288,12 +288,33 @@ describe("AgenticToolResolver — tool resolution", () => {
     expect(toolNames).toContain("read_file");
   });
 
-  it("disabledTools prevents prism-local tools from being re-included by bypass", async () => {
+  it("ignores stale client disabledTools for prism-local tools when core tools are locked", async () => {
+    // Internal tools are system-locked in the client for coreToolsLocked
+    // personas, so a disabledTools entry for one can only be stale state
+    // saved before the tool was marked system — the resolver keeps the tool.
     const { finalTools } = await AgenticToolResolver.resolve({
       options: {
         disabledTools: ["think", "sleep"],
       },
       agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: undefined,
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).toContain("think");
+    expect(toolNames).toContain("sleep");
+    expect(toolNames).toContain("read_file");
+  });
+
+  it("honors client disabledTools for prism-local tools when persona has coreToolsLocked: false", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {
+        disabledTools: ["think", "sleep"],
+      },
+      agent: "CUSTOM_AGENT",
       project: "coding",
       username: "anonymous",
       modelDefinition: undefined,
