@@ -1666,8 +1666,24 @@ export default class ToolOrchestratorService {
     // access to Prism's conversation messages.
     // IMPORTANT: Only extract from the LAST user message to avoid collecting
     // stale images from conversation history.
+    // The agent may ALSO pass referenceImages explicitly (e.g. a participant's
+    // avatar URL when the platform didn't attach it) — those are kept and the
+    // conversation-attached images are unioned in behind them.
     if (name === TOOL_NAMES.GENERATE_IMAGE && context.messages) {
-      const referenceImages: string[] = [];
+      const agentProvidedReferences = Array.isArray(
+        (args as { referenceImages?: unknown }).referenceImages,
+      )
+        ? (
+            (args as { referenceImages: unknown[] }).referenceImages
+          ).filter(
+            (image): image is string =>
+              typeof image === "string" &&
+              (image.startsWith("http://") ||
+                image.startsWith("https://") ||
+                image.startsWith("data:")),
+          )
+        : [];
+      const referenceImages: string[] = [...agentProvidedReferences];
       // Find the last user message with images
       for (let i = context.messages.length - 1; i >= 0; i--) {
         const message = context.messages[i];
@@ -1681,6 +1697,9 @@ export default class ToolOrchestratorService {
             `[ToolOrchestrator] generate_image: found ${message.images.length} image(s) on last user message`,
           );
           for (const image of message.images) {
+            if (referenceImages.includes(image as string)) {
+              continue; // already provided explicitly by the agent
+            }
             if (
               typeof image === "string" &&
               (image.startsWith("http://") || image.startsWith("https://"))
@@ -1708,7 +1727,20 @@ export default class ToolOrchestratorService {
       if (referenceImages.length > 0) {
         args = { ...args, referenceImages };
         logger.info(
-          `[ToolOrchestrator] generate_image: injecting ${referenceImages.length} reference image(s) into tool args`,
+          `[ToolOrchestrator] generate_image: injecting ${referenceImages.length} reference image(s) into tool args (${agentProvidedReferences.length} agent-provided)`,
+        );
+      } else if (
+        (args as { referenceImages?: unknown }).referenceImages !== undefined
+      ) {
+        // Agent passed something but nothing survived validation — strip the
+        // arg so the route doesn't receive malformed entries.
+        const { referenceImages: _invalid, ...rest } = args as Record<
+          string,
+          unknown
+        >;
+        args = rest;
+        logger.warn(
+          `[ToolOrchestrator] generate_image: agent-provided referenceImages had no valid entries — stripped`,
         );
       } else {
         logger.info(
