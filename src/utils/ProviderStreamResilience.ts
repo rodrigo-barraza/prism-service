@@ -115,6 +115,70 @@ function extractRetryAfterSeconds(error: unknown): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+/**
+ * Parsed numbers from a provider "context length exceeded" rejection.
+ * `inputTokens` may be a LOWER BOUND: vLLM reports
+ * `window - max_tokens + 1` ("your prompt contains at least N input
+ * tokens") when it short-circuits on overflow, so the real prompt can
+ * be arbitrarily larger than the reported value.
+ */
+export interface ContextOverflowInfo {
+  contextWindow: number;
+  requestedOutputTokens: number | null;
+  inputTokens: number | null;
+}
+
+/**
+ * Detect a context-window overflow rejection and extract its numbers.
+ * Matches the two wire formats seen from OpenAI-compatible runtimes:
+ *   - vLLM:   "...maximum context length is 90000 tokens. However, you
+ *              requested 58082 output tokens and your prompt contains at
+ *              least 31919 input tokens..."
+ *   - OpenAI: "...maximum context length is 8192 tokens. However, you
+ *              requested 9000 tokens (7000 in the messages, 2000 in the
+ *              completion)..."
+ * Returns null for anything else.
+ */
+export function parseContextOverflowError(
+  error: unknown,
+): ContextOverflowInfo | null {
+  if (!error || typeof error !== "object") return null;
+  const message = String(
+    (error as { message?: unknown }).message ?? "",
+  );
+  const windowMatch = message.match(
+    /maximum context length is (\d+) tokens/i,
+  );
+  if (!windowMatch) return null;
+  const contextWindow = Number(windowMatch[1]);
+
+  const vllmMatch = message.match(
+    /requested (\d+) output tokens and your prompt contains at least (\d+) input tokens/i,
+  );
+  if (vllmMatch) {
+    return {
+      contextWindow,
+      requestedOutputTokens: Number(vllmMatch[1]),
+      inputTokens: Number(vllmMatch[2]),
+    };
+  }
+
+  const openAIMatch = message.match(
+    /requested \d+ tokens \((\d+) in the messages, (\d+) in the completion\)/i,
+  );
+  if (openAIMatch) {
+    return {
+      contextWindow,
+      requestedOutputTokens: Number(openAIMatch[2]),
+      inputTokens: Number(openAIMatch[1]),
+    };
+  }
+
+  // Window matched but the component breakdown didn't — still an
+  // overflow; caller falls back to blind output reduction.
+  return { contextWindow, requestedOutputTokens: null, inputTokens: null };
+}
+
 export interface StreamRetryOptions {
   /** Max retry attempts after the initial try. */
   maxRetries?: number;
@@ -124,6 +188,16 @@ export interface StreamRetryOptions {
   signal?: AbortSignal | null;
   /** Label for log lines (e.g. provider name). */
   label?: string;
+  /**
+   * Recovery hook consulted FIRST on any zero-chunk error, before transient
+   * classification: return true to retry after mutating request state (e.g.
+   * shrinking maxTokens after a context-overflow rejection) — this wins even
+   * for errors that would classify as transient, so a doomed payload is
+   * never replayed unchanged. Return false to fall through to the normal
+   * transient check. Never called once any chunk has been yielded or the
+   * signal is aborted.
+   */
+  tryRecoverFromError?: (error: unknown, attempt: number) => boolean;
 }
 
 /**
@@ -141,6 +215,7 @@ export async function* streamWithRetries<T>(
     baseDelayMilliseconds = HARNESS.PROVIDER_STREAM_RETRY_BASE_MILLISECONDS,
     signal,
     label = "provider",
+    tryRecoverFromError,
   }: StreamRetryOptions = {},
 ): AsyncGenerator<T> {
   for (let attempt = 1; ; attempt++) {
@@ -153,11 +228,12 @@ export async function* streamWithRetries<T>(
       }
       return;
     } catch (error: unknown) {
+      const mayRetry =
+        !hasYieldedAnyChunk && !signal?.aborted && attempt <= maxRetries;
       const isRetryable =
-        !hasYieldedAnyChunk &&
-        !signal?.aborted &&
-        attempt <= maxRetries &&
-        isTransientProviderError(error);
+        mayRetry &&
+        (tryRecoverFromError?.(error, attempt) === true ||
+          isTransientProviderError(error));
       if (!isRetryable) throw error;
 
       const delayMilliseconds = computeRetryDelayMilliseconds(
