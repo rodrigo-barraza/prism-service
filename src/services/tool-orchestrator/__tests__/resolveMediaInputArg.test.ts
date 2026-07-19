@@ -122,6 +122,30 @@ describe("resolveMediaInputArg", () => {
     expect(viaImagesFallback.url).toBe(VIDEO_URL);
   });
 
+  it("resolves generate_audio's sampleSource only on the explicit sentinel", () => {
+    const resolved = ToolOrchestratorService.resolveMediaInputArg(
+      "generate_audio",
+      { action: "add_channel", channelId: "vox", sampleSource: "attached" },
+      [{ role: "user", audio: [AUDIO_URL] }],
+    );
+    expect(resolved.sampleSource).toBe(AUDIO_URL);
+  });
+
+  it("does NOT inject audio into generate_audio calls that omit sampleSource", () => {
+    for (const args of [
+      { action: "init", tempo: 120 },
+      { action: "add_channel", channelId: "bass", instrument: "synth_bass" },
+      { action: "render", sessionId: "abc" },
+    ]) {
+      const resolved = ToolOrchestratorService.resolveMediaInputArg(
+        "generate_audio",
+        args,
+        [{ role: "user", audio: [AUDIO_URL] }],
+      );
+      expect(resolved.sampleSource).toBeUndefined();
+    }
+  });
+
   it("leaves non-media tools untouched", () => {
     const args = ToolOrchestratorService.resolveMediaInputArg(
       "search_web",

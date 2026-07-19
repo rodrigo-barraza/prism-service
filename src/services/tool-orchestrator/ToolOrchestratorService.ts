@@ -1373,12 +1373,17 @@ export default class ToolOrchestratorService {
    * which conversation message fields can satisfy it, in priority order.
    * trim_video also falls back to `images` because Discord clients attach
    * videos through `images[]` (providers handle video natively there).
+   * `explicitOnly` marks OPTIONAL media args: they are substituted only
+   * when the model explicitly asked for conversation media ('attached'
+   * sentinel or an unreproducible data URI) — never when omitted, since
+   * omission is the normal case for those tools (e.g. a generate_audio
+   * add_channel call for a plain synth channel).
    * Names not yet in the shared taxonomy are literals until the next
    * utilities-library taxonomy bump.
    */
   static MEDIA_INPUT_TOOL_ARGS: Record<
     string,
-    { arg: string; fields: MediaMessageField[] }
+    { arg: string; fields: MediaMessageField[]; explicitOnly?: boolean }
   > = {
     [TOOL_NAMES.CONVERT_IMAGE_TO_ASCII]: { arg: "input", fields: ["images"] },
     [TOOL_NAMES.MANIPULATE_IMAGE]: { arg: "input", fields: ["images"] },
@@ -1388,6 +1393,7 @@ export default class ToolOrchestratorService {
     remove_background: { arg: "image", fields: ["images"] },
     remix_audio: { arg: "input", fields: ["audio"] },
     transcribe_audio: { arg: "audioUrl", fields: ["audio"] },
+    generate_audio: { arg: "sampleSource", fields: ["audio"], explicitOnly: true },
     [TOOL_NAMES.TRIM_VIDEO]: { arg: "url", fields: ["video", "images"] },
   };
 
@@ -1412,12 +1418,15 @@ export default class ToolOrchestratorService {
     if (!mapping || !messages) return args;
 
     const currentValue = args[mapping.arg];
-    const needsResolution =
-      currentValue == null ||
-      (typeof currentValue === "string" &&
-        (currentValue.trim() === "" ||
-          currentValue.trim().toLowerCase() === "attached" ||
-          currentValue.startsWith("data:")));
+    const isExplicitRequest =
+      typeof currentValue === "string" &&
+      (currentValue.trim().toLowerCase() === "attached" ||
+        currentValue.startsWith("data:"));
+    const needsResolution = mapping.explicitOnly
+      ? isExplicitRequest
+      : isExplicitRequest ||
+        currentValue == null ||
+        (typeof currentValue === "string" && currentValue.trim() === "");
     if (!needsResolution) return args;
 
     const conversationMedia = ToolOrchestratorService.findLastUserMedia(
