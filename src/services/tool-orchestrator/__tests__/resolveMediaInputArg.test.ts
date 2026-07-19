@@ -224,6 +224,107 @@ describe("resolveMediaInputArg", () => {
     expect(args.input).toBe("attached");
   });
 
+  describe("execute_python inputFiles (explicitOnly + multi)", () => {
+    const DOC_URL = "https://cdn.example.com/files/data.csv";
+    const DATA_URI = `data:text/plain;base64,${"QQ=="}`;
+    const attachmentMessages = [
+      { role: "user", documents: [DOC_URL], images: [CDN_URL] },
+    ];
+
+    it("NEVER injects files when inputFiles is omitted (python runs constantly without attachments)", () => {
+      for (const args of [
+        { code: "print(1)" },
+        { code: "print(1)", timeout: 30 },
+      ]) {
+        const resolved = ToolOrchestratorService.resolveMediaInputArg(
+          "execute_python",
+          args,
+          attachmentMessages,
+        );
+        expect(resolved.inputFiles).toBeUndefined();
+      }
+    });
+
+    it("expands the string sentinel to ALL attachments of the last media-bearing user message", () => {
+      const resolved = ToolOrchestratorService.resolveMediaInputArg(
+        "execute_python",
+        { code: "print(1)", inputFiles: "attached" },
+        attachmentMessages,
+      );
+      expect(resolved.inputFiles).toEqual([DOC_URL, CDN_URL]);
+    });
+
+    it("expands an 'attached' entry inside an array, preserving explicit URLs", () => {
+      const resolved = ToolOrchestratorService.resolveMediaInputArg(
+        "execute_python",
+        {
+          code: "print(1)",
+          inputFiles: ["https://example.com/mine.json", "attached"],
+        },
+        attachmentMessages,
+      );
+      expect(resolved.inputFiles).toEqual([
+        "https://example.com/mine.json",
+        DOC_URL,
+        CDN_URL,
+      ]);
+    });
+
+    it("replaces model-typed data: URIs in arrays with the most recent attachment", () => {
+      const resolved = ToolOrchestratorService.resolveMediaInputArg(
+        "execute_python",
+        { code: "print(1)", inputFiles: [DATA_URI] },
+        attachmentMessages,
+      );
+      expect(resolved.inputFiles).toEqual([DOC_URL]);
+    });
+
+    it("leaves arrays without sentinel entries untouched", () => {
+      const files = ["https://example.com/a.csv", "https://example.com/b.csv"];
+      const resolved = ToolOrchestratorService.resolveMediaInputArg(
+        "execute_python",
+        { code: "print(1)", inputFiles: files },
+        attachmentMessages,
+      );
+      expect(resolved.inputFiles).toBe(files);
+    });
+
+    it("leaves the sentinel untouched when no attachments exist", () => {
+      const resolved = ToolOrchestratorService.resolveMediaInputArg(
+        "execute_python",
+        { code: "print(1)", inputFiles: ["attached"] },
+        [{ role: "user" }],
+      );
+      expect(resolved.inputFiles).toEqual(["attached"]);
+    });
+
+    it("prefers public http URLs over base64 when both are attached", () => {
+      const resolved = ToolOrchestratorService.resolveMediaInputArg(
+        "execute_python",
+        { code: "print(1)", inputFiles: "attached" },
+        [
+          {
+            role: "user",
+            documents: [DATA_URI],
+            images: [CDN_URL],
+          },
+        ],
+      );
+      expect(resolved.inputFiles).toEqual([CDN_URL, DATA_URI]);
+    });
+  });
+
+  it("findLastUserMediaAll collects all usable entries of the newest media-bearing message only", () => {
+    const all = ToolOrchestratorService.findLastUserMediaAll(
+      [
+        { role: "user", images: ["https://old.example.com/stale.png"] },
+        { role: "user", images: [AVATAR_URL, CDN_URL], audio: [AUDIO_URL] },
+      ],
+      ["images", "audio"],
+    );
+    expect(all).toEqual([AVATAR_URL, CDN_URL, AUDIO_URL]);
+  });
+
   it("skips non-string entries and picks the first usable image in the message", () => {
     const messages = [
       {

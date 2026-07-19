@@ -603,3 +603,115 @@ describe("truncateToolResult", () => {
     expect(result.otherField).toBe("preserved");
   });
 });
+
+describe("model-visible tool media", () => {
+  const snapshotResult = {
+    message: "Animation updated",
+    snapshot: { url: "https://tools.rod.dev/creative/vector-animation/asset?id=abc", times: [0, 1] },
+  };
+
+  it("attaches a synthetic user message with images for the latest embedded tool round", () => {
+    const messages = [
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          { id: "call-1", name: "create_vector_animation", args: {}, result: snapshotResult },
+        ],
+      },
+    ] as any;
+
+    const expanded = expandMessagesForFunctionCall(messages, { filterDeleted: false });
+    expect(expanded).toHaveLength(3);
+    expect(expanded[2].role).toBe("user");
+    expect(expanded[2].images).toEqual([
+      "https://tools.rod.dev/creative/vector-animation/asset?id=abc",
+    ]);
+    expect(expanded[2].content).toContain("create_vector_animation");
+    expect(expanded[2].content).toContain("Not a user message");
+  });
+
+  it("recognizes generate_image minioRef, screenshotRef, and explicit modelImageUrl", () => {
+    const messages = [
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          { id: "c1", name: "generate_image", args: {}, result: { image: { data: "AAAA", minioRef: "https://storage.rod.dev/gen.png" } } },
+          { id: "c2", name: "browser_action", args: {}, result: { screenshotRef: "https://storage.rod.dev/shot.png" } },
+          { id: "c3", name: "custom_tool", args: {}, result: { modelImageUrl: "https://storage.rod.dev/custom.png" } },
+        ],
+      },
+    ] as any;
+
+    const expanded = expandMessagesForFunctionCall(messages, { filterDeleted: false });
+    const synthetic = expanded[expanded.length - 1];
+    expect(synthetic.role).toBe("user");
+    expect(synthetic.images).toEqual([
+      "https://storage.rod.dev/gen.png",
+      "https://storage.rod.dev/shot.png",
+      "https://storage.rod.dev/custom.png",
+    ]);
+  });
+
+  it("only attaches media for the LAST embedded round, not historical ones", () => {
+    const messages = [
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          { id: "old", name: "create_vector_animation", args: {}, result: snapshotResult },
+        ],
+      },
+      { role: "assistant", content: "intermediate text" },
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          { id: "new", name: "create_vector_animation", args: {}, result: { message: "ok", snapshot: { url: "https://tools.rod.dev/asset?id=new" } } },
+        ],
+      },
+    ] as any;
+
+    const expanded = expandMessagesForFunctionCall(messages, { filterDeleted: false });
+    const withImages = expanded.filter((m: any) => Array.isArray(m.images) && m.images.length > 0);
+    expect(withImages).toHaveLength(1);
+    expect(withImages[0].images).toEqual(["https://tools.rod.dev/asset?id=new"]);
+  });
+
+  it("does not attach media for non-http URLs, base64 data, or plain results", () => {
+    const messages = [
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          { id: "c1", name: "generate_image", args: {}, result: { image: { data: "iVBORbase64" } } },
+          { id: "c2", name: "custom", args: {}, result: { modelImageUrl: "data:image/png;base64,AAAA" } },
+          { id: "c3", name: "get_weather", args: {}, result: { temperature: 20 } },
+        ],
+      },
+    ] as any;
+
+    const expanded = expandMessagesForFunctionCall(messages, { filterDeleted: false });
+    expect(expanded.every((m: any) => !m.images || m.images.length === 0)).toBe(true);
+  });
+
+  it("leaves separate role:tool history messages untouched (no media injection)", () => {
+    const messages = [
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [{ id: "call-1", name: "create_vector_animation", args: {} }],
+      },
+      {
+        role: "tool",
+        tool_call_id: "call-1",
+        name: "create_vector_animation",
+        content: JSON.stringify(snapshotResult),
+      },
+    ] as any;
+
+    const expanded = expandMessagesForFunctionCall(messages, { filterDeleted: false });
+    expect(expanded.every((m: any) => !m.images || m.images.length === 0)).toBe(true);
+  });
+});

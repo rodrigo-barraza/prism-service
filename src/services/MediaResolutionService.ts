@@ -8,7 +8,9 @@ import logger from "#src/utils/logger";
 import {
   compressImageForSizeLimit,
   constrainImageDimensions,
+  normalizeImageFormatForProvider,
 } from "#src/utils/media";
+import { primeDocumentContext } from "#src/utils/documentContext";
 
 import type { ConversationMessage } from "./harnesses/types.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
@@ -44,8 +46,36 @@ export async function compressDataUrlIfOversized(
   const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
   if (!match) return dataUrl;
   let mimeType = match[1];
-  if (!mimeType.startsWith("image/")) return dataUrl;
   let base64Data = match[2];
+  // Step 0: normalize provider-hostile image formats (HEIC/HEIF → JPEG,
+  // SVG → PNG raster). Runs before the image/* gate so generic MIME types
+  // carrying sniffable HEIC/SVG bytes are converted too. A text/plain
+  // result is a visible conversion fallback — return it directly so
+  // providers inline it as text instead of sending a broken image block.
+  if (mimeType.startsWith("image/") || mimeType === "application/octet-stream") {
+    try {
+      const normalized = await normalizeImageFormatForProvider(
+        base64Data,
+        mimeType,
+        maxDimension,
+      );
+      if (normalized.converted) {
+        base64Data = normalized.data;
+        mimeType = normalized.mediaType;
+        logger.info(
+          `[MediaResolution] Normalized image format: now ${mimeType} (${(base64Data.length / 1024).toFixed(0)} KB b64)`,
+        );
+        if (mimeType === "text/plain") {
+          return `data:text/plain;base64,${base64Data}`;
+        }
+      }
+    } catch (error: unknown) {
+      logger.warn(
+        `[MediaResolution] Image format normalization failed: ${getErrorMessage(error)}`,
+      );
+    }
+  }
+  if (!mimeType.startsWith("image/")) return dataUrl;
   // Step 1: enforce pixel dimension limits (Anthropic rejects >8000px)
   try {
     const dimensionResult = await constrainImageDimensions(
@@ -223,6 +253,24 @@ export async function resolveMediaReference(
  *  - http(s):// → passthrough on both sides (no fetch, no inlining)
  */
 export async function resolveDocumentReference(
+  reference: string,
+  project: string,
+  username: string,
+): Promise<{ providerRef: string; storageRef: string }> {
+  const resolved = await resolveDocumentReferenceInner(
+    reference,
+    project,
+    username,
+  );
+  // Prefetch small text-like documents so provider payload builders can
+  // inline their content synchronously (see utils/documentContext.ts).
+  // Cached across turns for byte-stable prompts; failures degrade to the
+  // reader-tool pointer.
+  await primeDocumentContext(resolved.providerRef);
+  return resolved;
+}
+
+async function resolveDocumentReferenceInner(
   reference: string,
   project: string,
   username: string,

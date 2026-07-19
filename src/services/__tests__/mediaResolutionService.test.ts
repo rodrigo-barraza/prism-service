@@ -16,6 +16,7 @@ vi.mock('#src/utils/media', () => {
   return {
     compressImageForSizeLimit: vi.fn(),
     constrainImageDimensions: vi.fn(),
+    normalizeImageFormatForProvider: vi.fn(),
   };
 });
 
@@ -30,15 +31,21 @@ import FileService from '#src/services/FileService';
 import {
   compressImageForSizeLimit,
   constrainImageDimensions,
+  normalizeImageFormatForProvider,
 } from '#src/utils/media';
+import { clearDocumentContextCache } from '#src/utils/documentContext';
 
 describe('MediaResolutionService Unit Tests', () => {
   beforeEach(() => {
+    clearDocumentContextCache();
     vi.mocked(constrainImageDimensions).mockImplementation(async (data, mediaType) => {
       return { data, mediaType };
     });
     vi.mocked(compressImageForSizeLimit).mockImplementation(async (data, mediaType) => {
       return { data: 'compressed-data', mediaType };
+    });
+    vi.mocked(normalizeImageFormatForProvider).mockImplementation(async (data, mediaType) => {
+      return { data, mediaType, converted: false };
     });
     vi.mocked(FileService.uploadFile).mockResolvedValue({ ref: 'minio://bucket/uploaded-file-key' } as any);
     vi.mocked(FileService.isMinioRef).mockReturnValue(false);
@@ -94,6 +101,41 @@ describe('MediaResolutionService Unit Tests', () => {
 
       const output = await compressDataUrlIfOversized(input);
       expect(output).toBe(input); // returns original due to failure fallback
+    });
+
+    it('normalizes provider-hostile formats (HEIC/SVG) before the standard pipeline', async () => {
+      vi.mocked(normalizeImageFormatForProvider).mockResolvedValueOnce({
+        data: 'converted-png',
+        mediaType: 'image/png',
+        converted: true,
+      });
+      const output = await compressDataUrlIfOversized('data:image/svg+xml;base64,PHN2Zy8+');
+      expect(output).toBe('data:image/png;base64,converted-png');
+      expect(normalizeImageFormatForProvider).toHaveBeenCalledWith('PHN2Zy8+', 'image/svg+xml', undefined);
+      // Normalized bytes continue through the dimension constraint step
+      expect(constrainImageDimensions).toHaveBeenCalledWith('converted-png', 'image/png', undefined);
+    });
+
+    it('returns text/plain conversion fallbacks directly (visible, never a broken image block)', async () => {
+      const placeholder = Buffer.from('[Attached SVG image — rasterization failed]').toString('base64');
+      vi.mocked(normalizeImageFormatForProvider).mockResolvedValueOnce({
+        data: placeholder,
+        mediaType: 'text/plain',
+        converted: true,
+      });
+      const output = await compressDataUrlIfOversized('data:image/svg+xml;base64,broken');
+      expect(output).toBe(`data:text/plain;base64,${placeholder}`);
+      expect(constrainImageDimensions).not.toHaveBeenCalled();
+    });
+
+    it('sniffs generic application/octet-stream payloads through normalization', async () => {
+      vi.mocked(normalizeImageFormatForProvider).mockResolvedValueOnce({
+        data: 'converted-jpeg',
+        mediaType: 'image/jpeg',
+        converted: true,
+      });
+      const output = await compressDataUrlIfOversized('data:application/octet-stream;base64,ZnR5cGhlaWM=');
+      expect(output).toBe('data:image/jpeg;base64,converted-jpeg');
     });
   });
 
@@ -299,7 +341,21 @@ describe('MediaResolutionService Unit Tests', () => {
   });
 
   describe('resolveDocumentReference', () => {
+    // Document context priming fetches text-like documents once per
+    // reference; stub fetch so tests never hit the network.
+    const stubDocumentFetch = (contentType = 'application/octet-stream', body = 'binary') => {
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: { get: (name: string) => (name === 'content-type' ? contentType : null) },
+        arrayBuffer: async () => Buffer.from(body),
+        body: undefined,
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+      return fetchSpy;
+    };
+
     it('uploads data URIs to MinIO and prefers the public URL for the provider side', async () => {
+      stubDocumentFetch();
       vi.mocked(FileService.getPublicUrl).mockReturnValue('https://minio/bucket/projects/p/u/uploads/x.csv');
       const result = await resolveDocumentReference('data:text/csv;base64,QQ==', 'p', 'u');
       expect(FileService.uploadFile).toHaveBeenCalled();
@@ -308,22 +364,25 @@ describe('MediaResolutionService Unit Tests', () => {
     });
 
     it('falls back to the data URI when no public URL is available', async () => {
+      stubDocumentFetch();
       vi.mocked(FileService.getPublicUrl).mockReturnValue(null);
       const result = await resolveDocumentReference('data:text/csv;base64,QQ==', 'p', 'u');
       expect(result.providerRef).toBe('data:text/csv;base64,QQ==');
       expect(result.storageRef).toBe('minio://bucket/uploaded-file-key');
     });
 
-    it('passes http(s) references through without fetching', async () => {
-      const fetchSpy = vi.fn();
-      vi.stubGlobal('fetch', fetchSpy);
+    it('passes http(s) references through unchanged (content priming fetches at most once)', async () => {
+      const fetchSpy = stubDocumentFetch();
       const result = await resolveDocumentReference('https://example.com/report.xlsx', 'p', 'u');
       expect(result.providerRef).toBe('https://example.com/report.xlsx');
       expect(result.storageRef).toBe('https://example.com/report.xlsx');
-      expect(fetchSpy).not.toHaveBeenCalled();
+      // No base64 inlining of the document into the provider ref
+      expect(result.providerRef.startsWith('data:')).toBe(false);
+      expect(fetchSpy.mock.calls.length).toBeLessThanOrEqual(1);
     });
 
     it('maps minio refs to public URLs for the provider side, keeping the ref for storage', async () => {
+      stubDocumentFetch();
       vi.mocked(FileService.isMinioRef).mockImplementation(((ref: unknown) =>
         typeof ref === 'string' && ref.startsWith('minio://')) as any);
       vi.mocked(FileService.getPublicUrl).mockReturnValue('https://minio/bucket/projects/p/u/uploads/y.csv');

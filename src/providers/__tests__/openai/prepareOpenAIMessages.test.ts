@@ -10,6 +10,10 @@ import {
   prepareOpenAIMessages,
   type OpenAIMessage,
 } from "#src/providers/openai";
+import {
+  clearDocumentContextCache,
+  primeDocumentContext,
+} from "#src/utils/documentContext";
 
 // ── Helpers ──────────────────────────────────────────────────
 function makeMessage(overrides: Partial<OpenAIMessage>): OpenAIMessage {
@@ -380,5 +384,35 @@ describe("prepareOpenAIMessages — full conversation flow", () => {
       "tool",
       "assistant",
     ]);
+  });
+});
+
+// ── Document Attachments ─────────────────────────────────────
+describe("prepareOpenAIMessages — document attachments", () => {
+  it("emits reader-tool pointers for unprimed document references", () => {
+    clearDocumentContextCache();
+    const result = prepareOpenAIMessages([
+      makeMessage({
+        documents: ["https://minio.example.com/bucket/uploads/data.csv"],
+      }),
+    ]);
+    const content = result[0].content as Array<{ type: string; text?: string }>;
+    const pointer = content.find((part) => part.text?.includes("read_csv"));
+    expect(pointer?.text).toContain(
+      "https://minio.example.com/bucket/uploads/data.csv",
+    );
+  });
+
+  it("inlines primed small text documents as text parts", async () => {
+    clearDocumentContextCache();
+    const reference = `data:text/plain;base64,${Buffer.from("doc body").toString("base64")}`;
+    await primeDocumentContext(reference);
+    const result = prepareOpenAIMessages([
+      makeMessage({ documents: [reference] }),
+    ]);
+    const content = result[0].content as Array<{ type: string; text?: string }>;
+    const inline = content.find((part) => part.text?.includes("Attached file"));
+    expect(inline?.type).toBe("text");
+    expect(inline?.text).toContain("doc body");
   });
 });

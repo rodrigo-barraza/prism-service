@@ -76,6 +76,42 @@ describe("validateUploadDataUrl", () => {
     }
   });
 
+  it("accepts iPhone photos (HEIC/HEIF) and SVG via the image/ prefix", () => {
+    for (const dataUrl of [
+      "data:image/heic;base64,AAAAGGZ0eXBoZWlj",
+      "data:image/heif;base64,AAAAGGZ0eXBoZWlm",
+      "data:image/svg+xml;base64,PHN2Zy8+",
+    ]) {
+      expect(validateUploadDataUrl(dataUrl), dataUrl).toBeNull();
+    }
+  });
+
+  it("accepts any text/* plus common code/config MIME types", () => {
+    for (const dataUrl of [
+      "data:text/markdown;base64,IyBoaQ==",
+      "data:text/html;base64,PGgxLz4=",
+      "data:text/x-rust;base64,Zm4=",
+      "data:application/javascript;base64,bGV0IHg=",
+      "data:application/typescript;base64,bGV0IHg=",
+      "data:application/x-yaml;base64,YTogMQ==",
+      "data:application/xml;base64,PHhtbC8+",
+      "data:application/x-sh;base64,ZWNobw==",
+      "data:application/toml;base64,YSA9IDE=",
+      "data:application/x-python-code;base64,cHJpbnQ=",
+      "data:application/sql;base64,U0VMRUNU",
+    ]) {
+      expect(validateUploadDataUrl(dataUrl), dataUrl).toBeNull();
+    }
+  });
+
+  it("still rejects application/octet-stream (client rewrites known text extensions)", () => {
+    const error = validateUploadDataUrl(
+      "data:application/octet-stream;base64,AAAA",
+    );
+    expect(error).toMatch(/application\/octet-stream/);
+    expect(error).toMatch(/not allowed/);
+  });
+
   it("rejects missing/non-string/empty payloads", () => {
     expect(validateUploadDataUrl(undefined)).toMatch(/non-empty string/);
     expect(validateUploadDataUrl(42)).toMatch(/non-empty string/);

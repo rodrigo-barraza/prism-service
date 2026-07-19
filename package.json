@@ -52,6 +52,7 @@
     "@rodrigo-barraza/utilities-library": "github:rodrigo-barraza/utilities-library",
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "heic-convert": "^2.1.0",
     "minio": "^8.0.7",
     "mongodb": "^7.5.0",
     "openai": "^6.46.0",

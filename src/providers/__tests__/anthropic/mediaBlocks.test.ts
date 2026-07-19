@@ -15,6 +15,13 @@ vi.mock("#src/utils/media", () => ({
   })),
   extractVideoFramesCached: vi.fn(),
   getMaxImageDimensionForModel: vi.fn(() => 2000),
+  normalizeImageFormatForProvider: vi.fn(
+    async (data: string, mediaType: string) => ({
+      data,
+      mediaType,
+      converted: false,
+    }),
+  ),
 }));
 
 import { prepareMessages } from "#src/providers/anthropic";
@@ -22,7 +29,12 @@ import {
   extractVideoFramesCached,
   compressImageForSizeLimit,
   getMaxImageDimensionForModel,
+  normalizeImageFormatForProvider,
 } from "#src/utils/media";
+import {
+  clearDocumentContextCache,
+  primeDocumentContext,
+} from "#src/utils/documentContext";
 import type { ChatMessage } from "#src/types/ProviderTypes";
 
 interface Block {
@@ -37,8 +49,16 @@ function blocksOf(result: { messages: Array<{ content?: unknown }> }): Block[] {
 
 describe("prepareMessages — media handling", () => {
   beforeEach(() => {
+    clearDocumentContextCache();
     vi.mocked(extractVideoFramesCached).mockReset();
     vi.mocked(getMaxImageDimensionForModel).mockReturnValue(2000);
+    vi.mocked(normalizeImageFormatForProvider).mockImplementation(
+      async (data: string, mediaType: string) => ({
+        data,
+        mediaType,
+        converted: false,
+      }),
+    );
   });
 
   it("inserts a text placeholder for audio attachments instead of dropping them", async () => {
@@ -116,7 +136,7 @@ describe("prepareMessages — media handling", () => {
     expect(documentBlock?.source?.data).toBe("JVBERi0=");
   });
 
-  it("emits reader-tool pointers for document attachments (never inlined)", async () => {
+  it("emits reader-tool pointers for unprimed document attachments", async () => {
     const result = await prepareMessages([
       {
         role: "user",
@@ -154,6 +174,66 @@ describe("prepareMessages — media handling", () => {
         block.type === "text" && block.text?.includes("unresolved reference"),
     );
     expect(placeholder?.text).toContain("minio://bucket/lost-key.png");
+  });
+
+  it("routes normalized HEIC/SVG payloads into image blocks with the converted media type", async () => {
+    vi.mocked(normalizeImageFormatForProvider).mockResolvedValueOnce({
+      data: "RASTERPNG",
+      mediaType: "image/png",
+      converted: true,
+    });
+    const result = await prepareMessages([
+      {
+        role: "user",
+        content: "diagram",
+        images: ["data:image/svg+xml;base64,PHN2Zy8+"],
+      } as ChatMessage,
+    ]);
+    const blocks = blocksOf(result);
+    const image = blocks.find((block) => block.type === "image");
+    expect(image?.source?.media_type).toBe("image/png");
+    expect(image?.source?.data).toBe("RASTERPNG");
+  });
+
+  it("emits a visible text block when normalization falls back to text/plain", async () => {
+    const fallback = "[Attached SVG image — rasterization failed; SVG source follows]\n<svg/>";
+    vi.mocked(normalizeImageFormatForProvider).mockResolvedValueOnce({
+      data: Buffer.from(fallback, "utf-8").toString("base64"),
+      mediaType: "text/plain",
+      converted: true,
+    });
+    const result = await prepareMessages([
+      {
+        role: "user",
+        content: "diagram",
+        images: ["data:image/svg+xml;base64,broken"],
+      } as ChatMessage,
+    ]);
+    const blocks = blocksOf(result);
+    expect(blocks.some((block) => block.type === "image")).toBe(false);
+    const text = blocks.find(
+      (block) => block.type === "text" && block.text?.includes("rasterization failed"),
+    );
+    expect(text?.text).toContain("<svg/>");
+  });
+
+  it("inlines primed small text documents instead of the reader-tool pointer", async () => {
+    const reference = `data:text/csv;base64,${Buffer.from("a,b\n1,2").toString("base64")}`;
+    await primeDocumentContext(reference);
+    const result = await prepareMessages([
+      {
+        role: "user",
+        content: "analyze",
+        documents: [reference],
+      } as ChatMessage,
+    ]);
+    const blocks = blocksOf(result);
+    const inline = blocks.find(
+      (block) => block.type === "text" && block.text?.includes("Attached file"),
+    );
+    expect(inline?.text).toContain("text/csv");
+    expect(inline?.text).toContain("a,b\n1,2");
+    expect(blocks.some((block) => block.text?.includes("read_csv"))).toBe(false);
   });
 
   it("passes the model-appropriate dimension cap to image compression", async () => {

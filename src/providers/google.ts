@@ -16,6 +16,7 @@ import crypto from "crypto";
 import { Readable } from "stream";
 import { ProviderError } from "#src/utils/errors";
 import logger from "#src/utils/logger";
+import { getDocumentContextText } from "#src/utils/documentContext";
 import {
   GOOGLE_CLOUD_GEMINI_API_KEY,
   GOOGLE_TEXT_TO_SPEECH_MODEL,
@@ -81,6 +82,7 @@ export interface ConversationMessage {
   audio?: string[];
   video?: string[];
   pdf?: string[];
+  documents?: string[];
   thinking?: string;
   thinkingSignature?: string;
   tool_call_id?: string;
@@ -474,6 +476,16 @@ export async function convertMessages(
               }
             }
           }
+        }
+      }
+
+      // Document attachments — previously dropped silently for Gemini.
+      // Small text-like documents were primed at resolution time and
+      // inline their content directly; binary or oversized documents get
+      // a reader-tool pointer.
+      if (Array.isArray(item.documents)) {
+        for (const documentReference of item.documents) {
+          parts.push({ text: getDocumentContextText(documentReference) });
         }
       }
     }

@@ -1380,12 +1380,20 @@ export default class ToolOrchestratorService {
    * sentinel or an unreproducible data URI) — never when omitted, since
    * omission is the normal case for those tools (e.g. a generate_audio
    * add_channel call for a plain synth channel).
+   * `multi` marks array-capable args: the 'attached' sentinel expands to
+   * ALL usable attachments on the most recent media-bearing user message
+   * (public URLs preferred over base64) instead of just the first one.
    * Names not yet in the shared taxonomy are literals until the next
    * utilities-library taxonomy bump.
    */
   static MEDIA_INPUT_TOOL_ARGS: Record<
     string,
-    { arg: string; fields: MediaMessageField[]; explicitOnly?: boolean }
+    {
+      arg: string;
+      fields: MediaMessageField[];
+      explicitOnly?: boolean;
+      multi?: boolean;
+    }
   > = {
     [TOOL_NAMES.CONVERT_IMAGE_TO_ASCII]: { arg: "input", fields: ["images"] },
     [TOOL_NAMES.MANIPULATE_IMAGE]: { arg: "input", fields: ["images"] },
@@ -1404,6 +1412,16 @@ export default class ToolOrchestratorService {
     read_docx: { arg: "url", fields: ["documents"] },
     read_spreadsheet: { arg: "url", fields: ["documents"] },
     read_csv: { arg: "source", fields: ["documents"] },
+    // Python sandbox — inputFiles is OPTIONAL and multi-valued (array of
+    // http(s)/data: strings, or a single string). Python runs constantly
+    // without attachments, so files are substituted ONLY on the explicit
+    // "attached" sentinel, never on omitted args.
+    execute_python: {
+      arg: "inputFiles",
+      fields: ["documents", "images", "audio", "video", "pdf"],
+      explicitOnly: true,
+      multi: true,
+    },
   };
 
   /**
@@ -1427,6 +1445,19 @@ export default class ToolOrchestratorService {
     if (!mapping || !messages) return args;
 
     const currentValue = args[mapping.arg];
+
+    // Array-valued media args (execute_python inputFiles) — substitute
+    // only explicit sentinel/data: ENTRIES; real URLs/paths are respected.
+    if (Array.isArray(currentValue)) {
+      return ToolOrchestratorService.resolveMediaInputArrayEntries(
+        name,
+        args,
+        mapping,
+        currentValue,
+        messages,
+      );
+    }
+
     const isExplicitRequest =
       typeof currentValue === "string" &&
       (currentValue.trim().toLowerCase() === "attached" ||
@@ -1437,6 +1468,21 @@ export default class ToolOrchestratorService {
         currentValue == null ||
         (typeof currentValue === "string" && currentValue.trim() === "");
     if (!needsResolution) return args;
+
+    // Multi-capable args expand the sentinel to ALL attachments of the
+    // most recent media-bearing user message (public URLs first).
+    if (mapping.multi) {
+      const allMedia = ToolOrchestratorService.findLastUserMediaAll(
+        messages,
+        mapping.fields,
+      );
+      if (allMedia.length > 0) {
+        logger.info(
+          `[ToolOrchestrator] ${name}: resolving '${mapping.arg}' to ${allMedia.length} attachment(s) from conversation context`,
+        );
+        return { ...args, [mapping.arg]: allMedia };
+      }
+    }
 
     const conversationMedia = ToolOrchestratorService.findLastUserMedia(
       messages,
@@ -1493,6 +1539,87 @@ export default class ToolOrchestratorService {
       }
     }
     return null;
+  }
+
+  /**
+   * All usable media entries (http URL or data URI) on the most recent
+   * user message carrying any of the given fields — same stop-at-newest
+   * rule as findLastUserMedia. Entries are field-priority ordered with
+   * public http(s) URLs sorted before data: URIs, since tool payloads
+   * prefer lightweight URLs over inlined base64.
+   */
+  static findLastUserMediaAll(
+    messages: MediaMessage[],
+    fields: MediaMessageField[],
+  ): string[] {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const message = messages[i];
+      if (message.role !== "user") continue;
+      if (!fields.some((field) => (message[field]?.length ?? 0) > 0)) continue;
+      const usable: string[] = [];
+      for (const field of fields) {
+        const entries = message[field];
+        if (!Array.isArray(entries)) continue;
+        for (const entry of entries) {
+          if (
+            typeof entry === "string" &&
+            (entry.startsWith("http") || entry.startsWith("data:"))
+          ) {
+            usable.push(entry);
+          }
+        }
+      }
+      const httpEntries = usable.filter((entry) => entry.startsWith("http"));
+      const dataEntries = usable.filter((entry) => !entry.startsWith("http"));
+      return [...new Set([...httpEntries, ...dataEntries])];
+    }
+    return [];
+  }
+
+  /**
+   * Resolve sentinel/data: entries inside an ARRAY-valued media arg
+   * (execute_python inputFiles). "attached" entries expand to all
+   * attachments of the most recent media-bearing user message; model-typed
+   * data: URIs are replaced with the most recent attachment (models cannot
+   * reproduce base64 faithfully). Anything else passes through untouched.
+   */
+  static resolveMediaInputArrayEntries(
+    name: string,
+    args: Record<string, unknown>,
+    mapping: { arg: string; fields: MediaMessageField[] },
+    currentValue: unknown[],
+    messages: MediaMessage[],
+  ): Record<string, unknown> {
+    const isSentinelEntry = (entry: unknown): entry is string =>
+      typeof entry === "string" &&
+      (entry.trim().toLowerCase() === "attached" || entry.startsWith("data:"));
+    if (!currentValue.some(isSentinelEntry)) return args;
+
+    const allMedia = ToolOrchestratorService.findLastUserMediaAll(
+      messages,
+      mapping.fields,
+    );
+    if (allMedia.length === 0) {
+      logger.warn(
+        `[ToolOrchestrator] ${name}: '${mapping.arg}' contains the "attached" sentinel but no ${mapping.fields.join("/")} found on any user message`,
+      );
+      return args;
+    }
+    const resolved: unknown[] = [];
+    for (const entry of currentValue) {
+      if (isSentinelEntry(entry) && entry.trim().toLowerCase() === "attached") {
+        resolved.push(...allMedia);
+      } else if (isSentinelEntry(entry)) {
+        resolved.push(allMedia[0]);
+      } else {
+        resolved.push(entry);
+      }
+    }
+    const deduped = [...new Set(resolved)];
+    logger.info(
+      `[ToolOrchestrator] ${name}: resolved '${mapping.arg}' array entries from conversation context (${deduped.length} value(s))`,
+    );
+    return { ...args, [mapping.arg]: deduped };
   }
 
   static async executeTool(
