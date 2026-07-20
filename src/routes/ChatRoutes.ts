@@ -46,6 +46,7 @@ import { resolveMessageMediaReferences } from "#src/services/MediaResolutionServ
 import { getMaxImageDimensionForModel } from "#src/utils/media";
 
 import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
+import { withDirectViewerBroadcast } from "#src/utils/DirectViewerBroadcast";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import localModelQueue from "#src/services/LocalModelQueue";
 import LocalProviderGateway from "#src/services/local-provider/index";
@@ -626,9 +627,19 @@ export async function handleConversation(
   } else if (traceId) {
     conversationMeta = { traceId };
   }
+  // The request layer binds the direct-viewer broadcast to the REQUEST's
+  // conversationId — undefined when the id is minted server-side (new
+  // conversations, API callers that never send one). Rebind here with the
+  // resolved id or viewers (/admin/chat, second tabs) receive nothing;
+  // when the request DID carry an id the request layer already broadcasts,
+  // and wrapping again would double-deliver.
+  if (conversationId && !incomingConversationId) {
+    emit = withDirectViewerBroadcast(conversationId, emit);
+  }
   // Merge conversation identity into ctx for sub-handlers
   const fullContext = {
     ...context,
+    emit,
     conversationId: conversationId || null,
     agentConversationId: null as string | null,
     conversationMeta,
@@ -816,6 +827,15 @@ export async function handleAgent(
   const resolvedAgentConversationId =
     agentConversationId || crypto.randomUUID();
   const conversationId = incomingConversationId || crypto.randomUUID();
+  // The request layer binds the direct-viewer broadcast to the REQUEST's
+  // conversationId — undefined when the id is minted server-side (every
+  // lupos turn, any new conversation). Rebind here with the resolved id or
+  // viewers (/admin/chat, second tabs) receive nothing; when the request
+  // DID carry an id the request layer already broadcasts, and wrapping
+  // again would double-deliver.
+  if (!incomingConversationId) {
+    emit = withDirectViewerBroadcast(conversationId, emit);
+  }
   const traceId = incomingTraceId || null;
   let conversationMeta = incomingConversationMeta || null;
   // Title policy is server-owned: when the client didn't send one (new

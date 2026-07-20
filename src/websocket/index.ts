@@ -28,6 +28,11 @@ import type { IncomingMessage } from "http";
 import type { WebSocketServer } from "ws";
 import type { GoogleToolConfigEntry } from "#src/providers/google";
 import WebSocketConnectionRegistry from "./WebSocketConnectionRegistry.ts";
+import {
+  withDirectViewerBroadcast,
+  LiveTurnBuffer,
+} from "#src/utils/DirectViewerBroadcast";
+import type { SseEvent } from "#src/types/SseTypes";
 import type { ToolResultValue } from "#src/utils/FunctionCallingUtilities";
 
 // ── Types ────────────────────────────────────────────────────
@@ -194,28 +199,45 @@ function handleWebsocketChat(
     // "subscribe" messages only register the WebSocket for auto-response
     // streaming — they do NOT trigger a conversation turn. The client
     // uses this after the SSE stream closes (non-blocking subagent
-    // dispatch) so that background task completion events and the
-    // subsequent auto-response chunks stream in real-time.
+    // dispatch) and for viewing conversations driven elsewhere
+    // (/admin/chat, a second tab, another device). If a turn is already
+    // mid-flight, replay its buffered events so the viewer sees the
+    // user prompt and everything generated so far — messages are only
+    // persisted at finalize, so without the replay a mid-turn joiner
+    // renders nothing until the next live event. The registration above
+    // and this replay run in one synchronous block, so no event can
+    // slip between the replayed prefix and the live tail.
     if (data.type === "subscribe") {
       emitFunction({ type: "subscribed", conversationId });
+      if (conversationId) {
+        for (const bufferedEvent of LiveTurnBuffer.replay(conversationId)) {
+          emitFunction(
+            bufferedEvent as unknown as Record<string, unknown> & {
+              type: string;
+            },
+          );
+        }
+      }
       return;
     }
 
     // Mirror generation events to OTHER WebSocket viewers of this
-    // conversation (admin viewer, second tab). The driving socket is
-    // excluded — it already receives events via emitFunction.
+    // conversation (admin viewer, second tab) and record them for
+    // mid-turn replay. The driving socket is excluded — it already
+    // receives events via emitFunction. When the client sent no
+    // conversationId (new conversation), handleConversation rebinds the
+    // broadcast itself once the server-side id exists.
     const emitWithDirectViewers = conversationId
-      ? (event: Record<string, unknown>) => {
-          emitFunction(event);
-          WebSocketConnectionRegistry.getEmitFunction(conversationId, {
-            excludeWebsocket: websocket,
-          })?.(event as { type: string; [key: string]: unknown });
-        }
+      ? withDirectViewerBroadcast(
+          conversationId,
+          emitFunction as (event: SseEvent) => void,
+          { excludeWebsocket: websocket },
+        )
       : emitFunction;
 
     await handleConversation(
       { ...data, project, username, clientIp, agent },
-      emitWithDirectViewers,
+      emitWithDirectViewers as (event: Record<string, unknown>) => void,
     );
   });
 

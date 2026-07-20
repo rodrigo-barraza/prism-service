@@ -112,6 +112,58 @@ describe("buildJsonResponseFromEvents", () => {
     expect(result.response!.estimatedCost).toBe(0.001);
   });
 
+  it("should expose only the last pass's text as finalText when content spans tool calls", () => {
+    const events: TestEvent[] = [
+      { type: "chunk", content: "Let me plan the trumpet line..." },
+      {
+        type: "tool_execution",
+        status: "calling",
+        tool: { name: "generate_audio", args: {} },
+      },
+      {
+        type: "tool_execution",
+        status: "done",
+        tool: { name: "generate_audio", args: {}, result: { success: true } },
+      },
+      { type: "chunk", content: "Behold, " },
+      { type: "chunk", content: "your anthem!" },
+      { type: "done", provider: PROVIDERS.GOOGLE, model: "gemini-3.5-flash" },
+    ];
+
+    const result = callBuildJsonResponse(events, {
+      provider: PROVIDERS.GOOGLE,
+    });
+
+    // text keeps the historical all-passes join for back-compat.
+    expect(result.response!.text).toBe(
+      "Let me plan the trumpet line...Behold, your anthem!",
+    );
+    expect(result.response!.finalText).toBe("Behold, your anthem!");
+  });
+
+  it("should fall back finalText to text written before a silent trailing tool call", () => {
+    const events: TestEvent[] = [
+      { type: "chunk", content: "Here you go, mortal." },
+      {
+        type: "tool_execution",
+        status: "calling",
+        tool: { name: "react_to_discord_message", args: {} },
+      },
+      {
+        type: "tool_execution",
+        status: "done",
+        tool: { name: "react_to_discord_message", args: {}, result: { ok: true } },
+      },
+      { type: "done", provider: PROVIDERS.GOOGLE, model: "gemini-3.5-flash" },
+    ];
+
+    const result = callBuildJsonResponse(events, {
+      provider: PROVIDERS.GOOGLE,
+    });
+
+    expect(result.response!.finalText).toBe("Here you go, mortal.");
+  });
+
   it("should return null text when no chunk events exist", () => {
     const events: TestEvent[] = [
       { type: "done", provider: PROVIDERS.GOOGLE, model: "gemini-3.5-flash" },

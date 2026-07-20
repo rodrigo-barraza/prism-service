@@ -11,47 +11,16 @@ import { Request, Response, NextFunction } from "express";
 import { SseEvent } from "#src/types/SseTypes";
 import type { ChatRequest } from "#src/types/schemas";
 import AgentSessionRegistry from "#src/services/AgentSessionRegistry";
-import WebSocketConnectionRegistry from "#src/websocket/WebSocketConnectionRegistry";
+import { withDirectViewerBroadcast } from "./DirectViewerBroadcast.ts";
 
-/**
- * Mirror a generation event to any WebSocket clients subscribed directly to
- * this conversation (admin viewer, second browser tab). Counterpart of
- * SubAgentTelemetryEmitter.broadcastToDirectViewers, which does the same for
- * sub-agent conversations. Best-effort — direct-viewer delivery must never
- * break the primary stream.
- */
-export function broadcastEventToDirectViewers(
-  conversationId: string,
-  event: SseEvent,
-): void {
-  try {
-    const broadcast = WebSocketConnectionRegistry.getEmitFunction(conversationId);
-    if (!broadcast) return;
-    if (event.type === "image" && event.minioRef && event.data) {
-      const { data: _stripped, ...lightweightEvent } = event;
-      broadcast(lightweightEvent as { type: string; [key: string]: unknown });
-    } else {
-      broadcast(event as unknown as { type: string; [key: string]: unknown });
-    }
-  } catch {
-    // Never let viewer fan-out break the generating request
-  }
-}
-
-/**
- * Wrap a primary emit so every event is also mirrored to direct WebSocket
- * viewers of the conversation. No-op wrapper when there is no conversationId.
- */
-export function withDirectViewerBroadcast(
-  conversationId: string | undefined,
-  emit: (event: SseEvent) => void,
-): (event: SseEvent) => void {
-  if (!conversationId) return emit;
-  return (event: SseEvent) => {
-    emit(event);
-    broadcastEventToDirectViewers(conversationId, event);
-  };
-}
+// Direct-viewer broadcast + live-turn replay live in DirectViewerBroadcast.ts —
+// ChatRoutes and the WebSocket handler need them too, and importing them from
+// here would create an import cycle through handleConversation.
+export {
+  broadcastEventToDirectViewers,
+  withDirectViewerBroadcast,
+  LiveTurnBuffer,
+} from "./DirectViewerBroadcast.ts";
 
 // ─── shared by /chat and /agent routes ──────────────────────
 
@@ -109,6 +78,26 @@ export function buildJsonResponseFromEvents(
     .filter((event: SseEvent) => event.type === "chunk")
     .map((event: SseEvent) => event.content)
     .join("");
+
+  // finalText: only the LAST non-empty per-pass text segment, where
+  // tool_execution "calling" frames mark agentic pass boundaries.
+  // Models occasionally leak planning/reasoning as content on mid-loop
+  // passes; `text` (the historical all-passes join) would prepend that
+  // noise to the real answer. Chat consumers that want the final reply
+  // (e.g. lupos-bot) read finalText; `text` stays untouched for
+  // back-compat. Last NON-EMPTY so a reply written just before a
+  // trailing tool call still counts when the final pass emits nothing.
+  const textSegments: string[] = [""];
+  for (const event of events) {
+    if (event.type === "chunk") {
+      textSegments[textSegments.length - 1] += event.content ?? "";
+    } else if (event.type === "tool_execution" && event.status === "calling") {
+      textSegments.push("");
+    }
+  }
+  const finalText = textSegments
+    .reverse()
+    .find((segment) => segment.trim().length > 0);
   const thinking = events
     .filter((event: SseEvent) => event.type === "thinking")
     .map((event: SseEvent) => event.content)
@@ -155,6 +144,7 @@ export function buildJsonResponseFromEvents(
   return {
     response: {
       text: text || null,
+      finalText: finalText || null,
       thinking: thinking || null,
       images: images.length > 0 ? images : undefined,
       audio: audioEvents.length > 0 ? audioEvents : undefined,
