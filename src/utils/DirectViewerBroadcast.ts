@@ -167,22 +167,30 @@ export function broadcastEventToDirectViewers(
  * and mirrored to direct WebSocket viewers of the conversation. No-op
  * wrapper when there is no conversationId.
  *
+ * Generic over the emit's event shape — callers variously type events as
+ * SseEvent or Record-based EmitFunction payloads; both are runtime-
+ * compatible `{ type: string, ... }` objects.
+ *
  * `excludeWebsocket` skips the driving socket for WebSocket-driven chats —
  * it already receives every event through the primary emit.
  */
-export function withDirectViewerBroadcast(
+export function withDirectViewerBroadcast<TEvent extends object>(
   conversationId: string | undefined,
-  emit: (event: SseEvent) => void,
+  emit: (event: TEvent) => void,
   options: { excludeWebsocket?: WebSocket } = {},
-): (event: SseEvent) => void {
+): (event: TEvent) => void {
   if (!conversationId) return emit;
-  return (event: SseEvent) => {
+  return (event: TEvent) => {
     emit(event);
     try {
-      LiveTurnBuffer.record(conversationId, event);
+      LiveTurnBuffer.record(conversationId, event as unknown as SseEvent);
     } catch {
       // Replay is best-effort — never break the primary stream
     }
-    broadcastEventToDirectViewers(conversationId, event, options);
+    broadcastEventToDirectViewers(
+      conversationId,
+      event as unknown as SseEvent,
+      options,
+    );
   };
 }

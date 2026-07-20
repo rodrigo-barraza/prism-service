@@ -32,7 +32,6 @@ import {
   withDirectViewerBroadcast,
   LiveTurnBuffer,
 } from "#src/utils/DirectViewerBroadcast";
-import type { SseEvent } from "#src/types/SseTypes";
 import type { ToolResultValue } from "#src/utils/FunctionCallingUtilities";
 
 // ── Types ────────────────────────────────────────────────────
@@ -228,16 +227,14 @@ function handleWebsocketChat(
     // conversationId (new conversation), handleConversation rebinds the
     // broadcast itself once the server-side id exists.
     const emitWithDirectViewers = conversationId
-      ? withDirectViewerBroadcast(
-          conversationId,
-          emitFunction as (event: SseEvent) => void,
-          { excludeWebsocket: websocket },
-        )
+      ? withDirectViewerBroadcast(conversationId, emitFunction, {
+          excludeWebsocket: websocket,
+        })
       : emitFunction;
 
     await handleConversation(
       { ...data, project, username, clientIp, agent },
-      emitWithDirectViewers as (event: Record<string, unknown>) => void,
+      emitWithDirectViewers,
     );
   });
 
