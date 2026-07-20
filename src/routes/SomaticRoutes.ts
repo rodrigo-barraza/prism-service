@@ -6,7 +6,7 @@
 // Pure data: presentation (emoji, valence, labels) lives in the consumer.
 
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import { Router, Request, Response, NextFunction } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import SomaticStateService from "#src/services/somatic/SomaticStateService";
 import logger from "#src/utils/logger";

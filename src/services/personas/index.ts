@@ -1,5 +1,5 @@
 import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { Persona } from "./types.ts";
+import { type Persona } from "./types.ts";
 import { CodingPersona } from "./CodingPersona.ts";
 import { LuposPersona } from "./LuposPersona.ts";
 import { StickersPersona } from "./StickersPersona.ts";

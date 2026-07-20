@@ -431,7 +431,7 @@ async function triggerAsyncTaskAutoResponse(
   const ConversationServiceModule = await import("#src/services/ConversationService");
   const ConversationService = ConversationServiceModule.default;
   const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
-  const { MONGO_DB_NAME: databaseName } = await import("../../../config.js");
+  const { MONGO_DB_NAME: databaseName } = await import("../../../config.ts");
   const { COLLECTIONS: collectionNames } = await import("#src/constants");
   const { handleAgent } = await import("#src/routes/ChatRoutes");
 

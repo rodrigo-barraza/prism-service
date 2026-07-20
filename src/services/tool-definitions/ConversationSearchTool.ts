@@ -86,7 +86,7 @@ const searchConversations = {
       await import("#src/services/EmbeddingService");
     const { default: MongoWrapper } =
       await import("#src/wrappers/MongoWrapper");
-    const { MONGO_DB_NAME } = await import("../../../config.js");
+    const { MONGO_DB_NAME } = await import("../../../config.ts");
     const { COLLECTIONS } = await import("#src/constants");
 
     const database = MongoWrapper.getDb(MONGO_DB_NAME);

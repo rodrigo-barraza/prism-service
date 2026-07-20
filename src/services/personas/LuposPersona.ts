@@ -1,6 +1,6 @@
 import { AGENT_IDS, DISCORD_GUILDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { DOMAIN_KEY_TAGS, TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
-import { Persona, ToolPolicySection } from "./types.ts";
+import { type Persona, type ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 

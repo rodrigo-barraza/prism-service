@@ -1,5 +1,5 @@
 import { AGENT_IDS, CORS_ALLOWED_HEADERS_STRING } from "@rodrigo-barraza/utilities-library/taxonomy";
-import express, { Request, Response } from "express";
+import express, { type Request, type Response } from "express";
 import cors from "cors";
 import http from "http";
 import { WebSocketServer } from "ws";
@@ -646,7 +646,7 @@ setupWebSocket(wss);
   // Load custom agents from database into the persona registry
   try {
     const { default: AgentPersonaRegistryCustom } =
-      await import("./services/AgentPersonaRegistry.js");
+      await import("./services/AgentPersonaRegistry.ts");
     await AgentPersonaRegistryCustom.loadCustomAgents();
   } catch (error: unknown) {
     logger.warn(`Custom agent loading failed: ${getErrorMessage(error)}`);
@@ -658,9 +658,9 @@ setupWebSocket(wss);
   // Auto-connect enabled MCP servers
   try {
     const { default: MCPClientService } =
-      await import("./services/MCPClientService.js");
+      await import("./services/MCPClientService.ts");
     const { default: AgentPersonaRegistryMCP } =
-      await import("./services/AgentPersonaRegistry.js");
+      await import("./services/AgentPersonaRegistry.ts");
     const mcpDb = MongoWrapper.getDb(MONGO_DB_NAME);
     const codingProject =
       AgentPersonaRegistryMCP.get(AGENT_IDS.CODING)?.project || "coding";

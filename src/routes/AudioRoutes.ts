@@ -5,7 +5,7 @@ import {
   errorMessage,
 } from "@rodrigo-barraza/utilities-library";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
-import express, { Request, Response, NextFunction } from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import crypto from "crypto";
 import { getProvider } from "#src/providers/index";
 import { ProviderError } from "#src/utils/errors";

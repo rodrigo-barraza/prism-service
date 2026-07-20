@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import { type Request, type Response, type NextFunction } from "express";
 import { formatBytes } from "@rodrigo-barraza/utilities-library";
 import { IDENTITY_HEADERS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import logger from "#src/utils/logger";

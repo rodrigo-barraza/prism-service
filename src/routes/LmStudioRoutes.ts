@@ -1,6 +1,6 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { sleep } from "@rodrigo-barraza/utilities-library";
-import express, { Request, Response, NextFunction } from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import { getProvider } from "#src/providers/index";
 import type { LmStudioProvider } from "#src/providers/lm-studio";
 import { isInstance } from "#src/providers/instance-registry";

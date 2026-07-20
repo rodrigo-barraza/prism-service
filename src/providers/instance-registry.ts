@@ -15,8 +15,8 @@ import { createOllamaProvider } from "./ollama.ts";
 import { createVllmProvider } from "./vllm.ts";
 import { createLlamaCppProvider } from "./llama-cpp.ts";
 import {
-  InstanceEntry,
-  ProviderInstanceConfig,
+  type InstanceEntry,
+  type ProviderInstanceConfig,
 } from "#src/types/ProviderTypes";
 
 // ── Factory map ─────────────────────────────────────────────

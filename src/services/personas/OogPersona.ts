@@ -1,5 +1,5 @@
 import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { Persona, ToolPolicySection } from "./types.ts";
+import { type Persona, type ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 

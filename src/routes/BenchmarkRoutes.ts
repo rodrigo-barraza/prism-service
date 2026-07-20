@@ -1,6 +1,6 @@
 import { DEFAULT_USERNAME } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import express, { Request, Response, NextFunction } from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import { EventEmitter } from "node:events";
 import BenchmarkService from "#src/services/BenchmarkService";
 import logger from "#src/utils/logger";

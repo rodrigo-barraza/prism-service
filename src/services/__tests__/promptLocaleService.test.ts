@@ -10,7 +10,9 @@ import { fileURLToPath } from "url";
 //   1. All locale JSON files are valid JSON and load without errors
 //   2. Nested directory namespacing works (personas/omni.json → personas.omni.*)
 //   3. Every key referenced in system prompt assembly actually exists
-//   4. The dist/ output contains locale files after build (production readiness)
+//   4. The runtime locale resolution (relative to PromptLocaleService.ts)
+//      points at a directory that actually contains the locale files
+//      (production runs straight from src/ via Node type stripping)
 
 const LOCALES_DIRECTORY = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -19,13 +21,13 @@ const LOCALES_DIRECTORY = path.resolve(
   "locales",
 );
 
-const DIST_LOCALES_DIRECTORY = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
+// Mirrors getLocalesDirectory() in ../PromptLocaleService.ts: the service
+// resolves "../locales" relative to its own module file. Compute the same
+// path here so this test fails if the service's resolution logic and the
+// on-disk layout ever drift apart.
+const RUNTIME_LOCALES_DIRECTORY = path.resolve(
+  path.dirname(fileURLToPath(new URL("../PromptLocaleService.ts", import.meta.url))),
   "..",
-  "..",
-  "..",
-  "dist",
-  "src",
   "locales",
 );
 
@@ -311,29 +313,24 @@ describe("PromptLocaleService — No Value Contains [MISSING:]", () => {
   });
 });
 
-describe("PromptLocaleService — dist/ Production Build", () => {
-  it("should have locale files copied to dist/src/locales/en/ after build", () => {
-    if (!fs.existsSync(DIST_LOCALES_DIRECTORY)) {
-      // Build hasn't been run — skip (non-critical in dev mode)
-      return;
-    }
-    const distEnglishLocaleDirectory = path.join(DIST_LOCALES_DIRECTORY, "en");
-    expect(fs.existsSync(distEnglishLocaleDirectory)).toBe(true);
+describe("PromptLocaleService — Runtime Locale Resolution", () => {
+  it("should resolve the service-relative locales directory to real locale files", () => {
+    const runtimeEnglishLocaleDirectory = path.join(RUNTIME_LOCALES_DIRECTORY, "en");
+    expect(fs.existsSync(runtimeEnglishLocaleDirectory)).toBe(true);
 
-    const distLocaleKeys = loadAllLocaleKeys(distEnglishLocaleDirectory);
-    expect(distLocaleKeys.size).toBeGreaterThan(0);
+    const runtimeLocaleKeys = loadAllLocaleKeys(runtimeEnglishLocaleDirectory);
+    expect(runtimeLocaleKeys.size).toBeGreaterThan(0);
 
-    // Verify critical keys exist in the dist build
-    expect(distLocaleKeys.has("system-prompt.directModeIdentity")).toBe(true);
-    expect(distLocaleKeys.has("personas.omni.coreIdentity")).toBe(true);
-    expect(distLocaleKeys.has("orchestrator.header")).toBe(true);
-    expect(distLocaleKeys.has("tool-policy.generalPrinciples")).toBe(true);
+    // Verify critical keys exist at the runtime-resolved location
+    expect(runtimeLocaleKeys.has("system-prompt.directModeIdentity")).toBe(true);
+    expect(runtimeLocaleKeys.has("personas.omni.coreIdentity")).toBe(true);
+    expect(runtimeLocaleKeys.has("orchestrator.header")).toBe(true);
+    expect(runtimeLocaleKeys.has("tool-policy.generalPrinciples")).toBe(true);
   });
 
-  it("should have the personas/ subdirectory in dist locales", () => {
-    if (!fs.existsSync(DIST_LOCALES_DIRECTORY)) return;
-    const distPersonasDirectory = path.join(DIST_LOCALES_DIRECTORY, "en", "personas");
-    expect(fs.existsSync(distPersonasDirectory)).toBe(true);
+  it("should have the personas/ subdirectory at the runtime-resolved location", () => {
+    const runtimePersonasDirectory = path.join(RUNTIME_LOCALES_DIRECTORY, "en", "personas");
+    expect(fs.existsSync(runtimePersonasDirectory)).toBe(true);
   });
 });
 

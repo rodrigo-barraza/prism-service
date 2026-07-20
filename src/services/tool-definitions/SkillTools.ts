@@ -6,7 +6,7 @@ import {
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
 
-import { InternalToolContext } from "./InternalToolRegistry.ts";
+import { type InternalToolContext } from "./InternalToolRegistry.ts";
 import type { SkillDocument, SkillPrepareResult } from "#src/services/SkillService";
 
 interface SkillCreateArgs extends Partial<SkillDocument> {

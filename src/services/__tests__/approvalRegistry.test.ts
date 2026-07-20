@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   pendingApprovals,
   pendingQuestions,
-  ApprovalResolution,
-  QuestionResolution,
-  PendingToolApprovalEntry,
-  PendingPlanApprovalEntry,
-  PendingQuestionEntry,
+  type ApprovalResolution,
+  type QuestionResolution,
+  type PendingToolApprovalEntry,
+  type PendingPlanApprovalEntry,
+  type PendingQuestionEntry,
 } from '#src/services/ApprovalRegistry';
 
 describe('ApprovalRegistry Unit Tests', () => {

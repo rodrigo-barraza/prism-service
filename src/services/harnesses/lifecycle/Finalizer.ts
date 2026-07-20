@@ -25,10 +25,10 @@ import {
 } from "#src/constants";
 import logger from "#src/utils/logger";
 import {
-  TokenUsage,
-  MessagePayload,
-  ToolCallPayload,
-  LlmOptions,
+  type TokenUsage,
+  type MessagePayload,
+  type ToolCallPayload,
+  type LlmOptions,
 } from "#src/services/RequestLogger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 

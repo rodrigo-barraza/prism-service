@@ -5,7 +5,7 @@ import {
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
-import { InternalToolContext } from "./InternalToolRegistry.ts";
+import { type InternalToolContext } from "./InternalToolRegistry.ts";
 import { LOG_PREVIEW } from "#src/constants";
 import type { QuestionDefinition } from "#src/services/ApprovalRegistry";
 

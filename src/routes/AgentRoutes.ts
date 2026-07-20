@@ -1,6 +1,6 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
-import express, { Request, Response, NextFunction } from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import AgenticLoopService from "#src/services/AgenticLoopService";
 import AgentSessionRegistry from "#src/services/AgentSessionRegistry";
 import { handleAgent } from "./ChatRoutes.ts";

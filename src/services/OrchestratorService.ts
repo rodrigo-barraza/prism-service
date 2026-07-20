@@ -159,7 +159,7 @@ export class OrchestratorService {
     null;
   private static getAgenticLoopService() {
     if (!this.agenticLoopServicePromise) {
-      this.agenticLoopServicePromise = import("./AgenticLoopService.js");
+      this.agenticLoopServicePromise = import("./AgenticLoopService.ts");
     }
     return this.agenticLoopServicePromise;
   }

@@ -3,10 +3,10 @@ import type { PolicyRule, PolicyDecision } from "./PolicyEngine.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import {
   BUILT_IN_PERSONAS,
-  Persona,
-  PersonaContext,
-  ToolPolicySection,
-  SerializedPolicy,
+  type Persona,
+  type PersonaContext,
+  type ToolPolicySection,
+  type SerializedPolicy,
   buildToolPolicy,
 } from "./personas/index.ts";
 
@@ -172,7 +172,7 @@ const AgentPersonaRegistry = {
   async loadCustomAgents() {
     try {
       const { default: CustomAgentService } =
-        await import("./CustomAgentService.js");
+        await import("./CustomAgentService.ts");
       const agents = await CustomAgentService.list();
 
       // Clear existing custom agents first

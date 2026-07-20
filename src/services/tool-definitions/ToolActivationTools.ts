@@ -12,7 +12,7 @@ import { partitionByDiscoverableUniverse } from "#src/services/ToolDiscoveryScop
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 import SettingsService from "#src/services/SettingsService";
 import { TOOLS } from "#src/constants";
-import { InternalToolContext } from "./InternalToolRegistry.ts";
+import { type InternalToolContext } from "./InternalToolRegistry.ts";
 import {
   getCurrentDynamicTools,
   persistDynamicTools,

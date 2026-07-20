@@ -72,7 +72,7 @@ vi.mock("#src/wrappers/MongoWrapper", () => {
 
 // Import AFTER mocks are wired
 vi.unmock("../src/services/ConversationService.ts");
-vi.unmock("../src/services/ConversationService.js");
+vi.unmock("../src/services/ConversationService.ts");
 vi.unmock("../src/services/conversation/index.ts");
 vi.unmock("../src/services/conversation/ConversationService.ts");
 const MongoWrapperModule = await import("#src/wrappers/MongoWrapper");

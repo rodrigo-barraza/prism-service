@@ -6,7 +6,7 @@ import { COLLECTIONS, MEMORY } from "#src/constants";
 import logger from "#src/utils/logger";
 import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
-import { MemoryFetchOptions, SkillFetchOptions, ScoredSkill } from "./types.ts";
+import { type MemoryFetchOptions, type SkillFetchOptions, type ScoredSkill } from "./types.ts";
 
 const SKILL_RELEVANCE_THRESHOLD = MEMORY.SKILL_RELEVANCE_THRESHOLD;
 

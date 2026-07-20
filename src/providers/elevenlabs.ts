@@ -1,4 +1,4 @@
-import { ProviderOptions } from "#src/types/ProviderTypes";
+import { type ProviderOptions } from "#src/types/ProviderTypes";
 import WebSocket from "ws";
 import { ProviderError } from "#src/utils/errors";
 import logger from "#src/utils/logger";

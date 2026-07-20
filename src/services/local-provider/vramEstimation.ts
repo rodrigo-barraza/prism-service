@@ -1,6 +1,6 @@
 import { resolveArchParams, estimateMemory } from "#src/utils/gguf-arch";
 import { getProvider } from "#src/providers/index";
-import { LmStudioRawModel, GenericProvider, TransformedVramEstimate } from "./types.ts";
+import { type LmStudioRawModel, type GenericProvider, type TransformedVramEstimate } from "./types.ts";
 import { LOCAL_PROVIDER } from "#src/constants";
 
 /**

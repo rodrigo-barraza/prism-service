@@ -1,5 +1,5 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import express, { Request, Response } from "express";
+import express, { type Request, type Response } from "express";
 import ScheduledTaskService from "#src/services/ScheduledTaskService";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";

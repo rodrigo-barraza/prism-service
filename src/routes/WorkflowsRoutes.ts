@@ -1,5 +1,5 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import { Router, Request, Response, NextFunction } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import { EventEmitter } from "node:events";
 import { ObjectId, type Document, type Db } from "mongodb";
 import logger from "#src/utils/logger";
