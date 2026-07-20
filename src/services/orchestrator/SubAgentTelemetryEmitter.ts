@@ -6,6 +6,8 @@
 import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
 import ConversationStatusRegistry from "#src/services/ConversationStatusRegistry";
 import WebSocketConnectionRegistry from "#src/websocket/WebSocketConnectionRegistry";
+import { LiveTurnBuffer } from "#src/utils/DirectViewerBroadcast";
+import type { SseEvent } from "#src/types/SseTypes";
 import { estimateTokens } from "./SubAgentResultBuilder.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
@@ -112,6 +114,16 @@ export class SubAgentTelemetryEmitter {
    */
   private broadcastToDirectViewers(event: Record<string, unknown>): void {
     if (!this.subAgentConversationId) return;
+    // Record for mid-turn replay — a viewer that opens this sub-agent's
+    // conversation while it runs is sent everything emitted so far.
+    try {
+      LiveTurnBuffer.record(
+        this.subAgentConversationId,
+        event as unknown as SseEvent,
+      );
+    } catch {
+      // Replay is best-effort — never break sub-agent telemetry
+    }
     const directViewerEmit = WebSocketConnectionRegistry.getEmitFunction(
       this.subAgentConversationId,
     );
