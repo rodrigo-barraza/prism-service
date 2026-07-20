@@ -119,6 +119,23 @@ describe("runPreflightToolDiscovery", () => {
     );
   });
 
+  it("excludes recipe:* plan entries from pre-enabled tool names", async () => {
+    mockSearchToolsWithMCP.mockResolvedValue(
+      searchResultOf("recipe:sample-audio-from-web", "download_video", "generate_audio"),
+    );
+
+    const result = await runPreflightToolDiscovery({
+      context: makeContext(),
+      resolvedTools: makeResolvedTools(),
+    });
+
+    expect(result.enabledTools).toEqual(["download_video", "generate_audio"]);
+    const persisted = toolContextData.get("dynamicEnabledTools") as string[];
+    expect(persisted).not.toEqual(
+      expect.arrayContaining(["recipe:sample-audio-from-web"]),
+    );
+  });
+
   it("excludes tools already present in the resolved finalTools", async () => {
     mockSearchToolsWithMCP.mockResolvedValue(
       searchResultOf("read_file", "generate_qr_code"),

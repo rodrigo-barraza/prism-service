@@ -153,6 +153,9 @@ export async function runPreflightToolDiscovery({
         (name): name is string =>
           typeof name === "string" &&
           name.length > 0 &&
+          // "recipe:*" entries are multi-tool plans, not enableable tools —
+          // their constituent tools ride along as regular matches.
+          !name.startsWith("recipe:") &&
           !alreadyAvailable.has(name),
       )
       .slice(0, TOOLS.MAX_PREFLIGHT_TOOLS);
