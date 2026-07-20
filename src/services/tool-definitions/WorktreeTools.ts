@@ -13,7 +13,7 @@ import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalTo
 // speculative or risky changes. The active worktree state is
 // managed by ToolOrchestratorService (activeWorktrees map).
 
-import { InternalToolContext } from "./InternalToolRegistry.ts";
+import { type InternalToolContext } from "./InternalToolRegistry.ts";
 
 interface WorktreeContext extends InternalToolContext {
   _emit?: (event: { type: string; [key: string]: unknown }) => void;

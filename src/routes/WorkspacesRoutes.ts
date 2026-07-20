@@ -3,7 +3,7 @@ import {
   createApiClient,
   ApiError,
 } from "@rodrigo-barraza/utilities-library/http";
-import express, { Request, Response } from "express";
+import express, { type Request, type Response } from "express";
 import { basename } from "node:path";
 import { TOOLS_SERVICE_URL } from "#config";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";

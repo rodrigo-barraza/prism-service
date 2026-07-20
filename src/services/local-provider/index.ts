@@ -19,20 +19,20 @@ import {
   MODEL_MANAGEMENT_TYPES,
 } from "./constants.ts";
 import {
-  ModelEntry,
-  ListModelsResponse,
-  LmStudioRawModel,
-  GenericProvider,
-  TransformedVramEstimate,
-  TransformedHealthStatusMap,
-  TransformedLocalProviderOptions,
+  type ModelEntry,
+  type ListModelsResponse,
+  type LmStudioRawModel,
+  type GenericProvider,
+  type TransformedVramEstimate,
+  type TransformedHealthStatusMap,
+  type TransformedLocalProviderOptions,
 } from "./types.ts";
-import { ChatMessage } from "#src/types/ProviderTypes";
+import { type ChatMessage } from "#src/types/ProviderTypes";
 
 import { enrichWithHuggingFace } from "./hfMetadata.ts";
 import { NORMALIZER_BY_TYPE, HF_ENRICHED_TYPES } from "./normalizers.ts";
 import { estimateVRAM, estimateVRAMForModel } from "./vramEstimation.ts";
-import { InstanceEntry } from "#src/types/ProviderTypes";
+import { type InstanceEntry } from "#src/types/ProviderTypes";
 
 class LocalProviderGateway {
   constructor() {

@@ -1,5 +1,5 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import express, { Request, Response, NextFunction } from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import FileService from "#src/services/FileService";
 import FileGarbageCollectionService from "#src/services/FileGarbageCollectionService";
 import logger from "#src/utils/logger";

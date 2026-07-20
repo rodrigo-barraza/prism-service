@@ -6,7 +6,7 @@ import {
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
-import { InternalToolContext } from "./InternalToolRegistry.ts";
+import { type InternalToolContext } from "./InternalToolRegistry.ts";
 
 interface BriefContext extends InternalToolContext {
   _emit?: (event: { type: string; brief: Record<string, unknown> }) => void;

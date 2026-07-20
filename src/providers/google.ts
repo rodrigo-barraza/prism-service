@@ -1,4 +1,4 @@
-import { ProviderOptions } from "#src/types/ProviderTypes";
+import { type ProviderOptions } from "#src/types/ProviderTypes";
 import type { GenerateTextResult } from "#src/types/provider";
 import type { JsonValue } from "#src/types/index";
 import {

@@ -20,7 +20,7 @@ import { DEFAULT_MAX_OUTPUT_TOKENS } from "#src/constants/TokenBudgetDefaults";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { callWithRetries } from "#src/utils/ProviderStreamResilience";
 
-import { ProviderOptions, ChatMessage } from "#src/types/ProviderTypes";
+import { type ProviderOptions, type ChatMessage } from "#src/types/ProviderTypes";
 import type { TokenUsage } from "#src/types/admin";
 
 export interface AnthropicBlock {

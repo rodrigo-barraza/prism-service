@@ -24,7 +24,7 @@ const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
 import { DirectoryTreeFormatter } from "./DirectoryTreeFormatter.ts";
 import { ToolDocFormatter, type ToolDocMode } from "./ToolDocFormatter.ts";
 import { SkillMemoryScorer } from "./SkillMemoryScorer.ts";
-import { AssemblerContext } from "./types.ts";
+import { type AssemblerContext } from "./types.ts";
 import SomaticStateService, {
   type SomaticStateEvent,
 } from "#src/services/somatic/SomaticStateService";

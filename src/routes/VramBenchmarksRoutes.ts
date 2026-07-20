@@ -1,9 +1,9 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import { Router, Request, Response, NextFunction } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import logger from "#src/utils/logger";
 import requireDb from "#src/middleware/RequireDbMiddleware";
 import { COLLECTIONS } from "#src/constants";
-import { MongoFilter, GetVramBenchmarksQuerySchema } from "#src/types/index";
+import { type MongoFilter, GetVramBenchmarksQuerySchema } from "#src/types/index";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 const router = Router();

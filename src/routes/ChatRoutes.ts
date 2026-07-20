@@ -10,7 +10,7 @@ import {
   DEFAULT_CONVERSATION_TITLE,
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import express, { Request, Response, NextFunction } from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import {
   finalizeTextGeneration,
   getCollectionOpts,
@@ -62,7 +62,7 @@ import {
   extractLatestUserMessageText,
 } from "#src/utils/ConversationUtilities";
 import { handleSseRequest, handleJsonRequest } from "#src/utils/SseUtilities";
-import { SseEvent } from "#src/types/SseTypes";
+import { type SseEvent } from "#src/types/SseTypes";
 import { ChatRequestSchema } from "#src/types/index";
 import type {
   ConversationMessage,

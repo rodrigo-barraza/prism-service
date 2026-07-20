@@ -1,5 +1,5 @@
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { PersonaContext, ToolPolicySection } from "./types.ts";
+import { type PersonaContext, type ToolPolicySection } from "./types.ts";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";

@@ -191,7 +191,7 @@ export default class AgenticLoopService {
     ) {
       try {
         const { default: SettingsService } =
-          await import("./SettingsService.js");
+          await import("./SettingsService.ts");
         const agentSettings = await SettingsService.getSection("agents");
         if (!harnessId) harnessId = agentSettings?.harness || "standard";
         if (!topologyId)
@@ -260,7 +260,7 @@ export default class AgenticLoopService {
       if (!resolvedParentAgentConversationId) {
         try {
           const { default: OrchestratorService } =
-            await import("./OrchestratorService.js");
+            await import("./OrchestratorService.ts");
           OrchestratorService.cleanupConversation(resolvedAgentConversationId);
         } catch {
           /* OrchestratorService may not be used */

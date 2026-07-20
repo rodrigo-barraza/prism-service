@@ -36,7 +36,11 @@ import type { EmitFunction } from "#src/services/harnesses/types";
 export class SharedCostBudget {
   private perLoopCost = new Map<string, number>();
 
-  constructor(public readonly maxCostDollars: number) {}
+  public readonly maxCostDollars: number;
+
+  constructor(maxCostDollars: number) {
+    this.maxCostDollars = maxCostDollars;
+  }
 
   /** Record a loop's latest cumulative cost (idempotent per loop). */
   record(loopId: string, cumulativeCostDollars: number): void {

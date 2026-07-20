@@ -16,7 +16,7 @@ import {
 } from "#src/services/ToolDiscoveryScope";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 
-import { InternalToolContext } from "./InternalToolRegistry.ts";
+import { type InternalToolContext } from "./InternalToolRegistry.ts";
 import { TOOLS } from "#src/constants";
 import {
   getCurrentDynamicTools,

@@ -7,7 +7,7 @@ import {
   DIRECTORY_FETCH_TIMEOUT_MILLISECONDS,
   DIRECTORY_TREE_CHILD_LIMIT,
 } from "#src/constants";
-import { DirectoryData } from "./types.ts";
+import { type DirectoryData } from "./types.ts";
 
 export class DirectoryTreeFormatter {
   private workspaceRoot: string;

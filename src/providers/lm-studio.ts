@@ -1,13 +1,13 @@
 import {
-  ProviderOptions,
-  ChatMessage,
-  Provider,
-  GenerateTextResult,
-  StreamChunk,
-  ListModelsResult,
-  EnsureModelLoadedResult,
-  LmStudioModelEntry,
-  LmStudioLoadConfig,
+  type ProviderOptions,
+  type ChatMessage,
+  type Provider,
+  type GenerateTextResult,
+  type StreamChunk,
+  type ListModelsResult,
+  type EnsureModelLoadedResult,
+  type LmStudioModelEntry,
+  type LmStudioLoadConfig,
 } from "#src/types/provider";
 import { sleep } from "@rodrigo-barraza/utilities-library";
 // ─────────────────────────────────────────────────────────────

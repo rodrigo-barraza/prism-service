@@ -7,10 +7,10 @@ import {
   parsePublisherFromName,
 } from "./nameParsers.ts";
 import {
-  ModelEntry,
-  LmStudioRawModel,
-  OllamaRawModel,
-  OpenAICompatRawModel,
+  type ModelEntry,
+  type LmStudioRawModel,
+  type OllamaRawModel,
+  type OpenAICompatRawModel,
 } from "./types.ts";
 
 /**

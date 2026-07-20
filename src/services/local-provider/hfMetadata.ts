@@ -1,6 +1,6 @@
 import { formatBytes } from "@rodrigo-barraza/utilities-library";
 import { MODALITY_TYPES } from "#src/config";
-import { HuggingFaceMetadata, ModelEntry } from "./types.ts";
+import { type HuggingFaceMetadata, type ModelEntry } from "./types.ts";
 import { formatParams } from "./nameParsers.ts";
 import { LOCAL_PROVIDER } from "#src/constants";
 

@@ -6,10 +6,10 @@ import AgenticLoopService from "./AgenticLoopService.ts";
 import { getProvider } from "#src/providers/index";
 import { getModelByName } from "#src/config";
 import logger from "#src/utils/logger";
-import { SseEvent } from "#src/types/SseTypes";
-import { ConversationMessage } from "./harnesses/types.ts";
+import { type SseEvent } from "#src/types/SseTypes";
+import { type ConversationMessage } from "./harnesses/types.ts";
 import {
-  RecurrenceRule,
+  type RecurrenceRule,
   matchRecurrenceRule,
 } from "#src/utils/RecurrenceMatcher";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";

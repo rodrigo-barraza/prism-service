@@ -1,5 +1,5 @@
-import { ChatMessage } from "#src/types/ProviderTypes";
-import { ArchParams } from "#src/utils/gguf-arch";
+import { type ChatMessage } from "#src/types/ProviderTypes";
+import { type ArchParams } from "#src/utils/gguf-arch";
 
 export interface ModelEntry {
   name: string;

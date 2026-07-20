@@ -1,5 +1,5 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import { Router, Request, Response } from "express";
+import { Router, type Request, type Response } from "express";
 import { OrchestratorService } from "#src/services/OrchestratorService";
 
 interface SubAgentSummary {

@@ -1,4 +1,4 @@
-import { ProviderOptions } from "#src/types/ProviderTypes";
+import { type ProviderOptions } from "#src/types/ProviderTypes";
 import OpenAI, { toFile } from "openai";
 import type { Stream } from "openai/streaming";
 import type { Reasoning, ReasoningEffort } from "openai/resources/shared";

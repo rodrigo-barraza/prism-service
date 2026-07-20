@@ -3,7 +3,7 @@ import {
   DEFAULT_PROJECT,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { createAuthMiddleware } from "@rodrigo-barraza/utilities-library/service";
-import { Request, Response, NextFunction } from "express";
+import { type Request, type Response, type NextFunction } from "express";
 import { requestContext } from "#src/utils/RequestContext";
 
 /**

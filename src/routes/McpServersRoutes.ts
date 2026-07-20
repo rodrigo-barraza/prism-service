@@ -1,6 +1,6 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import express, { Request, Response, NextFunction } from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import { ObjectId } from "mongodb";
 import requireDb from "#src/middleware/RequireDbMiddleware";
 import MCPClientService from "#src/services/MCPClientService";

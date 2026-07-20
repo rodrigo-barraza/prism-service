@@ -7,7 +7,7 @@ import {
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
 import { SYSTEM_STATUSES, TODO_PRIORITIES } from "#src/constants";
-import { InternalToolContext } from "./InternalToolRegistry.ts";
+import { type InternalToolContext } from "./InternalToolRegistry.ts";
 
 
 interface TodoItemNormalized {

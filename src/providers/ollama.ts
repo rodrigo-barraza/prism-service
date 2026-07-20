@@ -1,9 +1,9 @@
 import {
-  ProviderOptions,
-  ChatMessage,
-  Provider,
-  GenerateTextResult,
-  StreamChunk,
+  type ProviderOptions,
+  type ChatMessage,
+  type Provider,
+  type GenerateTextResult,
+  type StreamChunk,
 } from "#src/types/provider";
 import { ProviderError } from "#src/utils/errors";
 import {

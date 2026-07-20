@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { matchRecurrenceRule, RecurrenceRule } from "#src/utils/RecurrenceMatcher";
+import { matchRecurrenceRule, type RecurrenceRule } from "#src/utils/RecurrenceMatcher";
 import { matchCron } from "#src/services/ScheduledTaskService";
 
 describe("RecurrenceMatcher - matchRecurrenceRule", () => {

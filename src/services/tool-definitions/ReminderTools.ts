@@ -10,7 +10,7 @@ import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalTo
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { TIMERS } from "#src/constants";
 
-import { InternalToolContext } from "./InternalToolRegistry.ts";
+import { type InternalToolContext } from "./InternalToolRegistry.ts";
 
 interface ReminderContext extends InternalToolContext {
   _emit?: (event: { type: string; [key: string]: unknown }) => void;

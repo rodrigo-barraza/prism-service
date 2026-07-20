@@ -6,7 +6,7 @@ import {
 const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import express, { Request, Response } from "express";
+import express, { type Request, type Response } from "express";
 import {
   PROVIDERS,
   PROVIDER_LIST,
