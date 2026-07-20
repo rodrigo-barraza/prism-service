@@ -2131,26 +2131,56 @@ export default class ToolOrchestratorService {
       Array.isArray(toolsApiResult?.matches)
     ) {
       const clientSchemas = ToolOrchestratorService.getClientToolSchemas();
+      // "recipe:*" matches are advisory multi-tool plans, not enableable
+      // tools — they bypass name-based partitioning, but a recipe whose
+      // REQUIRED tools fall outside the persona's universe is dropped:
+      // a plan the persona cannot execute is worse than no plan.
+      const recipeRequiredTools = toolsApiResult.matches
+        .filter((matchEntry) =>
+          (matchEntry.name as string).startsWith("recipe:"),
+        )
+        .flatMap(
+          (matchEntry) =>
+            ((matchEntry as { recipe?: { requiredTools?: string[] } }).recipe
+              ?.requiredTools ?? []),
+        );
       const { blocked } = partitionByDiscoverableUniverse(
         scopePersona,
         clientSchemas,
-        toolsApiResult.matches.map(
-          (matchEntry) => matchEntry.name as string,
-        ),
+        [
+          ...toolsApiResult.matches
+            .map((matchEntry) => matchEntry.name as string)
+            .filter((name) => !name.startsWith("recipe:")),
+          ...recipeRequiredTools,
+        ],
       );
       if (blocked.length > 0) {
         const blockedSet = new Set(blocked);
+        const matchCountBeforeFilter = toolsApiResult.matches.length;
         toolsApiResult.matches = toolsApiResult.matches.filter(
-          (matchEntry) => !blockedSet.has(matchEntry.name as string),
+          (matchEntry) => {
+            const entryName = matchEntry.name as string;
+            if (entryName.startsWith("recipe:")) {
+              const requiredTools =
+                (matchEntry as { recipe?: { requiredTools?: string[] } })
+                  .recipe?.requiredTools ?? [];
+              return !requiredTools.some((toolName) =>
+                blockedSet.has(toolName),
+              );
+            }
+            return !blockedSet.has(entryName);
+          },
         );
+        const removedCount =
+          matchCountBeforeFilter - toolsApiResult.matches.length;
         if (typeof toolsApiResult.total === "number") {
           toolsApiResult.total = Math.max(
             0,
-            toolsApiResult.total - blocked.length,
+            toolsApiResult.total - removedCount,
           );
         }
         logger.info(
-          `[ToolOrchestrator] search_tools: agent=${context.agent} filtered ${blocked.length} out-of-universe matches`,
+          `[ToolOrchestrator] search_tools: agent=${context.agent} filtered ${removedCount} out-of-universe matches`,
         );
       }
     }
