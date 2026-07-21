@@ -487,12 +487,18 @@ router.get(
           AgenticLoopService.getPendingApproval(conversationId);
         const pendingQuestion =
           AgenticLoopService.getPendingQuestion(conversationId);
+        // Raw `messages` are deliberately omitted — displayMessages is the
+        // serve-time form and shipping both doubles a multi-hundred-KB payload
+        const { messages: rawMessages, ...chatWithoutMessages } = chat;
         return res.json({
-          ...chat,
+          ...chatWithoutMessages,
           type: "direct",
           state: deriveAgentConversationState(chat),
+          messageCount: (
+            (rawMessages as import("../types/admin.ts").ChatMessage[]) || []
+          ).length,
           displayMessages: prepareDisplayMessages(
-            (chat.messages as import("../types/admin.ts").ChatMessage[]) || [],
+            (rawMessages as import("../types/admin.ts").ChatMessage[]) || [],
           ),
           liveStatus: (chat.isGenerating || chat.isActive)
             ? ConversationStatusRegistry.get(conversationId) || undefined
@@ -536,15 +542,23 @@ router.get(
 
         const isConversationActive = !!(agentChatRecord.isGenerating || agentChatRecord.isActive);
 
+        // Raw `messages` are deliberately omitted — displayMessages is the
+        // serve-time form and shipping both doubles a multi-hundred-KB payload
+        const { messages: rawAgentMessages, ...agentChatWithoutMessages } =
+          agentChat;
         return res.json({
-          ...agentChat,
+          ...agentChatWithoutMessages,
           stats: stats || undefined,
           type: "agent",
           state: deriveAgentConversationState(
             agentChatRecord as Parameters<typeof deriveAgentConversationState>[0],
           ),
+          messageCount: (
+            (rawAgentMessages as import("../types/admin.ts").ChatMessage[]) ||
+            []
+          ).length,
           displayMessages: prepareDisplayMessages(
-            (agentChat.messages as import("../types/admin.ts").ChatMessage[]) || [],
+            (rawAgentMessages as import("../types/admin.ts").ChatMessage[]) || [],
           ),
           liveStatus: isConversationActive
             ? ConversationStatusRegistry.get(conversationId) || undefined
@@ -582,6 +596,58 @@ router.get(
       res.json({ active: true, ...liveStatus });
     } else {
       res.json({ active: false });
+    }
+  }),
+);
+
+/**
+ * GET /conversations/:id/status
+ * Lightweight persisted-state snapshot for pollers. The full GET /:id ships
+ * the entire displayMessages payload (hundreds of KB on large conversations);
+ * background pollers only need the lifecycle flags, so this projects them
+ * straight off the document.
+ */
+router.get(
+  "/:id/status",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const queryProject = req.query.project as string | undefined;
+      const project = queryProject || req.project || "any";
+      const username = req.username || "any";
+      const { db } = req;
+      const conversationId = req.params.id as string;
+      const statusProjection = {
+        _id: 0,
+        id: 1,
+        isActive: 1,
+        isGenerating: 1,
+        pendingBackgroundTasks: 1,
+        updatedAt: 1,
+      };
+
+      const chatStatus = await db
+        .collection(COLLECTIONS.MODEL_CONVERSATIONS)
+        .findOne(
+          { id: conversationId, project, username },
+          { projection: statusProjection },
+        );
+      if (chatStatus) return res.json({ ...chatStatus, type: "direct" });
+
+      const agentChatStatus = await db
+        .collection(COLLECTIONS.AGENT_CONVERSATIONS)
+        .findOne(
+          { id: conversationId, project, username },
+          { projection: statusProjection },
+        );
+      if (agentChatStatus)
+        return res.json({ ...agentChatStatus, type: "agent" });
+
+      res.status(404).json({ error: "Conversation not found" });
+    } catch (error: unknown) {
+      logger.error(
+        `Error fetching conversation status: ${errorMessage(error)}`,
+      );
+      next(error);
     }
   }),
 );
