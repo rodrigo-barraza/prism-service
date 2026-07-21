@@ -229,6 +229,8 @@ const ConversationService: ConversationServiceInterface = {
     );
 
     const derived: Partial<TransformedConversation> = {
+      // Stored so list endpoints never have to load message arrays to count them
+      messageCount: ((conversation.messages as ChatMessage[]) || []).length,
       modalities: computeModalities(conversation.messages as ChatMessage[]),
       providers: [...providersSet],
       // Math.max mirrors the read-side enrichment semantics: request totals

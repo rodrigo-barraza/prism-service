@@ -447,6 +447,7 @@ export function buildConversationPatchFields({
   if (title !== undefined) setFields.title = title;
   if (messages !== undefined) {
     setFields.messages = messages;
+    setFields.messageCount = messages.length;
     setFields.modalities = computeModalities(messages);
     setFields.providers = extractProviders(messages, settings || null);
     // Deliberately NOT recomputing totalCost/inputTokens/outputTokens here:

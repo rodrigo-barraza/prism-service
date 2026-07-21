@@ -109,20 +109,40 @@ export async function processToolResultMedia(
 
     // Check if result has raw audio data, upload it if so
     const audioResult = resultObject?.audio;
-    if (audioResult?.data) {
+    if (resultObject && audioResult?.data) {
       const mimeType = audioResult.mimeType || "audio/wav";
-      const dataUrl = `data:${mimeType};base64,${audioResult.data}`;
-      try {
-        const uploadResult = await FileService.uploadFile(
-          dataUrl,
-          FILE_CATEGORIES.GENERATIONS,
-        );
-        // The model reads this result and reuses audioRef as a handle in
-        // later tool calls (e.g. generate_audio sampleSource), so it must
-        // be a fetchable public URL — never the internal minio:// ref.
-        const publicAudioUrl =
-          FileService.getPublicUrl(uploadResult.ref) ?? uploadResult.ref;
-        if (resultObject) {
+      // Tools-service already hosts audio it produced and stamps
+      // display{kind:"audio",url}. Reuse that URL as the canonical
+      // audioRef instead of re-uploading a second copy — audioRef,
+      // display.url, the streamed audio event, and the message.audio
+      // refs prepareDisplayMessages extracts must all share ONE URL
+      // space or the client's media dedup can't match them.
+      const hostedDisplayUrl =
+        resultObject.display?.kind === "audio" &&
+        typeof resultObject.display.url === "string" &&
+        resultObject.display.url
+          ? resultObject.display.url
+          : null;
+      if (hostedDisplayUrl) {
+        resultObject.audioRef = hostedDisplayUrl;
+        delete resultObject.audio;
+        emit({
+          type: SERVER_SENT_EVENT_TYPES.AUDIO,
+          data: hostedDisplayUrl,
+          mimeType,
+        });
+      } else {
+        const dataUrl = `data:${mimeType};base64,${audioResult.data}`;
+        try {
+          const uploadResult = await FileService.uploadFile(
+            dataUrl,
+            FILE_CATEGORIES.GENERATIONS,
+          );
+          // The model reads this result and reuses audioRef as a handle in
+          // later tool calls (e.g. generate_audio sampleSource), so it must
+          // be a fetchable public URL — never the internal minio:// ref.
+          const publicAudioUrl =
+            FileService.getPublicUrl(uploadResult.ref) ?? uploadResult.ref;
           resultObject.audioRef = publicAudioUrl;
           delete resultObject.audio;
           // Stamp display so audio results render an inline player via
@@ -132,18 +152,18 @@ export async function processToolResultMedia(
             url: publicAudioUrl,
             title: "Audio",
           };
+          emit({
+            type: SERVER_SENT_EVENT_TYPES.AUDIO,
+            data: publicAudioUrl,
+            mimeType,
+            minioRef: uploadResult.ref,
+          });
+        } catch (uploadError) {
+          logger.error(
+            `[PostExecutionEmitter] Failed to upload audio:`,
+            uploadError,
+          );
         }
-        emit({
-          type: SERVER_SENT_EVENT_TYPES.AUDIO,
-          data: uploadResult.ref,
-          mimeType,
-          minioRef: uploadResult.ref,
-        });
-      } catch (uploadError) {
-        logger.error(
-          `[PostExecutionEmitter] Failed to upload audio:`,
-          uploadError,
-        );
       }
     }
 

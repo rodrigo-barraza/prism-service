@@ -469,10 +469,14 @@ agentConversationRouter.get(
       if (!document)
         return res.status(404).json({ error: "Agent conversation not found" });
 
+      // Raw `messages` are deliberately omitted — displayMessages is the
+      // serve-time form and shipping both doubles a multi-hundred-KB payload
+      const { messages: rawMessages, ...documentWithoutMessages } = document;
       res.json({
-        ...document,
+        ...documentWithoutMessages,
+        messageCount: ((rawMessages as ChatMessage[]) || []).length,
         displayMessages: prepareDisplayMessages(
-          (document.messages as ChatMessage[]) || [],
+          (rawMessages as ChatMessage[]) || [],
         ),
       });
     } catch (error: unknown) {
