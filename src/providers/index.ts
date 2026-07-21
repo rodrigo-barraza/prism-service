@@ -3,6 +3,7 @@ import anthropicProvider from "./anthropic.ts";
 import googleProvider from "./google.ts";
 import elevenlabsProvider from "./elevenlabs.ts";
 import inworldProvider from "./inworld.ts";
+import moonshotProvider from "./moonshot.ts";
 import ActiveGenerationTracker from "#src/services/ActiveGenerationTracker";
 import { getInstanceProvider, isInstance } from "./instance-registry.ts";
 import type { Provider } from "#src/types/provider";
@@ -13,6 +14,7 @@ const providers: Record<string, Provider> = {
   [PROVIDERS.OPENAI]: openaiProvider as unknown as Provider,
   [PROVIDERS.ANTHROPIC]: anthropicProvider as Provider,
   [PROVIDERS.GOOGLE]: googleProvider as Provider,
+  [PROVIDERS.MOONSHOT]: moonshotProvider as unknown as Provider,
   [PROVIDERS.ELEVENLABS]: elevenlabsProvider as unknown as Provider,
   [PROVIDERS.INWORLD]: inworldProvider as unknown as Provider,
 };

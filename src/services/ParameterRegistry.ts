@@ -45,6 +45,9 @@ const ALL_CLOUD_PROVIDERS = [
   PROVIDERS.OPENAI,
   PROVIDERS.ANTHROPIC,
   PROVIDERS.GOOGLE,
+  // Moonshot (Kimi) is OpenAI-Chat-Completions compatible — accepts the same
+  // temperature/top_p/max_tokens/stop sampling params as the other cloud APIs.
+  PROVIDERS.MOONSHOT,
 ];
 
 const ALL_LOCAL_PROVIDERS = [
@@ -65,12 +68,14 @@ const LOCAL_PLUS_GOOGLE_ANTHROPIC = [
 const PROVIDERS_WITH_PENALTIES = [
   PROVIDERS.OPENAI,
   PROVIDERS.GOOGLE,
+  PROVIDERS.MOONSHOT,
   ...ALL_LOCAL_PROVIDERS,
 ];
 
 const PROVIDERS_WITH_SEED = [
   PROVIDERS.OPENAI,
   PROVIDERS.GOOGLE,
+  PROVIDERS.MOONSHOT,
   ...ALL_LOCAL_PROVIDERS,
 ];
 
@@ -198,7 +203,12 @@ const PARAMETER_DESCRIPTORS: ParameterDescriptor[] = [
     defaultValue: "high",
     agentDefault: "high",
     group: PARAMETER_SCHEMAS.GROUPS.REASONING,
-    providers: [PROVIDERS.OPENAI, ...ALL_LOCAL_PROVIDERS, PROVIDERS.ANTHROPIC],
+    providers: [
+      PROVIDERS.OPENAI,
+      PROVIDERS.MOONSHOT,
+      ...ALL_LOCAL_PROVIDERS,
+      PROVIDERS.ANTHROPIC,
+    ],
     requiresThinking: true,
   },
   {
@@ -320,7 +330,12 @@ const PARAMETER_DESCRIPTORS: ParameterDescriptor[] = [
     defaultValue: "",
     agentDefault: "",
     group: PARAMETER_SCHEMAS.GROUPS.ADVANCED,
-    providers: [PROVIDERS.OPENAI, PROVIDERS.GOOGLE, PROVIDERS.ANTHROPIC],
+    providers: [
+      PROVIDERS.OPENAI,
+      PROVIDERS.GOOGLE,
+      PROVIDERS.ANTHROPIC,
+      PROVIDERS.MOONSHOT,
+    ],
     hideWhenReasoning: true,
   },
   {
