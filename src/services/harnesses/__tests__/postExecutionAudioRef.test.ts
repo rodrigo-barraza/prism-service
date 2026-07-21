@@ -88,7 +88,7 @@ describe("processToolResultMedia — audio upload ref stamping", () => {
     expect(result.result.audioRef).toBe("minio://generations/a.wav");
   });
 
-  it("preserves a display already set by the tool (tools-service public URL wins)", async () => {
+  it("reuses a tools-service hosted display URL: audioRef = display.url, no re-upload", async () => {
     vi.mocked(FileService.getPublicUrl).mockReturnValue(
       "https://storage.example.dev/prism/generations/a.wav",
     );
@@ -105,15 +105,52 @@ describe("processToolResultMedia — audio upload ref stamping", () => {
         display: { ...toolDisplay },
       } as Record<string, unknown>,
     };
+    const emit = vi.fn();
 
     await processToolResultMedia(
       [{ id: "t1", name: "synthesize_speech", args: {} }] as never,
       [result] as never,
       makeState(),
       { streamedImages: [] } as never,
-      vi.fn(),
+      emit,
     );
 
     expect(result.result.display).toEqual(toolDisplay);
+    expect(result.result.audioRef).toBe(toolDisplay.url);
+    expect(result.result.audio).toBeUndefined();
+    expect(FileService.uploadFile).not.toHaveBeenCalled();
+    expect(emit).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "audio", data: toolDisplay.url }),
+    );
+  });
+
+  it("streams the audio event with the public URL (matching what gets persisted)", async () => {
+    vi.mocked(FileService.getPublicUrl).mockReturnValue(
+      "https://storage.example.dev/prism/generations/a.wav",
+    );
+    const result = {
+      id: "t1",
+      name: "generate_audio",
+      result: {
+        audio: { data: "AAAA", mimeType: "audio/wav" },
+      } as Record<string, unknown>,
+    };
+    const emit = vi.fn();
+
+    await processToolResultMedia(
+      [{ id: "t1", name: "generate_audio", args: {} }] as never,
+      [result] as never,
+      makeState(),
+      { streamedImages: [] } as never,
+      emit,
+    );
+
+    expect(emit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "audio",
+        data: "https://storage.example.dev/prism/generations/a.wav",
+        minioRef: "minio://generations/a.wav",
+      }),
+    );
   });
 });

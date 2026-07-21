@@ -33,6 +33,7 @@ export interface ConversationPatchFields {
   updatedAt: string;
   title?: string;
   messages?: ChatMessage[];
+  messageCount?: number;
   modalities?: Record<string, boolean>;
   providers?: string[];
   totalCost?: number;
@@ -81,6 +82,7 @@ export interface TransformedConversation {
   username: string;
   title: string;
   messages: ChatMessage[];
+  messageCount?: number;
   systemPrompt: string;
   settings: ConversationSettings;
   modalities: Record<string, boolean>;

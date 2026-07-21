@@ -122,7 +122,12 @@ router.get(
               .find(filter)
               .project({
                 ...CONVERSATION_LIST_BASE_PROJECTION,
-                messageCount: { $size: { $ifNull: ["$messages", []] } },
+                messageCount: {
+                  $ifNull: [
+                    "$messageCount",
+                    { $size: { $ifNull: ["$messages", []] } },
+                  ],
+                },
                 totalCost: { $ifNull: ["$totalCost", 0] },
               })
               .sort({ [sortKey]: sortDirectionValue })
@@ -141,7 +146,12 @@ router.get(
               .find(agentFilter)
               .project({
                 ...CONVERSATION_LIST_BASE_PROJECTION,
-                messageCount: { $size: { $ifNull: ["$messages", []] } },
+                messageCount: {
+                  $ifNull: [
+                    "$messageCount",
+                    { $size: { $ifNull: ["$messages", []] } },
+                  ],
+                },
                 totalCost: { $ifNull: ["$totalCost", 0] },
               })
               .sort({ [sortKey]: sortDirectionValue })
@@ -592,16 +602,21 @@ router.get(
         .collection(CONVERSATIONS_COLLECTION)
         .findOne({ id: req.params.id });
       if (conversationDocument) {
+        // Raw `messages` are deliberately omitted — displayMessages is the
+        // serve-time form and shipping both doubles a multi-hundred-KB payload
+        const { messages: rawMessages, ...conversationWithoutMessages } =
+          conversationDocument;
         return res.json({
-          ...conversationDocument,
+          ...conversationWithoutMessages,
           type: "direct",
           state: deriveAgentConversationState(
             conversationDocument as Parameters<
               typeof deriveAgentConversationState
             >[0],
           ),
+          messageCount: ((rawMessages as ChatMessage[]) || []).length,
           displayMessages: prepareDisplayMessages(
-            (conversationDocument.messages as ChatMessage[]) || [],
+            (rawMessages as ChatMessage[]) || [],
           ),
         });
       }
@@ -618,16 +633,19 @@ router.get(
         ) {
           agentRecord.hasSubAgents = true;
         }
+        const { messages: rawMessages, ...conversationWithoutMessages } =
+          conversationDocument;
         return res.json({
-          ...conversationDocument,
+          ...conversationWithoutMessages,
           type: "agent",
           state: deriveAgentConversationState(
             conversationDocument as Parameters<
               typeof deriveAgentConversationState
             >[0],
           ),
+          messageCount: ((rawMessages as ChatMessage[]) || []).length,
           displayMessages: prepareDisplayMessages(
-            (conversationDocument.messages as ChatMessage[]) || [],
+            (rawMessages as ChatMessage[]) || [],
           ),
         });
       }
