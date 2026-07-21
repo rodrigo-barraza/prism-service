@@ -1676,6 +1676,48 @@ export default class ToolOrchestratorService {
     return null;
   }
 
+  /**
+   * Parse the ordered per-image labels out of a message's
+   * `<attached-reference-images>` block. Platforms (lupos-bot) build the
+   * block index-aligned with the message's `images[]` array — entry N
+   * describes images[N-1] — so the returned `labels` array maps by
+   * position. `labelByUrl` additionally maps the block's http(s) URL
+   * lines back to their labels, so agent-copied reference URLs can be
+   * labeled too. Without this mapping the tools-api image model receives
+   * the references as an anonymous pile and binds prompt names to faces
+   * by guesswork (observed live: group portraits labeling the wrong
+   * people).
+   */
+  static parseReferenceImageLabels(content: unknown): {
+    labels: string[];
+    labelByUrl: Map<string, string>;
+  } {
+    const labels: string[] = [];
+    const labelByUrl = new Map<string, string>();
+    if (typeof content !== "string") return { labels, labelByUrl };
+    // Take the LAST block — it is appended after the message envelope and
+    // reflects the images actually attached to this message.
+    const blocks = content.match(
+      /<attached-reference-images>([\s\S]*?)<\/attached-reference-images>/g,
+    );
+    if (!blocks || blocks.length === 0) return { labels, labelByUrl };
+    const block = blocks[blocks.length - 1];
+    let currentIndex = -1;
+    for (const line of block.split("\n")) {
+      const entryMatch = line.match(/^(\d+)\.\s+(.*\S)\s*$/);
+      if (entryMatch) {
+        currentIndex = parseInt(entryMatch[1], 10) - 1;
+        if (currentIndex >= 0) labels[currentIndex] = entryMatch[2];
+        continue;
+      }
+      const urlMatch = line.match(/^\s+URL:\s+(https?:\/\/\S+)\s*$/);
+      if (urlMatch && currentIndex >= 0 && labels[currentIndex]) {
+        labelByUrl.set(urlMatch[1], labels[currentIndex]);
+      }
+    }
+    return { labels, labelByUrl };
+  }
+
   static async executeTool(
     name: string,
     args: Record<string, unknown> = {},
@@ -1732,14 +1774,21 @@ export default class ToolOrchestratorService {
           ).filter((image): image is string => typeof image === "string")
         : [];
       const agentProvidedReferences: string[] = [];
+      // Keep the agent's original entries index-aligned with the resolved
+      // ones so block labels (keyed by original http URL) can be matched.
+      const agentProvidedOriginals: string[] = [];
       for (const image of rawAgentReferences) {
         const resolved =
           await ToolOrchestratorService.resolveReferenceImageEntry(image);
         if (resolved && !agentProvidedReferences.includes(resolved)) {
           agentProvidedReferences.push(resolved);
+          agentProvidedOriginals.push(image);
         }
       }
       const referenceImages: string[] = [...agentProvidedReferences];
+      // Per-image labels aligned with referenceImages — preserves the
+      // name↔face binding through to the image model (empty = unlabeled).
+      const referenceLabels: string[] = agentProvidedReferences.map(() => "");
       // Find the last user message with images
       for (let i = context.messages.length - 1; i >= 0; i--) {
         const message = context.messages[i];
@@ -1752,7 +1801,18 @@ export default class ToolOrchestratorService {
           logger.info(
             `[ToolOrchestrator] generate_image: found ${message.images.length} image(s) on last user message`,
           );
-          for (const image of message.images) {
+          // Entry N of the message's <attached-reference-images> block
+          // describes images[N-1]; the URL map labels agent-copied refs.
+          const { labels: blockLabels, labelByUrl } =
+            ToolOrchestratorService.parseReferenceImageLabels(message.content);
+          for (let agentIndex = 0; agentIndex < agentProvidedReferences.length; agentIndex++) {
+            referenceLabels[agentIndex] =
+              labelByUrl.get(agentProvidedOriginals[agentIndex]) ||
+              labelByUrl.get(agentProvidedReferences[agentIndex]) ||
+              "";
+          }
+          for (let imageIndex = 0; imageIndex < message.images.length; imageIndex++) {
+            const image = message.images[imageIndex];
             if (typeof image !== "string") {
               logger.warn(
                 `[ToolOrchestrator] generate_image: REJECTED image ref (type=${typeof image})`,
@@ -1760,12 +1820,19 @@ export default class ToolOrchestratorService {
               continue;
             }
             if (referenceImages.includes(image)) {
-              continue; // already provided explicitly by the agent
+              // Already provided explicitly by the agent — backfill its
+              // label from the block if the URL match didn't cover it.
+              const existingIndex = referenceImages.indexOf(image);
+              if (!referenceLabels[existingIndex] && blockLabels[imageIndex]) {
+                referenceLabels[existingIndex] = blockLabels[imageIndex];
+              }
+              continue;
             }
             const resolved =
               await ToolOrchestratorService.resolveReferenceImageEntry(image);
             if (resolved && !referenceImages.includes(resolved)) {
               referenceImages.push(resolved);
+              referenceLabels.push(blockLabels[imageIndex] || "");
               logger.info(
                 `[ToolOrchestrator] generate_image: accepted image ref (${image.substring(0, 80)}...)`,
               );
@@ -1780,8 +1847,11 @@ export default class ToolOrchestratorService {
       }
       if (referenceImages.length > 0) {
         args = { ...args, referenceImages };
+        if (referenceLabels.some((label) => label)) {
+          args = { ...args, referenceLabels };
+        }
         logger.info(
-          `[ToolOrchestrator] generate_image: injecting ${referenceImages.length} reference image(s) into tool args (${agentProvidedReferences.length} agent-provided)`,
+          `[ToolOrchestrator] generate_image: injecting ${referenceImages.length} reference image(s) into tool args (${agentProvidedReferences.length} agent-provided, ${referenceLabels.filter((label) => label).length} labeled)`,
         );
       } else if (
         (args as { referenceImages?: unknown }).referenceImages !== undefined
