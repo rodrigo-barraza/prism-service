@@ -142,10 +142,22 @@ function getDefaultModels(
   outputType: string,
 ): Record<string, string> {
   const defaults: Record<string, string> = {};
+  // A model qualifying for this modality pair may also produce other output
+  // modalities (e.g. image models output text+image, so they match TEXT→TEXT).
+  // Prefer the most output-specific default per provider so a multi-output
+  // model's flag can't clobber the dedicated default; ties keep last-wins.
+  const outputBreadth: Record<string, number> = {};
   for (const model of getModels(inputType, outputType)) {
     const modelRecord = model as ModelDefinition & Record<string, unknown>;
     if (modelRecord.default) {
-      defaults[model.provider] = model.name;
+      const breadth = model.outputTypes?.length ?? 1;
+      if (
+        defaults[model.provider] === undefined ||
+        breadth <= outputBreadth[model.provider]
+      ) {
+        defaults[model.provider] = model.name;
+        outputBreadth[model.provider] = breadth;
+      }
     }
   }
   return defaults;

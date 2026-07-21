@@ -1026,7 +1026,6 @@ const MODELS = {
     label: "Gemini 3 Flash",
     provider: PROVIDERS.GOOGLE,
     modelType: MODEL_TYPES.CONVERSATION,
-    default: true,
     year: 2025,
     defaultTemperature: 1.0,
     arena: {
@@ -1191,7 +1190,6 @@ const MODELS = {
     label: "Gemini 3.5 Flash",
     provider: PROVIDERS.GOOGLE,
     modelType: MODEL_TYPES.CONVERSATION,
-    default: true,
     year: 2026,
     defaultTemperature: 1.0,
     arena: {
@@ -1205,6 +1203,51 @@ const MODELS = {
       cachedInputPerMillion: 0.15,
       audioInputPerMillion: 3.0,
       outputPerMillion: 9.0,
+    },
+    maxInputTokens: 1_048_576,
+    maxOutputTokens: 65_536,
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.AUDIO, MODALITY_TYPES.VIDEO, MODALITY_TYPES.PDF],
+    outputTypes: [MODALITY_TYPES.TEXT],
+    mediaLimits: {
+      image: { maxCount: 3000, maxSizeMB: 100 },
+      audio: { maxCount: 50, maxSizeMB: 100 },
+      video: { maxCount: 10, maxSizeMB: 100 },
+      pdf: { maxCount: 50, maxSizeMB: 100 },
+    },
+    streaming: true,
+    thinking: true,
+    thinkingLevels: ["minimal", "low", "medium", "high"],
+    webSearch: "Google Search",
+    codeExecution: true,
+    urlContext: true,
+    tools: [
+      "Thinking",
+      "Google Search",
+      "Tool Calling",
+      "Code Execution",
+      "URL Context",
+    ],
+  },
+
+  // Launched 2026-07-21 (GA in AI Studio / Vertex / Gemini API). Input/output
+  // prices are Google's published figures; cached & audio input follow the
+  // 3.5 Flash ratios (10% cache hit, 2× audio) pending an official listing —
+  // adjust once Google publishes the full pricing table. No arena scores yet.
+  GEMINI_36_FLASH: {
+    description:
+      "Google's Gemini 3.6 Flash, the new Flash-tier default — stronger agentic coding and computer use than 3.5 Flash while using ~17% fewer output tokens at a lower price.",
+    name: "gemini-3.6-flash",
+    label: "Gemini 3.6 Flash",
+    provider: PROVIDERS.GOOGLE,
+    modelType: MODEL_TYPES.CONVERSATION,
+    default: true,
+    year: 2026,
+    defaultTemperature: 1.0,
+    pricing: {
+      inputPerMillion: 1.5,
+      cachedInputPerMillion: 0.15,
+      audioInputPerMillion: 3.0,
+      outputPerMillion: 7.5,
     },
     maxInputTokens: 1_048_576,
     maxOutputTokens: 65_536,
@@ -1634,7 +1677,6 @@ const MODELS = {
     provider: PROVIDERS.GOOGLE,
     modelType: MODEL_TYPES.AUDIO,
     year: 2025,
-    default: true,
     pricing: { audioInputPerMillion: 1.0, outputPerMillion: 3.0 },
     inputTypes: [MODALITY_TYPES.AUDIO],
     outputTypes: [MODALITY_TYPES.TEXT],
