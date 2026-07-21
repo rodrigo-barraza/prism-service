@@ -136,6 +136,11 @@ interface PayloadDefaults {
 
 interface FetchOptions {
   signal?: AbortSignal;
+  /**
+   * Extra request headers merged over the defaults — used by authenticated
+   * OpenAI-compatible cloud providers (e.g. Moonshot) to add Authorization.
+   */
+  headers?: Record<string, string>;
 }
 
 /** Union of event types yielded by parseSSEStream. */
@@ -844,7 +849,7 @@ export async function fetchOpenAICompat(
 ): Promise<Response> {
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(options.headers ?? {}) },
     body: JSON.stringify(payload),
     dispatcher: STREAMING_DISPATCHER,
     ...(options.signal && { signal: options.signal }),

@@ -98,7 +98,8 @@ function getModelOptions(
       if (
         model.modelType === MODEL_TYPES.CONVERSATION &&
         (model.provider === PROVIDERS.OPENAI ||
-          model.provider === PROVIDERS.GOOGLE)
+          model.provider === PROVIDERS.GOOGLE ||
+          model.provider === PROVIDERS.MOONSHOT)
       ) {
         entry.jsonMode = true;
       }

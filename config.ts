@@ -58,6 +58,11 @@ export const GOOGLE_CLOUD_GEMINI_API_KEY =
   process.env.GOOGLE_CLOUD_GEMINI_API_KEY;
 export const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 export const INWORLD_BASIC = process.env.INWORLD_BASIC;
+// Moonshot AI (Kimi) — OpenAI-compatible cloud provider.
+export const MOONSHOT_API_KEY = process.env.MOONSHOT_API_KEY;
+// Optional endpoint override — defaults to https://api.moonshot.ai/v1.
+// Set to https://api.moonshot.cn/v1 for the China region.
+export const MOONSHOT_BASE_URL = process.env.MOONSHOT_BASE_URL;
 
 // ── Local Provider Instances ───────────────────────────────────
 // Parsed from indexed env vars: PROVIDER_<TYPE>_<N>_URL, _CONCURRENCY, _NICKNAME

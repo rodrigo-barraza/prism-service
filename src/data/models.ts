@@ -941,6 +941,83 @@ const MODELS = {
     ],
   },
 
+  // ----- Moonshot AI (Kimi) — Text Generation -----
+  // Kimi's API is OpenAI Chat Completions–compatible. Pricing is per 1M tokens
+  // from platform.moonshot.ai (K3 confirmed: 3.00 input / 0.30 cache-hit /
+  // 15.00 output). K2.6 & K2.7-Code list prices are via OpenRouter; their
+  // cache-hit rate is estimated at ~10% of input (K3's ratio) pending a
+  // published figure — adjust cachedInputPerMillion once confirmed.
+  KIMI_K3: {
+    description:
+      "Moonshot's flagship Kimi K3 — a 1M-token-context reasoning model built for long-horizon coding and end-to-end agentic knowledge work.",
+    name: "kimi-k3",
+    label: "Kimi K3",
+    provider: PROVIDERS.MOONSHOT,
+    modelType: MODEL_TYPES.CONVERSATION,
+    year: 2026,
+    defaultTemperature: 0.6,
+    pricing: {
+      inputPerMillion: 3.0,
+      cachedInputPerMillion: 0.3,
+      outputPerMillion: 15.0,
+    },
+    maxInputTokens: 1_048_576,
+    maxOutputTokens: 65_536,
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
+    mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
+    streaming: true,
+    thinking: true,
+    thinkingLevels: ["low", "high", "max"],
+    tools: ["Thinking", "Tool Calling"],
+  },
+  KIMI_K2_6: {
+    description:
+      "Kimi K2.6 — Moonshot's balanced general-purpose model with a 256K context, native vision, and thinking. The default Kimi model.",
+    name: "kimi-k2.6",
+    label: "Kimi K2.6",
+    provider: PROVIDERS.MOONSHOT,
+    modelType: MODEL_TYPES.CONVERSATION,
+    default: true,
+    year: 2026,
+    defaultTemperature: 0.6,
+    pricing: {
+      inputPerMillion: 0.66,
+      cachedInputPerMillion: 0.066,
+      outputPerMillion: 3.41,
+    },
+    maxInputTokens: 262_144,
+    maxOutputTokens: 32_768,
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
+    mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
+    streaming: true,
+    thinking: true,
+    tools: ["Thinking", "Tool Calling"],
+  },
+  KIMI_K2_7_CODE: {
+    description:
+      "Kimi K2.7 Code — a coding specialist tuned for reliable end-to-end programming over long (256K) contexts.",
+    name: "kimi-k2.7-code",
+    label: "Kimi K2.7 Code",
+    provider: PROVIDERS.MOONSHOT,
+    modelType: MODEL_TYPES.CONVERSATION,
+    year: 2026,
+    defaultTemperature: 0.6,
+    pricing: {
+      inputPerMillion: 0.72,
+      cachedInputPerMillion: 0.072,
+      outputPerMillion: 3.5,
+    },
+    maxInputTokens: 262_144,
+    maxOutputTokens: 32_768,
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.TEXT],
+    streaming: true,
+    thinking: false,
+    tools: ["Tool Calling"],
+  },
+
   // ----- Google — Text Generation -----
   GEMINI_3_FLASH: {
     description:

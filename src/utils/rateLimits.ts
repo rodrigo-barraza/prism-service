@@ -28,6 +28,7 @@ interface HttpResponseWithHeaders {
 export function extractOpenAIRateLimits(
   response: HttpResponseWithHeaders | null | undefined,
   model: string,
+  provider: string = PROVIDERS.OPENAI,
 ) {
   if (!response?.headers) return null;
   const headers = response.headers;
@@ -39,7 +40,7 @@ export function extractOpenAIRateLimits(
   if (!limitRequests && !limitTokens) return null;
 
   const result = {
-    provider: PROVIDERS.OPENAI,
+    provider,
     requests: {
       limit: safeInt(limitRequests),
       remaining: safeInt(headers.get("x-ratelimit-remaining-requests")),
@@ -53,7 +54,7 @@ export function extractOpenAIRateLimits(
   };
 
   // Update the global store with the latest per-model snapshot
-  rateLimitStore.update(PROVIDERS.OPENAI, model, result);
+  rateLimitStore.update(provider, model, result);
 
   return result;
 }
