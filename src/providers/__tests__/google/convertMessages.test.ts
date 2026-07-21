@@ -367,6 +367,49 @@ describe("convertMessages — inline image cap", () => {
       .filter((part) => "inlineData" in part);
     expect(imageParts.length).toBe(3);
   });
+
+  it("drops the OLDEST images when over the limit, keeping the newest", async () => {
+    // Distinguishable payloads: old images vs the two newest (the ones the
+    // current turn is about, e.g. "redraw this").
+    const oldImage = (index: number) =>
+      `data:image/png;base64,OLD${index}AAAA`;
+    const newImage = (index: number) =>
+      `data:image/png;base64,NEW${index}AAAA`;
+    const result = await convertMessages([
+      makeMessage({
+        images: Array.from({ length: 16 }, (_, i) => oldImage(i)),
+      } as never),
+      makeMessage({ content: "redraw this", images: [newImage(0), newImage(1)] } as never),
+    ]);
+
+    const inlineData = result
+      .flatMap((content) => content.parts ?? [])
+      .filter((part) => "inlineData" in part)
+      .map(
+        (part) => (part as { inlineData: { data: string } }).inlineData.data,
+      );
+    expect(inlineData.length).toBe(14);
+    // Both newest images survive; the 4 oldest are the ones dropped
+    expect(inlineData).toContain("NEW0AAAA");
+    expect(inlineData).toContain("NEW1AAAA");
+    expect(inlineData).not.toContain("OLD0AAAA");
+    expect(inlineData).not.toContain("OLD3AAAA");
+    expect(inlineData).toContain("OLD4AAAA");
+  });
+
+  it("tells the model that omitted images were the older ones", async () => {
+    const result = await convertMessages([
+      makeMessage({ images: Array(16).fill(pixel) } as never),
+      makeMessage({ content: "latest message" }),
+    ]);
+    const texts = result
+      .flatMap((content) => content.parts ?? [])
+      .filter((part) => "text" in part)
+      .map((part) => (part as { text: string }).text);
+    expect(
+      texts.some((text) => text.includes("older image(s) omitted")),
+    ).toBe(true);
+  });
 });
 
 // ── Document Attachments ─────────────────────────────────────
