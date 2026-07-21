@@ -70,8 +70,15 @@ describe("Config route — pattern constant detection", () => {
 
     expect(thinkingModels.length).toBeGreaterThan(0);
 
-    for (const model of thinkingModels) {
-      expect(model).toHaveProperty("thinkingLevels");
+    // Some thinking models (e.g. Kimi K2.6) reason but expose no effort
+    // control — they intentionally omit thinkingLevels so the provider never
+    // forwards reasoning_effort. Only models that declare levels are checked.
+    const leveledModels = thinkingModels.filter(
+      (m: any) => m.thinkingLevels !== undefined
+    );
+    expect(leveledModels.length).toBeGreaterThan(0);
+
+    for (const model of leveledModels) {
       expect(Array.isArray(model.thinkingLevels)).toBe(true);
       expect(model.thinkingLevels.length).toBeGreaterThanOrEqual(3);
       expect(model.thinkingLevels).toContain("low");
