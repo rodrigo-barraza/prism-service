@@ -34,6 +34,7 @@ import {
   TOOL_PROXY_TIMEOUT_MILLISECONDS,
   AGENT_DIRECTIVES,
 } from "#src/constants";
+import FileService from "#src/services/FileService";
 import InternalToolRegistry from "#src/services/tool-definitions/InternalToolRegistry";
 import SettingsService from "#src/services/SettingsService";
 import PromptLocaleService from "#src/services/PromptLocaleService";
@@ -1515,6 +1516,18 @@ export default class ToolOrchestratorService {
    * arguments the model cannot supply itself — it perceives attachments
    * as raw content but has no text handle for them.
    */
+  /**
+   * Map a stored media entry to a form tools-api can consume: http(s) and
+   * data: pass through; `minio://` storage refs (MediaResolutionService
+   * compacts uploads in place) map to their public bucket URL. Returns
+   * null for unusable entries.
+   */
+  static toFetchableMediaUrl(entry: string): string | null {
+    if (entry.startsWith("http") || entry.startsWith("data:")) return entry;
+    if (entry.startsWith("minio://")) return FileService.getPublicUrl(entry);
+    return null;
+  }
+
   static findLastUserMedia(
     messages: MediaMessage[],
     fields: MediaMessageField[],
@@ -1525,12 +1538,12 @@ export default class ToolOrchestratorService {
       for (const field of fields) {
         const entries = message[field];
         if (!Array.isArray(entries) || entries.length === 0) continue;
-        const firstUsable = entries.find(
-          (entry) =>
-            typeof entry === "string" &&
-            (entry.startsWith("http") || entry.startsWith("data:")),
-        );
-        if (firstUsable) return firstUsable;
+        for (const entry of entries) {
+          if (typeof entry !== "string") continue;
+          const fetchable =
+            ToolOrchestratorService.toFetchableMediaUrl(entry);
+          if (fetchable) return fetchable;
+        }
       }
       // Stop at the most recent user message carrying any of the fields —
       // older messages are stale context, same rule as before.
@@ -1561,12 +1574,10 @@ export default class ToolOrchestratorService {
         const entries = message[field];
         if (!Array.isArray(entries)) continue;
         for (const entry of entries) {
-          if (
-            typeof entry === "string" &&
-            (entry.startsWith("http") || entry.startsWith("data:"))
-          ) {
-            usable.push(entry);
-          }
+          if (typeof entry !== "string") continue;
+          const fetchable =
+            ToolOrchestratorService.toFetchableMediaUrl(entry);
+          if (fetchable) usable.push(fetchable);
         }
       }
       const httpEntries = usable.filter((entry) => entry.startsWith("http"));
@@ -1622,6 +1633,49 @@ export default class ToolOrchestratorService {
     return { ...args, [mapping.arg]: deduped };
   }
 
+  /**
+   * Normalize a reference-image entry to a form the tools-api /creative
+   * routes accept (http(s) or data: URL). Conversation storage holds
+   * `minio://` refs (MediaResolutionService compacts uploads in place
+   * before the provider call), and tools-api has no MinIO access — so
+   * those must be inlined as base64 here. Returns null for unusable
+   * entries.
+   */
+  static async resolveReferenceImageEntry(
+    reference: string,
+  ): Promise<string | null> {
+    if (
+      reference.startsWith("http://") ||
+      reference.startsWith("https://") ||
+      reference.startsWith("data:")
+    ) {
+      return reference;
+    }
+    if (reference.startsWith("minio://")) {
+      // Prefer the lightweight public bucket URL (same contract as document
+      // references); inline base64 only when no public URL is configured.
+      const publicUrl = FileService.getPublicUrl(reference);
+      if (publicUrl) return publicUrl;
+      try {
+        const key = FileService.extractKey(reference);
+        const file = await FileService.getFile(key);
+        if (!file) return null;
+        const chunks: Buffer[] = [];
+        for await (const chunk of file.stream) {
+          chunks.push(chunk);
+        }
+        const buffer = Buffer.concat(chunks);
+        return `data:${file.contentType};base64,${buffer.toString("base64")}`;
+      } catch (error: unknown) {
+        logger.warn(
+          `[ToolOrchestrator] failed to resolve minio image ref ${reference.substring(0, 80)}: ${getErrorMessage(error)}`,
+        );
+        return null;
+      }
+    }
+    return null;
+  }
+
   static async executeTool(
     name: string,
     args: Record<string, unknown> = {},
@@ -1670,19 +1724,21 @@ export default class ToolOrchestratorService {
     // avatar URL when the platform didn't attach it) — those are kept and the
     // conversation-attached images are unioned in behind them.
     if (name === TOOL_NAMES.GENERATE_IMAGE && context.messages) {
-      const agentProvidedReferences = Array.isArray(
+      const rawAgentReferences = Array.isArray(
         (args as { referenceImages?: unknown }).referenceImages,
       )
         ? (
             (args as { referenceImages: unknown[] }).referenceImages
-          ).filter(
-            (image): image is string =>
-              typeof image === "string" &&
-              (image.startsWith("http://") ||
-                image.startsWith("https://") ||
-                image.startsWith("data:")),
-          )
+          ).filter((image): image is string => typeof image === "string")
         : [];
+      const agentProvidedReferences: string[] = [];
+      for (const image of rawAgentReferences) {
+        const resolved =
+          await ToolOrchestratorService.resolveReferenceImageEntry(image);
+        if (resolved && !agentProvidedReferences.includes(resolved)) {
+          agentProvidedReferences.push(resolved);
+        }
+      }
       const referenceImages: string[] = [...agentProvidedReferences];
       // Find the last user message with images
       for (let i = context.messages.length - 1; i >= 0; i--) {
@@ -1697,27 +1753,25 @@ export default class ToolOrchestratorService {
             `[ToolOrchestrator] generate_image: found ${message.images.length} image(s) on last user message`,
           );
           for (const image of message.images) {
-            if (referenceImages.includes(image as string)) {
+            if (typeof image !== "string") {
+              logger.warn(
+                `[ToolOrchestrator] generate_image: REJECTED image ref (type=${typeof image})`,
+              );
+              continue;
+            }
+            if (referenceImages.includes(image)) {
               continue; // already provided explicitly by the agent
             }
-            if (
-              typeof image === "string" &&
-              (image.startsWith("http://") || image.startsWith("https://"))
-            ) {
-              referenceImages.push(image);
+            const resolved =
+              await ToolOrchestratorService.resolveReferenceImageEntry(image);
+            if (resolved && !referenceImages.includes(resolved)) {
+              referenceImages.push(resolved);
               logger.info(
-                `[ToolOrchestrator] generate_image: accepted HTTP image ref (${image.substring(0, 80)}...)`,
+                `[ToolOrchestrator] generate_image: accepted image ref (${image.substring(0, 80)}...)`,
               );
-            } else if (typeof image === "string" && image.startsWith("data:")) {
-              // Accept base64 data URLs — the /creative route supports up to 50MB bodies.
-              // Discord avatars and user-attached images are typically well under 5MB.
-              referenceImages.push(image);
-              logger.info(
-                `[ToolOrchestrator] generate_image: accepted base64 data URL (${(image.length / 1024).toFixed(0)} KB)`,
-              );
-            } else {
+            } else if (!resolved) {
               logger.warn(
-                `[ToolOrchestrator] generate_image: REJECTED image ref (type=${typeof image}, prefix=${String(image).substring(0, 30)})`,
+                `[ToolOrchestrator] generate_image: REJECTED image ref (prefix=${image.substring(0, 30)})`,
               );
             }
           }

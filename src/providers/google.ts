@@ -418,6 +418,22 @@ export async function convertMessages(
   let inlineImageCount = 0;
   let droppedImageCount = 0;
 
+  // When the conversation holds more images than the cap, drop the OLDEST
+  // ones — the newest attachments are what the current turn is about
+  // (e.g. "redraw this"), and counting front-to-back was silently dropping
+  // exactly those.
+  let totalInlineImageCandidates = 0;
+  for (const item of messages) {
+    if (item.role === "assistant" || item.role === "tool") continue;
+    if (Array.isArray(item.images)) {
+      totalInlineImageCandidates += item.images.length;
+    }
+  }
+  let skipOldestImages = Math.max(
+    0,
+    totalInlineImageCandidates - MAX_INLINE_IMAGES,
+  );
+
   for (let i = 0; i < messages.length; i++) {
     const item = messages[i];
     const parts: Part[] = [];
@@ -457,6 +473,14 @@ export async function convertMessages(
         if (array && Array.isArray(array)) {
           for (const mediaRef of array) {
             if (field === "images") {
+              if (skipOldestImages > 0) {
+                skipOldestImages--;
+                droppedImageCount++;
+                logger.warn(
+                  `[Google] Dropping older reference image to stay within the ${MAX_INLINE_IMAGES}-image Gemini limit`,
+                );
+                continue;
+              }
               if (inlineImageCount >= MAX_INLINE_IMAGES) {
                 logger.warn(
                   `[Google] Dropping reference image beyond the ${MAX_INLINE_IMAGES}-image Gemini limit`,
@@ -553,7 +577,7 @@ export async function convertMessages(
   // otherwise it silently reasons over an incomplete set.
   if (droppedImageCount > 0) {
     const notePart: Part = {
-      text: `[${droppedImageCount} additional image(s) omitted — this model accepts at most ${MAX_INLINE_IMAGES} images per request]`,
+      text: `[${droppedImageCount} older image(s) omitted — this model accepts at most ${MAX_INLINE_IMAGES} images per request; the most recent images were kept]`,
     };
     const lastUserContent = [...result]
       .reverse()
