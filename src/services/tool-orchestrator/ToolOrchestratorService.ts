@@ -1769,26 +1769,40 @@ export default class ToolOrchestratorService {
       const rawAgentReferences = Array.isArray(
         (args as { referenceImages?: unknown }).referenceImages,
       )
-        ? (
-            (args as { referenceImages: unknown[] }).referenceImages
-          ).filter((image): image is string => typeof image === "string")
+        ? (args as { referenceImages: unknown[] }).referenceImages
         : [];
       const agentProvidedReferences: string[] = [];
       // Keep the agent's original entries index-aligned with the resolved
       // ones so block labels (keyed by original http URL) can be matched.
       const agentProvidedOriginals: string[] = [];
-      for (const image of rawAgentReferences) {
+      const agentProvidedLabels: string[] = [];
+      for (const entry of rawAgentReferences) {
+        // The agent-facing schema asks for {url, label} objects so
+        // people-references arrive labeled; bare URL strings are kept for
+        // back-compat with older transcripts and looser models.
+        let url: string | null = null;
+        let label = "";
+        if (typeof entry === "string") {
+          url = entry;
+        } else if (entry && typeof entry === "object") {
+          const candidate = entry as { url?: unknown; label?: unknown };
+          if (typeof candidate.url === "string") url = candidate.url;
+          if (typeof candidate.label === "string")
+            label = candidate.label.trim();
+        }
+        if (!url) continue;
         const resolved =
-          await ToolOrchestratorService.resolveReferenceImageEntry(image);
+          await ToolOrchestratorService.resolveReferenceImageEntry(url);
         if (resolved && !agentProvidedReferences.includes(resolved)) {
           agentProvidedReferences.push(resolved);
-          agentProvidedOriginals.push(image);
+          agentProvidedOriginals.push(url);
+          agentProvidedLabels.push(label);
         }
       }
       const referenceImages: string[] = [...agentProvidedReferences];
       // Per-image labels aligned with referenceImages — preserves the
       // name↔face binding through to the image model (empty = unlabeled).
-      const referenceLabels: string[] = agentProvidedReferences.map(() => "");
+      const referenceLabels: string[] = [...agentProvidedLabels];
       // Find the last user message with images
       for (let i = context.messages.length - 1; i >= 0; i--) {
         const message = context.messages[i];
@@ -1806,7 +1820,9 @@ export default class ToolOrchestratorService {
           const { labels: blockLabels, labelByUrl } =
             ToolOrchestratorService.parseReferenceImageLabels(message.content);
           for (let agentIndex = 0; agentIndex < agentProvidedReferences.length; agentIndex++) {
+            // The agent's own label wins; the block map fills the gaps.
             referenceLabels[agentIndex] =
+              referenceLabels[agentIndex] ||
               labelByUrl.get(agentProvidedOriginals[agentIndex]) ||
               labelByUrl.get(agentProvidedReferences[agentIndex]) ||
               "";
