@@ -5,6 +5,7 @@ vi.mock('#src/services/FileService', () => {
     default: {
       uploadFile: vi.fn(),
       isMinioRef: vi.fn(),
+      isExternalStorage: vi.fn(),
       extractKey: vi.fn(),
       getFile: vi.fn(),
       getPublicUrl: vi.fn(),
@@ -49,6 +50,7 @@ describe('MediaResolutionService Unit Tests', () => {
     });
     vi.mocked(FileService.uploadFile).mockResolvedValue({ ref: 'minio://bucket/uploaded-file-key' } as any);
     vi.mocked(FileService.isMinioRef).mockReturnValue(false);
+    vi.mocked(FileService.isExternalStorage).mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -192,7 +194,7 @@ describe('MediaResolutionService Unit Tests', () => {
       expect(result.storageRef).toBe('minio://bucket/key-error');
     });
 
-    it('should fetch HTTP/HTTPS references, convert to data URL and compress', async () => {
+    it('should fetch HTTP/HTTPS references, convert to data URL for the provider, and archive to MinIO for storage', async () => {
       const fetchSpy = vi.fn().mockResolvedValue({
         ok: true,
         headers: {
@@ -201,13 +203,61 @@ describe('MediaResolutionService Unit Tests', () => {
         arrayBuffer: async () => Buffer.from('http-image-bytes'),
       });
       vi.stubGlobal('fetch', fetchSpy);
+      vi.mocked(FileService.isMinioRef).mockImplementation(
+        (ref): ref is string => typeof ref === 'string' && ref.startsWith('minio://'),
+      );
+
+      const result = await resolveMediaReference('https://example.com/logo.webp', 'project-x', 'user-y');
+
+      const expectedBase64 = Buffer.from('http-image-bytes').toString('base64');
+      expect(result.providerRef).toBe(`data:image/webp;base64,${expectedBase64}`);
+      // External URLs are not durable (e.g. signed Discord CDN links) — the
+      // fetched bytes are archived and the minio ref becomes the storage form
+      expect(result.storageRef).toBe('minio://bucket/uploaded-file-key');
+      expect(FileService.uploadFile).toHaveBeenCalledWith(
+        `data:image/webp;base64,${expectedBase64}`,
+        expect.any(String),
+        'project-x',
+        'user-y',
+      );
+      expect(fetchSpy).toHaveBeenCalledWith('https://example.com/logo.webp');
+    });
+
+    it('should keep the original URL for storage when MinIO is unavailable (never inline base64)', async () => {
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: {
+          get: () => 'image/webp',
+        },
+        arrayBuffer: async () => Buffer.from('http-image-bytes'),
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+      vi.mocked(FileService.isExternalStorage).mockReturnValue(false);
 
       const result = await resolveMediaReference('https://example.com/logo.webp', 'project-x', 'user-y');
 
       const expectedBase64 = Buffer.from('http-image-bytes').toString('base64');
       expect(result.providerRef).toBe(`data:image/webp;base64,${expectedBase64}`);
       expect(result.storageRef).toBe('https://example.com/logo.webp');
-      expect(fetchSpy).toHaveBeenCalledWith('https://example.com/logo.webp');
+      expect(FileService.uploadFile).not.toHaveBeenCalled();
+    });
+
+    it('should keep the original URL for storage when the archive upload fails', async () => {
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: {
+          get: () => 'image/webp',
+        },
+        arrayBuffer: async () => Buffer.from('http-image-bytes'),
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+      vi.mocked(FileService.uploadFile).mockRejectedValueOnce(new Error('minio write refused'));
+
+      const result = await resolveMediaReference('https://example.com/logo.webp', 'project-x', 'user-y');
+
+      const expectedBase64 = Buffer.from('http-image-bytes').toString('base64');
+      expect(result.providerRef).toBe(`data:image/webp;base64,${expectedBase64}`);
+      expect(result.storageRef).toBe('https://example.com/logo.webp');
     });
 
     it('should fall back to original reference if HTTP fetch is not ok', async () => {
