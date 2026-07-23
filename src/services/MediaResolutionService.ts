@@ -4,6 +4,7 @@
 // Extracted from ChatRoutes.ts to enforce route→service architectural boundary.
 
 import FileService from "./FileService.ts";
+import MinioWrapper from "#src/wrappers/MinioWrapper";
 import logger from "#src/utils/logger";
 import {
   compressImageForSizeLimit,
@@ -137,7 +138,9 @@ export async function compressDataUrlIfOversized(
  * Handles:
  *  - data:... base64  → upload to MinIO (original gets minio ref), provider gets data URL
  *  - minio://...       → download from MinIO (original unchanged), provider gets data URL
- *  - http(s)://...     → fetch (original unchanged), provider gets data URL
+ *  - http(s)://...     → fetch, archive to MinIO (storage gets minio ref;
+ *                        own-bucket URLs and archive failures keep the URL),
+ *                        provider gets data URL
  */
 export async function resolveMediaReference(
   reference: string,
@@ -204,7 +207,13 @@ export async function resolveMediaReference(
       return { providerRef: reference, storageRef: reference };
     }
   }
-  // HTTP(S) URL — fetch for provider, keep URL for storage
+  // HTTP(S) URL — fetch for provider, archive to MinIO for storage.
+  // External URLs are not durable (Discord CDN attachment links are signed
+  // and expire within ~a day), so the fetched bytes — already in memory for
+  // the provider — are re-uploaded to our own bucket and the minio:// ref
+  // becomes the storage form. Our own bucket URLs are left as-is, and any
+  // archive failure degrades to persisting the original URL (link rot),
+  // never to inlining base64 into MongoDB.
   if (reference.startsWith("http://") || reference.startsWith("https://")) {
     try {
       const response = await fetch(reference);
@@ -218,15 +227,37 @@ export async function resolveMediaReference(
         response.headers.get("content-type") || "application/octet-stream";
       const arrayBuffer = await response.arrayBuffer();
       const base64 = Buffer.from(arrayBuffer).toString("base64");
-      let providerRef = `data:${contentType};base64,${base64}`;
+      const originalDataUrl = `data:${contentType};base64,${base64}`;
       // Compress oversized images before they reach any provider
-      providerRef = await compressDataUrlIfOversized(
-        providerRef,
+      const providerRef = await compressDataUrlIfOversized(
+        originalDataUrl,
         maxImageDimension,
       );
+      let storageRef = reference;
+      const bucketUrl = MinioWrapper.getBucketUrl();
+      const isOwnBucketUrl = !!bucketUrl && reference.startsWith(bucketUrl);
+      if (!isOwnBucketUrl && FileService.isExternalStorage()) {
+        try {
+          const { ref: minioRef } = await FileService.uploadFile(
+            originalDataUrl, // Archive original bytes, not the compressed provider copy
+            FILE_CATEGORIES.UPLOADS,
+            project,
+            username,
+          );
+          // uploadFile returns the input unchanged when MinIO drops mid-call —
+          // only a real minio:// ref may replace the URL in storage.
+          if (FileService.isMinioRef(minioRef)) {
+            storageRef = minioRef;
+          }
+        } catch (error: unknown) {
+          logger.error(
+            `[MediaResolution] Failed to archive fetched URL to MinIO: ${getErrorMessage(error)}`,
+          );
+        }
+      }
       return {
         providerRef,
-        storageRef: reference,
+        storageRef,
       };
     } catch (error: unknown) {
       logger.error(

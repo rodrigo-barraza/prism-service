@@ -25,78 +25,113 @@ interface ConversationDocument {
 }
 
 /**
- * Upload any base64 data URLs in message images/audio to external storage.
- * Replaces inline data with minio:// refs when MinIO is available.
+ * Media array fields whose base64 data URLs are offloaded to MinIO before
+ * persistence. Provider-form messages can carry any of these inline —
+ * `video` in particular (never image-compressed) reaches tens of MB.
+ */
+const EXTRACTABLE_MEDIA_ARRAY_FIELDS = ["images", "video", "pdf"] as const;
+
+/**
+ * MongoDB documents cap at 16MB and the driver's BSON serializer buffer at
+ * ~17MB — one unswapped video blob makes the whole `$push` throw and loses
+ * the turn (see the 2026-07-22 lupos "summarize this video" empty-stub).
+ * A data: ref that survives the MinIO swap (storage down, upload failed)
+ * and exceeds this cap is dropped with a placeholder instead of being
+ * persisted inline.
+ */
+const MAXIMUM_INLINE_MEDIA_CHARACTERS = 8 * 1024 * 1024;
+
+function capOversizedInlineMediaRef(ref: string, fieldName: string): string {
+  if (
+    !ref.startsWith("data:") ||
+    ref.length <= MAXIMUM_INLINE_MEDIA_CHARACTERS
+  ) {
+    return ref;
+  }
+  const mimeType = ref.match(/^data:([^;,]+)/)?.[1] || "unknown";
+  const approximateMegabytes = (ref.length / (1024 * 1024)).toFixed(1);
+  logger.error(
+    `Dropped oversized inline ${fieldName} (${mimeType}, ${approximateMegabytes}MB base64) — could not offload to MinIO`,
+  );
+  return `dropped://oversized-${fieldName}?type=${encodeURIComponent(mimeType)}&approximateMegabytes=${approximateMegabytes}`;
+}
+
+/**
+ * Upload any base64 data URLs in message media fields (images/video/pdf
+ * arrays, audio string) to external storage, replacing inline data with
+ * minio:// refs. When MinIO is unavailable, small media stays inline by
+ * design, but oversized entries are dropped via placeholder so the
+ * conversation `$push` can never blow the BSON document limit.
  */
 export async function extractFiles(
   messages: Array<ChatMessage | MessagePayload>,
   project: string | null = null,
   username: string | null = null,
 ): Promise<Array<ChatMessage | MessagePayload>> {
-  if (!messages || !FileService.isExternalStorage()) return messages;
+  if (!messages) return messages;
+  const isExternalStorageAvailable = FileService.isExternalStorage();
 
   const processed: Array<ChatMessage | MessagePayload> = [];
   for (const message of messages) {
     const updated = { ...message } as ChatMessage | MessagePayload;
+    const category =
+      message.role === "assistant"
+        ? FILE_CATEGORIES.GENERATIONS
+        : FILE_CATEGORIES.UPLOADS;
 
-    // Handle images
-    if (message.images && message.images.length > 0) {
-      const category =
-        message.role === "assistant"
-          ? FILE_CATEGORIES.GENERATIONS
-          : FILE_CATEGORIES.UPLOADS;
-      const newImages: string[] = [];
-      for (const rawImage of message.images) {
-        if (typeof rawImage !== "string") {
-          newImages.push(String(rawImage));
+    for (const field of EXTRACTABLE_MEDIA_ARRAY_FIELDS) {
+      const mediaArray = (updated as Record<string, unknown>)[field];
+      if (!Array.isArray(mediaArray) || mediaArray.length === 0) continue;
+      const newRefs: string[] = [];
+      for (const rawRef of mediaArray) {
+        if (typeof rawRef !== "string") {
+          newRefs.push(String(rawRef));
           continue;
         }
-        const image = rawImage;
-        if (image.startsWith("minio://") || image.startsWith("http")) {
-          newImages.push(image);
-          continue;
-        }
-        if (image.startsWith("data:")) {
+        let ref = rawRef;
+        if (ref.startsWith("data:") && isExternalStorageAvailable) {
           try {
-            const { ref } = await FileService.uploadFile(
-              image,
+            // uploadFile passes the data URL through unchanged when MinIO
+            // drops mid-call — the size cap below still covers that case.
+            const { ref: uploadedRef } = await FileService.uploadFile(
+              ref,
               category,
               project,
               username,
             );
-            newImages.push(ref);
+            ref = uploadedRef;
           } catch (error: unknown) {
             logger.error(`Failed to upload file: ${errorMessage(error)}`);
-            newImages.push(image);
           }
-        } else {
-          newImages.push(image);
         }
+        newRefs.push(capOversizedInlineMediaRef(ref, field));
       }
-      updated.images = newImages;
+      (updated as Record<string, unknown>)[field] = newRefs;
     }
 
-    // Handle audio data URLs
+    // Handle audio data URLs (single string field)
     if (
       updated.audio &&
       typeof updated.audio === "string" &&
       updated.audio.startsWith("data:")
     ) {
-      const category =
-        updated.role === "assistant"
-          ? FILE_CATEGORIES.GENERATIONS
-          : FILE_CATEGORIES.UPLOADS;
-      try {
-        const { ref } = await FileService.uploadFile(
-          updated.audio,
-          category,
-          project,
-          username,
-        );
-        updated.audio = ref;
-      } catch (error: unknown) {
-        logger.error(`Failed to upload audio: ${errorMessage(error)}`);
+      if (isExternalStorageAvailable) {
+        try {
+          const { ref } = await FileService.uploadFile(
+            updated.audio,
+            category,
+            project,
+            username,
+          );
+          updated.audio = ref;
+        } catch (error: unknown) {
+          logger.error(`Failed to upload audio: ${errorMessage(error)}`);
+        }
       }
+      updated.audio = capOversizedInlineMediaRef(
+        updated.audio as string,
+        "audio",
+      );
     }
 
     processed.push(updated);
