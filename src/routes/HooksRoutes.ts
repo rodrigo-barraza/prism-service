@@ -5,7 +5,7 @@ import express, {
   type Response,
   type NextFunction,
 } from "express";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import requireDb from "#src/middleware/RequireDbMiddleware";
 import logger from "#src/utils/logger";
 import { COLLECTIONS, HOOKS } from "#src/constants";
@@ -41,9 +41,13 @@ router.use(requireDb);
 
 const COLLECTION = COLLECTIONS.AGENT_HOOKS;
 
-/** Strip Mongo's `_id`; the API's identity is the generated `id`. */
+/**
+ * Strip Mongo's `_id`; the API's identity is the generated `id`. `secret` is
+ * withheld too — it is returned once at creation and never read back, so a
+ * listing can be handed around without leaking the HMAC key.
+ */
 function toApiHook(document: ConfiguredHookDocument) {
-  const { _id, ...rest } = document;
+  const { _id, secret, ...rest } = document;
   return { ...rest, id: rest.id || (_id ? _id.toString() : "") };
 }
 
@@ -170,6 +174,10 @@ router.post(
         enabled: parsed.data.enabled,
         timeoutMilliseconds:
           parsed.data.timeoutMilliseconds ?? HOOKS.DEFAULT_TIMEOUT_MILLISECONDS,
+        // Only `http` handlers sign, but minting it unconditionally keeps the
+        // document shape uniform and means switching a hook's handler type
+        // later doesn't leave it silently unsigned.
+        secret: randomBytes(32).toString("hex"),
         createdAt: now,
         updatedAt: now,
       };
@@ -183,7 +191,9 @@ router.post(
       logger.info(
         `Hook created: ${document.name} on ${document.event} for agent ${document.agent ?? "*"} (${document.id})`,
       );
-      res.status(201).json(toApiHook(document));
+      // The one response that carries the secret — after this it is
+      // unreadable, so a caller that wants to verify signatures must keep it.
+      res.status(201).json({ ...toApiHook(document), secret: document.secret });
     } catch (error: unknown) {
       next(error);
     }

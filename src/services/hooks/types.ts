@@ -141,6 +141,13 @@ export interface ConfiguredHookDocument {
   handler: HookHandlerConfig;
   enabled: boolean;
   timeoutMilliseconds: number;
+  /**
+   * HMAC key for `http` handlers, generated on create. Lets a receiver verify
+   * the request really came from prism rather than anything else that can
+   * reach its URL. Returned once at creation and projected out of reads,
+   * matching `webhook_subscriptions`.
+   */
+  secret?: string;
   createdAt: string;
   updatedAt: string;
 }
