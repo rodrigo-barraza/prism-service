@@ -75,6 +75,10 @@ vi.mock("../lifecycle/HookInitializer.ts", () => ({
     };
     return { hooks: noopHooks, approvalEngine: {} };
   },
+  // The harness layers user-configured hooks on top of the built-ins before
+  // it starts. Stubbed to a no-op here so this suite stays about exhaustion
+  // recovery and never reaches Mongo.
+  attachConfiguredHooks: vi.fn().mockResolvedValue(0),
 }));
 
 vi.mock("../lifecycle/ToolExecutor.ts", () => ({

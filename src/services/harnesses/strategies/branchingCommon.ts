@@ -34,7 +34,10 @@ import {
 } from "#src/utils/SystemMessageTags";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import RequestLogger from "#src/services/RequestLogger";
-import { createStandardHooks } from "#src/services/harnesses/lifecycle/HookInitializer";
+import {
+  createStandardHooks,
+  attachConfiguredHooks,
+} from "#src/services/harnesses/lifecycle/HookInitializer";
 import { executeToolBatch } from "#src/services/harnesses/lifecycle/ToolExecutor";
 import { checkAndWaitForApproval } from "#src/services/harnesses/lifecycle/ApprovalGate";
 import {
@@ -137,6 +140,19 @@ export async function runBeforePromptSetup(
   });
   const { hooks } = standardHooks;
 
+  // Branching strategies get the user's configured hooks on the same terms as
+  // the default harness — a guardrail must not stop applying because the
+  // conversation switched to Tree-of-Thoughts.
+  await attachConfiguredHooks(hooks, {
+    project,
+    username,
+    agent,
+    conversationId,
+    agentConversationId: agentConversationId || "",
+    workspaceRoot,
+    hookDepth: context.parentAgentConversationId ? 1 : 0,
+  });
+
   if (options.planFirst) {
     emit({
       type: SERVER_SENT_EVENT_TYPES.STATUS,
@@ -159,6 +175,10 @@ export async function runBeforePromptSetup(
     workspaceRoot: workspaceRoot || undefined,
     workspaceEnabled: options.workspaceEnabled as boolean | undefined,
     locale: options.locale as string | undefined,
+    // ReActHarness passes this; omitting it here silently dropped every
+    // user-pinned rule whenever the conversation ran under Tree-of-Thoughts
+    // or Graph-of-Thoughts.
+    activeRuleNames: options.activeRuleNames as string[] | undefined,
   };
   await hooks.run("beforePrompt", hookContext);
 

@@ -69,6 +69,7 @@ async function fetchActiveRules(
   project: string | null | undefined,
   username: string | undefined,
   names: string[],
+  agent?: string | null,
 ): Promise<Array<{ name: string; content: string }>> {
   try {
     const collection = MongoWrapper.getCollection(
@@ -82,6 +83,19 @@ async function fetchActiveRules(
           username: username || "any",
           name: { $in: names },
           enabled: true,
+          // RulesRoutes requires an `agent` on every rule, but this query used
+          // to ignore it — so two agents owning same-named rules would inject
+          // each other's content. Restrict to the calling agent while still
+          // honoring rules stored without one.
+          ...(agent
+            ? {
+                $or: [
+                  { agent },
+                  { agent: null },
+                  { agent: { $exists: false } },
+                ],
+              }
+            : {}),
         },
         { projection: { name: 1, content: 1, _id: 0 } },
       )
@@ -92,6 +106,46 @@ async function fetchActiveRules(
       `[SystemPromptAssembler] Could not load active rules [${names.join(", ")}]: ${getErrorMessage(error)}`,
     );
     return [];
+  }
+}
+
+/**
+ * Fetch the project instructions document — the PRISM.md analogue of
+ * CLAUDE.md. Unlike rules, which the client pins per turn, this is a single
+ * always-on document per scope.
+ *
+ * Resolution is most-specific-wins: an agent-scoped document beats the
+ * scope-wide one, so a project can carry shared instructions plus a narrower
+ * overlay for one agent. `validTo: null` selects the current revision —
+ * writes supersede rather than overwrite, so history stays queryable.
+ */
+async function fetchProjectInstructions(
+  project: string | null | undefined,
+  username: string | undefined,
+  agent: string | null | undefined,
+): Promise<string> {
+  try {
+    // Delegate to the service rather than re-querying here. Both would have
+    // to agree on `validTo: null`, on most-specific-wins, and on how to break
+    // a tie when a crashed write leaves two current rows — three chances for
+    // the reader and the writer to drift apart on the same document.
+    const { default: ProjectInstructionsService } = await import(
+      "#src/services/ProjectInstructionsService"
+    );
+    const database = ProjectInstructionsService.getDatabase();
+    if (!database) return "";
+    const document = await ProjectInstructionsService.getCurrent(database, {
+      project: project || "any",
+      username: username || "any",
+      agent: agent || null,
+    });
+    const content = document?.content;
+    return typeof content === "string" ? content.trim() : "";
+  } catch (error: unknown) {
+    logger.warn(
+      `[SystemPromptAssembler] Could not load project instructions: ${getErrorMessage(error)}`,
+    );
+    return "";
   }
 }
 
@@ -519,6 +573,32 @@ export default class SystemPromptAssembler {
       }
     }
 
+    // ── 5b2. Project Instructions (the PRISM.md document) ─────────
+    // Always-on, user-and-agent-authored standing policy for this project.
+    // Deliberately placed in the cached system prompt rather than beside the
+    // per-turn injections: this is stable policy read on every turn, not
+    // retrieved context, and it should read as authoritative. A self-edit
+    // reprices the cached prefix exactly once, which is the right trade for
+    // content that otherwise holds still across a whole conversation.
+    // Sits directly above active-rules so a rule the user pins for one turn
+    // can override standing instructions.
+    const projectInstructions = await fetchProjectInstructions(
+      context.project,
+      context.username,
+      context.agent,
+    );
+    if (projectInstructions) {
+      sections.push(
+        wrapSection(
+          SYSTEM_PROMPT_SECTIONS.PROJECT_INSTRUCTIONS,
+          projectInstructions,
+        ),
+      );
+      logger.info(
+        `[SystemPromptAssembler] Injected project instructions (${projectInstructions.length} chars)`,
+      );
+    }
+
     // ── 5c. Active Rules (user-pinned per-turn directives) ────────
     // The client sends the names of the slash-command rules pinned to
     // this turn; the rule CONTENT is resolved here from the rules
@@ -531,6 +611,7 @@ export default class SystemPromptAssembler {
         context.project,
         context.username,
         context.activeRuleNames,
+        context.agent,
       );
       if (activeRules.length > 0) {
         const rulesText = activeRules

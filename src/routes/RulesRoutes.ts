@@ -11,6 +11,15 @@ router.use(requireDb);
 
 const COLLECTION = COLLECTIONS.AGENT_RULES;
 
+/**
+ * Parse a route param into an ObjectId, or null when it isn't one.
+ * `new ObjectId(garbage)` throws, and the error handler turns that into a
+ * 500 — a malformed id is a missing rule, not a server fault.
+ */
+function toObjectId(value: string): ObjectId | null {
+  return ObjectId.isValid(value) ? new ObjectId(value) : null;
+}
+
 interface RuleDocument {
   _id?: ObjectId;
   project: string;
@@ -107,7 +116,14 @@ router.put(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { db } = req;
+      const project = req.project || "any";
+      const username = req.username || "any";
       const validated = PutRuleSchema.parse(req.body);
+
+      const objectId = toObjectId(req.params.id as string);
+      if (!objectId) {
+        return res.status(404).json({ error: "Rule not found" });
+      }
 
       const updates: Partial<RuleDocument> = {
         ...(validated.name !== undefined && { name: validated.name }),
@@ -122,7 +138,10 @@ router.put(
       const result = await db
         .collection<RuleDocument>(COLLECTION)
         .findOneAndUpdate(
-          { _id: new ObjectId(req.params.id as string) },
+          // Scope the filter, not just the lookup: without project+username
+          // here, knowing a rule's id was enough to rewrite another scope's
+          // rule. The GET path was already scoped; these two were not.
+          { _id: objectId, project, username },
           { $set: updates },
           { returnDocument: "after" },
         );
@@ -148,10 +167,17 @@ router.delete(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { db } = req;
+      const project = req.project || "any";
+      const username = req.username || "any";
+
+      const objectId = toObjectId(req.params.id as string);
+      if (!objectId) {
+        return res.status(404).json({ error: "Rule not found" });
+      }
 
       const result = await db
         .collection<RuleDocument>(COLLECTION)
-        .findOneAndDelete({ _id: new ObjectId(req.params.id as string) });
+        .findOneAndDelete({ _id: objectId, project, username });
 
       if (!result) {
         return res.status(404).json({ error: "Rule not found" });

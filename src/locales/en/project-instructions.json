@@ -1,0 +1,39 @@
+{
+  "sectionHeader": "## Project Instructions",
+  "sectionPreamble": "The following instructions are standing policy for this project — set by the user and by you in earlier conversations. Follow them without being reminded. When a durable convention, decision, or preference changes, update them with edit_project_instructions so every future conversation inherits the correction.",
+  "tools": {
+    "read_project_instructions": {
+      "description": "Read the project instructions document — the durable, user-visible policy file for this project (Prism's equivalent of CLAUDE.md, stored in the database instead of on disk). It is already injected into your system prompt every conversation, so read it only when you need the exact current text: before editing it, when the user asks what the project instructions say, or when you must check whether a convention is already recorded before adding it. Returns the full markdown and the current version number.",
+      "parameters": {}
+    },
+    "update_project_instructions": {
+      "description": "Replace the ENTIRE project instructions document with new markdown. This is durable, user-visible project policy: it persists across all future conversations in this project, is injected into every system prompt, and is visible and editable by the user. Record only stable conventions, decisions, and preferences — build and test commands, architectural rules, house style, things the user has told you to always or never do. Never record transient facts (what you are working on right now, one-off task state, file contents, or anything that will be false next week). Prefer edit_project_instructions for ordinary changes; use this only for a deliberate full rewrite or reorganization, and pass the complete document — anything you omit is superseded and stops being injected. The previous version is kept in history and can be rolled back.",
+      "parameters": {
+        "content": "The complete replacement document in markdown. Not a diff, not a fragment — whatever you omit stops being part of the instructions."
+      }
+    },
+    "edit_project_instructions": {
+      "description": "Add or replace ONE `## section` of the project instructions, leaving the rest of the document untouched. This is the tool to reach for whenever you learn something durable and worth carrying into every future conversation in this project — a build or test command, a convention the user corrected you on, an architectural decision, a preference stated as a standing rule. It is durable, user-visible project policy: it persists across all future conversations, is injected into every system prompt, and the user can see and edit it. Keep it to stable conventions and decisions; never store transient task state or facts that expire. If the heading already exists its section is replaced (subsections under it go with it); otherwise the section is appended at the end. Prefer this over update_project_instructions — a section edit cannot accidentally delete the rest of the document.",
+      "parameters": {
+        "heading": "Section heading, without the leading '#'s — e.g. 'Build & Test'. Reuse an existing heading to replace that section; a new heading appends a new section. Prefix with '###' to target a subsection.",
+        "body": "The markdown body of the section. Replaces the whole section body; omit or pass an empty string to leave the heading with no content."
+      }
+    }
+  },
+  "results": {
+    "empty": "No project instructions have been set for this project yet. Use edit_project_instructions to start the document with a first section.",
+    "unchanged": "The '{{heading}}' section already reads exactly this way — nothing was written.",
+    "updated": "Project instructions replaced (now version {{version}}). This document is injected into every future conversation in this project.",
+    "edited": "Section '{{heading}}' {{action}} (now version {{version}}). This document is injected into every future conversation in this project."
+  },
+  "actions": {
+    "added": "added",
+    "replaced": "replaced"
+  },
+  "errors": {
+    "unavailable": "The project instructions store is unavailable — the database is not reachable right now.",
+    "contentRequired": "content is required — pass the complete replacement document",
+    "headingRequired": "heading is required — name the section to add or replace",
+    "tooLong": "content exceeds the {{limit}}-character limit — project instructions are injected into every system prompt, so keep them to standing policy and move detail elsewhere"
+  }
+}

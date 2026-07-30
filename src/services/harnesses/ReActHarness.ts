@@ -2,7 +2,10 @@ import BaseAgenticHarness from "./BaseAgenticHarness.ts";
 import { runTreeOfThoughts } from "./strategies/TreeOfThoughtsStrategy.ts";
 import { runGraphOfThoughts } from "./strategies/GraphOfThoughtsStrategy.ts";
 import { persistLoopError } from "./strategies/branchingCommon.ts";
-import { roundMilliseconds } from "@rodrigo-barraza/utilities-library";
+import {
+  roundMilliseconds,
+  errorMessage as getErrorMessage,
+} from "@rodrigo-barraza/utilities-library";
 import logger from "#src/utils/logger";
 import {
   SYSTEM_MESSAGE_TAGS,
@@ -16,7 +19,13 @@ import {
   MAX_TOOL_ITERATIONS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 
-import { createStandardHooks } from "./lifecycle/HookInitializer.ts";
+import {
+  createStandardHooks,
+  attachConfiguredHooks,
+} from "./lifecycle/HookInitializer.ts";
+import { buildHookPayload } from "#src/services/hooks/buildPayload";
+import { HOOK_EVENTS } from "#src/services/hooks/types";
+import { extractLatestUserMessageText } from "#src/utils/ConversationUtilities";
 import { executeToolBatch } from "./lifecycle/ToolExecutor.ts";
 import { checkAndWaitForApproval } from "./lifecycle/ApprovalGate.ts";
 import {
@@ -216,6 +225,104 @@ export default class ReActHarness extends BaseAgenticHarness {
     });
     const { hooks, approvalEngine } = standardHooks;
 
+    // ── User-configured hooks ────────────────────────────────
+    // Layered on top of the built-ins. Sub-agents build their own AgentHooks
+    // instance, so this runs per sub-agent too rather than being inherited —
+    // which is what lets a hook scoped to one agent stay scoped to it.
+    await attachConfiguredHooks(hooks, {
+      project: context.project,
+      username: context.username,
+      agent: context.agent,
+      conversationId: context.conversationId,
+      agentConversationId: context.agentConversationId as string,
+      workspaceRoot,
+      hookDepth: context.parentAgentConversationId ? 1 : 0,
+    });
+
+    // ── Session-level hook events ────────────────────────────
+    // `sessionStart` fires once per agentic run, before any provider call.
+    // `userPromptSubmit` follows with the text that opened the turn, and is
+    // one of only two events allowed to block — a deny here aborts the run
+    // before a single token is spent.
+    await hooks.run(
+      "sessionStart",
+      buildHookPayload(HOOK_EVENTS.SESSION_START, {
+        conversationId: context.conversationId,
+        agentConversationId: context.agentConversationId as string,
+        parentAgentConversationId: context.parentAgentConversationId as string,
+        project: context.project,
+        username: context.username,
+        agent: context.agent,
+        workspaceRoot,
+      }),
+    );
+
+    // A sub-agent runs its own harness, so its loop already knows it is one —
+    // no OrchestratorService plumbing needed to say so. `subagentStart` fires
+    // here rather than at the spawn site so it lands in the sub-agent's own
+    // scope, which is what a hook filtering by agent expects.
+    const isSubAgentRun = Boolean(context.parentAgentConversationId);
+    if (isSubAgentRun) {
+      await hooks.run(
+        "subagentStart",
+        buildHookPayload(HOOK_EVENTS.SUBAGENT_START, {
+          conversationId: context.conversationId,
+          agentConversationId: context.agentConversationId as string,
+          parentAgentConversationId: context.parentAgentConversationId as string,
+          project: context.project,
+          username: context.username,
+          agent: context.agent,
+          workspaceRoot,
+        }),
+      );
+    }
+
+    const submittedPrompt = extractLatestUserMessageText(currentMessages);
+    const promptVerdict = await hooks.run(
+      "userPromptSubmit",
+      buildHookPayload(HOOK_EVENTS.USER_PROMPT_SUBMIT, {
+        conversationId: context.conversationId,
+        agentConversationId: context.agentConversationId as string,
+        parentAgentConversationId: context.parentAgentConversationId as string,
+        project: context.project,
+        username: context.username,
+        agent: context.agent,
+        workspaceRoot,
+      }, { prompt: submittedPrompt }),
+    );
+    if (promptVerdict && promptVerdict.isApproved === false) {
+      const blockReason =
+        typeof promptVerdict.reason === "string"
+          ? promptVerdict.reason
+          : "blocked by a UserPromptSubmit hook";
+      logger.warn(`[ReActHarness] Prompt blocked before generation: ${blockReason}`);
+      emit({
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
+        message: `Prompt blocked: ${blockReason}`,
+      });
+      await hooks.run(
+        "sessionEnd",
+        buildHookPayload(HOOK_EVENTS.SESSION_END, {
+          conversationId: context.conversationId,
+          agentConversationId: context.agentConversationId as string,
+          project: context.project,
+          username: context.username,
+          agent: context.agent,
+          workspaceRoot,
+        }, { blocked: true, reason: blockReason }),
+      );
+      return { messages: currentMessages };
+    }
+    if (typeof promptVerdict?.additionalContext === "string" && promptVerdict.additionalContext) {
+      currentMessages.push({
+        role: "system",
+        content: wrapSystemMessage(
+          SYSTEM_MESSAGE_TAGS.HOOK_CONTEXT,
+          promptVerdict.additionalContext,
+        ),
+      } as ConversationMessage);
+    }
+
     if (options.planFirst) {
       emit({
         type: SERVER_SENT_EVENT_TYPES.STATUS,
@@ -383,6 +490,7 @@ export default class ReActHarness extends BaseAgenticHarness {
           context,
           state,
           "ReActHarness",
+          hooks,
         );
         currentMessages = pressureResult.messages;
 
@@ -585,6 +693,31 @@ export default class ReActHarness extends BaseAgenticHarness {
               this.logIteration(pass, currentMessages);
               continue;
             }
+          }
+
+          // `notification` covers the out-of-band moments a user would want
+          // pushed somewhere — an agent stopping to ask for approval is the
+          // main one, and it is the moment a hook can actually be useful
+          // (ping a phone, post to a channel) because the loop is now idle
+          // waiting on a human.
+          {
+            await hooks.run(
+              "notification",
+              buildHookPayload(HOOK_EVENTS.NOTIFICATION, {
+                conversationId: context.conversationId,
+                agentConversationId: context.agentConversationId as string,
+                parentAgentConversationId:
+                  context.parentAgentConversationId as string,
+                project: context.project,
+                username: context.username,
+                agent: context.agent,
+                workspaceRoot,
+              }, {
+                notification_type: "approval_required",
+                notification_message: `Approval requested for ${pass.pendingToolCalls.length} tool call(s)`,
+                tool_names: pass.pendingToolCalls.map((call) => call.name),
+              }),
+            );
           }
 
           const { isApproved, shouldApproveAll, deniedToolCalls = [] } =
@@ -937,12 +1070,59 @@ export default class ReActHarness extends BaseAgenticHarness {
       // the conversation isn't left as an empty stub in MongoDB.
       // Also inject the error as a conversation message so the LLM
       // has context about the failure on the next turn.
+      // `onError` was declared on AgentHooks from the start but never fired
+      // anywhere — this is the only path that can raise, so it is the one
+      // seam that makes the event real. Inspect-only: persistLoopError still
+      // owns recovery, a hook must not be able to swallow the failure.
+      await hooks.run(
+        "onError",
+        buildHookPayload(HOOK_EVENTS.ERROR, {
+          conversationId: context.conversationId,
+          agentConversationId: context.agentConversationId as string,
+          parentAgentConversationId: context.parentAgentConversationId as string,
+          project: context.project,
+          username: context.username,
+          agent: context.agent,
+          workspaceRoot,
+        }, { error_message: getErrorMessage(loopError) }),
+      );
       return await persistLoopError(
         this,
         currentMessages,
         standardHooks,
         loopError,
         "ReActHarness",
+      );
+    } finally {
+      if (isSubAgentRun) {
+        await hooks.run(
+          "subagentStop",
+          buildHookPayload(HOOK_EVENTS.SUBAGENT_STOP, {
+            conversationId: context.conversationId,
+            agentConversationId: context.agentConversationId as string,
+            parentAgentConversationId:
+              context.parentAgentConversationId as string,
+            project: context.project,
+            username: context.username,
+            agent: context.agent,
+            workspaceRoot,
+          }, { iterations: state.iterations }),
+        );
+      }
+      // Every exit converges here — clean break, budget stop, user abort, or
+      // a throw already handled above. `sessionEnd` is observation-only by
+      // construction: there is nothing left to block.
+      await hooks.run(
+        "sessionEnd",
+        buildHookPayload(HOOK_EVENTS.SESSION_END, {
+          conversationId: context.conversationId,
+          agentConversationId: context.agentConversationId as string,
+          parentAgentConversationId: context.parentAgentConversationId as string,
+          project: context.project,
+          username: context.username,
+          agent: context.agent,
+          workspaceRoot,
+        }, { iterations: state.iterations }),
       );
     }
   }

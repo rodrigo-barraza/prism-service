@@ -29,6 +29,7 @@ import retrieveOffloadedContentTool from "./RetrieveOffloadedContentTool.ts";
 import compactContextTool from "./CompactContextTool.ts";
 import asyncTaskTools from "./AsyncTaskTools.ts";
 import artifactTools from "./ArtifactTools.ts";
+import projectInstructionsTools from "./ProjectInstructionsTools.ts";
 
 // ─── Parameter Types (aligned with tools-service) ──────────────
 
@@ -123,6 +124,7 @@ function initialize() {
     compactContextTool,
     asyncTaskTools,
     artifactTools,
+    projectInstructionsTools,
   ];
 
   for (const toolOrTools of toolModulesList) {

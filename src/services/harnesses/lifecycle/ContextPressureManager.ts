@@ -13,6 +13,9 @@ import {
 import { HARNESS, COMPACTION } from "#src/constants";
 import { evaluateCompactionDeferral } from "./CompactionDeferralGuard.ts";
 import { maybeInjectContextLedger } from "./ContextLedgerInjector.ts";
+import { buildHookPayload } from "#src/services/hooks/buildPayload";
+import { HOOK_EVENTS } from "#src/services/hooks/types";
+import type AgentHooks from "#src/services/AgentHooks";
 
 import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type { ChatMessage } from "#src/types/admin";
@@ -68,6 +71,7 @@ export async function manageContextPressure(
   context: AgenticContext,
   state: AgenticLoopState,
   harnessLabel: string,
+  hooks?: AgentHooks,
 ): Promise<ContextPressureResult> {
   const { emit, signal } = context;
   const contextWindowSize =
@@ -181,6 +185,23 @@ export async function manageContextPressure(
     const wasModelRequested = state.compactionRequested;
     // Consume the request — one compact_context call, one compaction
     state.compactionRequested = false;
+
+    // `PreCompact` is the last moment anything can read the conversation at
+    // full fidelity — the point of the event is to let a hook preserve what
+    // compaction is about to discard. Inspect-only: compaction here is a
+    // pressure response, and letting a hook veto it would hand the loop a
+    // window it cannot fit in.
+    if (hooks) {
+      await hooks.run(
+        "preCompact",
+        buildHookPayload(HOOK_EVENTS.PRE_COMPACT, context, {
+          pre_compact_token_count: currentTokenEstimate,
+          message_count: messages.length,
+          was_model_requested: wasModelRequested === true,
+        }),
+      );
+    }
+
     const compactionResult = await CompactionService.compactConversation(
       messages as ChatMessage[],
       {
@@ -231,6 +252,18 @@ export async function manageContextPressure(
           `${compactionResult.postCompactTokenCount} tokens ` +
           `(${messages.length} messages remain)`,
       );
+
+      if (hooks) {
+        await hooks.run(
+          "postCompact",
+          buildHookPayload(HOOK_EVENTS.POST_COMPACT, context, {
+            pre_compact_token_count: compactionResult.preCompactTokenCount,
+            post_compact_token_count: compactionResult.postCompactTokenCount,
+            message_count: messages.length,
+            summary_text: compactionResult.summaryText || "",
+          }),
+        );
+      }
     }
   }
 
