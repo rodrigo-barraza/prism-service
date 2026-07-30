@@ -237,7 +237,13 @@ export function parsePromptDecision(
 
   if (!trimmed) return ambiguous("an empty response");
 
+  // A model that narrates before answering ("here's an example: {…}") leaves
+  // more than one object in the text, so candidates are tried in order until
+  // one actually carries a decision.
+  let sawEmptyObject = false;
+  let sawUnrecognizedObject = false;
   let searchIndex = 0;
+
   for (let attempt = 0; attempt < MAX_JSON_CANDIDATES; attempt += 1) {
     const candidate = extractFirstJsonObject(trimmed, searchIndex);
     if (!candidate) break;
@@ -252,18 +258,22 @@ export function parsePromptDecision(
 
     const picked = pickHookDecision(parsed);
     if (!picked) continue;
+    if (picked.fieldCount > 0) return picked.decision;
 
-    if (picked.fieldCount === 0) {
-      // `{}` is an explicit "nothing to change" and is honored as such.
-      // A non-empty object with zero recognized fields is off-format — the
-      // model answered a different question than the one asked.
-      const keyCount = Object.keys(parsed as Record<string, unknown>).length;
-      if (keyCount === 0) return {};
-      return ambiguous("a JSON object with no recognized decision fields");
+    // `{}` is an explicit "nothing to change". A non-empty object with zero
+    // recognized fields is off-format — the model answered a different
+    // question than the one it was asked.
+    if (Object.keys(parsed as Record<string, unknown>).length === 0) {
+      sawEmptyObject = true;
+    } else {
+      sawUnrecognizedObject = true;
     }
-
-    return picked.decision;
   }
+
+  if (sawUnrecognizedObject) {
+    return ambiguous("a JSON object with no recognized decision fields");
+  }
+  if (sawEmptyObject) return {};
 
   return ambiguous("output with no parseable JSON object");
 }
