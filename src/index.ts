@@ -73,6 +73,8 @@ import lmStudioRouter from "./routes/LmStudioRoutes.ts";
 import ollamaRouter from "./routes/OllamaRoutes.ts";
 import skillsRouter from "./routes/SkillsRoutes.ts";
 import rulesRouter from "./routes/RulesRoutes.ts";
+import hooksRouter from "./routes/HooksRoutes.ts";
+import projectInstructionsRouter from "./routes/ProjectInstructionsRoutes.ts";
 import agentMemoriesRouter from "./routes/AgentMemoriesRoutes.ts";
 import workflowMemoriesRouter from "./routes/WorkflowMemoriesRoutes.ts";
 import mcpServersRouter from "./routes/McpServersRoutes.ts";
@@ -135,6 +137,8 @@ const ENDPOINTS = {
     "/ollama",
     "/skills",
     "/rules",
+    "/hooks",
+    "/project-instructions",
     "/agent-memories",
     "/mcp-servers",
     "/favorites",
@@ -200,6 +204,8 @@ app.use("/lm-studio", lmStudioRouter);
 app.use("/ollama", ollamaRouter);
 app.use("/skills", skillsRouter);
 app.use("/rules", rulesRouter);
+app.use("/hooks", hooksRouter);
+app.use("/project-instructions", projectInstructionsRouter);
 app.use("/agent-memories", agentMemoriesRouter);
 app.use("/workflow-memories", workflowMemoriesRouter);
 app.use("/mcp-servers", mcpServersRouter);
@@ -457,6 +463,17 @@ setupWebSocket(wss);
         {
           collection: COLLECTIONS.AGENT_RULES,
           keys: { project: 1, username: 1, agent: 1 },
+        },
+        // agent_hooks — loaded per agentic run, so the scope lookup is hot.
+        {
+          collection: COLLECTIONS.AGENT_HOOKS,
+          keys: { project: 1, username: 1, enabled: 1 },
+        },
+        // agent_instructions — writes supersede rather than overwrite, so
+        // `validTo` is part of every current-revision read.
+        {
+          collection: COLLECTIONS.AGENT_INSTRUCTIONS,
+          keys: { project: 1, username: 1, agent: 1, validTo: 1 },
         },
         // mcp_servers
         {

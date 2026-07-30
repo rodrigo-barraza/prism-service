@@ -169,6 +169,21 @@ export async function executeToolBatch(
         };
       }
 
+      // A `transform` hook may rewrite the arguments before the tool runs —
+      // the PreToolUse `updatedInput` contract. Only a plain object is
+      // accepted; anything else is ignored rather than corrupting the call.
+      if (
+        hookResult &&
+        hookResult.updatedInput &&
+        typeof hookResult.updatedInput === "object" &&
+        !Array.isArray(hookResult.updatedInput)
+      ) {
+        logger.info(
+          `[ToolExecutor] Tool "${toolCall.name}" arguments rewritten by hook`,
+        );
+        toolCall.args = hookResult.updatedInput as Record<string, unknown>;
+      }
+
       const timeoutMilliseconds = resolveToolTimeout(toolCall.name, context);
       const toolSignal = buildToolSignal(context, timeoutMilliseconds);
 
@@ -211,8 +226,18 @@ export async function executeToolBatch(
           toolCall.name,
         );
         const durationMilliseconds = Date.now() - startTime;
-        await hooks.run("afterToolCall", toolCall, result, context);
-        return { name: toolCall.name, id: toolCall.id, result, durationMilliseconds };
+        const finalResult = await runPostToolHooks(
+          hooks,
+          toolCall,
+          result,
+          context,
+        );
+        return {
+          name: toolCall.name,
+          id: toolCall.id,
+          result: finalResult,
+          durationMilliseconds,
+        };
       }
 
       const startTime = Date.now();
@@ -275,12 +300,59 @@ export async function executeToolBatch(
         toolCall.name,
       );
       const durationMilliseconds = Date.now() - startTime;
-      await hooks.run("afterToolCall", toolCall, result, context);
-      return { name: toolCall.name, id: toolCall.id, result, durationMilliseconds };
+      const finalResult = await runPostToolHooks(
+        hooks,
+        toolCall,
+        result,
+        context,
+      );
+      return {
+        name: toolCall.name,
+        id: toolCall.id,
+        result: finalResult,
+        durationMilliseconds,
+      };
     }),
   );
 
   return results;
+}
+
+/**
+ * Fire the post-execution hook events for one tool result.
+ *
+ * `afterToolCallFailure` fires *in addition to* `afterToolCall` when the tool
+ * reported failure, so a listener can subscribe to failures alone instead of
+ * re-deriving the condition at every call site. A `transform` hook may replace
+ * what the model sees by returning `updatedToolOutput`.
+ */
+async function runPostToolHooks<T>(
+  hooks: AgentHooks,
+  toolCall: ToolCall,
+  result: T,
+  context: AgenticContext,
+): Promise<T> {
+  const hookResult = await hooks.run("afterToolCall", toolCall, result, context);
+
+  const failed =
+    !result ||
+    typeof result !== "object" ||
+    (result as { success?: boolean }).success === false ||
+    Boolean((result as { error?: unknown }).error);
+  // Called unconditionally rather than behind a `hasHooks` guard: `run` on an
+  // event with no listeners is already a no-op, and the guard made this path
+  // depend on a method that partial test doubles of AgentHooks don't provide.
+  if (failed) {
+    await hooks.run("afterToolCallFailure", toolCall, result, context);
+  }
+
+  if (hookResult && "updatedToolOutput" in hookResult) {
+    logger.info(
+      `[ToolExecutor] Tool "${toolCall.name}" output rewritten by hook`,
+    );
+    return hookResult.updatedToolOutput as T;
+  }
+  return result;
 }
 
 /** Execute a single tool call (for one-at-a-time execution). */

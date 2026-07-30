@@ -6,6 +6,8 @@ import ConversationEmbeddingService from "#src/services/ConversationEmbeddingSer
 import WorkflowMemoryService from "#src/services/WorkflowMemoryService";
 import CriticGate from "./CriticGate.ts";
 import type { PolicyRule } from "#src/services/PolicyEngine";
+import logger from "#src/utils/logger";
+import { errorMessage } from "@rodrigo-barraza/utilities-library";
 
 /**
  * HookInitializer — standardized lifecycle hook wiring for agentic harnesses.
@@ -96,4 +98,63 @@ export function createStandardHooks({
   );
 
   return { hooks, approvalEngine, assembler };
+}
+
+/**
+ * Attach the user's configured hooks on top of the built-in ones.
+ *
+ * Kept separate from `createStandardHooks` — which is synchronous and called
+ * on the hot path — because this reads Mongo. The registry caches per scope,
+ * so the common case is a map lookup rather than a query.
+ *
+ * Ordering matters: built-in hooks register first, so `AutoApprovalEngine`'s
+ * policy verdict is already in the merged result when a user's `PreToolUse`
+ * hook runs. Both are `decide` hooks and `AgentHooks.run` short-circuits on
+ * the first deny, which preserves the invariant that a policy DENY cannot be
+ * relaxed by anything registered later — including a user hook.
+ *
+ * Never throws. A malformed hook config must not take the conversation down
+ * with it; the failure is logged and the loop proceeds with built-ins only.
+ */
+export async function attachConfiguredHooks(
+  hooks: AgentHooks,
+  scope: {
+    project?: string | null;
+    username?: string | null;
+    agent?: string | null;
+    conversationId?: string | null;
+    agentConversationId?: string | null;
+    workspaceRoot?: string | null;
+    hookDepth?: number;
+  },
+): Promise<number> {
+  try {
+    const [{ default: MongoWrapper }, { MONGO_DB_NAME }, registry] =
+      await Promise.all([
+        import("#src/wrappers/MongoWrapper"),
+        import("#config"),
+        import("#src/services/hooks/ConfiguredHookRegistry"),
+      ]);
+
+    const database = MongoWrapper.getDb(MONGO_DB_NAME);
+    if (!database) return 0;
+
+    const configured = await registry.loadHooksForScope(database, {
+      project: scope.project || "any",
+      username: scope.username || "any",
+      agent: scope.agent || null,
+    });
+    if (configured.length === 0) return 0;
+
+    registry.registerConfiguredHooks(hooks, configured, scope);
+    logger.info(
+      `[HookInitializer] Attached ${configured.length} configured hook(s) for ${scope.project}/${scope.username}${scope.agent ? `/${scope.agent}` : ""}`,
+    );
+    return configured.length;
+  } catch (error: unknown) {
+    logger.warn(
+      `[HookInitializer] Could not attach configured hooks (continuing with built-ins): ${errorMessage(error)}`,
+    );
+    return 0;
+  }
 }

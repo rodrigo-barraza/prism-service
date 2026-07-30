@@ -46,6 +46,8 @@ export const COLLECTIONS = {
   FAVORITES: "favorites",
   AGENT_SKILLS: "agent_skills",
   AGENT_RULES: "agent_rules",
+  AGENT_HOOKS: "agent_hooks",
+  AGENT_INSTRUCTIONS: "agent_instructions",
   MCP_SERVERS: "mcp_servers",
   MEMORIES: "memories",
   MEMORY_CONSOLIDATION_RUNS: "memory_consolidation_runs",
@@ -284,6 +286,8 @@ export const SYSTEM_PROMPT_SECTIONS = {
   GUIDELINES: "coding-guidelines",
   /** User-pinned per-turn rules (slash-command badges in the client) */
   ACTIVE_RULES: "active-rules",
+  /** Always-on project instructions — the PRISM.md analogue of CLAUDE.md */
+  PROJECT_INSTRUCTIONS: "project-instructions",
   ORCHESTRATOR: "orchestrator-mode",
   CONSTRAINTS: "constraints",
   ENVIRONMENT: "environment",
@@ -754,6 +758,49 @@ export const WEBHOOK = {
 
   /** Maximum events buffered for webhook replay. */
   REPLAY_BUFFER_CAPACITY: 200,
+} as const;
+
+/**
+ * User-configurable lifecycle hooks. Unlike webhooks — which are
+ * fire-and-forget telemetry — these sit *inside* the agentic loop and can
+ * block it, so every bound here is a latency budget on the critical path.
+ */
+export const HOOKS = {
+  /** Default per-handler timeout when a hook does not set its own. */
+  DEFAULT_TIMEOUT_MILLISECONDS: 10_000,
+
+  /** Ceiling a hook's configured timeout is clamped to. */
+  MAX_TIMEOUT_MILLISECONDS: 60_000,
+
+  /**
+   * `PreToolUse` runs before every tool call, so its default is far tighter
+   * than the generic one — a slow hook here taxes the whole conversation.
+   */
+  PRE_TOOL_USE_TIMEOUT_MILLISECONDS: 5_000,
+
+  /**
+   * Hook handlers may themselves trigger tool calls that fire hooks. A run at
+   * or past this depth skips its handlers instead of recursing.
+   */
+  MAX_DEPTH: 2,
+
+  /** Cap on hooks loaded per scope, newest first. */
+  MAX_HOOKS_PER_SCOPE: 50,
+
+  /** Cap on a `systemMessage` / `additionalContext` string from a handler. */
+  MAX_OUTPUT_CHARS: 10_000,
+
+  /** Cap on the JSON payload handed to a handler. */
+  MAX_PAYLOAD_CHARS: 100_000,
+
+  /** How long a loaded hook config is reused before re-reading Mongo. */
+  CONFIG_CACHE_TTL_MILLISECONDS: 30_000,
+
+  /**
+   * `http` handlers sit on the critical path, so unlike `WebhookDispatcher`
+   * they get one attempt — a retry storm would multiply the stall.
+   */
+  HTTP_RETRY_ATTEMPTS: 1,
 } as const;
 
 // ─── Timer & Scheduler Constants ────────────────────────────

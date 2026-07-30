@@ -1,5 +1,12 @@
 import { z } from "zod";
 import { sanitizedStringSchema } from "@rodrigo-barraza/utilities-library";
+import { HOOKS } from "#src/constants";
+import {
+  HOOK_EVENT_NAMES,
+  HOOK_HANDLER_TYPES,
+  TOOL_MATCHED_EVENTS,
+} from "#src/services/hooks/types";
+import type { HookEventName } from "#src/services/hooks/types";
 
 /**
  * Zod Schemas for Runtime Payload Validation
@@ -359,6 +366,118 @@ export const PutRuleSchema = z.object({
   content: z.string().optional(),
   enabled: z.boolean().optional(),
 });
+
+/* ── Configurable lifecycle hooks ─────────────────────────────────────
+ * Wire format for `ConfiguredHookDocument` (#src/services/hooks/types).
+ * The event vocabulary, handler kinds, and the set of events whose matcher
+ * means anything all come from that module — never restate them here, or
+ * the route layer and the runner drift apart.
+ */
+
+/**
+ * One handler, discriminated on `type`. Mirrors `HookHandlerConfig`: a
+ * `prompt` asks a model, an `http` POSTs the payload somewhere, an
+ * `mcp_tool` calls a tool on an already-connected MCP server.
+ */
+export const HookHandlerSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal(HOOK_HANDLER_TYPES.PROMPT),
+    prompt: z.string().min(1, "prompt is required"),
+    provider: z.string().optional(),
+    model: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal(HOOK_HANDLER_TYPES.HTTP),
+    url: z.url(),
+    headers: z.record(z.string(), z.string()).optional(),
+  }),
+  z.object({
+    type: z.literal(HOOK_HANDLER_TYPES.MCP_TOOL),
+    server: z.string().min(1, "server is required"),
+    tool: z.string().min(1, "tool is required"),
+    input: z.record(z.string(), z.unknown()).optional(),
+  }),
+]);
+
+const TOOL_MATCHED_EVENT_SET = new Set<string>(TOOL_MATCHED_EVENTS);
+
+/**
+ * A matcher is only ever tested against a tool name. On any other event
+ * there is nothing to test it against, so the hook would fire on *every*
+ * occurrence of the event while its author believes it is narrowed. That
+ * is a silent footgun, so it is a write-time rejection rather than a
+ * runtime shrug.
+ *
+ * Shared by the POST and PUT schemas; PUT only sees a violation when both
+ * fields arrive in the same body, so `HooksRoutes` re-checks the merged
+ * `{event, matcher}` against the stored document as well.
+ */
+export function refineHookMatcher(
+  value: { event?: HookEventName; matcher?: string },
+  ctx: z.RefinementCtx,
+): void {
+  const { event, matcher } = value;
+  if (!event || !matcher || !matcher.trim()) return;
+  if (TOOL_MATCHED_EVENT_SET.has(event)) return;
+  ctx.addIssue({
+    code: "custom",
+    path: ["matcher"],
+    message:
+      `matcher "${matcher}" can never match on event "${event}" — ` +
+      `matchers are tested against a tool name, so they are only valid on ` +
+      `${TOOL_MATCHED_EVENTS.join(", ")}. Leave matcher empty for this event.`,
+  });
+}
+
+export const PostHookSchema = z
+  .object({
+    name: z.string().min(1, "name is required"),
+    description: z.string().optional().default(""),
+    event: z.enum(HOOK_EVENT_NAMES),
+    /** Empty, `*`, or absent matches every tool. */
+    matcher: z.string().optional().default(""),
+    /** `null` applies the hook to every agent in the scope. */
+    agent: z.string().nullable().optional().default(null),
+    handler: HookHandlerSchema,
+    enabled: z.boolean().optional().default(true),
+    timeoutMilliseconds: z
+      .number()
+      .int()
+      .positive()
+      .max(HOOKS.MAX_TIMEOUT_MILLISECONDS)
+      .optional(),
+  })
+  .superRefine(refineHookMatcher);
+
+export const PutHookSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    description: z.string().optional(),
+    event: z.enum(HOOK_EVENT_NAMES).optional(),
+    matcher: z.string().optional(),
+    agent: z.string().nullable().optional(),
+    handler: HookHandlerSchema.optional(),
+    enabled: z.boolean().optional(),
+    timeoutMilliseconds: z
+      .number()
+      .int()
+      .positive()
+      .max(HOOKS.MAX_TIMEOUT_MILLISECONDS)
+      .optional(),
+  })
+  .superRefine(refineHookMatcher);
+
+/**
+ * Body of `POST /hooks/:id/test`. The payload is merged over a synthesized
+ * base, so an empty body is a valid smoke test.
+ */
+export const PostHookTestSchema = z.object({
+  payload: z.record(z.string(), z.unknown()).optional().default({}),
+});
+
+export type PostHookInput = z.infer<typeof PostHookSchema>;
+export type PutHookInput = z.infer<typeof PutHookSchema>;
+export type HookHandlerInput = z.infer<typeof HookHandlerSchema>;
 
 export const GetAgentConversationsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),

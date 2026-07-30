@@ -11,9 +11,20 @@ import { errorMessage } from "@rodrigo-barraza/utilities-library";
  *                       (toolCall, ctx) and can return { isApproved: false } to block.
  *   afterToolCall    — Fires after each tool returns. Listeners receive
  *                       (toolCall, result, ctx).
+ *   afterToolCallFailure — Fires *in addition to* afterToolCall when a tool
+ *                       returns success:false or times out.
  *   afterResponse    — Fires when the loop exits with a final response.
  *                       Listeners receive (ctx, { text, thinking, toolCalls, messages }).
  *   onError          — Fires on any loop error. Listeners receive (error, ctx).
+ *   sessionStart     — Fires once per agentic run, before the first LLM call.
+ *   userPromptSubmit — Fires once per run with the submitted prompt text.
+ *   sessionEnd       — Fires once per run on every exit path, including errors.
+ *   subagentStart /
+ *   subagentStop     — Fire around a spawned sub-agent's loop.
+ *   preCompact /
+ *   postCompact      — Fire around an LLM compaction pass.
+ *   notification     — Fires when the loop surfaces something to the user
+ *                       out of band (approval required, plan proposed).
  *
  * Hook Categories (inspired by Antigravity SDK):
  *   inspect    — Read-only, non-blocking. Errors are logged but never propagate.
@@ -44,8 +55,22 @@ type HookEvent =
   | "beforePrompt"
   | "beforeToolCall"
   | "afterToolCall"
+  | "afterToolCallFailure"
   | "afterResponse"
-  | "onError";
+  | "onError"
+  // Session and turn boundaries.
+  | "sessionStart"
+  | "userPromptSubmit"
+  | "sessionEnd"
+  // Sub-agent boundaries. Each sub-agent builds its own AgentHooks instance,
+  // so configured hooks are re-loaded per sub-agent rather than inherited.
+  | "subagentStart"
+  | "subagentStop"
+  // Compaction boundaries.
+  | "preCompact"
+  | "postCompact"
+  // Out-of-band user-facing events (approval requests, plan proposals).
+  | "notification";
 
 /**
  * Hook category determines execution semantics.

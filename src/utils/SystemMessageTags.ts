@@ -62,6 +62,8 @@ export const SYSTEM_MESSAGE_TAGS = {
   PLATFORM_CONTEXT: "platform-context",
   /** Agent self context (somatic/emotional state). */
   SELF_CONTEXT: "self-context",
+  /** Context injected by a user-configured lifecycle hook. */
+  HOOK_CONTEXT: "hook-context",
 } as const;
 
 export type SystemMessageTag =

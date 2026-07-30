@@ -1,0 +1,39 @@
+{
+  "sectionHeader": "## Cave Rules",
+  "sectionPreamble": "These rules of cave. User carve them. You carve them too, other talks ago. Follow always, nobody need remind. Rule change? Use edit_project_instructions, so all future talk know new way.",
+  "tools": {
+    "read_project_instructions": {
+      "description": "Read cave rule stone — lasting rule for this project, user see it too (like CLAUDE.md, but live in database not on rock floor). Stone already in your head every talk, so read only when need exact words: before you carve, when user ask what rule say, or when check if rule already there before add new. Give back all markdown and version number.",
+      "parameters": {}
+    },
+    "update_project_instructions": {
+      "description": "Replace WHOLE rule stone with new markdown. This lasting rule, user can see: it stay for all future talk in project, go into every system prompt, user can read and change. Carve only steady thing — build command, test command, big design law, house style, what user say always do or never do. Never carve passing thing (what you do right now, one task, file words, thing false next moon). Better use edit_project_instructions for normal change; use this only for big deliberate rewrite, and pass whole document — what you leave out get superseded, stop going in prompt. Old version stay in history, can roll back.",
+      "parameters": {
+        "content": "Whole new document in markdown. Not diff, not piece — what you leave out stop being rule."
+      }
+    },
+    "edit_project_instructions": {
+      "description": "Add or replace ONE `## section` of rule stone, rest of stone untouched. Reach for this whenever you learn lasting thing worth carry into every future talk in project — build or test command, way user correct you, design choice, standing preference. This lasting rule, user can see: stay for all future talk, go into every system prompt, user can read and change. Keep to steady law; never store passing task state or fact that rot. If heading already there, its section replaced (sub-sections under it go too); if not, new section go at end. Better than update_project_instructions — section edit cannot eat rest of stone by mistake.",
+      "parameters": {
+        "heading": "Section heading, no leading '#' — like 'Build & Test'. Same heading replace that section; new heading add new section. Put '###' in front to hit sub-section.",
+        "body": "Markdown body of section. Replace whole section body; leave empty to keep heading with nothing under."
+      }
+    }
+  },
+  "results": {
+    "empty": "No cave rule carved yet for this project. Use edit_project_instructions to carve first section.",
+    "unchanged": "'{{heading}}' section already say exact this — nothing carved.",
+    "updated": "Rule stone replaced (now version {{version}}). This stone go into every future talk in project.",
+    "edited": "Section '{{heading}}' {{action}} (now version {{version}}). This stone go into every future talk in project."
+  },
+  "actions": {
+    "added": "added",
+    "replaced": "replaced"
+  },
+  "errors": {
+    "unavailable": "Rule stone store unavailable — database not reachable now.",
+    "contentRequired": "content needed — pass whole new document",
+    "headingRequired": "heading needed — name section to add or replace",
+    "tooLong": "content bigger than {{limit}} letters — rule stone go into every system prompt, so keep to standing law, put detail elsewhere"
+  }
+}
