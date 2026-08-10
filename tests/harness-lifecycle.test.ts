@@ -814,7 +814,7 @@ describe("ValidationInterceptor", () => {
     expect(ToolOrchestratorService.executeTool).not.toHaveBeenCalled();
   });
 
-  it("should call the shell validator for TS files and return feedback if validation fails", async () => {
+  it("should validate TS files via ONE LSP diagnostics batch call and return feedback on errors", async () => {
     const toolCalls: ToolCall[] = [
       { id: "call-1", name: "write_file", args: { path: "test.ts" } },
     ];
@@ -822,32 +822,44 @@ describe("ValidationInterceptor", () => {
       { id: "call-1", name: "write_file", result: { success: true } },
     ];
 
-    vi.mocked(ToolOrchestratorService.executeTool).mockResolvedValue({
-      exitCode: 1,
-      stdout: "error TS2322: Type 'string' is not assignable to type 'number'.",
-      stderr: "",
-    });
-
-    const feedbackList = await validateAfterToolExecution(toolCalls, results, mockContext, mockState);
-
-    expect(feedbackList).toHaveLength(1);
-    expect(feedbackList[0]).toEqual({
-      toolName: "execute_command",
-      filePath: "test.ts",
-      validatorType: "typescript",
-      errors: ["error TS2322: Type 'string' is not assignable to type 'number'."],
-      rawOutput: "error TS2322: Type 'string' is not assignable to type 'number'.",
-    });
-
-    expect(ToolOrchestratorService.executeTool).toHaveBeenCalledWith(
-      "execute_command",
-      expect.objectContaining({
-        command: "npx tsc --noEmit --pretty",
-        cwd: process.cwd(),
-        timeout: 15000,
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        operation: "diagnostics",
+        fileCount: 1,
+        files: [
+          {
+            filePath: `${process.cwd()}/test.ts`,
+            diagnostics: [
+              {
+                severity: "error",
+                line: 3,
+                character: 7,
+                message: "Type 'string' is not assignable to type 'number'.",
+                code: 2322,
+                source: "typescript",
+              },
+            ],
+          },
+        ],
       }),
-      expect.any(Object),
-    );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const feedbackList = await validateAfterToolExecution(toolCalls, results, mockContext, mockState);
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(String(fetchMock.mock.calls[0][0])).toContain("/agentic/lsp/diagnostics");
+      expect(feedbackList).toHaveLength(1);
+      expect(feedbackList[0].toolName).toBe("code_intel");
+      expect(feedbackList[0].filePath).toBe("test.ts");
+      expect(feedbackList[0].validatorType).toBe("typescript");
+      expect(feedbackList[0].errors[0]).toContain("TS2322");
+      // The old per-file whole-project tsc path must be gone.
+      expect(ToolOrchestratorService.executeTool).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("should extract paths from other parameter names like filePath, file, or newPath", async () => {
@@ -858,23 +870,28 @@ describe("ValidationInterceptor", () => {
       { id: "call-1", name: "patch_file", result: { success: true } },
     ];
 
-    vi.mocked(ToolOrchestratorService.executeTool).mockResolvedValue({
-      exitCode: 0,
-      stdout: "",
-      stderr: "",
-    });
-
-    const feedbackList = await validateAfterToolExecution(toolCalls, results, mockContext, mockState);
-    expect(feedbackList).toEqual([]);
-    expect(ToolOrchestratorService.executeTool).toHaveBeenCalledWith(
-      "execute_command",
-      expect.objectContaining({
-        command: "npx tsc --noEmit --pretty",
-        cwd: process.cwd(),
-        timeout: 15000,
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        operation: "diagnostics",
+        fileCount: 1,
+        files: [
+          { filePath: `${process.cwd()}/src/index.tsx`, diagnostics: [] },
+        ],
       }),
-      expect.any(Object),
-    );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const feedbackList = await validateAfterToolExecution(toolCalls, results, mockContext, mockState);
+      expect(feedbackList).toEqual([]);
+      // The .tsx path was extracted from `filePath` and sent to the LSP batch.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const requestBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(requestBody.files).toEqual([`${process.cwd()}/src/index.tsx`]);
+      expect(ToolOrchestratorService.executeTool).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("should run successfully without errors when validator exit code is 0", async () => {

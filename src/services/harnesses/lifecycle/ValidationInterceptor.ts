@@ -2,6 +2,7 @@ import logger from "#src/utils/logger";
 import { TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import { TOOLS_SERVICE_URL } from "#config";
+import { IDENTITY_HEADERS } from "@rodrigo-barraza/utilities-library/service";
 import path from "node:path";
 import fs from "node:fs";
 
@@ -242,11 +243,23 @@ async function runLspBatchValidator(
 
   const batch = files.slice(0, LSP_DIAGNOSTICS_BATCH_LIMIT);
 
+  // Worktree sessions must carry the override header so the tools-service
+  // sandbox admits paths under /tmp/prism-worktrees (same as the tool proxy).
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  const worktreeState = ToolOrchestratorService.getWorktreeState?.(
+    context.agentConversationId,
+  );
+  if (worktreeState?.worktreePath) {
+    headers[IDENTITY_HEADERS.workspaceOverride] = worktreeState.worktreePath;
+  }
+
   let response: Response;
   try {
     response = await fetch(`${TOOLS_SERVICE_URL}/agentic/lsp/diagnostics`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
         files: batch.map((file) => file.absolutePath),
         workspacePath: workspaceRoot,
@@ -353,12 +366,28 @@ export async function validateAfterToolExecution(
 
     // TypeScript → collect for the batched LSP diagnostics call
     if (LSP_VALIDATED_EXTENSIONS.has(fileExtension)) {
+      // When the session runs in an isolated worktree, the tool proxy
+      // rewrote the actual writes into the worktree — diagnose those copies
+      // (and let the override header pass the tools-service sandbox).
+      const worktreeState = ToolOrchestratorService.getWorktreeState?.(
+        context.agentConversationId,
+      );
       const workspaceRoot =
-        context.workspaceRoot || ToolOrchestratorService.getWorkspaceRoot();
+        worktreeState?.worktreePath ||
+        context.workspaceRoot ||
+        ToolOrchestratorService.getWorkspaceRoot();
       if (!workspaceRoot) continue;
-      const absolutePath = path.isAbsolute(filePath)
+      let absolutePath = path.isAbsolute(filePath)
         ? filePath
         : path.join(workspaceRoot, filePath);
+      if (
+        worktreeState &&
+        absolutePath.startsWith(worktreeState.originalRoot)
+      ) {
+        absolutePath =
+          worktreeState.worktreePath +
+          absolutePath.slice(worktreeState.originalRoot.length);
+      }
       const batch = lspBatchesByRoot.get(workspaceRoot) ?? [];
       if (!batch.some((entry) => entry.absolutePath === absolutePath)) {
         batch.push({ argPath: filePath, absolutePath });
