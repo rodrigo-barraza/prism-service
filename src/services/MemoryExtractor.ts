@@ -1,6 +1,7 @@
 import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import crypto from "crypto";
 import { getProvider } from "#src/providers/index";
+import ModelRoleRouter, { MODEL_ROLES } from "./ModelRoleRouter.ts";
 import MemoryService, { CODING_MEMORY_TYPES } from "./MemoryService.ts";
 import MemoryConsolidationService from "./MemoryConsolidationService.ts";
 import PromptLocaleService from "./PromptLocaleService.ts";
@@ -138,31 +139,21 @@ export default class MemoryExtractor {
     }
 
     try {
-      // ── Resolve extraction model from settings ────────────────
-      let extractionProvider: string | undefined;
-      let extractionModel: string | undefined;
-      try {
-        const memorySettings = (await SettingsService.getSection(
-          "memory",
-        )) as MemorySettingsSection;
-        extractionProvider = memorySettings.extractionProvider;
-        extractionModel = memorySettings.extractionModel;
-      } catch {
-        // Settings not configured — skip extraction silently
-        logger.info(
-          "[MemoryExtractor] Extraction model not configured in Settings → Memory Models. Skipping.",
+      // ── Resolve the extraction model through the utility role ──
+      // Never silently disabled: env/DB utility config → local-instance
+      // or cheap-cloud defaults. The memory settings section remains the
+      // DB layer of the utility role inside ModelRoleRouter.
+      const roleChain = await ModelRoleRouter.resolveChain(
+        MODEL_ROLES.UTILITY,
+      );
+      if (roleChain.length === 0) {
+        logger.error(
+          "[MemoryExtractor] Utility role resolved to an empty model chain — cannot extract memories.",
         );
         return [];
       }
-
-      if (!extractionProvider || !extractionModel) {
-        logger.info(
-          "[MemoryExtractor] Extraction provider/model not set. Skipping.",
-        );
-        return [];
-      }
-
-      const provider = getProvider(extractionProvider);
+      let extractionProvider = roleChain[0].provider;
+      let extractionModel = roleChain[0].model;
 
       // Build conversation text (compact format to save tokens)
       const conversationText = messages
@@ -193,13 +184,25 @@ export default class MemoryExtractor {
       let extractionError: string | null = null;
 
       try {
-        result = await provider.generateText(aiMessages, extractionModel, {
-          maxTokens: 1000,
-          temperature: 0.1,
-          // Utility call — never burn extended thinking on memory extraction.
-          thinkingEnabled: false,
-          reasoningEffort: "none",
-        });
+        ({ value: result } = await ModelRoleRouter.runWithChain(
+          roleChain,
+          async (entry) => {
+            extractionProvider = entry.provider;
+            extractionModel = entry.model;
+            return getProvider(entry.provider).generateText(
+              aiMessages,
+              entry.model,
+              {
+                maxTokens: 1000,
+                temperature: 0.1,
+                // Utility call — never burn extended thinking on memory extraction.
+                thinkingEnabled: false,
+                reasoningEffort: "none",
+              },
+            );
+          },
+          { role: MODEL_ROLES.UTILITY, operation: "memory:extract" },
+        ));
       } catch (error: unknown) {
         success = false;
         extractionError = errorMessage(error);

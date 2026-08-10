@@ -27,6 +27,23 @@ vi.mock('#config', () => ({
     ANTHROPIC_FILES_API_ENABLED: false,
     ANTHROPIC_BASE_URL: undefined,
     HIGH_RES_IMAGE_MAX_DIMENSION: 2576,
+    // Model role chains (ModelRoleRouter) — same env parsing as the real
+    // accessor so tests can drive roles via MODEL_ROLE_<ROLE> variables.
+    getModelRoleChainFromEnvironment: (role: string) => {
+        const raw = process.env[`MODEL_ROLE_${role.toUpperCase().replace(/-/g, '_')}`];
+        if (!raw) return [];
+        return raw
+            .split(',')
+            .map((entry) => {
+                const separatorIndex = entry.indexOf('=');
+                if (separatorIndex <= 0) return null;
+                return {
+                    provider: entry.slice(0, separatorIndex).trim(),
+                    model: entry.slice(separatorIndex + 1).trim(),
+                };
+            })
+            .filter((entry) => entry && entry.provider && entry.model);
+    },
 }));
 
 
