@@ -171,6 +171,39 @@ describe("AuthMiddleware — username resolution", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════
+describe("AuthMiddleware — profile resolution", () => {
+  const next: NextFunction = vi.fn();
+
+  it("should use x-profile-id header when provided", () => {
+    const request = createMockRequest({
+      headers: { "x-profile-id": "work" },
+    });
+
+    authMiddleware(request, createMockResponse(), next);
+
+    expect(request.profileId).toBe("work");
+  });
+
+  it("should default to 'default' when x-profile-id is absent", () => {
+    const request = createMockRequest();
+
+    authMiddleware(request, createMockResponse(), next);
+
+    expect(request.profileId).toBe("default");
+  });
+
+  it("should normalize invalid profile ids to 'default'", () => {
+    const request = createMockRequest({
+      headers: { "x-profile-id": "../../../etc/passwd" },
+    });
+
+    authMiddleware(request, createMockResponse(), next);
+
+    expect(request.profileId).toBe("default");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
 describe("AuthMiddleware — workspace scoping", () => {
   const next: NextFunction = vi.fn();
 
@@ -230,6 +263,7 @@ describe("AuthMiddleware — AsyncLocalStorage propagation", () => {
             headers: {
               "x-project": "test-project",
               "x-username": "test-user",
+              "x-profile-id": "work",
               "x-workspace-id": "ws-1",
               "x-workspace-root": "/home/test",
             },
@@ -247,6 +281,7 @@ describe("AuthMiddleware — AsyncLocalStorage propagation", () => {
     expect(capturedStore).toBeDefined();
     expect(capturedStore!.project).toBe("test-project");
     expect(capturedStore!.username).toBe("test-user");
+    expect(capturedStore!.profileId).toBe("work");
     expect(capturedStore!.clientIp).toBe("192.168.1.1");
     expect(capturedStore!.workspaceId).toBe("ws-1");
     expect(capturedStore!.workspaceRoot).toBe("/home/test");
