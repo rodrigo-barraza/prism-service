@@ -1,7 +1,33 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { validateAfterToolExecution } from "#src/services/harnesses/lifecycle/ValidationInterceptor";
 import type { ToolCall, ToolResult, AgenticContext } from "#src/services/harnesses/types";
 import type AgenticLoopState from "#src/services/AgenticLoopState";
+
+// TypeScript files validate via the tools-service LSP diagnostics batch —
+// give the interceptor a URL so that path is active.
+vi.mock("#config", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  TOOLS_SERVICE_URL: "http://tools.test",
+}));
+
+/** Stub global fetch with an LSP diagnostics batch response. */
+function mockLspDiagnostics(
+  files: Array<{
+    filePath: string;
+    diagnostics: Array<Record<string, unknown>>;
+  }>,
+) {
+  const fetchMock = vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      operation: "diagnostics",
+      fileCount: files.length,
+      files,
+    }),
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
 
 vi.mock("#src/utils/logger", () => ({
   default: {
@@ -47,6 +73,16 @@ describe("ValidationInterceptor", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: the LSP endpoint is unreachable — individual tests override
+    // with mockLspDiagnostics(...). Failures degrade to empty feedback.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("no LSP endpoint in this test")),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   describe("non-file-mutating tools should be ignored", () => {
@@ -133,11 +169,9 @@ describe("ValidationInterceptor", () => {
     });
 
     it("should extract path from 'path' argument", async () => {
-      vi.mocked(ToolOrchestratorService.executeTool).mockResolvedValue({
-        exitCode: 0,
-        stdout: "",
-        stderr: "",
-      });
+      const fetchMock = mockLspDiagnostics([
+        { filePath: "/workspace/src/test.ts", diagnostics: [] },
+      ]);
 
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "write_file", args: { path: "/workspace/src/test.ts" } },
@@ -148,15 +182,14 @@ describe("ValidationInterceptor", () => {
 
       await validateAfterToolExecution(toolCalls, results, mockAgenticContext, mockLoopState);
 
-      expect(ToolOrchestratorService.executeTool).toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(ToolOrchestratorService.executeTool).not.toHaveBeenCalled();
     });
 
     it("should extract path from 'filePath' argument", async () => {
-      vi.mocked(ToolOrchestratorService.executeTool).mockResolvedValue({
-        exitCode: 0,
-        stdout: "",
-        stderr: "",
-      });
+      const fetchMock = mockLspDiagnostics([
+        { filePath: "/workspace/src/app.tsx", diagnostics: [] },
+      ]);
 
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "write_file", args: { filePath: "/workspace/src/app.tsx" } },
@@ -167,7 +200,8 @@ describe("ValidationInterceptor", () => {
 
       await validateAfterToolExecution(toolCalls, results, mockAgenticContext, mockLoopState);
 
-      expect(ToolOrchestratorService.executeTool).toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(ToolOrchestratorService.executeTool).not.toHaveBeenCalled();
     });
   });
 
@@ -215,12 +249,30 @@ describe("ValidationInterceptor", () => {
   });
 
   describe("TypeScript validation", () => {
-    it("should return validation feedback when tsc reports errors", async () => {
-      vi.mocked(ToolOrchestratorService.executeTool).mockResolvedValue({
-        exitCode: 1,
-        stdout: "src/test.ts(10,5): error TS2304: Cannot find name 'foo'.\nsrc/test.ts(15,3): error TS2322: Type 'string' is not assignable to type 'number'.",
-        stderr: "",
-      });
+    it("should return validation feedback when the LSP reports errors", async () => {
+      mockLspDiagnostics([
+        {
+          filePath: "/workspace/src/test.ts",
+          diagnostics: [
+            {
+              severity: "error",
+              line: 10,
+              character: 5,
+              message: "Cannot find name 'foo'.",
+              code: 2304,
+              source: "typescript",
+            },
+            {
+              severity: "error",
+              line: 15,
+              character: 3,
+              message: "Type 'string' is not assignable to type 'number'.",
+              code: 2322,
+              source: "typescript",
+            },
+          ],
+        },
+      ]);
 
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "write_file", args: { path: "/workspace/src/test.ts" } },
@@ -234,15 +286,14 @@ describe("ValidationInterceptor", () => {
       expect(feedback).toHaveLength(1);
       expect(feedback[0].validatorType).toBe("typescript");
       expect(feedback[0].errors.length).toBeGreaterThanOrEqual(1);
+      expect(feedback[0].errors[0]).toContain("TS2304");
       expect(feedback[0].filePath).toBe("/workspace/src/test.ts");
     });
 
-    it("should return no feedback when tsc succeeds (exit code 0)", async () => {
-      vi.mocked(ToolOrchestratorService.executeTool).mockResolvedValue({
-        exitCode: 0,
-        stdout: "",
-        stderr: "",
-      });
+    it("should return no feedback when the LSP reports a clean file", async () => {
+      mockLspDiagnostics([
+        { filePath: "/workspace/src/clean.ts", diagnostics: [] },
+      ]);
 
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "write_file", args: { path: "/workspace/src/clean.ts" } },
@@ -258,11 +309,8 @@ describe("ValidationInterceptor", () => {
   });
 
   describe("validator error handling", () => {
-    it("should return null feedback when shell validator throws", async () => {
-      vi.mocked(ToolOrchestratorService.executeTool).mockRejectedValue(
-        new Error("Command timed out after 15s"),
-      );
-
+    it("should return empty feedback when the LSP endpoint is unreachable", async () => {
+      // beforeEach default: fetch rejects — the interceptor degrades gracefully.
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "write_file", args: { path: "/workspace/src/timeout.ts" } },
       ];
@@ -277,22 +325,27 @@ describe("ValidationInterceptor", () => {
   });
 
   describe("multiple file-mutating tools in a single batch", () => {
-    it("should validate each file-mutating tool independently", async () => {
-      vi.mocked(ToolOrchestratorService.executeTool)
-        .mockResolvedValueOnce({
-          exitCode: 1,
-          stdout: "error TS2304: Cannot find name 'x'",
-          stderr: "",
-        })
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: "",
-          stderr: "",
-        });
+    it("should validate the whole edited-file batch with ONE LSP call", async () => {
+      const fetchMock = mockLspDiagnostics([
+        {
+          filePath: "/workspace/src/broken.ts",
+          diagnostics: [
+            {
+              severity: "error",
+              line: 1,
+              character: 1,
+              message: "Cannot find name 'x'",
+              code: 2304,
+              source: "typescript",
+            },
+          ],
+        },
+        { filePath: "/workspace/src/fine.tsx", diagnostics: [] },
+      ]);
 
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "write_file", args: { path: "/workspace/src/broken.ts" } },
-        { id: "call-2", name: "string_replace_file", args: { path: "/workspace/src/fine.tsx" } },
+        { id: "call-2", name: "replace_in_file", args: { path: "/workspace/src/fine.tsx" } },
       ];
       const results: any[] = [
         { id: "call-1", result: { success: true } },
@@ -303,16 +356,22 @@ describe("ValidationInterceptor", () => {
 
       expect(feedback).toHaveLength(1);
       expect(feedback[0].filePath).toBe("/workspace/src/broken.ts");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const requestBody = JSON.parse(
+        (fetchMock.mock.calls[0][1] as { body: string }).body,
+      );
+      expect(requestBody.files).toEqual([
+        "/workspace/src/broken.ts",
+        "/workspace/src/fine.tsx",
+      ]);
     });
   });
 
   describe("result matching by ID and fallback by name", () => {
     it("should match results by ID when available", async () => {
-      vi.mocked(ToolOrchestratorService.executeTool).mockResolvedValue({
-        exitCode: 0,
-        stdout: "",
-        stderr: "",
-      });
+      mockLspDiagnostics([
+        { filePath: "/workspace/test.ts", diagnostics: [] },
+      ]);
 
       const toolCalls: ToolCall[] = [
         { id: "call-abc", name: "write_file", args: { path: "/workspace/test.ts" } },
@@ -343,11 +402,9 @@ describe("ValidationInterceptor", () => {
 
   describe("patch_file and move_file support", () => {
     it("should validate patch_file as a file-mutating tool", async () => {
-      vi.mocked(ToolOrchestratorService.executeTool).mockResolvedValue({
-        exitCode: 0,
-        stdout: "",
-        stderr: "",
-      });
+      const fetchMock = mockLspDiagnostics([
+        { filePath: "/workspace/src/patched.ts", diagnostics: [] },
+      ]);
 
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "patch_file", args: { path: "/workspace/src/patched.ts" } },
@@ -358,15 +415,13 @@ describe("ValidationInterceptor", () => {
 
       await validateAfterToolExecution(toolCalls, results, mockAgenticContext, mockLoopState);
 
-      expect(ToolOrchestratorService.executeTool).toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
     it("should validate move_file as a file-mutating tool using newPath", async () => {
-      vi.mocked(ToolOrchestratorService.executeTool).mockResolvedValue({
-        exitCode: 0,
-        stdout: "",
-        stderr: "",
-      });
+      const fetchMock = mockLspDiagnostics([
+        { filePath: "/workspace/src/moved.tsx", diagnostics: [] },
+      ]);
 
       const toolCalls: ToolCall[] = [
         { id: "call-1", name: "move_file", args: { newPath: "/workspace/src/moved.tsx" } },
@@ -377,7 +432,7 @@ describe("ValidationInterceptor", () => {
 
       await validateAfterToolExecution(toolCalls, results, mockAgenticContext, mockLoopState);
 
-      expect(ToolOrchestratorService.executeTool).toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -391,7 +446,7 @@ describe("ValidationInterceptor", () => {
       });
 
       const toolCalls: ToolCall[] = [
-        { id: "call-1", name: "write_file", args: { path: "src/subdir/test.ts" } },
+        { id: "call-1", name: "write_file", args: { path: "src/subdir/test.js" } },
       ];
       const results: any[] = [
         { id: "call-1", result: { success: true } },
@@ -456,7 +511,7 @@ describe("ValidationInterceptor", () => {
       });
 
       const toolCalls: ToolCall[] = [
-        { id: "call-1", name: "write_file", args: { path: "src/test.ts" } },
+        { id: "call-1", name: "write_file", args: { path: "src/test.js" } },
       ];
       const results: any[] = [
         { id: "call-1", result: { success: true } },
@@ -475,7 +530,7 @@ describe("ValidationInterceptor", () => {
       });
 
       const toolCalls: ToolCall[] = [
-        { id: "call-1", name: "write_file", args: { path: "src/test.ts" } },
+        { id: "call-1", name: "write_file", args: { path: "src/test.js" } },
       ];
       const results: any[] = [
         { id: "call-1", result: { success: true } },
@@ -497,7 +552,7 @@ describe("ValidationInterceptor", () => {
       });
 
       const toolCalls: ToolCall[] = [
-        { id: "call-abc", name: "write_file", args: { path: "src/test.ts" } },
+        { id: "call-abc", name: "write_file", args: { path: "src/test.js" } },
       ];
       const results: [ToolResult] = [
         { name: "write_file", result: { success: true } } as any,
