@@ -17,8 +17,56 @@ vi.mock("#src/services/RequestLogger", () => ({
   },
 }));
 
+// The gate now streams through getProvider(chainEntry.provider) — delegate
+// to the most recently created mock context's provider stub so each test's
+// per-context generateTextStream mock keeps working unchanged.
+let activeProviderStub: {
+  generateTextStream: (...args: unknown[]) => unknown;
+} | null = null;
+
+vi.mock("#src/providers/index", () => ({
+  getProvider: () => ({
+    generateTextStream: (...args: unknown[]) =>
+      activeProviderStub!.generateTextStream(...args),
+  }),
+}));
+
+vi.mock("#src/services/ModelRoleRouter", () => ({
+  MODEL_ROLES: {
+    DEFAULT: "default",
+    UTILITY: "utility",
+    CRITIC: "critic",
+    PLAN: "plan",
+    VISION: "vision",
+  },
+  default: {
+    resolveChain: vi
+      .fn()
+      .mockResolvedValue([{ provider: "google", model: "gemini-3.5-flash" }]),
+    runWithChain: vi.fn().mockImplementation(
+      async (
+        chain: Array<{ provider: string; model: string }>,
+        attempt: (
+          entry: { provider: string; model: string },
+          index: number,
+        ) => Promise<unknown>,
+      ) => {
+        let lastError: unknown;
+        for (let index = 0; index < chain.length; index++) {
+          try {
+            return { value: await attempt(chain[index], index), entry: chain[index] };
+          } catch (error) {
+            lastError = error;
+          }
+        }
+        throw lastError ?? new Error("empty chain");
+      },
+    ),
+  },
+}));
+
 function createMockContext(overrides?: Partial<AgenticContext>): AgenticContext {
-  return {
+  const context = {
     project: "test",
     username: "user",
     agent: "CODING",
@@ -35,6 +83,10 @@ function createMockContext(overrides?: Partial<AgenticContext>): AgenticContext 
     },
     ...overrides,
   } as unknown as AgenticContext;
+  activeProviderStub = (
+    context as unknown as { provider: typeof activeProviderStub }
+  ).provider;
+  return context;
 }
 
 function createMockToolCall(overrides?: Partial<ToolCall>): ToolCall {
@@ -125,7 +177,7 @@ describe("CriticGate", () => {
 
       expect(result.isApproved).toBe(true);
       expect(result.reason).toBe("critic_approved");
-      expect(result.criticModel).toBe("gemini-3.5-flash");
+      expect(result.criticModel).toBe("google/gemini-3.5-flash");
     });
 
     it("should approve when critic responds with 'APPROVE - safe'", async () => {
@@ -286,10 +338,10 @@ describe("CriticGate", () => {
 
       const result = await gate.review(toolCall, context);
 
-      expect(result.criticModel).toBe("gemini-2.0-flash");
+      expect(result.criticModel).toBe("google/gemini-2.0-flash");
     });
 
-    it("should fall back to context.resolvedModel when no custom model specified", async () => {
+    it("routes through the critic role chain — NEVER the main conversation model — when no custom model is specified", async () => {
       const gate = new CriticGate();
       const toolCall = createMockToolCall();
 
@@ -305,7 +357,9 @@ describe("CriticGate", () => {
 
       const result = await gate.review(toolCall, context);
 
-      expect(result.criticModel).toBe("claude-4-sonnet");
+      // Resolved from the critic role chain (mocked), not resolvedModel
+      expect(result.criticModel).toBe("google/gemini-3.5-flash");
+      expect(result.criticModel).not.toContain("claude-4-sonnet");
     });
   });
 

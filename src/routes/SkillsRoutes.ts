@@ -6,6 +6,7 @@ import EmbeddingService from "#src/services/EmbeddingService";
 import logger from "#src/utils/logger";
 import { COLLECTIONS } from "#src/constants";
 import { PostSkillSchema, PutSkillSchema } from "#src/types/index";
+import { resolveScope, scopeFilter } from "#src/utils/ProfileScope";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 const router = express.Router();
@@ -17,6 +18,8 @@ interface SkillDocument {
   _id?: ObjectId;
   project: string;
   username: string;
+  /** Legacy docs lack it (default profile). Writes always stamp a string. */
+  profileId?: string | null;
   name: string;
   description: string;
   content: string;
@@ -50,13 +53,11 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
-      const username = req.username || "any";
       const { db } = req;
 
       const skills = await db
         .collection<SkillDocument>(COLLECTION)
-        .find({ project, username })
+        .find({ ...scopeFilter(req) })
         .sort({ createdAt: -1 })
         // Don't return embedding vectors to the client — they're large
         .project<SkillDocument>({ embedding: 0 })
@@ -82,8 +83,7 @@ router.post(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
-      const username = req.username || "any";
+      const { project, username, profileId } = resolveScope(req);
       const { db } = req;
 
       const validated = PostSkillSchema.parse(req.body);
@@ -91,6 +91,7 @@ router.post(
       const document: SkillDocument = {
         project,
         username,
+        profileId,
         name: validated.name,
         description: validated.description,
         content: validated.content,
@@ -154,7 +155,10 @@ router.put(
           // Need current doc to merge fields for embedding
           const current = await db
             .collection<SkillDocument>(COLLECTION)
-            .findOne({ _id: new ObjectId(req.params.id as string) });
+            .findOne({
+              _id: new ObjectId(req.params.id as string),
+              ...scopeFilter(req),
+            });
 
           if (current) {
             const merged = {
@@ -174,7 +178,9 @@ router.put(
       const result = await db
         .collection<SkillDocument>(COLLECTION)
         .findOneAndUpdate(
-          { _id: new ObjectId(req.params.id as string) },
+          // Scope the filter, not just the lookup — without it, knowing a
+          // skill's id is enough to rewrite another scope's skill.
+          { _id: new ObjectId(req.params.id as string), ...scopeFilter(req) },
           { $set: updates },
           { returnDocument: "after", projection: { embedding: 0 } },
         );
@@ -203,7 +209,10 @@ router.delete(
 
       const result = await db
         .collection<SkillDocument>(COLLECTION)
-        .findOneAndDelete({ _id: new ObjectId(req.params.id as string) });
+        .findOneAndDelete({
+          _id: new ObjectId(req.params.id as string),
+          ...scopeFilter(req),
+        });
 
       if (!result) {
         return res.status(404).json({ error: "Skill not found" });

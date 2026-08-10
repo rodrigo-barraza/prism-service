@@ -693,7 +693,7 @@ describe("ProjectInstructionsService.resolveWriteScope", () => {
         ...SCOPE,
         agent: "CODING",
       }),
-    ).toEqual({ project: "prism", username: "rodrigo", agent: null });
+    ).toEqual({ project: "prism", username: "rodrigo", agent: null, profileId: "default" });
   });
 
   it("targets the project-wide document an agent actually reads", async () => {
@@ -709,7 +709,7 @@ describe("ProjectInstructionsService.resolveWriteScope", () => {
         ...SCOPE,
         agent: "CODING",
       }),
-    ).toEqual({ project: "prism", username: "rodrigo", agent: null });
+    ).toEqual({ project: "prism", username: "rodrigo", agent: null, profileId: "default" });
   });
 
   it("targets the agent-scoped document once one exists", async () => {
@@ -731,7 +731,7 @@ describe("ProjectInstructionsService.resolveWriteScope", () => {
         ...SCOPE,
         agent: "CODING",
       }),
-    ).toEqual({ project: "prism", username: "rodrigo", agent: "CODING" });
+    ).toEqual({ project: "prism", username: "rodrigo", agent: "CODING", profileId: "default" });
   });
 });
 

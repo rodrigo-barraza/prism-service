@@ -62,6 +62,7 @@ import { checkCostBudget } from "./lifecycle/CostBudgetEnforcer.ts";
 import SemanticStallDetector from "./lifecycle/SemanticStallDetector.ts";
 
 import PlanningModeService from "#src/services/PlanningModeService";
+import PromptLocaleService from "#src/services/PromptLocaleService";
 import ConversationStatusRegistry from "#src/services/ConversationStatusRegistry";
 import { HARNESS, AGENT_DIRECTIVES } from "#src/constants";
 
@@ -82,6 +83,7 @@ interface IterationPassOptions extends AgenticOptions {
   project: string;
   agent?: string | null;
   username: string;
+  profileId?: string | null;
 }
 
 /** Compute thinking and content phase durations from a PassState's timestamps. */
@@ -105,9 +107,7 @@ function computePassPhaseDurations(pass: PassState) {
 
 const {
   MAX_CONSECUTIVE_TOOL_ERRORS,
-  MAX_REPETITION_RETRIES,
-  REPETITION_TEMPERATURE_BUMP,
-  REPETITION_PENALTY_BUMP,
+  MAX_DEVIATION_RETRIES,
   MAX_POST_WARNING_STALL_ITERATIONS,
   MAX_EMPTY_OUTPUT_RETRIES,
   EMPTY_OUTPUT_TEMPERATURE_BUMP,
@@ -190,6 +190,7 @@ export default class ReActHarness extends BaseAgenticHarness {
       traceId,
       project,
       username,
+      profileId,
       agent,
       workspaceRoot,
       emit,
@@ -385,6 +386,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             messages: currentMessages,
             project,
             username,
+            profileId,
             agent,
             traceId,
             conversationId,
@@ -469,6 +471,7 @@ export default class ReActHarness extends BaseAgenticHarness {
           project,
           agent,
           username,
+          profileId,
         };
         if (state.planModeActive) {
           const planModeTools = this.tools.finalTools.filter(
@@ -516,6 +519,10 @@ export default class ReActHarness extends BaseAgenticHarness {
         await this.checkpointTurnProgress(currentMessages);
 
         // ── Stream LLM response ────────────────────────────────
+        // Snapshot loop state first: a mid-stream deviation abort rolls
+        // back to this point so aborted partial content never reaches
+        // the final transcript.
+        const streamStateSnapshot = this.captureStreamStateSnapshot();
         const stream = await this.createProviderStream(currentMessages, passOptions);
 
         // ── Context exhaustion pre-flight ──────────────────────
@@ -543,55 +550,76 @@ export default class ReActHarness extends BaseAgenticHarness {
 
         await this.consumeStream(stream, pass, allowedToolNames);
 
-        // ── Repetition detection recovery ──────────────────────
-        if (pass.repetitionDetected) {
+        // ── Mid-stream deviation recovery ──────────────────────
+        // A deviation rule (repetition, pre-emptive semantic stall, ...)
+        // fired mid-stream and aborted the provider pass. Roll back the
+        // aborted partial content, inject the rule's reminder as a
+        // system message, and regenerate the SAME iteration from the
+        // same message state — bounded, then fall through to the
+        // existing post-hoc failure handling.
+        if (pass.deviation) {
           finalizePassTracker(pass, passRequestId);
           this.emitGenerationProgress();
 
-          emit({
-            type: SERVER_SENT_EVENT_TYPES.STATUS,
-            message: "repetition_detected",
-            iteration: state.iterations,
-          });
-
+          const activeLocale =
+            (options.locale as string | undefined) ||
+            PromptLocaleService.getDefaultLocale();
+          let activeDeviation = pass.deviation;
           let retrySucceeded = false;
+
           for (
-            let repetitionRetry = 1;
-            repetitionRetry <= MAX_REPETITION_RETRIES;
-            repetitionRetry++
+            let deviationRetry = 1;
+            deviationRetry <= MAX_DEVIATION_RETRIES;
+            deviationRetry++
           ) {
+            // Discard the aborted pass's partial content from loop state
+            // so it never reaches display segments or the final text.
+            this.rollbackStreamStateToSnapshot(streamStateSnapshot);
+
+            emit({
+              type: SERVER_SENT_EVENT_TYPES.STATUS,
+              message: activeDeviation.statusMessage,
+              iteration: state.iterations,
+              rule: activeDeviation.ruleId,
+              retry: deviationRetry,
+            });
             logger.warn(
-              `[ReActHarness] Repetition recovery attempt ${repetitionRetry}/${MAX_REPETITION_RETRIES} — ` +
-                `bumping temperature and penalty`,
+              `[ReActHarness] Deviation recovery attempt ${deviationRetry}/${MAX_DEVIATION_RETRIES} ` +
+                `for rule "${activeDeviation.ruleId}" on iteration ${state.iterations}: ${activeDeviation.detail}`,
             );
 
-            const perturbedPassOptions = { ...passOptions };
-            const currentTemperature =
-              typeof perturbedPassOptions.temperature === "number"
-                ? perturbedPassOptions.temperature
-                : 0.7;
-            perturbedPassOptions.temperature = Math.min(
-              1.0,
-              currentTemperature + REPETITION_TEMPERATURE_BUMP * repetitionRetry,
-            );
-            (perturbedPassOptions as Record<string, unknown>).repeatPenalty =
-              1.0 + REPETITION_PENALTY_BUMP * repetitionRetry;
+            currentMessages.push({
+              role: "system",
+              content: wrapSystemMessage(
+                SYSTEM_MESSAGE_TAGS.DEVIATION_REMINDER,
+                this.deviationEngine.buildReminder(
+                  activeDeviation,
+                  activeLocale,
+                ),
+              ),
+            });
 
-            const retryPass = this.createPassState(perturbedPassOptions);
-            const retryRequestId = `${requestIdBase}-iter-${state.iterations}-rep-${repetitionRetry}`;
+            const retryPassOptions = this.deviationEngine.perturbRetryOptions(
+              activeDeviation.ruleId,
+              { ...passOptions },
+              deviationRetry,
+            );
+
+            const retryPass = this.createPassState(retryPassOptions);
+            const retryRequestId = `${requestIdBase}-iter-${state.iterations}-dev-${deviationRetry}`;
             retryPass.requestId = retryRequestId;
             this.registerTrackerRequest(retryRequestId);
 
             const retryStream = await this.createProviderStream(
               currentMessages,
-              perturbedPassOptions,
+              retryPassOptions,
             );
 
-            // Context exhaustion can also fire during repetition retries
+            // Context exhaustion can also fire during deviation retries
             if (retryStream === null) {
               logger.warn(
-                `[ReActHarness] Context exhaustion during repetition retry ${repetitionRetry} — ` +
-                  `aborting repetition recovery.`,
+                `[ReActHarness] Context exhaustion during deviation retry ${deviationRetry} — ` +
+                  `aborting deviation recovery.`,
               );
               break;
             }
@@ -600,24 +628,34 @@ export default class ReActHarness extends BaseAgenticHarness {
 
             finalizePassTracker(retryPass, retryRequestId);
 
-            if (!retryPass.repetitionDetected) {
+            if (!retryPass.deviation) {
               logger.info(
-                `[ReActHarness] Repetition recovery succeeded on attempt ${repetitionRetry}`,
+                `[ReActHarness] Deviation recovery succeeded on attempt ${deviationRetry} ` +
+                  `(rule "${activeDeviation.ruleId}")`,
               );
               Object.assign(pass, retryPass);
-              pass.repetitionDetected = false;
+              pass.deviation = undefined;
               retrySucceeded = true;
               break;
             }
+            activeDeviation = retryPass.deviation;
           }
 
           if (!retrySucceeded) {
+            // Post-hoc fall-through: discard the final aborted partial and
+            // end the turn with an explicit error message, exactly like the
+            // pre-existing exhausted-repetition path.
+            this.rollbackStreamStateToSnapshot(streamStateSnapshot);
             logger.error(
-              `[ReActHarness] All repetition recovery attempts exhausted`,
+              `[ReActHarness] All deviation recovery attempts exhausted (rule "${activeDeviation.ruleId}")`,
             );
             injectErrorAsConversationMessage(
               currentMessages,
-              `Repetition recovery failed.`,
+              PromptLocaleService.get(
+                activeLocale,
+                "harness.deviationRules.recoveryFailed",
+                { ruleId: activeDeviation.ruleId },
+              ),
               context,
             );
             this.logIteration(pass, currentMessages);
@@ -887,6 +925,10 @@ export default class ReActHarness extends BaseAgenticHarness {
           this.checkAndApplyToolSetChanges(currentMessages, pass.usage);
           this.logIteration(pass, currentMessages);
 
+          // Feed the completed iteration to the mid-stream deviation
+          // engine (its stall rule compares future streamed tool calls
+          // against these fingerprints) and the post-hoc stall detector.
+          this.deviationEngine.recordCompletedIteration(pass.pendingToolCalls);
           const stallVerdict = semanticStallDetector.recordIteration(pass.pendingToolCalls);
           if (stallVerdict.isStalled) {
             if (semanticStallDetector.hasWarningBeenIssued && semanticStallDetector.postWarningStalls >= MAX_POST_WARNING_STALL_ITERATIONS) {
@@ -995,6 +1037,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             }
 
             this.logIteration(pass, currentMessages);
+            this.deviationEngine.recordCompletedIteration([]);
             semanticStallDetector.recordIteration([], pass.streamedText);
             hasCleanTextBreak = true;
             break;

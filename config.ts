@@ -116,6 +116,30 @@ export const ANTHROPIC_BASE_URL = process.env.ANTHROPIC_BASE_URL;
 export const HIGH_RES_IMAGE_MAX_DIMENSION =
   parseInt(process.env.HIGH_RES_IMAGE_MAX_DIMENSION ?? "", 10) || 2576;
 
+// ── Model Role Chains ─────────────────────────────────────────
+// Explicit env config for role-based model routing (ModelRoleRouter).
+// One variable per role: MODEL_ROLE_UTILITY, MODEL_ROLE_CRITIC, ...
+// Value: ordered comma-separated fallback chain of `provider=model` pairs,
+// e.g. MODEL_ROLE_UTILITY="vllm=Qwen/Qwen3-4B,google=gemini-3.5-flash".
+// (`=` separates provider from model because local model ids may contain
+// `:` and `/`.)
+export function getModelRoleChainFromEnvironment(
+  role: string,
+): Array<{ provider: string; model: string }> {
+  const raw =
+    process.env[`MODEL_ROLE_${role.toUpperCase().replace(/-/g, "_")}`];
+  if (!raw) return [];
+  const chain: Array<{ provider: string; model: string }> = [];
+  for (const entry of raw.split(",")) {
+    const separatorIndex = entry.indexOf("=");
+    if (separatorIndex <= 0) continue;
+    const provider = entry.slice(0, separatorIndex).trim();
+    const model = entry.slice(separatorIndex + 1).trim();
+    if (provider && model) chain.push({ provider, model });
+  }
+  return chain;
+}
+
 // ── Default Model Names ───────────────────────────────────────
 // Vault-backed model identifiers — swap models without code deploys.
 

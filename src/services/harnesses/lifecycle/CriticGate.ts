@@ -1,11 +1,16 @@
 import logger from "#src/utils/logger";
 import { APPROVAL_TIERS } from "#src/services/AutoApprovalEngine";
+import ModelRoleRouter, {
+  MODEL_ROLES,
+  type RoleChainEntry,
+} from "#src/services/ModelRoleRouter";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import RequestLogger from "#src/services/RequestLogger";
+import { getProvider } from "#src/providers/index";
+import { ProviderError } from "#src/utils/errors";
 
 import type { ToolCall, AgenticContext } from "#src/services/harnesses/types";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
-import { streamWithRetries } from "#src/utils/ProviderStreamResilience";
 import { HARNESS } from "#src/constants";
 
 /**
@@ -54,14 +59,15 @@ export default class CriticGate {
     const approvalInfo = toolCall._approval as { tier: number } | undefined;
     const tier = approvalInfo?.tier ?? APPROVAL_TIERS.WRITE;
 
-    const activeCriticModel = this.criticModel || context.resolvedModel;
+    // Placeholder until the chain is resolved (DANGER tier only).
+    const unresolvedCriticModel = this.criticModel || MODEL_ROLES.CRITIC;
 
     // Only review DANGER tier tools
     if (tier !== APPROVAL_TIERS.DANGER) {
       return {
         isApproved: true,
         reason: "below_danger_tier",
-        criticModel: activeCriticModel,
+        criticModel: unresolvedCriticModel,
       };
     }
 
@@ -70,21 +76,35 @@ export default class CriticGate {
       return {
         isApproved: true,
         reason: "critic_skipped",
-        criticModel: activeCriticModel,
+        criticModel: unresolvedCriticModel,
       };
     }
 
     try {
       const reviewPrompt = this.buildReviewPrompt(toolCall);
 
-      // Use the same provider from the context to avoid a separate provider dependency.
-      // The critic call is intentionally lightweight and fast.
-      const criticResponse = await this.callCriticModel(
+      // Resolve the critic role chain: an explicit per-conversation model
+      // (agents settings / request option) heads the chain on the
+      // conversation's provider, then env/DB critic config, then the
+      // utility chain — NEVER the main conversation model by default.
+      const chain: RoleChainEntry[] = [];
+      if (this.criticModel) {
+        chain.push({
+          provider: context.providerName,
+          model: this.criticModel,
+        });
+      }
+      chain.push(...(await ModelRoleRouter.resolveChain(MODEL_ROLES.CRITIC)));
+
+      const { text: criticResponse, entry } = await this.callCriticModel(
         reviewPrompt,
         context,
-        activeCriticModel,
+        chain,
       );
-      return this.parseReviewResponse(criticResponse, activeCriticModel);
+      return this.parseReviewResponse(
+        criticResponse,
+        `${entry.provider}/${entry.model}`,
+      );
     } catch (criticError: unknown) {
       // On critic failure, default to allowing (fail-open for usability).
       // A fail-closed approach would block all DANGER tools on critic downtime.
@@ -94,7 +114,7 @@ export default class CriticGate {
       return {
         isApproved: true,
         reason: "critic_error_fallback",
-        criticModel: activeCriticModel,
+        criticModel: unresolvedCriticModel,
       };
     }
   }
@@ -133,41 +153,65 @@ export default class CriticGate {
   }
 
   /**
-   * Call the critic model for a safety review.
-   * Uses the same provider from the harness context.
+   * Call the critic model for a safety review, advancing along the
+   * critic role chain on transient failures (timeouts included — a
+   * stalled local instance must not disable danger review while a
+   * fallback model exists).
    */
   private async callCriticModel(
     prompt: string,
     context: AgenticContext,
-    activeModel: string,
-  ): Promise<string> {
-    const { provider } = context;
-
+    chain: RoleChainEntry[],
+  ): Promise<{ text: string; entry: RoleChainEntry }> {
     const criticMessages = [{ role: "user", content: prompt }];
-
-    const criticSignal = AbortSignal.timeout(CRITIC_TIMEOUT_MILLISECONDS);
-    const criticOptions = {
-      maxTokens: CRITIC_MAX_TOKENS,
-      temperature: 0,
-      // Utility call — never burn extended thinking on a 200-token verdict.
-      thinkingEnabled: false,
-      reasoningEffort: "none",
-      signal: criticSignal,
-    };
-
-    let responseText = "";
     const requestStartMilliseconds = performance.now();
 
-    const stream = streamWithRetries(
-      () => provider.generateTextStream(criticMessages, activeModel, criticOptions),
-      { signal: criticSignal, label: context.providerName },
+    const { value: responseText, entry } = await ModelRoleRouter.runWithChain(
+      chain,
+      async (chainEntry) => {
+        const timeoutController = new AbortController();
+        const timeoutHandle = setTimeout(
+          () => timeoutController.abort(),
+          CRITIC_TIMEOUT_MILLISECONDS,
+        );
+        try {
+          let text = "";
+          const stream = getProvider(chainEntry.provider).generateTextStream(
+            criticMessages,
+            chainEntry.model,
+            {
+              maxTokens: CRITIC_MAX_TOKENS,
+              temperature: 0,
+              // Utility call — never burn extended thinking on a 200-token verdict.
+              thinkingEnabled: false,
+              reasoningEffort: "none",
+              signal: timeoutController.signal,
+            },
+          );
+          for await (const chunk of stream) {
+            if (typeof chunk === "string") {
+              text += chunk;
+            }
+          }
+          return text;
+        } catch (streamError: unknown) {
+          if (timeoutController.signal.aborted) {
+            // Reclassify our own timeout abort as a transient 504 so the
+            // chain runner advances to the next critic model.
+            throw new ProviderError(
+              chainEntry.provider,
+              `Critic review timed out after ${CRITIC_TIMEOUT_MILLISECONDS}ms`,
+              504,
+              streamError as Error,
+            );
+          }
+          throw streamError;
+        } finally {
+          clearTimeout(timeoutHandle);
+        }
+      },
+      { role: MODEL_ROLES.CRITIC, operation: "agent:critic-review" },
     );
-
-    for await (const chunk of stream) {
-      if (typeof chunk === "string") {
-        responseText += chunk;
-      }
-    }
 
     RequestLogger.logBackgroundLlmCall({
       requestId: `${context.requestId || context.agentConversationId || "unknown"}-critic`,
@@ -176,8 +220,8 @@ export default class CriticGate {
       project: context.project,
       username: context.username,
       agent: context.agent || null,
-      provider: context.providerName,
-      model: activeModel,
+      provider: entry.provider,
+      model: entry.model,
       traceId: context.traceId || null,
       conversationId: (context.conversationId as string) || null,
       agentConversationId: context.agentConversationId || null,
@@ -199,7 +243,7 @@ export default class CriticGate {
       ),
     );
 
-    return responseText.trim();
+    return { text: responseText.trim(), entry };
   }
 
   /**

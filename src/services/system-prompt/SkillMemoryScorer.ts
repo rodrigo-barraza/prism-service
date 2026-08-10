@@ -6,6 +6,8 @@ import { COLLECTIONS, MEMORY } from "#src/constants";
 import logger from "#src/utils/logger";
 import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
+import { getRequestContext } from "#src/utils/RequestContext";
 import { type MemoryFetchOptions, type SkillFetchOptions, type ScoredSkill } from "./types.ts";
 
 const SKILL_RELEVANCE_THRESHOLD = MEMORY.SKILL_RELEVANCE_THRESHOLD;
@@ -33,6 +35,7 @@ export class SkillMemoryScorer {
       conversationId,
       endpoint,
       _username,
+      profileId,
       guildId,
       userIds,
       excludeMemoryIds,
@@ -43,6 +46,7 @@ export class SkillMemoryScorer {
       const memories = await MemoryService.search({
         agent,
         project,
+        profileId: profileId || undefined,
         queryText,
         limit: 10,
         conversationId: conversationId || undefined,
@@ -107,7 +111,13 @@ export class SkillMemoryScorer {
     project: string | null,
     username: string,
     queryText: string,
-    { traceId, agentConversationId, endpoint, agent }: SkillFetchOptions = {},
+    {
+      traceId,
+      agentConversationId,
+      endpoint,
+      agent,
+      profileId,
+    }: SkillFetchOptions = {},
   ): Promise<ScoredSkill[]> {
     try {
       const db = MongoWrapper.getDb(MONGO_DB_NAME);
@@ -115,7 +125,14 @@ export class SkillMemoryScorer {
 
       const skills = await db
         .collection(COLLECTIONS.AGENT_SKILLS)
-        .find({ project, username, enabled: true })
+        .find({
+          project,
+          username,
+          profileId: profileFilter(
+            profileId || getRequestContext().profileId || DEFAULT_PROFILE_ID,
+          ),
+          enabled: true,
+        })
         .project({ name: 1, content: 1, description: 1, embedding: 1 })
         .toArray();
 

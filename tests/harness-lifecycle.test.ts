@@ -6,7 +6,7 @@
  */
 import "./setup.ts";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { TEST_PROJECT, TEST_USER, TEST_CONVERSATION_ID } from "./setup.ts";
+import { TEST_PROJECT, TEST_USER, TEST_CONVERSATION_ID, MOCK_GENERATE_TEXT_STREAM } from "./setup.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
@@ -908,7 +908,7 @@ describe("CriticGate", () => {
     mockContext = createMockAgenticContext({ provider: mockProvider });
   });
 
-  it("should auto-approve any tool calls that are not in the DANGER tier and fallback to context.resolvedModel if criticModel is unconfigured", async () => {
+  it("should auto-approve any tool calls that are not in the DANGER tier without resolving the critic role chain", async () => {
     const criticGate = new CriticGate();
     const toolCall: ToolCall = {
       id: "call-1",
@@ -920,7 +920,7 @@ describe("CriticGate", () => {
     const reviewResult = await criticGate.review(toolCall, mockContext);
     expect(reviewResult.isApproved).toBe(true);
     expect(reviewResult.reason).toBe("below_danger_tier");
-    expect(reviewResult.criticModel).toBe("test-model"); // default to context.resolvedModel
+    expect(reviewResult.criticModel).toBe("critic"); // unresolved role placeholder — chain is only resolved for DANGER reviews
     expect(mockProvider.generateTextStream).not.toHaveBeenCalled();
   });
 
@@ -952,14 +952,17 @@ describe("CriticGate", () => {
     const mockStream = (async function* () {
       yield "APPROVE\nThe command is safe and standard.";
     })();
-    mockProvider.generateTextStream.mockReturnValue(mockStream);
+    // The gate streams via getProvider(chainEntry.provider) now — the
+    // explicit model heads the chain on the conversation's provider.
+    const context = createMockAgenticContext({ providerName: "google" });
+    MOCK_GENERATE_TEXT_STREAM.mockReturnValueOnce(mockStream);
 
-    const reviewResult = await criticGate.review(toolCall, mockContext);
+    const reviewResult = await criticGate.review(toolCall, context);
     expect(reviewResult.isApproved).toBe(true);
     expect(reviewResult.reason).toBe("critic_approved");
-    expect(reviewResult.criticModel).toBe("fast-critic-model");
+    expect(reviewResult.criticModel).toBe("google/fast-critic-model");
 
-    expect(mockProvider.generateTextStream).toHaveBeenCalledWith(
+    expect(MOCK_GENERATE_TEXT_STREAM).toHaveBeenCalledWith(
       expect.any(Array),
       "fast-critic-model",
       expect.any(Object),
@@ -978,7 +981,7 @@ describe("CriticGate", () => {
     const mockStream = (async function* () {
       yield "DENY\nContains destructive rm -rf command targeting critical directories.";
     })();
-    mockProvider.generateTextStream.mockReturnValue(mockStream);
+    MOCK_GENERATE_TEXT_STREAM.mockReturnValueOnce(mockStream);
 
     const reviewResult = await criticGate.review(toolCall, mockContext);
     expect(reviewResult.isApproved).toBe(false);
@@ -997,7 +1000,7 @@ describe("CriticGate", () => {
     const mockStream = (async function* () {
       yield "Maybe this is ok? I am not entirely sure.";
     })();
-    mockProvider.generateTextStream.mockReturnValue(mockStream);
+    MOCK_GENERATE_TEXT_STREAM.mockReturnValueOnce(mockStream);
 
     const reviewResult = await criticGate.review(toolCall, mockContext);
     expect(reviewResult.isApproved).toBe(false);
@@ -1013,7 +1016,7 @@ describe("CriticGate", () => {
       _approval: { tier: 3 } as any,
     };
 
-    mockProvider.generateTextStream.mockImplementation(() => {
+    MOCK_GENERATE_TEXT_STREAM.mockImplementationOnce(() => {
       throw new Error("Model rate limit reached");
     });
 

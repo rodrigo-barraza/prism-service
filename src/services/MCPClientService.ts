@@ -10,6 +10,8 @@ import { registerCleanup } from "#src/utils/CleanupRegistry";
 import type { Db } from "mongodb";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { COLLECTIONS } from "#src/constants";
+import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
+import { getRequestContext } from "#src/utils/RequestContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -94,6 +96,11 @@ export const MCP_PREFIX = "mcp" + MCP_DELIMITER;
 
 /**
  * Map of serverName → { client: Client, transport, tools: [], config, status }
+ *
+ * NOTE: keyed by server name only — not by profile (or project/username).
+ * Two profiles enabling a same-named server share/steal one connection. The
+ * key is embedded in namespaced tool names (`mcp__{serverName}__{tool}`) and
+ * consumed by harness call sites, so widening it fans out beyond this module.
  */
 const connections = new Map<string, MCPConnection>();
 
@@ -691,16 +698,30 @@ const MCPClientService = {
 
   /**
    * Auto-connect all enabled MCP servers from the database.
-
-
+   *
+   * `profileId` is optional so pre-profile callers keep working; it defaults
+   * to the ambient request's profile (AsyncLocalStorage), then "default".
    */
-  async connectAllFromDB(db: Db | null, project: string, username: string) {
+  async connectAllFromDB(
+    db: Db | null,
+    project: string,
+    username: string,
+    profileId?: string,
+  ) {
     if (!db) return;
+
+    const resolvedProfileId =
+      profileId ?? getRequestContext().profileId ?? DEFAULT_PROFILE_ID;
 
     try {
       const servers = (await db
         .collection(COLLECTIONS.MCP_SERVERS)
-        .find({ project, username, enabled: true })
+        .find({
+          project,
+          username,
+          profileId: profileFilter(resolvedProfileId),
+          enabled: true,
+        })
         .toArray()) as unknown as MCPServerConfig[];
 
       if (servers.length === 0) return;

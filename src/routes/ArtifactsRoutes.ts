@@ -26,6 +26,7 @@ router.get(
 
       const { data, total } = await ArtifactsService.list({
         project: req.project as string,
+        profileId: req.profileId,
         page,
         limit,
         kind,
@@ -53,6 +54,7 @@ router.get(
     try {
       const artifact = await ArtifactsService.getById(String(req.params.id), {
         project: req.project as string,
+        profileId: req.profileId,
       });
 
       if (!artifact) {
@@ -77,6 +79,7 @@ router.delete(
       const deleted = await ArtifactsService.remove(String(req.params.id), {
         project: req.project as string,
         username: req.username as string,
+        profileId: req.profileId,
       });
 
       if (!deleted) {

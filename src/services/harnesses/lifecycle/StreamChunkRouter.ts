@@ -154,17 +154,16 @@ export function routeStreamChunk(
     });
     harness.maybeEmitProgress();
 
-    // ── Repetition detection on thinking stream ────────
-    const thinkingRepetitionVerdict = harness["repetitionDetector"].append(
+    // ── Deviation rules on the thinking stream ─────────
+    const thinkingDeviation = harness["deviationEngine"].observeTextChunk(
       streamChunk.content || "",
     );
-    if (thinkingRepetitionVerdict.isDegenerate) {
+    if (thinkingDeviation) {
       logger.warn(
-        `[RepetitionDetector] Degenerate repetition detected in thinking stream on iteration ${state.iterations} — ` +
-          `metric=${thinkingRepetitionVerdict.metric}, confidence=${thinkingRepetitionVerdict.confidence.toFixed(2)}, ` +
-          `pattern="${(thinkingRepetitionVerdict.pattern || "").slice(0, 80)}"`,
+        `[DeviationRuleEngine] Rule "${thinkingDeviation.ruleId}" fired on thinking stream ` +
+          `at iteration ${state.iterations}: ${thinkingDeviation.detail}`,
       );
-      return { action: "repetitionDetected", verdict: thinkingRepetitionVerdict };
+      return { action: "deviation", verdict: thinkingDeviation };
     }
 
     return { action: "continue" };
@@ -333,6 +332,21 @@ export function routeStreamChunk(
             : undefined,
       }),
     };
+
+    // ── Deviation rules on streamed tool calls ─────────────
+    // Evaluated BEFORE the call is recorded or disclosed via SSE, so an
+    // aborted pass leaves no phantom tool call in state or on the client.
+    // (Native calls above are provider-executed and cannot be cancelled.)
+    const toolCallDeviation =
+      harness["deviationEngine"].observeToolCall(toolCall);
+    if (toolCallDeviation) {
+      logger.warn(
+        `[DeviationRuleEngine] Rule "${toolCallDeviation.ruleId}" fired on tool call ` +
+          `"${toolName}" at iteration ${state.iterations}: ${toolCallDeviation.detail}`,
+      );
+      return { action: "deviation", verdict: toolCallDeviation };
+    }
+
     pass.pendingToolCalls.push(toolCall);
     state.streamedToolCalls.push({ ...toolCall });
     trackToolDisplaySegment(harness, standardToolCallId);
@@ -456,16 +470,15 @@ export function routeStreamChunk(
     });
   harness.maybeEmitProgress();
 
-  // ── Repetition detection on text stream ──────────────
-  const textRepetitionVerdict =
-    harness["repetitionDetector"].append(rawChunkString);
-  if (textRepetitionVerdict.isDegenerate) {
+  // ── Deviation rules on the text stream ───────────────
+  const textDeviation =
+    harness["deviationEngine"].observeTextChunk(rawChunkString);
+  if (textDeviation) {
     logger.warn(
-      `[RepetitionDetector] Degenerate repetition detected in text stream on iteration ${state.iterations} — ` +
-        `metric=${textRepetitionVerdict.metric}, confidence=${textRepetitionVerdict.confidence.toFixed(2)}, ` +
-        `pattern="${(textRepetitionVerdict.pattern || "").slice(0, 80)}"`,
+      `[DeviationRuleEngine] Rule "${textDeviation.ruleId}" fired on text stream ` +
+        `at iteration ${state.iterations}: ${textDeviation.detail}`,
     );
-    return { action: "repetitionDetected", verdict: textRepetitionVerdict };
+    return { action: "deviation", verdict: textDeviation };
   }
 
   return { action: "continue" };

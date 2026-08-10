@@ -18,6 +18,8 @@ import type {
   HookPayload,
 } from "#src/services/hooks/types";
 import { matchesMatcher } from "#src/services/hooks/HookMatcher";
+import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
+import { getRequestContext } from "#src/utils/RequestContext";
 import {
   normalizeDecision,
   runConfiguredHook,
@@ -57,6 +59,8 @@ type HookCategory = Parameters<AgentHooks["register"]>[3];
 export interface HookScope {
   project: string;
   username: string;
+  /** Absent falls back to the request context's profile, then "default". */
+  profileId?: string;
   /** `null`/absent loads only the scope-wide hooks. */
   agent?: string | null;
 }
@@ -73,6 +77,8 @@ export interface HookScope {
 export interface HookRegistrationContext {
   project?: string | null;
   username?: string | null;
+  /** Absent falls back to the request context's profile, then "default". */
+  profileId?: string | null;
   agent?: string | null;
   sessionId?: string | null;
   agentConversationId?: string | null;
@@ -97,8 +103,17 @@ function resolveScope(context: HookRegistrationContext): HookScope {
   return {
     project: context.project || "any",
     username: context.username || "any",
+    profileId: resolveProfileId(context.profileId),
     agent: context.agent ?? null,
   };
+}
+
+/**
+ * A caller that doesn't know about profiles gets the ambient request's
+ * profile (AsyncLocalStorage), and the default profile outside any request.
+ */
+function resolveProfileId(profileId?: string | null): string {
+  return profileId || getRequestContext().profileId || DEFAULT_PROFILE_ID;
 }
 
 interface CachedScope {
@@ -110,7 +125,7 @@ const scopeCache = new Map<string, CachedScope>();
 
 /** Cache key for a scope. Exported so callers can invalidate precisely. */
 export function hookScopeKey(scope: HookScope | HookRegistrationContext): string {
-  return `${scope.project || "any"}::${scope.username || "any"}::${scope.agent ?? "*"}`;
+  return `${scope.project || "any"}::${scope.username || "any"}::${resolveProfileId(scope.profileId)}::${scope.agent ?? "*"}`;
 }
 
 /**
@@ -127,7 +142,9 @@ export async function loadHooksForScope(
 ): Promise<ConfiguredHookDocument[]> {
   if (!db) return [];
 
-  const key = hookScopeKey(scope);
+  // Resolve once so the cache key and the Mongo filter agree on the profile.
+  const profileId = resolveProfileId(scope.profileId);
+  const key = hookScopeKey({ ...scope, profileId });
   const cached = scopeCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.hooks;
 
@@ -140,6 +157,7 @@ export async function loadHooksForScope(
       .find({
         project: scope.project,
         username: scope.username,
+        profileId: profileFilter(profileId),
         enabled: true,
         $or: agentFilters,
       })

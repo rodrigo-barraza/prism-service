@@ -183,6 +183,19 @@
       "reason": "One line why now good moment. e.g. 'auth work done, test green'."
     }
   },
+  "checkpoint": {
+    "description": "Carve mark in cave wall at this point of talk, so can walk back later. Carve mark BEFORE risky wander — strange path, big search, bug hunt — where detail not matter after done. Later, rewind throw away all talk after mark from working head: cheaper than squeeze-summary, and lose nothing — thrown words still on wall, user still see. Same name again? Mark move here. Mark sit at last finished turn — this turn land after mark.",
+    "parameters": {
+      "name": "Short mark name, like 'before-auth-hunt'. No name? Get checkpoint-<n>.",
+      "description": "One line on what wander about to happen, so later rewind know what it throw."
+    }
+  },
+  "rewind": {
+    "description": "Throw away all talk after mark (no name given? newest mark) from working head. Use when wander done and step-by-step no longer matter — say lasting conclusion in reply FIRST (this turn survive), then rewind. Not delete: thrown words stay on wall, user still see, but they not go into head for next turns, even after reload. Better than compact_context when mark wraps the noise — no summary made, nothing twisted, nothing paid.",
+    "parameters": {
+      "checkpoint": "Name of mark to walk back to. No name? Newest mark."
+    }
+  },
   "run_async_task": {
     "description": "Run tool in background. Returns task ID immediately. Tool run behind while you work. Query with list_async_tasks, stop with cancel_async_task. System notify when done.",
     "parameters": {

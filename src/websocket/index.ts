@@ -23,6 +23,15 @@ import { FILE_CATEGORIES } from "#src/constants";
 import { getModelByName, MODELS } from "#src/config";
 import { calculateTokensPerSec } from "#src/utils/math";
 import PromptLocaleService from "#src/services/PromptLocaleService";
+import {
+  normalizeProfileId,
+  PROFILE_ID_HEADER,
+  DEFAULT_PROFILE_ID,
+} from "#src/utils/ProfileScope";
+import {
+  requestContext,
+  type RequestContextStore,
+} from "#src/utils/RequestContext";
 import type { WebSocket } from "ws";
 import type { IncomingMessage } from "http";
 import type { WebSocketServer } from "ws";
@@ -102,6 +111,22 @@ interface ToolResult {
  *   /ws/text-to-audio  — Streaming TTS (binary audio frames)
  *   /ws/live   — Persistent Live API session (audio/text bidirectional)
  */
+/**
+ * WebSocket messages arrive outside any HTTP request, so the AsyncLocalStorage
+ * request context is empty unless established per message. Running each
+ * message handler inside the connection's identity store lets deep code with
+ * no parameter path (FileService upload keys, ConversationService stamps,
+ * RequestLogger fallbacks) see the right profile/project/username.
+ */
+function bindConnectionContext(
+  store: RequestContextStore,
+  handler: (_rawData: Buffer | string) => Promise<void>,
+): (_rawData: Buffer | string) => void {
+  return (rawData) => {
+    void requestContext.run(store, () => handler(rawData));
+  };
+}
+
 export function setupWebSocket(webSocketServer: WebSocketServer) {
   webSocketServer.on("connection", (websocket: WebSocket, request: IncomingMessage) => {
     const url = new URL(request.url || "/", `http://${request.headers.host}`);
@@ -122,8 +147,16 @@ export function setupWebSocket(webSocketServer: WebSocketServer) {
       url.searchParams.get("username") ||
       DEFAULT_USERNAME;
     const agent = (request.headers[IDENTITY_HEADERS.agent] as string) || null;
+    // Profile identity — header first (mirrors AuthMiddleware), then a
+    // `profileId` query param for browser WebSocket clients that cannot
+    // set custom headers. normalizeProfileId falls back to the default
+    // profile for missing/invalid values.
+    const profileId = normalizeProfileId(
+      (request.headers[PROFILE_ID_HEADER] as string | undefined) ??
+        url.searchParams.get("profileId"),
+    );
     logger.info(
-      `WebSocket connection on ${pathname} (project: ${project}, user: ${username})`,
+      `WebSocket connection on ${pathname} (project: ${project}, user: ${username}, profile: ${profileId})`,
     );
 
     if (pathname === "/ws/chat") {
@@ -133,6 +166,7 @@ export function setupWebSocket(webSocketServer: WebSocketServer) {
         username,
         clientIp || "unknown",
         agent,
+        profileId,
       );
     } else if (pathname === "/ws/text-to-audio") {
       handleWebsocketVoice(
@@ -141,6 +175,7 @@ export function setupWebSocket(webSocketServer: WebSocketServer) {
         username,
         clientIp || "unknown",
         agent,
+        profileId,
       );
     } else if (pathname === "/ws/live") {
       handleWebsocketLive(
@@ -149,6 +184,7 @@ export function setupWebSocket(webSocketServer: WebSocketServer) {
         username,
         clientIp || "unknown",
         agent,
+        profileId,
       );
     } else {
       websocket.send(
@@ -167,6 +203,7 @@ function handleWebsocketChat(
   username: string,
   clientIp: string,
   agent: string | null,
+  profileId: string = DEFAULT_PROFILE_ID,
 ) {
   const emitFunction = (event: Record<string, unknown>) => {
     if (websocket.readyState === websocket.OPEN) {
@@ -174,7 +211,14 @@ function handleWebsocketChat(
     }
   };
 
-  websocket.on("message", async (rawData: Buffer | string) => {
+  const connectionStore: RequestContextStore = {
+    project,
+    username,
+    profileId,
+    clientIp,
+    agent,
+  };
+  websocket.on("message", bindConnectionContext(connectionStore, async (rawData: Buffer | string) => {
     let data: Record<string, unknown>;
     try {
       data = JSON.parse(rawData.toString());
@@ -233,10 +277,10 @@ function handleWebsocketChat(
       : emitFunction;
 
     await handleConversation(
-      { ...data, project, username, clientIp, agent },
+      { ...data, project, username, clientIp, agent, profileId },
       emitWithDirectViewers,
     );
-  });
+  }));
 
   websocket.on("close", () => {
     WebSocketConnectionRegistry.deregisterByWebSocket(websocket);
@@ -254,8 +298,16 @@ function handleWebsocketVoice(
   username: string,
   clientIp: string,
   _agent: string | null,
+  profileId: string = DEFAULT_PROFILE_ID,
 ) {
-  websocket.on("message", async (rawData: Buffer | string) => {
+  const connectionStore: RequestContextStore = {
+    project,
+    username,
+    profileId,
+    clientIp,
+    agent: _agent,
+  };
+  websocket.on("message", bindConnectionContext(connectionStore, async (rawData: Buffer | string) => {
     let data: Record<string, unknown>;
     try {
       data = JSON.parse(rawData.toString());
@@ -268,7 +320,9 @@ function handleWebsocketVoice(
 
     try {
       await handleVoice(
-        { ...data, project, username, clientIp } as Parameters<
+        // profileId is not (yet) part of VoiceParams — the double cast keeps
+        // the extra identity field flowing through to handleVoice's params.
+        { ...data, project, username, clientIp, profileId } as unknown as Parameters<
           typeof handleVoice
         >[0],
         (chunk: Buffer | Uint8Array) => {
@@ -285,7 +339,7 @@ function handleWebsocketVoice(
     } catch {
       // Error already emitted via emitJSON in handleVoice
     }
-  });
+  }));
 }
 
 // ─── persistent bidirectional session proxy ─────────────────
@@ -318,6 +372,7 @@ function handleWebsocketLive(
   username: string,
   _clientIp: string,
   agent: string | null,
+  profileId: string = DEFAULT_PROFILE_ID,
 ) {
   let liveSession: Session | null = null;
   /** Accumulated base64 PCM audio chunks for current turn (model output, 24kHz) */
@@ -397,7 +452,14 @@ function handleWebsocketLive(
     }
   }
 
-  websocket.on("message", async (rawData: Buffer | string) => {
+  const connectionStore: RequestContextStore = {
+    project,
+    username,
+    profileId,
+    clientIp: _clientIp,
+    agent,
+  };
+  websocket.on("message", bindConnectionContext(connectionStore, async (rawData: Buffer | string) => {
     let data: Record<string, unknown>;
     try {
       data = JSON.parse(rawData.toString());
@@ -543,7 +605,7 @@ function handleWebsocketLive(
                   project,
                   username,
                   true,
-                  { title: activeConversationTitle },
+                  { title: activeConversationTitle, profileId },
                 ).catch((error: Error) =>
                   logger.error(
                     `[Live API] Failed to set isGenerating: ${getErrorMessage(error)}`,
@@ -565,7 +627,7 @@ function handleWebsocketLive(
                       project,
                       username,
                       true,
-                      { title: activeConversationTitle },
+                      { title: activeConversationTitle, profileId },
                     ).catch((_error: Error) => {});
                   }
                 }
@@ -792,6 +854,7 @@ function handleWebsocketLive(
                     operation: "live",
                     project,
                     username,
+                    profileId,
                     clientIp: _clientIp,
                     agent,
                     provider: "google",
@@ -1001,7 +1064,7 @@ function handleWebsocketLive(
       liveSession = null;
       return;
     }
-  });
+  }));
 
   // Clean up on client disconnect
   websocket.on("close", () => {

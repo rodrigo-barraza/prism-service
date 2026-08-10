@@ -65,8 +65,12 @@ const EMPTY_TOOL_SET_HASH = "__no_tools__";
  * Compute a deterministic fingerprint for a single tool call.
  * Uses tool name + stable-sorted JSON of arguments to produce
  * a consistent hash regardless of argument insertion order.
+ *
+ * Exported for the DeviationRuleEngine's mid-stream stall rule, which
+ * compares a just-streamed tool call against previous iterations' calls
+ * using the same hashing so the two detectors can never disagree.
  */
-function computeToolCallFingerprint(toolCall: ToolCall): string {
+export function computeToolCallFingerprint(toolCall: ToolCall): string {
   const stableArguments = stableStringify(toolCall.args);
   return createHash("sha256")
     .update(`${toolCall.name}::${stableArguments}`)

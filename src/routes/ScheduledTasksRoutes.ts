@@ -1,6 +1,7 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { type Request, type Response } from "express";
 import ScheduledTaskService from "#src/services/ScheduledTaskService";
+import { resolveScope } from "#src/utils/ProfileScope";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { PROVIDERS } from "#src/constants";
@@ -19,9 +20,14 @@ router.get(
       typeof req.project === "string" ? req.project : "direct";
     const username: string =
       typeof req.username === "string" ? req.username : "system";
+    const { profileId } = resolveScope(req);
 
     try {
-      const tasks = await ScheduledTaskService.listTasks(project, username);
+      const tasks = await ScheduledTaskService.listTasks(
+        project,
+        username,
+        profileId,
+      );
       res.json(tasks);
     } catch (error: unknown) {
       logger.error(
@@ -62,6 +68,7 @@ router.post(
       typeof req.project === "string" ? req.project : "direct";
     const username: string =
       typeof req.username === "string" ? req.username : "system";
+    const { profileId } = resolveScope(req);
     const {
       name,
       prompt,
@@ -104,6 +111,7 @@ router.post(
         enabled: true,
         project: project as string,
         username: username as string,
+        profileId,
       } as Omit<
         import("../services/ScheduledTaskService.ts").ScheduledTask,
         "id" | "createdAt" | "updatedAt"
@@ -131,6 +139,7 @@ router.patch(
       typeof req.project === "string" ? req.project : "direct";
     const username: string =
       typeof req.username === "string" ? req.username : "system";
+    const { profileId } = resolveScope(req);
     const updates = req.body;
 
     try {
@@ -139,6 +148,7 @@ router.patch(
         project,
         username,
         updates,
+        profileId,
       );
       res.json(updatedTask);
     } catch (error: unknown) {
@@ -164,12 +174,14 @@ router.delete(
       typeof req.project === "string" ? req.project : "direct";
     const username: string =
       typeof req.username === "string" ? req.username : "system";
+    const { profileId } = resolveScope(req);
 
     try {
       const success = await ScheduledTaskService.deleteTask(
         id as string,
         project,
         username,
+        profileId,
       );
       res.json({ success });
     } catch (error: unknown) {
@@ -193,6 +205,7 @@ router.post(
       typeof req.project === "string" ? req.project : "direct";
     const username: string =
       typeof req.username === "string" ? req.username : "system";
+    const { profileId } = resolveScope(req);
     const { payload } = req.body;
 
     try {
@@ -201,6 +214,7 @@ router.post(
         project,
         username,
         payload,
+        profileId,
       );
       res.json(result);
     } catch (error: unknown) {
