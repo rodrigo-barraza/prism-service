@@ -27,6 +27,7 @@ import reminderTools from "./ReminderTools.ts";
 import conversationSearchTool from "./ConversationSearchTool.ts";
 import retrieveOffloadedContentTool from "./RetrieveOffloadedContentTool.ts";
 import compactContextTool from "./CompactContextTool.ts";
+import checkpointTools from "./CheckpointTools.ts";
 import asyncTaskTools from "./AsyncTaskTools.ts";
 import artifactTools from "./ArtifactTools.ts";
 import projectInstructionsTools from "./ProjectInstructionsTools.ts";
@@ -122,6 +123,7 @@ function initialize() {
     conversationSearchTool,
     retrieveOffloadedContentTool,
     compactContextTool,
+    checkpointTools,
     asyncTaskTools,
     artifactTools,
     projectInstructionsTools,

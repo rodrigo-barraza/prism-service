@@ -49,6 +49,11 @@
     "header": "[VALIDATION ERROR] Edit introduced {{errorCount}} error:",
     "analyzePrompt": "ANALYZE:\n1. What assumption caused failure?\n2. What change avoids this error class?\n\nFix before proceeding. Don't continue until validation passes."
   },
+  "deviationRules": {
+    "repetition": "[DEVIATION RULE — REPETITION] You say same thing over and over (\"{{pattern}}\"). Broken talk thrown in fire. User no see it. Talk again — say thing ONCE, then new thing or stop.",
+    "semanticStall": "[DEVIATION RULE — SEMANTIC STALL] You about to poke {{toolName}} same way AGAIN. Stopped before poke. Same poke give same rock. Use rocks you have, poke different, or new plan.",
+    "recoveryFailed": "Rule ({{ruleId}}) stop broken talk many times. No more tries. Turn end so loop no run forever."
+  },
   "systemReminder": {
     "header": "[SYSTEM REMINDER — Iteration {{currentIteration}}]",
     "preamble": "Critical rule still active:",

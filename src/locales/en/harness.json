@@ -49,6 +49,11 @@
     "header": "[VALIDATION ERROR] Your recent edit(s) introduced {{errorCount}} error(s):",
     "analyzePrompt": "ANALYZE what went wrong:\n1. What assumption in your approach caused the failure?\n2. What specific change would avoid this class of error?\n\nApply your analysis and fix these issues before proceeding. Do not move on to other tasks until validation passes."
   },
+  "deviationRules": {
+    "repetition": "[DEVIATION RULE — REPETITION] Your previous response was aborted mid-stream because it degenerated into repeating the same phrase (\"{{pattern}}\"). That partial output was discarded and will not be shown to the user. Regenerate your response WITHOUT repeating yourself: state each point exactly once, then either continue with new content or conclude.",
+    "semanticStall": "[DEVIATION RULE — SEMANTIC STALL] You were about to call {{toolName}} with EXACTLY the same arguments you already used in your previous iterations. That call was cancelled before execution — repeating an identical call cannot produce new information. Use the results you already have, change the arguments meaningfully, or take a different approach entirely.",
+    "recoveryFailed": "A deviation rule ({{ruleId}}) aborted this response repeatedly and recovery retries are exhausted. The turn was stopped to prevent a runaway loop."
+  },
   "systemReminder": {
     "header": "[SYSTEM REMINDER — Iteration {{currentIteration}}]",
     "preamble": "The following core behavioral constraints from your system instructions remain in effect:",

@@ -43,6 +43,8 @@ export const ChatMessageSchema = z.object({
   name: z.string().optional(),
   images: z.array(z.string()).optional(),
   deleted: z.boolean().optional(),
+  /** Soft rewind-pruned flag — see src/services/conversation/checkpoints.ts. */
+  pruned: z.boolean().optional(),
   toolCalls: z
     .array(
       z.object({
@@ -511,4 +513,9 @@ export const GetPromptsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(50),
   search: z.string().optional(),
+});
+
+export const PostClaudeConfigImportSchema = z.object({
+  workspacePath: z.string().min(1, "workspacePath is required"),
+  agent: z.string().nullable().optional(),
 });

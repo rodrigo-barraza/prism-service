@@ -403,8 +403,12 @@ async function prepareGenerationContext(
     thinkingEnabled: thinkingEnabled ?? undefined,
   });
 
-  // ── Strip soft-deleted messages ──────────────────────────────
-  const activeMessages = messages.filter((message) => !message.deleted);
+  // ── Strip soft-deleted and rewind-pruned messages ────────────
+  // `pruned` is the checkpoint/rewind soft boundary — see
+  // src/services/conversation/checkpoints.ts.
+  const activeMessages = messages.filter(
+    (message) => !message.deleted && !message.pruned,
+  );
   // ── Resolve image refs ─────────────────────────────────────
   // High-res Anthropic vision models keep a larger long-edge cap during
   // resolution so the provider-side 2576px path isn't pre-shrunk to 2000px.

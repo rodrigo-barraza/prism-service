@@ -10,7 +10,7 @@ import {
 } from "#src/utils/ProviderStreamResilience";
 import { getDocumentContextText } from "#src/utils/documentContext";
 import { roundMilliseconds } from "@rodrigo-barraza/utilities-library";
-import RepetitionDetector from "#src/services/RepetitionDetector";
+import DeviationRuleEngine from "./lifecycle/DeviationRuleEngine.ts";
 import {
   createUsageAccumulator,
   calculateTextCost,
@@ -79,6 +79,7 @@ import type {
   ChunkAction,
   ConversationMessage,
   StreamChunk,
+  StreamStateSnapshot,
   UsageAccumulator,
 } from "./types.ts";
 
@@ -109,7 +110,7 @@ export default class BaseAgenticHarness {
   protected state: AgenticLoopState;
   protected tools: ResolvedTools;
   protected trackerConversationId: string;
-  protected repetitionDetector: RepetitionDetector;
+  protected deviationEngine: DeviationRuleEngine;
   protected budgetTracker: ContextBudgetTracker | null;
 
   /** Cached estimated message tokens from the last clampOutputTokens call.
@@ -135,7 +136,7 @@ export default class BaseAgenticHarness {
     this.trackerConversationId = (context.parentAgentConversationId ||
       context.agentConversationId ||
       "") as string;
-    this.repetitionDetector = new RepetitionDetector();
+    this.deviationEngine = new DeviationRuleEngine();
 
     // Budget tracker is lazily initialized when the context window
     // first becomes available — see ensureBudgetTracker().
@@ -857,15 +858,15 @@ export default class BaseAgenticHarness {
 
   /**
    * Consume an LLM stream, routing each chunk through `processStreamChunk`.
-   * Handles abort signals, repetition detection, and stream teardown.
+   * Handles abort signals, mid-stream deviation rules, and stream teardown.
    */
   public async consumeStream(
     stream: AsyncIterable<unknown>,
     pass: PassState,
     allowedToolNames: Set<string>,
   ): Promise<void> {
-    // Reset the detector for each new stream (each LLM response is independent)
-    this.repetitionDetector.reset();
+    // Reset per-pass rule state (each LLM response is independent)
+    this.deviationEngine.beginPass();
 
     // Chunk-idle watchdog: a provider that stalls without closing the socket
     // must fail the pass instead of hanging the turn until the housekeeping
@@ -890,12 +891,94 @@ export default class BaseAgenticHarness {
         this._teardownStream(stream);
         break;
       }
-      if (result.action === "repetitionDetected") {
-        pass.repetitionDetected = true;
+      if (result.action === "deviation") {
+        pass.deviation = result.verdict;
         this._teardownStream(stream);
         break;
       }
     }
+  }
+
+  // ── Deviation abort/retry — loop-state snapshot ───────────
+
+  /**
+   * Capture the positions of every stream-accumulated field on the loop
+   * state, taken immediately before a provider pass. When a deviation
+   * rule aborts the pass mid-stream, `rollbackStreamStateToSnapshot`
+   * truncates the state back to these positions so the aborted partial
+   * text/thinking/tool calls never reach the final transcript, the DB
+   * display segments, or the finalize() content — the regenerated pass
+   * writes into a clean slate. (SSE chunks already sent for the aborted
+   * pass are superseded on the client by the emitted deviation status
+   * and the authoritative done-event content, exactly as with the
+   * pre-existing repetition recovery.)
+   */
+  public captureStreamStateSnapshot(): StreamStateSnapshot {
+    const state = this.state;
+    const lastSegment = state.displaySegments[state.displaySegments.length - 1];
+    return {
+      streamedThinkingLength: state.streamedThinking.length,
+      finalStreamedText: state.finalStreamedText,
+      streamedToolCallCount: state.streamedToolCalls.length,
+      streamedImageCount: state.streamedImages.length,
+      streamedAudioChunkCount: state.streamedAudioChunks.length,
+      displaySegmentCount: state.displaySegments.length,
+      displayTextFragmentCount: state.displayTextFragments.length,
+      displayThinkingFragmentCount: state.displayThinkingFragments.length,
+      lastTextFragmentLength:
+        state.displayTextFragments[state.displayTextFragments.length - 1]
+          ?.length ?? 0,
+      lastThinkingFragmentLength:
+        state.displayThinkingFragments[
+          state.displayThinkingFragments.length - 1
+        ]?.length ?? 0,
+      lastToolsSegmentToolIdCount:
+        lastSegment?.type === "tools" ? lastSegment.toolIds.length : 0,
+      lastDisplaySegType: state.lastDisplaySegType,
+      planModeTextLength: state.planModeText.length,
+      overallOutputCharacters: state.overallOutputCharacters,
+    };
+  }
+
+  /** Discard everything a (partially) aborted pass wrote into loop state. */
+  public rollbackStreamStateToSnapshot(snapshot: StreamStateSnapshot): void {
+    const state = this.state;
+    state.streamedThinking = state.streamedThinking.slice(
+      0,
+      snapshot.streamedThinkingLength,
+    );
+    state.finalStreamedText = snapshot.finalStreamedText;
+    state.streamedToolCalls.length = snapshot.streamedToolCallCount;
+    state.streamedImages.length = snapshot.streamedImageCount;
+    state.streamedAudioChunks.length = snapshot.streamedAudioChunkCount;
+    state.displaySegments.length = snapshot.displaySegmentCount;
+    state.displayTextFragments.length = snapshot.displayTextFragmentCount;
+    state.displayThinkingFragments.length =
+      snapshot.displayThinkingFragmentCount;
+    const lastTextIndex = state.displayTextFragments.length - 1;
+    if (lastTextIndex >= 0) {
+      state.displayTextFragments[lastTextIndex] = state.displayTextFragments[
+        lastTextIndex
+      ].slice(0, snapshot.lastTextFragmentLength);
+    }
+    const lastThinkingIndex = state.displayThinkingFragments.length - 1;
+    if (lastThinkingIndex >= 0) {
+      state.displayThinkingFragments[lastThinkingIndex] =
+        state.displayThinkingFragments[lastThinkingIndex].slice(
+          0,
+          snapshot.lastThinkingFragmentLength,
+        );
+    }
+    const lastSegment = state.displaySegments[state.displaySegments.length - 1];
+    if (lastSegment?.type === "tools") {
+      lastSegment.toolIds.length = snapshot.lastToolsSegmentToolIdCount;
+    }
+    state.lastDisplaySegType = snapshot.lastDisplaySegType;
+    state.planModeText = state.planModeText.slice(
+      0,
+      snapshot.planModeTextLength,
+    );
+    state.overallOutputCharacters = snapshot.overallOutputCharacters;
   }
 
   /**
