@@ -94,6 +94,8 @@ import workspacesRouter from "./routes/WorkspacesRoutes.ts";
 import scheduledTasksRouter from "./routes/ScheduledTasksRoutes.ts";
 import promptsRouter from "./routes/PromptsRoutes.ts";
 import webhookRouter from "./routes/WebhookRoutes.ts";
+import profilesRouter from "./routes/ProfilesRoutes.ts";
+import { PROFILE_ID_HEADER } from "./utils/ProfileScope.ts";
 
 const app = express();
 const server = http.createServer(app);
@@ -110,7 +112,9 @@ app.use(
   cors({
     origin: true, // reflect request origin (equivalent to *)
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: CORS_ALLOWED_HEADERS_STRING,
+    // x-profile-id is prism-local (not yet in the shared IDENTITY_HEADERS
+    // taxonomy the allow-list derives from), so it is appended explicitly.
+    allowedHeaders: `${CORS_ALLOWED_HEADERS_STRING}, ${PROFILE_ID_HEADER}`,
     maxAge: CROSS_ORIGIN_RESOURCE_SHARING_MAXIMUM_AGE_SECONDS, // cache preflight for 24h — eliminates burst OPTIONS storms
   }),
 );
@@ -157,6 +161,7 @@ const ENDPOINTS = {
     "/scheduled-tasks",
     "/prompts",
     "/webhooks",
+    "/profiles",
   ],
   websocket: ["/ws/chat", "/ws/text-to-audio"],
   admin: ["/admin", "/admin/lm-studio"],
@@ -226,6 +231,7 @@ app.use("/workspaces", workspacesRouter);
 app.use("/scheduled-tasks", scheduledTasksRouter);
 app.use("/prompts", promptsRouter);
 app.use("/webhooks", webhookRouter);
+app.use("/profiles", profilesRouter);
 
 // Error handler (must be last)
 app.use(errorHandler);

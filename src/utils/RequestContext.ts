@@ -11,6 +11,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 export interface RequestContextStore {
   project: string;
   username: string;
+  profileId?: string;
   clientIp: string | null;
   agent?: string | null;
   workspaceId?: string | null;
