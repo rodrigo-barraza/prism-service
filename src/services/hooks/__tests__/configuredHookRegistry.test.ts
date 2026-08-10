@@ -125,6 +125,8 @@ describe("ConfiguredHookRegistry", () => {
       expect(mock.find).toHaveBeenCalledWith({
         project: "prism",
         username: "rodrigo",
+        // Default profile owns legacy documents that predate the field
+        profileId: { $in: ["default", null] },
         enabled: true,
         $or: [{ agent: null }, { agent: "coder" }],
       });
@@ -211,11 +213,16 @@ describe("ConfiguredHookRegistry", () => {
       expect(mock.find).toHaveBeenCalledTimes(2);
     });
 
-    it("builds a stable scope key", () => {
+    it("builds a stable scope key (profile-aware)", () => {
       expect(hookScopeKey({ project: "p", username: "u", agent: "a" })).toBe(
-        "p::u::a",
+        "p::u::default::a",
       );
-      expect(hookScopeKey({ project: "p", username: "u" })).toBe("p::u::*");
+      expect(hookScopeKey({ project: "p", username: "u" })).toBe(
+        "p::u::default::*",
+      );
+      expect(
+        hookScopeKey({ project: "p", username: "u", profileId: "work" }),
+      ).toBe("p::u::work::*");
     });
   });
 
