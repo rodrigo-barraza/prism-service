@@ -43,6 +43,15 @@ export interface SkillDocument {
   usageCount: number;
   createdAt: string;
   updatedAt: string;
+  /** Provenance of imported skills, e.g. "claude-config:<workspaceRoot>". Absent on user-created skills. */
+  source?: string;
+}
+
+export interface SkillUpsertResult {
+  status: "created" | "updated" | "unchanged" | "skipped";
+  skillId?: string;
+  reason?: string;
+  error?: string;
 }
 
 export interface SkillPrepareResult {
@@ -127,6 +136,86 @@ const SkillService = {
       skill: sanitize(document as unknown as SkillDocument),
       message: `Skill "${name}" created. Execute with execute_skill({ skillId: "${skillId}" }).`,
     };
+  },
+
+  /**
+   * Idempotent upsert for skills imported from an external source
+   * (ClaudeConfigImportService). Keyed by skillId + source:
+   *   - no existing skill        → created
+   *   - same source              → updated in place (or unchanged)
+   *   - different/absent source  → skipped (never clobber a user skill)
+   */
+  async upsertImported(data: {
+    name: string;
+    description?: string;
+    prompt: string;
+    project?: string | null;
+    agent?: string | null;
+    source: string;
+  }): Promise<SkillUpsertResult> {
+    const collection = getCollection();
+    if (!collection) return { status: "skipped", error: "Database not available" };
+
+    const { name, description = "", prompt, project, agent, source } = data;
+    if (!name || !prompt || !source) {
+      return {
+        status: "skipped",
+        error: "'name', 'prompt' and 'source' are required",
+      };
+    }
+
+    const skillId = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+
+    const existing = (await collection.findOne({
+      skillId,
+    })) as unknown as SkillDocument | null;
+
+    if (existing && existing.source !== source) {
+      return {
+        status: "skipped",
+        skillId,
+        reason: `skill "${skillId}" already exists from a different source (${existing.source || "user-created"})`,
+      };
+    }
+
+    const now = new Date().toISOString();
+
+    if (existing) {
+      if (
+        existing.prompt === prompt &&
+        existing.description === description
+      ) {
+        return { status: "unchanged", skillId };
+      }
+      await collection.updateOne(
+        { skillId },
+        { $set: { description, prompt, updatedAt: now } },
+      );
+      logger.info(`[SkillService] Re-imported skill "${name}" (${skillId})`);
+      return { status: "updated", skillId };
+    }
+
+    await collection.insertOne({
+      skillId,
+      name,
+      description,
+      prompt,
+      steps: [],
+      tools: null,
+      maxIterations: MAX_TOOL_ITERATIONS,
+      model: null,
+      project: project || null,
+      agent: agent || null,
+      usageCount: 0,
+      source,
+      createdAt: now,
+      updatedAt: now,
+    });
+    logger.info(`[SkillService] Imported skill "${name}" (${skillId}) from ${source}`);
+    return { status: "created", skillId };
   },
 
   /**

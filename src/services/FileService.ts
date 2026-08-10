@@ -4,6 +4,8 @@ import type { Readable } from "stream";
 import MinioWrapper from "#src/wrappers/MinioWrapper";
 import logger from "#src/utils/logger";
 import { FILE_CATEGORIES } from "#src/constants";
+import { getRequestContext } from "#src/utils/RequestContext";
+import { DEFAULT_PROFILE_ID, normalizeProfileId } from "#src/utils/ProfileScope";
 import { MINIO_PUBLIC_URL, MINIO_BUCKET_NAME } from "#config";
 const MIME_TO_EXT: Record<string, string> = {
   "image/png": "png",
@@ -107,7 +109,7 @@ const FileService: FileServiceInterface = {
     const buffer = Buffer.from(base64Data, "base64");
     const fileExtension = MIME_TO_EXT[contentType] || "bin";
 
-    // Build path: projects/{project}/{username}/{category}/{uuid}.{fileExtension}
+    // Build path: projects/{project}/{username}/[{profileId}/]{category}/{uuid}.{fileExtension}
     // Falls back to flat {category}/{uuid}.{fileExtension} when project/username not provided
     let key: string;
     if (project && username) {
@@ -117,7 +119,17 @@ const FileService: FileServiceInterface = {
         /^\d{1,3}(\.\d{1,3}){3}$/.test(username) || username.includes(":")
           ? DEFAULT_USERNAME
           : username;
-      key = `projects/${project}/${safeUsername}/${category}/${crypto.randomUUID()}.${fileExtension}`;
+      // Profile partition — resolved from the request-context ALS so the
+      // signature stays unchanged. Only non-default profiles get a path
+      // segment: every pre-profile and default-profile file keeps its
+      // exact historical key shape.
+      const contextProfileId = getRequestContext().profileId;
+      const profileSegment =
+        contextProfileId &&
+        normalizeProfileId(contextProfileId) !== DEFAULT_PROFILE_ID
+          ? `${normalizeProfileId(contextProfileId)}/`
+          : "";
+      key = `projects/${project}/${safeUsername}/${profileSegment}${category}/${crypto.randomUUID()}.${fileExtension}`;
     } else {
       key = `${category}/${crypto.randomUUID()}.${fileExtension}`;
     }

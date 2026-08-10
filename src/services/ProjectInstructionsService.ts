@@ -4,6 +4,8 @@ import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { MONGO_DB_NAME } from "#config";
 import { COLLECTIONS } from "#src/constants";
 import logger from "#src/utils/logger";
+import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
+import { getRequestContext } from "#src/utils/RequestContext";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 // ────────────────────────────────────────────────────────────
@@ -45,12 +47,15 @@ export interface ProjectInstructionsScope {
   username?: string | null;
   /** null = applies to every agent in the project/username scope. */
   agent?: string | null;
+  /** Owning profile. Omitted = the current request's profile (or default). */
+  profileId?: string | null;
 }
 
 export interface ResolvedInstructionsScope {
   project: string;
   username: string;
   agent: string | null;
+  profileId: string;
 }
 
 export interface ProjectInstructionsDocument {
@@ -60,6 +65,8 @@ export interface ProjectInstructionsDocument {
   project: string;
   username: string;
   agent: string | null;
+  /** Owning profile. Absent on rows that predate profiles (= default). */
+  profileId?: string;
   content: string;
   version: number;
   /** null = current. An ISO timestamp closes the valid-time window. */
@@ -289,17 +296,26 @@ export function normalizeScope(
     project: scope?.project || DEFAULT_SCOPE_VALUE,
     username: scope?.username || DEFAULT_SCOPE_VALUE,
     agent: scope?.agent || null,
+    // Internal tools call without a profileId — fall back to the request's
+    // profile (AsyncLocalStorage), then the default profile.
+    profileId:
+      scope?.profileId || getRequestContext().profileId || DEFAULT_PROFILE_ID,
   };
 }
 
 function exactScopeFilter(
   scope: ResolvedInstructionsScope,
 ): Filter<ProjectInstructionsDocument> {
+  // Profile is an exact-match dimension like username — never a fallback
+  // layer. The cast is needed because the default profile's filter value is
+  // { $in: ["default", null] } (legacy rows lack the field) while the
+  // document type declares the stamped literal string.
   return {
     project: scope.project,
     username: scope.username,
     agent: scope.agent,
-  };
+    profileId: profileFilter(scope.profileId),
+  } as Filter<ProjectInstructionsDocument>;
 }
 
 function assertWithinContentCap(content: string) {
@@ -331,15 +347,22 @@ export async function ensureIndexes(db: Db) {
   indexedDatabases.add(db);
   try {
     const collection = collectionFor(db);
+    // The pre-profile unique index would make version allocation collide
+    // ACROSS profiles (two profiles claiming v(n+1) of the same
+    // project/username/agent scope) — drop it if it still exists.
+    await collection
+      .dropIndex("project_1_username_1_agent_1_version_1")
+      .catch(() => {});
     await collection.createIndex({
       project: 1,
       username: 1,
       agent: 1,
+      profileId: 1,
       validTo: 1,
       version: -1,
     });
     await collection.createIndex(
-      { project: 1, username: 1, agent: 1, version: 1 },
+      { project: 1, username: 1, agent: 1, profileId: 1, version: 1 },
       { unique: true },
     );
   } catch (error: unknown) {
@@ -397,8 +420,7 @@ async function getCurrent(
 
   const filter: Filter<ProjectInstructionsDocument> = resolved.agent
     ? {
-        project: resolved.project,
-        username: resolved.username,
+        ...exactScopeFilter(resolved),
         agent: { $in: [resolved.agent, null] },
         ...CURRENT_INSTRUCTIONS_FILTER,
       }
@@ -434,6 +456,9 @@ async function resolveWriteScope(
     project: effective.project,
     username: effective.username,
     agent: effective.agent || null,
+    // getCurrent only ever returns rows in the requester's profile partition;
+    // legacy rows (no profileId) belong to the default profile.
+    profileId: effective.profileId || resolved.profileId,
   };
 }
 
@@ -464,6 +489,8 @@ async function setContent(
       project: resolved.project,
       username: resolved.username,
       agent: resolved.agent,
+      // Always the literal profile id — never the $in filter value.
+      profileId: resolved.profileId,
       content: normalizedContent,
       version: (await highestVersion(db, resolved)) + 1,
       validTo: null,

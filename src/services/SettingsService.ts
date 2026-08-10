@@ -25,6 +25,8 @@ export interface SettingsData {
     subAgentModel: string;
     criticProvider: string;
     criticModel: string;
+    planProvider: string;
+    planModel: string;
     reminderProvider: string;
     reminderModel: string;
     harness: string;
@@ -80,6 +82,8 @@ const DEFAULTS: SettingsData = {
     subAgentModel: "",
     criticProvider: "",
     criticModel: "",
+    planProvider: "",
+    planModel: "",
     reminderProvider: "",
     reminderModel: "",
     harness: "standard",

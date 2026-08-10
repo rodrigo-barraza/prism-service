@@ -6,7 +6,7 @@
  * AgenticLoopState, and the AgenticLoopService façade.
  */
 
-import type { RepetitionVerdict } from "#src/services/RepetitionDetector";
+import type { DeviationVerdict } from "./lifecycle/DeviationRuleEngine.ts";
 
 // ── Usage & Cost ────────────────────────────────────────────
 
@@ -237,6 +237,9 @@ export interface AgenticContext {
   agent?: string | null;
   project: string;
   username: string;
+  /** Profile partition for this request — stamped literally on persisted
+   *  documents; absent means the default profile. */
+  profileId?: string | null;
   modelDefinition?: ModelDefinition | null;
   messages: ConversationMessage[];
   agentConversationId: string;
@@ -294,8 +297,32 @@ export interface PassState {
   pendingRequestDocumentIdPromise: Promise<import("mongodb").ObjectId | null>;
   /** Provider stop reason — "length"/"max_tokens" when output was truncated by token budget. */
   stopReason?: string;
-  /** Set by the streaming repetition detector when degenerate output is identified. */
-  repetitionDetected?: boolean;
+  /** Set when a mid-stream deviation rule fired and aborted this pass. */
+  deviation?: DeviationVerdict;
+}
+
+// ── Deviation Abort/Retry Snapshot ──────────────────────────
+
+/**
+ * Positions of every stream-accumulated AgenticLoopState field, captured
+ * before a provider pass so a deviation-aborted pass can be rolled back
+ * without leaking partial content into the final transcript.
+ */
+export interface StreamStateSnapshot {
+  streamedThinkingLength: number;
+  finalStreamedText: string;
+  streamedToolCallCount: number;
+  streamedImageCount: number;
+  streamedAudioChunkCount: number;
+  displaySegmentCount: number;
+  displayTextFragmentCount: number;
+  displayThinkingFragmentCount: number;
+  lastTextFragmentLength: number;
+  lastThinkingFragmentLength: number;
+  lastToolsSegmentToolIdCount: number;
+  lastDisplaySegType: string | null;
+  planModeTextLength: number;
+  overallOutputCharacters: number;
 }
 
 // ── Stream Chunk Routing ────────────────────────────────────
@@ -305,7 +332,7 @@ export type ChunkAction =
   | { action: "break" }
   | { action: "skip" }
   | { action: "toolCall"; toolCall: ToolCall }
-  | { action: "repetitionDetected"; verdict: RepetitionVerdict };
+  | { action: "deviation"; verdict: DeviationVerdict };
 
 // ── AgenticLoopState Constructor ────────────────────────────
 
@@ -370,6 +397,7 @@ export interface BeforePromptHookContext {
   messages: ConversationMessage[];
   project: string;
   username: string;
+  profileId?: string | null;
   agent?: string | null;
   traceId?: string | null;
   conversationId: string;

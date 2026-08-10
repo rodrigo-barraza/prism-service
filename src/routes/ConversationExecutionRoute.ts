@@ -109,6 +109,7 @@ router.post(
         agenticLoopEnabled: true,
         project: req.project,
         username: req.username,
+        profileId: req.profileId,
         clientIp: req.clientIp,
         agent: req.body.agent || req.agent || null,
         workspaceRoot: req.workspaceRoot || req.body.workspaceRoot || null,
@@ -126,6 +127,7 @@ router.post(
         ...req.body,
         project: req.project,
         username: req.username,
+        profileId: req.profileId,
         clientIp: req.clientIp,
       };
 

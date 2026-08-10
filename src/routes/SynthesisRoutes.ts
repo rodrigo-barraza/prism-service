@@ -11,6 +11,7 @@ import {
 } from "#src/types/index";
 import { handleSseRequest } from "#src/utils/SseUtilities";
 import { runSynthesisGeneration } from "#src/services/SynthesisOrchestrationService";
+import { resolveScope, scopeFilter } from "#src/utils/ProfileScope";
 import type { ChatRequest } from "#src/types/schemas";
 
 const router = express.Router();
@@ -22,6 +23,8 @@ interface SynthesisDocument {
   id: string;
   project: string;
   username: string;
+  /** Legacy docs lack it (default profile). Writes always stamp a string. */
+  profileId?: string | null;
   title: string;
   systemPrompt: string;
   assistantPersona?: string;
@@ -43,13 +46,11 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
-      const username = req.username || "any";
       const { db } = req;
 
       const runs = await db
         .collection<SynthesisDocument>(COLLECTION)
-        .find({ project, username })
+        .find({ ...scopeFilter(req) })
         .sort({ updatedAt: -1 })
         .toArray();
 
@@ -78,8 +79,7 @@ router.post(
         return res.status(400).json({ error: parsed.error.format() });
       }
 
-      const project = req.project || "any";
-      const username = req.username || "any";
+      const { project, username, profileId } = resolveScope(req);
       const { db } = req;
 
       await handleSseRequest(
@@ -98,7 +98,10 @@ router.post(
             { signal },
             {
               saveSynthesisRun: async (document) => {
-                await db.collection(COLLECTION).insertOne(document);
+                await db.collection(COLLECTION).insertOne({
+                  ...document,
+                  profileId,
+                });
               },
             },
           ),
@@ -118,14 +121,12 @@ router.get(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
-      const username = req.username || "any";
       const { db } = req;
       const runId = req.params.id as string;
 
       const run = await db
         .collection<SynthesisDocument>(COLLECTION)
-        .findOne({ id: runId, project, username });
+        .findOne({ id: runId, ...scopeFilter(req) });
 
       if (!run) {
         return res.status(404).json({ error: "Synthesis run not found" });
@@ -147,8 +148,7 @@ router.post(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
-      const username = req.username || "any";
+      const { project, username, profileId } = resolveScope(req);
       const { db } = req;
 
       const parsed = PostSynthesisBodySchema.safeParse(req.body);
@@ -173,6 +173,7 @@ router.post(
         id,
         project,
         username,
+        profileId,
         title,
         systemPrompt,
         userPersona,
@@ -203,8 +204,6 @@ router.patch(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
-      const username = req.username || "any";
       const { db } = req;
       const runId = req.params.id as string;
 
@@ -227,7 +226,7 @@ router.patch(
 
       const result = await db
         .collection<SynthesisDocument>(COLLECTION)
-        .updateOne({ id: runId, project, username }, { $set: setFields });
+        .updateOne({ id: runId, ...scopeFilter(req) }, { $set: setFields });
 
       if (result.matchedCount === 0) {
         return res.status(404).json({ error: "Synthesis run not found" });
@@ -235,7 +234,7 @@ router.patch(
 
       const updated = await db
         .collection<SynthesisDocument>(COLLECTION)
-        .findOne({ id: runId, project, username });
+        .findOne({ id: runId, ...scopeFilter(req) });
 
       res.json(updated);
     } catch (error: unknown) {
@@ -253,14 +252,12 @@ router.delete(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
-      const username = req.username || "any";
       const { db } = req;
       const runId = req.params.id as string;
 
       const result = await db
         .collection<SynthesisDocument>(COLLECTION)
-        .deleteOne({ id: runId, project, username });
+        .deleteOne({ id: runId, ...scopeFilter(req) });
 
       if (result.deletedCount === 0) {
         return res.status(404).json({ error: "Synthesis run not found" });

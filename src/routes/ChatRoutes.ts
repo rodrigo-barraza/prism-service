@@ -79,6 +79,8 @@ import {
   SYSTEM_STATUSES,
   MESSAGE_ROLES,
 } from "#src/constants";
+import { getRequestContext } from "#src/utils/RequestContext";
+import { DEFAULT_PROFILE_ID, normalizeProfileId } from "#src/utils/ProfileScope";
 
 interface ToolSchemaWithDomain extends ToolSchema {
   domain?: string;
@@ -201,6 +203,16 @@ async function prepareGenerationContext(
   }
 
   const validatedParams = parseResult.data;
+
+  // Profile identity — set by the request layer (router funnel, WebSocket
+  // resolution) on the raw params object; ChatRequestSchema passes it
+  // through untyped, so read it from the raw params. Falls back to the
+  // request-context ALS, then the default profile.
+  const rawProfileId = (params as Record<string, unknown>)?.profileId;
+  const profileId =
+    typeof rawProfileId === "string" && rawProfileId
+      ? normalizeProfileId(rawProfileId)
+      : getRequestContext().profileId || DEFAULT_PROFILE_ID;
 
   const {
     provider: _providerName,
@@ -391,8 +403,12 @@ async function prepareGenerationContext(
     thinkingEnabled: thinkingEnabled ?? undefined,
   });
 
-  // ── Strip soft-deleted messages ──────────────────────────────
-  const activeMessages = messages.filter((message) => !message.deleted);
+  // ── Strip soft-deleted and rewind-pruned messages ────────────
+  // `pruned` is the checkpoint/rewind soft boundary — see
+  // src/services/conversation/checkpoints.ts.
+  const activeMessages = messages.filter(
+    (message) => !message.deleted && !message.pruned,
+  );
   // ── Resolve image refs ─────────────────────────────────────
   // High-res Anthropic vision models keep a larger long-edge cap during
   // resolution so the provider-side 2576px path isn't pre-shrunk to 2000px.
@@ -554,6 +570,7 @@ async function prepareGenerationContext(
     skipConversation,
     project,
     username,
+    profileId,
     clientIp,
     agent,
     // Multi-workspace
@@ -600,6 +617,7 @@ export async function handleConversation(
     skipConversation,
     project,
     username,
+    profileId,
     clientIp,
     requestStart,
     requestId,
@@ -767,6 +785,7 @@ export async function handleConversation(
       operation: "chat",
       project,
       username,
+      profileId,
       clientIp,
       provider: providerName,
       model: resolvedModel || requestedModel || "any",
@@ -817,6 +836,7 @@ export async function handleAgent(
     incomingTraceId,
     project,
     username,
+    profileId,
     clientIp,
     agent,
     requestStart,
@@ -927,6 +947,7 @@ export async function handleAgent(
         traceId,
         project,
         username,
+        profileId,
         clientIp,
         agent,
         workspaceRoot: context.workspaceRoot,
@@ -971,6 +992,7 @@ export async function handleAgent(
       operation: "agent",
       project,
       username,
+      profileId,
       clientIp,
       agent: agent || null,
       harness: (options.harness as string) || null,
@@ -1012,6 +1034,7 @@ async function handleImageAPIModel(
     traceId,
     project,
     username,
+    profileId,
     clientIp,
     requestId,
     requestStart,
@@ -1101,6 +1124,7 @@ async function handleImageAPIModel(
     operation: "chat:image",
     project,
     username,
+    profileId,
     clientIp,
     provider: providerName,
     model: resolvedModel,
@@ -1153,12 +1177,14 @@ async function handleImageAPIModel(
       totalTime: roundMilliseconds(totalSec),
       estimatedCost,
     });
-    const meta = conversationMeta
-      ? {
-          ...conversationMeta,
-          settings: { provider: providerName, model: resolvedModel },
-        }
-      : undefined;
+    const meta = {
+      ...(conversationMeta || {}),
+      ...(conversationMeta && {
+        settings: { provider: providerName, model: resolvedModel },
+      }),
+      // Stamp the literal profile id on the conversation document.
+      profileId,
+    };
     await appendAndFinalize(
       conversationId,
       project,
@@ -1649,6 +1675,7 @@ router.post(
       ...req.body,
       project: req.project,
       username: req.username,
+      profileId: req.profileId,
       clientIp: req.clientIp,
     };
     if (req.query.stream !== "false") {

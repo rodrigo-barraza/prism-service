@@ -9,6 +9,11 @@ import {
   PostFavoritesBodySchema,
   DeleteFavoritesQuerySchema,
 } from "#src/types/index";
+import {
+  profileFilter,
+  resolveScope,
+  scopeFilter,
+} from "#src/utils/ProfileScope";
 
 const router = express.Router();
 router.use(requireDb);
@@ -18,6 +23,8 @@ const COLLECTION = COLLECTIONS.FAVORITES;
 interface FavoriteDocument {
   project: string;
   username: string;
+  /** Legacy docs lack it (default profile). Writes always stamp a string. */
+  profileId?: string | null;
   type: string;
   key: string;
   meta: Record<string, unknown>;
@@ -33,8 +40,6 @@ router.get(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const db = req.db;
-      const project = req.project || "any";
-      const username = req.username || "any";
 
       const parseResult = GetFavoritesQuerySchema.safeParse(req.query);
       if (!parseResult.success) {
@@ -43,7 +48,7 @@ router.get(
         });
       }
 
-      const filter: Record<string, unknown> = { project, username };
+      const filter: Record<string, unknown> = { ...scopeFilter(req) };
       if (parseResult.data.type) {
         filter.type = parseResult.data.type;
       }
@@ -74,8 +79,7 @@ router.post(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const db = req.db;
-      const project = req.project || "any";
-      const username = req.username || "any";
+      const { project, username, profileId } = resolveScope(req);
 
       const parseResult = PostFavoritesBodySchema.safeParse(req.body);
       if (!parseResult.success) {
@@ -89,17 +93,20 @@ router.post(
       const document: FavoriteDocument = {
         project,
         username,
+        profileId,
         type,
         key,
         meta: meta || {},
         createdAt: new Date().toISOString(),
       };
 
-      // Upsert to prevent duplicates
+      // Upsert to prevent duplicates. The filter uses profileFilter so a
+      // legacy (pre-profile) favorite in the default profile is updated in
+      // place — and stamped — rather than duplicated.
       await db
         .collection<FavoriteDocument>(COLLECTION)
         .updateOne(
-          { project, username, type, key },
+          { project, username, profileId: profileFilter(profileId), type, key },
           { $set: document },
           { upsert: true },
         );
@@ -121,8 +128,6 @@ router.delete(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const db = req.db;
-      const project = req.project || "any";
-      const username = req.username || "any";
 
       const parseResult = DeleteFavoritesQuerySchema.safeParse(req.query);
       if (!parseResult.success) {
@@ -135,7 +140,7 @@ router.delete(
 
       const result = await db
         .collection<FavoriteDocument>(COLLECTION)
-        .deleteOne({ project, username, type, key });
+        .deleteOne({ ...scopeFilter(req), type, key });
 
       res.json({ success: true, deleted: result.deletedCount });
     } catch (error: unknown) {

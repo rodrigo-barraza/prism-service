@@ -46,6 +46,11 @@ export interface AssemblerContext {
   agent?: string | null;
   project?: string | null;
   username?: string;
+  /**
+   * Profile partition of the requesting identity. Stamped by the harness;
+   * consumers fall back to the request's ALS context, then "default".
+   */
+  profileId?: string | null;
   messages?: Array<{ role: string; content?: string; [key: string]: unknown }>;
   enabledTools?: string[];
   resolvedToolNames?: string[];
@@ -72,6 +77,8 @@ export interface MemoryFetchOptions {
   agentConversationId?: string | null;
   conversationId?: string | null;
   endpoint?: string;
+  /** Defaults to the request's profile (ALS), then "default". */
+  profileId?: string | null;
   _username?: string;
   guildId?: string;
   userIds?: string[];
@@ -89,4 +96,6 @@ export interface SkillFetchOptions {
   agentConversationId?: string | null;
   endpoint?: string;
   agent?: string | null;
+  /** Defaults to the request's profile (ALS), then "default". */
+  profileId?: string | null;
 }

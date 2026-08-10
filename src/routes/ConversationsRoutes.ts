@@ -23,6 +23,7 @@ import {
   PatchConversationBodySchema,
 } from "#src/types/index";
 import { CONVERSATION_LIST_BASE_PROJECTION } from "#src/utils/QueryBuilders";
+import { profileFilter, resolveScope } from "#src/utils/ProfileScope";
 
 const router = express.Router();
 router.use(requireDb);
@@ -66,6 +67,11 @@ interface WorkflowDocument {
   workflowName: string;
   conversationIds: string[];
   updatedAt: Date;
+  /** Owning profile; documents are only ever stamped with a literal string.
+   *  `null` appears solely so the default profile's `$in` READ filter
+   *  (matching legacy docs without the field) typechecks. */
+  profileId?: string | null;
+  [key: string]: unknown;
 }
 
 /**
@@ -93,8 +99,11 @@ router.get(
         project: queryProject,
       } = parsed.data;
       const project = queryProject || req.project || "any";
+      const { profileId } = resolveScope(req);
 
-      const filter: Record<string, unknown> = {};
+      const filter: Record<string, unknown> = {
+        profileId: profileFilter(profileId),
+      };
       if (taskId) {
         filter.taskId = taskId;
       } else {
@@ -159,6 +168,7 @@ router.get(
                 parentConversationId: { $in: frontier },
                 project: filter.project,
                 username: filter.username,
+                profileId: filter.profileId,
                 ...(cursor ? { updatedAt: filter.updatedAt } : {}),
               })
               .project(CONVERSATION_LIST_PROJECTION)
@@ -311,6 +321,7 @@ router.get(
             parentConversationId: { $in: conversationIds },
             project,
             username,
+            profileId: profileFilter(profileId),
           };
           const [agentParents, modelParents] = await Promise.all([
             db
@@ -433,11 +444,17 @@ router.get(
       const conversationId = req.params.id as string;
 
       const usernameFilter = username;
+      const profileIdFilter = profileFilter(resolveScope(req).profileId);
 
       // Check conversations first
       const chat = await db
         .collection<ConversationDocument>(COLLECTIONS.MODEL_CONVERSATIONS)
-        .findOne({ id: conversationId, project, username: usernameFilter });
+        .findOne({
+          id: conversationId,
+          project,
+          username: usernameFilter,
+          profileId: profileIdFilter,
+        });
 
       if (chat) {
         // Enrich totalCost from the requests collection (source of truth).
@@ -515,7 +532,12 @@ router.get(
       // Check agent conversations next
       const agentChat = await db
         .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-        .findOne({ id: conversationId, project, username: usernameFilter });
+        .findOne({
+          id: conversationId,
+          project,
+          username: usernameFilter,
+          profileId: profileIdFilter,
+        });
 
       if (agentChat) {
         const stats = await ConversationService.getConversationStats(
@@ -616,6 +638,7 @@ router.get(
       const username = req.username || "any";
       const { db } = req;
       const conversationId = req.params.id as string;
+      const profileIdFilter = profileFilter(resolveScope(req).profileId);
       const statusProjection = {
         _id: 0,
         id: 1,
@@ -628,7 +651,7 @@ router.get(
       const chatStatus = await db
         .collection(COLLECTIONS.MODEL_CONVERSATIONS)
         .findOne(
-          { id: conversationId, project, username },
+          { id: conversationId, project, username, profileId: profileIdFilter },
           { projection: statusProjection },
         );
       if (chatStatus) return res.json({ ...chatStatus, type: "direct" });
@@ -636,7 +659,7 @@ router.get(
       const agentChatStatus = await db
         .collection(COLLECTIONS.AGENT_CONVERSATIONS)
         .findOne(
-          { id: conversationId, project, username },
+          { id: conversationId, project, username, profileId: profileIdFilter },
           { projection: statusProjection },
         );
       if (agentChatStatus)
@@ -665,7 +688,10 @@ router.get(
 
       const workflows = await db
         .collection<WorkflowDocument>("workflows")
-        .find({ conversationIds: conversationId })
+        .find({
+          conversationIds: conversationId,
+          profileId: profileFilter(resolveScope(req).profileId),
+        })
         .project({ workflowName: 1, updatedAt: 1 })
         .toArray();
 
@@ -693,6 +719,7 @@ router.post(
       const { db } = req;
       const conversationId = req.params.id as string;
       const usernameFilter = username;
+      const profileIdFilter = profileFilter(resolveScope(req).profileId);
 
       const parsed = PostConversationMessagesBodySchema.safeParse(req.body);
       if (!parsed.success) {
@@ -709,6 +736,7 @@ router.post(
           id: conversationId,
           project,
           username: usernameFilter,
+          profileId: profileIdFilter,
         });
 
       if (directExists === 0) {
@@ -718,6 +746,7 @@ router.post(
             id: conversationId,
             project,
             username: usernameFilter,
+            profileId: profileIdFilter,
           });
         if (agentExists > 0) {
           isAgent = true;
@@ -759,6 +788,13 @@ router.patch(
       const { db } = req;
       const conversationId = req.params.id as string;
       const usernameFilter = username;
+      const profileIdFilter = profileFilter(resolveScope(req).profileId);
+      const ownershipFilter = {
+        id: conversationId,
+        project,
+        username: usernameFilter,
+        profileId: profileIdFilter,
+      };
 
       const parsed = PatchConversationBodySchema.safeParse(req.body);
       if (!parsed.success) {
@@ -773,7 +809,7 @@ router.patch(
       let result = await db
         .collection<ConversationDocument>(COLLECTIONS.MODEL_CONVERSATIONS)
         .updateOne(
-          { id: conversationId, project, username: usernameFilter },
+          ownershipFilter,
           {
             $set: setFields as import("mongodb").UpdateFilter<ConversationDocument>,
           },
@@ -782,13 +818,13 @@ router.patch(
       if (result.matchedCount > 0) {
         const conversation = await db
           .collection<ConversationDocument>(COLLECTIONS.MODEL_CONVERSATIONS)
-          .findOne({ id: conversationId, project, username: usernameFilter });
+          .findOne(ownershipFilter);
         return res.json({ ...conversation, type: "direct" });
       }
 
       // Try updating agent conversations next
       result = await db.collection(COLLECTIONS.AGENT_CONVERSATIONS).updateOne(
-        { id: conversationId, project, username: usernameFilter },
+        ownershipFilter,
         {
           $set: setFields as import("mongodb").UpdateFilter<
             import("mongodb").Document
@@ -799,7 +835,7 @@ router.patch(
       if (result.matchedCount > 0) {
         const agentConversation = await db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-          .findOne({ id: conversationId, project, username: usernameFilter });
+          .findOne(ownershipFilter);
         return res.json({ ...agentConversation, type: "agent" });
       }
 
@@ -827,11 +863,17 @@ router.delete(
       const { db } = req;
       const conversationId = req.params.id as string;
       const usernameFilter = username;
+      const profileIdFilter = profileFilter(resolveScope(req).profileId);
 
       // Try deleting from conversations first
       let result = await db
         .collection(COLLECTIONS.MODEL_CONVERSATIONS)
-        .deleteOne({ id: conversationId, project, username: usernameFilter });
+        .deleteOne({
+          id: conversationId,
+          project,
+          username: usernameFilter,
+          profileId: profileIdFilter,
+        });
 
       let deletedType: string | null = null;
       if (result.deletedCount > 0) {
@@ -840,7 +882,12 @@ router.delete(
         // Try deleting from agent conversations next
         result = await db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-          .deleteOne({ id: conversationId, project, username: usernameFilter });
+          .deleteOne({
+            id: conversationId,
+            project,
+            username: usernameFilter,
+            profileId: profileIdFilter,
+          });
 
         if (result.deletedCount > 0) {
           deletedType = "agent";
@@ -854,7 +901,11 @@ router.delete(
       // Cascading deletion: iteratively discover and delete all descendant
       // conversations linked via parentConversationId (BFS traversal).
       const MAX_CASCADE_DEPTH = ORCHESTRATOR.AGENT_TREE_DISCOVERY_MAX_DEPTH;
-      const ownershipFilter = { project, username: usernameFilter };
+      const ownershipFilter = {
+        project,
+        username: usernameFilter,
+        profileId: profileIdFilter,
+      };
       let descendantDeletedCount = 0;
       let frontier = [conversationId];
 

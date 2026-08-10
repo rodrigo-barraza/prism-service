@@ -5,6 +5,7 @@ import {
 import { createAuthMiddleware } from "@rodrigo-barraza/utilities-library/service";
 import { type Request, type Response, type NextFunction } from "express";
 import { requestContext } from "#src/utils/RequestContext";
+import { normalizeProfileId, PROFILE_ID_HEADER } from "#src/utils/ProfileScope";
 
 /**
  * Express middleware that resolves project, username, client IP, and
@@ -41,6 +42,14 @@ export function authMiddleware(
   next: NextFunction,
 ) {
   sharedAuthMiddleware(req, res, () => {
+    // Profile: prism-local third identity dimension (x-profile-id header,
+    // not yet in the shared IDENTITY_HEADERS taxonomy). Absent/invalid → the
+    // default profile, which also owns pre-profile documents.
+    req.profileId = normalizeProfileId(req.headers[PROFILE_ID_HEADER]);
+    const store = requestContext.getStore();
+    if (store) {
+      store.profileId = req.profileId;
+    }
     // The shared middleware attaches null (and "" for clientIp) when a
     // value is absent; prism's request contract is undefined. Normalize
     // so downstream handlers and serialized payloads see the same shape

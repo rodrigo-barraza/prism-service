@@ -8,6 +8,7 @@ import {
   PatchPromptSchema,
   GetPromptsQuerySchema,
 } from "#src/types/index";
+import { resolveScope, scopeFilter } from "#src/utils/ProfileScope";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { generateUUID } from "@rodrigo-barraza/utilities-library";
 
@@ -29,10 +30,7 @@ router.get(
       const { page, limit, search } = parseResult.data;
       const skip = (page - 1) * limit;
 
-      const filter: Record<string, unknown> = {
-        project: req.project,
-        username: req.username,
-      };
+      const filter: Record<string, unknown> = { ...scopeFilter(req) };
 
       if (search) {
         filter.$or = [
@@ -74,8 +72,7 @@ router.get(
       const database = req.db;
       const prompt = await database.collection(COLLECTIONS.PROMPTS).findOne({
         id,
-        project: req.project,
-        username: req.username,
+        ...scopeFilter(req),
       });
 
       if (!prompt) {
@@ -105,6 +102,7 @@ router.post(
       }
 
       const { title, content, tags, color } = parseResult.data;
+      const { project, username, profileId } = resolveScope(req);
       const now = new Date();
 
       const promptDocument = {
@@ -113,8 +111,9 @@ router.post(
         content,
         tags,
         color,
-        project: req.project,
-        username: req.username,
+        project,
+        username,
+        profileId,
         createdAt: now,
         updatedAt: now,
       };
@@ -151,7 +150,7 @@ router.patch(
       const result = await database
         .collection(COLLECTIONS.PROMPTS)
         .findOneAndUpdate(
-          { id, project: req.project, username: req.username },
+          { id, ...scopeFilter(req) },
           { $set: { ...updates, updatedAt: new Date() } },
           { returnDocument: "after" },
         );
@@ -180,8 +179,7 @@ router.delete(
 
       const result = await database.collection(COLLECTIONS.PROMPTS).deleteOne({
         id,
-        project: req.project,
-        username: req.username,
+        ...scopeFilter(req),
       });
 
       if (result.deletedCount === 0) {

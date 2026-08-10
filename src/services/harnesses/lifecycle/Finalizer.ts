@@ -17,6 +17,8 @@ import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";
 import ToolContext from "#src/services/ToolContext";
 import { appendAndFinalize } from "#src/utils/ConversationUtilities";
+import { getRequestContext } from "#src/utils/RequestContext";
+import { DEFAULT_PROFILE_ID } from "#src/utils/ProfileScope";
 import {
   COLLECTIONS,
   FILE_CATEGORIES,
@@ -48,6 +50,10 @@ export interface FinalizerContext {
   traceId?: string | null;
   project?: string | null;
   username?: string | null;
+  /** Profile partition — stamped literally on the conversation document and
+   *  the request-log row. Absent means the requesting profile from ALS, or
+   *  the default profile. */
+  profileId?: string | null;
   clientIp?: string | null;
   agent?: string | null;
   workspaceRoot?: string | null;
@@ -183,6 +189,7 @@ export async function finalizeTextGeneration(
     traceId,
     project,
     username,
+    profileId,
     clientIp,
     agent,
     workspaceRoot,
@@ -190,6 +197,10 @@ export async function finalizeTextGeneration(
     emit,
     signal,
   } = context;
+
+  // Resolve the profile once — writes always stamp the literal id.
+  const resolvedProfileId =
+    profileId || getRequestContext().profileId || DEFAULT_PROFILE_ID;
 
   // Swap content and rawContent if present to ensure the database and caller get clean text
   if (messages) {
@@ -330,6 +341,7 @@ export async function finalizeTextGeneration(
       operation: modelDefinition?.liveAPI ? "live" : "chat",
       project,
       username,
+      profileId: resolvedProfileId,
       clientIp,
       agent,
       provider: providerName,
@@ -466,6 +478,9 @@ export async function finalizeTextGeneration(
     const finalMeta: Record<string, unknown> = {
       ...(conversationMeta || {}),
       settings: mergedSettings,
+      // Stamped as a literal top-level field on the conversation document
+      // by ConversationService.appendMessages — never null, never a filter.
+      profileId: resolvedProfileId,
     };
 
     if (parentAgentConversationId) {

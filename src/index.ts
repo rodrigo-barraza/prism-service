@@ -91,9 +91,12 @@ import thoughtStructureRouter from "./routes/ThoughtStructureRoutes.ts";
 import settingsRouter from "./routes/SettingsRoutes.ts";
 import customAgentsRouter from "./routes/CustomAgentsRoutes.ts";
 import workspacesRouter from "./routes/WorkspacesRoutes.ts";
+import claudeConfigImportRouter from "./routes/ClaudeConfigImportRoutes.ts";
 import scheduledTasksRouter from "./routes/ScheduledTasksRoutes.ts";
 import promptsRouter from "./routes/PromptsRoutes.ts";
 import webhookRouter from "./routes/WebhookRoutes.ts";
+import profilesRouter from "./routes/ProfilesRoutes.ts";
+import { PROFILE_ID_HEADER } from "./utils/ProfileScope.ts";
 
 const app = express();
 const server = http.createServer(app);
@@ -110,7 +113,9 @@ app.use(
   cors({
     origin: true, // reflect request origin (equivalent to *)
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: CORS_ALLOWED_HEADERS_STRING,
+    // x-profile-id is prism-local (not yet in the shared IDENTITY_HEADERS
+    // taxonomy the allow-list derives from), so it is appended explicitly.
+    allowedHeaders: `${CORS_ALLOWED_HEADERS_STRING}, ${PROFILE_ID_HEADER}`,
     maxAge: CROSS_ORIGIN_RESOURCE_SHARING_MAXIMUM_AGE_SECONDS, // cache preflight for 24h — eliminates burst OPTIONS storms
   }),
 );
@@ -157,6 +162,7 @@ const ENDPOINTS = {
     "/scheduled-tasks",
     "/prompts",
     "/webhooks",
+    "/profiles",
   ],
   websocket: ["/ws/chat", "/ws/text-to-audio"],
   admin: ["/admin", "/admin/lm-studio"],
@@ -223,9 +229,11 @@ app.use("/thought-structures", thoughtStructureRouter);
 app.use("/settings", settingsRouter);
 app.use("/custom-agents", customAgentsRouter);
 app.use("/workspaces", workspacesRouter);
+app.use("/claude-config-import", claudeConfigImportRouter);
 app.use("/scheduled-tasks", scheduledTasksRouter);
 app.use("/prompts", promptsRouter);
 app.use("/webhooks", webhookRouter);
+app.use("/profiles", profilesRouter);
 
 // Error handler (must be last)
 app.use(errorHandler);
@@ -320,7 +328,7 @@ setupWebSocket(wss);
         },
         {
           collection: COLLECTIONS.MODEL_CONVERSATIONS,
-          keys: { project: 1, username: 1, updatedAt: -1 },
+          keys: { project: 1, username: 1, profileId: 1, updatedAt: -1 },
         },
         { collection: COLLECTIONS.MODEL_CONVERSATIONS, keys: { traceId: 1 } },
         // conversations — admin workspace filter
@@ -360,7 +368,7 @@ setupWebSocket(wss);
         },
         {
           collection: COLLECTIONS.AGENT_CONVERSATIONS,
-          keys: { project: 1, username: 1, updatedAt: -1 },
+          keys: { project: 1, username: 1, profileId: 1, updatedAt: -1 },
         },
         // agent_conversations — admin workspace filter
         {
@@ -410,7 +418,7 @@ setupWebSocket(wss);
         // favorites — scoped listing sorted by recency
         {
           collection: COLLECTIONS.FAVORITES,
-          keys: { project: 1, username: 1, createdAt: -1 },
+          keys: { project: 1, username: 1, profileId: 1, createdAt: -1 },
         },
         // agent_artifacts — gallery listing + id lookup + url-dedup upsert
         {
@@ -421,6 +429,10 @@ setupWebSocket(wss);
         {
           collection: COLLECTIONS.AGENT_ARTIFACTS,
           keys: { project: 1, createdAt: -1 },
+        },
+        {
+          collection: COLLECTIONS.AGENT_ARTIFACTS,
+          keys: { project: 1, profileId: 1, createdAt: -1 },
         },
         {
           collection: COLLECTIONS.AGENT_ARTIFACTS,
@@ -453,42 +465,42 @@ setupWebSocket(wss);
         },
         {
           collection: COLLECTIONS.SYNTHESIS,
-          keys: { project: 1, username: 1, updatedAt: -1 },
+          keys: { project: 1, username: 1, profileId: 1, updatedAt: -1 },
         },
         {
           collection: COLLECTIONS.AGENT_SKILLS,
-          keys: { project: 1, username: 1 },
+          keys: { project: 1, username: 1, profileId: 1 },
         },
         // agent_rules
         {
           collection: COLLECTIONS.AGENT_RULES,
-          keys: { project: 1, username: 1, agent: 1 },
+          keys: { project: 1, username: 1, profileId: 1, agent: 1 },
         },
         // agent_hooks — loaded per agentic run, so the scope lookup is hot.
         {
           collection: COLLECTIONS.AGENT_HOOKS,
-          keys: { project: 1, username: 1, enabled: 1 },
+          keys: { project: 1, username: 1, profileId: 1, enabled: 1 },
         },
         // agent_instructions — writes supersede rather than overwrite, so
         // `validTo` is part of every current-revision read.
         {
           collection: COLLECTIONS.AGENT_INSTRUCTIONS,
-          keys: { project: 1, username: 1, agent: 1, validTo: 1 },
+          keys: { project: 1, username: 1, profileId: 1, agent: 1, validTo: 1 },
         },
         // mcp_servers
         {
           collection: COLLECTIONS.MCP_SERVERS,
-          keys: { project: 1, username: 1 },
+          keys: { project: 1, username: 1, profileId: 1 },
         },
         // mcp_servers — compound for enabled filter (5+ query sites)
         {
           collection: COLLECTIONS.MCP_SERVERS,
-          keys: { project: 1, username: 1, enabled: 1 },
+          keys: { project: 1, username: 1, profileId: 1, enabled: 1 },
         },
         // workspaces
         {
           collection: COLLECTIONS.WORKSPACES,
-          keys: { project: 1, username: 1 },
+          keys: { project: 1, username: 1, profileId: 1 },
         },
         {
           collection: COLLECTIONS.WORKSPACES,
@@ -498,7 +510,7 @@ setupWebSocket(wss);
         // prompts
         {
           collection: COLLECTIONS.PROMPTS,
-          keys: { project: 1, username: 1, updatedAt: -1 },
+          keys: { project: 1, username: 1, profileId: 1, updatedAt: -1 },
         },
         {
           collection: COLLECTIONS.PROMPTS,
@@ -521,12 +533,20 @@ setupWebSocket(wss);
         // workflow_memories — retrieval query index
         {
           collection: COLLECTIONS.WORKFLOW_MEMORIES,
-          keys: { agent: 1, project: 1, createdAt: -1 },
+          keys: { agent: 1, project: 1, profileId: 1, createdAt: -1 },
         },
         // workflow_memories — uniqueness per agent conversation
         {
           collection: COLLECTIONS.WORKFLOW_MEMORIES,
           keys: { conversationId: 1, agentConversationId: 1 },
+          options: { unique: true },
+        },
+        // profiles — roster of switchable identities per {project, username};
+        // profileId keys every profile-partitioned collection above (legacy
+        // docs without the field belong to the built-in default profile)
+        {
+          collection: COLLECTIONS.PROFILES,
+          keys: { project: 1, username: 1, profileId: 1 },
           options: { unique: true },
         },
       ];

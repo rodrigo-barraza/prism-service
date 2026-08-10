@@ -21,6 +21,7 @@ declare global {
       project?: string;
       clientIp?: string;
       username?: string;
+      profileId?: string;
       workspaceId?: string;
       workspaceRoot?: string;
       agent?: string;
