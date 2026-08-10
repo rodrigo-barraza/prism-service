@@ -67,6 +67,7 @@ export const COLLECTIONS = {
   OFFLOADED_TOOL_RESULTS: "offloaded_tool_results",
   AGENT_ARTIFACTS: "agent_artifacts",
   ANTHROPIC_FILE_CACHE: "anthropic_file_cache",
+  PROFILES: "profiles",
 };
 
 /** Shared system-wide statuses for agents, tasks, and workflows. */
