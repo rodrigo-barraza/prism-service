@@ -67,6 +67,13 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   // context; no external side effects)
   [TOOL_NAMES.COMPACT_CONTEXT]: APPROVAL_TIERS.AUTO,
 
+  // Tier 1 — checkpoint/rewind context pruning (no shell/file side
+  // effects; only writes soft flags on the agent's own conversation
+  // document — see CheckpointTools). Names are Prism-local strings,
+  // not yet in the shared taxonomy's TOOL_NAMES.
+  checkpoint: APPROVAL_TIERS.AUTO,
+  rewind: APPROVAL_TIERS.AUTO,
+
   // Tier 2 — scheduling / notebook (creates persistent state)
   [TOOL_NAMES.CREATE_CRON]: APPROVAL_TIERS.WRITE,
   [TOOL_NAMES.REMOTE_TRIGGER]: APPROVAL_TIERS.WRITE,

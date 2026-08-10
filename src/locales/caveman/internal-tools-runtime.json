@@ -126,5 +126,16 @@
 
   "list_async_tasks": {
     "noConversation": "Cannot list async tasks: no conversation context available."
+  },
+
+  "checkpoint": {
+    "noConversation": "No talk in head — mark need saved talk to sit on.",
+    "recorded": "Mark \"{{name}}\" carved at word {{index}}. Call rewind (maybe with this name) to throw away all after it.",
+    "moved": "Mark \"{{name}}\" moved to here (word {{index}})."
+  },
+
+  "rewind": {
+    "noConversation": "No talk in head — nothing to walk back.",
+    "success": "Walked back to mark \"{{name}}\": {{pruned}} word-bundle thrown from head ({{remaining}} stay). Thrown words still on wall, user still see, but not in head for next turns. This turn survive — put conclusions in reply."
   }
 }
