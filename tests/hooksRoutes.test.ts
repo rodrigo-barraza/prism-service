@@ -35,9 +35,18 @@ describe('HooksRoutes', () => {
   const agent = supertest(app);
   let hooks: any[] = [];
 
-  /** Every query this router issues is a flat equality match. */
+  /**
+   * Every query this router issues is a flat equality match, except the
+   * profile dimension: the default profile filters with
+   * `{ $in: ["default", null] }` so legacy documents (no profileId) match.
+   */
   const matches = (doc: any, query: any) =>
-    Object.entries(query || {}).every(([key, value]) => doc[key] === value);
+    Object.entries(query || {}).every(([key, value]) => {
+      if (value && typeof value === "object" && "$in" in (value as any)) {
+        return (value as any).$in.includes(doc[key] ?? null);
+      }
+      return doc[key] === value;
+    });
 
   const collection = {
     find: (query: any = {}) => {
