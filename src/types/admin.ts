@@ -305,6 +305,8 @@ export interface ChatMessage {
   thinking?: string;
   thinkingSignature?: string;
   deleted?: boolean;
+  /** Soft rewind-pruned flag — excluded from model context, kept for the UI. */
+  pruned?: boolean;
   tool_call_id?: string;
   [key: string]: unknown;
 }
