@@ -69,7 +69,9 @@ export function evaluateMongoExpression(doc: any, expression: any): any {
         return (val as any[]).some(sub => evaluateMongoExpression(doc, sub));
       }
       if (val && typeof val === "object" && "$in" in (val as any)) {
-        return ((val as any).$in as any[]).includes(doc[key]);
+        // Real MongoDB: null in an $in list matches missing fields too
+        // (how the default profile owns legacy docs without profileId).
+        return ((val as any).$in as any[]).includes(doc[key] ?? null);
       }
       if (val && typeof val === "object" && "$ne" in (val as any)) {
         return doc[key] !== (val as any).$ne;
