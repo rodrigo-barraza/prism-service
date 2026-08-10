@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { getProvider } from "#src/providers/index";
-import SettingsService from "#src/services/SettingsService";
+import ModelRoleRouter, { MODEL_ROLES } from "#src/services/ModelRoleRouter";
 import RequestLogger from "#src/services/RequestLogger";
 import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
@@ -26,6 +26,7 @@ import ToolResultOffloadService, {
   OFFLOAD_STUB_HEADER,
   type OffloadMetadata,
 } from "./ToolResultOffloadService.ts";
+import { SYSTEM_MESSAGE_TAGS } from "#src/utils/SystemMessageTags";
 import type { ChatMessage as AdminChatMessage } from "#src/types/admin";
 import type { ChatMessage, GenerateTextResult } from "#src/types/provider";
 import type { EmitFunction } from "#src/services/harnesses/types";
@@ -86,9 +87,20 @@ interface CompactionOptions {
   fallbackModel?: string;
 }
 
-interface MemorySettingsSection {
-  extractionProvider?: string;
-  extractionModel?: string;
+const DEVIATION_REMINDER_TAG_OPEN = `<${SYSTEM_MESSAGE_TAGS.DEVIATION_REMINDER}>`;
+
+/**
+ * Mid-stream deviation-rule reminders (DeviationRuleEngine) are active
+ * behavioral guards — dropping one during compaction re-opens the exact
+ * loop it was injected to break. They are the one class of system message
+ * that must survive compaction verbatim.
+ */
+function isDeviationReminderMessage(message: AdminChatMessage): boolean {
+  return (
+    message.role === "system" &&
+    typeof message.content === "string" &&
+    message.content.includes(DEVIATION_REMINDER_TAG_OPEN)
+  );
 }
 
 function estimateTotalTokens(messages: AdminChatMessage[]): number {
@@ -148,40 +160,30 @@ export default class CompactionService {
       return null;
     }
 
-    // ── Resolve compaction model from settings ─────────────────
-    // Uses the same provider/model config path as MemoryExtractor
-    let compactionProvider: string | undefined;
-    let compactionModel: string | undefined;
-    try {
-      const memorySettings = (await SettingsService.getSection(
-        "memory",
-      )) as MemorySettingsSection;
-      compactionProvider = memorySettings?.extractionProvider;
-      compactionModel = memorySettings?.extractionModel;
-    } catch {
-      /* Settings not configured — fall through to the fallback below */
-    }
-
+    // ── Resolve the compaction model through the utility role ──
     // Silently skipping compaction means silent context blowups (the loop
-    // keeps growing until the provider rejects the request). When no cheap
-    // compaction model is configured, fall back to the conversation's own
-    // provider/model rather than not compacting at all.
-    if (!compactionProvider || !compactionModel) {
-      if (options.fallbackProvider && options.fallbackModel) {
-        compactionProvider = options.fallbackProvider;
-        compactionModel = options.fallbackModel;
-        logger.warn(
-          `[CompactionService] No compaction model configured in Settings → Memory Models — ` +
-            `falling back to the conversation model (${compactionProvider}/${compactionModel}). ` +
-            `Configure a cheap utility model to reduce compaction cost.`,
-        );
-      } else {
-        logger.warn(
-          "[CompactionService] No compaction model configured and no fallback available. Skipping.",
-        );
-        return null;
-      }
+    // keeps growing until the provider rejects the request), so the chain
+    // is never empty while any model exists: env/DB utility config →
+    // the conversation's own model → local-instance/cheap-cloud defaults.
+    const roleChain = await ModelRoleRouter.resolveChain(MODEL_ROLES.UTILITY, {
+      fallback:
+        options.fallbackProvider && options.fallbackModel
+          ? {
+              provider: options.fallbackProvider,
+              model: options.fallbackModel,
+            }
+          : null,
+    });
+    if (roleChain.length === 0) {
+      logger.error(
+        "[CompactionService] Utility role resolved to an empty model chain — cannot compact.",
+      );
+      return null;
     }
+    // Updated per attempt inside the chain runner so the request log
+    // records whichever model actually served the call.
+    let compactionProvider = roleChain[0].provider;
+    let compactionModel = roleChain[0].model;
 
     const preCompactTokenCount = estimateTotalTokens(messages);
 
@@ -238,18 +240,25 @@ export default class CompactionService {
     let compactionError: string | null = null;
 
     try {
-      const provider = getProvider(compactionProvider);
-      result = await provider.generateText(
-        summarizationMessages,
-        compactionModel,
-        {
-          maxTokens: COMPACT_MAX_OUTPUT_TOKENS,
-          temperature: 0.1,
-          // Utility call — never burn extended thinking on summarization.
-          thinkingEnabled: false,
-          reasoningEffort: "none",
+      ({ value: result } = await ModelRoleRouter.runWithChain(
+        roleChain,
+        async (entry) => {
+          compactionProvider = entry.provider;
+          compactionModel = entry.model;
+          return getProvider(entry.provider).generateText(
+            summarizationMessages,
+            entry.model,
+            {
+              maxTokens: COMPACT_MAX_OUTPUT_TOKENS,
+              temperature: 0.1,
+              // Utility call — never burn extended thinking on summarization.
+              thinkingEnabled: false,
+              reasoningEffort: "none",
+            },
+          );
         },
-      );
+        { role: MODEL_ROLES.UTILITY, operation: "compact:summarize" },
+      ));
     } catch (error: unknown) {
       success = false;
       compactionError = errorMessage(error);
@@ -356,6 +365,12 @@ export default class CompactionService {
       content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX} — auto-generated by compaction]\n\n${summaryWithRecovery}`,
       isCompactSummary: true,
     });
+
+    // Carry active deviation-rule reminders from the dropped span across
+    // the boundary — losing one re-opens the loop it was injected to break.
+    compactedMessages.push(
+      ...collectDroppedDeviationReminders(messages, recentTail),
+    );
 
     // Append recent tail (last few turns the model is actively reasoning about)
     compactedMessages.push(...recentTail);
@@ -471,10 +486,44 @@ function extractRecentTail(messages: AdminChatMessage[]): AdminChatMessage[] {
     }
   }
 
-  // Extract the tail, skipping system messages (already in compactedMessages)
+  // Extract the tail, skipping system messages (already in
+  // compactedMessages) — EXCEPT deviation-rule reminders, which must
+  // survive compaction to keep suppressing the loop they broke.
   return messages
     .slice(tailStartIndex)
-    .filter((message) => message.role !== "system");
+    .filter(
+      (message) =>
+        message.role !== "system" || isDeviationReminderMessage(message),
+    );
+}
+
+/**
+ * Deviation-rule reminders from the span the summary replaces, de-duplicated
+ * by content and excluding any reminder the tail already carries. Appended
+ * right after the summary message so active behavioral guards persist
+ * through compaction.
+ */
+function collectDroppedDeviationReminders(
+  messages: AdminChatMessage[],
+  recentTail: AdminChatMessage[],
+): AdminChatMessage[] {
+  const tailSet = new Set<AdminChatMessage>(recentTail);
+  const tailContents = new Set(
+    recentTail
+      .filter((message) => isDeviationReminderMessage(message))
+      .map((message) => message.content as string),
+  );
+  const carried: AdminChatMessage[] = [];
+  const seenContents = new Set<string>();
+  for (const message of messages) {
+    if (tailSet.has(message)) continue;
+    if (!isDeviationReminderMessage(message)) continue;
+    const content = message.content as string;
+    if (tailContents.has(content) || seenContents.has(content)) continue;
+    seenContents.add(content);
+    carried.push(message);
+  }
+  return carried;
 }
 
 // ─── Lossless dropped-span offload ──────────────────────────

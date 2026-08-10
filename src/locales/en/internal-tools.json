@@ -183,6 +183,19 @@
       "reason": "One line on why now is a good boundary, e.g. 'auth refactor sub-task complete, tests green'."
     }
   },
+  "checkpoint": {
+    "description": "Record a named marker at the current point of this conversation so it can be rewound to later. Drop a checkpoint BEFORE starting an exploratory detour — a speculative approach, a broad investigation, a debugging spiral — whose details will not matter once it resolves. Later, calling rewind prunes everything after the marker from the working context: cheaper and lossless compared to compaction, because nothing is summarized and nothing is destroyed (pruned messages stay visible to the user). Re-using an existing name moves that marker here. The marker sits at the last fully persisted turn — the turn making this call lands after it.",
+    "parameters": {
+      "name": "Short kebab-case marker name, e.g. 'before-auth-spike'. Defaults to checkpoint-<n>.",
+      "description": "One line on what is about to be explored, so a later rewind call knows what it discards."
+    }
+  },
+  "rewind": {
+    "description": "Prune every message recorded after a checkpoint (default: the most recent one) from this conversation's working context. Use it when an exploratory detour has resolved and its blow-by-blow no longer matters — state the durable conclusion in your reply FIRST (the current turn survives the rewind), then rewind. Pruning is lossless housekeeping, not deletion: pruned messages remain stored and user-visible, but they are excluded from the context of every following turn, including after a reload. Prefer this over compact_context when a checkpoint brackets the noise — no summary is generated, so nothing is paraphrased and nothing is paid for.",
+    "parameters": {
+      "checkpoint": "Name of the checkpoint to rewind to. Omit to use the most recently recorded checkpoint."
+    }
+  },
   "run_async_task": {
     "description": "Dispatch a tool to run asynchronously in the background. Returns immediately with a task ID — the tool executes in the background while you continue other work. Use this for long-running operations like shell commands, web scraping, file operations, or API calls when you don't need to wait for the result before proceeding. Query task status with list_async_tasks. Cancel with cancel_async_task. You will be automatically notified when the task completes.",
     "parameters": {

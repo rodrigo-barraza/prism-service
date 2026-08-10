@@ -454,8 +454,9 @@ export const HARNESS = {
   /** Max consecutive tool execution errors before the loop gives up. */
   MAX_CONSECUTIVE_TOOL_ERRORS: 3,
 
-  /** Max retries when degenerate repetition is detected mid-stream. */
-  MAX_REPETITION_RETRIES: 2,
+  /** Max mid-stream deviation-rule retries per iteration
+   *  (abort in-flight stream → inject rule reminder → regenerate). */
+  MAX_DEVIATION_RETRIES: 2,
 
   /** Temperature bump applied on each repetition retry attempt. */
   REPETITION_TEMPERATURE_BUMP: 0.15,

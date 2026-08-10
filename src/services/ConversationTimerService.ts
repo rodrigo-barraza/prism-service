@@ -5,6 +5,7 @@ import { COLLECTIONS, NOTIFICATION_SOURCES, TIMER_MODES, TIMER_STATUSES, TIMERS 
 import logger from "#src/utils/logger";
 import AgenticLoopService from "./AgenticLoopService.ts";
 import ConversationService from "./ConversationService.ts";
+import { stripPrunedMessages } from "./conversation/checkpoints.ts";
 import { getProvider } from "#src/providers/index";
 import { getModelByName } from "#src/config";
 import { matchCron } from "./ScheduledTaskService.ts";
@@ -454,7 +455,11 @@ const ConversationTimerService = {
     // in the array, so AgenticLoopService's [0..n-2] marking skips it).
     let freshMessages: ConversationMessage[];
     if (databaseConversation) {
-      freshMessages = (databaseConversation.messages || []) as ConversationMessage[];
+      // Exclude rewind-pruned messages — a reloaded history must honor the
+      // checkpoint/rewind boundary (src/services/conversation/checkpoints.ts).
+      freshMessages = stripPrunedMessages(
+        (databaseConversation.messages || []) as ConversationMessage[],
+      );
     } else {
       freshMessages = [
         ...((conversation.messages as ConversationMessage[]) || []),
