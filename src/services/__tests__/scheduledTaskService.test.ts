@@ -12,6 +12,21 @@ const { mockDatabase, resetMockDatabase } = vi.hoisted(() => {
 
   const collectionInstances: Record<string, any> = {};
 
+  /**
+   * Flat query matcher supporting $ne and $in. $in treats a missing field as
+   * null, matching real MongoDB (how the default profile owns legacy docs).
+   */
+  const matchesQuery = (document: any, query: any) =>
+    Object.entries(query).every(([key, value]) => {
+      if (typeof value === "object" && value !== null && "$ne" in value) {
+        return document[key] !== (value as any).$ne;
+      }
+      if (typeof value === "object" && value !== null && "$in" in value) {
+        return ((value as any).$in as any[]).includes(document[key] ?? null);
+      }
+      return document[key] === value;
+    });
+
   const db = {
     collection: vi.fn().mockImplementation((collectionName: string) => {
       if (collectionInstances[collectionName]) {
@@ -26,12 +41,7 @@ const { mockDatabase, resetMockDatabase } = vi.hoisted(() => {
         find: vi.fn().mockImplementation((query) => {
           let sortCriteria: any = null;
           const filteredDocs = documents.filter((document) =>
-            Object.entries(query).every(([key, value]) => {
-              if (typeof value === "object" && value !== null && "$ne" in value) {
-                return document[key] !== (value as any).$ne;
-              }
-              return document[key] === value;
-            })
+            matchesQuery(document, query)
           );
 
           const cursor = {
@@ -58,18 +68,11 @@ const { mockDatabase, resetMockDatabase } = vi.hoisted(() => {
           return cursor;
         }),
         findOne: vi.fn().mockImplementation(async (query) =>
-          documents.find((document) =>
-            Object.entries(query).every(([key, value]) => document[key] === value)
-          )
+          documents.find((document) => matchesQuery(document, query))
         ),
         findOneAndUpdate: vi.fn().mockImplementation(async (query, update, options) => {
           const document = documents.find((document) =>
-            Object.entries(query).every(([key, value]) => {
-              if (typeof value === "object" && value !== null && "$ne" in value) {
-                return document[key] !== (value as any).$ne;
-              }
-              return document[key] === value;
-            })
+            matchesQuery(document, query)
           );
           if (document && update.$set) {
             Object.assign(document, update.$set);
@@ -78,7 +81,7 @@ const { mockDatabase, resetMockDatabase } = vi.hoisted(() => {
         }),
         deleteOne: vi.fn().mockImplementation(async (query) => {
           const index = documents.findIndex((document) =>
-            Object.entries(query).every(([key, value]) => document[key] === value)
+            matchesQuery(document, query)
           );
           if (index >= 0) {
             documents.splice(index, 1);
@@ -88,7 +91,7 @@ const { mockDatabase, resetMockDatabase } = vi.hoisted(() => {
         }),
         updateOne: vi.fn().mockImplementation(async (query, update) => {
           const document = documents.find((document) =>
-            Object.entries(query).every(([key, value]) => document[key] === value)
+            matchesQuery(document, query)
           );
           if (document && update.$set) {
             Object.assign(document, update.$set);
@@ -759,20 +762,28 @@ describe("ScheduledTaskService — Comprehensive Tests", () => {
     });
 
     it("should construct query filters correctly in _getQueryFilter", async () => {
-      // 1. Client projects: only use task ID
+      // The profile dimension applies unconditionally (default profile also
+      // matches legacy docs that predate the field).
+      const defaultProfile = { profileId: { $in: ["default", null] } };
+
+      // 1. Client projects: only use task ID (+ profile)
       let filter = await ScheduledTaskService._getQueryFilter("task-id", "unknown-project", "rodrigo");
-      expect(filter).toEqual({ id: "task-id" });
+      expect(filter).toEqual({ id: "task-id", ...defaultProfile });
 
       // 2. Non-client projects: include project and username
       filter = await ScheduledTaskService._getQueryFilter("task-id", "agent-project", "rodrigo");
-      expect(filter).toEqual({ id: "task-id", project: "agent-project", username: "rodrigo" });
+      expect(filter).toEqual({ id: "task-id", project: "agent-project", username: "rodrigo", ...defaultProfile });
 
       // 3. Omit username when username is "any" or "all"
       filter = await ScheduledTaskService._getQueryFilter("task-id", "agent-project", "any");
-      expect(filter).toEqual({ id: "task-id", project: "agent-project" });
+      expect(filter).toEqual({ id: "task-id", project: "agent-project", ...defaultProfile });
 
       filter = await ScheduledTaskService._getQueryFilter("task-id", "agent-project", "all");
-      expect(filter).toEqual({ id: "task-id", project: "agent-project" });
+      expect(filter).toEqual({ id: "task-id", project: "agent-project", ...defaultProfile });
+
+      // 4. A named profile filters exactly
+      filter = await ScheduledTaskService._getQueryFilter("task-id", "agent-project", "rodrigo", "work");
+      expect(filter).toEqual({ id: "task-id", project: "agent-project", username: "rodrigo", profileId: "work" });
     });
   });
 });

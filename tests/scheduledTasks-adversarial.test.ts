@@ -69,6 +69,9 @@ vi.mock('#src/wrappers/MongoWrapper', () => ({
                   for (const key in query) {
                     if (query[key] && typeof query[key] === 'object' && '$ne' in query[key]) {
                       if (item[key] === query[key].$ne) return false;
+                    } else if (query[key] && typeof query[key] === 'object' && '$in' in query[key]) {
+                      // Real MongoDB: null in $in matches missing fields too
+                      if (!query[key].$in.includes(item[key] ?? null)) return false;
                     } else if (item[key] !== query[key]) {
                       return false;
                     }
@@ -86,7 +89,10 @@ vi.mock('#src/wrappers/MongoWrapper', () => ({
             }
             const match = Array.from(databaseStore.values()).find((item) => {
               for (const key in query) {
-                if (item[key] !== query[key]) {
+                if (query[key] && typeof query[key] === 'object' && '$in' in query[key]) {
+                  // Real MongoDB: null in $in matches missing fields too
+                  if (!query[key].$in.includes(item[key] ?? null)) return false;
+                } else if (item[key] !== query[key]) {
                   return false;
                 }
               }
