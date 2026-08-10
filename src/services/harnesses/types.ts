@@ -237,6 +237,9 @@ export interface AgenticContext {
   agent?: string | null;
   project: string;
   username: string;
+  /** Profile partition for this request — stamped literally on persisted
+   *  documents; absent means the default profile. */
+  profileId?: string | null;
   modelDefinition?: ModelDefinition | null;
   messages: ConversationMessage[];
   agentConversationId: string;
@@ -370,6 +373,7 @@ export interface BeforePromptHookContext {
   messages: ConversationMessage[];
   project: string;
   username: string;
+  profileId?: string | null;
   agent?: string | null;
   traceId?: string | null;
   conversationId: string;

@@ -2,6 +2,8 @@ import type { ChatMessage } from "#src/types/admin";
 
 export interface ConversationMeta {
   title?: string;
+  /** Profile partition — stamped as a literal top-level field on the document. */
+  profileId?: string | null;
   systemPrompt?: string;
   settings?: ConversationSettings;
   traceId?: string | null;
@@ -80,6 +82,8 @@ export interface TransformedConversation {
   id: string;
   project: string;
   username: string;
+  /** Profile partition; legacy documents have no field (default profile). */
+  profileId?: string | null;
   title: string;
   messages: ChatMessage[];
   messageCount?: number;
@@ -150,6 +154,7 @@ export interface ConversationServiceInterface {
       agent?: string;
       title?: string;
       agentConversationId?: string;
+      profileId?: string;
     },
   ): Promise<void>;
   getConversationStats(

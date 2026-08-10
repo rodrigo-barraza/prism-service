@@ -8,6 +8,7 @@ import type { MCPServerConfig } from "#src/services/MCPClientService";
 import logger from "#src/utils/logger";
 import { COLLECTIONS } from "#src/constants";
 import { PostMcpServerSchema, PutMcpServerSchema } from "#src/types/index";
+import { resolveScope, scopeFilter } from "#src/utils/ProfileScope";
 
 const router = express.Router();
 router.use(requireDb);
@@ -18,6 +19,8 @@ interface McpServerDocument {
   _id: ObjectId;
   project: string;
   username: string;
+  /** Legacy docs lack it (default profile). Writes always stamp a string. */
+  profileId?: string | null;
   name: string;
   displayName: string;
   transport: "stdio" | "sse" | "streamable-http";
@@ -48,13 +51,11 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
-      const username = req.username || "any";
       const { db } = req;
 
       const servers = await db
         .collection<McpServerDocument>(COLLECTION)
-        .find({ project, username })
+        .find({ ...scopeFilter(req) })
         .sort({ createdAt: -1 })
         .toArray();
 
@@ -92,8 +93,7 @@ router.post(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
-      const username = req.username || "any";
+      const { project, username, profileId } = resolveScope(req);
       const { db } = req;
 
       const parsed = PostMcpServerSchema.safeParse(req.body);
@@ -116,6 +116,7 @@ router.post(
       const document = {
         project,
         username,
+        profileId,
         name,
         displayName: displayName || name,
         transport: transport as "stdio" | "sse" | "streamable-http",
@@ -170,7 +171,9 @@ router.put(
       const result = await db
         .collection<McpServerDocument>(COLLECTION)
         .findOneAndUpdate(
-          { _id: new ObjectId(serverId) },
+          // Scope the filter, not just the lookup — without it, knowing a
+          // server's id is enough to rewrite another scope's config.
+          { _id: new ObjectId(serverId), ...scopeFilter(req) },
           { $set: updates },
           { returnDocument: "after" },
         );
@@ -200,7 +203,7 @@ router.delete(
 
       const result = await db
         .collection<McpServerDocument>(COLLECTION)
-        .findOneAndDelete({ _id: new ObjectId(serverId) });
+        .findOneAndDelete({ _id: new ObjectId(serverId), ...scopeFilter(req) });
 
       if (!result) {
         return res.status(404).json({ error: "MCP server not found" });
@@ -232,7 +235,7 @@ router.post(
 
       const server = await db
         .collection<McpServerDocument>(COLLECTION)
-        .findOne({ _id: new ObjectId(serverId) });
+        .findOne({ _id: new ObjectId(serverId), ...scopeFilter(req) });
 
       if (!server) {
         return res.status(404).json({ error: "MCP server not found" });
@@ -275,7 +278,7 @@ router.post(
 
       const server = await db
         .collection<McpServerDocument>(COLLECTION)
-        .findOne({ _id: new ObjectId(serverId) });
+        .findOne({ _id: new ObjectId(serverId), ...scopeFilter(req) });
 
       if (!server) {
         return res.status(404).json({ error: "MCP server not found" });

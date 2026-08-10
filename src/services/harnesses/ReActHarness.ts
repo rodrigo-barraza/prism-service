@@ -82,6 +82,7 @@ interface IterationPassOptions extends AgenticOptions {
   project: string;
   agent?: string | null;
   username: string;
+  profileId?: string | null;
 }
 
 /** Compute thinking and content phase durations from a PassState's timestamps. */
@@ -190,6 +191,7 @@ export default class ReActHarness extends BaseAgenticHarness {
       traceId,
       project,
       username,
+      profileId,
       agent,
       workspaceRoot,
       emit,
@@ -385,6 +387,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             messages: currentMessages,
             project,
             username,
+            profileId,
             agent,
             traceId,
             conversationId,
@@ -469,6 +472,7 @@ export default class ReActHarness extends BaseAgenticHarness {
           project,
           agent,
           username,
+          profileId,
         };
         if (state.planModeActive) {
           const planModeTools = this.tools.finalTools.filter(

@@ -4,6 +4,7 @@ import { ObjectId } from "mongodb";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { MONGO_DB_NAME } from "#config";
 import { COLLECTIONS } from "#src/constants";
+import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
@@ -30,7 +31,9 @@ router.get(
 
       const collection = database.collection(COLLECTIONS.WORKFLOW_MEMORIES);
 
-      const filter: Record<string, unknown> = {};
+      const filter: Record<string, unknown> = {
+        profileId: profileFilter(req.profileId || DEFAULT_PROFILE_ID),
+      };
       if (project) filter.project = project;
       if (agent) filter.agent = agent;
 
@@ -76,7 +79,10 @@ router.delete(
 
       const collection = database.collection(COLLECTIONS.WORKFLOW_MEMORIES);
 
-      const filter: Record<string, unknown> = { project };
+      const filter: Record<string, unknown> = {
+        project,
+        profileId: profileFilter(req.profileId || DEFAULT_PROFILE_ID),
+      };
       if (agent) filter.agent = agent;
 
       const result = await collection.deleteMany(filter);

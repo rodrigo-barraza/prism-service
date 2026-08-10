@@ -37,6 +37,8 @@ import {
   wrapSystemMessage,
   wrapTag,
 } from "#src/utils/SystemMessageTags";
+import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
+import { getRequestContext } from "#src/utils/RequestContext";
 
 /**
  * Wrap a system prompt section in XML semantic tags.
@@ -51,6 +53,14 @@ import {
  */
 function wrapSection(tagName: string, content: string): string {
   return wrapTag(tagName, content);
+}
+
+/**
+ * Resolve the profile partition for prompt-assembly queries: the context's
+ * stamped profileId wins, then the request's ALS context, then the default.
+ */
+function resolveProfileId(profileId?: string | null): string {
+  return profileId || getRequestContext().profileId || DEFAULT_PROFILE_ID;
 }
 
 
@@ -70,6 +80,7 @@ async function fetchActiveRules(
   username: string | undefined,
   names: string[],
   agent?: string | null,
+  profileId?: string | null,
 ): Promise<Array<{ name: string; content: string }>> {
   try {
     const collection = MongoWrapper.getCollection(
@@ -81,6 +92,7 @@ async function fetchActiveRules(
         {
           project: project || "any",
           username: username || "any",
+          profileId: profileFilter(resolveProfileId(profileId)),
           name: { $in: names },
           enabled: true,
           // RulesRoutes requires an `agent` on every rule, but this query used
@@ -129,6 +141,10 @@ async function fetchProjectInstructions(
     // to agree on `validTo: null`, on most-specific-wins, and on how to break
     // a tie when a crashed write leaves two current rows — three chances for
     // the reader and the writer to drift apart on the same document.
+    // NOTE(profiles): agent_instructions is NOT profile-scoped yet —
+    // ProjectInstructionsService owns both read and write scope, so the
+    // profileId dimension must be added there (reader + writer together),
+    // not threaded through this call alone.
     const { default: ProjectInstructionsService } = await import(
       "#src/services/ProjectInstructionsService"
     );
@@ -612,6 +628,7 @@ export default class SystemPromptAssembler {
         context.username,
         context.activeRuleNames,
         context.agent,
+        context.profileId,
       );
       if (activeRules.length > 0) {
         const rulesText = activeRules
@@ -785,6 +802,7 @@ export default class SystemPromptAssembler {
           agentConversationId: context.agentConversationId,
           endpoint: "/agent",
           agent: agentId,
+          profileId: context.profileId,
         },
       );
       if (skills.length > 0) {
@@ -831,6 +849,7 @@ export default class SystemPromptAssembler {
           conversationId: context.conversationId as string | null,
           endpoint: "/agent",
           _username: context.username,
+          profileId: context.profileId,
           guildId: memoryGuildId,
           userIds: memoryUserIds,
           excludeMemoryIds: alreadyInjectedMemoryIds,
@@ -862,6 +881,7 @@ export default class SystemPromptAssembler {
             conversationId: context.conversationId as string | null,
             endpoint: "/agent",
             username: context.username,
+            profileId: context.profileId,
           },
         );
         if (workflows) {

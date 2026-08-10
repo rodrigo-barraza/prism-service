@@ -39,6 +39,7 @@ router.post(
         sourceMessageId,
         traceId: traceId || undefined,
         project: req.project,
+        profileId: req.profileId,
         endpoint: "/memory/extract",
       });
 
@@ -81,6 +82,7 @@ router.post(
         limit: limit || 10,
         traceId: traceId || undefined,
         project: req.project,
+        profileId: req.profileId,
         endpoint: "/memory/search",
       });
 
@@ -111,6 +113,7 @@ router.get(
         agent: AGENT_IDS.LUPOS,
         guildId,
         userId,
+        profileId: req.profileId,
         limit,
         skip,
       });

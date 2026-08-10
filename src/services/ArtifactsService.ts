@@ -3,6 +3,9 @@ import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { MONGO_DB_NAME } from "#config";
 import { COLLECTIONS } from "#src/constants";
 import { generateUUID, getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
+import { getRequestContext } from "#src/utils/RequestContext";
+import type { Condition } from "mongodb";
 
 // ─── ArtifactsService — registry of everything the agent creates ───
 //
@@ -39,6 +42,8 @@ export interface ArtifactDocument {
   id: string;
   project: string;
   username: string;
+  /** Profile partition — literal id; legacy docs predate the field. */
+  profileId?: string;
   agent?: string | null;
   conversationId?: string | null;
   agentConversationId?: string | null;
@@ -63,6 +68,8 @@ export interface ArtifactDocument {
 export interface ArtifactProvenance {
   project?: string | null;
   username?: string | null;
+  /** Defaults to the request's profile (ALS), then "default". */
+  profileId?: string | null;
   agent?: string | null;
   conversationId?: string | null;
   agentConversationId?: string | null;
@@ -96,10 +103,29 @@ function provenanceFields(provenance: ArtifactProvenance) {
   return {
     project: provenance.project || "unknown",
     username: provenance.username || "unknown",
+    // Always the literal id — never null, never the $in filter shape.
+    profileId: resolveProfileId(provenance.profileId),
     agent: provenance.agent ?? null,
     conversationId: provenance.conversationId ?? null,
     agentConversationId: provenance.agentConversationId ?? null,
   };
+}
+
+/** Explicit value wins, then the request's ALS context, then the default. */
+function resolveProfileId(profileId?: string | null): string {
+  return profileId || getRequestContext().profileId || DEFAULT_PROFILE_ID;
+}
+
+/**
+ * Read-scope filter value for a profile id (default owns legacy docs).
+ * Cast: the driver's Filter type cannot express `$in: [id, null]` against an
+ * optional string field, but MongoDB itself uses null in $in to match
+ * missing fields — which is exactly how legacy docs join the default profile.
+ */
+function profileReadFilter(profileId?: string | null): Condition<string | undefined> {
+  return profileFilter(resolveProfileId(profileId)) as Condition<
+    string | undefined
+  >;
 }
 
 /** Humanize a tool name for use as a fallback artifact title: "generate_image" → "Generate image". */
@@ -204,6 +230,7 @@ export default class ArtifactsService {
     const existing = await collection.findOne({
       id: artifactId,
       project: scope.project,
+      profileId: profileReadFilter(scope.profileId),
       source: "document",
     });
     if (!existing) return null;
@@ -218,7 +245,11 @@ export default class ArtifactsService {
     );
 
     const result = await collection.findOneAndUpdate(
-      { id: artifactId, project: scope.project },
+      {
+        id: artifactId,
+        project: scope.project,
+        profileId: profileReadFilter(scope.profileId),
+      },
       {
         $set: {
           content: updates.content,
@@ -267,8 +298,15 @@ export default class ArtifactsService {
 
     const scope = provenanceFields(provenance);
     const now = new Date();
+    // Upsert key includes the profile read-filter; the $set below stamps the
+    // literal id, so a legacy (field-less) doc matched under the default
+    // profile is migrated in place rather than duplicated.
     await collection.updateOne(
-      { project: scope.project, url: capturable.url },
+      {
+        project: scope.project,
+        profileId: profileReadFilter(scope.profileId),
+        url: capturable.url,
+      },
       {
         $set: {
           ...scope,
@@ -290,15 +328,21 @@ export default class ArtifactsService {
 
   static async getById(
     artifactId: string,
-    scope: { project: string },
+    scope: { project: string; profileId?: string },
   ): Promise<ArtifactDocument | null> {
     const collection = getArtifactsCollection();
     if (!collection) throw new Error("Database unavailable");
-    return collection.findOne({ id: artifactId, project: scope.project });
+    return collection.findOne({
+      id: artifactId,
+      project: scope.project,
+      profileId: profileReadFilter(scope.profileId),
+    });
   }
 
   static async list(options: {
     project: string;
+    /** Defaults to the request's profile (ALS), then "default". */
+    profileId?: string;
     page: number;
     limit: number;
     kind?: ArtifactKind;
@@ -311,7 +355,10 @@ export default class ArtifactsService {
     const collection = getArtifactsCollection();
     if (!collection) throw new Error("Database unavailable");
 
-    const filter: Record<string, unknown> = { project: options.project };
+    const filter: Record<string, unknown> = {
+      project: options.project,
+      profileId: profileReadFilter(options.profileId),
+    };
     if (options.kind) filter.kind = options.kind;
     if (options.source) filter.source = options.source;
     if (options.conversationId) {
@@ -375,13 +422,14 @@ export default class ArtifactsService {
 
   static async remove(
     artifactId: string,
-    scope: { project: string; username: string },
+    scope: { project: string; username: string; profileId?: string },
   ): Promise<boolean> {
     const collection = getArtifactsCollection();
     if (!collection) throw new Error("Database unavailable");
     const result = await collection.deleteOne({
       id: artifactId,
       project: scope.project,
+      profileId: profileReadFilter(scope.profileId),
     });
     return result.deletedCount > 0;
   }

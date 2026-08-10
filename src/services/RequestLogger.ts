@@ -15,7 +15,14 @@ import { COLLECTIONS, SYSTEM_STATUSES } from "#src/constants";
 import { MODALITY_TYPES, getPricing } from "#src/config";
 import { calculateTokensPerSec } from "#src/utils/math";
 import WebhookEventBus from "./WebhookEventBus.ts";
+import { getRequestContext } from "#src/utils/RequestContext";
+import { DEFAULT_PROFILE_ID } from "#src/utils/ProfileScope";
 const COLLECTION = COLLECTIONS.REQUESTS;
+
+/** Literal profile id for a request-log write: params → ALS → default. */
+function resolveLogProfileId(profileId?: string | null): string {
+  return profileId || getRequestContext().profileId || DEFAULT_PROFILE_ID;
+}
 // Provider-native API tool/feature name → canonical display name is resolved
 // via the shared capability taxonomy (resolveCapabilityName). These are NOT our
 // custom tool names — they are keys from Anthropic/OpenAI/Google APIs.
@@ -32,6 +39,9 @@ export interface LogParams {
   operation?: string | null;
   project?: string | null;
   username?: string | null;
+  /** Profile partition — stamped literally on the request row; when absent
+   *  the ALS request context (then the default profile) fills it in. */
+  profileId?: string | null;
   clientIp?: string | null;
   agent?: string | null;
   harness?: string | null;
@@ -135,6 +145,7 @@ export interface InsertPendingRequestParams {
   operation?: string | null;
   project?: string | null;
   username?: string | null;
+  profileId?: string | null;
   clientIp?: string | null;
   agent?: string | null;
   harness?: string | null;
@@ -202,6 +213,7 @@ const RequestLogger = {
     operation = null,
     project,
     username,
+    profileId = null,
     clientIp = null,
     agent = null,
     harness = null,
@@ -268,6 +280,7 @@ const RequestLogger = {
         operation: operation || null,
         project,
         username,
+        profileId: resolveLogProfileId(profileId),
         clientIp,
         agent: agent || null,
         harness: harness || null,
@@ -333,6 +346,7 @@ const RequestLogger = {
     operation = null,
     project,
     username,
+    profileId = null,
     clientIp = null,
     agent = null,
     harness = null,
@@ -386,6 +400,7 @@ const RequestLogger = {
       operation,
       project,
       username,
+      profileId,
       clientIp,
       agent,
       harness: (harness as string) || (options?.harness as string) || null,
@@ -497,6 +512,7 @@ const RequestLogger = {
     operation,
     project,
     username,
+    profileId,
     agent,
     provider: providerName,
     model,
@@ -549,6 +565,7 @@ const RequestLogger = {
       operation,
       project,
       username: username || "system",
+      profileId,
       clientIp: null,
       agent: agent || null,
       traceId: traceId || null,
@@ -592,6 +609,7 @@ const RequestLogger = {
     operation = null,
     project = null,
     username = null,
+    profileId = null,
     clientIp = null,
     agent = null,
     harness = null,
@@ -618,6 +636,7 @@ const RequestLogger = {
         operation: operation || null,
         project: project || null,
         username: username || null,
+        profileId: resolveLogProfileId(profileId),
         clientIp: clientIp || null,
         agent: agent || null,
         harness: harness || null,
@@ -669,6 +688,7 @@ const RequestLogger = {
         operation,
         project,
         username,
+        profileId,
         clientIp,
         agent,
         harness,
@@ -744,6 +764,7 @@ const RequestLogger = {
         operation: operation || null,
         project,
         username,
+        profileId: resolveLogProfileId(profileId),
         clientIp,
         agent: agent || null,
         harness: harness || null,

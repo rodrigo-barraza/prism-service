@@ -24,6 +24,7 @@ import {
 } from "./utils.ts";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { getRequestContext } from "#src/utils/RequestContext";
 
 const DEFAULT_COLLECTION = COLLECTIONS.MODEL_CONVERSATIONS;
 
@@ -60,6 +61,15 @@ const ConversationService: ConversationServiceInterface = {
     // Build $set fields for metadata
     const setFields: Partial<TransformedConversation> = { updatedAt: now };
     if (traceId) setFields.traceId = traceId;
+
+    // Profile stamp — always the literal id (never null / $in). Falls back to
+    // the request-context ALS so callers that don't thread profileId through
+    // meta (legacy paths) still stamp the requesting profile.
+    const stampProfileId =
+      (typeof conversationMeta?.profileId === "string" &&
+        conversationMeta.profileId) ||
+      getRequestContext().profileId;
+    if (stampProfileId) setFields.profileId = stampProfileId;
 
     if (conversationMeta) {
       if (conversationMeta.title !== undefined) {
@@ -372,16 +382,22 @@ const ConversationService: ConversationServiceInterface = {
       agent,
       title,
       agentConversationId,
+      profileId,
     }: {
       collection?: string;
       agent?: string;
       title?: string;
       agentConversationId?: string;
+      profileId?: string;
     } = {},
   ): Promise<void> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) return;
     const now = new Date().toISOString();
+
+    // Profile stamp — literal id only; ALS fallback covers callers that
+    // can't thread it through opts (e.g. utils/ConversationUtilities).
+    const stampProfileId = profileId || getRequestContext().profileId;
 
     if (generating) {
       // Upsert — create a stub if it doesn't exist yet
@@ -393,6 +409,7 @@ const ConversationService: ConversationServiceInterface = {
             isActive: true,
             updatedAt: now,
             ...(agentConversationId && { agentConversationId }),
+            ...(stampProfileId && { profileId: stampProfileId }),
           },
           $setOnInsert: {
             title: title || DEFAULT_CONVERSATION_TITLE,

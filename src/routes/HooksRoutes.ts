@@ -22,6 +22,7 @@ import type {
 } from "#src/services/hooks/types";
 import { runConfiguredHook } from "#src/services/hooks/HookRunner";
 import { invalidateHookCache } from "#src/services/hooks/ConfiguredHookRegistry";
+import { resolveScope, scopeFilter } from "#src/utils/ProfileScope";
 
 /**
  * CRUD for user-configured lifecycle hooks, plus a dry-run endpoint.
@@ -78,13 +79,11 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
-      const username = req.username || "any";
       const agent = (req.query.agent as string) || null;
       const event = (req.query.event as string) || null;
       const { db } = req;
 
-      const query: Record<string, unknown> = { project, username };
+      const query: Record<string, unknown> = { ...scopeFilter(req) };
       if (agent) query.agent = agent;
       if (event) query.event = event;
 
@@ -109,14 +108,12 @@ router.get(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
-      const username = req.username || "any";
       const { db } = req;
       const hookId = req.params.id as string;
 
       const hook = await db
         .collection<ConfiguredHookDocument>(COLLECTION)
-        .findOne({ id: hookId, project, username });
+        .findOne({ id: hookId, ...scopeFilter(req) });
 
       if (!hook) {
         return res.status(404).json({ error: "Hook not found" });
@@ -137,8 +134,7 @@ router.post(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
-      const username = req.username || "any";
+      const { project, username, profileId } = resolveScope(req);
       const { db } = req;
 
       const parsed = PostHookSchema.safeParse(req.body);
@@ -150,7 +146,7 @@ router.post(
       // accepting the 51st would store a hook that never runs.
       const existingCount = await db
         .collection<ConfiguredHookDocument>(COLLECTION)
-        .countDocuments({ project, username });
+        .countDocuments({ ...scopeFilter(req) });
 
       if (existingCount >= HOOKS.MAX_HOOKS_PER_SCOPE) {
         return res.status(400).json({
@@ -161,10 +157,13 @@ router.post(
       }
 
       const now = new Date().toISOString();
-      const document: ConfiguredHookDocument = {
+      // Intersection type: `profileId` is stamped on stored hooks, but
+      // `ConfiguredHookDocument` (services/hooks/types) doesn't declare it.
+      const document: ConfiguredHookDocument & { profileId: string } = {
         id: randomUUID(),
         project,
         username,
+        profileId,
         agent: parsed.data.agent,
         name: parsed.data.name,
         description: parsed.data.description,
@@ -208,8 +207,6 @@ router.put(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
-      const username = req.username || "any";
       const { db } = req;
       const hookId = req.params.id as string;
 
@@ -220,7 +217,7 @@ router.put(
 
       const existing = await db
         .collection<ConfiguredHookDocument>(COLLECTION)
-        .findOne({ id: hookId, project, username });
+        .findOne({ id: hookId, ...scopeFilter(req) });
 
       if (!existing) {
         return res.status(404).json({ error: "Hook not found" });
@@ -254,7 +251,7 @@ router.put(
       const result = await db
         .collection<ConfiguredHookDocument>(COLLECTION)
         .findOneAndUpdate(
-          { id: hookId, project, username },
+          { id: hookId, ...scopeFilter(req) },
           { $set: updates },
           { returnDocument: "after" },
         );
@@ -281,14 +278,12 @@ router.delete(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
-      const username = req.username || "any";
       const { db } = req;
       const hookId = req.params.id as string;
 
       const result = await db
         .collection<ConfiguredHookDocument>(COLLECTION)
-        .findOneAndDelete({ id: hookId, project, username });
+        .findOneAndDelete({ id: hookId, ...scopeFilter(req) });
 
       if (!result) {
         return res.status(404).json({ error: "Hook not found" });
@@ -319,8 +314,7 @@ router.post(
   "/:id/test",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
-      const username = req.username || "any";
+      const { project, username } = resolveScope(req);
       const { db } = req;
       const hookId = req.params.id as string;
 
@@ -331,7 +325,7 @@ router.post(
 
       const hook = await db
         .collection<ConfiguredHookDocument>(COLLECTION)
-        .findOne({ id: hookId, project, username });
+        .findOne({ id: hookId, ...scopeFilter(req) });
 
       if (!hook) {
         return res.status(404).json({ error: "Hook not found" });

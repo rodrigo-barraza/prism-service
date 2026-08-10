@@ -12,6 +12,12 @@ import {
   type RecurrenceRule,
   matchRecurrenceRule,
 } from "#src/utils/RecurrenceMatcher";
+import {
+  DEFAULT_PROFILE_ID,
+  profileFilter,
+  type ProfileIdFilter,
+} from "#src/utils/ProfileScope";
+import { getRequestContext } from "#src/utils/RequestContext";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 export interface TransformedScheduledTaskFilter {
@@ -19,6 +25,7 @@ export interface TransformedScheduledTaskFilter {
   name?: string;
   project?: string;
   username?: string;
+  profileId?: ProfileIdFilter;
 }
 
 export interface ScheduledTask {
@@ -26,6 +33,8 @@ export interface ScheduledTask {
   name: string;
   project: string;
   username?: string;
+  /** Owning profile. Absent on documents that predate profiles (= default). */
+  profileId?: string;
   prompt: string;
   agent: string | null;
   provider: string;
@@ -248,9 +257,12 @@ const ScheduledTaskService = {
             continue;
           }
 
-          // Trigger execution in the background asynchronously
+          // Trigger execution in the background asynchronously.
+          // The daemon has no request context — re-hydrate the profile from
+          // the task document, mirroring the username fallback.
           this.executeTask(task, undefined, {
             username: task.username || "system",
+            profileId: task.profileId || DEFAULT_PROFILE_ID,
           }).catch((error: Error) =>
             logger.error(
               `[ScheduledTasks] Execution failed for task "${task.name}": ${getErrorMessage(error)}`,
@@ -274,8 +286,13 @@ const ScheduledTaskService = {
     payload?: Record<string, unknown>,
     {
       username = "system",
+      profileId = getRequestContext().profileId ?? DEFAULT_PROFILE_ID,
       agentConversationId,
-    }: { username?: string; agentConversationId?: string } = {},
+    }: {
+      username?: string;
+      profileId?: string;
+      agentConversationId?: string;
+    } = {},
   ): Promise<{ agentConversationId: string }> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
@@ -336,6 +353,7 @@ const ScheduledTaskService = {
       id: resolvedConversationId,
       project: task.project,
       username,
+      profileId,
       title: task.name,
       agent: task.agent,
       taskId: task.id,
@@ -397,6 +415,7 @@ const ScheduledTaskService = {
         traceId,
         project: task.project,
         username,
+        profileId,
         clientIp: "127.0.0.1",
         agent: task.agent,
         workspaceRoot: workspacePath,
@@ -463,10 +482,16 @@ const ScheduledTaskService = {
     id: string,
     project: string,
     username: string,
+    profileId: string = getRequestContext().profileId ?? DEFAULT_PROFILE_ID,
   ): Promise<TransformedScheduledTaskFilter> {
     const isClientProject = await this._isClientProject(project);
 
-    const filter: TransformedScheduledTaskFilter = { id };
+    // Profile is an orthogonal dimension — applied even for client projects
+    // that skip project/username scoping.
+    const filter: TransformedScheduledTaskFilter = {
+      id,
+      profileId: profileFilter(profileId),
+    };
     if (!isClientProject) {
       filter.project = project;
     }
@@ -481,13 +506,19 @@ const ScheduledTaskService = {
     return filter;
   },
 
-  async listTasks(project: string, username: string): Promise<ScheduledTask[]> {
+  async listTasks(
+    project: string,
+    username: string,
+    profileId: string = getRequestContext().profileId ?? DEFAULT_PROFILE_ID,
+  ): Promise<ScheduledTask[]> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) return [];
 
     const isClientProject = await this._isClientProject(project);
 
-    const query: Record<string, unknown> = {};
+    const query: Record<string, unknown> = {
+      profileId: profileFilter(profileId),
+    };
     if (!isClientProject) {
       query.project = project;
     }
@@ -529,6 +560,10 @@ const ScheduledTaskService = {
     const nowISO = new Date().toISOString();
     const task: ScheduledTask = {
       ...data,
+      // Always stamp the literal profile id — the daemon re-hydrates it at
+      // execution time, exactly like username.
+      profileId:
+        data.profileId ?? getRequestContext().profileId ?? DEFAULT_PROFILE_ID,
       id: crypto.randomUUID(),
       createdAt: nowISO,
       updatedAt: nowISO,
@@ -543,6 +578,7 @@ const ScheduledTaskService = {
     project: string,
     username: string,
     updates: Partial<ScheduledTask>,
+    profileId?: string,
   ): Promise<ScheduledTask> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
@@ -554,8 +590,10 @@ const ScheduledTaskService = {
     };
     delete cleanUpdates.id;
     delete cleanUpdates.createdAt;
+    // A task can never be moved between profiles via PATCH.
+    delete cleanUpdates.profileId;
 
-    const filter = await this._getQueryFilter(id, project, username);
+    const filter = await this._getQueryFilter(id, project, username, profileId);
     const result = await db
       .collection(COLLECTIONS.SCHEDULED_TASKS)
       .findOneAndUpdate(
@@ -575,11 +613,12 @@ const ScheduledTaskService = {
     id: string,
     project: string,
     username: string,
+    profileId?: string,
   ): Promise<boolean> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
 
-    const filter = await this._getQueryFilter(id, project, username);
+    const filter = await this._getQueryFilter(id, project, username, profileId);
     let result = await db
       .collection(COLLECTIONS.SCHEDULED_TASKS)
       .deleteOne(filter);
@@ -599,11 +638,12 @@ const ScheduledTaskService = {
     project: string,
     username: string,
     payload?: Record<string, unknown>,
+    profileId: string = getRequestContext().profileId ?? DEFAULT_PROFILE_ID,
   ): Promise<{ success: boolean; agentConversationId: string }> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
 
-    const filter = await this._getQueryFilter(id, project, username);
+    const filter = await this._getQueryFilter(id, project, username, profileId);
     let task = (await db
       .collection(COLLECTIONS.SCHEDULED_TASKS)
       .findOne(filter)) as unknown as ScheduledTask;
@@ -625,6 +665,7 @@ const ScheduledTaskService = {
     // Fire-and-forget background execution with the pre-generated conversation ID
     this.executeTask({ ...task, id: task.id }, payload, {
       username,
+      profileId,
       agentConversationId,
     }).catch((error: Error) => {
       logger.error(
