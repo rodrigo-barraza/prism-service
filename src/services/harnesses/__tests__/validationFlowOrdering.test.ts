@@ -16,7 +16,7 @@
  * TypeScript errors were detected — the iteration was logged as "done" before validation
  * even ran, and plan mode could activate in the middle of an error correction cycle.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { PROVIDERS } from "#src/constants";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
@@ -97,6 +97,32 @@ vi.mock("#src/services/ToolOrchestratorService", () => ({
   },
 }));
 
+// The interceptor reaches tools-service directly for the LSP diagnostics
+// batch — give it a URL so the TypeScript path is active in tests.
+vi.mock("#config", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  TOOLS_SERVICE_URL: "http://tools.test",
+}));
+
+/** Stub global fetch with a tools-service LSP diagnostics batch response. */
+function mockLspDiagnostics(
+  files: Array<{
+    filePath: string;
+    diagnostics: Array<Record<string, unknown>>;
+  }>,
+) {
+  const fetchMock = vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      operation: "diagnostics",
+      fileCount: files.length,
+      files,
+    }),
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import { validateAfterToolExecution } from "#src/services/harnesses/lifecycle/ValidationInterceptor";
 import { checkForPlanModeEntry } from "#src/services/harnesses/lifecycle/PlanModeController";
@@ -126,6 +152,10 @@ describe("Validation Flow Ordering", () => {
     mockState = {} as any;
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   describe("Validation runs before plan mode toggling", () => {
     it("should detect validation errors before plan mode entry is even checked", async () => {
       const toolCalls: ToolCall[] = [
@@ -139,11 +169,21 @@ describe("Validation Flow Ordering", () => {
         { id: "call-1", name: "write_file", result: { success: true } },
       ];
 
-      vi.mocked(ToolOrchestratorService.executeTool).mockResolvedValue({
-        exitCode: 1,
-        stdout: "error TS2322: Type 'string' is not assignable to type 'number'.",
-        stderr: "",
-      });
+      mockLspDiagnostics([
+        {
+          filePath: "/home/rodrigo/development/src/bananas.ts",
+          diagnostics: [
+            {
+              severity: "error",
+              line: 1,
+              character: 19,
+              message: "Type 'string' is not assignable to type 'number'.",
+              code: 2322,
+              source: "typescript",
+            },
+          ],
+        },
+      ]);
 
       const validationFeedback = await validateAfterToolExecution(
         toolCalls,
@@ -195,11 +235,12 @@ describe("Validation Flow Ordering", () => {
         { id: "call-1", name: "write_file", result: { success: true } },
       ];
 
-      vi.mocked(ToolOrchestratorService.executeTool).mockResolvedValue({
-        exitCode: 0,
-        stdout: "",
-        stderr: "",
-      });
+      mockLspDiagnostics([
+        {
+          filePath: "/home/rodrigo/development/src/clean.ts",
+          diagnostics: [],
+        },
+      ]);
 
       const validationFeedback = await validateAfterToolExecution(
         toolCalls,
@@ -243,16 +284,30 @@ describe("Validation Flow Ordering", () => {
         { id: "call-1", name: "write_file", result: { success: true } },
       ];
 
-      const typescriptErrorOutput = [
-        "src/bananas.ts(2,7): error TS2322: Type 'string' is not assignable to type 'number'.",
-        "src/bananas.ts(5,3): error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.",
-      ].join("\n");
-
-      vi.mocked(ToolOrchestratorService.executeTool).mockResolvedValue({
-        exitCode: 1,
-        stdout: typescriptErrorOutput,
-        stderr: "",
-      });
+      mockLspDiagnostics([
+        {
+          filePath: "/home/rodrigo/development/src/bananas.ts",
+          diagnostics: [
+            {
+              severity: "error",
+              line: 2,
+              character: 7,
+              message: "Type 'string' is not assignable to type 'number'.",
+              code: 2322,
+              source: "typescript",
+            },
+            {
+              severity: "error",
+              line: 5,
+              character: 3,
+              message:
+                "Argument of type 'number' is not assignable to parameter of type 'string'.",
+              code: 2345,
+              source: "typescript",
+            },
+          ],
+        },
+      ]);
 
       const validationFeedback = await validateAfterToolExecution(
         toolCalls,
@@ -265,7 +320,7 @@ describe("Validation Flow Ordering", () => {
       const feedback = validationFeedback[0];
 
       // Verify the structure matches what the harness will inject
-      expect(feedback.toolName).toBe("execute_command");
+      expect(feedback.toolName).toBe("code_intel");
       expect(feedback.filePath).toBe("src/bananas.ts");
       expect(feedback.validatorType).toBe("typescript");
       expect(feedback.errors).toHaveLength(2);
@@ -585,18 +640,27 @@ describe("Validation Flow Ordering", () => {
         { id: "call-3", name: "read_file", result: { content: "..." } },
       ];
 
-      // First call validates alpha.ts (fails), second validates beta.tsx (passes)
-      vi.mocked(ToolOrchestratorService.executeTool)
-        .mockResolvedValueOnce({
-          exitCode: 1,
-          stdout: "error TS2322: Type mismatch in alpha.ts",
-          stderr: "",
-        })
-        .mockResolvedValueOnce({
-          exitCode: 0,
-          stdout: "",
-          stderr: "",
-        });
+      // ONE batched LSP call covers both edited TS files: alpha.ts errors,
+      // beta.tsx is clean.
+      const fetchMock = mockLspDiagnostics([
+        {
+          filePath: "/home/rodrigo/development/src/alpha.ts",
+          diagnostics: [
+            {
+              severity: "error",
+              line: 1,
+              character: 1,
+              message: "Type mismatch in alpha.ts",
+              code: 2322,
+              source: "typescript",
+            },
+          ],
+        },
+        {
+          filePath: "/home/rodrigo/development/src/beta.tsx",
+          diagnostics: [],
+        },
+      ]);
 
       const validationFeedback = await validateAfterToolExecution(
         toolCalls,
@@ -609,9 +673,18 @@ describe("Validation Flow Ordering", () => {
       expect(validationFeedback).toHaveLength(1);
       expect(validationFeedback[0].filePath).toBe("src/alpha.ts");
 
-      // Should have called executeTool twice (once for alpha.ts, once for beta.tsx)
-      // but NOT for gamma.ts (read_file is not file-mutating)
-      expect(ToolOrchestratorService.executeTool).toHaveBeenCalledTimes(2);
+      // The whole edited-file batch is validated with ONE LSP diagnostics
+      // call (deduped by workspace root) — no per-file shell compiles.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const requestBody = JSON.parse(
+        (fetchMock.mock.calls[0][1] as { body: string }).body,
+      );
+      expect(requestBody.files).toEqual([
+        "/home/rodrigo/development/src/alpha.ts",
+        "/home/rodrigo/development/src/beta.tsx",
+      ]);
+      expect(requestBody.workspacePath).toBe("/home/rodrigo/development");
+      expect(ToolOrchestratorService.executeTool).not.toHaveBeenCalled();
     });
 
     it("should return multiple feedback items when multiple files have errors", async () => {
@@ -624,17 +697,34 @@ describe("Validation Flow Ordering", () => {
         { id: "call-2", name: "patch_file", result: { success: true } },
       ];
 
-      vi.mocked(ToolOrchestratorService.executeTool)
-        .mockResolvedValueOnce({
-          exitCode: 1,
-          stdout: "error TS2322: Bug in alpha",
-          stderr: "",
-        })
-        .mockResolvedValueOnce({
-          exitCode: 1,
-          stdout: "error TS2304: Bug in beta",
-          stderr: "",
-        });
+      mockLspDiagnostics([
+        {
+          filePath: "/home/rodrigo/development/src/alpha.ts",
+          diagnostics: [
+            {
+              severity: "error",
+              line: 1,
+              character: 1,
+              message: "Bug in alpha",
+              code: 2322,
+              source: "typescript",
+            },
+          ],
+        },
+        {
+          filePath: "/home/rodrigo/development/src/beta.tsx",
+          diagnostics: [
+            {
+              severity: "error",
+              line: 1,
+              character: 1,
+              message: "Bug in beta",
+              code: 2304,
+              source: "typescript",
+            },
+          ],
+        },
+      ]);
 
       const validationFeedback = await validateAfterToolExecution(
         toolCalls,
@@ -694,12 +784,22 @@ describe("Validation Flow Ordering", () => {
         { id: "call-write", name: "write_file", result: { success: true, path: "src/bananas.ts" } },
       ];
 
-      // Mock the tsc validation call
-      vi.mocked(ToolOrchestratorService.executeTool).mockResolvedValue({
-        exitCode: 1,
-        stdout: "src/bananas.ts(1,7): error TS2322: Type 'string' is not assignable to type 'number'.",
-        stderr: "",
-      });
+      // Mock the LSP diagnostics batch call
+      mockLspDiagnostics([
+        {
+          filePath: "/home/rodrigo/development/src/bananas.ts",
+          diagnostics: [
+            {
+              severity: "error",
+              line: 1,
+              character: 7,
+              message: "Type 'string' is not assignable to type 'number'.",
+              code: 2322,
+              source: "typescript",
+            },
+          ],
+        },
+      ]);
 
       // Step 1: Validation intercept (runs FIRST in the correct ordering)
       const validationFeedback = await validateAfterToolExecution(
@@ -799,12 +899,13 @@ describe("Validation Flow Ordering", () => {
         { id: "call-write", name: "write_file", result: { success: true } },
       ];
 
-      // tsc passes with exit code 0
-      vi.mocked(ToolOrchestratorService.executeTool).mockResolvedValue({
-        exitCode: 0,
-        stdout: "",
-        stderr: "",
-      });
+      // LSP reports a clean file
+      mockLspDiagnostics([
+        {
+          filePath: "/home/rodrigo/development/src/clean.ts",
+          diagnostics: [],
+        },
+      ]);
 
       // Step 1: Validation (passes)
       const validationFeedback = await validateAfterToolExecution(

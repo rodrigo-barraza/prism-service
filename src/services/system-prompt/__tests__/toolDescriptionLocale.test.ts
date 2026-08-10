@@ -85,7 +85,8 @@ const ENGLISH_TOOL_HEADER = "Enabled Tools";
 const CAVEMAN_ENVIRONMENT_HEADER = "## Environment";
 const ENGLISH_ENVIRONMENT_HEADER = "## Environment";
 
-const CAVEMAN_CODING_GUIDELINES_MARKER = "read file before editing";
+const CAVEMAN_CODING_GUIDELINES_MARKER =
+  "read file before edit. read give hashline";
 const ENGLISH_CODING_GUIDELINES_MARKER =
   "Always read relevant files before making edits";
 
