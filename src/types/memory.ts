@@ -12,6 +12,8 @@ export interface MemoryDocument {
   agent: string;
   project?: string | null;
   username?: string | null;
+  /** Profile partition — literal id; legacy docs predate the field. */
+  profileId?: string;
   type: string;
   title?: string | null;
   content: string;
@@ -49,6 +51,8 @@ export interface MemoryStoreParams {
   agent: string;
   project?: string | null;
   username?: string | null;
+  /** Defaults to the request's profile (ALS), then "default". */
+  profileId?: string;
   type?: string;
   title?: string | null;
   content: string;
@@ -63,6 +67,8 @@ export interface MemoryStoreParams {
 export interface MemorySearchParams {
   agent: string;
   project?: string | null;
+  /** Defaults to the request's profile (ALS), then "default". */
+  profileId?: string;
   guildId?: string;
   userIds?: string[];
   queryText: string;
@@ -75,6 +81,8 @@ export interface MemorySearchParams {
 export interface MemoryListParams {
   agent?: string;
   project?: string | null;
+  /** Defaults to the request's profile (ALS), then "default". */
+  profileId?: string;
   guildId?: string;
   userId?: string;
   limit?: number;
@@ -104,6 +112,8 @@ export interface ConsolidationParams {
   agent?: string;
   project: string;
   username?: string;
+  /** Defaults to the request's profile (ALS), then "default". */
+  profileId?: string;
   trigger?: string;
   broadcast?: (event: Record<string, unknown>) => void;
   endpoint?: string | null;

@@ -52,6 +52,8 @@ import {
 } from "./memory/ConversationalMemoryPartitioner.ts";
 
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
+import { getRequestContext } from "#src/utils/RequestContext";
 import type {
   MemoryDoc,
   ConsolidationAction,
@@ -62,6 +64,25 @@ import type {
   ConsolidateOptions,
   CheckAndRunOptions,
 } from "./memory/types.ts";
+
+/**
+ * Profile-aware widenings of the shared consolidation option shapes.
+ * Consolidation must never merge memories across profiles, so every run is
+ * pinned to exactly one profile. Background/daemon callers that pass no
+ * profileId (and run outside a request's ALS) consolidate the DEFAULT
+ * profile only.
+ */
+export type ProfiledConsolidateOptions = ConsolidateOptions & {
+  profileId?: string;
+};
+export type ProfiledCheckAndRunOptions = CheckAndRunOptions & {
+  profileId?: string;
+};
+
+/** Explicit param wins, then the request's ALS context, then the default. */
+function resolveProfileId(profileId?: string | null): string {
+  return profileId || getRequestContext().profileId || DEFAULT_PROFILE_ID;
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 /** Resolve the current consolidation provider + model from settings. */
@@ -95,7 +116,12 @@ async function applyActions(
   agentType: string,
   project: string | null,
   username: string,
-  { traceId, endpoint, memoryLookup }: ApplyActionsOptions = {},
+  {
+    traceId,
+    endpoint,
+    memoryLookup,
+    profileId,
+  }: ApplyActionsOptions & { profileId?: string } = {},
 ) {
   const results = {
     merged: 0,
@@ -160,6 +186,7 @@ async function applyActions(
           agent,
           project,
           username: username || "system",
+          profileId,
           type: action.merged.type || (isConversational ? "other" : "project"),
           title: action.merged.title || null,
           content: action.merged.content,
@@ -371,15 +398,18 @@ async function runConsolidation({
   agent = AGENT_IDS.CODING,
   project,
   username,
+  profileId,
   trigger = "manual",
   broadcast,
   endpoint,
   traceId,
   agentConversationId,
   guildId,
-}: ConsolidateOptions) {
+}: ProfiledConsolidateOptions) {
     const startTime = performance.now();
     const agentId = agent || AGENT_IDS.CODING;
+    // One profile per run — consolidation never merges across profiles.
+    const runProfileId = resolveProfileId(profileId);
     const persona = AgentPersonaRegistry.get(agentId);
     const agentType = persona?.type || "";
     const isConversational = agentType === "conversational";
@@ -396,9 +426,11 @@ async function runConsolidation({
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not available");
 
-    // Current rows only — soft-closed memories are history, not candidates
+    // Current rows only — soft-closed memories are history, not candidates.
+    // Scoped to one profile so a run never clusters/merges across profiles.
     const query: Record<string, unknown> = {
       agent: agentId,
+      profileId: profileFilter(runProfileId),
       ...CURRENT_MEMORY_FILTER,
     };
     if (project) query.project = project;
@@ -655,6 +687,7 @@ async function runConsolidation({
         traceId,
         endpoint,
         memoryLookup: isConversational ? memoryLookup : undefined,
+        profileId: runProfileId,
       },
     );
     await resetRunCount(project || guildId || "global");
@@ -706,7 +739,7 @@ const MemoryConsolidationService = {
    * the advisory Mongo lock makes runs single-writer per scope, and the
    * finally guarantees release on every exit path.
    */
-  async consolidate(options: ConsolidateOptions) {
+  async consolidate(options: ProfiledConsolidateOptions) {
     const lockScope = options.project || options.guildId || "global";
     if (!(await acquireConsolidationLock(lockScope))) {
       return {
@@ -760,13 +793,17 @@ const MemoryConsolidationService = {
   async checkAndRun({
     project,
     username,
+    profileId,
     broadcast,
     endpoint,
     agent,
     traceId,
     agentConversationId,
-  }: CheckAndRunOptions) {
+  }: ProfiledCheckAndRunOptions) {
     try {
+      // Resolve now, while the request's ALS context is still live — the
+      // fire-and-forget consolidate() below may outlive it.
+      const runProfileId = resolveProfileId(profileId);
       await incrementRunCount(project || "global");
       const count = await getRunCount(project || "global");
       if (count >= SESSIONS_BETWEEN_RUNS) {
@@ -778,6 +815,7 @@ const MemoryConsolidationService = {
           agent: agent || AGENT_IDS.CODING,
           project,
           username,
+          profileId: runProfileId,
           trigger: "conversation_threshold",
           broadcast,
           endpoint: endpoint || "/agent",

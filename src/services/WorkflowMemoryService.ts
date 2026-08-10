@@ -6,6 +6,8 @@ import { scoreHybrid } from "./memory/HybridRetrieval.ts";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
+import { getRequestContext } from "#src/utils/RequestContext";
 import type {
   AgenticContext,
   ConversationMessage,
@@ -55,6 +57,8 @@ interface WorkflowDocument {
   agentConversationId: string;
   project: string;
   username: string;
+  /** Profile partition — literal id; legacy docs predate the field. */
+  profileId?: string;
   agent: string;
   userRequest: string;
   stepCount: number;
@@ -168,6 +172,12 @@ const WorkflowMemoryService = {
   ): Promise<void> {
     const { conversationId, agentConversationId, project, username, agent } =
       context;
+    // The harness may stamp profileId onto the context; this extraction may
+    // also run outside a live request, so fall back to ALS then the default.
+    const profileId =
+      (context as AgenticContext & { profileId?: string | null }).profileId ||
+      getRequestContext().profileId ||
+      DEFAULT_PROFILE_ID;
 
     const resolvedAgentConversationId = agentConversationId || "";
 
@@ -232,6 +242,8 @@ const WorkflowMemoryService = {
       agentConversationId: resolvedAgentConversationId,
       project,
       username,
+      // Always the literal id — never null, never the $in filter shape.
+      profileId,
       agent: agent || "CODING",
       userRequest,
       stepCount: trajectory.steps.length,
@@ -272,10 +284,15 @@ const WorkflowMemoryService = {
       conversationId?: string | null;
       endpoint?: string | null;
       username?: string;
+      /** Profile partition — defaults to the request's profile (ALS), then "default". */
+      profileId?: string | null;
       maximumResults?: number;
     } = {},
   ): Promise<string | null> {
     if (!queryText || !project) return null;
+    const profileScope = profileFilter(
+      options.profileId || getRequestContext().profileId || DEFAULT_PROFILE_ID,
+    );
 
     const database = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!database) return null;
@@ -287,6 +304,7 @@ const WorkflowMemoryService = {
     const workflowCount = await workflowCollection.countDocuments({
       agent,
       project,
+      profileId: profileScope,
     });
 
     if (workflowCount === 0) return null;
@@ -306,7 +324,7 @@ const WorkflowMemoryService = {
 
     const allWorkflows = await workflowCollection
       .find(
-        { agent, project },
+        { agent, project, profileId: profileScope },
         {
           projection: {
             summary: 1,

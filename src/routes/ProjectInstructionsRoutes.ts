@@ -4,6 +4,7 @@ import express, { type Request, type Response } from "express";
 import { z } from "zod";
 import requireDb from "#src/middleware/RequireDbMiddleware";
 import logger from "#src/utils/logger";
+import { DEFAULT_PROFILE_ID, resolveScope } from "#src/utils/ProfileScope";
 import ProjectInstructionsService, {
   PROJECT_INSTRUCTIONS_MAX_CONTENT_CHARS,
   type ProjectInstructionsDocument,
@@ -66,6 +67,7 @@ function serialize(document: ProjectInstructionsDocument) {
     id: document.id,
     project: document.project,
     username: document.username,
+    profileId: document.profileId ?? DEFAULT_PROFILE_ID,
     agent: document.agent ?? null,
     content: document.content,
     version: document.version,
@@ -82,6 +84,7 @@ function scopeFrom(req: Request, agent?: string) {
   return {
     project: req.project || "any",
     username: req.username || "any",
+    profileId: resolveScope(req).profileId,
     agent: agent || null,
   };
 }

@@ -174,6 +174,7 @@ router.post(
       agenticLoopEnabled: true,
       project: request.project,
       username: request.username,
+      profileId: request.profileId,
       clientIp: request.clientIp,
       // Server-owned defaults (policy lives here, not in clients):
       // the coding agent is the default persona, and agentic turns need

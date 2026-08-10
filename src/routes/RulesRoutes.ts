@@ -5,6 +5,7 @@ import requireDb from "#src/middleware/RequireDbMiddleware";
 import logger from "#src/utils/logger";
 import { COLLECTIONS } from "#src/constants";
 import { PostRuleSchema, PutRuleSchema } from "#src/types/index";
+import { resolveScope, scopeFilter } from "#src/utils/ProfileScope";
 
 const router = express.Router();
 router.use(requireDb);
@@ -24,6 +25,8 @@ interface RuleDocument {
   _id?: ObjectId;
   project: string;
   username: string;
+  /** Legacy docs lack it (default profile). Writes always stamp a string. */
+  profileId?: string | null;
   agent: string;
   name: string;
   description: string;
@@ -41,12 +44,10 @@ router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
-      const username = req.username || "any";
       const agent = (req.query.agent as string) || null;
       const { db } = req;
 
-      const query: Record<string, unknown> = { project, username };
+      const query: Record<string, unknown> = { ...scopeFilter(req) };
       if (agent) query.agent = agent;
 
       const rules = await db
@@ -75,8 +76,7 @@ router.post(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const project = req.project || "any";
-      const username = req.username || "any";
+      const { project, username, profileId } = resolveScope(req);
       const { db } = req;
 
       const validated = PostRuleSchema.parse(req.body);
@@ -84,6 +84,7 @@ router.post(
       const document: RuleDocument = {
         project,
         username,
+        profileId,
         agent: validated.agent,
         name: validated.name,
         description: validated.description,
@@ -116,8 +117,6 @@ router.put(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { db } = req;
-      const project = req.project || "any";
-      const username = req.username || "any";
       const validated = PutRuleSchema.parse(req.body);
 
       const objectId = toObjectId(req.params.id as string);
@@ -141,7 +140,8 @@ router.put(
           // Scope the filter, not just the lookup: without project+username
           // here, knowing a rule's id was enough to rewrite another scope's
           // rule. The GET path was already scoped; these two were not.
-          { _id: objectId, project, username },
+          // Profile scope rides along the same way.
+          { _id: objectId, ...scopeFilter(req) },
           { $set: updates },
           { returnDocument: "after" },
         );
@@ -167,8 +167,6 @@ router.delete(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { db } = req;
-      const project = req.project || "any";
-      const username = req.username || "any";
 
       const objectId = toObjectId(req.params.id as string);
       if (!objectId) {
@@ -177,7 +175,7 @@ router.delete(
 
       const result = await db
         .collection<RuleDocument>(COLLECTION)
-        .findOneAndDelete({ _id: objectId, project, username });
+        .findOneAndDelete({ _id: objectId, ...scopeFilter(req) });
 
       if (!result) {
         return res.status(404).json({ error: "Rule not found" });

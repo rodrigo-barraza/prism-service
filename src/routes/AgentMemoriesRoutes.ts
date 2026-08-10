@@ -37,6 +37,7 @@ router.post(
         agent: agent || AGENT_IDS.CODING,
         project: project || DEFAULT_PROJECT,
         username: username || null,
+        profileId: req.profileId,
         content,
         type: type || "project",
         title: title || null,
@@ -85,6 +86,7 @@ router.get(
       const result = await MemoryService.list({
         agent: agent as string,
         project: project as string,
+        profileId: req.profileId,
         limit: Number(limit),
         skip: Number(skip),
         type: type ? String(type) : undefined,
@@ -115,6 +117,7 @@ router.get(
       const result = await MemoryService.facets({
         agent,
         project: project as string,
+        profileId: req.profileId,
       });
       res.json(result);
     } catch (error: unknown) {
@@ -142,6 +145,7 @@ router.delete(
       const result = await MemoryService.removeAllByAgent(
         project as string,
         agent,
+        req.profileId,
       );
       res.json({ success: true, deletedCount: result.deletedCount });
     } catch (error: unknown) {
@@ -228,6 +232,7 @@ router.post(
         agent,
         project,
         username,
+        profileId: req.profileId,
         trigger: "manual",
         endpoint: "/agent-memories/consolidate",
       });

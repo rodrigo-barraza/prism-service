@@ -11,6 +11,7 @@ import WorkflowExecutionService from "#src/services/WorkflowExecutionService";
 import { createAbortController } from "#src/utils/AbortController";
 import { registerCleanup } from "#src/utils/CleanupRegistry";
 import { COLLECTIONS, FILE_CATEGORIES } from "#src/constants";
+import { profileFilter, resolveScope } from "#src/utils/ProfileScope";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 interface CustomRequest extends Request {
@@ -384,7 +385,11 @@ router.get(
         const { db } = req;
 
         const source = req.query.source || "prism-client";
-        const query = source === "all" ? {} : { source };
+        const query: Record<string, unknown> =
+          source === "all" ? {} : { source };
+        // Workflows are not project/username-scoped, but they ARE
+        // profile-partitioned (legacy documents belong to the default profile).
+        query.profileId = profileFilter(resolveScope(req).profileId);
 
         const workflows = await db
           .collection(WORKFLOWS_COLLECTION)
@@ -419,6 +424,7 @@ router.get(
         } catch {
           filter = { workflowId: req.params.id };
         }
+        filter.profileId = profileFilter(resolveScope(req).profileId);
 
         const workflow = await db
           .collection(WORKFLOWS_COLLECTION)
@@ -457,6 +463,7 @@ router.post(
 
         const project = req.project;
         const username = req.username || null;
+        const { profileId } = resolveScope(req);
 
         let { nodes, edges, nodeResults } = req.body;
 
@@ -496,7 +503,7 @@ router.post(
         if (Array.isArray(convIds) && convIds.length > 0) {
           const conversations = await db
             .collection(COLLECTIONS.MODEL_CONVERSATIONS)
-            .find({ id: { $in: convIds } })
+            .find({ id: { $in: convIds }, profileId: profileFilter(profileId) })
             .project({ totalCost: 1 })
             .toArray();
           totalCost = conversations.reduce(
@@ -508,6 +515,9 @@ router.post(
 
         const workflow = {
           ...req.body,
+          // Stamped after the body spread so a client payload can never
+          // assign the workflow to another profile.
+          profileId,
           nodes: finalNodes,
           edges: edges || req.body.edges,
           nodeResults: processedResults || nodeResults,
@@ -549,10 +559,13 @@ router.put(
         } catch {
           filter = { workflowId: req.params.id };
         }
+        filter.profileId = profileFilter(resolveScope(req).profileId);
 
         const project = req.project;
         const username = req.username || null;
         const body = { ...req.body };
+        // A workflow can never be moved between profiles via PUT.
+        delete body.profileId;
         if (Array.isArray(body.nodes)) {
           body.nodes = await extractWorkflowFiles(
             body.nodes,
@@ -613,6 +626,8 @@ router.patch(
         } catch {
           filter = { workflowId: req.params.id };
         }
+        const profileIdFilter = profileFilter(resolveScope(req).profileId);
+        filter.profileId = profileIdFilter;
 
         const { conversationIds } = req.body;
         if (!Array.isArray(conversationIds) || conversationIds.length === 0) {
@@ -641,7 +656,7 @@ router.patch(
         if (allConvIds.length > 0) {
           const conversations = await db
             .collection(COLLECTIONS.MODEL_CONVERSATIONS)
-            .find({ id: { $in: allConvIds } })
+            .find({ id: { $in: allConvIds }, profileId: profileIdFilter })
             .project({ totalCost: 1 })
             .toArray();
           const totalCost = conversations.reduce(
@@ -682,6 +697,7 @@ router.delete(
         } catch {
           filter = { workflowId: req.params.id };
         }
+        filter.profileId = profileFilter(resolveScope(req).profileId);
 
         await db.collection(WORKFLOWS_COLLECTION).deleteOne(filter);
         res.json({ success: true });
@@ -740,6 +756,8 @@ router.post(
       } catch {
         filter = { workflowId: req.params.id };
       }
+      const profileIdFilter = profileFilter(resolveScope(req).profileId);
+      filter.profileId = profileIdFilter;
 
       const workflow = await db
         .collection(WORKFLOWS_COLLECTION)
@@ -899,7 +917,10 @@ router.post(
           const allConversationIds = updatePayload.conversationIds as string[];
           const conversations = await db
             .collection(COLLECTIONS.MODEL_CONVERSATIONS)
-            .find({ id: { $in: allConversationIds } })
+            .find({
+              id: { $in: allConversationIds },
+              profileId: profileIdFilter,
+            })
             .project({ totalCost: 1 })
             .toArray();
           updatePayload.totalCost = conversations.reduce(

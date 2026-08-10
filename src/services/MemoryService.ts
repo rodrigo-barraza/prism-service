@@ -17,6 +17,8 @@ import { COLLECTIONS, MEMORY, LOG_PREVIEW } from "#src/constants";
 import { scoreHybrid } from "./memory/HybridRetrieval.ts";
 import SettingsService from "./SettingsService.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
+import { getRequestContext } from "#src/utils/RequestContext";
 // ─── Constants ────────────────────────────────────────────────────────────────
 /** Single unified collection for all agent memories. */
 const COLLECTION = COLLECTIONS.MEMORIES;
@@ -31,6 +33,14 @@ async function getExtractionConfig() {
 const DUPLICATE_THRESHOLD = MEMORY.DUPLICATE_THRESHOLD;
 const RELEVANCE_THRESHOLD = MEMORY.RELEVANCE_THRESHOLD;
 /**
+ * Resolve the profile partition for a call: explicit param wins, then the
+ * request's ALS context, then the default profile. Always a literal id —
+ * safe to stamp into documents (never null, never a filter object).
+ */
+function resolveProfileId(profileId?: string | null): string {
+  return profileId || getRequestContext().profileId || DEFAULT_PROFILE_ID;
+}
+/**
  * Valid memory types — inspired by Claude Code's memdir taxonomy.
  *
  * Memories are constrained to these types. LUPOS additionally uses its own
@@ -43,6 +53,8 @@ export interface MemoryStoreParams {
   agent: string;
   project?: string | null;
   username?: string | null;
+  /** Profile partition — defaults to the request's profile (ALS), then "default". */
+  profileId?: string;
   type?: string;
   title?: string | null;
   content: string;
@@ -70,6 +82,8 @@ export interface MemoryInvalidateParams {
 export interface MemoryExtractAndStoreParams {
   guildId?: string;
   channelId?: string;
+  /** Profile partition — defaults to the request's profile (ALS), then "default". */
+  profileId?: string;
   messages: Record<string, unknown>[];
   participants: Record<string, unknown>[];
   sourceMessageId?: string;
@@ -80,6 +94,8 @@ export interface MemoryExtractAndStoreParams {
 export interface MemorySearchParams {
   agent: string;
   project?: string | null;
+  /** Profile partition — defaults to the request's profile (ALS), then "default". */
+  profileId?: string;
   guildId?: string;
   userIds?: string[];
   queryText: string;
@@ -94,6 +110,8 @@ export interface MemorySearchParams {
 export interface MemoryListParams {
   agent?: string;
   project?: string | null;
+  /** Profile partition — defaults to the request's profile (ALS), then "default". */
+  profileId?: string;
   guildId?: string;
   userId?: string;
   aboutUserId?: string;
@@ -108,6 +126,8 @@ export interface MemoryListParams {
 export interface MemoryFacetsParams {
   agent?: string;
   project?: string | null;
+  /** Profile partition — defaults to the request's profile (ALS), then "default". */
+  profileId?: string;
   guildId?: string;
 }
 
@@ -305,6 +325,7 @@ const MemoryService = {
     agent,
     project,
     username,
+    profileId,
     type,
     title,
     content,
@@ -323,6 +344,7 @@ const MemoryService = {
     if (agent === AGENT_IDS.CODING) {
       type = CODING_MEMORY_TYPES.includes(type as string) ? type : "project";
     }
+    const resolvedProfileId = resolveProfileId(profileId);
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
     if (!collection) {
       logger.warn(`[MemoryService] store: collection ${COLLECTION} not available`);
@@ -349,6 +371,7 @@ const MemoryService = {
     if (dedupe) {
       const dedupFilter: Record<string, unknown> = {
         agent,
+        profileId: profileFilter(resolvedProfileId),
         ...CURRENT_MEMORY_FILTER,
       };
       if (project) dedupFilter.project = project;
@@ -391,6 +414,8 @@ const MemoryService = {
       agent,
       project: project || null,
       username: username || null,
+      // Always the literal id — never null, never the $in filter shape.
+      profileId: resolvedProfileId,
       type: type || "other",
       title: title || null,
       content,
@@ -419,6 +444,7 @@ const MemoryService = {
     sourceMessageId,
     traceId,
     project,
+    profileId,
     endpoint,
   }: MemoryExtractAndStoreParams) {
     // Extract facts from the conversation via AI
@@ -450,6 +476,7 @@ const MemoryService = {
           agent: AGENT_IDS.LUPOS,
           project: project || null,
           username: fact.sourceUsername || null,
+          profileId,
           type: fact.category || "other",
           title: null,
           content: fact.fact,
@@ -487,6 +514,7 @@ const MemoryService = {
   async search({
     agent,
     project,
+    profileId,
     guildId,
     userIds,
     queryText,
@@ -515,8 +543,12 @@ const MemoryService = {
     if (agent) embeddingOpts.agent = agent;
     if (username) embeddingOpts.username = username;
     const queryEmbedding = await generateEmbedding(queryText, embeddingOpts);
-    // Build the filter — always scoped by agent, current rows only
-    const filter: Record<string, unknown> = { agent, ...CURRENT_MEMORY_FILTER };
+    // Build the filter — always scoped by agent + profile, current rows only
+    const filter: Record<string, unknown> = {
+      agent,
+      profileId: profileFilter(resolveProfileId(profileId)),
+      ...CURRENT_MEMORY_FILTER,
+    };
     if (project) filter.project = project;
     if (guildId) filter.guildId = guildId;
     if (userIds && userIds.length > 0) {
@@ -594,6 +626,7 @@ const MemoryService = {
   async list({
     agent,
     project,
+    profileId,
     guildId,
     userId,
     aboutUserId,
@@ -607,6 +640,7 @@ const MemoryService = {
     const filter: Record<string, unknown> = includeSuperseded
       ? {}
       : { ...CURRENT_MEMORY_FILTER };
+    filter.profileId = profileFilter(resolveProfileId(profileId));
     if (agent) filter.agent = agent;
     if (project) filter.project = project;
     if (guildId) filter.guildId = guildId;
@@ -630,9 +664,12 @@ const MemoryService = {
    * Discord users memories are about (aboutUserId) and revealed by
    * (sourceUserId), each with counts. Powers the Memories tab filter dropdown.
    */
-  async facets({ agent, project, guildId }: MemoryFacetsParams) {
+  async facets({ agent, project, profileId, guildId }: MemoryFacetsParams) {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
-    const match: Record<string, unknown> = { ...CURRENT_MEMORY_FILTER };
+    const match: Record<string, unknown> = {
+      ...CURRENT_MEMORY_FILTER,
+      profileId: profileFilter(resolveProfileId(profileId)),
+    };
     if (agent) match.agent = agent;
     if (project) match.project = project;
     if (guildId) match.guildId = guildId;
@@ -752,9 +789,12 @@ const MemoryService = {
   async remove(memoryId: string) {
     return this.delete(memoryId);
   },
-  async removeAllByAgent(project: string, agent?: string) {
+  async removeAllByAgent(project: string, agent?: string, profileId?: string) {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
-    const filter: Record<string, unknown> = { project };
+    const filter: Record<string, unknown> = {
+      project,
+      profileId: profileFilter(resolveProfileId(profileId)),
+    };
     if (agent) filter.agent = agent;
     const result = await collection.deleteMany(filter);
     logger.info(
@@ -817,23 +857,35 @@ const MemoryService = {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) return;
     const collection = db.collection(COLLECTION);
-    // Primary lookup: by agent + project, with createdAt suffix so the
-    // dedup/search paths' sort({createdAt:-1}).limit(N) walks the index
-    // instead of fetching every ~12KB embedding doc and sorting in memory
-    await collection.createIndex({ agent: 1, project: 1, createdAt: -1 });
+    // Primary lookup: by agent + project + profile, with createdAt suffix so
+    // the dedup/search paths' sort({createdAt:-1}).limit(N) walks the index
+    // instead of fetching every ~12KB embedding doc and sorting in memory.
+    // profileId queries use {$in:["default",null]} for the default profile,
+    // which the index still serves (missing fields index as null).
+    await collection.createIndex({
+      agent: 1,
+      project: 1,
+      profileId: 1,
+      createdAt: -1,
+    });
     // LUPOS queries: agent + guild + user, same createdAt-suffix rationale
     await collection.createIndex({
       agent: 1,
       guildId: 1,
       aboutUserId: 1,
+      profileId: 1,
       createdAt: -1,
     });
     // Type-filtered queries
-    await collection.createIndex({ agent: 1, project: 1, type: 1 });
+    await collection.createIndex({ agent: 1, project: 1, profileId: 1, type: 1 });
     // Drop the old prefix-redundant variants superseded by the indexes above
     for (const staleIndex of [
       "agent_1_project_1",
       "agent_1_guildId_1_aboutUserId_1",
+      // Pre-profile shapes superseded by the profileId-bearing indexes
+      "agent_1_project_1_createdAt_-1",
+      "agent_1_guildId_1_aboutUserId_1_createdAt_-1",
+      "agent_1_project_1_type_1",
     ]) {
       await collection.dropIndex(staleIndex).catch(() => {});
     }
