@@ -47,6 +47,8 @@ const configMock = {
     if (outputType === MODALITY_TYPES.EMBEDDING) return MOCK_EMBEDDING_PRICING;
     return MOCK_TEXT_PRICING;
   },
+  // ModelRoleRouter's utility-role cloud default — none in unit tests
+  resolveRecommendedDefault: () => null,
 };
 
 // Root config.js — exports MONGO_DB_NAME (used by ConversationService etc.)

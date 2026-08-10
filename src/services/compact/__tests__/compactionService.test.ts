@@ -32,6 +32,20 @@ vi.mock("#src/services/RequestLogger", () => ({
   },
 }));
 
+// Keep ModelRoleRouter's built-in utility defaults deterministic: no local
+// instances registered and no cloud API keys available in unit tests.
+vi.mock("#src/providers/instance-registry", () => ({
+  listInstances: vi.fn().mockReturnValue([]),
+}));
+
+vi.mock("#src/config", async (importOriginal) => {
+  const original = await importOriginal<typeof import("#src/config")>();
+  return {
+    ...original,
+    resolveRecommendedDefault: vi.fn().mockReturnValue(null),
+  };
+});
+
 describe("AutoCompactionTrigger", () => {
   it("should calculate effective context window correctly", () => {
     const effectiveWindowSmaller = AutoCompactionTrigger.getEffectiveContextWindowSize(100000, 10000);
@@ -189,7 +203,7 @@ describe("CompactionService", () => {
     { role: "assistant", content: "Assistant response 4" },
   ];
 
-  it("should return null if settings are not configured or missing provider/model", async () => {
+  it("returns null only when the utility role chain is truly empty (no config, no fallback, no defaults)", async () => {
     vi.mocked(SettingsService.getSection).mockResolvedValueOnce(null as any);
     const result = await CompactionService.compactConversation(sampleMessages, {
       project: "test-proj",
@@ -208,13 +222,88 @@ describe("CompactionService", () => {
     expect(resultEmpty).toBeNull();
   });
 
-  it("should return null if settings check throws", async () => {
+  it("is NOT silently disabled — unset settings fall back to the conversation model via the utility role", async () => {
+    vi.mocked(SettingsService.getSection).mockResolvedValueOnce({
+      extractionProvider: "",
+      extractionModel: "",
+    });
+    mockGenerateText.mockResolvedValueOnce({
+      text: "<summary>Compacted via the fallback conversation model.</summary>",
+      usage: { inputTokens: 100, outputTokens: 50 },
+    });
+    mockGenerateText.mockResolvedValueOnce({ text: "<ok/>", usage: { inputTokens: 10, outputTokens: 2 } });
+
+    const result = await CompactionService.compactConversation(sampleMessages, {
+      project: "test-proj",
+      username: "rodrigo",
+      fallbackProvider: "anthropic",
+      fallbackModel: "claude-fable-5",
+    });
+
+    expect(result).not.toBeNull();
+    expect(RequestLogger.logBackgroundLlmCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: "compact:summarize",
+        provider: "anthropic",
+        model: "claude-fable-5",
+      }),
+    );
+  });
+
+  it("should return null if settings check throws and nothing else resolves", async () => {
     vi.mocked(SettingsService.getSection).mockRejectedValueOnce(new Error("Database disconnected"));
     const result = await CompactionService.compactConversation(sampleMessages, {
       project: "test-proj",
       username: "rodrigo",
     });
     expect(result).toBeNull();
+  });
+
+  it("carries deviation-rule reminders across the compaction boundary", async () => {
+    const reminderContent =
+      "<deviation-rule-reminder>\n\n[DEVIATION RULE — SEMANTIC STALL] Stop repeating read_file.\n\n</deviation-rule-reminder>";
+    const messagesWithReminder = [
+      { role: "system", content: "You are an assistant." },
+      { role: "user", content: `User turn 1${filler}` },
+      { role: "system", content: reminderContent },
+      { role: "system", content: "An ordinary system note that may be dropped." },
+      { role: "assistant", content: `Assistant response 1${filler}` },
+      { role: "user", content: "User turn 2" },
+      { role: "assistant", content: "Assistant response 2" },
+      { role: "user", content: "User turn 3" },
+      { role: "assistant", content: "Assistant response 3" },
+      { role: "user", content: "User turn 4" },
+      { role: "assistant", content: "Assistant response 4" },
+    ];
+    mockGenerateText.mockResolvedValueOnce({
+      text: "<summary>Summary of the dropped span.</summary>",
+      usage: { inputTokens: 100, outputTokens: 50 },
+    });
+    mockGenerateText.mockResolvedValueOnce({ text: "<ok/>", usage: { inputTokens: 10, outputTokens: 2 } });
+
+    const result = await CompactionService.compactConversation(
+      messagesWithReminder,
+      { project: "test-proj", username: "rodrigo" },
+    );
+
+    expect(result).not.toBeNull();
+    const compacted = result!.compactedMessages;
+    const reminderMessages = compacted.filter(
+      (message) => message.content === reminderContent,
+    );
+    // Exactly one copy of the reminder survives, positioned after the summary
+    expect(reminderMessages).toHaveLength(1);
+    const summaryIndex = compacted.findIndex(
+      (message) => (message as { isCompactSummary?: boolean }).isCompactSummary,
+    );
+    expect(compacted.indexOf(reminderMessages[0])).toBeGreaterThan(summaryIndex);
+    // The ordinary system message from the dropped span does NOT survive
+    expect(
+      compacted.some(
+        (message) =>
+          message.content === "An ordinary system note that may be dropped.",
+      ),
+    ).toBe(false);
   });
 
   it("should return null if circuit breaker is open", async () => {

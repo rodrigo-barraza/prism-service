@@ -56,6 +56,59 @@ import AgentHooks from "#src/services/AgentHooks";
 import AutoApprovalEngine from "#src/services/AutoApprovalEngine";
 
 // Mock child_process.execSync
+// CriticGate now streams through getProvider(chainEntry.provider) with a
+// role-resolved chain — delegate to a per-test provider stub so the
+// existing context-provider mocks keep driving the stream.
+const criticProviderHolder = vi.hoisted(() => ({
+  current: null as null | {
+    generateTextStream: (...args: unknown[]) => unknown;
+  },
+}));
+
+vi.mock("#src/providers/index", () => ({
+  getProvider: () => ({
+    generateTextStream: (...args: unknown[]) =>
+      criticProviderHolder.current!.generateTextStream(...args),
+  }),
+}));
+
+vi.mock("#src/services/ModelRoleRouter", () => ({
+  MODEL_ROLES: {
+    DEFAULT: "default",
+    UTILITY: "utility",
+    CRITIC: "critic",
+    PLAN: "plan",
+    VISION: "vision",
+  },
+  default: {
+    resolveChain: vi
+      .fn()
+      .mockResolvedValue([{ provider: "google", model: "gemini-3.5-flash" }]),
+    runWithChain: vi.fn().mockImplementation(
+      async (
+        chain: Array<{ provider: string; model: string }>,
+        attempt: (
+          entry: { provider: string; model: string },
+          index: number,
+        ) => Promise<unknown>,
+      ) => {
+        let lastError: unknown;
+        for (let index = 0; index < chain.length; index++) {
+          try {
+            return {
+              value: await attempt(chain[index], index),
+              entry: chain[index],
+            };
+          } catch (error) {
+            lastError = error;
+          }
+        }
+        throw lastError ?? new Error("empty chain");
+      },
+    ),
+  },
+}));
+
 vi.mock("node:child_process", () => ({
   execSync: vi.fn(),
 }));
@@ -155,6 +208,10 @@ describe("Harness Lifecycle Modules", () => {
       }),
     };
 
+    beforeEach(() => {
+      criticProviderHolder.current = mockProvider;
+    });
+
     const mockAgenticContext = {
       project: "test-project",
       username: "test-user",
@@ -213,7 +270,7 @@ describe("Harness Lifecycle Modules", () => {
       const reviewResult = await criticGate.review(toolCall, mockAgenticContext as any);
       expect(reviewResult.isApproved).toBe(true);
       expect(reviewResult.reason).toBe("critic_approved");
-      expect(reviewResult.criticModel).toBe("critic-model");
+      expect(reviewResult.criticModel).toBe("google/critic-model");
       expect(mockProvider.generateTextStream).toHaveBeenCalled();
     });
 
@@ -282,6 +339,7 @@ describe("Harness Lifecycle Modules", () => {
         }),
       };
 
+      criticProviderHolder.current = mockProviderMinimal;
       const contextMinimal = {
         provider: mockProviderMinimal,
         resolvedModel: "gemini-3.5-flash",
@@ -308,6 +366,7 @@ describe("Harness Lifecycle Modules", () => {
         }),
       };
 
+      criticProviderHolder.current = mockProviderDenyEmpty;
       const contextMinimal = {
         provider: mockProviderDenyEmpty,
         resolvedModel: "gemini-3.5-flash",
@@ -334,6 +393,7 @@ describe("Harness Lifecycle Modules", () => {
         }),
       };
 
+      criticProviderHolder.current = mockProviderAmbiguous;
       const contextMinimal = {
         provider: mockProviderAmbiguous,
         resolvedModel: "gemini-3.5-flash",
@@ -363,6 +423,7 @@ describe("Harness Lifecycle Modules", () => {
         }),
       };
 
+      criticProviderHolder.current = mockProviderApprove;
       const contextMinimal = {
         provider: mockProviderApprove,
         resolvedModel: "gemini-3.5-flash",

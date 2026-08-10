@@ -34,6 +34,8 @@ export const SYSTEM_MESSAGE_TAGS = {
   BACKTRACK: "backtrack-guidance",
   /** Semantic stall / behavioral loop warning. */
   BEHAVIORAL_LOOP: "behavioral-loop-warning",
+  /** Mid-stream deviation-rule reminder (aborted pass → corrective retry). */
+  DEVIATION_REMINDER: "deviation-rule-reminder",
   /** Recovery prompt after an empty model response. */
   EMPTY_OUTPUT: "empty-output-recovery",
   /** Max tool-call iterations reached — wrap up now. */
