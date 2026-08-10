@@ -126,5 +126,16 @@
 
   "list_async_tasks": {
     "noConversation": "Cannot list async tasks: no conversation context available."
+  },
+
+  "checkpoint": {
+    "noConversation": "No active conversation in context — checkpoint needs a persisted conversation to mark.",
+    "recorded": "Checkpoint \"{{name}}\" recorded at message index {{index}}. Call rewind (optionally with this name) to prune everything after it.",
+    "moved": "Checkpoint \"{{name}}\" moved to the current position (message index {{index}})."
+  },
+
+  "rewind": {
+    "noConversation": "No active conversation in context — nothing to rewind.",
+    "success": "Rewound to checkpoint \"{{name}}\": {{pruned}} message(s) pruned from context ({{remaining}} remain). Pruned messages are excluded from all future turns but stay stored and visible to the user. This turn survives — carry forward any conclusions in your reply."
   }
 }
