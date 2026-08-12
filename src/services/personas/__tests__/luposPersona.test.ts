@@ -12,11 +12,12 @@ import { LuposPersona } from "#src/services/personas/LuposPersona";
 const defaultEnabledTools = LuposPersona.enabledByDefaultTools ?? [];
 
 /** The tool policy as assembled for a turn that has discovered nothing. */
-function buildColdStartPolicy(): string {
+function buildColdStartPolicy(locale = "en"): string {
   if (typeof LuposPersona.toolPolicy !== "function") {
     return LuposPersona.toolPolicy ?? "";
   }
   return LuposPersona.toolPolicy({
+    locale,
     enabledTools: defaultEnabledTools,
     resolvedToolNames: defaultEnabledTools,
   });
@@ -53,4 +54,19 @@ describe("Lupos persona tool policy", () => {
       expect(defaultEnabledTools).toContain(toolName);
     }
   });
+
+  // A gift or mugging sends no receipt and no DM — the wolf's own sentence is
+  // the only notification the member ever gets. An earlier draft told him the
+  // amounts were "theater, not finance", and he duly wrote around them: gold
+  // moved every time and nobody in the channel could tell. Both locales must
+  // keep telling him to say the number out loud.
+  it.each(["en", "caveman"])(
+    "tells the wolf to name the amount out loud (%s)",
+    (locale) => {
+      const goldRules = extractGoldRules(buildColdStartPolicy(locale));
+
+      expect(goldRules).toContain("SAY THE NUMBER");
+      expect(goldRules).not.toContain("theater, not finance");
+    },
+  );
 });
