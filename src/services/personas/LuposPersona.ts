@@ -224,9 +224,18 @@ const LUPOS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
     // Wolf economy: hoard-funded gifts, provoked muggings, fumble
     // scatters. Amount/frequency caps are enforced server-side in
     // lupos-bot (luposAgentGold) — this section is behavioral guidance.
+    // All three tools are listed because `requires` is an OR: the rules
+    // name every one of them, so any one reaching the model must render
+    // them. They are enabled by default (see enabledByDefaultTools), so
+    // this gate passes on the first iteration rather than waiting for a
+    // discovery round that the wolf has no reason to run.
     content: (locale) =>
       PromptLocaleService.get(locale, "personas.lupos.toolPolicyGold"),
-    requires: ["mug_discord_gold"],
+    requires: [
+      "get_discord_gold_balance",
+      "give_discord_gold",
+      "mug_discord_gold",
+    ],
   },
 ];
 
@@ -367,11 +376,24 @@ export const LuposPersona: Persona = {
   ],
   // Core tools only on the first iteration — everything in
   // LUPOS_AVAILABLE_TOOLS is available but NOT enabled, reachable via
-  // innate discovery or pre-flight (same shape as Omni). Exception:
-  // react_to_discord_message is always on — it replaces lupos-bot's old
-  // unconditional per-reply emoji reaction, so it must not depend on
-  // mid-conversation discovery.
-  enabledByDefaultTools: ["react_to_discord_message"],
+  // innate discovery or pre-flight (same shape as Omni). The exceptions
+  // are the tools whose trigger is emotional rather than lexical:
+  // pre-flight matches the catalog against the user's message text, so a
+  // tool that fires on being insulted or charmed — words that never name
+  // it — is unreachable in exactly the moments it exists for.
+  //   - react_to_discord_message replaces lupos-bot's old unconditional
+  //     per-reply emoji reaction.
+  //   - The gold trio backs the Gold Rules policy section: mugging keys
+  //     off rudeness, gifting off kindness. That section is the only
+  //     place the wolf is told the economy exists at all, and it is
+  //     `requires`-gated on these three, so leaving them to discovery
+  //     left him unaware of his own hoard on every turn.
+  enabledByDefaultTools: [
+    "react_to_discord_message",
+    "get_discord_gold_balance",
+    "give_discord_gold",
+    "mug_discord_gold",
+  ],
   capabilities: "",
   hasSomaticState: true,
   // Lupos's resting temperament: mildly cynical, restless, a buried streak
