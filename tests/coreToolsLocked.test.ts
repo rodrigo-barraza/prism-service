@@ -43,7 +43,7 @@ describe("GET /config/agents — coreToolsLocked field", () => {
     }
   });
 
-  it("returns only react_to_discord_message in enabledByDefaultToolNames for LUPOS — the rest available but not enabled", async () => {
+  it("returns only the mood-triggered tools in enabledByDefaultToolNames for LUPOS — the rest available but not enabled", async () => {
     const response = await authenticatedGet("/config/agents").expect(200);
     const agents = response.body as AgentConfigResponse[];
 
@@ -51,12 +51,18 @@ describe("GET /config/agents — coreToolsLocked field", () => {
     expect(lupos).toBeDefined();
     expect(lupos!.enabledByDefaultToolNames).toBeDefined();
     expect(lupos!.enabledByDefaultToolNames).not.toContain("*");
-    // Lupos starts lean: always-on core tools plus react_to_discord_message
-    // (which replaced lupos-bot's unconditional per-reply emoji reaction, so
-    // it can't depend on mid-conversation discovery). Everything else in his
-    // availableTools is reachable via innate discovery, not enabled by default.
+    // Lupos starts lean: always-on core tools plus the handful whose trigger
+    // is a mood rather than a word. Pre-flight discovery matches the catalog
+    // against the user's message text, so reacting (which replaced
+    // lupos-bot's unconditional per-reply emoji) and the gold trio (mugging
+    // fires on rudeness, gifting on kindness) would never be reachable in
+    // the moments they exist for. Everything else in his availableTools is
+    // reachable via innate discovery, not enabled by default.
     expect(lupos!.enabledByDefaultToolNames).toEqual([
       "react_to_discord_message",
+      "get_discord_gold_balance",
+      "give_discord_gold",
+      "mug_discord_gold",
     ]);
   });
 });
