@@ -1227,7 +1227,6 @@ const MODELS = {
     label: "Gemini 3.6 Flash",
     provider: PROVIDERS.GOOGLE,
     modelType: MODEL_TYPES.CONVERSATION,
-    default: true,
     year: 2026,
     defaultTemperature: 1.0,
     pricing: {
@@ -1271,6 +1270,7 @@ const MODELS = {
     label: "Gemini 3.7 Flash",
     provider: PROVIDERS.GOOGLE,
     modelType: MODEL_TYPES.CONVERSATION,
+    default: true,
     year: 2026,
     defaultTemperature: 1.0,
     pricing: {
@@ -1295,6 +1295,11 @@ const MODELS = {
     // ("Thinking level MINIMAL is not supported for this model"). It does
     // accept thinkingBudget: 0, which is how the provider turns thinking off.
     thinkingLevels: ["low", "medium", "high"],
+    // No "minimal" rung, but thinking still switches off — via thinkingBudget: 0
+    // (verified 200). Stated explicitly because the absence of "minimal" is
+    // otherwise read as "thinking is always on", which is true of 3.1 Pro but
+    // NOT of this model.
+    canDisableThinking: true,
     webSearch: "Google Search",
     codeExecution: true,
     urlContext: true,

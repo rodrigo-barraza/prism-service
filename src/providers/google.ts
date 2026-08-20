@@ -30,7 +30,11 @@ interface ModelDefinition {
   name: string;
   thinking?: boolean;
   thinkingLevels?: string[];
-  /** false = this model cannot switch thinking off at all (Pro tier). */
+  /**
+   * Explicit override for whether thinking can be switched off, when the
+   * thinkingLevels list does not say. false = never (Pro tier); true = yes,
+   * by a mechanism other than a "minimal" level (3.7 Flash: thinkingBudget 0).
+   */
   canDisableThinking?: boolean;
   outputTypes?: string[];
   listed?: boolean;
