@@ -510,12 +510,14 @@ const MODELS = {
     modelType: MODEL_TYPES.CONVERSATION,
     year: 2026,
     defaultTemperature: 1.0,
+    // Repriced by OpenAI on 2026-07-30. Over-272k tiers follow the published
+    // rule, applied to the whole request: 2x input, 1.5x output.
     pricing: {
-      inputPerMillion: 2.5,
-      cachedInputPerMillion: 0.25,
-      outputPerMillion: 15.0,
-      inputOver272kPerMillion: 5.0,
-      outputOver272kPerMillion: 22.5,
+      inputPerMillion: 2.0,
+      cachedInputPerMillion: 0.2,
+      outputPerMillion: 12.0,
+      inputOver272kPerMillion: 4.0,
+      outputOver272kPerMillion: 18.0,
       webSearchPer1kCalls: 10.0,
     },
     maxInputTokens: 1_050_000,
@@ -547,12 +549,14 @@ const MODELS = {
     modelType: MODEL_TYPES.CONVERSATION,
     year: 2026,
     defaultTemperature: 1.0,
+    // Repriced by OpenAI on 2026-07-30. Over-272k tiers follow the published
+    // rule, applied to the whole request: 2x input, 1.5x output.
     pricing: {
-      inputPerMillion: 1.0,
-      cachedInputPerMillion: 0.1,
-      outputPerMillion: 6.0,
-      inputOver272kPerMillion: 2.0,
-      outputOver272kPerMillion: 9.0,
+      inputPerMillion: 0.2,
+      cachedInputPerMillion: 0.02,
+      outputPerMillion: 1.2,
+      inputOver272kPerMillion: 0.4,
+      outputOver272kPerMillion: 1.8,
       webSearchPer1kCalls: 10.0,
     },
     maxInputTokens: 1_050_000,
@@ -1011,9 +1015,9 @@ const MODELS = {
     year: 2026,
     defaultTemperature: 0.6,
     pricing: {
-      inputPerMillion: 0.66,
-      cachedInputPerMillion: 0.066,
-      outputPerMillion: 3.41,
+      inputPerMillion: 0.95,
+      cachedInputPerMillion: 0.16,
+      outputPerMillion: 4.0,
     },
     maxInputTokens: 262_144,
     maxOutputTokens: 32_768,
@@ -1034,9 +1038,9 @@ const MODELS = {
     year: 2026,
     defaultTemperature: 0.6,
     pricing: {
-      inputPerMillion: 0.72,
-      cachedInputPerMillion: 0.072,
-      outputPerMillion: 3.5,
+      inputPerMillion: 0.95,
+      cachedInputPerMillion: 0.19,
+      outputPerMillion: 4.0,
     },
     maxInputTokens: 262_144,
     maxOutputTokens: 32_768,
@@ -1066,6 +1070,7 @@ const MODELS = {
     },
     pricing: {
       inputPerMillion: 0.5,
+      cachedInputPerMillion: 0.05,
       audioInputPerMillion: 1.0,
       outputPerMillion: 3.0,
     },
@@ -1105,6 +1110,7 @@ const MODELS = {
     arena: { text: 1500, code: 1461, vision: 1278, document: 1462 },
     pricing: {
       inputPerMillion: 2.0,
+      cachedInputPerMillion: 0.2,
       audioInputPerMillion: 4.0,
       outputPerMillion: 12.0,
       inputOver200kPerMillion: 4.0,
@@ -1216,24 +1222,26 @@ const MODELS = {
     ],
   },
 
-  // Launched 2026-07-21 (GA in AI Studio / Vertex / Gemini API). Input/output
-  // prices are Google's published figures; cached & audio input follow the
-  // 3.5 Flash ratios (10% cache hit, 2× audio) pending an official listing —
-  // adjust once Google publishes the full pricing table. No arena scores yet.
+  // Launched 2026-07-21 (GA in AI Studio / Vertex / Gemini API). Input, cached
+  // input and output are Google's published figures as of 2026-08-20; only
+  // audio input is still unlisted for this tier. No arena scores yet.
   GEMINI_36_FLASH: {
     description:
-      "Google's Gemini 3.6 Flash, the new Flash-tier default — stronger agentic coding and computer use than 3.5 Flash while using ~17% fewer output tokens at a lower price.",
+      "Google's Gemini 3.6 Flash — stronger agentic coding and computer use than 3.5 Flash while using ~17% fewer output tokens at a lower price. Superseded as the Flash-tier default by 3.7 Flash.",
     name: "gemini-3.6-flash",
     label: "Gemini 3.6 Flash",
     provider: PROVIDERS.GOOGLE,
     modelType: MODEL_TYPES.CONVERSATION,
     year: 2026,
     defaultTemperature: 1.0,
+    // Promotional rate, in effect through 2026-12-31; reverts to $1.50 in /
+    // $7.50 out (cached $0.15) on 2027-01-01. Audio input is not published
+    // separately for this tier — carried at Google's usual 2x input ratio.
     pricing: {
-      inputPerMillion: 1.5,
-      cachedInputPerMillion: 0.15,
-      audioInputPerMillion: 3.0,
-      outputPerMillion: 7.5,
+      inputPerMillion: 0.75,
+      cachedInputPerMillion: 0.075,
+      audioInputPerMillion: 1.5,
+      outputPerMillion: 3.75,
     },
     maxInputTokens: 1_048_576,
     maxOutputTokens: 65_536,
@@ -1273,11 +1281,14 @@ const MODELS = {
     default: true,
     year: 2026,
     defaultTemperature: 1.0,
+    // Promotional rate, in effect through 2026-12-31; reverts to $1.50 in /
+    // $7.50 out (cached $0.15) on 2027-01-01. Audio input is not published
+    // separately for this tier — carried at Google's usual 2x input ratio.
     pricing: {
-      inputPerMillion: 1.5,
-      cachedInputPerMillion: 0.15,
-      audioInputPerMillion: 3.0,
-      outputPerMillion: 7.5,
+      inputPerMillion: 0.75,
+      cachedInputPerMillion: 0.075,
+      audioInputPerMillion: 1.5,
+      outputPerMillion: 3.75,
     },
     maxInputTokens: 1_048_576,
     maxOutputTokens: 65_536,
@@ -1323,6 +1334,8 @@ const MODELS = {
     defaultTemperature: 1.0,
     pricing: {
       inputPerMillion: 0.25,
+      cachedInputPerMillion: 0.025,
+      audioInputPerMillion: 0.5,
       outputPerMillion: 1.5,
     },
     maxInputTokens: 1_048_576,
@@ -1362,7 +1375,7 @@ const MODELS = {
     pricing: {
       inputPerMillion: 0.3,
       cachedInputPerMillion: 0.03,
-      audioInputPerMillion: 0.6,
+      audioInputPerMillion: 0.3,
       outputPerMillion: 2.5,
     },
     maxInputTokens: 1_048_576,
@@ -1781,7 +1794,7 @@ const MODELS = {
     provider: PROVIDERS.GOOGLE,
     modelType: MODEL_TYPES.EMBED,
     year: 2025,
-    pricing: { inputPerMillion: 0.2 },
+    pricing: { inputPerMillion: 0.15 },
     maxInputTokens: 2_048,
     dimensions: 3072,
     inputTypes: [MODALITY_TYPES.TEXT],
@@ -1897,7 +1910,7 @@ const MODELS = {
     modelType: MODEL_TYPES.AUDIO,
     year: 2026,
     default: true,
-    pricing: { audioInputPerMillion: 1.0, outputPerMillion: 3.0 },
+    pricing: { audioInputPerMillion: 3.0, outputPerMillion: 9.0 },
     inputTypes: [MODALITY_TYPES.AUDIO],
     outputTypes: [MODALITY_TYPES.TEXT],
   },

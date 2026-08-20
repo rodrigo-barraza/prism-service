@@ -467,17 +467,52 @@ describe("Pricing sanity checks against official published rates", () => {
         expect(m.pricing.outputPerMillion).toBe(3.0);
     });
 
-    it("Gemini 3.7 Flash: $1.50 in / $7.50 out, $0.15 cachedIn", () => {
+    // Promotional rate through 2026-12-31; reverts to 1.5 / 7.5 (cached 0.15)
+    // on 2027-01-01, at which point this test is the reminder to update it.
+    it("Gemini 3.7 Flash: $0.75 in / $3.75 out, $0.075 cachedIn (promo)", () => {
         const m = getModel("gemini-3.7-flash");
-        expect(m.pricing.inputPerMillion).toBe(1.5);
-        expect(m.pricing.cachedInputPerMillion).toBe(0.15);
-        expect(m.pricing.outputPerMillion).toBe(7.5);
+        expect(m.pricing.inputPerMillion).toBe(0.75);
+        expect(m.pricing.cachedInputPerMillion).toBe(0.075);
+        expect(m.pricing.outputPerMillion).toBe(3.75);
+    });
+
+    it("Gemini 3.6 Flash is priced identically to 3.7 Flash", () => {
+        const a = getModel("gemini-3.6-flash");
+        const b = getModel("gemini-3.7-flash");
+        expect(a.pricing).toEqual(b.pricing);
     });
 
     it("Gemini 3.5 Flash-Lite: $0.30 in / $2.50 out", () => {
         const m = getModel("gemini-3.5-flash-lite");
         expect(m.pricing.inputPerMillion).toBe(0.3);
         expect(m.pricing.outputPerMillion).toBe(2.5);
+    });
+
+    it("Kimi K2.6: $0.95 in / $4.00 out, $0.16 cachedIn", () => {
+        const m = getModel("kimi-k2.6");
+        expect(m.pricing.inputPerMillion).toBe(0.95);
+        expect(m.pricing.cachedInputPerMillion).toBe(0.16);
+        expect(m.pricing.outputPerMillion).toBe(4.0);
+    });
+
+    it("Kimi K2.7 Code: $0.95 in / $4.00 out, $0.19 cachedIn", () => {
+        const m = getModel("kimi-k2.7-code");
+        expect(m.pricing.inputPerMillion).toBe(0.95);
+        expect(m.pricing.cachedInputPerMillion).toBe(0.19);
+        expect(m.pricing.outputPerMillion).toBe(4.0);
+    });
+
+    it("Gemini Embedding 001: $0.15 in", () => {
+        const m = getModel("gemini-embedding-001");
+        expect(m.pricing.inputPerMillion).toBe(0.15);
+    });
+
+    it("Gemini 3.1 Flash-Lite: $0.25 in / $0.50 audioIn / $1.50 out", () => {
+        const m = getModel("gemini-3.1-flash-lite");
+        expect(m.pricing.inputPerMillion).toBe(0.25);
+        expect(m.pricing.cachedInputPerMillion).toBe(0.025);
+        expect(m.pricing.audioInputPerMillion).toBe(0.5);
+        expect(m.pricing.outputPerMillion).toBe(1.5);
     });
 
     it("Gemini 3.1 Pro: $2.00 in / $12.00 out, $4.00 audioIn", () => {
@@ -557,11 +592,27 @@ describe("Pricing sanity checks against official published rates", () => {
 
     // ── Google Gemini — STT ──────────────────────────────────────
 
-    it("Gemini 3.5 Flash STT: $1.00 audioIn / $3.00 out", () => {
+    it("Gemini 3.5 Flash STT: $3.00 audioIn / $9.00 out", () => {
+        // Same model id as the conversation entry, so it must be the same
+        // rate — it previously carried 3 Flash's cheaper numbers, which meant
+        // one model billed at two prices depending on which entry was hit.
         const sttPricing = getPricing(TYPES.AUDIO, TYPES.TEXT);
         const p = sttPricing["gemini-3.5-flash"];
-        expect(p.audioInputPerMillion).toBe(1.0);
-        expect(p.outputPerMillion).toBe(3.0);
+        expect(p.audioInputPerMillion).toBe(3.0);
+        expect(p.outputPerMillion).toBe(9.0);
+    });
+
+    it("every STT entry agrees with the conversation entry for the same id", () => {
+        const sttPricing = getPricing(TYPES.AUDIO, TYPES.TEXT);
+        const textPricing = getPricing(TYPES.TEXT, TYPES.TEXT);
+        for (const [name, stt] of Object.entries(sttPricing) as [string, any][]) {
+            const text = (textPricing as any)[name];
+            if (!text) continue; // audio-only model, nothing to agree with
+            for (const field of ["audioInputPerMillion", "outputPerMillion"]) {
+                if (stt[field] === undefined || text[field] === undefined) continue;
+                expect(stt[field], `${name}.${field}`).toBe(text[field]);
+            }
+        }
     });
 
     it("Gemini 3 Flash STT: $1.00 audioIn / $3.00 out", () => {
@@ -700,6 +751,32 @@ describe("Pricing sanity checks against official published rates", () => {
         expect(m.pricing.inputPerMillion).toBe(5.0);
         expect(m.pricing.imageInputPerMillion).toBe(8.0);
         expect(m.pricing.imageOutputPerMillion).toBe(30.0);
+    });
+
+    it("GPT 5.6 Luna: $0.20 in / $1.20 out (repriced 2026-07-30)", () => {
+        const m = getModel("gpt-5.6-luna");
+        expect(m.pricing.inputPerMillion).toBe(0.2);
+        expect(m.pricing.cachedInputPerMillion).toBe(0.02);
+        expect(m.pricing.outputPerMillion).toBe(1.2);
+    });
+
+    it("GPT 5.6 Terra: $2.00 in / $12.00 out (repriced 2026-07-30)", () => {
+        const m = getModel("gpt-5.6-terra");
+        expect(m.pricing.inputPerMillion).toBe(2.0);
+        expect(m.pricing.cachedInputPerMillion).toBe(0.2);
+        expect(m.pricing.outputPerMillion).toBe(12.0);
+    });
+
+    it("over-272k tiers are 2x input and 1.5x output of the base rate", () => {
+        // OpenAI's published rule, applied to the whole request. Encoding it
+        // as a relationship catches a base-rate edit that forgets the tier.
+        for (const name of ["gpt-5.4", "gpt-5.5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]) {
+            const m = getModel(name);
+            expect(m.pricing.inputOver272kPerMillion, `${name} input tier`)
+                .toBeCloseTo(m.pricing.inputPerMillion * 2, 6);
+            expect(m.pricing.outputOver272kPerMillion, `${name} output tier`)
+                .toBeCloseTo(m.pricing.outputPerMillion * 1.5, 6);
+        }
     });
 
     it("text-embedding-3-small: $0.02 in", () => {
