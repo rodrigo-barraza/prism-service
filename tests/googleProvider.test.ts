@@ -349,7 +349,7 @@ describe("Google Provider Adapter", () => {
     it("sets responseModalities: ['IMAGE'] when forceImageGeneration is true and model definition outputTypes has image", async () => {
       const messages: ConversationMessage[] = [{ role: "user", content: "make image" }];
 
-      await googleProvider.generateText(messages, "gemini-3-pro-image-preview", {
+      await googleProvider.generateText(messages, "gemini-3-pro-image", {
         forceImageGeneration: true,
       });
 
@@ -360,7 +360,7 @@ describe("Google Provider Adapter", () => {
     it("sets includesThoughts config when thinking is enabled and model supports thinking", async () => {
       const messages: ConversationMessage[] = [{ role: "user", content: "think" }];
 
-      await googleProvider.generateText(messages, "gemini-3-pro-image-preview", {
+      await googleProvider.generateText(messages, "gemini-3-pro-image", {
         thinkingEnabled: true,
         thinkingBudget: 1000,
       });
@@ -372,10 +372,25 @@ describe("Google Provider Adapter", () => {
       });
     });
 
-    it("sets thinkingBudget to 0 when thinkingEnabled is false and model supports thinking", async () => {
+    it("winds thinking down via thinkingLevel when thinkingEnabled is false and the model declares minimal", async () => {
       const messages: ConversationMessage[] = [{ role: "user", content: "think fast" }];
 
-      await googleProvider.generateText(messages, "gemini-3-pro-image-preview", {
+      await googleProvider.generateText(messages, "gemini-3-pro-image", {
+        thinkingEnabled: false,
+      });
+
+      // Gemini 3 Pro Image declares a "minimal" level, so that is how thinking
+      // is turned down — thinkingBudget: 0 is a 400 on several current models.
+      const callArguments = mockGenerateContent.mock.calls[0][0];
+      expect(callArguments.config.thinkingConfig).toEqual({
+        thinkingLevel: "minimal",
+      });
+    });
+
+    it("uses thinkingBudget: 0 when thinkingEnabled is false and the model has no minimal level", async () => {
+      const messages: ConversationMessage[] = [{ role: "user", content: "think fast" }];
+
+      await googleProvider.generateText(messages, "gemini-3.7-flash", {
         thinkingEnabled: false,
       });
 

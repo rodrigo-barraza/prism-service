@@ -78,10 +78,19 @@ describe("Config route — pattern constant detection", () => {
     );
     expect(leveledModels.length).toBeGreaterThan(0);
 
+    // Every declared level must come from the shared vocabulary and the list
+    // must be non-empty — but NOT "at least low+high". Verified against the
+    // live API on 2026-08-20, the Nano Banana 2 image models accept only
+    // ["minimal", "high"] and reject LOW/MEDIUM by name, so a blanket
+    // "contains low" would pin a claim the provider 400s on.
+    const KNOWN_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"];
     for (const model of leveledModels) {
       expect(Array.isArray(model.thinkingLevels)).toBe(true);
-      expect(model.thinkingLevels.length).toBeGreaterThanOrEqual(3);
-      expect(model.thinkingLevels).toContain("low");
+      expect(model.thinkingLevels.length).toBeGreaterThan(0);
+      for (const level of model.thinkingLevels) {
+        expect(KNOWN_LEVELS, `${model.name} declares unknown level ${level}`).toContain(level);
+      }
+      // "high" is the one rung every leveled model in the catalog offers.
       expect(model.thinkingLevels).toContain("high");
     }
   });

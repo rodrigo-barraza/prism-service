@@ -159,7 +159,7 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
       expect(args.config.thinkingConfig.thinkingBudget).toBe(2048);
     });
 
-    it("configures thinkingConfig with thinkingBudget 0 if thinkingEnabled is explicitly false", async () => {
+    it("configures thinkingConfig with thinkingLevel minimal if thinkingEnabled is explicitly false", async () => {
       mockGenerateContent.mockResolvedValueOnce({
         candidates: [{ content: { parts: [{ text: "Done" }] } }],
         usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
@@ -170,8 +170,12 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
         thinkingEnabled: false,
       });
 
+      // 3.5 Flash declares a "minimal" level, so thinking is wound down with
+      // that rather than thinkingBudget: 0 — the sibling models 3.6 Flash and
+      // 3.5 Flash-Lite reject budget 0 with a 400, so the provider prefers the
+      // level whenever one is declared. See buildGenerateConfig.test.ts.
       const args = mockGenerateContent.mock.calls[0][0] as any;
-      expect(args.config.thinkingConfig).toEqual({ thinkingBudget: 0 });
+      expect(args.config.thinkingConfig).toEqual({ thinkingLevel: "minimal" });
     });
 
     it("does not configure thinkingConfig if model does not support thinking", async () => {

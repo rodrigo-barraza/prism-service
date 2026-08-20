@@ -376,7 +376,7 @@ describe("calculateImageCost with real config pricing", () => {
     const imagePricing = getPricing(TYPES.TEXT, TYPES.IMAGE);
 
     it("Gemini 3.1 Flash Image: ~$0.067 per 1024px image", () => {
-        const pricing = imagePricing["gemini-3.1-flash-image-preview"];
+        const pricing = imagePricing["gemini-3.1-flash-image"];
         const prompt = "A cute cartoon turtle standing upright with a friendly expression";
         const cost = calculateImageCost(prompt, pricing, 0, 1120);
         // Google's published price for 1024px: ~$0.067
@@ -386,7 +386,7 @@ describe("calculateImageCost with real config pricing", () => {
     });
 
     it("Gemini 3 Pro Image: ~$0.134 per 1024px image", () => {
-        const pricing = imagePricing["gemini-3-pro-image-preview"];
+        const pricing = imagePricing["gemini-3-pro-image"];
         const prompt = "A watercolor landscape painting";
         const cost = calculateImageCost(prompt, pricing, 0, 1120);
         // Google's published price for 1024px: ~$0.134
@@ -467,11 +467,17 @@ describe("Pricing sanity checks against official published rates", () => {
         expect(m.pricing.outputPerMillion).toBe(3.0);
     });
 
-    it("Gemini 3 Pro: $2.00 in / $12.00 out, $4.00 audioIn", () => {
-        const m = getModel("gemini-3-pro-preview");
-        expect(m.pricing.inputPerMillion).toBe(2.0);
-        expect(m.pricing.audioInputPerMillion).toBe(4.0);
-        expect(m.pricing.outputPerMillion).toBe(12.0);
+    it("Gemini 3.7 Flash: $1.50 in / $7.50 out, $0.15 cachedIn", () => {
+        const m = getModel("gemini-3.7-flash");
+        expect(m.pricing.inputPerMillion).toBe(1.5);
+        expect(m.pricing.cachedInputPerMillion).toBe(0.15);
+        expect(m.pricing.outputPerMillion).toBe(7.5);
+    });
+
+    it("Gemini 3.5 Flash-Lite: $0.30 in / $2.50 out", () => {
+        const m = getModel("gemini-3.5-flash-lite");
+        expect(m.pricing.inputPerMillion).toBe(0.3);
+        expect(m.pricing.outputPerMillion).toBe(2.5);
     });
 
     it("Gemini 3.1 Pro: $2.00 in / $12.00 out, $4.00 audioIn", () => {
@@ -492,15 +498,22 @@ describe("Pricing sanity checks against official published rates", () => {
     // ── Google Gemini — Image Generation ──────────────────────────
 
     it("Gemini 3.1 Flash Image: $0.50 in / $0.50 imageIn / $3.00 out / $60.00 imageOut", () => {
-        const m = getModel("gemini-3.1-flash-image-preview");
+        const m = getModel("gemini-3.1-flash-image");
         expect(m.pricing.inputPerMillion).toBe(0.5);
         expect(m.pricing.imageInputPerMillion).toBe(0.5);
         expect(m.pricing.outputPerMillion).toBe(3.0);
         expect(m.pricing.imageOutputPerMillion).toBe(60.0);
     });
 
+    it("Gemini 3.1 Flash-Lite Image: $0.25 in / $1.50 out / $30.00 imageOut", () => {
+        const m = getModel("gemini-3.1-flash-lite-image");
+        expect(m.pricing.inputPerMillion).toBe(0.25);
+        expect(m.pricing.outputPerMillion).toBe(1.5);
+        expect(m.pricing.imageOutputPerMillion).toBe(30.0);
+    });
+
     it("Gemini 3 Pro Image: $2.00 in / $2.00 imageIn / $12.00 out / $120.00 imageOut", () => {
-        const m = getModel("gemini-3-pro-image-preview");
+        const m = getModel("gemini-3-pro-image");
         expect(m.pricing.inputPerMillion).toBe(2.0);
         expect(m.pricing.imageInputPerMillion).toBe(2.0);
         expect(m.pricing.outputPerMillion).toBe(12.0);
@@ -509,14 +522,14 @@ describe("Pricing sanity checks against official published rates", () => {
 
     it("Gemini 3.1 Flash Image per-image cost matches Google's published ~$0.067", () => {
         // Google: 1024px = 1120 tokens at $60/M = $0.0672
-        const m = getModel("gemini-3.1-flash-image-preview");
+        const m = getModel("gemini-3.1-flash-image");
         const costPerImage = (1120 / 1_000_000) * m.pricing.imageOutputPerMillion;
         expect(costPerImage).toBeCloseTo(0.067, 3);
     });
 
     it("Gemini 3 Pro Image per-image cost matches Google's published ~$0.134", () => {
         // Google: 1024px to 2048px = 1120 tokens at $120/M = $0.1344
-        const m = getModel("gemini-3-pro-image-preview");
+        const m = getModel("gemini-3-pro-image");
         const costPerImage = (1120 / 1_000_000) * m.pricing.imageOutputPerMillion;
         expect(costPerImage).toBeCloseTo(0.134, 3);
     });
@@ -668,13 +681,26 @@ describe("Pricing sanity checks against official published rates", () => {
         expect(model.pricing.outputPerMillion).toBe(50.0);
     });
 
-    it("Mythos 5: $10.00 in / $50.00 out", () => {
-        const model = getModel("claude-mythos-5");
-        expect(model.pricing.inputPerMillion).toBe(10.0);
-        expect(model.pricing.outputPerMillion).toBe(50.0);
+    it("Opus 5: $5.00 in / $25.00 out", () => {
+        const model = getModel("claude-opus-5");
+        expect(model.pricing.inputPerMillion).toBe(5.0);
+        expect(model.pricing.outputPerMillion).toBe(25.0);
     });
 
     // ── OpenAI — Embeddings ──────────────────────────────────────
+
+    it("GPT 5.2 Pro: $21.00 in / $168.00 out", () => {
+        const m = getModel("gpt-5.2-pro");
+        expect(m.pricing.inputPerMillion).toBe(21.0);
+        expect(m.pricing.outputPerMillion).toBe(168.0);
+    });
+
+    it("GPT Image 2: $5.00 in / $8.00 imageIn / $30.00 imageOut", () => {
+        const m = getModel("gpt-image-2");
+        expect(m.pricing.inputPerMillion).toBe(5.0);
+        expect(m.pricing.imageInputPerMillion).toBe(8.0);
+        expect(m.pricing.imageOutputPerMillion).toBe(30.0);
+    });
 
     it("text-embedding-3-small: $0.02 in", () => {
         const m = getModel("text-embedding-3-small");
