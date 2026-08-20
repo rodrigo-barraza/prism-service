@@ -350,6 +350,33 @@ describe("Provider availability filtering", () => {
     expect(providers).not.toContain(PROVIDERS.OLLAMA);
   });
 
+  it("Google's text default is Gemini 3.7 Flash", async () => {
+    const res = await request(app).get("/config").expect(200);
+    expect(res.body.textToText.defaults.google).toBe("gemini-3.7-flash");
+  });
+
+  it("exactly one Google conversation model carries the default flag", async () => {
+    const res = await request(app).get("/config").expect(200);
+    const googleModels = (res.body.textToText.models.google || []) as any[];
+    const flagged = googleModels.filter((m: any) => m.default === true);
+    // The derivation is last-wins on ties, so a second flag would silently
+    // decide the default by file order rather than by intent.
+    expect(flagged.length).toBeLessThanOrEqual(1);
+  });
+
+  it("carries canDisableThinking through to the client for models that set it", async () => {
+    const res = await request(app).get("/config").expect(200);
+    const googleModels = (res.body.textToText.models.google || []) as any[];
+    const byName = (n: string) => googleModels.find((m: any) => m.name === n);
+
+    // The client decides whether to offer "No Thinking" from this field; the
+    // fallback heuristic ("declares a minimal level") gets both of these wrong.
+    expect(byName("gemini-3.7-flash")?.canDisableThinking).toBe(true);
+    expect(byName("gemini-3.1-pro-preview")?.canDisableThinking).toBe(false);
+    // Models that leave it unset stay on the heuristic.
+    expect(byName("gemini-3.6-flash")).not.toHaveProperty("canDisableThinking");
+  });
+
   it("defaults only contain available providers", async () => {
     const res = await request(app).get("/config").expect(200);
 

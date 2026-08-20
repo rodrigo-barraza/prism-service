@@ -38,7 +38,12 @@ export interface ModelOptionEntry {
   modelType?: string;
   liveAPI?: boolean;
   thinkingLevels?: string[];
-  /** false = the model cannot switch thinking off at all (Gemini Pro tier). */
+  /**
+   * Whether thinking can be switched off, when that is not inferable from
+   * thinkingLevels. Absent = fall back to the "declares minimal" heuristic.
+   * false = always-on thinking (Gemini Pro tier); true = can be switched off
+   * by some other mechanism (3.7 Flash, via thinkingBudget: 0).
+   */
   canDisableThinking?: boolean;
   mediaLimits?: Record<string, unknown>;
   year?: number;
@@ -118,6 +123,8 @@ function getModelOptions(
       if (modelRecord.liveAPI) entry.liveAPI = true;
       if (modelRecord.thinkingLevels)
         entry.thinkingLevels = modelRecord.thinkingLevels as string[];
+      if (modelRecord.canDisableThinking !== undefined)
+        entry.canDisableThinking = modelRecord.canDisableThinking as boolean;
       if (modelRecord.mediaLimits)
         entry.mediaLimits = modelRecord.mediaLimits as Record<string, unknown>;
       if (modelRecord.year) entry.year = modelRecord.year as number;
