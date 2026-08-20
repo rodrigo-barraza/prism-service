@@ -38,6 +38,8 @@ export interface ModelOptionEntry {
   modelType?: string;
   liveAPI?: boolean;
   thinkingLevels?: string[];
+  /** false = the model cannot switch thinking off at all (Gemini Pro tier). */
+  canDisableThinking?: boolean;
   mediaLimits?: Record<string, unknown>;
   year?: number;
   supportsSystemPrompt?: boolean;

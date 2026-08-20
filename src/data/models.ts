@@ -42,6 +42,35 @@ const MODELS = {
     webSearch: true,
     tools: ["Thinking", "Web Search", "Tool Calling", "File Search"],
   },
+
+  GPT_52_PRO: {
+    description:
+      "OpenAI's GPT-5.2 Pro, the extended-compute tier of GPT-5.2 — slower, far more thorough reasoning for the hardest analysis and planning tasks.",
+    name: "gpt-5.2-pro",
+    label: "GPT 5.2 Pro",
+    provider: PROVIDERS.OPENAI,
+    modelType: MODEL_TYPES.CONVERSATION,
+    responsesAPI: true,
+    year: 2025,
+    defaultTemperature: 1.0,
+    pricing: {
+      inputPerMillion: 21.0,
+      outputPerMillion: 168.0,
+      webSearchPer1kCalls: 10.0,
+    },
+    maxInputTokens: 400_000,
+    maxOutputTokens: 272_000,
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
+    mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
+    streaming: true,
+    thinking: true,
+    // Verified 2026-08-20 against /v1/responses: this model rejects "low" and
+    // "minimal" by name and accepts "xhigh" — its vocabulary is NOT gpt-5.2's.
+    thinkingLevels: ["medium", "high", "xhigh"],
+    webSearch: true,
+    tools: ["Thinking", "Web Search", "Tool Calling", "File Search"],
+  },
   GPT_5_MINI: {
     description:
       "A fast, lightweight, and cost-efficient version of GPT-5, optimized for everyday tasks, basic tool calling, and high-speed execution.",
@@ -900,23 +929,24 @@ const MODELS = {
       "Code Execution",
     ],
   },
-  MYTHOS_5: {
+
+  OPUS_5: {
     description:
-      "Anthropic's Claude Mythos 5: an unrestricted Mythos-class model featuring elite reasoning and cybersecurity capabilities.",
-    name: "claude-mythos-5",
-    label: "Mythos 5",
+      "Anthropic's Claude Opus 5, the current frontier Opus — best-in-class reasoning, agentic coding, and long-horizon tool use over a 1M-token context.",
+    name: "claude-opus-5",
+    label: "Opus 5",
     provider: PROVIDERS.ANTHROPIC,
     modelType: MODEL_TYPES.CONVERSATION,
     year: 2026,
     defaultTemperature: 1.0,
-    arena: { text: 1545, code: 1590, document: 1565, search: 1310 },
+    lockedSampling: true,
     pricing: {
-      inputPerMillion: 10.0,
-      cachedInputPerMillion: 1.0,
-      cacheWriteInputPerMillion: 12.5,
-      outputPerMillion: 50.0,
+      inputPerMillion: 5.0,
+      cachedInputPerMillion: 0.5,
+      cacheWriteInputPerMillion: 6.25,
+      outputPerMillion: 25.0,
     },
-    maxInputTokens: 200_000,
+    maxInputTokens: 1_000_000,
     maxOutputTokens: 128_000,
     inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
     outputTypes: [MODALITY_TYPES.TEXT],
@@ -940,7 +970,6 @@ const MODELS = {
       "Code Execution",
     ],
   },
-
   // ----- Moonshot AI (Kimi) — Text Generation -----
   // Kimi's API is OpenAI Chat Completions–compatible. Pricing is per 1M tokens
   // from platform.moonshot.ai (K3 confirmed: 3.00 input / 0.30 cache-hit /
@@ -1064,51 +1093,6 @@ const MODELS = {
       "URL Context",
     ],
   },
-  GEMINI_3_PRO: {
-    description:
-      "Google's Gemini 3 Pro, a premium multimodal model optimized for complex reasoning, planning, and coding within a large context.",
-    name: "gemini-3-pro-preview",
-    label: "Gemini 3 Pro",
-    provider: PROVIDERS.GOOGLE,
-    modelType: MODEL_TYPES.CONVERSATION,
-    year: 2025,
-    defaultTemperature: 1.0,
-    arena: {
-      text: 1485,
-      code: 1442,
-      vision: 1288,
-      document: 1444,
-      search: 1214,
-    },
-    pricing: {
-      inputPerMillion: 2.0,
-      audioInputPerMillion: 4.0,
-      outputPerMillion: 12.0,
-    },
-    maxInputTokens: 1_048_576,
-    maxOutputTokens: 65_536,
-    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.AUDIO, MODALITY_TYPES.VIDEO, MODALITY_TYPES.PDF],
-    outputTypes: [MODALITY_TYPES.TEXT],
-    mediaLimits: {
-      image: { maxCount: 3000, maxSizeMB: 100 },
-      audio: { maxCount: 50, maxSizeMB: 100 },
-      video: { maxCount: 10, maxSizeMB: 100 },
-      pdf: { maxCount: 50, maxSizeMB: 100 },
-    },
-    streaming: true,
-    thinking: true,
-    thinkingLevels: ["minimal", "low", "medium", "high"],
-    webSearch: "Google Search",
-    codeExecution: true,
-    urlContext: true,
-    tools: [
-      "Thinking",
-      "Google Search",
-      "Tool Calling",
-      "Code Execution",
-      "URL Context",
-    ],
-  },
   GEMINI_31_PRO: {
     description:
       "Google's Gemini 3.1 Pro, offering enhanced logic, multi-turn instruction following, and a 1M token context window.",
@@ -1138,7 +1122,10 @@ const MODELS = {
     },
     streaming: true,
     thinking: true,
-    thinkingLevels: ["minimal", "low", "medium", "high"],
+    thinkingLevels: ["low", "medium", "high"],
+    // Verified 2026-08-20: this model 400s on BOTH thinkingBudget: 0 and
+    // thinkingLevel: "minimal" — Pro-tier thinking cannot be switched off.
+    canDisableThinking: false,
     webSearch: "Google Search",
     codeExecution: true,
     urlContext: true,
@@ -1274,6 +1261,52 @@ const MODELS = {
     ],
   },
 
+  // Launched 2026-08 (version 3.7-flash-08-2026). Google lists 3.7 Flash at the
+  // same rate card as 3.6 Flash, so the figures below mirror that entry — see
+  // the note there about list vs. promotional pricing.
+  GEMINI_37_FLASH: {
+    description:
+      "Google's Gemini 3.7 Flash, the newest Flash-tier model — better long-horizon agentic reasoning and tool use than 3.6 Flash at the same price.",
+    name: "gemini-3.7-flash",
+    label: "Gemini 3.7 Flash",
+    provider: PROVIDERS.GOOGLE,
+    modelType: MODEL_TYPES.CONVERSATION,
+    year: 2026,
+    defaultTemperature: 1.0,
+    pricing: {
+      inputPerMillion: 1.5,
+      cachedInputPerMillion: 0.15,
+      audioInputPerMillion: 3.0,
+      outputPerMillion: 7.5,
+    },
+    maxInputTokens: 1_048_576,
+    maxOutputTokens: 65_536,
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.AUDIO, MODALITY_TYPES.VIDEO, MODALITY_TYPES.PDF],
+    outputTypes: [MODALITY_TYPES.TEXT],
+    mediaLimits: {
+      image: { maxCount: 3000, maxSizeMB: 100 },
+      audio: { maxCount: 50, maxSizeMB: 100 },
+      video: { maxCount: 10, maxSizeMB: 100 },
+      pdf: { maxCount: 50, maxSizeMB: 100 },
+    },
+    streaming: true,
+    thinking: true,
+    // Verified 2026-08-20: unlike 3.6 Flash, 3.7 has NO "minimal" level
+    // ("Thinking level MINIMAL is not supported for this model"). It does
+    // accept thinkingBudget: 0, which is how the provider turns thinking off.
+    thinkingLevels: ["low", "medium", "high"],
+    webSearch: "Google Search",
+    codeExecution: true,
+    urlContext: true,
+    tools: [
+      "Thinking",
+      "Google Search",
+      "Tool Calling",
+      "Code Execution",
+      "URL Context",
+    ],
+  },
+
   GEMINI_31_FLASH_LITE: {
     description:
       "Google's Gemini 3.1 Flash-Lite, designed for low-resource operations, high-speed classification, and highly cost-efficient tasks.",
@@ -1299,6 +1332,48 @@ const MODELS = {
     },
     streaming: true,
     thinking: true,
+    thinkingLevels: ["minimal", "low", "medium", "high"],
+    webSearch: "Google Search",
+    codeExecution: true,
+    urlContext: true,
+    tools: [
+      "Thinking",
+      "Google Search",
+      "Tool Calling",
+      "Code Execution",
+      "URL Context",
+    ],
+  },
+
+  GEMINI_35_FLASH_LITE: {
+    description:
+      "Google's Gemini 3.5 Flash-Lite, the cost-efficient tier — high-throughput classification and extraction with a 1M-token context.",
+    name: "gemini-3.5-flash-lite",
+    label: "Gemini 3.5 Flash-Lite",
+    provider: PROVIDERS.GOOGLE,
+    modelType: MODEL_TYPES.CONVERSATION,
+    year: 2026,
+    defaultTemperature: 1.0,
+    pricing: {
+      inputPerMillion: 0.3,
+      cachedInputPerMillion: 0.03,
+      audioInputPerMillion: 0.6,
+      outputPerMillion: 2.5,
+    },
+    maxInputTokens: 1_048_576,
+    maxOutputTokens: 65_536,
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.AUDIO, MODALITY_TYPES.VIDEO, MODALITY_TYPES.PDF],
+    outputTypes: [MODALITY_TYPES.TEXT],
+    mediaLimits: {
+      image: { maxCount: 3000, maxSizeMB: 100 },
+      audio: { maxCount: 50, maxSizeMB: 100 },
+      video: { maxCount: 10, maxSizeMB: 100 },
+      pdf: { maxCount: 50, maxSizeMB: 100 },
+    },
+    streaming: true,
+    thinking: true,
+    // Verified 2026-08-20: rejects thinkingBudget: 0 (400) like 3.6 Flash —
+    // thinking is wound down with thinkingLevel: "minimal" instead.
     thinkingLevels: ["minimal", "low", "medium", "high"],
     webSearch: "Google Search",
     codeExecution: true,
@@ -1493,10 +1568,64 @@ const MODELS = {
     supportsSystemPrompt: false,
     tools: ["Image Generation"],
   },
+
+  GPT_IMAGE_2: {
+    description:
+      "OpenAI's GPT Image 2, the current flagship image model — high-fidelity generation and editing with stronger prompt adherence than GPT Image 1.5.",
+    name: "gpt-image-2",
+    label: "GPT Image 2",
+    provider: PROVIDERS.OPENAI,
+    year: 2026,
+    modelType: MODEL_TYPES.CONVERSATION,
+    defaultTemperature: 1.0,
+    pricing: {
+      inputPerMillion: 5.0,
+      cachedInputPerMillion: 1.25,
+      outputPerMillion: 10.0,
+      imageInputPerMillion: 8.0,
+      cachedImageInputPerMillion: 2.0,
+      imageOutputPerMillion: 30.0,
+    },
+    imageTokensPerImage: 1056,
+    maxInputTokens: 32_768,
+    maxOutputTokens: 32_768,
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    imageAPI: true,
+    supportsSystemPrompt: false,
+    tools: ["Image Generation"],
+  },
+
+  GPT_IMAGE_1_MINI: {
+    description:
+      "OpenAI's GPT Image 1 Mini, the low-cost image tier for high-volume generation and editing.",
+    name: "gpt-image-1-mini",
+    label: "GPT Image 1 Mini",
+    provider: PROVIDERS.OPENAI,
+    year: 2025,
+    modelType: MODEL_TYPES.CONVERSATION,
+    defaultTemperature: 1.0,
+    pricing: {
+      inputPerMillion: 2.0,
+      cachedInputPerMillion: 0.2,
+      outputPerMillion: 8.0,
+      imageInputPerMillion: 2.5,
+      cachedImageInputPerMillion: 0.25,
+      imageOutputPerMillion: 8.0,
+    },
+    imageTokensPerImage: 1056,
+    maxInputTokens: 32_768,
+    maxOutputTokens: 32_768,
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    imageAPI: true,
+    supportsSystemPrompt: false,
+    tools: ["Image Generation"],
+  },
   GEMINI_3_PRO_IMAGE: {
     description:
       "Google's Gemini 3 Pro Image model, optimized for generating high-quality visual art and editing images from text.",
-    name: "gemini-3-pro-image-preview",
+    name: "gemini-3-pro-image",
     label: "Gemini 3 Pro Image",
     provider: PROVIDERS.GOOGLE,
     modelType: MODEL_TYPES.CONVERSATION,
@@ -1511,7 +1640,7 @@ const MODELS = {
       imageOutputPerMillion: 120.0,
     },
     imageTokensPerImage: 1120,
-    maxInputTokens: 1_048_576,
+    maxInputTokens: 131_072,
     maxOutputTokens: 32_768,
     inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
     outputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
@@ -1524,7 +1653,7 @@ const MODELS = {
   GEMINI_31_FLASH_IMAGE: {
     description:
       "Google's Gemini 3.1 Flash Image model, delivering high-speed image generation and editing capabilities.",
-    name: "gemini-3.1-flash-image-preview",
+    name: "gemini-3.1-flash-image",
     label: "Gemini 3.1 Flash Image",
     provider: PROVIDERS.GOOGLE,
     modelType: MODEL_TYPES.CONVERSATION,
@@ -1538,13 +1667,44 @@ const MODELS = {
       imageOutputPerMillion: 60.0,
     },
     imageTokensPerImage: 1120,
-    maxInputTokens: 131_072,
-    maxOutputTokens: 32_768,
+    maxInputTokens: 65_536,
+    maxOutputTokens: 65_536,
     inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.PDF],
     outputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
     streaming: false,
     thinking: true,
-    thinkingLevels: ["minimal", "low", "medium", "high"],
+    // Verified 2026-08-20: LOW and MEDIUM are rejected by name on the image
+    // models ("Thinking level LOW is not supported for this model").
+    thinkingLevels: ["minimal", "high"],
+    webSearch: true,
+    tools: ["Thinking", "Image Generation", "Web Search"],
+  },
+
+  GEMINI_31_FLASH_LITE_IMAGE: {
+    description:
+      "Google's Gemini 3.1 Flash-Lite Image model (Nano Banana 2 Lite), the cheapest tier for fast image generation and editing.",
+    name: "gemini-3.1-flash-lite-image",
+    label: "Gemini 3.1 Flash-Lite Image",
+    provider: PROVIDERS.GOOGLE,
+    modelType: MODEL_TYPES.CONVERSATION,
+    year: 2026,
+    defaultTemperature: 1.0,
+    pricing: {
+      inputPerMillion: 0.25,
+      imageInputPerMillion: 0.25,
+      outputPerMillion: 1.5,
+      imageOutputPerMillion: 30.0,
+    },
+    imageTokensPerImage: 1120,
+    maxInputTokens: 65_536,
+    maxOutputTokens: 65_536,
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.PDF],
+    outputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    streaming: false,
+    thinking: true,
+    // Verified 2026-08-20: LOW and MEDIUM are rejected by name, as on the
+    // full-size 3.1 Flash Image model.
+    thinkingLevels: ["minimal", "high"],
     webSearch: true,
     tools: ["Thinking", "Image Generation", "Web Search"],
   },
@@ -1657,6 +1817,36 @@ const MODELS = {
     inputTypes: [MODALITY_TYPES.AUDIO],
     outputTypes: [MODALITY_TYPES.TEXT],
   },
+
+  GPT_TRANSCRIBE: {
+    description:
+      "OpenAI's current-generation speech-to-text model, cheaper and more accurate than GPT-4o Transcribe.",
+    name: "gpt-transcribe",
+    label: "GPT Transcribe",
+    provider: PROVIDERS.OPENAI,
+    modelType: MODEL_TYPES.AUDIO,
+    year: 2026,
+    pricing: {
+      perMinute: 0.0045,
+    },
+    inputTypes: [MODALITY_TYPES.AUDIO],
+    outputTypes: [MODALITY_TYPES.TEXT],
+  },
+
+  GPT_4O_TRANSCRIBE_DIARIZE: {
+    description:
+      "OpenAI's GPT-4o Transcribe with speaker diarization, labelling who spoke each segment in multi-speaker audio.",
+    name: "gpt-4o-transcribe-diarize",
+    label: "GPT-4o Transcribe Diarize",
+    provider: PROVIDERS.OPENAI,
+    modelType: MODEL_TYPES.AUDIO,
+    year: 2026,
+    pricing: {
+      perMinute: 0.006,
+    },
+    inputTypes: [MODALITY_TYPES.AUDIO],
+    outputTypes: [MODALITY_TYPES.TEXT],
+  },
   WHISPER_1: {
     description:
       "OpenAI's Whisper v2 model, delivering highly robust multilingual speech-to-text recognition and transcription.",
@@ -1683,11 +1873,11 @@ const MODELS = {
   },
   GEMINI_3_PRO_STT: {
     description:
-      "Google's Gemini 3 Pro Speech-to-Text model, delivering high-accuracy audio transcription under noisy environments.",
-    name: "gemini-3-pro-preview",
-    label: "Gemini 3 Pro",
+      "Google's Gemini 3.1 Pro Speech-to-Text model, delivering high-accuracy audio transcription under noisy environments.",
+    name: "gemini-3.1-pro-preview",
+    label: "Gemini 3.1 Pro",
     provider: PROVIDERS.GOOGLE,
-    year: 2025,
+    year: 2026,
     modelType: MODEL_TYPES.AUDIO,
     pricing: { audioInputPerMillion: 4.0, outputPerMillion: 12.0 },
     inputTypes: [MODALITY_TYPES.AUDIO],

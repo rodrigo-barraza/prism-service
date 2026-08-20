@@ -562,6 +562,30 @@ export function prepareOpenAIMessages(
 }
 
 /**
+ * Reasoning effort is a GLOBAL user setting, but the vocabulary is per-model:
+ * gpt-5.2-pro accepts only medium/high/xhigh, others add low/minimal, and
+ * "max" is Anthropic's. Forwarding a level the target model doesn't declare is
+ * a hard 400 ("Unsupported value: 'low' is not supported with this model"),
+ * not a downgrade — so drop it and let the model use its own default.
+ * Mirrors the guards in buildMoonshotPayload and buildGenerateConfig.
+ */
+export function effortForModel(
+  model: string,
+  effort: string | undefined,
+): string | undefined {
+  if (!effort) return undefined;
+  const modelDefinition = getModelByName(model);
+  const levels =
+    modelDefinition && "thinkingLevels" in modelDefinition
+      ? ((modelDefinition as { thinkingLevels?: string[] }).thinkingLevels ?? [])
+      : [];
+  // No declared vocabulary → leave today's behaviour alone (o1/o3 and the
+  // OpenAI-compatible passthroughs never listed levels).
+  if (levels.length === 0) return effort;
+  return levels.includes(effort) ? effort : undefined;
+}
+
+/**
  * Convert messages to Responses API input format.
  * System messages become developer messages; images use input_image, PDFs use input_file.
  */
@@ -809,8 +833,9 @@ const openaiProvider = {
 
     // Reasoning
     const reasoning: Reasoning = {};
-    if (options.reasoningEffort) {
-      reasoning.effort = options.reasoningEffort as ReasoningEffort;
+    const effort = effortForModel(model, options.reasoningEffort);
+    if (effort) {
+      reasoning.effort = effort as ReasoningEffort;
     }
     if (options.reasoningSummary) {
       reasoning.summary = options.reasoningSummary as
@@ -1003,9 +1028,10 @@ const openaiProvider = {
     };
     if (isReasoning) {
       if (options.maxTokens) payload.max_completion_tokens = options.maxTokens;
-      if (options.reasoningEffort) {
+      const effort = effortForModel(model, options.reasoningEffort);
+      if (effort) {
         payload.reasoning_effort =
-          options.reasoningEffort as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming["reasoning_effort"];
+          effort as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming["reasoning_effort"];
       }
     } else {
       if (options.temperature !== undefined)
@@ -1182,8 +1208,9 @@ const openaiProvider = {
 
     // Reasoning
     const reasoning: Reasoning = {};
-    if (options.reasoningEffort) {
-      reasoning.effort = options.reasoningEffort as ReasoningEffort;
+    const effort = effortForModel(model, options.reasoningEffort);
+    if (effort) {
+      reasoning.effort = effort as ReasoningEffort;
     }
     if (options.reasoningSummary) {
       reasoning.summary = options.reasoningSummary as

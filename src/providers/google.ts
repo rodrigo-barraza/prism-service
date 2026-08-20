@@ -30,6 +30,8 @@ interface ModelDefinition {
   name: string;
   thinking?: boolean;
   thinkingLevels?: string[];
+  /** false = this model cannot switch thinking off at all (Pro tier). */
+  canDisableThinking?: boolean;
   outputTypes?: string[];
   listed?: boolean;
   imageAPI?: boolean;
@@ -323,7 +325,7 @@ function normalizeGoogleUsage(
  * Centralizes the repeated config-building pattern across generateText,
  * generateTextStream, and generateTextStreamLive.
  */
-function buildGenerateConfig(
+export function buildGenerateConfig(
   options: ProviderOptions,
   modelDefinition: ModelDefinition | null | undefined,
 ): GenerateContentConfig {
@@ -365,10 +367,28 @@ function buildGenerateConfig(
   // Thinking config
   const supportsThinking = modelDefinition?.thinking === true;
   if (supportsThinking) {
+    const levels = modelDefinition?.thinkingLevels ?? [];
     if (options.thinkingEnabled === false) {
       // Explicitly disable thinking — omitting thinkingConfig would let the
       // model default to thinking, silently consuming the output token budget.
-      config.thinkingConfig = { thinkingBudget: 0 };
+      // HOW you turn it off is per-model, and getting it wrong is a hard 400
+      // INVALID_ARGUMENT rather than a degraded answer:
+      //   • 3.6 Flash / 3.5 Flash-Lite reject thinkingBudget: 0 outright and
+      //     wind thinking down via thinkingLevel: "minimal" instead.
+      //   • 3.7 Flash is the mirror image — it takes budget 0 but has no
+      //     "minimal" level.
+      //   • Pro-tier models (3.1 Pro) accept NEITHER: thinking cannot be
+      //     switched off at all, so the closest we can honour the request is
+      //     the lowest level they do declare, with thoughts left unsurfaced.
+      // The catalog's thinkingLevels is the switch, so it has to be truthful
+      // per model — see the verified table in src/data/models.ts.
+      if (levels.includes("minimal")) {
+        config.thinkingConfig = { thinkingLevel: "minimal" as ThinkingLevel };
+      } else if (modelDefinition?.canDisableThinking === false) {
+        config.thinkingConfig = { thinkingLevel: levels[0] as ThinkingLevel };
+      } else {
+        config.thinkingConfig = { thinkingBudget: 0 };
+      }
     } else {
       config.thinkingConfig = { includeThoughts: true };
       if (
@@ -378,7 +398,12 @@ function buildGenerateConfig(
         config.thinkingConfig.thinkingBudget = parseInt(
           String(options.thinkingBudget),
         );
-      } else if (options.thinkingLevel && modelDefinition?.thinkingLevels) {
+      } else if (options.thinkingLevel && levels.includes(options.thinkingLevel)) {
+        // Forward the level only when THIS model declares it. The setting is
+        // global, so a level that is valid elsewhere ("minimal" on 3.6 Flash,
+        // "xhigh" on OpenAI) would otherwise follow the user onto a model that
+        // rejects it and 400 the request — same failure as the disable path
+        // above. Mirrors the guard buildMoonshotPayload already applies.
         config.thinkingConfig.thinkingLevel =
           options.thinkingLevel as ThinkingLevel;
       }
@@ -872,7 +897,14 @@ const googleProvider = {
           thinkingConfig.thinkingBudget = parseInt(
             String(options.thinkingBudget),
           );
-        } else if (options.thinkingLevel && modelDefinition?.thinkingLevels) {
+        } else if (
+          options.thinkingLevel &&
+          (modelDefinition?.thinkingLevels ?? []).includes(
+            options.thinkingLevel,
+          )
+        ) {
+          // Same guard as buildGenerateConfig: only forward a level this model
+          // actually declares, so a global setting can't 400 the session.
           thinkingConfig.thinkingLevel = options.thinkingLevel;
         }
         liveConfig.thinkingConfig = thinkingConfig;
