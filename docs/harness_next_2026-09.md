@@ -33,5 +33,115 @@ mid-conversation effort changes (GPT-6 Astra only); Codex App Server
 
 ## 2. What was built
 
-(See §3–§9 below; each section names the files and the tests that pin it.)
+### 2.1 Turn input mailbox — the spine (service)
+`src/services/TurnInputMailbox.ts`, `src/services/harnesses/lifecycle/TurnInputDrain.ts`,
+`ReActHarness` drains, `AgenticLoopService` open/close, `POST /agent/input`.
+A per-turn in-memory box keyed by the loop's `conversationId` (root: the client
+id; sub-agent: its own id). Four kinds ride it: `user_update`,
+`question_answer`, `task_completion`, `agent_message`. The harness drains it
+before every model call, after each tool batch, and instead of ending the
+turn on a text-only answer (the answer stays as a mid-history message and the
+loop continues). Each applied entry emits `{type:"turn_input", id, kind,
+content, boundary, iteration}` and `status: turn_input_applied`. A post with
+no open turn is refused (`409 no_active_turn`) so the client queues instead.
+Tests: `turnInputMailbox.test.ts`, `turnInputDrain.test.ts`,
+`turnInputAcceptance.test.ts` (real ReActHarness: update reaches the next
+model call; update on the final answer keeps the turn alive; DETACHED_WORK vs
+NON_BLOCKING_DISPATCH; counter accounting).
+
+Native steering (`response.steer`, WebSocket, gpt-6-astra only) is NOT wired;
+the mailbox is the provider-independent fallback the review asked for, and the
+catalog flag `steering` marks where a native path can be added.
+
+### 2.2 Non-blocking questions
+`ask_user` gains `blocking` (default true). `blocking:false` emits the card
+with a `questionId`, returns `DETACHED_WORK`, and the answer (via the unchanged
+`POST /agent/answer`) is posted to the mailbox as a `<user-answer>` message.
+Turn already ended → 404 → the client sends the answer as a normal message.
+
+### 2.3 Parent keeps working after delegation
+`run_async_task continueWorking=true` → `DETACHED_WORK` (loop continues);
+completion → mailbox if the turn is open, else the existing auto-response.
+`wait_for_tasks {taskIds?, agentIds?, timeoutSeconds?}` — bounded wait on
+async tasks and/or sub-agents (`awaitedBy` suppresses the duplicate
+notification). `send_subagent_message` to a RUNNING sub-agent is delivered
+through its mailbox (the dead `pendingMessages` write is fixed; tests now
+assert delivery). `pendingBackgroundTasks` balances on every path
+(`countedAsPending`, the async auto-response `finally`).
+Sub-agent dispatch itself (`create_subagent(s)`) still ends the parent turn —
+`wait_for_tasks` covers the "wait when you need it" half; making dispatch
+non-breaking is a follow-up in `OrchestratorService.spawnFromTool`.
+
+### 2.4 Event sequence ids and cursor replay
+`SseEvent.seq` stamped in `withDirectViewerBroadcast` (monotonic per
+conversation, never reset between turns, TTL-swept with the buffer).
+`LiveTurnBuffer.replay(id, afterSeq)`; overflow keeps the newest 5000 and
+reports `droppedCount`. WebSocket subscribe accepts `afterSeq`, acks
+`{type:"subscribed", conversationId, lastSeq, replayedCount, droppedCount}`
+before the replay. Client: `liveTurnCursor` (the ack's `lastSeq` is
+informational; replay dedupes against the pre-subscribe mark).
+NOT done from §4 of the review: persisted run state (pending tools /
+approvals / questions / checkpoints) and the "safe retry vs uncertain
+outcome" recovery classification. `ApprovalRegistry` still holds live
+`resolve` closures; persisting the descriptor is the first step. The client's
+full typed-reducer migration of `AgentChatComponent` is also not done — new
+state lives in dedicated hooks/modules, the component's structure is unchanged.
+
+### 2.5 OpenAI native state and catalog
+Messages carry `phase`, `reasoningItems[{id, summary, encrypted_content}]`,
+`providerResponseId`; captured on both Responses paths, threaded through
+dispatcher → router → pass/loop state → every assistant message (tool-batch,
+mid-history, Finalizer final, `/chat` sites) → ChatRoutes rebuild →
+FunctionCallingUtilities; replayed by `prepareResponsesInput` (text-only
+reasoning before the message, `encrypted_content` on paired items, `phase` on
+every assistant item). Requests always `include: ["reasoning.encrypted_content"]`;
+`previousResponseId` passthrough exists (no caller). Sampling params are gated
+on the RESOLVED effort so gpt-6-astra never receives `"none"`.
+Catalog: `gpt-6-astra` (+ `asyncTools`, `steering`, `programmaticToolCalling`,
+`configurationUpdate`), `programmaticToolCalling` on the 5.6 family,
+`getModelNativeCapabilities()`.
+NOT wired: native async tools (`"async": true`), `configuration_update`
+items, native programmatic tool calling — each needs the stateful
+`previous_response_id` flow; the flags and the passthrough are the hooks.
+
+### 2.6 Programmatic tool composition
+`run_tool_program {code, timeoutSeconds?, description?}` — `node:vm`
+(null-prototype sandbox, code generation off, host bridge closed over inside
+the realm, JSON across the boundary). `callTool` / `callTools` (parallel 8).
+Every nested call: denylist, `enabledTools`, `AutoApprovalEngine.check()`
+with policy DENY terminal, AND tier AUTO required (read-only even when a
+policy approves a write tool interactively). Linked abort + wall-clock
+deadline, 50-call cap, 64 KB logs / 32 KB result, one status event per
+program. 34 tests including sandbox-escape attempts.
+
+### 2.7 Persistent goals
+`ConversationGoalService` (goal on the conversation document; `goal_update`
+only on meaningful change), tools `set_goal` / `update_goal` / `clear_goal`,
+routes `GET/PUT/PATCH/DELETE /conversations/:id/goal`, `<goal>` block in the
+per-turn system context, `afterResponse` accounting with budget exhaustion →
+`blocked`. `ScheduledTask.conversationId` continues the same conversation
+(append + resume, `scheduler:<task>:<minute>` dedupe, skips paused / completed
+/ blocked); timers defer while paused. Client `GoalPanelComponent` with
+Pause/Resume/Clear. No goal-creation form in the client yet: goals are set by
+the model (`set_goal`) or by `PUT`.
+
+### 2.8 Wire contract added (client ⇄ service)
+- `POST /agent/input {conversationId, text, images?}` → `{ok, inputId, position}` | 409 `{reason:"no_active_turn"}`
+- events `turn_input`, `status: turn_input_applied | question_pending`, `goal_update`; `user_question` + `questionId`, `blocking`
+- `seq` on every streamed event; subscribe `afterSeq`; `subscribed` ack fields above
+- `/conversations/:id/goal` GET/PUT/PATCH/DELETE
+- Message markers: `_turnInput {id, kind, receivedAt}`, `rawContent`, `_notificationSource: user-update | user-answer`
+The shared taxonomy (`@rodrigo-barraza/utilities-library`) has no
+`TURN_INPUT` / `GOAL_UPDATE` event types yet — both sides use the literals.
+
+### 2.9 Not adopted from the review
+- Codex App Server as an optional runtime through `HarnessRegistry`: not
+  started (version-pinned stdio pilot is a separate spike).
+- Review workspace (changes panel, inline comments, test evidence beside the
+  conversation): not started.
+- Benchmark-infrastructure acceptance scenarios: the scenarios exist as
+  vitest integration tests against the real harness
+  (`turnInputAcceptance.test.ts`, `isActive.test.ts` continueWorking arc,
+  `prismServiceLiveCursor.test.ts` no-duplicate reconnect); they are not yet
+  benchmark presets.
 
