@@ -55,6 +55,10 @@ import { injectToolDiscoveryNudge } from "./lifecycle/ToolDiscoveryNudge.ts";
 import { finalizePassTracker } from "./lifecycle/TrackerFinalizer.ts";
 import { handleCodexPlanningResponse } from "./lifecycle/CodexPlanningDetector.ts";
 import {
+  drainTurnInput,
+  hasPendingTurnInput,
+} from "./lifecycle/TurnInputDrain.ts";
+import {
   maybeInjectSystemReminder,
   cleanupReminderCache,
 } from "./lifecycle/SystemReminderInjector.ts";
@@ -379,6 +383,11 @@ export default class ReActHarness extends BaseAgenticHarness {
 
         // ── Instruction fade-out countermeasure ─────────────────
         await maybeInjectSystemReminder(currentMessages, state, context);
+
+        // ── Mid-turn input (steering / answers / completions) ───
+        // Anything that reached the TurnInputMailbox since the last
+        // boundary goes in front of this iteration's model call.
+        drainTurnInput(currentMessages, state, context, "iteration_start");
 
         // ── beforePrompt hook (iteration 1 only) ──────────────
         if (state.iterations === 1) {
@@ -957,12 +966,23 @@ export default class ReActHarness extends BaseAgenticHarness {
             state.compactionRequested = true;
           }
 
+          // Background work dispatched while THIS turn keeps going
+          // (run_async_task continueWorking, non-blocking ask_user). Only
+          // recorded here; the completion arrives through the mailbox.
+          if (results.some(r => (r.result as any)?._directive === AGENT_DIRECTIVES.DETACHED_WORK)) {
+            state.detachedWorkDispatched = true;
+          }
+
           const hasNonBlockingDispatch = results.some(r => (r.result as any)?._directive === AGENT_DIRECTIVES.NON_BLOCKING_DISPATCH);
           if (hasNonBlockingDispatch) {
             hasCleanTextBreak = true;
             hasNonBlockingDispatchBreak = true;
             break;
           }
+
+          // Input that arrived during the tool batch is observed together
+          // with the tool results, before the next model call.
+          drainTurnInput(currentMessages, state, context, "after_tools");
           continue;
         }
 
@@ -1036,6 +1056,24 @@ export default class ReActHarness extends BaseAgenticHarness {
               continue;
             }
 
+            // The model is done, but the user (or a completion) got here
+            // first: keep the answer as a mid-history assistant message,
+            // apply the input, and let the model respond to it in the
+            // same turn instead of ending and replaying it as a new one.
+            if (hasPendingTurnInput(context) && !signal?.aborted) {
+              currentMessages.push({
+                role: "assistant",
+                content: pass.finalStreamedText || pass.streamedText,
+                thinking: pass.streamedThinking.trim(),
+                thinkingSignature: pass.thinkingSignature,
+                ...computePassPhaseDurations(pass),
+              });
+              drainTurnInput(currentMessages, state, context, "before_end");
+              this.logIteration(pass, currentMessages);
+              this.deviationEngine.recordCompletedIteration([]);
+              continue;
+            }
+
             this.logIteration(pass, currentMessages);
             this.deviationEngine.recordCompletedIteration([]);
             semanticStallDetector.recordIteration([], pass.streamedText);
@@ -1088,7 +1126,22 @@ export default class ReActHarness extends BaseAgenticHarness {
 
       cleanupReminderCache(agentConversationId);
 
-      if (hasNonBlockingDispatchBreak && agentConversationId && conversationId) {
+      // Detached work (continueWorking async tasks) that is STILL running
+      // when the turn ends: count it like a non-blocking dispatch so the
+      // conversation stays "active" until the completion wakes a new turn.
+      // Work that already completed came back through the mailbox and
+      // needs no counter.
+      let hasDetachedWorkStillRunning = false;
+      if (state.detachedWorkDispatched && !hasNonBlockingDispatchBreak && agentConversationId) {
+        try {
+          const { default: AsyncTaskRegistry } = await import("#src/services/AsyncTaskRegistry");
+          hasDetachedWorkStillRunning = AsyncTaskRegistry.countRunningTasks(agentConversationId) > 0;
+        } catch {
+          /* registry unavailable — treat as nothing running */
+        }
+      }
+
+      if ((hasNonBlockingDispatchBreak || hasDetachedWorkStillRunning) && agentConversationId && conversationId) {
         try {
           const { default: ConversationService } = await import("#src/services/conversation/ConversationService");
           const { COLLECTIONS } = await import("#src/constants");

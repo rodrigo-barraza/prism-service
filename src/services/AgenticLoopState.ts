@@ -80,6 +80,16 @@ export default class AgenticLoopState {
    */
   lastStallWarningIteration: number | null;
 
+  // ── Turn input (TurnInputMailbox) ───────────────────────
+  /** Entries injected into this turn at loop boundaries (steering, answers, completions). */
+  turnInputApplied: number;
+  /**
+   * A DETACHED_WORK directive was seen: background work is running while
+   * this turn continues. Read at loop end to bump pendingBackgroundTasks
+   * when the turn finishes before the work does.
+   */
+  detachedWorkDispatched: boolean;
+
   // ── Error budget tracking ───────────────────────────────
   toolErrorCounts: Map<string, number>;
 
@@ -162,6 +172,9 @@ export default class AgenticLoopState {
     this.postCompactTokenCount = null;
     this.compactionRequested = false;
     this.lastStallWarningIteration = null;
+
+    this.turnInputApplied = 0;
+    this.detachedWorkDispatched = false;
 
     this.toolErrorCounts = new Map();
     this.pendingRequestLogWrites = [];

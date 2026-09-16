@@ -12,6 +12,7 @@ import {
   type QuestionDefinition,
   type QuestionAnswer,
 } from "./ApprovalRegistry.ts";
+import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import ConversationGenerationTracker from "./ConversationGenerationTracker.ts";
 import ConversationStatusRegistry from "./ConversationStatusRegistry.ts";
 import ToolContext from "./ToolContext.ts";
@@ -237,6 +238,9 @@ export default class AgenticLoopService {
 
     // 4. Instantiate and run
     const harness = new HarnessClass(context, state, resolvedTools);
+    // Accept mid-turn input (steering, non-blocking answers, completions)
+    // for the life of this turn; the harness drains it at its boundaries.
+    TurnInputMailbox.open(conversationId);
     try {
       return await harness.run();
     } finally {
@@ -246,6 +250,7 @@ export default class AgenticLoopService {
       // Clean up in-memory state keyed by conversationId (client-facing)
       pendingApprovals.delete(conversationId);
       pendingQuestions.delete(conversationId);
+      TurnInputMailbox.close(conversationId);
 
       // Always clean up per-session tracker entries to prevent memory leaks —
       // sub-agent sessions have their own agentConversationId that must be released.

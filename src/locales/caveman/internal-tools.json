@@ -90,9 +90,10 @@
     }
   },
   "ask_user": {
-    "description": "Ask user question, wait for response. For clarification or confirmation before major action. Loop pauses until answered. Up to 4 question per call.",
+    "description": "Ask user question. Default: loop pause until answered — use for clarification or confirmation before major action. blocking=false: show card, keep working, answer come later as <user-answer> message. Never blocking=false when next step need answer. Up to 4 question per call.",
     "parameters": {
       "context": "Optional: extra context.",
+      "blocking": "Optional: default true (wait). false → show card, keep working, answer come later as <user-answer>.",
       "questions": "Question batch (up to 4)."
     }
   },
