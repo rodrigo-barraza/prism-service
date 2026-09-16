@@ -70,6 +70,8 @@ export const SYSTEM_MESSAGE_TAGS = {
   USER_UPDATE: "user-update",
   /** The user's answer to a non-blocking ask_user card, delivered at a loop boundary. */
   USER_ANSWER: "user-answer",
+  /** The conversation's persistent goal (objective, progress, budget) injected alongside system context. */
+  GOAL: "goal",
 } as const;
 
 export type SystemMessageTag =

@@ -32,6 +32,10 @@ import ResponseVarietyService from "#src/services/ResponseVarietyService";
 import WorkflowMemoryService from "#src/services/WorkflowMemoryService";
 import { SYSTEM_PROMPT_SECTIONS, COLLECTIONS } from "#src/constants";
 import PromptLocaleService from "#src/services/PromptLocaleService";
+import ConversationGoalService, {
+  formatGoalForPrompt,
+  resolveGoalConversationId,
+} from "#src/services/ConversationGoalService";
 import {
   SYSTEM_MESSAGE_TAGS,
   wrapSystemMessage,
@@ -897,6 +901,36 @@ export default class SystemPromptAssembler {
       }
     }
 
+    // ── 11. Conversation Goal (persistent objective) ──────────────
+    // Rides the per-turn system-context message, never the cached system
+    // prompt: progress and spend move every turn and would re-price the
+    // cached prefix. Sub-agents read their parent's goal (read-only).
+    let goalText = "";
+    const goalConversationId = resolveGoalConversationId({
+      conversationId: context.conversationId as string | null | undefined,
+      agentConversationId: context.agentConversationId,
+      parentAgentConversationId: context.parentAgentConversationId,
+    });
+    if (goalConversationId && context.project && context.username) {
+      try {
+        const goal = await ConversationGoalService.get(
+          goalConversationId,
+          context.project,
+          context.username,
+        );
+        if (goal) {
+          goalText = wrapSystemMessage(
+            SYSTEM_MESSAGE_TAGS.GOAL,
+            formatGoalForPrompt(goal),
+          );
+        }
+      } catch (error: unknown) {
+        logger.warn(
+          `[SystemPromptAssembler] Could not load conversation goal for ${goalConversationId}: ${getErrorMessage(error)}`,
+        );
+      }
+    }
+
     return {
       prompt: sections.join("\n\n"),
       platformContextMessage:
@@ -911,6 +945,7 @@ export default class SystemPromptAssembler {
       skillsText,
       memoriesText,
       workflowsText,
+      goalText,
       injectedMemoryIds,
     };
   }
@@ -926,6 +961,7 @@ export default class SystemPromptAssembler {
           skillsText,
           memoriesText,
           workflowsText,
+          goalText,
           injectedMemoryIds,
         } = await this.assemble(context);
         if (!systemPrompt) return;
@@ -950,6 +986,7 @@ export default class SystemPromptAssembler {
           skillsText,
           memoriesText,
           workflowsText,
+          goalText,
           locale: assembledLocale,
         });
 
@@ -984,6 +1021,8 @@ export function injectSystemPromptContext(
     skillsText?: string;
     memoriesText?: string;
     workflowsText?: string;
+    /** Pre-wrapped <goal> section (the conversation's persistent objective). */
+    goalText?: string;
     localTimeText?: string;
     locale?: string;
   },
@@ -995,6 +1034,7 @@ export function injectSystemPromptContext(
     skillsText,
     memoriesText,
     workflowsText,
+    goalText,
     localTimeText,
     locale,
   } = options;
@@ -1081,6 +1121,10 @@ export function injectSystemPromptContext(
 
     if (workflowsText) {
       systemContextBlock += `\n\n${workflowsText}`;
+    }
+
+    if (goalText) {
+      systemContextBlock += `\n\n${goalText}`;
     }
 
     const messageIndex = messages.indexOf(lastUserMessage);

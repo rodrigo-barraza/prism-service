@@ -4,6 +4,7 @@ import SystemPromptAssembler from "#src/services/system-prompt/index";
 import MemoryExtractor from "#src/services/MemoryExtractor";
 import ConversationEmbeddingService from "#src/services/ConversationEmbeddingService";
 import WorkflowMemoryService from "#src/services/WorkflowMemoryService";
+import ConversationGoalService from "#src/services/ConversationGoalService";
 import CriticGate from "./CriticGate.ts";
 import type { PolicyRule } from "#src/services/PolicyEngine";
 import logger from "#src/utils/logger";
@@ -17,6 +18,7 @@ import { errorMessage } from "@rodrigo-barraza/utilities-library";
  *   - beforeToolCall → AutoApprovalEngine (determines approval tier)
  *   - afterResponse  → MemoryExtractor (extracts memories from conversation)
  *   - afterResponse  → ConversationEmbeddingService (embeds conversation for cross-session search)
+ *   - afterResponse  → ConversationGoalService (spend/turn accounting on the conversation goal)
  *
  * This module creates and wires them in a single call so harnesses
  * don't duplicate the registration boilerplate.
@@ -94,6 +96,13 @@ export function createStandardHooks({
     "afterResponse",
     WorkflowMemoryService.createHook() as HookHandler,
     "WorkflowMemory",
+    "inspect",
+  );
+
+  hooks.register(
+    "afterResponse",
+    ConversationGoalService.createHook() as HookHandler,
+    "ConversationGoal",
     "inspect",
   );
 
