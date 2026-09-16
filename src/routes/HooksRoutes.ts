@@ -48,7 +48,7 @@ const COLLECTION = COLLECTIONS.AGENT_HOOKS;
  * listing can be handed around without leaking the HMAC key.
  */
 function toApiHook(document: ConfiguredHookDocument) {
-  const { _id, secret, ...rest } = document;
+  const { _id, secret: _secret, ...rest } = document;
   return { ...rest, id: rest.id || (_id ? _id.toString() : "") };
 }
 
