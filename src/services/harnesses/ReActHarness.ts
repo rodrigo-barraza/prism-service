@@ -55,6 +55,10 @@ import { injectToolDiscoveryNudge } from "./lifecycle/ToolDiscoveryNudge.ts";
 import { finalizePassTracker } from "./lifecycle/TrackerFinalizer.ts";
 import { handleCodexPlanningResponse } from "./lifecycle/CodexPlanningDetector.ts";
 import {
+  drainTurnInput,
+  hasPendingTurnInput,
+} from "./lifecycle/TurnInputDrain.ts";
+import {
   maybeInjectSystemReminder,
   cleanupReminderCache,
 } from "./lifecycle/SystemReminderInjector.ts";
@@ -84,6 +88,22 @@ interface IterationPassOptions extends AgenticOptions {
   agent?: string | null;
   username: string;
   profileId?: string | null;
+}
+
+/**
+ * Provider-native state a pass produced (OpenAI Responses: message phase,
+ * reasoning items no tool call claimed, response.id) — spread onto the
+ * assistant message so it persists and is replayed next turn.
+ */
+function providerNativeState(pass: PassState) {
+  return {
+    ...(pass.phase !== undefined && { phase: pass.phase }),
+    ...(pass.reasoningItems &&
+      pass.reasoningItems.length > 0 && { reasoningItems: pass.reasoningItems }),
+    ...(pass.providerResponseId && {
+      providerResponseId: pass.providerResponseId,
+    }),
+  };
 }
 
 /** Compute thinking and content phase durations from a PassState's timestamps. */
@@ -379,6 +399,11 @@ export default class ReActHarness extends BaseAgenticHarness {
 
         // ── Instruction fade-out countermeasure ─────────────────
         await maybeInjectSystemReminder(currentMessages, state, context);
+
+        // ── Mid-turn input (steering / answers / completions) ───
+        // Anything that reached the TurnInputMailbox since the last
+        // boundary goes in front of this iteration's model call.
+        drainTurnInput(currentMessages, state, context, "iteration_start");
 
         // ── beforePrompt hook (iteration 1 only) ──────────────
         if (state.iterations === 1) {
@@ -838,12 +863,16 @@ export default class ReActHarness extends BaseAgenticHarness {
               thinking: pass.streamedThinking.trim(),
               thinkingSignature: pass.thinkingSignature,
               ...computePassPhaseDurations(pass),
+              ...providerNativeState(pass),
               toolCalls: pass.pendingToolCalls.map(tc => {
                 const res = results.find(r => r.id === tc.id);
                 return {
                   id: tc.id || null,
+                  responsesItemId: tc.responsesItemId,
                   name: tc.name,
                   args: tc.args,
+                  thoughtSignature: tc.thoughtSignature,
+                  reasoningItem: tc.reasoningItem,
                   result: res ? res.result : null,
                   durationMilliseconds: res?.durationMilliseconds,
                 };
@@ -884,6 +913,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             thinking: pass.streamedThinking.trim(),
             thinkingSignature: pass.thinkingSignature,
             ...computePassPhaseDurations(pass),
+            ...providerNativeState(pass),
             toolCalls: pass.pendingToolCalls.map(tc => {
               const res = results.find(r => r.id === tc.id);
               return {
@@ -957,12 +987,23 @@ export default class ReActHarness extends BaseAgenticHarness {
             state.compactionRequested = true;
           }
 
+          // Background work dispatched while THIS turn keeps going
+          // (run_async_task continueWorking, non-blocking ask_user). Only
+          // recorded here; the completion arrives through the mailbox.
+          if (results.some(r => (r.result as any)?._directive === AGENT_DIRECTIVES.DETACHED_WORK)) {
+            state.detachedWorkDispatched = true;
+          }
+
           const hasNonBlockingDispatch = results.some(r => (r.result as any)?._directive === AGENT_DIRECTIVES.NON_BLOCKING_DISPATCH);
           if (hasNonBlockingDispatch) {
             hasCleanTextBreak = true;
             hasNonBlockingDispatchBreak = true;
             break;
           }
+
+          // Input that arrived during the tool batch is observed together
+          // with the tool results, before the next model call.
+          drainTurnInput(currentMessages, state, context, "after_tools");
           continue;
         }
 
@@ -999,6 +1040,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             thinking: pass.streamedThinking.trim(),
             thinkingSignature: pass.thinkingSignature,
             ...computePassPhaseDurations(pass),
+            ...providerNativeState(pass),
           });
           currentMessages.push({
             role: "system",
@@ -1025,6 +1067,7 @@ export default class ReActHarness extends BaseAgenticHarness {
                 thinking: pass.streamedThinking.trim(),
                 thinkingSignature: pass.thinkingSignature,
                 ...computePassPhaseDurations(pass),
+                ...providerNativeState(pass),
               });
               this.logIteration(pass, currentMessages);
               continue;
@@ -1033,6 +1076,25 @@ export default class ReActHarness extends BaseAgenticHarness {
             const codexResult = handleCodexPlanningResponse(pass, currentMessages, context, state, this.tools.finalTools, "ReActHarness");
             if (codexResult.shouldContinueLoop) {
               this.logIteration(pass, currentMessages);
+              continue;
+            }
+
+            // The model is done, but the user (or a completion) got here
+            // first: keep the answer as a mid-history assistant message,
+            // apply the input, and let the model respond to it in the
+            // same turn instead of ending and replaying it as a new one.
+            if (hasPendingTurnInput(context) && !signal?.aborted) {
+              currentMessages.push({
+                role: "assistant",
+                content: pass.finalStreamedText || pass.streamedText,
+                thinking: pass.streamedThinking.trim(),
+                thinkingSignature: pass.thinkingSignature,
+                ...computePassPhaseDurations(pass),
+                ...providerNativeState(pass),
+              });
+              drainTurnInput(currentMessages, state, context, "before_end");
+              this.logIteration(pass, currentMessages);
+              this.deviationEngine.recordCompletedIteration([]);
               continue;
             }
 
@@ -1052,6 +1114,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             thinking: pass.streamedThinking.trim(),
             thinkingSignature: pass.thinkingSignature,
             ...computePassPhaseDurations(pass),
+            ...providerNativeState(pass),
           });
           currentMessages.push({
             role: "user",
@@ -1088,11 +1151,33 @@ export default class ReActHarness extends BaseAgenticHarness {
 
       cleanupReminderCache(agentConversationId);
 
-      if (hasNonBlockingDispatchBreak && agentConversationId && conversationId) {
+      // Detached work (continueWorking async tasks) that is STILL running
+      // when the turn ends: count it like a non-blocking dispatch so the
+      // conversation stays "active" until the completion wakes a new turn.
+      // Work that already completed came back through the mailbox and
+      // needs no counter.
+      let hasDetachedWorkStillRunning = false;
+      if (state.detachedWorkDispatched && !hasNonBlockingDispatchBreak && agentConversationId) {
+        try {
+          const { default: AsyncTaskRegistry } = await import("#src/services/AsyncTaskRegistry");
+          hasDetachedWorkStillRunning = AsyncTaskRegistry.countRunningTasks(agentConversationId) > 0;
+        } catch {
+          /* registry unavailable — treat as nothing running */
+        }
+      }
+
+      if ((hasNonBlockingDispatchBreak || hasDetachedWorkStillRunning) && agentConversationId && conversationId) {
         try {
           const { default: ConversationService } = await import("#src/services/conversation/ConversationService");
           const { COLLECTIONS } = await import("#src/constants");
           await ConversationService.adjustPendingBackgroundTasks(conversationId, project, username, 1, { collection: COLLECTIONS.AGENT_CONVERSATIONS });
+          if (hasDetachedWorkStillRunning) {
+            // The tasks remember the count so whichever path delivers the
+            // completion (mailbox in a later turn, wait_for_tasks, or an
+            // auto-response) pays it back exactly once.
+            const { default: AsyncTaskRegistry } = await import("#src/services/AsyncTaskRegistry");
+            AsyncTaskRegistry.markRunningAsCounted(agentConversationId);
+          }
         } catch {
           /* best-effort counter adjustment — ignore failures */
         }

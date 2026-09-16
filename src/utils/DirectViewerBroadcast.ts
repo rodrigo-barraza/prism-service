@@ -15,6 +15,9 @@ import type { SseEvent } from "#src/types/SseTypes";
  *      that subscribes mid-turn is replayed everything it missed (the turn's
  *      user prompt and messages are only persisted at finalize, so without
  *      replay a mid-turn joiner sees nothing until the next live event).
+ *      Every event is stamped with a per-conversation monotonic `seq`, so a
+ *      viewer that reconnects sends the last seq it saw (`afterSeq`) and is
+ *      replayed only what it missed — never a duplicate of what it rendered.
  *
  * IMPORTANT — wrap-exactly-once invariant: the request layers
  * (handleSseRequest / handleJsonRequest / the WebSocket chat handler) wrap
@@ -27,7 +30,11 @@ import type { SseEvent } from "#src/types/SseTypes";
 
 // ─── Live turn buffer ─────────────────────────────────────────
 
-/** Hard cap per turn — a runaway turn stops buffering instead of growing. */
+/**
+ * Hard cap per turn — past it the OLDEST events are dropped so a late
+ * joiner still receives the newest tail (and a `droppedCount` telling it
+ * earlier output was truncated).
+ */
 const MAX_BUFFERED_EVENTS_PER_TURN = 5000;
 /** Never buffer single events with heavy inline payloads (raw base64). */
 const MAX_BUFFERED_EVENT_BYTES = 100_000;
@@ -36,18 +43,43 @@ const BUFFER_TTL_MILLISECONDS = 2 * 60 * 60 * 1000;
 const BUFFER_SWEEP_INTERVAL_MILLISECONDS = 10 * 60 * 1000;
 
 interface TurnBuffer {
+  /** Retained events live at `events[head..]`; below `head` is already dropped. */
   events: SseEvent[];
+  /** Index of the oldest retained event — advanced instead of `shift()`ing. */
+  head: number;
   lastTouchedAt: number;
+  /** True once the turn has exceeded the cap and lost its oldest events. */
   overflowed: boolean;
+  /** How many events this turn dropped off the front of the buffer. */
+  droppedCount: number;
+  /** `seq` of the most recently dropped event (0 when nothing dropped). */
+  lastDroppedSeq: number;
+}
+
+/**
+ * Per-conversation sequence counter. Held BESIDE the turn buffer, never
+ * inside it: the buffer resets every turn, but a viewer's cursor from the
+ * previous turn must still compare "older than" everything in the next
+ * turn, so the counter only ever moves forward for a conversation.
+ */
+interface SequenceCounter {
+  lastSeq: number;
+  lastTouchedAt: number;
 }
 
 const turnBuffersByConversation = new Map<string, TurnBuffer>();
+const sequenceCountersByConversation = new Map<string, SequenceCounter>();
 
 const bufferSweepTimer = setInterval(() => {
   const now = Date.now();
   for (const [conversationId, buffer] of turnBuffersByConversation) {
     if (now - buffer.lastTouchedAt > BUFFER_TTL_MILLISECONDS) {
       turnBuffersByConversation.delete(conversationId);
+    }
+  }
+  for (const [conversationId, counter] of sequenceCountersByConversation) {
+    if (now - counter.lastTouchedAt > BUFFER_TTL_MILLISECONDS) {
+      sequenceCountersByConversation.delete(conversationId);
     }
   }
 }, BUFFER_SWEEP_INTERVAL_MILLISECONDS);
@@ -70,14 +102,80 @@ function toLightweightEvent(event: SseEvent): SseEvent {
   return event;
 }
 
+function newTurnBuffer(): TurnBuffer {
+  return {
+    events: [],
+    head: 0,
+    lastTouchedAt: Date.now(),
+    overflowed: false,
+    droppedCount: 0,
+    lastDroppedSeq: 0,
+  };
+}
+
+/**
+ * A fresh counter starts at the wall clock rather than 0. It is still a
+ * plain monotonic counter (+1 per event), but a cursor a client kept from
+ * before a process restart — or from before the TTL sweep retired an idle
+ * counter — then still sorts below every seq the conversation emits next,
+ * instead of silently making the client drop live events as "already seen".
+ */
+function nextSequence(conversationId: string): number {
+  let counter = sequenceCountersByConversation.get(conversationId);
+  if (!counter) {
+    counter = { lastSeq: Date.now(), lastTouchedAt: 0 };
+    sequenceCountersByConversation.set(conversationId, counter);
+  }
+  counter.lastSeq += 1;
+  counter.lastTouchedAt = Date.now();
+  return counter.lastSeq;
+}
+
 export const LiveTurnBuffer = {
+  /**
+   * Stamp `seq` on an event IN PLACE (so the driving stream, the buffer and
+   * every viewer fan-out see one and the same numbered object). An event
+   * that already carries a `seq` (a re-broadcast) keeps it; the counter is
+   * only pulled forward past it so later stamps stay monotonic.
+   */
+  stamp<TEvent extends { seq?: number }>(
+    conversationId: string,
+    event: TEvent,
+  ): TEvent {
+    if (typeof event.seq === "number") {
+      const counter = sequenceCountersByConversation.get(conversationId);
+      if (counter) {
+        counter.lastSeq = Math.max(counter.lastSeq, event.seq);
+        counter.lastTouchedAt = Date.now();
+      } else {
+        sequenceCountersByConversation.set(conversationId, {
+          lastSeq: event.seq,
+          lastTouchedAt: Date.now(),
+        });
+      }
+      return event;
+    }
+    event.seq = nextSequence(conversationId);
+    return event;
+  },
+
+  /** The highest `seq` stamped for the conversation so far (0 when none). */
+  lastSeq(conversationId: string): number {
+    return sequenceCountersByConversation.get(conversationId)?.lastSeq ?? 0;
+  },
+
   /**
    * Record one generation event for the conversation's active turn.
    * `user_message` starts a fresh turn; `done`/`error` end it (the
    * persisted document becomes canonical moments later, so replaying a
    * finished turn would only duplicate what the snapshot already shows).
+   * Every event is stamped with a `seq` (if it has none yet) — including
+   * the ones that end the turn or are too heavy to buffer, so a viewer's
+   * cursor keeps advancing in step with the driving stream.
    */
   record(conversationId: string, event: SseEvent): void {
+    LiveTurnBuffer.stamp(conversationId, event);
+
     if (event.type === "done" || event.type === "error") {
       turnBuffersByConversation.delete(conversationId);
       return;
@@ -85,20 +183,10 @@ export const LiveTurnBuffer = {
 
     let buffer = turnBuffersByConversation.get(conversationId);
     if (event.type === "user_message" || !buffer) {
-      buffer = { events: [], lastTouchedAt: Date.now(), overflowed: false };
+      buffer = newTurnBuffer();
       turnBuffersByConversation.set(conversationId, buffer);
     }
     buffer.lastTouchedAt = Date.now();
-
-    if (buffer.overflowed) return;
-    if (buffer.events.length >= MAX_BUFFERED_EVENTS_PER_TURN) {
-      // Replaying a truncated turn would render corrupt partial text, so
-      // an overflowed buffer is abandoned entirely — late joiners fall
-      // back to live-only events plus the finalize snapshot.
-      buffer.overflowed = true;
-      buffer.events = [];
-      return;
-    }
 
     const lightweightEvent = toLightweightEvent(event);
     if (
@@ -108,26 +196,66 @@ export const LiveTurnBuffer = {
       return;
     }
     buffer.events.push(lightweightEvent);
+
+    if (buffer.events.length - buffer.head > MAX_BUFFERED_EVENTS_PER_TURN) {
+      // Drop the oldest by advancing the head — O(1) per event. The
+      // dead prefix is compacted away once per cap's worth of drops, so
+      // the slice cost is amortised to O(1) as well and the array never
+      // holds more than two caps of entries.
+      const dropped = buffer.events[buffer.head];
+      buffer.head += 1;
+      buffer.overflowed = true;
+      buffer.droppedCount += 1;
+      buffer.lastDroppedSeq = dropped.seq ?? buffer.lastDroppedSeq;
+      if (buffer.head >= MAX_BUFFERED_EVENTS_PER_TURN) {
+        buffer.events = buffer.events.slice(buffer.head);
+        buffer.head = 0;
+      }
+    }
   },
 
   /**
    * Events of the conversation's active turn, in emit order — empty when
-   * no turn is running (or the turn's buffer overflowed).
+   * no turn is running. With `afterSeq`, only events stamped AFTER that
+   * cursor: a viewer re-subscribing after a reconnect gets what it
+   * missed and nothing it already rendered. A cursor from a previous
+   * turn sorts below the whole current turn, so it yields all of it.
    */
-  replay(conversationId: string): SseEvent[] {
+  replay(conversationId: string, afterSeq?: number): SseEvent[] {
     const buffer = turnBuffersByConversation.get(conversationId);
-    if (!buffer || buffer.overflowed) return [];
-    return [...buffer.events];
+    if (!buffer) return [];
+    const retained = buffer.events.slice(buffer.head);
+    if (afterSeq === undefined) return retained;
+    return retained.filter(
+      (event) => typeof event.seq === "number" && event.seq > afterSeq,
+    );
   },
 
-  /** Drop a conversation's buffered turn. */
+  /**
+   * How many of the active turn's events a subscriber at `afterSeq` can
+   * no longer be replayed because the buffer overflowed. Without a cursor
+   * it is the turn's whole drop count; a cursor already past the dropped
+   * range lost nothing; in between, the count of sequence numbers between
+   * the cursor and the last dropped event (an upper bound — heavy events
+   * that were never buffered also consume a seq).
+   */
+  droppedCount(conversationId: string, afterSeq?: number): number {
+    const buffer = turnBuffersByConversation.get(conversationId);
+    if (!buffer || !buffer.overflowed) return 0;
+    if (afterSeq === undefined) return buffer.droppedCount;
+    if (afterSeq >= buffer.lastDroppedSeq) return 0;
+    return Math.min(buffer.droppedCount, buffer.lastDroppedSeq - afterSeq);
+  },
+
+  /** Drop a conversation's buffered turn (its sequence counter lives on). */
   clear(conversationId: string): void {
     turnBuffersByConversation.delete(conversationId);
   },
 
-  /** Clear all buffers (tests / shutdown). */
+  /** Clear all buffers and sequence counters (tests / shutdown). */
   clearAll(): void {
     turnBuffersByConversation.clear();
+    sequenceCountersByConversation.clear();
   },
 };
 
@@ -181,6 +309,14 @@ export function withDirectViewerBroadcast<TEvent extends object>(
 ): (event: TEvent) => void {
   if (!conversationId) return emit;
   return (event: TEvent) => {
+    // Stamp BEFORE the primary emit so the driving stream, the replay
+    // buffer and every viewer carry the same seq for this event — that
+    // is what lets a client dedupe a replayed prefix against live events.
+    try {
+      LiveTurnBuffer.stamp(conversationId, event as unknown as SseEvent);
+    } catch {
+      // Sequencing is best-effort — never break the primary stream
+    }
     emit(event);
     try {
       LiveTurnBuffer.record(conversationId, event as unknown as SseEvent);

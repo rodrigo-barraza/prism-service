@@ -96,6 +96,22 @@ export interface ScoredBranch {
 
 export type StandardHooks = ReturnType<typeof createStandardHooks>;
 
+/**
+ * Provider-native state a pass produced (OpenAI Responses: message phase,
+ * reasoning items no tool call claimed, response.id) — spread onto the
+ * assistant message so it persists and is replayed next turn.
+ */
+export function providerNativeState(pass: PassState) {
+  return {
+    ...(pass.phase !== undefined && { phase: pass.phase }),
+    ...(pass.reasoningItems &&
+      pass.reasoningItems.length > 0 && { reasoningItems: pass.reasoningItems }),
+    ...(pass.providerResponseId && {
+      providerResponseId: pass.providerResponseId,
+    }),
+  };
+}
+
 export const BRANCH_STRATEGY_DESCRIPTORS = [
   "",
   "Focus on a MINIMAL approach — use the fewest tools and smallest changes possible. " +
@@ -411,6 +427,7 @@ export async function runPlanningPhase(
         ...(pass.thinkingSignature && {
           thinkingSignature: pass.thinkingSignature,
         }),
+        ...providerNativeState(pass),
         toolCalls: [
           {
             id: exitPlanToolCall.id || null,
@@ -447,6 +464,7 @@ export async function runPlanningPhase(
           ...(pass.thinkingSignature && {
             thinkingSignature: pass.thinkingSignature,
           }),
+        ...providerNativeState(pass),
         });
       }
       currentMessages.push({
@@ -474,6 +492,7 @@ export async function runPlanningPhase(
         ...(pass.thinkingSignature && {
           thinkingSignature: pass.thinkingSignature,
         }),
+      ...providerNativeState(pass),
       });
       continue;
     }
@@ -824,6 +843,7 @@ export async function commitToolCallResults(
     ...(pass.thinkingSignature && {
       thinkingSignature: pass.thinkingSignature,
     }),
+    ...providerNativeState(pass),
     toolCalls: pass.pendingToolCalls.map((toolCall: ToolCall) => {
       const matchingResult = results.find(
         (result) => result.id === toolCall.id,
@@ -934,6 +954,7 @@ export function handleNoToolCallOutcome(
       ...(pass.thinkingSignature && {
         thinkingSignature: pass.thinkingSignature,
       }),
+    ...providerNativeState(pass),
     });
 
     currentMessages.push({

@@ -491,6 +491,7 @@ const MODELS = {
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     verbosity: true,
     reasoningSummary: true,
+    programmaticToolCalling: true,
     responsesAPI: true,
     webSearch: true,
     tools: [
@@ -530,6 +531,7 @@ const MODELS = {
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     verbosity: true,
     reasoningSummary: true,
+    programmaticToolCalling: true,
     responsesAPI: true,
     webSearch: true,
     tools: [
@@ -569,8 +571,56 @@ const MODELS = {
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     verbosity: true,
     reasoningSummary: true,
+    programmaticToolCalling: true,
     responsesAPI: true,
     webSearch: true,
+    tools: [
+      "Thinking",
+      "Web Search",
+      "Tool Calling",
+      "File Search",
+      "Computer Use",
+    ],
+  },
+  GPT_6_ASTRA: {
+    description:
+      "OpenAI's GPT-6 Astra frontier model (2026-09-03): async tool calling, mid-turn steering, programmatic tool calling and mid-conversation configuration updates for long-running agentic work.",
+    name: "gpt-6-astra",
+    label: "GPT 6 Astra",
+    provider: PROVIDERS.OPENAI,
+    modelType: MODEL_TYPES.CONVERSATION,
+    year: 2026,
+    defaultTemperature: 1.0,
+    // No custom temperature/top_p/logprobs — reasoning-only sampling.
+    lockedSampling: true,
+    // Published 2026-09-03: $10 in / $1 cached / $50 out per 1M; $12.50 cache write.
+    pricing: {
+      inputPerMillion: 10.0,
+      cachedInputPerMillion: 1.0,
+      cacheWriteInputPerMillion: 12.5,
+      outputPerMillion: 50.0,
+      webSearchPer1kCalls: 10.0,
+    },
+    // Context window 1,050,000 = 922,000 max input + 128,000 max output.
+    maxInputTokens: 922_000,
+    maxOutputTokens: 128_000,
+    knowledgeCutoff: "2026-04-30",
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
+    mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
+    streaming: true,
+    thinking: true,
+    // "none" is a hard 400 on this model — reasoning cannot be switched off.
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    verbosity: true,
+    reasoningSummary: true,
+    responsesAPI: true,
+    webSearch: true,
+    // Native features only gpt-6-astra has (see getModelNativeCapabilities).
+    asyncTools: true,
+    steering: true,
+    programmaticToolCalling: true,
+    configurationUpdate: true,
     tools: [
       "Thinking",
       "Web Search",

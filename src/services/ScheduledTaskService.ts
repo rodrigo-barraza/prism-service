@@ -1,8 +1,17 @@
 import crypto from "crypto";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { MONGO_DB_NAME } from "#config";
-import { COLLECTIONS } from "#src/constants";
+import { COLLECTIONS, NOTIFICATION_SOURCES } from "#src/constants";
 import AgenticLoopService from "./AgenticLoopService.ts";
+import ConversationService from "./ConversationService.ts";
+import ConversationGoalService, {
+  GOAL_STATUSES,
+} from "./ConversationGoalService.ts";
+import { stripPrunedMessages } from "./conversation/checkpoints.ts";
+import type {
+  ConversationSettings,
+  TransformedConversation,
+} from "./conversation/types.ts";
 import { getProvider } from "#src/providers/index";
 import { getModelByName } from "#src/config";
 import logger from "#src/utils/logger";
@@ -58,8 +67,34 @@ export interface ScheduledTask {
   };
   enabled: boolean;
   lastRunMinute?: string; // "YYYY-MM-DDTHH:mm"
+  /**
+   * Target agent conversation. When set, every run continues THIS
+   * conversation (prompt appended as a scheduler notification, loop resumed
+   * with the conversation's own settings) instead of opening a new one.
+   */
+  conversationId?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Settings a conversation document carries for resuming its loop. */
+interface ScheduledConversationSettings extends ConversationSettings {
+  provider?: string;
+  model?: string;
+  agent?: string | null;
+  workspaceRoot?: string | null;
+  toolConfig?: ScheduledTask["toolConfig"];
+}
+
+export interface ScheduledTaskRunResult {
+  agentConversationId: string;
+  /** Set when a continuation run did not start (paused goal, duplicate, busy). */
+  skipped?: string;
+}
+
+/** "YYYY-MM-DDTHH:mm" in local time — the scheduler's per-minute identity. */
+export function minuteKeyFor(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
 // ─── Simple Zero-Dependency Cron Matcher ───────────────────────────────────────
@@ -293,9 +328,13 @@ const ScheduledTaskService = {
       profileId?: string;
       agentConversationId?: string;
     } = {},
-  ): Promise<{ agentConversationId: string }> {
+  ): Promise<ScheduledTaskRunResult> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
+
+    if (task.conversationId) {
+      return this.continueConversation(task, payload, { username, profileId });
+    }
 
     const resolvedConversationId = agentConversationId || crypto.randomUUID();
     if (!task.agent) {
@@ -451,6 +490,213 @@ const ScheduledTaskService = {
     }
 
     return { agentConversationId: resolvedConversationId };
+  },
+
+  /**
+   * Continue the task's target conversation instead of opening a new one:
+   * the prompt lands as a scheduler notification (`_notificationSource:
+   * scheduler`, `_notificationId: scheduler:<taskId>:<minuteKey>`) and the
+   * agentic loop resumes on that conversation with its own settings/model —
+   * the ConversationTimerService shape. Skips, with a log line, when the
+   * conversation's goal is paused/completed/blocked, when this minute's
+   * notification is already in the conversation, or while it is generating.
+   */
+  async continueConversation(
+    task: ScheduledTask,
+    payload?: Record<string, unknown>,
+    {
+      username = "system",
+      profileId = getRequestContext().profileId ?? DEFAULT_PROFILE_ID,
+    }: { username?: string; profileId?: string } = {},
+  ): Promise<ScheduledTaskRunResult> {
+    const db = MongoWrapper.getDb(MONGO_DB_NAME);
+    if (!db) throw new Error("Database not connected");
+    const conversationId = task.conversationId as string;
+    const collection = COLLECTIONS.AGENT_CONVERSATIONS;
+
+    const goal = await ConversationGoalService.get(
+      conversationId,
+      task.project,
+      username,
+    );
+    if (goal && goal.status !== GOAL_STATUSES.ACTIVE) {
+      logger.info(
+        `[ScheduledTasks] Task "${task.name}" skipped — goal on conversation ${conversationId} is ${goal.status}${goal.blockedOn ? ` (${goal.blockedOn})` : ""}.`,
+      );
+      return { agentConversationId: conversationId, skipped: `goal ${goal.status}` };
+    }
+
+    const conversation = (await db
+      .collection(collection)
+      .findOne({ id: conversationId, project: task.project, username })) as
+      | TransformedConversation
+      | null;
+    if (!conversation) {
+      throw new Error(
+        `Scheduled task "${task.name}" targets conversation ${conversationId}, which was not found`,
+      );
+    }
+
+    const notificationId = `${NOTIFICATION_SOURCES.SCHEDULER}:${task.id}:${minuteKeyFor(new Date())}`;
+    const alreadyDelivered = (conversation.messages || []).some(
+      (message) =>
+        (message as { _notificationId?: string })._notificationId ===
+        notificationId,
+    );
+    if (alreadyDelivered) {
+      logger.info(
+        `[ScheduledTasks] Task "${task.name}" skipped — ${notificationId} already delivered to conversation ${conversationId}.`,
+      );
+      return { agentConversationId: conversationId, skipped: "duplicate" };
+    }
+    if (conversation.isGenerating === true) {
+      logger.info(
+        `[ScheduledTasks] Task "${task.name}" skipped — conversation ${conversationId} is generating.`,
+      );
+      return { agentConversationId: conversationId, skipped: "generating" };
+    }
+
+    const nowISO = new Date().toISOString();
+    let finalPrompt = task.prompt;
+    if (payload && Object.keys(payload).length > 0) {
+      finalPrompt += `\n\nTrigger payload: ${JSON.stringify(payload)}`;
+    }
+    const triggerMessage: ConversationMessage = {
+      role: "user",
+      content: `🔔 Scheduled task "${task.name}": ${finalPrompt}`,
+      timestamp: nowISO,
+      _alreadyPersisted: true,
+      _notificationSource: NOTIFICATION_SOURCES.SCHEDULER,
+      _notificationId: notificationId,
+    };
+
+    logger.info(
+      `[ScheduledTasks] Executing task "${task.name}" on existing conversation ${conversationId} (user: ${username})`,
+    );
+
+    await ConversationService.appendMessages(
+      conversationId,
+      task.project,
+      username,
+      [triggerMessage],
+      null,
+      { collection },
+    );
+
+    // Reload — the appended notification and any rewind-pruned history are
+    // only right on the document (same reasoning as the timer service).
+    const reloaded = (await db
+      .collection(collection)
+      .findOne({ id: conversationId, project: task.project, username })) as
+      | TransformedConversation
+      | null;
+    const source = reloaded || conversation;
+    const freshMessages: ConversationMessage[] = reloaded
+      ? stripPrunedMessages(
+          (reloaded.messages || []) as unknown as ConversationMessage[],
+        )
+      : [
+          ...((conversation.messages || []) as unknown as ConversationMessage[]),
+          triggerMessage,
+        ];
+    for (const message of freshMessages) {
+      message._alreadyPersisted = true;
+    }
+
+    const settings = {
+      ...(source.settings || {}),
+    } as ScheduledConversationSettings;
+    const providerName = settings.provider || task.provider;
+    const resolvedModel = settings.model || task.model;
+    const agent = settings.agent || source.agent || task.agent;
+    if (!agent) {
+      throw new Error(
+        `Scheduled task "${task.name}" is missing a required agent identifier`,
+      );
+    }
+    const workspaceRoot = settings.workspaceRoot || source.workspaceRoot || null;
+    const toolConfig = task.toolConfig || settings.toolConfig;
+
+    const provider = getProvider(providerName);
+    if (!provider) {
+      throw new Error(`Provider not found: ${providerName}`);
+    }
+    const modelDefinition = getModelByName(resolvedModel);
+    const traceId = (source.traceId as string | undefined) || crypto.randomUUID();
+
+    const mockEmit = (event: SseEvent) => {
+      logger.debug(`[ScheduledTasks][${task.name}][Event] type=${event.type}`);
+    };
+
+    await ConversationService.setGenerating(
+      conversationId,
+      task.project,
+      username,
+      true,
+      { collection, agent },
+    );
+
+    try {
+      await AgenticLoopService.runAgenticLoop({
+        provider:
+          provider as unknown as import("./harnesses/types.ts").LLMProvider,
+        providerName,
+        resolvedModel,
+        modelDefinition,
+        messages: freshMessages,
+        originalMessages: freshMessages,
+        options: {
+          agenticLoopEnabled: true,
+          functionCallingEnabled: true,
+          planFirst: false,
+          autoApprove: true,
+          ...(toolConfig?.disabledTools && {
+            disabledTools: toolConfig.disabledTools,
+          }),
+          ...(toolConfig?.enabledTools && {
+            enabledTools: toolConfig.enabledTools,
+          }),
+        },
+        agentConversationId: conversationId,
+        conversationId,
+        userMessage: triggerMessage,
+        conversationMeta: {
+          title: (source.title as string) || task.name,
+          agent,
+          workspaceRoot,
+          settings,
+        },
+        traceId,
+        project: task.project,
+        username,
+        profileId,
+        clientIp: "127.0.0.1",
+        agent,
+        workspaceRoot,
+        requestId: crypto.randomUUID(),
+        requestStart: performance.now(),
+        emit: mockEmit,
+      });
+
+      logger.success(
+        `[ScheduledTasks] Task "${task.name}" completed on conversation ${conversationId}.`,
+      );
+    } catch (error: unknown) {
+      logger.error(
+        `[ScheduledTasks] Agent loop error for task "${task.name}" on conversation ${conversationId}: ${getErrorMessage(error)}`,
+      );
+      throw error;
+    } finally {
+      await ConversationService.setGenerating(
+        conversationId,
+        task.project,
+        username,
+        false,
+        { collection },
+      ).catch(() => {});
+    }
+
+    return { agentConversationId: conversationId };
   },
 
   /**
@@ -660,7 +906,9 @@ const ScheduledTaskService = {
       throw new Error(`Scheduled Task not found: ${id}`);
     }
 
-    const agentConversationId = crypto.randomUUID();
+    // A task bound to a conversation continues it; otherwise pre-generate
+    // the id so the caller can follow the new conversation immediately.
+    const agentConversationId = task.conversationId || crypto.randomUUID();
 
     // Fire-and-forget background execution with the pre-generated conversation ID
     this.executeTask({ ...task, id: task.id }, payload, {

@@ -11,7 +11,9 @@ import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import type { TokenUsage, ToolCallEntry } from "#src/types/admin";
+import type { TokenUsage, ResponsesPhase,
+  ResponsesReasoningItem,
+  ToolCallEntry } from "#src/types/admin";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { FILE_CATEGORIES } from "#src/constants";
 
@@ -41,6 +43,12 @@ export interface StreamState {
   rateLimits: unknown;
   /** Provider stop reason — "length"/"max_tokens" when output was truncated by token budget. */
   stopReason?: string;
+  /** OpenAI Responses API message phase (merged from providerState chunks). */
+  phase?: ResponsesPhase;
+  /** OpenAI Responses API reasoning items not paired with a tool call. */
+  reasoningItems?: ResponsesReasoningItem[];
+  /** OpenAI Responses API `response.id`. */
+  providerResponseId?: string;
 }
 
 export interface StreamContext {
@@ -75,14 +83,14 @@ interface StreamChunk {
   result?: unknown;
   status?: string;
   thoughtSignature?: string;
-  reasoningItem?: {
-    id: string;
-    summary: Array<{ type: string; text: string }>;
-  };
+  reasoningItem?: ResponsesReasoningItem;
   message?: string;
-  phase?: string;
+  /** "status" chunks carry a free-form phase label; "providerState" chunks a ResponsesPhase. */
+  phase?: string | null;
   progress?: number;
   characters?: number;
+  providerResponseId?: string;
+  reasoningItems?: ResponsesReasoningItem[];
 }
 
 /** Union of all SSE event shapes emitted to the client. */
@@ -350,6 +358,24 @@ export async function dispatchChunk(
         status: chunk.status || undefined,
         thoughtSignature: chunk.thoughtSignature || undefined,
       });
+      return true;
+
+    case "providerState":
+      // Provider-native state to store on the assistant message and replay
+      // next turn (OpenAI Responses: response.id, message phase, unpaired
+      // reasoning items). Never shown to the client.
+      if (chunk.providerResponseId) {
+        state.providerResponseId = chunk.providerResponseId;
+      }
+      if (chunk.phase !== undefined) {
+        state.phase = chunk.phase as ResponsesPhase;
+      }
+      if (chunk.reasoningItems && chunk.reasoningItems.length > 0) {
+        state.reasoningItems = [
+          ...(state.reasoningItems ?? []),
+          ...chunk.reasoningItems,
+        ];
+      }
       return true;
 
     case "toolCallDelta":

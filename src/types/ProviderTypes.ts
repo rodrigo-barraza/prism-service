@@ -1,4 +1,5 @@
 import type { Provider } from "./provider.ts";
+import type { ResponsesPhase, ResponsesReasoningItem } from "./admin.ts";
 
 export interface ProviderInstanceConfig {
   url: string;
@@ -37,9 +38,18 @@ export interface ChatMessage {
     id?: string | null;
     name: string;
     args?: Record<string, unknown> | unknown;
+    responsesItemId?: string;
+    thoughtSignature?: string;
+    reasoningItem?: ResponsesReasoningItem;
   }>;
   thinking?: string;
   thinkingSignature?: string;
+  /** OpenAI Responses API message phase — resent on replay. */
+  phase?: ResponsesPhase;
+  /** OpenAI Responses API reasoning items not paired with a tool call. */
+  reasoningItems?: ResponsesReasoningItem[];
+  /** OpenAI Responses API `response.id` that produced this message. */
+  providerResponseId?: string;
   /** Tool result correlation — maps this message to the tool_use that produced it. */
   tool_call_id?: string;
   /** Generic message ID — fallback for tool correlation. */
@@ -142,6 +152,12 @@ export interface ProviderOptions {
   systemPrompt?: string;
   // OpenAI Responses API
   responsesAPI?: boolean;
+  /**
+   * OpenAI Responses API `previous_response_id` — stateful continuation from
+   * a stored response. No caller sets it yet; the hook exists so the harness
+   * can chain turns server-side instead of replaying the transcript.
+   */
+  previousResponseId?: string;
   // Provider routing
   agent?: string;
   username?: string;

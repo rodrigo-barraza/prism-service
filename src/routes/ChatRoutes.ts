@@ -1393,6 +1393,14 @@ async function handleStreamingText(context: GenerationContext) {
       ...(streamState.thinkingSignature
         ? { thinkingSignature: streamState.thinkingSignature }
         : {}),
+      // OpenAI Responses API state — replayed on the follow-up request.
+      ...(streamState.phase !== undefined ? { phase: streamState.phase } : {}),
+      ...(streamState.reasoningItems?.length
+        ? { reasoningItems: streamState.reasoningItems }
+        : {}),
+      ...(streamState.providerResponseId
+        ? { providerResponseId: streamState.providerResponseId }
+        : {}),
     };
     const toolResultMillisecondsgs = streamState.toolCalls
       .filter((toolCall) => toolCall.result)
@@ -1415,6 +1423,9 @@ async function handleStreamingText(context: GenerationContext) {
     streamState.text = "";
     streamState.thinking = "";
     streamState.thinkingSignature = "";
+    streamState.phase = undefined;
+    streamState.reasoningItems = undefined;
+    streamState.providerResponseId = undefined;
     streamState.toolCalls.length = 0;
     const followUpStream = streamWithRetries(
       () =>
@@ -1490,6 +1501,9 @@ async function handleStreamingText(context: GenerationContext) {
     text: streamState.text,
     thinking: streamState.thinking,
     images: streamState.images,
+    ...(streamState.phase !== undefined && { phase: streamState.phase }),
+    ...(streamState.reasoningItems && streamState.reasoningItems.length > 0 && { reasoningItems: streamState.reasoningItems }),
+    ...(streamState.providerResponseId && { providerResponseId: streamState.providerResponseId }),
     toolCalls: streamState.toolCalls.map(
       (toolCall): ToolCallPayload => ({
         name: toolCall.name,
@@ -1636,6 +1650,9 @@ async function handleNonStreamingText(context: GenerationContext) {
     text: genResult.text || "",
     thinking: genResult.thinking || "",
     images,
+    ...(genResult.phase !== undefined && { phase: genResult.phase }),
+    ...(genResult.reasoningItems && genResult.reasoningItems.length > 0 && { reasoningItems: genResult.reasoningItems }),
+    ...(genResult.providerResponseId && { providerResponseId: genResult.providerResponseId }),
     toolCalls:
       genResult.toolCalls?.map((toolCall) => ({
         id: toolCall.id || null,

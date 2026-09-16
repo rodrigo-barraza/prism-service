@@ -54,6 +54,15 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   // Tier 1 — memory management (non-destructive upsert)
   [TOOL_NAMES.SAVE_MEMORY]: APPROVAL_TIERS.AUTO,
 
+  // Tier 1 — conversation goal metadata, bounded waits, read-only programs
+  // (local tool names — see GoalTools / AsyncTaskConstants / RunToolProgramTool)
+  set_goal: APPROVAL_TIERS.AUTO,
+  update_goal: APPROVAL_TIERS.AUTO,
+  clear_goal: APPROVAL_TIERS.AUTO,
+  wait_for_tasks: APPROVAL_TIERS.AUTO,
+  // run_tool_program only dispatches tier-AUTO tools itself (enforced inside)
+  run_tool_program: APPROVAL_TIERS.AUTO,
+
   // Tier 1 — control flow (no side effects)
   [TOOL_NAMES.SLEEP]: APPROVAL_TIERS.AUTO,
   [TOOL_NAMES.ENTER_PLAN_MODE]: APPROVAL_TIERS.AUTO,

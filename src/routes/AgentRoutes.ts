@@ -3,6 +3,7 @@ import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import express, { type Request, type Response, type NextFunction } from "express";
 import AgenticLoopService from "#src/services/AgenticLoopService";
 import AgentSessionRegistry from "#src/services/AgentSessionRegistry";
+import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import { handleAgent } from "./ChatRoutes.ts";
 import logger from "#src/utils/logger";
 import { handleSseRequest, handleJsonRequest } from "#src/utils/SseUtilities";
@@ -110,6 +111,70 @@ router.post(
   }),
 );
 
+
+// ─── mid-turn input (steering) ──────────────────────────────
+
+/**
+ * POST /agent/input
+ *
+ * Body:
+ *   { conversationId: string, text: string, images?: string[] }
+ *
+ * Hands a message to the turn that is RUNNING on this conversation. The
+ * harness applies it at its next safe boundary (before the next model call,
+ * after the current tool batch, or in place of ending the turn) and
+ * acknowledges with a `turn_input` event plus a `status` of
+ * `turn_input_applied` carrying the returned `inputId`.
+ *
+ * 409 when no turn is open: the client should queue the message as the next
+ * turn instead (that is the pre-existing behaviour and remains the fallback).
+ */
+router.post(
+  "/input",
+  asyncHandler(async (request: Request, response: Response) => {
+    const { conversationId, text, images } = request.body;
+
+    if (!conversationId) {
+      return response.status(400).json({ error: "Missing conversationId" });
+    }
+    if (typeof text !== "string" && !Array.isArray(images)) {
+      return response.status(400).json({ error: "Missing text" });
+    }
+
+    const posted = TurnInputMailbox.post(conversationId, {
+      kind: "user_update",
+      text: typeof text === "string" ? text : "",
+      ...(Array.isArray(images) && images.length > 0
+        ? { images: images.filter((image: unknown) => typeof image === "string") }
+        : {}),
+    });
+
+    if (!posted.accepted) {
+      const status = posted.reason === "no_active_turn" ? 409 : 400;
+      return response.status(status).json({
+        error:
+          posted.reason === "no_active_turn"
+            ? "No active turn for this conversation — send it as a new message"
+            : posted.reason === "mailbox_full"
+              ? "Too many pending updates for this turn"
+              : "Empty input",
+        reason: posted.reason,
+        conversationId,
+      });
+    }
+
+    logger.info(
+      `[agent/input] update ${posted.id} queued for conversation ${conversationId} (position ${posted.position})`,
+    );
+
+    response.json({
+      ok: true,
+      inputId: posted.id,
+      position: posted.position,
+      active: AgentSessionRegistry.isActive(conversationId),
+    });
+  }),
+);
 
 // ─── explicit session stop ──────────────────────────────────
 

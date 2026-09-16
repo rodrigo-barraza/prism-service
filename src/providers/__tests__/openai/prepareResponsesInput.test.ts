@@ -347,3 +347,162 @@ describe("prepareResponsesInput — document attachments", () => {
     expect(inline?.text).toContain("a: 1");
   });
 });
+
+// ── Provider-native state replay (encrypted reasoning, phase) ─
+describe("prepareResponsesInput — Responses native state replay", () => {
+  it("round-trips encrypted_content on a tool-call-paired reasoning item", () => {
+    const result = prepareResponsesInput([
+      makeMessage({
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          {
+            id: "call_1",
+            responsesItemId: "fc_1",
+            name: "search",
+            args: {},
+            reasoningItem: {
+              id: "rs_enc",
+              summary: [{ type: "summary_text", text: "Thinking..." }],
+              encrypted_content: "gAAAAABopaque==",
+            },
+          },
+        ],
+      }),
+    ]);
+
+    const reasoningItem = result.find(
+      (item) => (item as { type?: string }).type === "reasoning",
+    ) as { id: string; encrypted_content?: string; summary: unknown[] };
+    expect(reasoningItem.id).toBe("rs_enc");
+    expect(reasoningItem.encrypted_content).toBe("gAAAAABopaque==");
+    expect(reasoningItem.summary).toHaveLength(1);
+    // Reasoning still precedes its function call
+    expect((result[0] as { type?: string }).type).toBe("reasoning");
+    expect((result[1] as { type?: string }).type).toBe("function_call");
+  });
+
+  it("omits encrypted_content when the stored item has none (legacy messages)", () => {
+    const result = prepareResponsesInput([
+      makeMessage({
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          {
+            id: "call_1",
+            name: "search",
+            args: {},
+            reasoningItem: { id: "rs_plain", summary: [] },
+          },
+        ],
+      }),
+    ]);
+    const reasoningItem = result[0] as unknown as Record<string, unknown>;
+    expect(reasoningItem.type).toBe("reasoning");
+    expect("encrypted_content" in reasoningItem).toBe(false);
+  });
+
+  it("emits a text-only assistant turn's reasoningItems immediately before the message", () => {
+    const result = prepareResponsesInput([
+      makeMessage({ role: "user", content: "Hi" }),
+      makeMessage({
+        role: "assistant",
+        content: "Hello there.",
+        reasoningItems: [
+          {
+            id: "rs_a",
+            summary: [{ type: "summary_text", text: "Greeting back." }],
+            encrypted_content: "enc-a",
+          },
+          { id: "rs_b", summary: [] },
+        ],
+      }),
+      makeMessage({ role: "user", content: "Next" }),
+    ]);
+
+    const shapes = result.map((item) => {
+      const typed = item as { type?: string; role?: string; id?: string };
+      return typed.type === "reasoning" ? `reasoning:${typed.id}` : typed.role;
+    });
+    expect(shapes).toEqual([
+      "user",
+      "reasoning:rs_a",
+      "reasoning:rs_b",
+      "assistant",
+      "user",
+    ]);
+    expect((result[1] as { encrypted_content?: string }).encrypted_content).toBe(
+      "enc-a",
+    );
+    expect("encrypted_content" in (result[2] as object)).toBe(false);
+    expect((result[3] as { content: string }).content).toBe("Hello there.");
+  });
+
+  it("does not emit reasoning for a text-only assistant message without reasoningItems", () => {
+    const result = prepareResponsesInput([
+      makeMessage({ role: "assistant", content: "Plain." }),
+    ]);
+    expect(result).toHaveLength(1);
+    expect((result[0] as { role: string }).role).toBe("assistant");
+  });
+
+  it("resends phase on a text-only assistant message", () => {
+    const result = prepareResponsesInput([
+      makeMessage({ role: "assistant", content: "Done.", phase: "final_answer" }),
+    ]);
+    expect((result[0] as { phase?: string }).phase).toBe("final_answer");
+  });
+
+  it("resends phase on the text item of a tool-calling assistant turn", () => {
+    const result = prepareResponsesInput([
+      makeMessage({
+        role: "assistant",
+        content: "Let me look that up.",
+        phase: "commentary",
+        toolCalls: [{ id: "call_1", name: "search", args: {} }],
+      }),
+    ]);
+    expect((result[0] as { role?: string; phase?: string }).role).toBe("assistant");
+    expect((result[0] as { phase?: string }).phase).toBe("commentary");
+    expect((result[1] as { type?: string }).type).toBe("function_call");
+    expect("phase" in (result[1] as object)).toBe(false);
+  });
+
+  it("resends a stored null phase and omits phase entirely when never stored", () => {
+    const result = prepareResponsesInput([
+      makeMessage({ role: "assistant", content: "Older model.", phase: null }),
+      makeMessage({ role: "assistant", content: "No phase field." }),
+      makeMessage({ role: "user", content: "Users never carry phase", phase: "final_answer" } as Partial<OpenAIMessage>),
+    ]);
+    expect("phase" in (result[0] as object)).toBe(true);
+    expect((result[0] as { phase?: unknown }).phase).toBeNull();
+    expect("phase" in (result[1] as object)).toBe(false);
+    expect("phase" in (result[2] as object)).toBe(false);
+  });
+
+  it("replays unpaired reasoningItems of a tool-calling turn ahead of its output", () => {
+    const result = prepareResponsesInput([
+      makeMessage({
+        role: "assistant",
+        content: "",
+        reasoningItems: [{ id: "rs_unpaired", summary: [], encrypted_content: "x" }],
+        toolCalls: [{ id: "call_1", name: "search", args: {} }],
+      }),
+    ]);
+    expect((result[0] as { type?: string; id?: string }).id).toBe("rs_unpaired");
+    expect((result[1] as { type?: string }).type).toBe("function_call");
+  });
+
+  it("keeps phase on a media-bearing assistant message", () => {
+    const result = prepareResponsesInput([
+      makeMessage({
+        role: "assistant",
+        content: "Here is the picture.",
+        images: ["https://example.com/photo.jpg"],
+        phase: "final_answer",
+      }),
+    ]);
+    expect((result[0] as { phase?: string }).phase).toBe("final_answer");
+    expect(Array.isArray((result[0] as { content: unknown }).content)).toBe(true);
+  });
+});

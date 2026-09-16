@@ -90,9 +90,10 @@
     }
   },
   "ask_user": {
-    "description": "Ask the user one or more questions and wait for their responses before continuing. Use this when you need clarification, a decision between options, or explicit confirmation before proceeding with a potentially impactful action. The agent loop pauses until the user responds. You can batch up to 4 related questions in a single call to reduce round-trips.",
+    "description": "Ask the user one or more questions. By default the agent loop pauses until the user responds — use that when you need clarification, a decision between options, or explicit confirmation before a potentially impactful action. Set blocking=false to ask a preference the rest of your work does not depend on: the card is shown, you continue immediately, and the answer is delivered to you as a <user-answer> message at your next step (or as the next turn if this one has ended). Never use blocking=false for a decision the next action depends on. You can batch up to 4 related questions in a single call to reduce round-trips.",
     "parameters": {
       "context": "Optional: additional context shown below the questions.",
+      "blocking": "Optional: default true (wait for the answer). false → show the card, keep working, and receive the answer later as a <user-answer> message.",
       "questions": "Batch of questions to ask the user (up to 4). Each item is a question object."
     }
   },
@@ -197,10 +198,11 @@
     }
   },
   "run_async_task": {
-    "description": "Dispatch a tool to run asynchronously in the background. Returns immediately with a task ID — the tool executes in the background while you continue other work. Use this for long-running operations like shell commands, web scraping, file operations, or API calls when you don't need to wait for the result before proceeding. Query task status with list_async_tasks. Cancel with cancel_async_task. You will be automatically notified when the task completes.",
+    "description": "Dispatch a tool to run asynchronously in the background. Returns immediately with a task ID — the tool executes in the background while you continue other work. Use this for long-running operations like shell commands, web scraping, file operations, or API calls when you don't need to wait for the result before proceeding. Query task status with list_async_tasks. Cancel with cancel_async_task. You will be automatically notified when the task completes. By default dispatching ends your turn and the completion wakes you in a new turn; pass continueWorking=true to keep working on independent steps while it runs — the completion then arrives as a <task-notification> message at your next step, and wait_for_tasks blocks on it when you actually need the result.",
     "parameters": {
       "toolName": "The name of the tool to execute asynchronously (e.g., 'execute_command', 'search_web', 'read_url').",
-      "toolArguments": "The arguments to pass to the tool, exactly as you would pass them in a direct tool call."
+      "toolArguments": "The arguments to pass to the tool, exactly as you would pass them in a direct tool call.",
+      "continueWorking": "When true, keep your turn going after dispatching: continue with steps that do not depend on the result. The completion is delivered to you mid-turn (or as the next turn if this one has ended). Default false: end your turn now and be woken when the task completes."
     }
   },
   "list_async_tasks": {
@@ -211,5 +213,44 @@
     "parameters": {
       "taskId": "The unique ID of the async task to cancel."
     }
+  },
+  "run_tool_program": {
+    "description": "Run a small JavaScript program that calls several READ-ONLY tools and returns only the evidence you need. Use it when you would otherwise make many tool calls whose raw output you do not need to see (read 20 files and extract the matching symbols; grep a tree and count hits per directory; fetch several pages and pull one field from each); to filter or combine large results before they reach you; and for parallel lookups. Intermediate tool outputs stay inside the program — only your return value comes back.\n\nHelpers available inside the program: `await callTool(name, args)` runs one tool and resolves with its result; `await callTools([{name, args}, ...])` runs several in parallel (up to 8 at a time) and resolves with the results in the same order — a failed call yields `{error}` in its slot instead of rejecting the batch. `console.log` output is captured and returned as `logs`. Top-level `await` and `return` are allowed; the value you `return` is the tool result (JSON, capped at 32 KB — keep it small: a compact table, a list of matches, a summary). Only tools the harness would auto-approve without asking (read-only: read_file, read_files, list_directory, search_file_contents, find_files, get_file_info, git_status/diff/log, search_web, read_web_page, ...) are callable; a write, shell, MCP, sub-agent, or interactive tool resolves to `{error: \"tool_not_allowed\", reason}` — never do writes here. Limits: 50 tool calls per program, 30 s by default (max 120). No require/import/fetch/process — plain JavaScript plus the helpers above.",
+    "parameters": {
+      "code": "JavaScript program body. Runs as `(async () => { ... })()`, so use top-level `await` and end with `return <value>`. Call tools via `callTool(name, args)` and `callTools([{name, args}, ...])`.",
+      "timeoutSeconds": "Wall-clock limit for the whole program including nested tool calls. Default 30, maximum 120.",
+      "description": "One line saying what the program does (shown to the user)."
+    }
+  },
+  "wait_for_tasks": {
+    "description": "Block until background work finishes and return its results in place. Waits on async tasks (from run_async_task) and/or sub-agents (from create_subagent / create_subagents). With no ids it waits on every running async task and sub-agent of this conversation. Returns each item's status and result (or error); items still running when the timeout elapses are listed in stillRunning. Use this when you actually need a result to continue — do not poll with list_async_tasks.",
+    "parameters": {
+      "taskIds": "Async task ids to wait for (from run_async_task).",
+      "agentIds": "Sub-agent ids to wait for (from create_subagent / create_subagents).",
+      "timeoutSeconds": "Maximum seconds to wait (default 60, max 300). On timeout you get what has settled so far."
+    }
+  },
+  "set_goal": {
+    "description": "Set (or replace) the persistent goal of this conversation: what 'done' means, in the user's words. Optionally state how completion will be recognised and a budget (max dollars, max turns, deadline). The goal is shown to you on every turn and to the user in a panel; keep it current with update_goal. Use it when the user gives you a multi-turn objective, not for one-off questions.",
+    "parameters": {
+      "objective": "What 'done' means, in the user's words. One or two sentences.",
+      "completionCriteria": "How to tell the objective is met (tests green, file exists, user confirmed…).",
+      "maxCostDollars": "Optional spend ceiling in dollars across every turn of this goal.",
+      "maxTurns": "Optional ceiling on the number of turns spent on this goal.",
+      "deadline": "Optional ISO 8601 timestamp after which the goal counts as out of budget."
+    }
+  },
+  "update_goal": {
+    "description": "Update the conversation's goal: report progress (summary and/or percent), record what you are blocked on, or change its status. Call it with status 'completed' when the completion criteria are met, and set blockedOn (status 'blocked') when you are stuck instead of retrying in circles; pass an empty blockedOn once unblocked. Only the user can pause a goal. The user is notified only when something meaningful changes.",
+    "parameters": {
+      "progress": "One-line summary of where the work stands now.",
+      "percent": "Estimated completion, 0–100.",
+      "blockedOn": "The current obstacle; pass an empty string once unblocked to clear it.",
+      "status": "New status: active, completed, or blocked."
+    }
+  },
+  "clear_goal": {
+    "description": "Remove the conversation's persistent goal. Use it when the user drops the objective; to finish a goal, prefer update_goal with status 'completed' so the record stays.",
+    "parameters": {}
   }
 }

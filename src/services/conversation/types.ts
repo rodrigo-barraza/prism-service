@@ -1,4 +1,5 @@
 import type { ChatMessage } from "#src/types/admin";
+import type { ConversationGoal } from "#src/services/ConversationGoalService";
 
 export interface ConversationMeta {
   title?: string;
@@ -14,6 +15,8 @@ export interface ConversationMeta {
   agent?: string | null;
   contextBudget?: Record<string, unknown> | null;
   conversationOutcome?: string | null;
+  /** Persistent objective of the conversation — owned by ConversationGoalService. */
+  goal?: ConversationGoal | null;
   /** Runtime-only: memory IDs injected this turn, written via $addToSet to the document's injectedMemoryIds array. Not stored as a top-level field. */
   _newInjectedMemoryIds?: string[];
 }

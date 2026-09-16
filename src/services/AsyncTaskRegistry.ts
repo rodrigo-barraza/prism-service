@@ -43,6 +43,39 @@ export interface AsyncTaskState {
   project: string | null;
   username: string | null;
   abortController: AbortController | null;
+  /**
+   * Resolves once the task leaves `running` (completed / failed / cancelled),
+   * AFTER the state fields are updated and BEFORE `onComplete` fires. Never
+   * rejects — inspect `status` to learn how it settled.
+   */
+  settled: Promise<void>;
+  /**
+   * How the completion reached the parent: through the running turn's
+   * TurnInputMailbox, by waking a new turn (auto-response), or returned
+   * directly by a `wait_for_tasks` call. Unset while running or when the
+   * completion was dropped (sub-agent whose turn had already ended).
+   */
+  deliveredVia?: "mailbox" | "auto_response" | "wait";
+  /**
+   * The agentConversationId of a `wait_for_tasks` call currently blocked on
+   * this task. While set, the completion callback must NOT deliver the
+   * result (the waiter returns it itself). Cleared by the waiter when its
+   * wait times out or is aborted, so a later completion is still delivered.
+   */
+  awaitedBy?: string;
+  /**
+   * The turn that dispatched this task ended while it was still running and
+   * bumped the conversation's pendingBackgroundTasks (+1, once per turn).
+   * Whichever delivery path consumes the completion pays that back and
+   * clears the flag on the task's siblings (the +1 was per turn, not per
+   * task). See `markRunningAsCounted` / `clearCountedAsPending`.
+   */
+  countedAsPending?: boolean;
+}
+
+export interface AsyncTaskWaitOptions {
+  timeoutMilliseconds?: number;
+  signal?: AbortSignal;
 }
 
 export type AsyncTaskExecutor = (
@@ -63,6 +96,17 @@ const taskCountersByConversation = new Map<string, number>();
 
 /** Active task states keyed by taskId */
 const activeTasks = new Map<string, AsyncTaskState>();
+
+/** Resolvers for each task's `settled` promise, keyed by taskId */
+const settleResolvers = new Map<string, () => void>();
+
+/** Resolve (once) the `settled` promise of a task. Idempotent. */
+function markSettled(taskId: string): void {
+  const resolve = settleResolvers.get(taskId);
+  if (!resolve) return;
+  settleResolvers.delete(taskId);
+  resolve();
+}
 
 /** Background pruning interval reference */
 let pruningIntervalHandle: ReturnType<typeof setInterval> | null = null;
@@ -133,6 +177,7 @@ registerCleanup(async () => {
     taskState.status = SYSTEM_STATUSES.CANCELLED;
     taskState.completedAt = Date.now();
     taskState.durationMilliseconds = taskState.completedAt - taskState.startedAt;
+    markSettled(taskState.taskId);
   }
 
   if (pruningIntervalHandle) {
@@ -175,6 +220,12 @@ export default class AsyncTaskRegistry {
     const taskId = generateTaskId(conversationKey);
     const taskAbortController = createAbortController();
 
+    let resolveSettled: () => void = () => {};
+    const settled = new Promise<void>((resolve) => {
+      resolveSettled = resolve;
+    });
+    settleResolvers.set(taskId, resolveSettled);
+
     const taskState: AsyncTaskState = {
       taskId,
       toolName,
@@ -190,6 +241,7 @@ export default class AsyncTaskRegistry {
       project: context.project || null,
       username: context.username || null,
       abortController: taskAbortController,
+      settled,
     };
 
     activeTasks.set(taskId, taskState);
@@ -214,6 +266,10 @@ export default class AsyncTaskRegistry {
           `[AsyncTaskRegistry] Task ${taskId} completed: tool="${toolName}" durationMilliseconds=${taskState.durationMilliseconds}`,
         );
 
+        // Settle BEFORE onComplete: a wait_for_tasks waiter has already
+        // stamped `awaitedBy`, and the (synchronous) callback below reads
+        // it to decide whether delivery is the waiter's job.
+        markSettled(taskId);
         onComplete?.(taskState);
       })
       .catch((executionError: Error) => {
@@ -236,6 +292,7 @@ export default class AsyncTaskRegistry {
         taskState.completedAt = Date.now();
         taskState.durationMilliseconds = taskState.completedAt - taskState.startedAt;
 
+        markSettled(taskId);
         onComplete?.(taskState);
       });
 
@@ -276,6 +333,7 @@ export default class AsyncTaskRegistry {
     taskState.status = SYSTEM_STATUSES.CANCELLED;
     taskState.completedAt = Date.now();
     taskState.durationMilliseconds = taskState.completedAt - taskState.startedAt;
+    markSettled(taskId);
 
     logger.info(`[AsyncTaskRegistry] Cancelled task ${taskId}: tool="${taskState.toolName}"`);
     return true;
@@ -298,11 +356,101 @@ export default class AsyncTaskRegistry {
   }
 
   /**
+   * Called by the harness when a turn ends with detached work still running
+   * and it has bumped pendingBackgroundTasks for it: every running task of
+   * the conversation remembers that the count exists. Returns how many
+   * tasks were marked.
+   */
+  static markRunningAsCounted(agentConversationId: string): number {
+    let marked = 0;
+    for (const taskState of activeTasks.values()) {
+      if (
+        taskState.agentConversationId === agentConversationId &&
+        taskState.status === SYSTEM_STATUSES.RUNNING
+      ) {
+        taskState.countedAsPending = true;
+        marked++;
+      }
+    }
+    return marked;
+  }
+
+  /**
+   * The per-turn +1 has been paid back by one completion: clear the flag on
+   * every task of the conversation so no sibling pays it again.
+   */
+  static clearCountedAsPending(agentConversationId: string | null): void {
+    if (!agentConversationId) return;
+    for (const taskState of activeTasks.values()) {
+      if (taskState.agentConversationId === agentConversationId) {
+        taskState.countedAsPending = false;
+      }
+    }
+  }
+
+  /**
    * Check if a specific task has a given status.
    */
   static hasActiveTask(taskId: string): boolean {
     const taskState = activeTasks.get(taskId);
     return taskState?.status === SYSTEM_STATUSES.RUNNING || false;
+  }
+
+  /**
+   * Wait for one task to settle (completed / failed / cancelled).
+   *
+   * Resolves with the task's state as soon as it settles, or when the
+   * timeout elapses or `signal` aborts — in those two cases the returned
+   * state is still `running`, so callers read `status` to tell the
+   * outcomes apart. Resolves `null` for an unknown taskId. Never rejects.
+   *
+   * Does NOT touch `awaitedBy` — the tool that owns the duplicate
+   * suppression sets and clears it around this call.
+   */
+  static async waitForTask(
+    taskId: string,
+    { timeoutMilliseconds, signal }: AsyncTaskWaitOptions = {},
+  ): Promise<AsyncTaskState | null> {
+    const taskState = activeTasks.get(taskId);
+    if (!taskState) return null;
+    if (taskState.status !== SYSTEM_STATUSES.RUNNING) return taskState;
+    if (signal?.aborted) return taskState;
+
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+    let abortListener: (() => void) | null = null;
+
+    const timeoutPromise = new Promise<void>((resolve) => {
+      if (typeof timeoutMilliseconds === "number" && timeoutMilliseconds >= 0) {
+        timeoutHandle = setTimeout(resolve, timeoutMilliseconds);
+      }
+    });
+    const abortPromise = new Promise<void>((resolve) => {
+      if (signal) {
+        abortListener = () => resolve();
+        signal.addEventListener("abort", abortListener, { once: true });
+      }
+    });
+
+    try {
+      await Promise.race([taskState.settled, timeoutPromise, abortPromise]);
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+      if (signal && abortListener) signal.removeEventListener("abort", abortListener);
+    }
+    return taskState;
+  }
+
+  /**
+   * Wait for several tasks under ONE shared deadline / signal. Returns the
+   * states aligned with `taskIds` (`null` for an unknown id).
+   */
+  static async waitForTasks(
+    taskIds: string[],
+    options: AsyncTaskWaitOptions = {},
+  ): Promise<Array<AsyncTaskState | null>> {
+    return Promise.all(
+      taskIds.map((taskId) => AsyncTaskRegistry.waitForTask(taskId, options)),
+    );
   }
 
   /**
@@ -320,6 +468,7 @@ export default class AsyncTaskRegistry {
           taskState.completedAt = Date.now();
           taskState.durationMilliseconds = taskState.completedAt - taskState.startedAt;
         }
+        markSettled(taskId);
         taskIdsToRemove.push(taskId);
       }
     }
@@ -349,9 +498,11 @@ export default class AsyncTaskRegistry {
       if (taskState.status === SYSTEM_STATUSES.RUNNING) {
         taskState.abortController?.abort();
       }
+      markSettled(taskState.taskId);
     }
     activeTasks.clear();
     taskCountersByConversation.clear();
+    settleResolvers.clear();
   }
 
   /** Force a pruning sweep — exposed for testing */

@@ -275,6 +275,24 @@ export interface ToolEntry {
   [key: string]: unknown;
 }
 
+/**
+ * OpenAI Responses API reasoning output item, replayed verbatim on the next
+ * request. `encrypted_content` is the opaque reasoning state the API returns
+ * when `include: ["reasoning.encrypted_content"]` is requested (or `store`
+ * is false); without it the model re-reasons from the summary alone.
+ */
+export interface ResponsesReasoningItem {
+  id: string;
+  summary: Array<{ type: string; text: string }>;
+  encrypted_content?: string;
+}
+
+/**
+ * Responses API assistant-message phase (gpt-5.3-codex and later). OpenAI
+ * asks that it be preserved and resent on every assistant message.
+ */
+export type ResponsesPhase = "commentary" | "final_answer" | null;
+
 export interface ToolCallEntry {
   id?: string | null;
   name: string;
@@ -284,10 +302,7 @@ export interface ToolCallEntry {
   responsesItemId?: string;
   thoughtSignature?: string;
   /** OpenAI Responses API reasoning output item paired with this function call. */
-  reasoningItem?: {
-    id: string;
-    summary: Array<{ type: string; text: string }>;
-  };
+  reasoningItem?: ResponsesReasoningItem;
   durationMilliseconds?: number;
 }
 
@@ -304,6 +319,12 @@ export interface ChatMessage {
   toolCalls?: ToolCallEntry[];
   thinking?: string;
   thinkingSignature?: string;
+  /** OpenAI Responses API message phase — resent on replay. */
+  phase?: ResponsesPhase;
+  /** OpenAI Responses API reasoning items NOT paired with a tool call (text-only turns). */
+  reasoningItems?: ResponsesReasoningItem[];
+  /** OpenAI Responses API `response.id` that produced this message. */
+  providerResponseId?: string;
   deleted?: boolean;
   /** Soft rewind-pruned flag — excluded from model context, kept for the UI. */
   pruned?: boolean;
