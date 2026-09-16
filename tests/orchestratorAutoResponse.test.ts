@@ -48,6 +48,8 @@ import MongoWrapper from "#src/wrappers/MongoWrapper";
 import ConversationService from "#src/services/ConversationService";
 import OrchestratorService from "#src/services/OrchestratorService";
 import { GitWorktreeHelper } from "#src/services/orchestrator/GitWorktreeHelper";
+import TurnInputMailbox from "#src/services/TurnInputMailbox";
+import CounterConversationService from "#src/services/conversation/ConversationService";
 import type { OrchestratorContext, SubAgentResult } from "#src/types/orchestrator";
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -1097,6 +1099,213 @@ describe("Event-Driven Auto-Response", () => {
       const [agentParams] = mockHandleAgent.mock.calls[0];
       expect(agentParams.conversationId).toBe("parent-conv-id");
       expect(agentParams.agenticLoopEnabled).toBe(true);
+    });
+  });
+
+  // ── Mid-turn delivery through the TurnInputMailbox ───────────
+
+  describe("_triggerParentAutoResponse while the parent is mid-turn", () => {
+    const midTurnConversation = {
+      id: "parent-conv-id",
+      isGenerating: true,
+      messages: [
+        { role: "user", content: "Build me a feature" },
+        { role: "assistant", content: "I spawned sub-agents" },
+        { role: "user", content: "also do this while you wait" },
+      ],
+      settings: { provider: PROVIDERS.GOOGLE, model: "gemini-3-flash-preview", agent: "CODING" },
+    };
+
+    const completionMessage = {
+      role: "user" as const,
+      content: "<task-notification>\n[SUB-AGENT TEAM COMPLETED] Team finished.\n</task-notification>",
+      timestamp: new Date().toISOString(),
+      _alreadyPersisted: true,
+      _notificationSource: NOTIFICATION_SOURCES.ORCHESTRATOR,
+      _notificationId: "orchestrator:team-completed:fixed",
+    };
+
+    let adjustSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      TurnInputMailbox._clearAll();
+      adjustSpy = vi
+        .spyOn(CounterConversationService, "adjustPendingBackgroundTasks")
+        .mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+      TurnInputMailbox._clearAll();
+    });
+
+    it("should post the notification into the OPEN parent turn instead of waking a new one, and still pay back the counter", async () => {
+      mockFindOne.mockResolvedValue(midTurnConversation);
+      TurnInputMailbox.open("parent-conv-id");
+
+      await OrchestratorService._triggerParentAutoResponse(
+        "parent-conv-id", "test-project", "test-user",
+        orchestratorContext, completionMessage,
+      );
+
+      expect(mockHandleAgent).not.toHaveBeenCalled();
+      expect(vi.mocked(ConversationService.appendMessages)).not.toHaveBeenCalled();
+
+      expect(TurnInputMailbox.pendingCount("parent-conv-id")).toBe(1);
+      const [entry] = TurnInputMailbox.drain("parent-conv-id");
+      expect(entry.kind).toBe("task_completion");
+      expect(entry.text).toBe(completionMessage.content);
+      expect(entry.meta).toEqual({
+        _notificationSource: NOTIFICATION_SOURCES.ORCHESTRATOR,
+        _notificationId: "orchestrator:team-completed:fixed",
+      });
+
+      expect(adjustSpy).toHaveBeenCalledTimes(1);
+      expect(adjustSpy).toHaveBeenCalledWith(
+        "parent-conv-id", "test-project", "test-user", -1,
+        expect.objectContaining({ collection: expect.any(String) }),
+      );
+    });
+
+    it("should keep the old skip (no mailbox post, counter paid back) when the parent's loop is not open", async () => {
+      mockFindOne.mockResolvedValue(midTurnConversation);
+      expect(TurnInputMailbox.isOpen("parent-conv-id")).toBe(false);
+
+      await OrchestratorService._triggerParentAutoResponse(
+        "parent-conv-id", "test-project", "test-user",
+        orchestratorContext, completionMessage,
+      );
+
+      expect(mockHandleAgent).not.toHaveBeenCalled();
+      expect(TurnInputMailbox.openCount).toBe(0);
+      expect(adjustSpy).toHaveBeenCalledWith(
+        "parent-conv-id", "test-project", "test-user", -1, expect.anything(),
+      );
+    });
+
+    it("should not use the mailbox when the parent is idle (normal auto-response)", async () => {
+      mockFindOne.mockResolvedValue({ ...midTurnConversation, isGenerating: false });
+      TurnInputMailbox.open("parent-conv-id");
+
+      await OrchestratorService._triggerParentAutoResponse(
+        "parent-conv-id", "test-project", "test-user",
+        orchestratorContext, completionMessage,
+      );
+
+      expect(mockHandleAgent).toHaveBeenCalledTimes(1);
+      expect(TurnInputMailbox.pendingCount("parent-conv-id")).toBe(0);
+    });
+  });
+
+  // ── awaitedBy suppression (wait_for_tasks already returned it) ──
+
+  describe("awaitedBy suppression", () => {
+    let adjustSpy: ReturnType<typeof vi.spyOn>;
+
+    const idleParent = {
+      id: "parent-conv-id",
+      isGenerating: false,
+      messages: [{ role: "user", content: "go" }, { role: "assistant", content: "spawning" }],
+      settings: { provider: PROVIDERS.GOOGLE, model: "gemini-3-flash-preview", agent: "CODING" },
+    };
+
+    async function spawnCompleted(description: string): Promise<string> {
+      const spawned = await OrchestratorService.spawnFromTool({
+        description,
+        prompt: "Prompt",
+        awaitCompletion: true,
+        orchestratorContext,
+      });
+      return (spawned as SubAgentResult).agent_id;
+    }
+
+    function routerResultFor(agentId: string): SubAgentResult {
+      return {
+        agent_id: agentId,
+        description: "Agent",
+        status: "completed",
+        summary: "done",
+        result: "output",
+        toolUses: 1,
+        iterations: 1,
+        durationMilliseconds: 100,
+        messages: [],
+      };
+    }
+
+    beforeEach(() => {
+      adjustSpy = vi
+        .spyOn(CounterConversationService, "adjustPendingBackgroundTasks")
+        .mockResolvedValue(undefined);
+      mockFindOne.mockResolvedValue(idleParent);
+    });
+
+    it("should skip the router completion notification when every agent was awaited, and pay back the counter", async () => {
+      const agentId = await spawnCompleted("Awaited agent");
+      OrchestratorService._getActiveSubAgents().get(agentId)!.awaitedBy = "session-id-456";
+
+      await OrchestratorService._notifyParentOfRouterCompletion(
+        "team", "hierarchical", [routerResultFor(agentId)], orchestratorContext,
+      );
+
+      expect(mockHandleAgent).not.toHaveBeenCalled();
+      expect(vi.mocked(ConversationService.appendMessages)).not.toHaveBeenCalled();
+      expect(adjustSpy).toHaveBeenCalledWith(
+        "parent-conv-id", "test-project", "test-user", -1, expect.anything(),
+      );
+    });
+
+    it("should still notify when only SOME of the team's agents were awaited", async () => {
+      const awaitedId = await spawnCompleted("Awaited agent");
+      const otherId = await spawnCompleted("Other agent");
+      OrchestratorService._getActiveSubAgents().get(awaitedId)!.awaitedBy = "session-id-456";
+
+      await OrchestratorService._notifyParentOfRouterCompletion(
+        "team", "hierarchical",
+        [routerResultFor(awaitedId), routerResultFor(otherId)],
+        orchestratorContext,
+      );
+
+      await waitForMockCalls(mockHandleAgent, 1);
+      expect(mockHandleAgent).toHaveBeenCalledTimes(1);
+    });
+
+    it("should still notify when no agent was awaited", async () => {
+      const agentId = await spawnCompleted("Plain agent");
+
+      await OrchestratorService._notifyParentOfRouterCompletion(
+        "team", "hierarchical", [routerResultFor(agentId)], orchestratorContext,
+      );
+
+      await waitForMockCalls(mockHandleAgent, 1);
+    });
+
+    it("should skip the resumed-agent notification for an awaited agent", async () => {
+      const agentId = await spawnCompleted("Resumed agent");
+      OrchestratorService._getActiveSubAgents().get(agentId)!.awaitedBy = "session-id-456";
+
+      await OrchestratorService._notifyParentOfResumedAgentCompletion(
+        agentId, routerResultFor(agentId), orchestratorContext,
+      );
+
+      expect(mockHandleAgent).not.toHaveBeenCalled();
+      expect(adjustSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("should clear the stamp when the agent runs again, so its next completion is notified", async () => {
+      const agentId = await spawnCompleted("Re-run agent");
+      const subAgentState = OrchestratorService._getActiveSubAgents().get(agentId)!;
+      subAgentState.awaitedBy = "session-id-456";
+
+      // A follow-up starts a new loop → _runSubAgentLoop clears the stamp.
+      await OrchestratorService.sendMessage(agentId, "again", orchestratorContext);
+      await waitForMockCalls(mockRunAgenticLoop, 2);
+      expect(subAgentState.awaitedBy).toBeUndefined();
+      expect(OrchestratorService._isAwaitedByParent([agentId])).toBe(false);
+    });
+
+    it("_isAwaitedByParent should be false for an empty list or an unknown agent", () => {
+      expect(OrchestratorService._isAwaitedByParent([])).toBe(false);
+      expect(OrchestratorService._isAwaitedByParent(["agent-unknown"])).toBe(false);
     });
   });
 });

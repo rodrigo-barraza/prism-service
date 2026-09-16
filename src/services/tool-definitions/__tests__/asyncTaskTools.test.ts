@@ -37,6 +37,8 @@ vi.mock("#src/services/PromptLocaleService", () => ({
           `Task "${variables?.taskId || ""}" is already in "${variables?.status || ""}" state.`,
         "internal-tools-runtime.cancel_async_task.success":
           `Task "${variables?.taskId || ""}" has been cancelled.`,
+        "internal-tools-runtime.wait_for_tasks.noConversation":
+          "Cannot wait for tasks: no conversation context available.",
       };
       return localeStrings[key] || `[MISSING: ${key}]`;
     },
@@ -48,6 +50,7 @@ const mockDispatch = vi.fn();
 const mockListTasks = vi.fn();
 const mockCancelTask = vi.fn();
 const mockGetTask = vi.fn();
+const mockWaitForTasks = vi.fn();
 
 vi.mock("#src/services/AsyncTaskRegistry", () => ({
   default: {
@@ -55,6 +58,7 @@ vi.mock("#src/services/AsyncTaskRegistry", () => ({
     listTasks: (...arguments_: any[]) => mockListTasks(...arguments_),
     cancelTask: (...arguments_: any[]) => mockCancelTask(...arguments_),
     getTask: (...arguments_: any[]) => mockGetTask(...arguments_),
+    waitForTasks: (...arguments_: any[]) => mockWaitForTasks(...arguments_),
   },
 }));
 
@@ -159,6 +163,7 @@ vi.mock("#src/types/GlobalToolOrchestratorRegistry", () => ({
 
 import InternalToolRegistry from "#src/services/tool-definitions/InternalToolRegistry";
 import { ASYNC_TASK_TOOL_NAMES, MAXIMUM_CONCURRENT_ASYNC_TASKS } from "#src/services/AsyncTaskConstants";
+import { AGENT_DIRECTIVES } from "#src/constants";
 
 // ────────────────────────────────────────────────────────────
 // Helpers
@@ -193,10 +198,186 @@ describe("AsyncTaskTools Unit Tests", () => {
 
   // ── Registration ────────────────────────────────────────────
   describe("tool registration", () => {
-    it("should register all three async task tools in InternalToolRegistry", () => {
+    it("should register all four async task tools in InternalToolRegistry", () => {
       expect(InternalToolRegistry.has(ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK)).toBe(true);
       expect(InternalToolRegistry.has(ASYNC_TASK_TOOL_NAMES.LIST_ASYNC_TASKS)).toBe(true);
       expect(InternalToolRegistry.has(ASYNC_TASK_TOOL_NAMES.CANCEL_ASYNC_TASK)).toBe(true);
+      expect(InternalToolRegistry.has(ASYNC_TASK_TOOL_NAMES.WAIT_FOR_TASKS)).toBe(true);
+    });
+  });
+
+  // ── run_async_task continueWorking ──────────────────────────
+  describe("run_async_task continueWorking", () => {
+    it("should return DETACHED_WORK (not NON_BLOCKING_DISPATCH) when continueWorking is true", async () => {
+      mockDispatch.mockReturnValue({ ...FIXED_TASK_STATE });
+
+      const result = await InternalToolRegistry.execute(
+        ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
+        { toolName: "execute_command", toolArguments: { command: "make" }, continueWorking: true },
+        buildContext(),
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          _directive: AGENT_DIRECTIVES.DETACHED_WORK,
+          task: expect.objectContaining({ taskId: "task-1-abcd", status: "running" }),
+          instruction: expect.stringContaining("wait_for_tasks"),
+        }),
+      );
+    });
+
+    it("should pass the client conversationId into the dispatch context", async () => {
+      mockDispatch.mockReturnValue({ ...FIXED_TASK_STATE });
+      await InternalToolRegistry.execute(
+        ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
+        { toolName: "execute_command", toolArguments: {}, continueWorking: true },
+        buildContext({ conversationId: "client-conv" }),
+      );
+      const [, , dispatchContext] = mockDispatch.mock.calls[0];
+      expect(dispatchContext).toEqual(
+        expect.objectContaining({ conversationId: "client-conv", agentConversationId: "conv-async-test" }),
+      );
+    });
+
+    it("should treat a non-boolean continueWorking as false", async () => {
+      mockDispatch.mockReturnValue({ ...FIXED_TASK_STATE });
+      const result = await InternalToolRegistry.execute(
+        ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
+        { toolName: "execute_command", toolArguments: {}, continueWorking: "yes" },
+        buildContext(),
+      );
+      expect(result).toEqual(expect.objectContaining({ _directive: AGENT_DIRECTIVES.NON_BLOCKING_DISPATCH }));
+    });
+  });
+
+  // ── wait_for_tasks ──────────────────────────────────────────
+  describe("wait_for_tasks", () => {
+    it("should return error when agentConversationId is missing", async () => {
+      const result = await InternalToolRegistry.execute(
+        ASYNC_TASK_TOOL_NAMES.WAIT_FOR_TASKS,
+        { taskIds: ["task-1-abcd"] },
+        buildContext({ agentConversationId: undefined }),
+      );
+      expect(result).toEqual({ error: expect.stringContaining("no conversation context") });
+      expect(mockWaitForTasks).not.toHaveBeenCalled();
+    });
+
+    it("should stamp awaitedBy, wait through the registry, and map settled tasks", async () => {
+      const runningTask = { ...FIXED_TASK_STATE, status: "running" as string, awaitedBy: undefined as string | undefined };
+      mockGetTask.mockReturnValue(runningTask);
+      mockWaitForTasks.mockImplementation(async () => {
+        expect(runningTask.awaitedBy).toBe("conv-async-test");
+        return [
+          {
+            ...runningTask,
+            status: "completed",
+            result: { output: "ok" },
+            durationMilliseconds: 42,
+          },
+        ];
+      });
+
+      const result = await InternalToolRegistry.execute(
+        ASYNC_TASK_TOOL_NAMES.WAIT_FOR_TASKS,
+        { taskIds: ["task-1-abcd"], timeoutSeconds: 2 },
+        buildContext(),
+      );
+
+      expect(mockWaitForTasks).toHaveBeenCalledWith(
+        ["task-1-abcd"],
+        expect.objectContaining({ timeoutMilliseconds: 2000 }),
+      );
+      expect(result).toEqual({
+        tasks: [
+          expect.objectContaining({
+            taskId: "task-1-abcd",
+            kind: "async_task",
+            status: "completed",
+            result: JSON.stringify({ output: "ok" }),
+            durationMilliseconds: 42,
+          }),
+        ],
+        timedOut: false,
+        stillRunning: [],
+      });
+    });
+
+    it("should report timedOut with stillRunning ids and clear awaitedBy on a still-running task", async () => {
+      const runningTask = { ...FIXED_TASK_STATE, status: "running" as string, awaitedBy: undefined as string | undefined };
+      mockGetTask.mockReturnValue(runningTask);
+      mockWaitForTasks.mockResolvedValue([runningTask]);
+
+      const result = await InternalToolRegistry.execute(
+        ASYNC_TASK_TOOL_NAMES.WAIT_FOR_TASKS,
+        { taskIds: ["task-1-abcd"], timeoutSeconds: 0.01 },
+        buildContext(),
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({ timedOut: true, stillRunning: ["task-1-abcd"] }),
+      );
+      expect(runningTask.awaitedBy).toBeUndefined();
+    });
+
+    it("should clamp timeoutSeconds to the 300 s maximum and default to 60 s", async () => {
+      mockGetTask.mockReturnValue(null);
+      mockWaitForTasks.mockResolvedValue([null]);
+
+      await InternalToolRegistry.execute(
+        ASYNC_TASK_TOOL_NAMES.WAIT_FOR_TASKS,
+        { taskIds: ["task-1-abcd"], timeoutSeconds: 9999 },
+        buildContext(),
+      );
+      expect(mockWaitForTasks).toHaveBeenLastCalledWith(
+        ["task-1-abcd"],
+        expect.objectContaining({ timeoutMilliseconds: 300_000 }),
+      );
+
+      await InternalToolRegistry.execute(
+        ASYNC_TASK_TOOL_NAMES.WAIT_FOR_TASKS,
+        { taskIds: ["task-1-abcd"] },
+        buildContext(),
+      );
+      expect(mockWaitForTasks).toHaveBeenLastCalledWith(
+        ["task-1-abcd"],
+        expect.objectContaining({ timeoutMilliseconds: 60_000 }),
+      );
+    });
+
+    it("should forward the loop's abort signal", async () => {
+      mockGetTask.mockReturnValue(null);
+      mockWaitForTasks.mockResolvedValue([null]);
+      const abortController = new AbortController();
+      await InternalToolRegistry.execute(
+        ASYNC_TASK_TOOL_NAMES.WAIT_FOR_TASKS,
+        { taskIds: ["task-1-abcd"] },
+        buildContext({ signal: abortController.signal }),
+      );
+      expect(mockWaitForTasks).toHaveBeenCalledWith(
+        ["task-1-abcd"],
+        expect.objectContaining({ signal: abortController.signal }),
+      );
+    });
+
+    it("should ignore non-string entries in taskIds", async () => {
+      mockGetTask.mockReturnValue(null);
+      mockWaitForTasks.mockResolvedValue([null]);
+      await InternalToolRegistry.execute(
+        ASYNC_TASK_TOOL_NAMES.WAIT_FOR_TASKS,
+        { taskIds: [42, " task-1-abcd ", null, ""] },
+        buildContext(),
+      );
+      expect(mockWaitForTasks).toHaveBeenCalledWith(["task-1-abcd"], expect.anything());
+    });
+
+    it("should be rejected as an async dispatch target", async () => {
+      const result = await InternalToolRegistry.execute(
+        ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
+        { toolName: ASYNC_TASK_TOOL_NAMES.WAIT_FOR_TASKS, toolArguments: {} },
+        buildContext(),
+      );
+      expect(result).toEqual({ error: expect.stringContaining("cannot be dispatched asynchronously") });
+      expect(mockDispatch).not.toHaveBeenCalled();
     });
   });
 
