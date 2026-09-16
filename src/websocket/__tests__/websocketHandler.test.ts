@@ -87,6 +87,12 @@ vi.mock("#src/wrappers/MongoWrapper", () => ({
 }));
 
 import { setupWebSocket } from "#src/websocket/index";
+import {
+  LiveTurnBuffer,
+  withDirectViewerBroadcast,
+} from "#src/utils/DirectViewerBroadcast";
+import WebSocketConnectionRegistry from "#src/websocket/WebSocketConnectionRegistry";
+import type { SseEvent } from "#src/types/SseTypes";
 
 // ── Helper Mock Classes ───────────────────────────────────────────────
 class MockWebSocket {
@@ -206,6 +212,173 @@ describe("WebSocket Handler Suite", () => {
       expect(mockSocket.send).toHaveBeenCalledWith(
         JSON.stringify({ type: "error", message: "Invalid JSON" })
       );
+    });
+
+    describe("subscribe", () => {
+      const chatRequest = {
+        url: "/ws/chat?project=my-proj",
+        headers: { host: "localhost" },
+        socket: { remoteAddress: "127.0.0.1" },
+      };
+
+      function sentFrames(socket: MockWebSocket): Array<Record<string, any>> {
+        return socket.send.mock.calls.map(([raw]) => JSON.parse(raw as string));
+      }
+
+      function openSubscriber(): MockWebSocket {
+        setupWebSocket(mockWss);
+        const socket = new MockWebSocket();
+        mockWss.emitConnection(socket, chatRequest);
+        return socket;
+      }
+
+      beforeEach(() => {
+        LiveTurnBuffer.clearAll();
+        WebSocketConnectionRegistry.clear();
+      });
+
+      it("acks with lastSeq/replayedCount/droppedCount and replays the whole active turn without a cursor", () => {
+        const emit = withDirectViewerBroadcast("conv-sub-1", vi.fn());
+        const prompt = { type: "user_message", content: "prompt" } as SseEvent;
+        const chunk = { type: "chunk", content: "so far" } as SseEvent;
+        emit(prompt);
+        emit(chunk);
+
+        const socket = openSubscriber();
+        socket.emit(
+          "message",
+          Buffer.from(JSON.stringify({ type: "subscribe", conversationId: "conv-sub-1" })),
+        );
+
+        const frames = sentFrames(socket);
+        expect(frames[0]).toEqual({
+          type: "subscribed",
+          conversationId: "conv-sub-1",
+          lastSeq: chunk.seq,
+          replayedCount: 2,
+          droppedCount: 0,
+        });
+        expect(frames.slice(1)).toEqual([prompt, chunk]);
+        expect(mockHandleConversation).not.toHaveBeenCalled();
+      });
+
+      it("replays only events after the client's cursor and reports the count", () => {
+        const emit = withDirectViewerBroadcast("conv-sub-2", vi.fn());
+        const prompt = { type: "user_message", content: "prompt" } as SseEvent;
+        const seen = { type: "chunk", content: "already rendered" } as SseEvent;
+        const missed = { type: "chunk", content: "missed" } as SseEvent;
+        emit(prompt);
+        emit(seen);
+        emit(missed);
+
+        const socket = openSubscriber();
+        socket.emit(
+          "message",
+          Buffer.from(
+            JSON.stringify({
+              type: "subscribe",
+              conversationId: "conv-sub-2",
+              afterSeq: seen.seq,
+            }),
+          ),
+        );
+
+        const frames = sentFrames(socket);
+        expect(frames[0]).toEqual({
+          type: "subscribed",
+          conversationId: "conv-sub-2",
+          lastSeq: missed.seq,
+          replayedCount: 1,
+          droppedCount: 0,
+        });
+        expect(frames.slice(1)).toEqual([missed]);
+      });
+
+      it("sends the ack before the replay and lets nothing slip between them or before the live tail", () => {
+        const emit = withDirectViewerBroadcast("conv-sub-3", vi.fn());
+        const prompt = { type: "user_message", content: "prompt" } as SseEvent;
+        emit(prompt);
+
+        const socket = openSubscriber();
+        socket.emit(
+          "message",
+          Buffer.from(JSON.stringify({ type: "subscribe", conversationId: "conv-sub-3" })),
+        );
+        // The socket is now registered: a live event lands AFTER the replay
+        const live = { type: "chunk", content: "live" } as SseEvent;
+        emit(live);
+
+        const frames = sentFrames(socket);
+        expect(frames.map((frame) => frame.type)).toEqual([
+          "subscribed",
+          "user_message",
+          "chunk",
+        ]);
+        expect(frames[0].lastSeq).toBe(prompt.seq);
+        expect(frames[2]).toEqual(live);
+        expect(live.seq).toBe(prompt.seq! + 1);
+      });
+
+      it("keeps the newest tail and reports droppedCount when the turn overflowed", () => {
+        const emit = withDirectViewerBroadcast("conv-sub-4", vi.fn());
+        for (let index = 0; index < 5002; index++) {
+          emit({ type: "chunk", content: String(index) } as SseEvent);
+        }
+
+        const socket = openSubscriber();
+        socket.emit(
+          "message",
+          Buffer.from(JSON.stringify({ type: "subscribe", conversationId: "conv-sub-4" })),
+        );
+
+        const frames = sentFrames(socket);
+        expect(frames[0]).toEqual(
+          expect.objectContaining({
+            type: "subscribed",
+            replayedCount: 5000,
+            droppedCount: 2,
+          }),
+        );
+        expect(frames).toHaveLength(5001);
+        expect(frames[1].content).toBe("2");
+        expect(frames[5000].content).toBe("5001");
+      });
+
+      it("acks a subscribe with no conversationId and replays nothing", () => {
+        const socket = openSubscriber();
+        socket.emit("message", Buffer.from(JSON.stringify({ type: "subscribe" })));
+
+        expect(sentFrames(socket)).toEqual([
+          {
+            type: "subscribed",
+            lastSeq: 0,
+            replayedCount: 0,
+            droppedCount: 0,
+          },
+        ]);
+      });
+
+      it("ignores a non-numeric afterSeq and replays the whole turn", () => {
+        const emit = withDirectViewerBroadcast("conv-sub-5", vi.fn());
+        emit({ type: "user_message", content: "prompt" } as SseEvent);
+        emit({ type: "chunk", content: "c" } as SseEvent);
+
+        const socket = openSubscriber();
+        socket.emit(
+          "message",
+          Buffer.from(
+            JSON.stringify({
+              type: "subscribe",
+              conversationId: "conv-sub-5",
+              afterSeq: "not-a-number",
+            }),
+          ),
+        );
+
+        expect(sentFrames(socket)[0]).toEqual(
+          expect.objectContaining({ replayedCount: 2, droppedCount: 0 }),
+        );
+      });
     });
   });
 

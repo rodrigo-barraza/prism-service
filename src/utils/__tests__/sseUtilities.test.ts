@@ -514,6 +514,7 @@ describe("withDirectViewerBroadcast", () => {
     expect(viewerEmit).toHaveBeenCalledWith({
       type: "image",
       minioRef: "minio://images/1.png",
+      seq: expect.any(Number),
     });
     WebSocketConnectionRegistry.clear();
   });
