@@ -90,9 +90,10 @@
     }
   },
   "ask_user": {
-    "description": "Ask the user one or more questions and wait for their responses before continuing. Use this when you need clarification, a decision between options, or explicit confirmation before proceeding with a potentially impactful action. The agent loop pauses until the user responds. You can batch up to 4 related questions in a single call to reduce round-trips.",
+    "description": "Ask the user one or more questions. By default the agent loop pauses until the user responds — use that when you need clarification, a decision between options, or explicit confirmation before a potentially impactful action. Set blocking=false to ask a preference the rest of your work does not depend on: the card is shown, you continue immediately, and the answer is delivered to you as a <user-answer> message at your next step (or as the next turn if this one has ended). Never use blocking=false for a decision the next action depends on. You can batch up to 4 related questions in a single call to reduce round-trips.",
     "parameters": {
       "context": "Optional: additional context shown below the questions.",
+      "blocking": "Optional: default true (wait for the answer). false → show the card, keep working, and receive the answer later as a <user-answer> message.",
       "questions": "Batch of questions to ask the user (up to 4). Each item is a question object."
     }
   },

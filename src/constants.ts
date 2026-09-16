@@ -105,6 +105,31 @@ export const AGENT_DIRECTIVES = {
   NON_BLOCKING_DISPATCH: "NON_BLOCKING_DISPATCH",
   /** compact_context tool → compact at the next iteration boundary. */
   REQUEST_COMPACTION: "REQUEST_COMPACTION",
+  /**
+   * Work was dispatched in the background but the parent KEEPS its turn
+   * (run_async_task with continueWorking, non-blocking ask_user). The loop
+   * does not break; the completion / answer arrives through the
+   * TurnInputMailbox at the next boundary, or wakes a new turn if this one
+   * has already ended. The harness only records the flag so the
+   * pendingBackgroundTasks counter is adjusted when the turn finishes with
+   * work still running.
+   */
+  DETACHED_WORK: "DETACHED_WORK",
+} as const;
+
+/**
+ * Turn input — messages that reach a RUNNING turn (see TurnInputMailbox).
+ * Event/status literals are local until promoted to the shared taxonomy.
+ */
+export const TURN_INPUT = {
+  /** SSE event: an input entry was injected into the running turn. */
+  EVENT_TYPE: "turn_input",
+  /** `status` message value: acknowledgement that an entry was applied. */
+  STATUS_APPLIED: "turn_input_applied",
+  /** `status` message value: a non-blocking question is awaiting an answer. */
+  STATUS_QUESTION_PENDING: "question_pending",
+  /** Message marker key carried on injected messages. */
+  MESSAGE_KEY: "_turnInput",
 } as const;
 
 /** Priorities specifically for Todo items and task ranking. */
@@ -446,6 +471,10 @@ export const NOTIFICATION_SOURCES = {
   TIMER: "timer",
   ASYNC_TASK: "async-task",
   BACKGROUND_TASK: "background-task",
+  /** Answer to a non-blocking ask_user card, injected mid-turn. */
+  USER_ANSWER: "user-answer",
+  /** Mid-turn steering message from the user, injected by the harness. */
+  USER_UPDATE: "user-update",
 } as const;
 
 // ─── Harness Constants ──────────────────────────────────────
