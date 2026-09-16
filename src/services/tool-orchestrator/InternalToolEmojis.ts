@@ -54,6 +54,15 @@ export const INTERNAL_TOOL_EMOJIS: Record<string, string[]> = {
   // Async tasks
   run_async_task: ["⚡", "🔄"],
   list_async_tasks: ["📋", "🔄"],
+  wait_for_tasks: ["⏳", "🔄"],
+
+  // Programmatic tool composition
+  run_tool_program: ["🧮", "🔧"],
+
+  // Goals (persistent objective on the conversation)
+  set_goal: ["🎯", "📝"],
+  update_goal: ["🎯", "📈"],
+  clear_goal: ["🎯", "🗑️"],
   cancel_async_task: ["⏹️", "🔄"],
 
   // Tool activation
