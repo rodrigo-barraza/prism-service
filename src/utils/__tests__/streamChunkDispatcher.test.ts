@@ -100,3 +100,57 @@ describe("StreamChunkDispatcher — text slice cursor", () => {
     expect(textOf(events)).toBe("Answer: 4 ");
   });
 });
+
+describe("StreamChunkDispatcher — providerState (OpenAI Responses)", () => {
+  it("merges response id, phase and reasoning items into state without emitting", async () => {
+    const events: Array<Record<string, unknown>> = [];
+    const state = makeState();
+    const context = makeContext(events);
+    await dispatchChunk(
+      { type: "providerState", providerResponseId: "resp_1" },
+      state,
+      context,
+    );
+    await dispatchChunk({ type: "providerState", phase: "commentary" }, state, context);
+    await dispatchChunk(
+      {
+        type: "providerState",
+        phase: "final_answer",
+        reasoningItems: [{ id: "rs_a", summary: [], encrypted_content: "enc-a" }],
+      },
+      state,
+      context,
+    );
+    await dispatchChunk(
+      { type: "providerState", reasoningItems: [{ id: "rs_b", summary: [] }] },
+      state,
+      context,
+    );
+    expect(state.providerResponseId).toBe("resp_1");
+    expect(state.phase).toBe("final_answer");
+    expect(state.reasoningItems?.map((item) => item.id)).toEqual(["rs_a", "rs_b"]);
+    expect(events).toHaveLength(0);
+  });
+
+  it("keeps encrypted_content on a tool call's paired reasoning item", async () => {
+    const events: Array<Record<string, unknown>> = [];
+    const state = makeState();
+    await dispatchChunk(
+      {
+        type: "toolCall",
+        id: "call_1",
+        responsesItemId: "fc_1",
+        name: "search",
+        args: {},
+        reasoningItem: { id: "rs_1", summary: [], encrypted_content: "enc-1" },
+      },
+      state,
+      makeContext(events),
+    );
+    expect(state.toolCalls[0].reasoningItem).toEqual({
+      id: "rs_1",
+      summary: [],
+      encrypted_content: "enc-1",
+    });
+  });
+});

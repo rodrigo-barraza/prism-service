@@ -38,6 +38,16 @@ describe("effortForModel", () => {
     expect(effortForModel("not-a-catalog-model", "medium")).toBe("medium");
   });
 
+  it("gpt-6-astra: keeps low…max, never emits none or minimal", () => {
+    // Verified 2026-09-15: reasoning.effort ∈ {low, medium, high, xhigh, max};
+    // "none" is an HTTP 400 on this model.
+    for (const level of ["low", "medium", "high", "xhigh", "max"]) {
+      expect(effortForModel("gpt-6-astra", level)).toBe(level);
+    }
+    expect(effortForModel("gpt-6-astra", "none")).toBeUndefined();
+    expect(effortForModel("gpt-6-astra", "minimal")).toBeUndefined();
+  });
+
   it("returns undefined when no effort was requested", () => {
     expect(effortForModel("gpt-5.2-pro", undefined)).toBeUndefined();
     expect(effortForModel("gpt-5.2-pro", "")).toBeUndefined();

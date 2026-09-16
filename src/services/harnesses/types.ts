@@ -11,6 +11,10 @@ import type { DeviationVerdict } from "./lifecycle/DeviationRuleEngine.ts";
 // ── Usage & Cost ────────────────────────────────────────────
 
 import type { TokenUsage } from "#src/services/RequestLogger";
+import type {
+  ResponsesPhase,
+  ResponsesReasoningItem,
+} from "#src/types/admin";
 
 export interface UsageAccumulator extends TokenUsage {
   inputTokens: number;
@@ -44,10 +48,7 @@ export interface ToolCall {
   responsesItemId?: string;
   thoughtSignature?: string;
   /** OpenAI Responses API reasoning output item paired with this function call. */
-  reasoningItem?: {
-    id: string;
-    summary: Array<{ type: string; text: string }>;
-  };
+  reasoningItem?: ResponsesReasoningItem;
   /** Populated by AutoApprovalEngine.checkBatch / the ApprovalGate. */
   _approval?: {
     tier: number | string;
@@ -96,6 +97,12 @@ export interface ConversationMessage {
   /** Duration of the content generation phase in seconds (wall-clock, per-iteration). */
   contentDurationSeconds?: number | null;
   toolCalls?: ToolCall[];
+  /** OpenAI Responses API message phase — resent on replay. */
+  phase?: ResponsesPhase;
+  /** OpenAI Responses API reasoning items not paired with a tool call. */
+  reasoningItems?: ResponsesReasoningItem[];
+  /** OpenAI Responses API `response.id` that produced this message. */
+  providerResponseId?: string;
   images?: string[];
   audio?: string;
   timestamp?: string;
@@ -299,6 +306,12 @@ export interface PassState {
   stopReason?: string;
   /** Set when a mid-stream deviation rule fired and aborted this pass. */
   deviation?: DeviationVerdict;
+  /** OpenAI Responses API message phase of this pass's final message item. */
+  phase?: ResponsesPhase;
+  /** OpenAI Responses API reasoning items this pass emitted without a tool call to pair with. */
+  reasoningItems?: ResponsesReasoningItem[];
+  /** OpenAI Responses API `response.id` of this pass. */
+  providerResponseId?: string;
 }
 
 // ── Deviation Abort/Retry Snapshot ──────────────────────────
@@ -362,10 +375,7 @@ export interface StreamChunk {
   id?: string;
   responsesItemId?: string;
   /** OpenAI Responses API reasoning output item paired with this tool call. */
-  reasoningItem?: {
-    id: string;
-    summary: Array<{ type: string; text: string }>;
-  };
+  reasoningItem?: ResponsesReasoningItem;
   name?: string;
   args?: Record<string, unknown>;
   thoughtSignature?: string;
@@ -385,6 +395,10 @@ export interface StreamChunk {
   results?: unknown[];
   // Status
   message?: string;
+  // Provider-native state (type: "providerState")
+  providerResponseId?: string;
+  phase?: ResponsesPhase;
+  reasoningItems?: ResponsesReasoningItem[];
   [key: string]: unknown;
 }
 
