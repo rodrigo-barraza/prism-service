@@ -31,6 +31,8 @@ import checkpointTools from "./CheckpointTools.ts";
 import asyncTaskTools from "./AsyncTaskTools.ts";
 import artifactTools from "./ArtifactTools.ts";
 import projectInstructionsTools from "./ProjectInstructionsTools.ts";
+import runToolProgramTool from "./RunToolProgramTool.ts";
+import goalTools from "./GoalTools.ts";
 
 // ─── Parameter Types (aligned with tools-service) ──────────────
 
@@ -127,6 +129,8 @@ function initialize() {
     asyncTaskTools,
     artifactTools,
     projectInstructionsTools,
+    runToolProgramTool,
+    goalTools,
   ];
 
   for (const toolOrTools of toolModulesList) {

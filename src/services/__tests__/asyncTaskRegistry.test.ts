@@ -469,4 +469,212 @@ describe("AsyncTaskRegistry", () => {
     expect(taskState.status).toBe("cancelled");
     expect(taskState.result).toBeNull();
   });
+
+  // ── settled promise / waitForTask ───────────────────────
+
+  describe("settled promise and waitForTask", () => {
+    function deferred() {
+      let resolve!: (value: unknown) => void;
+      let reject!: (error: Error) => void;
+      const promise = new Promise<unknown>((innerResolve, innerReject) => {
+        resolve = innerResolve;
+        reject = innerReject;
+      });
+      return { promise, resolve, reject };
+    }
+
+    it("should expose a settled promise that resolves after completion, before onComplete", async () => {
+      const { promise, resolve } = deferred();
+      const seenAtCallback: string[] = [];
+      let settledAtCallback = false;
+      const taskState = AsyncTaskRegistry.dispatch(
+        "execute_command",
+        {},
+        { agentConversationId: "session-settle" },
+        () => promise,
+        (state) => {
+          seenAtCallback.push(state.status);
+          // The settled promise has resolved by the time onComplete fires.
+          state.settled.then(() => {
+            settledAtCallback = true;
+          });
+        },
+      ) as AsyncTaskState;
+
+      expect(taskState.settled).toBeInstanceOf(Promise);
+      let resolved = false;
+      taskState.settled.then(() => {
+        resolved = true;
+      });
+      await new Promise((tick) => setImmediate(tick));
+      expect(resolved).toBe(false);
+
+      resolve({ ok: true });
+      await taskState.settled;
+      expect(taskState.status).toBe("completed");
+      expect(seenAtCallback).toEqual(["completed"]);
+      await new Promise((tick) => setImmediate(tick));
+      expect(settledAtCallback).toBe(true);
+    });
+
+    it("should settle on failure and on cancellation", async () => {
+      const failing = deferred();
+      const failingTask = AsyncTaskRegistry.dispatch(
+        "execute_command",
+        {},
+        { agentConversationId: "session-settle" },
+        () => failing.promise,
+      ) as AsyncTaskState;
+      failing.reject(new Error("nope"));
+      await failingTask.settled;
+      expect(failingTask.status).toBe("failed");
+
+      const hanging = AsyncTaskRegistry.dispatch(
+        "execute_command",
+        {},
+        { agentConversationId: "session-settle" },
+        () => new Promise(() => {}),
+      ) as AsyncTaskState;
+      expect(AsyncTaskRegistry.cancelTask(hanging.taskId)).toBe(true);
+      await hanging.settled;
+      expect(hanging.status).toBe("cancelled");
+    });
+
+    it("should settle tasks aborted by cleanup() and clear()", async () => {
+      const cleaned = AsyncTaskRegistry.dispatch(
+        "execute_command",
+        {},
+        { agentConversationId: "session-cleanup" },
+        () => new Promise(() => {}),
+      ) as AsyncTaskState;
+      AsyncTaskRegistry.cleanup("session-cleanup");
+      await cleaned.settled;
+      expect(cleaned.status).toBe("cancelled");
+
+      const cleared = AsyncTaskRegistry.dispatch(
+        "execute_command",
+        {},
+        { agentConversationId: "session-clear" },
+        () => new Promise(() => {}),
+      ) as AsyncTaskState;
+      AsyncTaskRegistry.clear();
+      await cleared.settled;
+    });
+
+    it("waitForTask should resolve with the state once the task settles", async () => {
+      const { promise, resolve } = deferred();
+      const taskState = AsyncTaskRegistry.dispatch(
+        "execute_command",
+        {},
+        { agentConversationId: "session-wait" },
+        () => promise,
+      ) as AsyncTaskState;
+
+      const waitPromise = AsyncTaskRegistry.waitForTask(taskState.taskId, { timeoutMilliseconds: 5000 });
+      resolve("result");
+      const awaited = await waitPromise;
+      expect(awaited).toBe(taskState);
+      expect(awaited?.status).toBe("completed");
+      expect(awaited?.result).toBe("result");
+    });
+
+    it("waitForTask should return the still-running state on timeout", async () => {
+      const taskState = AsyncTaskRegistry.dispatch(
+        "execute_command",
+        {},
+        { agentConversationId: "session-wait" },
+        () => new Promise(() => {}),
+      ) as AsyncTaskState;
+
+      const started = Date.now();
+      const awaited = await AsyncTaskRegistry.waitForTask(taskState.taskId, { timeoutMilliseconds: 20 });
+      expect(Date.now() - started).toBeLessThan(1000);
+      expect(awaited?.status).toBe("running");
+    });
+
+    it("waitForTask should return immediately when the signal aborts, and when already aborted", async () => {
+      const taskState = AsyncTaskRegistry.dispatch(
+        "execute_command",
+        {},
+        { agentConversationId: "session-wait" },
+        () => new Promise(() => {}),
+      ) as AsyncTaskState;
+
+      const abortController = new AbortController();
+      const waitPromise = AsyncTaskRegistry.waitForTask(taskState.taskId, {
+        timeoutMilliseconds: 60_000,
+        signal: abortController.signal,
+      });
+      abortController.abort();
+      const awaited = await waitPromise;
+      expect(awaited?.status).toBe("running");
+
+      const alreadyAborted = new AbortController();
+      alreadyAborted.abort();
+      const immediate = await AsyncTaskRegistry.waitForTask(taskState.taskId, {
+        timeoutMilliseconds: 60_000,
+        signal: alreadyAborted.signal,
+      });
+      expect(immediate?.status).toBe("running");
+    });
+
+    it("waitForTask should resolve immediately for a settled task and null for an unknown one", async () => {
+      const taskState = AsyncTaskRegistry.dispatch(
+        "execute_command",
+        {},
+        { agentConversationId: "session-wait" },
+        async () => "fast",
+      ) as AsyncTaskState;
+      await taskState.settled;
+
+      const started = Date.now();
+      const awaited = await AsyncTaskRegistry.waitForTask(taskState.taskId, { timeoutMilliseconds: 60_000 });
+      expect(Date.now() - started).toBeLessThan(1000);
+      expect(awaited?.status).toBe("completed");
+
+      expect(await AsyncTaskRegistry.waitForTask("task-unknown")).toBeNull();
+    });
+
+    it("waitForTasks should return states aligned with the ids under one deadline", async () => {
+      const first = deferred();
+      const firstTask = AsyncTaskRegistry.dispatch(
+        "a",
+        {},
+        { agentConversationId: "session-wait" },
+        () => first.promise,
+      ) as AsyncTaskState;
+      const hanging = AsyncTaskRegistry.dispatch(
+        "b",
+        {},
+        { agentConversationId: "session-wait" },
+        () => new Promise(() => {}),
+      ) as AsyncTaskState;
+
+      first.resolve(1);
+      const states = await AsyncTaskRegistry.waitForTasks(
+        [firstTask.taskId, "task-unknown", hanging.taskId],
+        { timeoutMilliseconds: 20 },
+      );
+      expect(states).toHaveLength(3);
+      expect(states[0]?.status).toBe("completed");
+      expect(states[1]).toBeNull();
+      expect(states[2]?.status).toBe("running");
+    });
+
+    it("should carry the optional delivery bookkeeping fields", () => {
+      const taskState = AsyncTaskRegistry.dispatch(
+        "execute_command",
+        {},
+        { agentConversationId: "session-fields" },
+        () => new Promise(() => {}),
+      ) as AsyncTaskState;
+      expect(taskState.deliveredVia).toBeUndefined();
+      expect(taskState.awaitedBy).toBeUndefined();
+      taskState.awaitedBy = "session-fields";
+      taskState.deliveredVia = "wait";
+      expect(AsyncTaskRegistry.getTask(taskState.taskId)).toEqual(
+        expect.objectContaining({ awaitedBy: "session-fields", deliveredVia: "wait" }),
+      );
+    });
+  });
 });

@@ -7,7 +7,9 @@
  * logic to avoid duplication.
  */
 
-import type { ChatMessage, ToolCallEntry } from "#src/types/admin";
+import type { ChatMessage, ResponsesPhase,
+  ResponsesReasoningItem,
+  ToolCallEntry } from "#src/types/admin";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 export type ToolResultValue =
@@ -161,10 +163,7 @@ interface ExpandedToolCall {
   args?: ToolResultValue;
   responsesItemId?: string;
   thoughtSignature?: string;
-  reasoningItem?: {
-    id: string;
-    summary: Array<{ type: string; text: string }>;
-  };
+  reasoningItem?: ResponsesReasoningItem;
 }
 
 interface ExpandedMessage {
@@ -174,6 +173,10 @@ interface ExpandedMessage {
   tool_call_id?: string | null;
   thinking?: string;
   thinkingSignature?: string;
+  /** OpenAI Responses API state — replayed verbatim next turn. */
+  phase?: ResponsesPhase;
+  reasoningItems?: ResponsesReasoningItem[];
+  providerResponseId?: string;
   toolCalls?: ExpandedToolCall[];
   images?: string[];
   video?: string[];
@@ -246,6 +249,7 @@ export function expandMessagesForFunctionCall(
         ...(message.thinkingSignature && {
           thinkingSignature: message.thinkingSignature,
         }),
+        ...responsesNativeFields(message),
         toolCalls: message.toolCalls.map((toolCall: ToolCallEntry) => ({
           id: toolCall.id,
           name: toolCall.name,
@@ -387,7 +391,29 @@ export function expandMessagesForFunctionCall(
         ...(message.role === "assistant" && message.thinkingSignature
           ? { thinkingSignature: message.thinkingSignature }
           : {}),
+        ...(message.role === "assistant" ? responsesNativeFields(message) : {}),
       },
     ];
   });
+}
+
+/**
+ * OpenAI Responses API state stored on an assistant message (phase,
+ * reasoning items without a tool call, response.id) — carried through
+ * expansion unchanged so the provider can replay it.
+ */
+function responsesNativeFields(message: ChatMessage): {
+  phase?: ResponsesPhase;
+  reasoningItems?: ResponsesReasoningItem[];
+  providerResponseId?: string;
+} {
+  return {
+    ...(message.phase !== undefined ? { phase: message.phase } : {}),
+    ...(Array.isArray(message.reasoningItems) && message.reasoningItems.length > 0
+      ? { reasoningItems: message.reasoningItems }
+      : {}),
+    ...(message.providerResponseId
+      ? { providerResponseId: message.providerResponseId }
+      : {}),
+  };
 }

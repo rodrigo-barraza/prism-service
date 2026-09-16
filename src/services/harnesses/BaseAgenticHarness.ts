@@ -1499,6 +1499,9 @@ export default class BaseAgenticHarness {
           ? roundMilliseconds(state.overallContentDurationSeconds)
           : null,
         conversationOutcome: state.conversationOutcome || null,
+        ...(state.phase !== undefined && { phase: state.phase }),
+        ...(state.reasoningItems && state.reasoningItems.length > 0 && { reasoningItems: state.reasoningItems }),
+        ...(state.providerResponseId && { providerResponseId: state.providerResponseId }),
       },
       newTurnMessages as MessagePayload[],
       finalizeOptions,
@@ -1528,6 +1531,9 @@ export default class BaseAgenticHarness {
     currentMessages.push({
       role: "assistant",
       content: state.finalStreamedText.trim(),
+      ...(state.phase !== undefined && { phase: state.phase }),
+      ...(state.reasoningItems && state.reasoningItems.length > 0 && { reasoningItems: state.reasoningItems }),
+      ...(state.providerResponseId && { providerResponseId: state.providerResponseId }),
       ...(state.streamedThinking.trim() && {
         thinking: state.streamedThinking.trim(),
       }),

@@ -37,6 +37,7 @@ import AgenticLoopService from "#src/services/AgenticLoopService";
 import { runCleanupFunctions } from "#src/utils/CleanupRegistry";
 import { GitWorktreeHelper } from "#src/services/orchestrator/GitWorktreeHelper";
 import { SubAgentPersistenceService } from "#src/services/orchestrator/SubAgentPersistenceService";
+import TurnInputMailbox from "#src/services/TurnInputMailbox";
 
 // Mock the GitWorktreeHelper to avoid disk operations
 
@@ -1142,9 +1143,127 @@ describe("OrchestratorService Spawning & Agent Types", () => {
     });
   });
 
+  describe("waitForAgents / isSubAgentConversation", () => {
+    it("should resolve when the awaited agent leaves RUNNING and keep the awaitedBy stamp", async () => {
+      OrchestratorService.cleanupConversation("session-id-456");
+
+      let resolveLoop!: (value: unknown) => void;
+      mockRunAgenticLoop.mockReturnValueOnce(new Promise((resolve) => { resolveLoop = resolve; }));
+
+      const spawned = await OrchestratorService.spawnFromTool({
+        description: "Awaited agent",
+        prompt: "Prompt",
+        orchestratorContext,
+      });
+      const agentId = (spawned as any).agent_id as string;
+      const subAgentState = OrchestratorService._getActiveSubAgents().get(agentId)!;
+      expect(subAgentState.status).toBe("running");
+      expect(OrchestratorService.isSubAgentConversation(subAgentState.subAgentConversationId)).toBe(true);
+      expect(OrchestratorService.isSubAgentConversation("not-a-sub-agent")).toBe(false);
+
+      const waitPromise = OrchestratorService.waitForAgents([agentId], {
+        timeoutMilliseconds: 5000,
+        parentAgentConversationId: "session-id-456",
+      });
+      await waitForCondition(() => subAgentState.awaitedBy === "session-id-456");
+
+      resolveLoop({ messages: [{ role: "assistant", content: "Finished the job" }] });
+      const [entry] = await waitPromise;
+
+      expect(entry.agentId).toBe(agentId);
+      expect(entry.running).toBe(false);
+      expect(entry.result?.status).toBe("completed");
+      expect(entry.result?.result).toContain("Finished the job");
+      // A settled agent keeps the stamp so the completion notification that
+      // follows is recognised as already delivered.
+      expect(subAgentState.awaitedBy).toBe("session-id-456");
+    });
+
+    it("should time out with running=true and clear awaitedBy so the notification can still fire", async () => {
+      OrchestratorService.cleanupConversation("session-id-456");
+
+      let resolveLoop!: (value: unknown) => void;
+      mockRunAgenticLoop.mockReturnValueOnce(new Promise((resolve) => { resolveLoop = resolve; }));
+      const spawned = await OrchestratorService.spawnFromTool({
+        description: "Slow agent",
+        prompt: "Prompt",
+        orchestratorContext,
+      });
+      const agentId = (spawned as any).agent_id as string;
+      const subAgentState = OrchestratorService._getActiveSubAgents().get(agentId)!;
+
+      const started = Date.now();
+      const [entry] = await OrchestratorService.waitForAgents([agentId], {
+        timeoutMilliseconds: 30,
+        parentAgentConversationId: "session-id-456",
+      });
+      expect(Date.now() - started).toBeLessThan(2000);
+      expect(entry.running).toBe(true);
+      expect(entry.result?.status).toBe("running");
+      expect(subAgentState.awaitedBy).toBeUndefined();
+
+      resolveLoop({ messages: [] });
+      await waitForCondition(() => subAgentState.status !== "running");
+    });
+
+    it("should return as soon as the signal aborts", async () => {
+      OrchestratorService.cleanupConversation("session-id-456");
+
+      let resolveLoop!: (value: unknown) => void;
+      mockRunAgenticLoop.mockReturnValueOnce(new Promise((resolve) => { resolveLoop = resolve; }));
+      const spawned = await OrchestratorService.spawnFromTool({
+        description: "Aborted wait agent",
+        prompt: "Prompt",
+        orchestratorContext,
+      });
+      const agentId = (spawned as any).agent_id as string;
+
+      const abortController = new AbortController();
+      const waitPromise = OrchestratorService.waitForAgents([agentId], {
+        timeoutMilliseconds: 60_000,
+        signal: abortController.signal,
+        parentAgentConversationId: "session-id-456",
+      });
+      setTimeout(() => abortController.abort(), 10);
+      const started = Date.now();
+      const [entry] = await waitPromise;
+      expect(Date.now() - started).toBeLessThan(2000);
+      expect(entry.running).toBe(true);
+
+      resolveLoop({ messages: [] });
+      await waitForCondition(() => OrchestratorService._getActiveSubAgents().get(agentId)!.status !== "running");
+    });
+
+    it("should wait on every running child of the parent when no ids are given, and report unknown ids", async () => {
+      OrchestratorService.cleanupConversation("session-id-456");
+
+      const resolvers: Array<(value: unknown) => void> = [];
+      mockRunAgenticLoop.mockReturnValueOnce(new Promise((resolve) => { resolvers.push(resolve); }));
+      mockRunAgenticLoop.mockReturnValueOnce(new Promise((resolve) => { resolvers.push(resolve); }));
+      const first = await OrchestratorService.spawnFromTool({ description: "Child A", prompt: "A", orchestratorContext });
+      const second = await OrchestratorService.spawnFromTool({ description: "Child B", prompt: "B", orchestratorContext });
+
+      const waitPromise = OrchestratorService.waitForAgents([], {
+        timeoutMilliseconds: 5000,
+        parentAgentConversationId: "session-id-456",
+      });
+      resolvers.forEach((resolve) => resolve({ messages: [{ role: "assistant", content: "ok" }] }));
+      const entries = await waitPromise;
+
+      expect(entries.map((entry) => entry.agentId).sort()).toEqual(
+        [(first as any).agent_id, (second as any).agent_id].sort(),
+      );
+      expect(entries.every((entry) => !entry.running)).toBe(true);
+
+      const [unknown] = await OrchestratorService.waitForAgents(["agent-does-not-exist"], { timeoutMilliseconds: 10 });
+      expect(unknown).toEqual({ agentId: "agent-does-not-exist", running: false, result: null });
+    });
+  });
+
   describe("Messaging & Sub-Agent Continuation", () => {
     it("should deliver message to active running sub-agent", async () => {
       OrchestratorService.cleanupConversation("session-id-456");
+      TurnInputMailbox._clearAll();
 
       const deferredPromise = new Promise((resolve) => {
         resolveDeferredPromise = resolve;
@@ -1162,16 +1281,91 @@ describe("OrchestratorService Spawning & Agent Types", () => {
 
       const activeAgents = OrchestratorService.listSubAgents({ parentConversationId: "conv-id-789" });
       const agentId = activeAgents[0].agentId;
+      const subAgentState = OrchestratorService._getActiveSubAgents().get(agentId)!;
+
+      // The (mocked) loop never opens its mailbox; simulate the running
+      // loop accepting input, keyed by the sub-agent's own conversation id.
+      TurnInputMailbox.open(subAgentState.subAgentConversationId);
 
       const result = await OrchestratorService.sendMessage(agentId, "continue instruction", orchestratorContext);
       expect(result).toBeDefined();
-      expect((result as any).status).toBe("message_queued");
+      expect((result as any).status).toBe("message_delivered");
+      expect((result as any).message).toContain("next step");
 
+      // DELIVERY: the running loop's mailbox holds the follow-up, tagged so
+      // the sub-agent's model can tell it came from its parent mid-task.
+      expect(TurnInputMailbox.pendingCount(subAgentState.subAgentConversationId)).toBe(1);
+      const [entry] = TurnInputMailbox.drain(subAgentState.subAgentConversationId);
+      expect(entry.kind).toBe("agent_message");
+      expect(entry.text).toContain("<task-notification>");
+      expect(entry.text).toContain("Message from your parent agent");
+      expect(entry.text).toContain("continue instruction");
+      expect(entry.meta).toEqual(
+        expect.objectContaining({
+          _notificationSource: "orchestrator",
+          _notificationId: expect.stringMatching(new RegExp(`^orchestrator:${agentId}:`)),
+        }),
+      );
+      // Nothing was left in the dead field.
+      expect(subAgentState.pendingMessages ?? []).toHaveLength(0);
+
+      TurnInputMailbox.close(subAgentState.subAgentConversationId);
       if (resolveDeferredPromise) {
         resolveDeferredPromise({ messages: [] });
         resolveDeferredPromise = undefined;
       }
       await spawnPromise;
+    });
+
+    it("should hold a message for a RUNNING sub-agent whose loop is not open yet, and apply it at the next loop start", async () => {
+      OrchestratorService.cleanupConversation("session-id-456");
+      TurnInputMailbox._clearAll();
+
+      const deferredPromise = new Promise((resolve) => {
+        resolveDeferredPromise = resolve;
+      });
+      mockRunAgenticLoop.mockReturnValueOnce(deferredPromise);
+
+      const spawnPromise = OrchestratorService.spawnFromTool({
+        description: "Starting agent",
+        prompt: "Prompt",
+        awaitCompletion: true,
+        orchestratorContext,
+      });
+      await waitForAgentRegistration();
+
+      const agentId = OrchestratorService.listSubAgents({ parentConversationId: "conv-id-789" })[0].agentId;
+      const subAgentState = OrchestratorService._getActiveSubAgents().get(agentId)!;
+      expect(TurnInputMailbox.isOpen(subAgentState.subAgentConversationId)).toBe(false);
+
+      const result = await OrchestratorService.sendMessage(agentId, "held instruction", orchestratorContext);
+      expect((result as any).status).toBe("message_pending");
+      expect((result as any).status).not.toBe("message_queued");
+      expect(subAgentState.pendingMessages).toEqual(["held instruction"]);
+
+      resolveDeferredPromise?.({ messages: [{ role: "assistant", content: "first run" }] });
+      resolveDeferredPromise = undefined;
+      await spawnPromise;
+
+      // The next loop start drains the held message into the sub-agent's
+      // messages, right after the new prompt.
+      mockRunAgenticLoop.mockClear();
+      mockRunAgenticLoop.mockResolvedValueOnce({ messages: [{ role: "assistant", content: "second run" }] });
+      const followUp = await OrchestratorService.sendMessage(agentId, "second prompt", orchestratorContext);
+      expect((followUp as any).status).toBe("running");
+      await waitForCondition(() => mockRunAgenticLoop.mock.calls.length >= 1);
+
+      const loopMessages = mockRunAgenticLoop.mock.calls[0][0].messages as Array<{ role: string; content: string; _notificationSource?: string }>;
+      const promptIndex = loopMessages.findIndex((message) => message.content === "second prompt");
+      const heldIndex = loopMessages.findIndex((message) => typeof message.content === "string" && message.content.includes("held instruction"));
+      expect(promptIndex).toBeGreaterThanOrEqual(0);
+      expect(heldIndex).toBeGreaterThan(promptIndex);
+      expect(loopMessages[heldIndex].role).toBe("user");
+      expect(loopMessages[heldIndex].content).toContain("Message from your parent agent");
+      expect(loopMessages[heldIndex]._notificationSource).toBe("orchestrator");
+      expect(subAgentState.pendingMessages).toEqual([]);
+
+      await waitForCondition(() => subAgentState.status !== "running");
     });
 
     it("should return error when message is sent to non-existent agent", async () => {

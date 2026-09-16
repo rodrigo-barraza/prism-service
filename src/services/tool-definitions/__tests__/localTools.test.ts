@@ -203,17 +203,62 @@ describe("Local Tools Unit Tests Suite", () => {
     );
 
     expect(result).toEqual({
+      questionId: expect.stringMatching(/^q-/),
       questions: ["What is your favorite color?"],
       answers: [{ answer: "Blue" }],
     });
     expect(mockEmit).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "user_question",
+        blocking: true,
+        questionId: (result as { questionId: string }).questionId,
         questions: expect.arrayContaining([
           expect.objectContaining({ question: "What is your favorite color?" }),
         ]),
       })
     );
+  });
+
+  // 3b. AskUserQuestionTool — non-blocking: returns at once, answer lands in the mailbox
+  it("ask_user with blocking=false returns immediately and routes the answer through the turn mailbox", async () => {
+    const { default: TurnInputMailbox } = await import("#src/services/TurnInputMailbox");
+    const { AGENT_DIRECTIVES, TURN_INPUT } = await import("#src/constants");
+    TurnInputMailbox._clearAll();
+    TurnInputMailbox.open("conv-123");
+    const mockEmit = vi.fn();
+    let capturedResolve: ((value: unknown) => void) | null = null;
+    mockSetPendingQuestion.mockImplementation((_conversationId, pending) => {
+      capturedResolve = pending.resolve;
+    });
+
+    const result = (await InternalToolRegistry.execute(
+      "ask_user",
+      { blocking: false, questions: [{ question: "Tabs or spaces?" }] },
+      { agentConversationId: "conv-123", conversationId: "conv-123", _emit: mockEmit } as any
+    )) as Record<string, unknown>;
+
+    expect(result._directive).toBe(AGENT_DIRECTIVES.DETACHED_WORK);
+    expect(result.status).toBe("pending");
+    expect(result.questionId).toMatch(/^q-/);
+    expect(mockEmit).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "user_question", blocking: false, questionId: result.questionId })
+    );
+    expect(mockEmit).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "status", message: TURN_INPUT.STATUS_QUESTION_PENDING, questionId: result.questionId })
+    );
+    expect(capturedResolve).not.toBeNull();
+    expect(TurnInputMailbox.pendingCount("conv-123")).toBe(0);
+
+    // The /agent/answer route resolves the entry later → mailbox
+    capturedResolve!({ answers: [{ answer: "Spaces", annotations: "always" }] });
+    const drained = TurnInputMailbox.drain("conv-123");
+    expect(drained).toHaveLength(1);
+    expect(drained[0].kind).toBe("question_answer");
+    expect(drained[0].text).toContain("Tabs or spaces?");
+    expect(drained[0].text).toContain("Spaces");
+    expect(drained[0].text).toContain("always");
+    expect(drained[0].meta).toEqual({ questionId: result.questionId });
+    TurnInputMailbox._clearAll();
   });
 
   // 4. BriefTool

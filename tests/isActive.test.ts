@@ -12,6 +12,9 @@
  *   setGenerating(false) so isActive never gaps to false
  * - Error paths: DB unavailable, pipeline throws
  * - Stale state: updateMany cleanup sets isActive=false alongside isGenerating/pendingBackgroundTasks
+ * - run_async_task continueWorking lifecycle: a completion delivered into the
+ *   OPEN turn through the TurnInputMailbox leaves the counter alone; a
+ *   completion after the turn ended wakes a new turn and pays the +1 back
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createMockCollection } from "./mongoMock.ts";
@@ -32,6 +35,35 @@ vi.mock("#src/services/FileService", () => ({
     uploadFile: vi.fn().mockResolvedValue({ ref: "minio://test/ref" }),
   },
 }));
+
+// ── continueWorking lifecycle mocks ──────────────────────────
+const mockExecuteTool = vi.fn();
+vi.mock("#src/services/ToolOrchestratorService", () => ({
+  default: {
+    executeTool: (...callArguments: unknown[]) => mockExecuteTool(...(callArguments as [])),
+    executeToolStreaming: vi.fn(),
+    isStreamable: () => false,
+  },
+}));
+
+const mockHandleAgent = vi.fn(() => Promise.resolve());
+vi.mock("#src/routes/ChatRoutes", () => ({
+  handleAgent: (...callArguments: unknown[]) => mockHandleAgent(...(callArguments as [])),
+}));
+
+vi.mock("#src/services/ConversationService", () => ({
+  default: { appendMessages: vi.fn(() => Promise.resolve()) },
+}));
+
+vi.mock("#src/websocket/WebSocketConnectionRegistry", () => ({
+  default: { getEmitFunction: () => null },
+}));
+
+vi.mock("#src/services/OrchestratorService", () => ({
+  default: { isSubAgentConversation: () => false, waitForAgents: async () => [] },
+}));
+
+vi.mock("#src/utils/CleanupRegistry", () => ({ registerCleanup: vi.fn() }));
 
 vi.mock("#src/utils/ConversationDiscovery", () => ({
   discoverDescendantConversationIds: vi
@@ -58,6 +90,10 @@ const MongoWrapper = MongoWrapperModule.default;
 const { default: ConversationService } = await import(
   "#src/services/conversation/ConversationService"
 );
+const { default: asyncTaskTools } = await import("#src/services/tool-definitions/AsyncTaskTools");
+const { default: AsyncTaskRegistry } = await import("#src/services/AsyncTaskRegistry");
+const { default: TurnInputMailbox } = await import("#src/services/TurnInputMailbox");
+const runAsyncTask = asyncTaskTools[0];
 
 const BASE_ARGUMENTS = {
   conversationId: TEST_CONVERSATION_ID,
@@ -301,6 +337,153 @@ describe("isActive", () => {
       const document = await mockCollection.findOne({ id: "stale-conv-002" });
       expect(document?.pendingBackgroundTasks).toBe(0);
       expect(document?.isActive).toBe(false);
+    });
+  });
+
+  // ── run_async_task continueWorking lifecycle ──────────────────
+
+  describe("continueWorking async task lifecycle", () => {
+    const toolContext = {
+      agentConversationId: TEST_CONVERSATION_ID,
+      conversationId: TEST_CONVERSATION_ID,
+      project: TEST_PROJECT,
+      username: TEST_USER,
+    };
+
+    function deferExecution() {
+      let resolve!: (value: unknown) => void;
+      mockExecuteTool.mockReturnValueOnce(new Promise<unknown>((innerResolve) => { resolve = innerResolve; }));
+      return { resolve };
+    }
+
+    beforeEach(async () => {
+      AsyncTaskRegistry.clear();
+      TurnInputMailbox._clearAll();
+      mockHandleAgent.mockClear();
+      mockExecuteTool.mockReset();
+      // The auto-response path looks the conversation up by agentConversationId
+      // through getCollection; route it to the same in-memory collection.
+      vi.mocked(MongoWrapper.getCollection).mockReturnValue(mockCollection as any);
+      await seedConversation({
+        agentConversationId: TEST_CONVERSATION_ID,
+        messages: [{ role: "user", content: "start" }],
+        settings: { provider: "google", model: "gemini-3-flash-preview" },
+      });
+    });
+
+    it("delivers a completion into the OPEN turn via the mailbox and leaves the counter untouched", async () => {
+      // 1. Turn starts — the loop opens the mailbox.
+      await ConversationService.setGenerating(TEST_CONVERSATION_ID, TEST_PROJECT, TEST_USER, true);
+      TurnInputMailbox.open(TEST_CONVERSATION_ID);
+
+      // 2. The model dispatches with continueWorking and keeps its turn.
+      const { resolve } = deferExecution();
+      const dispatch = await runAsyncTask.execute(
+        { toolName: "execute_command", toolArguments: { command: "make" }, continueWorking: true },
+        toolContext,
+      );
+      expect(dispatch).toHaveProperty("_directive", "DETACHED_WORK");
+
+      // 3. The task completes while the turn is still open.
+      resolve({ output: "built" });
+      await vi.waitFor(() => {
+        expect(TurnInputMailbox.pendingCount(TEST_CONVERSATION_ID)).toBe(1);
+      });
+      const [entry] = TurnInputMailbox.drain(TEST_CONVERSATION_ID);
+      expect(entry.kind).toBe("task_completion");
+      expect(entry.text).toContain("built");
+
+      // 4. No new turn, no counter movement: the harness never +1s for work
+      //    that finished before the turn ended.
+      let document = await getDocument();
+      expect(document?.pendingBackgroundTasks).toBe(0);
+      expect(mockHandleAgent).not.toHaveBeenCalled();
+
+      // 5. Turn ends normally.
+      TurnInputMailbox.close(TEST_CONVERSATION_ID);
+      await ConversationService.setGenerating(TEST_CONVERSATION_ID, TEST_PROJECT, TEST_USER, false);
+      document = await getDocument();
+      expect(document?.pendingBackgroundTasks).toBe(0);
+      expect(document?.isActive).toBe(false);
+    });
+
+    it("wakes a new turn and decrements the counter when the task completes after the turn ended", async () => {
+      // 1. Turn starts; dispatch with continueWorking.
+      await ConversationService.setGenerating(TEST_CONVERSATION_ID, TEST_PROJECT, TEST_USER, true);
+      TurnInputMailbox.open(TEST_CONVERSATION_ID);
+      const { resolve } = deferExecution();
+      await runAsyncTask.execute(
+        { toolName: "execute_command", toolArguments: { command: "make" }, continueWorking: true },
+        toolContext,
+      );
+      const [taskState] = AsyncTaskRegistry.listTasks(TEST_CONVERSATION_ID);
+
+      // 2. Turn ends with the task STILL running — the harness does exactly
+      //    this: +1 (before setGenerating(false)), then the mailbox closes.
+      expect(AsyncTaskRegistry.countRunningTasks(TEST_CONVERSATION_ID)).toBe(1);
+      await ConversationService.adjustPendingBackgroundTasks(TEST_CONVERSATION_ID, TEST_PROJECT, TEST_USER, 1);
+      await ConversationService.setGenerating(TEST_CONVERSATION_ID, TEST_PROJECT, TEST_USER, false);
+      TurnInputMailbox.close(TEST_CONVERSATION_ID);
+      let document = await getDocument();
+      expect(document?.pendingBackgroundTasks).toBe(1);
+      expect(document?.isActive).toBe(true); // awaiting background work
+
+      // 3. The task completes → no open turn → auto-response wakes a new one.
+      resolve({ output: "late" });
+      await vi.waitFor(() => {
+        expect(mockHandleAgent).toHaveBeenCalledTimes(1);
+      });
+      expect(TurnInputMailbox.openCount).toBe(0);
+      expect(taskState.deliveredVia).toBe("auto_response");
+
+      // 4. The auto-response's finally pays the +1 back → idle again.
+      await vi.waitFor(async () => {
+        const fresh = await getDocument();
+        expect(fresh?.pendingBackgroundTasks).toBe(0);
+      });
+      document = await getDocument();
+      expect(document?.isActive).toBe(false);
+    });
+
+    it("pays the +1 back when a task counted at turn end completes during a LATER open turn", async () => {
+      // 1. Turn N: dispatch with continueWorking; turn ends with it running.
+      await ConversationService.setGenerating(TEST_CONVERSATION_ID, TEST_PROJECT, TEST_USER, true);
+      TurnInputMailbox.open(TEST_CONVERSATION_ID);
+      const { resolve } = deferExecution();
+      await runAsyncTask.execute(
+        { toolName: "execute_command", toolArguments: { command: "make" }, continueWorking: true },
+        toolContext,
+      );
+      const [taskState] = AsyncTaskRegistry.listTasks(TEST_CONVERSATION_ID);
+      // The harness does exactly this at loop end: +1, then marks the running tasks.
+      await ConversationService.adjustPendingBackgroundTasks(TEST_CONVERSATION_ID, TEST_PROJECT, TEST_USER, 1);
+      expect(AsyncTaskRegistry.markRunningAsCounted(TEST_CONVERSATION_ID)).toBe(1);
+      expect(taskState.countedAsPending).toBe(true);
+      await ConversationService.setGenerating(TEST_CONVERSATION_ID, TEST_PROJECT, TEST_USER, false);
+      TurnInputMailbox.close(TEST_CONVERSATION_ID);
+      expect((await getDocument())?.pendingBackgroundTasks).toBe(1);
+
+      // 2. The user starts turn N+1 (the loop opens the mailbox again).
+      await ConversationService.setGenerating(TEST_CONVERSATION_ID, TEST_PROJECT, TEST_USER, true);
+      TurnInputMailbox.open(TEST_CONVERSATION_ID);
+
+      // 3. The task completes now → delivered into turn N+1 via the mailbox …
+      resolve({ output: "eventually" });
+      await vi.waitFor(() => {
+        expect(TurnInputMailbox.pendingCount(TEST_CONVERSATION_ID)).toBe(1);
+      });
+      expect(taskState.deliveredVia).toBe("mailbox");
+      expect(mockHandleAgent).not.toHaveBeenCalled();
+
+      // 4. … and turn N's +1 is paid back, once, so the conversation goes
+      //    idle when turn N+1 ends instead of sticking on "awaiting tasks".
+      await vi.waitFor(async () => {
+        expect((await getDocument())?.pendingBackgroundTasks).toBe(0);
+      });
+      expect(taskState.countedAsPending).toBe(false);
+      TurnInputMailbox.close(TEST_CONVERSATION_ID);
+      await ConversationService.setGenerating(TEST_CONVERSATION_ID, TEST_PROJECT, TEST_USER, false);
+      expect((await getDocument())?.isActive).toBe(false);
     });
   });
 });

@@ -203,6 +203,47 @@ function getModelByName(name: string): ModelDefinition | null {
 }
 
 /**
+ * Provider-native agentic features a model exposes, as plain booleans so
+ * the harness can branch without casting catalog entries. Every flag is
+ * false for a model that does not declare it (or is not in the catalog).
+ *
+ *   asyncTools               — `"async": true` on a function tool; the model
+ *                              keeps generating and the result comes back
+ *                              later via `previous_response_id`.
+ *   steering                 — mid-turn `response.steer` (WebSocket only).
+ *   programmaticToolCalling  — `{"type":"programmatic_tool_calling"}` tool
+ *                              plus per-tool `allowed_callers`.
+ *   configurationUpdate      — `configuration_update` input items to change
+ *                              reasoning effort mid-conversation.
+ */
+export interface ModelNativeCapabilities {
+  asyncTools: boolean;
+  steering: boolean;
+  programmaticToolCalling: boolean;
+  configurationUpdate: boolean;
+}
+
+const NATIVE_CAPABILITY_KEYS = [
+  "asyncTools",
+  "steering",
+  "programmaticToolCalling",
+  "configurationUpdate",
+] as const satisfies ReadonlyArray<keyof ModelNativeCapabilities>;
+
+function getModelNativeCapabilities(
+  modelName: string,
+): ModelNativeCapabilities {
+  const modelRecord = getModelByName(modelName) as
+    | (ModelDefinition & Record<string, unknown>)
+    | null;
+  const capabilities = {} as ModelNativeCapabilities;
+  for (const key of NATIVE_CAPABILITY_KEYS) {
+    capabilities[key] = modelRecord?.[key] === true;
+  }
+  return capabilities;
+}
+
+/**
  * Resolve the recommended default model for a given input→output type
  * and set of available providers.
  *
@@ -348,6 +389,7 @@ export {
   getDefaultModels,
   getPricing,
   getModelByName,
+  getModelNativeCapabilities,
   resolveRecommendedDefault,
 
   // Voices

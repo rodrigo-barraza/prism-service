@@ -68,6 +68,7 @@ vi.mock("#src/services/SettingsService", () => ({
 }));
 
 import OrchestratorService from "#src/services/OrchestratorService";
+import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import { GitWorktreeHelper } from "#src/services/orchestrator/GitWorktreeHelper";
 import { SubAgentTelemetryEmitter } from "#src/services/orchestrator/SubAgentTelemetryEmitter";
 import { HierarchicalRouter } from "#src/services/orchestrator/routers/HierarchicalRouter";
@@ -388,7 +389,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       expect(callArgs.messages.some((message: { content?: string }) => message.content && message.content.includes("Here is follow-up instructions"))).toBe(true);
     });
 
-    it("should queue follow-up messages if the sub-agent is currently running", async () => {
+    it("should deliver follow-up messages into the running sub-agent's turn", async () => {
       let resolveLoop!: (value: unknown) => void;
       const loopPromise = new Promise((resolve) => {
         resolveLoop = resolve;
@@ -419,14 +420,28 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       expect(matchingAgent).toBeDefined();
       const agentId = matchingAgent!.agentId;
 
+      // The sub-agent's loop is accepting input (the mocked loop never
+      // opens its own mailbox, so open it the way AgenticLoopService does).
+      const subAgentState = OrchestratorService._getActiveSubAgents().get(agentId)!;
+      TurnInputMailbox.open(subAgentState.subAgentConversationId);
+
       // Send a follow-up while it is still running
-      const queueRes = await OrchestratorService.sendMessage(
+      const deliveryRes = await OrchestratorService.sendMessage(
         agentId,
         "Queue this follow-up",
         orchestratorContext
       );
 
-      expect("status" in queueRes && queueRes.status).toBe("message_queued");
+      expect("status" in deliveryRes && deliveryRes.status).toBe("message_delivered");
+
+      // The running loop holds it — it is applied at the next boundary, not
+      // parked in a field nobody reads.
+      const entries = TurnInputMailbox.drain(subAgentState.subAgentConversationId);
+      expect(entries).toHaveLength(1);
+      expect(entries[0].kind).toBe("agent_message");
+      expect(entries[0].text).toContain("Queue this follow-up");
+      expect(subAgentState.pendingMessages ?? []).toHaveLength(0);
+      TurnInputMailbox.close(subAgentState.subAgentConversationId);
 
       // Resolve the original loop so that spawnPromise resolves
       resolveLoop({ messages: [] });

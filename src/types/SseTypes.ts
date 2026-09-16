@@ -22,4 +22,12 @@ export interface SseEvent {
   audioRef?: string;
   traceId?: string;
   conversationId?: string;
+  /**
+   * Per-conversation monotonic sequence number, stamped by
+   * withDirectViewerBroadcast / LiveTurnBuffer. Never resets between turns,
+   * so a viewer's cursor (`afterSeq` on subscribe) from a previous turn still
+   * sorts below every event of the next one. Events that already carry one
+   * (re-broadcasts) keep it.
+   */
+  seq?: number;
 }

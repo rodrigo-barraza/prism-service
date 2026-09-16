@@ -19,7 +19,11 @@ import {
   normalizeUsage,
   prependIdentitySystemMessage,
 } from "#src/providers/openai-compat";
-import type { TokenUsage } from "#src/types/admin";
+import type {
+  ResponsesPhase,
+  ResponsesReasoningItem,
+  TokenUsage,
+} from "#src/types/admin";
 import type { JsonValue } from "#src/types/index";
 import {
   getDataUrlMimeType,
@@ -118,15 +122,61 @@ export interface OpenAIMessage {
     args: Record<string, unknown>;
     result?: unknown;
     responsesItemId?: string;
-    reasoningItem?: {
-      id: string;
-      summary: Array<{ type: string; text: string }>;
-    };
+    reasoningItem?: ResponsesReasoningItem;
   }>;
   tool_call_id?: string;
   id?: string;
   thinking?: string;
   thinkingSignature?: string;
+  /** Responses API message phase — resent on every assistant message. */
+  phase?: ResponsesPhase;
+  /** Responses API reasoning items that had no function call to pair with. */
+  reasoningItems?: ResponsesReasoningItem[];
+  /** Responses API `response.id` that produced this message. */
+  providerResponseId?: string;
+}
+
+/**
+ * Serialise a stored reasoning item back into a Responses `input` item.
+ * `encrypted_content` is only attached when present — sending an empty
+ * field is a 400, and pre-08-2026 messages never stored one.
+ */
+function reasoningInputItem(
+  reasoningItem: ResponsesReasoningItem,
+): OpenAI.Responses.ResponseInputItem {
+  return {
+    type: "reasoning",
+    id: reasoningItem.id,
+    summary: reasoningItem.summary,
+    ...(reasoningItem.encrypted_content
+      ? { encrypted_content: reasoningItem.encrypted_content }
+      : {}),
+  } as unknown as OpenAI.Responses.ResponseInputItem;
+}
+
+/**
+ * `phase` for an assistant input item — only when the stored message has one.
+ * `null` is a legitimate stored value (older models) and is resent as-is.
+ */
+function phaseField(message: OpenAIMessage): { phase?: ResponsesPhase } {
+  return message.phase !== undefined ? { phase: message.phase } : {};
+}
+
+/**
+ * Every Responses request asks for encrypted reasoning so a stateless
+ * replay (`store: false`, or a stored response that has expired) carries
+ * the model's full reasoning state instead of the summary alone.
+ */
+const RESPONSES_ENCRYPTED_REASONING_INCLUDE = "reasoning.encrypted_content";
+
+function withEncryptedReasoningInclude(
+  existing: string[] | null | undefined,
+): string[] {
+  const include = [...(existing ?? [])];
+  if (!include.includes(RESPONSES_ENCRYPTED_REASONING_INCLUDE)) {
+    include.push(RESPONSES_ENCRYPTED_REASONING_INCLUDE);
+  }
+  return include;
 }
 
 /**
@@ -379,6 +429,51 @@ function asErrorRecord(
 ): ErrorRecord {
   return error as ErrorRecord;
 }
+/**
+ * Read a Responses reasoning output item into the stored shape. Returns
+ * undefined for an item without an id (nothing to replay by reference).
+ */
+function toReasoningItem(item: unknown): ResponsesReasoningItem | undefined {
+  const raw = item as {
+    id?: string;
+    summary?: Array<{ type: string; text: string }>;
+    encrypted_content?: string | null;
+  };
+  if (!raw?.id) return undefined;
+  return {
+    id: raw.id,
+    summary: raw.summary || [],
+    ...(raw.encrypted_content
+      ? { encrypted_content: raw.encrypted_content }
+      : {}),
+  };
+}
+
+/** Fold a later (more complete) copy of a reasoning item into the tracked one. */
+function mergeReasoningItem(
+  target: ResponsesReasoningItem,
+  update: ResponsesReasoningItem,
+): void {
+  if (update.encrypted_content) {
+    target.encrypted_content = update.encrypted_content;
+  }
+  if (update.summary.length > 0) {
+    target.summary = update.summary;
+  }
+}
+
+/**
+ * `phase` off a Responses message output item. `undefined` when the model
+ * does not emit one (pre-5.3 models); `null` is a real value and is kept.
+ */
+function readMessagePhase(item: unknown): ResponsesPhase | undefined {
+  const raw = item as { phase?: ResponsesPhase };
+  if (!raw || !("phase" in raw)) return undefined;
+  return raw.phase === "commentary" || raw.phase === "final_answer"
+    ? raw.phase
+    : null;
+}
+
 export function normalizeResponsesUsage(
   rawUsage:
     | {
@@ -600,11 +695,17 @@ export function prepareResponsesInput(
       message.toolCalls &&
       message.toolCalls.length > 0
     ) {
+      // Reasoning the model emitted in this turn that no function call
+      // claimed — replayed ahead of everything else it produced.
+      for (const reasoningItem of message.reasoningItems ?? []) {
+        result.push(reasoningInputItem(reasoningItem));
+      }
       // If the assistant also produced text, include it first
       if (message.content?.trim()) {
         result.push({
           role: "assistant",
           content: message.content,
+          ...phaseField(message),
         } as OpenAI.Responses.ResponseInputItem);
       }
       // Each tool call becomes a function_call output item, preceded by its
@@ -612,11 +713,7 @@ export function prepareResponsesInput(
       // reasoning models — omitting it triggers a 400 referential integrity error).
       for (const toolCall of message.toolCalls) {
         if (toolCall.reasoningItem) {
-          result.push({
-            type: "reasoning",
-            id: toolCall.reasoningItem.id,
-            summary: toolCall.reasoningItem.summary,
-          } as unknown as OpenAI.Responses.ResponseInputItem);
+          result.push(reasoningInputItem(toolCall.reasoningItem));
         }
         let functionCallId = toolCall.responsesItemId;
         if (!functionCallId || !functionCallId.startsWith("fc")) {
@@ -686,6 +783,16 @@ export function prepareResponsesInput(
         ? ("developer" as const)
         : (message.role as "developer" | "user" | "assistant");
     const nameObject = message.name ? { name: message.name } : {};
+    const assistantFields = role === "assistant" ? phaseField(message) : {};
+
+    // A text-only assistant turn keeps its reasoning on the message itself
+    // (there was no function call to pair it with). It goes back to the API
+    // immediately before the message it preceded, exactly as it was output.
+    if (role === "assistant") {
+      for (const reasoningItem of message.reasoningItems ?? []) {
+        result.push(reasoningInputItem(reasoningItem));
+      }
+    }
 
     if (message.images?.length || message.documents?.length) {
       const content: OpenAI.Responses.ResponseInputContent[] = [];
@@ -775,6 +882,7 @@ export function prepareResponsesInput(
       result.push({
         role,
         ...nameObject,
+        ...assistantFields,
         content,
       } as OpenAI.Responses.ResponseInputItem);
       continue;
@@ -783,6 +891,7 @@ export function prepareResponsesInput(
     result.push({
       role,
       ...nameObject,
+      ...assistantFields,
       content: message.content ?? "",
     } as OpenAI.Responses.ResponseInputItem);
   }
@@ -888,8 +997,21 @@ const openaiProvider = {
       payload.text = text;
     }
 
-    // Temperature/topP only work with reasoning.effort=none
-    if (options.reasoningEffort === "none") {
+    // Always ask for encrypted reasoning so the stored reasoning items can be
+    // replayed statelessly (merged with any include a caller already set).
+    payload.include = withEncryptedReasoningInclude(
+      payload.include as string[] | undefined,
+    ) as OpenAI.Responses.ResponseIncludable[];
+
+    // Stateful continuation hook — chains onto a stored response.
+    if (options.previousResponseId) {
+      payload.previous_response_id = options.previousResponseId;
+    }
+
+    // Temperature/topP only work with reasoning.effort=none — and only when
+    // the model actually accepted "none" (gpt-6-astra rejects it with a 400
+    // and takes no sampling parameters at all).
+    if (effort === "none") {
       if (options.temperature !== undefined)
         payload.temperature = options.temperature;
       if (options.topP !== undefined) payload.top_p = options.topP;
@@ -950,17 +1072,13 @@ const openaiProvider = {
       responsesItemId?: string;
       name: string;
       args: Record<string, unknown>;
-      reasoningItem?: {
-        id: string;
-        summary: Array<{ type: string; text: string }>;
-      };
+      reasoningItem?: ResponsesReasoningItem;
     }> = [];
+    // Track pending reasoning items to pair with subsequent function calls;
+    // whatever is left unpaired belongs to the message itself.
+    const pendingReasoningItems: ResponsesReasoningItem[] = [];
+    let phase: ResponsesPhase | undefined;
     if (response.output) {
-      // Track pending reasoning items to pair with subsequent function calls
-      const pendingReasoningItems: Array<{
-        id: string;
-        summary: Array<{ type: string; text: string }>;
-      }> = [];
       for (const item of response.output) {
         if (item.type === "image_generation_call" && item.result) {
           images.push({
@@ -969,16 +1087,13 @@ const openaiProvider = {
             mimeType: "image/png",
           });
         } else if (item.type === "reasoning") {
-          const reasoningOutputItem = item as unknown as {
-            id: string;
-            summary?: Array<{ type: string; text: string }>;
-          };
-          if (reasoningOutputItem.id) {
-            pendingReasoningItems.push({
-              id: reasoningOutputItem.id,
-              summary: reasoningOutputItem.summary || [],
-            });
+          const reasoningOutputItem = toReasoningItem(item);
+          if (reasoningOutputItem) {
+            pendingReasoningItems.push(reasoningOutputItem);
           }
+        } else if (item.type === "message") {
+          const messagePhase = readMessagePhase(item);
+          if (messagePhase !== undefined) phase = messagePhase;
         } else if (item.type === "function_call") {
           let args: Record<string, unknown> = {};
           try {
@@ -1007,6 +1122,11 @@ const openaiProvider = {
     };
     if (toolCalls.length > 0) result.toolCalls = toolCalls;
     if (rateLimits) result.rateLimits = rateLimits;
+    if (response.id) result.providerResponseId = response.id;
+    if (phase !== undefined) result.phase = phase;
+    if (pendingReasoningItems.length > 0) {
+      result.reasoningItems = pendingReasoningItems;
+    }
     return result;
   },
   async _generateTextChatCompletions(
@@ -1263,8 +1383,21 @@ const openaiProvider = {
       payload.text = text;
     }
 
-    // Temperature/topP only work with reasoning.effort=none
-    if (options.reasoningEffort === "none") {
+    // Always ask for encrypted reasoning so the stored reasoning items can be
+    // replayed statelessly (merged with any include a caller already set).
+    payload.include = withEncryptedReasoningInclude(
+      payload.include as string[] | undefined,
+    ) as OpenAI.Responses.ResponseIncludable[];
+
+    // Stateful continuation hook — chains onto a stored response.
+    if (options.previousResponseId) {
+      payload.previous_response_id = options.previousResponseId;
+    }
+
+    // Temperature/topP only work with reasoning.effort=none — and only when
+    // the model actually accepted "none" (gpt-6-astra rejects it with a 400
+    // and takes no sampling parameters at all).
+    if (effort === "none") {
       if (options.temperature !== undefined)
         payload.temperature = options.temperature;
       if (options.topP !== undefined) payload.top_p = options.topP;
@@ -1326,13 +1459,24 @@ const openaiProvider = {
     > = {};
     // Track reasoning output items so we can pair them with subsequent function calls.
     // The Responses API emits reasoning items before their paired function_call items.
-    const pendingReasoningItems: Array<{
-      id: string;
-      summary: Array<{ type: string; text: string }>;
-    }> = [];
+    const pendingReasoningItems: ResponsesReasoningItem[] = [];
+    // Every reasoning item of this response by id — paired or not — so the
+    // `output_item.done` payload (encrypted_content, final summary) and the
+    // completed response can update the same object the tool call holds.
+    const reasoningItemsById: Record<string, ResponsesReasoningItem> = {};
     const reasoningSummaryAccumulator: Record<string, string> = {};
+    let providerResponseId: string | undefined;
+    let phase: ResponsesPhase | undefined;
     for await (const event of streamData) {
       if (options.signal?.aborted) break;
+      // Response id — the handle for stateful continuation
+      if (event.type === "response.created") {
+        const typedEvent = event as OpenAI.Responses.ResponseCreatedEvent;
+        if (typedEvent.response?.id) {
+          providerResponseId = typedEvent.response.id;
+          yield { type: "providerState", providerResponseId };
+        }
+      }
       // Text delta from output_text
       if (event.type === "response.output_text.delta") {
         const typedEvent = event as OpenAI.Responses.ResponseTextDeltaEvent;
@@ -1369,15 +1513,16 @@ const openaiProvider = {
         const typedEvent =
           event as OpenAI.Responses.ResponseOutputItemAddedEvent;
         if (typedEvent.item?.type === "reasoning") {
-          const reasoningItem = typedEvent.item as unknown as {
-            id: string;
-            summary?: Array<{ type: string; text: string }>;
-          };
-          if (reasoningItem.id) {
-            pendingReasoningItems.push({
-              id: reasoningItem.id,
-              summary: reasoningItem.summary || [],
-            });
+          const reasoningItem = toReasoningItem(typedEvent.item);
+          if (reasoningItem) {
+            pendingReasoningItems.push(reasoningItem);
+            reasoningItemsById[reasoningItem.id] = reasoningItem;
+          }
+        } else if (typedEvent.item?.type === "message") {
+          const messagePhase = readMessagePhase(typedEvent.item);
+          if (messagePhase !== undefined) {
+            phase = messagePhase;
+            yield { type: "providerState", phase };
           }
         } else if (typedEvent.item?.type === "function_call") {
           const item =
@@ -1395,6 +1540,29 @@ const openaiProvider = {
                 name: item.name,
               };
             }
+          }
+        }
+      }
+      // Finished output items carry the authoritative payload: the reasoning
+      // item's encrypted_content + final summary, the message's phase.
+      if (event.type === "response.output_item.done") {
+        const typedEvent = event as OpenAI.Responses.ResponseOutputItemDoneEvent;
+        if (typedEvent.item?.type === "reasoning") {
+          const doneItem = toReasoningItem(typedEvent.item);
+          if (doneItem) {
+            const tracked = reasoningItemsById[doneItem.id];
+            if (tracked) {
+              mergeReasoningItem(tracked, doneItem);
+            } else {
+              pendingReasoningItems.push(doneItem);
+              reasoningItemsById[doneItem.id] = doneItem;
+            }
+          }
+        } else if (typedEvent.item?.type === "message") {
+          const messagePhase = readMessagePhase(typedEvent.item);
+          if (messagePhase !== undefined && messagePhase !== phase) {
+            phase = messagePhase;
+            yield { type: "providerState", phase };
           }
         }
       }
@@ -1436,9 +1604,7 @@ const openaiProvider = {
         // Pop the most recent pending reasoning item and finalize its summary
         // text from the accumulated deltas. This pairs the reasoning item with
         // this function call for referential integrity on subsequent turns.
-        let pairedReasoningItem:
-          | { id: string; summary: Array<{ type: string; text: string }> }
-          | undefined;
+        let pairedReasoningItem: ResponsesReasoningItem | undefined;
         if (pendingReasoningItems.length > 0) {
           pairedReasoningItem = pendingReasoningItems.shift();
           if (pairedReasoningItem) {
@@ -1476,6 +1642,44 @@ const openaiProvider = {
         if (typedEvent.response?.usage) {
           usage = normalizeResponsesUsage(typedEvent.response.usage);
         }
+        if (typedEvent.response?.id) {
+          providerResponseId = typedEvent.response.id;
+        }
+        // The completed response carries the whole output: backfill any
+        // encrypted_content / summary / phase a done event did not deliver.
+        for (const item of typedEvent.response?.output ?? []) {
+          if (item.type === "reasoning") {
+            const finalItem = toReasoningItem(item);
+            if (!finalItem) continue;
+            const tracked = reasoningItemsById[finalItem.id];
+            if (tracked) {
+              mergeReasoningItem(tracked, finalItem);
+            } else {
+              pendingReasoningItems.push(finalItem);
+              reasoningItemsById[finalItem.id] = finalItem;
+            }
+          } else if (item.type === "message") {
+            const messagePhase = readMessagePhase(item);
+            if (messagePhase !== undefined) phase = messagePhase;
+          }
+        }
+        // Reasoning nobody paired with a function call belongs to the
+        // message — finalise its summary from the streamed deltas.
+        for (const leftover of pendingReasoningItems) {
+          const accumulatedText = reasoningSummaryAccumulator[leftover.id];
+          if (accumulatedText && leftover.summary.length === 0) {
+            leftover.summary = [{ type: "summary_text", text: accumulatedText }];
+          }
+          delete reasoningSummaryAccumulator[leftover.id];
+        }
+        yield {
+          type: "providerState",
+          ...(providerResponseId ? { providerResponseId } : {}),
+          ...(phase !== undefined ? { phase } : {}),
+          ...(pendingReasoningItems.length > 0
+            ? { reasoningItems: pendingReasoningItems.splice(0) }
+            : {}),
+        };
         // Detect max_tokens truncation (Responses API uses "incomplete" status)
         const responseRecord = typedEvent.response as unknown as Record<
           string,

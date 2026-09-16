@@ -15,6 +15,12 @@ import ConversationService, {
 import { COLLECTIONS, COST_SUMMATION_EXPRESSION, ORCHESTRATOR } from "#src/constants";
 import logger from "#src/utils/logger";
 import ConversationTimerService from "#src/services/ConversationTimerService";
+import ConversationGoalService, {
+  ConversationNotFoundError,
+  GOAL_STATUSES,
+  type ConversationGoalBudget,
+  type GoalPatch,
+} from "#src/services/ConversationGoalService";
 import ConversationStatusRegistry from "#src/services/ConversationStatusRegistry";
 import AgenticLoopService from "#src/services/AgenticLoopService";
 import {
@@ -1015,6 +1021,191 @@ router.post(
       username,
     );
     res.json({ success: wasCancelled });
+  }),
+);
+
+// ─── Conversation goal ───────────────────────────────────────────
+// The persistent objective of a conversation (ConversationGoalService).
+// Same project/username scoping as the message routes above.
+
+function resolveGoalRouteScope(req: Request) {
+  const queryProject = req.query.project as string | undefined;
+  return {
+    conversationId: req.params.id as string,
+    project: queryProject || req.project || "any",
+    username: req.username || "any",
+  };
+}
+
+/** Statuses the user may set through PATCH — the model owns the others. */
+const USER_SETTABLE_GOAL_STATUSES: readonly string[] = [
+  GOAL_STATUSES.ACTIVE,
+  GOAL_STATUSES.PAUSED,
+];
+
+/**
+ * GET /conversations/:id/goal
+ * The conversation's goal, or null when none is set.
+ */
+router.get(
+  "/:id/goal",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { conversationId, project, username } = resolveGoalRouteScope(req);
+      const goal = await ConversationGoalService.get(
+        conversationId,
+        project,
+        username,
+      );
+      res.json({ goal });
+    } catch (error: unknown) {
+      logger.error(`Error fetching conversation goal: ${errorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+/**
+ * PUT /conversations/:id/goal
+ * Create or replace the goal: { objective, completionCriteria?, budget? }.
+ */
+router.put(
+  "/:id/goal",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { conversationId, project, username } = resolveGoalRouteScope(req);
+      const body = (req.body || {}) as Record<string, unknown>;
+      if (typeof body.objective !== "string" || !body.objective.trim()) {
+        return res
+          .status(400)
+          .json({ error: "Missing required field: objective" });
+      }
+
+      const goal = await ConversationGoalService.set(
+        conversationId,
+        project,
+        username,
+        {
+          objective: body.objective,
+          completionCriteria:
+            typeof body.completionCriteria === "string"
+              ? body.completionCriteria
+              : undefined,
+          budget:
+            body.budget && typeof body.budget === "object"
+              ? (body.budget as ConversationGoalBudget)
+              : undefined,
+        },
+      );
+      res.json({ goal });
+    } catch (error: unknown) {
+      if (error instanceof ConversationNotFoundError) {
+        return res.status(404).json({ error: error.message });
+      }
+      logger.error(`Error setting conversation goal: ${errorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+/**
+ * PATCH /conversations/:id/goal
+ * Partial update: { status?: "active"|"paused", progress?, blockedOn?, budget? }.
+ * `progress` is a summary string or { summary?, percent? }. This is the
+ * user's pause/resume lever — the model cannot pause a goal.
+ */
+router.patch(
+  "/:id/goal",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { conversationId, project, username } = resolveGoalRouteScope(req);
+      const body = (req.body || {}) as Record<string, unknown>;
+      const patch: GoalPatch = {};
+
+      if (body.status !== undefined) {
+        if (
+          typeof body.status !== "string" ||
+          !USER_SETTABLE_GOAL_STATUSES.includes(body.status)
+        ) {
+          return res.status(400).json({
+            error: `status must be one of ${USER_SETTABLE_GOAL_STATUSES.join(", ")}`,
+          });
+        }
+        patch.status = body.status as GoalPatch["status"];
+      }
+
+      if (typeof body.progress === "string") {
+        patch.progressSummary = body.progress;
+      } else if (body.progress && typeof body.progress === "object") {
+        const progress = body.progress as Record<string, unknown>;
+        if (typeof progress.summary === "string") {
+          patch.progressSummary = progress.summary;
+        }
+        if (progress.percent === null || typeof progress.percent === "number") {
+          patch.percent = progress.percent;
+        }
+      }
+      if (body.percent === null || typeof body.percent === "number") {
+        patch.percent = body.percent;
+      }
+      if (body.blockedOn === null || typeof body.blockedOn === "string") {
+        patch.blockedOn = body.blockedOn;
+      }
+      if (body.budget !== undefined) {
+        patch.budget =
+          body.budget && typeof body.budget === "object"
+            ? (body.budget as ConversationGoalBudget)
+            : null;
+      }
+
+      if (Object.keys(patch).length === 0) {
+        return res.status(400).json({
+          error: "Nothing to update: send status, progress, percent, blockedOn or budget",
+        });
+      }
+
+      const goal = await ConversationGoalService.update(
+        conversationId,
+        project,
+        username,
+        patch,
+      );
+      if (!goal) {
+        return res.status(404).json({ error: "Conversation has no goal" });
+      }
+      res.json({ goal });
+    } catch (error: unknown) {
+      if (error instanceof ConversationNotFoundError) {
+        return res.status(404).json({ error: error.message });
+      }
+      logger.error(`Error updating conversation goal: ${errorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+/**
+ * DELETE /conversations/:id/goal
+ * Remove the goal. { success: false } when there was none.
+ */
+router.delete(
+  "/:id/goal",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { conversationId, project, username } = resolveGoalRouteScope(req);
+      const cleared = await ConversationGoalService.clear(
+        conversationId,
+        project,
+        username,
+      );
+      res.json({ success: cleared });
+    } catch (error: unknown) {
+      if (error instanceof ConversationNotFoundError) {
+        return res.status(404).json({ error: error.message });
+      }
+      logger.error(`Error clearing conversation goal: ${errorMessage(error)}`);
+      next(error);
+    }
   }),
 );
 

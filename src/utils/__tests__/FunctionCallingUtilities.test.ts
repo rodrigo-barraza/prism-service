@@ -734,3 +734,77 @@ describe("model-visible tool media", () => {
     expect(expanded.every((m: any) => !m.images || m.images.length === 0)).toBe(true);
   });
 });
+
+describe("expandMessagesForFunctionCall — OpenAI Responses native state", () => {
+  it("carries phase, reasoningItems and providerResponseId on a text-only assistant message", () => {
+    const expanded = expandMessagesForFunctionCall(
+      [
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: "Hello.",
+          phase: "final_answer",
+          reasoningItems: [{ id: "rs_1", summary: [], encrypted_content: "enc" }],
+          providerResponseId: "resp_1",
+        },
+      ] as any,
+      { filterDeleted: false },
+    );
+    expect(expanded[1]).toMatchObject({
+      role: "assistant",
+      content: "Hello.",
+      phase: "final_answer",
+      reasoningItems: [{ id: "rs_1", summary: [], encrypted_content: "enc" }],
+      providerResponseId: "resp_1",
+    });
+  });
+
+  it("carries them on a tool-calling assistant message and keeps encrypted_content on the paired item", () => {
+    const expanded = expandMessagesForFunctionCall(
+      [
+        {
+          role: "assistant",
+          content: "",
+          phase: "commentary",
+          providerResponseId: "resp_2",
+          toolCalls: [
+            {
+              id: "call_1",
+              responsesItemId: "fc_1",
+              name: "search",
+              args: {},
+              reasoningItem: { id: "rs_1", summary: [], encrypted_content: "enc" },
+              result: { ok: true },
+            },
+          ],
+        },
+      ] as any,
+      { filterDeleted: false },
+    );
+    expect(expanded[0]).toMatchObject({
+      role: "assistant",
+      phase: "commentary",
+      providerResponseId: "resp_2",
+    });
+    expect(expanded[0].toolCalls![0].reasoningItem).toEqual({
+      id: "rs_1",
+      summary: [],
+      encrypted_content: "enc",
+    });
+    expect("reasoningItems" in expanded[0]).toBe(false);
+  });
+
+  it("does not stamp a null phase on messages that never had one, nor on user messages", () => {
+    const expanded = expandMessagesForFunctionCall(
+      [
+        { role: "user", content: "hi", phase: "final_answer" },
+        { role: "assistant", content: "Older model.", phase: null },
+        { role: "assistant", content: "No phase." },
+      ] as any,
+      { filterDeleted: false },
+    );
+    expect("phase" in expanded[0]).toBe(false);
+    expect(expanded[1].phase).toBeNull();
+    expect("phase" in expanded[2]).toBe(false);
+  });
+});

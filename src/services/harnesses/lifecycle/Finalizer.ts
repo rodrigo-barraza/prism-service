@@ -33,6 +33,10 @@ import {
   type LlmOptions,
 } from "#src/services/RequestLogger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import type {
+  ResponsesPhase,
+  ResponsesReasoningItem,
+} from "#src/types/admin";
 
 export interface FinalizerContext {
   providerName: string;
@@ -88,6 +92,10 @@ export interface FinalizerPayload {
   /** Accumulated content generation phase duration across all iterations (seconds). */
   contentDurationSeconds?: number | null;
   conversationOutcome?: string | null;
+  /** OpenAI Responses API state of the final pass — stored on the final assistant message. */
+  phase?: ResponsesPhase;
+  reasoningItems?: ResponsesReasoningItem[];
+  providerResponseId?: string;
 }
 
 /**
@@ -169,6 +177,9 @@ export async function finalizeTextGeneration(
     thinkingDurationSeconds,
     contentDurationSeconds,
     conversationOutcome,
+    phase,
+    reasoningItems,
+    providerResponseId,
   }: FinalizerPayload,
   overrideMessagesToAppend: MessagePayload[] | null = null,
   finalizerOptions?: { deferDoneEmission?: boolean },
@@ -404,6 +415,9 @@ export async function finalizeTextGeneration(
       contentDurationSeconds,
       userMessage,
       conversationMeta,
+      phase,
+      reasoningItems,
+      providerResponseId,
     });
     let toolConfig: Record<string, unknown> | undefined = undefined;
     if (resolvedEnabledTools) {
@@ -750,6 +764,10 @@ export function assembleMessagesToAppend(options: {
   userMessage?: MessagePayload | null;
   conversationMeta?: Record<string, unknown> | null;
   requestId?: string;
+  /** OpenAI Responses API state of the final pass. */
+  phase?: ResponsesPhase;
+  reasoningItems?: ResponsesReasoningItem[];
+  providerResponseId?: string;
 }): MessagePayload[] {
   const {
     overrideMessagesToAppend,
@@ -767,7 +785,18 @@ export function assembleMessagesToAppend(options: {
     userMessage,
     conversationMeta,
     requestId,
+    phase,
+    reasoningItems,
+    providerResponseId,
   } = options;
+
+  // Provider-native state persists on the assistant message so the next
+  // turn replays it (OpenAI: phase + reasoning items + response.id).
+  const providerNativeFields = {
+    ...(phase !== undefined && { phase }),
+    ...(reasoningItems && reasoningItems.length > 0 && { reasoningItems }),
+    ...(providerResponseId && { providerResponseId }),
+  };
 
   let messagesToAppend: MessagePayload[] = [];
 
@@ -818,6 +847,7 @@ export function assembleMessagesToAppend(options: {
           : {}),
         ...(thinkingDurationSeconds != null && { thinkingDurationSeconds }),
         ...(contentDurationSeconds != null && { contentDurationSeconds }),
+        ...providerNativeFields,
         timestamp: new Date().toISOString(),
         ...(requestId && { requestId }),
       } as MessagePayload);
@@ -852,6 +882,7 @@ export function assembleMessagesToAppend(options: {
         if (audioReference) {
           messagesToAppend[lastAssistantIndex].audio = audioReference;
         }
+        Object.assign(messagesToAppend[lastAssistantIndex], providerNativeFields);
       }
     }
   } else {
@@ -872,6 +903,7 @@ export function assembleMessagesToAppend(options: {
       ...(toolCalls.length > 0 && { toolCalls }),
       ...(thinkingDurationSeconds != null && { thinkingDurationSeconds }),
       ...(contentDurationSeconds != null && { contentDurationSeconds }),
+      ...providerNativeFields,
       timestamp: new Date().toISOString(),
       ...(requestId && { requestId }),
     } as MessagePayload);

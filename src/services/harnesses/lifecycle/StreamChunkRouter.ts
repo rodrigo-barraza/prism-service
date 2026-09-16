@@ -175,6 +175,33 @@ export function routeStreamChunk(
     return { action: "continue" };
   }
 
+  // ── Provider-native state (OpenAI Responses) ─────────
+  // response.id, message phase and unpaired reasoning items — stored on
+  // the assistant message this pass produces and replayed next turn.
+  if (streamChunk?.type === "providerState") {
+    const loopState = harness["state"];
+    if (streamChunk.providerResponseId) {
+      pass.providerResponseId = streamChunk.providerResponseId;
+      // A new response id opens a new pass: whatever the previous pass left
+      // on the loop state belongs to a message already pushed.
+      loopState.providerResponseId = streamChunk.providerResponseId;
+      loopState.phase = undefined;
+      loopState.reasoningItems = undefined;
+    }
+    if (streamChunk.phase !== undefined) {
+      pass.phase = streamChunk.phase;
+      loopState.phase = streamChunk.phase;
+    }
+    if (streamChunk.reasoningItems && streamChunk.reasoningItems.length > 0) {
+      pass.reasoningItems = [
+        ...(pass.reasoningItems ?? []),
+        ...streamChunk.reasoningItems,
+      ];
+      loopState.reasoningItems = pass.reasoningItems;
+    }
+    return { action: "continue" };
+  }
+
   // ── Tool call start (early disclosure) ─────────────────
   if (streamChunk?.type === "toolCallStart") {
     recordFirstToken(harness, pass);

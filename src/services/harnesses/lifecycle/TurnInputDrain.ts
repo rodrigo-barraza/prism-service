@@ -1,0 +1,123 @@
+import TurnInputMailbox, {
+  type TurnInputEntry,
+} from "#src/services/TurnInputMailbox";
+import { NOTIFICATION_SOURCES, TURN_INPUT } from "#src/constants";
+import {
+  SYSTEM_MESSAGE_TAGS,
+  wrapSystemMessage,
+} from "#src/utils/SystemMessageTags";
+import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import logger from "#src/utils/logger";
+
+import type AgenticLoopState from "#src/services/AgenticLoopState";
+import type {
+  ConversationMessage,
+  AgenticContext,
+} from "#src/services/harnesses/types";
+
+/**
+ * TurnInputDrain — moves pending TurnInputMailbox entries into the running
+ * turn's message array at a safe boundary and acknowledges each one on the
+ * event stream.
+ *
+ * Boundaries (ReActHarness):
+ *   - `iteration_start`  before the model call of every iteration
+ *   - `after_tools`      after a tool batch has been observed
+ *   - `before_end`       the model answered with text only; instead of ending
+ *                        the turn, the pending input is applied and the loop
+ *                        continues so the model can act on it
+ *
+ * Every injected message is a `user`-role message. A steering update is
+ * wrapped in <user-update> so the model can tell it arrived mid-task (and so
+ * a provider that demotes system messages still sees the marker); answers to
+ * non-blocking questions are wrapped in <user-answer>; task completions and
+ * sub-agent follow-ups arrive already formatted by their producer and are
+ * pushed verbatim. The marker `_turnInput` on the message lets the client
+ * render the bubble as "applied mid-turn" and strip the wrapper.
+ */
+
+export type TurnInputBoundary = "iteration_start" | "after_tools" | "before_end";
+
+export function buildTurnInputMessage(entry: TurnInputEntry): ConversationMessage {
+  const base: ConversationMessage = {
+    role: "user",
+    content: "",
+    ...(entry.images && entry.images.length > 0 ? { images: entry.images } : {}),
+    [TURN_INPUT.MESSAGE_KEY]: { id: entry.id, kind: entry.kind, receivedAt: entry.receivedAt },
+    rawContent: entry.text,
+    ...(entry.meta || {}),
+  };
+  switch (entry.kind) {
+    case "user_update":
+      return {
+        ...base,
+        content: wrapSystemMessage(SYSTEM_MESSAGE_TAGS.USER_UPDATE, entry.text),
+        _notificationSource: NOTIFICATION_SOURCES.USER_UPDATE,
+        _notificationId: `${NOTIFICATION_SOURCES.USER_UPDATE}:${entry.id}:${entry.receivedAt}`,
+      };
+    case "question_answer":
+      return {
+        ...base,
+        content: wrapSystemMessage(SYSTEM_MESSAGE_TAGS.USER_ANSWER, entry.text),
+        _notificationSource: NOTIFICATION_SOURCES.USER_ANSWER,
+        _notificationId: `${NOTIFICATION_SOURCES.USER_ANSWER}:${entry.id}:${entry.receivedAt}`,
+      };
+    case "task_completion":
+    case "agent_message":
+    default:
+      // Producers format these (AgentNotificationService for completions,
+      // the orchestrator for follow-ups) and set their own source markers
+      // through `meta`; keep the text verbatim.
+      return { ...base, content: entry.text };
+  }
+}
+
+/**
+ * Drain the mailbox for this turn into `currentMessages`. Returns the number
+ * of entries applied (0 when nothing was pending — the common case, and it
+ * costs one Map lookup).
+ */
+export function drainTurnInput(
+  currentMessages: ConversationMessage[],
+  state: AgenticLoopState,
+  context: AgenticContext,
+  boundary: TurnInputBoundary,
+): number {
+  const conversationId = context.conversationId;
+  if (!conversationId) return 0;
+  const entries = TurnInputMailbox.drain(conversationId);
+  if (entries.length === 0) return 0;
+
+  for (const entry of entries) {
+    currentMessages.push(buildTurnInputMessage(entry));
+    state.turnInputApplied++;
+    // The event carries the entry so viewers (and the driving client, which
+    // rendered an optimistic bubble by id) can show it in the transcript.
+    context.emit({
+      type: TURN_INPUT.EVENT_TYPE,
+      id: entry.id,
+      kind: entry.kind,
+      content: entry.text,
+      ...(entry.images && entry.images.length > 0 ? { images: entry.images } : {}),
+      boundary,
+      iteration: state.iterations,
+    });
+    context.emit({
+      type: SERVER_SENT_EVENT_TYPES.STATUS,
+      message: TURN_INPUT.STATUS_APPLIED,
+      inputId: entry.id,
+      kind: entry.kind,
+      boundary,
+      iteration: state.iterations,
+    });
+  }
+  logger.info(
+    `[TurnInputDrain] Applied ${entries.length} entr${entries.length === 1 ? "y" : "ies"} at ${boundary} (iteration ${state.iterations}) for ${conversationId}`,
+  );
+  return entries.length;
+}
+
+/** True when input is waiting — used at the text-only break to keep the loop alive. */
+export function hasPendingTurnInput(context: AgenticContext): boolean {
+  return !!context.conversationId && TurnInputMailbox.pendingCount(context.conversationId) > 0;
+}
