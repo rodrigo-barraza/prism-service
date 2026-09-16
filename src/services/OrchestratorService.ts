@@ -27,6 +27,8 @@ import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import { createAbortController } from "#src/utils/AbortController";
 import { registerCleanup } from "#src/utils/CleanupRegistry";
 import { stripToolCallMarkup } from "#src/utils/StreamChunkDispatcher";
+import TurnInputMailbox from "#src/services/TurnInputMailbox";
+import { WAIT_FOR_AGENTS_POLL_INTERVAL_MILLISECONDS } from "#src/services/AsyncTaskConstants";
 
 // Extracted Domain Helpers
 import { InstanceLoadBalancer } from "./orchestrator/InstanceLoadBalancer.ts";
@@ -57,6 +59,8 @@ import type {
   TeamMember,
   SubAgentResult,
   ResumedAgentResult,
+  SubAgentWaitEntry,
+  SubAgentWaitOptions,
 } from "#src/types/orchestrator";
 
 import type { ConversationMessage, LLMProvider } from "./harnesses/types.ts";
@@ -92,6 +96,17 @@ function truncateAgentOutput(agentOutput: string, locale: string): string {
   return (
     agentOutput.slice(0, ORCHESTRATOR.AGENT_OUTPUT_TRUNCATION_LIMIT) +
     truncationSuffix
+  );
+}
+
+/**
+ * Wrap a parent's `send_subagent_message` follow-up so the sub-agent's model
+ * can tell it arrived mid-task (mailbox) or was held for this loop start.
+ */
+function formatParentFollowUp(message: string): string {
+  return wrapSystemMessage(
+    SYSTEM_MESSAGE_TAGS.TASK_NOTIFICATION,
+    `Message from your parent agent while you are working:\n\n${message}`,
   );
 }
 
@@ -590,13 +605,41 @@ export class OrchestratorService {
     }
 
     if (subAgent.status === SYSTEM_STATUSES.RUNNING) {
-      // Sub-agent still running — queue the message
+      // Sub-agent mid-turn — hand the follow-up to its running loop through
+      // the TurnInputMailbox (keyed by the sub-agent's own conversation id);
+      // the harness drains it at its next boundary.
+      const posted = TurnInputMailbox.post(subAgent.subAgentConversationId, {
+        kind: "agent_message",
+        text: formatParentFollowUp(message),
+        meta: {
+          _notificationSource: NOTIFICATION_SOURCES.ORCHESTRATOR,
+          _notificationId: `${NOTIFICATION_SOURCES.ORCHESTRATOR}:${agentId}:${Date.now()}`,
+        },
+      });
+      if (posted.accepted) {
+        logger.info(
+          `[Orchestrator] Follow-up delivered to running sub-agent ${agentId} (${posted.id})`,
+        );
+        return {
+          agent_id: agentId,
+          status: "message_delivered",
+          message: "Delivered to the running sub-agent; it will act on it at its next step.",
+        };
+      }
+      // RUNNING but the loop is not accepting input yet (the window between
+      // registration and the mailbox opening, or the loop is finalizing).
+      // Hold it; _runSubAgentLoop drains pendingMessages right before the
+      // loop starts, so it rides the next loop rather than being dropped.
       if (!subAgent.pendingMessages) subAgent.pendingMessages = [];
       subAgent.pendingMessages.push(message);
+      logger.info(
+        `[Orchestrator] Sub-agent ${agentId} is running but not accepting input (${posted.reason}) — follow-up held for its next loop start`,
+      );
       return {
         agent_id: agentId,
-        status: "message_queued",
-        message: "Sub-agent is running. Follow-up queued.",
+        status: "message_pending",
+        message:
+          "Sub-agent is running but its loop is not accepting input yet; the message will be applied when its loop next starts.",
       };
     }
 
@@ -944,6 +987,115 @@ export class OrchestratorService {
     logger.info(
       `[Orchestrator] All pending dispatches settled for conversation ${agentConversationId}`,
     );
+  }
+
+  /** Whether `conversationId` is the own conversation id of a live sub-agent. */
+  static isSubAgentConversation(conversationId: string): boolean {
+    for (const subAgent of activeSubAgents.values()) {
+      if (subAgent.subAgentConversationId === conversationId) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Wait for sub-agents to leave RUNNING (wait_for_tasks).
+   *
+   * With an empty `agentIds` list, waits on every RUNNING agent whose
+   * `parentAgentConversationId` is `options.parentAgentConversationId`.
+   * Resolves when all targets have settled, when `timeoutMilliseconds`
+   * elapses, or when `signal` aborts — never rejects. Each entry carries
+   * the agent's `buildSubAgentResult` snapshot and whether it is still
+   * running.
+   *
+   * The loop promises are not retained per agent (spawnFromTool detaches
+   * them), so this polls `activeSubAgents` every
+   * WAIT_FOR_AGENTS_POLL_INTERVAL_MILLISECONDS.
+   *
+   * Duplicate suppression: every awaited RUNNING agent is stamped
+   * `awaitedBy`; `_sendParentCompletionNotification` skips (and still pays
+   * back pendingBackgroundTasks) when every agent in a notification carries
+   * the stamp. The stamp is removed here only for agents still running when
+   * the wait ends — a settled agent keeps it, so the notification that
+   * follows its loop's `.then` is still recognised as already delivered.
+   * `_runSubAgentLoop` clears it at the start of a new run.
+   */
+  static async waitForAgents(
+    agentIds: string[],
+    {
+      timeoutMilliseconds = 60_000,
+      signal,
+      parentAgentConversationId,
+    }: SubAgentWaitOptions = {},
+  ): Promise<SubAgentWaitEntry[]> {
+    const targetAgentIds =
+      agentIds.length > 0
+        ? agentIds
+        : [...activeSubAgents.values()]
+            .filter(
+              (subAgent) =>
+                subAgent.status === SYSTEM_STATUSES.RUNNING &&
+                (!parentAgentConversationId ||
+                  subAgent.parentAgentConversationId === parentAgentConversationId),
+            )
+            .map((subAgent) => subAgent.agentId);
+
+    for (const agentId of targetAgentIds) {
+      const subAgent = activeSubAgents.get(agentId);
+      if (subAgent && subAgent.status === SYSTEM_STATUSES.RUNNING) {
+        subAgent.awaitedBy = parentAgentConversationId || "wait_for_tasks";
+      }
+    }
+
+    const isStillRunning = (agentId: string) =>
+      activeSubAgents.get(agentId)?.status === SYSTEM_STATUSES.RUNNING;
+
+    const deadline = Date.now() + Math.max(0, timeoutMilliseconds);
+    while (
+      targetAgentIds.some(isStillRunning) &&
+      !signal?.aborted &&
+      Date.now() < deadline
+    ) {
+      const delay = Math.min(
+        WAIT_FOR_AGENTS_POLL_INTERVAL_MILLISECONDS,
+        Math.max(0, deadline - Date.now()),
+      );
+      await new Promise<void>((resolve) => {
+        let abortListener: (() => void) | null = null;
+        const timer = setTimeout(() => {
+          if (signal && abortListener) signal.removeEventListener("abort", abortListener);
+          resolve();
+        }, delay);
+        if (signal) {
+          abortListener = () => {
+            clearTimeout(timer);
+            resolve();
+          };
+          signal.addEventListener("abort", abortListener, { once: true });
+        }
+      });
+    }
+
+    return targetAgentIds.map((agentId) => {
+      const subAgent = activeSubAgents.get(agentId);
+      if (!subAgent) return { agentId, running: false, result: null };
+      const running = subAgent.status === SYSTEM_STATUSES.RUNNING;
+      if (running && subAgent.awaitedBy === (parentAgentConversationId || "wait_for_tasks")) {
+        // Hand delivery back to the completion notification.
+        delete subAgent.awaitedBy;
+      }
+      return { agentId, running, result: buildSubAgentResult(subAgent) };
+    });
+  }
+
+  /**
+   * True when EVERY listed agent is known and stamped `awaitedBy` — the
+   * result has already been returned by a `wait_for_tasks` call, so the
+   * parent must not be notified a second time. A partially awaited team is
+   * still notified: the waiter returned only its own agents.
+   */
+  static _isAwaitedByParent(agentIds: string[]): boolean {
+    if (agentIds.length === 0) return false;
+    return agentIds.every((agentId) => !!activeSubAgents.get(agentId)?.awaitedBy);
   }
 
   static clearAllActiveSubAgents(): void {
@@ -1567,6 +1719,7 @@ export class OrchestratorService {
         toolUses: agentResult.toolUses || 0,
         durationMilliseconds: agentResult.durationMilliseconds || 0,
         resultBody: truncatedOutput,
+        agentIds: [agentId],
       },
       orchestratorContext,
     );
@@ -1583,11 +1736,25 @@ export class OrchestratorService {
       toolUses: number;
       durationMilliseconds: number;
       resultBody: string;
+      /** The agents this notification reports on — for `awaitedBy` suppression. */
+      agentIds?: string[];
     },
     orchestratorContext: OrchestratorContext,
   ): Promise<void> {
     const { conversationId, project, username } = orchestratorContext;
     if (!conversationId || !project || !username) return;
+
+    // A wait_for_tasks call already returned these results into the
+    // parent's running turn — do not notify twice. The harness bumped
+    // pendingBackgroundTasks when the dispatching turn ended, so pay that
+    // back exactly as the skip paths in _triggerParentAutoResponse do.
+    if (options.agentIds && OrchestratorService._isAwaitedByParent(options.agentIds)) {
+      logger.info(
+        `[Orchestrator] Completion of ${options.agentIds.join(", ")} was returned by wait_for_tasks — skipping parent notification for ${conversationId}`,
+      );
+      await OrchestratorService._decrementPendingBackgroundTasks(conversationId, project, username);
+      return;
+    }
 
     const completionMessage = AgentNotificationService.createNotificationMessage({
       status: options.status,
@@ -1629,6 +1796,10 @@ export class OrchestratorService {
   ) {
     const { default: AgenticLoopService } =
       await OrchestratorService.getAgenticLoopService();
+
+    // A fresh loop is a fresh completion: a `wait_for_tasks` stamp from an
+    // earlier run must not suppress this run's parent notification.
+    delete subAgent.awaitedBy;
 
     // Build the sub-agent's initial messages
     const commitInstructions = subAgent.isolated
@@ -1850,6 +2021,27 @@ export class OrchestratorService {
         content: prompt,
       },
     ];
+
+    // Follow-ups that arrived while the agent was RUNNING but its loop was
+    // not accepting input yet (sendMessage's fallback). Drained as late as
+    // possible so the window to the mailbox opening is the harness's own
+    // construction time; anything landing in that residual window waits
+    // for the next loop start.
+    if (subAgent.pendingMessages && subAgent.pendingMessages.length > 0) {
+      const heldMessages = subAgent.pendingMessages;
+      subAgent.pendingMessages = [];
+      for (const heldMessage of heldMessages) {
+        subAgentMessages.push({
+          role: "user",
+          content: formatParentFollowUp(heldMessage),
+          _notificationSource: NOTIFICATION_SOURCES.ORCHESTRATOR,
+          _notificationId: `${NOTIFICATION_SOURCES.ORCHESTRATOR}:${subAgent.agentId}:${Date.now()}`,
+        } as ConversationMessage);
+      }
+      logger.info(
+        `[Orchestrator] Sub-agent ${subAgent.agentId}: applied ${heldMessages.length} held follow-up(s) at loop start`,
+      );
+    }
 
     // Capture sub-agent output AND forward tool events to the parent orchestrator's
     // SSE stream. This lets the frontend display live sub-agent tool activity
@@ -2242,6 +2434,10 @@ export class OrchestratorService {
       0,
     );
 
+    const notifiedAgentIds = routerResults
+      .filter((result): result is SubAgentResult => !("error" in result))
+      .map((result) => result.agent_id);
+
     await OrchestratorService._sendParentCompletionNotification(
       {
         status: overallStatus,
@@ -2249,9 +2445,36 @@ export class OrchestratorService {
         toolUses: totalToolUses,
         durationMilliseconds: totalDurationMilliseconds,
         resultBody,
+        agentIds: notifiedAgentIds,
       },
       orchestratorContext,
     );
+  }
+
+  /**
+   * Pay back one pendingBackgroundTasks unit on the parent when the work
+   * cycle ends WITHOUT an auto-response turn (mid-turn mailbox delivery, or
+   * a wait_for_tasks call already returned the result). Best-effort.
+   */
+  static async _decrementPendingBackgroundTasks(
+    conversationId: string,
+    project: string,
+    username: string,
+  ): Promise<void> {
+    try {
+      const ConversationService = (await import("./conversation/ConversationService.ts")).default;
+      await ConversationService.adjustPendingBackgroundTasks(
+        conversationId,
+        project,
+        username,
+        -1,
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS },
+      );
+    } catch (clearError: unknown) {
+      logger.warn(
+        `[Orchestrator] Failed to decrement pendingBackgroundTasks: ${getErrorMessage(clearError)}`,
+      );
+    }
   }
 
   // ── Parent Auto-Response ─────────────────────────────────────
@@ -2307,26 +2530,36 @@ export class OrchestratorService {
     const isUserMidTurn = conversation.isGenerating && lastMessage?.role === "user";
 
     if (isUserMidTurn) {
-      logger.info(
-        `[Orchestrator] Parent conversation ${conversationId} is currently generating new user message — skipping auto-response (user is mid-turn)`,
-      );
-      // Decrement pendingBackgroundTasks even though we're skipping the
-      // auto-response — the sub-agent results are already persisted as
-      // a completion notification message.
-      try {
-        const ConversationService = (await import("./conversation/ConversationService.ts")).default;
-        await ConversationService.adjustPendingBackgroundTasks(
-          conversationId,
-          project,
-          username,
-          -1,
-          { collection: COLLECTIONS.AGENT_CONVERSATIONS },
+      // The parent is mid-turn. If its loop is open, hand the notification
+      // into the running turn through the TurnInputMailbox so the model
+      // sees the result now instead of never (a skipped auto-response was
+      // the only alternative). The harness persists the injected message
+      // with the turn, so it is not appended here.
+      const posted = TurnInputMailbox.isOpen(conversationId)
+        ? TurnInputMailbox.post(conversationId, {
+            kind: "task_completion",
+            text: String(completionMessage.content ?? ""),
+            meta: {
+              _notificationSource:
+                (completionMessage as Record<string, unknown>)._notificationSource ??
+                NOTIFICATION_SOURCES.ORCHESTRATOR,
+              _notificationId: (completionMessage as Record<string, unknown>)._notificationId,
+            },
+          })
+        : null;
+      if (posted?.accepted) {
+        logger.info(
+          `[Orchestrator] Parent conversation ${conversationId} is mid-turn — completion delivered to the running turn (${posted.id}) instead of an auto-response`,
         );
-      } catch (clearError: unknown) {
-        logger.warn(
-          `[Orchestrator] Failed to decrement pendingBackgroundTasks: ${getErrorMessage(clearError)}`,
+      } else {
+        logger.info(
+          `[Orchestrator] Parent conversation ${conversationId} is currently generating new user message — skipping auto-response (user is mid-turn${posted ? `, mailbox ${posted.reason}` : ""})`,
         );
       }
+      // Decrement pendingBackgroundTasks either way — the dispatching turn
+      // counted this work when it ended, and no auto-response will pay it
+      // back.
+      await OrchestratorService._decrementPendingBackgroundTasks(conversationId, project, username);
       return;
     }
 

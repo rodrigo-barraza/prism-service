@@ -1171,6 +1171,13 @@ export default class ReActHarness extends BaseAgenticHarness {
           const { default: ConversationService } = await import("#src/services/conversation/ConversationService");
           const { COLLECTIONS } = await import("#src/constants");
           await ConversationService.adjustPendingBackgroundTasks(conversationId, project, username, 1, { collection: COLLECTIONS.AGENT_CONVERSATIONS });
+          if (hasDetachedWorkStillRunning) {
+            // The tasks remember the count so whichever path delivers the
+            // completion (mailbox in a later turn, wait_for_tasks, or an
+            // auto-response) pays it back exactly once.
+            const { default: AsyncTaskRegistry } = await import("#src/services/AsyncTaskRegistry");
+            AsyncTaskRegistry.markRunningAsCounted(agentConversationId);
+          }
         } catch {
           /* best-effort counter adjustment — ignore failures */
         }

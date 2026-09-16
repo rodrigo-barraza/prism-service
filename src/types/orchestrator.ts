@@ -52,7 +52,20 @@ export interface SubAgentState {
   maxIterations: number;
   minContextLength: number | null;
   parentConversationId: string;
+  /**
+   * Follow-ups from `send_subagent_message` that arrived while the agent was
+   * RUNNING but its loop was not yet accepting input (the window before the
+   * TurnInputMailbox opens). Drained into the next `_runSubAgentLoop` call.
+   * A message that reaches an OPEN loop goes through the mailbox instead.
+   */
   pendingMessages?: string[];
+  /**
+   * The agentConversationId of a `wait_for_tasks` call blocked on this
+   * agent. While set, the parent completion notification is suppressed —
+   * the waiter returns the result itself. Cleared when a wait times out /
+   * aborts with the agent still running, and at every loop start.
+   */
+  awaitedBy?: string;
   enabledTools?: string[] | null;
   reservationReleased?: boolean;
   agentIndex?: number;
@@ -100,6 +113,26 @@ export interface SubAgentResult {
   error?: string;
   recursionDepth?: number;
   subtreeMetrics?: SubtreeMetrics;
+}
+
+/** One entry of `OrchestratorService.waitForAgents`. */
+export interface SubAgentWaitEntry {
+  agentId: string;
+  /** Still RUNNING when the wait ended (timeout / abort). */
+  running: boolean;
+  /** `null` when the agent id is unknown. */
+  result: SubAgentResult | null;
+}
+
+export interface SubAgentWaitOptions {
+  timeoutMilliseconds?: number;
+  signal?: AbortSignal;
+  /**
+   * The waiting conversation. With an empty `agentIds` list, every RUNNING
+   * agent whose parent is this conversation is waited on; also stamped as
+   * `awaitedBy` on each awaited agent.
+   */
+  parentAgentConversationId?: string;
 }
 
 export interface SubAgentStopResult {
