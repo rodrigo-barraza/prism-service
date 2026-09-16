@@ -247,19 +247,40 @@ function handleWebsocketChat(
     // mid-flight, replay its buffered events so the viewer sees the
     // user prompt and everything generated so far — messages are only
     // persisted at finalize, so without the replay a mid-turn joiner
-    // renders nothing until the next live event. The registration above
-    // and this replay run in one synchronous block, so no event can
-    // slip between the replayed prefix and the live tail.
+    // renders nothing until the next live event. The registration above,
+    // the ack and this replay run in one synchronous block, so no event
+    // can slip between the replayed prefix and the live tail.
+    //
+    // A re-subscribing client (reconnect, tab wake) sends `afterSeq` — the
+    // last `seq` it rendered — and is replayed only what it missed. The
+    // ack goes out FIRST and carries `lastSeq` (the conversation's newest
+    // seq), `replayedCount` (events that follow) and `droppedCount`
+    // (events the buffer overflowed past, so the client can show that
+    // earlier output was truncated). Clients that send no `afterSeq` get
+    // the whole active turn, exactly as before.
     if (data.type === "subscribe") {
-      emitFunction({ type: "subscribed", conversationId });
-      if (conversationId) {
-        for (const bufferedEvent of LiveTurnBuffer.replay(conversationId)) {
-          emitFunction(
-            bufferedEvent as unknown as Record<string, unknown> & {
-              type: string;
-            },
-          );
-        }
+      const afterSeq =
+        typeof data.afterSeq === "number" && Number.isFinite(data.afterSeq)
+          ? data.afterSeq
+          : undefined;
+      const replayedEvents = conversationId
+        ? LiveTurnBuffer.replay(conversationId, afterSeq)
+        : [];
+      emitFunction({
+        type: "subscribed",
+        conversationId,
+        lastSeq: conversationId ? LiveTurnBuffer.lastSeq(conversationId) : 0,
+        replayedCount: replayedEvents.length,
+        droppedCount: conversationId
+          ? LiveTurnBuffer.droppedCount(conversationId, afterSeq)
+          : 0,
+      });
+      for (const bufferedEvent of replayedEvents) {
+        emitFunction(
+          bufferedEvent as unknown as Record<string, unknown> & {
+            type: string;
+          },
+        );
       }
       return;
     }
