@@ -1,5 +1,6 @@
 import type { ToolSchema } from "#src/services/harnesses/types";
 import type { ChatMessage, ProviderOptions } from "./ProviderTypes.ts";
+import type { ResponsesPhase, ResponsesReasoningItem } from "./admin.ts";
 
 export type { ChatMessage, ProviderOptions };
 
@@ -82,6 +83,21 @@ export interface StreamToolCallChunk {
   status?: "calling" | "done" | "error";
   native?: boolean;
   thoughtSignature?: string;
+  responsesItemId?: string;
+  reasoningItem?: ResponsesReasoningItem;
+}
+
+/**
+ * Provider-native conversation state that is not text, thinking or a tool
+ * call but must be stored on the assistant message and replayed next turn.
+ * Emitted by the OpenAI Responses path; every field is optional and the
+ * consumer merges each chunk into its accumulator.
+ */
+export interface StreamProviderStateChunk {
+  type: "providerState";
+  providerResponseId?: string;
+  phase?: ResponsesPhase;
+  reasoningItems?: ResponsesReasoningItem[];
 }
 
 export interface StreamUsageChunk {
@@ -142,7 +158,8 @@ export type StreamChunk =
   | StreamToolCallStartChunk
   | StreamToolCallDeltaChunk
   | StreamStopReasonChunk
-  | StreamStatusChunk;
+  | StreamStatusChunk
+  | StreamProviderStateChunk;
 
 // ── Provider Result Types ───────────────────────────────────
 
@@ -155,11 +172,19 @@ export interface GenerateTextResult {
     name: string;
     args: Record<string, unknown>;
     thoughtSignature?: string;
+    responsesItemId?: string;
+    reasoningItem?: ResponsesReasoningItem;
     durationMilliseconds?: number;
   }>;
   images?: Array<{ data: string; mimeType: string }>;
   safetyBlock?: boolean;
   rateLimits?: Record<string, unknown> | null;
+  /** OpenAI Responses API message phase of the final message item. */
+  phase?: ResponsesPhase;
+  /** OpenAI Responses API reasoning items not paired with a tool call. */
+  reasoningItems?: ResponsesReasoningItem[];
+  /** OpenAI Responses API `response.id`. */
+  providerResponseId?: string;
 }
 
 export interface GenerateImageResult {

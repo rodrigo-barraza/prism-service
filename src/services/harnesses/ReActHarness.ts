@@ -90,6 +90,22 @@ interface IterationPassOptions extends AgenticOptions {
   profileId?: string | null;
 }
 
+/**
+ * Provider-native state a pass produced (OpenAI Responses: message phase,
+ * reasoning items no tool call claimed, response.id) — spread onto the
+ * assistant message so it persists and is replayed next turn.
+ */
+function providerNativeState(pass: PassState) {
+  return {
+    ...(pass.phase !== undefined && { phase: pass.phase }),
+    ...(pass.reasoningItems &&
+      pass.reasoningItems.length > 0 && { reasoningItems: pass.reasoningItems }),
+    ...(pass.providerResponseId && {
+      providerResponseId: pass.providerResponseId,
+    }),
+  };
+}
+
 /** Compute thinking and content phase durations from a PassState's timestamps. */
 function computePassPhaseDurations(pass: PassState) {
   // Seal thinking phase with generationEnd if thinking was active but never sealed
@@ -847,12 +863,16 @@ export default class ReActHarness extends BaseAgenticHarness {
               thinking: pass.streamedThinking.trim(),
               thinkingSignature: pass.thinkingSignature,
               ...computePassPhaseDurations(pass),
+              ...providerNativeState(pass),
               toolCalls: pass.pendingToolCalls.map(tc => {
                 const res = results.find(r => r.id === tc.id);
                 return {
                   id: tc.id || null,
+                  responsesItemId: tc.responsesItemId,
                   name: tc.name,
                   args: tc.args,
+                  thoughtSignature: tc.thoughtSignature,
+                  reasoningItem: tc.reasoningItem,
                   result: res ? res.result : null,
                   durationMilliseconds: res?.durationMilliseconds,
                 };
@@ -893,6 +913,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             thinking: pass.streamedThinking.trim(),
             thinkingSignature: pass.thinkingSignature,
             ...computePassPhaseDurations(pass),
+            ...providerNativeState(pass),
             toolCalls: pass.pendingToolCalls.map(tc => {
               const res = results.find(r => r.id === tc.id);
               return {
@@ -1019,6 +1040,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             thinking: pass.streamedThinking.trim(),
             thinkingSignature: pass.thinkingSignature,
             ...computePassPhaseDurations(pass),
+            ...providerNativeState(pass),
           });
           currentMessages.push({
             role: "system",
@@ -1045,6 +1067,7 @@ export default class ReActHarness extends BaseAgenticHarness {
                 thinking: pass.streamedThinking.trim(),
                 thinkingSignature: pass.thinkingSignature,
                 ...computePassPhaseDurations(pass),
+                ...providerNativeState(pass),
               });
               this.logIteration(pass, currentMessages);
               continue;
@@ -1067,6 +1090,7 @@ export default class ReActHarness extends BaseAgenticHarness {
                 thinking: pass.streamedThinking.trim(),
                 thinkingSignature: pass.thinkingSignature,
                 ...computePassPhaseDurations(pass),
+                ...providerNativeState(pass),
               });
               drainTurnInput(currentMessages, state, context, "before_end");
               this.logIteration(pass, currentMessages);
@@ -1090,6 +1114,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             thinking: pass.streamedThinking.trim(),
             thinkingSignature: pass.thinkingSignature,
             ...computePassPhaseDurations(pass),
+            ...providerNativeState(pass),
           });
           currentMessages.push({
             role: "user",

@@ -80,6 +80,16 @@ export default class AgenticLoopState {
    */
   lastStallWarningIteration: number | null;
 
+  // ── Provider-native state of the FINAL pass (OpenAI Responses) ──
+  // response.id, assistant message phase and unpaired reasoning items of
+  // the pass that produced the final text — stamped on the final assistant
+  // message by finalize() so the next turn replays them. Reset at the start
+  // of every pass (response.created) so a tool-batch pass never leaks into
+  // the final message; mid-history messages take theirs from the pass.
+  phase?: "commentary" | "final_answer" | null;
+  reasoningItems?: Array<{ id: string; summary: Array<{ type: string; text: string }>; encrypted_content?: string }>;
+  providerResponseId?: string;
+
   // ── Turn input (TurnInputMailbox) ───────────────────────
   /** Entries injected into this turn at loop boundaries (steering, answers, completions). */
   turnInputApplied: number;
