@@ -201,7 +201,8 @@
     "description": "Run tool in background. Returns task ID immediately. Tool run behind while you work. Query with list_async_tasks, stop with cancel_async_task. System notify when done.",
     "parameters": {
       "toolName": "Tool name to run in background.",
-      "toolArguments": "Argument for tool, same as normal call."
+      "toolArguments": "Argument for tool, same as normal call.",
+      "continueWorking": "Optional: true = keep working this turn; completion come as <task-notification> at next step (or next turn). Default false = end turn now."
     }
   },
   "list_async_tasks": {
@@ -212,5 +213,44 @@
     "parameters": {
       "taskId": "Task ID to cancel."
     }
+  },
+  "run_tool_program": {
+    "description": "Run small JavaScript program that call many READ-ONLY tool, filter result, return only evidence you need. Use instead of many read call whose raw output you no need. Helpers: callTool(name, args), callTools([{name,args}]) parallel. Return value = tool result. Keep small.",
+    "parameters": {
+      "code": "JavaScript body. Top-level await and return allowed.",
+      "timeoutSeconds": "Optional: wall-clock cap (default 30, max 120).",
+      "description": "Optional: short label shown to user."
+    }
+  },
+  "wait_for_tasks": {
+    "description": "Block until background work finish, return result in place. Wait on async task (run_async_task) and/or sub-agent (create_subagent). No id = wait all running. Bounded by timeoutSeconds.",
+    "parameters": {
+      "taskIds": "Optional: async task id to wait.",
+      "agentIds": "Optional: sub-agent id to wait.",
+      "timeoutSeconds": "Optional: max wait (default 60, max 300)."
+    }
+  },
+  "set_goal": {
+    "description": "Set persistent goal for conversation: what 'done' mean, in user words. Optional: how to know done, max dollars, max turns, deadline. Shown every turn. Refused for sub-agent.",
+    "parameters": {
+      "objective": "Goal in user words.",
+      "completionCriteria": "Optional: how to know done.",
+      "maxCostDollars": "Optional: dollar cap for goal.",
+      "maxTurns": "Optional: turn cap.",
+      "deadline": "Optional: ISO deadline."
+    }
+  },
+  "update_goal": {
+    "description": "Update goal: progress (summary/percent), what block you, or status. Use status 'completed' when criteria met; set blockedOn when stuck, not spin. Only user can pause.",
+    "parameters": {
+      "progress": "Short progress summary.",
+      "percent": "Optional: 0-100.",
+      "blockedOn": "Current obstacle, or null when clear.",
+      "status": "active | completed | blocked."
+    }
+  },
+  "clear_goal": {
+    "description": "Remove persistent goal. Use when user drop objective; to finish goal, prefer update_goal status 'completed'.",
+    "parameters": {}
   }
 }

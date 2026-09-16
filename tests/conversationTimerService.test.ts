@@ -482,6 +482,39 @@ describe("ConversationTimerService", () => {
       expect(ConversationService.setGenerating).not.toHaveBeenCalled();
     });
 
+    it("should defer the timer while the conversation's goal is paused", async () => {
+      const timer = { ...TIMER_FIXTURE };
+      mockGetDocuments(COLLECTIONS.CONVERSATION_TIMERS).push(timer);
+      mockGetDocuments(COLLECTIONS.AGENT_CONVERSATIONS).push({
+        ...CONVERSATION_FIXTURE,
+        isGenerating: false,
+        goal: { objective: "x", status: "paused" },
+      });
+
+      await ConversationTimerService.tick();
+
+      expect(mockFindOneAndUpdate).not.toHaveBeenCalled();
+      expect(ConversationService.appendMessages).not.toHaveBeenCalled();
+      expect(mockRunAgenticLoop).not.toHaveBeenCalled();
+      // Still armed — it fires once the user resumes the goal.
+      expect(timer.status).toBe("active");
+    });
+
+    it("should fire normally when the conversation's goal is active", async () => {
+      mockGetDocuments(COLLECTIONS.CONVERSATION_TIMERS).push({ ...TIMER_FIXTURE });
+      mockGetDocuments(COLLECTIONS.AGENT_CONVERSATIONS).push({
+        ...CONVERSATION_FIXTURE,
+        isGenerating: false,
+        goal: { objective: "x", status: "active" },
+      });
+
+      await ConversationTimerService.tick();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(ConversationService.appendMessages).toHaveBeenCalled();
+      expect(mockRunAgenticLoop).toHaveBeenCalled();
+    });
+
     it("should fallback to model_conversations when conversation is not in agent_conversations", async () => {
       mockGetDocuments(COLLECTIONS.CONVERSATION_TIMERS).push({ ...TIMER_FIXTURE });
       mockGetDocuments(COLLECTIONS.MODEL_CONVERSATIONS).push({

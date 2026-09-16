@@ -469,6 +469,8 @@ export const ORCHESTRATOR = {
 export const NOTIFICATION_SOURCES = {
   ORCHESTRATOR: "orchestrator",
   TIMER: "timer",
+  /** A scheduled task continuing an existing conversation. */
+  SCHEDULER: "scheduler",
   ASYNC_TASK: "async-task",
   BACKGROUND_TASK: "background-task",
   /** Answer to a non-blocking ask_user card, injected mid-turn. */

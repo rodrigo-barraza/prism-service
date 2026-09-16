@@ -59,7 +59,7 @@ const ENGLISH_WRITE_TODO_MARKER = "Write or update a persistent TODO checklist";
 const CAVEMAN_ENTER_PLAN_MARKER = "enter planning mode";
 const ENGLISH_ENTER_PLAN_MARKER = "Switch into planning mode";
 
-const CAVEMAN_ASK_USER_MARKER = "ask user question, wait for response";
+const CAVEMAN_ASK_USER_MARKER = "ask user question";
 const ENGLISH_ASK_USER_MARKER = "Ask the user one or more questions";
 
 const CAVEMAN_SUMMARIZE_MARKER = "compress conversation into summary";

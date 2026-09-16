@@ -5,6 +5,7 @@ import { COLLECTIONS, NOTIFICATION_SOURCES, TIMER_MODES, TIMER_STATUSES, TIMERS 
 import logger from "#src/utils/logger";
 import AgenticLoopService from "./AgenticLoopService.ts";
 import ConversationService from "./ConversationService.ts";
+import { GOAL_STATUSES } from "./ConversationGoalService.ts";
 import { stripPrunedMessages } from "./conversation/checkpoints.ts";
 import { getProvider } from "#src/providers/index";
 import { getModelByName } from "#src/config";
@@ -273,6 +274,17 @@ const ConversationTimerService = {
           await timerCollection.updateOne(
             { id: timer.id },
             { $set: { status: TIMER_STATUSES.EXPIRED, updatedAt: nowTimestamp } },
+          );
+          continue;
+        }
+
+        // A paused goal means the user asked for no follow-ups: defer the
+        // timer like a generating conversation — it fires once they resume.
+        const goalStatus = (conversation as { goal?: { status?: string } }).goal
+          ?.status;
+        if (goalStatus === GOAL_STATUSES.PAUSED) {
+          logger.debug(
+            `[ConversationTimers] Conversation ${timer.conversationId} has a paused goal. Deferring timer ${timer.id}.`,
           );
           continue;
         }

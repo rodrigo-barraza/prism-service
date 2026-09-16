@@ -154,6 +154,16 @@ vi.mock("#src/services/AgenticLoopService", () => ({
   },
 }));
 
+// ── Mock ConversationService (continuation path appends + flags) ──
+const mockAppendMessages = vi.fn();
+const mockSetGenerating = vi.fn();
+vi.mock("#src/services/ConversationService", () => ({
+  default: {
+    appendMessages: (...callArguments: unknown[]) => mockAppendMessages(...callArguments),
+    setGenerating: (...callArguments: unknown[]) => mockSetGenerating(...callArguments),
+  },
+}));
+
 // ── Mock providers ─────────────────────────────────────────────
 vi.mock("#src/providers/index", () => ({
   getProvider: vi.fn().mockImplementation((providerName: string) => {
@@ -632,6 +642,226 @@ describe("ScheduledTaskService — Comprehensive Tests", () => {
       await expect(
         ScheduledTaskService.executeTask(TASK_FIXTURE as any)
       ).rejects.toThrow("Database not connected");
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────
+  // GROUP 4b: Continuing an existing conversation (task.conversationId)
+  // ──────────────────────────────────────────────────────────────
+  describe("Continuing an existing conversation", () => {
+    const TARGET_ID = "conversation-target-1";
+    const CONTINUING_TASK = {
+      ...TASK_FIXTURE,
+      id: "task-continue-001",
+      conversationId: TARGET_ID,
+    };
+
+    function insertTargetConversation(extra: Record<string, unknown> = {}) {
+      const conversation = {
+        id: TARGET_ID,
+        project: "prism-chat",
+        username: "rodrigo",
+        title: "Long-running goal",
+        agent: "OMNI",
+        traceId: "trace-target",
+        isGenerating: false,
+        messages: [
+          { role: "user", content: "Start the work" },
+          { role: "assistant", content: "On it" },
+        ],
+        settings: {
+          provider: PROVIDERS.ANTHROPIC,
+          model: "claude-sonnet-4-5",
+          agent: "OMNI",
+          workspaceRoot: "/work/target",
+          toolConfig: { disabledTools: ["execute_shell"] },
+        },
+        ...extra,
+      };
+      mockDatabase._collections.agent_conversations.push(conversation);
+      return conversation;
+    }
+
+    beforeEach(() => {
+      mockRunAgenticLoop.mockResolvedValue(undefined);
+      mockSetGenerating.mockResolvedValue(undefined);
+      // The double's appendMessages writes straight onto the target document
+      // so the reload after the append sees the notification.
+      mockAppendMessages.mockImplementation(
+        async (conversationId: string, _project: string, _username: string, messages: any[]) => {
+          const conversation = mockDatabase._collections.agent_conversations.find(
+            (document: any) => document.id === conversationId,
+          );
+          if (conversation) {
+            conversation.messages = [...(conversation.messages || []), ...messages];
+          }
+          return conversation;
+        },
+      );
+    });
+
+    it("should append the prompt as a scheduler notification and resume the loop on the SAME conversation", async () => {
+      insertTargetConversation();
+
+      const result = await ScheduledTaskService.executeTask(CONTINUING_TASK as any, { event: "webhook" }, { username: "rodrigo" });
+
+      expect(result).toEqual({ agentConversationId: TARGET_ID });
+      // No new conversation document — the target is continued.
+      expect(mockDatabase._collections.agent_conversations.length).toBe(1);
+
+      expect(mockAppendMessages).toHaveBeenCalledTimes(1);
+      const [appendedId, appendedProject, appendedUsername, appendedMessages, meta, options] =
+        mockAppendMessages.mock.calls[0];
+      expect([appendedId, appendedProject, appendedUsername]).toEqual([TARGET_ID, "prism-chat", "rodrigo"]);
+      expect(meta).toBeNull();
+      expect(options).toEqual({ collection: "agent_conversations" });
+      expect(appendedMessages).toHaveLength(1);
+      const notification = appendedMessages[0];
+      expect(notification.role).toBe("user");
+      expect(notification.content).toContain("Verify server status");
+      expect(notification.content).toContain('Trigger payload: {"event":"webhook"}');
+      expect(notification._alreadyPersisted).toBe(true);
+      expect(notification._notificationSource).toBe("scheduler");
+      expect(notification._notificationId).toMatch(
+        /^scheduler:task-continue-001:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/,
+      );
+
+      expect(mockRunAgenticLoop).toHaveBeenCalledTimes(1);
+      const loopArguments = mockRunAgenticLoop.mock.calls[0][0];
+      expect(loopArguments.conversationId).toBe(TARGET_ID);
+      expect(loopArguments.agentConversationId).toBe(TARGET_ID);
+      // The conversation's own settings win over the task's provider/model.
+      expect(loopArguments.providerName).toBe(PROVIDERS.ANTHROPIC);
+      expect(loopArguments.resolvedModel).toBe("claude-sonnet-4-5");
+      expect(loopArguments.agent).toBe("OMNI");
+      expect(loopArguments.workspaceRoot).toBe("/work/target");
+      expect(loopArguments.traceId).toBe("trace-target");
+      expect(loopArguments.options.autoApprove).toBe(true);
+      expect(loopArguments.options.disabledTools).toEqual(["execute_shell"]);
+      expect(loopArguments.userMessage).toBe(notification);
+      // Full history + the notification, every message marked persisted.
+      expect(loopArguments.messages).toHaveLength(3);
+      expect(loopArguments.messages.every((message: any) => message._alreadyPersisted === true)).toBe(true);
+      expect(loopArguments.messages[2]._notificationId).toBe(notification._notificationId);
+      expect(loopArguments.conversationMeta.title).toBe("Long-running goal");
+
+      // isGenerating bracket: true before, false after.
+      expect(mockSetGenerating).toHaveBeenCalledTimes(2);
+      expect(mockSetGenerating.mock.calls[0].slice(0, 4)).toEqual([TARGET_ID, "prism-chat", "rodrigo", true]);
+      expect(mockSetGenerating.mock.calls[1].slice(0, 4)).toEqual([TARGET_ID, "prism-chat", "rodrigo", false]);
+    });
+
+    it("should skip with a log line when the target's goal is paused, completed or blocked", async () => {
+      for (const status of ["paused", "completed", "blocked"]) {
+        resetMockDatabase();
+        mockAppendMessages.mockClear();
+        mockRunAgenticLoop.mockClear();
+        insertTargetConversation({
+          goal: { objective: "x", status, progress: { summary: "s", updatedAt: "t" }, spentDollars: 0, turnsUsed: 0 },
+        });
+
+        const result = await ScheduledTaskService.executeTask(CONTINUING_TASK as any, undefined, { username: "rodrigo" });
+
+        expect(result).toEqual({ agentConversationId: TARGET_ID, skipped: `goal ${status}` });
+        expect(mockAppendMessages).not.toHaveBeenCalled();
+        expect(mockRunAgenticLoop).not.toHaveBeenCalled();
+      }
+    });
+
+    it("should run when the target's goal is active", async () => {
+      insertTargetConversation({
+        goal: { objective: "x", status: "active", progress: { summary: "s", updatedAt: "t" }, spentDollars: 0, turnsUsed: 0 },
+      });
+      const result = await ScheduledTaskService.executeTask(CONTINUING_TASK as any, undefined, { username: "rodrigo" });
+      expect(result).toEqual({ agentConversationId: TARGET_ID });
+      expect(mockRunAgenticLoop).toHaveBeenCalledTimes(1);
+    });
+
+    it("should dedupe on the scheduler:<taskId>:<minuteKey> notification id", async () => {
+      const now = new Date();
+      const minuteKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}T${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      insertTargetConversation({
+        messages: [
+          { role: "user", content: "already here", _notificationId: `scheduler:task-continue-001:${minuteKey}` },
+        ],
+      });
+
+      const result = await ScheduledTaskService.executeTask(CONTINUING_TASK as any, undefined, { username: "rodrigo" });
+
+      expect(result).toEqual({ agentConversationId: TARGET_ID, skipped: "duplicate" });
+      expect(mockAppendMessages).not.toHaveBeenCalled();
+      expect(mockRunAgenticLoop).not.toHaveBeenCalled();
+    });
+
+    it("should skip while the target conversation is generating", async () => {
+      insertTargetConversation({ isGenerating: true });
+      const result = await ScheduledTaskService.executeTask(CONTINUING_TASK as any, undefined, { username: "rodrigo" });
+      expect(result).toEqual({ agentConversationId: TARGET_ID, skipped: "generating" });
+      expect(mockAppendMessages).not.toHaveBeenCalled();
+    });
+
+    it("should throw when the target conversation does not exist", async () => {
+      await expect(
+        ScheduledTaskService.executeTask(CONTINUING_TASK as any, undefined, { username: "rodrigo" })
+      ).rejects.toThrow("was not found");
+      expect(mockAppendMessages).not.toHaveBeenCalled();
+    });
+
+    it("should fall back to the task's provider/model/agent when the conversation carries none", async () => {
+      insertTargetConversation({ settings: {}, agent: undefined });
+      await ScheduledTaskService.executeTask(CONTINUING_TASK as any, undefined, { username: "rodrigo" });
+      const loopArguments = mockRunAgenticLoop.mock.calls[0][0];
+      expect(loopArguments.providerName).toBe(PROVIDERS.GOOGLE);
+      expect(loopArguments.resolvedModel).toBe("gemini-3.5-flash");
+      expect(loopArguments.agent).toBe("OMNI");
+    });
+
+    it("should clear isGenerating and rethrow when the loop fails", async () => {
+      insertTargetConversation();
+      mockRunAgenticLoop.mockRejectedValueOnce(new Error("loop exploded"));
+      await expect(
+        ScheduledTaskService.executeTask(CONTINUING_TASK as any, undefined, { username: "rodrigo" })
+      ).rejects.toThrow("loop exploded");
+      expect(mockSetGenerating.mock.calls.at(-1)!.slice(0, 4)).toEqual([TARGET_ID, "prism-chat", "rodrigo", false]);
+    });
+
+    it("should persist conversationId through createTask and updateTask", async () => {
+      const created = await ScheduledTaskService.createTask({
+        name: "Follow up",
+        project: "prism-chat",
+        prompt: "Check progress",
+        agent: "OMNI",
+        provider: PROVIDERS.GOOGLE,
+        model: "gemini-3.5-flash",
+        scheduleType: "hourly",
+        enabled: true,
+        username: "rodrigo",
+        conversationId: TARGET_ID,
+      } as any);
+      expect(created.conversationId).toBe(TARGET_ID);
+      expect(mockDatabase._collections.scheduled_tasks[0].conversationId).toBe(TARGET_ID);
+
+      const updated = await ScheduledTaskService.updateTask(created.id, created.project, created.username!, {
+        conversationId: null,
+      });
+      expect(updated.conversationId).toBeNull();
+    });
+
+    it("should have the manual trigger continue the bound conversation", async () => {
+      const executeTaskSpy = vi
+        .spyOn(ScheduledTaskService, "executeTask")
+        .mockResolvedValue({ agentConversationId: TARGET_ID });
+      try {
+        const task = insertScheduledTask({ conversationId: TARGET_ID });
+        const result = await ScheduledTaskService.triggerTask(task.id, task.project, task.username);
+
+        expect(result).toEqual({ success: true, agentConversationId: TARGET_ID });
+        expect(executeTaskSpy).toHaveBeenCalledTimes(1);
+        expect(executeTaskSpy.mock.calls[0][0].conversationId).toBe(TARGET_ID);
+        expect(executeTaskSpy.mock.calls[0][2]).toMatchObject({ agentConversationId: TARGET_ID });
+      } finally {
+        executeTaskSpy.mockRestore();
+      }
     });
   });
 

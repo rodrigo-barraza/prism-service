@@ -82,6 +82,7 @@ router.post(
       cronExpression,
       recurrenceRule,
       toolConfig,
+      conversationId,
     } = req.body;
 
     const finalProvider = provider || PROVIDERS.ANTHROPIC;
@@ -108,6 +109,11 @@ router.post(
         cronExpression,
         recurrenceRule,
         toolConfig,
+        // Optional target conversation — the task then continues it.
+        conversationId:
+          typeof conversationId === "string" && conversationId.trim()
+            ? conversationId.trim()
+            : undefined,
         enabled: true,
         project: project as string,
         username: username as string,
