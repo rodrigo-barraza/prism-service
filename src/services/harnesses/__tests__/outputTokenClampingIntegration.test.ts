@@ -15,6 +15,7 @@ import type {
   AgenticContext,
 } from "#src/services/harnesses/types";
 import { estimateTokens } from "#src/utils/CostCalculator";
+import { ProviderError } from "#src/utils/errors";
 
 vi.mock("#src/utils/logger", () => ({
   default: {
@@ -511,5 +512,66 @@ describe("TokenBudgetDefaults — constant values", () => {
 
   it("MINIMUM_CLAMPED_OUTPUT_TOKENS should be 1024", () => {
     expect(MINIMUM_CLAMPED_OUTPUT_TOKENS).toBe(1_024);
+  });
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  createProviderStream — provider context-overflow rejections
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+describe("createProviderStream — provider context-overflow rejections", () => {
+  /** A provider that rejects the first request with `rejection`, then answers. */
+  function rejectOnce(rejection: string) {
+    const requestedMaxTokens: number[] = [];
+    const generateTextStream = vi.fn(
+      (_messages: unknown, _model: unknown, options: { maxTokens: number }) => {
+        requestedMaxTokens.push(options.maxTokens);
+        const attempt = requestedMaxTokens.length;
+        return (async function* () {
+          if (attempt === 1) throw new ProviderError("sglang", rejection, 400);
+          yield "ok";
+        })();
+      },
+    );
+    return { generateTextStream, requestedMaxTokens };
+  }
+
+  async function consume(stream: AsyncIterable<unknown> | null): Promise<unknown[]> {
+    const chunks: unknown[] = [];
+    for await (const item of stream!) chunks.push(item);
+    return chunks;
+  }
+
+  it("retries with less output when the completion pushed the request over", async () => {
+    const { generateTextStream, requestedMaxTokens } = rejectOnce(
+      "Requested token count exceeds the model's maximum context length of 32768 tokens. You requested a total of 40000 tokens: 24000 tokens from the input messages and 16000 tokens for the completion. Please reduce the number of tokens in the input messages or the completion to fit within the limit.",
+    );
+    const harness = createHarnessWithFullContext({ contextWindow: 200_000, maxTokens: 16_000 });
+    (harness as any).context.provider.generateTextStream = generateTextStream;
+
+    const stream = await harness.createProviderStream(
+      createMessagesWithTokenCount(1_000),
+      { maxTokens: 16_000 } as any,
+    );
+
+    expect(await consume(stream)).toEqual(["ok"]);
+    expect(requestedMaxTokens[0]).toBe(16_000);
+    expect(requestedMaxTokens[1]).toBeLessThanOrEqual(32_768 - 24_000);
+  });
+
+  it("surfaces the rejection at once when the prompt alone is over the window", async () => {
+    const { generateTextStream, requestedMaxTokens } = rejectOnce(
+      "The input (40000 tokens) is longer than the model's context length (32768 tokens).",
+    );
+    const harness = createHarnessWithFullContext({ contextWindow: 200_000, maxTokens: 16_000 });
+    (harness as any).context.provider.generateTextStream = generateTextStream;
+
+    const stream = await harness.createProviderStream(
+      createMessagesWithTokenCount(1_000),
+      { maxTokens: 16_000 } as any,
+    );
+
+    await expect(consume(stream)).rejects.toThrow("longer than the model's context length");
+    expect(requestedMaxTokens).toEqual([16_000]);
   });
 });
