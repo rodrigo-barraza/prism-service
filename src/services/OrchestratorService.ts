@@ -273,9 +273,18 @@ export class OrchestratorService {
           )
         : baseMaxIterations;
 
-    // Check concurrency limit (global)
+    // Concurrency limit — counted per ROOT conversation, not process-wide:
+    // a global count let one conversation's fan-out refuse every spawn in
+    // every other conversation.
+    const concurrencyRootId = OrchestratorService.getRootConversationId(
+      parentConversationId || agentConversationId || "",
+    );
     const runningCount = Array.from(activeSubAgents.values()).filter(
-      (subAgent) => subAgent.status === SYSTEM_STATUSES.RUNNING,
+      (subAgent) =>
+        subAgent.status === SYSTEM_STATUSES.RUNNING &&
+        OrchestratorService.getRootConversationId(
+          subAgent.parentConversationId || subAgent.parentAgentConversationId || "",
+        ) === concurrencyRootId,
     ).length;
     if (runningCount >= ORCHESTRATOR.MAX_SUB_AGENTS) {
       return {
@@ -1262,21 +1271,43 @@ export class OrchestratorService {
       resolveRegistrationBarrier = resolve;
     });
     let registrationCount = 0;
+    const settledMemberIndexes = new Set<number>();
+    const settleMember = (
+      memberIndex: number,
+      memberResult: SubAgentResult | { error: string },
+    ) => {
+      if (settledMemberIndexes.has(memberIndex)) return;
+      settledMemberIndexes.add(memberIndex);
+      registeredResults.push(memberResult);
+      registrationCount++;
+      if (registrationCount >= memberCount) {
+        resolveRegistrationBarrier();
+      }
+    };
 
-    // Wrap the spawn callback to inject onRegistered into each assignment
+    // Wrap the spawn callback to inject onRegistered into each assignment.
+    // A member refused before registration (concurrency cap, depth cap,
+    // circuit breaker) never calls onRegistered — it settles the barrier
+    // with its error instead, or the dispatcher would wait forever.
     const spawnWithRegistration = (
       assignment: OrchestratorSpawnParams,
     ): Promise<SubAgentResult | { error: string }> => {
-      return OrchestratorService.spawnFromTool({
+      const memberIndex = assignment.agentIndex ?? registrationCount;
+      const spawnPromise = OrchestratorService.spawnFromTool({
         ...assignment,
-        onRegistered: (registeredResult) => {
-          registeredResults.push(registeredResult);
-          registrationCount++;
-          if (registrationCount >= memberCount) {
-            resolveRegistrationBarrier();
+        onRegistered: (registeredResult) =>
+          settleMember(memberIndex, registeredResult),
+      });
+      spawnPromise.then(
+        (spawnResult) => {
+          if (spawnResult && "error" in spawnResult) {
+            settleMember(memberIndex, spawnResult);
           }
         },
-      });
+        (spawnError: unknown) =>
+          settleMember(memberIndex, { error: getErrorMessage(spawnError) }),
+      );
+      return spawnPromise;
     };
 
     const routerPromise = router.execute(
@@ -1377,7 +1408,33 @@ export class OrchestratorService {
 
     // Wait only for agent registration (fast: ID + worktree allocation),
     // NOT for the agentic loops to finish. This unblocks the parent LLM.
-    await registrationBarrier;
+    // Also released when the router settles (members it never spawned —
+    // e.g. a sequence that stopped at a refused step — will never register)
+    // and, as the last bound, after DISPATCH_REGISTRATION_TIMEOUT_MILLISECONDS.
+    let registrationTimer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      registrationBarrier,
+      wrappedRouterPromise,
+      new Promise<void>((resolve) => {
+        registrationTimer = setTimeout(
+          resolve,
+          ORCHESTRATOR.DISPATCH_REGISTRATION_TIMEOUT_MILLISECONDS,
+        );
+      }),
+    ]);
+    clearTimeout(registrationTimer);
+
+    for (
+      let memberIndex = 0;
+      memberIndex < memberCount && registeredResults.length < memberCount;
+      memberIndex++
+    ) {
+      if (settledMemberIndexes.has(memberIndex)) continue;
+      const member = teamCreationArguments.members[memberIndex];
+      settleMember(memberIndex, {
+        error: `Member ${memberIndex + 1} ("${member?.description || "sub-agent"}") did not register within ${Math.round(ORCHESTRATOR.DISPATCH_REGISTRATION_TIMEOUT_MILLISECONDS / 1000)}s or was never started by the "${topology}" router. If it starts later, its result arrives with the team's completion notification.`,
+      });
+    }
 
     logger.info(
       `[Orchestrator] createTeam dispatched (non-blocking): team "${teamCreationArguments.name}" via topology "${topology}" — ${registeredResults.length} agent(s) registered`,
