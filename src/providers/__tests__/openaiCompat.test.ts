@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import {
+  fetchOpenAICompat,
   normalizeUsage,
   convertToolsToOpenAI,
   buildPayloadParams,
@@ -85,6 +86,16 @@ describe('normalizeUsage', () => {
       completion_tokens_details: { reasoning_tokens: 0 },
     });
     expect(usage.reasoningOutputTokens).toBeUndefined();
+  });
+
+  it('reads reasoning tokens SGLang reports at the top level of usage', () => {
+    const usage = normalizeUsage({
+      prompt_tokens: 40,
+      completion_tokens: 30,
+      reasoning_tokens: 12,
+    });
+    expect(usage.reasoningOutputTokens).toBe(12);
+    expect(usage.outputTokens).toBe(30);
   });
 
   it('handles very large token values without overflow', () => {
@@ -506,5 +517,37 @@ describe('processNonStreamingResponse', () => {
     };
     const result = processNonStreamingResponse(data);
     expect(result.toolCalls).toBeNull();
+  });
+});
+
+describe('fetchOpenAICompat — rejected requests', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('throws the parsed message with the HTTP status attached', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({ object: 'error', message: 'bad parameter', code: 400 }),
+          { status: 400 },
+        ),
+      ),
+    );
+    const error = await fetchOpenAICompat('http://server/v1/chat/completions', {}).catch(
+      (caught: unknown) => caught,
+    );
+    expect((error as Error).message).toBe('bad parameter');
+    expect((error as { status?: number }).status).toBe(400);
+  });
+
+  it('keeps the raw body when the error is not JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('upstream down', { status: 502 })));
+    const error = await fetchOpenAICompat('http://server/v1/chat/completions', {}).catch(
+      (caught: unknown) => caught,
+    );
+    expect((error as Error).message).toBe('API error: 502 upstream down');
+    expect((error as { status?: number }).status).toBe(502);
   });
 });

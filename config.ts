@@ -11,6 +11,7 @@ export interface ProviderInstance {
   url: string;
   concurrency: number;
   nickname?: string;
+  apiKey?: string;
 }
 
 /**
@@ -20,8 +21,10 @@ export interface ProviderInstance {
  *   PROVIDER_LM_STUDIO_1_URL, PROVIDER_LM_STUDIO_1_CONCURRENCY, PROVIDER_LM_STUDIO_1_NICKNAME
  *   PROVIDER_LM_STUDIO_2_URL, PROVIDER_LM_STUDIO_2_CONCURRENCY, PROVIDER_LM_STUDIO_2_NICKNAME
  *   ... up to 10 instances
+ * plus an optional _API_KEY per instance, sent as a Bearer token by the
+ * providers that support one (SGLang).
  *
- * Returns: [{ url, concurrency, nickname? }, ...]
+ * Returns: [{ url, concurrency, nickname?, apiKey? }, ...]
  */
 function parseProviderInstances(
   environmentVariablePrefix: string,
@@ -42,6 +45,10 @@ function parseProviderInstances(
     const entry: ProviderInstance = { url, concurrency };
     if (nickname) {
       entry.nickname = nickname;
+    }
+    const apiKey = process.env[`${environmentVariablePrefix}_${index}_API_KEY`];
+    if (apiKey) {
+      entry.apiKey = apiKey;
     }
     instances.push(entry);
   }
@@ -70,6 +77,7 @@ export const PROVIDER_LM_STUDIO = parseProviderInstances("PROVIDER_LM_STUDIO");
 export const PROVIDER_VLLM = parseProviderInstances("PROVIDER_VLLM");
 export const PROVIDER_OLLAMA = parseProviderInstances("PROVIDER_OLLAMA");
 export const PROVIDER_LLAMA_CPP = parseProviderInstances("PROVIDER_LLAMA_CPP");
+export const PROVIDER_SGLANG = parseProviderInstances("PROVIDER_SGLANG");
 
 // ── MongoDB ────────────────────────────────────────────────────
 export const MONGO_URI = process.env.MONGO_URI;

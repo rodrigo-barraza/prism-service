@@ -9,6 +9,7 @@
  *
  * Each provider has a different API shape:
  *   - vLLM:     GET /v1/models → data[].max_model_len
+ *   - SGLang:   GET /v1/models → the base model's max_model_len
  *   - llama-cpp: GET /props    → default_params.n_ctx
  *   - Ollama:   POST /api/show → model_info.context_length or parameters
  */
@@ -30,12 +31,14 @@ const contextLengthInflight = new Map<string, Promise<number | null>>();
  * deduplicates concurrent queries. If discovery fails (network
  * error, unsupported endpoint), silently returns without setting
  * the option so the clamp falls back to its existing behavior.
+ * `requestHeaders` carries a server's auth (SGLang's --api-key).
  */
 export async function discoverContextLength(
   providerName: string,
   baseUrl: string,
   model: string,
   options: ProviderOptions,
+  requestHeaders: Record<string, string> = {},
 ): Promise<void> {
   // Already set (by a previous call or by the provider itself)
   if (options._loadedContextLength) return;
@@ -52,7 +55,12 @@ export async function discoverContextLength(
   // Deduplicate concurrent requests for the same model
   let inflightPromise = contextLengthInflight.get(cacheKey);
   if (!inflightPromise) {
-    inflightPromise = queryContextLength(providerName, baseUrl, model);
+    inflightPromise = queryContextLength(
+      providerName,
+      baseUrl,
+      model,
+      requestHeaders,
+    );
     contextLengthInflight.set(cacheKey, inflightPromise);
   }
 
@@ -82,9 +90,13 @@ async function queryContextLength(
   providerName: string,
   baseUrl: string,
   model: string,
+  requestHeaders: Record<string, string>,
 ): Promise<number | null> {
   const normalizedProvider = providerName.toLowerCase();
 
+  if (normalizedProvider.includes("sglang")) {
+    return querySglangContextLength(baseUrl, model, requestHeaders);
+  }
   if (
     normalizedProvider.startsWith("vllm") ||
     normalizedProvider.includes("vllm")
@@ -148,6 +160,49 @@ async function queryVllmContextLength(
 
     const payload = await response.json();
     return parseVllmResponse(payload, model);
+  } catch {
+    return null;
+  }
+}
+
+// ── SGLang ───────────────────────────────────────────────────
+// GET /v1/models → { data: [{ id, parent, max_model_len }] } — one base model
+// per server; LoRA adapters are listed beside it with parent set and a null
+// max_model_len, and are requested as "<base>:<adapter>".
+
+/**
+ * Pure parser for SGLang /v1/models: the window of the base model the
+ * request runs on. Exported for unit testing.
+ */
+export function parseSglangResponse(
+  payload: any,
+  model: string,
+): number | null {
+  if (!payload || !Array.isArray(payload.data)) return null;
+  const baseModels = payload.data.filter((entry: any) => !entry?.parent);
+  const baseName = (model || "").split(":")[0];
+  const modelEntry =
+    baseModels.find((entry: any) => entry.id === baseName) ||
+    (baseModels.length === 1 ? baseModels[0] : undefined);
+  return typeof modelEntry?.max_model_len === "number"
+    ? modelEntry.max_model_len
+    : null;
+}
+
+async function querySglangContextLength(
+  baseUrl: string,
+  model: string,
+  requestHeaders: Record<string, string>,
+): Promise<number | null> {
+  try {
+    const response = await fetch(`${baseUrl}/v1/models`, {
+      headers: requestHeaders,
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return null;
+
+    const payload = await response.json();
+    return parseSglangResponse(payload, model);
   } catch {
     return null;
   }

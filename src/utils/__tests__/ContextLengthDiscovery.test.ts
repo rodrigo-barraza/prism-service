@@ -1,9 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import {
+  discoverContextLength,
   parseVllmResponse,
   parseLlamaCppResponse,
   parseOllamaResponse,
+  parseSglangResponse,
 } from "#src/utils/ContextLengthDiscovery";
+import type { ProviderOptions } from "#src/types/provider";
 
 describe("ContextLengthDiscovery Parsers", () => {
   describe("parseVllmResponse", () => {
@@ -85,5 +88,53 @@ describe("ContextLengthDiscovery Parsers", () => {
       expect(parseOllamaResponse({}, "llama3")).toBeNull();
       expect(parseOllamaResponse({ model_info: {} }, "llama3")).toBeNull();
     });
+  });
+});
+
+describe("SGLang context length", () => {
+  const sglangModels = {
+    object: "list",
+    data: [
+      { id: "Qwen/Qwen3.6-27B", parent: null, max_model_len: 65536 },
+      { id: "sql-lora", parent: "Qwen/Qwen3.6-27B", max_model_len: null },
+    ],
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("reads the base model's window for the base model and its adapters", () => {
+    expect(parseSglangResponse(sglangModels, "Qwen/Qwen3.6-27B")).toBe(65536);
+    expect(parseSglangResponse(sglangModels, "Qwen/Qwen3.6-27B:sql-lora")).toBe(65536);
+    // SGLang does not validate the model name — one base model answers for all
+    expect(parseSglangResponse(sglangModels, "default")).toBe(65536);
+  });
+
+  it("returns null on a malformed payload", () => {
+    expect(parseSglangResponse(null, "m")).toBeNull();
+    expect(parseSglangResponse({ data: [{ id: "m" }] }, "m")).toBeNull();
+  });
+
+  it("routes an sglang instance to /v1/models with the server's auth header", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify(sglangModels), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const options: ProviderOptions = {};
+    await discoverContextLength(
+      "sglang-3",
+      "http://sglang-box:30000",
+      "Qwen/Qwen3.6-27B:sql-lora",
+      options,
+      { Authorization: "Bearer sk-local" },
+    );
+
+    expect(options._loadedContextLength).toBe(65536);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://sglang-box:30000/v1/models",
+      expect.objectContaining({ headers: { Authorization: "Bearer sk-local" } }),
+    );
   });
 });

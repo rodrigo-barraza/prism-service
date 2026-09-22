@@ -130,13 +130,22 @@ export interface ContextOverflowInfo {
 
 /**
  * Detect a context-window overflow rejection and extract its numbers.
- * Matches the two wire formats seen from OpenAI-compatible runtimes:
+ * Matches the wire formats seen from OpenAI-compatible runtimes:
  *   - vLLM:   "...maximum context length is 90000 tokens. However, you
  *              requested 58082 output tokens and your prompt contains at
  *              least 31919 input tokens..."
  *   - OpenAI: "...maximum context length is 8192 tokens. However, you
  *              requested 9000 tokens (7000 in the messages, 2000 in the
  *              completion)..."
+ *   - SGLang: "Requested token count exceeds the model's maximum context
+ *              length of 32768 tokens. You requested a total of 34000
+ *              tokens: 30000 tokens from the input messages and 4000
+ *              tokens for the completion..."; "The input (40000 tokens) is
+ *              longer than the model's context length (32768 tokens).";
+ *              "Input length (40000 tokens) exceeds the maximum allowed
+ *              length (32762 tokens)..."; "max_completion_tokens is too
+ *              large: 40000.This model supports at most 32768 completion
+ *              tokens."
  * Returns null for anything else.
  */
 export function parseContextOverflowError(
@@ -146,11 +155,52 @@ export function parseContextOverflowError(
   const message = String(
     (error as { message?: unknown }).message ?? "",
   );
+
+  // SGLang — the prompt alone is over the window (or over the input limit
+  // the scheduler derives from it), so no output budget can make it fit.
+  const promptOverflowMatch =
+    message.match(
+      /input \((\d+) tokens\) is longer than the model's context length \((\d+) tokens\)/i,
+    ) ||
+    message.match(
+      /input length \((\d+) tokens\) exceeds the maximum allowed length \((\d+) tokens\)/i,
+    );
+  if (promptOverflowMatch) {
+    return {
+      contextWindow: Number(promptOverflowMatch[2]),
+      requestedOutputTokens: null,
+      inputTokens: Number(promptOverflowMatch[1]),
+    };
+  }
+
+  // SGLang — max_tokens alone is over the window set by --context-length
+  const outputOverflowMatch = message.match(
+    /max_completion_tokens is too large: (\d+)\.\s*This model supports at most (\d+) completion tokens/i,
+  );
+  if (outputOverflowMatch) {
+    return {
+      contextWindow: Number(outputOverflowMatch[2]),
+      requestedOutputTokens: Number(outputOverflowMatch[1]),
+      inputTokens: null,
+    };
+  }
+
   const windowMatch = message.match(
-    /maximum context length is (\d+) tokens/i,
+    /maximum context length (?:is|of) (\d+) tokens/i,
   );
   if (!windowMatch) return null;
   const contextWindow = Number(windowMatch[1]);
+
+  const sglangMatch = message.match(
+    /(\d+) tokens from the input messages and (\d+) tokens for the completion/i,
+  );
+  if (sglangMatch) {
+    return {
+      contextWindow,
+      requestedOutputTokens: Number(sglangMatch[2]),
+      inputTokens: Number(sglangMatch[1]),
+    };
+  }
 
   const vllmMatch = message.match(
     /requested (\d+) output tokens and your prompt contains at least (\d+) input tokens/i,

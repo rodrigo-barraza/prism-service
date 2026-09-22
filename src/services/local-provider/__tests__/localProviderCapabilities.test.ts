@@ -19,7 +19,11 @@ vi.mock('#src/config', () => ({
   },
 }));
 
-import { matchesAny, detectCapabilities } from '#src/services/local-provider/detectCapabilities';
+import {
+  matchesAny,
+  detectCapabilities,
+  detectSglangCapabilities,
+} from '#src/services/local-provider/detectCapabilities';
 import { MODALITY_TYPES, MODEL_TYPES } from "#src/constants";
 
 describe('detectCapabilities', () => {
@@ -144,5 +148,45 @@ describe('detectCapabilities', () => {
       expect(result.vision).toBe(true);
       expect(result.video).toBe(true);
     });
+  });
+});
+
+describe('detectSglangCapabilities', () => {
+  it('is the name-based detection when the server reported nothing', () => {
+    expect(detectSglangCapabilities('qwen3-8b', undefined)).toEqual(
+      detectCapabilities('qwen3-8b'),
+    );
+  });
+
+  it('decides Tool Calling from the tool-call parser, whatever the name', () => {
+    expect(
+      detectSglangCapabilities('plain-llm', { toolCallParser: 'hermes' }).functionCalling,
+    ).toBe(true);
+    const unparsed = detectSglangCapabilities('qwen3-8b', { toolCallParser: null });
+    expect(unparsed.functionCalling).toBe(false);
+    expect(unparsed.tools).not.toContain('Tool Calling');
+  });
+
+  it('adds Thinking for a reasoning parser but keeps the name when there is none', () => {
+    expect(
+      detectSglangCapabilities('plain-llm', { reasoningParser: 'deepseek-r1' }).thinking,
+    ).toBe(true);
+    expect(
+      detectSglangCapabilities('qwen3-8b', { reasoningParser: null }).thinking,
+    ).toBe(true);
+  });
+
+  it('lets image understanding decide vision, and video follow it', () => {
+    const blind = detectSglangCapabilities('qwen2.5-vl-7b', { imageUnderstanding: false });
+    expect(blind.vision).toBe(false);
+    expect(blind.video).toBe(false);
+    expect(blind.inputTypes).toEqual([MODALITY_TYPES.TEXT]);
+
+    const seeing = detectSglangCapabilities('qwen2.5-vl-7b', { imageUnderstanding: true });
+    expect(seeing.inputTypes).toEqual([
+      MODALITY_TYPES.TEXT,
+      MODALITY_TYPES.IMAGE,
+      MODALITY_TYPES.VIDEO,
+    ]);
   });
 });

@@ -5,6 +5,8 @@ export interface ProviderInstanceConfig {
   url: string;
   concurrency?: number;
   nickname?: string;
+  /** Bearer token for a server started with an API key (SGLang --api-key). */
+  apiKey?: string;
 }
 
 export interface InstanceEntry {

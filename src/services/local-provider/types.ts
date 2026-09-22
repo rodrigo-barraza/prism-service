@@ -70,6 +70,31 @@ export interface OpenAICompatRawModel {
   display_name?: string;
 }
 
+/**
+ * What an SGLang server reports about itself on /model_info (a server too
+ * old to list its parsers there: /server_info, its launch arguments). A field
+ * is absent when the endpoint did not answer; `null` means the server
+ * answered and runs without one.
+ */
+export interface SglangReportedCapabilities {
+  /** --tool-call-parser — without one, tool calls come back as plain text. */
+  toolCallParser?: string | null;
+  /** --reasoning-parser — splits reasoning into reasoning_content. */
+  reasoningParser?: string | null;
+  imageUnderstanding?: boolean;
+  audioUnderstanding?: boolean;
+}
+
+export interface SglangRawModel {
+  key: string;
+  display_name?: string;
+  /** "embedding" for a server launched with --is-embedding. */
+  type: "llm" | "embedding";
+  /** The context length the server enforces (/v1/models max_model_len). */
+  max_model_len?: number;
+  sglangCapabilities?: SglangReportedCapabilities;
+}
+
 export interface GenericProvider {
   listModels?: () => Promise<ListModelsResponse>;
   checkHealth?: () => Promise<{

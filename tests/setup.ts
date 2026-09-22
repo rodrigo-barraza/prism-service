@@ -19,6 +19,7 @@ vi.mock('#config', () => ({
     PROVIDER_VLLM: [],
     PROVIDER_OLLAMA: [],
     PROVIDER_LLAMA_CPP: [],
+    PROVIDER_SGLANG: [],
     TOOLS_SERVICE_URL: 'http://localhost:5590',
     // Web Push off by default; push tests mock the protocol module.
     PRISM_VAPID_PUBLIC_KEY: undefined,
