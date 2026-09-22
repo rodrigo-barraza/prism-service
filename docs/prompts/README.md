@@ -13,7 +13,6 @@ Self-contained task prompts for the items in `docs/harness_modernization_2026-09
 | 02 | `02-claude-5-generation-compat.md` | `claude-5-generation-compat` | service | M | — | 06, 10, 25 (`data/models.ts`, `providers/anthropic.ts`); 09 (`ReActHarness.ts`) |
 | 05 | `05-per-call-approvals.md` | `per-call-approvals` | service, client | M | — | 12, 13, 18 (approval gate); 08, 26 (`AgentChatComponent.tsx`) |
 | 06 | `06-compaction-that-works.md` | `compaction-that-works` | service | M | 02 (windows) | 10 (`compact/*`) |
-| 08 | `08-client-dead-buttons-and-queue.md` | `client-dead-buttons-and-queue` | client | M | — | 26 and every client prompt (`AgentChatComponent.tsx`) |
 | 09 | `09-harness-small-fixes.md` | `loop-small-fixes`, `cron-matcher`, `provider-small-fixes` | service | M | — | 02, 04, 17 |
 | 10 | `10-prefix-stable-requests.md` | `cache-telemetry`, `prefix-stable-requests` | service | L | 02, 06 | 06, 23 (`RequestLogger.ts`), 25 |
 | 11 | `11-routing-and-memory-extraction.md` | `memory-extraction-diet`, `role-model-routing` | service | M | 02 | 17 (`OrchestratorService.ts`) |
@@ -67,7 +66,7 @@ The UI parts of 05, 12, 13, 15, 16 and 21 all touch `prism-client/src/components
    "$WT"/node_modules/.bin/vitest run --root "$WT"   # prism-service: covers src/**/__tests__ AND tests/
    "$WT"/node_modules/.bin/eslint "$WT"/src
    ```
-   - prism-client has pre-existing `tsc` errors on master. Diff your error list against master's and add none. Until prompt 08 lands, `next.config.ts` still ignores build type errors, so `tsc` is the only type gate.
+   - prism-client: `tsc` is clean on master, and `next build` type-checks (`ignoreBuildErrors: false` since prompt 08), so a new type error fails both. Run `next build` once at the end when you touch client types.
    - Report pre-existing lint failures separately from yours.
 5. **Test patterns to copy** (prism-service unless noted):
    - **Provider request shapes:** `tests/anthropicProvider.test.ts`. It uses `vi.mock('@anthropic-ai/sdk')` and asserts on the exact payload passed to `messages.create` / `messages.stream`. `tests/googleProvider.test.ts` does the same for Gemini.
