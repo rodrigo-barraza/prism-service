@@ -2,7 +2,11 @@ import logger from "#src/utils/logger";
 import { estimateTokens } from "#src/utils/CostCalculator";
 import type { ChatMessage, ToolCallEntry } from "#src/types/admin";
 import MicroCompactionService from "#src/services/compact/MicroCompactionService";
-import { computeContextBudgets } from "#src/services/compact/ContextBudgets";
+import {
+  computeContextBudgets,
+  messageTokenBudget,
+  type ProviderInputBaseline,
+} from "#src/services/compact/ContextBudgets";
 import { findRecencyBoundary } from "#src/services/compact/RecencyProtection";
 import { markDerivedMessage } from "#src/services/compact/MessageLineage";
 import PromptLocaleService from "#src/services/PromptLocaleService";
@@ -54,6 +58,13 @@ interface EnforceOptions {
    * measurement.
    */
   fixedOverheadTokens?: number;
+  /**
+   * The loop's latest provider-reported input and the ratio an earlier turn
+   * measured — the compaction trigger's inputs, so the truncation budget is
+   * measured in the same units (ContextBudgets.messageTokenBudget).
+   */
+  providerInputBaseline?: ProviderInputBaseline | null;
+  calibrationRatio?: number | null;
   /** Why summarization did not keep the request under budget — logged if truncation runs. */
   truncationReason?: string;
   locale?: string;
@@ -313,9 +324,10 @@ export default class ContextWindowManager {
     } = options;
 
     // The truncation budget is shared with the compaction trigger
-    // (ContextBudgets) and never below its threshold; the request's fixed
-    // overhead (system prompt + tool schemas) is carved out of it because
-    // only the messages are estimated here.
+    // (ContextBudgets) and never below its threshold. Only the messages are
+    // estimated here, so the request budget is converted to message tokens
+    // with the trigger's own estimate (reported baseline or calibrated
+    // chars/4 + system prompt + tool schemas) — same units, no crossing.
     const fixedOverhead =
       options.fixedOverheadTokens ??
       TOOL_SCHEMA_OVERHEAD_TOKENS + toolCount * 150;
@@ -324,7 +336,11 @@ export default class ContextWindowManager {
       maxOutputTokens,
     );
     const budget = Math.max(
-      truncationBudget - fixedOverhead,
+      messageTokenBudget(truncationBudget, {
+        overheadTokens: fixedOverhead,
+        baseline: options.providerInputBaseline,
+        calibrationRatio: options.calibrationRatio,
+      }),
       1024, // Ensure at least a small budget even if window is tight
     );
 
@@ -341,8 +357,9 @@ export default class ContextWindowManager {
     }
 
     logger.warn(
-      `[ContextWindowManager] Truncating: ${currentTokens} message tokens > ${budget} budget ` +
-        `(${maxInputTokens} window, ${fixedOverhead} fixed overhead) — ` +
+      `[ContextWindowManager] Truncating: ${currentTokens} message tokens > ${budget} message budget ` +
+        `(${truncationBudget}-token request budget of a ${maxInputTokens} window, ` +
+        `${options.providerInputBaseline ? "from reported usage" : `${fixedOverhead} fixed overhead`}) — ` +
         `${options.truncationReason || "no compaction attempted on this path"}`,
     );
 

@@ -635,6 +635,37 @@ describe("summarization comes before lossy truncation (200K window, 64K max outp
   });
 });
 
+// ── 3b. Same units for trigger and truncation ────────────────
+
+describe("truncation and the trigger measure the same thing", () => {
+  it("does not truncate while the REPORTED request is under the threshold, however chars/4 overcounts", async () => {
+    // Found live (PDF text + 93 tool schemas): real input ran at ~0.7 of
+    // chars/4. Truncation measured chars/4 and fired at ~50K real tokens,
+    // below the 58.8K compaction threshold of an 80K window.
+    const { harness, emit, seen } = buildHarness({
+      contextWindow: 80_000,
+      maxTokens: 8_192,
+      messages: [{ role: "user", content: "Read every PDF." }],
+      isNewConversation: true,
+      maxIterations: 22,
+      script: (iteration) =>
+        iteration <= 18
+          ? { kind: "tool", toolName: NON_COMPACTABLE_TOOL }
+          : { kind: "text", text: "Read them all." },
+      toolResult: (_name, iteration) => bulkText(`pdf-${iteration}`, 4_000),
+      reportedInputTokens: (_iteration, messagesSeen) => Math.round(estimateOf(messagesSeen) * 0.6),
+    });
+    await harness.run();
+
+    // chars/4 went well past the ~68K truncation budget…
+    expect(Math.max(...seen.map(estimateOf))).toBeGreaterThan(70_000);
+    // …but the real request never reached the 58.8K threshold: no summary,
+    // and no lossy truncation either.
+    expect(summarizeCalls()).toHaveLength(0);
+    expect(statusEvents(emit, STATUS_MESSAGES.CONTEXT_TRUNCATED)).toHaveLength(0);
+  });
+});
+
 // ── 4. Trigger on reality ────────────────────────────────────
 
 describe("the trigger follows provider-reported input tokens", () => {

@@ -9,7 +9,7 @@ import { GOAL_STATUSES } from "./ConversationGoalService.ts";
 import { stripPrunedMessages } from "./conversation/checkpoints.ts";
 import {
   applyCompactionBoundary,
-  type CompactionBoundary,
+  readCompactionState,
 } from "./compact/CompactionBoundary.ts";
 import { getProvider } from "#src/providers/index";
 import { getModelByName } from "#src/config";
@@ -480,8 +480,7 @@ const ConversationTimerService = {
       // then the messages after it (compact/CompactionBoundary.ts).
       freshMessages = applyCompactionBoundary(
         freshMessages,
-        (databaseConversation as { compaction?: CompactionBoundary | null })
-          .compaction,
+        readCompactionState(databaseConversation).boundary,
       ).messages;
     } else {
       freshMessages = [
@@ -554,6 +553,11 @@ const ConversationTimerService = {
           planFirst: false,
           autoApprove: true,
           minContextLength: MINIMUM_CONTEXT_LENGTH,
+          // Calibrates the first compaction-trigger estimate of this turn.
+          ...(readCompactionState(updatedConversation).calibrationRatio && {
+            _inputCalibrationRatio:
+              readCompactionState(updatedConversation).calibrationRatio,
+          }),
           ...(toolConfiguration?.disabledTools && {
             disabledTools: toolConfiguration.disabledTools,
           }),

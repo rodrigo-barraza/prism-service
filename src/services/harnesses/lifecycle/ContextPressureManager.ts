@@ -140,6 +140,11 @@ export async function manageContextPressure(
       ),
       overheadTokens: requestOverheadTokens,
       baseline: state.providerInputBaseline,
+      // Measured on an earlier turn of this conversation — calibrates the
+      // first call's estimate, before this turn has a report of its own.
+      calibrationRatio: context.options?._inputCalibrationRatio as
+        | number
+        | undefined,
     }).tokens;
   let currentTokenEstimate = estimateRequest();
   state.truncationReason = `compaction not triggered (${currentTokenEstimate} request tokens, threshold ${budgets.autoCompactThreshold})`;
