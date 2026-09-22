@@ -8,7 +8,7 @@
  */
 
 import crypto from "node:crypto";
-import type { ChatMessage, ResponsesPhase,
+import type { AnthropicThinkingBlock, ChatMessage, ResponsesPhase,
   ResponsesReasoningItem,
   ToolCallEntry } from "#src/types/admin";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
@@ -270,6 +270,8 @@ interface ExpandedMessage {
   tool_call_id?: string | null;
   thinking?: string;
   thinkingSignature?: string;
+  /** Anthropic thinking blocks — replayed verbatim next turn. */
+  thinkingBlocks?: AnthropicThinkingBlock[];
   /** OpenAI Responses API state — replayed verbatim next turn. */
   phase?: ResponsesPhase;
   reasoningItems?: ResponsesReasoningItem[];
@@ -346,6 +348,7 @@ export function expandMessagesForFunctionCall(
         ...(message.thinkingSignature && {
           thinkingSignature: message.thinkingSignature,
         }),
+        ...thinkingBlockFields(message),
         ...responsesNativeFields(message),
         toolCalls: message.toolCalls.map((toolCall: ToolCallEntry) => ({
           id: toolCall.id,
@@ -493,10 +496,20 @@ export function expandMessagesForFunctionCall(
         ...(message.role === "assistant" && message.thinkingSignature
           ? { thinkingSignature: message.thinkingSignature }
           : {}),
+        ...(message.role === "assistant" ? thinkingBlockFields(message) : {}),
         ...(message.role === "assistant" ? responsesNativeFields(message) : {}),
       },
     ];
   });
+}
+
+/** Anthropic thinking blocks stored on an assistant message — carried unchanged. */
+function thinkingBlockFields(message: ChatMessage): {
+  thinkingBlocks?: AnthropicThinkingBlock[];
+} {
+  return Array.isArray(message.thinkingBlocks) && message.thinkingBlocks.length > 0
+    ? { thinkingBlocks: message.thinkingBlocks }
+    : {};
 }
 
 /**

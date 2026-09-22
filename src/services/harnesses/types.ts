@@ -12,6 +12,7 @@ import type { DeviationVerdict } from "./lifecycle/DeviationRuleEngine.ts";
 
 import type { TokenUsage } from "#src/services/RequestLogger";
 import type {
+  AnthropicThinkingBlock,
   ResponsesPhase,
   ResponsesReasoningItem,
 } from "#src/types/admin";
@@ -87,11 +88,24 @@ export type DisplaySegment =
 
 // ── Conversation Messages ───────────────────────────────────
 
+/** A provider safety refusal (Anthropic `stop_reason: "refusal"`). */
+export interface ModelRefusal {
+  category: string | null;
+  explanation: string | null;
+  recommendedModel?: string | null;
+  /** The model that declined. */
+  model?: string;
+}
+
 export interface ConversationMessage {
   role: string;
   content?: string;
   thinking?: string;
   thinkingSignature?: string;
+  /** Anthropic: every thinking block of the turn, verbatim and in order. */
+  thinkingBlocks?: AnthropicThinkingBlock[];
+  /** Set on the final assistant message of a turn a safety classifier declined. */
+  refusal?: ModelRefusal;
   /** Duration of the thinking phase in seconds (wall-clock, per-iteration). */
   thinkingDurationSeconds?: number | null;
   /** Duration of the content generation phase in seconds (wall-clock, per-iteration). */
@@ -282,6 +296,12 @@ export interface PassState {
   finalStreamedText: string;
   streamedThinking: string;
   thinkingSignature: string;
+  /** Anthropic: this pass's thinking blocks, verbatim and in order. */
+  thinkingBlocks?: AnthropicThinkingBlock[];
+  /** Set when the provider declined the pass (Anthropic `stop_reason: "refusal"`). */
+  refusal?: ModelRefusal;
+  /** The model that actually served the pass, when a fallback did. */
+  servedModel?: string;
   pendingToolCalls: ToolCall[];
   /** Tool calls the model emitted but that were dropped because the tool is
    *  not in the current native schema. Used to give the model explicit

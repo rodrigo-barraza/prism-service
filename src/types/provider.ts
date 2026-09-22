@@ -1,3 +1,4 @@
+import type { AnthropicThinkingBlock } from "./admin.ts";
 import type { ToolSchema } from "#src/services/harnesses/types";
 import type { ChatMessage, ProviderOptions } from "./ProviderTypes.ts";
 import type { ResponsesPhase, ResponsesReasoningItem } from "./admin.ts";
@@ -189,6 +190,12 @@ export interface GenerateTextResult {
   reasoningItems?: ResponsesReasoningItem[];
   /** OpenAI Responses API `response.id`. */
   providerResponseId?: string;
+  /** Anthropic thinking blocks, verbatim and in order. */
+  thinkingBlocks?: AnthropicThinkingBlock[];
+  /** Anthropic safety-classifier refusal — `text` is then empty. */
+  refusal?: { category: string | null; explanation: string | null };
+  /** The model that served the response when a fallback did. */
+  servedModel?: string;
 }
 
 export interface GenerateImageResult {

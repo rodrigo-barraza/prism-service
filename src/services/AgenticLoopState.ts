@@ -7,6 +7,8 @@ import type {
   PassState,
 } from "./harnesses/types.ts";
 import { MEDIA } from "#src/constants";
+import type { ModelRefusal } from "./harnesses/types.ts";
+import type { AnthropicThinkingBlock } from "#src/types/admin";
 interface CriteriaScores {
   correctness: number;
   risk: number;
@@ -89,6 +91,10 @@ export default class AgenticLoopState {
   phase?: "commentary" | "final_answer" | null;
   reasoningItems?: Array<{ id: string; summary: Array<{ type: string; text: string }>; encrypted_content?: string }>;
   providerResponseId?: string;
+  /** Anthropic thinking blocks of the final pass (reset with each pass). */
+  thinkingBlocks?: AnthropicThinkingBlock[];
+  /** Set when a safety classifier declined the turn; stored on the final message. */
+  refusal?: ModelRefusal;
 
   // ── Turn input (TurnInputMailbox) ───────────────────────
   /** Entries injected into this turn at loop boundaries (steering, answers, completions). */
@@ -120,7 +126,8 @@ export default class AgenticLoopState {
     | "budget_exhausted"
     | "plan_rejected"
     | "error"
-    | "aborted";
+    | "aborted"
+    | "refused";
   /** Spend at the moment the cost cap stopped the loop (null = no stop). */
   costBudgetStop: { spentDollars: number; maxCostDollars: number } | null;
 

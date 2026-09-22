@@ -50,6 +50,7 @@ import {
   handleExitPlanMode,
   checkForPlanModeEntry,
 } from "#src/services/harnesses/lifecycle/PlanModeController";
+import { buildPlanSubmissionContinuation } from "#src/services/harnesses/lifecycle/PlanSubmissionContinuation";
 import { buildToolRetryGuidance } from "#src/services/harnesses/lifecycle/ToolRetryInterceptor";
 import {
   isOutputTruncated,
@@ -98,8 +99,9 @@ export type StandardHooks = ReturnType<typeof createStandardHooks>;
 
 /**
  * Provider-native state a pass produced (OpenAI Responses: message phase,
- * reasoning items no tool call claimed, response.id) — spread onto the
- * assistant message so it persists and is replayed next turn.
+ * reasoning items no tool call claimed, response.id; Anthropic: thinking
+ * blocks) — spread onto the assistant message so it persists and is
+ * replayed next turn.
  */
 export function providerNativeState(pass: PassState) {
   return {
@@ -109,6 +111,9 @@ export function providerNativeState(pass: PassState) {
     ...(pass.providerResponseId && {
       providerResponseId: pass.providerResponseId,
     }),
+    // Anthropic: the pass's thinking blocks, verbatim and in order
+    ...(pass.thinkingBlocks &&
+      pass.thinkingBlocks.length > 0 && { thinkingBlocks: pass.thinkingBlocks }),
   };
 }
 
@@ -496,6 +501,11 @@ export async function runPlanningPhase(
         }),
       ...providerNativeState(pass),
       });
+      // Keep the plan, then ask for it to be submitted — the next request
+      // must not end on the assistant turn (no prefill).
+      currentMessages.push(
+        buildPlanSubmissionContinuation(options?.locale as string | undefined),
+      );
       continue;
     }
 

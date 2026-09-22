@@ -1396,6 +1396,10 @@ async function handleStreamingText(context: GenerationContext) {
       ...(streamState.providerResponseId
         ? { providerResponseId: streamState.providerResponseId }
         : {}),
+      // Anthropic thinking blocks — replayed verbatim on the follow-up.
+      ...(streamState.thinkingBlocks?.length
+        ? { thinkingBlocks: streamState.thinkingBlocks }
+        : {}),
     };
     const toolResultMillisecondsgs = streamState.toolCalls
       .filter((toolCall) => toolCall.result)
@@ -1421,6 +1425,7 @@ async function handleStreamingText(context: GenerationContext) {
     streamState.phase = undefined;
     streamState.reasoningItems = undefined;
     streamState.providerResponseId = undefined;
+    streamState.thinkingBlocks = undefined;
     streamState.toolCalls.length = 0;
     const followUpStream = streamWithRetries(
       () =>
@@ -1490,12 +1495,18 @@ async function handleStreamingText(context: GenerationContext) {
     });
     streamState.text = truncationWarning;
   }
+  // A safety-classifier refusal: whatever streamed before it is not the
+  // answer (the typed refusal event already reached the client).
+  if (streamState.refusal) streamState.text = "";
   // Build normalized result for shared finalization
   const now = performance.now();
   await finalizeTextGeneration(context, {
     text: streamState.text,
     thinking: streamState.thinking,
     images: streamState.images,
+    ...(streamState.thinkingBlocks?.length && { thinkingBlocks: streamState.thinkingBlocks }),
+    ...(streamState.refusal && { refusal: streamState.refusal }),
+    ...(streamState.servedModel && { servedModel: streamState.servedModel }),
     ...(streamState.phase !== undefined && { phase: streamState.phase }),
     ...(streamState.reasoningItems && streamState.reasoningItems.length > 0 && { reasoningItems: streamState.reasoningItems }),
     ...(streamState.providerResponseId && { providerResponseId: streamState.providerResponseId }),
@@ -1648,6 +1659,9 @@ async function handleNonStreamingText(context: GenerationContext) {
     ...(genResult.phase !== undefined && { phase: genResult.phase }),
     ...(genResult.reasoningItems && genResult.reasoningItems.length > 0 && { reasoningItems: genResult.reasoningItems }),
     ...(genResult.providerResponseId && { providerResponseId: genResult.providerResponseId }),
+    ...(genResult.thinkingBlocks && genResult.thinkingBlocks.length > 0 && { thinkingBlocks: genResult.thinkingBlocks }),
+    ...(genResult.refusal && { refusal: genResult.refusal }),
+    ...(genResult.servedModel && { servedModel: genResult.servedModel }),
     toolCalls:
       genResult.toolCalls?.map((toolCall) => ({
         id: toolCall.id || null,

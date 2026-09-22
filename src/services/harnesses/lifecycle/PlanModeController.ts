@@ -82,6 +82,9 @@ export function blockUnauthorizedToolCalls(
         ...(pass.thinkingSignature && {
           thinkingSignature: pass.thinkingSignature,
         }),
+        ...(pass.thinkingBlocks?.length && {
+          thinkingBlocks: pass.thinkingBlocks,
+        }),
       });
     }
 
