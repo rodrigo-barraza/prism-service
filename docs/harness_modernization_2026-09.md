@@ -812,6 +812,8 @@ The client audit's ranked gaps, beyond §2.4:
   - Low fit: H3 trained critic, I3 KV offload.
 
 ## 6. Suggested order
+Self-contained execution prompts for each item (except #1 auth and #14 sandbox), with test plans, dependencies and shared-file waves, are in [`docs/prompts/`](prompts/README.md).
+
 1. **Week-one fixes** (S each, independent): S1 stopgap, S2, A1–A4, B1, B2, B5, B10, B13, C1, C2, C5.
 2. **Correctness batch:** B3 with §4.2 (per-call approvals, rules, always-allow), B6 compaction, B8, B9, B11, B12, S3–S6.
 3. **Cache discipline:** K2 telemetry first, so that K1 is measurable; then K1, §4.1, K4.
