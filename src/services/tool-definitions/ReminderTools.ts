@@ -27,6 +27,7 @@ const CRON_MINIMUM_DELAY_SECONDS = TIMERS.CRON_MINIMUM_DELAY_SECONDS;
 // execution within a single conversation turn.
 const setTimer = {
   name: TOOL_NAMES.SET_TIMER,
+  capabilities: ["external_side_effect"] as const,
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.SET_TIMER],
   description:
     "Set a short one-shot timer to pause, wait, or defer execution within this conversation. " +
@@ -147,6 +148,7 @@ const setTimer = {
 // Lists active agent-internal one-shot timers for this conversation.
 const listTimers = {
   name: TOOL_NAMES.LIST_TIMERS,
+  capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.LIST_TIMERS],
   description:
     "List all active one-shot agent timers in the current conversation. " +
@@ -215,6 +217,7 @@ const listTimers = {
 // Cancels an active agent-internal one-shot timer.
 const cancelTimer = {
   name: TOOL_NAMES.CANCEL_TIMER,
+  capabilities: ["external_side_effect"] as const,
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.CANCEL_TIMER],
   description:
     "Cancel an active one-shot agent timer in the current conversation. " +

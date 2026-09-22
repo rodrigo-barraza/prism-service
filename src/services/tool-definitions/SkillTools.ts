@@ -20,6 +20,7 @@ interface SkillCreateArgs extends Partial<SkillDocument> {
 
 const createSkill = {
   name: TOOL_NAMES.CREATE_SKILL,
+  capabilities: ["memory_write"] as const,
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.CREATE_SKILL],
   description:
     "Create a reusable workflow skill. Skills are stored prompt templates with variable " +
@@ -120,6 +121,7 @@ const createSkill = {
 
 const executeSkill = {
   name: TOOL_NAMES.EXECUTE_SKILL,
+  capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.EXECUTE_SKILL],
   description:
     "Execute a previously created skill by its ID. The skill's prompt template is " +
@@ -197,6 +199,7 @@ const executeSkill = {
 
 const listSkills = {
   name: TOOL_NAMES.LIST_SKILLS,
+  capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.LIST_SKILLS],
   description:
     "List all available skills. Skills are reusable workflow templates created with create_skill.",
@@ -233,6 +236,7 @@ const listSkills = {
 
 const deleteSkill = {
   name: TOOL_NAMES.DELETE_SKILL,
+  capabilities: ["memory_write"] as const,
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.DELETE_SKILL],
   description: "Delete a skill by its ID.",
   parameters: {

@@ -8,6 +8,7 @@ import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalTo
 
 export default {
   name: TOOL_NAMES.ENTER_PLAN_MODE,
+  capabilities: [] as const,
 
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.ENTER_PLAN_MODE],
   description:

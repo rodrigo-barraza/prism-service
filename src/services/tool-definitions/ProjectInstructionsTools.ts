@@ -103,6 +103,7 @@ async function loadService() {
 
 const readProjectInstructionsTool = {
   name: "read_project_instructions",
+  capabilities: ["fs_read"] as const,
   emoji: ["📘", "👀"],
   description:
     "Read the project instructions document — the durable, user-visible policy file for this project " +
@@ -168,6 +169,7 @@ const readProjectInstructionsTool = {
 
 const updateProjectInstructionsTool = {
   name: "update_project_instructions",
+  capabilities: ["memory_write"] as const,
   emoji: ["📘", "📝"],
   description:
     "Replace the ENTIRE project instructions document with new markdown. " +
@@ -261,6 +263,7 @@ const updateProjectInstructionsTool = {
 
 const editProjectInstructionsTool = {
   name: "edit_project_instructions",
+  capabilities: ["memory_write"] as const,
   emoji: ["📘", "✏️"],
   description:
     "Add or replace ONE `## section` of the project instructions, leaving the rest of the document untouched. " +

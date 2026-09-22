@@ -133,6 +133,7 @@ function buildDiscoverAndEnableSchema(locale: string) {
 
 const discoverAndEnableTools = {
   name: "discover_and_enable_tools",
+  capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS["discover_and_enable_tools"],
   description:
     "Search the full tool catalog and automatically enable matches in one step. " +

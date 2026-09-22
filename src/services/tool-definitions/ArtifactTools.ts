@@ -32,6 +32,7 @@ function provenanceFromContext(context: InternalToolContext) {
 
 const createArtifactTool = {
   name: TOOL_NAMES.CREATE_ARTIFACT,
+  capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.CREATE_ARTIFACT],
   description:
     "Create a standalone document artifact (markdown or html) that is saved to the user's Artifacts gallery and rendered in the chat. " +
@@ -110,6 +111,7 @@ const createArtifactTool = {
 
 const updateArtifactTool = {
   name: TOOL_NAMES.UPDATE_ARTIFACT,
+  capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.UPDATE_ARTIFACT],
   description:
     "Replace the content of an existing document artifact with a new complete version (the previous version is kept in history). " +
@@ -193,6 +195,7 @@ const updateArtifactTool = {
 
 const listArtifactsTool = {
   name: TOOL_NAMES.LIST_ARTIFACTS,
+  capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.LIST_ARTIFACTS],
   description:
     "List recent artifacts in this project's gallery — agent-authored documents (markdown/html) and captured visual outputs (images, embeds, video, audio). " +
