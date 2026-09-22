@@ -22,6 +22,7 @@ import {
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import type BaseAgenticHarness from "#src/services/harnesses/BaseAgenticHarness";
 import type { TokenUsage } from "#src/types/admin";
+import type { RequestTelemetryChunk } from "#src/utils/PromptPrefixHashes";
 import type {
   PassState,
   ChunkAction,
@@ -100,6 +101,12 @@ export function routeStreamChunk(
   // ── Rate limits ──────────────────────────────────────
   if (streamChunk?.type === "rateLimits") {
     state.lastRateLimits = streamChunk.rateLimits || null;
+    return { action: "continue" };
+  }
+
+  // ── Prompt-cache telemetry (hashes of what was sent) ──
+  if (streamChunk?.type === "requestTelemetry") {
+    pass.requestTelemetry = streamChunk as unknown as RequestTelemetryChunk;
     return { action: "continue" };
   }
 

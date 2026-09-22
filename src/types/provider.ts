@@ -1,6 +1,7 @@
 import type { ToolSchema } from "#src/services/harnesses/types";
 import type { ChatMessage, ProviderOptions } from "./ProviderTypes.ts";
 import type { ResponsesPhase, ResponsesReasoningItem } from "./admin.ts";
+import type { RequestTelemetryChunk } from "#src/utils/PromptPrefixHashes";
 
 export type { ChatMessage, ProviderOptions };
 
@@ -159,7 +160,8 @@ export type StreamChunk =
   | StreamToolCallDeltaChunk
   | StreamStopReasonChunk
   | StreamStatusChunk
-  | StreamProviderStateChunk;
+  | StreamProviderStateChunk
+  | RequestTelemetryChunk;
 
 // ── Provider Result Types ───────────────────────────────────
 

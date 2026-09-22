@@ -19,6 +19,15 @@ import { MODALITY_TYPES, getDefaultModels, getModelByName } from "#src/config";
 import { DEFAULT_MAX_OUTPUT_TOKENS } from "#src/constants/TokenBudgetDefaults";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { callWithRetries } from "#src/utils/ProviderStreamResilience";
+import {
+  hashPromptPrefix,
+  isDiagnosticsRejection,
+  isProviderDiagnosticsRejected,
+  markProviderDiagnosticsRejected,
+  requestTelemetryChunk,
+  type ProviderCacheDiagnostics,
+  type RequestTelemetryChunk,
+} from "#src/utils/PromptPrefixHashes";
 
 import { type ProviderOptions, type ChatMessage } from "#src/types/ProviderTypes";
 import type { TokenUsage } from "#src/types/admin";
@@ -82,7 +91,80 @@ export type TransformedStreamEvent =
   | { type: "stopReason"; stopReason: string }
   | { type: "stopDetails"; stopDetails: unknown }
   | { type: "usage"; usage: TokenUsage }
-  | { type: "rateLimits"; rateLimits: ReturnType<typeof extractAnthropicRateLimits> };
+  | { type: "rateLimits"; rateLimits: ReturnType<typeof extractAnthropicRateLimits> }
+  | RequestTelemetryChunk;
+
+/** Beta that returns why the prompt cache missed against a previous message. */
+export const ANTHROPIC_CACHE_DIAGNOSIS_BETA = "cache-diagnosis-2026-04-07";
+
+/**
+ * The API reads `content: "x"` as `[{ type: "text", text: "x" }]`, and
+ * applyCacheBreakpoints converts only the newest message — hash both forms
+ * alike so the breakpoint moving on does not read as a rewritten history.
+ */
+function asTextBlocks(content: unknown): unknown {
+  return typeof content === "string" ? [{ type: "text", text: content }] : content;
+}
+
+/** Hashes of the final Anthropic payload (tools → system → messages). */
+export function hashAnthropicPrefix(payload: Record<string, unknown>) {
+  const messages = payload.messages as Array<Record<string, unknown>> | undefined;
+  return hashPromptPrefix({
+    system: asTextBlocks(payload.system),
+    tools: payload.tools as unknown[] | undefined,
+    messages: messages?.map((message) => ({
+      ...message,
+      content: asTextBlocks(message.content),
+    })),
+  });
+}
+
+/**
+ * Normalize `message.diagnostics` (beta cache-diagnosis). A null
+ * `cache_miss_reason` means the server answered before its background
+ * comparison finished.
+ */
+export function normalizeAnthropicCacheDiagnostics(
+  envelope: unknown,
+  comparedResponseId: string | null,
+): ProviderCacheDiagnostics | null {
+  if (envelope === undefined || (envelope === null && !comparedResponseId)) {
+    return null;
+  }
+  const reason = (envelope as { cache_miss_reason?: unknown } | null)
+    ?.cache_miss_reason as
+    | { type?: string; cache_missed_input_tokens?: number }
+    | null
+    | undefined;
+  const reasonType = reason?.type ?? null;
+  const status = !reasonType
+    ? "pending"
+    : reasonType === "previous_message_not_found"
+      ? "comparison_not_found"
+      : reasonType === "unavailable"
+        ? "unavailable"
+        : "cache_miss";
+  return {
+    source: "anthropic",
+    status,
+    reason: status === "cache_miss" ? reasonType : null,
+    missedTokens:
+      typeof reason?.cache_missed_input_tokens === "number"
+        ? reason.cache_missed_input_tokens
+        : null,
+    comparedResponseId,
+    raw: envelope,
+  };
+}
+
+/** Keep the most informative diagnostics seen on the stream. */
+function preferDiagnostics(current: unknown, candidate: unknown): unknown {
+  if (candidate === undefined) return current;
+  const candidateReason = (candidate as { cache_miss_reason?: unknown } | null)
+    ?.cache_miss_reason;
+  if (current === undefined || candidateReason) return candidate;
+  return current;
+}
 
 // Default budget tokens mapped from effort level (for non-adaptive models)
 const EFFORT_BUDGET_MAP: Record<string, number> = {
@@ -1128,6 +1210,9 @@ const anthropicProvider = {
       fileIds: [],
     };
     let receivedAnyStreamChunk = false;
+    const cacheTelemetry = options.cacheTelemetry;
+    const requestsCacheDiagnostics =
+      !!cacheTelemetry && !isProviderDiagnosticsRejected("anthropic", model);
     try {
       const prepared = await prepareMessages(messages, model);
       const effectiveSystemPrompt = resolveSystemPrompt(
@@ -1251,15 +1336,33 @@ const anthropicProvider = {
 
       applyCacheBreakpoints(streamPayload);
 
+      // Prompt-cache telemetry: hash exactly what is sent, and opt into
+      // Anthropic's own miss diagnosis against the previous message
+      // (`null` on a conversation's first request opts in for the next).
+      const prefixHashes = cacheTelemetry
+        ? hashAnthropicPrefix(streamPayload)
+        : null;
+      if (requestsCacheDiagnostics) {
+        streamPayload.diagnostics = {
+          previous_message_id: cacheTelemetry?.previousResponseId ?? null,
+        };
+      }
+      const betaHeaders = [
+        ...(fileSources.applied ? [ANTHROPIC_FILES_API_BETA] : []),
+        ...(requestsCacheDiagnostics ? [ANTHROPIC_CACHE_DIAGNOSIS_BETA] : []),
+      ];
+
       const stream = getClient().messages.stream(
         streamPayload as unknown as Anthropic.MessageCreateParamsNonStreaming,
         {
           ...(options.signal && { signal: options.signal }),
-          ...(fileSources.applied && {
-            headers: { "anthropic-beta": ANTHROPIC_FILES_API_BETA },
+          ...(betaHeaders.length > 0 && {
+            headers: { "anthropic-beta": betaHeaders.join(",") },
           }),
         },
       );
+      let anthropicMessageId: string | undefined;
+      let diagnosticsEnvelope: unknown;
 
       // Track current content block type for server tool response processing
       let currentBlockType: string | null = null;
@@ -1281,6 +1384,14 @@ const anthropicProvider = {
         if (options.signal?.aborted) {
           stream.abort();
           break;
+        }
+        if (chunk.type === "message_start") {
+          anthropicMessageId = chunk.message?.id || anthropicMessageId;
+          diagnosticsEnvelope = preferDiagnostics(
+            diagnosticsEnvelope,
+            (chunk.message as { diagnostics?: unknown } | undefined)
+              ?.diagnostics,
+          );
         }
         // Capture input token counts from message_start (sent once at stream start).
         // Anthropic sends input_tokens, cache_read_input_tokens, and
@@ -1486,6 +1597,10 @@ const anthropicProvider = {
 
         // Message delta (final usage + stop details) — carries output_tokens only
         if (chunk.type === "message_delta") {
+          diagnosticsEnvelope = preferDiagnostics(
+            diagnosticsEnvelope,
+            (chunk as { diagnostics?: unknown }).diagnostics,
+          );
           if (chunk.usage) {
             usage = {
               inputTokens: messageStartUsage?.input_tokens ?? 0,
@@ -1515,6 +1630,10 @@ const anthropicProvider = {
         if (finalMessage?.usage) {
           usage = buildUsage(finalMessage.usage);
         }
+        diagnosticsEnvelope = preferDiagnostics(
+          diagnosticsEnvelope,
+          (finalMessage as { diagnostics?: unknown } | undefined)?.diagnostics,
+        );
       } catch {
         // finalMessage() can throw for tool_use stop reasons — use message_delta usage
       }
@@ -1525,6 +1644,17 @@ const anthropicProvider = {
       }
       if (rateLimits) {
         yield { type: "rateLimits", rateLimits };
+      }
+      if (cacheTelemetry) {
+        yield requestTelemetryChunk(prefixHashes, {
+          providerResponseId: anthropicMessageId,
+          cacheDiagnostics: requestsCacheDiagnostics
+            ? normalizeAnthropicCacheDiagnostics(
+                diagnosticsEnvelope,
+                cacheTelemetry.previousResponseId ?? null,
+              )
+            : null,
+        });
       }
     } catch (error: unknown) {
       if (error instanceof Error && error.name === "AbortError") return;
@@ -1544,6 +1674,21 @@ const anthropicProvider = {
           ...options,
           disableAnthropicFileSources: true,
         });
+        return;
+      }
+      // Telemetry must never cost a turn: a request rejected for the
+      // diagnostics beta is sent again without it (nothing reached the
+      // consumer yet), and this model is not asked again this process.
+      if (
+        !receivedAnyStreamChunk &&
+        requestsCacheDiagnostics &&
+        isDiagnosticsRejection(error, /diagnostics|cache-diagnosis/i)
+      ) {
+        logger.warn(
+          `[anthropic] cache diagnostics rejected for ${model} (${getErrorMessage(error)}) — retrying without`,
+        );
+        markProviderDiagnosticsRejected("anthropic", model);
+        yield* anthropicProvider.generateTextStream(messages, model, options);
         return;
       }
       // No provider-level retry: transient stream failures are retried by the

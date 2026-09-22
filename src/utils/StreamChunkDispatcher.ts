@@ -378,6 +378,11 @@ export async function dispatchChunk(
       }
       return true;
 
+    case "requestTelemetry":
+      // Prompt-cache telemetry for the request log — never shown to the
+      // client, and never text.
+      return true;
+
     case "toolCallDelta":
       // Incremental tool call argument streaming — track generation timing
       // so the throughput badge stays alive, but don't emit to the client.

@@ -24,6 +24,10 @@ import {
 } from "#config";
 import { MODALITY_TYPES, MODELS, DEFAULT_VOICES, getDefaultModels } from "#src/config";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import {
+  hashPromptPrefix,
+  requestTelemetryChunk,
+} from "#src/utils/PromptPrefixHashes";
 
 /** Shape of a model definition from the MODELS catalog. */
 interface ModelDefinition {
@@ -74,6 +78,27 @@ export type GoogleToolConfigEntry =
   | GoogleSearchTool
   | GoogleCodeExecutionTool
   | GoogleUrlContextTool;
+
+/**
+ * Hashes of a Gemini request. `functionDeclarations` are flattened so each
+ * tool is its own entry — a reorder then reads differently from a change.
+ */
+export function hashGooglePrefix(
+  contents: unknown[] | undefined,
+  config: GenerateContentConfig,
+) {
+  const tools = ((config.tools ?? []) as Array<Record<string, unknown>>).flatMap(
+    (entry) =>
+      Array.isArray(entry.functionDeclarations)
+        ? (entry.functionDeclarations as unknown[])
+        : [entry],
+  );
+  return hashPromptPrefix({
+    system: config.systemInstruction,
+    tools,
+    messages: contents,
+  });
+}
 
 export interface ConversationMessage {
   role: string;
@@ -763,6 +788,10 @@ const googleProvider = {
       if (options.signal) {
         streamConfig.httpOptions = { timeout: 0 };
       }
+      const prefixHashes = options.cacheTelemetry
+        ? hashGooglePrefix(contents as unknown[], streamConfig)
+        : null;
+      let geminiResponseId: string | undefined;
       const responseStream = await getClient().models.generateContentStream({
         model,
         contents,
@@ -774,6 +803,7 @@ const googleProvider = {
       let lastFinishReason: string | null = null;
       for await (const chunk of responseStream) {
         if (options.signal?.aborted) break;
+        geminiResponseId = chunk.responseId || geminiResponseId;
         // Track finishReason for truncation detection
         const candidateFinishReason = chunk.candidates?.[0]?.finishReason;
         if (candidateFinishReason) lastFinishReason = candidateFinishReason;
@@ -829,6 +859,11 @@ const googleProvider = {
         yield { type: "usage", usage };
       } else {
         yield { type: "usage", usage: { inputTokens: 0, outputTokens: 0 } };
+      }
+      if (options.cacheTelemetry) {
+        yield requestTelemetryChunk(prefixHashes, {
+          providerResponseId: geminiResponseId,
+        });
       }
     } catch (error: unknown) {
       if (error instanceof Error && error.name === "AbortError") return;
