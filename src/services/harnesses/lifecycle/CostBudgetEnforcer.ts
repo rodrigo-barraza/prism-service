@@ -100,6 +100,7 @@ export function checkCostBudget(
   // The stop reason is persisted by the Finalizer — every harness breaks on
   // `true`, so recording it here covers ReAct, ToT and GoT alike.
   state.conversationOutcome = "budget_exhausted";
+  state.costBudgetStop = { spentDollars: estimatedCost, maxCostDollars };
 
   emit({
     type: SERVER_SENT_EVENT_TYPES.STATUS,
@@ -111,7 +112,7 @@ export function checkCostBudget(
 
   logger.warn(
     `[CostBudgetEnforcer] Cost limit exceeded on iteration ${state.iterations}: ` +
-      `$${estimatedCost.toFixed(4)} >= $${maxCostDollars.toFixed(4)} budget. Triggering exhaustion recovery.`,
+      `$${estimatedCost.toFixed(4)} >= $${maxCostDollars.toFixed(4)} budget. Stopping the loop.`,
   );
 
   return true;

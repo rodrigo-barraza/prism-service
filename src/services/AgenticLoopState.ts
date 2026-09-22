@@ -121,6 +121,8 @@ export default class AgenticLoopState {
     | "plan_rejected"
     | "error"
     | "aborted";
+  /** Spend at the moment the cost cap stopped the loop (null = no stop). */
+  costBudgetStop: { spentDollars: number; maxCostDollars: number } | null;
 
   // ── Branch tracking (TreeOfThought) ─────────────────────
   branchesExplored: number;
@@ -196,6 +198,7 @@ export default class AgenticLoopState {
     this.toolErrorCounts = new Map();
     this.pendingRequestLogWrites = [];
     this.conversationOutcome = "completed";
+    this.costBudgetStop = null;
 
     this.branchesExplored = 0;
     this.branchesBacktracked = 0;
