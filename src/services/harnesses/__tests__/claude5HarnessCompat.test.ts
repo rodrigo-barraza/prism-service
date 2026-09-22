@@ -114,7 +114,15 @@ vi.mock("#src/services/OrchestratorService", () => ({
 }));
 
 vi.mock("../lifecycle/ApprovalGate.ts", () => ({
-  checkAndWaitForApproval: vi.fn().mockResolvedValue({ isApproved: true, shouldApproveAll: false }),
+  // Every call cleared, nothing blocked — the gate's per-call verdict.
+  checkAndWaitForApproval: vi.fn().mockImplementation(async (toolCalls: unknown[]) => ({
+    executableToolCalls: toolCalls,
+    blockedResults: [],
+    deniedToolCalls: [],
+    shouldApproveAll: false,
+  })),
+  orderResultsLikeCalls: (_toolCalls: unknown[], results: unknown[]) => results,
+  approvalRecordFor: () => ({}),
 }));
 
 vi.mock("../lifecycle/PostExecutionEmitter.ts", () => ({
@@ -180,11 +188,6 @@ vi.mock("../lifecycle/CostBudgetEnforcer.ts", () => ({
   checkCostBudget: vi.fn().mockReturnValue(false),
 }));
 
-vi.mock("../lifecycle/SandboxExecutor.ts", () => ({
-  createSandboxCheckpoint: vi.fn().mockReturnValue("mock-stash-ref"),
-  restoreSandboxCheckpoint: vi.fn(),
-}));
-
 vi.mock("../lifecycle/PlanModeController.ts", () => ({
   blockUnauthorizedToolCalls: vi.fn(),
   handleExitPlanMode: vi.fn(),
@@ -221,7 +224,6 @@ vi.mock("#src/services/ToolOrchestratorService", () => ({
 vi.mock("#src/services/WebhookEventBus", () => ({
   default: { emit: vi.fn() },
 }));
-
 
 // ── Harness factory ──────────────────────────────────────────
 

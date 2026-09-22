@@ -151,7 +151,13 @@ describe("recoverOrphanedTurnCheckpoints", () => {
     // The recovery ran appendMessages: pushed the orphaned messages and
     // cleared the checkpoint in the same atomic update.
     const appendUpdate = mockCollection.updateOne.mock.calls[0][1];
-    expect(appendUpdate.$push.messages.$each).toEqual(orphanedMessages);
+    // Every appended message is given a server-minted id (rewind/fork anchor).
+    expect(appendUpdate.$push.messages.$each).toEqual(
+      orphanedMessages.map((message) => ({
+        ...message,
+        id: expect.stringMatching(/^msg_/),
+      })),
+    );
     expect(appendUpdate.$unset).toEqual({ turnCheckpoint: "" });
   });
 

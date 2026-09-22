@@ -213,10 +213,6 @@ vi.mock("../lifecycle/SystemReminderInjector.ts", () => ({
 vi.mock("../lifecycle/CostBudgetEnforcer.ts", () => ({
   checkCostBudget: vi.fn().mockReturnValue(false),
 }));
-vi.mock("../lifecycle/SandboxExecutor.ts", () => ({
-  createSandboxCheckpoint: vi.fn().mockReturnValue("mock-stash-ref"),
-  restoreSandboxCheckpoint: vi.fn(),
-}));
 vi.mock("../lifecycle/PlanModeController.ts", () => ({
   blockUnauthorizedToolCalls: vi.fn(),
   handleExitPlanMode: vi.fn(),

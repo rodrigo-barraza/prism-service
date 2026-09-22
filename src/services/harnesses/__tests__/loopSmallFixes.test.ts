@@ -168,11 +168,6 @@ vi.mock("../lifecycle/SystemReminderInjector.ts", () => ({
   cleanupReminderCache: vi.fn(),
 }));
 
-vi.mock("../lifecycle/SandboxExecutor.ts", () => ({
-  createSandboxCheckpoint: vi.fn().mockReturnValue("mock-stash-ref"),
-  restoreSandboxCheckpoint: vi.fn(),
-}));
-
 vi.mock("#src/utils/FunctionCallingUtilities", () => ({
   expandMessagesForFunctionCall: vi.fn().mockImplementation((messages: unknown[]) => messages),
 }));

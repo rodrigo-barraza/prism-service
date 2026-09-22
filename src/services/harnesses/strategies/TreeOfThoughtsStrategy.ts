@@ -8,14 +8,15 @@
  *
  *   BFS (Algorithm 1): Generate N branches in parallel, score,
  *   retain top-b as frontier. Execute the best; on validation
- *   failure, fall back to the next frontier candidate before
- *   re-branching.
+ *   failure, backtrack the conversation and re-branch.
  *
- *   Note on BFS Frontier Fallback: BFS frontier fallback (switching to the next-best
- *   pre-scored candidate upon validation failure) requires sandbox execution to be active
- *   (options.enableSandbox === true) to safely roll back any file changes from the failed branch
- *   before executing the next sibling. Without a sandbox, frontier fallback is bypassed to avoid
- *   running siblings on a dirty filesystem.
+ *   Note on BFS frontier fallback: switching to the next-best pre-scored
+ *   candidate needs the failed branch's FILE changes rolled back first. It
+ *   was gated on the git SandboxExecutor, which nothing ever enabled and
+ *   which ran `git add -A` on the user's index; both were removed
+ *   (prism-service docs/prompts/15). The frontier is still scored and
+ *   reported (frontierSize); a fallback would restore from the
+ *   tools-service workspace snapshots instead.
  *
  *   DFS (Algorithm 2): Explore siblings sequentially — generate
  *   one branch, score it, accept if above threshold. If below,
@@ -58,7 +59,6 @@ import { logKVCacheHitRate } from "#src/services/harnesses/lifecycle/KVCacheRepo
 import { finalizePassTracker } from "#src/services/harnesses/lifecycle/TrackerFinalizer";
 import { maybeInjectSystemReminder } from "#src/services/harnesses/lifecycle/SystemReminderInjector";
 import { checkCostBudget } from "#src/services/harnesses/lifecycle/CostBudgetEnforcer";
-import { restoreSandboxCheckpoint } from "#src/services/harnesses/lifecycle/SandboxExecutor";
 import { HARNESS } from "#src/constants";
 import type {
   IterationPassOptions,
@@ -110,7 +110,7 @@ async function runTreeOfThoughtsTurn(
   const context = harness["context"];
   const state: AgenticLoopState = harness["state"];
   const tools = harness["tools"];
-  const { options, project, username, agent, workspaceRoot, emit, signal } =
+  const { options, project, username, agent, emit, signal } =
     context;
 
   const searchStrategy: SearchStrategy =
@@ -476,7 +476,7 @@ async function runTreeOfThoughtsTurn(
           ...message,
         }));
 
-        const { results, sandboxCheckpointReference } =
+        const { results } =
           await executeApprovedToolBatch(
             harness,
             selectedPass,
@@ -515,91 +515,12 @@ async function runTreeOfThoughtsTurn(
 
           const backtrackAttemptsThisIteration = state.branchesBacktracked;
 
-          // ── BFS frontier fallback (Paper Algorithm 1: try next-best state) ──
-          // Before re-branching from scratch, try the next frontier candidate
-          // that was already scored but not executed.
-          if (
-            searchStrategy === "bfs" &&
-            state.frontierCandidates.length > 0 &&
-            sandboxCheckpointReference
-          ) {
-            const fallbackCandidate = state.frontierCandidates.shift()!;
-
-            currentMessages = preExecutionSnapshot;
-            restoreSandboxCheckpoint(
-              workspaceRoot,
-              sandboxCheckpointReference,
-              emit,
-            );
-
-            emit({
-              type: SERVER_SENT_EVENT_TYPES.STATUS,
-              message: STATUS_MESSAGES.BRANCH_BACKTRACKED,
-              branchIndex: selectedBranch.branchIndex,
-              validationErrors: validationFeedback.length,
-              restoredCheckpoint: true,
-              reason: "frontier_fallback",
-              fallbackBranchIndex: fallbackCandidate.branchIndex,
-              fallbackScore: fallbackCandidate.score,
-            });
-
-            logger.info(
-              `[TreeOfThoughts/BFS] Branch ${selectedBranch.branchIndex + 1} failed validation. ` +
-                `Falling back to frontier candidate ${fallbackCandidate.branchIndex + 1} ` +
-                `(score: ${fallbackCandidate.score.toFixed(1)}).`,
-            );
-
-            currentMessages.push({
-              role: "system",
-              content: wrapSystemMessage(
-                SYSTEM_MESSAGE_TAGS.VALIDATION_ERRORS,
-                PromptLocaleService.get(
-                  (options?.locale as string | undefined) ||
-                    PromptLocaleService.getDefaultLocale(),
-                  "harness.treeOfThoughts.frontierFallback",
-                  {
-                    branchIndex: String(selectedBranch.branchIndex + 1),
-                    errorCount: String(validationFeedback.length),
-                    errorBlock,
-                  },
-                ),
-              ),
-            });
-
-            // Re-enter the main execution path with the fallback candidate's pass
-            // by replacing the selected branch and re-executing the tool phase
-            // on the next iteration with the fallback's tool calls.
-            harness.logIteration(selectedPass, currentMessages);
-
-            // Inject the fallback branch's reasoning as context for the next iteration
-            if (fallbackCandidate.pass.finalStreamedText || fallbackCandidate.pass.streamedText) {
-              currentMessages.push({
-                role: "assistant",
-                content: fallbackCandidate.pass.finalStreamedText || fallbackCandidate.pass.streamedText,
-                ...(fallbackCandidate.pass.streamedThinking.trim() && {
-                  thinking: fallbackCandidate.pass.streamedThinking.trim(),
-                }),
-              });
-            }
-
-            continue;
-          }
-
           const shouldRestoreCheckpoint =
             backtrackAttemptsThisIteration <=
               MAX_BACKTRACK_ATTEMPTS_PER_ITERATION && scoredBranches.length > 1;
 
           if (shouldRestoreCheckpoint) {
             currentMessages = preExecutionSnapshot;
-
-            // Restore filesystem to pre-execution state alongside conversation
-            if (sandboxCheckpointReference) {
-              restoreSandboxCheckpoint(
-                workspaceRoot,
-                sandboxCheckpointReference,
-                emit,
-              );
-            }
 
             emit({
               type: SERVER_SENT_EVENT_TYPES.STATUS,

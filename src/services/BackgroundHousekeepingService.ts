@@ -25,6 +25,7 @@ import { MONGO_DB_NAME } from "#config";
 import { COLLECTIONS, FILE_CATEGORIES } from "#src/constants";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { pruneExpiredWorkspaceSnapshots } from "#src/services/conversation/workspaceSnapshots";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,9 @@ export interface HousekeepingResult {
   staleConversations?: HousekeepingConversationResult | { error: string };
   requestLogs?: { deleted: number } | { error: string };
   minioOrphans?: { removed: number } | { error: string };
+  workspaceSnapshots?:
+    | { deletedRefs: number; prunedDocuments: number }
+    | { error: string };
   durationMilliseconds: number;
   trigger: string;
 }
@@ -362,6 +366,22 @@ const BackgroundHousekeepingService = {
       results.minioOrphans = { error: getErrorMessage(error) };
       logger.error(
         `[Housekeeping] MinIO orphan cleanup failed: ${getErrorMessage(error)}`,
+      );
+    }
+
+    // 5. Expired workspace snapshots (rewind refs + their records)
+    try {
+      const snapshots = await pruneExpiredWorkspaceSnapshots();
+      results.workspaceSnapshots = snapshots;
+      if (snapshots.deletedRefs > 0 || snapshots.prunedDocuments > 0) {
+        logger.info(
+          `[Housekeeping] Pruned ${snapshots.deletedRefs} expired workspace snapshot ref(s) across ${snapshots.prunedDocuments} conversation(s)`,
+        );
+      }
+    } catch (error: unknown) {
+      results.workspaceSnapshots = { error: getErrorMessage(error) };
+      logger.error(
+        `[Housekeeping] Workspace snapshot pruning failed: ${getErrorMessage(error)}`,
       );
     }
 
