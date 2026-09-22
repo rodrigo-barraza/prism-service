@@ -123,7 +123,12 @@ export async function handleExitPlanMode(
 ): Promise<{ shouldContinueLoop: boolean }> {
   const { options, emit, signal, conversationId } = context;
 
-  const planText = state.planModeText.trim() || pass.streamedText.trim();
+  // Models that stream no plan text put it in the tool's `summary` argument.
+  const summaryArgument = exitPlanToolCall.args?.summary;
+  const planText =
+    state.planModeText.trim() ||
+    pass.streamedText.trim() ||
+    (typeof summaryArgument === "string" ? summaryArgument.trim() : "");
   const planSteps = PlanningModeService.extractSteps(planText);
 
   logger.info(

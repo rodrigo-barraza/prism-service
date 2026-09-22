@@ -53,6 +53,19 @@ export async function runExhaustionRecoveryPass(
   const { emit, signal, options, resolvedModel, modelDefinition, provider } =
     context;
 
+  // A cost-cap stop must not spend again: no summary pass — the turn ends
+  // with a note built from the tool activity so far, naming the real reason.
+  if (state.conversationOutcome === "budget_exhausted") {
+    const spend = state.costBudgetStop;
+    state.finalStreamedText = buildSyntheticFallbackSummary(
+      state,
+      currentMessages,
+      `[Cost cap reached${spend ? ` — $${spend.spentDollars.toFixed(4)} spent of the $${spend.maxCostDollars} allowed` : ""} after ${state.iterations} iteration(s). ` +
+        `The loop stopped before running any further tool calls. Below is a summary of tool activity.]`,
+    );
+    return;
+  }
+
   emit({
     type: SERVER_SENT_EVENT_TYPES.STATUS,
     message: STATUS_MESSAGES.ITERATION_LIMIT_REACHED,
@@ -171,6 +184,8 @@ export async function runExhaustionRecoveryPass(
 export function buildSyntheticFallbackSummary(
   state: AgenticLoopState,
   currentMessages: ConversationMessage[],
+  headline = `[Iteration limit reached after ${state.iterations} iterations — the model did not produce a final summary. ` +
+    `Below is a synthetic summary of tool activity.]`,
 ): string {
   const toolCalls = state.streamedToolCalls;
   const toolNameCounts = new Map<string, number>();
@@ -180,10 +195,7 @@ export function buildSyntheticFallbackSummary(
   }
 
   const sections: string[] = [];
-  sections.push(
-    `[Iteration limit reached after ${state.iterations} iterations — the model did not produce a final summary. ` +
-      `Below is a synthetic summary of tool activity.]`,
-  );
+  sections.push(headline);
 
   // Tool usage breakdown
   const toolUsageSummary = Array.from(toolNameCounts.entries())
