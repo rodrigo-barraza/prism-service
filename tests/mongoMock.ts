@@ -63,18 +63,22 @@ export function evaluateMongoExpression(doc: any, expression: any): any {
       }
     }
 
-    // Fallback for simple query operators (used in find/findOne)
+    // Fallback for simple query operators (used in find/findOne). Every key
+    // must match — an operator key is one condition among the others.
     for (const [key, val] of Object.entries(expression)) {
       if (key === "$or") {
-        return (val as any[]).some(sub => evaluateMongoExpression(doc, sub));
+        if (!(val as any[]).some(sub => evaluateMongoExpression(doc, sub))) return false;
+        continue;
       }
       if (val && typeof val === "object" && "$in" in (val as any)) {
         // Real MongoDB: null in an $in list matches missing fields too
         // (how the default profile owns legacy docs without profileId).
-        return ((val as any).$in as any[]).includes(doc[key] ?? null);
+        if (!((val as any).$in as any[]).includes(doc[key] ?? null)) return false;
+        continue;
       }
       if (val && typeof val === "object" && "$ne" in (val as any)) {
-        return doc[key] !== (val as any).$ne;
+        if (doc[key] === (val as any).$ne) return false;
+        continue;
       }
       const docVal = doc[key];
       if (docVal && val && typeof docVal === "object" && typeof val === "object" && docVal.toString && val.toString) {
@@ -182,6 +186,7 @@ export function createMockCollection(initialData: any[] = []) {
       const $push = update.$push || {};
       const $inc = update.$inc || {};
       const $addToSet = update.$addToSet || {};
+      const $unset = update.$unset || {};
 
       // Enforce disjoint-path constraint
       const setKeys = new Set(Object.keys($set));
@@ -203,6 +208,7 @@ export function createMockCollection(initialData: any[] = []) {
       if (doc) {
         applySetFields(doc, $set);
         if (isInsert) Object.assign(doc, $setOnInsert);
+        for (const field of Object.keys($unset)) delete doc[field];
 
         for (const [field, val] of Object.entries($push)) {
           if (!doc[field]) doc[field] = [];
@@ -234,6 +240,23 @@ export function createMockCollection(initialData: any[] = []) {
       return { matchedCount: 0, modifiedCount: 0 };
     },
 
+    /**
+     * Standard-mode updateMany: the same operators as updateOne, applied to
+     * every match (no upsert). Synchronous up to its return, so two calls
+     * never interleave — like a single MongoDB write per document.
+     */
+    async updateMany(filter: any, update: any) {
+      const matches = Array.from(documents.values()).filter(d => evaluateMongoExpression(d, filter));
+      for (const doc of matches) {
+        applySetFields(doc, update.$set || {});
+        for (const field of Object.keys(update.$unset || {})) delete doc[field];
+        for (const [field, val] of Object.entries(update.$inc || {})) {
+          doc[field] = (doc[field] || 0) + (val as number);
+        }
+      }
+      return { matchedCount: matches.length, modifiedCount: matches.length };
+    },
+
     countDocuments: async (query: any = {}) => {
       return Array.from(documents.values()).filter(doc => evaluateMongoExpression(doc, query)).length;
     },
@@ -244,6 +267,22 @@ export function createMockCollection(initialData: any[] = []) {
       if (!newDoc._id && !newDoc.id) newDoc._id = key;
       documents.set(key, newDoc);
       return { insertedId: key };
+    },
+
+    async insertMany(docs: any[]) {
+      const insertedIds: Record<number, string> = {};
+      docs.forEach((doc, index) => {
+        const key = doc.id || doc._id || Math.random().toString();
+        const newDoc = { ...doc };
+        if (!newDoc._id && !newDoc.id) newDoc._id = key;
+        documents.set(key, newDoc);
+        insertedIds[index] = key;
+      });
+      return { insertedCount: docs.length, insertedIds };
+    },
+
+    async createIndex() {
+      return "mock-index";
     },
 
     async deleteOne(query: any) {
