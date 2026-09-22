@@ -12,6 +12,19 @@ export interface WebhookEvent {
 
 export type WebhookEventCallback = (event: WebhookEvent) => void;
 
+/**
+ * The "needs you" events: a conversation waits on its user, its goal moved,
+ * or its turn ended. (The request.* / generation.* events are emitted by
+ * name where they happen.)
+ */
+export const NEEDS_YOU_WEBHOOK_EVENTS = {
+  APPROVAL_REQUIRED: "approval.required",
+  QUESTION_ASKED: "question.asked",
+  GOAL_UPDATED: "goal.updated",
+  TURN_COMPLETED: "turn.completed",
+  TURN_FAILED: "turn.failed",
+} as const;
+
 const REPLAY_BUFFER_CAPACITY = WEBHOOK.REPLAY_BUFFER_CAPACITY;
 
 const listeners = new Set<WebhookEventCallback>();

@@ -96,6 +96,7 @@ import scheduledTasksRouter from "./routes/ScheduledTasksRoutes.ts";
 import promptsRouter from "./routes/PromptsRoutes.ts";
 import webhookRouter from "./routes/WebhookRoutes.ts";
 import profilesRouter from "./routes/ProfilesRoutes.ts";
+import pushRouter from "./routes/PushRoutes.ts";
 import { PROFILE_ID_HEADER } from "./utils/ProfileScope.ts";
 
 const app = express();
@@ -234,6 +235,7 @@ app.use("/scheduled-tasks", scheduledTasksRouter);
 app.use("/prompts", promptsRouter);
 app.use("/webhooks", webhookRouter);
 app.use("/profiles", profilesRouter);
+app.use("/push", pushRouter);
 
 // Error handler (must be last)
 app.use(errorHandler);
@@ -548,6 +550,17 @@ setupWebSocket(wss);
           collection: COLLECTIONS.PROFILES,
           keys: { project: 1, username: 1, profileId: 1 },
           options: { unique: true },
+        },
+        // push_subscriptions — one document per browser endpoint, read by
+        // owner when a conversation needs its user
+        {
+          collection: COLLECTIONS.PUSH_SUBSCRIPTIONS,
+          keys: { endpoint: 1 },
+          options: { unique: true },
+        },
+        {
+          collection: COLLECTIONS.PUSH_SUBSCRIPTIONS,
+          keys: { username: 1, profileId: 1 },
         },
       ];
 

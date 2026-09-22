@@ -28,6 +28,14 @@ interface RegisteredConnection {
 
 const connectionsByConversation = new Map<string, Set<RegisteredConnection>>();
 
+/**
+ * Sockets whose page reported itself hidden (a background tab). They still
+ * receive every event; they just do not count as someone watching — the
+ * push notifier treats a conversation with only hidden viewers as
+ * unwatched.
+ */
+const hiddenWebsockets = new WeakSet<WebSocket>();
+
 const WebSocketConnectionRegistry = {
   /**
    * Register a WebSocket + emit function for a conversation.
@@ -157,6 +165,33 @@ const WebSocketConnectionRegistry = {
     // Check for at least one open connection
     for (const connection of connectionSet) {
       if (connection.websocket.readyState === connection.websocket.OPEN) {
+        return true;
+      }
+    }
+    return false;
+  },
+
+  /**
+   * Record whether a socket's page is visible (`{type:"visibility"}` from
+   * the client, sent on subscribe and on every visibilitychange).
+   */
+  setVisibility(websocket: WebSocket, isHidden: boolean): void {
+    if (isHidden) hiddenWebsockets.add(websocket);
+    else hiddenWebsockets.delete(websocket);
+  },
+
+  /**
+   * True when an open connection whose page is NOT hidden is subscribed to
+   * the conversation — somebody is looking at it right now.
+   */
+  hasVisibleConnection(conversationId: string): boolean {
+    const connectionSet = connectionsByConversation.get(conversationId);
+    if (!connectionSet) return false;
+    for (const connection of connectionSet) {
+      if (
+        connection.websocket.readyState === connection.websocket.OPEN &&
+        !hiddenWebsockets.has(connection.websocket)
+      ) {
         return true;
       }
     }
