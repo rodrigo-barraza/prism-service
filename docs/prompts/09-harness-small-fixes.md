@@ -58,15 +58,9 @@ Every item below is independent. For each one: write a red test, fix it, and kee
 
 ## Landing 2 — `cron-matcher`
 
-**e. The cron matcher** (`ScheduledTaskService.ts` ~107–141) has four errors:
-- `a-b/n` ignores the upper bound `b`;
-- `*/n` on day-of-month and month fires on even values (should be 1, 3, 5, …);
-- day-of-month and day-of-week are ANDed (cron ORs them when both are restricted);
-- day-of-week `7` (Sunday) never matches.
-
-*Fix:* replace it with a maintained parser (e.g. `croner`, MIT, no dependencies; add it per README §Conventions 2) or a corrected local implementation. Timezone handling must match today's behaviour, so check how tasks store a timezone.
-
-*Tests, red first:* a table test with `1-10/3`, `*/2` on day-of-month, `0 9 1 * 1` (OR semantics), `0 0 * * 7`, month steps, and a DST boundary in the configured timezone. Compare next-run times against the library or hand-computed values. Also test that existing stored tasks still parse.
+**Done 2026-09-22:** `matchCron` (`src/services/ScheduledTaskService.ts`) is a corrected local 5-field matcher with crontab(5) semantics: `a-b/n` stops at `b`, `*/n` on 1-based fields starts at 1, day-of-month and day-of-week are ORed when both are restricted, day-of-week 7 is Sunday, and JAN–DEC / SUN–SAT names are accepted. There is no new dependency, and timezone and DST behaviour is unchanged (process-local time).
+**Branch:** `cron-matcher`.
+**Tests:** `src/services/__tests__/cronMatcher.test.ts`, a next-run table in America/Los_Angeles covering both DST boundaries and the stored and documented expressions.
 
 ---
 
