@@ -8,6 +8,7 @@ import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalTo
 import { type InternalToolContext } from "./InternalToolRegistry.ts";
 import { LOG_PREVIEW, AGENT_DIRECTIVES, TURN_INPUT } from "#src/constants";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
+import { resolveLoopKey } from "#src/services/LoopKey";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import type { QuestionDefinition } from "#src/services/ApprovalRegistry";
 
@@ -42,6 +43,9 @@ interface QuestionPendingStatusEvent {
 interface AskUserContext extends InternalToolContext {
   _emit?: (event: UserQuestionEmitEvent | QuestionPendingStatusEvent) => void;
 }
+
+/** How long a BLOCKING question holds the turn before it gives up. */
+export const ASK_USER_BLOCKING_TIMEOUT_MILLISECONDS = 300_000;
 
 let questionSequence = 0;
 function nextQuestionId(): string {
@@ -261,8 +265,10 @@ export default {
       }),
     );
 
-    const agentConversationId = context.agentConversationId;
-    if (!agentConversationId) {
+    // Filed under the loop key — the id the client answers with (see LoopKey).
+    const loopKey = resolveLoopKey(context);
+    const agentConversationId = context.agentConversationId || null;
+    if (!loopKey) {
       return {
         error: PromptLocaleService.get(
           PromptLocaleService.getDefaultLocale(),
@@ -302,13 +308,17 @@ export default {
     // The answer route resolves the same pending-question entry; the
     // resolver posts the answer into the turn's mailbox, where the harness
     // picks it up at its next boundary. If the turn has already ended the
-    // entry is gone (loop cleanup) and the route answers 404 — the client
-    // then sends the answer as a normal message, which is the same text.
+    // entry is gone (loop cleanup) or the mailbox refuses it, and the route
+    // answers 404 — the client then sends the answer as a normal message,
+    // which is the same text. Either way it is delivered exactly once.
     if (!isBlocking) {
-      const mailboxKey = context.conversationId || agentConversationId;
-      AgenticLoopService._setPendingQuestion(agentConversationId, {
+      AgenticLoopService._setPendingQuestion(loopKey, {
+        questionId,
+        blocking: false,
+        createdAt: Date.now(),
+        agentConversationId,
         resolve: (value: QuestionResult) => {
-          const posted = TurnInputMailbox.post(mailboxKey, {
+          const posted = TurnInputMailbox.post(loopKey, {
             kind: "question_answer",
             text: formatQuestionAnswers(normalizedQuestions, value.answers, questionId),
             meta: { questionId },
@@ -318,6 +328,7 @@ export default {
               `[AskUserQuestion] Answer to ${questionId} arrived with no open turn (${posted.reason})`,
             );
           }
+          return { delivered: posted.accepted, reason: posted.reason };
         },
         questions: normalizedQuestions,
       });
@@ -342,11 +353,17 @@ export default {
     }
 
     const result = await new Promise<QuestionResult>((resolve) => {
-      const timeoutId = setTimeout(
-        () => resolve({ answers: null, timedOut: true }),
-        300_000,
-      );
-      AgenticLoopService._setPendingQuestion(agentConversationId, {
+      const timeoutId = setTimeout(() => {
+        // Off the registry first, so a late answer 404s (and the client
+        // sends it as a message) instead of resolving a wait nobody reads.
+        AgenticLoopService._removePendingQuestion(loopKey, questionId);
+        resolve({ answers: null, timedOut: true });
+      }, ASK_USER_BLOCKING_TIMEOUT_MILLISECONDS);
+      AgenticLoopService._setPendingQuestion(loopKey, {
+        questionId,
+        blocking: true,
+        createdAt: Date.now(),
+        agentConversationId,
         resolve: (value: QuestionResult) => {
           clearTimeout(timeoutId);
           resolve(value);
@@ -356,7 +373,9 @@ export default {
     });
 
     if (result.timedOut) {
-      logger.warn(`[AskUserQuestion] Timed out after 5 minutes`);
+      logger.warn(
+        `[AskUserQuestion] ${questionId} timed out after ${ASK_USER_BLOCKING_TIMEOUT_MILLISECONDS / 1000}s`,
+      );
       return {
         answers: null,
         timedOut: true,

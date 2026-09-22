@@ -21,6 +21,7 @@ interface WorktreeContext extends InternalToolContext {
 
 interface WorktreeCreateResult {
   worktreePath?: string;
+  branch?: string;
   error?: string;
 }
 
@@ -109,12 +110,12 @@ const enterWorktree = {
       ? workspaceRoot
       : workspaceRoot;
 
-    const branchName = `worktree/${agentConversationId.slice(0, 8)}-${Date.now().toString(36)}`;
+    const requestedBranchName = `worktree/${agentConversationId.slice(0, 8)}-${Date.now().toString(36)}`;
 
     // Create worktree via tools-api
     const proxyResult = await ToolOrchestratorService._proxyPost(
       "/agentic/git/worktree/create",
-      { path: repoPath, branch: branchName },
+      { path: repoPath, branch: requestedBranchName },
       context,
     );
 
@@ -128,6 +129,9 @@ const enterWorktree = {
       if (typeof record.worktreePath === "string") {
         createResult.worktreePath = record.worktreePath;
       }
+      if (typeof record.branch === "string") {
+        createResult.branch = record.branch;
+      }
       if (typeof record.error === "string") {
         createResult.error = record.error;
       }
@@ -136,6 +140,8 @@ const enterWorktree = {
     if (createResult.error) {
       return { error: `Failed to create worktree: ${createResult.error}` };
     }
+    // Store the branch tools-service created, never the name we asked for.
+    const branchName = createResult.branch ?? requestedBranchName;
 
     // Store the worktree state
     ToolOrchestratorService._setWorktree(agentConversationId, {
@@ -244,23 +250,42 @@ const exitWorktree = {
 
     let mergeResult: WorktreeMergeResult | null = null;
 
+    const errorOf = (value: unknown): string | undefined =>
+      value && typeof value === "object" && !Array.isArray(value)
+        ? typeof (value as Record<string, unknown>).error === "string"
+          ? ((value as Record<string, unknown>).error as string)
+          : undefined
+        : undefined;
+    const mergeFailed = (error: string) => ({
+      error: PromptLocaleService.get(
+        PromptLocaleService.getDefaultLocale(),
+        "internal-tools-runtime.exit_worktree.mergeFailed",
+        { error, path: worktreeState.worktreePath },
+      ),
+    });
+
     if (action === "merge") {
+      // The agent's edits are uncommitted until now: commit them first, or
+      // the merge carries nothing.
+      const commitError = errorOf(
+        await ToolOrchestratorService._proxyPost(
+          "/agentic/git/worktree/commit",
+          {
+            path: worktreeState.repoPath,
+            worktreePath: worktreeState.worktreePath,
+            message:
+              commitMessage || `Worktree work: ${worktreeState.branchName}`,
+          },
+          context,
+        ),
+      );
+      if (commitError) return mergeFailed(commitError);
+
       const proxyDiffResult = await ToolOrchestratorService._proxyPost(
         "/agentic/git/worktree/diff",
         { path: worktreeState.repoPath, branch: worktreeState.branchName },
         context,
       );
-      const diffResult: { error?: string; [key: string]: unknown } = {};
-      if (
-        proxyDiffResult &&
-        typeof proxyDiffResult === "object" &&
-        !Array.isArray(proxyDiffResult)
-      ) {
-        const record = proxyDiffResult as Record<string, unknown>;
-        if (typeof record.error === "string") {
-          diffResult.error = record.error;
-        }
-      }
 
       const proxyMergeResult = await ToolOrchestratorService._proxyPost(
         "/agentic/git/worktree/merge",
@@ -272,46 +297,35 @@ const exitWorktree = {
         },
         context,
       );
+      // A refused merge (conflict, or uncommitted edits in the main tree)
+      // keeps the worktree and branch: the error names the path.
+      const mergeError = errorOf(proxyMergeResult);
+      if (mergeError) return mergeFailed(mergeError);
 
-      const resolvedMergeResult: WorktreeMergeResult = {};
-      if (
-        proxyMergeResult &&
-        typeof proxyMergeResult === "object" &&
-        !Array.isArray(proxyMergeResult)
-      ) {
-        const record = proxyMergeResult as Record<string, unknown>;
-        if (typeof record.error === "string") {
-          resolvedMergeResult.error = record.error;
-        }
-      }
-
-      if (resolvedMergeResult.error) {
-        return {
-          error: PromptLocaleService.get(
-            PromptLocaleService.getDefaultLocale(),
-            "internal-tools-runtime.exit_worktree.mergeFailed",
-            {
-              error: resolvedMergeResult.error,
-              path: worktreeState.worktreePath,
-            },
-          ),
-        };
-      }
-
-      resolvedMergeResult.diff = diffResult.error ? null : proxyDiffResult;
-      mergeResult = resolvedMergeResult;
+      mergeResult = {
+        diff: errorOf(proxyDiffResult) ? null : proxyDiffResult,
+      };
     }
 
-    // Remove the worktree (both merge and discard)
-    await ToolOrchestratorService._proxyPost(
-      "/agentic/git/worktree/remove",
-      {
-        path: worktreeState.repoPath,
-        worktreePath: worktreeState.worktreePath,
-        deleteBranch: true,
-      },
-      context,
+    // Remove the worktree. After a merge its branch is contained, so the
+    // safe removal succeeds; only an explicit discard forces.
+    const removeError = errorOf(
+      await ToolOrchestratorService._proxyPost(
+        "/agentic/git/worktree/remove",
+        {
+          path: worktreeState.repoPath,
+          worktreePath: worktreeState.worktreePath,
+          deleteBranch: true,
+          force: action === "discard",
+        },
+        context,
+      ),
     );
+    if (removeError) {
+      logger.warn(
+        `[Worktree] exit: kept ${worktreeState.worktreePath} (${worktreeState.branchName}): ${removeError}`,
+      );
+    }
 
     ToolOrchestratorService._clearWorktree(agentConversationId);
 

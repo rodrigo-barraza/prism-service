@@ -21,6 +21,7 @@ import RequestLogger from "#src/services/RequestLogger";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { ORCHESTRATOR, SYSTEM_STATUSES } from "#src/constants";
+import { settleCompetingWorktrees } from "#src/services/orchestrator/WorktreeMergeBack";
 
 const MAXIMUM_EVALUATION_CHARACTERS = ORCHESTRATOR.MAXIMUM_SYNTHESIS_CHARACTERS;
 const DEFAULT_VERIFICATION_COMMANDS = ["tsc --noEmit", "npm test"];
@@ -190,6 +191,28 @@ function buildSelectionPrompt(
   ].join("\n");
 }
 
+/** Which candidate's work the judge picked — the only worktree that merges back. */
+interface TournamentOutcome {
+  winnerAgentId: string | null;
+}
+
+/**
+ * The judge answers "**Winner:** Sub-Agent #N" (routers.tournament.judgeFormat),
+ * N numbering `memberResults` from 1. Null unless N names a completed candidate.
+ */
+export function parseTournamentWinner(
+  judgeText: string,
+  memberResults: (SubAgentResult | { error: string })[],
+): string | null {
+  const match = judgeText.match(/Winner:?\**\s*Sub-?Agent\s*#\s*(\d+)/i);
+  if (!match) return null;
+  const candidate = memberResults[Number(match[1]) - 1];
+  if (!candidate || "error" in candidate || candidate.status !== "completed") {
+    return null;
+  }
+  return candidate.agent_id;
+}
+
 /**
  * Tournament Router — Best-of-N Selection with Judge Pass (BoN)
  *
@@ -209,6 +232,35 @@ export class TournamentRouter implements TopologyRouter {
     ) => Promise<SubAgentResult | { error: string }>,
     _continueSubAgent?: ContinueSubAgentCallback,
     topologyConfig?: TopologyConfig,
+  ): Promise<(SubAgentResult | { error: string })[]> {
+    // Candidates keep their worktrees until the judge has picked one; only the
+    // winner's work merges back, the others keep their branches.
+    const selection: TournamentOutcome = { winnerAgentId: null };
+    const results = await this.runTournament(
+      teamName,
+      members,
+      orchestratorContext,
+      spawnSubAgent,
+      topologyConfig,
+      selection,
+    );
+    await settleCompetingWorktrees(
+      results,
+      selection.winnerAgentId,
+      orchestratorContext.emit,
+    );
+    return results;
+  }
+
+  private async runTournament(
+    teamName: string,
+    members: TeamMember[],
+    orchestratorContext: OrchestratorContext,
+    spawnSubAgent: (
+      assignment: OrchestratorSpawnParams,
+    ) => Promise<SubAgentResult | { error: string }>,
+    topologyConfig: TopologyConfig | undefined,
+    selection: TournamentOutcome,
   ): Promise<(SubAgentResult | { error: string })[]> {
     const { providerName, resolvedModel } = orchestratorContext;
     const isVerificationEnabled = topologyConfig?.enableVerification === true;
@@ -254,6 +306,8 @@ export class TournamentRouter implements TopologyRouter {
         teamSize: members.length,
         orchestratorContext,
         awaitCompletion: true,
+        // Competing candidates must not all merge into the parent's tree.
+        preserveWorktree: true,
       });
     }
 
@@ -279,6 +333,7 @@ export class TournamentRouter implements TopologyRouter {
       logger.info(
         `[TournamentRouter] Only 1 sub-agent succeeded — auto-selecting as winner`,
       );
+      selection.winnerAgentId = (successfulResults[0] as SubAgentResult).agent_id;
       return memberResults;
     }
 
@@ -292,6 +347,7 @@ export class TournamentRouter implements TopologyRouter {
       );
 
       verificationOutcomes = new Map();
+      const verifierResults: (SubAgentResult | { error: string })[] = [];
 
       const verificationPromises = memberResults.map(
         async (result, resultIndex) => {
@@ -358,7 +414,11 @@ export class TournamentRouter implements TopologyRouter {
               teamSize: members.length,
               orchestratorContext,
               awaitCompletion: true,
+              // A verifier's by-products (build output, lockfiles) must never
+              // merge into the parent's tree; retired below.
+              preserveWorktree: true,
             });
+            verifierResults.push(verificationResult);
 
             if ("error" in verificationResult) {
               verificationOutcomes!.set(resultIndex, {
@@ -404,6 +464,7 @@ export class TournamentRouter implements TopologyRouter {
       );
 
       await Promise.all(verificationPromises);
+      await settleCompetingWorktrees(verifierResults, null);
 
       const passingCandidateCount = Array.from(
         verificationOutcomes.values(),
@@ -515,6 +576,16 @@ export class TournamentRouter implements TopologyRouter {
         messages: [],
         diff: { additions: 0, deletions: 0, files: [] },
       };
+
+      selection.winnerAgentId = parseTournamentWinner(
+        selectionResult.text || "",
+        memberResults,
+      );
+      if (!selection.winnerAgentId) {
+        logger.warn(
+          `[TournamentRouter] Judge named no valid winner — no candidate's work is merged; every branch is kept`,
+        );
+      }
 
       const inputTokens = selectionResult.usage?.inputTokens ?? 0;
       const outputTokens = selectionResult.usage?.outputTokens ?? 0;
