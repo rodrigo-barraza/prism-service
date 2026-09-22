@@ -1,7 +1,7 @@
 # Work Handoff — Prism Service + Client
 
 **Last updated:** 2026-09-15 — see also `harness_next_2026-09.md` (turn input mailbox, non-blocking questions, wait_for_tasks, event cursor, OpenAI native state + gpt-6-astra, run_tool_program, goals; branch `harness-next` in both repos).
-**2026-09-22:** `harness_modernization_2026-09.md` is the current recommendations list — verified defects (auth, Claude 5-generation 400s, ask_user answers, sub-agent merge-back, approvals, compaction), measured cache/cost, and the features to adopt, ranked. Start there.
+**2026-09-22:** `harness_modernization_2026-09.md` is the current recommendations list — verified defects (auth, Claude 5-generation 400s, ask_user answers, sub-agent merge-back, approvals, compaction), measured cache/cost, and the features to adopt, ranked. Start there; each item has a self-contained execution prompt in `docs/prompts/` (README = index, waves, test conventions, isolated live-test recipe).
 **Purpose:** Continuation brief for a fresh agent. Two independent bodies of work are in flight:
 1. **Harness improvement plan** (`prism-service`) — from `docs/harness_improvement_plan.md`
 2. **Business-logic audit** (`prism-service` + `prism-client`) — from `prism-client/business-logic-audit.md`
