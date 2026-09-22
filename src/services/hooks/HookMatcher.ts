@@ -149,24 +149,255 @@ export function matchesMatcher(
   }
 }
 
+// ─── Argument rules: `Tool(argPattern)` ───────────────────────────────────────
+//
+// The permission-rule syntax of docs/prompts/12 (Claude Code's `Bash(git *)`),
+// so a hook and a rule that mean the same call read the same:
+//
+//   rule      := toolGlob "(" [ name "=" ] pattern ")"
+//   pattern   := "/" regex "/"   — ANCHORED: compiled as ^(?:regex)$
+//              | glob            — `*` any run (never `/` in a path), `**` any
+//                                  run including `/`, `?` one character, `\`
+//                                  escapes; a trailing `:*` is the prefix form
+//                                  (`npm run test:*`)
+//
+// Without `name=`, the pattern is tested against the call's canonical value:
+// the command of a shell tool, the path of a file tool, the URL or query of a
+// web tool, and otherwise the arguments as compact key-sorted JSON. A matcher
+// shaped `name(…)` is always read as a rule, never as a regex.
+//
+// Hooks only decide whether a hook RUNS, so there is no allow/deny asymmetry
+// here: a malformed rule is rejected at write time (`describeMatcher` →
+// "invalid") and is a non-match at run time, like any other broken matcher.
+
+const RULE_PATTERN = /^([A-Za-z0-9_.*-]+)\(([\s\S]*)\)$/;
+const ARGUMENT_NAME_PATTERN = /^([A-Za-z_][A-Za-z0-9_]*)=([\s\S]*)$/;
+
+type CanonicalKind = "command" | "path" | "text";
+
+/** Which argument holds a tool's canonical value, and how globs read it. */
+const CANONICAL_ARGUMENTS: Record<string, { keys: string[]; kind: CanonicalKind }> = {
+  execute_shell: { keys: ["command"], kind: "command" },
+  execute_command: { keys: ["command"], kind: "command" },
+  execute_python: { keys: ["code"], kind: "text" },
+  execute_javascript: { keys: ["code"], kind: "text" },
+  read_file: { keys: ["path", "file_path", "filePath"], kind: "path" },
+  read_files: { keys: ["paths"], kind: "path" },
+  write_file: { keys: ["path", "file_path", "filePath"], kind: "path" },
+  replace_in_file: { keys: ["path", "file_path", "filePath"], kind: "path" },
+  patch_file: { keys: ["path", "file_path", "filePath"], kind: "path" },
+  move_file: { keys: ["source", "destination"], kind: "path" },
+  delete_file: { keys: ["path", "file_path", "filePath"], kind: "path" },
+  list_directory: { keys: ["path"], kind: "path" },
+  find_files: { keys: ["pattern", "path"], kind: "path" },
+  search_file_contents: { keys: ["path", "query"], kind: "path" },
+  get_file_info: { keys: ["path"], kind: "path" },
+  edit_notebook: { keys: ["path", "notebook_path"], kind: "path" },
+  read_web_page: { keys: ["url"], kind: "text" },
+  search_web: { keys: ["query"], kind: "text" },
+};
+
+/** Path-shaped argument names: a glob over one of these uses path rules. */
+const PATH_ARGUMENT_NAMES = new Set([
+  "path",
+  "paths",
+  "file_path",
+  "filePath",
+  "source",
+  "destination",
+  "notebook_path",
+  "cwd",
+]);
+
+interface ParsedArgumentRule {
+  toolRegex: RegExp;
+  argumentName: string | null;
+  /** `null` when a `/regex/` failed to compile. */
+  compile: ((kind: CanonicalKind) => RegExp | null) | null;
+}
+
+const parsedRuleCache = new Map<string, ParsedArgumentRule | null>();
+
+function escapeRegExp(character: string): string {
+  return character.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+}
+
+/** A glob as an anchored regex. `path` keeps `*` inside one path segment. */
+export function globToRegExp(glob: string, kind: CanonicalKind): RegExp {
+  let body = glob;
+  let prefixForm = false;
+  if (kind !== "path" && body.endsWith(":*") && !body.endsWith("\\:*")) {
+    body = body.slice(0, -2);
+    prefixForm = true;
+  }
+  const star = kind === "path" ? "[^/]*" : "[\\s\\S]*";
+  const single = kind === "path" ? "[^/]" : "[\\s\\S]";
+
+  let source = "";
+  for (let index = 0; index < body.length; index++) {
+    const character = body[index];
+    if (character === "\\" && index + 1 < body.length) {
+      source += escapeRegExp(body[++index]);
+    } else if (character === "*" && body[index + 1] === "*") {
+      index++;
+      if (kind === "path" && body[index + 1] === "/") {
+        index++;
+        source += "(?:[\\s\\S]*/)?";
+      } else {
+        source += "[\\s\\S]*";
+      }
+    } else if (character === "*") {
+      source += star;
+    } else if (character === "?") {
+      source += single;
+    } else {
+      source += escapeRegExp(character);
+    }
+  }
+  // Prefix form: the prefix alone, or the prefix followed by a word break.
+  if (prefixForm) source += "(?:\\s[\\s\\S]*)?";
+  return new RegExp(`^${source}$`);
+}
+
+function parseArgumentRule(pattern: string): ParsedArgumentRule | null {
+  if (parsedRuleCache.has(pattern)) return parsedRuleCache.get(pattern) ?? null;
+
+  const ruleMatch = RULE_PATTERN.exec(pattern);
+  if (!ruleMatch) {
+    parsedRuleCache.set(pattern, null);
+    return null;
+  }
+  const [, toolPattern, inner] = ruleMatch;
+  const named = ARGUMENT_NAME_PATTERN.exec(inner);
+  const argumentName = named ? named[1] : null;
+  const patternSource = (named ? named[2] : inner).trim();
+
+  let compile: ParsedArgumentRule["compile"] = null;
+  if (patternSource.length >= 2 && patternSource.startsWith("/") && patternSource.endsWith("/")) {
+    try {
+      const regex = new RegExp(`^(?:${patternSource.slice(1, -1)})$`);
+      compile = () => regex;
+    } catch (compileError: unknown) {
+      logger.warn(
+        `[HookMatcher] Invalid argument regex in "${pattern}": ${errorMessage(compileError)}. Treating as a non-match.`,
+      );
+    }
+  } else if (patternSource.length > 0) {
+    const byKind = new Map<CanonicalKind, RegExp>();
+    compile = (kind) => {
+      if (!byKind.has(kind)) byKind.set(kind, globToRegExp(patternSource, kind));
+      return byKind.get(kind) ?? null;
+    };
+  }
+
+  const parsed: ParsedArgumentRule = {
+    toolRegex: globToRegExp(toolPattern, "text"),
+    argumentName,
+    compile,
+  };
+  parsedRuleCache.set(pattern, parsed);
+  return parsed;
+}
+
+/** Is this matcher the `Tool(argPattern)` form? */
+export function isArgumentRule(matcher: string | null | undefined): boolean {
+  return typeof matcher === "string" && RULE_PATTERN.test(matcher.trim());
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    const entries = Object.keys(value as Record<string, unknown>)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson((value as Record<string, unknown>)[key])}`);
+    return `{${entries.join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+/** Every string an argument pattern is tested against for this call. */
+function candidateValues(
+  toolName: string,
+  args: Record<string, unknown>,
+  argumentName: string | null,
+): { values: string[]; kind: CanonicalKind } {
+  const flatten = (value: unknown): string[] =>
+    Array.isArray(value)
+      ? value.flatMap(flatten)
+      : value === undefined || value === null
+        ? []
+        : [typeof value === "string" ? value : stableJson(value)];
+
+  if (argumentName) {
+    return {
+      values: flatten(args[argumentName]),
+      kind: PATH_ARGUMENT_NAMES.has(argumentName) ? "path" : "text",
+    };
+  }
+  const spec = CANONICAL_ARGUMENTS[toolName];
+  if (spec) {
+    const values = spec.keys.flatMap((key) => flatten(args[key]));
+    if (values.length > 0) return { values, kind: spec.kind };
+  }
+  return { values: [stableJson(args)], kind: "text" };
+}
+
+/**
+ * Does a tool call satisfy `matcher`? Name-only matchers behave exactly as
+ * `matchesMatcher`; the `Tool(argPattern)` form also tests the arguments.
+ * Never throws.
+ */
+export function matchesToolCall(
+  matcher: string | null | undefined,
+  toolName: string | null | undefined,
+  args: Record<string, unknown> | null | undefined,
+): boolean {
+  if (matchesEverything(matcher)) return true;
+  const pattern = (matcher as string).trim();
+  if (!isArgumentRule(pattern)) return matchesMatcher(pattern, toolName);
+  if (typeof toolName !== "string" || !toolName) return false;
+  if (isRejectedPattern(pattern)) return false;
+
+  const rule = parseArgumentRule(pattern);
+  if (!rule || !rule.compile) return false;
+  if (!rule.toolRegex.test(toolName)) return false;
+
+  try {
+    const { values, kind } = candidateValues(toolName, args || {}, rule.argumentName);
+    const regex = rule.compile(kind);
+    return !!regex && values.some((value) => regex.test(value));
+  } catch (matchError: unknown) {
+    logger.warn(
+      `[HookMatcher] Rule "${pattern}" failed while testing "${toolName}": ${errorMessage(matchError)}`,
+    );
+    return false;
+  }
+}
+
 /**
  * Classify a matcher without evaluating it. Exposed for the routes layer,
  * which wants to tell a user at write time whether their matcher will be read
- * as a name list or as a regex.
+ * as a name list, an argument rule or a regex — and to refuse one that can
+ * never match.
  */
 export function describeMatcher(
   matcher: string | null | undefined,
-): "all" | "literal" | "regex" | "invalid" {
+): "all" | "literal" | "rule" | "regex" | "invalid" {
   if (matchesEverything(matcher)) return "all";
   const pattern = (matcher as string).trim();
   if (isRejectedPattern(pattern)) return "invalid";
   if (LITERAL_LIST_PATTERN.test(pattern)) return "literal";
+  if (isArgumentRule(pattern)) {
+    const rule = parseArgumentRule(pattern);
+    return rule && rule.compile ? "rule" : "invalid";
+  }
   return compileMatcher(pattern) ? "regex" : "invalid";
 }
 
-/** Drop the compiled-pattern cache. Test seam; also safe at runtime. */
+/** Drop the compiled-pattern caches. Test seam; also safe at runtime. */
 export function clearMatcherCache(): void {
   compiledMatcherCache.clear();
+  parsedRuleCache.clear();
 }
 
 export default matchesMatcher;

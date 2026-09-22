@@ -6,6 +6,7 @@ import {
   TOOL_NAMES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { HARNESS } from "#src/constants";
+import { firePermissionDenied, rememberHookContext } from "./TurnHooks.ts";
 
 import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type AgentHooks from "#src/services/AgentHooks";
@@ -141,10 +142,11 @@ export async function executeToolBatch(
         };
       }
 
-      // Honor decide-hook verdicts (CriticGate, AutoApprovalEngine, custom
-      // guardrails). AgentHooks.run short-circuits internally on a deny, but
-      // the block only holds if the caller acts on the returned result —
-      // discarding it here made every `decide` hook a silent no-op.
+      // Honor the built-in post-approval decide hooks (CriticGate, the
+      // AutoApprovalEngine re-check). AgentHooks.run short-circuits on a
+      // deny, but the block only holds if the caller acts on the result.
+      // Configured PreToolUse hooks are NOT here any more: they run before
+      // the approval gate (TurnHooks.runPreToolUseStage).
       const hookResult = await hooks.run("beforeToolCall", toolCall, context);
       if (hookResult && hookResult.isApproved === false) {
         const blockReason =
@@ -158,6 +160,15 @@ export async function executeToolBatch(
           type: SERVER_SENT_EVENT_TYPES.STATUS,
           message: `Tool "${toolCall.name}" blocked: ${blockReason}`,
         });
+        // CriticGate stamps the model that reviewed the call; anything else
+        // vetoing here is the rule layer's re-check.
+        await firePermissionDenied(
+          hooks,
+          context,
+          toolCall,
+          hookResult.criticModel ? "classifier" : "rule",
+          blockReason,
+        );
         return {
           name: toolCall.name,
           id: toolCall.id,
@@ -231,6 +242,7 @@ export async function executeToolBatch(
           toolCall,
           result,
           context,
+          state,
         );
         return {
           name: toolCall.name,
@@ -305,6 +317,7 @@ export async function executeToolBatch(
         toolCall,
         result,
         context,
+        state,
       );
       return {
         name: toolCall.name,
@@ -324,13 +337,15 @@ export async function executeToolBatch(
  * `afterToolCallFailure` fires *in addition to* `afterToolCall` when the tool
  * reported failure, so a listener can subscribe to failures alone instead of
  * re-deriving the condition at every call site. A `transform` hook may replace
- * what the model sees by returning `updatedToolOutput`.
+ * what the model sees by returning `updatedToolOutput`, and add
+ * `additionalContext`, which joins the batch's <hook-context> message.
  */
 async function runPostToolHooks<T>(
   hooks: AgentHooks,
   toolCall: ToolCall,
   result: T,
   context: AgenticContext,
+  state?: AgenticLoopState,
 ): Promise<T> {
   const hookResult = await hooks.run("afterToolCall", toolCall, result, context);
 
@@ -345,6 +360,8 @@ async function runPostToolHooks<T>(
   if (failed) {
     await hooks.run("afterToolCallFailure", toolCall, result, context);
   }
+
+  if (state) rememberHookContext(state, hookResult?.additionalContext);
 
   if (hookResult && "updatedToolOutput" in hookResult) {
     logger.info(

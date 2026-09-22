@@ -41,6 +41,22 @@ import {
 import { executeToolBatch } from "#src/services/harnesses/lifecycle/ToolExecutor";
 import { checkAndWaitForApproval } from "#src/services/harnesses/lifecycle/ApprovalGate";
 import {
+  buildDeniedToolResult,
+  buildStopContinuationMessage,
+  closeTurnHooks,
+  fireInstructionsLoaded,
+  fireStopFailure,
+  flushHookContext,
+  openTurnHooks,
+  runPostToolBatchStage,
+  runPreToolUseStage,
+  runStopStage,
+  type LoadedInstruction,
+  type TurnHookHandle,
+} from "#src/services/harnesses/lifecycle/TurnHooks";
+import { buildHookPayload } from "#src/services/hooks/buildPayload";
+import { HOOK_EVENTS } from "#src/services/hooks/types";
+import {
   emitPostExecutionStatus,
   processToolResultMedia,
   trackToolErrors,
@@ -94,7 +110,40 @@ export interface ScoredBranch {
   pass: PassState;
 }
 
-export type StandardHooks = ReturnType<typeof createStandardHooks>;
+export type StandardHooks = ReturnType<typeof createStandardHooks> & {
+  /** The turn's configured-hook handle, set by `runBeforePromptSetup`. */
+  turnHooks?: TurnHookHandle;
+};
+
+/**
+ * Hooks a strategy run opened, so `runWithTurnHooks` can close them on every
+ * exit path — the strategies return from half a dozen places.
+ */
+const openTurns = new WeakMap<BaseAgenticHarness, StandardHooks>();
+
+/**
+ * Run a branching strategy with the turn-level configured hooks closed on
+ * every exit (SubagentStop, TurnEnd, session bookkeeping) — the same
+ * guarantee the ReAct loop's `finally` gives.
+ */
+export async function runWithTurnHooks(
+  harness: BaseAgenticHarness,
+  strategy: (harness: BaseAgenticHarness) => Promise<{ messages: ConversationMessage[] }>,
+): Promise<{ messages: ConversationMessage[] }> {
+  try {
+    return await strategy(harness);
+  } finally {
+    const standardHooks = openTurns.get(harness);
+    openTurns.delete(harness);
+    if (standardHooks?.turnHooks) {
+      const handle = standardHooks.turnHooks;
+      await closeTurnHooks(harness["context"], standardHooks.hooks, harness["state"], handle, {
+        blocked: handle.blocked,
+        reason: handle.reason,
+      });
+    }
+  }
+}
 
 /**
  * Provider-native state a pass produced (OpenAI Responses: message phase,
@@ -147,7 +196,7 @@ export async function runBeforePromptSetup(
     emit,
   } = context;
 
-  const standardHooks = createStandardHooks({
+  const standardHooks: StandardHooks = createStandardHooks({
     workspaceRoot: workspaceRoot || undefined,
     autoApprove: options.autoApprove === true,
     policies: options.policies,
@@ -167,7 +216,14 @@ export async function runBeforePromptSetup(
     agentConversationId: agentConversationId || "",
     workspaceRoot,
     hookDepth: context.parentAgentConversationId ? 1 : 0,
+    emit: emit as (event: Record<string, unknown>) => void,
   });
+
+  // The same turn-open events the ReAct loop fires. A refusal is reported on
+  // `standardHooks.turnHooks.blocked`; the strategy returns before its loop.
+  standardHooks.turnHooks = await openTurnHooks(context, hooks, currentMessages);
+  openTurns.set(harness, standardHooks);
+  if (standardHooks.turnHooks.blocked) return standardHooks;
 
   if (options.planFirst) {
     emit({
@@ -197,6 +253,11 @@ export async function runBeforePromptSetup(
     activeRuleNames: options.activeRuleNames as string[] | undefined,
   };
   await hooks.run("beforePrompt", hookContext);
+  await fireInstructionsLoaded(
+    context,
+    hooks,
+    hookContext._loadedInstructions as LoadedInstruction[] | undefined,
+  );
 
   if (hookContext._assembledSystemPrompt) {
     const assembledPrompt = hookContext._assembledSystemPrompt as string;
@@ -717,25 +778,34 @@ export async function executeApprovedToolBatch(
   const { options, workspaceRoot, emit } = context;
   const { hooks, approvalEngine } = standardHooks;
 
+  // Context from a batch that was backtracked (validation failure) must not
+  // leak into the next committed one.
+  state.pendingHookContext = [];
+
+  // PreToolUse BEFORE the gate, as in the ReAct loop.
+  const preToolUse = await runPreToolUseStage(
+    pass.pendingToolCalls,
+    context,
+    hooks,
+    state,
+  );
+
   const { isApproved, shouldApproveAll, deniedToolCalls = [] } =
     await checkAndWaitForApproval(
-      pass.pendingToolCalls,
+      preToolUse.executable,
       context,
       approvalEngine,
+      hooks,
     );
 
-  // Policy-denied calls are terminal — never executed, never approvable.
+  // Denied calls (rule or PermissionRequest hook) are terminal — never
+  // executed, never approvable.
   const deniedIds = new Set(deniedToolCalls.map((toolCall) => toolCall.id));
-  const deniedResults: ToolResult[] = deniedToolCalls.map((toolCall) => ({
-    name: toolCall.name,
-    id: toolCall.id,
-    result: {
-      success: false,
-      error: "POLICY_DENIED",
-      message: `Tool execution denied by policy: ${toolCall._approval?.reason || "policy rule"}`,
-    },
-  }));
-  const executableToolCalls = pass.pendingToolCalls.filter(
+  const deniedResults: ToolResult[] = [
+    ...deniedToolCalls.map(buildDeniedToolResult),
+    ...preToolUse.blocked,
+  ];
+  const executableToolCalls = preToolUse.executable.filter(
     (toolCall) => !deniedIds.has(toolCall.id),
   );
 
@@ -797,6 +867,8 @@ export async function executeApprovedToolBatch(
   );
 
   emitPostExecutionStatus(pass.pendingToolCalls, emit);
+
+  await runPostToolBatchStage(context, hooks, state, pass.pendingToolCalls, results);
 
   return { results, sandboxCheckpointReference };
 }
@@ -861,6 +933,7 @@ export async function commitToolCallResults(
     }),
   };
   currentMessages.push(assistantMessage);
+  flushHookContext(currentMessages, state);
 
   const retryGuidanceMessage = buildToolRetryGuidance(
     pass.pendingToolCalls,
@@ -1039,6 +1112,39 @@ export function handleNoToolCallOutcome(
 //  Run finalization + loop error persistence
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+/**
+ * The strategy's pass answered without tool calls — the point the turn would
+ * end. Stop hooks are awaited here; returns `true` when one blocked, after
+ * recording the answer and the hook's reason so the loop can continue.
+ */
+export async function continueAfterStopHooks(
+  harness: BaseAgenticHarness,
+  pass: PassState,
+  currentMessages: ConversationMessage[],
+  standardHooks: StandardHooks,
+): Promise<boolean> {
+  const context = harness["context"];
+  const state: AgenticLoopState = harness["state"];
+  const answer = pass.finalStreamedText || pass.streamedText || "";
+  const { continueWith } = await runStopStage(
+    context,
+    standardHooks.hooks,
+    state,
+    answer,
+    currentMessages,
+  );
+  if (!continueWith || context.signal?.aborted) return false;
+  currentMessages.push({
+    role: "assistant",
+    content: answer,
+    ...(pass.streamedThinking?.trim() && { thinking: pass.streamedThinking.trim() }),
+    ...(pass.thinkingSignature && { thinkingSignature: pass.thinkingSignature }),
+    ...providerNativeState(pass),
+  });
+  currentMessages.push(buildStopContinuationMessage(continueWith));
+  return true;
+}
+
 export async function finalizeStrategyRun(
   harness: BaseAgenticHarness,
   currentMessages: ConversationMessage[],
@@ -1081,6 +1187,29 @@ export async function persistLoopError(
   logger.error(
     `[${logLabel}] Loop error on iteration ${state.iterations}: ${getErrorMessage(loopError)}. Persisting ${currentMessages.length - state.originalMessageCount} accumulated message(s).`,
   );
+
+  // StopFailure / Error — observation only; recovery stays here. `onError`
+  // was declared on AgentHooks from the start but fired nowhere before the
+  // hooks feature; this is the one path every harness's throw goes through.
+  await fireStopFailure(context, standardHooks.hooks, loopError);
+  await standardHooks.hooks
+    .run(
+      "onError",
+      buildHookPayload(
+        HOOK_EVENTS.ERROR,
+        {
+          conversationId: context.conversationId,
+          agentConversationId: context.agentConversationId as string,
+          parentAgentConversationId: context.parentAgentConversationId as string,
+          project: context.project,
+          username: context.username,
+          agent: context.agent,
+          workspaceRoot: context.workspaceRoot,
+        },
+        { error_message: getErrorMessage(loopError) },
+      ),
+    )
+    .catch(() => undefined);
 
   injectErrorAsConversationMessage(
     currentMessages,

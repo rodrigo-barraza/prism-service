@@ -21,6 +21,11 @@ import AgenticLoopState from "#src/services/AgenticLoopState";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import { pendingApprovals } from "#src/services/ApprovalRegistry";
 import { invalidateHookCache } from "#src/services/hooks/ConfiguredHookRegistry";
+import HookSessionTracker, {
+  _resetSessionsForTests,
+} from "#src/services/hooks/HookSessionTracker";
+import { deny } from "#src/services/PolicyEngine";
+import { ProviderError } from "#src/utils/errors";
 import type { ConfiguredHookDocument } from "#src/services/hooks/types";
 import type {
   AgenticContext,
@@ -34,6 +39,14 @@ const hookState = vi.hoisted(() => ({
   recorded: [] as Array<Record<string, unknown>>,
   decide: (_payload: Record<string, unknown>): Record<string, unknown> => ({}),
   executed: [] as Array<{ name: string; args: Record<string, unknown> }>,
+  /** How the automatic approver answers a card. */
+  approve: true,
+  /** What the system-prompt assembler stub reports as loaded. */
+  loadedInstructions: undefined as unknown,
+  /** The conversation document the model-switch check reads. */
+  conversationDocument: null as Record<string, unknown> | null,
+  /** Called inside executeTool — lets a test act mid-batch. */
+  duringTool: null as null | (() => void),
 }));
 
 // ── The capturing HTTP handler ───────────────────────────────
@@ -47,6 +60,16 @@ vi.mock("#src/services/hooks/handlers/HttpHookHandler", () => ({
 }));
 vi.mock("#src/services/hooks/handlers/PromptHookHandler", () => ({ default: vi.fn() }));
 vi.mock("#src/services/hooks/handlers/McpToolHookHandler", () => ({ default: vi.fn() }));
+
+vi.mock("#src/wrappers/MongoWrapper", () => ({
+  default: {
+    getDb: () => ({
+      collection: () => ({
+        findOne: async () => hookState.conversationDocument,
+      }),
+    }),
+  },
+}));
 
 // Built-ins without Mongo, the system-prompt assembler or the memory hooks:
 // a real kernel, the real AutoApprovalEngine as the tier/policy decide hook,
@@ -69,6 +92,9 @@ vi.mock("../lifecycle/HookInitializer.ts", async () => {
           const target = hookContext as Record<string, unknown>;
           target._assembledSystemPrompt = "You are a test agent.";
           target._injectedSkills = [];
+          if (hookState.loadedInstructions) {
+            target._loadedInstructions = hookState.loadedInstructions;
+          }
         },
         "SystemPromptAssembler",
         "transform",
@@ -84,7 +110,8 @@ vi.mock("#src/services/ToolOrchestratorService", () => ({
   default: {
     isStreamable: () => false,
     executeTool: vi.fn(async (name: string, args: Record<string, unknown>) => {
-      hookState.executed.push({ name, args });
+      hookState.executed.push({ name, args: { ...args } });
+      hookState.duringTool?.();
       return { success: true, content: `${name} ok` };
     }),
     getToolSchemas: vi.fn().mockReturnValue([]),
@@ -241,8 +268,29 @@ type Turn =
  * produces on iteration i+1. Approval cards are answered automatically (allow)
  * a tick after they are emitted, so a run that emits one still terminates.
  */
-function buildHarness(script: Turn[], { autoApprove = false } = {}) {
-  const conversationId = "hook-semantics-conv";
+interface HarnessOptions {
+  autoApprove?: boolean;
+  policies?: unknown[];
+  signal?: AbortSignal;
+  conversationId?: string;
+  history?: ConversationMessage[];
+  pricing?: Record<string, number>;
+  /** Throw this from the provider on the given iteration. */
+  providerError?: { iteration: number; error: Error };
+}
+
+function buildHarness(
+  script: Turn[],
+  {
+    autoApprove = false,
+    policies,
+    signal,
+    conversationId = "hook-semantics-conv",
+    history = [],
+    pricing,
+    providerError,
+  }: HarnessOptions = {},
+) {
   let iteration = 0;
   const seenMessages: ConversationMessage[][] = [];
   const eventLog: string[] = [];
@@ -252,7 +300,13 @@ function buildHarness(script: Turn[], { autoApprove = false } = {}) {
     if (event.type === "approval_required") {
       setTimeout(() => {
         const entry = pendingApprovals.get(conversationId);
-        if (entry && entry.type === "tool") entry.resolve({ isApproved: true });
+        if (entry && entry.type === "tool") {
+          entry.resolve(
+            hookState.approve
+              ? { isApproved: true }
+              : { isApproved: false, reason: "user_rejected" },
+          );
+        }
       }, 0);
     }
   });
@@ -269,7 +323,11 @@ function buildHarness(script: Turn[], { autoApprove = false } = {}) {
     agent: null,
     providerName: "test-provider",
     resolvedModel: "test-model",
-    modelDefinition: { maxInputTokens: 128000, maxOutputTokens: 8192 } as never,
+    modelDefinition: {
+      maxInputTokens: 128000,
+      maxOutputTokens: 8192,
+      ...(pricing && { pricing }),
+    } as never,
     traceId: "test-trace",
     agentConversationId: conversationId,
     conversationId,
@@ -279,16 +337,17 @@ function buildHarness(script: Turn[], { autoApprove = false } = {}) {
       autoApprove,
       agenticLoopEnabled: true,
       maxTokens: 8192,
+      ...(policies && { policies }),
     },
-    messages: [{ role: "user", content: "Do the task" }],
+    messages: [...history, { role: "user", content: "Do the task" }],
     emit,
-    signal: undefined as never,
+    signal: (signal ?? undefined) as never,
     requestId: "req-test",
     requestStart: performance.now(),
     isNewConversation: true,
   } as never;
 
-  const state = new AgenticLoopState({ originalMessageCount: 1 });
+  const state = new AgenticLoopState({ originalMessageCount: history.length + 1 });
   const tools: ResolvedTools = {
     finalTools: [
       { name: "read_file", description: "Read a file", parameters: {} },
@@ -302,6 +361,7 @@ function buildHarness(script: Turn[], { autoApprove = false } = {}) {
     async (messages: ConversationMessage[]) => {
       iteration++;
       eventLog.push(`model:${iteration}`);
+      if (providerError && providerError.iteration === iteration) throw providerError.error;
       seenMessages.push(messages.map((message) => ({ ...message })));
       return mockProvider.generateTextStream();
     },
@@ -508,5 +568,423 @@ describe("configured hooks — B9 semantics against a real ReActHarness", () => 
     );
     expect(answerIndex).toBeGreaterThan(-1);
     expect(reasonIndex).toBe(answerIndex + 1);
+  });
+});
+
+// ── The new events, each at its moment ───────────────────────
+
+describe("configured hooks — the new events fire once, at the right moment", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    invalidateHookCache();
+    TurnInputMailbox._clearAll();
+    pendingApprovals.clear();
+    _resetSessionsForTests();
+    hookState.configured = [];
+    hookState.recorded = [];
+    hookState.executed = [];
+    hookState.decide = () => ({});
+    hookState.approve = true;
+    hookState.loadedInstructions = undefined;
+    hookState.conversationDocument = null;
+    hookState.duringTool = null;
+  });
+
+  const ALL_OBSERVED = [
+    "SessionStart",
+    "TurnStart",
+    "UserPromptSubmit",
+    "InstructionsLoaded",
+    "PreToolUse",
+    "PermissionRequest",
+    "Notification",
+    "PostToolUse",
+    "PostToolBatch",
+    "Stop",
+    "TurnEnd",
+  ];
+
+  it("fires the whole turn in order, PermissionRequest before the card and PostToolBatch before the next model call", async () => {
+    hookState.configured = ALL_OBSERVED.map((event) => configuredHook(event));
+    hookState.loadedInstructions = [
+      { instructionType: "project_instructions", name: "PRISM.md", content: "Be terse." },
+    ];
+    const { harness, eventLog } = buildHarness([
+      { kind: "tool", calls: [{ name: "write_file", args: { path: "a.txt", content: "x" } }] },
+      { kind: "text", text: "done" },
+    ]);
+    // Interleave hook deliveries with the harness's own events in one log.
+    hookState.decide = (payload) => {
+      eventLog.push(`hook:${payload.hook_event_name}`);
+      return {};
+    };
+
+    await harness.run();
+    await settle();
+
+    const order = eventLog.filter((entry) => entry.startsWith("hook:") || entry.startsWith("model:") || entry === "approval_required");
+    expect(order).toEqual([
+      "hook:SessionStart",
+      "hook:TurnStart",
+      "hook:UserPromptSubmit",
+      "hook:InstructionsLoaded",
+      "model:1",
+      "hook:PreToolUse",
+      "hook:PermissionRequest",
+      "hook:Notification",
+      "approval_required",
+      "hook:PostToolUse",
+      "hook:PostToolBatch",
+      "model:2",
+      "hook:Stop",
+      "hook:TurnEnd",
+    ]);
+
+    const [instructions] = recordedFor("InstructionsLoaded");
+    expect(instructions).toMatchObject({
+      instruction_type: "project_instructions",
+      file_path: "PRISM.md",
+      file_content: "Be terse.",
+    });
+    const [batch] = recordedFor("PostToolBatch");
+    expect(batch.tool_calls).toEqual([
+      expect.objectContaining({ tool_name: "write_file", tool_use_id: "call-1-1" }),
+    ]);
+    expect(recordedFor("TurnEnd")[0]).toMatchObject({ iterations: 2, response_text: "done" });
+  });
+
+  it("SessionStart fires per session, TurnStart per turn; SessionEnd when the session idles out", async () => {
+    // A document written before this change: no `async`, event SessionStart.
+    hookState.configured = [
+      configuredHook("SessionStart"),
+      configuredHook("TurnStart"),
+      configuredHook("SessionEnd"),
+    ];
+
+    const first = buildHarness([{ kind: "text", text: "one" }], { conversationId: "session-conv" });
+    await first.harness.run();
+    const second = buildHarness([{ kind: "text", text: "two" }], {
+      conversationId: "session-conv",
+      history: [
+        { role: "user", content: "earlier" },
+        { role: "assistant", content: "one" },
+      ],
+    });
+    await second.harness.run();
+    await settle();
+
+    expect(recordedFor("TurnStart")).toHaveLength(2);
+    expect(recordedFor("SessionStart")).toHaveLength(1);
+    expect(recordedFor("SessionStart")[0].source).toBe("startup");
+    expect(recordedFor("SessionEnd")).toHaveLength(0);
+
+    await HookSessionTracker.endSession("session-conv", "idle");
+    await settle();
+    expect(recordedFor("SessionEnd")).toHaveLength(1);
+    expect(recordedFor("SessionEnd")[0]).toMatchObject({ reason: "idle", turns: 2 });
+
+    // The next turn opens a new session — a resume, since it has history.
+    const third = buildHarness([{ kind: "text", text: "three" }], {
+      conversationId: "session-conv",
+      history: [
+        { role: "user", content: "earlier" },
+        { role: "assistant", content: "one" },
+      ],
+    });
+    await third.harness.run();
+    await settle();
+    expect(recordedFor("SessionStart").map((payload) => payload.source)).toEqual(["startup", "resume"]);
+  });
+
+  it("PermissionRequest can answer instead of the human: allow skips the card, deny refuses the call", async () => {
+    hookState.configured = [configuredHook("PermissionRequest"), configuredHook("PermissionDenied")];
+    hookState.decide = (payload) => {
+      if (payload.hook_event_name !== "PermissionRequest") return {};
+      const input = payload.tool_input as { path: string };
+      return input.path === "ok.txt"
+        ? { decision: "allow" }
+        : { decision: "deny", message: "not that file" };
+    };
+    const { harness, emit, seenMessages } = buildHarness([
+      {
+        kind: "tool",
+        calls: [
+          { name: "write_file", args: { path: "ok.txt", content: "x" } },
+          { name: "write_file", args: { path: "secret.txt", content: "y" } },
+        ],
+      },
+      { kind: "text", text: "done" },
+    ]);
+    await harness.run();
+    await settle();
+
+    expect(emittedOfType(emit, "approval_required")).toHaveLength(0);
+    expect(recordedFor("PermissionRequest")).toHaveLength(2);
+    expect(recordedFor("PermissionRequest")[0]).toMatchObject({ permission_mode: "default", tier: "write" });
+    expect(hookState.executed.map((call) => call.args.path)).toEqual(["ok.txt"]);
+    const denied = recordedFor("PermissionDenied");
+    expect(denied).toHaveLength(1);
+    expect(denied[0]).toMatchObject({ denied_by: "hook", reason: "not that file", tool_name: "write_file" });
+    const toolMessage = seenMessages[1].find((message) => (message.toolCalls?.length ?? 0) > 0)!;
+    const refused = toolMessage.toolCalls!.find((call) => (call.args as { path: string }).path === "secret.txt")!;
+    expect((refused.result as { message: string }).message).toContain("not that file");
+  });
+
+  it("PermissionDenied names the layer: a deny rule, then the user", async () => {
+    hookState.configured = [configuredHook("PermissionDenied")];
+    const byRule = buildHarness(
+      [
+        { kind: "tool", calls: [{ name: "write_file", args: { path: "x", content: "" } }] },
+        { kind: "text", text: "done" },
+      ],
+      { policies: [deny("write_file", { name: "no-writes" })] },
+    );
+    await byRule.harness.run();
+    await settle();
+    expect(recordedFor("PermissionDenied")).toEqual([
+      expect.objectContaining({ denied_by: "rule", tool_name: "write_file" }),
+    ]);
+
+    hookState.recorded = [];
+    hookState.approve = false;
+    const byUser = buildHarness([
+      { kind: "tool", calls: [{ name: "write_file", args: { path: "y", content: "" } }] },
+      { kind: "text", text: "done" },
+    ]);
+    await byUser.harness.run();
+    await settle();
+    expect(recordedFor("PermissionDenied")).toEqual([
+      expect.objectContaining({ denied_by: "user", reason: "user_rejected" }),
+    ]);
+  });
+
+  it("a hook `allow` skips the mode's prompt but never a deny rule", async () => {
+    hookState.configured = [configuredHook("PreToolUse")];
+    hookState.decide = (payload) =>
+      payload.hook_event_name === "PreToolUse" ? { permissionDecision: "allow" } : {};
+    const allowed = buildHarness([
+      { kind: "tool", calls: [{ name: "write_file", args: { path: "a", content: "" } }] },
+      { kind: "text", text: "done" },
+    ]);
+    await allowed.harness.run();
+    expect(emittedOfType(allowed.emit, "approval_required")).toHaveLength(0);
+    expect(hookState.executed).toHaveLength(1);
+
+    hookState.executed = [];
+    const ruled = buildHarness(
+      [
+        { kind: "tool", calls: [{ name: "write_file", args: { path: "a", content: "" } }] },
+        { kind: "text", text: "done" },
+      ],
+      { policies: [deny("write_file")] },
+    );
+    await ruled.harness.run();
+    expect(hookState.executed).toHaveLength(0);
+  });
+
+  it("PreToolUse updatedInput rewrites the call before the gate and the tool see it", async () => {
+    hookState.configured = [configuredHook("PreToolUse", "write_file(path=*.tmp)")];
+    hookState.decide = (payload) =>
+      payload.hook_event_name === "PreToolUse"
+        ? { permissionDecision: "allow", updatedInput: { path: "sandbox/out.tmp", content: "x" } }
+        : {};
+    const { harness } = buildHarness([
+      {
+        kind: "tool",
+        calls: [
+          { name: "write_file", args: { path: "out.tmp", content: "x" } },
+          { name: "read_file", args: { path: "README.md" } },
+        ],
+      },
+      { kind: "text", text: "done" },
+    ]);
+    await harness.run();
+    await settle();
+
+    // The argument matcher selected only the .tmp write.
+    expect(recordedFor("PreToolUse")).toHaveLength(1);
+    expect(hookState.executed.find((call) => call.name === "write_file")!.args).toEqual({
+      path: "sandbox/out.tmp",
+      content: "x",
+    });
+  });
+
+  it("additionalContext from PreToolUse, PostToolUse and PostToolBatch reaches the next model call as one message", async () => {
+    hookState.configured = [
+      configuredHook("PreToolUse"),
+      configuredHook("PostToolUse"),
+      configuredHook("PostToolBatch"),
+    ];
+    hookState.decide = (payload) => ({ additionalContext: `from ${String(payload.hook_event_name)}` });
+    const { harness, seenMessages } = buildHarness([
+      { kind: "tool", calls: [{ name: "read_file", args: { path: "a" } }] },
+      { kind: "text", text: "done" },
+    ]);
+    await harness.run();
+
+    const contextMessages = seenMessages[1].filter(
+      (message) => typeof message.content === "string" && message.content.includes("<hook-context>"),
+    );
+    expect(contextMessages).toHaveLength(1);
+    for (const source of ["from PreToolUse", "from PostToolUse", "from PostToolBatch"]) {
+      expect(contextMessages[0].content).toContain(source);
+    }
+    // After the tool results it describes.
+    const toolIndex = seenMessages[1].findIndex((message) => (message.toolCalls?.length ?? 0) > 0);
+    expect(seenMessages[1].indexOf(contextMessages[0])).toBe(toolIndex + 1);
+  });
+
+  it("systemMessage is shown to the user", async () => {
+    hookState.configured = [configuredHook("TurnStart")];
+    hookState.decide = () => ({ systemMessage: "Heads up: prod credentials are loaded." });
+    const { harness, emit } = buildHarness([{ kind: "text", text: "done" }]);
+    await harness.run();
+    await settle();
+    expect(emittedOfType(emit, "status")).toContainEqual(
+      expect.objectContaining({
+        message: "hook_system_message",
+        text: "Heads up: prod credentials are loaded.",
+        hookEvent: "TurnStart",
+      }),
+    );
+  });
+
+  it("StopFailure fires with the classified error type when the provider fails", async () => {
+    hookState.configured = [configuredHook("StopFailure"), configuredHook("Stop")];
+    const { harness } = buildHarness([{ kind: "text", text: "never" }], {
+      providerError: {
+        iteration: 1,
+        error: new ProviderError("anthropic", "Too many requests", 429),
+      },
+    });
+    await expect(harness.run()).rejects.toThrow("Too many requests");
+    await settle();
+    expect(recordedFor("StopFailure")).toEqual([
+      expect.objectContaining({ error_type: "rate_limit", error_message: "Too many requests" }),
+    ]);
+    expect(recordedFor("Stop")).toHaveLength(0);
+  });
+
+  it("Interrupt fires when the user stops, with the transcript", async () => {
+    hookState.configured = [configuredHook("Interrupt")];
+    const controller = new AbortController();
+    hookState.duringTool = () => controller.abort();
+    const { harness } = buildHarness(
+      [
+        { kind: "tool", calls: [{ name: "read_file", args: { path: "a" } }] },
+        { kind: "text", text: "never" },
+      ],
+      { signal: controller.signal },
+    );
+    await harness.run();
+    await settle();
+
+    const interrupts = recordedFor("Interrupt");
+    expect(interrupts).toHaveLength(1);
+    expect(interrupts[0].transcript).toEqual(
+      expect.arrayContaining([expect.objectContaining({ role: "user", content: "Do the task" })]),
+    );
+  });
+
+  it("PreModelSwitch / PostModelSwitch carry the estimated re-cache cost; a block refuses the turn", async () => {
+    hookState.configured = [configuredHook("PreModelSwitch"), configuredHook("PostModelSwitch")];
+    hookState.conversationDocument = { settings: { model: "old-model", provider: "openai" } };
+    const pricing = { inputPerMillion: 3, cacheWriteInputPerMillion: 3.75 };
+    const history = [
+      { role: "user", content: "x".repeat(4_000) },
+      { role: "assistant", content: "ok" },
+    ] as ConversationMessage[];
+
+    const switched = buildHarness([{ kind: "text", text: "done" }], { history, pricing });
+    await switched.harness.run();
+    await settle();
+    const [pre] = recordedFor("PreModelSwitch");
+    expect(pre).toMatchObject({
+      from_model: "old-model",
+      from_provider: "openai",
+      to_model: "test-model",
+      cache_write_price_per_million: 3.75,
+    });
+    expect(pre.estimated_recache_tokens as number).toBeGreaterThan(900);
+    expect(pre.estimated_recache_cost_usd as number).toBeCloseTo(
+      ((pre.estimated_recache_tokens as number) / 1_000_000) * 3.75,
+      6,
+    );
+    expect(recordedFor("PostModelSwitch")).toHaveLength(1);
+
+    hookState.recorded = [];
+    hookState.decide = (payload) =>
+      payload.hook_event_name === "PreModelSwitch" ? { decision: "block", reason: "stay on old-model" } : {};
+    const blocked = buildHarness([{ kind: "text", text: "never" }], { history, pricing });
+    await blocked.harness.run();
+    expect(blocked.iterations()).toBe(0);
+    expect(recordedFor("PostModelSwitch")).toHaveLength(0);
+  });
+
+  it("no model-switch events when the model did not change", async () => {
+    hookState.configured = [configuredHook("PreModelSwitch")];
+    hookState.conversationDocument = { settings: { model: "test-model", provider: "test-provider" } };
+    const { harness } = buildHarness([{ kind: "text", text: "done" }]);
+    await harness.run();
+    expect(recordedFor("PreModelSwitch")).toHaveLength(0);
+  });
+});
+
+// ── Async hooks ──────────────────────────────────────────────
+
+describe("configured hooks — async", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    invalidateHookCache();
+    TurnInputMailbox._clearAll();
+    pendingApprovals.clear();
+    _resetSessionsForTests();
+    hookState.configured = [];
+    hookState.recorded = [];
+    hookState.executed = [];
+    hookState.decide = () => ({});
+    hookState.approve = true;
+  });
+
+  it("delivers an async hook's context at the next mailbox boundary", async () => {
+    hookState.configured = [configuredHook("PostToolUse", "", { async: true })];
+    hookState.decide = () => ({ additionalContext: "lint found 2 warnings in a.ts" });
+    const { harness, emit, seenMessages } = buildHarness([
+      { kind: "tool", calls: [{ name: "read_file", args: { path: "a.ts" } }] },
+      { kind: "text", text: "done" },
+    ]);
+    TurnInputMailbox.open("hook-semantics-conv");
+    await harness.run();
+
+    const delivered = seenMessages[1].find(
+      (message) =>
+        message.role === "system" &&
+        typeof message.content === "string" &&
+        message.content.includes("lint found 2 warnings"),
+    );
+    expect(delivered, "the async output must reach the model at the next boundary").toBeDefined();
+    expect(emittedOfType(emit, "status")).toContainEqual(
+      expect.objectContaining({ message: "hook_context_applied", _hookEvent: "PostToolUse" }),
+    );
+    // Never a user bubble.
+    expect(emittedOfType(emit, "turn_input")).toHaveLength(0);
+  });
+
+  it("an async hook cannot block or rewrite the action that fired it", async () => {
+    hookState.configured = [configuredHook("PreToolUse", "", { async: true })];
+    hookState.decide = () => ({
+      permissionDecision: "deny",
+      permissionDecisionReason: "too late to matter",
+      updatedInput: { path: "elsewhere" },
+    });
+    const { harness } = buildHarness([
+      { kind: "tool", calls: [{ name: "read_file", args: { path: "a.ts" } }] },
+      { kind: "text", text: "done" },
+    ]);
+    await harness.run();
+    await settle();
+
+    expect(recordedFor("PreToolUse")).toHaveLength(1);
+    expect(hookState.executed).toEqual([{ name: "read_file", args: { path: "a.ts" } }]);
   });
 });

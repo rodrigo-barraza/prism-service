@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import {
   matchesMatcher,
+  matchesToolCall,
   describeMatcher,
   clearMatcherCache,
   MAX_MATCHER_LENGTH,
@@ -163,6 +164,55 @@ describe("HookMatcher", () => {
       for (let index = 0; index < 5; index += 1) {
         expect(matchesMatcher("mcp__.*__list", "mcp__files__list")).toBe(true);
       }
+    });
+  });
+
+  // ── Argument rules — `Tool(argPattern)`, prompt 12's rule syntax ──
+  describe("argument rules", () => {
+    it.each([
+      // canonical value of a shell tool is its command; `*` crosses `/`
+      ["execute_shell(git *)", "execute_shell", { command: "git push origin/main" }, true],
+      ["execute_shell(git *)", "execute_shell", { command: "rm -rf /" }, false],
+      // the tool part is itself a glob
+      ["execute_*(git *)", "execute_command", { command: "git status" }, true],
+      ["execute_shell(git *)", "execute_command", { command: "git status" }, false],
+      // canonical value of a file tool is its path; `*` stays in one segment
+      ["write_file(src/**)", "write_file", { path: "src/a/b.ts" }, true],
+      ["write_file(src/*)", "write_file", { path: "src/a/b.ts" }, false],
+      ["write_file(src/**/*.ts)", "write_file", { path: "src/index.ts" }, true],
+      // named argument, anchored regex
+      ["write_file(path=/.*\\.env/)", "write_file", { path: "config/.env" }, true],
+      ["write_file(path=/\\.env/)", "write_file", { path: "config/.env" }, false],
+      // prefix form
+      ["execute_shell(npm run test:*)", "execute_shell", { command: "npm run test --watch" }, true],
+      ["execute_shell(npm run test:*)", "execute_shell", { command: "npm run test" }, true],
+      ["execute_shell(npm run test:*)", "execute_shell", { command: "npm run testing" }, false],
+      // an unknown tool's canonical value is its arguments as sorted JSON
+      ["mcp__github__*(*prism-service*)", "mcp__github__create_issue", { title: "t", repo: "prism-service" }, true],
+      ["mcp__github__*(repo=prism*)", "mcp__github__create_issue", { repo: "prism-service" }, true],
+      ["mcp__github__*(repo=prism*)", "mcp__github__create_issue", { repo: "tools-service" }, false],
+      // array arguments match when any element does
+      ["read_files(docs/**)", "read_files", { paths: ["src/a.ts", "docs/b.md"] }, true],
+    ])("%s on %s %j → %s", (matcher, toolName, args, expected) => {
+      expect(matchesToolCall(matcher, toolName, args)).toBe(expected);
+    });
+
+    it("keeps name-only matchers exactly as matchesMatcher reads them", () => {
+      expect(matchesToolCall("Bash|Edit", "Edit", { anything: 1 })).toBe(true);
+      expect(matchesToolCall("^mcp__", "mcp__x__y", {})).toBe(true);
+      expect(matchesToolCall("", "whatever", {})).toBe(true);
+      expect(matchesToolCall("read_file", "write_file", {})).toBe(false);
+    });
+
+    it("classifies rules, and a rule whose regex cannot compile as invalid", () => {
+      expect(describeMatcher("execute_shell(git *)")).toBe("rule");
+      expect(describeMatcher("write_file(path=/[/)")).toBe("invalid");
+      expect(matchesToolCall("write_file(path=/[/)", "write_file", { path: "[" })).toBe(false);
+    });
+
+    it("never throws on hostile argument shapes", () => {
+      expect(() => matchesToolCall("x(*)", "x", { value: 1n as unknown })).not.toThrow();
+      expect(matchesToolCall("x(*)", "x", null)).toBe(true);
     });
   });
 });

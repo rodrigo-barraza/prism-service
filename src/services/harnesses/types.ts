@@ -56,6 +56,17 @@ export interface ToolCall {
     isApproved?: boolean;
     isDenied?: boolean;
     reason?: string;
+    /** Which layer denied: a rule, the classifier, a hook, or the user. */
+    deniedBy?: "rule" | "classifier" | "hook" | "user";
+  };
+  /**
+   * The configured PreToolUse hooks' verdict, stamped BEFORE the approval
+   * gate: `ask` forces a per-call approval request, `allow` skips the mode's
+   * prompt (never a deny or ask rule).
+   */
+  _hookPermission?: {
+    decision: "allow" | "ask";
+    reason?: string;
   };
   result?: unknown;
   status?: string;

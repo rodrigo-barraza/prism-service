@@ -5,11 +5,13 @@ import { COLLECTIONS, HOOKS } from "#src/constants";
 import type AgentHooks from "#src/services/AgentHooks";
 import type { TransformedHookResult } from "#src/services/AgentHooks";
 import type { LLMProvider, ToolCall } from "#src/services/harnesses/types";
+import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import {
-  BLOCKING_EVENTS,
   HOOK_DEPTH_CONTEXT_KEY,
   HOOK_EVENTS,
+  HOOK_HANDLER_TYPES,
   INTERNAL_EVENT_BY_HOOK_EVENT,
+  MATCHER_FIELD_BY_EVENT,
   TOOL_MATCHED_EVENTS,
 } from "#src/services/hooks/types";
 import type {
@@ -17,7 +19,9 @@ import type {
   HookEventName,
   HookPayload,
 } from "#src/services/hooks/types";
-import { matchesMatcher } from "#src/services/hooks/HookMatcher";
+import { matchesMatcher, matchesToolCall } from "#src/services/hooks/HookMatcher";
+import { summarizeTranscript } from "#src/services/hooks/buildPayload";
+import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
 import { getRequestContext } from "#src/utils/RequestContext";
 import {
@@ -96,6 +100,12 @@ export interface HookRegistrationContext {
   model?: string;
   requestId?: string;
   traceId?: string | null;
+  /**
+   * The run's event stream. A hook's `systemMessage` is shown to the user
+   * through it — for every event, including fire-and-forget ones whose
+   * return value the kernel discards.
+   */
+  emit?: (event: Record<string, unknown>) => void;
 }
 
 /** Identity with the `"any"` fallbacks applied. */
@@ -236,16 +246,22 @@ interface AdaptedArguments {
   provider?: LLMProvider;
   providerName?: string;
   model?: string;
+  /** The live message array, when the event was fired with the agentic context. */
+  messages?: Array<Record<string, unknown>>;
 }
 
 /**
  * Fold an event's positional arguments into one flat payload.
  *
- * Three shapes arrive here and all three are handled by position, not by
- * guessing: `(toolCall, …)` for the tool events, `(ctx, output)` for `Stop`,
- * and `(payload)` for everything the hooks feature newly wires up. The
- * fallback — spread a lone plain object — is what makes a new event work
- * without touching this file, provided it passes its fields as one object.
+ * Two shapes arrive here, handled by position, not by guessing:
+ *   - `(toolCall, second?, ctx?)` for the tool events. On `PostToolUse` /
+ *     `PostToolUseFailure` `second` is the tool's result; on
+ *     `PermissionRequest` / `PermissionDenied` it is the event's extra
+ *     fields (tier, who denied, …).
+ *   - `(payload, ctx?)` for everything else. Spreading the lone plain object
+ *     is what makes a new event work without touching this file.
+ * The agentic context, when passed, is never spread — it only lends the
+ * provider, signal and live transcript.
  */
 export function adaptHookArguments(
   event: HookEventName,
@@ -290,12 +306,9 @@ export function adaptHookArguments(
       payload.tool_output = second;
       const errorText = isPlainObject(second) ? second.error : undefined;
       if (typeof errorText === "string") payload.tool_error = errorText;
+    } else if (isPlainObject(second) && !looksLikeAgenticContext(second)) {
+      Object.assign(payload, second);
     }
-  } else if (event === HOOK_EVENTS.STOP) {
-    // `afterResponse(ctx, output)` — only the text belongs in a payload; the
-    // rest of `output` is the whole message history.
-    const output = isPlainObject(second) ? second : undefined;
-    if (typeof output?.text === "string") payload.response_text = output.text;
   } else {
     const single = args.find(
       (argument) =>
@@ -312,10 +325,15 @@ export function adaptHookArguments(
   );
 
   const contextSignal = agenticContext?.signal;
+  const liveMessages =
+    agenticContext?._currentMessages ?? agenticContext?.messages;
 
   return {
     payload,
     depth,
+    messages: Array.isArray(liveMessages)
+      ? (liveMessages as Array<Record<string, unknown>>)
+      : undefined,
     signal:
       contextSignal instanceof AbortSignal ? contextSignal : context.signal,
     provider:
@@ -328,18 +346,96 @@ export function adaptHookArguments(
   };
 }
 
+/** Events whose hooks gate something and short-circuit on the first refusal. */
+const DECIDE_EVENTS = new Set<HookEventName>([
+  HOOK_EVENTS.PRE_TOOL_USE,
+  HOOK_EVENTS.USER_PROMPT_SUBMIT,
+  HOOK_EVENTS.PERMISSION_REQUEST,
+  HOOK_EVENTS.PRE_MODEL_SWITCH,
+  HOOK_EVENTS.STOP,
+]);
+
+/** Events whose hooks are awaited for what they return, without gating. */
+const TRANSFORM_EVENTS = new Set<HookEventName>([
+  HOOK_EVENTS.POST_TOOL_USE,
+  HOOK_EVENTS.POST_TOOL_BATCH,
+  HOOK_EVENTS.INTERRUPT,
+]);
+
 /**
  * Which `AgentHooks` category a configured hook registers under.
  *
- * `PostToolUse` is the interesting case: it is not in `BLOCKING_EVENTS`, but
- * it can rewrite the tool result via `updatedToolOutput`, and `inspect` hooks
- * are fire-and-forget — their return value is discarded and the loop does not
- * wait for them. A rewrite registered as `inspect` would silently never apply.
+ * `inspect` hooks are fire-and-forget — their return value is discarded and
+ * the loop does not wait for them. So every event whose hooks return
+ * something the loop USES must be `decide` or `transform`: `PostToolUse`
+ * (rewrites the result), `PostToolBatch` (adds context), `Stop` (can keep
+ * the agent going). Getting this wrong is silent in both directions. An
+ * `async` hook is always `inspect`, whatever its event: it must not hold up,
+ * block or rewrite the action that fired it.
  */
-export function categoryForEvent(event: HookEventName): HookCategory {
-  if (event === HOOK_EVENTS.POST_TOOL_USE) return "transform";
-  if (BLOCKING_EVENTS.includes(event)) return "decide";
+export function categoryForEvent(
+  event: HookEventName,
+  isAsync = false,
+): HookCategory {
+  if (isAsync) return "inspect";
+  if (DECIDE_EVENTS.has(event)) return "decide";
+  if (TRANSFORM_EVENTS.has(event)) return "transform";
   return "inspect";
+}
+
+/** Status message a hook's `systemMessage` is shown to the user under. */
+export const HOOK_SYSTEM_MESSAGE_STATUS = "hook_system_message";
+
+/**
+ * Does the hook's matcher select this occurrence of its event? Tool events
+ * test the call (name, and arguments for the `Tool(argPattern)` form); the
+ * events in `MATCHER_FIELD_BY_EVENT` test one payload field; every other
+ * event has nothing to narrow, so its (write-time-rejected) matcher is moot.
+ */
+export function hookSelects(
+  hook: ConfiguredHookDocument,
+  payload: HookPayload,
+): boolean {
+  if (TOOL_MATCHED_EVENTS.includes(hook.event)) {
+    return matchesToolCall(hook.matcher, payload.tool_name, payload.tool_input);
+  }
+  const field = MATCHER_FIELD_BY_EVENT[hook.event];
+  if (field) {
+    const value = payload[field];
+    return matchesMatcher(
+      hook.matcher,
+      value === undefined || value === null ? "" : String(value),
+    );
+  }
+  return true;
+}
+
+/**
+ * Deliver an async hook's output at the running turn's next safe boundary.
+ * `additionalContext` becomes a `hook_context` mailbox entry the harness
+ * drains into the conversation; a turn that has already ended has no
+ * boundary left, so the output is logged and dropped.
+ */
+function deliverAsyncOutput(
+  hook: ConfiguredHookDocument,
+  result: TransformedHookResult,
+  context: HookRegistrationContext,
+): void {
+  const text =
+    typeof result.additionalContext === "string" ? result.additionalContext.trim() : "";
+  if (!text) return;
+  const conversationId = context.conversationId || context.sessionId;
+  if (!conversationId) return;
+  const posted = TurnInputMailbox.post(conversationId, {
+    kind: "hook_context",
+    text,
+    meta: { _hookName: hook.name, _hookEvent: hook.event },
+  });
+  if (!posted.accepted) {
+    logger.info(
+      `[ConfiguredHookRegistry] Async hook "${hook.name}" (${hook.event}) finished after its turn (${posted.reason}); output dropped.`,
+    );
+  }
 }
 
 /**
@@ -368,7 +464,7 @@ export function registerConfiguredHooks(
       continue;
     }
 
-    const isToolMatched = TOOL_MATCHED_EVENTS.includes(hook.event);
+    const isAsync = hook.async === true;
 
     const handler = async (
       ...args: unknown[]
@@ -377,9 +473,7 @@ export function registerConfiguredHooks(
 
       // The matcher gates *before* the handler runs — the whole point of a
       // matcher is that a `Bash`-only hook costs nothing on a `Read` call.
-      if (isToolMatched && !matchesMatcher(hook.matcher, adapted.payload.tool_name)) {
-        return undefined;
-      }
+      if (!hookSelects(hook, adapted.payload)) return undefined;
 
       const result = await runConfiguredHook(hook, adapted.payload, {
         hookDepth: adapted.depth,
@@ -395,16 +489,39 @@ export function registerConfiguredHooks(
         conversationId: context.conversationId,
         agentConversationId:
           adapted.payload.agent_conversation_id || context.agentConversationId,
+        transcript:
+          hook.handler?.type === HOOK_HANDLER_TYPES.AGENT
+            ? summarizeTranscript(adapted.messages)
+            : undefined,
       });
 
-      return normalizeDecision(result, hook.event);
+      const normalized = normalizeDecision(result, hook.event);
+
+      // Shown to the user here, once, for every event and category — an
+      // inspect hook's return value never reaches its call site.
+      if (typeof normalized.systemMessage === "string" && normalized.systemMessage) {
+        context.emit?.({
+          type: SERVER_SENT_EVENT_TYPES.STATUS,
+          message: HOOK_SYSTEM_MESSAGE_STATUS,
+          text: normalized.systemMessage,
+          hookName: hook.name,
+          hookEvent: hook.event,
+        });
+        delete normalized.systemMessage;
+      }
+
+      if (isAsync) {
+        deliverAsyncOutput(hook, normalized, context);
+        return undefined;
+      }
+      return normalized;
     };
 
     hooks.register(
       internalEvent,
       handler,
       hook.name,
-      categoryForEvent(hook.event),
+      categoryForEvent(hook.event, isAsync),
     );
     registered += 1;
   }
@@ -437,6 +554,7 @@ const ConfiguredHookRegistry = {
   hookScopeKey,
   categoryForEvent,
   adaptHookArguments,
+  hookSelects,
 };
 
 export default ConfiguredHookRegistry;

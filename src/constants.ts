@@ -834,6 +834,42 @@ export const HOOKS = {
    * they get one attempt — a retry storm would multiply the stall.
    */
   HTTP_RETRY_ATTEMPTS: 1,
+
+  /**
+   * `Interrupt` runs while the user is waiting for Stop to take effect, so it
+   * gets a second by default and never more than three.
+   */
+  INTERRUPT_TIMEOUT_MILLISECONDS: 1_000,
+  INTERRUPT_MAX_TIMEOUT_MILLISECONDS: 3_000,
+
+  /**
+   * Continuations a `Stop` hook may force in a row before the loop stops
+   * anyway (Antigravity caps the same thing). A verifier that never passes
+   * must not turn one turn into an unbounded one.
+   */
+  MAX_STOP_CONTINUATIONS: 3,
+
+  /**
+   * A conversation session ends after this long without a turn; that is when
+   * `SessionEnd` fires. A turn after it opens a new session (`resume`).
+   */
+  SESSION_IDLE_MILLISECONDS: 30 * 60_000,
+
+  /** Shared budget for `SessionEnd` hooks flushed at shutdown (Claude Code: 1.5 s). */
+  SESSION_END_SHUTDOWN_BUDGET_MILLISECONDS: 1_500,
+
+  /**
+   * Messages of recent transcript an `agent` hook's verifier sees, and the
+   * characters kept from each. An `Interrupt` payload carries the same slice.
+   */
+  TRANSCRIPT_MESSAGES: 12,
+  TRANSCRIPT_MESSAGE_CHARS: 2_000,
+
+  /** Env var naming the usernames allowed to own a `command` hook. */
+  COMMAND_OWNERS_ENV_VAR: "PRISM_HOOK_COMMAND_OWNERS",
+
+  /** tools-service route that runs a `command` hook. */
+  COMMAND_RUN_PATH: "/agentic/hook-command/run",
 } as const;
 
 // ─── Timer & Scheduler Constants ────────────────────────────

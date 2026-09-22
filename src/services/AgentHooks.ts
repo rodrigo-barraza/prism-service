@@ -24,7 +24,19 @@ import { errorMessage } from "@rodrigo-barraza/utilities-library";
  *   preCompact /
  *   postCompact      — Fire around an LLM compaction pass.
  *   notification     — Fires when the loop surfaces something to the user
- *                       out of band (approval required, plan proposed).
+ *                       out of band (approval actually required).
+ *   turnStart /
+ *   turnEnd          — Fire around every agentic run (sessionStart/sessionEnd
+ *                       are per conversation session, see HookSessionTracker).
+ *   preToolUse       — Configured PreToolUse hooks, fired BEFORE the approval
+ *                       gate (beforeToolCall stays the post-approval seam).
+ *   permissionRequest / permissionDenied
+ *                    — Around the human approval step.
+ *   postToolBatch    — After a whole batch resolved, before the next model call.
+ *   stop             — Configured Stop hooks, awaited at the point the loop
+ *                       would end the turn (afterResponse stays the built-ins').
+ *   stopFailure / interrupt / instructionsLoaded / preModelSwitch /
+ *   postModelSwitch  — See services/hooks/types.ts HOOK_EVENTS.
  *
  * Hook Categories (inspired by Antigravity SDK):
  *   inspect    — Read-only, non-blocking. Errors are logged but never propagate.
@@ -69,8 +81,21 @@ type HookEvent =
   // Compaction boundaries.
   | "preCompact"
   | "postCompact"
-  // Out-of-band user-facing events (approval requests, plan proposals).
-  | "notification";
+  // Out-of-band user-facing events (approval requests).
+  | "notification"
+  // Configured-hook seams (services/hooks/types.ts INTERNAL_EVENT_BY_HOOK_EVENT).
+  | "turnStart"
+  | "turnEnd"
+  | "preToolUse"
+  | "permissionRequest"
+  | "permissionDenied"
+  | "postToolBatch"
+  | "stop"
+  | "stopFailure"
+  | "interrupt"
+  | "instructionsLoaded"
+  | "preModelSwitch"
+  | "postModelSwitch";
 
 /**
  * Hook category determines execution semantics.
@@ -94,7 +119,56 @@ interface RegisteredHook {
   category: HookCategory;
 }
 
-export type { HookCategory, HookHandler };
+export type { HookCategory, HookHandler, HookEvent };
+
+/** Precedence when two hooks disagree: deny > ask > allow. */
+const PERMISSION_DECISION_RANK: Record<string, number> = {
+  allow: 1,
+  ask: 2,
+  deny: 3,
+};
+
+/** Fields several hooks may each contribute to; joined, never overwritten. */
+const ACCUMULATED_TEXT_FIELDS = ["additionalContext", "systemMessage"] as const;
+
+/**
+ * Fold one hook's result into the running result for an event.
+ *
+ * A plain spread would let the LAST hook win every field, so a user's
+ * `allow` registered after another's `ask` would silently cancel the prompt,
+ * and two hooks each adding context would lose the first one's. Two rules
+ * replace last-wins where it matters: `permissionDecision` keeps the stronger
+ * verdict, and `additionalContext` / `systemMessage` accumulate.
+ */
+export function mergeHookResults(
+  previous: TransformedHookResult | undefined,
+  next: object,
+): TransformedHookResult {
+  const incoming = next as TransformedHookResult;
+  const merged: TransformedHookResult = { ...previous, ...incoming };
+
+  const previousDecision = previous?.permissionDecision as string | undefined;
+  const nextDecision = incoming.permissionDecision as string | undefined;
+  if (previousDecision && nextDecision) {
+    const keepPrevious =
+      (PERMISSION_DECISION_RANK[previousDecision] ?? 0) >
+      (PERMISSION_DECISION_RANK[nextDecision] ?? 0);
+    if (keepPrevious) {
+      merged.permissionDecision = previousDecision;
+      merged.reason = previous?.reason ?? merged.reason;
+    }
+  }
+
+  for (const field of ACCUMULATED_TEXT_FIELDS) {
+    const before = previous?.[field];
+    const after = incoming[field];
+    if (typeof before === "string" && before && typeof after === "string" && after) {
+      merged[field] = `${before}\n\n${after}`;
+    }
+  }
+
+  return merged;
+}
 
 export default class AgentHooks {
   private _hooks: Map<HookEvent, RegisteredHook[]>;
@@ -147,7 +221,7 @@ export default class AgentHooks {
           ...args,
         );
         if (hookResult && typeof hookResult === "object") {
-          result = { ...result, ...hookResult };
+          result = mergeHookResults(result, hookResult);
           // Short-circuit if any decide hook denies
           if (
             "isApproved" in hookResult &&
@@ -173,7 +247,7 @@ export default class AgentHooks {
           ...args,
         );
         if (hookResult && typeof hookResult === "object") {
-          result = { ...result, ...hookResult };
+          result = mergeHookResults(result, hookResult);
         }
       } catch (error: unknown) {
         logger.error(
