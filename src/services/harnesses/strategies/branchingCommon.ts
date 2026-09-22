@@ -39,9 +39,12 @@ import {
   attachConfiguredHooks,
 } from "#src/services/harnesses/lifecycle/HookInitializer";
 import { executeToolBatch } from "#src/services/harnesses/lifecycle/ToolExecutor";
-import { checkAndWaitForApproval } from "#src/services/harnesses/lifecycle/ApprovalGate";
 import {
-  buildDeniedToolResult,
+  approvalRecordFor,
+  checkAndWaitForApproval,
+  orderResultsLikeCalls,
+} from "#src/services/harnesses/lifecycle/ApprovalGate";
+import {
   buildStopContinuationMessage,
   closeTurnHooks,
   fireInstructionsLoaded,
@@ -806,45 +809,23 @@ export async function executeApprovedToolBatch(
     state,
   );
 
-  const { isApproved, shouldApproveAll, deniedToolCalls = [] } =
+  const { executableToolCalls, blockedResults, shouldApproveAll } =
     await checkAndWaitForApproval(
       preToolUse.executable,
       context,
       approvalEngine,
-      hooks,
+      { toolSchemas: tools.finalTools, hooks },
     );
+  if (shouldApproveAll) {
+    options.autoApprove = true;
+  }
 
-  // Denied calls (rule or PermissionRequest hook) are terminal — never
-  // executed, never approvable.
-  const deniedIds = new Set(deniedToolCalls.map((toolCall) => toolCall.id));
-  const deniedResults: ToolResult[] = [
-    ...deniedToolCalls.map(buildDeniedToolResult),
-    ...preToolUse.blocked,
-  ];
-  const executableToolCalls = preToolUse.executable.filter(
-    (toolCall) => !deniedIds.has(toolCall.id),
-  );
-
-  let results: ToolResult[];
+  // Denied calls (rule, PreToolUse or PermissionRequest hook, the user)
+  // never run; every call the gate cleared runs in one batch. Results keep
+  // the model's order.
   let sandboxCheckpointReference: string | null = null;
-  if (!isApproved) {
-    results = [
-      ...executableToolCalls.map((toolCall) => ({
-        name: toolCall.name,
-        id: toolCall.id,
-        result: {
-          success: false,
-          error: "USER_REJECTED",
-          message: "Tool execution was manually rejected by the user.",
-        },
-      })),
-      ...deniedResults,
-    ];
-  } else {
-    if (shouldApproveAll) {
-      options.autoApprove = true;
-    }
-
+  let executedResults: ToolResult[] = [];
+  if (executableToolCalls.length > 0) {
     context._currentMessages = currentMessages;
 
     // ── Sandbox checkpoint (git-based rollback) ────────────
@@ -852,17 +833,19 @@ export async function executeApprovedToolBatch(
       ? createSandboxCheckpoint(workspaceRoot, emit)
       : null;
 
-    results = [
-      ...(await executeToolBatch(
-        executableToolCalls,
-        context,
-        tools,
-        hooks,
-        state,
-      )),
-      ...deniedResults,
-    ];
+    executedResults = await executeToolBatch(
+      executableToolCalls,
+      context,
+      tools,
+      hooks,
+      state,
+    );
   }
+  const results: ToolResult[] = orderResultsLikeCalls(pass.pendingToolCalls, [
+    ...executedResults,
+    ...blockedResults,
+    ...preToolUse.blocked,
+  ]);
 
   // ── Post-execution processing ─────────────────────────
   await processToolResultMedia(
@@ -945,6 +928,7 @@ export async function commitToolCallResults(
         reasoningItem: toolCall.reasoningItem || undefined,
         result: matchingResult ? matchingResult.result : null,
         durationMilliseconds: matchingResult?.durationMilliseconds,
+        ...approvalRecordFor(toolCall),
       };
     }),
   };

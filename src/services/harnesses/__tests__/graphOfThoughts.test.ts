@@ -45,7 +45,15 @@ vi.mock("#src/services/harnesses/lifecycle/CostBudgetEnforcer", () => ({
 }));
 
 vi.mock("#src/services/harnesses/lifecycle/ApprovalGate", () => ({
-  checkAndWaitForApproval: vi.fn().mockResolvedValue({ isApproved: true, shouldApproveAll: false, deniedToolCalls: [] }),
+  // Every call cleared, nothing blocked — the gate's per-call verdict.
+  checkAndWaitForApproval: vi.fn().mockImplementation(async (toolCalls: unknown[]) => ({
+    executableToolCalls: toolCalls,
+    blockedResults: [],
+    deniedToolCalls: [],
+    shouldApproveAll: false,
+  })),
+  orderResultsLikeCalls: (_toolCalls: unknown[], results: unknown[]) => results,
+  approvalRecordFor: () => ({}),
 }));
 
 vi.mock("#src/services/harnesses/lifecycle/CodexPlanningDetector", () => ({
@@ -498,7 +506,16 @@ describe("GraphOfThoughtsStrategy", () => {
       requestId: "req-reject",
     }));
 
-    vi.mocked(checkAndWaitForApproval).mockResolvedValueOnce({ isApproved: false, shouldApproveAll: false, deniedToolCalls: [] });
+    vi.mocked(checkAndWaitForApproval).mockImplementationOnce(async (toolCalls) => ({
+      executableToolCalls: [],
+      blockedResults: toolCalls.map((toolCall) => ({
+        name: toolCall.name,
+        id: toolCall.id,
+        result: { success: false, error: "USER_REJECTED", message: "The user declined this call." },
+      })),
+      deniedToolCalls: [],
+      shouldApproveAll: false,
+    }));
 
     const result = await runGraphOfThoughts(mockHarnessInstance as any);
     expect(result).toBeDefined();

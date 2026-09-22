@@ -1,10 +1,10 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import express, { type Request, type Response, type NextFunction } from "express";
-import AgenticLoopService from "#src/services/AgenticLoopService";
 import AgentSessionRegistry from "#src/services/AgentSessionRegistry";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import { handleAgent } from "./ChatRoutes.ts";
+import { handleApprovalDecision } from "./ApprovalDecisionRoute.ts";
 import logger from "#src/utils/logger";
 import { handleSseRequest, handleJsonRequest } from "#src/utils/SseUtilities";
 import { TIMERS } from "#src/constants";
@@ -15,44 +15,14 @@ const router = express.Router();
 // ─── resolves pending plan/tool approvals ───────────────────
 
 /**
- * POST /agent/approve
- *
- * Body:
- *   { conversationId: string, approved: boolean }
- *
- * Resolves the pending approval promise in AgenticLoopService
- * so the agentic loop can continue (or abort).
+ * POST /agent/approve — one decision for one pending tool or plan call.
+ * Body and status codes: see handleApprovalDecision (ApprovalDecisionRoute).
  */
 router.post(
   "/approve",
-  asyncHandler(async (request: Request, response: Response) => {
-    const { conversationId, approved, approveAll } = request.body;
-    const isApproved = approved !== false;
-    const shouldApproveAll = approveAll === true;
-
-    if (!conversationId) {
-      return response.status(400).json({ error: "Missing conversationId" });
-    }
-
-    const resolved = AgenticLoopService.resolveApproval(
-      conversationId,
-      isApproved,
-      { shouldApproveAll },
-    );
-
-    if (!resolved) {
-      return response.status(404).json({
-        error: "No pending approval for this conversation",
-        conversationId,
-      });
-    }
-
-    logger.info(
-      `[agent/approve] ${isApproved ? "Approved" : "Rejected"}${shouldApproveAll ? " (all future)" : ""} for conversation ${conversationId}`,
-    );
-
-    response.json({ ok: true, approved: isApproved });
-  }),
+  asyncHandler(async (request: Request, response: Response) =>
+    handleApprovalDecision(request, response, "[agent/approve]"),
+  ),
 );
 
 // ─── resolves pending ask_user_question pauses ──────────────

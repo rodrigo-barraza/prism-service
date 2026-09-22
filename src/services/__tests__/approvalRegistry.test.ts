@@ -1,76 +1,163 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import {
-  pendingApprovals,
+  ApprovalRegistry,
   pendingQuestions,
-  type ApprovalResolution,
+  type ApprovalRequestCall,
   type QuestionResolution,
-  type PendingToolApprovalEntry,
-  type PendingPlanApprovalEntry,
   type PendingQuestionEntry,
+  type ToolCallDecision,
 } from '#src/services/ApprovalRegistry';
+
+const WRITE_SCHEMA = {
+  type: 'object',
+  properties: { path: { type: 'string' }, content: { type: 'string' } },
+  required: ['path', 'content'],
+};
+
+function writeCall(toolCallId: string): ApprovalRequestCall {
+  return {
+    toolCallId,
+    name: 'write_file',
+    args: { path: `${toolCallId}.txt`, content: 'x' },
+    tier: 2,
+    tierLabel: 'write',
+    argsSchema: WRITE_SCHEMA,
+  };
+}
+
+function park(loopKey: string, toolCallIds: string[], { timeoutMilliseconds = 60_000, batchId = `batch-${loopKey}` } = {}) {
+  const decided: Array<[string, ToolCallDecision]> = [];
+  let settled = false;
+  const promise = ApprovalRegistry.waitForDecisions(loopKey, {
+    type: 'tool',
+    batchId,
+    calls: toolCallIds.map(writeCall),
+    timeoutMilliseconds,
+    onDecided: (toolCallId, decision) => decided.push([toolCallId, decision]),
+  }).then((decisions) => {
+    settled = true;
+    return decisions;
+  });
+  return { promise, decided, isSettled: () => settled, batchId };
+}
 
 describe('ApprovalRegistry Unit Tests', () => {
   beforeEach(() => {
-    pendingApprovals.clear();
+    ApprovalRegistry._clearAll();
     pendingQuestions.clear();
   });
 
-  describe('pendingApprovals', () => {
-    it('should store and resolve a pending tool approval entry', async () => {
-      const conversationId = 'test-conversation-id-1';
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
-      const approvalPromise = new Promise<ApprovalResolution>((resolve) => {
-        const entry: PendingToolApprovalEntry = {
-          type: 'tool',
-          tools: ['run_command'],
-          toolCalls: [
-            { id: 'call_1', name: 'run_command', args: { command: 'ls' } }
-          ],
-          resolve,
-        };
-        pendingApprovals.set(conversationId, entry);
+  describe('per-call approvals', () => {
+    it('decides each call on its own; the batch resolves only when all are decided', async () => {
+      const { promise, decided, isSettled } = park('conv-1', ['a', 'b', 'c']);
+
+      expect(ApprovalRegistry.decide('conv-1', { toolCallId: 'b', decision: 'allow' })).toMatchObject({
+        status: 'decided',
+        decidedToolCallIds: ['b'],
+        remaining: 2,
       });
+      await Promise.resolve();
+      expect(isSettled()).toBe(false);
+      expect(ApprovalRegistry.getPending('conv-1')?.toolCalls.map((toolCall) => toolCall.id)).toEqual(['a', 'c']);
 
-      expect(pendingApprovals.has(conversationId)).toBe(true);
-      const retrievedEntry = pendingApprovals.get(conversationId) as PendingToolApprovalEntry;
-      expect(retrievedEntry).toBeDefined();
-      expect(retrievedEntry.type).toBe('tool');
-      expect(retrievedEntry.tools).toEqual(['run_command']);
-      expect(retrievedEntry.toolCalls[0].name).toBe('run_command');
+      ApprovalRegistry.decide('conv-1', { toolCallId: 'a', decision: 'deny', reason: '  wrong file  ' });
+      ApprovalRegistry.decide('conv-1', { toolCallId: 'c', decision: 'allow' });
 
-      const resolution: ApprovalResolution = {
-        isApproved: true,
-        shouldApproveAll: false,
-        reason: 'User approved'
-      };
-      retrievedEntry.resolve(resolution);
-      pendingApprovals.delete(conversationId);
-
-      const resolvedValue = await approvalPromise;
-      expect(resolvedValue).toEqual(resolution);
-      expect(pendingApprovals.has(conversationId)).toBe(false);
+      const decisions = await promise;
+      expect(decisions.get('a')).toMatchObject({ decision: 'deny', source: 'user', reason: 'wrong file' });
+      expect(decisions.get('b')).toMatchObject({ decision: 'allow', source: 'user', scope: 'call' });
+      expect(decisions.get('c')).toMatchObject({ decision: 'allow' });
+      expect(decided.map(([toolCallId]) => toolCallId)).toEqual(['b', 'a', 'c']);
+      expect(ApprovalRegistry.getPending('conv-1')).toBeNull();
     });
 
-    it('should store and resolve a pending plan approval entry', async () => {
-      const conversationId = 'test-conversation-id-2';
+    it('a second decision for the same call is stale (409), and stays stale after the batch is done', async () => {
+      const { promise } = park('conv-2', ['a', 'b']);
+      ApprovalRegistry.decide('conv-2', { toolCallId: 'a', decision: 'allow' });
+      expect(ApprovalRegistry.decide('conv-2', { toolCallId: 'a', decision: 'deny' })).toEqual({ status: 'stale', toolCallId: 'a' });
+      ApprovalRegistry.decide('conv-2', { toolCallId: 'b', decision: 'allow' });
+      await promise;
+      expect(ApprovalRegistry.decide('conv-2', { toolCallId: 'a', decision: 'allow' })).toEqual({ status: 'stale', toolCallId: 'a' });
+    });
 
-      const approvalPromise = new Promise<boolean>((resolve) => {
-        const entry: PendingPlanApprovalEntry = {
-          type: 'plan',
-          resolve,
-        };
-        pendingApprovals.set(conversationId, entry);
+    it('a call from an earlier batch is stale while a newer batch waits; an unknown id is not found', async () => {
+      const first = park('conv-3', ['old'], { batchId: 'batch-1' });
+      ApprovalRegistry.decide('conv-3', { toolCallId: 'old', decision: 'allow' });
+      await first.promise;
+      park('conv-3', ['new'], { batchId: 'batch-2' });
+
+      expect(ApprovalRegistry.decide('conv-3', { toolCallId: 'old', decision: 'allow' })).toEqual({ status: 'stale', toolCallId: 'old' });
+      expect(ApprovalRegistry.decide('conv-3', { toolCallId: 'never', decision: 'allow' })).toEqual({ status: 'not_found' });
+      expect(ApprovalRegistry.decide('conv-3', { toolCallId: 'new', batchId: 'batch-1', decision: 'allow' })).toEqual({ status: 'stale', toolCallId: 'new' });
+      expect(ApprovalRegistry.decide('nobody-waits', { toolCallId: 'x', decision: 'allow' })).toEqual({ status: 'not_found' });
+    });
+
+    it('without a toolCallId: resolves the only pending call, refuses to guess between several', async () => {
+      park('conv-4', ['a', 'b']);
+      expect(ApprovalRegistry.decide('conv-4', { decision: 'allow' })).toEqual({ status: 'ambiguous', pendingToolCallIds: ['a', 'b'] });
+      ApprovalRegistry.decide('conv-4', { toolCallId: 'a', decision: 'deny' });
+      expect(ApprovalRegistry.decide('conv-4', { decision: 'allow' })).toMatchObject({ status: 'decided', decidedToolCallIds: ['b'] });
+    });
+
+    it('scope "batch" allows the named call and every other still-pending call', async () => {
+      const { promise } = park('conv-5', ['a', 'b', 'c']);
+      ApprovalRegistry.decide('conv-5', { toolCallId: 'a', decision: 'deny' });
+      expect(ApprovalRegistry.decide('conv-5', { toolCallId: 'b', decision: 'allow', scope: 'batch' })).toMatchObject({
+        decidedToolCallIds: ['b', 'c'],
+        remaining: 0,
       });
+      const decisions = await promise;
+      expect(decisions.get('a')?.decision).toBe('deny');
+      expect(decisions.get('c')).toMatchObject({ decision: 'allow', scope: 'batch' });
+    });
 
-      expect(pendingApprovals.has(conversationId)).toBe(true);
-      const retrievedEntry = pendingApprovals.get(conversationId) as PendingPlanApprovalEntry;
+    it('a widening scope can only allow', () => {
+      park('conv-6', ['a']);
+      expect(ApprovalRegistry.decide('conv-6', { toolCallId: 'a', decision: 'deny', scope: 'batch' })).toMatchObject({ status: 'invalid' });
+      expect(ApprovalRegistry.decide('conv-6', { toolCallId: 'a', decision: 'deny', scope: 'conversation' })).toMatchObject({ status: 'invalid' });
+      expect(ApprovalRegistry.getPending('conv-6')?.toolCalls).toHaveLength(1);
+    });
 
-      retrievedEntry.resolve(true);
-      pendingApprovals.delete(conversationId);
+    it('edited arguments are validated against the tool schema before they count', async () => {
+      const { promise } = park('conv-7', ['a']);
+      expect(ApprovalRegistry.decide('conv-7', { toolCallId: 'a', decision: 'allow', editedArgs: { path: 42 } })).toMatchObject({
+        status: 'invalid',
+        error: expect.stringContaining('path'),
+      });
+      expect(ApprovalRegistry.decide('conv-7', { toolCallId: 'a', decision: 'deny', editedArgs: { path: 'b.txt', content: 'y' } })).toMatchObject({ status: 'invalid' });
+      expect(ApprovalRegistry.getPending('conv-7')?.toolCalls).toHaveLength(1);
 
-      const resolvedValue = await approvalPromise;
-      expect(resolvedValue).toBe(true);
-      expect(pendingApprovals.has(conversationId)).toBe(false);
+      ApprovalRegistry.decide('conv-7', { toolCallId: 'a', decision: 'allow', editedArgs: { path: 'b.txt', content: 'y' } });
+      expect((await promise).get('a')?.editedArgs).toEqual({ path: 'b.txt', content: 'y' });
+    });
+
+    it('the timeout denies whatever is still undecided', async () => {
+      vi.useFakeTimers();
+      const { promise } = park('conv-8', ['a', 'b'], { timeoutMilliseconds: 1_000 });
+      ApprovalRegistry.decide('conv-8', { toolCallId: 'a', decision: 'allow' });
+      vi.advanceTimersByTime(1_000);
+      const decisions = await promise;
+      expect(decisions.get('a')).toMatchObject({ decision: 'allow', source: 'user' });
+      expect(decisions.get('b')).toMatchObject({ decision: 'deny', source: 'timeout' });
+    });
+
+    it('a newer batch on the same loop supersedes the old one (its pending calls are denied)', async () => {
+      const first = park('conv-9', ['a'], { batchId: 'batch-1' });
+      park('conv-9', ['b'], { batchId: 'batch-2' });
+      expect((await first.promise).get('a')).toMatchObject({ decision: 'deny', source: 'superseded' });
+      expect(ApprovalRegistry.getPending('conv-9')?.batchId).toBe('batch-2');
+    });
+
+    it('cancel (turn ended) denies the rest; other loops are untouched', async () => {
+      const mine = park('conv-10', ['a']);
+      park('conv-11', ['b']);
+      ApprovalRegistry.cancel('conv-10');
+      expect((await mine.promise).get('a')).toMatchObject({ decision: 'deny', source: 'turn_ended' });
+      expect(ApprovalRegistry.getPending('conv-11')?.toolCalls).toHaveLength(1);
     });
   });
 
