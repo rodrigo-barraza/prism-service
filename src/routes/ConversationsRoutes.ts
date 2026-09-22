@@ -22,6 +22,7 @@ import ConversationGoalService, {
   type GoalPatch,
 } from "#src/services/ConversationGoalService";
 import ConversationStatusRegistry from "#src/services/ConversationStatusRegistry";
+import ConversationAttentionRegistry from "#src/services/ConversationAttentionRegistry";
 import AgenticLoopService from "#src/services/AgenticLoopService";
 import {
   GetConversationsQuerySchema,
@@ -510,13 +511,15 @@ router.get(
           AgenticLoopService.getPendingApproval(conversationId);
         const pendingQuestion =
           AgenticLoopService.getPendingQuestion(conversationId);
+        const attention = ConversationAttentionRegistry.get(conversationId);
         // Raw `messages` are deliberately omitted — displayMessages is the
         // serve-time form and shipping both doubles a multi-hundred-KB payload
         const { messages: rawMessages, ...chatWithoutMessages } = chat;
         return res.json({
           ...chatWithoutMessages,
+          ...attention,
           type: "direct",
-          state: deriveAgentConversationState(chat),
+          state: deriveAgentConversationState({ ...chat, ...attention }),
           messageCount: (
             (rawMessages as import("../types/admin.ts").ChatMessage[]) || []
           ).length,
@@ -569,6 +572,7 @@ router.get(
         }
 
         const isConversationActive = !!(agentChatRecord.isGenerating || agentChatRecord.isActive);
+        const attention = ConversationAttentionRegistry.get(conversationId);
 
         // Raw `messages` are deliberately omitted — displayMessages is the
         // serve-time form and shipping both doubles a multi-hundred-KB payload
@@ -576,11 +580,13 @@ router.get(
           agentChat;
         return res.json({
           ...agentChatWithoutMessages,
+          ...attention,
           stats: stats || undefined,
           type: "agent",
-          state: deriveAgentConversationState(
-            agentChatRecord as Parameters<typeof deriveAgentConversationState>[0],
-          ),
+          state: deriveAgentConversationState({
+            ...(agentChatRecord as Parameters<typeof deriveAgentConversationState>[0]),
+            ...attention,
+          }),
           messageCount: (
             (rawAgentMessages as import("../types/admin.ts").ChatMessage[]) ||
             []

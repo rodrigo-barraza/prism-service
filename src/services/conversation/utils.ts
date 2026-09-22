@@ -4,6 +4,7 @@ import { MONGO_DB_NAME } from "#config";
 import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
+import ConversationAttentionRegistry from "#src/services/ConversationAttentionRegistry";
 import {
   COLLECTIONS,
   COST_SUMMATION_EXPRESSION,
@@ -512,10 +513,13 @@ export function buildConversationPatchFields({
 
 /**
  * Canonical activity state for a served conversation document, derived from
- * persisted fields only. Fine-grained live phases (thinking, executing…)
- * require a live SSE connection and never appear here.
+ * persisted fields plus the in-memory attention counts
+ * (ConversationAttentionRegistry). Fine-grained live phases (thinking,
+ * executing…) require a live SSE connection and never appear here.
  */
 export type AgentConversationState =
+  | "awaiting-approval"
+  | "awaiting-answer"
   | "completed"
   | "completed-with-errors"
   | "generating"
@@ -526,8 +530,10 @@ export type AgentConversationState =
 
 /**
  * Derive the canonical conversation activity state from persisted document
- * fields, evaluated in priority order: generating → orchestrating →
- * done → error → sub-agents → background-tasks → active.
+ * fields, evaluated in priority order: awaiting-approval → awaiting-answer →
+ * generating → orchestrating → done → error → sub-agents →
+ * background-tasks → active. A turn waiting on its user is still
+ * `isGenerating`, so the waits must outrank it.
  *
  * Mirrors the client-side ladder in
  * prism-client/src/utils/agentConversationStates.ts — keep the two in sync.
@@ -543,7 +549,11 @@ export function deriveAgentConversationState(conversation: {
   pendingBackgroundTasks?: number;
   hasSubAgents?: boolean;
   requestErrorCount?: number;
+  pendingApprovalCount?: number;
+  pendingQuestionCount?: number;
 }): AgentConversationState {
+  if ((conversation.pendingApprovalCount ?? 0) > 0) return "awaiting-approval";
+  if ((conversation.pendingQuestionCount ?? 0) > 0) return "awaiting-answer";
   if (conversation.isGenerating) {
     return conversation.hasSubAgents ? "orchestrating" : "generating";
   }
@@ -559,11 +569,14 @@ export function deriveAgentConversationState(conversation: {
 }
 
 /**
- * Stamp the derived `state` onto a conversation record about to be served.
+ * Stamp the attention counts (pendingApprovalCount, pendingQuestionCount,
+ * awaitingSince) and the derived `state` onto a conversation record about
+ * to be served.
  */
 export function attachConversationState(
   conversation: Record<string, unknown>,
 ): void {
+  ConversationAttentionRegistry.attach(conversation);
   conversation.state = deriveAgentConversationState(
     conversation as Parameters<typeof deriveAgentConversationState>[0],
   );
