@@ -1,5 +1,6 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import crypto from "node:crypto";
 import express, { type Request, type Response, type NextFunction } from "express";
 import AgentSessionRegistry from "#src/services/AgentSessionRegistry";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
@@ -180,6 +181,13 @@ router.post(
       //   1. x-workspace-root header (set by Prism Client's serviceHeaders.js)
       //   2. body.workspaceRoot (for server-to-server / API callers)
       workspaceRoot: request.workspaceRoot || request.body.workspaceRoot || null,
+      // A turn that brings no conversationId (a new conversation from an
+      // API caller or bot) still gets one: minted HERE, so the session
+      // layer can register the turn under it for /agent/stop and
+      // one-turn-per-conversation admission. `conversationId` stays unset —
+      // handleAgent still treats the conversation as new — and the id
+      // reaches the caller on the stream's first event.
+      serverConversationId: request.body.conversationId ? undefined : crypto.randomUUID(),
     };
 
     if (request.query.stream !== "false") {
