@@ -31,6 +31,7 @@ interface WorktreeMergeResult {
 
 const enterWorktree = {
   name: TOOL_NAMES.ENTER_WORKTREE,
+  capabilities: ["fs_write"] as const,
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.ENTER_WORKTREE],
   description:
     "Enter an isolated git worktree for the current conversation. Creates a new branch " +
@@ -173,6 +174,7 @@ const enterWorktree = {
 
 const exitWorktree = {
   name: TOOL_NAMES.EXIT_WORKTREE,
+  capabilities: ["fs_write"] as const,
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.EXIT_WORKTREE],
   description:
     "Exit the current isolated worktree and return to the main workspace. " +

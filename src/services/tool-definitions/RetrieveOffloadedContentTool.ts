@@ -26,6 +26,7 @@ const RETRIEVE_OFFLOADED_CONTENT_NAME = TOOL_NAMES.RETRIEVE_OFFLOADED_CONTENT;
 
 const retrieveOffloadedContent = {
   name: RETRIEVE_OFFLOADED_CONTENT_NAME,
+  capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS[RETRIEVE_OFFLOADED_CONTENT_NAME],
   description:
     "Recover the verbatim content of an old tool result that was offloaded during context compaction. " +

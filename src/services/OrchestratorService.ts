@@ -2144,6 +2144,14 @@ export class OrchestratorService {
             orchestratorContext.policies.length > 0 && {
               policies: orchestratorContext.policies,
             }),
+          // The parent's permission rules, widened to cover the sub-agent's
+          // own conversation — a "this conversation" deny keeps holding here.
+          ...(orchestratorContext.permissionRules && {
+            _permissionRules: orchestratorContext.permissionRules.forSubAgent({
+              agent: subAgent.agent,
+              conversationId: subAgent.subAgentConversationId,
+            }),
+          }),
           ...(orchestratorContext.enableCriticGate !== undefined && {
             enableCriticGate: orchestratorContext.enableCriticGate,
           }),

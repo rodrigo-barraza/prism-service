@@ -151,6 +151,7 @@ export async function runBeforePromptSetup(
     workspaceRoot: workspaceRoot || undefined,
     autoApprove: options.autoApprove === true,
     policies: options.policies,
+    permissionRules: options._permissionRules,
     enableCriticGate: options.enableCriticGate === true,
     criticModel: options.criticModel || undefined,
   });

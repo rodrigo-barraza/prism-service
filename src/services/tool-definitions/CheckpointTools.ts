@@ -51,6 +51,7 @@ function resolveConversationId(context: InternalToolContext) {
 
 const checkpointTool = {
   name: "checkpoint",
+  capabilities: [] as const,
   emoji: ["📍", "🧠"],
   description:
     "Record a named marker at the current point of this conversation so it can be rewound to later. " +
@@ -135,6 +136,7 @@ const checkpointTool = {
 
 const rewindTool = {
   name: "rewind",
+  capabilities: [] as const,
   emoji: ["⏪", "🧠"],
   description:
     "Prune every message recorded after a checkpoint (default: the most recent one) from this conversation's " +

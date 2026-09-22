@@ -91,6 +91,7 @@ interface QuestionInput {
 
 export default {
   name: TOOL_NAMES.ASK_USER,
+  capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.ASK_USER],
   description:
     "Ask the user one or more questions and wait for their responses before continuing. " +
