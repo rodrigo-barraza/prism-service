@@ -132,7 +132,12 @@ export async function runTreeOfThoughts(
       currentMessages,
       LOG_LABEL,
     );
-    if (!planApproved) return { messages: currentMessages };
+    // Rejected, timed out, aborted or exhausted: the turn still ends through
+    // finalize — prompt and plan persisted, isGenerating cleared, `done` sent.
+    if (!planApproved) {
+      await harness["finalize"](currentMessages, standardHooks.hooks);
+      return { messages: currentMessages };
+    }
   }
 
   // ── Main loop ────────────────────────────────────────────

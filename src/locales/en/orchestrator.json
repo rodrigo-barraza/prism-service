@@ -126,6 +126,7 @@
     "agentStatus": "## Agent {{agentNumber}}: {{agentDescription}} {{agentStatus}} ({{iterations}} iterations)",
     "agentOutput": "{{output}}",
     "noOutput": "(no output)",
+    "mergeBackKept": "⚠️ Its file changes were NOT merged ({{status}}{{files}}). They are kept on branch `{{branch}}` ({{location}}); merge or discard them there. {{error}}",
     "truncated": "\n... (truncated)"
   }
 }

@@ -118,6 +118,14 @@ describe("getTier — default assignments", () => {
   it("MCP-namespaced tool defaults to Tier 3 (third-party code)", () => {
     expect(engine.getTier("mcp__server__tool")).toBe(APPROVAL_TIERS.DANGER);
   });
+
+  // Asking is not an action: gating ask_user behind an approval card meant
+  // the user approved the question before seeing it (or, unanswered, the
+  // approval timed out and the model guessed) — seen live 2026-09-22.
+  it("ask_user is Tier 1 (AUTO) — a question never needs approval to be asked", () => {
+    expect(engine.getTier("ask_user")).toBe(APPROVAL_TIERS.AUTO);
+    expect(engine.check({ id: "call-q", name: "ask_user", args: { questions: [] } }).isApproved).toBe(true);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -799,14 +807,17 @@ describe('ApprovalRegistry adversarial', () => {
 
   it('should handle question resolution with null answers', () => {
     let receivedResolution: QuestionResolution | null = null;
-    pendingQuestions.set('conv-q', {
+    pendingQuestions.set('conv-q', new Map([['q-1', {
+      questionId: 'q-1',
+      blocking: true,
+      createdAt: Date.now(),
       resolve: (value: QuestionResolution) => {
         receivedResolution = value;
       },
       question: 'What color?',
-    });
+    }]]));
 
-    pendingQuestions.get('conv-q')!.resolve({ answers: null });
+    pendingQuestions.get('conv-q')!.get('q-1')!.resolve({ answers: null });
     expect(receivedResolution).not.toBeNull();
     expect(receivedResolution!.answers).toBeNull();
   });

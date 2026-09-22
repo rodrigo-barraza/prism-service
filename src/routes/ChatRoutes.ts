@@ -275,6 +275,7 @@ async function prepareGenerationContext(
     maxIterations,
     maxSubAgentIterations,
     maxRecursionDepth,
+    maxCostDollars,
     agentContext,
     // Multi-workspace: user-selected workspace root path (absolute fs path).
     workspaceRoot,
@@ -337,6 +338,8 @@ async function prepareGenerationContext(
     ...(maxIterations != null && { maxIterations }),
     ...(maxSubAgentIterations != null && { maxSubAgentIterations }),
     ...(maxRecursionDepth != null && { maxRecursionDepth }),
+    ...(typeof maxCostDollars === "number" &&
+      maxCostDollars > 0 && { maxCostDollars }),
     ...(agentContext != null && { agentContext }),
     ...(enableCriticGate != null && { enableCriticGate }),
     ...(criticModel != null && { criticModel }),
@@ -954,16 +957,8 @@ export async function handleAgent(
       const { default: AgenticLoopService } =
         await import("#src/services/AgenticLoopService");
 
-      // Inject persona-level policies into options (if the agent has them)
-      if (agent && !options.policies) {
-        const { default: AgentPersonaRegistry } =
-          await import("#src/services/AgentPersonaRegistry");
-        const persona = AgentPersonaRegistry.get(agent);
-        if (persona?.policies && persona.policies.length > 0) {
-          options.policies = persona.policies;
-        }
-      }
-
+      // Persona-level policies are resolved inside the loop, so scheduled,
+      // timer and sub-agent runs get them too.
       await AgenticLoopService.runAgenticLoop({
         provider:
           context.provider as import("../services/harnesses/types.ts").LLMProvider,
