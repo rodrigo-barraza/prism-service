@@ -6,6 +6,8 @@ import {
   COLLECTIONS,
   CHANGE_STREAM_RECONNECT_INTERVAL_MILLISECONDS,
   CHANGE_STREAM_RETRY_DELAY_MILLISECONDS,
+  PENDING_DECISIONS,
+  STALE_GENERATING_CUTOFF_MILLISECONDS,
 } from "#src/constants";
 import { registerCleanup } from "#src/utils/CleanupRegistry";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
@@ -250,24 +252,24 @@ const ChangeStreamService = {
     );
 
     // Periodic stale isGenerating cleanup (every 60s)
-    // Catches flags left behind by crashed requests or dropped connections
+    // Catches flags left behind by crashed requests or dropped connections.
+    // A turn parked on its user is not stale however long it waits.
     staleGeneratingInterval = setInterval(async () => {
       try {
-        const fiveMinAgo = new Date(
-          Date.now() - CHANGE_STREAM_RECONNECT_INTERVAL_MILLISECONDS,
+        const cutoff = new Date(
+          Date.now() - STALE_GENERATING_CUTOFF_MILLISECONDS,
         ).toISOString();
+        const staleFilter = {
+          isGenerating: true,
+          updatedAt: { $lt: cutoff },
+          runState: { $ne: PENDING_DECISIONS.RUN_STATE_AWAITING_USER },
+        };
         const { modifiedCount } = await db
           .collection(COLLECTIONS.MODEL_CONVERSATIONS)
-          .updateMany(
-            { isGenerating: true, updatedAt: { $lt: fiveMinAgo } },
-            { $set: { isGenerating: false, isActive: false } },
-          );
+          .updateMany(staleFilter, { $set: { isGenerating: false, isActive: false } });
         const { modifiedCount: agentCleared } = await db
           .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-          .updateMany(
-            { isGenerating: true, updatedAt: { $lt: fiveMinAgo } },
-            { $set: { isGenerating: false, isActive: false } },
-          );
+          .updateMany(staleFilter, { $set: { isGenerating: false, isActive: false } });
         if (modifiedCount > 0 || agentCleared > 0) {
           logger.info(
             "Auto-cleared " +

@@ -9,6 +9,7 @@ import { type InternalToolContext } from "./InternalToolRegistry.ts";
 import { LOG_PREVIEW, AGENT_DIRECTIVES, TURN_INPUT } from "#src/constants";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import { resolveLoopKey } from "#src/services/LoopKey";
+import { decisionOwnerOf } from "#src/services/conversation/ConversationRunState";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import type { QuestionDefinition } from "#src/services/ApprovalRegistry";
 
@@ -44,9 +45,6 @@ interface AskUserContext extends InternalToolContext {
   _emit?: (event: UserQuestionEmitEvent | QuestionPendingStatusEvent) => void;
 }
 
-/** How long a BLOCKING question holds the turn before it gives up. */
-export const ASK_USER_BLOCKING_TIMEOUT_MILLISECONDS = 300_000;
-
 let questionSequence = 0;
 function nextQuestionId(): string {
   questionSequence++;
@@ -79,7 +77,8 @@ interface QuestionAnswer {
 
 interface QuestionResult {
   answers: QuestionAnswer[] | null;
-  timedOut?: boolean;
+  /** The wait ended without an answer: its turn was stopped. */
+  isCancelled?: boolean;
 }
 
 interface QuestionInput {
@@ -290,48 +289,53 @@ export default {
     const questionId = nextQuestionId();
     const isBlocking = toolArguments.blocking !== false;
 
-    // Emit the SSE event with the full questions array
-    if (context._emit) {
-      context._emit({
+    const { default: AgenticLoopService } =
+      await import("#src/services/AgenticLoopService");
+    const owner = decisionOwnerOf(context);
+    // The card is shown only once its question is recorded: an answer can
+    // only land on a question that exists (PendingDecisionStore).
+    const showCard = () =>
+      context._emit?.({
         type: "user_question",
         questions: normalizedQuestions,
         context: questionContext || null,
         questionId,
         blocking: isBlocking,
       });
-    }
-
-    const { default: AgenticLoopService } =
-      await import("#src/services/AgenticLoopService");
 
     // ── Non-blocking: register the resolver, return at once ──────────
-    // The answer route resolves the same pending-question entry; the
-    // resolver posts the answer into the turn's mailbox, where the harness
-    // picks it up at its next boundary. If the turn has already ended the
-    // entry is gone (loop cleanup) or the mailbox refuses it, and the route
+    // The answer route resolves the same pending question; the resolver
+    // posts the answer into the turn's mailbox, where the harness picks it
+    // up at its next boundary. If the turn has already ended the question
+    // is closed (loop cleanup) or the mailbox refuses it, and the route
     // answers 404 — the client then sends the answer as a normal message,
     // which is the same text. Either way it is delivered exactly once.
     if (!isBlocking) {
-      AgenticLoopService._setPendingQuestion(loopKey, {
-        questionId,
-        blocking: false,
-        createdAt: Date.now(),
-        agentConversationId,
-        resolve: (value: QuestionResult) => {
-          const posted = TurnInputMailbox.post(loopKey, {
-            kind: "question_answer",
-            text: formatQuestionAnswers(normalizedQuestions, value.answers, questionId),
-            meta: { questionId },
-          });
-          if (!posted.accepted) {
-            logger.warn(
-              `[AskUserQuestion] Answer to ${questionId} arrived with no open turn (${posted.reason})`,
-            );
-          }
-          return { delivered: posted.accepted, reason: posted.reason };
+      await AgenticLoopService._setPendingQuestion(
+        loopKey,
+        {
+          questionId,
+          blocking: false,
+          createdAt: Date.now(),
+          agentConversationId,
+          resolve: (value: QuestionResult) => {
+            const posted = TurnInputMailbox.post(loopKey, {
+              kind: "question_answer",
+              text: formatQuestionAnswers(normalizedQuestions, value.answers, questionId),
+              meta: { questionId },
+            });
+            if (!posted.accepted) {
+              logger.warn(
+                `[AskUserQuestion] Answer to ${questionId} arrived with no open turn (${posted.reason})`,
+              );
+            }
+            return { delivered: posted.accepted, reason: posted.reason };
+          },
+          questions: normalizedQuestions,
         },
-        questions: normalizedQuestions,
-      });
+        owner,
+      );
+      showCard();
       if (context._emit) {
         context._emit({
           type: SERVER_SENT_EVENT_TYPES.STATUS,
@@ -352,38 +356,42 @@ export default {
       };
     }
 
-    const result = await new Promise<QuestionResult>((resolve) => {
-      const timeoutId = setTimeout(() => {
-        // Off the registry first, so a late answer 404s (and the client
-        // sends it as a message) instead of resolving a wait nobody reads.
-        AgenticLoopService._removePendingQuestion(loopKey, questionId);
-        resolve({ answers: null, timedOut: true });
-      }, ASK_USER_BLOCKING_TIMEOUT_MILLISECONDS);
-      AgenticLoopService._setPendingQuestion(loopKey, {
+    // ── Blocking: park until answered — no timeout (prompt 13) ───────
+    // Only the turn's end releases it: a stopped turn withdraws the card.
+    const { signal } = context;
+    let resolveAnswer!: (value: QuestionResult) => void;
+    const answered = new Promise<QuestionResult>((resolve) => {
+      resolveAnswer = resolve;
+    });
+    const withdraw = () => {
+      void AgenticLoopService._removePendingQuestion(loopKey, questionId);
+      resolveAnswer({ answers: null, isCancelled: true });
+    };
+    await AgenticLoopService._setPendingQuestion(
+      loopKey,
+      {
         questionId,
         blocking: true,
         createdAt: Date.now(),
         agentConversationId,
-        resolve: (value: QuestionResult) => {
-          clearTimeout(timeoutId);
-          resolve(value);
-        },
+        resolve: (value: QuestionResult) => resolveAnswer(value),
         questions: normalizedQuestions,
-      });
-    });
+      },
+      owner,
+    );
+    showCard();
+    signal?.addEventListener("abort", withdraw, { once: true });
+    if (signal?.aborted) withdraw();
+    let result: QuestionResult;
+    try {
+      result = await answered;
+    } finally {
+      signal?.removeEventListener("abort", withdraw);
+    }
 
-    if (result.timedOut) {
-      logger.warn(
-        `[AskUserQuestion] ${questionId} timed out after ${ASK_USER_BLOCKING_TIMEOUT_MILLISECONDS / 1000}s`,
-      );
-      return {
-        answers: null,
-        timedOut: true,
-        message: PromptLocaleService.get(
-          PromptLocaleService.getDefaultLocale(),
-          "internal-tools-runtime.ask_user.timedOut",
-        ),
-      };
+    if (result.isCancelled || !result.answers) {
+      logger.info(`[AskUserQuestion] ${questionId} withdrawn — its turn was stopped`);
+      return { questionId, answers: null, isCancelled: true };
     }
 
     logger.info(

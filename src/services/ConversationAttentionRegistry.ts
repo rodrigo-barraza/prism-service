@@ -1,4 +1,7 @@
 import ChangeStreamService from "#src/services/ChangeStreamService";
+import PendingDecisionStore, {
+  type PendingDecisionRecord,
+} from "#src/services/PendingDecisionStore";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
@@ -21,8 +24,11 @@ import { TURN_INPUT } from "#src/constants";
  * ApprovalRegistry maps: those are keyed per loop, and pending questions by
  * agentConversationId, neither of which the list endpoint can address.
  *
- * In memory, like the waits it mirrors: a restart ends every waiting turn,
- * so an empty registry after boot is the truth.
+ * In memory, fed by events — but the waits themselves are durable
+ * (PendingDecisionStore, prompt 13): a turn parked on its user survives a
+ * restart, so boot `restore`s every pending decision here, a decision made
+ * with no turn running (after the restart) is `forget`-ed by the route, and
+ * the abandoned-entry sweep keeps any entry the store still holds pending.
  *
  * Every change is published on the change stream as a synthetic
  * `conversation_attention` event carrying the new counts, so a sidebar
@@ -38,7 +44,10 @@ const PLAN_APPROVAL_KEY = "plan";
 /** SSE event: one pending call was decided (per-call approvals). */
 const APPROVAL_DECIDED_EVENT_TYPE = "approval_decided";
 
-/** Abandoned entries (a turn that died without a terminal event) expire. */
+/**
+ * Abandoned entries (a turn that died without a terminal event) expire —
+ * unless the store still holds a decision of theirs pending (checked at sweep).
+ */
 const ENTRY_TTL_MILLISECONDS = 2 * 60 * 60 * 1000;
 const SWEEP_INTERVAL_MILLISECONDS = 10 * 60 * 1000;
 
@@ -84,12 +93,30 @@ let approvalKeySequence = 0;
 const sweepTimer = setInterval(() => {
   const now = Date.now();
   for (const [conversationId, entry] of entriesByConversation) {
-    if (now - entry.touchedAt > ENTRY_TTL_MILLISECONDS) {
-      ConversationAttentionRegistry.clear(conversationId);
-    }
+    if (now - entry.touchedAt <= ENTRY_TTL_MILLISECONDS) continue;
+    // A parked turn has no timeout: it may wait on its user for days.
+    void hasPendingDecisions(conversationId)
+      .then((isStillPending) => {
+        if (isStillPending) entry.touchedAt = Date.now();
+        else ConversationAttentionRegistry.clear(conversationId);
+      })
+      .catch(() => ConversationAttentionRegistry.clear(conversationId));
   }
 }, SWEEP_INTERVAL_MILLISECONDS);
 sweepTimer.unref?.();
+
+/** The conversation an attention entry is filed under for a stored decision. */
+export function attentionConversationIdOf(record: PendingDecisionRecord): string {
+  return record.parentConversationId || record.loopKey;
+}
+
+async function hasPendingDecisions(conversationId: string): Promise<boolean> {
+  const [own, subAgents] = await Promise.all([
+    PendingDecisionStore.find({ loopKey: conversationId, status: "pending" }),
+    PendingDecisionStore.find({ parentConversationId: conversationId, status: "pending" }),
+  ]);
+  return own.length > 0 || subAgents.length > 0;
+}
 
 function entryFor(conversationId: string): AttentionEntry {
   let entry = entriesByConversation.get(conversationId);
@@ -329,6 +356,51 @@ const ConversationAttentionRegistry = {
         return;
     }
     publishIfChanged(conversationId);
+  },
+
+  /**
+   * Re-open waits from stored decisions — at boot, for the turns parked on
+   * their user when the previous process stopped. Non-blocking questions
+   * count too: their card is still open.
+   */
+  restore(records: PendingDecisionRecord[]): void {
+    const touched = new Set<string>();
+    for (const record of records) {
+      if (record.status !== "pending") continue;
+      const conversationId = attentionConversationIdOf(record);
+      const since = Date.parse(record.createdAt) || Date.now();
+      const entry = entryFor(conversationId);
+      if (record.kind === "question") {
+        entry.questions.set(record.itemId, { since, blocking: record.blocking !== false });
+      } else {
+        entry.approvals.set(record.kind === "plan" ? PLAN_APPROVAL_KEY : record.itemId, {
+          since,
+          toolName: record.name ?? null,
+        });
+      }
+      touched.add(conversationId);
+    }
+    for (const conversationId of touched) publishIfChanged(conversationId);
+  },
+
+  /**
+   * Close the waits of these stored decisions — settled with no turn
+   * running to emit the event that would have closed them (decided after a
+   * restart, or retired by a newer turn).
+   */
+  forget(records: PendingDecisionRecord[]): void {
+    const touched = new Set<string>();
+    for (const record of records) {
+      const conversationId = attentionConversationIdOf(record);
+      const entry = entriesByConversation.get(conversationId);
+      if (!entry) continue;
+      const removed =
+        record.kind === "question"
+          ? entry.questions.delete(record.itemId)
+          : entry.approvals.delete(record.kind === "plan" ? PLAN_APPROVAL_KEY : record.itemId);
+      if (removed) touched.add(conversationId);
+    }
+    for (const conversationId of touched) publishIfChanged(conversationId);
   },
 
   /** Forget everything the conversation was waiting on. */

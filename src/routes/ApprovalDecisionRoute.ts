@@ -1,6 +1,8 @@
 import type { Request, Response } from "express";
 import AgenticLoopService from "#src/services/AgenticLoopService";
 import ConversationApprovalSettings from "#src/services/ConversationApprovalSettings";
+import ConversationAttentionRegistry from "#src/services/ConversationAttentionRegistry";
+import PendingDecisionStore from "#src/services/PendingDecisionStore";
 import type {
   ApprovalDecisionInput,
   ApprovalDecisionKind,
@@ -30,7 +32,14 @@ import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
  * decision, `approved: "false"`, or any other value is a 400 — never a yes.
  *
  * 404 — nothing pending under this conversation, or an id never seen.
- * 409 — the call was already decided, or belongs to a batch that is done.
+ * 409 — the call was already decided (a second POST of one decision reads
+ *       this: each call is decided exactly once), or belongs to a batch
+ *       that is done.
+ *
+ * The pending calls are durable (PendingDecisionStore): a decision for a
+ * turn parked when the previous process stopped is accepted and stored —
+ * `delivered: false` in the response — and the turn picks it up when it is
+ * re-driven. `delivered: true` means the running turn took it.
  */
 
 const DECISIONS: readonly ApprovalDecisionKind[] = ["allow", "deny"];
@@ -116,7 +125,7 @@ export async function handleApprovalDecision(
   if (!parsed.ok) return response.status(400).json({ error: parsed.error });
   const { conversationId, input } = parsed;
 
-  const outcome = AgenticLoopService.decideApproval(conversationId, input);
+  const outcome = await AgenticLoopService.decideApproval(conversationId, input);
 
   switch (outcome.status) {
     case "not_found":
@@ -160,8 +169,20 @@ export async function handleApprovalDecision(
     }
   }
 
+  if (!outcome.delivered && outcome.decidedToolCallIds.length > 0) {
+    // No running turn emitted `approval_decided` for these: close their
+    // "needs you" entries here.
+    const decided = await PendingDecisionStore.find({ loopKey: conversationId });
+    ConversationAttentionRegistry.forget(
+      decided.filter(
+        (record) =>
+          record.batchId === outcome.batchId && outcome.decidedToolCallIds.includes(record.itemId),
+      ),
+    );
+  }
+
   logger.info(
-    `${logPrefix} ${input.decision} ${outcome.decidedToolCallIds.join(", ")} (scope ${scope}${input.editedArgs ? ", edited args" : ""}) for conversation ${conversationId}; ${outcome.remaining} still pending`,
+    `${logPrefix} ${input.decision} ${outcome.decidedToolCallIds.join(", ")} (scope ${scope}${input.editedArgs ? ", edited args" : ""}) for conversation ${conversationId}; ${outcome.remaining} still pending${outcome.delivered ? "" : " — stored for the re-driven turn"}`,
   );
 
   return response.json({
@@ -173,6 +194,7 @@ export async function handleApprovalDecision(
     batchId: outcome.batchId,
     decidedToolCallIds: outcome.decidedToolCallIds,
     remaining: outcome.remaining,
+    delivered: outcome.delivered,
     ...(persisted !== undefined ? { persisted } : {}),
   });
 }

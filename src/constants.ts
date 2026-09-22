@@ -12,6 +12,13 @@ export const SERVER_SENT_EVENTS_KEEPALIVE_INTERVAL_MILLISECONDS = 30_000;
 /** Reconnect interval for MongoDB change stream watchers. */
 export const CHANGE_STREAM_RECONNECT_INTERVAL_MILLISECONDS = 60_000;
 
+/**
+ * A turn whose `isGenerating` flag has not been touched for this long is
+ * presumed dead (crashed request, dropped connection) and the flag cleared.
+ * A turn parked on its user (`runState: "awaiting_user"`) is never stale.
+ */
+export const STALE_GENERATING_CUTOFF_MILLISECONDS = 5 * 60_000;
+
 /** Retry delay for reopening a failed change stream. */
 export const CHANGE_STREAM_RETRY_DELAY_MILLISECONDS = 5000;
 
@@ -72,6 +79,7 @@ export const COLLECTIONS = {
   ANTHROPIC_FILE_CACHE: "anthropic_file_cache",
   PROFILES: "profiles",
   PUSH_SUBSCRIPTIONS: "push_subscriptions",
+  PENDING_DECISIONS: "pending_decisions",
 };
 
 /** Shared system-wide statuses for agents, tasks, and workflows. */
@@ -141,10 +149,8 @@ export const TURN_INPUT = {
  * Event literals are local until promoted to the shared taxonomy.
  */
 export const APPROVALS = {
-  /** SSE event: one pending call was decided (user, another tab, scope, timeout). */
+  /** SSE event: one pending call was decided (user, another tab, scope, superseded, turn end). */
   DECIDED_EVENT_TYPE: "approval_decided",
-  /** Settled toolCallIds remembered so a late decision answers 409, not 404. */
-  SETTLED_MEMORY: 5_000,
   /** A denial reason longer than this is cut before it reaches the model. */
   MAXIMUM_REASON_LENGTH: 2_000,
   /** File-write previews: a diff is only computed when both sides fit. */
@@ -153,6 +159,18 @@ export const APPROVALS = {
   PREVIEW_MAXIMUM_DIFF_CHARACTERS: 40_000,
   /** File-write previews: reading the current file must not stall the gate. */
   PREVIEW_TIMEOUT_MILLISECONDS: 5_000,
+} as const;
+
+/**
+ * Durable decisions — the approvals and questions a turn waits on, kept in
+ * `pending_decisions` (PendingDecisionStore) so they outlive the process
+ * that asked. There is no timeout: a turn parks until its user decides.
+ */
+export const PENDING_DECISIONS = {
+  /** Conversation `runState` while a turn is parked on its user. */
+  RUN_STATE_AWAITING_USER: "awaiting_user",
+  /** A settled record is kept this long (TTL on `expiresAt`) — a late second POST still reads 409. */
+  SETTLED_RETENTION_DAYS: 7,
 } as const;
 
 /** Priorities specifically for Todo items and task ranking. */
@@ -596,9 +614,6 @@ export const HARNESS = {
 
   /** System reminder extraction timeout (milliseconds). */
   EXTRACTION_TIMEOUT_MILLISECONDS: 15_000,
-
-  /** Approval gate timeout — how long to wait for user response (milliseconds). */
-  APPROVAL_TIMEOUT_MILLISECONDS: 120_000,
 
   /** Default per-tool wall-clock timeout — a hung tool must not hang the turn forever (milliseconds). */
   DEFAULT_TOOL_TIMEOUT_MILLISECONDS: 600_000,
