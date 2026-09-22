@@ -39,8 +39,16 @@ import { GitWorktreeHelper } from "#src/services/orchestrator/GitWorktreeHelper"
 import { SubAgentPersistenceService } from "#src/services/orchestrator/SubAgentPersistenceService";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
 
-// Mock the GitWorktreeHelper to avoid disk operations
-
+// The tools-service diff contract with nothing changed (hoisted for vi.mock).
+const { EMPTY_WORKTREE_DIFF } = vi.hoisted(() => ({
+  EMPTY_WORKTREE_DIFF: {
+    branch: "orchestrator/agent-1",
+    base: "main",
+    files: [],
+    patch: "",
+    stats: { filesChanged: 0, additions: 0, deletions: 0 },
+  },
+}));
 
 // Mock the GitWorktreeHelper to avoid disk operations
 vi.mock("#src/services/orchestrator/GitWorktreeHelper", () => ({
@@ -48,15 +56,11 @@ vi.mock("#src/services/orchestrator/GitWorktreeHelper", () => ({
     getDefaultWorkspaceRoot: vi.fn().mockReturnValue("/workspace"),
     resolveRepositoryPath: vi.fn().mockReturnValue("/workspace"),
     toolsApiPost: vi.fn().mockResolvedValue({}),
-    createWorktree: vi.fn().mockResolvedValue({ worktreePath: "/workspace/worktree-1" }),
-    removeWorktree: vi.fn().mockResolvedValue({}),
-    mergeWorktree: vi.fn().mockResolvedValue({ success: true }),
-    getWorktreeDiff: vi.fn().mockResolvedValue({
-      hasChanges: false,
-      additions: 0,
-      deletions: 0,
-      files: [],
-    }),
+    createWorktree: vi.fn().mockResolvedValue({ worktreePath: "/workspace/worktree-1", branch: "orchestrator/agent-1" }),
+    commitWorktree: vi.fn().mockResolvedValue({ committed: true }),
+    removeWorktree: vi.fn().mockResolvedValue({ branchDeleted: true }),
+    mergeWorktree: vi.fn().mockResolvedValue({ merged: "orchestrator/agent-1", into: "main" }),
+    getWorktreeDiff: vi.fn().mockResolvedValue(EMPTY_WORKTREE_DIFF),
     cleanupWorktrees: vi.fn().mockResolvedValue({}),
   },
 }));
@@ -116,18 +120,13 @@ describe("OrchestratorService Spawning & Agent Types", () => {
     AgenticLoopService.runAgenticLoop = mockRunAgenticLoop;
 
     vi.mocked(GitWorktreeHelper.createWorktree).mockReset();
-    vi.mocked(GitWorktreeHelper.createWorktree).mockResolvedValue({ worktreePath: "/workspace/worktree-1" });
+    vi.mocked(GitWorktreeHelper.createWorktree).mockResolvedValue({ worktreePath: "/workspace/worktree-1", branch: "orchestrator/agent-1" });
 
     vi.mocked(GitWorktreeHelper.removeWorktree).mockReset();
-    vi.mocked(GitWorktreeHelper.removeWorktree).mockResolvedValue({});
+    vi.mocked(GitWorktreeHelper.removeWorktree).mockResolvedValue({ branchDeleted: true });
 
     vi.mocked(GitWorktreeHelper.getWorktreeDiff).mockReset();
-    vi.mocked(GitWorktreeHelper.getWorktreeDiff).mockResolvedValue({
-      hasChanges: false,
-      additions: 0,
-      deletions: 0,
-      files: [],
-    });
+    vi.mocked(GitWorktreeHelper.getWorktreeDiff).mockResolvedValue(EMPTY_WORKTREE_DIFF);
 
     orchestratorContext = {
       project: "test-project",
@@ -878,13 +877,15 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       };
 
       vi.mocked(GitWorktreeHelper.createWorktree).mockResolvedValue({
-        worktreePath: "/path/to/repo/worktree-abc123"
+        worktreePath: "/path/to/repo/worktree-abc123",
+        branch: "orchestrator/agent-abc123",
       });
       vi.mocked(GitWorktreeHelper.getWorktreeDiff).mockResolvedValue({
-        hasChanges: true,
-        additions: 10,
-        deletions: 2,
-        files: ["file.ts"],
+        branch: "orchestrator/agent-abc123",
+        base: "main",
+        files: [{ path: "file.ts", status: "modified" }],
+        patch: "",
+        stats: { filesChanged: 1, additions: 10, deletions: 2 },
       });
 
       const result = await OrchestratorService.spawnFromTool({
@@ -895,7 +896,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       orchestratorContext: contextWithWorkspace,
       });
 
-      expect(GitWorktreeHelper.getWorktreeDiff).toHaveBeenCalled();
+      expect(GitWorktreeHelper.getWorktreeDiff).toHaveBeenCalledWith("/workspace", "orchestrator/agent-abc123");
       expect(result).toBeDefined();
       expect("diff" in result).toBe(true);
       expect((result as any).diff).toEqual({
@@ -912,7 +913,8 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       };
 
       vi.mocked(GitWorktreeHelper.createWorktree).mockResolvedValue({
-        worktreePath: "/path/to/repo/worktree-abc123"
+        worktreePath: "/path/to/repo/worktree-abc123",
+        branch: "orchestrator/agent-abc123",
       });
 
       await OrchestratorService.spawnFromTool({

@@ -144,8 +144,9 @@ describe("Topology Routers Test Suite", () => {
       expect(secondPrompt).toContain("Completed task: Step A");
       expect(secondPrompt).toContain("Do B");
 
-      // Verify git merge was called to merge completed worktrees
-      expect(GitWorktreeHelper.mergeWorktree).toHaveBeenCalledTimes(2);
+      // Each step merged back when its own loop ended (WorktreeMergeBack), so
+      // the next step branches from it; the router merges nothing itself.
+      expect(GitWorktreeHelper.mergeWorktree).not.toHaveBeenCalled();
     });
 
     it("should abort sequence early if a step fails", async () => {
@@ -167,22 +168,44 @@ describe("Topology Routers Test Suite", () => {
       expect(spawnSubAgentMock).toHaveBeenCalledTimes(1);
     });
 
-    it("should abort sequence early if git merge fails", async () => {
+    it("should abort sequence early if a step's work could not merge back", async () => {
       const router = new SequentialRouter();
       const members = [
         { description: "Step A", prompt: "Do A" },
         { description: "Step B", prompt: "Do B" },
       ];
 
-      // Make merge fail
-      vi.mocked(GitWorktreeHelper.mergeWorktree).mockResolvedValueOnce({ error: "Merge conflict" });
+      // Step A's merge-back conflicted: its work is kept on its branch.
+      spawnSubAgentMock.mockResolvedValueOnce({
+        agent_id: "agent-a",
+        description: "Step A",
+        status: "completed",
+        result: "Completed task: Step A",
+        summary: "Done",
+        toolUses: 1,
+        durationMilliseconds: 10,
+        iterations: 1,
+        messages: [],
+        diff: { additions: 1, deletions: 0, files: ["test.txt"] },
+        mergeBack: {
+          status: "conflict",
+          branch: "orchestrator/agent-a",
+          repositoryPath: "/workspace",
+          worktreePath: "/tmp/prism-worktrees/agent-a",
+          branchDeleted: false,
+          conflictingFiles: ["test.txt"],
+          error: "Merging 'orchestrator/agent-a' into main conflicts in test.txt.",
+        },
+      });
 
       const results = await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
 
-      // Should have 2 results: Step A's success + the merge error abort
+      // Step B never runs without Step A's work: A's result + the abort
+      expect(spawnSubAgentMock).toHaveBeenCalledTimes(1);
       expect(results).toHaveLength(2);
       expect("error" in results[1]).toBe(true);
-      expect((results[1] as { error: string }).error).toContain("Failed to merge branch");
+      expect((results[1] as { error: string }).error).toContain("did not merge back");
+      expect((results[1] as { error: string }).error).toContain("orchestrator/agent-a");
     });
 
     it("should skip git merge and complete successfully for research tasks (no diff)", async () => {
@@ -410,16 +433,52 @@ describe("Topology Routers Test Suite", () => {
         { agent: "QA", description: "Verify Code", prompt: "QA prompt" },
       ];
 
-      vi.mocked(GitWorktreeHelper.mergeWorktree).mockResolvedValueOnce({ error: "Merge conflict" });
+      // Dev's preserved worktree (deferred) conflicts when the turn merges.
+      spawnSubAgentMock.mockResolvedValueOnce({
+        agent_id: "agent-dev",
+        description: "Write Code",
+        status: "completed",
+        result: "[Dev]: wrote it",
+        summary: "Done",
+        toolUses: 1,
+        durationMilliseconds: 10,
+        iterations: 1,
+        messages: [],
+        diff: { additions: 1, deletions: 0, files: ["test.txt"] },
+        mergeBack: {
+          status: "deferred",
+          branch: "orchestrator/agent-dev",
+          repositoryPath: "/workspace",
+          worktreePath: "/tmp/prism-worktrees/agent-dev",
+          branchDeleted: false,
+        },
+      });
+      vi.mocked(GitWorktreeHelper.mergeWorktree).mockResolvedValueOnce({
+        error: "Merge conflict",
+        reason: "conflict",
+        conflictingFiles: ["test.txt"],
+      });
 
       const results = await router.execute(
         "test-team", members, orchestratorContext, spawnSubAgentMock, continueSubAgentMock,
       );
 
-      // Should have 2 results: Dev's success + the merge error abort
+      // The merge used the branch the sub-agent was created with.
+      expect(GitWorktreeHelper.mergeWorktree).toHaveBeenCalledWith(
+        "/workspace",
+        "orchestrator/agent-dev",
+        expect.any(String),
+      );
+      // Should have 2 results: Dev's (kept, with its conflict) + the merge error abort
       expect(results).toHaveLength(2);
+      expect((results[0] as SubAgentResult).mergeBack).toMatchObject({
+        status: "conflict",
+        worktreePath: "/tmp/prism-worktrees/agent-dev",
+        conflictingFiles: ["test.txt"],
+      });
+      expect(GitWorktreeHelper.removeWorktree).not.toHaveBeenCalled();
       expect("error" in results[1]).toBe(true);
-      expect((results[1] as { error: string }).error).toContain("Failed to merge branch");
+      expect((results[1] as { error: string }).error).toContain("Failed to merge turn 1");
     });
 
     it("should reject members with missing or empty prompts", async () => {
