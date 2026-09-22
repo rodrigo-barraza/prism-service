@@ -11,7 +11,6 @@ Self-contained task prompts for the items in `docs/harness_modernization_2026-09
 | # | File | Branch slug(s) | Repos | Size | Depends on | Shares hub files with |
 |---|---|---|---|---|---|---|
 | 02 | `02-claude-5-generation-compat.md` | `claude-5-generation-compat` | service | M | — | 06, 10, 25 (`data/models.ts`, `providers/anthropic.ts`); 09 (`ReActHarness.ts`) |
-| 04 | `04-subagent-worktree-merge-back.md` | `subagent-worktree-merge-back` | service, tools | S | — | 09, 17 (`OrchestratorService.ts`) |
 | 05 | `05-per-call-approvals.md` | `per-call-approvals` | service, client | M | — | 12, 13, 18 (approval gate); 08, 26 (`AgentChatComponent.tsx`) |
 | 06 | `06-compaction-that-works.md` | `compaction-that-works` | service | M | 02 (windows) | 10 (`compact/*`) |
 | 08 | `08-client-dead-buttons-and-queue.md` | `client-dead-buttons-and-queue` | client | M | — | 26 and every client prompt (`AgentChatComponent.tsx`) |
