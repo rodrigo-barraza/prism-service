@@ -8,6 +8,7 @@ import {
 } from "#src/utils/SystemMessageTags";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import logger from "#src/utils/logger";
+import { resolveLoopKey } from "#src/services/LoopKey";
 
 import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type {
@@ -98,7 +99,8 @@ export function drainTurnInput(
   context: AgenticContext,
   boundary: TurnInputBoundary,
 ): number {
-  const conversationId = context.conversationId;
+  // The key AgenticLoopService opened this turn's mailbox under.
+  const conversationId = resolveLoopKey(context);
   if (!conversationId) return 0;
   const entries = TurnInputMailbox.drain(conversationId);
   if (entries.length === 0) return 0;
@@ -145,5 +147,6 @@ export function drainTurnInput(
 
 /** True when input is waiting — used at the text-only break to keep the loop alive. */
 export function hasPendingTurnInput(context: AgenticContext): boolean {
-  return !!context.conversationId && TurnInputMailbox.pendingCount(context.conversationId) > 0;
+  const loopKey = resolveLoopKey(context);
+  return !!loopKey && TurnInputMailbox.pendingCount(loopKey) > 0;
 }

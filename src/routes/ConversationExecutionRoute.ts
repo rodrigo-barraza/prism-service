@@ -4,6 +4,7 @@ import AgenticLoopService from "#src/services/AgenticLoopService";
 import { handleAgent } from "./ChatRoutes.ts";
 import logger from "#src/utils/logger";
 import { handleSseRequest, handleJsonRequest } from "#src/utils/SseUtilities";
+import { handleQuestionAnswer } from "./QuestionAnswerHandler.ts";
 
 const router = express.Router();
 
@@ -46,51 +47,12 @@ router.post(
 
 /**
  * POST /conversation/answer
- * Body: { conversationId, answer, answers }
+ * Body: { conversationId, questionId?, answer | answers } — see QuestionAnswerHandler.
  * Resolves pending ask_user_question prompts for agent loops.
  */
 router.post(
   "/answer",
-  asyncHandler(async (req: Request, res: Response) => {
-    const { conversationId, answer, answers } = req.body;
-
-    if (!conversationId) {
-      return res.status(400).json({ error: "Missing conversationId" });
-    }
-
-    let normalizedAnswers: {
-      answer: string | string[];
-      annotations?: string;
-    }[];
-    if (Array.isArray(answers) && answers.length > 0) {
-      normalizedAnswers = answers as {
-        answer: string | string[];
-        annotations?: string;
-      }[];
-    } else if (answer !== undefined && answer !== null) {
-      normalizedAnswers = [{ answer: String(answer) }];
-    } else {
-      return res.status(400).json({ error: "Missing answer or answers" });
-    }
-
-    const resolved = AgenticLoopService.resolveUserQuestion(
-      conversationId,
-      normalizedAnswers,
-    );
-
-    if (!resolved) {
-      return res.status(404).json({
-        error: "No pending question for this conversation",
-        conversationId,
-      });
-    }
-
-    logger.info(
-      `[conversation/answer] ${normalizedAnswers.length} answer(s) for conversation ${conversationId}`,
-    );
-
-    res.json({ ok: true });
-  }),
+  asyncHandler(handleQuestionAnswer("conversation/answer")),
 );
 
 /**
