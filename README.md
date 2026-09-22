@@ -1,16 +1,17 @@
 # Prism Service
 
-Centralized AI gateway routing requests to **9 providers** (OpenAI, Anthropic, Google GenAI, ElevenLabs, Inworld, LM Studio, Ollama, llama.cpp, vLLM) through a unified REST + WebSocket API. Single entry point for the entire ecosystem.
+Centralized AI gateway routing requests to **11 providers** (OpenAI, Anthropic, Google GenAI, Kimi, ElevenLabs, Inworld, LM Studio, Ollama, llama.cpp, vLLM, SGLang) through a unified REST + WebSocket API. Single entry point for the entire ecosystem.
 
 **Port:** `7777` · **Runtime:** Node.js (TypeScript) · **Framework:** Express 5 · **DB:** MongoDB · **Storage:** MinIO
 
 ## Quick Start
 
 ```bash
-cp secrets.example.ts secrets.ts   # API keys, MongoDB URI, etc.
 npm install
 npm run dev
 ```
+
+Configuration is environment variables, read by `config.ts`. At boot, `boot.ts` fills in any that are unset from the vault service (`VAULT_SERVICE_URL`), so a variable you export yourself always wins.
 
 ## Provider Capabilities
 
@@ -24,7 +25,46 @@ npm run dev
 | **LM Studio** | ✅ | ✅ | — | — | — | ✅ | — | — | — | — |
 | **Ollama** | ✅ | ✅ | — | — | — | — | — | — | — | — |
 | **llama.cpp** | ✅ | ✅ | — | — | — | — | — | — | — | — |
-| **vLLM** | ✅ | ✅ | — | — | — | — | — | — | — | — |
+| **Kimi** | ✅ | ✅ | — | — | — | ✅ | — | ✅ | — | — |
+| **vLLM** | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | — | — |
+| **SGLang** | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | — | — |
+
+## Self-hosted Providers
+
+LM Studio, Ollama, llama.cpp, vLLM and SGLang servers are registered from indexed environment variables, up to ten per type. The first server of a type is addressed by the type itself (`sglang`), later ones by number (`sglang-2`):
+
+| Variable | Meaning |
+|---|---|
+| `PROVIDER_<TYPE>_<N>_URL` | The server's origin, without `/v1` — e.g. `http://gpu-box:30000` |
+| `PROVIDER_<TYPE>_<N>_CONCURRENCY` | Requests Prism sends it at once (default 1) |
+| `PROVIDER_<TYPE>_<N>_NICKNAME` | Label shown in the client, e.g. `Desktop` |
+| `PROVIDER_<TYPE>_<N>_API_KEY` | Bearer token for a server started with an API key (SGLang only) |
+
+`<TYPE>` is `LM_STUDIO`, `OLLAMA`, `LLAMA_CPP`, `VLLM` or `SGLANG`; `<N>` runs from 1 to 10.
+
+### SGLang
+
+```bash
+python -m sglang.launch_server --model-path Qwen/Qwen3.6-27B \
+  --reasoning-parser qwen3 --tool-call-parser qwen3_coder \
+  --enable-cache-report --host 0.0.0.0 --port 30000
+```
+
+```bash
+PROVIDER_SGLANG_1_URL=http://gpu-box:30000
+PROVIDER_SGLANG_1_CONCURRENCY=4
+PROVIDER_SGLANG_1_NICKNAME=Desktop
+```
+
+- **`--tool-call-parser`** is what makes tool calls work: without one, SGLang returns them as plain text, and Prism doesn't list the model as capable of tool calling. Use the parser the model card names, or `auto` (SGLang v0.5.12+).
+- **`--reasoning-parser`** splits reasoning into its own stream. Without it, a thinking model's `<think>` tags stay in the text, which Prism still separates.
+- **`--enable-cache-report`** adds cached prompt tokens to usage, so the request log shows prefix-cache hits.
+- **`--host 0.0.0.0`**: SGLang listens on `127.0.0.1` by default, which Prism can't reach on another machine.
+- **`--api-key <key>`**: set the same value as `PROVIDER_SGLANG_<N>_API_KEY`.
+- **Embedding models**: a server started with `--is-embedding` (needed for decoder-based models) serves `/v1/embeddings`, and Prism lists its model as an embedding model.
+- **LoRA adapters** loaded on the server show up as their own models, named `<base>:<adapter>`.
+
+Prism reads the model list and context window from `/v1/models`, and the parsers and image/audio support from `/model_info`. It demotes system messages after the first to the user role, because several chat templates reject them. It forwards media only as `data:` or `http(s)` URLs, since SGLang would read any other path from its own disk.
 
 ## API Endpoints
 

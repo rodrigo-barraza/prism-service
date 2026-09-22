@@ -433,6 +433,53 @@ describe("C4/C5 — streamWithRetries zero-yield invariant", () => {
     expect(parseContextOverflowError(null)).toBeNull();
   });
 
+  it("parseContextOverflowError extracts SGLang's formats", () => {
+    expect(
+      parseContextOverflowError(
+        new Error(
+          "Requested token count exceeds the model's maximum context length of 32768 tokens. You requested a total of 34000 tokens: 30000 tokens from the input messages and 4000 tokens for the completion. Please reduce the number of tokens in the input messages or the completion to fit within the limit.",
+        ),
+      ),
+    ).toEqual({
+      contextWindow: 32_768,
+      requestedOutputTokens: 4_000,
+      inputTokens: 30_000,
+    });
+    expect(
+      parseContextOverflowError(
+        new Error(
+          "The input (40000 tokens) is longer than the model's context length (32768 tokens).",
+        ),
+      ),
+    ).toEqual({
+      contextWindow: 32_768,
+      requestedOutputTokens: null,
+      inputTokens: 40_000,
+    });
+    expect(
+      parseContextOverflowError(
+        new Error(
+          "Input length (40000 tokens) exceeds the maximum allowed length (32762 tokens). Use a shorter input or enable --allow-auto-truncate.",
+        ),
+      ),
+    ).toEqual({
+      contextWindow: 32_762,
+      requestedOutputTokens: null,
+      inputTokens: 40_000,
+    });
+    expect(
+      parseContextOverflowError(
+        new Error(
+          "max_completion_tokens is too large: 40000.This model supports at most 32768 completion tokens.",
+        ),
+      ),
+    ).toEqual({
+      contextWindow: 32_768,
+      requestedOutputTokens: 40_000,
+      inputTokens: null,
+    });
+  });
+
   it("classifies transient errors across providers (status, type, network code)", () => {
     expect(isTransientProviderError(new ProviderError("x", "overloaded", 529))).toBe(true);
     expect(isTransientProviderError(new ProviderError("x", "rate limited", 429))).toBe(true);

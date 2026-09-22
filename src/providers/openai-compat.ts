@@ -2,7 +2,7 @@
 // OpenAI-Compatible Provider Utilities
 // ─────────────────────────────────────────────────────────────
 // Shared helpers for providers that use the OpenAI Chat Completions
-// API format: lm-studio, vllm, llama-cpp, and openai itself.
+// API format: lm-studio, vllm, llama-cpp, sglang, moonshot, and openai itself.
 
 import { Agent } from "undici";
 import { getDataUrlMimeType } from "#src/utils/media";
@@ -77,6 +77,15 @@ interface OpenAIUsage {
   completion_tokens?: number;
   prompt_tokens_details?: { cached_tokens?: number };
   completion_tokens_details?: { reasoning_tokens?: number };
+  /** SGLang reports reasoning tokens here, at the top level. */
+  reasoning_tokens?: number;
+}
+
+/** An error a server reports inside a stream it already answered 200. */
+interface OpenAIStreamErrorBody {
+  message?: string;
+  type?: string;
+  code?: number | string;
 }
 
 export interface OpenAICompletionResponse {
@@ -86,6 +95,12 @@ export interface OpenAICompletionResponse {
     finish_reason?: string;
   }>;
   usage?: OpenAIUsage;
+  /** SGLang: {"error": {...}}; LM Studio may send a bare string. */
+  error?: OpenAIStreamErrorBody | string | null;
+  /** vLLM-style flat error events carry object: "error" beside the message. */
+  object?: string;
+  message?: string;
+  code?: number | string;
 }
 
 interface OpenAIToolFunction {
@@ -283,8 +298,10 @@ export function normalizeUsage(
     usage.inputTokens = Math.max(0, (usage.inputTokens ?? 0) - cachedTokens);
   }
 
-  // Reasoning token breakdown
-  const reasoningTokens = rawUsage?.completion_tokens_details?.reasoning_tokens;
+  // Reasoning token breakdown (already counted in completion_tokens)
+  const reasoningTokens =
+    rawUsage?.completion_tokens_details?.reasoning_tokens ??
+    rawUsage?.reasoning_tokens;
   if (reasoningTokens && reasoningTokens > 0) {
     usage.reasoningOutputTokens = reasoningTokens;
   }
@@ -599,6 +616,30 @@ export function processNonStreamingResponse(
 // ── SSE Stream Parsing ──────────────────────────────────────
 
 /**
+ * Read an in-stream error event: SGLang sends `{"error": {message, code}}`
+ * (e.g. a prompt over its input limit found after the 200), vLLM-style
+ * servers a flat `{"object": "error", message, code}`, LM Studio sometimes a
+ * bare string. Carries a numeric `code` as `status`, like fetchOpenAICompat.
+ */
+function readStreamError(
+  json: OpenAICompletionResponse,
+): (Error & { status?: number }) | null {
+  if (typeof json.error === "string" && json.error) return new Error(json.error);
+  const body =
+    json.error && typeof json.error === "object"
+      ? json.error
+      : json.object === "error"
+        ? json
+        : null;
+  if (!body) return null;
+  const error: Error & { status?: number } = new Error(
+    body.message || "The server reported an error mid-stream",
+  );
+  if (typeof body.code === "number") error.status = body.code;
+  return error;
+}
+
+/**
  * Parse an SSE stream from an OpenAI-compatible /v1/chat/completions endpoint.
  * Yields the same event types as the provider generateTextStream methods:
  *   - string (text content)
@@ -662,9 +703,19 @@ export async function* parseSSEStream(
         if (trimmed === "data: [DONE]") continue;
         if (!trimmed.startsWith("data: ")) continue;
 
+        let json: OpenAICompletionResponse;
         try {
-          const json = JSON.parse(trimmed.slice(6)) as OpenAICompletionResponse;
+          json = JSON.parse(trimmed.slice(6)) as OpenAICompletionResponse;
+        } catch {
+          continue; // skip malformed JSON lines
+        }
 
+        // A server that fails after answering 200 reports it as an event —
+        // dropping it would end the turn empty, with no reason given.
+        const streamError = readStreamError(json);
+        if (streamError) throw streamError;
+
+        try {
           // Extract usage if present (some servers send it on the last chunk)
           if (json.usage) {
             usage = normalizeUsage(json.usage);
@@ -771,7 +822,7 @@ export async function* parseSSEStream(
             }
           }
         } catch {
-          // skip malformed JSON lines
+          // a chunk this parser cannot use — keep reading
         }
       }
     }
@@ -840,7 +891,9 @@ export async function* parseSSEStream(
  * Make a fetch request to an OpenAI-compatible endpoint and handle
  * error responses consistently.
  *
- * @throws {Error} With a parsed error message from the API
+ * @throws {Error} With a parsed error message from the API and the HTTP
+ *   `status`, so a caller can tell a rejected request (4xx) from a server
+ *   that is down or overloaded (5xx).
  */
 export async function fetchOpenAICompat(
   url: string,
@@ -865,7 +918,7 @@ export async function fetchOpenAICompat(
     } catch {
       /* raw text fallback */
     }
-    throw new Error(errorMessage);
+    throw Object.assign(new Error(errorMessage), { status: response.status });
   }
 
   return response;

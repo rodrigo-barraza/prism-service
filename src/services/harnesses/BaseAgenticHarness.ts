@@ -805,6 +805,14 @@ export default class BaseAgenticHarness {
     const recoverFromContextOverflow = (error: unknown): boolean => {
       const overflow = parseContextOverflowError(error);
       if (!overflow) return false;
+      // A prompt that alone fills the window leaves no output budget to
+      // shrink — surface the rejection instead of replaying it.
+      if (
+        overflow.inputTokens !== null &&
+        overflow.inputTokens >= overflow.contextWindow
+      ) {
+        return false;
+      }
       const currentMaxTokens = providerOptions.maxTokens;
       if (
         typeof currentMaxTokens !== "number" ||

@@ -23,6 +23,7 @@ vi.mock("#config", () => ({
   PROVIDER_VLLM: [],
   PROVIDER_OLLAMA: [],
   PROVIDER_LLAMA_CPP: [],
+  PROVIDER_SGLANG: [],
   MONGO_URI: "",
   MONGO_DB_NAME: "prism",
   MINIO_ENDPOINT: undefined,
