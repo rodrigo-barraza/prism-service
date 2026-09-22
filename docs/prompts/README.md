@@ -11,11 +11,8 @@ Self-contained task prompts for the items in `docs/harness_modernization_2026-09
 | # | File | Branch slug(s) | Repos | Size | Depends on | Shares hub files with |
 |---|---|---|---|---|---|---|
 | 02 | `02-claude-5-generation-compat.md` | `claude-5-generation-compat` | service | M | — | 06, 10, 25 (`data/models.ts`, `providers/anthropic.ts`); 09 (`ReActHarness.ts`) |
-| 03 | `03-ask-user-answers-reach-the-turn.md` | `ask-user-answers-reach-the-turn` | service, client | S | — | 05 (`AgentRoutes.ts`), 13 |
-| 04 | `04-subagent-worktree-merge-back.md` | `subagent-worktree-merge-back` | service, tools | S | — | 09, 17 (`OrchestratorService.ts`) |
 | 05 | `05-per-call-approvals.md` | `per-call-approvals` | service, client | M | — | 12, 13, 18 (approval gate); 08, 26 (`AgentChatComponent.tsx`) |
 | 06 | `06-compaction-that-works.md` | `compaction-that-works` | service | M | 02 (windows) | 10 (`compact/*`) |
-| 07 | `07-memory-dedup-ids.md` | `memory-dedup-ids` | service | S | — | 19 (`SkillMemoryScorer.ts`) |
 | 08 | `08-client-dead-buttons-and-queue.md` | `client-dead-buttons-and-queue` | client | M | — | 26 and every client prompt (`AgentChatComponent.tsx`) |
 | 09 | `09-harness-small-fixes.md` | `loop-small-fixes`, `cron-matcher`, `provider-small-fixes` | service | M | — | 02, 04, 17 |
 | 10 | `10-prefix-stable-requests.md` | `cache-telemetry`, `prefix-stable-requests` | service | L | 02, 06 | 06, 23 (`RequestLogger.ts`), 25 |
@@ -118,7 +115,9 @@ PRISM_SERVICE_PORT=$PORT PRISM_SERVICE_MONGO_DB_NAME=prism_test_<slug> \
   - Its workspace roots come from its own Mongo (`loadUserWorkspaceRoots`, `src/routes/AdminRoutes.ts`). Register a scratch git repo under your scratchpad as the only root, and pass it as `workspaceRoot` in the `/agent` body.
   - If your task doesn't change tools-service, use `$PROD_TOOLS_SERVICE_URL`, but only for read-only tools, since tool calls then execute on the NAS.
 - **prism-client under test.**
-  - Run `"$CLIENT_WT"/node_modules/.bin/next dev -p <port3>` with `PRISM_SERVICE_URL=http://localhost:$PORT` and `PRISM_WS_URL=ws://localhost:$PORT`.
+  - **Environment variables do not isolate it.** `next.config.ts` copies every vault secret over `process.env` and inlines the vault's `PRISM_SERVICE_URL`, so `PRISM_SERVICE_URL=http://localhost:$PORT next dev` still drives the PRODUCTION prism-service. Start the stand-in vault from prism-service, which proxies the real one and replaces only the prism-service URLs: `LOCAL_PRISM_PORT=$PORT LOCAL_CLIENT_PORT=<port3> OVERLAY_VAULT_PORT=<port4> node "$WT"/scripts/live-overlay-vault.mjs` (run it in the background).
+  - Then run `VAULT_SERVICE_URL=http://127.0.0.1:<port4> "$CLIENT_WT"/node_modules/.bin/next dev "$CLIENT_WT" -p <port3>`.
+  - Before you drive anything, confirm the page's requests go to `localhost:$PORT` (Playwright `page.on("request")`).
   - Drive it with the recipe in `prism-client/.claude/skills/verify/SKILL.md`: Playwright borrowed from `tools-service/node_modules`, `waitUntil: "domcontentloaded"`, and remove `<nextjs-portal>` before clicking.
   - Save screenshots to the scratchpad and name them in the report.
 - **Clean up.** Stop your servers. You may drop only your own `prism_test_<slug>` / `tools_test_<slug>` databases.

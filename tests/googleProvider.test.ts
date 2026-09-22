@@ -316,6 +316,42 @@ describe("Google Provider Adapter", () => {
       expect(result.toolCalls![0].thoughtSignature).toBe("thought-signature-xyz");
     });
 
+    it("keeps thought parts out of the answer text and returns them as thinking", async () => {
+      // buildGenerateConfig asks for includeThoughts, so a thinking model's
+      // non-streaming reply carries its thought summary as `thought: true`
+      // text parts ahead of the answer — the stream already routes them to
+      // thinking; the answer text must not contain them.
+      mockGenerateContent.mockResolvedValue({
+        text: "The answer is 42.",
+        candidates: [
+          {
+            content: {
+              parts: [
+                { text: "**Weighing the question**\nSix times seven.", thought: true },
+                { text: "The answer is ", thoughtSignature: "sig-1" },
+                { text: "42." },
+              ],
+            },
+            finishReason: "STOP",
+          },
+        ],
+        usageMetadata: {
+          promptTokenCount: 20,
+          candidatesTokenCount: 6,
+          thoughtsTokenCount: 30,
+        },
+      });
+
+      const result = await googleProvider.generateText(
+        [{ role: "user", content: "What is six times seven?" }],
+        "gemini-3.5-flash",
+      );
+
+      expect(result.text).toBe("The answer is 42.");
+      expect(result.text).not.toContain("Weighing the question");
+      expect(result.thinking).toBe("**Weighing the question**\nSix times seven.");
+    });
+
     it("resolves and fetches http URLs when passed in image reference lists", async () => {
       const messages: ConversationMessage[] = [
         {

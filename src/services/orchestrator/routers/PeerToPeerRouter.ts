@@ -16,7 +16,11 @@ import {
   selectInstanceForMember,
 } from "#src/services/orchestrator/InstanceResolver";
 import logger from "#src/utils/logger";
-import { GitWorktreeHelper } from "#src/services/orchestrator/GitWorktreeHelper";
+import {
+  isMergeBackKept,
+  mergeBackAllDeferred,
+  mergeDeferredKeepingWorktree,
+} from "#src/services/orchestrator/WorktreeMergeBack";
 import { ORCHESTRATOR } from "#src/constants";
 
 const MINIMUM_SUBSTANTIVE_RESPONSE_LENGTH = ORCHESTRATOR.MINIMUM_SUBSTANTIVE_RESPONSE_LENGTH;
@@ -277,39 +281,19 @@ export class PeerToPeerRouter implements TopologyRouter {
         break;
       }
 
-      // Merge modifications back so other worktrees see them (only if the agent actually changed files)
-      const hasFileChanges =
-        spawnResult.status === "completed" &&
-        spawnResult.agent_id &&
-        spawnResult.diff;
-
-      if (hasFileChanges) {
-        const subAgentId = spawnResult.agent_id!;
-        const branchName = `orchestrator/${subAgentId}`;
-        const workspaceRoot = GitWorktreeHelper.getDefaultWorkspaceRoot(
-          orchestratorContext.workspaceRoot ?? undefined,
+      // Merge this turn's work into the parent's branch so it lands as the
+      // mesh goes. The worktree (and branch) stay for the speaker's next turn.
+      if (spawnResult.status === "completed" && spawnResult.diff) {
+        const report = await mergeDeferredKeepingWorktree(
+          spawnResult,
+          orchestratorContext.emit,
         );
-        const repositoryPath = GitWorktreeHelper.resolveRepositoryPath(
-          workspaceRoot,
-          member.files || [],
-        );
-
-        logger.info(
-          `[PeerToPeerRouter] Merging branch ${branchName} back into main repo`,
-        );
-        const mergeResult = await GitWorktreeHelper.mergeWorktree(
-          repositoryPath,
-          branchName,
-          `chore(mesh): merge turn ${turnIndex + 1} from ${speakerName}`,
-        );
-
-        if (mergeResult.error) {
-          const errorMessage = `Failed to merge branch for ${subAgentId}: ${mergeResult.error}`;
+        if (isMergeBackKept(report)) {
+          const errorMessage = `Failed to merge turn ${turnIndex + 1} from ${speakerName} (branch ${report!.branch}): ${report!.error}`;
           logger.error(`[PeerToPeerRouter] ${errorMessage}`);
-          return [
-            ...latestResultByMemberIndex.values(),
-            { error: errorMessage },
-          ];
+          const latestResults = [...latestResultByMemberIndex.values()];
+          await mergeBackAllDeferred(latestResults, orchestratorContext.emit);
+          return [...latestResults, { error: errorMessage }];
         }
       } else if (spawnResult.status === "completed") {
         logger.info(
@@ -356,6 +340,9 @@ export class PeerToPeerRouter implements TopologyRouter {
     // Return the most recent result per member slot (not per turn).
     // This keeps the result array aligned 1:1 with the original members array,
     // which is what the frontend TeamCreateRenderer expects.
-    return [...latestResultByMemberIndex.values()];
+    const latestResults = [...latestResultByMemberIndex.values()];
+    // The mesh is done with its speakers' worktrees: merge what is left, clean up.
+    await mergeBackAllDeferred(latestResults, orchestratorContext.emit);
+    return latestResults;
   }
 }

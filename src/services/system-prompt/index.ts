@@ -43,6 +43,7 @@ import {
 } from "#src/utils/SystemMessageTags";
 import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
 import { getRequestContext } from "#src/utils/RequestContext";
+import { estimateTokens } from "#src/utils/CostCalculator";
 
 /**
  * Wrap a system prompt section in XML semantic tags.
@@ -184,7 +185,9 @@ async function fetchAlreadyInjectedMemoryIds(
     );
     const storedIds = document?.injectedMemoryIds;
     if (!Array.isArray(storedIds) || storedIds.length === 0) return new Set();
-    return new Set<string>(storedIds as string[]);
+    // Conversations written before ids were strings hold ObjectIds; the
+    // scorer compares strings, so normalize every entry on the way in.
+    return new Set<string>(storedIds.map((storedId) => String(storedId)));
   } catch (error: unknown) {
     logger.warn(
       `[SystemPromptAssembler] Could not load injectedMemoryIds for conversation ${conversationId}: ${getErrorMessage(error)}`,
@@ -991,7 +994,7 @@ export default class SystemPromptAssembler {
         });
 
         logger.info(
-          `[SystemPromptAssembler] Assembled ${systemPrompt.length} char static system prompt for agent="${context.agent || "DIRECT"}" (${skillNames.length} skills injected into user context, ${injectedMemoryIds.length} new memories injected)`,
+          `[SystemPromptAssembler] Assembled ${systemPrompt.length} char static system prompt for agent="${context.agent || "DIRECT"}" (${skillNames.length} skills injected into user context, ${injectedMemoryIds.length} new memories injected, ~${estimateTokens(memoriesText)} memory tokens)`,
         );
       } catch (error: unknown) {
         logger.error(

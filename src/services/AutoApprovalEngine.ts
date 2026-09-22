@@ -43,6 +43,8 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   [TOOL_NAMES.UPDATE_TASK]: APPROVAL_TIERS.AUTO,
   [TOOL_NAMES.GET_SUBAGENT_OUTPUT]: APPROVAL_TIERS.AUTO,
   [TOOL_NAMES.WRITE_TODO]: APPROVAL_TIERS.AUTO,
+  // Asking the user is not an action — the answer card IS the user's say.
+  [TOOL_NAMES.ASK_USER]: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — orchestrator orchestration
   [TOOL_NAMES.CREATE_SUBAGENT]: APPROVAL_TIERS.AUTO,
