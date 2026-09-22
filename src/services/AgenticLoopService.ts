@@ -160,6 +160,22 @@ export default class AgenticLoopService {
       }
     }
 
+    // Persona-level policies (a custom agent's DENY/ASK_USER/APPROVE rules)
+    // are resolved HERE, for every entry point — the HTTP route, scheduled
+    // tasks, conversation timers and sub-agents. Those other entry points run
+    // with autoApprove, so a policy that only the route injected was a DENY
+    // that silently did not apply. Policies already on the options (e.g.
+    // inherited from a parent orchestrator) win.
+    if (agent && !options.policies) {
+      const { default: AgentPersonaRegistry } = await import(
+        "./AgentPersonaRegistry.ts"
+      );
+      const persona = AgentPersonaRegistry.get(agent);
+      if (persona?.policies && persona.policies.length > 0) {
+        options.policies = persona.policies;
+      }
+    }
+
     // 2. Initialize shared state
     const state = new AgenticLoopState({
       originalMessageCount: messages.length,

@@ -7,7 +7,7 @@
  * the tool never returned (it is exempt from the tool timeout). The
  * concurrency cap was also counted across every conversation in the process.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
 import "./setup.ts";
 import { PROVIDERS, ORCHESTRATOR } from "#src/constants";
 import { TOPOLOGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
@@ -33,6 +33,7 @@ vi.mock("#src/services/orchestrator/GitWorktreeHelper", () => ({
 }));
 
 import OrchestratorService from "#src/services/OrchestratorService";
+import { TopologyExecutionService } from "#src/services/orchestrator/TopologyExecutionService";
 import type { OrchestratorContext, OrchestratorSpawnParams, SubAgentState } from "#src/types/orchestrator";
 
 const members = [
@@ -58,13 +59,21 @@ function buildContext(): OrchestratorContext {
   } as OrchestratorContext;
 }
 
-/** Settle `promise` within `milliseconds` of FAKE time, or report it hung. */
+/**
+ * Settle `promise` within `milliseconds` of FAKE time, or report it hung.
+ * Fake time advances in steps with a real event-loop turn (setImmediate is
+ * not faked) between them, so mocked I/O in the spawn path can complete.
+ */
 async function settleWithin<T>(promise: Promise<T>, milliseconds: number): Promise<T | "HUNG"> {
   let settled: { value: T } | null = null;
   promise.then((value) => {
     settled = { value };
   });
-  await vi.advanceTimersByTimeAsync(milliseconds);
+  const steps = 20;
+  for (let step = 0; step < steps && !settled; step++) {
+    await vi.advanceTimersByTimeAsync(milliseconds / steps);
+    await new Promise((resolve) => setImmediate(resolve));
+  }
   return settled ? (settled as { value: T }).value : "HUNG";
 }
 
@@ -82,6 +91,14 @@ function seedRunningAgents(count: number, parentConversationId: string) {
 
 describe("create_subagent(s) dispatch never hangs", () => {
   let realSpawn: typeof OrchestratorService.spawnFromTool;
+
+  // The routers are dynamic imports; module loading needs real time, which
+  // fake timers would starve. Load them once up front on real timers.
+  beforeAll(async () => {
+    await TopologyExecutionService.resolveRouter(TOPOLOGIES.HIERARCHICAL);
+    await TopologyExecutionService.resolveRouter(TOPOLOGIES.SEQUENTIAL);
+    await import("#src/services/AgenticLoopService");
+  });
 
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
