@@ -7,6 +7,7 @@ import {
   HOOK_HANDLER_TYPES,
 } from "#src/services/hooks/types";
 import type {
+  CommandHookHandlerConfig,
   ConfiguredHookDocument,
   HookDecision,
   HookEventName,
@@ -14,9 +15,14 @@ import type {
 } from "#src/services/hooks/types";
 import type { TransformedHookResult } from "#src/services/AgentHooks";
 import type { LLMProvider } from "#src/services/harnesses/types";
+import type { HookTranscriptEntry } from "#src/services/hooks/buildPayload";
 import runPromptHook from "#src/services/hooks/handlers/PromptHookHandler";
 import runHttpHook from "#src/services/hooks/handlers/HttpHookHandler";
 import runMcpToolHook from "#src/services/hooks/handlers/McpToolHookHandler";
+import runCommandHook, {
+  commandTimeoutDecision,
+} from "#src/services/hooks/handlers/CommandHookHandler";
+import runAgentHook from "#src/services/hooks/handlers/AgentHookHandler";
 
 /**
  * HookRunner — the one place a configured hook actually executes.
@@ -78,9 +84,11 @@ export const HOOK_DECISION_FIELDS = [
   "updatedToolOutput",
   "decision",
   "reason",
+  "message",
 ] as const;
 
 const PERMISSION_DECISIONS = new Set(["allow", "deny", "ask"]);
+const GENERIC_DECISIONS = new Set(["block", "allow", "deny"]);
 
 /**
  * Payload keys that survive truncation. These identify *which* event fired
@@ -120,6 +128,8 @@ export interface HookRunOptions {
   traceId?: string | null;
   conversationId?: string | null;
   agentConversationId?: string | null;
+  /** Recent conversation, for `agent` verifiers. */
+  transcript?: HookTranscriptEntry[];
 }
 
 // ─── Serialization ────────────────────────────────────────────────────────────
@@ -215,9 +225,19 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * accidentally deny by having its field merged straight into the hook result.
  */
 export function pickHookDecision(
-  value: unknown,
+  input: unknown,
 ): { decision: HookDecision; fieldCount: number } | null {
-  if (!isPlainObject(value)) return null;
+  if (!isPlainObject(input)) return null;
+
+  // Claude Code nests the event-specific half under `hookSpecificOutput`
+  // (`{"hookSpecificOutput": {"hookEventName": "PreToolUse",
+  // "permissionDecision": "deny"}}`). A hook script written for Claude Code
+  // must work here unchanged, so the nested fields are lifted to the top;
+  // a top-level field of the same name still wins.
+  const nested = isPlainObject(input.hookSpecificOutput)
+    ? input.hookSpecificOutput
+    : null;
+  const value: Record<string, unknown> = nested ? { ...nested, ...input } : input;
 
   const decision: HookDecision = {};
   let fieldCount = 0;
@@ -260,12 +280,16 @@ export function pickHookDecision(
     decision.updatedToolOutput = value.updatedToolOutput;
     fieldCount += 1;
   }
-  if (value.decision === "block") {
-    decision.decision = "block";
+  if (typeof value.decision === "string" && GENERIC_DECISIONS.has(value.decision)) {
+    decision.decision = value.decision as "block" | "allow" | "deny";
     fieldCount += 1;
   }
   if (typeof value.reason === "string") {
     decision.reason = value.reason;
+    fieldCount += 1;
+  }
+  if (typeof value.message === "string") {
+    decision.message = value.message;
     fieldCount += 1;
   }
 
@@ -274,17 +298,31 @@ export function pickHookDecision(
 
 // ─── Timeout ──────────────────────────────────────────────────────────────────
 
+/** Per-event default deadline and ceiling, where they differ from the generic ones. */
+const EVENT_TIMEOUTS: Partial<
+  Record<HookEventName, { defaultMilliseconds: number; maxMilliseconds?: number }>
+> = {
+  // Before every tool call (and every approval prompt): a slow hook here
+  // taxes the entire conversation, not one turn.
+  [HOOK_EVENTS.PRE_TOOL_USE]: { defaultMilliseconds: HOOKS.PRE_TOOL_USE_TIMEOUT_MILLISECONDS },
+  [HOOK_EVENTS.PERMISSION_REQUEST]: { defaultMilliseconds: HOOKS.PRE_TOOL_USE_TIMEOUT_MILLISECONDS },
+  // The user pressed Stop and is watching it take effect.
+  [HOOK_EVENTS.INTERRUPT]: {
+    defaultMilliseconds: HOOKS.INTERRUPT_TIMEOUT_MILLISECONDS,
+    maxMilliseconds: HOOKS.INTERRUPT_MAX_TIMEOUT_MILLISECONDS,
+  },
+};
+
 /**
  * The deadline a hook actually runs under: its own setting when it has a sane
- * one, otherwise the per-event default, always clamped to the ceiling.
- * `PreToolUse` gets the tighter default because it fires before *every* tool
- * call — a slow hook there taxes the entire conversation, not one turn.
+ * one, otherwise the per-event default, always clamped to the event's ceiling
+ * (`Interrupt`: 3 s) or the global one.
  */
 export function resolveHookTimeout(hook: ConfiguredHookDocument): number {
+  const eventTimeouts = EVENT_TIMEOUTS[hook.event];
   const eventDefault =
-    hook.event === HOOK_EVENTS.PRE_TOOL_USE
-      ? HOOKS.PRE_TOOL_USE_TIMEOUT_MILLISECONDS
-      : HOOKS.DEFAULT_TIMEOUT_MILLISECONDS;
+    eventTimeouts?.defaultMilliseconds ?? HOOKS.DEFAULT_TIMEOUT_MILLISECONDS;
+  const ceiling = eventTimeouts?.maxMilliseconds ?? HOOKS.MAX_TIMEOUT_MILLISECONDS;
 
   const configured = hook.timeoutMilliseconds;
   const base =
@@ -292,7 +330,7 @@ export function resolveHookTimeout(hook: ConfiguredHookDocument): number {
       ? configured
       : eventDefault;
 
-  return Math.min(base, HOOKS.MAX_TIMEOUT_MILLISECONDS);
+  return Math.min(base, ceiling);
 }
 
 class HookTimeoutError extends Error {}
@@ -414,6 +452,44 @@ export async function runConfiguredHook(
         });
         break;
 
+      case HOOK_HANDLER_TYPES.COMMAND:
+        work = runCommandHook(hook.handler, {
+          payloadJson,
+          event: hook.event,
+          signal,
+          timeoutMilliseconds,
+          hookName: hook.name,
+          hookId: hook.id,
+          // Ownership is the DOCUMENT's, never the caller's: a hook runs with
+          // the rights of whoever it belongs to.
+          owner: hook.username,
+          project: options.project ?? hook.project,
+          sessionId: payload.session_id,
+          cwd: payload.cwd,
+        });
+        break;
+
+      case HOOK_HANDLER_TYPES.AGENT:
+        work = runAgentHook(hook.handler, payload, {
+          payloadJson,
+          event: hook.event,
+          signal,
+          timeoutMilliseconds,
+          hookName: hook.name,
+          provider: options.provider,
+          providerName: options.providerName,
+          model: options.model,
+          project: options.project ?? hook.project,
+          username: options.username ?? hook.username,
+          agent: options.agent ?? hook.agent,
+          requestId: options.requestId,
+          traceId: options.traceId,
+          conversationId: options.conversationId,
+          agentConversationId: options.agentConversationId,
+          transcript: options.transcript,
+        });
+        break;
+
       default:
         logger.warn(
           `[HookRunner] Hook "${hook.name}" has unknown handler type "${String(handlerType)}"`,
@@ -429,6 +505,16 @@ export async function runConfiguredHook(
     logger.warn(
       `[HookRunner] ${label} failed on ${hook.event} (${reason}): ${errorMessage(hookError)}`,
     );
+    // A command hook configured `fail_closed` blocks when the runner's own
+    // deadline wins the race, the same as when tools-service reports it.
+    if (reason === "hook_timeout" && hook.handler?.type === HOOK_HANDLER_TYPES.COMMAND) {
+      const closed = commandTimeoutDecision(
+        hook.handler as CommandHookHandlerConfig,
+        hook.event,
+        hook.name,
+      );
+      if (closed) return { ...closed, _reason: "command_timeout_fail_closed" };
+    }
     return { _handlerFailed: true, _reason: reason };
   }
 }
@@ -448,19 +534,24 @@ function capOutputs(result: HookHandlerResult): HookHandlerResult {
 // ─── Translation into the kernel's vocabulary ────────────────────────────────
 
 /**
- * Map a hook's decision onto the `{isApproved, …}` object `AgentHooks` merges.
+ * Map a hook's decision onto the result `AgentHooks` merges.
  *
- * Three spellings mean "stop": `permissionDecision:"deny"` (the `PreToolUse`
- * vocabulary), `decision:"block"` (the generic one), and `continue:false`
- * (abort the run). They collapse to the same internal result because the
- * kernel has exactly one refusal channel.
+ * Every vocabulary collapses to one verdict — deny, ask or allow:
+ *   - deny:  `permissionDecision:"deny"`, `decision:"block"|"deny"`,
+ *            `continue:false`. On `Stop` only `decision:"block"` counts, and
+ *            it means the opposite of stopping: the agent keeps going with
+ *            the reason as its next instruction (`continue:false` on `Stop`
+ *            is the turn ending, which it already is).
+ *   - ask:   `permissionDecision:"ask"` — a per-call approval request. Only
+ *            `PreToolUse` has one to make; the approval gate reads it.
+ *   - allow: `permissionDecision:"allow"`, `decision:"allow"` — skips the
+ *            mode's prompt on `PreToolUse`, or answers the prompt on
+ *            `PermissionRequest`. It never overrides a deny rule.
  *
- * A refusal on an event outside `BLOCKING_EVENTS` is dropped with a warning.
- * `SessionEnd`, `Notification`, `Stop` and friends fire at seams with nothing
- * left to refuse; honoring a deny there would mean inventing an abort path
- * that the surrounding code has no handling for. The rest of the decision —
- * `systemMessage`, `additionalContext` — still passes through, because those
- * *do* have somewhere to land.
+ * A refusal on an event outside `BLOCKING_EVENTS` is dropped with a warning:
+ * `SessionEnd`, `Notification` and friends fire at seams with nothing left to
+ * refuse. `systemMessage`, `additionalContext` and the rewrites still pass
+ * through; the call site decides whether its event honours them.
  */
 export function normalizeDecision(
   decision: HookDecision | HookHandlerResult | null | undefined,
@@ -470,45 +561,57 @@ export function normalizeDecision(
   if (!decision || typeof decision !== "object") return result;
 
   const canBlock = BLOCKING_EVENTS.includes(event);
+  const reasonText =
+    decision.permissionDecisionReason ||
+    decision.reason ||
+    decision.message ||
+    decision.stopReason;
 
-  const wantsDeny =
+  let verdict: "deny" | "ask" | "allow" | null = null;
+  if (event === HOOK_EVENTS.STOP) {
+    if (decision.decision === "block") verdict = "deny";
+  } else if (
     decision.permissionDecision === "deny" ||
     decision.decision === "block" ||
-    decision.continue === false;
-  const wantsAsk = decision.permissionDecision === "ask";
+    decision.decision === "deny" ||
+    decision.continue === false
+  ) {
+    verdict = "deny";
+  } else if (decision.permissionDecision === "ask") {
+    verdict = "ask";
+  } else if (
+    decision.permissionDecision === "allow" ||
+    decision.decision === "allow"
+  ) {
+    verdict = "allow";
+  }
 
-  if (wantsDeny && !canBlock) {
+  if (verdict === "deny" && !canBlock) {
     logger.warn(
-      `[HookRunner] Ignoring deny from a hook on "${event}": that event cannot block. Reason given: ${
-        decision.permissionDecisionReason ||
-        decision.reason ||
-        decision.stopReason ||
-        "(none)"
-      }`,
+      `[HookRunner] Ignoring deny from a hook on "${event}": that event cannot block. Reason given: ${reasonText || "(none)"}`,
     );
-  } else if (wantsDeny) {
+  } else if (verdict === "deny") {
     result.isApproved = false;
     result.isDenied = true;
-    result.reason =
-      decision.permissionDecisionReason ||
-      decision.reason ||
-      decision.stopReason ||
-      "Blocked by a configured hook";
-  } else if (wantsAsk && !canBlock) {
-    // `ask` routes into the ApprovalGate, which only exists on the tool-call
-    // seam. Elsewhere it is the same category of mistake as a stray deny.
+    result.permissionDecision = "deny";
+    result.reason = reasonText || "Blocked by a configured hook";
+  } else if (verdict === "ask" && event !== HOOK_EVENTS.PRE_TOOL_USE) {
+    // Only `PreToolUse` sits in front of an approval step it can route a
+    // call into. Elsewhere `ask` is the same category of mistake as a stray
+    // deny.
     logger.warn(
-      `[HookRunner] Ignoring "ask" from a hook on "${event}": that event has no approval seam.`,
+      `[HookRunner] Ignoring "ask" from a hook on "${event}": only PreToolUse can request an approval.`,
     );
-  } else if (wantsAsk) {
-    result.isApproved = false;
-    result.requiresApproval = true;
-    result.reason =
-      decision.permissionDecisionReason ||
-      decision.reason ||
-      "A configured hook requested approval";
-  } else if (decision.permissionDecision === "allow") {
+  } else if (verdict === "ask") {
+    result.permissionDecision = "ask";
+    result.reason = reasonText || "A configured hook requested approval";
+  } else if (
+    verdict === "allow" &&
+    (event === HOOK_EVENTS.PRE_TOOL_USE || event === HOOK_EVENTS.PERMISSION_REQUEST)
+  ) {
     result.isApproved = true;
+    result.permissionDecision = "allow";
+    if (reasonText) result.reason = reasonText;
   }
 
   if (decision.updatedInput) result.updatedInput = decision.updatedInput;

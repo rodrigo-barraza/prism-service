@@ -19,6 +19,8 @@ import logger from "#src/utils/logger";
  *                        kept working (instead of waking a new turn later)
  *   - `agent_message`    a parent's send_subagent_message to a RUNNING
  *                        sub-agent (previously queued into a field nobody read)
+ *   - `hook_context`     the `additionalContext` of an async configured hook
+ *                        that finished while the turn kept going
  *
  * Keyed by the loop's client-facing `conversationId` — for a root turn that
  * is the id the client holds; for a sub-agent it is the sub-agent's own
@@ -35,7 +37,8 @@ export type TurnInputKind =
   | "user_update"
   | "question_answer"
   | "task_completion"
-  | "agent_message";
+  | "agent_message"
+  | "hook_context";
 
 export interface TurnInputEntry {
   id: string;

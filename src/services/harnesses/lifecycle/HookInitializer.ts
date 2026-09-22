@@ -116,11 +116,11 @@ export function createStandardHooks({
  * on the hot path — because this reads Mongo. The registry caches per scope,
  * so the common case is a map lookup rather than a query.
  *
- * Ordering matters: built-in hooks register first, so `AutoApprovalEngine`'s
- * policy verdict is already in the merged result when a user's `PreToolUse`
- * hook runs. Both are `decide` hooks and `AgentHooks.run` short-circuits on
- * the first deny, which preserves the invariant that a policy DENY cannot be
- * relaxed by anything registered later — including a user hook.
+ * A user's `PreToolUse` hooks no longer share `beforeToolCall` with the
+ * built-ins: they register on their own `preToolUse` event, which the loop
+ * fires BEFORE the approval gate. That a policy DENY cannot be relaxed by a
+ * hook is now the gate's invariant — `AutoApprovalEngine.check` applies
+ * rules after the hook verdict and a DENY rule wins over a hook `allow`.
  *
  * Never throws. A malformed hook config must not take the conversation down
  * with it; the failure is logged and the loop proceeds with built-ins only.
@@ -135,6 +135,8 @@ export async function attachConfiguredHooks(
     agentConversationId?: string | null;
     workspaceRoot?: string | null;
     hookDepth?: number;
+    /** The run's event stream — where a hook's `systemMessage` is shown. */
+    emit?: (event: Record<string, unknown>) => void;
   },
 ): Promise<number> {
   try {

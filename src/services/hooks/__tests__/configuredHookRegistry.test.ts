@@ -230,17 +230,30 @@ describe("ConfiguredHookRegistry", () => {
     it("registers blocking events as decide hooks", () => {
       expect(categoryForEvent(HOOK_EVENTS.PRE_TOOL_USE)).toBe("decide");
       expect(categoryForEvent(HOOK_EVENTS.USER_PROMPT_SUBMIT)).toBe("decide");
+      expect(categoryForEvent(HOOK_EVENTS.PERMISSION_REQUEST)).toBe("decide");
+      expect(categoryForEvent(HOOK_EVENTS.PRE_MODEL_SWITCH)).toBe("decide");
+      // Awaited now: a Stop `block` keeps the agent going.
+      expect(categoryForEvent(HOOK_EVENTS.STOP)).toBe("decide");
     });
 
-    it("registers PostToolUse as transform — it can rewrite the result", () => {
+    it("registers the events whose output the loop uses as transform", () => {
       expect(categoryForEvent(HOOK_EVENTS.POST_TOOL_USE)).toBe("transform");
+      expect(categoryForEvent(HOOK_EVENTS.POST_TOOL_BATCH)).toBe("transform");
+      expect(categoryForEvent(HOOK_EVENTS.INTERRUPT)).toBe("transform");
     });
 
     it("registers everything else as inspect", () => {
-      expect(categoryForEvent(HOOK_EVENTS.STOP)).toBe("inspect");
       expect(categoryForEvent(HOOK_EVENTS.SESSION_START)).toBe("inspect");
+      expect(categoryForEvent(HOOK_EVENTS.TURN_START)).toBe("inspect");
       expect(categoryForEvent(HOOK_EVENTS.NOTIFICATION)).toBe("inspect");
       expect(categoryForEvent(HOOK_EVENTS.POST_TOOL_USE_FAILURE)).toBe("inspect");
+      expect(categoryForEvent(HOOK_EVENTS.PERMISSION_DENIED)).toBe("inspect");
+      expect(categoryForEvent(HOOK_EVENTS.STOP_FAILURE)).toBe("inspect");
+    });
+
+    it("registers an async hook as inspect whatever its event — it cannot gate", () => {
+      expect(categoryForEvent(HOOK_EVENTS.PRE_TOOL_USE, true)).toBe("inspect");
+      expect(categoryForEvent(HOOK_EVENTS.STOP, true)).toBe("inspect");
     });
 
     it("maps the config event onto the kernel's internal name", () => {
@@ -256,9 +269,11 @@ describe("ConfiguredHookRegistry", () => {
         baseContext,
       );
 
+      // PreToolUse and Stop have their own seams: before the approval gate,
+      // and where the loop would end the turn — not the built-ins' events.
       expect(registrations.map((entry) => entry.event)).toEqual([
-        "beforeToolCall",
-        "afterResponse",
+        "preToolUse",
+        "stop",
         "sessionEnd",
       ]);
     });
@@ -400,24 +415,27 @@ describe("ConfiguredHookRegistry", () => {
       expect(payload.tool_error).toBe("exit 1");
     });
 
-    it("takes only the text from (ctx, output) on Stop", () => {
-      const { payload } = adaptHookArguments(
+    it("takes the Stop payload, and only borrows from the context", () => {
+      const { payload, messages } = adaptHookArguments(
         HOOK_EVENTS.STOP,
         [
+          { last_assistant_message: "final answer", stop_hook_active: false },
           {
             provider: {},
             resolvedModel: "m",
             messages: [{ role: "user", content: "hi" }],
             agentConversationId: "conversation-9",
           },
-          { text: "final answer", messages: [1, 2, 3], toolCalls: [] },
         ],
         baseContext,
       );
 
-      expect(payload.response_text).toBe("final answer");
-      // The context and the full message history must never be spread in.
+      expect(payload.last_assistant_message).toBe("final answer");
+      expect(payload.agent_conversation_id).toBe("conversation-9");
+      // The context and the full message history must never be spread in;
+      // the live transcript is handed over separately (for agent verifiers).
       expect(payload.messages).toBeUndefined();
+      expect(messages).toEqual([{ role: "user", content: "hi" }]);
       expect(payload.provider).toBeUndefined();
       expect(payload.toolCalls).toBeUndefined();
     });
@@ -502,7 +520,7 @@ describe("ConfiguredHookRegistry", () => {
       registerConfiguredHooks(hooks, [makeHook()], baseContext);
 
       const result = await hooks.run(
-        "beforeToolCall",
+        "preToolUse",
         { name: "Bash", args: { command: "rm -rf /" }, id: "c1" },
         {},
       );
@@ -510,6 +528,7 @@ describe("ConfiguredHookRegistry", () => {
       expect(result).toMatchObject({
         isApproved: false,
         isDenied: true,
+        permissionDecision: "deny",
         reason: "no rm",
       });
     });
@@ -521,11 +540,12 @@ describe("ConfiguredHookRegistry", () => {
         systemMessage: "still shown",
       });
 
+      const emit = vi.fn();
       const { hooks, registrations } = captureHooks();
       registerConfiguredHooks(
         hooks,
         [makeHook({ event: HOOK_EVENTS.POST_TOOL_USE })],
-        baseContext,
+        { ...baseContext, emit },
       );
 
       const result = (await registrations[0].handler(
@@ -536,7 +556,11 @@ describe("ConfiguredHookRegistry", () => {
 
       expect(result.isDenied).toBeUndefined();
       expect(result.isApproved).toBeUndefined();
-      expect(result.systemMessage).toBe("still shown");
+      // `systemMessage` is shown to the user by the registry itself, once.
+      expect(result.systemMessage).toBeUndefined();
+      expect(emit).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "hook_system_message", text: "still shown" }),
+      );
     });
 
     it("forwards a PostToolUse rewrite", async () => {
