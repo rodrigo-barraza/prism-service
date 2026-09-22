@@ -65,6 +65,11 @@ describe("getTier — default assignments", () => {
     "git_diff",
     "git_log",
     "summarize_project",
+    // Tool discovery only changes what the model is offered.
+    "search_tools",
+    "enable_tools",
+    "discover_and_enable_tools",
+    "disable_tools",
   ];
 
   for (const tool of tier1Tools) {

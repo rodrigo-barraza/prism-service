@@ -82,6 +82,13 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   [TOOL_NAMES.ENTER_PLAN_MODE]: APPROVAL_TIERS.AUTO,
   [TOOL_NAMES.EXIT_PLAN_MODE]: APPROVAL_TIERS.AUTO,
   [TOOL_NAMES.SEARCH_TOOLS]: APPROVAL_TIERS.AUTO,
+  // Enabling or disabling tools only changes what the model is offered;
+  // every tool it enables is still gated by its own tier when called.
+  // Unmapped, these fell to WRITE and the first card of a CODING turn was
+  // a prompt to look tools up.
+  [TOOL_NAMES.ENABLE_TOOLS]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.DISCOVER_AND_ENABLE_TOOLS]: APPROVAL_TIERS.AUTO,
+  [TOOL_NAMES.DISABLE_TOOLS]: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — context recovery (read-only over offloaded tool results)
   [TOOL_NAMES.RETRIEVE_OFFLOADED_CONTENT]: APPROVAL_TIERS.AUTO,
