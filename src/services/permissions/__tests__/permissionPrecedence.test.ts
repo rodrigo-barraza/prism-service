@@ -193,6 +193,83 @@ describe("AutoApprovalEngine names the deciding layer", () => {
   });
 });
 
+describe("configured PreToolUse hooks meet the permission stack", () => {
+  // hooks → rules → mode → ask: the hook ran first and stamped its verdict.
+  const hooked = (
+    name: string,
+    args: Record<string, unknown>,
+    decision: "allow" | "ask",
+    reason?: string,
+  ) => ({ ...call(name, args), _hookPermission: { decision, ...(reason && { reason }) } });
+
+  it("a rule deny is final — a hook allow does not relax it", () => {
+    const engine = new AutoApprovalEngine({
+      permissionRules: ruleSet([{ rule: "execute_shell(rm *)", decision: "deny" }]),
+    });
+    expect(engine.check(hooked("execute_shell", { command: "rm -rf build" }, "allow"))).toMatchObject({
+      isApproved: false,
+      isDenied: true,
+      deniedBy: "rule",
+      layer: "rules",
+    });
+  });
+
+  it("self-protection holds against a hook allow", () => {
+    const engine = new AutoApprovalEngine({ fullAuto: true });
+    const result = engine.check(
+      hooked("execute_shell", { command: "curl -X DELETE http://localhost:7777/permissions/rules/abc" }, "allow"),
+    );
+    expect(result).toMatchObject({ isDenied: true, deniedBy: "rule", layer: "self_protection" });
+  });
+
+  it("a hook ask beats a rule allow", () => {
+    const engine = new AutoApprovalEngine({
+      permissionRules: ruleSet([{ rule: "write_file", decision: "allow" }]),
+    });
+    expect(engine.check(hooked("write_file", { path: "a.ts" }, "ask", "review writes"))).toMatchObject({
+      isApproved: false,
+      reason: "hook_ask: review writes",
+      layer: "hook",
+    });
+  });
+
+  it("a rule ask still asks when a hook allowed", () => {
+    const engine = new AutoApprovalEngine({
+      permissionRules: ruleSet([{ rule: "write_file(**/*.lock)", decision: "ask" }]),
+    });
+    expect(engine.check(hooked("write_file", { path: "pnpm.lock" }, "allow"))).toMatchObject({
+      isApproved: false,
+      layer: "rules",
+    });
+  });
+
+  it("full auto answers a rule ask — unless a hook asked too", () => {
+    const engine = new AutoApprovalEngine({
+      fullAuto: true,
+      permissionRules: ruleSet([{ rule: "write_file(**/*.lock)", decision: "ask" }]),
+    });
+    expect(engine.check(call("write_file", { path: "pnpm.lock" }))).toMatchObject({ isApproved: true, layer: "full_auto" });
+    expect(engine.check(hooked("write_file", { path: "pnpm.lock" }, "ask"))).toMatchObject({
+      isApproved: false,
+      layer: "rules",
+    });
+  });
+
+  it("with no rule, a hook allow stands in for the tier prompt and a hook ask asks even at the AUTO tier", () => {
+    const engine = new AutoApprovalEngine({ permissionRules: ruleSet([]) });
+    expect(engine.check(hooked("write_file", { path: "a.ts" }, "allow"))).toMatchObject({
+      isApproved: true,
+      reason: "hook_allow",
+      layer: "hook",
+    });
+    expect(engine.check(hooked("read_file", { path: "a.ts" }, "ask"))).toMatchObject({
+      isApproved: false,
+      reason: "hook_ask",
+      layer: "hook",
+    });
+  });
+});
+
 describe("capability resolution", () => {
   beforeEach(() => resetToolCapabilities());
 

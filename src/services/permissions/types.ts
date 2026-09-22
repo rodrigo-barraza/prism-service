@@ -49,7 +49,9 @@ export type PermissionLayer =
   | "tier"
   | "full_auto"
   | "approve_all"
-  | "user";
+  | "user"
+  /** A configured PreToolUse hook's `ask` / `allow` (hooks run before rules). */
+  | "hook";
 
 /** A stored rule, as the API returns it. */
 export interface PermissionRuleDocument {
