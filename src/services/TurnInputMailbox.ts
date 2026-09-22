@@ -31,6 +31,12 @@ import logger from "#src/utils/logger";
  * caller that gets `accepted: false` knows to queue the message as the next
  * turn instead. Nothing here needs to survive a restart — a restart ends the
  * turn, and the client falls back to the queue.
+ *
+ * A turn that has decided to end SEALS its box first (ReActHarness, before
+ * it counts background work and finalizes): from then on a post is refused
+ * exactly as if the box were closed. Without the seal, input arriving during
+ * finalize was accepted and then dropped by `close()` — a sub-agent team's
+ * whole result, or a user's update, lost to a window of database writes.
  */
 
 export type TurnInputKind =
@@ -63,6 +69,8 @@ interface Mailbox {
   openedAt: number;
   /** Total accepted over the life of the turn (for diagnostics / acks). */
   acceptedCount: number;
+  /** The turn is ending: posts are refused as `no_active_turn`. */
+  sealed: boolean;
 }
 
 const mailboxes = new Map<string, Mailbox>();
@@ -76,15 +84,37 @@ const TurnInputMailbox = {
   /** Open the mailbox for a turn. Idempotent; re-opening keeps pending entries. */
   open(conversationId: string): void {
     if (!conversationId) return;
-    if (!mailboxes.has(conversationId)) {
-      mailboxes.set(conversationId, { entries: [], openedAt: Date.now(), acceptedCount: 0 });
-      logger.debug(`[TurnInputMailbox] Opened for ${conversationId} (open=${mailboxes.size})`);
+    const existing = mailboxes.get(conversationId);
+    if (existing) {
+      existing.sealed = false;
+      return;
     }
+    mailboxes.set(conversationId, { entries: [], openedAt: Date.now(), acceptedCount: 0, sealed: false });
+    logger.debug(`[TurnInputMailbox] Opened for ${conversationId} (open=${mailboxes.size})`);
+  },
+
+  /**
+   * Whether a turn of this conversation is running in this process — open,
+   * or sealed while it finalizes.
+   */
+  hasTurn(conversationId: string): boolean {
+    return mailboxes.has(conversationId);
   },
 
   /** Whether a turn is currently accepting input for this conversation. */
   isOpen(conversationId: string): boolean {
-    return mailboxes.has(conversationId);
+    const box = mailboxes.get(conversationId);
+    return !!box && !box.sealed;
+  },
+
+  /**
+   * The turn has decided to end: refuse every further post (as
+   * `no_active_turn`, so producers take their after-the-turn path) while
+   * the harness finalizes. Pending entries stay drainable.
+   */
+  seal(conversationId: string): void {
+    const box = mailboxes.get(conversationId);
+    if (box) box.sealed = true;
   },
 
   /**
@@ -97,7 +127,7 @@ const TurnInputMailbox = {
     input: TurnInputPost,
   ): { accepted: boolean; id?: string; position?: number; reason?: string } {
     const box = mailboxes.get(conversationId);
-    if (!box) return { accepted: false, reason: "no_active_turn" };
+    if (!box || box.sealed) return { accepted: false, reason: "no_active_turn" };
     if (box.entries.length >= TURN_INPUT_MAXIMUM_PENDING) {
       return { accepted: false, reason: "mailbox_full" };
     }

@@ -84,6 +84,10 @@ export interface SubAgentState {
   telemetryEmitter?: { updateParentEmit: (emit: EmitFunction | null | undefined) => void } | null;
   /** Epoch ms when the agent transitioned to complete/idle — used for TTL-based eviction. */
   completedAt?: number;
+  /** report_progress messages delivered during the current run (capped per run). */
+  progressReportCount?: number;
+  /** The latest report_progress message, delivered or not. */
+  lastProgress?: { message: string; reportedAt: number };
 }
 
 // ── Worktree diff contract (tools-service) ─────────────────

@@ -426,8 +426,26 @@ export const ORCHESTRATOR = {
   /** Max characters of sub-agent result text propagated in tool-call fallback summaries. */
   MAX_RESULT_LENGTH_FOR_PROPAGATION: 2000,
 
-  /** TIME_TO_LIVE for completed/idle sub-agents before they are evicted from memory (milliseconds). 30 minutes. */
+  /**
+   * TIME_TO_LIVE for completed/idle sub-agents before they are evicted from
+   * memory (milliseconds). 30 minutes. An evicted agent is still resumable:
+   * resume_subagent rebuilds it from its conversation document.
+   */
   IDLE_AGENT_TIME_TO_LIVE_MILLISECONDS: 30 * 60 * 1_000,
+
+  /**
+   * A sub-agent completion that finds its parent mid-turn but not accepting
+   * input (the turn is finalizing, or starting) re-checks this often, up to
+   * PARENT_TURN_WAIT_MAXIMUM_MILLISECONDS, before waking the parent.
+   */
+  PARENT_TURN_WAIT_POLL_MILLISECONDS: 250,
+  PARENT_TURN_WAIT_MAXIMUM_MILLISECONDS: 60_000,
+
+  /** Max characters of one report_progress message delivered to the parent. */
+  PROGRESS_REPORT_MAXIMUM_CHARACTERS: 2_000,
+
+  /** Max report_progress deliveries per sub-agent run — a chatty child cannot flood its parent's context. */
+  MAXIMUM_PROGRESS_REPORTS_PER_RUN: 10,
 
   /** Max retries waiting for a parent conversation to become idle before auto-responding. */
   AUTO_RESPONSE_GENERATION_WAIT_MAXIMUM_RETRIES: 30,
@@ -514,6 +532,8 @@ export const NOTIFICATION_SOURCES = {
   USER_ANSWER: "user-answer",
   /** Mid-turn steering message from the user, injected by the harness. */
   USER_UPDATE: "user-update",
+  /** A running sub-agent's report_progress, delivered into its parent's turn. */
+  SUB_AGENT_PROGRESS: "subagent-progress",
 } as const;
 
 // ─── Harness Constants ──────────────────────────────────────

@@ -50,6 +50,7 @@ export const INTERNAL_TOOL_EMOJIS: Record<string, string[]> = {
   get_subagent_output: ["📥", "🤖"],
   delete_subagents: ["🗑️", "👥"],
   resume_subagent: ["🔄", "🤖"],
+  report_progress: ["📣", "🤖"],
 
   // Async tasks
   run_async_task: ["⚡", "🔄"],

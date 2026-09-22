@@ -3,6 +3,7 @@ import { COLLECTIONS, SYSTEM_STATUSES } from "#src/constants";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { MONGO_DB_NAME } from "#config";
+import type { ConversationMessage } from "#src/services/harnesses/types";
 
 /**
  * Service for persisting sub-agent metadata and state to MongoDB.
@@ -150,6 +151,54 @@ export class SubAgentPersistenceService {
         `[SubAgentPersistence] Failed to persist active status for ${subAgentConversationId}: ${getErrorMessage(error)}`,
       );
     }
+  }
+
+  /**
+   * A sub-agent's own conversation document — what registerSubAgent wrote
+   * plus the transcript its loops persisted — looked up by its conversation
+   * id or by its agent id, within one user's project. Null when absent or
+   * when the database is unavailable.
+   */
+  static async loadSubAgentConversation(
+    lookup: { subAgentConversationId: string } | { agentId: string },
+    { project, username }: { project: string; username: string },
+  ): Promise<Record<string, unknown> | null> {
+    try {
+      const conversationCollection = MongoWrapper.getCollection(
+        MONGO_DB_NAME,
+        COLLECTIONS.AGENT_CONVERSATIONS,
+      );
+      if (!conversationCollection) return null;
+      const query =
+        "agentId" in lookup
+          ? { subAgentId: lookup.agentId, isSubAgent: true, project, username }
+          : { id: lookup.subAgentConversationId, project, username };
+      return (await conversationCollection.findOne(query)) as Record<string, unknown> | null;
+    } catch (error: unknown) {
+      logger.warn(
+        `[SubAgentPersistence] Failed to load sub-agent conversation: ${getErrorMessage(error)}`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * The transcript a sub-agent's earlier runs persisted, ready to be the
+   * head of its next run: every message marked already persisted. Empty
+   * when there is none.
+   */
+  static async loadSubAgentHistory(
+    subAgentConversationId: string,
+    owner: { project: string; username: string },
+  ): Promise<ConversationMessage[]> {
+    const document = await SubAgentPersistenceService.loadSubAgentConversation(
+      { subAgentConversationId },
+      owner,
+    );
+    const messages = Array.isArray(document?.messages)
+      ? (document!.messages as ConversationMessage[])
+      : [];
+    return messages.map((message) => ({ ...message, _alreadyPersisted: true }));
   }
 
   /**

@@ -108,13 +108,14 @@ PRISM_SERVICE_PORT=$PORT PRISM_SERVICE_MONGO_DB_NAME=prism_test_<slug> \
   - If your task changes tools-service, boot it from its worktree: `TOOLS_SERVICE_PORT=<port2> TOOLS_SERVICE_MONGO_DB_NAME=tools_test_<slug> node "$TOOLS_WT"/src/boot.ts`.
   - Its workspace roots come from its own Mongo (`loadUserWorkspaceRoots`, `src/routes/AdminRoutes.ts`). Register a scratch git repo under your scratchpad as the only root, and pass it as `workspaceRoot` in the `/agent` body.
   - If your task doesn't change tools-service, use `$PROD_TOOLS_SERVICE_URL`, but only for read-only tools, since tool calls then execute on the NAS.
+  - **Spawning a sub-agent is not read-only**, even for pure research: every spawn asks tools-service to `git worktree add` in the workspace root. For any live test that spawns sub-agents, boot tools-service isolated (a detached worktree of its master is enough when you don't change it) after seeding its test DB: `workspace_config` ← `{_key: "user_roots", roots: ["<scratch git repo>"]}` in `tools_test_<slug>`. Its log then shows that repo as the only local root.
 - **prism-client under test.**
   - **Environment variables do not isolate it.** `next.config.ts` copies every vault secret over `process.env` and inlines the vault's `PRISM_SERVICE_URL`, so `PRISM_SERVICE_URL=http://localhost:$PORT next dev` still drives the PRODUCTION prism-service. Start the stand-in vault from prism-service, which proxies the real one and replaces only the prism-service URLs: `LOCAL_PRISM_PORT=$PORT LOCAL_CLIENT_PORT=<port3> OVERLAY_VAULT_PORT=<port4> node "$WT"/scripts/live-overlay-vault.mjs` (run it in the background).
   - Then run `VAULT_SERVICE_URL=http://127.0.0.1:<port4> "$CLIENT_WT"/node_modules/.bin/next dev "$CLIENT_WT" -p <port3>`.
   - Before you drive anything, confirm the page's requests go to `localhost:$PORT` (Playwright `page.on("request")`).
   - Drive it with the recipe in `prism-client/.claude/skills/verify/SKILL.md`: Playwright borrowed from `tools-service/node_modules`, `waitUntil: "domcontentloaded"`, and remove `<nextjs-portal>` before clicking.
   - Save screenshots to the scratchpad and name them in the report.
-- **Clean up.** Stop your servers. You may drop only your own `prism_test_<slug>` / `tools_test_<slug>` databases.
+- **Clean up.** Stop your servers. You may drop only your own `prism_test_<slug>` / `tools_test_<slug>` databases. The services' Mongo user is not allowed `dropDatabase`: drop each collection instead (a database with no collections is gone).
 
 ## Retirement
 

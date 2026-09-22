@@ -1,15 +1,16 @@
 # 17 — Sub-agents: non-blocking, file-defined, oracle, independent branches (three landings)
 
+> **Landing 1 done** (`nonblocking-subagent-dispatch`, service + client): root `create_subagent(s)`/`resume_subagent` return DETACHED_WORK and deliver once via `DetachedDispatchRegistry` (wait_for_tasks → running turn's mailbox → auto-response; counted only when the dispatching turn ends undelivered); `POST /orchestrator/sub-agents/:agentId/stop` + panel Stop; `report_progress` (sub-agents only, `agent_message` with `_authority: "sub-agent"`); resume restores persisted history and rehydrates evicted agents; turns seal their mailbox when they end.
+> Tests: `tests/nonBlockingSubAgentDispatch.test.ts` (real harness), `tests/subAgentDispatchAccounting.test.ts`, `tests/orchestratorSubAgentStop.test.ts`, `tests/subAgentReportProgress.test.ts`, `tests/orchestratorServiceResume.test.ts`, `turnInputAcceptance` 4–5; client `subAgentsPanelComponent.test.tsx`, `utils/__tests__/subAgentActivity.test.ts`.
+
 > Hand to ONE session per landing: *"Read prism-service/docs/prompts/17-subagents-modern.md and execute Landing N."*
 > Conventions, gates and the isolated live recipe: `docs/prompts/README.md`. Source: `docs/harness_modernization_2026-09.md` §4.7 (and harness-next §2.3).
 
 **Repos:** prism-service (small client additions in Landing 1) · **Size:** L · **Depends on:** 04 (worktree merge-back), 09 Landing 1 (the `create_subagent` hang). Prompt 11 (role models) is a soft dependency. · **Shares hubs with:** 11, 21 (`OrchestratorService.ts`, `ToolOrchestratorService.ts`, `AgentPersonaRegistry.ts`).
 
 ## Today
-- **Dispatch ends the parent's turn.** `create_subagent(s)` returns `NON_BLOCKING_DISPATCH` with "END YOUR TURN NOW" (`ToolOrchestratorService.ts` ~2150–2190). `wait_for_tasks` exists.
-- **Resume loses history.** `resume_subagent` is in memory with a 30-minute TTL and restarts without history (`OrchestratorService.ts` ~2007–2011).
 - **Custom agents are limited.** They can't pin a model, effort or max turns, and can't be spawned as sub-agents (`ToolOrchestratorService.ts` ~545). The model sees agent names but not their descriptions.
-- **No upward messages.** A child can't message its parent mid-run.
+- **Resuming is in place** (Landing 1): `resume_subagent` continues from the persisted transcript, and a `partial` result from Landing 2's `maxTurns` can use it.
 
 ## Reference designs
 - **Claude Code.** Sub-agents are Markdown files with frontmatter (tools, model, permission mode). They run in the background by default and can be resumed by id. Caps: 200 spawns per session, 20 concurrent, depth 3.
@@ -18,29 +19,6 @@
 - **Research.**
   - Agents that read each other's full solutions converge within one round; independent proposals avoid that (arXiv 2608.23541).
   - Reject authority only helps when the reviewer can verify the work (2609.14767).
-
----
-
-## Landing 1 — `nonblocking-subagent-dispatch`
-
-**Changes.**
-- **Keep working after dispatch.** `create_subagent(s)` returns `DETACHED_WORK`, so the parent keeps working.
-  - Completions arrive through the `TurnInputMailbox` (already built for `run_async_task continueWorking`).
-  - `wait_for_tasks {agentIds}` works for sub-agents.
-  - Keep `pendingBackgroundTasks` balanced on every path (see `docs/harness_next_2026-09.md` §2.3).
-- **Stop one agent.** Per-agent stop: `POST /orchestrator/sub-agents/:agentId/stop`, plus a stop button in the sub-agents panel.
-- **Progress upward.** A `report_progress(message)` tool for sub-agents delivers into the parent's mailbox as an `agent_message`, marked as sub-agent authority rather than user authority.
-- **Resume with history.** `resume_subagent` restores the persisted history of the sub-agent conversation.
-
-**Tests.**
-- **Red first.** Real-harness integration:
-  - the parent spawns 2 sub-agents and **keeps calling tools** (red: the turn ends);
-  - completions arrive at the next mailbox boundary;
-  - `wait_for_tasks` returns both.
-- **Stop one.** Stopping one leaves the other running.
-- **Progress.** `report_progress` arrives exactly once, as a non-user kind.
-- **Resume.** Resuming shows the sub-agent's previous messages in the next provider payload. (Red: empty.)
-- **Counters.** `pendingBackgroundTasks` returns to zero on every path.
 
 ---
 

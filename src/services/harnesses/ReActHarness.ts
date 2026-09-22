@@ -71,6 +71,7 @@ import { recordRefusal } from "./lifecycle/RefusalHandler.ts";
 import {
   drainTurnInput,
   hasPendingTurnInput,
+  sealTurnInput,
 } from "./lifecycle/TurnInputDrain.ts";
 import {
   maybeInjectSystemReminder,
@@ -1093,6 +1094,23 @@ export default class ReActHarness extends BaseAgenticHarness {
               continue;
             }
 
+            // Input that arrived while the Stop hooks ran (a sub-agent
+            // completion, a user update) still gets its answer in this turn.
+            if (hasPendingTurnInput(context) && !signal?.aborted) {
+              currentMessages.push({
+                role: "assistant",
+                content: pass.finalStreamedText || pass.streamedText,
+                thinking: pass.streamedThinking.trim(),
+                thinkingSignature: pass.thinkingSignature,
+                ...computePassPhaseDurations(pass),
+                ...providerNativeState(pass),
+              });
+              drainTurnInput(currentMessages, state, context, "before_end");
+              this.logIteration(pass, currentMessages);
+              this.deviationEngine.recordCompletedIteration([]);
+              continue;
+            }
+
             this.logIteration(pass, currentMessages);
             this.deviationEngine.recordCompletedIteration([]);
             semanticStallDetector.recordIteration([], pass.streamedText);
@@ -1139,6 +1157,11 @@ export default class ReActHarness extends BaseAgenticHarness {
         break;
       }
 
+      // The turn is ending: from here on, input takes its after-the-turn
+      // path (a completion wakes a new turn instead of being accepted and
+      // then dropped while this one finalizes).
+      sealTurnInput(currentMessages, state, context);
+
       if (!hasCleanTextBreak && state.streamedToolCalls.length > 0 && !signal?.aborted) {
         if (state.conversationOutcome === "completed") state.conversationOutcome = "exhausted";
         await runExhaustionRecoveryPass(this, context, state, currentMessages);
@@ -1146,12 +1169,13 @@ export default class ReActHarness extends BaseAgenticHarness {
 
       cleanupReminderCache(agentConversationId);
 
-      // Detached work (continueWorking async tasks) that is STILL running
-      // when the turn ends: count it like a non-blocking dispatch so the
-      // conversation stays "active" until the completion wakes a new turn.
-      // Work that already completed came back through the mailbox and
-      // needs no counter.
+      // Detached work whose result has NOT come back when the turn ends:
+      // count it so the conversation stays "active" until the result wakes
+      // a new turn. Async tasks (continueWorking) count one unit for the
+      // turn; each sub-agent dispatch counts its own. Work whose result
+      // already came back through the mailbox needs no counter.
       let hasDetachedWorkStillRunning = false;
+      let undeliveredSubAgentDispatches = 0;
       if (state.detachedWorkDispatched && !hasNonBlockingDispatchBreak && agentConversationId) {
         try {
           const { default: AsyncTaskRegistry } = await import("#src/services/AsyncTaskRegistry");
@@ -1159,13 +1183,25 @@ export default class ReActHarness extends BaseAgenticHarness {
         } catch {
           /* registry unavailable — treat as nothing running */
         }
+        try {
+          // Marked as counted here, so whichever path delivers the result
+          // pays its unit back exactly once.
+          const { default: OrchestratorService } = await import("#src/services/OrchestratorService");
+          undeliveredSubAgentDispatches =
+            OrchestratorService.markUndeliveredDispatchesAsCounted(agentConversationId);
+        } catch {
+          /* orchestrator unavailable — nothing counted */
+        }
       }
 
-      if ((hasNonBlockingDispatchBreak || hasDetachedWorkStillRunning) && agentConversationId && conversationId) {
+      const pendingBackgroundDelta =
+        (hasNonBlockingDispatchBreak || hasDetachedWorkStillRunning ? 1 : 0) +
+        undeliveredSubAgentDispatches;
+      if (pendingBackgroundDelta > 0 && agentConversationId && conversationId) {
         try {
           const { default: ConversationService } = await import("#src/services/conversation/ConversationService");
           const { COLLECTIONS } = await import("#src/constants");
-          await ConversationService.adjustPendingBackgroundTasks(conversationId, project, username, 1, { collection: COLLECTIONS.AGENT_CONVERSATIONS });
+          await ConversationService.adjustPendingBackgroundTasks(conversationId, project, username, pendingBackgroundDelta, { collection: COLLECTIONS.AGENT_CONVERSATIONS });
           if (hasDetachedWorkStillRunning) {
             // The tasks remember the count so whichever path delivers the
             // completion (mailbox in a later turn, wait_for_tasks, or an
@@ -1180,14 +1216,14 @@ export default class ReActHarness extends BaseAgenticHarness {
 
       if (hasNonBlockingDispatchBreak && agentConversationId) {
         await this.finalize(currentMessages, hooks, { deferDoneEmission: true });
-        const { default: OrchestratorService } = await import("#src/services/OrchestratorService");
-        await OrchestratorService.awaitPendingDispatches(agentConversationId);
       } else {
         await this.finalize(currentMessages, hooks);
       }
 
       return { messages: currentMessages };
     } catch (loopError: unknown) {
+      // Ending on an error is still ending: seal, and keep what was accepted.
+      sealTurnInput(currentMessages, state, context);
       // ── Error-path persistence ─────────────────────────────
       // Persist whatever messages accumulated before the error so
       // the conversation isn't left as an empty stub in MongoDB.
