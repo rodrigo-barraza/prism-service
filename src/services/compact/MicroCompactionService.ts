@@ -7,6 +7,11 @@ import ToolResultOffloadService, {
 } from "#src/services/compact/ToolResultOffloadService";
 import type { ChatMessage, ToolCallEntry } from "#src/types/admin";
 import { COMPACTION } from "#src/constants";
+import {
+  findRecencyBoundary,
+  type RecencyProtection,
+} from "#src/services/compact/RecencyProtection";
+import { markDerivedMessage } from "#src/services/compact/MessageLineage";
 
 // ────────────────────────────────────────────────────────────
 // MicroCompactionService — In-Memory Tool Result Eviction
@@ -44,9 +49,6 @@ import { COMPACTION } from "#src/constants";
 const CLEARED_RESULT_MARKER = "[Old tool result content cleared]";
 
 const MINIMUM_RESULT_TOKEN_THRESHOLD = COMPACTION.MINIMUM_RESULT_TOKEN_THRESHOLD;
-
-/** Number of recent user turns to never micro-compact. */
-const PROTECTED_RECENT_TURNS = COMPACTION.PROTECTED_RECENT_TURNS;
 
 /**
  * Tools whose results are safe to clear during micro-compaction.
@@ -89,43 +91,24 @@ function estimateToolResultTokens(
   return estimateTokens(resultText);
 }
 
-/**
- * Find the protection boundary index — messages at or after this index
- * are in the "recent" window and should never be micro-compacted.
- */
-function findProtectionBoundary(
-  messages: ChatMessage[],
-  protectedTurnCount: number,
-): number {
-  let userTurnsSeen = 0;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === "user") {
-      userTurnsSeen++;
-      if (userTurnsSeen >= protectedTurnCount) {
-        return i;
-      }
-    }
-  }
-  return 0;
-}
-
 export default class MicroCompactionService {
   /**
    * Evict old compactable tool results in-memory, offloading each
-   * verbatim payload so it stays retrievable.
+   * verbatim payload so it stays retrievable. "Old" is by recency of model
+   * calls (RecencyProtection.ts), so earlier iterations of the current run
+   * are eligible — a long single run no longer grows linearly.
    *
    * Returns the modified messages array and the number of tokens freed.
-   * Does NOT mutate the original array — returns a new one.
+   * Does NOT mutate the original array — returns a new one; each copied
+   * message is registered with MessageLineage so persistence still writes
+   * the verbatim result.
    */
   static microcompactMessages(
     messages: ChatMessage[],
-    protectedTurnCount: number = PROTECTED_RECENT_TURNS,
+    protection: RecencyProtection = {},
     offloadMetadata: OffloadMetadata = {},
   ): MicroCompactionResult {
-    const protectionBoundary = findProtectionBoundary(
-      messages,
-      protectedTurnCount,
-    );
+    const protectionBoundary = findRecencyBoundary(messages, protection);
 
     let freedTokens = 0;
     let clearedResultCount = 0;
@@ -189,10 +172,13 @@ export default class MicroCompactionService {
 
       if (!messageModified) return message;
 
-      return {
-        ...message,
-        toolCalls: compactedToolCalls,
-      };
+      return markDerivedMessage(
+        {
+          ...message,
+          toolCalls: compactedToolCalls,
+        },
+        message,
+      );
     });
 
     if (clearedResultCount > 0) {

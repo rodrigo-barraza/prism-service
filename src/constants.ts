@@ -629,11 +629,36 @@ export const COMPACTION = {
   /** Max output tokens for the summary-judge validation call. */
   JUDGE_MAX_OUTPUT_TOKENS: 1_024,
 
-  /** Circuit breaker: stop retrying after this many consecutive compact failures. */
+  /**
+   * Circuit breaker: stop retrying after this many consecutive compact
+   * failures — per conversation (CompactionService keys it by the loop's
+   * conversation id), never process-wide.
+   */
   MAX_CONSECUTIVE_COMPACT_FAILURES: 3,
 
-  /** Recent tail turns preserved after compaction boundary. */
-  RECENT_TAIL_TURN_COUNT: 3,
+  /** A conversation's breaker entry is forgotten after this long without a new failure. */
+  CIRCUIT_BREAKER_TTL_MILLISECONDS: 30 * 60 * 1000,
+
+  /**
+   * After a summary failed to shrink the history (shrink guard), the same
+   * conversation is not re-summarized until its history has grown by this
+   * fraction — a same-size history would only fail the same way again.
+   */
+  NO_SHRINK_RETRY_GROWTH_FRACTION: 0.1,
+
+  /**
+   * Recency protection (micro-compaction offload, LLM compaction tail,
+   * truncation): the most recent PROTECTED_RECENT_ITERATIONS assistant
+   * messages (one per model call) and everything after the first of them
+   * stay verbatim — capped at PROTECTED_TOOL_OUTPUT_TOKENS of tool output, so
+   * a few huge results cannot pin the whole window. The newest iteration is
+   * always protected. Measured in iterations, not user turns: a long run has
+   * one user turn, and protecting "the last N user turns" protected all of it.
+   */
+  PROTECTED_RECENT_ITERATIONS: 4,
+
+  /** Tool-output token cap on the recency-protected window (see above). */
+  PROTECTED_TOOL_OUTPUT_TOKENS: 20_000,
 
   /** Buffer reserved for the compaction summary output. */
   MAX_OUTPUT_TOKENS_FOR_SUMMARY: 20_000,
@@ -646,9 +671,6 @@ export const COMPACTION = {
 
   /** Minimum result token count before micro-compaction applies. */
   MINIMUM_RESULT_TOKEN_THRESHOLD: 500,
-
-  /** Number of recent turns always preserved (never compressed). */
-  PROTECTED_RECENT_TURNS: 4,
 } as const;
 
 // ─── Tool Result Offload Constants ──────────────────────────
@@ -678,9 +700,6 @@ export const OFFLOAD = {
 export const CONTEXT_WINDOW = {
   /** Default overhead for tool schemas, internal formatting, etc. */
   TOOL_SCHEMA_OVERHEAD_TOKENS: 2000,
-
-  /** Fraction of context window to target (leave headroom for output + safety). */
-  TARGET_UTILIZATION: 0.8,
 
   /** When truncating tool results aggressively, cap at this many characters. */
   AGGRESSIVE_TOOL_RESULT_CAP: 3000,

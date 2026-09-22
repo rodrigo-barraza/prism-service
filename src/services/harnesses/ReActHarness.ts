@@ -49,6 +49,8 @@ import {
   MAX_OUTPUT_TRUNCATION_RECOVERIES,
 } from "./lifecycle/OutputTruncationRecovery.ts";
 import { manageContextPressure } from "./lifecycle/ContextPressureManager.ts";
+import ContextWindowManager from "#src/services/ContextWindowManager";
+import type { ChatMessage } from "#src/types/admin";
 import { buildContextExhaustedMessage } from "./lifecycle/ContextExhaustionGuard.ts";
 import { logKVCacheHitRate } from "./lifecycle/KVCacheReporter.ts";
 import { injectToolDiscoveryNudge } from "./lifecycle/ToolDiscoveryNudge.ts";
@@ -519,6 +521,7 @@ export default class ReActHarness extends BaseAgenticHarness {
           state,
           "ReActHarness",
           hooks,
+          this.estimateRequestOverheadTokens(),
         );
         currentMessages = pressureResult.messages;
 
@@ -691,6 +694,13 @@ export default class ReActHarness extends BaseAgenticHarness {
         // ── Finalize tracker for this pass ─────────────────────
         finalizePassTracker(pass, passRequestId);
         logKVCacheHitRate(pass.usage, state.iterations, "ReActHarness");
+        // What this call really cost in input tokens (cache included), next
+        // to the size of what it carried — the next compaction trigger's
+        // baseline. Recorded before this pass's tool results are appended.
+        state.recordProviderInput(
+          pass.usage,
+          ContextWindowManager.estimateTokens(currentMessages as ChatMessage[]),
+        );
         this.emitGenerationProgress();
 
         // ── Truncation recovery ────────────────────────────────

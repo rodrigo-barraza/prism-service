@@ -502,6 +502,11 @@ export function buildConversationPatchFields({
       modelNamesSet.add(settings.model as string);
     }
     setFields.modelNames = Array.from(modelNamesSet);
+    // An edit or delete inside the summarized span would leave the persisted
+    // summary describing messages that no longer read that way — drop the
+    // boundary; the next turn loads the full history (and re-summarizes once
+    // if it is still over the threshold).
+    setFields.compaction = null;
   }
   if (systemPrompt !== undefined) setFields.systemPrompt = systemPrompt;
   if (settings !== undefined) {

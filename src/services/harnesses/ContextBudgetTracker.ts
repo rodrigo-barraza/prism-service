@@ -82,11 +82,12 @@ export default class ContextBudgetTracker {
     adjustedInput: number;
     availableForOutput: number;
   } {
-    this.systemPromptTokensEstimate = estimateTokens(systemPromptText);
-    this.toolSchemaTokensEstimate =
-      toolSchemas.length > 0
-        ? estimateTokens(JSON.stringify(toolSchemas))
-        : 0;
+    const fixedOverhead = ContextBudgetTracker.estimateFixedOverhead(
+      systemPromptText,
+      toolSchemas,
+    );
+    this.systemPromptTokensEstimate = fixedOverhead.systemPromptTokens;
+    this.toolSchemaTokensEstimate = fixedOverhead.toolSchemaTokens;
     // Skills are injected into the messages array (system context message),
     // so their tokens are a carve-out of the message estimate — never
     // additive on top of it.
@@ -254,6 +255,22 @@ export default class ContextBudgetTracker {
 
     this.lastSnapshot = snapshot;
     this.emitSnapshot(snapshot);
+  }
+
+  /**
+   * The request's fixed categories besides the messages — the system prompt
+   * (sent as a first-class parameter) and the serialized tool schemas. The
+   * compaction trigger and truncation budget count them too.
+   */
+  static estimateFixedOverhead(
+    systemPromptText: string,
+    toolSchemas: unknown[],
+  ): { systemPromptTokens: number; toolSchemaTokens: number } {
+    return {
+      systemPromptTokens: estimateTokens(systemPromptText),
+      toolSchemaTokens:
+        toolSchemas.length > 0 ? estimateTokens(JSON.stringify(toolSchemas)) : 0,
+    };
   }
 
   /** Get the latest budget snapshot for persistence. */

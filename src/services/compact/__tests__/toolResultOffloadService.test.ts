@@ -151,7 +151,7 @@ describe("MicroCompactionService offload integration", () => {
   it("evicts to a recoverable stub whose original content is retrievable", async () => {
     const result = MicroCompactionService.microcompactMessages(
       buildMessages(),
-      4,
+      { iterations: 4 },
       { conversationId: "conv-int", project: "test", username: "tester" },
     );
 
@@ -171,11 +171,11 @@ describe("MicroCompactionService offload integration", () => {
   it("is idempotent — a second pass leaves stubs untouched", () => {
     const firstPass = MicroCompactionService.microcompactMessages(
       buildMessages(),
-      4,
+      { iterations: 4 },
     );
     const secondPass = MicroCompactionService.microcompactMessages(
       firstPass.messages,
-      4,
+      { iterations: 4 },
     );
     expect(secondPass.clearedResultCount).toBe(0);
     expect(secondPass.messages[1].toolCalls![0].result).toBe(

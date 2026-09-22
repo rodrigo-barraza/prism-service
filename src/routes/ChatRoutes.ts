@@ -15,6 +15,10 @@ import {
   finalizeTextGeneration,
   getCollectionOpts,
 } from "#src/services/harnesses/lifecycle/Finalizer";
+import {
+  applyCompactionBoundary,
+  loadCompactionBoundary,
+} from "#src/services/compact/CompactionBoundary";
 import crypto from "crypto";
 import { getProvider } from "#src/providers/index";
 import { ProviderError } from "#src/utils/errors";
@@ -406,9 +410,32 @@ async function prepareGenerationContext(
   // ── Strip soft-deleted and rewind-pruned messages ────────────
   // `pruned` is the checkpoint/rewind soft boundary — see
   // src/services/conversation/checkpoints.ts.
-  const activeMessages = messages.filter(
+  const strippedMessages = messages.filter(
     (message) => !message.deleted && !message.pruned,
   );
+  // ── Compaction boundary ──────────────────────────────────────
+  // An agent conversation summarized on an earlier turn loads through its
+  // boundary — the summary, then only the messages after it — instead of
+  // paying for a fresh summary on every turn past the threshold. Applied
+  // after the prune/delete strip, so a rewound boundary message voids it.
+  let activeMessages = strippedMessages;
+  const agentCollection = getCollectionOpts(project, agent)?.collection;
+  if (agenticLoopEnabled && incomingConversationId && agentCollection) {
+    const boundary = await loadCompactionBoundary(
+      incomingConversationId,
+      String(project),
+      String(username),
+      agentCollection,
+    );
+    if (boundary) {
+      const loaded = applyCompactionBoundary(strippedMessages, boundary);
+      activeMessages = loaded.messages;
+      logger.info(
+        `[agent] Compaction boundary of ${incomingConversationId}: ` +
+          `${loaded.applied ? "" : "not applied — "}${loaded.reason}`,
+      );
+    }
+  }
   // ── Resolve image refs ─────────────────────────────────────
   // High-res Anthropic vision models keep a larger long-edge cap during
   // resolution so the provider-side 2576px path isn't pre-shrunk to 2000px.

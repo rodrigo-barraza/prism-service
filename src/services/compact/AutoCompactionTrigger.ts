@@ -1,5 +1,6 @@
 import logger from "#src/utils/logger";
 import { COMPACTION } from "#src/constants";
+import { computeContextBudgets } from "./ContextBudgets.ts";
 
 // ────────────────────────────────────────────────────────────
 // AutoCompactionTrigger — Threshold-Based Auto-Compact
@@ -20,10 +21,14 @@ import { COMPACTION } from "#src/constants";
 // Claude Code threshold calculation:
 //   effectiveWindow = contextWindow - min(maxOutputTokens, 20_000)
 //   autoCompactThreshold = effectiveWindow - 13_000
+// Both come from ContextBudgets — the same function that sets the
+// truncation budget, so truncation can never fire below this threshold.
+//
+// The token count evaluated here is the whole request (messages + system
+// prompt + tool schemas), from provider-reported usage whenever the loop
+// has it (ContextBudgets.estimateRequestInputTokens).
 // ────────────────────────────────────────────────────────────
 
-const MAX_OUTPUT_TOKENS_FOR_SUMMARY = COMPACTION.MAX_OUTPUT_TOKENS_FOR_SUMMARY;
-const AUTOCOMPACT_BUFFER_TOKENS = COMPACTION.AUTOCOMPACT_BUFFER_TOKENS;
 const MINIMUM_MESSAGES_FOR_COMPACTION = COMPACTION.MINIMUM_MESSAGES_FOR_COMPACTION;
 
 export interface AutoCompactThresholdResult {
@@ -43,11 +48,8 @@ export default class AutoCompactionTrigger {
     contextWindowSize: number,
     maxOutputTokens: number,
   ): number {
-    const reservedForSummary = Math.min(
-      maxOutputTokens,
-      MAX_OUTPUT_TOKENS_FOR_SUMMARY,
-    );
-    return contextWindowSize - reservedForSummary;
+    return computeContextBudgets(contextWindowSize, maxOutputTokens)
+      .effectiveWindow;
   }
 
   /**
@@ -60,11 +62,8 @@ export default class AutoCompactionTrigger {
     contextWindowSize: number,
     maxOutputTokens: number,
   ): number {
-    const effectiveWindow = this.getEffectiveContextWindowSize(
-      contextWindowSize,
-      maxOutputTokens,
-    );
-    return effectiveWindow - AUTOCOMPACT_BUFFER_TOKENS;
+    return computeContextBudgets(contextWindowSize, maxOutputTokens)
+      .autoCompactThreshold;
   }
 
   /**

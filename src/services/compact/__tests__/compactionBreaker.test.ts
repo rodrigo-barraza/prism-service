@@ -52,7 +52,11 @@ vi.mock("#src/utils/logger", () => ({
   },
 }));
 
-/** A history long enough that a short summary always shrinks it. */
+/**
+ * A history long enough that a short summary always shrinks it — and longer
+ * than the recency-protected window (4 model calls), so there is always an
+ * older span to summarize.
+ */
 function buildHistory(turns: number, charactersPerMessage = 4_000): ChatMessage[] {
   const messages: ChatMessage[] = [];
   for (let turn = 0; turn < turns; turn++) {
@@ -143,7 +147,7 @@ describe("CompactionService circuit breaker — per conversation", () => {
       usage: { inputTokens: 100, outputTokens: 50_000 },
     });
 
-    let history = buildHistory(4);
+    let history = buildHistory(8);
     for (let attempt = 0; attempt < COMPACTION.MAX_CONSECUTIVE_COMPACT_FAILURES + 1; attempt++) {
       expect(
         await CompactionService.compactConversation(history, optionsFor("conversation-A")),
@@ -161,7 +165,7 @@ describe("CompactionService circuit breaker — per conversation", () => {
       text: `<summary>${"x".repeat(200_000)}</summary>`,
       usage: { inputTokens: 100, outputTokens: 50_000 },
     });
-    const history = buildHistory(4);
+    const history = buildHistory(8);
     await CompactionService.compactConversation(history, optionsFor("conversation-A"));
     await CompactionService.compactConversation(history, optionsFor("conversation-A"));
     expect(summarizeCallCount()).toBe(1);
