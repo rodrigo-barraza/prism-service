@@ -441,6 +441,25 @@ describe("c. rejecting a plan finalizes the turn", () => {
     expectRejectedTurnFinalized(emit);
   });
 
+  it("a plan given only as exit_plan_mode's summary argument is proposed and persisted", async () => {
+    // Live run (gemini-3.5-flash-lite): the model streamed no text and put
+    // the whole plan in args.summary — the proposal the user saw was empty.
+    script = [
+      { kind: "tool", toolName: TOOL_NAMES.EXIT_PLAN_MODE, text: "", args: { summary: PLAN_TEXT } },
+      { kind: "text", text: "must never run" },
+    ];
+    const { context, emit } = buildLoopContext({ options: { planFirst: true, autoApprove: false } });
+    stopAnswering = answerPlanWhenAsked("loop-fix-conv", false);
+
+    await runLoop(context);
+
+    const proposal = emit.mock.calls.map((call) => call[0]).find((event) => event?.type === "plan_proposal");
+    expect(proposal?.plan).toBe(PLAN_TEXT);
+    const { messages } = persistedMeta();
+    const toolMessage = messages.find((message) => message.role === "tool");
+    expect(String(toolMessage?.content)).toContain("Read the config");
+  });
+
   for (const [label, run] of [
     ["Tree of Thoughts", runTreeOfThoughts],
     ["Graph of Thoughts", runGraphOfThoughts],
