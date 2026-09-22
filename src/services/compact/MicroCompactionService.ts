@@ -55,13 +55,23 @@ const MINIMUM_RESULT_TOKEN_THRESHOLD = COMPACTION.MINIMUM_RESULT_TOKEN_THRESHOLD
  * These produce large outputs (file contents, shell output, search results)
  * that the model no longer needs once it has acted on them.
  *
- * Matches Claude Code's COMPACTABLE_TOOLS set from microCompact.ts.
+ * Matches Claude Code's COMPACTABLE_TOOLS set from microCompact.ts. Named
+ * by the tools that actually run (tools-service `read_url`, `read_web_page`,
+ * `search_web`, `read_files`, `search_file_contents`, `execute_shell`) — the
+ * generic WEB_CONTENT / WEB_SEARCH names match no tool-service tool, so
+ * until 2026-09 web and multi-file results were never offloaded.
  */
 const COMPACTABLE_TOOLS: Set<string> = new Set([
   TOOL_NAMES.READ_FILE,
+  TOOL_NAMES.MULTI_FILE_READ,
+  TOOL_NAMES.GREP_SEARCH,
   TOOL_NAMES.EXECUTE_CODE,
+  TOOL_NAMES.EXECUTE_SHELL,
   TOOL_NAMES.WEB_CONTENT,
   TOOL_NAMES.WEB_SEARCH,
+  TOOL_NAMES.READ_URL,
+  TOOL_NAMES.READ_WEB_PAGE,
+  TOOL_NAMES.SEARCH_WEB,
   TOOL_NAMES.SEARCH_FILES,
   TOOL_NAMES.LIST_DIRECTORY,
   TOOL_NAMES.READ_IMAGE,

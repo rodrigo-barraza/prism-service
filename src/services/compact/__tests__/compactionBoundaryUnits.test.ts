@@ -203,6 +203,32 @@ describe("findRecencyBoundary — protection by recency of model calls", () => {
   });
 });
 
+describe("micro-compaction offloads the tools that actually run", () => {
+  it("offloads an old read_url / search_web / read_files result", async () => {
+    const { default: MicroCompactionService } = await import(
+      "#src/services/compact/MicroCompactionService"
+    );
+    const big = "page text ".repeat(1_000);
+    const messages: ChatMessage[] = [
+      { role: "user", content: "research" },
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          { id: "old-url", name: "read_url", args: {}, result: big },
+          { id: "old-search", name: "search_web", args: {}, result: big },
+          { id: "old-files", name: "read_files", args: {}, result: big },
+        ],
+      },
+    ];
+    for (let turn = 0; turn < COMPACTION.PROTECTED_RECENT_ITERATIONS; turn++) {
+      messages.push({ role: "assistant", content: `step ${turn}` });
+    }
+    const result = MicroCompactionService.microcompactMessages(messages);
+    expect(result.clearedResultCount).toBe(3);
+  });
+});
+
 // ── CompactionBoundary ───────────────────────────────────────
 
 const BOUNDARY: CompactionBoundary = {
