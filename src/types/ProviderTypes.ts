@@ -1,5 +1,9 @@
 import type { Provider } from "./provider.ts";
-import type { ResponsesPhase, ResponsesReasoningItem } from "./admin.ts";
+import type {
+  AnthropicThinkingBlock,
+  ResponsesPhase,
+  ResponsesReasoningItem,
+} from "./admin.ts";
 
 export interface ProviderInstanceConfig {
   url: string;
@@ -44,6 +48,8 @@ export interface ChatMessage {
   }>;
   thinking?: string;
   thinkingSignature?: string;
+  /** Anthropic: every thinking block of the turn, verbatim and in order. */
+  thinkingBlocks?: AnthropicThinkingBlock[];
   /** OpenAI Responses API message phase — resent on replay. */
   phase?: ResponsesPhase;
   /** OpenAI Responses API reasoning items not paired with a tool call. */
@@ -107,6 +113,10 @@ export interface ProviderOptions {
   responseSchema?: Record<string, unknown>;
   /** Internal: skip Anthropic Files API substitution (fallback retry path). */
   disableAnthropicFileSources?: boolean;
+  /** Internal: assistant content of a `pause_turn` being resumed (Anthropic). */
+  anthropicPausedTurn?: unknown[];
+  /** Internal: how many `pause_turn` resumes this stream has made (Anthropic). */
+  anthropicPauseContinuations?: number;
   frequencyPenalty?: number;
   presencePenalty?: number;
   repeatPenalty?: number;

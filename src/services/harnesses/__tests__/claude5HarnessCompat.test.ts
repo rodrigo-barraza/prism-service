@@ -235,13 +235,6 @@ const textPass = (text: string): ScriptedPass => (pass, state) => {
   state.finalStreamedText = text;
 };
 
-const toolPass = (toolName: string): ScriptedPass => (pass, state, iteration) => {
-  pass.streamedText = "";
-  pass.finalStreamedText = "";
-  pass.pendingToolCalls = [{ id: `call-${iteration}`, name: toolName, args: {} }];
-  state.streamedToolCalls.push({ id: `call-${iteration}`, name: toolName, args: {} });
-};
-
 interface HarnessOptions {
   /** Scripted passes (consumeStream mocked) … */
   script?: ScriptedPass[];

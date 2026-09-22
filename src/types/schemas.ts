@@ -56,6 +56,8 @@ export const ChatMessageSchema = z.object({
     .optional(),
   thinking: z.string().optional(),
   thinkingSignature: z.string().optional(),
+  /** Anthropic thinking blocks, verbatim — replayed as sent. */
+  thinkingBlocks: z.array(z.record(z.string(), z.unknown())).optional(),
 }).passthrough(); // Preserve transient metadata (_alreadyPersisted, timestamp, etc.)
 
 export const ChatRequestSchema = z

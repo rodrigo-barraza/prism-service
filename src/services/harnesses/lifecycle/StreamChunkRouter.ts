@@ -21,7 +21,7 @@ import {
   STATUS_MESSAGES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import type BaseAgenticHarness from "#src/services/harnesses/BaseAgenticHarness";
-import type { TokenUsage } from "#src/types/admin";
+import type { TokenUsage, AnthropicThinkingBlock } from "#src/types/admin";
 import type {
   PassState,
   ChunkAction,
@@ -175,6 +175,52 @@ export function routeStreamChunk(
     return { action: "continue" };
   }
 
+  // ── Thinking block (Anthropic) ───────────────────────
+  // Stored verbatim and in order on the assistant message this pass
+  // produces — a merged or trimmed block is a tampered signature. A block
+  // that followed other content (a progress update) stays `trailing` until
+  // the tool call it introduces starts.
+  if (streamChunk?.type === "thinking_block" && streamChunk.block) {
+    const block = {
+      ...(streamChunk.block as AnthropicThinkingBlock),
+    } as AnthropicThinkingBlock;
+    if (streamChunk.afterContent === true) block.trailing = true;
+    (pass.thinkingBlocks ??= []).push(block);
+    state.thinkingBlocks = pass.thinkingBlocks;
+    return { action: "continue" };
+  }
+
+  // ── Refusal (Anthropic safety classifiers) ───────────
+  if (streamChunk?.type === "refusal") {
+    pass.refusal = {
+      category: (streamChunk.category as string | null) ?? null,
+      explanation: (streamChunk.explanation as string | null) ?? null,
+      recommendedModel: (streamChunk.recommendedModel as string | null) ?? null,
+      model: pass.servedModel ?? context.resolvedModel,
+    };
+    return { action: "continue" };
+  }
+
+  // ── Server-side fallback took over mid-response ──────
+  // Thinking and client tool calls the declining model produced before the
+  // hand-off are never replayed or run; streamed text stays (the fallback
+  // model continues from it).
+  if (streamChunk?.type === "fallback") {
+    logger.info(
+      `[AgenticLoop] ${streamChunk.from ?? context.resolvedModel} declined — ${streamChunk.to ?? "a fallback model"} continues (iteration ${state.iterations})`,
+    );
+    pass.thinkingBlocks = [];
+    state.thinkingBlocks = pass.thinkingBlocks;
+    pass.pendingToolCalls = [];
+    return { action: "continue" };
+  }
+
+  // ── The model that actually served the pass ──────────
+  if (streamChunk?.type === "servedModel") {
+    pass.servedModel = (streamChunk.model as string) || undefined;
+    return { action: "continue" };
+  }
+
   // ── Provider-native state (OpenAI Responses) ─────────
   // response.id, message phase and unpaired reasoning items — stored on
   // the assistant message this pass produces and replayed next turn.
@@ -204,6 +250,7 @@ export function routeStreamChunk(
 
   // ── Tool call start (early disclosure) ─────────────────
   if (streamChunk?.type === "toolCallStart") {
+    anchorTrailingThinkingBlocks(pass, streamChunk.id);
     recordFirstToken(harness, pass);
     recordTiming(harness, pass);
     sealThinkingPhase(pass);
@@ -546,6 +593,23 @@ function trackToolDisplaySegment(
   } else {
     state.displaySegments.push({ type: "tools", toolIds: [toolCallId] });
     state.lastDisplaySegType = "tools";
+  }
+}
+
+/**
+ * Thinking blocks that followed other content in the pass (progress
+ * updates) belong in front of the tool call that starts next.
+ */
+function anchorTrailingThinkingBlocks(
+  pass: PassState,
+  toolCallId: string | undefined,
+): void {
+  if (!toolCallId || !pass.thinkingBlocks) return;
+  for (const block of pass.thinkingBlocks) {
+    if (block.trailing) {
+      delete block.trailing;
+      block.beforeToolCallId = toolCallId;
+    }
   }
 }
 

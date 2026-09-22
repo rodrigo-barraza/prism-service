@@ -59,4 +59,20 @@ describe("thinking blocks — persistence", () => {
     expect((toolRound as any).thinkingBlocks).toStrictEqual([blockA]);
     expect((plain as any).thinkingBlocks).toStrictEqual([blockB]);
   });
+
+  it("a declined turn ends with its own empty assistant message carrying the refusal", () => {
+    const refusal = { category: "cyber", explanation: "declined", model: "claude-opus-5-5" };
+    const messages = assembleMessagesToAppend({
+      overrideMessagesToAppend: [
+        { role: "user", content: "go" },
+        { role: "assistant", content: "", toolCalls: [{ id: "toolu_1", name: "search", args: {} }] },
+        { role: "tool", tool_call_id: "toolu_1", content: "{}" },
+      ] as MessagePayload[],
+      text: "",
+      refusal,
+    } as any);
+    const final = messages[messages.length - 1];
+    expect(final).toMatchObject({ role: "assistant", content: "", refusal });
+    expect(messages[1].refusal).toBeUndefined();
+  });
 });

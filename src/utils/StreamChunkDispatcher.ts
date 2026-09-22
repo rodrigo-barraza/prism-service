@@ -11,7 +11,7 @@ import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import type { TokenUsage, ResponsesPhase,
+import type { AnthropicThinkingBlock, TokenUsage, ResponsesPhase,
   ResponsesReasoningItem,
   ToolCallEntry } from "#src/types/admin";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
@@ -49,6 +49,12 @@ export interface StreamState {
   reasoningItems?: ResponsesReasoningItem[];
   /** OpenAI Responses API `response.id`. */
   providerResponseId?: string;
+  /** Anthropic thinking blocks, verbatim and in order. */
+  thinkingBlocks?: AnthropicThinkingBlock[];
+  /** Anthropic safety-classifier refusal — the streamed text is not an answer. */
+  refusal?: { category: string | null; explanation: string | null };
+  /** The model that served the response when a fallback did. */
+  servedModel?: string;
 }
 
 export interface StreamContext {
@@ -261,6 +267,49 @@ export async function dispatchChunk(
     case "thinking_signature":
       state.thinkingSignature = chunk.signature || "";
       return true;
+
+    case "thinking_block": {
+      // Anthropic: stored verbatim, replayed byte-for-byte next request.
+      const { block, afterContent } = chunk as unknown as {
+        block: AnthropicThinkingBlock;
+        afterContent?: boolean;
+      };
+      (state.thinkingBlocks ??= []).push(
+        afterContent ? { ...block, trailing: true } : { ...block },
+      );
+      return true;
+    }
+
+    case "fallback":
+      // A server-side fallback took over mid-response: the declining
+      // model's thinking and tool calls are not replayed.
+      state.thinkingBlocks = [];
+      state.toolCalls.length = 0;
+      return true;
+
+    case "servedModel":
+      state.servedModel =
+        (chunk as unknown as { model?: string }).model || undefined;
+      return true;
+
+    case "refusal": {
+      const refusal = chunk as unknown as {
+        category?: string | null;
+        explanation?: string | null;
+      };
+      state.refusal = {
+        category: refusal.category ?? null,
+        explanation: refusal.explanation ?? null,
+      };
+      // A declined response's tool calls never run.
+      state.toolCalls.length = 0;
+      emit({
+        type: "refusal",
+        category: state.refusal.category,
+        explanation: state.refusal.explanation,
+      });
+      return true;
+    }
 
     case "image": {
       const minioRef = await uploadImageChunk(

@@ -255,7 +255,35 @@ export interface TokenUsage {
   totalInputTokens?: number;
   /** Provider-reported tokens/sec (llama.cpp, lm-studio). */
   tokensPerSec?: number;
+  /**
+   * Billed tokens broken down by the model that produced them — set when
+   * more than one model ran (Anthropic server-side fallback: the declining
+   * model's partial output and the fallback model's answer bill at their
+   * own rates). The top-level counts are the sum; calculateTextCost prices
+   * each entry with that model's catalog pricing.
+   */
+  byModel?: Record<string, ModelTokenUsage>;
 }
+
+export interface ModelTokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+}
+
+/**
+ * An Anthropic thinking block exactly as the API returned it. Replayed
+ * byte-for-byte on the next request (a modified block is a tampered
+ * signature — always a 400). The two optional keys are Prism's placement
+ * of a block that followed other content in its response, stripped before
+ * replay: `beforeToolCallId` (a progress update introducing that tool call)
+ * or `trailing` (nothing followed it).
+ */
+export type AnthropicThinkingBlock = (
+  | { type: "thinking"; thinking: string; signature: string }
+  | { type: "redacted_thinking"; data: string }
+) & { beforeToolCallId?: string; trailing?: boolean };
 
 export interface GenerationOptions {
   temperature?: number;
@@ -319,6 +347,8 @@ export interface ChatMessage {
   toolCalls?: ToolCallEntry[];
   thinking?: string;
   thinkingSignature?: string;
+  /** Anthropic: every thinking block of the turn, verbatim and in order. */
+  thinkingBlocks?: AnthropicThinkingBlock[];
   /** OpenAI Responses API message phase — resent on replay. */
   phase?: ResponsesPhase;
   /** OpenAI Responses API reasoning items NOT paired with a tool call (text-only turns). */
