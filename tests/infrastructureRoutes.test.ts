@@ -486,12 +486,18 @@ describe('Infrastructure Routes Integration Tests', () => {
     });
 
     it('POST /conversation/answer - resolves answer', async () => {
+      vi.mocked(AgenticLoopService.resolveUserQuestion).mockReturnValueOnce({
+        resolved: true, questionId: 'q-1', blocking: true, loopKey: 'conv-123', matchedBy: 'loop_key',
+      });
       const response = await request(app)
         .post('/conversation/answer')
-        .send({ conversationId: 'conv-123', answer: '42' })
+        .send({ conversationId: 'conv-123', questionId: 'q-1', answer: '42' })
         .expect(200);
 
-      expect(response.body).toHaveProperty('ok', true);
+      expect(response.body).toMatchObject({ ok: true, questionId: 'q-1', blocking: true });
+      expect(AgenticLoopService.resolveUserQuestion).toHaveBeenLastCalledWith(
+        'conv-123', [{ answer: '42' }], { questionId: 'q-1', agentConversationId: undefined },
+      );
     });
 
     it('POST /conversation - triggers completion', async () => {

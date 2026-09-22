@@ -167,15 +167,19 @@ describe('ApprovalRegistry Unit Tests', () => {
 
       const questionPromise = new Promise<QuestionResolution>((resolve) => {
         const entry: PendingQuestionEntry = {
+          questionId: 'q-1',
+          blocking: true,
+          createdAt: Date.now(),
           question: 'What is your favorite color?',
           choices: ['red', 'blue', 'green'],
           resolve,
         };
-        pendingQuestions.set(conversationId, entry);
+        // loop key → questionId → entry
+        pendingQuestions.set(conversationId, new Map([[entry.questionId, entry]]));
       });
 
       expect(pendingQuestions.has(conversationId)).toBe(true);
-      const retrievedEntry = pendingQuestions.get(conversationId) as PendingQuestionEntry;
+      const retrievedEntry = pendingQuestions.get(conversationId)!.get('q-1') as PendingQuestionEntry;
       expect(retrievedEntry.question).toBe('What is your favorite color?');
       expect(retrievedEntry.choices).toEqual(['red', 'blue', 'green']);
 
