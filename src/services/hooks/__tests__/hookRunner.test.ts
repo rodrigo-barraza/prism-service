@@ -369,9 +369,27 @@ describe("HookRunner", () => {
       expect(picked!.fieldCount).toBe(0);
     });
 
-    it("only accepts `block` for decision", () => {
-      expect(pickHookDecision({ decision: "allow" })!.fieldCount).toBe(0);
+    it("accepts block, and the PermissionRequest allow/deny, for decision", () => {
+      expect(pickHookDecision({ decision: "approve" })!.fieldCount).toBe(0);
       expect(pickHookDecision({ decision: "block" })!.fieldCount).toBe(1);
+      expect(pickHookDecision({ decision: "allow" })!.decision.decision).toBe("allow");
+      expect(pickHookDecision({ decision: "deny", message: "no" })!.fieldCount).toBe(2);
+    });
+
+    it("lifts Claude Code's hookSpecificOutput fields to the top", () => {
+      const picked = pickHookDecision({
+        hookSpecificOutput: {
+          hookEventName: "PreToolUse",
+          permissionDecision: "deny",
+          permissionDecisionReason: "no",
+        },
+        systemMessage: "shown",
+      });
+      expect(picked!.decision).toEqual({
+        permissionDecision: "deny",
+        permissionDecisionReason: "no",
+        systemMessage: "shown",
+      });
     });
 
     it("keeps updatedToolOutput even when it is null", () => {
@@ -397,13 +415,23 @@ describe("HookRunner", () => {
           { permissionDecision: "deny", permissionDecisionReason: "rm -rf" },
           blocking,
         ),
-      ).toEqual({ isApproved: false, isDenied: true, reason: "rm -rf" });
+      ).toEqual({
+        isApproved: false,
+        isDenied: true,
+        permissionDecision: "deny",
+        reason: "rm -rf",
+      });
     });
 
     it("maps decision:block to a denial", () => {
       expect(
         normalizeDecision({ decision: "block", reason: "policy" }, blocking),
-      ).toEqual({ isApproved: false, isDenied: true, reason: "policy" });
+      ).toEqual({
+        isApproved: false,
+        isDenied: true,
+        permissionDecision: "deny",
+        reason: "policy",
+      });
     });
 
     it("maps continue:false to a denial", () => {
@@ -415,6 +443,7 @@ describe("HookRunner", () => {
       ).toEqual({
         isApproved: false,
         isDenied: true,
+        permissionDecision: "deny",
         reason: "budget exhausted",
       });
     });
@@ -425,23 +454,44 @@ describe("HookRunner", () => {
       expect(result.reason).toBe("Blocked by a configured hook");
     });
 
-    it("maps ask to an approval request", () => {
-      expect(
-        normalizeDecision(
-          { permissionDecision: "ask", permissionDecisionReason: "confirm?" },
-          blocking,
-        ),
-      ).toEqual({
-        isApproved: false,
-        requiresApproval: true,
-        reason: "confirm?",
-      });
+    it("maps ask to an approval request — NOT a deny (B9)", () => {
+      const result = normalizeDecision(
+        { permissionDecision: "ask", permissionDecisionReason: "confirm?" },
+        blocking,
+      );
+      expect(result).toEqual({ permissionDecision: "ask", reason: "confirm?" });
+      // The kernel short-circuits decide hooks on isApproved === false; an
+      // ask must never look like that.
+      expect(result.isApproved).toBeUndefined();
     });
 
     it("maps allow to an approval", () => {
       expect(normalizeDecision({ permissionDecision: "allow" }, blocking)).toEqual(
-        { isApproved: true },
+        { isApproved: true, permissionDecision: "allow" },
       );
+    });
+
+    it("maps PermissionRequest's decision allow/deny with its message", () => {
+      expect(
+        normalizeDecision({ decision: "allow" }, HOOK_EVENTS.PERMISSION_REQUEST),
+      ).toMatchObject({ isApproved: true, permissionDecision: "allow" });
+      expect(
+        normalizeDecision(
+          { decision: "deny", message: "not on Fridays" },
+          HOOK_EVENTS.PERMISSION_REQUEST,
+        ),
+      ).toMatchObject({ isApproved: false, permissionDecision: "deny", reason: "not on Fridays" });
+    });
+
+    it("reads a Stop `block` as keep-going, and only `block`", () => {
+      expect(
+        normalizeDecision({ decision: "block", reason: "run the tests" }, HOOK_EVENTS.STOP),
+      ).toMatchObject({ permissionDecision: "deny", reason: "run the tests" });
+      // `continue: false` on Stop is the turn ending — which it already is.
+      expect(normalizeDecision({ continue: false }, HOOK_EVENTS.STOP)).toEqual({});
+      expect(
+        normalizeDecision({ permissionDecision: "deny" }, HOOK_EVENTS.STOP),
+      ).toEqual({});
     });
 
     it("IGNORES a deny on an event that cannot block, and warns", () => {
@@ -458,8 +508,9 @@ describe("HookRunner", () => {
 
     it.each([
       HOOK_EVENTS.POST_TOOL_USE,
-      HOOK_EVENTS.STOP,
       HOOK_EVENTS.SESSION_END,
+      HOOK_EVENTS.PERMISSION_DENIED,
+      HOOK_EVENTS.POST_TOOL_BATCH,
       HOOK_EVENTS.NOTIFICATION,
       HOOK_EVENTS.SESSION_START,
       HOOK_EVENTS.ERROR,
@@ -490,9 +541,9 @@ describe("HookRunner", () => {
         { permissionDecision: "ask" },
         nonBlocking,
       );
-      expect(result.requiresApproval).toBeUndefined();
+      expect(result.permissionDecision).toBeUndefined();
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("no approval seam"),
+        expect.stringContaining("only PreToolUse can request an approval"),
       );
     });
 

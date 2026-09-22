@@ -105,6 +105,14 @@ export default class AgenticLoopState {
    * when the turn finishes before the work does.
    */
   detachedWorkDispatched: boolean;
+  /**
+   * `additionalContext` from configured hooks (PreToolUse, PostToolUse,
+   * PostToolBatch) collected during a tool batch, injected as one
+   * <hook-context> message after the batch's results.
+   */
+  pendingHookContext: string[];
+  /** Consecutive continuations Stop hooks have forced (capped). */
+  stopHookContinuations: number;
 
   // ── Error budget tracking ───────────────────────────────
   toolErrorCounts: Map<string, number>;
@@ -201,6 +209,8 @@ export default class AgenticLoopState {
 
     this.turnInputApplied = 0;
     this.detachedWorkDispatched = false;
+    this.pendingHookContext = [];
+    this.stopHookContinuations = 0;
 
     this.toolErrorCounts = new Map();
     this.pendingRequestLogWrites = [];

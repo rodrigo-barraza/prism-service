@@ -141,6 +141,8 @@ export interface ApprovalResult {
    * full-auto mode and inside sub-agents.
    */
   isDenied?: boolean;
+  /** Which layer denied (set on every denial). */
+  deniedBy?: "rule" | "classifier" | "hook" | "user";
   tier: ApprovalTier;
   tierLabel: string;
   reason: string;
@@ -193,9 +195,23 @@ export default class AutoApprovalEngine {
   getTierLabel(toolName: string): string {
     return TIER_LABELS[this.getTier(toolName)] || "write";
   }
+  /**
+   * Decide one call. Layer order (Claude Code's): the configured PreToolUse
+   * hooks already ran and stamped `_hookPermission`; then rules; then the
+   * mode (full auto) and tier; then — for whatever is left — a human.
+   *
+   *   - A rule DENY is final. No hook `allow` and no mode relaxes it.
+   *   - A rule ASK asks, even when a hook said `allow` (and, as before, is
+   *     answered "yes" by full auto unless a hook asked too).
+   *   - A hook `ask` asks, whatever the tier or mode — that is what it is for.
+   *   - A hook `allow` stands in for the tier/mode prompt only.
+   */
   check(toolCall: ToolCall): ApprovalResult {
     const tier = this.getTier(toolCall.name);
     const tierLabel = TIER_LABELS[tier] || "write";
+    const hookPermission = toolCall._hookPermission;
+    const hookAsks = hookPermission?.decision === "ask";
+    const hookAskReason = `hook_ask${hookPermission?.reason ? `: ${hookPermission.reason}` : ""}`;
 
     // ── Policy evaluation (takes precedence over tier system AND full
     // auto — a defensive DENY policy must hold even when everything else
@@ -209,6 +225,9 @@ export default class AutoApprovalEngine {
       if (policyResult) {
         switch (policyResult.decision) {
           case "APPROVE":
+            if (hookAsks) {
+              return { isApproved: false, tier, tierLabel, reason: hookAskReason };
+            }
             return {
               isApproved: true,
               tier,
@@ -220,12 +239,14 @@ export default class AutoApprovalEngine {
             return {
               isApproved: false,
               isDenied: true,
+              deniedBy: "rule",
               tier,
               tierLabel,
               reason: policyResult.reason,
             };
           case "ASK_USER":
-            if (this.fullAuto) break; // full auto answers "ask user" with yes
+            // full auto answers "ask user" with yes — unless a hook asked too
+            if (this.fullAuto && !hookAsks) break;
             return {
               isApproved: false,
               tier,
@@ -235,6 +256,13 @@ export default class AutoApprovalEngine {
         }
       }
       // No policy matched (or full-auto ASK_USER) — fall through to tier system
+    }
+
+    if (hookAsks) {
+      return { isApproved: false, tier, tierLabel, reason: hookAskReason };
+    }
+    if (hookPermission?.decision === "allow") {
+      return { isApproved: true, tier, tierLabel, reason: "hook_allow" };
     }
 
     // Full Auto mode: everything not policy-denied runs

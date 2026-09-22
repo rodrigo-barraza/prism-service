@@ -53,8 +53,10 @@ import {
   executeApprovedToolBatch,
   commitToolCallResults,
   handleNoToolCallOutcome,
+  continueAfterStopHooks,
   finalizeStrategyRun,
   persistLoopError,
+  runWithTurnHooks,
 } from "#src/services/harnesses/strategies/branchingCommon";
 
 const {
@@ -69,7 +71,17 @@ const LOG_LABEL = "GraphOfThoughts";
 //  Public API — called by ReActHarness when thoughtStructure === "graph_of_thoughts"
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-export async function runGraphOfThoughts(
+/**
+ * Entry point: the strategy run with its turn-level configured hooks closed
+ * on every exit path (see `runWithTurnHooks`).
+ */
+export function runGraphOfThoughts(
+  harness: BaseAgenticHarness,
+): Promise<{ messages: ConversationMessage[] }> {
+  return runWithTurnHooks(harness, runGraphOfThoughtsTurn);
+}
+
+async function runGraphOfThoughtsTurn(
   harness: BaseAgenticHarness,
 ): Promise<{ messages: ConversationMessage[] }> {
   const context = harness["context"];
@@ -97,6 +109,8 @@ export async function runGraphOfThoughts(
   let hasCleanTextBreak = false;
 
   const standardHooks = await runBeforePromptSetup(harness, currentMessages);
+  // A UserPromptSubmit / PreModelSwitch hook refused the turn.
+  if (standardHooks.turnHooks?.blocked) return { messages: currentMessages };
 
   // ── Pre-loop planning phase ─────────────────────────────
   if (state.planModeActive) {
@@ -407,7 +421,15 @@ export async function runGraphOfThoughts(
         LOG_LABEL,
       );
       truncationRecoveryCount = outcome.truncationRecoveryCount;
-      if (outcome.cleanTextBreak) hasCleanTextBreak = true;
+      if (outcome.cleanTextBreak) {
+        // Where the turn would end: Stop hooks may keep it going (capped).
+        if (
+          await continueAfterStopHooks(harness, synthesizedPass, currentMessages, standardHooks)
+        ) {
+          continue;
+        }
+        hasCleanTextBreak = true;
+      }
       if (outcome.action === "break") break;
       continue;
     }

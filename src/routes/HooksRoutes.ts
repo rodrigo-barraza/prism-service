@@ -13,14 +13,15 @@ import {
   PostHookSchema,
   PutHookSchema,
   PostHookTestSchema,
+  hookMatcherProblem,
 } from "#src/types/schemas";
-import { TOOL_MATCHED_EVENTS } from "#src/services/hooks/types";
+import { HOOK_HANDLER_TYPES } from "#src/services/hooks/types";
 import type {
   ConfiguredHookDocument,
-  HookEventName,
   HookPayload,
 } from "#src/services/hooks/types";
 import { runConfiguredHook } from "#src/services/hooks/HookRunner";
+import { isCommandHookOwner } from "#src/services/hooks/handlers/CommandHookHandler";
 import { invalidateHookCache } from "#src/services/hooks/ConfiguredHookRegistry";
 import { resolveScope, scopeFilter } from "#src/utils/ProfileScope";
 
@@ -52,21 +53,16 @@ function toApiHook(document: ConfiguredHookDocument) {
   return { ...rest, id: rest.id || (_id ? _id.toString() : "") };
 }
 
-const TOOL_MATCHED_EVENT_SET = new Set<string>(TOOL_MATCHED_EVENTS);
-
 /**
- * The matcher rule again, this time against the *merged* document. The PUT
- * schema can only catch a violation when both fields ride in on the same
- * body; setting a matcher on a hook whose stored event is `Stop` — or moving
- * a matched hook onto a non-tool event — is only visible here.
+ * A `command` hook runs a shell command with tools-service's privileges —
+ * there is no OS sandbox yet (#14) — so only the usernames listed in
+ * `PRISM_HOOK_COMMAND_OWNERS` may create one, or edit one. Empty means
+ * nobody. (The runner re-checks the stored owner before every execution.)
  */
-function matcherConflict(event: HookEventName, matcher: string): string | null {
-  if (!matcher.trim()) return null;
-  if (TOOL_MATCHED_EVENT_SET.has(event)) return null;
+function commandOwnershipError(username: string): string {
   return (
-    `matcher "${matcher}" can never match on event "${event}" — ` +
-    `matchers are tested against a tool name, so they are only valid on ` +
-    `${TOOL_MATCHED_EVENTS.join(", ")}. Leave matcher empty for this event.`
+    `command hooks are owner-only: they run shell commands with tools-service's ` +
+    `privileges (no OS sandbox). "${username}" is not in ${HOOKS.COMMAND_OWNERS_ENV_VAR}.`
   );
 }
 
@@ -142,6 +138,13 @@ router.post(
         return res.status(400).json({ error: parsed.error.format() });
       }
 
+      if (
+        parsed.data.handler.type === HOOK_HANDLER_TYPES.COMMAND &&
+        !isCommandHookOwner(username)
+      ) {
+        return res.status(403).json({ error: commandOwnershipError(username) });
+      }
+
       // The registry only ever loads MAX_HOOKS_PER_SCOPE of them; silently
       // accepting the 51st would store a hook that never runs.
       const existingCount = await db
@@ -171,6 +174,7 @@ router.post(
         matcher: parsed.data.matcher,
         handler: parsed.data.handler,
         enabled: parsed.data.enabled,
+        async: parsed.data.async,
         timeoutMilliseconds:
           parsed.data.timeoutMilliseconds ?? HOOKS.DEFAULT_TIMEOUT_MILLISECONDS,
         // Only `http` handlers sign, but minting it unconditionally keeps the
@@ -224,12 +228,20 @@ router.put(
       }
 
       const validated = parsed.data;
-      const conflict = matcherConflict(
+      // The matcher rule again, against the *merged* document: a PUT that
+      // changes only the event (or only the matcher) is only visible here.
+      const conflict = hookMatcherProblem(
         validated.event ?? existing.event,
         validated.matcher ?? existing.matcher ?? "",
       );
       if (conflict) {
         return res.status(400).json({ error: conflict });
+      }
+
+      const mergedHandlerType = (validated.handler ?? existing.handler)?.type;
+      const { username } = resolveScope(req);
+      if (mergedHandlerType === HOOK_HANDLER_TYPES.COMMAND && !isCommandHookOwner(username)) {
+        return res.status(403).json({ error: commandOwnershipError(username) });
       }
 
       const updates: Partial<ConfiguredHookDocument> = {
@@ -242,6 +254,7 @@ router.put(
         ...(validated.agent !== undefined && { agent: validated.agent }),
         ...(validated.handler !== undefined && { handler: validated.handler }),
         ...(validated.enabled !== undefined && { enabled: validated.enabled }),
+        ...(validated.async !== undefined && { async: validated.async }),
         ...(validated.timeoutMilliseconds !== undefined && {
           timeoutMilliseconds: validated.timeoutMilliseconds,
         }),

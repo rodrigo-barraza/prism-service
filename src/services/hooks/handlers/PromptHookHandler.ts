@@ -6,10 +6,11 @@ import { getProvider } from "#src/providers/index";
 import { streamWithRetries } from "#src/utils/ProviderStreamResilience";
 import RequestLogger from "#src/services/RequestLogger";
 import {
-  BLOCKING_EVENTS,
+  FAIL_CLOSED_EVENTS,
   HOOK_EVENTS,
 } from "#src/services/hooks/types";
 import type {
+  AgentHookHandlerConfig,
   HookEventName,
   HookPayload,
   PromptHookHandlerConfig,
@@ -67,7 +68,7 @@ const RESPONSE_CONTRACT = [
   "Recognized fields (all optional; omit what does not apply):",
   '  "permissionDecision": "allow" | "deny" | "ask"   — tool-call verdict',
   '  "permissionDecisionReason": string               — why, shown to the user',
-  '  "decision": "block"                              — generic refusal',
+  '  "decision": "block"                              — generic refusal (on Stop: keep going)',
   '  "reason": string                                 — why, shown to the user',
   '  "continue": false                                — abort the whole run',
   '  "stopReason": string                             — why the run stopped',
@@ -196,9 +197,9 @@ function failClosedDecision(
   event: HookEventName,
   reason: string,
 ): HookHandlerResult {
-  // `PreToolUse` speaks the permission vocabulary; the other blocking event
-  // (`UserPromptSubmit`) only has the generic one.
-  if (event === HOOK_EVENTS.PRE_TOOL_USE) {
+  // The tool-call gates speak the permission vocabulary; `UserPromptSubmit`
+  // only has the generic one.
+  if (event === HOOK_EVENTS.PRE_TOOL_USE || event === HOOK_EVENTS.PERMISSION_REQUEST) {
     return {
       permissionDecision: "deny",
       permissionDecisionReason: reason,
@@ -220,7 +221,7 @@ export function parsePromptDecision(
   hookName = "prompt hook",
 ): HookHandlerResult {
   const trimmed = (responseText || "").trim();
-  const canBlock = BLOCKING_EVENTS.includes(event);
+  const canBlock = FAIL_CLOSED_EVENTS.includes(event);
 
   const ambiguous = (detail: string): HookHandlerResult => {
     if (canBlock) {
@@ -230,7 +231,7 @@ export function parsePromptDecision(
       return failClosedDecision(event, "hook_prompt_ambiguous_fail_closed");
     }
     logger.warn(
-      `[PromptHookHandler] "${hookName}" returned ${detail} on ${event}. Discarding (event cannot block). Output: "${trimmed.slice(0, 120)}"`,
+      `[PromptHookHandler] "${hookName}" returned ${detail} on ${event}. Discarding (not a fail-closed gate). Output: "${trimmed.slice(0, 120)}"`,
     );
     return { _handlerFailed: true, _reason: "hook_prompt_ambiguous" };
   };
@@ -280,8 +281,8 @@ export function parsePromptDecision(
 
 // ─── Provider call ────────────────────────────────────────────────────────────
 
-function resolveProvider(
-  config: PromptHookHandlerConfig,
+export function resolvePromptHookProvider(
+  config: PromptHookHandlerConfig | AgentHookHandlerConfig,
   options: PromptHookOptions,
 ): { provider: LLMProvider; providerName: string; model: string } | null {
   const configuredProviderName = config.provider?.trim();
@@ -342,7 +343,7 @@ export default async function runPromptHook(
     return { _handlerFailed: true, _reason: "prompt_template_missing" };
   }
 
-  const resolved = resolveProvider(config, options);
+  const resolved = resolvePromptHookProvider(config, options);
   if (!resolved) {
     return { _handlerFailed: true, _reason: "prompt_provider_unavailable" };
   }

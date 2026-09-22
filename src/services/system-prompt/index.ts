@@ -241,6 +241,13 @@ export default class SystemPromptAssembler {
 
   async assemble(context: AssemblerContext) {
     const sections: string[] = [];
+    // What the `InstructionsLoaded` hook event reports: each standing
+    // instruction this prompt carries (PRISM.md, every pinned rule).
+    const loadedInstructions: Array<{
+      instructionType: "project_instructions" | "rule";
+      name: string;
+      content: string;
+    }> = [];
     const isDirectMode = !context.agent;
     const agentId = context.agent || AGENT_IDS.CODING;
     const persona = isDirectMode ? null : AgentPersonaRegistry.get(agentId);
@@ -611,6 +618,11 @@ export default class SystemPromptAssembler {
       context.agent,
     );
     if (projectInstructions) {
+      loadedInstructions.push({
+        instructionType: "project_instructions",
+        name: "PRISM.md",
+        content: projectInstructions,
+      });
       sections.push(
         wrapSection(
           SYSTEM_PROMPT_SECTIONS.PROJECT_INSTRUCTIONS,
@@ -638,6 +650,13 @@ export default class SystemPromptAssembler {
         context.profileId,
       );
       if (activeRules.length > 0) {
+        for (const rule of activeRules) {
+          loadedInstructions.push({
+            instructionType: "rule",
+            name: rule.name,
+            content: rule.content,
+          });
+        }
         const rulesText = activeRules
           .map((rule) => `## /${rule.name}\n${rule.content}`)
           .join("\n\n");
@@ -950,6 +969,7 @@ export default class SystemPromptAssembler {
       workflowsText,
       goalText,
       injectedMemoryIds,
+      loadedInstructions,
     };
   }
 
@@ -966,8 +986,13 @@ export default class SystemPromptAssembler {
           workflowsText,
           goalText,
           injectedMemoryIds,
+          loadedInstructions,
         } = await this.assemble(context);
         if (!systemPrompt) return;
+
+        if (loadedInstructions.length > 0) {
+          context._loadedInstructions = loadedInstructions;
+        }
 
         context._injectedSkills = skillNames;
         context._skillsText = skillsText;
