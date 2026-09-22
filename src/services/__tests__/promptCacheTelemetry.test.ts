@@ -204,6 +204,8 @@ describe("provider diagnostics normalization", () => {
       normalizeAnthropicCacheDiagnostics({ cache_miss_reason: { type: "messages_changed", cache_missed_input_tokens: 900 } }, "msg_1"),
     ).toMatchObject({ source: "anthropic", status: "cache_miss", reason: "messages_changed", missedTokens: 900 });
     expect(normalizeAnthropicCacheDiagnostics({ cache_miss_reason: null }, "msg_1")?.status).toBe("pending");
+    // A full hit comes back as `diagnostics: null` (live, claude-sonnet-5)
+    expect(normalizeAnthropicCacheDiagnostics(null, "msg_1")).toMatchObject({ status: "no_miss", comparedResponseId: "msg_1" });
     expect(normalizeAnthropicCacheDiagnostics({ cache_miss_reason: { type: "previous_message_not_found" } }, "msg_1")?.status).toBe(
       "comparison_not_found",
     );

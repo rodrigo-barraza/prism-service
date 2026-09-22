@@ -37,7 +37,8 @@ export interface ProviderCacheDiagnostics {
   source: "openai" | "anthropic";
   /**
    * `cache_hit`, `cache_miss`, `pending` (Anthropic answered before its
-   * background comparison finished), `comparison_not_found` or
+   * background comparison finished), `no_miss` (Anthropic returned
+   * `diagnostics: null` — nothing to explain), `comparison_not_found` or
    * `unavailable`.
    */
   status: string;

@@ -122,7 +122,9 @@ export function hashAnthropicPrefix(payload: Record<string, unknown>) {
 /**
  * Normalize `message.diagnostics` (beta cache-diagnosis). A null
  * `cache_miss_reason` means the server answered before its background
- * comparison finished.
+ * comparison finished; `diagnostics: null` against a previous message is
+ * what a full cache hit returns (observed live on claude-sonnet-5,
+ * 2026-09-22) — there is no miss to explain.
  */
 export function normalizeAnthropicCacheDiagnostics(
   envelope: unknown,
@@ -130,6 +132,16 @@ export function normalizeAnthropicCacheDiagnostics(
 ): ProviderCacheDiagnostics | null {
   if (envelope === undefined || (envelope === null && !comparedResponseId)) {
     return null;
+  }
+  if (envelope === null) {
+    return {
+      source: "anthropic",
+      status: "no_miss",
+      reason: null,
+      missedTokens: null,
+      comparedResponseId,
+      raw: null,
+    };
   }
   const reason = (envelope as { cache_miss_reason?: unknown } | null)
     ?.cache_miss_reason as
