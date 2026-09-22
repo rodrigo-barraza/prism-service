@@ -221,7 +221,9 @@ export async function runBeforePromptSetup(
 
   // The same turn-open events the ReAct loop fires. A refusal is reported on
   // `standardHooks.turnHooks.blocked`; the strategy returns before its loop.
-  standardHooks.turnHooks = await openTurnHooks(context, hooks, currentMessages);
+  standardHooks.turnHooks = await openTurnHooks(context, hooks, currentMessages, {
+    toolSchemas: tools.finalTools,
+  });
   openTurns.set(harness, standardHooks);
   if (standardHooks.turnHooks.blocked) return standardHooks;
 

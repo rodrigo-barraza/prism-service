@@ -240,6 +240,8 @@ describe("ConfiguredHookRegistry", () => {
       expect(categoryForEvent(HOOK_EVENTS.POST_TOOL_USE)).toBe("transform");
       expect(categoryForEvent(HOOK_EVENTS.POST_TOOL_BATCH)).toBe("transform");
       expect(categoryForEvent(HOOK_EVENTS.INTERRUPT)).toBe("transform");
+      // Awaited so a shutdown cannot exit before it is delivered.
+      expect(categoryForEvent(HOOK_EVENTS.SESSION_END)).toBe("transform");
     });
 
     it("registers everything else as inspect", () => {

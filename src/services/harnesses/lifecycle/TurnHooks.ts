@@ -121,11 +121,18 @@ export interface TurnHookHandle {
  * Everything that happens before the first model call. Returns `blocked`
  * when the turn must end here; the caller still calls `closeTurnHooks`.
  */
+export interface OpenTurnOptions {
+  /** The live message array, for a loop that reassigns its own. */
+  getMessages?: () => ConversationMessage[];
+  /** The resolved tool schemas the turn will send (for the re-cache estimate). */
+  toolSchemas?: unknown[];
+}
+
 export async function openTurnHooks(
   context: AgenticContext,
   hooks: AgentHooks,
   currentMessages: ConversationMessage[],
-  getMessages: () => ConversationMessage[] = () => currentMessages,
+  { getMessages = () => currentMessages, toolSchemas }: OpenTurnOptions = {},
 ): Promise<TurnHookHandle> {
   const subAgent = isSubAgentRun(context);
   const conversationId = context.conversationId;
@@ -189,7 +196,7 @@ export async function openTurnHooks(
     pushHookContext(currentMessages, promptVerdict.additionalContext);
   }
 
-  const switchVerdict = await runModelSwitchHooks(context, hooks, currentMessages);
+  const switchVerdict = await runModelSwitchHooks(context, hooks, currentMessages, toolSchemas);
   if (switchVerdict.blocked) {
     emitStatus(context.emit, `Model switch blocked: ${switchVerdict.reason}`);
     return { blocked: true, reason: switchVerdict.reason, release };
@@ -229,7 +236,7 @@ export async function closeTurnHooks(
 /** The model the conversation's previous turn ran on, from its document. */
 async function loadPreviousModel(
   context: AgenticContext,
-): Promise<{ model: string; provider: string | null } | null> {
+): Promise<{ model: string; provider: string | null; systemPrompt: string } | null> {
   try {
     const [{ default: MongoWrapper }, { MONGO_DB_NAME }] = await Promise.all([
       import("#src/wrappers/MongoWrapper"),
@@ -241,13 +248,14 @@ async function loadPreviousModel(
       .collection(COLLECTIONS.AGENT_CONVERSATIONS)
       .findOne(
         { id: context.conversationId, project: context.project, username: context.username },
-        { projection: { "settings.model": 1, "settings.provider": 1 } },
+        { projection: { "settings.model": 1, "settings.provider": 1, systemPrompt: 1 } },
       );
     const settings = (document?.settings ?? null) as { model?: unknown; provider?: unknown } | null;
     if (!settings || typeof settings.model !== "string" || !settings.model) return null;
     return {
       model: settings.model,
       provider: typeof settings.provider === "string" ? settings.provider : null,
+      systemPrompt: typeof document?.systemPrompt === "string" ? document.systemPrompt : "",
     };
   } catch (loadError: unknown) {
     logger.warn(`[TurnHooks] Could not read the previous model: ${errorMessage(loadError)}`);
@@ -258,18 +266,23 @@ async function loadPreviousModel(
 /**
  * What switching costs in cache: the whole prompt prefix is written to the
  * new model's cache from scratch. Estimated from what the turn will send —
- * history, tool schemas and any system prompt already known — at the new
- * model's cache-write price (its input price when it has none).
+ * history, the resolved tool schemas, and the system prompt (this turn's is
+ * not assembled yet, so the previous turn's, from the conversation document,
+ * stands in) — at the new model's cache-write price (its input price when it
+ * has none). A chars/4 estimate: good to the order of magnitude a "this
+ * switch costs $X" hook needs, not to the token.
  */
 export function estimateRecacheCost(
   context: AgenticContext,
   currentMessages: ConversationMessage[],
+  { systemPrompt = "", toolSchemas }: { systemPrompt?: string; toolSchemas?: unknown[] } = {},
 ): { tokens: number; costUsd: number; pricePerMillion: number } {
   const messageText = currentMessages
     .map((message) => (typeof message.content === "string" ? message.content : JSON.stringify(message.content ?? "")))
     .join("\n");
-  const toolText = JSON.stringify(context.options?.tools ?? []);
-  const systemText = typeof context.options?.systemPrompt === "string" ? context.options.systemPrompt : "";
+  const toolText = JSON.stringify(toolSchemas ?? context.options?.tools ?? []);
+  const systemText =
+    (typeof context.options?.systemPrompt === "string" && context.options.systemPrompt) || systemPrompt;
   const tokens = estimateTokens(`${systemText}\n${toolText}\n${messageText}`);
   const pricing = context.modelDefinition?.pricing ?? {};
   const pricePerMillion =
@@ -287,6 +300,7 @@ async function runModelSwitchHooks(
   context: AgenticContext,
   hooks: AgentHooks,
   currentMessages: ConversationMessage[],
+  toolSchemas?: unknown[],
 ): Promise<{ blocked: boolean; reason?: string }> {
   if (isSubAgentRun(context) || !context.conversationId) return { blocked: false };
   // One Mongo read per turn, only for conversations that have a hook to tell.
@@ -296,7 +310,10 @@ async function runModelSwitchHooks(
   const previous = await loadPreviousModel(context);
   if (!previous || previous.model === context.resolvedModel) return { blocked: false };
 
-  const recache = estimateRecacheCost(context, currentMessages);
+  const recache = estimateRecacheCost(context, currentMessages, {
+    systemPrompt: previous.systemPrompt,
+    toolSchemas,
+  });
   const fields = {
     from_model: previous.model,
     from_provider: previous.provider,
