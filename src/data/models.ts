@@ -631,6 +631,24 @@ const MODELS = {
   },
 
   // ----- Anthropic — Text Generation -----
+  // Values verified 2026-09-22 against platform.claude.com: pricing page
+  // (input / 5-min cache write / cache read / output per MTok) and models
+  // overview (context window, max output). Request-surface flags read by
+  // src/providers/anthropic.ts (resolveAnthropicModelProfile):
+  //   adaptiveThinking         — thinking is {type:"adaptive"} + output_config.effort;
+  //                              budget_tokens is a 400.
+  //   lockedSampling           — temperature / top_p / top_k are a 400; never sent.
+  //   thinkingAlwaysOn         — {type:"disabled"} is a 400; "thinking off" omits
+  //                              `thinking` and runs at effort "low".
+  //   thinkingDisableMaxEffort — {type:"disabled"} only at or below this effort.
+  //   noAssistantPrefill       — a request ending on an assistant turn is a 400.
+  //   noForcedToolChoice       — tool_choice "any" / "tool" is a 400.
+  //   preservedThinking        — thinking blocks are bound to the model and the
+  //                              conversation prefix (thinking-binding-controls beta).
+  //   thinkingDisplayUpdates   — thinking.display "updates" (beta) is accepted.
+  //   serverSideFallbacks      — `fallbacks: "default"` (beta) re-runs a refusal.
+  //   requiresDataRetention    — 400 for orgs without 30-day retention.
+  //   defaultEffort            — the API's effort when none is sent.
   HAIKU_45: {
     description:
       "Anthropic's Claude 4.5 Haiku, a high-speed, cost-efficient model optimized for rapid classification, data extraction, and quick responses.",
@@ -670,7 +688,6 @@ const MODELS = {
     label: "Sonnet 4.5",
     provider: PROVIDERS.ANTHROPIC,
     modelType: MODEL_TYPES.CONVERSATION,
-    default: true,
     year: 2025,
     defaultTemperature: 1.0,
     arena: { document: 1450 },
@@ -712,6 +729,7 @@ const MODELS = {
     modelType: MODEL_TYPES.CONVERSATION,
     year: 2026,
     defaultTemperature: 1.0,
+    noAssistantPrefill: true,
     arena: { code: 1523, search: 1203 },
     pricing: {
       inputPerMillion: 3.0,
@@ -719,8 +737,8 @@ const MODELS = {
       cacheWriteInputPerMillion: 3.75,
       outputPerMillion: 15.0,
     },
-    maxInputTokens: 200_000,
-    maxOutputTokens: 64_000,
+    maxInputTokens: 1_000_000,
+    maxOutputTokens: 128_000,
     inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
     outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: {
@@ -749,8 +767,11 @@ const MODELS = {
     label: "Sonnet 5",
     provider: PROVIDERS.ANTHROPIC,
     modelType: MODEL_TYPES.CONVERSATION,
+    default: true,
     year: 2026,
     defaultTemperature: 1.0,
+    lockedSampling: true,
+    noAssistantPrefill: true,
     arena: {},
     pricing: {
       inputPerMillion: 2.0,
@@ -758,8 +779,8 @@ const MODELS = {
       cacheWriteInputPerMillion: 2.5,
       outputPerMillion: 10.0,
     },
-    maxInputTokens: 200_000,
-    maxOutputTokens: 64_000,
+    maxInputTokens: 1_000_000,
+    maxOutputTokens: 128_000,
     inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
     outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: {
@@ -831,6 +852,7 @@ const MODELS = {
     modelType: MODEL_TYPES.CONVERSATION,
     year: 2026,
     defaultTemperature: 1.0,
+    noAssistantPrefill: true,
     arena: { text: 1504, code: 1555, document: 1525, search: 1255 },
     pricing: {
       inputPerMillion: 5.0,
@@ -838,8 +860,8 @@ const MODELS = {
       cacheWriteInputPerMillion: 6.25,
       outputPerMillion: 25.0,
     },
-    maxInputTokens: 200_000,
-    maxOutputTokens: 64_000,
+    maxInputTokens: 1_000_000,
+    maxOutputTokens: 128_000,
     inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
     outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: {
@@ -871,6 +893,7 @@ const MODELS = {
     year: 2026,
     defaultTemperature: 1.0,
     lockedSampling: true,
+    noAssistantPrefill: true,
     arena: { text: 1520, code: 1565, document: 1540, search: 1270 },
     pricing: {
       inputPerMillion: 5.0,
@@ -878,8 +901,8 @@ const MODELS = {
       cacheWriteInputPerMillion: 6.25,
       outputPerMillion: 25.0,
     },
-    maxInputTokens: 200_000,
-    maxOutputTokens: 64_000,
+    maxInputTokens: 1_000_000,
+    maxOutputTokens: 128_000,
     inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
     outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: {
@@ -912,6 +935,7 @@ const MODELS = {
     year: 2026,
     defaultTemperature: 1.0,
     lockedSampling: true,
+    noAssistantPrefill: true,
     arena: { text: 1530, code: 1580, document: 1555, search: 1290 },
     pricing: {
       inputPerMillion: 5.0,
@@ -919,8 +943,8 @@ const MODELS = {
       cacheWriteInputPerMillion: 6.25,
       outputPerMillion: 25.0,
     },
-    maxInputTokens: 200_000,
-    maxOutputTokens: 64_000,
+    maxInputTokens: 1_000_000,
+    maxOutputTokens: 128_000,
     inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
     outputTypes: [MODALITY_TYPES.TEXT],
     mediaLimits: {
@@ -952,6 +976,12 @@ const MODELS = {
     modelType: MODEL_TYPES.CONVERSATION,
     year: 2026,
     defaultTemperature: 1.0,
+    lockedSampling: true,
+    noAssistantPrefill: true,
+    thinkingAlwaysOn: true,
+    thinkingDisplayUpdates: true,
+    serverSideFallbacks: true,
+    requiresDataRetention: true,
     arena: { text: 1545, code: 1590, document: 1565, search: 1310 },
     pricing: {
       inputPerMillion: 10.0,
@@ -959,7 +989,55 @@ const MODELS = {
       cacheWriteInputPerMillion: 12.5,
       outputPerMillion: 50.0,
     },
-    maxInputTokens: 200_000,
+    maxInputTokens: 1_000_000,
+    maxOutputTokens: 128_000,
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
+    mediaLimits: {
+      image: { maxCount: 100, maxSizeMB: 32 },
+      pdf: { maxCount: 5, maxSizeMB: 32 },
+    },
+    streaming: true,
+    thinking: true,
+    adaptiveThinking: true,
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    assistantImages: false,
+    webSearch: true,
+    webFetch: true,
+    codeExecution: true,
+    tools: [
+      "Thinking",
+      "Web Search",
+      "Tool Calling",
+      "Computer Use",
+      "Code Execution",
+    ],
+  },
+  FABLE_51: {
+    description:
+      "Anthropic's Claude Fable 5.1, its most capable widely released model — for demanding reasoning and long-horizon agentic work, with thinking that is always on.",
+    name: "claude-fable-5-1",
+    label: "Fable 5.1",
+    provider: PROVIDERS.ANTHROPIC,
+    modelType: MODEL_TYPES.CONVERSATION,
+    year: 2026,
+    defaultTemperature: 1.0,
+    lockedSampling: true,
+    noAssistantPrefill: true,
+    thinkingAlwaysOn: true,
+    noForcedToolChoice: true,
+    preservedThinking: true,
+    thinkingDisplayUpdates: true,
+    serverSideFallbacks: true,
+    requiresDataRetention: true,
+    // Cache reads are 0.025x base input on Fable 5.1 (not the usual 0.1x).
+    pricing: {
+      inputPerMillion: 10.0,
+      cachedInputPerMillion: 0.25,
+      cacheWriteInputPerMillion: 12.5,
+      outputPerMillion: 50.0,
+    },
+    maxInputTokens: 1_000_000,
     maxOutputTokens: 128_000,
     inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
     outputTypes: [MODALITY_TYPES.TEXT],
@@ -994,11 +1072,62 @@ const MODELS = {
     year: 2026,
     defaultTemperature: 1.0,
     lockedSampling: true,
+    noAssistantPrefill: true,
+    thinkingDisableMaxEffort: "high",
+    serverSideFallbacks: true,
     pricing: {
       inputPerMillion: 5.0,
       cachedInputPerMillion: 0.5,
       cacheWriteInputPerMillion: 6.25,
       outputPerMillion: 25.0,
+    },
+    maxInputTokens: 1_000_000,
+    maxOutputTokens: 128_000,
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
+    mediaLimits: {
+      image: { maxCount: 100, maxSizeMB: 32 },
+      pdf: { maxCount: 5, maxSizeMB: 32 },
+    },
+    streaming: true,
+    thinking: true,
+    adaptiveThinking: true,
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    assistantImages: false,
+    webSearch: true,
+    webFetch: true,
+    codeExecution: true,
+    tools: [
+      "Thinking",
+      "Web Search",
+      "Tool Calling",
+      "Computer Use",
+      "Code Execution",
+    ],
+  },
+  OPUS_55: {
+    description:
+      "Anthropic's Claude Opus 5.5, the Opus for long-running agentic coding and knowledge work — Opus 5's 1M context at a lower price, with thinking that is always on.",
+    name: "claude-opus-5-5",
+    label: "Opus 5.5",
+    provider: PROVIDERS.ANTHROPIC,
+    modelType: MODEL_TYPES.CONVERSATION,
+    year: 2026,
+    defaultTemperature: 1.0,
+    lockedSampling: true,
+    noAssistantPrefill: true,
+    thinkingAlwaysOn: true,
+    noForcedToolChoice: true,
+    preservedThinking: true,
+    thinkingDisplayUpdates: true,
+    serverSideFallbacks: true,
+    defaultEffort: "medium",
+    // Cache reads are 0.05x base input on Opus 5.5 (not the usual 0.1x).
+    pricing: {
+      inputPerMillion: 4.0,
+      cachedInputPerMillion: 0.2,
+      cacheWriteInputPerMillion: 5.0,
+      outputPerMillion: 20.0,
     },
     maxInputTokens: 1_000_000,
     maxOutputTokens: 128_000,

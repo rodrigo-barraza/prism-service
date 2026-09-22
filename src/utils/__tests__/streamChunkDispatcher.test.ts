@@ -154,3 +154,39 @@ describe("StreamChunkDispatcher — providerState (OpenAI Responses)", () => {
     });
   });
 });
+
+describe("StreamChunkDispatcher — Anthropic thinking blocks and refusals (/chat)", () => {
+  it("keeps thinking blocks verbatim and in order, marking a progress block trailing", async () => {
+    const state = makeState();
+    const events: Array<Record<string, unknown>> = [];
+    const context = makeContext(events);
+    const blockA = { type: "thinking", thinking: " a ", signature: "sig-A" };
+    const blockB = { type: "thinking", thinking: "", signature: "sig-B" };
+    await dispatchChunk({ type: "thinking_block", block: blockA, afterContent: false } as never, state, context);
+    await dispatchChunk({ type: "thinking_block", block: blockB, afterContent: true } as never, state, context);
+    expect(state.thinkingBlocks).toStrictEqual([blockA, { ...blockB, trailing: true }]);
+    expect(textOf(events)).toBe("");
+  });
+
+  it("a fallback drops the declining model's blocks and tool calls", async () => {
+    const state = makeState();
+    const context = makeContext([]);
+    await dispatchChunk({ type: "thinking_block", block: { type: "thinking", thinking: "x", signature: "s" }, afterContent: false } as never, state, context);
+    state.toolCalls.push({ id: "toolu_1", name: "search", args: {} } as never);
+    await dispatchChunk({ type: "fallback", from: "claude-fable-5-1", to: "claude-opus-4-8" } as never, state, context);
+    await dispatchChunk({ type: "servedModel", model: "claude-opus-4-8" } as never, state, context);
+    expect(state.thinkingBlocks).toEqual([]);
+    expect(state.toolCalls).toHaveLength(0);
+    expect(state.servedModel).toBe("claude-opus-4-8");
+  });
+
+  it("a refusal is recorded and emitted as a typed event", async () => {
+    const state = makeState();
+    const events: Array<Record<string, unknown>> = [];
+    state.toolCalls.push({ id: "toolu_1", name: "search", args: {} } as never);
+    await dispatchChunk({ type: "refusal", category: "cyber", explanation: "declined" } as never, state, makeContext(events));
+    expect(state.refusal).toEqual({ category: "cyber", explanation: "declined" });
+    expect(state.toolCalls).toHaveLength(0);
+    expect(events).toContainEqual({ type: "refusal", category: "cyber", explanation: "declined" });
+  });
+});

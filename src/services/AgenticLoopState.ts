@@ -5,7 +5,9 @@ import type {
   ToolCall,
   AgenticLoopStateInit,
   PassState,
+  ModelRefusal,
 } from "./harnesses/types.ts";
+import type { AnthropicThinkingBlock } from "#src/types/admin";
 import { MEDIA } from "#src/constants";
 interface CriteriaScores {
   correctness: number;
@@ -89,6 +91,10 @@ export default class AgenticLoopState {
   phase?: "commentary" | "final_answer" | null;
   reasoningItems?: Array<{ id: string; summary: Array<{ type: string; text: string }>; encrypted_content?: string }>;
   providerResponseId?: string;
+  /** Anthropic thinking blocks of the final pass (reset with each pass). */
+  thinkingBlocks?: AnthropicThinkingBlock[];
+  /** Set when a safety classifier declined the turn; stored on the final message. */
+  refusal?: ModelRefusal;
 
   // ── Turn input (TurnInputMailbox) ───────────────────────
   /** Entries injected into this turn at loop boundaries (steering, answers, completions). */
@@ -113,7 +119,7 @@ export default class AgenticLoopState {
   // Set by harnesses before finalization to indicate how the
   // conversation ended. Used by afterResponse hooks (e.g. AWM) to
   // gate actions that should only run on successful completions.
-  conversationOutcome: "completed" | "exhausted" | "error" | "aborted";
+  conversationOutcome: "completed" | "exhausted" | "error" | "aborted" | "refused";
 
   // ── Branch tracking (TreeOfThought) ─────────────────────
   branchesExplored: number;

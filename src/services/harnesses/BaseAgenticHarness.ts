@@ -1174,6 +1174,7 @@ export default class BaseAgenticHarness {
       agent: agent || null,
       provider: providerName,
       model: resolvedModel,
+      ...(pass.servedModel && { servedModel: pass.servedModel }),
       conversationId,
       agentConversationId,
       parentAgentConversationId: parentAgentConversationId || null,
@@ -1339,6 +1340,9 @@ export default class BaseAgenticHarness {
       requestId: null, // set after tracker registration
       pendingRequestDocumentIdPromise: pendingPromise,
     };
+    // A new pass: the previous pass's thinking blocks already went out with
+    // its own assistant message; the loop state tracks the newest pass only.
+    this.state.thinkingBlocks = undefined;
 
     return passState;
   }
@@ -1502,6 +1506,8 @@ export default class BaseAgenticHarness {
         ...(state.phase !== undefined && { phase: state.phase }),
         ...(state.reasoningItems && state.reasoningItems.length > 0 && { reasoningItems: state.reasoningItems }),
         ...(state.providerResponseId && { providerResponseId: state.providerResponseId }),
+        ...(state.thinkingBlocks && state.thinkingBlocks.length > 0 && { thinkingBlocks: state.thinkingBlocks }),
+        ...(state.refusal && { refusal: state.refusal }),
       },
       newTurnMessages as MessagePayload[],
       finalizeOptions,
@@ -1534,6 +1540,8 @@ export default class BaseAgenticHarness {
       ...(state.phase !== undefined && { phase: state.phase }),
       ...(state.reasoningItems && state.reasoningItems.length > 0 && { reasoningItems: state.reasoningItems }),
       ...(state.providerResponseId && { providerResponseId: state.providerResponseId }),
+      ...(state.thinkingBlocks && state.thinkingBlocks.length > 0 && { thinkingBlocks: state.thinkingBlocks }),
+      ...(state.refusal && { refusal: state.refusal }),
       ...(state.streamedThinking.trim() && {
         thinking: state.streamedThinking.trim(),
       }),

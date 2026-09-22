@@ -47,6 +47,9 @@ export interface LogParams {
   harness?: string | null;
   provider?: string | null;
   model?: string | null;
+  /** The model that actually produced the response when it was not `model`
+   *  (Anthropic server-side fallback after a safety-classifier refusal). */
+  servedModel?: string | null;
   conversationId?: string | null;
   traceId?: string | null;
   agentConversationId?: string | null;
@@ -219,6 +222,7 @@ const RequestLogger = {
     harness = null,
     provider,
     model,
+    servedModel = null,
     conversationId = null,
     traceId = null,
     agentConversationId = null,
@@ -286,6 +290,7 @@ const RequestLogger = {
         harness: harness || null,
         provider,
         model,
+        ...(servedModel && { servedModel }),
         conversationId,
         traceId,
         ...(agentConversationId && { agentConversationId }),
@@ -694,6 +699,7 @@ const RequestLogger = {
         harness,
         provider,
         model,
+        servedModel,
         conversationId,
         traceId,
         agentConversationId,
@@ -770,6 +776,7 @@ const RequestLogger = {
         harness: harness || null,
         provider,
         model,
+        ...(servedModel && { servedModel }),
         conversationId,
         traceId,
         toolsUsed,

@@ -612,6 +612,24 @@ describe('Claude 5 generation — small request defects', () => {
     expect(toolCall.argsParseError).toBe(true);
     expect(toolCall.rawArgs).toContain('"q": 7');
   });
+  it('streaming: an SDK parse failure mid-tool-input becomes a malformed call, not a failed turn', async () => {
+    streamScriptQueue.push({
+      events: [
+        { type: 'message_start', message: { model: 'claude-sonnet-5', usage: { input_tokens: 5, output_tokens: 0 } } },
+        { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'toolu_9', name: 'lookup', input: {} } },
+        { type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '{"q": "unterminated' } },
+      ],
+      throwAfter: new SyntaxError('Unexpected end of JSON input'),
+    });
+    const chunks = await collect(
+      anthropicProvider.generateTextStream([{ role: 'user', content: 'hi' }], 'claude-sonnet-5', {
+        tools: [{ name: 'lookup', parameters: { type: 'object', properties: { q: { type: 'string' } } } }],
+      }),
+    );
+    const toolCall = chunks.find((chunk) => chunk?.type === 'toolCall');
+    expect(toolCall).toMatchObject({ id: 'toolu_9', name: 'lookup', argsParseError: true });
+    expect(toolCall.rawArgs).toContain('unterminated');
+  });
 });
 
 describe('Claude 5 generation — thinking blocks stored and replayed verbatim', () => {
@@ -624,10 +642,9 @@ describe('Claude 5 generation — thinking blocks stored and replayed verbatim',
     mockMessagesStream.mockClear();
     createResponseQueue.length = 0;
     streamScriptQueue.length = 0;
-    const defaults = SettingsService.getDefaults() as any;
+    // Tests run preserved thinking with "error" (production default: drop_block)
     settingsSpy = vi.spyOn(SettingsService, 'getCached').mockReturnValue({
-      ...defaults,
-      anthropic: { ...(defaults.anthropic ?? {}), thinkingBlockBinding: 'error' },
+      anthropic: { thinkingBlockBinding: 'error' },
     } as any);
   });
 
@@ -785,7 +802,7 @@ describe('Claude 5 generation — refusals and fallbacks', () => {
       usage: { input_tokens: 9, output_tokens: 1 },
     });
     const result: any = await anthropicProvider.generateText([{ role: 'user', content: 'x' }], 'claude-opus-5-5');
-    expect(result.refusal).toEqual({ category: 'bio', explanation: null });
+    expect(result.refusal).toMatchObject({ category: 'bio', explanation: null });
     expect(result.text).toBe('');
   });
 

@@ -6,6 +6,7 @@
   },
   "planningMode": {
     "blocked": "You are in PLANNING MODE. Tool call(s) [{{blockedNames}}] were blocked — only exit_plan_mode is available. Write your complete plan as text output, then call exit_plan_mode to submit it for user approval.",
+    "submitPlan": "Your plan is written. Now call exit_plan_mode with that plan so the user can review and approve it — do not restate it as text.",
     "approvalResult": "User has approved your plan. You can now start coding. Start with updating your todo list if applicable.",
     "rejectionStatus": "Plan rejected — execution cancelled.",
     "planningInstruction": "## ⚠️ PLANNING MODE ACTIVE — TOOL ACCESS RESTRICTED\n\nYou are in PLANNING MODE. The ONLY tools available are:\n- **exit_plan_mode** — Submit your plan for user approval\n- **think** — Internal reasoning\n\nAll other tool calls WILL BE BLOCKED.\n\n**What to do:**\n1. Analyze the user's request\n2. Design your implementation approach as text output\n3. Call exit_plan_mode when ready — the user will review and approve before you can execute\n\nKeep your plan concise. For simple tasks, a brief summary is sufficient."
