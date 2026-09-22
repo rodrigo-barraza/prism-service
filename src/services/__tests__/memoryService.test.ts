@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { ObjectId } from "mongodb";
 import { PROVIDERS } from "#src/constants";
 import MemoryService from "#src/services/MemoryService";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
@@ -165,6 +166,25 @@ describe("MemoryService", () => {
       expect(results).toHaveLength(1);
       expect(results[0].content).toBe("Matches perfectly");
       expect(results[0].score).toBeCloseTo(1.0, 5);
+    });
+
+    it("returns the Mongo _id as a string id, so callers can compare it", async () => {
+      const documentObjectId = new ObjectId();
+      mockCollection.toArray.mockResolvedValue([
+        {
+          _id: documentObjectId,
+          content: "Matches perfectly",
+          embedding: [0.1, 0.2, 0.3],
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+
+      const results = await MemoryService.search({
+        agent: "CODING",
+        queryText: "TypeScript",
+      });
+
+      expect(results[0].id).toBe(documentObjectId.toHexString());
     });
   });
 
