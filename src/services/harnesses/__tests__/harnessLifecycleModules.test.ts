@@ -5,7 +5,7 @@ import FileService from "#src/services/FileService";
 import { appendAndFinalize } from "#src/utils/ConversationUtilities";
 import { APPROVAL_TIERS } from "#src/services/AutoApprovalEngine";
 import CriticGate from "#src/services/harnesses/lifecycle/CriticGate";
-import { pendingApprovals } from "#src/services/ApprovalRegistry";
+import { ApprovalRegistry } from "#src/services/ApprovalRegistry";
 import { checkAndWaitForApproval } from "#src/services/harnesses/lifecycle/ApprovalGate";
 import { manageContextPressure } from "#src/services/harnesses/lifecycle/ContextPressureManager";
 import { checkCostBudget } from "#src/services/harnesses/lifecycle/CostBudgetEnforcer";
@@ -447,14 +447,25 @@ describe("Harness Lifecycle Modules", () => {
       checkBatch: vi.fn(),
     } as unknown as AutoApprovalEngine;
 
+    beforeEach(() => {
+      ApprovalRegistry._clearAll();
+    });
+
+    const needsDangerTool = () =>
+      vi.mocked(mockApprovalEngine.checkBatch).mockReturnValue({
+        needsApproval: [{ name: "danger_tool", id: "1", _approval: { tier: APPROVAL_TIERS.DANGER, tierLabel: "DANGER" } }],
+        approved: [],
+      } as any);
+
     it("should approve immediately if no tools need approval", async () => {
       vi.mocked(mockApprovalEngine.checkBatch).mockReturnValue({
         needsApproval: [],
         approved: [],
       } as any);
 
-      const approvalResult = await checkAndWaitForApproval([], mockAgenticContext as any, mockApprovalEngine);
-      expect(approvalResult.isApproved).toBe(true);
+      const verdict = await checkAndWaitForApproval([], mockAgenticContext as any, mockApprovalEngine);
+      expect(verdict.executableToolCalls).toEqual([]);
+      expect(verdict.blockedResults).toEqual([]);
     });
 
     it("should approve immediately if autoApprove is configured", async () => {
@@ -468,19 +479,17 @@ describe("Harness Lifecycle Modules", () => {
         options: { autoApprove: true },
       };
 
-      const approvalResult = await checkAndWaitForApproval(
+      const verdict = await checkAndWaitForApproval(
         [{ name: "danger_tool" }] as any,
         contextWithAuto as any,
         mockApprovalEngine,
       );
-      expect(approvalResult.isApproved).toBe(true);
+      expect(verdict.executableToolCalls.map((toolCall) => toolCall.name)).toEqual(["danger_tool"]);
+      expect(ApprovalRegistry.getPending("conv-123")).toBeNull();
     });
 
-    it("should emit approval_required events and wait for user approval resolution", async () => {
-      vi.mocked(mockApprovalEngine.checkBatch).mockReturnValue({
-        needsApproval: [{ name: "danger_tool", id: "1", _approval: { tier: APPROVAL_TIERS.DANGER, tierLabel: "DANGER" } }],
-        approved: [],
-      } as any);
+    it("should emit one approval_required per call and wait for that call's decision", async () => {
+      needsDangerTool();
 
       const promise = checkAndWaitForApproval(
         [{ name: "danger_tool", id: "1" }] as any,
@@ -489,30 +498,29 @@ describe("Harness Lifecycle Modules", () => {
       );
 
       await vi.waitFor(() => {
-        expect(pendingApprovals.has("conv-123")).toBe(true);
+        expect(ApprovalRegistry.getPending("conv-123")).not.toBeNull();
       });
 
-      const pendingApproval = pendingApprovals.get("conv-123");
-      expect(pendingApproval).toBeDefined();
-      expect(pendingApproval?.type).toBe("tool");
-
-      (pendingApproval as any)?.resolve({ isApproved: true, shouldApproveAll: false });
-
-      const result = await promise;
-      expect(result.isApproved).toBe(true);
-      expect(result.shouldApproveAll).toBe(false);
+      const pending = ApprovalRegistry.getPending("conv-123")!;
+      expect(pending.type).toBe("tool");
       expect(mockAgenticContext.emit).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "approval_required" })
+        expect.objectContaining({ type: "approval_required", toolCallId: "1", batchId: pending.batchId, tier: APPROVAL_TIERS.DANGER }),
+      );
+
+      ApprovalRegistry.decide("conv-123", { toolCallId: "1", decision: "allow" });
+
+      const verdict = await promise;
+      expect(verdict.executableToolCalls.map((toolCall) => toolCall.id)).toEqual(["1"]);
+      expect(verdict.executableToolCalls[0]._approval).toMatchObject({ isApproved: true, decidedBy: "user" });
+      expect(verdict.shouldApproveAll).toBe(false);
+      expect(mockAgenticContext.emit).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "approval_decided", toolCallId: "1", decision: "allow" }),
       );
     });
 
     it("should handle timeout when user does not respond in time", async () => {
       vi.useFakeTimers();
-
-      vi.mocked(mockApprovalEngine.checkBatch).mockReturnValue({
-        needsApproval: [{ name: "danger_tool", id: "1", _approval: { tier: APPROVAL_TIERS.DANGER, tierLabel: "DANGER" } }],
-        approved: [],
-      } as any);
+      needsDangerTool();
 
       const promise = checkAndWaitForApproval(
         [{ name: "danger_tool", id: "1" }] as any,
@@ -521,23 +529,21 @@ describe("Harness Lifecycle Modules", () => {
       );
 
       await vi.waitFor(() => {
-        expect(pendingApprovals.has("conv-123")).toBe(true);
+        expect(ApprovalRegistry.getPending("conv-123")).not.toBeNull();
       });
 
       vi.advanceTimersByTime(120_000);
 
-      const result = await promise;
-      expect(result.isApproved).toBe(false);
-      expect(pendingApprovals.has("conv-123")).toBe(false);
+      const verdict = await promise;
+      expect(verdict.executableToolCalls).toEqual([]);
+      expect(verdict.blockedResults[0].result).toMatchObject({ success: false, error: "APPROVAL_TIMED_OUT" });
+      expect(ApprovalRegistry.getPending("conv-123")).toBeNull();
 
       vi.useRealTimers();
     });
 
-    it("should reject previous approval if superseded by a new approval request", async () => {
-      vi.mocked(mockApprovalEngine.checkBatch).mockReturnValue({
-        needsApproval: [{ name: "danger_tool", id: "1", _approval: { tier: APPROVAL_TIERS.DANGER, tierLabel: "DANGER" } }],
-        approved: [],
-      } as any);
+    it("should deny the previous batch if superseded by a new approval request", async () => {
+      needsDangerTool();
 
       const promise1 = checkAndWaitForApproval(
         [{ name: "danger_tool", id: "1" }] as any,
@@ -546,8 +552,9 @@ describe("Harness Lifecycle Modules", () => {
       );
 
       await vi.waitFor(() => {
-        expect(pendingApprovals.has("conv-123")).toBe(true);
+        expect(ApprovalRegistry.getPending("conv-123")).not.toBeNull();
       });
+      const firstBatchId = ApprovalRegistry.getPending("conv-123")!.batchId;
 
       const promise2 = checkAndWaitForApproval(
         [{ name: "danger_tool", id: "1" }] as any,
@@ -556,22 +563,19 @@ describe("Harness Lifecycle Modules", () => {
       );
 
       await vi.waitFor(() => {
-        expect(pendingApprovals.has("conv-123")).toBe(true);
+        expect(ApprovalRegistry.getPending("conv-123")?.batchId).not.toBe(firstBatchId);
       });
 
-      const result1 = await promise1;
-      expect(result1.isApproved).toBe(false);
+      const verdict1 = await promise1;
+      expect(verdict1.executableToolCalls).toEqual([]);
 
-      (pendingApprovals.get("conv-123") as any)?.resolve({ isApproved: true, shouldApproveAll: false });
-      const result2 = await promise2;
-      expect(result2.isApproved).toBe(true);
+      ApprovalRegistry.decide("conv-123", { toolCallId: "1", decision: "allow" });
+      const verdict2 = await promise2;
+      expect(verdict2.executableToolCalls.map((toolCall) => toolCall.id)).toEqual(["1"]);
     });
 
-    it("should return shouldApproveAll=true when user selects approve all option", async () => {
-      vi.mocked(mockApprovalEngine.checkBatch).mockReturnValue({
-        needsApproval: [{ name: "danger_tool", id: "1", _approval: { tier: APPROVAL_TIERS.DANGER, tierLabel: "DANGER" } }],
-        approved: [],
-      } as any);
+    it("should return shouldApproveAll=true when the user auto-approves the conversation", async () => {
+      needsDangerTool();
 
       const promise = checkAndWaitForApproval(
         [{ name: "danger_tool", id: "1" }] as any,
@@ -580,14 +584,14 @@ describe("Harness Lifecycle Modules", () => {
       );
 
       await vi.waitFor(() => {
-        expect(pendingApprovals.has("conv-123")).toBe(true);
+        expect(ApprovalRegistry.getPending("conv-123")).not.toBeNull();
       });
 
-      (pendingApprovals.get("conv-123") as any)?.resolve({ isApproved: true, shouldApproveAll: true });
+      ApprovalRegistry.decide("conv-123", { toolCallId: "1", decision: "allow", scope: "conversation" });
 
-      const result = await promise;
-      expect(result.isApproved).toBe(true);
-      expect(result.shouldApproveAll).toBe(true);
+      const verdict = await promise;
+      expect(verdict.executableToolCalls).toHaveLength(1);
+      expect(verdict.shouldApproveAll).toBe(true);
     });
   });
 
@@ -889,11 +893,10 @@ describe("Harness Lifecycle Modules", () => {
       );
 
       await vi.waitFor(() => {
-        expect(pendingApprovals.has("conversation-id-123")).toBe(true);
+        expect(ApprovalRegistry.getPending("conversation-id-123")).not.toBeNull();
       });
 
-      const pendingApproval = pendingApprovals.get("conversation-id-123");
-      (pendingApproval as any).resolve(true);
+      ApprovalRegistry.decide("conversation-id-123", { toolCallId: "exit-call-id", decision: "allow" });
 
       const result = await promise;
       expect(result.shouldContinueLoop).toBe(true);
@@ -928,15 +931,65 @@ describe("Harness Lifecycle Modules", () => {
       );
 
       await vi.waitFor(() => {
-        expect(pendingApprovals.has("conversation-id-123")).toBe(true);
+        expect(ApprovalRegistry.getPending("conversation-id-123")).not.toBeNull();
       });
 
-      const pendingApproval = pendingApprovals.get("conversation-id-123");
-      (pendingApproval as any).resolve(false);
+      ApprovalRegistry.decide("conversation-id-123", { toolCallId: "exit-call-id", decision: "deny" });
 
       const result = await promise;
       expect(result.shouldContinueLoop).toBe(false);
       expect(emitSpy).toHaveBeenCalledWith(expect.objectContaining({ message: "Plan rejected — execution cancelled." }));
+    });
+
+    it("decides the plan by its exit_plan_mode call id, and relays a denial's reason", async () => {
+      const exitPlanToolCall = { id: "exit-call-reason", name: "exit_plan_mode", args: {} };
+      const pass = { streamedText: "Plan: delete the tests", streamedThinking: "", thinkingSignature: "" };
+      const toolResults = [{ id: "exit-call-reason", name: "exit_plan_mode", result: null }];
+      const emitSpy = vi.fn();
+      const context = {
+        options: { autoApprove: false },
+        emit: emitSpy,
+        conversationId: "conversation-plan-reason",
+        requestStart: performance.now(),
+      };
+      const state = {
+        planModeActive: true,
+        planModeText: "",
+        overallUsage: { inputTokens: 10, outputTokens: 20 },
+      };
+
+      const promise = handleExitPlanMode(
+        exitPlanToolCall as any,
+        pass as any,
+        toolResults as any,
+        [] as any,
+        context as any,
+        state as any,
+      );
+
+      await vi.waitFor(() => {
+        expect(ApprovalRegistry.getPending("conversation-plan-reason")).not.toBeNull();
+      });
+      const pending = ApprovalRegistry.getPending("conversation-plan-reason")!;
+      expect(pending.type).toBe("plan");
+      expect(emitSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "plan_proposal", toolCallId: "exit-call-reason", batchId: pending.batchId }),
+      );
+
+      expect(
+        ApprovalRegistry.decide("conversation-plan-reason", {
+          toolCallId: "exit-call-reason",
+          decision: "deny",
+          reason: "keep the tests",
+        }).status,
+      ).toBe("decided");
+
+      const result = await promise;
+      expect(result.shouldContinueLoop).toBe(false);
+      expect(emitSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining("keep the tests") }),
+      );
+      expect(state.planModeActive).toBe(true);
     });
 
     it("should cancel previous pending approval if a new one is requested", async () => {
@@ -966,7 +1019,7 @@ describe("Harness Lifecycle Modules", () => {
       );
 
       await vi.waitFor(() => {
-        expect(pendingApprovals.has("conversation-id-123")).toBe(true);
+        expect(ApprovalRegistry.getPending("conversation-id-123")).not.toBeNull();
       });
 
       const promise2 = handleExitPlanMode(
@@ -979,14 +1032,13 @@ describe("Harness Lifecycle Modules", () => {
       );
 
       await vi.waitFor(() => {
-        expect(pendingApprovals.has("conversation-id-123")).toBe(true);
+        expect(ApprovalRegistry.getPending("conversation-id-123")).not.toBeNull();
       });
 
       const result1 = await promise1;
       expect(result1.shouldContinueLoop).toBe(false);
 
-      const pendingApproval = pendingApprovals.get("conversation-id-123");
-      (pendingApproval as any).resolve(true);
+      ApprovalRegistry.decide("conversation-id-123", { toolCallId: "exit-call-id", decision: "allow" });
 
       const result2 = await promise2;
       expect(result2.shouldContinueLoop).toBe(true);
@@ -1020,7 +1072,7 @@ describe("Harness Lifecycle Modules", () => {
       );
 
       await vi.waitFor(() => {
-        expect(pendingApprovals.has("conversation-id-123")).toBe(true);
+        expect(ApprovalRegistry.getPending("conversation-id-123")).not.toBeNull();
       });
 
       vi.advanceTimersByTime(120_000);

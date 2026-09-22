@@ -18,7 +18,7 @@ import ReActHarness from "../ReActHarness.ts";
 import AgenticLoopState from "#src/services/AgenticLoopState";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
-import { pendingApprovals } from "#src/services/ApprovalRegistry";
+import { ApprovalRegistry } from "#src/services/ApprovalRegistry";
 import { runTreeOfThoughts } from "../strategies/TreeOfThoughtsStrategy.ts";
 import { runGraphOfThoughts } from "../strategies/GraphOfThoughtsStrategy.ts";
 import { SERVER_SENT_EVENT_TYPES, TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
@@ -337,13 +337,13 @@ async function runLoop(context: AgenticContext) {
   return AgenticLoopService.runAgenticLoop(context);
 }
 
-/** Resolve the plan-approval prompt with `approved` as soon as it is pending. */
+/** Decide the plan-approval prompt with `approved` as soon as it is pending. */
 function answerPlanWhenAsked(conversationId: string, approved: boolean) {
   const timer = setInterval(() => {
-    const entry = pendingApprovals.get(conversationId);
-    if (entry && entry.type === "plan") {
+    const pending = ApprovalRegistry.getPending(conversationId);
+    if (pending?.type === "plan") {
       clearInterval(timer);
-      entry.resolve(approved as never);
+      ApprovalRegistry.decide(conversationId, { decision: approved ? "allow" : "deny" });
     }
   }, 1);
   return () => clearInterval(timer);
@@ -362,7 +362,7 @@ function doneEvents(emit: ReturnType<typeof vi.fn>) {
 beforeEach(() => {
   vi.clearAllMocks();
   TurnInputMailbox._clearAll();
-  pendingApprovals.clear();
+  ApprovalRegistry._clearAll();
   script = [];
   modelCalls = 0;
   scriptedUsage = { inputTokens: 100, outputTokens: 10 };

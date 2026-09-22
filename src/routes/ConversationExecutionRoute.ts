@@ -1,8 +1,7 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { type Request, type Response, type NextFunction } from "express";
-import AgenticLoopService from "#src/services/AgenticLoopService";
 import { handleAgent } from "./ChatRoutes.ts";
-import logger from "#src/utils/logger";
+import { handleApprovalDecision } from "./ApprovalDecisionRoute.ts";
 import { handleSseRequest, handleJsonRequest } from "#src/utils/SseUtilities";
 import { handleQuestionAnswer } from "./QuestionAnswerHandler.ts";
 
@@ -10,39 +9,14 @@ const router = express.Router();
 
 /**
  * POST /conversation/approve
- * Body: { conversationId, approved, approveAll }
- * Resolves pending plan/tool approvals for agent loops.
+ * Alias of POST /agent/approve — same body, same fail-closed rules
+ * (see handleApprovalDecision in ApprovalDecisionRoute).
  */
 router.post(
   "/approve",
-  asyncHandler(async (req: Request, res: Response) => {
-    const { conversationId, approved, approveAll } = req.body;
-    const isApproved = approved !== false;
-    const shouldApproveAll = approveAll === true;
-
-    if (!conversationId) {
-      return res.status(400).json({ error: "Missing conversationId" });
-    }
-
-    const resolved = AgenticLoopService.resolveApproval(
-      conversationId,
-      isApproved,
-      { shouldApproveAll },
-    );
-
-    if (!resolved) {
-      return res.status(404).json({
-        error: "No pending approval for this conversation",
-        conversationId,
-      });
-    }
-
-    logger.info(
-      `[conversation/approve] ${isApproved ? "Approved" : "Rejected"}${shouldApproveAll ? " (all future)" : ""} for conversation ${conversationId}`,
-    );
-
-    res.json({ ok: true, approved: isApproved });
-  }),
+  asyncHandler(async (req: Request, res: Response) =>
+    handleApprovalDecision(req, res, "[conversation/approve]"),
+  ),
 );
 
 /**

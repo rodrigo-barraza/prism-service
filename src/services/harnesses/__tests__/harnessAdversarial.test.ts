@@ -24,7 +24,7 @@ import { ChatRequestSchema } from "#src/types/schemas";
 import AgenticLoopState from "#src/services/AgenticLoopState";
 import ToolContext from "#src/services/ToolContext";
 import {
-  pendingApprovals,
+  ApprovalRegistry,
   pendingQuestions,
 } from "#src/services/ApprovalRegistry";
 import HarnessRegistry from "#src/services/harnesses/HarnessRegistry";
@@ -581,90 +581,49 @@ describe("Flow 4: ToolContext Session Isolation", () => {
 describe("Flow 5: ApprovalRegistry Promise Lifecycle", () => {
 
   afterEach(() => {
-    pendingApprovals.clear();
+    ApprovalRegistry._clearAll();
     pendingQuestions.clear();
   });
 
-  it("should store and retrieve a pending tool approval", () => {
-    const resolveFunction = vi.fn();
-    pendingApprovals.set("conv-1", {
-      resolve: resolveFunction,
-      type: "tool",
-      tools: ["shell_execute"],
-      toolCalls: [{
-        id: "tc-1",
-        name: "shell_execute",
-        args: { command: "ls" },
-      }],
+  function parkBatch(loopKey: string, type: "tool" | "plan", toolCallIds: string[]) {
+    return ApprovalRegistry.waitForDecisions(loopKey, {
+      type,
+      batchId: `batch-${loopKey}-${toolCallIds.join("-")}`,
+      calls: toolCallIds.map((toolCallId) => ({ toolCallId, name: "shell_execute", args: { command: "ls" } })),
+      timeoutMilliseconds: 60_000,
     });
+  }
 
-    const entry = pendingApprovals.get("conv-1");
-    expect(entry).toBeDefined();
-    expect(entry!.type).toBe("tool");
-    expect(entry!.tools).toContain("shell_execute");
+  it("should store and retrieve a pending tool approval", () => {
+    parkBatch("conv-1", "tool", ["tc-1"]);
+
+    const pending = ApprovalRegistry.getPending("conv-1");
+    expect(pending).not.toBeNull();
+    expect(pending!.type).toBe("tool");
+    expect(pending!.toolCalls.map((toolCall) => toolCall.name)).toContain("shell_execute");
   });
 
   it("should store and retrieve a pending plan approval", () => {
-    const resolveFunction = vi.fn();
-    pendingApprovals.set("conv-plan", {
-      resolve: resolveFunction,
-      type: "plan",
-    });
+    parkBatch("conv-plan", "plan", ["plan-call"]);
 
-    const entry = pendingApprovals.get("conv-plan");
-    expect(entry).toBeDefined();
-    expect(entry!.type).toBe("plan");
+    expect(ApprovalRegistry.getPending("conv-plan")?.type).toBe("plan");
   });
 
-  it("should overwrite previous approval when same conversationId is used (resolver is superseded)", () => {
-    const firstResolver = vi.fn();
-    const secondResolver = vi.fn();
+  it("should supersede the previous batch when the same loop parks a new one (never orphaned)", async () => {
+    const first = parkBatch("conv-overwrite", "tool", ["old"]);
+    parkBatch("conv-overwrite", "tool", ["new"]);
 
-    pendingApprovals.set("conv-overwrite", {
-      resolve: firstResolver,
-      type: "tool",
-      tools: ["old_tool"],
-      toolCalls: [],
-    });
-
-    // In production, ApprovalGate now resolves the existing entry
-    // before setting the new one. This test documents the raw Map behavior.
-    const existingEntry = pendingApprovals.get("conv-overwrite");
-    if (existingEntry) {
-      existingEntry.resolve({ isApproved: false, reason: "superseded" } as never);
-      pendingApprovals.delete("conv-overwrite");
-    }
-
-    pendingApprovals.set("conv-overwrite", {
-      resolve: secondResolver,
-      type: "tool",
-      tools: ["new_tool"],
-      toolCalls: [],
-    });
-
-    const entry = pendingApprovals.get("conv-overwrite");
-    expect(entry!.tools).toContain("new_tool");
-    // First resolver was properly superseded — not orphaned
-    expect(firstResolver).toHaveBeenCalledWith({
-      isApproved: false,
-      reason: "superseded",
-    });
+    expect(ApprovalRegistry.getPending("conv-overwrite")?.toolCalls.map((toolCall) => toolCall.id)).toEqual(["new"]);
+    expect((await first).get("old")).toMatchObject({ decision: "deny", source: "superseded" });
   });
 
-  it("should handle resolving an approval that was already deleted", () => {
-    const resolveFunction = vi.fn();
-    pendingApprovals.set("conv-deleted", {
-      resolve: resolveFunction,
-      type: "tool",
-      tools: ["shell_execute"],
-      toolCalls: [],
-    });
+  it("should answer stale for a call whose batch was already settled", async () => {
+    const batch = parkBatch("conv-deleted", "tool", ["tc-1"]);
+    ApprovalRegistry.cancel("conv-deleted");
+    await batch;
 
-    pendingApprovals.delete("conv-deleted");
-
-    // Trying to retrieve after deletion
-    const entry = pendingApprovals.get("conv-deleted");
-    expect(entry).toBeUndefined();
+    expect(ApprovalRegistry.getPending("conv-deleted")).toBeNull();
+    expect(ApprovalRegistry.decide("conv-deleted", { toolCallId: "tc-1", decision: "allow" }).status).toBe("stale");
   });
 
   it("should store and retrieve a pending question", () => {
@@ -685,15 +644,9 @@ describe("Flow 5: ApprovalRegistry Promise Lifecycle", () => {
   });
 
   it("should isolate approvals from questions with same conversationId", () => {
-    const approvalResolver = vi.fn();
     const questionResolver = vi.fn();
 
-    pendingApprovals.set("conv-shared", {
-      resolve: approvalResolver,
-      type: "tool",
-      tools: ["test"],
-      toolCalls: [],
-    });
+    parkBatch("conv-shared", "tool", ["test"]);
 
     pendingQuestions.set("conv-shared", new Map([["q-1", {
       questionId: "q-1",
@@ -703,12 +656,12 @@ describe("Flow 5: ApprovalRegistry Promise Lifecycle", () => {
       question: "confirm?",
     }]]));
 
-    expect(pendingApprovals.get("conv-shared")).toBeDefined();
+    expect(ApprovalRegistry.getPending("conv-shared")).not.toBeNull();
     expect(pendingQuestions.get("conv-shared")).toBeDefined();
 
     // Clearing one should not affect the other
-    pendingApprovals.delete("conv-shared");
-    expect(pendingApprovals.get("conv-shared")).toBeUndefined();
+    ApprovalRegistry.cancel("conv-shared");
+    expect(ApprovalRegistry.getPending("conv-shared")).toBeNull();
     expect(pendingQuestions.get("conv-shared")).toBeDefined();
   });
 });
@@ -1061,51 +1014,37 @@ describe("Flow 9: ToolContext Dirty Flag for Dynamic Tool Mutation", () => {
 describe("Flow 10: AgenticLoopService Approval API", () => {
 
   afterEach(() => {
-    pendingApprovals.clear();
+    ApprovalRegistry._clearAll();
     pendingQuestions.clear();
   });
 
-  it("should resolve a tool approval and invoke the resolver function", () => {
-    const resolverFunction = vi.fn();
-    pendingApprovals.set("conv-resolve-test", {
-      resolve: resolverFunction,
+  it("should resolve a tool approval through the registry, per call", async () => {
+    const decisions = ApprovalRegistry.waitForDecisions("conv-resolve-test", {
       type: "tool",
-      tools: ["shell_execute"],
-      toolCalls: [],
+      batchId: "batch-resolve",
+      calls: [{ toolCallId: "tc-1", name: "shell_execute", args: {} }],
+      timeoutMilliseconds: 60_000,
     });
 
-    const entry = pendingApprovals.get("conv-resolve-test");
-    expect(entry).toBeDefined();
+    // What AgenticLoopService.decideApproval() does for POST /agent/approve
+    expect(
+      ApprovalRegistry.decide("conv-resolve-test", { toolCallId: "tc-1", decision: "allow" }),
+    ).toMatchObject({ status: "decided", decidedToolCallIds: ["tc-1"] });
 
-    // Simulate AgenticLoopService.resolveApproval()
-    if (entry!.type === "tool") {
-      entry!.resolve({
-        isApproved: true,
-        shouldApproveAll: false,
-        reason: "user_approved",
-      });
-    }
-
-    expect(resolverFunction).toHaveBeenCalledWith({
-      isApproved: true,
-      shouldApproveAll: false,
-      reason: "user_approved",
-    });
+    expect((await decisions).get("tc-1")).toMatchObject({ decision: "allow", source: "user" });
   });
 
-  it("should resolve a plan approval with a boolean", () => {
-    const resolverFunction = vi.fn();
-    pendingApprovals.set("conv-plan-resolve", {
-      resolve: resolverFunction,
+  it("should resolve a plan approval like any other call", async () => {
+    const decisions = ApprovalRegistry.waitForDecisions("conv-plan-resolve", {
       type: "plan",
+      batchId: "batch-plan",
+      calls: [{ toolCallId: "exit-plan", name: "exit_plan_mode", args: { plan: "1. do it" } }],
+      timeoutMilliseconds: 60_000,
     });
 
-    const entry = pendingApprovals.get("conv-plan-resolve");
-    if (entry!.type === "plan") {
-      entry!.resolve(true);
-    }
+    ApprovalRegistry.decide("conv-plan-resolve", { decision: "allow" });
 
-    expect(resolverFunction).toHaveBeenCalledWith(true);
+    expect((await decisions).get("exit-plan")?.decision).toBe("allow");
   });
 
   it("should handle resolving a question with answers", () => {

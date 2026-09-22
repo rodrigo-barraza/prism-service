@@ -62,7 +62,7 @@ The agentic loop is gated on a dedicated REST endpoint:
 | `POST /agent` | ✅ Always on      | ✅ Always on     | Autonomous agent workflows, Agent tab, Lupos |
 | `WS /ws/chat` | Flag-gated        | Flag-gated       | Prism Client real-time chat                        |
 
-`/agent` forces `agenticLoopEnabled: true` and `functionCallingEnabled: true` on every request. Supports SSE streaming (default) and JSON response (`?stream=false` for server-to-server callers like Lupos). Approval endpoint at `POST /agent/approve` resolves pending plan/tool approvals by conversationId.
+`/agent` forces `agenticLoopEnabled: true` and `functionCallingEnabled: true` on every request. Supports SSE streaming (default) and JSON response (`?stream=false` for server-to-server callers like Lupos). Approval endpoint at `POST /agent/approve` decides ONE pending tool or plan call — `{conversationId, toolCallId, decision: "allow"|"deny", reason?, editedArgs?, scope?: "call"|"batch"|"conversation"}` — and fails closed (a missing or non-boolean decision is a 400, an unknown id a 404, an already-decided one a 409). Each `approval_required` event carries `toolCallId`, `batchId`, the tier, the full args and, for file writes, a diff `preview`; the batch proceeds once every call in it is decided (`ApprovalRegistry`, `ApprovalGate`). Scope `"conversation"` persists `approvals.autoApprove` on that conversation document (`ConversationApprovalSettings`), which its later turns start with.
 
 **Files**: `prism/src/routes/agent.js`, `prism/src/routes/chat.js`
 

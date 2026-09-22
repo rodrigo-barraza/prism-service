@@ -15,7 +15,13 @@ const { runAgenticLoopMock } = vi.hoisted(() => ({
 vi.mock('#src/services/AgenticLoopService', () => ({
   default: {
     runAgenticLoop: runAgenticLoopMock,
-    resolveApproval: vi.fn().mockReturnValue(true),
+    decideApproval: vi.fn().mockReturnValue({
+      status: 'decided',
+      type: 'tool',
+      batchId: 'batch-1',
+      decidedToolCallIds: ['tc-1'],
+      remaining: 0,
+    }),
     resolveUserQuestion: vi.fn().mockReturnValue(true),
     getPendingApproval: vi.fn().mockReturnValue({ isPending: false }),
     getPendingQuestion: vi.fn().mockReturnValue({ isPending: false }),

@@ -15,14 +15,10 @@ import AutoApprovalEngine, {
   APPROVAL_TIERS,
 } from "#src/services/AutoApprovalEngine";
 import {
-  pendingApprovals,
+  ApprovalRegistry,
   pendingQuestions,
 } from "#src/services/ApprovalRegistry";
-import type {
-  ApprovalResolution,
-  PendingToolApprovalEntry,
-  QuestionResolution,
-} from "#src/services/ApprovalRegistry";
+import type { QuestionResolution } from "#src/services/ApprovalRegistry";
 import {
   allow,
   deny,
@@ -744,65 +740,41 @@ describe('AutoApprovalEngine adversarial', () => {
 
 describe('ApprovalRegistry adversarial', () => {
   afterEach(() => {
-    pendingApprovals.clear();
+    ApprovalRegistry._clearAll();
     pendingQuestions.clear();
   });
 
-  it('should handle double-resolve of approval — second call is no-op', async () => {
-    let resolveCount = 0;
-    const approvalPromise = new Promise<ApprovalResolution>((resolve) => {
-      pendingApprovals.set('conv-1', {
-        resolve: (value: ApprovalResolution) => {
-          resolveCount++;
-          resolve(value);
-        },
-        type: 'tool',
-        tools: ['execute_shell'],
-        toolCalls: [{ id: 'tc-1', name: 'execute_shell', args: {} }],
-      });
+  function parkOne(loopKey: string, toolCallId: string) {
+    return ApprovalRegistry.waitForDecisions(loopKey, {
+      type: 'tool',
+      batchId: `batch-${loopKey}`,
+      calls: [{ toolCallId, name: 'execute_shell', args: {} }],
+      timeoutMilliseconds: 60_000,
     });
+  }
 
-    const entry = pendingApprovals.get('conv-1')! as PendingToolApprovalEntry;
-    entry.resolve({ isApproved: true });
-    entry.resolve({ isApproved: false }); // Double resolve
-
-    const result = await approvalPromise;
-    expect(result.isApproved).toBe(true);
-    // The promise resolved with the first value; second is ignored by Promise semantics
-    expect(resolveCount).toBe(2); // Both calls execute but only first matters
+  it('should treat a double decision as stale — the first one stands', async () => {
+    const decisions = parkOne('conv-1', 'tc-1');
+    expect(ApprovalRegistry.decide('conv-1', { toolCallId: 'tc-1', decision: 'allow' }).status).toBe('decided');
+    expect(ApprovalRegistry.decide('conv-1', { toolCallId: 'tc-1', decision: 'deny' }).status).toBe('stale');
+    expect((await decisions).get('tc-1')?.decision).toBe('allow');
   });
 
-  it('should handle approval for non-existent conversationId — map.get returns undefined', () => {
-    const entry = pendingApprovals.get('nonexistent-conv');
-    expect(entry).toBeUndefined();
+  it('should answer not_found for a conversation with nothing pending', () => {
+    expect(ApprovalRegistry.decide('nonexistent-conv', { decision: 'allow' })).toEqual({ status: 'not_found' });
   });
 
-  it('should handle concurrent approvals for different conversations', () => {
-    const results: Array<{ conversationId: string; isApproved: boolean }> = [];
+  it('should keep concurrent approvals of different conversations apart', async () => {
+    const decisionsA = parkOne('conv-a', 'tc-a');
+    const decisionsB = parkOne('conv-b', 'tc-b');
 
-    pendingApprovals.set('conv-a', {
-      resolve: (value: ApprovalResolution) => results.push({ conversationId: 'conv-a', ...value }),
-      type: 'tool',
-      tools: ['tool1'],
-      toolCalls: [],
-    });
+    // A decision addressed to conversation A's call id under B's key finds nothing.
+    expect(ApprovalRegistry.decide('conv-b', { toolCallId: 'tc-a', decision: 'allow' }).status).toBe('not_found');
+    ApprovalRegistry.decide('conv-b', { toolCallId: 'tc-b', decision: 'deny' });
+    ApprovalRegistry.decide('conv-a', { toolCallId: 'tc-a', decision: 'allow' });
 
-    pendingApprovals.set('conv-b', {
-      resolve: (value: ApprovalResolution) => results.push({ conversationId: 'conv-b', ...value }),
-      type: 'tool',
-      tools: ['tool2'],
-      toolCalls: [],
-    });
-
-    // Resolve in reverse order
-    const entryB = pendingApprovals.get('conv-b')! as PendingToolApprovalEntry;
-    const entryA = pendingApprovals.get('conv-a')! as PendingToolApprovalEntry;
-    entryB.resolve({ isApproved: false });
-    entryA.resolve({ isApproved: true });
-
-    expect(results.length).toBe(2);
-    expect(results[0].conversationId).toBe('conv-b');
-    expect(results[1].conversationId).toBe('conv-a');
+    expect((await decisionsA).get('tc-a')?.decision).toBe('allow');
+    expect((await decisionsB).get('tc-b')?.decision).toBe('deny');
   });
 
   it('should handle question resolution with null answers', () => {
@@ -822,15 +794,11 @@ describe('ApprovalRegistry adversarial', () => {
     expect(receivedResolution!.answers).toBeNull();
   });
 
-  it('should clean up stale entries — Map.delete removes dangling resolvers', () => {
-    pendingApprovals.set('stale-conv', {
-      resolve: () => {},
-      type: 'plan',
-    } as unknown as import('../ApprovalRegistry.ts').PendingToolApprovalEntry);
-
-    expect(pendingApprovals.has('stale-conv')).toBe(true);
-    pendingApprovals.delete('stale-conv');
-    expect(pendingApprovals.has('stale-conv')).toBe(false);
+  it('should leave no dangling waiter once the turn ends', async () => {
+    const decisions = parkOne('stale-conv', 'tc-1');
+    ApprovalRegistry.cancel('stale-conv');
+    expect((await decisions).get('tc-1')).toMatchObject({ decision: 'deny', source: 'turn_ended' });
+    expect(ApprovalRegistry.getPending('stale-conv')).toBeNull();
   });
 });
 

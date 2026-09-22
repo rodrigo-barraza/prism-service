@@ -10,7 +10,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { runGraphOfThoughts } from "#src/services/harnesses/strategies/GraphOfThoughtsStrategy";
 import { runTreeOfThoughts } from "#src/services/harnesses/strategies/TreeOfThoughtsStrategy";
-import { pendingApprovals } from "#src/services/ApprovalRegistry";
+import { ApprovalRegistry } from "#src/services/ApprovalRegistry";
 import { invalidateHookCache } from "#src/services/hooks/ConfiguredHookRegistry";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import type { ConfiguredHookDocument } from "#src/services/hooks/types";
@@ -135,8 +135,10 @@ function buildBranchingHarness(passFor: (iteration: number) => { text: string; t
   const emit = vi.fn((event: Record<string, unknown>) => {
     if (event.type === "approval_required") {
       setTimeout(() => {
-        const entry = pendingApprovals.get("branching-conv");
-        if (entry && entry.type === "tool") entry.resolve({ isApproved: true });
+        ApprovalRegistry.decide("branching-conv", {
+          toolCallId: event.toolCallId as string,
+          decision: "allow",
+        });
       }, 0);
     }
   });
@@ -230,7 +232,7 @@ describe.each([
     vi.clearAllMocks();
     invalidateHookCache();
     TurnInputMailbox._clearAll();
-    pendingApprovals.clear();
+    ApprovalRegistry._clearAll();
     hookState.configured = [];
     hookState.recorded = [];
     hookState.executed = [];

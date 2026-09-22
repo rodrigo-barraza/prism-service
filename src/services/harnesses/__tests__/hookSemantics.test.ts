@@ -19,7 +19,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import ReActHarness from "../ReActHarness.ts";
 import AgenticLoopState from "#src/services/AgenticLoopState";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
-import { pendingApprovals } from "#src/services/ApprovalRegistry";
+import { ApprovalRegistry } from "#src/services/ApprovalRegistry";
 import { invalidateHookCache } from "#src/services/hooks/ConfiguredHookRegistry";
 import HookSessionTracker, {
   _resetSessionsForTests,
@@ -298,15 +298,12 @@ function buildHarness(
   const emit = vi.fn((event: Record<string, unknown>) => {
     eventLog.push(String(event.type));
     if (event.type === "approval_required") {
+      // One card per call: answer each by its toolCallId (per-call approvals).
       setTimeout(() => {
-        const entry = pendingApprovals.get(conversationId);
-        if (entry && entry.type === "tool") {
-          entry.resolve(
-            hookState.approve
-              ? { isApproved: true }
-              : { isApproved: false, reason: "user_rejected" },
-          );
-        }
+        ApprovalRegistry.decide(conversationId, {
+          toolCallId: event.toolCallId as string,
+          decision: hookState.approve ? "allow" : "deny",
+        });
       }, 0);
     }
   });
@@ -431,7 +428,7 @@ describe("configured hooks — B9 semantics against a real ReActHarness", () => 
     vi.clearAllMocks();
     invalidateHookCache();
     TurnInputMailbox._clearAll();
-    pendingApprovals.clear();
+    ApprovalRegistry._clearAll();
     hookState.configured = [];
     hookState.recorded = [];
     hookState.executed = [];
@@ -578,7 +575,7 @@ describe("configured hooks — the new events fire once, at the right moment", (
     vi.clearAllMocks();
     invalidateHookCache();
     TurnInputMailbox._clearAll();
-    pendingApprovals.clear();
+    ApprovalRegistry._clearAll();
     _resetSessionsForTests();
     hookState.configured = [];
     hookState.recorded = [];
@@ -943,7 +940,7 @@ describe("configured hooks — async", () => {
     vi.clearAllMocks();
     invalidateHookCache();
     TurnInputMailbox._clearAll();
-    pendingApprovals.clear();
+    ApprovalRegistry._clearAll();
     _resetSessionsForTests();
     hookState.configured = [];
     hookState.recorded = [];

@@ -6,12 +6,16 @@ import AgenticToolResolver from "./AgenticToolResolver.ts";
 import AgenticLoopState from "./AgenticLoopState.ts";
 import HarnessRegistry from "./harnesses/HarnessRegistry.ts";
 import {
-  pendingApprovals,
+  ApprovalRegistry,
   pendingQuestions,
+  type ApprovalDecisionInput,
+  type ApprovalDecisionOutcome,
   type PendingToolCallSummary,
   type QuestionDefinition,
   type QuestionAnswer,
 } from "./ApprovalRegistry.ts";
+import ConversationApprovalSettings from "./ConversationApprovalSettings.ts";
+import { resolveLoopKey } from "./LoopKey.ts";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import ConversationGenerationTracker from "./ConversationGenerationTracker.ts";
 import ConversationStatusRegistry from "./ConversationStatusRegistry.ts";
@@ -180,6 +184,24 @@ export default class AgenticLoopService {
       }
     }
 
+    // "Auto-approve this conversation" (an approval card's conversation
+    // scope) is persisted on the conversation, so it holds for every later
+    // turn of it — and of no other. Root turns only: a sub-agent inherits
+    // its parent's approval mode through its options.
+    if (
+      !options.autoApprove &&
+      !options.isSubAgent &&
+      !context.isNewConversation &&
+      conversationId &&
+      (await ConversationApprovalSettings.isAutoApproveEnabled(
+        conversationId,
+        project,
+        username,
+      ))
+    ) {
+      options.autoApprove = true;
+    }
+
     // 2. Initialize shared state
     const state = new AgenticLoopState({
       originalMessageCount: messages.length,
@@ -268,7 +290,7 @@ export default class AgenticLoopService {
       ToolContext.cleanupInMemory(resolvedAgentConversationId);
 
       // Clean up in-memory state keyed by conversationId (client-facing)
-      pendingApprovals.delete(conversationId);
+      ApprovalRegistry.cancel(resolveLoopKey(context));
       pendingQuestions.delete(conversationId);
       TurnInputMailbox.close(conversationId);
 
@@ -295,45 +317,33 @@ export default class AgenticLoopService {
   }
 
   // ── Approval Resolution API ─────────────────────────────
-  // Keyed by conversationId — the client-facing conversation identifier.
-  // Only one agentic run is active per conversation at a time, so there
-  // is no collision risk.
+  // Keyed by the loop key (resolveLoopKey) — for a root turn, the
+  // client-facing conversation id. One decision per tool call.
 
-  /** Resolve a pending approval for a conversation. */
-  static resolveApproval(
+  /** Apply the user's decision for one pending call (POST /agent/approve). */
+  static decideApproval(
     conversationId: string,
-    isApproved: boolean,
-    { shouldApproveAll = false }: { shouldApproveAll?: boolean } = {},
-  ): boolean {
-    const entry = pendingApprovals.get(conversationId);
-    if (!entry) return false;
-
-    if (entry.type === "plan") {
-      entry.resolve(isApproved);
-    } else {
-      entry.resolve({
-        isApproved,
-        shouldApproveAll,
-        reason: isApproved ? "user_approved" : "user_rejected",
-      });
-    }
-    return true;
+    input: ApprovalDecisionInput,
+  ): ApprovalDecisionOutcome {
+    return ApprovalRegistry.decide(resolveLoopKey({ conversationId }), input);
   }
 
-  /** Check if a conversation has a pending approval. */
+  /** The calls still waiting for a decision on a conversation's running turn. */
   static getPendingApproval(conversationId: string): {
     isPending: boolean;
     type?: string;
+    batchId?: string;
     tools?: string[];
     toolCalls?: PendingToolCallSummary[];
   } {
-    const entry = pendingApprovals.get(conversationId);
-    if (!entry) return { isPending: false };
+    const pending = ApprovalRegistry.getPending(resolveLoopKey({ conversationId }));
+    if (!pending || pending.toolCalls.length === 0) return { isPending: false };
     return {
       isPending: true,
-      type: entry.type,
-      tools: entry.tools,
-      toolCalls: entry.toolCalls,
+      type: pending.type,
+      batchId: pending.batchId,
+      tools: pending.toolCalls.map((toolCall) => toolCall.name),
+      toolCalls: pending.toolCalls,
     };
   }
 

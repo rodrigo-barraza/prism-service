@@ -21,9 +21,12 @@ import {
   attachConfiguredHooks,
 } from "./lifecycle/HookInitializer.ts";
 import { executeToolBatch } from "./lifecycle/ToolExecutor.ts";
-import { checkAndWaitForApproval } from "./lifecycle/ApprovalGate.ts";
 import {
-  buildDeniedToolResult,
+  approvalRecordFor,
+  checkAndWaitForApproval,
+  orderResultsLikeCalls,
+} from "./lifecycle/ApprovalGate.ts";
+import {
   buildStopContinuationMessage,
   closeTurnHooks,
   fireInstructionsLoaded,
@@ -732,53 +735,33 @@ export default class ReActHarness extends BaseAgenticHarness {
             state,
           );
 
-          const { isApproved, shouldApproveAll, deniedToolCalls = [] } =
+          const { executableToolCalls, blockedResults, shouldApproveAll } =
             await checkAndWaitForApproval(
               preToolUse.executable,
               context,
               approvalEngine,
-              hooks,
+              { toolSchemas: this.tools.finalTools, hooks },
             );
+          if (shouldApproveAll) options.autoApprove = true;
 
-          // Denied calls (rule or PermissionRequest hook) are terminal —
-          // never executed, never approvable.
-          const deniedIds = new Set(deniedToolCalls.map((toolCall) => toolCall.id));
-          const deniedResults: ToolResult[] = [
-            ...deniedToolCalls.map(buildDeniedToolResult),
-            ...preToolUse.blocked,
-          ];
-          const executableToolCalls = preToolUse.executable.filter(
-            (toolCall) => !deniedIds.has(toolCall.id),
+          // Denied calls (rule, PreToolUse or PermissionRequest hook, the
+          // user) never run; every call the gate cleared runs in one batch.
+          // Results keep the model's order.
+          context._currentMessages = currentMessages;
+          const executedResults =
+            executableToolCalls.length > 0
+              ? await executeToolBatch(
+                  executableToolCalls,
+                  context,
+                  this.tools,
+                  hooks,
+                  state,
+                )
+              : [];
+          const results: ToolResult[] = orderResultsLikeCalls(
+            pass.pendingToolCalls,
+            [...executedResults, ...blockedResults, ...preToolUse.blocked],
           );
-
-          let results: ToolResult[] = [];
-          if (!isApproved) {
-            results = [
-              ...executableToolCalls.map((toolCall) => ({
-                name: toolCall.name,
-                id: toolCall.id,
-                result: {
-                  success: false,
-                  error: "USER_REJECTED",
-                  message: "Tool execution was manually rejected by the user.",
-                },
-              })),
-              ...deniedResults,
-            ];
-          } else {
-            if (shouldApproveAll) options.autoApprove = true;
-            context._currentMessages = currentMessages;
-            results = [
-              ...(await executeToolBatch(
-                executableToolCalls,
-                context,
-                this.tools,
-                hooks,
-                state,
-              )),
-              ...deniedResults,
-            ];
-          }
 
           await processToolResultMedia(
             pass.pendingToolCalls,
@@ -830,6 +813,7 @@ export default class ReActHarness extends BaseAgenticHarness {
                   reasoningItem: tc.reasoningItem,
                   result: res ? res.result : null,
                   durationMilliseconds: res?.durationMilliseconds,
+                  ...approvalRecordFor(tc),
                 };
               }),
             });
@@ -882,6 +866,7 @@ export default class ReActHarness extends BaseAgenticHarness {
                 reasoningItem: tc.reasoningItem,
                 result: res ? res.result : null,
                 durationMilliseconds: res?.durationMilliseconds,
+                ...approvalRecordFor(tc),
               };
             }),
           };
