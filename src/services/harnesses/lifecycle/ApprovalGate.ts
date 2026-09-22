@@ -40,7 +40,8 @@ import { buildDeniedToolResult, firePermissionDenied } from "./TurnHooks.ts";
  *   2. `Notification` fires once — the loop is about to go idle on a person;
  *   3. the cards go out and the gate waits.
  * `PermissionDenied` fires for every call denied along the way (rule, hook,
- * user). A batch that needs nobody fires none of this.
+ * user) and every card that lapsed unanswered (timeout, superseded,
+ * turn_ended). A batch that needs nobody fires none of this.
  *
  * Reusable by any harness that executes write/danger-tier tools.
  */
@@ -453,7 +454,8 @@ export async function checkAndWaitForApproval(
       };
       declinedNames.push(toolCall.name);
       blockedResults.push(userDeclinedResult(toolCall, declined as ToolCallDecision, locale));
-      await firePermissionDenied(hooks, context, toolCall, "user", declined.reason || reason);
+      // Only a person's "no" is the user's; a lapsed card names how it lapsed.
+      await firePermissionDenied(hooks, context, toolCall, declined.source, declined.reason || reason);
     }
   }
 

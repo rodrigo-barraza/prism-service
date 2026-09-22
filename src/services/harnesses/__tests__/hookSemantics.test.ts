@@ -39,8 +39,8 @@ const hookState = vi.hoisted(() => ({
   recorded: [] as Array<Record<string, unknown>>,
   decide: (_payload: Record<string, unknown>): Record<string, unknown> => ({}),
   executed: [] as Array<{ name: string; args: Record<string, unknown> }>,
-  /** How the automatic approver answers a card. */
-  approve: true,
+  /** How the automatic approver answers a card; "lapse" ends the turn's wait unanswered. */
+  approve: true as boolean | "lapse",
   /** What the system-prompt assembler stub reports as loaded. */
   loadedInstructions: undefined as unknown,
   /** The conversation document the model-switch check reads. */
@@ -296,6 +296,10 @@ function buildHarness(
     if (event.type === "approval_required") {
       // One card per call: answer each by its toolCallId (per-call approvals).
       setTimeout(() => {
+        if (hookState.approve === "lapse") {
+          ApprovalRegistry.cancel(conversationId);
+          return;
+        }
         ApprovalRegistry.decide(conversationId, {
           toolCallId: event.toolCallId as string,
           decision: hookState.approve ? "allow" : "deny",
@@ -748,6 +752,19 @@ describe("configured hooks — the new events fire once, at the right moment", (
     await settle();
     expect(recordedFor("PermissionDenied")).toEqual([
       expect.objectContaining({ denied_by: "user", reason: "user_rejected" }),
+    ]);
+
+    // Nobody answered: the card lapsed — not the user's "no".
+    hookState.recorded = [];
+    hookState.approve = "lapse";
+    const lapsed = buildHarness([
+      { kind: "tool", calls: [{ name: "write_file", args: { path: "z", content: "" } }] },
+      { kind: "text", text: "done" },
+    ]);
+    await lapsed.harness.run();
+    await settle();
+    expect(recordedFor("PermissionDenied")).toEqual([
+      expect.objectContaining({ denied_by: "turn_ended", reason: "turn_ended", tool_name: "write_file" }),
     ]);
   });
 

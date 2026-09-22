@@ -17,6 +17,7 @@ import { HOOK_EVENTS } from "#src/services/hooks/types";
 import type { HookEventName } from "#src/services/hooks/types";
 import HookSessionTracker from "#src/services/hooks/HookSessionTracker";
 import type AgentHooks from "#src/services/AgentHooks";
+import type { ApprovalDecisionSource } from "#src/services/ApprovalRegistry";
 import type { TransformedHookResult } from "#src/services/AgentHooks";
 import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type {
@@ -479,12 +480,16 @@ export function buildDeniedToolResult(toolCall: ToolCall): ToolResult {
   };
 }
 
-/** `PermissionDenied` — a rule, the classifier, a hook or the user said no. */
+/**
+ * `PermissionDenied` — a rule, the classifier, a hook or the user said no,
+ * or the approval lapsed unanswered: `timeout`, `superseded` (a newer batch
+ * replaced it) or `turn_ended` (the turn stopped while it waited).
+ */
 export async function firePermissionDenied(
   hooks: AgentHooks | undefined,
   context: AgenticContext,
   toolCall: ToolCall,
-  deniedBy: "rule" | "classifier" | "hook" | "user",
+  deniedBy: "rule" | "classifier" | "hook" | ApprovalDecisionSource,
   reason: string,
 ): Promise<void> {
   if (!hooks) return;
