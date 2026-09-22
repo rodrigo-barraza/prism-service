@@ -1,6 +1,9 @@
 import { formatBytes } from "@rodrigo-barraza/utilities-library";
 import { MODALITY_TYPES } from "#src/config";
-import { detectCapabilities } from "./detectCapabilities.ts";
+import {
+  detectCapabilities,
+  detectOllamaCapabilities,
+} from "./detectCapabilities.ts";
 import {
   parseParamsFromName,
   parseQuantFromName,
@@ -68,11 +71,12 @@ export function normalizeLmStudioModel(raw: LmStudioRawModel): ModelEntry {
 
 /**
  * Normalize an Ollama model into a canonical model entry.
- * Ollama's /api/tags returns { name, model, size, details: { family, parameter_size, ... } }.
+ * Ollama's /api/tags returns { name, model, size, details: { family, parameter_size, ... } };
+ * the provider's listModels adds `ollamaCapabilities` from /api/show.
  */
 export function normalizeOllamaModel(raw: OllamaRawModel): ModelEntry {
-  const name = raw.model || raw.name || "";
-  const capabilities = detectCapabilities(name);
+  const name = raw.model || raw.name || raw.key || "";
+  const capabilities = detectOllamaCapabilities(name, raw.ollamaCapabilities);
   const details = raw.details || {};
 
   const entry: ModelEntry = {

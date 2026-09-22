@@ -618,12 +618,16 @@ describe('Feature Routes Integration Tests', () => {
     });
 
     it('Answer endpoint', async () => {
+      const { default: AgenticLoopService } = await import('#src/services/AgenticLoopService');
+      vi.mocked(AgenticLoopService.resolveUserQuestion).mockReturnValueOnce({
+        resolved: true, questionId: 'q-1', blocking: true, loopKey: 'conv-123', matchedBy: 'loop_key',
+      });
       const response = await request(app)
         .post('/agent-test/answer')
         .send({ conversationId: 'conv-123', answer: 'my answer' })
         .expect(200);
 
-      expect(response.body).toHaveProperty('ok', true);
+      expect(response.body).toMatchObject({ ok: true, questionId: 'q-1' });
     });
 
     it('Streaming agent endpoint', async () => {

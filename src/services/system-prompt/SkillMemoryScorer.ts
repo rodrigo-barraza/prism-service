@@ -62,9 +62,11 @@ export class SkillMemoryScorer {
         return { memoriesText: "", injectedMemoryIds: [] };
       }
 
+      // The exclusion set holds strings; `Set.has` compares by identity, so
+      // an id that is still an ObjectId would never match. Compare by value.
       const novelMemories = excludeMemoryIds?.size
         ? memories.filter(
-            (memory) => memory && !excludeMemoryIds.has(memory.id as string),
+            (memory) => memory && !excludeMemoryIds.has(String(memory.id)),
           )
         : memories.filter((memory) => !!memory);
 
@@ -92,8 +94,8 @@ export class SkillMemoryScorer {
         selectedMemories = [...anchors, ...rotating.slice(0, 3)];
       }
 
-      const injectedMemoryIds = selectedMemories.map(
-        (memory) => memory.id as string,
+      const injectedMemoryIds = selectedMemories.map((memory) =>
+        String(memory.id),
       );
       const memoriesText = MemoryService.formatForPrompt(selectedMemories, {
         plainCaveats: conversationalStyle === true,
