@@ -159,6 +159,8 @@ export function requestWorkspaceRestore(
     workspaceRoot: string;
     ref: string;
     againstRef?: string | null;
+    /** The agent's own changes since `ref` — the restore touches only these paths. */
+    agentRanges?: Array<{ from: string; to: string | null }>;
     force?: boolean;
     dryRun?: boolean;
   },
