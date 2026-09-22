@@ -43,10 +43,13 @@ import {
   finalizeTextGeneration,
   type FinalizerContext,
   type DeferredDoneEvent,
-  computeNewTurnMessages,
   sanitizeMessagesForPersistence,
   getCollectionOpts,
 } from "./lifecycle/Finalizer.ts";
+import {
+  syncTurnTranscript,
+  collectTurnMessages,
+} from "./lifecycle/TurnTranscript.ts";
 import { routeStreamChunk } from "./lifecycle/StreamChunkRouter.ts";
 import { substituteToolOutputTokens } from "./lifecycle/ToolOutputSubstituter.ts";
 import logger from "#src/utils/logger";
@@ -125,6 +128,13 @@ export default class BaseAgenticHarness {
 
   /** Most recently registered tracker request id for this harness. */
   private lastTrackerRequestId: string | null = null;
+
+  /** estimateRequestOverheadTokens() memo, keyed by prompt text and tool-set identity. */
+  private requestOverheadCache: {
+    systemPromptText: string;
+    toolSchemas: unknown[];
+    tokens: number;
+  } | null = null;
 
   constructor(
     context: AgenticContext,
@@ -463,13 +473,23 @@ export default class BaseAgenticHarness {
 
   // ── Context window enforcement ───────────────────────────
 
-  /** Enforce token budget on messages before sending to provider. */
+  /**
+   * Enforce token budget on messages before sending to provider — the
+   * lossy last resort after ContextPressureManager's summarization, which
+   * left the reason it could not keep the request under budget on
+   * `state.truncationReason`.
+   */
   enforceContextWindow(
     messages: ConversationMessage[],
     toolCount: number,
   ): ConversationMessage[] {
     const { modelDefinition, options = {}, emit } = this.context;
     const preEnforceCount = messages.length;
+    // Truncation may drop or cap messages of the current turn — record
+    // them in the turn transcript first so persistence keeps them whole.
+    syncTurnTranscript(this.context, this.state, messages);
+    const truncationReason = this.state.truncationReason;
+    this.state.truncationReason = null;
     const contextResult = ContextWindowManager.enforce(
       messages as ChatMessage[],
       {
@@ -479,6 +499,10 @@ export default class BaseAgenticHarness {
           DEFAULT_MAX_INPUT_TOKENS,
         maxOutputTokens: options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS,
         toolCount,
+        fixedOverheadTokens: this.estimateRequestOverheadTokens(),
+        providerInputBaseline: this.state.providerInputBaseline,
+        calibrationRatio: options._inputCalibrationRatio as number | undefined,
+        truncationReason: truncationReason || undefined,
         locale: options?.locale as string | undefined || DEFAULT_LOCALE,
       },
     );
@@ -503,6 +527,34 @@ export default class BaseAgenticHarness {
       return contextResult.messages as unknown as ConversationMessage[];
     }
     return messages;
+  }
+
+  /**
+   * System prompt + tool schema tokens the next request carries besides the
+   * messages (chars/4) — part of the compaction trigger's estimate until the
+   * provider reports real usage, and carved out of the truncation budget.
+   * Cached while the prompt and the tool set are unchanged.
+   */
+  estimateRequestOverheadTokens(): number {
+    const systemPromptText =
+      (this.context.options?.systemPrompt as string | undefined) || "";
+    const toolSchemas = this.tools.finalTools;
+    const cached = this.requestOverheadCache;
+    if (
+      cached &&
+      cached.systemPromptText === systemPromptText &&
+      cached.toolSchemas === toolSchemas
+    ) {
+      return cached.tokens;
+    }
+    const { systemPromptTokens, toolSchemaTokens } =
+      ContextBudgetTracker.estimateFixedOverhead(systemPromptText, toolSchemas);
+    this.requestOverheadCache = {
+      systemPromptText,
+      toolSchemas,
+      tokens: systemPromptTokens + toolSchemaTokens,
+    };
+    return systemPromptTokens + toolSchemaTokens;
   }
 
   // ── Provider stream creation ──────────────────────────────
@@ -1408,10 +1460,10 @@ export default class BaseAgenticHarness {
     const { conversationId, project, username, agent } = this.context;
     if (!conversationId) return;
     try {
-      const newTurnMessages = computeNewTurnMessages(
-        this.context.messages,
+      const newTurnMessages = collectTurnMessages(
+        this.context,
+        this.state,
         currentMessages,
-        this.state.originalMessageCount,
       );
       const sanitizedMessages = sanitizeMessagesForPersistence(
         newTurnMessages as MessagePayload[],
@@ -1470,13 +1522,15 @@ export default class BaseAgenticHarness {
     const { cleanSegments, cleanTextFragments, cleanThinkingFragments } =
       state.getCleanDisplayData();
 
-    // If the last message of the original context was already persisted (e.g. background timer reminder or scheduled task),
-    // we slice from originalMessageCount so we don't append it again. Otherwise, we slice from
-    // originalMessageCount - 1 to capture the user's triggering message for this turn.
-    const newTurnMessages = computeNewTurnMessages(
-      context.messages,
+    // The turn's messages, verbatim — from the turn transcript, which
+    // compaction, offload and truncation of the view never reach
+    // (lifecycle/TurnTranscript.ts). Before the first context-pressure
+    // boundary this is the classic slice: from originalMessageCount (or one
+    // before it, to capture the triggering user message) of the view.
+    const newTurnMessages = collectTurnMessages(
+      context,
+      state,
       currentMessages,
-      state.originalMessageCount,
     );
 
     // Verbatim tool-output substitution ({{tool_output:field}} → exact tool
@@ -1546,6 +1600,7 @@ export default class BaseAgenticHarness {
         ...(state.providerResponseId && { providerResponseId: state.providerResponseId }),
         ...(state.thinkingBlocks && state.thinkingBlocks.length > 0 && { thinkingBlocks: state.thinkingBlocks }),
         ...(state.refusal && { refusal: state.refusal }),
+        compactionBoundary: state.compactionBoundary,
       },
       newTurnMessages as MessagePayload[],
       finalizeOptions,

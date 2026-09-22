@@ -151,6 +151,8 @@ describe("TreeOfThoughtsStrategy", () => {
       frontierCandidates: [],
       toolErrorCounts: new Map(),
       streamedToolCalls: [],
+      turnTranscript: null,
+      turnTranscriptSeen: new WeakSet(),
     };
 
     mockHarnessInstance = {
@@ -163,6 +165,7 @@ describe("TreeOfThoughtsStrategy", () => {
         resolvedEnabledTools: ["read_file"],
       },
       enforceContextWindow: vi.fn().mockImplementation((messages) => messages),
+      estimateRequestOverheadTokens: vi.fn().mockReturnValue(0),
       createPassState: vi.fn().mockImplementation((options) => ({
         streamedText: "Thought branch output",
         finalStreamedText: "Thought branch output",

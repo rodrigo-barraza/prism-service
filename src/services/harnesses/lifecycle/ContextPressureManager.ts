@@ -3,7 +3,12 @@ import { errorMessage } from "@rodrigo-barraza/utilities-library";
 
 import MicroCompactionService from "#src/services/compact/MicroCompactionService";
 import AutoCompactionTrigger from "#src/services/compact/AutoCompactionTrigger";
-import CompactionService from "#src/services/compact/CompactionService";
+import { shrinkContext } from "#src/services/compact/ContextShrinkStrategy";
+import {
+  computeContextBudgets,
+  estimateRequestInputTokens,
+} from "#src/services/compact/ContextBudgets";
+import type { CompactionSkipReason } from "#src/services/compact/CompactionService";
 import ConversationEmbeddingService from "#src/services/ConversationEmbeddingService";
 import ContextWindowManager from "#src/services/ContextWindowManager";
 import {
@@ -13,6 +18,7 @@ import {
 import { HARNESS, COMPACTION } from "#src/constants";
 import { evaluateCompactionDeferral } from "./CompactionDeferralGuard.ts";
 import { maybeInjectContextLedger } from "./ContextLedgerInjector.ts";
+import { syncTurnTranscript } from "./TurnTranscript.ts";
 import { buildHookPayload } from "#src/services/hooks/buildPayload";
 import { HOOK_EVENTS } from "#src/services/hooks/types";
 import type AgentHooks from "#src/services/AgentHooks";
@@ -47,7 +53,25 @@ import type { ConversationMessage, AgenticContext } from "#src/services/harnesse
  *
  *   3. Compaction summary persistence — when auto-compaction fires,
  *      persists the summary text to ConversationEmbeddingService
- *      as a free embedding source (no additional LLM call needed).
+ *      as a free embedding source (no additional LLM call needed),
+ *      and keeps the compaction boundary on the loop state for the
+ *      Finalizer to persist (the next turn loads through it).
+ *
+ * The token count every step reads is the whole next REQUEST: the
+ * previous model call's provider-reported input (cache included) plus the
+ * growth of the message array since, or — before any report — chars/4 of
+ * the messages plus the system prompt and tool schemas
+ * (ContextBudgets.estimateRequestInputTokens).
+ *
+ * Summarization comes before lossy truncation: the pipeline records on
+ * `state.truncationReason` why it did not bring the request under budget,
+ * and ContextWindowManager (run next, from the same ContextBudgets)
+ * truncates only above a budget that never sits below the compaction
+ * threshold — logging that reason when it does.
+ *
+ * Before anything shrinks, the turn transcript records the messages the
+ * turn produced (TurnTranscript.ts) — the view may lose them, persistence
+ * never does.
  *
  * Extracted from ReActHarness (lines 244–341) to eliminate ~80 lines
  * of duplicated inline code across all harness implementations.
@@ -58,6 +82,25 @@ const CONTEXT_PRESSURE_THRESHOLD = HARNESS.CONTEXT_PRESSURE_THRESHOLD;
 interface ContextPressureResult {
   messages: ConversationMessage[];
   tokenEstimate: number;
+}
+
+/** Why summarization did not keep the request under budget — for the truncation log. */
+function describeSkippedCompaction(skipReason: CompactionSkipReason | null): string {
+  switch (skipReason) {
+    case "breaker_open":
+      return "compaction breaker open for this conversation";
+    case "failed":
+      return "compaction failed (utility model error or no summary)";
+    case "nothing_to_summarize":
+      return "compaction impossible: nothing older than the protected recent window";
+    case "did_not_shrink":
+    case "no_shrink_cooldown":
+      return "compaction impossible: a summary does not shrink this history";
+    case "no_model":
+      return "compaction impossible: no utility model resolves";
+    default:
+      return "compaction produced no result";
+  }
 }
 
 /**
@@ -72,6 +115,8 @@ export async function manageContextPressure(
   state: AgenticLoopState,
   harnessLabel: string,
   hooks?: AgentHooks,
+  /** System prompt + tool schema tokens the request carries besides the messages. */
+  requestOverheadTokens = 0,
 ): Promise<ContextPressureResult> {
   const { emit, signal } = context;
   const contextWindowSize =
@@ -81,11 +126,28 @@ export async function manageContextPressure(
   const maxOutputTokens =
     context.options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS;
   const availableInputBudget = contextWindowSize - maxOutputTokens;
+  const budgets = computeContextBudgets(contextWindowSize, maxOutputTokens);
+
+  // Everything the turn produced so far is recorded before any layer below
+  // can replace or drop it from the view.
+  syncTurnTranscript(context, state, currentMessages);
 
   let messages = currentMessages;
-  let currentTokenEstimate = ContextWindowManager.estimateTokens(
-    messages as ChatMessage[],
-  );
+  const estimateRequest = () =>
+    estimateRequestInputTokens({
+      messageTokens: ContextWindowManager.estimateTokens(
+        messages as ChatMessage[],
+      ),
+      overheadTokens: requestOverheadTokens,
+      baseline: state.providerInputBaseline,
+      // Measured on an earlier turn of this conversation — calibrates the
+      // first call's estimate, before this turn has a report of its own.
+      calibrationRatio: context.options?._inputCalibrationRatio as
+        | number
+        | undefined,
+    }).tokens;
+  let currentTokenEstimate = estimateRequest();
+  state.truncationReason = `compaction not triggered (${currentTokenEstimate} request tokens, threshold ${budgets.autoCompactThreshold})`;
 
   // ── 0. Deferral guard (rubric-gated compaction, survey A1) ──
   // The pressure threshold is permission to compact, not a command:
@@ -141,9 +203,7 @@ export async function manageContextPressure(
     );
     if (microCompactionResult.clearedResultCount > 0) {
       messages = microCompactionResult.messages as ConversationMessage[];
-      currentTokenEstimate = ContextWindowManager.estimateTokens(
-        messages as ChatMessage[],
-      );
+      currentTokenEstimate = estimateRequest();
       logger.info(
         `[${harnessLabel}] Micro-compaction at ${(contextPressureRatio * 100).toFixed(0)}% context pressure — ` +
           `evicted ${microCompactionResult.clearedResultCount} results ` +
@@ -179,6 +239,14 @@ export async function manageContextPressure(
       `[${harnessLabel}] Auto-compaction deferred (${deferral.reason}) at ` +
         `${currentTokenEstimate} tokens — will force at ${Math.round(autoCompactForceThreshold)}`,
     );
+    state.truncationReason = `compaction deferred (${deferral.reason})`;
+  }
+
+  if (
+    !autoCompactEvaluation.shouldCompact &&
+    currentTokenEstimate >= autoCompactEvaluation.threshold
+  ) {
+    state.truncationReason = `compaction impossible: fewer than ${COMPACTION.MINIMUM_MESSAGES_FOR_COMPACTION} messages to summarize`;
   }
 
   if (autoCompactEvaluation.shouldCompact && !autoCompactDeferred) {
@@ -202,7 +270,7 @@ export async function manageContextPressure(
       );
     }
 
-    const compactionResult = await CompactionService.compactConversation(
+    const { result: compactionResult, skipReason } = await shrinkContext(
       messages as ChatMessage[],
       {
         project: context.project || "",
@@ -219,16 +287,27 @@ export async function manageContextPressure(
       },
     );
 
+    if (!compactionResult) {
+      state.truncationReason = describeSkippedCompaction(skipReason);
+    }
+
     if (compactionResult) {
       messages = compactionResult.compactedMessages as ConversationMessage[];
       state.originalMessageCount = messages.length;
       state.compactionPerformed = true;
       state.preCompactTokenCount = compactionResult.preCompactTokenCount;
       state.postCompactTokenCount = compactionResult.postCompactTokenCount;
+      // The Finalizer persists the latest boundary; a compaction whose span
+      // cannot be addressed keeps the previous one (still valid, just older).
+      if (compactionResult.boundary) {
+        state.compactionBoundary = compactionResult.boundary;
+      }
 
-      currentTokenEstimate = ContextWindowManager.estimateTokens(
-        messages as ChatMessage[],
-      );
+      currentTokenEstimate = estimateRequest();
+      state.truncationReason =
+        currentTokenEstimate > budgets.truncationBudget
+          ? "compaction impossible: still over budget after summarizing — the protected recent window alone exceeds it"
+          : null;
 
       // ── 3. Compaction summary persistence ─────────────────
       // Persist summary to ConversationEmbeddingService as a free

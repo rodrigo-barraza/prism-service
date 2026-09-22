@@ -253,6 +253,35 @@ describe("ContextBudgetTracker", () => {
       expect(calibratedEvent.messageTokens).toBe(Math.ceil(20_000 * ratio));
     });
 
+    it("calibrates the system prompt and tool schemas too, not just the messages", () => {
+      // Live shape (PDF reads + 93 tool schemas): the provider counted ~0.48 of
+      // the chars/4 estimate. Scaling only the messages and adding the raw
+      // overhead back ended a turn as "context exhausted" at ~42K real tokens
+      // of a 68K window.
+      const { emit } = createMockEmit();
+      const tracker = new ContextBudgetTracker(emit, 68_300);
+      const systemPrompt = "s".repeat(4 * 3_700);
+      const toolSchemas = [{ schema: "t".repeat(4 * 28_000) }];
+      tracker.computeAndEmitEstimate(50_000, systemPrompt, toolSchemas, 8_192);
+      tracker.recordRealUsage({ inputTokens: 39_600 }, 50_000);
+      const ratio = tracker.getCalibrationRatio()!;
+
+      const { adjustedInput, clampedMaxTokens } = tracker.computeAndEmitEstimate(
+        55_000,
+        systemPrompt,
+        toolSchemas,
+        8_192,
+      );
+
+      const overhead = estimateTokens(systemPrompt) + estimateTokens(JSON.stringify(toolSchemas));
+      const calibratedTotal = Math.ceil(55_000 * ratio) + Math.ceil(estimateTokens(systemPrompt) * ratio) +
+        Math.ceil(estimateTokens(JSON.stringify(toolSchemas)) * ratio);
+      expect(adjustedInput).toBeLessThan((55_000 + overhead) * ratio * 1.2);
+      expect(adjustedInput).toBeGreaterThanOrEqual(calibratedTotal);
+      // The real request is ~42K: plenty of room for the 8K reply.
+      expect(clampedMaxTokens).toBe(8_192);
+    });
+
     it("should return null calibration ratio before any real usage", () => {
       const { emit } = createMockEmit();
       const tracker = new ContextBudgetTracker(emit, CONTEXT_WINDOW);

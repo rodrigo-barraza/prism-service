@@ -150,7 +150,7 @@ describe("MicroCompactionService", () => {
       },
     ];
 
-    const result = MicroCompactionService.microcompactMessages(messages, 4);
+    const result = MicroCompactionService.microcompactMessages(messages, { iterations: 4 });
 
     expect(result.clearedResultCount).toBe(1);
     expect(result.offloadedResultCount).toBe(1);
@@ -201,6 +201,8 @@ describe("CompactionService", () => {
     { role: "assistant", content: "Assistant response 3" },
     { role: "user", content: "User turn 4" },
     { role: "assistant", content: "Assistant response 4" },
+    { role: "user", content: "User turn 5" },
+    { role: "assistant", content: "Assistant response 5" },
   ];
 
   it("returns null only when the utility role chain is truly empty (no config, no fallback, no defaults)", async () => {
@@ -274,6 +276,8 @@ describe("CompactionService", () => {
       { role: "assistant", content: "Assistant response 3" },
       { role: "user", content: "User turn 4" },
       { role: "assistant", content: "Assistant response 4" },
+      { role: "user", content: "User turn 5" },
+      { role: "assistant", content: "Assistant response 5" },
     ];
     mockGenerateText.mockResolvedValueOnce({
       text: "<summary>Summary of the dropped span.</summary>",
@@ -366,6 +370,8 @@ describe("CompactionService", () => {
       { role: "assistant", content: "Assistant response 3" },
       { role: "user", content: "User turn 4" },
       { role: "assistant", content: "Assistant response 4" },
+      { role: "user", content: "User turn 5" },
+      { role: "assistant", content: "Assistant response 5" },
     ];
     mockGenerateText.mockResolvedValueOnce({
       text: "<summary>Data was fetched and processed.</summary>",
@@ -438,9 +444,8 @@ describe("CompactionService", () => {
       }));
       expect(result.compactedMessages[1].content).toContain("This is the conversation summary.");
 
-      // Recent tail should be preserved. RECENT_TAIL_TURN_COUNT = 3.
-      // Last 3 user turns: "User turn 2", "User turn 3", "User turn 4".
-      // They and their assistant responses should be kept.
+      // The recency-protected window (the last 4 model calls) is kept:
+      // responses 2–5 and everything after response 1, from "User turn 2".
       const userTurnTwoIndex = result.compactedMessages.findIndex(
         (message) => message.role === "user" && message.content === "User turn 2"
       );

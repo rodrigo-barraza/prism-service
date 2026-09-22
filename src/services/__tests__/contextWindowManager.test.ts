@@ -148,11 +148,11 @@ describe("ContextWindowManager.enforce — fast path", () => {
 
 describe("ContextWindowManager.enforce — tool result truncation", () => {
   it("truncates large tool results in old messages", () => {
-    // Budget at 32k with 5 tools:
-    // floor((32000 - 8192 - (2000 + 5*150)) * 0.80) = floor(21058 * 0.80) = 16846 tokens
-    // We need total estimated tokens > 16846 to trigger truncation.
-    // 80k chars ≈ 22857 tokens in tool results alone → exceeds budget.
-    const bigResult = "x".repeat(80_000);
+    // Budget at 32k with 5 tools (ContextBudgets truncation budget minus
+    // the fixed overhead): min(32000 − 8192, (32000 − 5120) / 1.1) − (2000 + 5×150)
+    // = 23808 − 2750 = 21058 tokens. 100k chars ≈ 25000 tokens in the old
+    // tool result alone → exceeds it.
+    const bigResult = "x".repeat(100_000);
     const messages = [
       { role: "system", content: "System prompt ".repeat(200) },
       { role: "user", content: "Do something" },
@@ -161,10 +161,13 @@ describe("ContextWindowManager.enforce — tool result truncation", () => {
         content: "I'll read the file",
         toolCalls: [{ name: "read_file", args: '{"path": "big.js"}', result: bigResult }],
       },
+      // Four newer model calls — the recency-protected window
       { role: "user", content: "What about this?" },
+      { role: "assistant", content: "This." },
       { role: "user", content: "And this?" },
-      { role: "user", content: "More context" },
+      { role: "assistant", content: "That." },
       { role: "user", content: "Even more" },
+      { role: "assistant", content: "More." },
       { role: "user", content: "Final question" },
       { role: "assistant", content: "Here's my answer" },
     ];
@@ -220,8 +223,9 @@ describe("ContextWindowManager.enforce — tool result truncation", () => {
 
 describe("ContextWindowManager.enforce — assistant compression", () => {
   it("compresses old assistant messages while preserving recent ones", () => {
-    // Build a conversation large enough to trigger compression
-    const longContent = "A".repeat(5_000);
+    // Build a conversation large enough to trigger compression: a 16K window
+    // with 2K output leaves (16000 − 5120) / 1.1 − 2000 ≈ 7,890 message tokens.
+    const longContent = "A".repeat(6_000);
     const messages = [
       { role: "system", content: "System" },
       { role: "user", content: "Q1" },

@@ -7,6 +7,10 @@ import AgenticLoopService from "./AgenticLoopService.ts";
 import ConversationService from "./ConversationService.ts";
 import { GOAL_STATUSES } from "./ConversationGoalService.ts";
 import { stripPrunedMessages } from "./conversation/checkpoints.ts";
+import {
+  applyCompactionBoundary,
+  readCompactionState,
+} from "./compact/CompactionBoundary.ts";
 import { getProvider } from "#src/providers/index";
 import { getModelByName } from "#src/config";
 import { matchCron } from "./ScheduledTaskService.ts";
@@ -472,6 +476,12 @@ const ConversationTimerService = {
       freshMessages = stripPrunedMessages(
         (databaseConversation.messages || []) as ConversationMessage[],
       );
+      // A compacted conversation reloads through its boundary: the summary,
+      // then the messages after it (compact/CompactionBoundary.ts).
+      freshMessages = applyCompactionBoundary(
+        freshMessages,
+        readCompactionState(databaseConversation).boundary,
+      ).messages;
     } else {
       freshMessages = [
         ...((conversation.messages as ConversationMessage[]) || []),
@@ -543,6 +553,11 @@ const ConversationTimerService = {
           planFirst: false,
           autoApprove: true,
           minContextLength: MINIMUM_CONTEXT_LENGTH,
+          // Calibrates the first compaction-trigger estimate of this turn.
+          ...(readCompactionState(updatedConversation).calibrationRatio && {
+            _inputCalibrationRatio:
+              readCompactionState(updatedConversation).calibrationRatio,
+          }),
           ...(toolConfiguration?.disabledTools && {
             disabledTools: toolConfiguration.disabledTools,
           }),

@@ -10,7 +10,6 @@ Self-contained task prompts for the items in `docs/harness_modernization_2026-09
 
 | # | File | Branch slug(s) | Repos | Size | Depends on | Shares hub files with |
 |---|---|---|---|---|---|---|
-| 06 | `06-compaction-that-works.md` | `compaction-that-works` | service | M | 02 (windows) | 10 (`compact/*`) |
 | 09 | `09-harness-small-fixes.md` | `loop-small-fixes`, `cron-matcher`, `provider-small-fixes` | service | M | — | 02, 04, 17 |
 | 10 | `10-prefix-stable-requests.md` | `cache-telemetry`, `prefix-stable-requests` | service | L | 02, 06 | 06, 23 (`RequestLogger.ts`), 25 |
 | 11 | `11-routing-and-memory-extraction.md` | `memory-extraction-diet`, `role-model-routing` | service | M | 02 | 17 (`OrchestratorService.ts`) |
