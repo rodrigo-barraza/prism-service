@@ -900,11 +900,12 @@ export default class ReActHarness extends BaseAgenticHarness {
           );
 
           const exitPlanToolCall = pass.pendingToolCalls.find(tc => tc.name === TOOL_NAMES.EXIT_PLAN_MODE);
+          let isPlanRejected = false;
           if (exitPlanToolCall) {
             const { shouldContinueLoop } = await handleExitPlanMode(
               exitPlanToolCall, pass, results, currentMessages, context, state,
             );
-            if (!shouldContinueLoop) return { messages: currentMessages };
+            isPlanRejected = !shouldContinueLoop;
           }
 
           const assistantMessage: ConversationMessage = {
@@ -937,6 +938,16 @@ export default class ReActHarness extends BaseAgenticHarness {
               stc.result = res.result;
               stc.durationMilliseconds = res.durationMilliseconds;
             }
+          }
+
+          // A rejected (or timed-out) plan ends the turn, but the turn still
+          // happened: the plan and the verdict are in the assistant message
+          // just pushed, and finalize() persists them, clears isGenerating
+          // and emits `done`. Nothing is left to recover.
+          if (isPlanRejected) {
+            this.logIteration(pass, currentMessages);
+            hasCleanTextBreak = true;
+            break;
           }
 
           const retryGuidance = buildToolRetryGuidance(
@@ -1145,7 +1156,7 @@ export default class ReActHarness extends BaseAgenticHarness {
       }
 
       if (!hasCleanTextBreak && state.streamedToolCalls.length > 0 && !signal?.aborted) {
-        state.conversationOutcome = "exhausted";
+        if (state.conversationOutcome === "completed") state.conversationOutcome = "exhausted";
         await runExhaustionRecoveryPass(this, context, state, currentMessages);
       }
 
