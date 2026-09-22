@@ -3,6 +3,7 @@ import "./setup.ts";
 import { PROVIDERS, SYSTEM_STATUSES } from "#src/constants";
 import OrchestratorService from "#src/services/OrchestratorService";
 import type { SubAgentState } from "#src/types/orchestrator";
+import { GitWorktreeHelper } from "#src/services/orchestrator/GitWorktreeHelper";
 
 // Mock dependencies to avoid actual loop execution and worktree creation
 vi.mock("#src/services/AgenticLoopService", () => ({
@@ -15,12 +16,15 @@ vi.mock("#src/services/AgenticLoopService", () => ({
 
 vi.mock("#src/services/orchestrator/GitWorktreeHelper", () => ({
   GitWorktreeHelper: {
-    removeWorktree: vi.fn().mockResolvedValue({}),
+    removeWorktree: vi.fn().mockResolvedValue({ branchDeleted: true }),
+    commitWorktree: vi.fn().mockResolvedValue({ committed: false }),
+    mergeWorktree: vi.fn().mockResolvedValue({ merged: "branch-agent-1", into: "main" }),
     getWorktreeDiff: vi.fn().mockResolvedValue({
-      hasChanges: false,
-      additions: 0,
-      deletions: 0,
+      branch: "branch-agent-1",
+      base: "main",
       files: [],
+      patch: "",
+      stats: { filesChanged: 0, additions: 0, deletions: 0 },
     }),
     toolsApiPost: vi.fn().mockResolvedValue({}),
   },
@@ -158,6 +162,39 @@ describe("OrchestratorService Resume Agent", () => {
     expect(msg.role).toBe("user");
     expect(msg.content).toContain("[SUB-AGENT RESUMED COMPLETED]");
 
+    autoResponseSpy.mockRestore();
+  });
+
+  it("merges a resumed agent's work back when it completes (resume does not defer)", async () => {
+    // Resumed in the worktree a merge conflict kept: this retries the merge.
+    const subAgent = registerMockSubAgent("agent-1", "complete");
+    vi.mocked(GitWorktreeHelper.getWorktreeDiff).mockResolvedValueOnce({
+      branch: "branch-agent-1",
+      base: "main",
+      files: [{ path: "notes/hello.txt", status: "added" }],
+      patch: "+hello\n",
+      stats: { filesChanged: 1, additions: 1, deletions: 0 },
+    });
+    const autoResponseSpy = vi
+      .spyOn(OrchestratorService, "_triggerParentAutoResponse")
+      .mockResolvedValue();
+
+    await OrchestratorService.resumeAgent("agent-1", "resolve the conflict", context);
+    await vi.waitFor(() => expect(subAgent.status).toBe("complete"));
+
+    expect(GitWorktreeHelper.mergeWorktree).toHaveBeenCalledWith(
+      "/workspace",
+      "branch-agent-1",
+      expect.any(String),
+    );
+    expect(GitWorktreeHelper.removeWorktree).toHaveBeenCalledWith(
+      "/workspace",
+      "/workspace/worktree-agent-1",
+    );
+    expect(subAgent.mergeBack).toMatchObject({ status: "merged", worktreePath: null });
+    // Merged and gone: a further resume runs in the parent's workspace.
+    expect(subAgent.isolated).toBe(false);
+    expect(subAgent.worktreePath).toBeNull();
     autoResponseSpy.mockRestore();
   });
 

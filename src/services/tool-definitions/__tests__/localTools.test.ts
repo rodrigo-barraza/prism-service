@@ -498,6 +498,89 @@ describe("Local Tools Unit Tests Suite", () => {
     );
   });
 
+  it("enter_worktree stores the branch tools-service created, not the one it asked for", async () => {
+    mockProxyPost.mockResolvedValueOnce({
+      worktreePath: "/tmp/prism-worktrees/wt-9",
+      branch: "worktree/as-created",
+    });
+
+    await InternalToolRegistry.execute("enter_worktree", {}, { agentConversationId: "conv-branch" });
+
+    expect(mockSetWorktree).toHaveBeenCalledWith(
+      "conv-branch",
+      expect.objectContaining({ branchName: "worktree/as-created" }),
+    );
+  });
+
+  it("exit_worktree merge commits the edits first, merges the stored branch, then removes without force", async () => {
+    mockProxyPost.mockReset();
+    mockProxyPost.mockResolvedValue({ ok: true });
+    mockGetWorktreeState.mockReturnValueOnce({
+      originalRoot: "/workspace",
+      worktreePath: "/tmp/prism-worktrees/wt-1",
+      branchName: "worktree/abc",
+      repoPath: "/workspace",
+    });
+
+    const exitResult = await InternalToolRegistry.execute(
+      "exit_worktree",
+      { action: "merge" },
+      { agentConversationId: "conv-merge" },
+    );
+
+    expect(exitResult).toMatchObject({ acknowledged: true, action: "merge" });
+    const calls = mockProxyPost.mock.calls.map(([path, body]) => [path, body]);
+    expect(calls.map(([path]) => path)).toEqual([
+      "/agentic/git/worktree/commit",
+      "/agentic/git/worktree/diff",
+      "/agentic/git/worktree/merge",
+      "/agentic/git/worktree/remove",
+    ]);
+    expect(calls[2][1]).toMatchObject({ branch: "worktree/abc" });
+    expect(calls[3][1]).toMatchObject({ deleteBranch: true, force: false });
+  });
+
+  it("exit_worktree keeps the worktree when the merge is refused", async () => {
+    mockProxyPost.mockReset();
+    mockProxyPost.mockImplementation(async (path: string) =>
+      path.endsWith("/merge") ? { error: "conflicts in a.ts" } : { ok: true },
+    );
+    mockGetWorktreeState.mockReturnValueOnce({
+      originalRoot: "/workspace",
+      worktreePath: "/tmp/prism-worktrees/wt-1",
+      branchName: "worktree/abc",
+      repoPath: "/workspace",
+    });
+
+    const exitResult = await InternalToolRegistry.execute(
+      "exit_worktree",
+      { action: "merge" },
+      { agentConversationId: "conv-conflict" },
+    );
+
+    expect(exitResult).toHaveProperty("error");
+    expect(mockProxyPost.mock.calls.map(([path]) => path)).not.toContain("/agentic/git/worktree/remove");
+    expect(mockClearWorktree).not.toHaveBeenCalledWith("conv-conflict");
+  });
+
+  it("exit_worktree discard is the one removal that forces", async () => {
+    mockProxyPost.mockReset();
+    mockProxyPost.mockResolvedValue({ ok: true });
+    mockGetWorktreeState.mockReturnValueOnce({
+      originalRoot: "/workspace",
+      worktreePath: "/tmp/prism-worktrees/wt-1",
+      branchName: "worktree/abc",
+      repoPath: "/workspace",
+    });
+
+    await InternalToolRegistry.execute("exit_worktree", { action: "discard" }, { agentConversationId: "conv-discard" });
+
+    expect(mockProxyPost.mock.calls.map(([path]) => path)).toEqual(["/agentic/git/worktree/remove"]);
+    expect(mockProxyPost.mock.calls[0][1]).toMatchObject({ force: true });
+    mockProxyPost.mockReset();
+    mockProxyPost.mockResolvedValue({ success: true, worktreePath: "/workspace/wt-1" });
+  });
+
   // 12. DiscoverAndEnableTools
   it("should discover and auto-enable tools", async () => {
     const context = { agentConversationId: "conv-123", enabledTools: [] };
