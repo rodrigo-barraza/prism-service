@@ -1038,13 +1038,12 @@ describe("Event-Driven Auto-Response", () => {
       expect(agentParams.agenticLoopEnabled).toBe(true);
     });
 
-    it("should clear isGenerating and trigger auto-response when Finalizer deferred the flag (non-blocking)", async () => {
-      // This is the critical regression test for the deadlock that occurred
-      // when the Finalizer used skipGeneratingClear: true. In that scenario:
-      // 1. Finalizer keeps isGenerating=true (deferDoneEmission)
-      // 2. awaitPendingDispatches blocks → router resolves
-      // 3. _triggerParentAutoResponse fires while isGenerating is still true
-      // 4. Without the fix, it would poll for 60s and give up → conversation stuck
+    it("should clear a stale isGenerating and trigger the auto-response when no parent turn is running", async () => {
+      // Regression guard for the old deferred-done deadlock: a completion
+      // that finds isGenerating=true persisted must not wait on it forever.
+      // Sub-agent dispatch no longer defers `done` (DETACHED_WORK), so a
+      // flag with no turn of the parent running in this process is stale:
+      // the completion wakes the parent at once and the flag is cleared.
       mockFindOne.mockResolvedValue({
         id: "parent-conv-id",
         isGenerating: true,

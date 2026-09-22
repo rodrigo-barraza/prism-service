@@ -100,6 +100,11 @@ const MOCK_INTERNAL_TOOL_SCHEMAS = [
     description: "Wait for a specified duration",
     parameters: { type: "object", properties: {} },
   },
+  {
+    name: "report_progress",
+    description: "Tell the delegating agent how far you have got",
+    parameters: { type: "object", properties: {} },
+  },
 ];
 
 // Mock ToolOrchestratorService
@@ -181,7 +186,7 @@ vi.mock("#src/services/AgentPersonaRegistry", () => ({
 // Mock InternalToolRegistry
 vi.mock("#src/services/tool-definitions/InternalToolRegistry", () => ({
   default: {
-    getNames: vi.fn(() => new Set(["think", "sleep"])),
+    getNames: vi.fn(() => new Set(["think", "sleep", "report_progress"])),
   },
 }));
 
@@ -264,6 +269,22 @@ describe("AgenticToolResolver — tool resolution", () => {
     // Explicitly enabled tools should still be present
     expect(toolNames).toContain("read_file");
     expect(toolNames).toContain("write_file");
+  });
+
+  it("gives report_progress to sub-agents only — a root agent has no parent to report to", async () => {
+    const resolveFor = async (isSubAgent: boolean) =>
+      (
+        await AgenticToolResolver.resolve({
+          options: { isSubAgent, enabledTools: ["read_file"] },
+          agent: undefined,
+          project: "coding",
+          username: "anonymous",
+          modelDefinition: undefined,
+        })
+      ).finalTools.map((tool) => tool.name);
+
+    expect(await resolveFor(true)).toContain("report_progress");
+    expect(await resolveFor(false)).not.toContain("report_progress");
   });
 
   it("includes orchestrator tools by default when isSubAgent is not set", async () => {

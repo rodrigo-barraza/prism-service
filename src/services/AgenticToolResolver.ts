@@ -5,6 +5,7 @@ import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import ToolContext from "./ToolContext.ts";
 
 import InternalToolRegistry from "./tool-definitions/InternalToolRegistry.ts";
+import { SUB_AGENT_ONLY_TOOL_NAMES } from "./tool-definitions/SubAgentProgressTool.ts";
 import {
   CORE_AGENTIC_TOOLS as CORE_AGENTIC_TOOLS_LIST,
   CORE_ORCHESTRATOR_TOOLS as CORE_ORCHESTRATOR_TOOLS_LIST,
@@ -345,6 +346,14 @@ export default class AgenticToolResolver {
         (tool) => !CORE_ORCHESTRATOR_TOOLS.has(tool.name),
       );
       for (const toolName of CORE_ORCHESTRATOR_TOOLS) {
+        unreachableToolNames.add(toolName);
+      }
+    } else {
+      // …and the reverse: a root agent has no parent to report_progress to.
+      finalTools = finalTools.filter(
+        (tool) => !SUB_AGENT_ONLY_TOOL_NAMES.has(tool.name),
+      );
+      for (const toolName of SUB_AGENT_ONLY_TOOL_NAMES) {
         unreachableToolNames.add(toolName);
       }
     }

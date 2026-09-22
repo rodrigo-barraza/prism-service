@@ -10,6 +10,7 @@ import {
   buildTurnInputMessage,
   drainTurnInput,
   hasPendingTurnInput,
+  sealTurnInput,
 } from "#src/services/harnesses/lifecycle/TurnInputDrain";
 import { NOTIFICATION_SOURCES, TURN_INPUT } from "#src/constants";
 import type { ConversationMessage, AgenticContext } from "#src/services/harnesses/types";
@@ -91,5 +92,25 @@ describe("TurnInputDrain", () => {
     const state = new AgenticLoopState();
     expect(drainTurnInput([], state, context, "iteration_start")).toBe(0);
     expect(hasPendingTurnInput(context)).toBe(false);
+    expect(sealTurnInput([], state, context)).toBe(0);
+  });
+
+  it("sealTurnInput seals the box and keeps what it had already accepted in the transcript", () => {
+    const { context, emit } = makeContext();
+    const state = new AgenticLoopState();
+    TurnInputMailbox.open("conv-1");
+    TurnInputMailbox.post("conv-1", {
+      kind: "task_completion",
+      text: "<task-notification>team done</task-notification>",
+      meta: { _notificationSource: NOTIFICATION_SOURCES.ORCHESTRATOR },
+    });
+    const messages: ConversationMessage[] = [];
+
+    expect(sealTurnInput(messages, state, context)).toBe(1);
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0].content).toBe("<task-notification>team done</task-notification>");
+    expect(emit.mock.calls[0][0]).toMatchObject({ type: TURN_INPUT.EVENT_TYPE, kind: "task_completion", boundary: "turn_end" });
+    expect(TurnInputMailbox.post("conv-1", { kind: "user_update", text: "late" }).accepted).toBe(false);
   });
 });

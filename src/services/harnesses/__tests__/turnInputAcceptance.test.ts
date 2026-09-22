@@ -69,6 +69,8 @@ vi.mock("#src/services/RequestLogger", () => ({
   },
 }));
 
+// Runs inside the Stop hooks (the harness awaits them where the turn would end).
+let onStopHooks: (() => void) | null = null;
 vi.mock("../lifecycle/HookInitializer.ts", () => ({
   createStandardHooks: () => {
     const noopHooks = {
@@ -77,6 +79,7 @@ vi.mock("../lifecycle/HookInitializer.ts", () => ({
           hookContext._assembledSystemPrompt = "You are a test agent.";
           hookContext._injectedSkills = [];
         }
+        if (name === "stop") onStopHooks?.();
       }),
     };
     return { hooks: noopHooks, approvalEngine: {} };
@@ -111,7 +114,7 @@ vi.mock("#src/services/AsyncTaskRegistry", () => ({
 }));
 
 vi.mock("#src/services/OrchestratorService", () => ({
-  default: { awaitPendingDispatches: vi.fn().mockResolvedValue(undefined) },
+  default: { markUndeliveredDispatchesAsCounted: vi.fn().mockReturnValue(0) },
 }));
 
 vi.mock("../lifecycle/ApprovalGate.ts", () => ({
@@ -334,6 +337,7 @@ describe("TurnInputMailbox acceptance — a running agent receives mid-turn inpu
   beforeEach(() => {
     vi.clearAllMocks();
     TurnInputMailbox._clearAll();
+    onStopHooks = null;
     countRunningTasksMock.mockReturnValue(0);
     executeToolBatchMock.mockImplementation(async (toolCalls: Array<{ name: string; id: string }>) => toolResults(toolCalls));
   });
@@ -447,5 +451,49 @@ describe("TurnInputMailbox acceptance — a running agent receives mid-turn inpu
     expect(iterations()).toBe(2);
     expect(messages.some((message) => message.content === "<task-notification>task-1 done</task-notification>")).toBe(true);
     expect(adjustPendingBackgroundTasksMock).not.toHaveBeenCalled();
+  });
+
+  it("4. input that arrives while the Stop hooks run is still answered in this turn", async () => {
+    const { harness, seenMessages, conversationId, iterations } = buildScriptedHarness([
+      { kind: "text", text: "All done." },
+      { kind: "text", text: "Folded the team's result in." },
+    ]);
+    TurnInputMailbox.open(conversationId);
+    onStopHooks = () => {
+      onStopHooks = null;
+      TurnInputMailbox.post(conversationId, {
+        kind: "task_completion",
+        text: "<task-notification>team done</task-notification>",
+        meta: { _notificationSource: "orchestrator" },
+      });
+    };
+
+    await harness.run();
+
+    expect(iterations()).toBe(2);
+    expect(seenMessages[1].some((message) => message.content === "<task-notification>team done</task-notification>")).toBe(true);
+  });
+
+  it("5. a turn that ends without reaching a boundary keeps what it accepted and refuses the rest", async () => {
+    const { harness, conversationId, iterations } = buildScriptedHarness([
+      { kind: "tool", toolName: "search_web" },
+    ]);
+    TurnInputMailbox.open(conversationId);
+    // Accepted during the tool batch, but NON_BLOCKING_DISPATCH ends the
+    // turn before the after_tools boundary drains it.
+    executeToolBatchMock.mockImplementationOnce(async (toolCalls: Array<{ name: string; id: string }>) => {
+      TurnInputMailbox.post(conversationId, { kind: "user_update", text: "one more thing" });
+      return toolResults(toolCalls, { _directive: AGENT_DIRECTIVES.NON_BLOCKING_DISPATCH });
+    });
+
+    const { messages } = await harness.run();
+
+    expect(iterations()).toBe(1);
+    expect(messages.some((message) => message.rawContent === "one more thing")).toBe(true);
+    expect(TurnInputMailbox.isOpen(conversationId)).toBe(false);
+    expect(TurnInputMailbox.post(conversationId, { kind: "user_update", text: "late" })).toMatchObject({
+      accepted: false,
+      reason: "no_active_turn",
+    });
   });
 });
