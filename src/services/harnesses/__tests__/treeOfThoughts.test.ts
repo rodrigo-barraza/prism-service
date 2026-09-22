@@ -29,10 +29,6 @@ vi.mock("#src/utils/logger", () => ({
   },
 }));
 
-vi.mock("#src/services/harnesses/lifecycle/SandboxExecutor", () => ({
-  createSandboxCheckpoint: vi.fn().mockReturnValue("mock-stash-ref"),
-  restoreSandboxCheckpoint: vi.fn(),
-}));
 
 vi.mock("#src/services/harnesses/lifecycle/ValidationInterceptor", () => ({
   validateAfterToolExecution: vi.fn().mockResolvedValue([]),
@@ -315,60 +311,10 @@ describe("TreeOfThoughtsStrategy", () => {
     expect(mockAgenticLoopState.frontierCandidates[0].score).toBeCloseTo(6.0, 5);
   });
 
-  it("should fall back to next frontier candidate on validation failure in BFS mode", async () => {
-    mockAgenticContext.workspaceRoot = "/workspace/mock";
-    mockAgenticContext.options.branchCount = 3;
-    mockAgenticContext.options.searchStrategy = "bfs";
-    mockAgenticContext.options.valueThreshold = 5.0;
-    mockAgenticContext.options.enableSandbox = true;
-    mockAgenticContext.options.maxIterations = 1;
-
-    mockProvider.generateTextStream = vi.fn().mockImplementation(async function* (messages: any[]) {
-      const lastMessage = messages[messages.length - 1]?.content || "";
-      if (lastMessage.includes("Rate each candidate approach")) {
-        yield "1: correctness=8, risk=8, efficiency=8, completeness=8\n2: correctness=6, risk=6, efficiency=6, completeness=6\n3: correctness=4, risk=4, efficiency=4, completeness=4";
-      } else {
-        yield "Thought branch output";
-      }
-    });
-
-    let passStateCreationCount = 0;
-    mockHarnessInstance.createPassState = vi.fn().mockImplementation((options) => {
-      passStateCreationCount++;
-      return {
-        streamedText: "Thought branch output " + passStateCreationCount,
-        finalStreamedText: "Thought branch output " + passStateCreationCount,
-        streamedThinking: "",
-        thinkingSignature: "",
-        pendingToolCalls: [{ id: "call-" + passStateCreationCount, name: "read_file", args: {} }],
-        streamedImages: [],
-        start: Date.now(),
-        firstTokenTime: null,
-        generationEnd: null,
-        outputCharacters: 0,
-        usage: { inputTokens: 10, outputTokens: 5, cacheReadInputTokens: 0 },
-        options,
-        requestId: "req-" + passStateCreationCount,
-      };
-    });
-
-    vi.mocked(validateAfterToolExecution)
-      .mockResolvedValueOnce([{ filePath: "test.ts", validatorType: "lint", rawOutput: "Lint error", toolName: "read_file", errors: ["Lint error"] }])
-      .mockResolvedValueOnce([]);
-
-    const treeOfThoughtsResult = await runTreeOfThoughts(mockHarnessInstance as any);
-
-    expect(treeOfThoughtsResult).toBeDefined();
-    expect(validateAfterToolExecution).toHaveBeenCalledTimes(1);
-    expect(mockAgenticLoopState.branchesBacktracked).toBe(1);
-    expect(mockAgenticLoopState.frontierCandidates.length).toBe(0);
-  });
-
-  it("should re-branch after all frontier candidates fail in BFS mode", async () => {
+  it("should re-branch after a failed branch in BFS mode", async () => {
     mockAgenticContext.options.branchCount = 2;
     mockAgenticContext.options.searchStrategy = "bfs";
     mockAgenticContext.options.valueThreshold = 5.0;
-    mockAgenticContext.options.enableSandbox = true;
     mockAgenticContext.options.maxIterations = 2;
 
     mockProvider.generateTextStream = vi.fn().mockImplementation(async function* (messages: any[]) {
@@ -599,11 +545,9 @@ describe("TreeOfThoughtsStrategy", () => {
     expect(lastMsg.role).toBe("system"); // retry guidance or blocked error is system message
   });
 
-  it("should restore sandbox checkpoint on validation failure if frontierCandidates is empty", async () => {
+  it("should backtrack the conversation on validation failure", async () => {
     mockAgenticContext.options.branchCount = 2;
     mockAgenticContext.options.beamWidth = 1; // empty frontierCandidates
-    mockAgenticContext.options.enableSandbox = true;
-    mockAgenticContext.workspaceRoot = "/mock/root";
     mockAgenticContext.options.maxIterations = 1;
 
     mockHarnessInstance.createPassState = vi.fn().mockImplementation((options) => ({

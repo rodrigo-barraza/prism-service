@@ -18,10 +18,6 @@ vi.mock("#src/utils/logger", () => ({
   },
 }));
 
-vi.mock("#src/services/harnesses/lifecycle/SandboxExecutor", () => ({
-  createSandboxCheckpoint: vi.fn().mockReturnValue("mock-stash-ref"),
-  restoreSandboxCheckpoint: vi.fn(),
-}));
 
 vi.mock("#src/services/harnesses/lifecycle/ValidationInterceptor", () => ({
   validateAfterToolExecution: vi.fn().mockResolvedValue([]),
@@ -508,7 +504,6 @@ describe("GraphOfThoughtsStrategy", () => {
 
   it("should trigger validation errors in synthesized tool execution", async () => {
     mockAgenticContext.options.branchCount = 2;
-    mockAgenticContext.options.enableSandbox = true;
     mockAgenticContext.workspaceRoot = "/mock/root";
     mockAgenticContext.options.maxIterations = 1;
 

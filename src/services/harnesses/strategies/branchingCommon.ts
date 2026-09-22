@@ -64,7 +64,6 @@ import { injectToolDiscoveryNudge } from "#src/services/harnesses/lifecycle/Tool
 import { finalizePassTracker } from "#src/services/harnesses/lifecycle/TrackerFinalizer";
 import { handleCodexPlanningResponse } from "#src/services/harnesses/lifecycle/CodexPlanningDetector";
 import { cleanupReminderCache } from "#src/services/harnesses/lifecycle/SystemReminderInjector";
-import { createSandboxCheckpoint } from "#src/services/harnesses/lifecycle/SandboxExecutor";
 import { streamWithRetries } from "#src/utils/ProviderStreamResilience";
 import PlanningModeService from "#src/services/PlanningModeService";
 import { HARNESS } from "#src/constants";
@@ -707,14 +706,11 @@ export async function executeApprovedToolBatch(
   pass: PassState,
   currentMessages: ConversationMessage[],
   standardHooks: StandardHooks,
-): Promise<{
-  results: ToolResult[];
-  sandboxCheckpointReference: string | null;
-}> {
+): Promise<{ results: ToolResult[] }> {
   const context = harness["context"];
   const state: AgenticLoopState = harness["state"];
   const tools = harness["tools"];
-  const { options, workspaceRoot, emit } = context;
+  const { options, emit } = context;
   const { hooks, approvalEngine } = standardHooks;
 
   const { isApproved, shouldApproveAll, deniedToolCalls = [] } =
@@ -740,7 +736,6 @@ export async function executeApprovedToolBatch(
   );
 
   let results: ToolResult[];
-  let sandboxCheckpointReference: string | null = null;
   if (!isApproved) {
     results = [
       ...executableToolCalls.map((toolCall) => ({
@@ -760,11 +755,6 @@ export async function executeApprovedToolBatch(
     }
 
     context._currentMessages = currentMessages;
-
-    // ── Sandbox checkpoint (git-based rollback) ────────────
-    sandboxCheckpointReference = options.enableSandbox
-      ? createSandboxCheckpoint(workspaceRoot, emit)
-      : null;
 
     results = [
       ...(await executeToolBatch(
@@ -798,7 +788,7 @@ export async function executeApprovedToolBatch(
 
   emitPostExecutionStatus(pass.pendingToolCalls, emit);
 
-  return { results, sandboxCheckpointReference };
+  return { results };
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
