@@ -68,9 +68,19 @@ notification). `send_subagent_message` to a RUNNING sub-agent is delivered
 through its mailbox (the dead `pendingMessages` write is fixed; tests now
 assert delivery). `pendingBackgroundTasks` balances on every path
 (`countedAsPending`, the async auto-response `finally`).
-Sub-agent dispatch itself (`create_subagent(s)`) still ends the parent turn —
-`wait_for_tasks` covers the "wait when you need it" half; making dispatch
-non-breaking is a follow-up in `OrchestratorService.spawnFromTool`.
+Sub-agent dispatch is non-breaking too (prompt 17 Landing 1,
+`nonblocking-subagent-dispatch`): a root `create_subagent(s)` /
+`resume_subagent` returns DETACHED_WORK, and its result is delivered once
+through a dispatch record (`orchestrator/DetachedDispatchRegistry.ts`) —
+wait_for_tasks, else the parent's running turn (mailbox), else an
+auto-response. The harness counts a dispatch in pendingBackgroundTasks only
+when its turn ends with the result undelivered; the delivery pays it back;
+a user stop cancels undelivered dispatches. A turn that decides to end
+seals its mailbox (`sealTurnInput`) so late input takes its after-the-turn
+path instead of being dropped at `close()`. A running sub-agent can
+`report_progress` into its parent's turn as an `agent_message` with
+`_authority: "sub-agent"`; `resume_subagent` restores the persisted
+transcript (and rebuilds an evicted agent from its document).
 
 ### 2.4 Event sequence ids and cursor replay
 `SseEvent.seq` stamped in `withDirectViewerBroadcast` (monotonic per

@@ -4,6 +4,8 @@ import { PROVIDERS, SYSTEM_STATUSES } from "#src/constants";
 import OrchestratorService from "#src/services/OrchestratorService";
 import type { SubAgentState } from "#src/types/orchestrator";
 import { GitWorktreeHelper } from "#src/services/orchestrator/GitWorktreeHelper";
+import AgenticLoopService from "#src/services/AgenticLoopService";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
 
 // Mock dependencies to avoid actual loop execution and worktree creation
 vi.mock("#src/services/AgenticLoopService", () => ({
@@ -16,6 +18,7 @@ vi.mock("#src/services/AgenticLoopService", () => ({
 
 vi.mock("#src/services/orchestrator/GitWorktreeHelper", () => ({
   GitWorktreeHelper: {
+    getDefaultWorkspaceRoot: vi.fn().mockReturnValue("/workspace"),
     removeWorktree: vi.fn().mockResolvedValue({ branchDeleted: true }),
     commitWorktree: vi.fn().mockResolvedValue({ committed: false }),
     mergeWorktree: vi.fn().mockResolvedValue({ merged: "branch-agent-1", into: "main" }),
@@ -123,7 +126,7 @@ describe("OrchestratorService Resume Agent", () => {
     expect((result as { error: string }).error).toContain("cannot be resumed");
   });
 
-  it("should successfully trigger background loop and return NON_BLOCKING_DISPATCH at recursionDepth 0", async () => {
+  it("should successfully trigger background loop and return DETACHED_WORK at recursionDepth 0", async () => {
     const subAgent = registerMockSubAgent("agent-1", "complete");
 
     // Spy on _triggerParentAutoResponse to avoid database operations
@@ -133,8 +136,8 @@ describe("OrchestratorService Resume Agent", () => {
 
     const result = await OrchestratorService.resumeAgent("agent-1", "do more", context);
 
-    // Should return non-blocking directive immediately
-    expect(result).toHaveProperty("_directive", "NON_BLOCKING_DISPATCH");
+    // The parent keeps working: the resume is detached work, not a turn end
+    expect(result).toHaveProperty("_directive", "DETACHED_WORK");
     expect(result).toHaveProperty("agent");
     expect((result as any).agent.agent_id).toBe("agent-1");
     expect((result as any).agent.status).toBe("running");
@@ -155,7 +158,7 @@ describe("OrchestratorService Resume Agent", () => {
 
     // Auto-response spy should have been called
     expect(autoResponseSpy).toHaveBeenCalledOnce();
-    const [convId, proj, user, ctx, msg] = autoResponseSpy.mock.calls[0];
+    const [convId, proj, user, _ctx, msg] = autoResponseSpy.mock.calls[0];
     expect(convId).toBe("conv-parent");
     expect(proj).toBe("test-project");
     expect(user).toBe("test-user");
@@ -196,6 +199,109 @@ describe("OrchestratorService Resume Agent", () => {
     expect(subAgent.isolated).toBe(false);
     expect(subAgent.worktreePath).toBeNull();
     autoResponseSpy.mockRestore();
+  });
+
+  // ── History (prompt 17, Landing 1) ─────────────────────────
+  // A finished run releases `messages` (null) — the transcript lives in the
+  // sub-agent's own agent_conversations document. A resume must continue
+  // from it, not from an empty conversation.
+  describe("resume restores the persisted history", () => {
+    const persistedHistory = [
+      { role: "user", content: "Look up A" },
+      { role: "assistant", content: "A is 42." },
+    ];
+    let defaultCollection: ReturnType<typeof MongoWrapper.getCollection>;
+
+    function servePersistedConversation(document: Record<string, unknown>) {
+      vi.mocked(MongoWrapper.getCollection).mockReturnValue({
+        findOne: vi.fn().mockImplementation(async (query: Record<string, unknown>) =>
+          Object.entries(query).every(([key, value]) => document[key] === value) ? document : null,
+        ),
+        updateOne: vi.fn().mockResolvedValue({ acknowledged: true, matchedCount: 1 }),
+        find: vi.fn().mockReturnValue({ toArray: async () => [] }),
+      } as never);
+    }
+
+    beforeEach(() => {
+      defaultCollection = MongoWrapper.getCollection("prism-test", "agent_conversations");
+      vi.spyOn(OrchestratorService, "_triggerParentAutoResponse").mockResolvedValue();
+    });
+
+    afterEach(() => {
+      vi.mocked(MongoWrapper.getCollection).mockReturnValue(defaultCollection);
+    });
+
+    it("puts the previous run's messages ahead of the new prompt in the resumed loop's input", async () => {
+      const subAgent = registerMockSubAgent("agent-1", "complete");
+      subAgent.messages = null; // released when its first run completed
+      servePersistedConversation({
+        id: "session-agent-1",
+        project: "test-project",
+        username: "test-user",
+        isSubAgent: true,
+        subAgentId: "agent-1",
+        messages: persistedHistory,
+      });
+
+      await OrchestratorService.resumeAgent("agent-1", "Now look up B", context);
+      await vi.waitFor(() => expect(AgenticLoopService.runAgenticLoop).toHaveBeenCalled());
+
+      const [{ messages }] = vi.mocked(AgenticLoopService.runAgenticLoop).mock.calls[0] as [
+        { messages: Array<{ role: string; content: string; _alreadyPersisted?: boolean }> },
+      ];
+      expect(messages.slice(0, 2).map((message) => message.content)).toEqual(["Look up A", "A is 42."]);
+      expect(messages.slice(0, 2).every((message) => message._alreadyPersisted === true)).toBe(true);
+      expect(messages[messages.length - 1]).toMatchObject({ role: "user", content: "Now look up B" });
+      await vi.waitFor(() => expect(subAgent.status).toBe("complete"));
+    });
+
+    it("resumes an agent evicted from memory (TTL or restart) from its persisted conversation", async () => {
+      servePersistedConversation({
+        id: "session-agent-9",
+        project: "test-project",
+        username: "test-user",
+        isSubAgent: true,
+        subAgentId: "agent-9",
+        subAgentDescription: "Evicted researcher",
+        subAgentStatus: "complete",
+        subAgentProviderName: PROVIDERS.GOOGLE,
+        subAgentResolvedModel: "gemini-3-flash-preview",
+        subAgentRecursionDepth: 1,
+        parentConversationId: "conv-parent",
+        parentAgentConversationId: "session-parent",
+        agent: "CODING",
+        messages: persistedHistory,
+      });
+      expect(OrchestratorService._getActiveSubAgents().has("agent-9")).toBe(false);
+
+      const result = await OrchestratorService.resumeAgent("agent-9", "Now look up B", context);
+
+      expect(result).not.toHaveProperty("error");
+      await vi.waitFor(() => expect(AgenticLoopService.runAgenticLoop).toHaveBeenCalled());
+      const [loopInput] = vi.mocked(AgenticLoopService.runAgenticLoop).mock.calls[0] as [
+        { conversationId: string; messages: Array<{ content: string }> },
+      ];
+      expect(loopInput.conversationId).toBe("session-agent-9");
+      expect(loopInput.messages.map((message) => message.content)).toContain("A is 42.");
+    });
+
+    it("does not resume another conversation's agent", async () => {
+      servePersistedConversation({
+        id: "session-agent-9",
+        project: "test-project",
+        username: "test-user",
+        isSubAgent: true,
+        subAgentId: "agent-9",
+        subAgentStatus: "complete",
+        parentConversationId: "some-other-conversation",
+        messages: persistedHistory,
+      });
+
+      const result = await OrchestratorService.resumeAgent("agent-9", "Now look up B", context);
+
+      expect((result as { error: string }).error).toContain("not found");
+      expect(AgenticLoopService.runAgenticLoop).not.toHaveBeenCalled();
+    });
   });
 
   it("should delegate to continueAgent and block when recursionDepth > 0", async () => {

@@ -27,6 +27,9 @@ import type {
  *   - `before_end`       the model answered with text only; instead of ending
  *                        the turn, the pending input is applied and the loop
  *                        continues so the model can act on it
+ *   - `turn_end`         the turn is ending anyway (sealTurnInput): what was
+ *                        already accepted joins the transcript so it is
+ *                        persisted with the turn instead of dropped
  *
  * Every injected message is a `user`-role message. A steering update is
  * wrapped in <user-update> so the model can tell it arrived mid-task (and so
@@ -45,7 +48,7 @@ import type {
 /** Status acknowledging an async hook's context reached the model. */
 export const HOOK_CONTEXT_APPLIED_STATUS = "hook_context_applied";
 
-export type TurnInputBoundary = "iteration_start" | "after_tools" | "before_end";
+export type TurnInputBoundary = "iteration_start" | "after_tools" | "before_end" | "turn_end";
 
 export function buildTurnInputMessage(entry: TurnInputEntry): ConversationMessage {
   if (entry.kind === "hook_context") {
@@ -89,6 +92,17 @@ export function buildTurnInputMessage(entry: TurnInputEntry): ConversationMessag
 }
 
 /**
+ * What a viewer is shown for an entry: the producer's display text when it
+ * set one (`meta.rawContent` — a sub-agent's own words without the
+ * model-facing wrapper, which is also what the persisted message keeps),
+ * else the entry's text.
+ */
+function displayTextOf(entry: TurnInputEntry): string {
+  const rawContent = entry.meta?.rawContent;
+  return typeof rawContent === "string" ? rawContent : entry.text;
+}
+
+/**
  * Drain the mailbox for this turn into `currentMessages`. Returns the number
  * of entries applied (0 when nothing was pending — the common case, and it
  * costs one Map lookup).
@@ -125,7 +139,7 @@ export function drainTurnInput(
       type: TURN_INPUT.EVENT_TYPE,
       id: entry.id,
       kind: entry.kind,
-      content: entry.text,
+      content: displayTextOf(entry),
       ...(entry.images && entry.images.length > 0 ? { images: entry.images } : {}),
       boundary,
       iteration: state.iterations,
@@ -143,6 +157,24 @@ export function drainTurnInput(
     `[TurnInputDrain] Applied ${entries.length} entr${entries.length === 1 ? "y" : "ies"} at ${boundary} (iteration ${state.iterations}) for ${conversationId}`,
   );
   return entries.length;
+}
+
+/**
+ * The turn has decided to end. Seal its mailbox — every later post is
+ * refused as `no_active_turn`, so its producer takes the after-the-turn
+ * path (a completion wakes a new turn, the client queues an update) — and
+ * move anything already accepted into the transcript, where finalize
+ * persists it. Returns how many entries were moved.
+ */
+export function sealTurnInput(
+  currentMessages: ConversationMessage[],
+  state: AgenticLoopState,
+  context: AgenticContext,
+): number {
+  const loopKey = resolveLoopKey(context);
+  if (!loopKey) return 0;
+  TurnInputMailbox.seal(loopKey);
+  return drainTurnInput(currentMessages, state, context, "turn_end");
 }
 
 /** True when input is waiting — used at the text-only break to keep the loop alive. */

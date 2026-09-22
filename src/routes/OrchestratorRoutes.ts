@@ -87,6 +87,32 @@ router.post(
 );
 
 /*
+ * POST /orchestrator/sub-agents/:agentId/stop
+ * Stop ONE running sub-agent — the sub-agents panel's per-row stop. Its
+ * teammates keep running and the team's completion reports it as stopped.
+ * 404 when the caller has no such agent, 409 when it is no longer running.
+ */
+router.post(
+  "/sub-agents/:agentId/stop",
+  asyncHandler(async (request: Request, response: Response) => {
+    const agentId = request.params.agentId;
+    if (typeof agentId !== "string" || !agentId) {
+      return response.status(400).json({ error: "agentId is required" });
+    }
+    const result = await OrchestratorService.stopAgentForUser(agentId, request.username);
+    if ("error" in result) {
+      return result.error === "not_found"
+        ? response.status(404).json({ error: "Sub-agent not found" })
+        : response.status(409).json({
+            error: `Sub-agent is ${result.status}, not running`,
+            status: result.status,
+          });
+    }
+    response.json(result);
+  }),
+);
+
+/*
  * GET /orchestrator/sub-agents/:agentId
  * Get the status of a specific chat-spawned sub-agent.
  */

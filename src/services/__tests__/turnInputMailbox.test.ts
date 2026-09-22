@@ -75,4 +75,25 @@ describe("TurnInputMailbox", () => {
     TurnInputMailbox.open("conv-1");
     expect(TurnInputMailbox.pendingCount("conv-1")).toBe(1);
   });
+
+  it("seal() refuses every later post as no_active_turn and keeps what was accepted drainable", () => {
+    TurnInputMailbox.open("conv-1");
+    TurnInputMailbox.post("conv-1", { kind: "task_completion", text: "accepted before" });
+    TurnInputMailbox.seal("conv-1");
+
+    expect(TurnInputMailbox.isOpen("conv-1")).toBe(false);
+    expect(TurnInputMailbox.post("conv-1", { kind: "task_completion", text: "too late" })).toEqual({
+      accepted: false,
+      reason: "no_active_turn",
+    });
+    expect(TurnInputMailbox.drain("conv-1").map((entry) => entry.text)).toEqual(["accepted before"]);
+  });
+
+  it("a new turn opening a sealed box accepts input again", () => {
+    TurnInputMailbox.open("conv-1");
+    TurnInputMailbox.seal("conv-1");
+    TurnInputMailbox.open("conv-1");
+    expect(TurnInputMailbox.isOpen("conv-1")).toBe(true);
+    expect(TurnInputMailbox.post("conv-1", { kind: "user_update", text: "next turn" }).accepted).toBe(true);
+  });
 });
