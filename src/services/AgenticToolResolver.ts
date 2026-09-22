@@ -11,6 +11,7 @@ import {
   TOOL_NAMES,
   DEFAULT_TOPOLOGY,
   DOMAINS,
+  resolveProviderBaseType,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { MODALITY_TYPES } from "#src/config";
 import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";
@@ -513,11 +514,14 @@ export default class AgenticToolResolver {
       return true;
     }
 
-    // Name-based detection for local provider models not in the static registry
+    // Name-based detection for local provider models not in the static
+    // registry — on any instance of the type ("sglang-2" as well as "sglang")
     if (
       providerName &&
       resolvedModel &&
-      (LOCAL_PROVIDER_TYPES as Set<string>).has(providerName)
+      (LOCAL_PROVIDER_TYPES as Set<string>).has(
+        resolveProviderBaseType(providerName),
+      )
     ) {
       const modelNameLowercase = resolvedModel.toLowerCase();
       if (
