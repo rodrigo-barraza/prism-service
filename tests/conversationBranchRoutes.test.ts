@@ -278,6 +278,8 @@ describe("POST /conversations/:id/rewind — code", () => {
       workspaceRoot: WORKSPACE,
       ref: `${NS}2-1`,
       againstRef: `${NS}2-1-after`,
+      // Only turn 2's writes may be undone — never the user's own edits.
+      agentRanges: [{ from: `${NS}2-1`, to: `${NS}2-1-after` }],
       force: false,
       dryRun: false,
     });
@@ -293,6 +295,26 @@ describe("POST /conversations/:id/rewind — code", () => {
       phase: "restore",
       undoRef: `${NS}undo-1`,
       workspaceRoot: WORKSPACE,
+    });
+  });
+
+  it("scopes the restore to every agent batch and earlier restore since the target", async () => {
+    await rewind({ toMessageId: "m3", restore: "code" }); // leaves a restore record
+    db.list(COLLECTIONS.AGENT_CONVERSATIONS)[0].workspaceSnapshots.push(
+      // turn 3 crashed mid-batch: no after-snapshot
+      { ref: `${NS}3-1`, phase: "before", turn: 3, iteration: 1, messageId: null, messageBoundary: 9, toolCallIds: ["t9"], workspaceRoot: WORKSPACE, commit: "c9", createdAt: "2099-01-01T00:00:00.000Z" },
+    );
+
+    await rewind({ toMessageId: "m0", restore: "code", dryRun: true });
+
+    expect(restoreRequests()[1].body).toMatchObject({
+      ref: `${NS}1-1`,
+      agentRanges: [
+        { from: `${NS}1-1`, to: `${NS}1-1-after` },
+        { from: `${NS}2-1`, to: `${NS}2-1-after` },
+        { from: `${NS}undo-1`, to: `${NS}restore-1` },
+        { from: `${NS}3-1`, to: null },
+      ],
     });
   });
 

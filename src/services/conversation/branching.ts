@@ -40,9 +40,11 @@ import type { ConversationSettings } from "./types.ts";
 //     prunedBy: "user-rewind" so display serving hides them.
 //   code — restores each workspace to the first "before" snapshot taken
 //     after M (the state the user saw at M: the agent's next write had not
-//     happened yet), via tools-service. The conflict baseline is the
-//     latest snapshot, so a file the user edited after the agent's last
-//     write makes the restore refuse (409) unless `force`.
+//     happened yet), via tools-service, scoped by `agentRanges` to the
+//     paths the agent itself changed since (each batch's before→after
+//     snapshot pair; an earlier restore's undo→after). A user's unrelated
+//     edit is left alone; a user edit to one of those paths makes the
+//     restore refuse (409) unless `force`.
 //   both — code first; a refused or failed restore leaves the
 //     conversation untouched.
 //
@@ -138,10 +140,48 @@ export function snapshotPosition(record: WorkspaceSnapshotRecord, messages: Chat
   return record.messageBoundary;
 }
 
+export interface AgentRange {
+  from: string;
+  /** null: through the current working tree. */
+  to: string | null;
+}
+
 export interface RestorePlan {
   workspaceRoot: string;
   target: WorkspaceSnapshotRecord;
   baseline: WorkspaceSnapshotRecord;
+  /** The agent's own changes since the target — what the restore may touch. */
+  agentRanges: AgentRange[];
+}
+
+/**
+ * The before→after pair of every agent write batch from the target on,
+ * and the undo→after pair of every restore. A batch whose after-snapshot
+ * is missing (a crash mid-batch) runs to the next snapshot, or to the
+ * current tree when it was the last one.
+ */
+export function agentRangesFrom(ordered: WorkspaceSnapshotRecord[], targetIndex: number): AgentRange[] {
+  const ranges: AgentRange[] = [];
+  for (let index = targetIndex; index < ordered.length; index += 1) {
+    const record = ordered[index];
+    if (record.phase === "restore") {
+      if (record.undoRef) ranges.push({ from: record.undoRef, to: record.ref });
+      continue;
+    }
+    if (record.phase !== "before") continue;
+    const after = ordered.find(
+      (candidate, candidateIndex) =>
+        candidateIndex > index && candidate.phase === "after" && candidate.ref === `${record.ref}-after`,
+    );
+    if (after) {
+      ranges.push({ from: record.ref, to: after.ref });
+      continue;
+    }
+    const next = ordered[index + 1];
+    const nextState = next ? (next.phase === "restore" ? next.undoRef : next.ref) : null;
+    ranges.push({ from: record.ref, to: nextState || null });
+  }
+  return ranges;
 }
 
 /**
@@ -163,11 +203,16 @@ export function planRestores(
   const plans: RestorePlan[] = [];
   for (const [workspaceRoot, list] of byRoot) {
     const ordered = [...list].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-    const target = ordered.find(
+    const targetIndex = ordered.findIndex(
       (record) => record.phase === "before" && snapshotPosition(record, messages) >= keepThrough,
     );
-    if (!target) continue;
-    plans.push({ workspaceRoot, target, baseline: ordered[ordered.length - 1] });
+    if (targetIndex === -1) continue;
+    plans.push({
+      workspaceRoot,
+      target: ordered[targetIndex],
+      baseline: ordered[ordered.length - 1],
+      agentRanges: agentRangesFrom(ordered, targetIndex),
+    });
   }
   return plans;
 }
@@ -307,6 +352,7 @@ export async function rewindConversation(
             workspaceRoot: plan.workspaceRoot,
             ref: plan.target.ref,
             againstRef: plan.baseline.ref,
+            agentRanges: plan.agentRanges,
             force,
             dryRun: planDryRun,
           },
