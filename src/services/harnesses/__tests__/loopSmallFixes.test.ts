@@ -173,10 +173,6 @@ vi.mock("../lifecycle/SandboxExecutor.ts", () => ({
   restoreSandboxCheckpoint: vi.fn(),
 }));
 
-vi.mock("../lifecycle/ExhaustionRecovery.ts", () => ({
-  runExhaustionRecoveryPass: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock("#src/utils/FunctionCallingUtilities", () => ({
   expandMessagesForFunctionCall: vi.fn().mockImplementation((messages: unknown[]) => messages),
 }));
@@ -307,7 +303,14 @@ function buildLoopContext(overrides: {
     traceId: "test-trace",
     agentConversationId: "loop-fix-conv",
     conversationId: "loop-fix-conv",
-    provider: { generateTextStream: vi.fn(), discoverContextWindow: vi.fn() },
+    // Only a recovery/summary pass reaches the provider directly; every loop
+    // iteration goes through the scripted createProviderStream.
+    provider: {
+      generateTextStream: vi.fn().mockImplementation(async function* () {
+        yield "summary from an extra model call";
+      }),
+      discoverContextWindow: vi.fn(),
+    },
     options: {
       maxIterations: 6,
       agenticLoopEnabled: true,
@@ -390,10 +393,17 @@ describe("a. maxCostDollars reaches the loop and stops it with a persisted budge
 
     expect(modelCalls, "the loop must stop at the budget, not run the whole script").toBe(1);
     expect(executeToolBatchMock).not.toHaveBeenCalled();
+    expect(
+      (context.provider as unknown as { generateTextStream: ReturnType<typeof vi.fn> }).generateTextStream,
+      "a spent budget must not buy a summary pass",
+    ).not.toHaveBeenCalled();
     const events = emit.mock.calls.map((call) => call[0]);
     expect(events.some((event) => event?.message === "cost_limit_reached")).toBe(true);
-    const { meta } = persistedMeta();
+    const { messages, meta } = persistedMeta();
     expect(meta.conversationOutcome).toBe("budget_exhausted");
+    const finalAssistant = messages.filter((message) => message.role === "assistant").at(-1);
+    expect(String(finalAssistant?.content)).toContain("Cost cap reached");
+    expect(String(finalAssistant?.content)).not.toContain("Iteration limit");
   });
 });
 
