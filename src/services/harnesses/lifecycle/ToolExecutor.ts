@@ -6,6 +6,10 @@ import {
   TOOL_NAMES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { HARNESS } from "#src/constants";
+import {
+  snapshotAfterToolBatch,
+  snapshotBeforeToolBatch,
+} from "#src/services/conversation/workspaceSnapshots";
 
 import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type AgentHooks from "#src/services/AgentHooks";
@@ -118,6 +122,10 @@ export async function executeToolBatch(
   } = context;
 
   const resolvedAgentConversationId = agentConversationId || "";
+
+  // A batch that can write to the workspace is bracketed by shadow-git
+  // snapshots — the code half of user rewind. Read-only batches skip it.
+  const workspaceSnapshot = await snapshotBeforeToolBatch(toolCalls, context, state);
 
   const results = await Promise.all(
     toolCalls.map(async (toolCall) => {
@@ -314,6 +322,8 @@ export async function executeToolBatch(
       };
     }),
   );
+
+  await snapshotAfterToolBatch(workspaceSnapshot);
 
   return results;
 }
