@@ -124,6 +124,8 @@ function buildBranchingHarness(passFor: (iteration: number) => { text: string; t
     planModeText: "",
     frontierCandidates: [],
     toolErrorCounts: new Map(),
+    turnTranscript: null,
+    turnTranscriptSeen: new WeakSet(),
     streamedToolCalls: [] as unknown[],
     finalStreamedText: "",
     streamedThinking: "",
@@ -173,6 +175,7 @@ function buildBranchingHarness(passFor: (iteration: number) => { text: string; t
       resolvedEnabledTools: ["read_file", "write_file"],
     },
     enforceContextWindow: vi.fn().mockImplementation((messages: unknown) => messages),
+    estimateRequestOverheadTokens: vi.fn().mockReturnValue(0),
     createPassState: vi.fn().mockImplementation((options: unknown) => {
       const scripted = passFor(state.iterations);
       return {
