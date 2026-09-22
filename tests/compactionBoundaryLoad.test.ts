@@ -138,6 +138,24 @@ describe("POST /agent — loading a compacted conversation", () => {
     expect(messages).toHaveLength(history.length - 1);
   });
 
+  it("contextWindowLimit caps the window the loop manages context against", async () => {
+    mockConversationDocument({ id: CONVERSATION_ID });
+    const response = await supertest(app)
+      .post("/agent?stream=false")
+      .set("x-project", "prism-test")
+      .set("x-username", "rodrigo")
+      .send({
+        provider: PROVIDERS.GOOGLE,
+        model: "gemini-3.5-flash",
+        conversationId: CONVERSATION_ID,
+        messages: clientHistory(),
+        contextWindowLimit: 40_000,
+      });
+    expect(response.status).toBe(200);
+    const context = vi.mocked(AgenticLoopService.runAgenticLoop).mock.calls[0][0];
+    expect(context.modelDefinition?.maxInputTokens).toBe(40_000);
+  });
+
   it("fails open when the conversation document cannot be read", async () => {
     vi.mocked(MongoWrapper.getCollection).mockReturnValue({
       findOne: vi.fn().mockRejectedValue(new Error("mongo down")),

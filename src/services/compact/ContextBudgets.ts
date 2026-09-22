@@ -17,7 +17,7 @@ import {
 // never reached its 167K compaction threshold, so lossy truncation
 // did compaction's job on every long conversation.
 //
-// Invariant (enforced here, tested in contextBudgets.test.ts):
+// Invariant (enforced here, tested in compactionBoundaryUnits.test.ts):
 //   autoCompactThreshold  ≤  truncationBudget
 // so summarization always gets the first chance.
 // ────────────────────────────────────────────────────────────
@@ -118,4 +118,33 @@ export function estimateRequestInputTokens({
     };
   }
   return { tokens: messageTokens + overheadTokens, source: "estimated" };
+}
+
+/** Smallest `contextWindowLimit` honoured — below it a turn cannot hold a system prompt, tools and a reply. */
+export const MINIMUM_CONTEXT_WINDOW_LIMIT = 8_192;
+
+/**
+ * Apply a request's `contextWindowLimit`: context management (compaction
+ * threshold, truncation budget, output clamp) then works as if the model's
+ * window were that size — a cheaper working window on a large-window model,
+ * and how an isolated live test forces compaction without a small model.
+ * Only ever lowers the window; a missing, invalid or larger limit leaves the
+ * definition untouched. Never mutates the shared catalog entry.
+ */
+export function applyContextWindowLimit<T extends object>(
+  modelDefinition: T | null,
+  limit: unknown,
+): T | null {
+  if (
+    !modelDefinition ||
+    typeof limit !== "number" ||
+    !Number.isFinite(limit) ||
+    limit < MINIMUM_CONTEXT_WINDOW_LIMIT
+  ) {
+    return modelDefinition;
+  }
+  const ownWindow = (modelDefinition as { maxInputTokens?: number })
+    .maxInputTokens;
+  if (ownWindow && limit >= ownWindow) return modelDefinition;
+  return { ...modelDefinition, maxInputTokens: Math.floor(limit) };
 }

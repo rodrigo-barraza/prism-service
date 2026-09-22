@@ -8,6 +8,8 @@ import { describe, it, expect, vi } from "vitest";
 import {
   computeContextBudgets,
   estimateRequestInputTokens,
+  applyContextWindowLimit,
+  MINIMUM_CONTEXT_WINDOW_LIMIT,
 } from "#src/services/compact/ContextBudgets";
 import { findRecencyBoundary } from "#src/services/compact/RecencyProtection";
 import {
@@ -107,6 +109,24 @@ describe("estimateRequestInputTokens — the trigger counts the whole request", 
         baseline: { inputTokens: 0, messageTokens: 5_000 },
       }).source,
     ).toBe("estimated");
+  });
+});
+
+describe("applyContextWindowLimit — a request-level working window", () => {
+  const catalogEntry = { name: "big-model", maxInputTokens: 1_000_000 };
+
+  it("lowers the window without mutating the catalog entry", () => {
+    const limited = applyContextWindowLimit(catalogEntry, 40_000);
+    expect(limited).toEqual({ name: "big-model", maxInputTokens: 40_000 });
+    expect(catalogEntry.maxInputTokens).toBe(1_000_000);
+  });
+
+  it("never raises the window, and ignores missing or invalid limits", () => {
+    expect(applyContextWindowLimit(catalogEntry, 2_000_000)).toBe(catalogEntry);
+    expect(applyContextWindowLimit(catalogEntry, undefined)).toBe(catalogEntry);
+    expect(applyContextWindowLimit(catalogEntry, "40000")).toBe(catalogEntry);
+    expect(applyContextWindowLimit(catalogEntry, MINIMUM_CONTEXT_WINDOW_LIMIT - 1)).toBe(catalogEntry);
+    expect(applyContextWindowLimit(null, 40_000)).toBeNull();
   });
 });
 
