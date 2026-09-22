@@ -163,6 +163,13 @@ function applyHashlineEdits(text: string, edits: HashlineEdit[]): string | null 
   return lines.join("\n") + (trailingNewline ? "\n" : "");
 }
 
+/** The path as the diff header shows it: relative to the workspace root when inside it. */
+function displayPath(filePath: string, workspaceRoot: string | null | undefined): string {
+  if (!workspaceRoot) return filePath;
+  const root = workspaceRoot.replace(/\/+$/, "");
+  return filePath.startsWith(`${root}/`) ? filePath.slice(root.length + 1) : filePath;
+}
+
 function finish(filePath: string, diff: string, isNewFile: boolean): ApprovalPreview | null {
   if (!diff) return null;
   const isTruncated = diff.length > APPROVALS.PREVIEW_MAXIMUM_DIFF_CHARACTERS;
@@ -183,6 +190,7 @@ export async function buildApprovalPreview(
   const args = toolCall.args || {};
   const filePath = typeof args.path === "string" ? args.path : null;
   if (!filePath) return null;
+  const headerPath = displayPath(filePath, context.workspaceRoot);
 
   try {
     if (toolCall.name === APPLY_PATCH_TOOL_NAME || toolCall.name === TOOL_NAMES.PATCH_FILE) {
@@ -202,7 +210,7 @@ export async function buildApprovalPreview(
       if (args.content.length > APPROVALS.PREVIEW_MAXIMUM_CHARACTERS) return null;
       return finish(
         filePath,
-        createUnifiedDiff(filePath, current.text, args.content),
+        createUnifiedDiff(headerPath, current.text, args.content),
         current.text === null,
       );
     }
@@ -212,7 +220,7 @@ export async function buildApprovalPreview(
       const updated = applyHashlineEdits(current.text, args.edits as HashlineEdit[]);
       return updated === null
         ? null
-        : finish(filePath, createUnifiedDiff(filePath, current.text, updated), false);
+        : finish(filePath, createUnifiedDiff(headerPath, current.text, updated), false);
     }
   } catch (error: unknown) {
     logger.warn(
