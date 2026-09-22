@@ -37,6 +37,10 @@ import {
   type OpenAICompletionResponse,
 } from "#src/providers/openai-compat";
 import type { InputMessage } from "#src/providers/openai-compat";
+import {
+  hashChatPrefix,
+  requestTelemetryChunk,
+} from "#src/utils/PromptPrefixHashes";
 
 const DEFAULT_BASE_URL = "https://api.moonshot.ai/v1";
 
@@ -199,6 +203,12 @@ const moonshotProvider = {
     logger.provider("Moonshot", `generateTextStream model=${model}`);
     try {
       const payload = buildMoonshotPayload(messages, model, options, true);
+      const prefixHashes = options.cacheTelemetry
+        ? hashChatPrefix(
+            payload.messages as unknown[],
+            payload.tools as unknown[] | undefined,
+          )
+        : null;
       const response = await fetchOpenAICompat(
         `${getBaseUrl()}/chat/completions`,
         payload,
@@ -234,6 +244,7 @@ const moonshotProvider = {
       }
 
       if (rateLimits) yield { type: "rateLimits", rateLimits };
+      if (options.cacheTelemetry) yield requestTelemetryChunk(prefixHashes);
     } catch (error: unknown) {
       if (error instanceof Error && error.name === "AbortError") return; // client disconnected
       if (error instanceof ProviderError) throw error;

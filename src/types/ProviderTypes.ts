@@ -99,6 +99,15 @@ export interface ProviderOptions {
    * conversation's prefix; providers without an equivalent ignore it.
    */
   promptCacheKey?: string;
+  /**
+   * Prompt-cache telemetry (agent loop). When set, the adapter hashes the
+   * payload it sends and yields one `requestTelemetry` chunk at the end of
+   * the stream. `previousResponseId` — the previous request's provider
+   * response id in the same conversation — is what OpenAI
+   * (`prompt_cache_options.comparison_response_id`) and Anthropic
+   * (`diagnostics.previous_message_id`) diagnose a cache miss against.
+   */
+  cacheTelemetry?: { previousResponseId?: string | null };
   webSearch?: boolean | string;
   webFetch?: boolean;
   codeExecution?: boolean;

@@ -25,6 +25,10 @@ import {
   type OpenAICompletionResponse,
 } from "#src/providers/openai-compat";
 import type { InputMessage } from "#src/providers/openai-compat";
+import {
+  hashChatPrefix,
+  requestTelemetryChunk,
+} from "#src/utils/PromptPrefixHashes";
 
 // ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 // ┃  TEMPORARY PATCH — Remove when vLLM fixes Qwen3.6 chat     ┃
@@ -243,6 +247,9 @@ export function createVllmProvider(
           };
         }
 
+        const prefixHashes = options.cacheTelemetry
+          ? hashChatPrefix(prepared, tools)
+          : null;
         const response = await fetchOpenAICompat(
           `${baseUrl}/v1/chat/completions`,
           payload,
@@ -276,6 +283,7 @@ export function createVllmProvider(
             yield chunk;
           }
         }
+        if (options.cacheTelemetry) yield requestTelemetryChunk(prefixHashes);
       } catch (error: unknown) {
         if (error instanceof Error && error.name === "AbortError") return; // Client disconnected
         if (error instanceof ProviderError) throw error;

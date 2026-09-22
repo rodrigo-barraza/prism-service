@@ -3,6 +3,9 @@
 > Hand to ONE session per landing: *"Read prism-service/docs/prompts/10-prefix-stable-requests.md and execute Landing N."*
 > Conventions, gates and the isolated live recipe: `docs/prompts/README.md`. Source: `docs/harness_modernization_2026-09.md` §3 (K1, K2, K4), §4.1, Appendix A.
 
+> **Landing 1 (`cache-telemetry`) is done** (2026-09-22). Every `agent:iteration` row carries `prefixHashes`, `firstDivergenceIndex` and `cacheTelemetry` (what changed against the previous request, plus OpenAI/Anthropic cache diagnostics), and `GET /admin/stats/cache` aggregates them.
+> Tests: `src/services/harnesses/__tests__/cacheTelemetryLoop.test.ts`, `src/services/__tests__/promptCacheTelemetry.test.ts`, `tests/cacheDiagnostics.test.ts`, `tests/adminCacheStats.test.ts`. The fixed probe scenario and its baseline are under Landing 2 → Live measurement.
+
 **Repos:** prism-service · **Size:** L · **Depends on:** 02 (thinking blocks stored and replayed verbatim, plus `block_binding`) and 06 (compaction boundaries) · **Shares hubs with:** 23 (`src/services/RequestLogger.ts`: coordinate, since 23 adds redaction on the same write path), 25 (providers).
 
 ## Background (measured 2026-09-22, `prism.requests`, 30 days)
@@ -10,31 +13,7 @@
 - **Zero-cache iterations.** 30% of consecutive Gemini iterations (178 of 603, most under 30 s apart) read **zero** cache.
 - **Cold conversations.** Only 11% of conversations got any cache hit on their first request.
 - **Cost.** About 9.8M tokens per month that were an exact prefix of the previous request were billed at full price: roughly $6.6 per month, plus $3–4 of cold starts.
-- **No diagnosis possible.** The log stores only `{role, content}` per message (`BaseAgenticHarness.ts` ~1220–1227): no system prompt, no tools, no tool-call structure. So nobody can tell *why* a request missed.
-
----
-
-## Landing 1 — `cache-telemetry` (do this first, so Landing 2 is measurable)
-
-**Changes:**
-- **Hashes per request row.**
-  - `prefixHashes: {system, tools, messages: [h0, h1, …]}`: SHA-256 over canonical JSON of what was actually sent. For `tools`, a canonically sorted form with schemas.
-  - `firstDivergenceIndex` against the previous iteration of the same loop.
-  - The provider cache fields already recorded.
-
-  Hash the **serialized provider payload** where possible (inside each adapter, or a hook just before send), not the harness messages.
-- **Provider diagnostics.**
-  - OpenAI GPT-5.6+: send `prompt_cache_options.comparison_response_id` = the previous response id; log `prompt_cache_diagnostics.reason` (`tools_changed`, `input_changed`, …). No cost, no rate-limit charge. Verify the field names against https://developers.openai.com/api/docs/guides/prompt-caching/diagnostics.
-  - Anthropic: beta `cache-diagnosis-2026-04-07` with `diagnostics.previous_message_id`; log `response.diagnostics`. Verify against the Claude API reference.
-- **Stats endpoint.** `GET /admin/stats/cache` returns cache-read share per provider/model, the share of zero-cache consecutive pairs, and a histogram of miss reasons (from diagnostics, or from `firstDivergenceIndex` plus which hash changed).
-- **Client (optional, small).** Show the per-conversation cache-read share in the usage panel.
-
-**Tests:**
-- **Hashes, red first.** A scripted two-iteration loop per provider adapter (Anthropic, OpenAI, Google, vLLM/openai-compat) → rows carry hashes, and `firstDivergenceIndex` equals the previous message count when the history only appended. (Red: the fields don't exist.)
-- **Diagnostics.** Request-shape tests for both diagnostics fields. Response fixtures with a diagnostics reason are logged.
-- **Stats endpoint.** A route test on seeded rows (supertest).
-
-**Live:** run the measurement below on master behaviour (this landing changes no request bytes) to record the **baseline**.
+- **No diagnosis possible.** The log stores only `{role, content}` per message (`BaseAgenticHarness.ts` ~1220–1227): no system prompt, no tools, no tool-call structure. So nobody can tell *why* a request missed. *(Landing 1 added the hashes and diagnostics.)*
 
 ---
 
@@ -92,10 +71,25 @@ Recon first: using the Landing 1 hashes on a scripted run, list every place the 
 - **Anthropic thinking.** A scripted 3-iteration Claude run with a mid-loop discovery, in `"error"` binding mode, produces no binding error (fixture-level assertion on the outgoing payload order and bytes).
 
 **Live measurement** (isolated; this is the point of the prompt):
-- **Scenario.** A fixed 10-iteration, discovery-heavy task on `gemini-3.6-flash` (for example: "find the three largest files in the scratch workspace, read each, summarize" with discovery forced), run 3 times on master's behaviour (Landing 1 baseline) and 3 times on this branch.
+- **Scenario (fixed by Landing 1).** In the isolated instance (`README.md` §Live, `prism_test_<slug>`):
+  1. `PUT /settings` with `{"agents":{"preflightToolDiscovery":false}}`, so discovery happens mid-loop.
+  2. `POST /custom-agents` a probe agent: `availableTools: ["get_element","convert_units"]`, `enabledByDefaultTools: []`, and APPROVE `policies` for `get_element`, `convert_units`, `discover_and_enable_tools` and `enable_tools`. Run with `autoApprove: false`. Production tools-service serves `/` as its workspace root, so only these tools (and tier-AUTO ones) may execute. Unapproved discovery stalls for 2 minutes on approval and spoils the scenario.
+  3. `POST /agent?stream=false` three times: `provider: "google"`, `model: "gemini-3.6-flash"`, `agent: "CUSTOM_CACHE_PROBE"`, `maxIterations: 14`, a fresh `conversationId` (sent as `agentConversationId` too) each time. The message: *"Look up iron, copper, silver and gold with the periodic table tool, one element per tool call. Then convert each density from grams per cubic centimetre to pounds per cubic foot with the unit conversion tool, one conversion per tool call. Use only those two tools: no web search and no code execution. Finish with a table: element, density in g/cm3, density in lb/ft3."*
+  4. `GET /admin/stats/cache?from=…&to=…` over the runs' window. `createdAt` compares as a string, so pass ISO times with milliseconds.
+- **Baseline** (Landing 1 branch, which sends master's prompt bytes; 2026-09-22; 3 runs, 42 iterations):
+  - cache-read share 74.1% overall and 74.9% within a turn;
+  - zero-cache consecutive pairs: 0 of 39;
+  - first requests with a cache hit: 3 of 3;
+  - cost about $0.28 in iteration rows ($0.32 by the `/agent` totals);
+  - prefix changes: exactly one per run, `tools_changed` at iteration 2 (discovery swaps 87 tools for 61). Every other pair is `append_only`.
+- **What the baseline says about the targets.**
+  - Gemini 3.6 Flash's implicit cache reads stay near 16.1K tokens while the prompt grows from 20K to 27K (one run stepped to about 24K late). Even the `tools_changed` request read 16.1K.
+  - With the prefix already append-only, Gemini's coarse implicit caching caps the within-turn share, not Prism. The 80% target is unlikely on Gemini without explicit `cachedContents` (K3).
+  - Measure the tool bust where it costs. On the short probe (iron and copper, `maxIterations: 6`), `claude-sonnet-5` reads about 99% of the previous prompt on append-only iterations and 0 on the `tools_changed` one; Anthropic's diagnosis says `tools_changed`, 26,655 missed tokens. `gpt-5.6-luna` reads 98–99%, with 0 and `unavailable` on `tools_changed`.
+  - Gaps are the other zero-cache cause. In a pilot, a 126 s approval wait was followed by a zero-cache Gemini read on an append-only prefix.
 - **Report.** Cache-read share, the share of zero-cache consecutive pairs, first-request hits, and cost.
 - **Targets:** zero-cache consecutive pairs under 5% (excluding each conversation's first request) and cache-read share above 80% within a turn. If they aren't met, report which hash still changes.
-- **Claude.** Repeat once on `claude-sonnet-5`: no 400s, empty `input_transformations`.
+- **Claude.** Repeat the short probe once on `claude-sonnet-5`: no 400s, empty `input_transformations`. Landing 1's run is the "before".
 
 ## Done when (each landing)
 - The tests are green and the gates are clean.

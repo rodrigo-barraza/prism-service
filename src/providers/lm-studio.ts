@@ -43,6 +43,10 @@ import {
   type PreparedMessage,
   type OpenAICompletionResponse,
 } from "#src/providers/openai-compat";
+import {
+  hashChatPrefix,
+  requestTelemetryChunk,
+} from "#src/utils/PromptPrefixHashes";
 import { ORCHESTRATOR_ONLY_TOOLS } from "#src/services/OrchestratorPrompt";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { PROVIDERS } from "#src/constants";
@@ -1257,6 +1261,12 @@ export function createLmStudioProvider(
       logger.info(
         `[LM-Studio] OpenAI-compat streaming (agentic): model=${model}, tools=${((payload as Record<string, unknown>).tools as unknown[] | undefined)?.length || 0}/${options.tools?.length || 0}, ctx=${options._loadedContextLength || "unset"}`,
       );
+      const prefixHashes = options.cacheTelemetry
+        ? hashChatPrefix(
+            payload.messages,
+            (payload as Record<string, unknown>).tools as unknown[] | undefined,
+          )
+        : null;
       yield { type: "status", message: "Starting…", phase: "starting" };
       const response = await fetch(`${baseUrl}/v1/chat/completions`, {
         method: "POST",
@@ -1324,6 +1334,7 @@ export function createLmStudioProvider(
           yield chunk;
         }
       }
+      if (options.cacheTelemetry) yield requestTelemetryChunk(prefixHashes);
     },
     // ── Embedding Generation ─────────────────────────────────
     /**
