@@ -349,8 +349,22 @@ export const PROMPT_DELIMITERS = {
 // ─── Orchestrator Constants ─────────────────────────────────
 
 export const ORCHESTRATOR = {
-  /** Maximum parallel sub-agents a single parent can spawn. */
+  /**
+   * Maximum RUNNING sub-agents per root conversation (the whole delegation
+   * tree of one user conversation). Counted per conversation so one busy
+   * conversation cannot starve every other one in the process.
+   */
   MAX_SUB_AGENTS: 10,
+
+  /**
+   * How long a non-blocking create_subagent(s) call waits for its members to
+   * register (id + worktree allocated) before returning what it has. The
+   * tool is exempt from the per-tool timeout, so this is its only bound; a
+   * member still unregistered is reported as an error entry and keeps
+   * starting in the background (its result arrives via the completion
+   * notification).
+   */
+  DISPATCH_REGISTRATION_TIMEOUT_MILLISECONDS: 120_000,
 
   /** Default max iterations per sub-agent agentic loop. */
   MAX_SUB_AGENT_ITERATIONS: 15,

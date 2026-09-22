@@ -18,6 +18,15 @@ import {
 import logger from "#src/utils/logger";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import { ORCHESTRATOR } from "#src/constants";
+import {
+  mergeBackAllDeferred,
+  settleCompetingWorktrees,
+} from "#src/services/orchestrator/WorktreeMergeBack";
+
+/** Which actor's work the jury picked — the only worktree that merges back. */
+interface JuryOutcome {
+  winnerAgentId: string | null;
+}
 
 const DEFAULT_MAXIMUM_ROUNDS = 3;
 const DEFAULT_ACTOR_COUNT = 1;
@@ -335,8 +344,11 @@ export class CriticLoopRouter implements TopologyRouter {
       return [{ error: errorMessage }];
     }
 
+    // Actors keep their worktrees across rounds (preserveWorktree); once the
+    // loop is done, the work that won merges back into the parent's branch.
     if (actorCount > 1) {
-      return this.executeJuryMode(
+      const jury: JuryOutcome = { winnerAgentId: null };
+      const juryResults = await this.executeJuryMode(
         teamName,
         members,
         orchestratorContext,
@@ -344,10 +356,18 @@ export class CriticLoopRouter implements TopologyRouter {
         continueSubAgent,
         actorCount,
         maximumRounds,
+        jury,
       );
+      // Competing actors: only the jury's pick merges; the others keep a branch.
+      await settleCompetingWorktrees(
+        juryResults,
+        jury.winnerAgentId,
+        orchestratorContext.emit,
+      );
+      return juryResults;
     }
 
-    return this.executeCouncilMode(
+    const councilResults = await this.executeCouncilMode(
       teamName,
       members,
       orchestratorContext,
@@ -355,6 +375,9 @@ export class CriticLoopRouter implements TopologyRouter {
       continueSubAgent,
       maximumRounds,
     );
+    // One actor, revised in place: its final state is the team's work.
+    await mergeBackAllDeferred(councilResults, orchestratorContext.emit);
+    return councilResults;
   }
 
   // ── Council of Judges Mode (1 Actor + N Critics) ──────────────────────
@@ -652,6 +675,7 @@ export class CriticLoopRouter implements TopologyRouter {
     continueSubAgent?: ContinueSubAgentCallback,
     actorCount = 2,
     maximumRounds = DEFAULT_MAXIMUM_ROUNDS,
+    jury: JuryOutcome = { winnerAgentId: null },
   ): Promise<(SubAgentResult | { error: string })[]> {
     const { providerName, resolvedModel } = orchestratorContext;
     const allResults: (SubAgentResult | { error: string })[] = [];
@@ -817,6 +841,7 @@ export class CriticLoopRouter implements TopologyRouter {
       );
       return allResults;
     }
+    jury.winnerAgentId = winnerResult.agent_id;
 
     logger.info(
       `[CriticLoopRouter] Jury selected Actor ${winnerActorIndex + 1} — verdict: ${selection.verdict}`,

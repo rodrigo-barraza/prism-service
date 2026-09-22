@@ -7,7 +7,10 @@
  */
 import { describe, it, expect } from "vitest";
 
-import { sanitizeSchemaForOpenAI } from "#src/providers/openai";
+import {
+  hasOpenObjectSchema,
+  sanitizeSchemaForOpenAI,
+} from "#src/providers/openai";
 
 // ── Primitive / Edge Cases ───────────────────────────────────
 describe("sanitizeSchemaForOpenAI — edge cases", () => {
@@ -240,5 +243,99 @@ describe("sanitizeSchemaForOpenAI — recursive sanitization", () => {
     const properties = result.properties as Record<string, unknown>;
     expect(properties.pattern).toBeDefined();
     expect(properties.minimum).toBeDefined();
+  });
+});
+
+// ── Open objects (non-strict tools) ──────────────────────────
+describe("hasOpenObjectSchema", () => {
+  it("flags a free-form map anywhere in the schema", () => {
+    const freeForm = { type: "object", description: "any keys" };
+    expect(hasOpenObjectSchema(freeForm)).toBe(true);
+    expect(
+      hasOpenObjectSchema({
+        type: "object",
+        properties: { env: freeForm },
+      }),
+    ).toBe(true);
+    expect(
+      hasOpenObjectSchema({
+        type: "object",
+        properties: { rows: { type: "array", items: freeForm } },
+      }),
+    ).toBe(true);
+    expect(
+      hasOpenObjectSchema({
+        type: "object",
+        properties: { value: { anyOf: [{ type: "string" }, freeForm] } },
+      }),
+    ).toBe(true);
+  });
+
+  it("flags additionalProperties set to anything but false", () => {
+    expect(
+      hasOpenObjectSchema({
+        type: "object",
+        properties: {},
+        additionalProperties: true,
+      }),
+    ).toBe(true);
+    expect(
+      hasOpenObjectSchema({
+        type: "object",
+        properties: {},
+        additionalProperties: { type: "string" },
+      }),
+    ).toBe(true);
+  });
+
+  it("treats typed objects and an explicit empty properties map as closed", () => {
+    expect(hasOpenObjectSchema({ type: "object", properties: {} })).toBe(false);
+    expect(
+      hasOpenObjectSchema({
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          nested: { type: "object", properties: { flag: { type: "boolean" } } },
+        },
+        additionalProperties: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("ignores data keywords and field names that look like schemas", () => {
+    expect(
+      hasOpenObjectSchema({
+        type: "object",
+        properties: {
+          type: { type: "string", enum: ["object"] },
+          mode: { type: "string", default: "x", examples: [{ type: "object" }] },
+        },
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("sanitizeSchemaForOpenAI — non-strict", () => {
+  it("keeps open objects open and optional fields optional", () => {
+    const result = sanitizeSchemaForOpenAI(
+      {
+        type: "object",
+        properties: {
+          toolName: { type: "string", pattern: "^[a-z_]+$" },
+          toolArguments: { type: "object", description: "free-form" },
+        },
+        required: ["toolName"],
+      },
+      false,
+      false,
+    ) as Record<string, any>;
+
+    expect(result).not.toHaveProperty("additionalProperties");
+    expect(result.required).toEqual(["toolName"]);
+    expect(result.properties.toolName).toEqual({ type: "string" });
+    expect(result.properties.toolArguments).toEqual({
+      type: "object",
+      description: "free-form",
+    });
   });
 });
