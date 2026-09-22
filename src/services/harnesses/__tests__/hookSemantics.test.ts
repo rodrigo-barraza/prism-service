@@ -888,7 +888,12 @@ describe("configured hooks — the new events fire once, at the right moment", (
 
   it("PreModelSwitch / PostModelSwitch carry the estimated re-cache cost; a block refuses the turn", async () => {
     hookState.configured = [configuredHook("PreModelSwitch"), configuredHook("PostModelSwitch")];
-    hookState.conversationDocument = { settings: { model: "old-model", provider: "openai" } };
+    // The previous turn's system prompt stands in for this turn's, which is
+    // not assembled yet when the switch is decided.
+    hookState.conversationDocument = {
+      settings: { model: "old-model", provider: "openai" },
+      systemPrompt: "s".repeat(40_000),
+    };
     const pricing = { inputPerMillion: 3, cacheWriteInputPerMillion: 3.75 };
     const history = [
       { role: "user", content: "x".repeat(4_000) },
@@ -905,10 +910,11 @@ describe("configured hooks — the new events fire once, at the right moment", (
       to_model: "test-model",
       cache_write_price_per_million: 3.75,
     });
-    expect(pre.estimated_recache_tokens as number).toBeGreaterThan(900);
+    // ~1 000 tokens of history + ~10 000 of system prompt + the tool schemas.
+    expect(pre.estimated_recache_tokens as number).toBeGreaterThan(10_500);
     expect(pre.estimated_recache_cost_usd as number).toBeCloseTo(
       ((pre.estimated_recache_tokens as number) / 1_000_000) * 3.75,
-      6,
+      5,
     );
     expect(recordedFor("PostModelSwitch")).toHaveLength(1);
 

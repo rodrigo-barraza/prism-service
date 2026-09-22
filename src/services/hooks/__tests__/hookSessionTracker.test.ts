@@ -55,6 +55,21 @@ describe("HookSessionTracker", () => {
     expect(HookSessionTracker.openSessionCount()).toBe(0);
   });
 
+  it("waits for an awaited SessionEnd hook to finish before shutdown resolves", async () => {
+    vi.useRealTimers();
+    const hooks = new AgentHooks();
+    const delivered: string[] = [];
+    hooks.register(
+      "sessionEnd",
+      () => new Promise<void>((resolve) => setTimeout(() => { delivered.push("done"); resolve(); }, 50)),
+      "slow-but-bounded",
+      "transform",
+    );
+    HookSessionTracker.beginSessionTurn("c-1", hooks, IDENTITY, false);
+    await HookSessionTracker.endAllSessions("shutdown", 1_000);
+    expect(delivered).toEqual(["done"]);
+  });
+
   it("closes every open session at shutdown under one budget", async () => {
     vi.useRealTimers();
     const fast = recordingHooks();

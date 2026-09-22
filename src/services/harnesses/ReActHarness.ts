@@ -272,12 +272,10 @@ export default class ReActHarness extends BaseAgenticHarness {
     // SessionStart (new session only), SubagentStart, TurnStart,
     // UserPromptSubmit and the model-switch pair. A UserPromptSubmit or
     // PreModelSwitch refusal ends the run before a single token is spent.
-    const turnHooks: TurnHookHandle = await openTurnHooks(
-      context,
-      hooks,
-      currentMessages,
-      () => currentMessages,
-    );
+    const turnHooks: TurnHookHandle = await openTurnHooks(context, hooks, currentMessages, {
+      getMessages: () => currentMessages,
+      toolSchemas: this.tools.finalTools,
+    });
     if (turnHooks.blocked) {
       await closeTurnHooks(context, hooks, state, turnHooks, {
         blocked: true,

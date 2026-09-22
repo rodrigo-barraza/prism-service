@@ -355,11 +355,18 @@ const DECIDE_EVENTS = new Set<HookEventName>([
   HOOK_EVENTS.STOP,
 ]);
 
-/** Events whose hooks are awaited for what they return, without gating. */
+/**
+ * Events whose hooks are awaited without gating: for what they return, or —
+ * `SessionEnd` — because nothing else would wait for them. At shutdown the
+ * process exits as soon as its cleanup resolves, so a fire-and-forget
+ * SessionEnd hook was simply lost (seen in the live check); awaited, it is
+ * bounded by its own timeout and the shared shutdown budget.
+ */
 const TRANSFORM_EVENTS = new Set<HookEventName>([
   HOOK_EVENTS.POST_TOOL_USE,
   HOOK_EVENTS.POST_TOOL_BATCH,
   HOOK_EVENTS.INTERRUPT,
+  HOOK_EVENTS.SESSION_END,
 ]);
 
 /**
