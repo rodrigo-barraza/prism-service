@@ -125,12 +125,12 @@ vi.mock('#src/services/AgenticLoopService', () => ({
 }));
 
 vi.mock('#src/utils/SseUtilities', () => ({
-  handleSseRequest: vi.fn().mockImplementation(async (req, res, params, handler) => {
+  handleSseRequest: vi.fn().mockImplementation(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/event-stream' });
     res.write('data: {}\n\n');
     res.end();
   }),
-  handleJsonRequest: vi.fn().mockImplementation(async (req, res, next, params, handler) => {
+  handleJsonRequest: vi.fn().mockImplementation(async (req, res) => {
     res.json({ ok: true });
   }),
 }));
@@ -160,7 +160,7 @@ describe('Feature Routes Integration Tests', () => {
 
   beforeEach(() => {
     // Intercept fetch calls to Tools Service
-    vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+    vi.spyOn(global, 'fetch').mockImplementation(async (url) => {
       const urlString = String(url);
       if (urlString.includes('/agentic/project/summary')) {
         return {

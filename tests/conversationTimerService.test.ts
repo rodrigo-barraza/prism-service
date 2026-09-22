@@ -1,13 +1,11 @@
 import "./setup.ts";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { PROVIDERS, COLLECTIONS } from "#src/constants";
-import crypto from "crypto";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import ConversationService from "#src/services/ConversationService";
 import * as configModule from "#src/config";
 import * as scheduledTaskServiceModule from "#src/services/ScheduledTaskService";
 import * as providersModule from "#src/providers/index";
-import { registerCleanup } from "#src/utils/CleanupRegistry";
 
 // ── Mock logger (suppress output) ──────────────────────────────
 vi.mock("#src/utils/logger", () => ({

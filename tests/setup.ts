@@ -108,7 +108,9 @@ global.fetch = vi.fn().mockImplementation(async (url, init) => {
         if (originalFetch) {
             return await originalFetch(url, init);
         }
-    } catch (e) {}
+    } catch {
+        // the real fetch failed — fall through to the 500 below
+    }
     return {
         ok: false,
         status: 500,

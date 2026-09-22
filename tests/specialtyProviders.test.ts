@@ -2,7 +2,6 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import './setup.ts';
 import elevenlabsProvider from '#src/providers/elevenlabs';
 import inworldProvider from '#src/providers/inworld';
-import { Readable } from 'stream';
 import EventEmitter from 'events';
 import WebSocket from 'ws';
 
@@ -10,13 +9,13 @@ import WebSocket from 'ws';
 const mockWsSend = vi.fn();
 const mockWsClose = vi.fn();
 
-vi.mock('ws', () => {
-  const EventEmitter = require('events');
+vi.mock('ws', async () => {
+  const { EventEmitter } = await import('events');
   class mockWebSocketClass extends EventEmitter {
     readyState = 1; // OPEN
     send = mockWsSend;
     close = mockWsClose;
-    constructor(url: string, options: any) {
+    constructor(_url: string, _options: any) {
       super();
       // Auto-open in next tick
       setTimeout(() => {

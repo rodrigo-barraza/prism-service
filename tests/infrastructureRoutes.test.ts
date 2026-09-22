@@ -2,10 +2,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { app } from './setup.ts';
 import request from 'supertest';
 import MongoWrapper from '#src/wrappers/MongoWrapper';
-import BenchmarkService from '#src/services/BenchmarkService';
-import OrchestratorService from '#src/services/OrchestratorService';
 import AgenticLoopService from '#src/services/AgenticLoopService';
-import FileService from '#src/services/FileService';
 import SettingsService from '#src/services/SettingsService';
 import * as providersModule from '#src/providers/index';
 import { errorHandler } from '#src/utils/errors';
@@ -109,8 +106,6 @@ vi.mock('#src/services/FileService', () => ({
     })
   }
 }));
-
-const originalGetProvider = providersModule.getProvider;
 
 describe('Infrastructure Routes Integration Tests', () => {
   let mockDb: any;

@@ -155,7 +155,7 @@ describe("OrchestratorService Resume Agent", () => {
 
     // Auto-response spy should have been called
     expect(autoResponseSpy).toHaveBeenCalledOnce();
-    const [convId, proj, user, ctx, msg] = autoResponseSpy.mock.calls[0];
+    const [convId, proj, user, , msg] = autoResponseSpy.mock.calls[0];
     expect(convId).toBe("conv-parent");
     expect(proj).toBe("test-project");
     expect(user).toBe("test-user");

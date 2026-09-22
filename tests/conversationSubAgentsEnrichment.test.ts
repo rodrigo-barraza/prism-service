@@ -23,14 +23,15 @@ describe("Conversation Sub-agents Enrichment Integration Tests", () => {
   let shouldDistinctFail = false;
 
   beforeEach(async () => {
-    const request = (await import("supertest")).default;
     const { app } = await import("./setup.ts");
     const conversationsRouter = (await import("#src/routes/ConversationsRoutes")).default;
     const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
 
     try {
       app.use("/conversations", conversationsRouter);
-    } catch (ignoreError) {}
+    } catch {
+      // mounting is best-effort; a failed mount shows up as a 404 in the requests below
+    }
 
     // Reset default mock data
     mockAgentConversations = [];
@@ -81,7 +82,7 @@ describe("Conversation Sub-agents Enrichment Integration Tests", () => {
             }
             return 0;
           },
-          distinct: async (field: string, queryFilter: any) => {
+          distinct: async () => {
             if (shouldDistinctFail) {
               throw new Error("Simulated database failure for distinct query");
             }
@@ -93,7 +94,7 @@ describe("Conversation Sub-agents Enrichment Integration Tests", () => {
             }
             return [];
           },
-          aggregate: (pipeline: any[]) => {
+          aggregate: () => {
             return {
               toArray: async () => [],
             };
