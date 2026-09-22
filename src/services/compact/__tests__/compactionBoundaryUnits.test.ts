@@ -266,6 +266,24 @@ describe("micro-compaction offloads the tools that actually run", () => {
   });
 });
 
+describe("extractSummaryFromResponse — the persisted summary is the summary", () => {
+  it("ignores a <summary> tag the analysis mentions in prose", async () => {
+    const { extractSummaryFromResponse } = await import("#src/services/compact/CompactionPrompt");
+    const response =
+      "<analysis>\nI will list the files, then wrap the result in `<summary>` tags.\n</analysis>\n" +
+      "<summary>\n1. Primary Request: read eight PDFs.\n</summary>";
+    expect(extractSummaryFromResponse(response)).toBe("1. Primary Request: read eight PDFs.");
+  });
+
+  it("takes the last summary block when the analysis is unclosed", async () => {
+    const { extractSummaryFromResponse } = await import("#src/services/compact/CompactionPrompt");
+    const response =
+      "<analysis> notes about <summary> formatting… " +
+      "<summary>The real summary.</summary>";
+    expect(extractSummaryFromResponse(response)).toBe("The real summary.");
+  });
+});
+
 // ── CompactionBoundary ───────────────────────────────────────
 
 const BOUNDARY: CompactionBoundary = {
