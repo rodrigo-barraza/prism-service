@@ -5,10 +5,10 @@ import AgenticLoopService from "#src/services/AgenticLoopService";
 import AgentSessionRegistry from "#src/services/AgentSessionRegistry";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import { handleAgent } from "./ChatRoutes.ts";
-import { handleQuestionAnswer } from "./QuestionAnswerHandler.ts";
 import logger from "#src/utils/logger";
 import { handleSseRequest, handleJsonRequest } from "#src/utils/SseUtilities";
 import { TIMERS } from "#src/constants";
+import { handleQuestionAnswer } from "./QuestionAnswerHandler.ts";
 
 const router = express.Router();
 
