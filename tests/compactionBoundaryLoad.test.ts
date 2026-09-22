@@ -51,17 +51,17 @@ const BOUNDARY = {
 /** What the client sends back: its loaded history plus the new question. */
 function clientHistory() {
   return [
-    { role: "user", content: "set up the ledger", messageId: "u-1" },
-    { role: "assistant", content: "ledger set up", messageId: "a-1" },
-    { role: "user", content: "agree the totals", messageId: "u-2" },
+    { role: "user", content: "set up the ledger", id: "u-1" },
+    { role: "assistant", content: "ledger set up", id: "a-1" },
+    { role: "user", content: "agree the totals", id: "u-2" },
     {
       role: "assistant",
       content: "totals agreed",
-      messageId: "a-2",
+      id: "a-2",
       toolCalls: [{ id: "call-1", name: "read_file", args: {}, result: "totals.csv" }],
     },
-    { role: "user", content: "now export them", messageId: "u-3" },
-    { role: "assistant", content: "exported", messageId: "a-3" },
+    { role: "user", content: "now export them", id: "u-3" },
+    { role: "assistant", content: "exported", id: "a-3" },
     { role: "user", content: "what did we agree?" },
   ];
 }

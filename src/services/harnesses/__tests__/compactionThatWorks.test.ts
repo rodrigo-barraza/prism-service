@@ -43,7 +43,11 @@ import type {
   PassState,
 } from "../types.ts";
 import type { ChatMessage } from "#src/types/admin";
-import type { CompactionBoundary } from "#src/services/compact/CompactionBoundary";
+import {
+  followMintedAnchor,
+  type CompactionBoundary,
+} from "#src/services/compact/CompactionBoundary";
+import { mintMessageIds } from "#src/services/conversation/messageIds";
 
 // ── Mocks: model, tools, database — the context pipeline stays real ──
 
@@ -475,11 +479,11 @@ describe("a long single run shrinks instead of growing linearly", () => {
 function persistedHistory(exchanges: number, tokensEach: number): ConversationMessage[] {
   const history: ConversationMessage[] = [];
   for (let exchange = 1; exchange <= exchanges; exchange++) {
-    history.push({ role: "user", content: `question ${exchange}`, messageId: `u-${exchange}` } as ConversationMessage);
+    history.push({ role: "user", content: `question ${exchange}`, id: `u-${exchange}` } as ConversationMessage);
     history.push({
       role: "assistant",
       content: bulkText(`answer-${exchange}`, tokensEach),
-      messageId: `a-${exchange}`,
+      id: `a-${exchange}`,
     } as ConversationMessage);
   }
   return history;
@@ -516,13 +520,11 @@ describe("compaction is paid once", () => {
     expect(boundary.tokensAfter).toBeLessThan(boundary.tokensBefore);
     expect(boundary.model).toBe("utility-model");
     // The boundary names a message the client will send back.
-    expect(history.map((message) => message.messageId)).toContain(boundary.throughMessageId);
-    // Every persisted message of the turn is addressable for a later boundary.
-    for (const message of persistedTurn1) {
-      if (message.role === "user" || message.role === "assistant") {
-        expect(typeof message.messageId).toBe("string");
-      }
-    }
+    expect(history.map((message) => message.id)).toContain(boundary.throughMessageId);
+    // What appendMessages stores: every appended message gets its minted id,
+    // and the boundary (anchored in an earlier turn) is left as it is.
+    const storedTurn1 = mintMessageIds(persistedTurn1);
+    expect(followMintedAnchor(boundary, persistedTurn1, storedTurn1)).toBe(boundary);
     // The compaction event carries the boundary for the client's marker.
     const completeEvent = statusEvents(turn1.emit, STATUS_MESSAGES.COMPACTION_COMPLETE)[0].event;
     expect(completeEvent.boundary?.throughMessageId).toBe(boundary.throughMessageId);
@@ -530,7 +532,7 @@ describe("compaction is paid once", () => {
     // ── Turn 2: the client sends back everything it loaded, plus a question.
     vi.mocked(RequestLogger.logBackgroundLlmCall).mockClear();
     const clientHistory = [
-      ...prepareDisplayMessages([...history, ...persistedTurn1] as ChatMessage[]),
+      ...prepareDisplayMessages([...history, ...storedTurn1] as ChatMessage[]),
       { role: "user", content: "turn-2 question" },
     ] as ConversationMessage[];
     const { applyCompactionBoundary } = await import("#src/services/compact/CompactionBoundary");
@@ -554,7 +556,7 @@ describe("compaction is paid once", () => {
     const firstCall = turn2.seen[0] as ChatMessage[];
     expect(firstCall[0].isCompactSummary).toBe(true);
     expect(firstCall[0].content).toContain(SUMMARY_TEXT);
-    const anchorIndex = history.findIndex((message) => message.messageId === boundary.throughMessageId);
+    const anchorIndex = history.findIndex((message) => message.id === boundary.throughMessageId);
     for (const covered of history.slice(0, anchorIndex + 1)) {
       expect(firstCall.some((message) => message.content === covered.content)).toBe(false);
     }
@@ -615,6 +617,19 @@ describe("summarization comes before lossy truncation (200K window, 64K max outp
     // Compaction fires at its force threshold (167K + 6.5K); no call ever
     // needed the ~177K truncation budget ((200K − 1,024 − 4,096) / 1.1).
     expect(Math.max(...seen.map(estimateOf))).toBeLessThan(177_000);
+
+    // The boundary is anchored in THIS run, so it names its message by the
+    // provisional id the message is appended with; appendMessages mints the
+    // stored id and re-points the boundary at it.
+    const { messages: appended, meta } = lastAppend();
+    const boundary = meta.compaction as CompactionBoundary;
+    expect(boundary.throughMessageId).toMatch(/^msg_/);
+    const anchorIndex = appended.findIndex((message) => message.id === boundary.throughMessageId);
+    expect(anchorIndex).toBeGreaterThanOrEqual(0);
+    const stored = mintMessageIds(appended);
+    const storedBoundary = followMintedAnchor(boundary, appended, stored);
+    expect(storedBoundary.throughMessageId).toBe(stored[anchorIndex].id);
+    expect(storedBoundary.throughMessageId).not.toBe(boundary.throughMessageId);
   });
 
   it("truncates only when compaction cannot run, and logs why", async () => {

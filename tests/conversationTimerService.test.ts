@@ -475,16 +475,16 @@ describe("ConversationTimerService", () => {
         ...CONVERSATION_FIXTURE,
         isGenerating: false,
         messages: [
-          { role: "user", content: "set up the ledger", messageId: "u-1" },
+          { role: "user", content: "set up the ledger", id: "u-1" },
           {
             role: "assistant",
             content: "reading it",
-            messageId: "a-1",
+            id: "a-1",
             toolCalls: [{ id: "call-1", name: "read_file", args: {} }],
           },
           { role: "tool", tool_call_id: "call-1", name: "read_file", content: "ledger.csv" },
-          { role: "user", content: "agree the totals", messageId: "u-2" },
-          { role: "assistant", content: "totals agreed", messageId: "a-2" },
+          { role: "user", content: "agree the totals", id: "u-2" },
+          { role: "assistant", content: "totals agreed", id: "a-2" },
         ],
         compaction: {
           summary: "SUMMARY: the ledger was read.",

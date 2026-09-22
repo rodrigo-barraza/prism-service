@@ -17,6 +17,9 @@ import { randomUUID } from "node:crypto";
 //   `legacy-<raw index>`, which resolveMessageIndex() maps back. It is
 //   stable for as long as nothing before it is removed — the client
 //   re-fetches after every mutation anyway.
+// - A compaction boundary names the last message its summary covers by
+//   this same id (compact/CompactionBoundary.ts); one minted mid-turn is
+//   provisional until appendMessages re-points it (followMintedAnchor).
 // ────────────────────────────────────────────────────────────
 
 const LEGACY_PREFIX = "legacy-";
@@ -30,7 +33,8 @@ export function newMessageId(): string {
   return `msg_${randomUUID()}`;
 }
 
-function isStoredId(id: unknown): id is string {
+/** A persisted, server-minted id — not a served-only `legacy-` one. */
+export function isStoredMessageId(id: unknown): id is string {
   return typeof id === "string" && id.length > 0 && !id.startsWith(LEGACY_PREFIX);
 }
 
@@ -52,7 +56,7 @@ export function ensureMessageIds<T extends object>(messages: T[]): T[] {
   const seen = new Set<string>();
   return messages.map((message) => {
     const id = (message as IdentifiedMessage).id;
-    if (isStoredId(id) && !seen.has(id)) {
+    if (isStoredMessageId(id) && !seen.has(id)) {
       seen.add(id);
       return message;
     }
@@ -65,7 +69,7 @@ export function ensureMessageIds<T extends object>(messages: T[]): T[] {
 /** Attach the served id to every raw message (stored id, else the legacy index id). */
 export function withServedMessageIds<T extends object>(messages: T[]): T[] {
   return messages.map((message, index) =>
-    isStoredId((message as IdentifiedMessage).id)
+    isStoredMessageId((message as IdentifiedMessage).id)
       ? message
       : { ...message, id: legacyMessageId(index) },
   );
@@ -75,7 +79,7 @@ export function withServedMessageIds<T extends object>(messages: T[]): T[] {
 export function servedMessageId(message: object | undefined, index: number): string | null {
   if (!message) return null;
   const id = (message as IdentifiedMessage).id;
-  return isStoredId(id) ? id : legacyMessageId(index);
+  return isStoredMessageId(id) ? id : legacyMessageId(index);
 }
 
 /** Resolve a served id against the raw persisted array; -1 when unknown. */
@@ -89,5 +93,5 @@ export function resolveMessageIndex(messages: object[], messageId: unknown): num
   const index = Number(messageId.slice(LEGACY_PREFIX.length));
   if (!Number.isInteger(index) || index < 0 || index >= messages.length) return -1;
   // A legacy id only names a message that still has no stored id.
-  return isStoredId((messages[index] as IdentifiedMessage).id) ? -1 : index;
+  return isStoredMessageId((messages[index] as IdentifiedMessage).id) ? -1 : index;
 }

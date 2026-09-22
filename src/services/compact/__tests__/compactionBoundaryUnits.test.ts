@@ -16,7 +16,7 @@ import { findRecencyBoundary } from "#src/services/compact/RecencyProtection";
 import {
   applyCompactionBoundary,
   resolveBoundaryAnchorId,
-  stampMessageIds,
+  followMintedAnchor,
   buildCompactionSummaryMessage,
   type CompactionBoundary,
 } from "#src/services/compact/CompactionBoundary";
@@ -299,11 +299,11 @@ const BOUNDARY: CompactionBoundary = {
 describe("applyCompactionBoundary — load summary + tail", () => {
   it("folds the display shape the client sends", () => {
     const history = [
-      { role: "user", content: "q1", messageId: "u-1" },
-      { role: "assistant", content: "a1", messageId: "a-1" },
-      { role: "user", content: "q2", messageId: "u-2" },
-      { role: "assistant", content: "a2", messageId: "a-2", toolCalls: [{ id: "c1", name: "x", result: "r" }] },
-      { role: "user", content: "q3", messageId: "u-3" },
+      { role: "user", content: "q1", id: "u-1" },
+      { role: "assistant", content: "a1", id: "a-1" },
+      { role: "user", content: "q2", id: "u-2" },
+      { role: "assistant", content: "a2", id: "a-2", toolCalls: [{ id: "c1", name: "x", result: "r" }] },
+      { role: "user", content: "q3", id: "u-3" },
     ];
     const loaded = applyCompactionBoundary(history, BOUNDARY);
     expect(loaded.applied).toBe(true);
@@ -318,10 +318,10 @@ describe("applyCompactionBoundary — load summary + tail", () => {
   it("folds the raw persisted shape, taking the anchor's tool messages with it", () => {
     const history = [
       { role: "system", content: "operating context" },
-      { role: "user", content: "q1", messageId: "u-1" },
-      { role: "assistant", content: "a2", messageId: "a-2", toolCalls: [{ id: "c1", name: "x" }] },
+      { role: "user", content: "q1", id: "u-1" },
+      { role: "assistant", content: "a2", id: "a-2", toolCalls: [{ id: "c1", name: "x" }] },
       { role: "tool", tool_call_id: "c1", name: "x", content: "result" },
-      { role: "user", content: "q3", messageId: "u-3" },
+      { role: "user", content: "q3", id: "u-3" },
     ];
     const loaded = applyCompactionBoundary(history, BOUNDARY);
     expect(loaded.messages.map((message) => message.role)).toEqual(["system", "user", "user"]);
@@ -331,8 +331,8 @@ describe("applyCompactionBoundary — load summary + tail", () => {
 
   it("leaves a history without the boundary message unchanged", () => {
     const history = [
-      { role: "user", content: "q1", messageId: "u-1" },
-      { role: "user", content: "q3", messageId: "u-3" },
+      { role: "user", content: "q1", id: "u-1" },
+      { role: "user", content: "q3", id: "u-3" },
     ];
     const loaded = applyCompactionBoundary(history, BOUNDARY);
     expect(loaded.applied).toBe(false);
@@ -347,11 +347,11 @@ describe("applyCompactionBoundary — load summary + tail", () => {
 });
 
 describe("resolveBoundaryAnchorId — the message a boundary names", () => {
-  it("uses an existing messageId", () => {
+  it("uses an existing stored id", () => {
     expect(
       resolveBoundaryAnchorId([
-        { role: "user", content: "q", messageId: "u-1", _alreadyPersisted: true },
-        { role: "assistant", content: "a", messageId: "a-1", _alreadyPersisted: true },
+        { role: "user", content: "q", id: "u-1", _alreadyPersisted: true },
+        { role: "assistant", content: "a", id: "a-1", _alreadyPersisted: true },
       ]),
     ).toBe("a-1");
   });
@@ -360,9 +360,10 @@ describe("resolveBoundaryAnchorId — the message a boundary names", () => {
     const original: ChatMessage = { role: "assistant", content: "", toolCalls: [{ id: "c", name: "read_file", result: "x" }] };
     const view = markDerivedMessage({ ...original, toolCalls: [{ id: "c", name: "read_file", result: "stub" }] }, original);
     const anchor = resolveBoundaryAnchorId([{ role: "user", content: "task" }, view]);
-    expect(anchor).toEqual(expect.any(String));
-    expect(original.messageId).toBe(anchor);
-    expect(view.messageId).toBe(anchor);
+    // Provisional, in the server's own id format — appendMessages re-points it.
+    expect(anchor).toMatch(/^msg_/);
+    expect(original.id).toBe(anchor);
+    expect(view.id).toBe(anchor);
   });
 
   it("cannot name a message persisted before ids existed", () => {
@@ -374,10 +375,19 @@ describe("resolveBoundaryAnchorId — the message a boundary names", () => {
     ).toBeNull();
   });
 
+  it("never names a served-only legacy id — it shifts when earlier messages go", () => {
+    expect(
+      resolveBoundaryAnchorId([
+        { role: "user", content: "q", id: "legacy-0", _alreadyPersisted: true },
+        { role: "assistant", content: "a", id: "legacy-1", _alreadyPersisted: true },
+      ]),
+    ).toBeNull();
+  });
+
   it("skips what persistence drops (system, context notes, empty stubs)", () => {
     expect(
       resolveBoundaryAnchorId([
-        { role: "assistant", content: "real", messageId: "a-1" },
+        { role: "assistant", content: "real", id: "a-1" },
         { role: "system", content: "note" },
         { role: "user", content: `${PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX} dropped]` },
         { role: "assistant", content: "   " },
@@ -392,19 +402,27 @@ describe("resolveBoundaryAnchorId — the message a boundary names", () => {
   });
 });
 
-describe("stampMessageIds", () => {
-  it("gives each addressable message an id and keeps existing ones", () => {
-    const messages: Array<ChatMessage> = [
-      { role: "user", content: "q", messageId: "keep" },
-      { role: "assistant", content: "a" },
-      { role: "tool", content: "r", tool_call_id: "c" },
-      { role: "assistant", content: "" },
-    ];
-    stampMessageIds(messages);
-    expect(messages[0].messageId).toBe("keep");
-    expect(messages[1].messageId).toEqual(expect.any(String));
-    expect(messages[2].messageId).toBeUndefined();
-    expect(messages[3].messageId).toBeUndefined();
+describe("followMintedAnchor — appendMessages re-points a current-turn boundary", () => {
+  const before = [
+    { role: "user", content: "q", id: "client-local" },
+    { role: "assistant", content: "a", id: "msg_provisional" },
+  ];
+  const minted = [
+    { role: "user", content: "q", id: "msg_minted-1" },
+    { role: "assistant", content: "a", id: "msg_minted-2" },
+  ];
+
+  it("follows an anchor appended in this call to the id it was minted", () => {
+    const boundary = { ...BOUNDARY, throughMessageId: "msg_provisional" };
+    expect(followMintedAnchor(boundary, before, minted).throughMessageId).toBe("msg_minted-2");
+  });
+
+  it("leaves a boundary on an earlier turn's message alone", () => {
+    expect(followMintedAnchor(BOUNDARY, before, minted)).toBe(BOUNDARY);
+  });
+
+  it("passes null (a boundary being cleared) through", () => {
+    expect(followMintedAnchor(null, before, minted)).toBeNull();
   });
 });
 

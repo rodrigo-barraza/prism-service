@@ -26,6 +26,7 @@ import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { getRequestContext } from "#src/utils/RequestContext";
 import { mintMessageIds } from "./messageIds.ts";
+import { followMintedAnchor } from "#src/services/compact/CompactionBoundary";
 
 const DEFAULT_COLLECTION = COLLECTIONS.MODEL_CONVERSATIONS;
 
@@ -51,10 +52,10 @@ const ConversationService: ConversationServiceInterface = {
     const dbCollection = MongoWrapper.getCollection(MONGO_DB_NAME, collection);
 
     // Extract files (upload base64 data to MinIO), then give every appended
-    // message a fresh server-minted id — the anchor rewind/fork address.
-    const processedMessages = mintMessageIds(
-      await extractFiles(newMessages, project, username),
-    );
+    // message a fresh server-minted id — the anchor rewind, fork and a
+    // compaction boundary address.
+    const extractedMessages = await extractFiles(newMessages, project, username);
+    const processedMessages = mintMessageIds(extractedMessages);
 
     const now = new Date().toISOString();
 
@@ -95,7 +96,13 @@ const ConversationService: ConversationServiceInterface = {
         setFields.contextBudget = conversationMeta.contextBudget;
       }
       if (conversationMeta.compaction !== undefined) {
-        setFields.compaction = conversationMeta.compaction;
+        // A boundary anchored in this turn named its message by a
+        // provisional id; follow it to the id minted above.
+        setFields.compaction = followMintedAnchor(
+          conversationMeta.compaction,
+          extractedMessages,
+          processedMessages,
+        );
       }
       if (conversationMeta.agent) {
         setFields.agent = conversationMeta.agent;
