@@ -34,6 +34,14 @@ import { getDocumentContextText } from "#src/utils/documentContext";
 import { LOG_PREVIEW } from "#src/constants";
 
 import type { ToolSchema } from "#src/services/harnesses/types";
+import {
+  hashChatPrefix,
+  isDiagnosticsRejection,
+  isProviderDiagnosticsRejected,
+  markProviderDiagnosticsRejected,
+  requestTelemetryChunk,
+  type ProviderCacheDiagnostics,
+} from "#src/utils/PromptPrefixHashes";
 
 /**
  * OpenAI Chat Completions API enforces a hard maximum of 128 tools.
@@ -48,6 +56,44 @@ const PRIORITY_TOOL_NAMES = new Set<string>([
   TOOL_NAMES.SEARCH_TOOLS,
   TOOL_NAMES.ENABLE_TOOLS,
 ]);
+
+/**
+ * Prompt Cache Diagnostics (`prompt_cache_options.comparison_response_id`)
+ * — Responses API, GPT-5.6 and later.
+ */
+export function supportsPromptCacheDiagnostics(model: string): boolean {
+  const match = /^gpt-(\d+)(?:\.(\d+))?/.exec(model);
+  if (!match) return false;
+  const major = Number(match[1]);
+  const minor = Number(match[2] ?? 0);
+  return major > 5 || (major === 5 && minor >= 6);
+}
+
+/** Normalize `response.prompt_cache_diagnostics` (from response.completed). */
+export function normalizeOpenAICacheDiagnostics(
+  raw: unknown,
+  comparedResponseId: string | null,
+): ProviderCacheDiagnostics | null {
+  if (!raw || typeof raw !== "object") return null;
+  const diagnostics = raw as {
+    type?: string;
+    reason?: string;
+    cache_missed_tokens?: number;
+  };
+  const type = diagnostics.type ?? "unavailable";
+  return {
+    source: "openai",
+    status:
+      type === "comparison_response_not_found" ? "comparison_not_found" : type,
+    reason: diagnostics.reason ?? null,
+    missedTokens:
+      typeof diagnostics.cache_missed_tokens === "number"
+        ? diagnostics.cache_missed_tokens
+        : null,
+    comparedResponseId,
+    raw,
+  };
+}
 
 function useResponsesAPI(model: string): boolean {
   const modelDefinition = getModelByName(model);
@@ -1528,16 +1574,60 @@ const openaiProvider = {
       payload.top_logprobs = options.topLogprobs;
     }
 
+    // Prompt-cache telemetry: hashes of what is sent, and OpenAI's own miss
+    // diagnosis against the previous response (no cost, no rate limit).
+    const cacheTelemetry = options.cacheTelemetry;
+    const prefixHashes = cacheTelemetry
+      ? hashChatPrefix(payload.input as unknown[], payload.tools as unknown[])
+      : null;
+    let comparisonResponseId =
+      cacheTelemetry?.previousResponseId &&
+      supportsPromptCacheDiagnostics(model) &&
+      !isProviderDiagnosticsRejected("openai", model)
+        ? cacheTelemetry.previousResponseId
+        : null;
+    if (comparisonResponseId) {
+      (payload as unknown as Record<string, unknown>).prompt_cache_options = {
+        comparison_response_id: comparisonResponseId,
+      };
+    }
+
     logger.info(
       `[OpenAI/Responses] Sending stream payload: ${JSON.stringify(payload)}`,
     );
 
-    const { data: streamData, response: rawStreamResponse } = await getClient()
-      .responses.create(payload, {
-        ...(options.signal && { signal: options.signal }),
-      })
-      .withResponse();
+    const createResponseStream = () =>
+      getClient()
+        .responses.create(payload, {
+          ...(options.signal && { signal: options.signal }),
+        })
+        .withResponse();
+    let createdStream: Awaited<ReturnType<typeof createResponseStream>>;
+    try {
+      createdStream = await createResponseStream();
+    } catch (error: unknown) {
+      // Telemetry must never cost a turn: drop the diagnostics field and
+      // resend once, and stop asking for this model this process.
+      if (
+        !comparisonResponseId ||
+        !isDiagnosticsRejection(
+          error,
+          /prompt_cache_options|comparison_response_id/i,
+        )
+      ) {
+        throw error;
+      }
+      logger.warn(
+        `[OpenAI/Responses] prompt cache diagnostics rejected for ${model} — retrying without`,
+      );
+      markProviderDiagnosticsRejected("openai", model);
+      delete (payload as unknown as Record<string, unknown>).prompt_cache_options;
+      comparisonResponseId = null;
+      createdStream = await createResponseStream();
+    }
+    const { data: streamData, response: rawStreamResponse } = createdStream;
     const rateLimits = extractOpenAIRateLimits(rawStreamResponse, model);
+    let promptCacheDiagnostics: unknown;
     let usage = null;
     // Track function names from output_item.added events; the arguments.done
     // event may not include the name property (known OpenAI SDK issue).
@@ -1564,6 +1654,15 @@ const openaiProvider = {
           providerResponseId = typedEvent.response.id;
           yield { type: "providerState", providerResponseId };
         }
+      }
+      // Prompt cache diagnostics ride on the terminal response.
+      if (
+        event.type === "response.completed" ||
+        event.type === "response.incomplete"
+      ) {
+        promptCacheDiagnostics = (
+          event.response as unknown as Record<string, unknown> | undefined
+        )?.prompt_cache_diagnostics;
       }
       // Text delta from output_text
       if (event.type === "response.output_text.delta") {
@@ -1791,6 +1890,17 @@ const openaiProvider = {
     if (rateLimits) {
       yield { type: "rateLimits", rateLimits };
     }
+    if (cacheTelemetry) {
+      yield requestTelemetryChunk(prefixHashes, {
+        providerResponseId,
+        cacheDiagnostics: comparisonResponseId
+          ? normalizeOpenAICacheDiagnostics(
+              promptCacheDiagnostics,
+              comparisonResponseId,
+            )
+          : null,
+      });
+    }
   },
   async *_streamChatCompletions(
     messages: OpenAIMessage[],
@@ -1877,6 +1987,12 @@ const openaiProvider = {
       payload.tools = truncateToolsForChatCompletions(allTools);
     }
 
+    const cacheTelemetry = options.cacheTelemetry;
+    const prefixHashes = cacheTelemetry
+      ? hashChatPrefix(payload.messages, payload.tools)
+      : null;
+    let chatCompletionId: string | undefined;
+
     let stream: Stream<OpenAI.Chat.ChatCompletionChunk>;
     let rateLimits: ReturnType<typeof extractOpenAIRateLimits>;
     try {
@@ -1943,6 +2059,7 @@ const openaiProvider = {
 
     for await (const chunk of stream) {
       if (options.signal?.aborted) break;
+      chatCompletionId = chunk.id || chatCompletionId;
       if (chunk.usage) {
         usage = normalizeUsage(chunk.usage);
       }
@@ -2032,6 +2149,11 @@ const openaiProvider = {
     }
     if (rateLimits) {
       yield { type: "rateLimits", rateLimits };
+    }
+    if (cacheTelemetry) {
+      yield requestTelemetryChunk(prefixHashes, {
+        providerResponseId: chatCompletionId,
+      });
     }
   },
 

@@ -17,6 +17,8 @@ import { calculateTokensPerSec } from "#src/utils/math";
 import WebhookEventBus from "./WebhookEventBus.ts";
 import { getRequestContext } from "#src/utils/RequestContext";
 import { DEFAULT_PROFILE_ID } from "#src/utils/ProfileScope";
+import type { PromptPrefixHashes } from "#src/utils/PromptPrefixHashes";
+import type { CacheTelemetryRecord } from "./PromptCacheTelemetry.ts";
 const COLLECTION = COLLECTIONS.REQUESTS;
 
 /** Literal profile id for a request-log write: params → ALS → default. */
@@ -86,6 +88,27 @@ export interface LogParams {
   contextLength?: number | null;
   evalBatchSize?: number | null;
   physicalBatchSize?: number | null;
+  /** Hashes of the system / tools / per-message payload the adapter sent. */
+  prefixHashes?: PromptPrefixHashes | null;
+  /** First message index that differs from the previous request of the
+   *  same agent conversation (= its message count when only appended). */
+  firstDivergenceIndex?: number | null;
+  /** What changed against that request, and the provider's diagnostics. */
+  cacheTelemetry?: CacheTelemetryRecord | null;
+}
+
+/** Row fields for prompt-cache telemetry — written only when present. */
+function cacheTelemetryRowFields({
+  prefixHashes,
+  firstDivergenceIndex,
+  cacheTelemetry,
+}: LogParams): Record<string, unknown> {
+  if (!prefixHashes) return {};
+  return {
+    prefixHashes,
+    firstDivergenceIndex: firstDivergenceIndex ?? null,
+    cacheTelemetry: cacheTelemetry ?? null,
+  };
 }
 
 export interface TokenUsage {
@@ -259,6 +282,7 @@ const RequestLogger = {
     contextLength = null,
     evalBatchSize = null,
     physicalBatchSize = null,
+    ...cacheTelemetryParams
   }: LogParams) {
     try {
       const db = MongoWrapper.getDb(MONGO_DB_NAME);
@@ -329,6 +353,7 @@ const RequestLogger = {
         ...(contextLength != null && { contextLength }),
         ...(evalBatchSize != null && { evalBatchSize }),
         ...(physicalBatchSize != null && { physicalBatchSize }),
+        ...cacheTelemetryRowFields(cacheTelemetryParams),
         status: SYSTEM_STATUSES.COMPLETED,
       };
       await db.collection(COLLECTION).insertOne(document);
@@ -383,6 +408,9 @@ const RequestLogger = {
     // Optional
     agenticIteration = null,
     rateLimits = null,
+    prefixHashes = null,
+    firstDivergenceIndex = null,
+    cacheTelemetry = null,
   }: LogChatGenerationParams) {
     // Build synthetic message array for computeModalities (same function used by conversations)
     const syntheticMessages = [
@@ -500,6 +528,9 @@ const RequestLogger = {
         (options?._loadedPhysicalBatchSize as number) ??
         (options?.eval_batch_size as number) ??
         null,
+      prefixHashes,
+      firstDivergenceIndex,
+      cacheTelemetry,
     });
   },
   /**
@@ -805,6 +836,7 @@ const RequestLogger = {
         responsePayload: normalizedResponsePayload,
         modalities,
         rateLimits,
+        ...cacheTelemetryRowFields(fullPayload),
       };
 
       if (agentConversationId)

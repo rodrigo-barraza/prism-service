@@ -35,6 +35,7 @@ import {
 import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
 import ConversationStatusRegistry from "#src/services/ConversationStatusRegistry";
 import RequestLogger from "#src/services/RequestLogger";
+import PromptCacheTelemetry from "#src/services/PromptCacheTelemetry";
 import { resolveMessageMediaReferences } from "#src/services/MediaResolutionService";
 import { getMaxImageDimensionForModel } from "#src/utils/media";
 import { UNITS, DEFAULT_LOCALE } from "#src/constants";
@@ -758,6 +759,14 @@ export default class BaseAgenticHarness {
         this.context.agentConversationId ||
         (this.context.conversationId as string | undefined) ||
         undefined,
+      // Ask the adapter for the hashes of what it sends; the previous
+      // response id lets OpenAI / Anthropic diagnose a miss themselves.
+      cacheTelemetry: {
+        previousResponseId: PromptCacheTelemetry.previousResponseId(
+          this.cacheTelemetryKey(),
+          this.context.providerName,
+        ),
+      },
     };
 
     for (const optionKey of [
@@ -1096,6 +1105,15 @@ export default class BaseAgenticHarness {
 
   // ── Iteration logging ─────────────────────────────────────
 
+  /** Prompt-cache telemetry compares requests within one agent conversation. */
+  private cacheTelemetryKey(): string | null {
+    return (
+      this.context.agentConversationId ||
+      (this.context.conversationId as string | undefined) ||
+      null
+    );
+  }
+
   /** Log a single iteration to the request log. */
   logIteration(pass: PassState, currentMessages: ConversationMessage[]): void {
     const {
@@ -1135,6 +1153,16 @@ export default class BaseAgenticHarness {
       }
     }
 
+    // Hashes of what the adapter sent, compared with the previous request
+    // of this agent conversation (null when the adapter reported none).
+    const cacheTelemetryFields = PromptCacheTelemetry.recordRequest({
+      conversationKey: this.cacheTelemetryKey(),
+      requestId: `${this.context.requestId}-${state.iterations}`,
+      provider: providerName,
+      model: resolvedModel,
+      telemetry: pass.requestTelemetry,
+    });
+
     // Two-phase completion: if we pre-inserted a pending skeleton on
     // iteration start, update it in-place instead of inserting a new doc.
     const requestLogPayload = {
@@ -1169,6 +1197,7 @@ export default class BaseAgenticHarness {
       toolCalls: pass.pendingToolCalls as ToolCallPayload[],
       outputCharacters: pass.outputCharacters,
       agenticIteration: state.iterations,
+      ...cacheTelemetryFields,
     };
 
     const fullPayload: import("../RequestLogger.ts").LogParams = {
@@ -1250,6 +1279,7 @@ export default class BaseAgenticHarness {
             : null,
         usage: pass.usage,
       },
+      ...cacheTelemetryFields,
     };
 
     // Fire-and-forget for streaming latency, but track the full chain so
