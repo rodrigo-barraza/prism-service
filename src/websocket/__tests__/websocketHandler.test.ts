@@ -358,6 +358,24 @@ describe("WebSocket Handler Suite", () => {
         ]);
       });
 
+      it("a `visibility` message marks the viewer hidden or visible and never starts a turn", () => {
+        const socket = openSubscriber();
+        socket.emit(
+          "message",
+          Buffer.from(JSON.stringify({ type: "subscribe", conversationId: "conv-visibility" })),
+        );
+        expect(WebSocketConnectionRegistry.hasVisibleConnection("conv-visibility")).toBe(true);
+
+        socket.emit("message", Buffer.from(JSON.stringify({ type: "visibility", hidden: true })));
+        expect(WebSocketConnectionRegistry.hasVisibleConnection("conv-visibility")).toBe(false);
+        // Still subscribed: a hidden tab keeps streaming.
+        expect(WebSocketConnectionRegistry.hasActiveConnection("conv-visibility")).toBe(true);
+
+        socket.emit("message", Buffer.from(JSON.stringify({ type: "visibility", hidden: false })));
+        expect(WebSocketConnectionRegistry.hasVisibleConnection("conv-visibility")).toBe(true);
+        expect(mockHandleConversation).not.toHaveBeenCalled();
+      });
+
       it("ignores a non-numeric afterSeq and replays the whole turn", () => {
         const emit = withDirectViewerBroadcast("conv-sub-5", vi.fn());
         emit({ type: "user_message", content: "prompt" } as SseEvent);

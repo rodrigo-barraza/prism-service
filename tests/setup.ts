@@ -20,6 +20,12 @@ vi.mock('#config', () => ({
     PROVIDER_OLLAMA: [],
     PROVIDER_LLAMA_CPP: [],
     TOOLS_SERVICE_URL: 'http://localhost:5590',
+    // Web Push off by default; push tests mock the protocol module.
+    PRISM_VAPID_PUBLIC_KEY: undefined,
+    PRISM_VAPID_PRIVATE_KEY: undefined,
+    PRISM_VAPID_SUBJECT: undefined,
+    PRISM_PUSH_NTFY_TOPIC: undefined,
+    PRISM_CLIENT_PUBLIC_URL: undefined,
     MONGO_URI: 'mongodb://test:test@localhost:27017/?directConnection=true&replicaSet=rs0&authSource=admin',
     MONGO_DB_NAME: 'prism-test',
     LIVE_AUDIO_MODEL: 'gemini-2.0-flash-live-001',

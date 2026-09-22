@@ -2,6 +2,7 @@ import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { MONGO_DB_NAME } from "#config";
 import { COLLECTIONS } from "#src/constants";
 import logger from "#src/utils/logger";
+import WebhookEventBus, { NEEDS_YOU_WEBHOOK_EVENTS } from "#src/services/WebhookEventBus";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 /**
@@ -462,11 +463,21 @@ async function persist(
     .updateOne({ id: located.document.id, project, username }, update);
 }
 
+/**
+ * Announce a meaningful goal change: always as the `goal.updated` webhook,
+ * and on the turn's stream as a `goal_update` event when there is one.
+ */
 function emitChange(
   emit: GoalEmit | null | undefined,
   goal: ConversationGoal,
   change: GoalChange,
+  scope: { conversationId: string; project: string; username: string },
 ): void {
+  WebhookEventBus.emit(NEEDS_YOU_WEBHOOK_EVENTS.GOAL_UPDATED, {
+    ...scope,
+    change,
+    goal: structuredClone(goal),
+  });
   if (!emit) return;
   try {
     emit({ type: GOAL_UPDATE_EVENT_TYPE, goal: structuredClone(goal), change });
@@ -551,7 +562,7 @@ const ConversationGoalService = {
     logger.info(
       `[ConversationGoal] Goal set on ${conversationId}: "${objective.slice(0, 80)}"`,
     );
-    emitChange(emit, goal, "set");
+    emitChange(emit, goal, "set", { conversationId, project, username });
     return goal;
   },
 
@@ -585,7 +596,7 @@ const ConversationGoalService = {
             : ""
         })`,
       );
-      emitChange(emit, after, change);
+      emitChange(emit, after, change, { conversationId, project, username });
     }
     return after;
   },
@@ -606,7 +617,7 @@ const ConversationGoalService = {
 
     await persist(located, project, username, null);
     logger.info(`[ConversationGoal] Goal cleared on ${conversationId}`);
-    emitChange(emit, before, "cleared");
+    emitChange(emit, before, "cleared", { conversationId, project, username });
     return true;
   },
 
@@ -658,7 +669,9 @@ const ConversationGoalService = {
 
     await persist(located, project, username, after);
     const change = detectMeaningfulChange(before, after);
-    if (change) emitChange(emit, after, change);
+    if (change) {
+      emitChange(emit, after, change, { conversationId, project, username });
+    }
     return after;
   },
 

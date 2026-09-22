@@ -28,6 +28,7 @@ import {
   MILLISECONDS_PER_HOUR,
   minutes,
 } from "@rodrigo-barraza/utilities-library";
+import ConversationAttentionRegistry from "#src/services/ConversationAttentionRegistry";
 
 const router = express.Router();
 const {
@@ -342,11 +343,16 @@ router.get(
                 ? Math.max(originalCost, aggregatedCost)
                 : originalCost;
 
+            const attention = ConversationAttentionRegistry.get(
+              document.id as string | undefined,
+            );
             return {
               ...document,
-              state: deriveAgentConversationState(
-                document as Parameters<typeof deriveAgentConversationState>[0],
-              ),
+              ...attention,
+              state: deriveAgentConversationState({
+                ...(document as Parameters<typeof deriveAgentConversationState>[0]),
+                ...attention,
+              }),
               totalCost,
               requestCount: associatedRequests.length,
               inputTokens,
@@ -606,14 +612,17 @@ router.get(
         // serve-time form and shipping both doubles a multi-hundred-KB payload
         const { messages: rawMessages, ...conversationWithoutMessages } =
           conversationDocument;
+        const attention = ConversationAttentionRegistry.get(req.params.id as string);
         return res.json({
           ...conversationWithoutMessages,
+          ...attention,
           type: "direct",
-          state: deriveAgentConversationState(
-            conversationDocument as Parameters<
+          state: deriveAgentConversationState({
+            ...(conversationDocument as Parameters<
               typeof deriveAgentConversationState
-            >[0],
-          ),
+            >[0]),
+            ...attention,
+          }),
           messageCount: ((rawMessages as ChatMessage[]) || []).length,
           displayMessages: prepareDisplayMessages(
             (rawMessages as ChatMessage[]) || [],
@@ -635,14 +644,17 @@ router.get(
         }
         const { messages: rawMessages, ...conversationWithoutMessages } =
           conversationDocument;
+        const attention = ConversationAttentionRegistry.get(req.params.id as string);
         return res.json({
           ...conversationWithoutMessages,
+          ...attention,
           type: "agent",
-          state: deriveAgentConversationState(
-            conversationDocument as Parameters<
+          state: deriveAgentConversationState({
+            ...(conversationDocument as Parameters<
               typeof deriveAgentConversationState
-            >[0],
-          ),
+            >[0]),
+            ...attention,
+          }),
           messageCount: ((rawMessages as ChatMessage[]) || []).length,
           displayMessages: prepareDisplayMessages(
             (rawMessages as ChatMessage[]) || [],
