@@ -362,6 +362,23 @@ describe("POST /conversations/:id/rewind — both, refusal and dry run", () => {
     expect(stored().workspaceSnapshots).toHaveLength(4);
   });
 
+  it("a dry run with conflicts still previews the conversation part", async () => {
+    tools.restore = (body) => ({
+      status: 409,
+      body: {
+        snapshotCapable: true, ref: body.ref, againstRef: body.againstRef, dryRun: true, applied: false,
+        refused: true, conflicts: ["c.txt"], restored: ["a.txt", "c.txt"], removed: ["b.txt"], skipped: [],
+      },
+    });
+
+    const response = await rewind({ toMessageId: "m3", restore: "both", dryRun: true });
+
+    expect(response.status).toBe(409);
+    expect(response.body.code).toMatchObject({ status: "refused", workspaces: [{ conflicts: ["c.txt"], removed: ["b.txt"] }] });
+    expect(response.body.conversation).toMatchObject({ prunedCount: 5 });
+    expect(stored().messages.some((message: Doc) => message.pruned)).toBe(false);
+  });
+
   it("passes force through", async () => {
     await rewind({ toMessageId: "m3", restore: "code", force: true });
     expect(restoreRequests()[0].body.force).toBe(true);

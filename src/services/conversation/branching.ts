@@ -344,10 +344,12 @@ export async function rewindConversation(
           ...(response.undoRef && { undoRef: response.undoRef }),
         });
       }
-      if (report.code.status === "refused") {
+      // A real rewind stops here and leaves the conversation alone; a dry
+      // run goes on so the preview also says what the conversation loses.
+      if (report.code.status === "refused" && !dryRun) {
         return { status: 409, report };
       }
-      if (report.code.status === "failed" && restoreRecords.length === 0) {
+      if (report.code.status === "failed" && restoreRecords.length === 0 && !dryRun) {
         return { status: 502, report };
       }
     }
@@ -402,6 +404,7 @@ export async function rewindConversation(
       `conversation ${report.conversation ? `${report.conversation.prunedCount} pruned` : "untouched"}, ` +
       `code ${report.code?.status || "untouched"}`,
   );
+  if (report.code?.status === "refused") return { status: 409, report };
   const partialFailure = report.code?.status === "failed";
   return { status: partialFailure ? 207 : 200, report };
 }
