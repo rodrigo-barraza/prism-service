@@ -97,6 +97,9 @@ export function checkCostBudget(
   const resolvedMaxCostDollars = effectiveMax;
   if (estimatedCost < resolvedMaxCostDollars) return false;
   maxCostDollars = resolvedMaxCostDollars;
+  // The stop reason is persisted by the Finalizer — every harness breaks on
+  // `true`, so recording it here covers ReAct, ToT and GoT alike.
+  state.conversationOutcome = "budget_exhausted";
 
   emit({
     type: SERVER_SENT_EVENT_TYPES.STATUS,

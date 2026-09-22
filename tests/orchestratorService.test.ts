@@ -948,7 +948,9 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       expect(GitWorktreeHelper.removeWorktree).not.toHaveBeenCalled();
     });
 
-    it("should enforce MAX_SUB_AGENTS limit", async () => {
+    it("should enforce MAX_SUB_AGENTS limit within one root conversation", async () => {
+      // The cap is per root conversation (prompt 09 b) — agents running in
+      // other conversations do not count; see orchestratorDispatchWait.test.ts.
       OrchestratorService.cleanupConversation("session-id-456");
 
       const runningPromises: Promise<any>[] = [];
@@ -969,7 +971,6 @@ describe("OrchestratorService Spawning & Agent Types", () => {
             orchestratorContext: {
               ...orchestratorContext,
               agentConversationId: `session-id-456-${i}`,
-              conversationId: `conv-id-789-${i}`,
             },
           })
         );
