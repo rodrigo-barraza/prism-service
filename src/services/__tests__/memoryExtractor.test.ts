@@ -49,6 +49,15 @@ vi.mock("#src/services/RequestLogger", () => ({
   },
 }));
 
+// Four messages with enough user-written text to clear the trivial-span
+// skip (MEMORY.EXTRACTION_MIN_AUTHORED_CHARACTERS).
+const SESSION = [
+  { role: "user", content: "I am a senior developer and I work in TypeScript." },
+  { role: "assistant", content: "Great — TypeScript it is." },
+  { role: "user", content: "Please keep the colour tokens in oklch." },
+  { role: "assistant", content: "Will do, oklch for every token." },
+];
+
 describe("MemoryExtractor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -73,10 +82,7 @@ describe("MemoryExtractor", () => {
       project: "test-proj",
       username: "rodrigo",
       messages: [
-        { role: "user", content: "msg1" },
-        { role: "assistant", content: "msg2" },
-        { role: "user", content: "msg3" },
-        { role: "assistant", content: "msg4" }
+        ...SESSION,
       ],
       toolCalls: [{ id: "call1", name: "save_memory", args: {} }]
     });
@@ -86,24 +92,28 @@ describe("MemoryExtractor", () => {
   });
 
   it("should skip extraction if provider or model is not configured", async () => {
-    vi.mocked(SettingsService.getSection).mockResolvedValueOnce({
+    // Every read of the knob comes back empty — the memory role reads it,
+    // then the utility chain it falls back to reads it again.
+    const configured = await SettingsService.getSection("memory");
+    vi.mocked(SettingsService.getSection).mockResolvedValue({
       extractionProvider: "",
       extractionModel: ""
     });
 
-    const results = await MemoryExtractor.extractAndStore({
-      project: "test-proj",
-      username: "rodrigo",
-      messages: [
-        { role: "user", content: "msg1" },
-        { role: "assistant", content: "msg2" },
-        { role: "user", content: "msg3" },
-        { role: "assistant", content: "msg4" }
-      ]
-    });
+    try {
+      const results = await MemoryExtractor.extractAndStore({
+        project: "test-proj",
+        username: "rodrigo",
+        messages: [
+          ...SESSION,
+        ]
+      });
 
-    expect(results).toEqual([]);
-    expect(mockGenerateText).not.toHaveBeenCalled();
+      expect(results).toEqual([]);
+      expect(mockGenerateText).not.toHaveBeenCalled();
+    } finally {
+      vi.mocked(SettingsService.getSection).mockResolvedValue(configured);
+    }
   });
 
   it("should extract memories, store them, and emit SSE updates on success", async () => {
@@ -126,10 +136,7 @@ describe("MemoryExtractor", () => {
       project: "test-proj",
       username: "rodrigo",
       messages: [
-        { role: "user", content: "msg1" },
-        { role: "assistant", content: "msg2" },
-        { role: "user", content: "msg3" },
-        { role: "assistant", content: "msg4" }
+        ...SESSION,
       ],
       emit: emitSpy
     });
@@ -175,10 +182,7 @@ describe("MemoryExtractor", () => {
       project: "test-proj",
       username: "rodrigo",
       messages: [
-        { role: "user", content: "msg1" },
-        { role: "assistant", content: "msg2" },
-        { role: "user", content: "msg3" },
-        { role: "assistant", content: "msg4" }
+        ...SESSION,
       ]
     });
 
@@ -202,10 +206,7 @@ describe("MemoryExtractor", () => {
       project: "test-proj",
       username: "rodrigo",
       messages: [
-        { role: "user", content: "msg1" },
-        { role: "assistant", content: "msg2" },
-        { role: "user", content: "msg3" },
-        { role: "assistant", content: "msg4" }
+        ...SESSION,
       ]
     });
 
@@ -222,10 +223,7 @@ describe("MemoryExtractor", () => {
       project: "test-proj",
       username: "rodrigo",
       messages: [
-        { role: "user", content: "msg1" },
-        { role: "assistant", content: "msg2" },
-        { role: "user", content: "msg3" },
-        { role: "assistant", content: "msg4" }
+        ...SESSION,
       ],
       emit: emitSpy,
       agent: "CODING"

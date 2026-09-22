@@ -3,32 +3,11 @@
 > Hand to ONE session per landing: *"Read prism-service/docs/prompts/11-routing-and-memory-extraction.md and execute Landing N."*
 > Conventions, gates and the isolated live recipe: `docs/prompts/README.md`. Source: `docs/harness_modernization_2026-09.md` §3 K5, K6.
 
+> **Landing 1 (`memory-extraction-diet`) executed 2026-09-22.** Extraction reads only what the last extraction did not: a per-scope watermark (`src/services/memory/ExtractionWatermark.ts`, collection `memory_extraction_watermarks`) plus a 2-message context, and a span with under 12 user-written characters makes no call. Extraction runs on the new `memory` role (`MODEL_ROLE_MEMORY`, then Settings → Memory Models, then the utility chain; the default model is unchanged). Consolidation counts only extractions that stored something.
+> The watermark is per conversation. The per-Discord-channel scope is opt-in (`MEMORY_EXTRACTION_CHANNEL_WATERMARK=true`): on real Lupos channels it cut input ~60% but also the memory yield (2 and 5 → 0 per 12 replies), and Flash-Lite yielded less there too.
+> Tests: `src/services/__tests__/memoryExtractionDiet.test.ts` (red-first, skip rules, compaction, role, full-vs-watermark quality sample), `extractionWatermark.test.ts`, and the `memory` cases in `modelRoleRouter.test.ts`. Landing 2 builds its `memory` utility role on `MODEL_ROLES.MEMORY`.
+
 **Repos:** prism-service (Landing 2 adds a small settings UI in prism-client) · **Size:** M · **Depends on:** 02 (router advances on 400; model catalog) · **Shares hubs with:** 17 (`OrchestratorService.ts`, `InstanceResolver.ts`).
-
----
-
-## Landing 1 — `memory-extraction-diet`
-
-**Evidence.** Over 30 days, `memory:extract` cost $4.99 across 369 calls on `gemini-3.5-flash`, about 11.6K input tokens per call: 14% of all spend. Consolidation ran about 46 times a day on Haiku 4.5.
-
-**Recon.**
-- Read `src/services/MemoryExtractor.ts` and its trigger (`src/services/harnesses/lifecycle/HookInitializer.ts` ~81–85: after every response).
-- Measure what one call sends. Expect the whole conversation.
-
-**Changes.**
-- **A watermark.** Store `memoryExtractedThroughMessageId` on the conversation. Each extraction reads only the messages after it, plus a small fixed context window.
-- **Skip trivial spans.** No user-authored content in the new span, or below N characters, means no call.
-- **A cheaper model.** Extraction runs on the configurable utility role (a Flash-Lite-class or local model). The default stays today's model until you have measured quality on a sample: extract with both and compare the memories produced.
-- **Batch consolidation.** Consolidation may use the provider batch API (Anthropic Message Batches or Gemini batch, 50% off) when it's not latency-sensitive. Optional: only if it stays simple.
-
-**Tests.**
-- **Red first.** The second extraction in a conversation includes only messages after the watermark. (Red: the whole conversation.)
-- **Skip conditions.** Unit tests.
-- **Watermark survives compaction.** Compaction (prompt 06) must not reset or break it.
-- **Model role honoured.** Test the role config.
-- **Quality sample.** A small fixture set comparing memories from full-context and watermark extraction. They must be equivalent on the fixtures.
-
-**Live.** Isolated, 3 turns. Compare `memory:extract` input tokens in the test DB against a master run. Report the numbers.
 
 ---
 

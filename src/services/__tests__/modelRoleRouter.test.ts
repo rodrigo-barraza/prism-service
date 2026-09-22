@@ -46,6 +46,7 @@ const ROLE_ENVIRONMENT_KEYS = [
   "MODEL_ROLE_PLAN",
   "MODEL_ROLE_VISION",
   "MODEL_ROLE_DEFAULT",
+  "MODEL_ROLE_MEMORY",
 ];
 
 describe("ModelRoleRouter — chain resolution order", () => {
@@ -88,6 +89,56 @@ describe("ModelRoleRouter — chain resolution order", () => {
       provider: "google",
       model: "gemini-3.5-flash",
     });
+  });
+
+  it("memory: its own env config heads the chain, then the shared knob, then the utility chain", async () => {
+    process.env.MODEL_ROLE_MEMORY = "google=gemini-3.5-flash-lite";
+    process.env.MODEL_ROLE_UTILITY = "vllm=local-model";
+    vi.mocked(SettingsService.getSection).mockResolvedValue({
+      extractionProvider: "google",
+      extractionModel: "gemini-3.5-flash",
+    } as never);
+    vi.mocked(resolveRecommendedDefault).mockReturnValue({
+      provider: "openai",
+      model: "gpt-5-mini",
+      temperature: 1.0,
+    });
+
+    const chain = await ModelRoleRouter.resolveChain(MODEL_ROLES.MEMORY);
+
+    expect(chain).toEqual([
+      { provider: "google", model: "gemini-3.5-flash-lite" },
+      { provider: "google", model: "gemini-3.5-flash" },
+      { provider: "vllm", model: "local-model" },
+      { provider: "openai", model: "gpt-5-mini" },
+    ]);
+  });
+
+  it("memory: without its own config it IS the utility chain (the default is unchanged)", async () => {
+    process.env.MODEL_ROLE_UTILITY = "vllm=local-model";
+    vi.mocked(resolveRecommendedDefault).mockReturnValue({
+      provider: "google",
+      model: "gemini-3.5-flash",
+      temperature: 1.0,
+    });
+
+    const memory = await ModelRoleRouter.resolveChain(MODEL_ROLES.MEMORY);
+    const utility = await ModelRoleRouter.resolveChain(MODEL_ROLES.UTILITY);
+
+    expect(memory).toEqual(utility);
+  });
+
+  it("memory: MODEL_ROLE_MEMORY does not move the utility role (compaction keeps its model)", async () => {
+    process.env.MODEL_ROLE_MEMORY = "google=gemini-3.5-flash-lite";
+    vi.mocked(resolveRecommendedDefault).mockReturnValue({
+      provider: "google",
+      model: "gemini-3.5-flash",
+      temperature: 1.0,
+    });
+
+    const utility = await ModelRoleRouter.resolveChain(MODEL_ROLES.UTILITY);
+
+    expect(utility).toEqual([{ provider: "google", model: "gemini-3.5-flash" }]);
   });
 
   it("utility defaults to a configured local instance when nothing is configured (silent-disable eliminated)", async () => {
