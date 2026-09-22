@@ -2,11 +2,14 @@ import { z } from "zod";
 import { sanitizedStringSchema } from "@rodrigo-barraza/utilities-library";
 import { HOOKS } from "#src/constants";
 import {
+  COMMAND_TIMEOUT_BEHAVIORS,
   HOOK_EVENT_NAMES,
   HOOK_HANDLER_TYPES,
   TOOL_MATCHED_EVENTS,
+  eventAcceptsMatcher,
 } from "#src/services/hooks/types";
 import type { HookEventName } from "#src/services/hooks/types";
+import { describeMatcher, isArgumentRule } from "#src/services/hooks/HookMatcher";
 
 /**
  * Zod Schemas for Runtime Payload Validation
@@ -384,56 +387,100 @@ export const PutRuleSchema = z.object({
 /**
  * One handler, discriminated on `type`. Mirrors `HookHandlerConfig`: a
  * `prompt` asks a model, an `http` POSTs the payload somewhere, an
- * `mcp_tool` calls a tool on an already-connected MCP server.
+ * `mcp_tool` calls a tool on an already-connected MCP server, a `command`
+ * runs a shell command in tools-service's hooks directory (owner-only), an
+ * `agent` asks a no-tools verifier that also sees the transcript. Every
+ * variant is strict: a misspelt field is a 400, never silently dropped.
  */
 export const HookHandlerSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal(HOOK_HANDLER_TYPES.PROMPT),
-    prompt: z.string().min(1, "prompt is required"),
-    provider: z.string().optional(),
-    model: z.string().optional(),
-  }),
-  z.object({
-    type: z.literal(HOOK_HANDLER_TYPES.HTTP),
-    url: z.url(),
-    headers: z.record(z.string(), z.string()).optional(),
-  }),
-  z.object({
-    type: z.literal(HOOK_HANDLER_TYPES.MCP_TOOL),
-    server: z.string().min(1, "server is required"),
-    tool: z.string().min(1, "tool is required"),
-    input: z.record(z.string(), z.unknown()).optional(),
-  }),
+  z
+    .object({
+      type: z.literal(HOOK_HANDLER_TYPES.PROMPT),
+      prompt: z.string().min(1, "prompt is required"),
+      provider: z.string().optional(),
+      model: z.string().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal(HOOK_HANDLER_TYPES.HTTP),
+      url: z.url(),
+      headers: z.record(z.string(), z.string()).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal(HOOK_HANDLER_TYPES.MCP_TOOL),
+      server: z.string().min(1, "server is required"),
+      tool: z.string().min(1, "tool is required"),
+      input: z.record(z.string(), z.unknown()).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal(HOOK_HANDLER_TYPES.COMMAND),
+      command: z
+        .string()
+        .min(1, "command is required")
+        .max(4_000, "command is limited to 4000 characters"),
+      timeoutBehavior: z.enum(COMMAND_TIMEOUT_BEHAVIORS).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal(HOOK_HANDLER_TYPES.AGENT),
+      prompt: z.string().min(1, "prompt is required"),
+      provider: z.string().optional(),
+      model: z.string().optional(),
+    })
+    .strict(),
 ]);
 
 const TOOL_MATCHED_EVENT_SET = new Set<string>(TOOL_MATCHED_EVENTS);
 
 /**
- * A matcher is only ever tested against a tool name. On any other event
- * there is nothing to test it against, so the hook would fire on *every*
- * occurrence of the event while its author believes it is narrowed. That
- * is a silent footgun, so it is a write-time rejection rather than a
- * runtime shrug.
+ * Why `matcher` cannot stand on `event`, or `null` when it can.
  *
- * Shared by the POST and PUT schemas; PUT only sees a violation when both
- * fields arrive in the same body, so `HooksRoutes` re-checks the merged
- * `{event, matcher}` against the stored document as well.
+ *   - An event with nothing to narrow (`Stop`, `TurnStart`, …) refuses any
+ *     matcher: the hook would fire on every occurrence while its author
+ *     believes it is narrowed — a silent footgun, so a write-time rejection.
+ *   - `Tool(argPattern)` only means something on a tool event.
+ *   - A pattern that cannot compile would match nothing, ever.
+ *
+ * Shared by the schemas and `HooksRoutes` (which re-checks the merged
+ * `{event, matcher}` of a PUT against the stored document).
  */
+export function hookMatcherProblem(
+  event: HookEventName,
+  matcher: string,
+): string | null {
+  if (!matcher || !matcher.trim()) return null;
+  if (!eventAcceptsMatcher(event)) {
+    return (
+      `matcher "${matcher}" can never match on event "${event}" — that event has ` +
+      `nothing to match against. Leave matcher empty for this event.`
+    );
+  }
+  if (isArgumentRule(matcher) && !TOOL_MATCHED_EVENT_SET.has(event)) {
+    return (
+      `matcher "${matcher}" is a Tool(argPattern) rule, which only applies to ` +
+      `${TOOL_MATCHED_EVENTS.join(", ")}.`
+    );
+  }
+  if (describeMatcher(matcher) === "invalid") {
+    return `matcher "${matcher}" is not a valid pattern (too long, or a regex that does not compile).`;
+  }
+  return null;
+}
+
 export function refineHookMatcher(
   value: { event?: HookEventName; matcher?: string },
   ctx: z.RefinementCtx,
 ): void {
   const { event, matcher } = value;
-  if (!event || !matcher || !matcher.trim()) return;
-  if (TOOL_MATCHED_EVENT_SET.has(event)) return;
-  ctx.addIssue({
-    code: "custom",
-    path: ["matcher"],
-    message:
-      `matcher "${matcher}" can never match on event "${event}" — ` +
-      `matchers are tested against a tool name, so they are only valid on ` +
-      `${TOOL_MATCHED_EVENTS.join(", ")}. Leave matcher empty for this event.`,
-  });
+  if (!event || !matcher) return;
+  const problem = hookMatcherProblem(event, matcher);
+  if (problem) ctx.addIssue({ code: "custom", path: ["matcher"], message: problem });
 }
 
 export const PostHookSchema = z
@@ -447,6 +494,8 @@ export const PostHookSchema = z
     agent: z.string().nullable().optional().default(null),
     handler: HookHandlerSchema,
     enabled: z.boolean().optional().default(true),
+    /** Background hook: never waits, never blocks; output reaches the next boundary. */
+    async: z.boolean().optional().default(false),
     timeoutMilliseconds: z
       .number()
       .int()
@@ -454,6 +503,7 @@ export const PostHookSchema = z
       .max(HOOKS.MAX_TIMEOUT_MILLISECONDS)
       .optional(),
   })
+  .strict()
   .superRefine(refineHookMatcher);
 
 export const PutHookSchema = z
@@ -465,6 +515,7 @@ export const PutHookSchema = z
     agent: z.string().nullable().optional(),
     handler: HookHandlerSchema.optional(),
     enabled: z.boolean().optional(),
+    async: z.boolean().optional(),
     timeoutMilliseconds: z
       .number()
       .int()
@@ -472,6 +523,7 @@ export const PutHookSchema = z
       .max(HOOKS.MAX_TIMEOUT_MILLISECONDS)
       .optional(),
   })
+  .strict()
   .superRefine(refineHookMatcher);
 
 /**

@@ -1,3 +1,4 @@
+import { HOOKS } from "#src/constants";
 import type { HookEventName, HookPayload } from "./types.ts";
 
 /**
@@ -39,4 +40,49 @@ export function buildHookPayload(
     payload.parent_agent_conversation_id = context.parentAgentConversationId;
   }
   return payload;
+}
+
+/** One transcript entry as a hook payload carries it. */
+export interface HookTranscriptEntry {
+  role: string;
+  content: string;
+  tool_calls?: string[];
+}
+
+/**
+ * The tail of a conversation, reduced to what a hook can use: role, text,
+ * and the names of any tool calls, each message capped. `Interrupt` payloads
+ * and `agent` verifiers carry it; the full history never crosses the hook
+ * boundary (images, thinking signatures and provider state stay behind).
+ */
+export function summarizeTranscript(
+  messages: ReadonlyArray<Record<string, unknown>> | null | undefined,
+  maxMessages: number = HOOKS.TRANSCRIPT_MESSAGES,
+  maxChars: number = HOOKS.TRANSCRIPT_MESSAGE_CHARS,
+): HookTranscriptEntry[] {
+  if (!Array.isArray(messages)) return [];
+  return messages.slice(-maxMessages).map((message) => {
+    const content = message.content;
+    const text =
+      typeof content === "string"
+        ? content
+        : Array.isArray(content)
+          ? content
+              .map((part) =>
+                part && typeof part === "object" && typeof (part as { text?: unknown }).text === "string"
+                  ? (part as { text: string }).text
+                  : "",
+              )
+              .join("")
+          : "";
+    const entry: HookTranscriptEntry = {
+      role: typeof message.role === "string" ? message.role : "unknown",
+      content: text.length > maxChars ? `${text.slice(0, maxChars)}…` : text,
+    };
+    const toolCalls = message.toolCalls;
+    if (Array.isArray(toolCalls) && toolCalls.length > 0) {
+      entry.tool_calls = toolCalls.map((toolCall) => String((toolCall as { name?: unknown })?.name ?? "?"));
+    }
+    return entry;
+  });
 }

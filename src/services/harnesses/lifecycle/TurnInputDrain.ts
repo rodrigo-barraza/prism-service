@@ -35,11 +35,26 @@ import type {
  * sub-agent follow-ups arrive already formatted by their producer and are
  * pushed verbatim. The marker `_turnInput` on the message lets the client
  * render the bubble as "applied mid-turn" and strip the wrapper.
+ *
+ * `hook_context` (an async hook's output) is the exception: nobody typed it,
+ * so it is injected as a system-role <hook-context> message with no
+ * `_turnInput` marker (it must never render as a user bubble), and it is
+ * acknowledged with a `hook_context_applied` status instead of `turn_input`.
  */
+
+/** Status acknowledging an async hook's context reached the model. */
+export const HOOK_CONTEXT_APPLIED_STATUS = "hook_context_applied";
 
 export type TurnInputBoundary = "iteration_start" | "after_tools" | "before_end";
 
 export function buildTurnInputMessage(entry: TurnInputEntry): ConversationMessage {
+  if (entry.kind === "hook_context") {
+    return {
+      role: "system",
+      content: wrapSystemMessage(SYSTEM_MESSAGE_TAGS.HOOK_CONTEXT, entry.text),
+      ...(entry.meta || {}),
+    } as ConversationMessage;
+  }
   const base: ConversationMessage = {
     role: "user",
     content: "",
@@ -92,6 +107,17 @@ export function drainTurnInput(
 
   for (const entry of entries) {
     currentMessages.push(buildTurnInputMessage(entry));
+    if (entry.kind === "hook_context") {
+      context.emit({
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
+        message: HOOK_CONTEXT_APPLIED_STATUS,
+        inputId: entry.id,
+        boundary,
+        iteration: state.iterations,
+        ...(entry.meta || {}),
+      });
+      continue;
+    }
     state.turnInputApplied++;
     // The event carries the entry so viewers (and the driving client, which
     // rendered an optimistic bubble by id) can show it in the transcript.
