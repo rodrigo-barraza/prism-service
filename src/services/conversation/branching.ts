@@ -49,7 +49,9 @@ import type { ConversationSettings } from "./types.ts";
 // fork — a NEW conversation holding a copy of the messages through M
 // (tool calls and results included) and `forkedFrom: {conversationId,
 // messageId}`. Files are not touched; request rows and costs are not
-// copied, so the fork's cost rollup starts at zero.
+// copied, so the fork's cost rollup starts at zero. `position: "before"`
+// copies only what precedes M — edit-as-branch: the client then sends the
+// edited prompt in the fork, and the original conversation stays intact.
 // ────────────────────────────────────────────────────────────
 
 export const REWIND_RESTORE_MODES = ["conversation", "code", "both"] as const;
@@ -415,30 +417,42 @@ function stripTelemetry(message: ChatMessage): ChatMessage {
   return copy as ChatMessage;
 }
 
+export type ForkPosition = "at" | "before";
+
 export interface ForkResult {
   id: string;
   type: "direct" | "agent";
   title: string;
   messageCount: number;
-  forkedFrom: { conversationId: string; messageId: string; title: string; forkedAt: string };
+  forkedFrom: {
+    conversationId: string;
+    messageId: string;
+    position: ForkPosition;
+    title: string;
+    forkedAt: string;
+  };
 }
 
 export async function forkConversation(
   db: Db,
   scope: ConversationScope,
-  { atMessageId, stampProfileId }: { atMessageId: string; stampProfileId?: string | null },
+  {
+    messageId,
+    position = "at",
+    stampProfileId,
+  }: { messageId: string; position?: ForkPosition; stampProfileId?: string | null },
 ): Promise<ForkResult> {
   const found = await findConversation(db, scope);
   if (!found) throw new BranchingError(404, "Conversation not found");
   const { document, collection, type } = found;
 
   const messages = document.messages || [];
-  const index = resolveMessageIndex(messages, atMessageId);
-  if (index === -1) throw new BranchingError(404, `Message not found: ${atMessageId}`);
+  const index = resolveMessageIndex(messages, messageId);
+  if (index === -1) throw new BranchingError(404, `Message not found: ${messageId}`);
   if (isHiddenFromDisplay(messages[index])) {
     throw new BranchingError(400, "That message was rewound out of the conversation.");
   }
-  const end = extendThroughToolResults(messages, index);
+  const end = position === "before" ? index - 1 : extendThroughToolResults(messages, index);
   const copied = ensureMessageIds(
     messages
       .slice(0, end + 1)
@@ -451,6 +465,7 @@ export async function forkConversation(
   const forkedFrom = {
     conversationId: scope.conversationId,
     messageId: servedMessageId(messages[index], index) as string,
+    position,
     title: sourceTitle,
     forkedAt: now,
   };
@@ -500,7 +515,9 @@ export async function forkConversation(
       profileId: scope.profileId,
     },
     {
-      $push: { forks: { conversationId: forkId, messageId: forkedFrom.messageId, createdAt: now } },
+      $push: {
+        forks: { conversationId: forkId, messageId: forkedFrom.messageId, position, createdAt: now },
+      },
     } as Document,
   );
 

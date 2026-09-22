@@ -436,7 +436,9 @@ describe("POST /conversations/:id/fork", () => {
     expect(fork.checkpoints).toBeUndefined();
     expect(tools.requests).toHaveLength(0);
     // The source records its fork.
-    expect(stored().forks).toEqual([{ conversationId: response.body.id, messageId: "m5", createdAt: expect.any(String) }]);
+    expect(stored().forks).toEqual([
+      { conversationId: response.body.id, messageId: "m5", position: "at", createdAt: expect.any(String) },
+    ]);
   });
 
   it("forks at a user message without the rest of its turn, and both continue independently", async () => {
@@ -451,6 +453,28 @@ describe("POST /conversations/:id/fork", () => {
     expect(fork.messages.some((message: Doc) => message.pruned)).toBe(false);
     const served = await request.get(`/conversations/${forkId}`).set(HEADERS);
     expect(served.body.forkedFrom).toMatchObject({ conversationId: "conv-1", messageId: "m3" });
+  });
+
+  it("forks BEFORE a message for edit-as-branch — the first message included", async () => {
+    const beforeTurnTwo = await request.post("/conversations/conv-1/fork").set(HEADERS).send({ beforeMessageId: "m4" });
+    const beforeFirst = await request.post("/conversations/conv-1/fork").set(HEADERS).send({ beforeMessageId: "m0" });
+
+    expect(beforeTurnTwo.status).toBe(201);
+    expect(beforeTurnTwo.body.forkedFrom).toMatchObject({ messageId: "m4", position: "before" });
+    const fork = db.list(COLLECTIONS.AGENT_CONVERSATIONS).find((doc) => doc.id === beforeTurnTwo.body.id)!;
+    expect(fork.messages.map((message: Doc) => message.id)).toEqual(["m0", "m1", "m2", "m3"]);
+    expect(beforeFirst.status).toBe(201);
+    expect(beforeFirst.body).toMatchObject({ messageCount: 0, forkedFrom: { messageId: "m0", position: "before" } });
+    // The source is untouched either way.
+    expect(stored().messages).toHaveLength(9);
+    expect(stored().messages.some((message: Doc) => message.pruned)).toBe(false);
+  });
+
+  it("requires exactly one of atMessageId / beforeMessageId", async () => {
+    expect((await request.post("/conversations/conv-1/fork").set(HEADERS).send({})).status).toBe(400);
+    expect(
+      (await request.post("/conversations/conv-1/fork").set(HEADERS).send({ atMessageId: "m1", beforeMessageId: "m4" })).status,
+    ).toBe(400);
   });
 
   it("404s for an unknown message or conversation", async () => {

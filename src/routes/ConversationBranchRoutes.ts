@@ -29,9 +29,15 @@ const RewindBodySchema = z.object({
   dryRun: z.boolean().optional(),
 });
 
-const ForkBodySchema = z.object({
-  atMessageId: z.string().min(1),
-});
+/** `atMessageId` copies through the message; `beforeMessageId` stops just before it (edit-as-branch). */
+const ForkBodySchema = z
+  .object({
+    atMessageId: z.string().min(1).optional(),
+    beforeMessageId: z.string().min(1).optional(),
+  })
+  .refine((body) => !!body.atMessageId !== !!body.beforeMessageId, {
+    message: "Provide exactly one of atMessageId or beforeMessageId",
+  });
 
 function conversationScope(req: Request): ConversationScope {
   const scope = resolveScope(req);
@@ -79,8 +85,10 @@ router.post(
       return res.status(400).json({ error: parsed.error.format() });
     }
     try {
+      const { atMessageId, beforeMessageId } = parsed.data;
       const fork = await forkConversation(req.db, conversationScope(req), {
-        atMessageId: parsed.data.atMessageId,
+        messageId: (atMessageId || beforeMessageId) as string,
+        position: beforeMessageId ? "before" : "at",
         stampProfileId: resolveScope(req).profileId,
       });
       return res.status(201).json(fork);
