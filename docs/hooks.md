@@ -16,7 +16,7 @@ Code: `src/services/hooks/` (types, runner, registry, matcher, handlers) and `sr
 | `InstructionsLoaded` | PRISM.md or a pinned rule went into the system prompt | — | `instruction_type` |
 | `PreToolUse` | Before the approval gate | `deny` drops the call; `ask` forces an approval request; `allow` skips the mode's prompt (never a deny rule) | tool |
 | `PermissionRequest` | Just before a person is asked to approve a call | `allow` / `deny` answer for them | tool |
-| `PermissionDenied` | A rule, the classifier, a hook or the user denied a call (`denied_by`) | — | tool |
+| `PermissionDenied` | A rule, the classifier, a hook or the user denied a call, or its approval lapsed unanswered (`denied_by`: `rule` · `classifier` · `hook` · `user` · `timeout` · `superseded` · `turn_ended`) | — | tool |
 | `PostToolUse` / `PostToolUseFailure` | After a tool returned / failed | `updatedToolOutput`, `additionalContext` | tool |
 | `PostToolBatch` | The batch resolved, before the next model call | `additionalContext` | — |
 | `Stop` | The agent is about to end the turn | `decision: "block"` keeps it going with `reason` — at most 3 times per turn | — |
