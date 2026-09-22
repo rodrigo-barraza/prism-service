@@ -509,6 +509,36 @@ describe("POST /conversations/:id/fork", () => {
     expect(stored().messages.some((message: Doc) => message.pruned)).toBe(false);
   });
 
+  it("forking BEFORE a user message leaves its turn's context note behind", async () => {
+    const note = (id: string, time: string) => ({
+      id,
+      role: "system",
+      content: `<system-context>\n\nLocal time: ${time}\n\n</system-context>`,
+    });
+    db.list(COLLECTIONS.AGENT_CONVERSATIONS).push(
+      fixtureConversation({
+        id: "conv-notes",
+        messages: [
+          note("n0", "10:00"),
+          { id: "m0", role: "user", content: "write a" },
+          { id: "m1", role: "assistant", content: "wrote a" },
+          note("n2", "10:05"),
+          { id: "m2", role: "user", content: "write b" },
+          { id: "m3", role: "assistant", content: "wrote b" },
+        ],
+        workspaceSnapshots: [],
+        checkpoints: [],
+      }),
+    );
+
+    const response = await request.post("/conversations/conv-notes/fork").set(HEADERS).send({ beforeMessageId: "m2" });
+
+    expect(response.status).toBe(201);
+    const fork = db.list(COLLECTIONS.AGENT_CONVERSATIONS).find((doc) => doc.id === response.body.id)!;
+    // Turn 1 keeps its own note; turn 2's note leaves with turn 2.
+    expect(fork.messages.map((message: Doc) => message.id)).toEqual(["n0", "m0", "m1"]);
+  });
+
   it("requires exactly one of atMessageId / beforeMessageId", async () => {
     expect((await request.post("/conversations/conv-1/fork").set(HEADERS).send({})).status).toBe(400);
     expect(
