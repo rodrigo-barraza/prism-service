@@ -1,44 +1,26 @@
 # 13 — Durable runs: park, survive restarts, pause at budget (three landings)
 
+> **Landing 1 (`persist-pending-decisions`) done 2026-09-22:** approvals, plan approvals and `ask_user` questions are records in `pending_decisions` (`src/services/PendingDecisionStore.ts`), written before the card goes out and decided by a conditional write (exactly once; a second POST is 409). No timeouts; a turn parks as `runState: "awaiting_user"` (`src/services/conversation/ConversationRunState.ts`), boot restores the "needs you" counts, and a decision after a restart is stored with `delivered: false` for Landing 2 to pick up.
+> Tests: `src/services/harnesses/__tests__/persistPendingDecisions.test.ts` (restart, no timeout, exactly once), plus `approvalRegistry.test.ts`, `backgroundHousekeeping.test.ts`, `conversationAttentionRegistry.test.ts`; client `src/utils/__tests__/{awaitingUserStatus.test.tsx,pendingDecisionCards.test.ts}` and `useQuestionAnswerSender.test.tsx` (409).
+
 > Hand to ONE session per landing: *"Read prism-service/docs/prompts/13-durable-run-state.md and execute Landing N."*
 > Conventions, gates and the isolated live recipe: `docs/prompts/README.md`. Source: `docs/harness_modernization_2026-09.md` §4.3 (and harness-next §2.4 "not done").
 
 **Repos:** prism-service, prism-client (state display) · **Size:** L · **Depends on:** 05 (approvals keyed per call, which this persists) · **Shares hubs with:** 12, 17 (`OrchestratorService.ts`), 03 (pending questions).
 
 ## Today
-All pending work lives in in-memory maps:
-- `ApprovalRegistry.ts` ~69
+Pending approvals and questions are durable (Landing 1): `PendingDecisionStore` holds them, and `ApprovalRegistry` / `QuestionRegistry` keep only the in-process WAITER of a turn running here. The rest of the pending work still lives in in-memory maps:
 - `AsyncTaskRegistry.ts` ~95
 - `OrchestratorService.ts` ~114 (sub-agents)
 - `TurnInputMailbox.ts` ~65
 - `utils/DirectViewerBroadcast.ts` ~70 (replay buffer)
 
-A restart drops all of it. Waits also time out: approvals after 2 minutes, questions after 5. The turn checkpoint (`BaseAgenticHarness.ts` ~1363, recovered in `src/index.ts` ~594–615) salvages messages, but never the turn itself.
+A restart drops all of that, and nothing re-drives a parked turn: its decisions are stored, but the turn does not continue. The turn checkpoint (`BaseAgenticHarness.checkpointTurnProgress`, recovered in `src/index.ts` by `recoverOrphanedTurnCheckpoints`) salvages messages, but never the turn itself; `AgenticLoopService.retireOrphanedDecisions` supersedes a dead turn's pending decisions when a NEW turn starts on the loop — Landing 2's re-drive must attach its waiters before that runs.
 
 **Reference behaviour.**
 - **Managed Agents** park a session in `requires_action` with no timeout, and pause at a budget with `budget_reached`.
 - **Codex** recovers threads and active goals after a daemon restart.
 - **DBOS / LangGraph** use typed, schema-validated interrupts.
-
----
-
-## Landing 1 — `persist-pending-decisions`
-
-**Changes.**
-- **Persist decisions.** Write pending approvals and questions to Mongo (`pending_decisions`): `{loopKey, toolCallId | questionId, kind, args/question, tier, options, createdAt, status}`.
-- **Resolvers become lookups.** An in-process emitter wakes a waiting loop; a database write is the source of truth.
-- **Park, don't time out.** Remove the approval and question timeouts. The turn parks as `awaiting_user`: a conversation state with `isGenerating` semantics updated. The client shows "waiting for you" instead of a spinner.
-- **Answer after restart.** An answer or approval that arrives after a restart is stored. The loop resumes when it is re-driven (Landing 2).
-
-**Tests.**
-- **Red first (restart).** An integration test:
-  1. start a turn that reaches an approval;
-  2. simulate a restart by rebuilding the registries and services over the **same** Mongo mock store (or a test database);
-  3. approve via the route.
-
-  The decision is persisted and visible. (Red: lost.)
-- **No timeout.** With fake timers past the old timeout, the approval is still pending and the state is `awaiting_user`. (Red: rejected.)
-- **Exactly once.** Decisions are idempotent: a double POST is accepted once.
 
 ---
 
