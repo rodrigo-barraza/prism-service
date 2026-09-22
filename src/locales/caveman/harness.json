@@ -93,6 +93,6 @@
   "approval": {
     "declined": "User say no to {{toolName}}. Not run. No retry same call; go on without or ask user.",
     "declinedWithReason": "User say no to {{toolName}}. Not run. User reason: {{reason}}. Heed reason; no retry same call.",
-    "timedOut": "No approval in time for {{toolName}}. Not run. No assume ran; go on without or ask user."
+    "lapsed": "No decide on {{toolName}} before turn moved on. Not run. No assume ran; go on without or ask user."
   }
 }

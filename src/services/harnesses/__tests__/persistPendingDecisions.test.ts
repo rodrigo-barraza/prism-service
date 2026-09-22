@@ -392,103 +392,6 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-// ── Restart ──────────────────────────────────────────────────────────
-
-describe("a pending approval survives a restart", () => {
-  it("is persisted when the gate parks, and an approval POSTed to the NEW process is recorded", async () => {
-    const conversationId = "durable-approval";
-    seedConversation(conversationId);
-    const { harness, emit } = buildScriptedHarness(conversationId, [
-      { kind: "tools", calls: ONE_WRITE },
-      { kind: "text", text: "done" },
-    ]);
-
-    void harness.run();
-    await vi.waitFor(() => expect(approvalEvents(emit)).toHaveLength(1));
-    await flush();
-
-    // Persisted: what is being asked, of which loop, still undecided.
-    const [parked] = pendingDecisionDocuments();
-    expect(parked).toMatchObject({
-      loopKey: conversationId,
-      kind: "tool",
-      itemId: "call-1",
-      name: "write_file",
-      args: { path: "one.txt", content: "one\n" },
-      status: "pending",
-      batchId: approvalEvents(emit)[0].batchId,
-    });
-
-    // ── The process dies. Every module (and its in-memory map) is gone;
-    //    the Mongo store is not.
-    vi.resetModules();
-    const { default: restartedRouter } = await import("#src/routes/AgentRoutes");
-    const { default: RestartedLoopService } = await import("#src/services/AgenticLoopService");
-    const restarted = buildApp(restartedRouter);
-
-    // Still visible as pending to a reloading client.
-    const before = await RestartedLoopService.getPendingApproval(conversationId);
-    expect(before).toMatchObject({ isPending: true, toolCalls: [expect.objectContaining({ id: "call-1" })] });
-
-    const approved = await restarted
-      .post("/agent/approve")
-      .send({ conversationId, toolCallId: "call-1", decision: "allow" });
-    expect(approved.status, JSON.stringify(approved.body)).toBe(200);
-    // Nothing in this process was waiting on it: stored for the re-driven turn (Landing 2).
-    expect(approved.body).toMatchObject({ ok: true, decision: "allow", delivered: false });
-
-    const [decided] = pendingDecisionDocuments();
-    expect(decided).toMatchObject({
-      itemId: "call-1",
-      status: "decided",
-      decision: { decision: "allow", scope: "call", source: "user" },
-    });
-    expect(typeof decided.decidedAt).toBe("string");
-
-    const after = await RestartedLoopService.getPendingApproval(conversationId);
-    expect(after.isPending).toBe(false);
-
-    // And it is a decision, not a vote: the same call cannot be decided again.
-    const again = await restarted
-      .post("/agent/approve")
-      .send({ conversationId, toolCallId: "call-1", decision: "deny" });
-    expect(again.status).toBe(409);
-    expect(pendingDecisionDocuments()[0].decision.decision).toBe("allow");
-  });
-
-  it("a blocking question survives too: the answer POSTed after the restart is stored", async () => {
-    const conversationId = "durable-question";
-    let settled = false;
-    void InternalToolRegistry.execute(
-      "ask_user",
-      { questions: [{ question: "Which port?" }] },
-      { conversationId, agentConversationId: `agent-${conversationId}`, project: PROJECT, username: USERNAME },
-    ).then(() => {
-      settled = true;
-    });
-    await vi.waitFor(async () =>
-      expect(await AgenticLoopService.listPendingQuestions(conversationId)).toHaveLength(1),
-    );
-    await flush();
-    const [parked] = pendingDecisionDocuments();
-    expect(parked).toMatchObject({ loopKey: conversationId, kind: "question", status: "pending", blocking: true });
-
-    vi.resetModules();
-    const { default: restartedRouter } = await import("#src/routes/AgentRoutes");
-    const answered = await buildApp(restartedRouter)
-      .post("/agent/answer")
-      .send({ conversationId, questionId: parked.itemId, answer: "5173" });
-    expect(answered.status, JSON.stringify(answered.body)).toBe(200);
-    expect(answered.body).toMatchObject({ ok: true, questionId: parked.itemId, delivered: false });
-    expect(pendingDecisionDocuments()[0]).toMatchObject({
-      status: "answered",
-      answers: [{ answer: "5173" }],
-    });
-    // The old process's wait is not what took it.
-    expect(settled).toBe(false);
-  });
-});
-
 // ── No timeout ───────────────────────────────────────────────────────
 
 describe("a wait has no timeout: the turn parks awaiting the user", () => {
@@ -607,5 +510,105 @@ describe("a decision is accepted once", () => {
     const second = await http.post("/agent/answer").send({ conversationId, questionId, answer: "blue" });
     expect(second.status, JSON.stringify(second.body)).toBe(409);
     expect(second.body).toMatchObject({ reason: "already_answered", questionId });
+  });
+});
+
+// ── Restart ──────────────────────────────────────────────────────────
+// LAST in the file, on purpose: vi.resetModules() leaves this file's static
+// imports on the old module graph while the tools' dynamic imports reach
+// the new one — a split no real process has. Nothing may run after it.
+
+describe("a pending approval survives a restart", () => {
+  it("is persisted when the gate parks, and an approval POSTed to the NEW process is recorded", async () => {
+    const conversationId = "durable-approval";
+    seedConversation(conversationId);
+    const { harness, emit } = buildScriptedHarness(conversationId, [
+      { kind: "tools", calls: ONE_WRITE },
+      { kind: "text", text: "done" },
+    ]);
+
+    void harness.run();
+    await vi.waitFor(() => expect(approvalEvents(emit)).toHaveLength(1));
+    await flush();
+
+    // Persisted: what is being asked, of which loop, still undecided.
+    const [parked] = pendingDecisionDocuments();
+    expect(parked).toMatchObject({
+      loopKey: conversationId,
+      kind: "tool",
+      itemId: "call-1",
+      name: "write_file",
+      args: { path: "one.txt", content: "one\n" },
+      status: "pending",
+      batchId: approvalEvents(emit)[0].batchId,
+    });
+
+    // ── The process dies. Every module (and its in-memory map) is gone;
+    //    the Mongo store is not.
+    vi.resetModules();
+    const { default: restartedRouter } = await import("#src/routes/AgentRoutes");
+    const { default: RestartedLoopService } = await import("#src/services/AgenticLoopService");
+    const restarted = buildApp(restartedRouter);
+
+    // Still visible as pending to a reloading client.
+    const before = await RestartedLoopService.getPendingApproval(conversationId);
+    expect(before).toMatchObject({ isPending: true, toolCalls: [expect.objectContaining({ id: "call-1" })] });
+
+    const approved = await restarted
+      .post("/agent/approve")
+      .send({ conversationId, toolCallId: "call-1", decision: "allow" });
+    expect(approved.status, JSON.stringify(approved.body)).toBe(200);
+    // Nothing in this process was waiting on it: stored for the re-driven turn (Landing 2).
+    expect(approved.body).toMatchObject({ ok: true, decision: "allow", delivered: false });
+
+    const [decided] = pendingDecisionDocuments();
+    expect(decided).toMatchObject({
+      itemId: "call-1",
+      status: "decided",
+      decision: { decision: "allow", scope: "call", source: "user" },
+    });
+    expect(typeof decided.decidedAt).toBe("string");
+
+    const after = await RestartedLoopService.getPendingApproval(conversationId);
+    expect(after.isPending).toBe(false);
+
+    // And it is a decision, not a vote: the same call cannot be decided again.
+    const again = await restarted
+      .post("/agent/approve")
+      .send({ conversationId, toolCallId: "call-1", decision: "deny" });
+    expect(again.status).toBe(409);
+    expect(pendingDecisionDocuments()[0].decision.decision).toBe("allow");
+  });
+
+  it("a blocking question survives too: the answer POSTed after the restart is stored", async () => {
+    const conversationId = "durable-question";
+    let settled = false;
+    void InternalToolRegistry.execute(
+      "ask_user",
+      { questions: [{ question: "Which port?" }] },
+      { conversationId, agentConversationId: `agent-${conversationId}`, project: PROJECT, username: USERNAME },
+    ).then(() => {
+      settled = true;
+    });
+    await vi.waitFor(async () =>
+      expect(await AgenticLoopService.listPendingQuestions(conversationId)).toHaveLength(1),
+    );
+    await flush();
+    const [parked] = pendingDecisionDocuments();
+    expect(parked).toMatchObject({ loopKey: conversationId, kind: "question", status: "pending", blocking: true });
+
+    vi.resetModules();
+    const { default: restartedRouter } = await import("#src/routes/AgentRoutes");
+    const answered = await buildApp(restartedRouter)
+      .post("/agent/answer")
+      .send({ conversationId, questionId: parked.itemId, answer: "5173" });
+    expect(answered.status, JSON.stringify(answered.body)).toBe(200);
+    expect(answered.body).toMatchObject({ ok: true, questionId: parked.itemId, delivered: false });
+    expect(pendingDecisionDocuments()[0]).toMatchObject({
+      status: "answered",
+      answers: [{ answer: "5173" }],
+    });
+    // The old process's wait is not what took it.
+    expect(settled).toBe(false);
   });
 });

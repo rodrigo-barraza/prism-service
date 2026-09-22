@@ -22,7 +22,7 @@ import {
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import MinioWrapper from "#src/wrappers/MinioWrapper";
 import { MONGO_DB_NAME } from "#config";
-import { COLLECTIONS, FILE_CATEGORIES } from "#src/constants";
+import { COLLECTIONS, FILE_CATEGORIES, PENDING_DECISIONS } from "#src/constants";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { pruneExpiredWorkspaceSnapshots } from "#src/services/conversation/workspaceSnapshots";
@@ -38,7 +38,7 @@ const WORKTREE_ROOT = "/tmp/prism-worktrees";
 /** Request logs older than this are pruned (keep 90 days) */
 const REQUEST_LOG_MAX_AGE_DAYS = 90;
 
-/** Stale isGenerating flags left from crashes */
+/** Stale isGenerating flags left from crashes (a turn parked on its user is never stale) */
 const STALE_CONVERSATION_CUTOFF_MILLISECONDS = hours(2);
 
 export interface HousekeepingWorktreeResult {
@@ -115,19 +115,18 @@ async function clearStaleConversations(): Promise<HousekeepingConversationResult
     Date.now() - STALE_CONVERSATION_CUTOFF_MILLISECONDS,
   ).toISOString();
 
+  const staleGeneratingFilter = {
+    isGenerating: true,
+    updatedAt: { $lt: cutoff },
+    runState: { $ne: PENDING_DECISIONS.RUN_STATE_AWAITING_USER },
+  };
   const [convResult, agentConvResult, staleAwaitingResult, staleSubAgentResult] = await Promise.all([
     db
       .collection(COLLECTIONS.MODEL_CONVERSATIONS)
-      .updateMany(
-        { isGenerating: true, updatedAt: { $lt: cutoff } },
-        { $set: { isGenerating: false, isActive: false } },
-      ),
+      .updateMany(staleGeneratingFilter, { $set: { isGenerating: false, isActive: false } }),
     db
       .collection(COLLECTIONS.AGENT_CONVERSATIONS)
-      .updateMany(
-        { isGenerating: true, updatedAt: { $lt: cutoff } },
-        { $set: { isGenerating: false, isActive: false } },
-      ),
+      .updateMany(staleGeneratingFilter, { $set: { isGenerating: false, isActive: false } }),
     // Clear stale pendingBackgroundTasks counters left from crashes/restarts
     db
       .collection(COLLECTIONS.AGENT_CONVERSATIONS)

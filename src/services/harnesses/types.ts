@@ -66,7 +66,7 @@ export interface ToolCall {
     /** Which layer denied: a rule, the classifier, a hook, or the user. */
     deniedBy?: "rule" | "classifier" | "hook" | "user";
     /** Set by the ApprovalGate for a call a human decided (or that timed out waiting). */
-    decidedBy?: "user" | "timeout" | "superseded" | "turn_ended";
+    decidedBy?: "user" | "superseded" | "turn_ended";
     /** The user's own reason for declining. */
     userReason?: string;
     /** The user edited the arguments on the approval card; `args` holds the edit. */

@@ -1,5 +1,7 @@
 import type { Request, Response } from "express";
 import AgenticLoopService from "#src/services/AgenticLoopService";
+import ConversationAttentionRegistry from "#src/services/ConversationAttentionRegistry";
+import PendingDecisionStore from "#src/services/PendingDecisionStore";
 import logger from "#src/utils/logger";
 
 /**
@@ -21,6 +23,13 @@ import logger from "#src/utils/logger";
  * 404 when nothing took the answer — no pending question, an unknown
  * `questionId`, or a non-blocking card whose turn already ended. The client
  * then sends the answer as a normal message, so it is delivered once.
+ *
+ * 409 `already_answered` for a second answer to one card: the first was
+ * taken, and a 404 here would make the client send this one as a message.
+ *
+ * Questions are durable (PendingDecisionStore): an answer to a turn parked
+ * when the previous process stopped is stored — `delivered: false` — for
+ * the turn to pick up when it is re-driven.
  */
 export function handleQuestionAnswer(routeLabel: string) {
   return async (request: Request, response: Response) => {
@@ -56,7 +65,7 @@ export function handleQuestionAnswer(routeLabel: string) {
       return response.status(400).json({ error: "Missing answer or answers" });
     }
 
-    const outcome = AgenticLoopService.resolveUserQuestion(
+    const outcome = await AgenticLoopService.resolveUserQuestion(
       addressedId,
       normalizedAnswers,
       {
@@ -66,6 +75,14 @@ export function handleQuestionAnswer(routeLabel: string) {
       },
     );
 
+    if (!outcome.resolved && outcome.reason === "already_answered") {
+      return response.status(409).json({
+        error: "This question was already answered",
+        reason: outcome.reason,
+        conversationId: addressedId,
+        questionId: outcome.questionId,
+      });
+    }
     if (!outcome.resolved) {
       const error =
         outcome.reason === "unknown_question"
@@ -86,10 +103,18 @@ export function handleQuestionAnswer(routeLabel: string) {
         `(${outcome.blocking ? "blocking" : "non-blocking"}) on ${outcome.loopKey}`,
     );
 
+    if (!outcome.delivered) {
+      // No running turn will emit the event that closes its "needs you" entry.
+      ConversationAttentionRegistry.forget(
+        await PendingDecisionStore.find({ loopKey: outcome.loopKey, itemId: outcome.questionId }),
+      );
+    }
+
     response.json({
       ok: true,
       questionId: outcome.questionId,
       blocking: outcome.blocking,
+      delivered: outcome.delivered,
     });
   };
 }

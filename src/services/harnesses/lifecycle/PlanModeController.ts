@@ -1,10 +1,11 @@
 import PlanningModeService from "#src/services/PlanningModeService";
 import crypto from "node:crypto";
-import { ApprovalRegistry } from "#src/services/ApprovalRegistry";
+import { ApprovalRegistry, type ToolCallDecision } from "#src/services/ApprovalRegistry";
 import { resolveLoopKey } from "#src/services/LoopKey";
+import { decisionOwnerOf } from "#src/services/conversation/ConversationRunState";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import logger from "#src/utils/logger";
-import { APPROVALS, HARNESS } from "#src/constants";
+import { APPROVALS } from "#src/constants";
 import {
   SYSTEM_MESSAGE_TAGS,
   wrapSystemMessage,
@@ -36,8 +37,6 @@ import type {
  * Extracted from ReActHarness to allow future plan-aware harnesses
  * to reuse the same plan lifecycle without duplicating the logic.
  */
-
-const PLAN_APPROVAL_TIMEOUT_MILLISECONDS = HARNESS.APPROVAL_TIMEOUT_MILLISECONDS;
 
 /**
  * Filter out unauthorized tool calls during plan mode.
@@ -113,8 +112,10 @@ export function blockUnauthorizedToolCalls(
  * wait for user approval, and transition out of plan mode.
  *
  * Either way the decision is written into the exit_plan_mode tool result, so
- * the caller's assistant message carries the plan AND the verdict. On a
- * rejection, a timeout or an abort the caller must still finalize the turn
+ * the caller's assistant message carries the plan AND the verdict. There is
+ * no timeout: the proposal is recorded (PendingDecisionStore) before it is
+ * shown and the turn parks until the user decides. On a rejection or an
+ * abort the caller must still finalize the turn
  * (persist, clear isGenerating, emit `done`) — this function emits no `done`
  * of its own.
  */
@@ -145,6 +146,34 @@ export async function handleExitPlanMode(
   const batchId = crypto.randomUUID();
   const toolCallId = exitPlanToolCall.id || `${batchId}:plan`;
 
+  let planDecision: "approved" | "rejected";
+  let rejectionReason: string | undefined;
+  let decisionsPromise: Promise<Map<string, ToolCallDecision>> | null = null;
+  const loopKey = resolveLoopKey(context);
+  if (!options.autoApprove) {
+    // Recorded first, THEN shown — as ApprovalGate does for tool cards.
+    ({ decisions: decisionsPromise } = await ApprovalRegistry.open(
+      loopKey,
+      {
+        type: "plan",
+        batchId,
+        calls: [{ toolCallId, name: exitPlanToolCall.name, args: { plan: planText } }],
+        onDecided: (decidedToolCallId, decision) => {
+          emit({
+            type: APPROVALS.DECIDED_EVENT_TYPE,
+            toolCallId: decidedToolCallId,
+            batchId,
+            decision: decision.decision,
+            scope: decision.scope,
+            source: decision.source,
+            ...(decision.reason ? { reason: decision.reason } : {}),
+          });
+        },
+      },
+      decisionOwnerOf(context),
+    ));
+  }
+
   emit({
     type: "plan_proposal",
     plan: planText,
@@ -154,41 +183,16 @@ export async function handleExitPlanMode(
     batchId,
   });
 
-  let planDecision: "approved" | "rejected" | "timed_out";
-  let rejectionReason: string | undefined;
-  if (options.autoApprove) {
+  if (!decisionsPromise) {
     planDecision = "approved";
     logger.info("[PlanningMode] Auto-approved plan (autoApprove=true)");
   } else {
-    const loopKey = resolveLoopKey(context);
-    const decisionsPromise = ApprovalRegistry.waitForDecisions(loopKey, {
-      type: "plan",
-      batchId,
-      calls: [{ toolCallId, name: exitPlanToolCall.name, args: { plan: planText } }],
-      timeoutMilliseconds: PLAN_APPROVAL_TIMEOUT_MILLISECONDS,
-      onDecided: (decidedToolCallId, decision) => {
-        emit({
-          type: APPROVALS.DECIDED_EVENT_TYPE,
-          toolCallId: decidedToolCallId,
-          batchId,
-          decision: decision.decision,
-          scope: decision.scope,
-          source: decision.source,
-          ...(decision.reason ? { reason: decision.reason } : {}),
-        });
-      },
-    });
-    const cancelOnAbort = () => ApprovalRegistry.cancel(loopKey);
+    const cancelOnAbort = () => void ApprovalRegistry.cancel(loopKey);
     signal?.addEventListener("abort", cancelOnAbort, { once: true });
     if (signal?.aborted) cancelOnAbort();
     try {
       const decision = (await decisionsPromise).get(toolCallId);
-      planDecision =
-        decision?.decision === "allow"
-          ? "approved"
-          : decision?.source === "timeout"
-            ? "timed_out"
-            : "rejected";
+      planDecision = decision?.decision === "allow" ? "approved" : "rejected";
       rejectionReason = decision?.reason;
       if (planDecision === "approved" && decision?.scope === "conversation") {
         options.autoApprove = true;

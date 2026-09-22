@@ -334,11 +334,14 @@ async function runLoop(context: AgenticContext) {
 
 /** Decide the plan-approval prompt with `approved` as soon as it is pending. */
 function answerPlanWhenAsked(conversationId: string, approved: boolean) {
-  const timer = setInterval(() => {
-    const pending = ApprovalRegistry.getPending(conversationId);
-    if (pending?.type === "plan") {
+  let isDeciding = false;
+  const timer = setInterval(async () => {
+    if (isDeciding) return;
+    const pending = await ApprovalRegistry.getPending(conversationId);
+    if (pending?.type === "plan" && !isDeciding) {
+      isDeciding = true;
       clearInterval(timer);
-      ApprovalRegistry.decide(conversationId, { decision: approved ? "allow" : "deny" });
+      await ApprovalRegistry.decide(conversationId, { decision: approved ? "allow" : "deny" });
     }
   }, 1);
   return () => clearInterval(timer);

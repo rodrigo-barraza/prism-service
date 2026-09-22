@@ -529,9 +529,9 @@ router.get(
         }
 
         const pendingApproval =
-          AgenticLoopService.getPendingApproval(conversationId);
+          await AgenticLoopService.getPendingApproval(conversationId);
         const pendingQuestion =
-          AgenticLoopService.getPendingQuestion(conversationId);
+          await AgenticLoopService.getPendingQuestion(conversationId);
         const attention = ConversationAttentionRegistry.get(conversationId);
         // Raw `messages` are deliberately omitted — displayMessages is the
         // serve-time form and shipping both doubles a multi-hundred-KB payload
@@ -576,9 +576,9 @@ router.get(
           username,
         );
         const pendingApproval =
-          AgenticLoopService.getPendingApproval(conversationId);
+          await AgenticLoopService.getPendingApproval(conversationId);
         const pendingQuestion =
-          AgenticLoopService.getPendingQuestion(conversationId);
+          await AgenticLoopService.getPendingQuestion(conversationId);
 
         // Derive hasSubAgents from the stored subAgents array when the
         // persisted boolean flag is missing (conversations created before the

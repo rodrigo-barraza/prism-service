@@ -61,15 +61,25 @@ vi.mock("#src/services/hooks/handlers/HttpHookHandler", () => ({
 vi.mock("#src/services/hooks/handlers/PromptHookHandler", () => ({ default: vi.fn() }));
 vi.mock("#src/services/hooks/handlers/McpToolHookHandler", () => ({ default: vi.fn() }));
 
-vi.mock("#src/wrappers/MongoWrapper", () => ({
-  default: {
-    getDb: () => ({
-      collection: () => ({
-        findOne: async () => hookState.conversationDocument,
+vi.mock("#src/wrappers/MongoWrapper", async () => {
+  const { createMockCollection } = await import("../../../../tests/mongoMock.ts");
+  // The approvals the gate records (PendingDecisionStore) live in a working
+  // mock collection; every other collection only serves the conversation document.
+  const pendingDecisions = createMockCollection();
+  return {
+    default: {
+      getDb: () => ({
+        collection: (name: string) =>
+          name === "pending_decisions"
+            ? pendingDecisions
+            : {
+                findOne: async () => hookState.conversationDocument,
+                updateOne: async () => ({ matchedCount: 0, modifiedCount: 0 }),
+              },
       }),
-    }),
-  },
-}));
+    },
+  };
+});
 
 // Built-ins without Mongo, the system-prompt assembler or the memory hooks:
 // a real kernel, the real AutoApprovalEngine as the tier/policy decide hook,
@@ -297,10 +307,10 @@ function buildHarness(
       // One card per call: answer each by its toolCallId (per-call approvals).
       setTimeout(() => {
         if (hookState.approve === "lapse") {
-          ApprovalRegistry.cancel(conversationId);
+          void ApprovalRegistry.cancel(conversationId);
           return;
         }
-        ApprovalRegistry.decide(conversationId, {
+        void ApprovalRegistry.decide(conversationId, {
           toolCallId: event.toolCallId as string,
           decision: hookState.approve ? "allow" : "deny",
         });

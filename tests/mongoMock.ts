@@ -80,6 +80,21 @@ export function evaluateMongoExpression(doc: any, expression: any): any {
         if (doc[key] === (val as any).$ne) return false;
         continue;
       }
+      if (
+        val &&
+        typeof val === "object" &&
+        ["$lt", "$lte", "$gt", "$gte"].some((operator) => operator in (val as any))
+      ) {
+        // A missing field never satisfies a range, as in MongoDB.
+        const docValue = doc[key];
+        if (docValue === undefined || docValue === null) return false;
+        const range = val as Record<string, any>;
+        if ("$lt" in range && !(docValue < range.$lt)) return false;
+        if ("$lte" in range && !(docValue <= range.$lte)) return false;
+        if ("$gt" in range && !(docValue > range.$gt)) return false;
+        if ("$gte" in range && !(docValue >= range.$gte)) return false;
+        continue;
+      }
       const docVal = doc[key];
       if (docVal && val && typeof docVal === "object" && typeof val === "object" && docVal.toString && val.toString) {
         if (docVal.toString() !== val.toString()) return false;

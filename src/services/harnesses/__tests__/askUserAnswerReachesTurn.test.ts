@@ -24,8 +24,8 @@ import AgenticLoopService from "#src/services/AgenticLoopService";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import agentRouter from "#src/routes/AgentRoutes";
 import InternalToolRegistry from "#src/services/tool-definitions/InternalToolRegistry";
-import { ASK_USER_BLOCKING_TIMEOUT_MILLISECONDS } from "#src/services/tool-definitions/AskUserQuestionTool";
-import { pendingQuestions } from "#src/services/ApprovalRegistry";
+import { ApprovalRegistry } from "#src/services/ApprovalRegistry";
+import QuestionRegistry from "#src/services/QuestionRegistry";
 import logger from "#src/utils/logger";
 import type {
   AgenticContext,
@@ -337,9 +337,13 @@ function startTurn(
 }
 
 /** Resolve once `predicate` holds — the loop runs on the microtask/IO queue. */
-async function until(predicate: () => boolean, label: string, limitMilliseconds = 5_000) {
+async function until(
+  predicate: () => boolean | Promise<boolean>,
+  label: string,
+  limitMilliseconds = 5_000,
+) {
   const startedAt = Date.now();
-  while (!predicate()) {
+  while (!(await predicate())) {
     if (Date.now() - startedAt > limitMilliseconds) throw new Error(`timed out waiting for ${label}`);
     await new Promise((resolve) => setImmediate(resolve));
   }
@@ -464,8 +468,9 @@ describe("ask_user answers reach the running turn", () => {
     const questionId = questionEvents(run)[0].questionId;
     expect(answers[0].status).toBe(200);
     expect(answers[0].body).toMatchObject({ ok: true, questionId, blocking: false });
-    expect(answers[1].status).toBe(404);
-    expect(answers[1].body).toMatchObject({ reason: "unknown_question", questionId });
+    // 409, not 404: a 404 would make the client re-send the answer as a message.
+    expect(answers[1].status).toBe(409);
+    expect(answers[1].body).toMatchObject({ reason: "already_answered", questionId });
 
     // The text-only answer did not end the turn: the pending answer kept it alive.
     expect(callIndex).toBe(3);
@@ -476,9 +481,11 @@ describe("ask_user answers reach the running turn", () => {
     expect(delivered[0].questionId).toBe(questionId);
     expect(finalText).toBe("Spaces, noted.");
 
-    // After the turn, the card is gone: the client's 404 fallback takes over.
+    // After the turn the card is still the one that was answered: a late
+    // re-send is refused as such, never delivered again.
     const late = await request(app).post("/agent/answer").send({ conversationId, questionId, answer: "spaces" });
-    expect(late.status).toBe(404);
+    expect(late.status).toBe(409);
+    expect(late.body).toMatchObject({ reason: "already_answered" });
   });
 
   it("a sub-agent's question is answered with the sub-agent's own conversation id", async () => {
@@ -523,12 +530,15 @@ describe("ask_user answers reach the running turn", () => {
       { conversationId, agentConversationId: "minted-many-agent-id" },
     );
     await until(() => questionEvents(run).length === 3, "three user_question events");
-    await until(() => (pendingQuestions.get(conversationId)?.size ?? 0) === 3, "three registered questions");
+    await until(
+      async () => (await AgenticLoopService.listPendingQuestions(conversationId)).length === 3,
+      "three registered questions",
+    );
     const byText = (prefix: string) =>
       questionEvents(run).find((event) => (event.questions as Array<{ question: string }>)[0].question.startsWith(prefix))!
         .questionId as string;
     const [idB, idA, idC] = [byText("B:"), byText("A:"), byText("C:")];
-    expect(AgenticLoopService.listPendingQuestions(conversationId).map((question) => question.questionId)).toEqual([idB, idA, idC]);
+    expect((await AgenticLoopService.listPendingQuestions(conversationId)).map((question) => question.questionId)).toEqual([idB, idA, idC]);
 
     const unknown = await request(app).post("/agent/answer").send({ conversationId, questionId: "q-does-not-exist", answer: "?" });
     expect(unknown.status).toBe(404);
@@ -550,40 +560,49 @@ describe("ask_user answers reach the running turn", () => {
     const delivered = userAnswerMessages(run.seen[1]);
     expect(delivered).toHaveLength(1);
     expect(delivered[0].content).toContain("dark");
-    expect(pendingQuestions.has(conversationId)).toBe(false);
+    expect(await AgenticLoopService.listPendingQuestions(conversationId)).toEqual([]);
   });
 });
 
 describe("ask_user registry edges", () => {
   afterEach(() => {
     vi.useRealTimers();
-    pendingQuestions.clear();
+    QuestionRegistry._clearAll();
+    ApprovalRegistry._clearAll();
     TurnInputMailbox._clearAll();
   });
 
-  it("an unanswered blocking question times out exactly as configured, and leaves the registry", async () => {
-    // Only the timeout timers are faked — setImmediate stays real for `until`.
+  it("an unanswered blocking question never times out; a stopped turn withdraws it", async () => {
+    // The old five-minute timeout is gone (prompt 13): the turn parks on its user.
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const controller = new AbortController();
     let settled: Record<string, unknown> | null = null;
     const pending = InternalToolRegistry.execute(
       "ask_user",
       { questions: [{ question: "Still there?" }] },
-      { conversationId: "conv-timeout", agentConversationId: "agent-timeout" },
+      { conversationId: "conv-parked", agentConversationId: "agent-parked", signal: controller.signal },
     ).then((result) => {
       settled = result as Record<string, unknown>;
     });
-    await until(() => AgenticLoopService.listPendingQuestions("conv-timeout").length === 1, "registration");
+    await until(
+      async () => (await AgenticLoopService.listPendingQuestions("conv-parked")).length === 1,
+      "registration",
+    );
 
-    await vi.advanceTimersByTimeAsync(ASK_USER_BLOCKING_TIMEOUT_MILLISECONDS - 1);
+    await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
     expect(settled).toBeNull();
-    expect(AgenticLoopService.listPendingQuestions("conv-timeout")).toHaveLength(1);
+    expect(await AgenticLoopService.listPendingQuestions("conv-parked")).toHaveLength(1);
 
-    await vi.advanceTimersByTimeAsync(1);
+    // The user presses Stop: the wait is released unanswered and the card closes.
+    controller.abort();
     await pending;
-    expect(settled).toMatchObject({ answers: null, timedOut: true });
-    expect(ASK_USER_BLOCKING_TIMEOUT_MILLISECONDS).toBe(300_000);
+    expect(settled).toMatchObject({ answers: null, isCancelled: true });
+    await until(
+      async () => (await AgenticLoopService.listPendingQuestions("conv-parked")).length === 0,
+      "the card to close",
+    );
     // A late answer is not swallowed by a dead wait — it 404s, so the client re-sends it as a message.
-    expect(AgenticLoopService.resolveUserQuestion("conv-timeout", [{ answer: "yes" }])).toEqual({
+    expect(await AgenticLoopService.resolveUserQuestion("conv-parked", [{ answer: "yes" }])).toEqual({
       resolved: false,
       reason: "no_pending_question",
     });
