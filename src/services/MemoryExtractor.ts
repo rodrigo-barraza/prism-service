@@ -1,5 +1,6 @@
 import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import crypto from "crypto";
+import { isMemoryExtractionChannelWatermarkEnabled } from "#config";
 import { getProvider } from "#src/providers/index";
 import ModelRoleRouter, { MODEL_ROLES } from "./ModelRoleRouter.ts";
 import MemoryService, { CODING_MEMORY_TYPES } from "./MemoryService.ts";
@@ -7,6 +8,18 @@ import MemoryConsolidationService from "./MemoryConsolidationService.ts";
 import PromptLocaleService from "./PromptLocaleService.ts";
 import RequestLogger from "./RequestLogger.ts";
 import SettingsService from "./SettingsService.ts";
+import {
+  ExtractionWatermarkStore,
+  buildExtractionTranscript,
+  resolveWatermarkScope,
+  selectExtractionSpan,
+  spanAuthoredCharacters,
+  watermarkThroughEnd,
+  type ExtractionSpan,
+  type TranscriptEntry,
+} from "./memory/ExtractionWatermark.ts";
+import { DEFAULT_PROFILE_ID } from "#src/utils/ProfileScope";
+import { getRequestContext } from "#src/utils/RequestContext";
 import logger from "#src/utils/logger";
 import { parseJsonFromLargeLanguageModelResponse } from "@rodrigo-barraza/utilities-library";
 import {
@@ -34,6 +47,27 @@ import type { MessagePayload } from "./RequestLogger.ts";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const MIN_MESSAGES_FOR_EXTRACTION = MEMORY.MIN_MESSAGES_FOR_EXTRACTION;
+
+function renderEntries(entries: TranscriptEntry[]): string {
+  return entries.map((entry) => `${entry.role}: ${entry.text}`).join("\n");
+}
+
+/** The user turn of an extraction call: the new span, after its context if any. */
+export function buildExtractionRequest({
+  context,
+  span,
+}: ExtractionSpan): string {
+  if (context.length === 0) {
+    return `Extract memories from this coding session:\n\n${renderEntries(span)}`;
+  }
+  return (
+    "Extract memories from the NEW messages of this coding session. The earlier " +
+    "messages were already processed: use them only to understand the new ones, " +
+    "and do not extract anything that appears only there.\n\n" +
+    `<earlier_messages>\n${renderEntries(context)}\n</earlier_messages>\n\n` +
+    `<new_messages>\n${renderEntries(span)}\n</new_messages>`
+  );
+}
 
 /**
  * Extraction prompt — CC-style 4-type taxonomy with explicit negative constraints.
@@ -74,6 +108,9 @@ interface MemoryExtractionContext {
   conversationId?: string | null;
   endpoint?: string | null;
   agent?: string | null;
+  profileId?: string | null;
+  /** Platform runtime context (Discord guild/channel) — scopes the watermark. */
+  agentContext?: unknown;
   toolCalls?: ToolCall[];
   emit?: EmitFunction | null;
 }
@@ -99,7 +136,9 @@ interface AfterResponseOutput {
  * - 4-type taxonomy: user, feedback, project, reference
  * - All memories stored in the unified `memories` collection via MemoryService
  * - Mutual exclusion: skips extraction when the main agent used save_memory
- * - Configurable extraction model via Settings → Memory Models
+ * - Reads only what the last extraction did not (memory/ExtractionWatermark)
+ * - Configurable extraction model: the `memory` role (MODEL_ROLE_MEMORY, then
+ *   Settings → Memory Models, then the utility chain)
  *
  * Registered as an `afterResponse` hook in AgentHooks.
  * Runs in the background (fire-and-forget) after the final response.
@@ -114,6 +153,8 @@ export default class MemoryExtractor {
     conversationId,
     endpoint,
     agent,
+    profileId,
+    agentContext,
     toolCalls,
     emit,
   }: MemoryExtractionContext): Promise<StoredMemory[]> {
@@ -124,57 +165,83 @@ export default class MemoryExtractor {
       return [];
     }
 
+    const agentId = agent || AGENT_IDS.CODING;
+    const watermarkScope = resolveWatermarkScope({
+      project,
+      agent: agentId,
+      profileId:
+        profileId || getRequestContext().profileId || DEFAULT_PROFILE_ID,
+      conversationId,
+      agentContext,
+      channelScope: isMemoryExtractionChannelWatermarkEnabled(),
+    });
+    const watermark = watermarkScope
+      ? await ExtractionWatermarkStore.read(watermarkScope)
+      : null;
+    // Built after an await on purpose: finalize() pushes the turn's final
+    // assistant reply into this same array right after firing afterResponse,
+    // and an extraction must see it — as the pre-diet code did.
+    const transcript = buildExtractionTranscript(messages);
+    const advanceWatermark = async () => {
+      const next = watermarkThroughEnd(transcript);
+      if (watermarkScope && next) {
+        await ExtractionWatermarkStore.write(watermarkScope, next);
+      }
+    };
+
     // ── Mutual Exclusion ──────────────────────────────────────────
     // If the main agent already wrote memories this turn via save_memory,
     // skip extraction — the agent's explicit memory writes take precedence.
     // This prevents duplicate or conflicting memories from the extraction
-    // pipeline when the agent has already decided what to remember.
+    // pipeline when the agent has already decided what to remember. The
+    // watermark moves past the span: the agent has already decided about it.
     if (
       toolCalls?.some((toolCall) => toolCall.name === TOOL_NAMES.SAVE_MEMORY)
     ) {
       logger.info(
         `[MemoryExtractor] Skipping — main agent used save_memory this turn (mutual exclusion)`,
       );
+      await advanceWatermark();
+      return [];
+    }
+
+    // ── The span: only what no extraction has read yet ────────────
+    const selection = selectExtractionSpan(transcript, watermark);
+    const authoredCharacters = spanAuthoredCharacters(selection.span);
+    const spanLabel =
+      `${selection.span.length}/${transcript.entries.length} messages ` +
+      `(${selection.reason}, ${authoredCharacters} user-written chars) ` +
+      `in ${watermarkScope?.scope || "unscoped"}`;
+    if (selection.reason === "watermark-lost") {
+      logger.warn(
+        `[MemoryExtractor] Watermark not found in the transcript — re-reading all ${spanLabel}`,
+      );
+    }
+    // Trivial span: no call, and the watermark stays where it is so these
+    // messages ride along with the next span instead of being dropped.
+    if (authoredCharacters < MEMORY.EXTRACTION_MIN_AUTHORED_CHARACTERS) {
+      logger.info(`[MemoryExtractor] Skipping trivial span — ${spanLabel}`);
       return [];
     }
 
     try {
-      // ── Resolve the extraction model through the utility role ──
-      // Never silently disabled: env/DB utility config → local-instance
-      // or cheap-cloud defaults. The memory settings section remains the
-      // DB layer of the utility role inside ModelRoleRouter.
-      const roleChain = await ModelRoleRouter.resolveChain(
-        MODEL_ROLES.UTILITY,
-      );
+      // ── Resolve the extraction model through the memory role ──
+      // Never silently disabled: MODEL_ROLE_MEMORY → Settings → Memory
+      // Models → the utility chain (local-instance or cheap-cloud defaults).
+      const roleChain = await ModelRoleRouter.resolveChain(MODEL_ROLES.MEMORY);
       if (roleChain.length === 0) {
         logger.error(
-          "[MemoryExtractor] Utility role resolved to an empty model chain — cannot extract memories.",
+          "[MemoryExtractor] Memory role resolved to an empty model chain — cannot extract memories.",
         );
         return [];
       }
       let extractionProvider = roleChain[0].provider;
       let extractionModel = roleChain[0].model;
 
-      // Build conversation text (compact format to save tokens)
-      const conversationText = messages
-        .filter(
-          (message) => message.role === "user" || message.role === "assistant",
-        )
-        .map((message) => {
-          const content = message.content || "";
-          // Truncate very long messages to save tokens
-          const truncated =
-            content.length > LOG_PREVIEW.LONG ? content.slice(0, LOG_PREVIEW.LONG) + "..." : content;
-          return `${message.role}: ${truncated}`;
-        })
-        .join("\n");
-
+      logger.info(`[MemoryExtractor] Extracting ${spanLabel}`);
       const aiMessages: ChatMessage[] = [
         { role: "system", content: EXTRACTION_PROMPT },
-        {
-          role: "user",
-          content: `Extract memories from this coding session:\n\n${conversationText}`,
-        },
+        { role: "user", content: buildExtractionRequest(selection) },
       ];
 
       const requestId = crypto.randomUUID();
@@ -201,7 +268,7 @@ export default class MemoryExtractor {
               },
             );
           },
-          { role: MODEL_ROLES.UTILITY, operation: "memory:extract" },
+          { role: MODEL_ROLES.MEMORY, operation: "memory:extract" },
         ));
       } catch (error: unknown) {
         success = false;
@@ -244,6 +311,9 @@ export default class MemoryExtractor {
           requestStartMilliseconds: requestStart,
           extraRequestPayload: {
             messageCount: messages.length,
+            spanMessageCount: selection.span.length,
+            contextMessageCount: selection.context.length,
+            watermark: selection.reason,
           },
         });
 
@@ -317,10 +387,13 @@ export default class MemoryExtractor {
         return [];
       }
 
+      // The span has been read — the next extraction starts after it, even
+      // when it held nothing worth keeping.
+      await advanceWatermark();
+
       const extractedMemories = memories as ExtractedMemory[];
 
       // ── Store each memory via MemoryService ─────────────────────
-      const agentId = agent || AGENT_IDS.CODING;
       const stored: StoredMemory[] = [];
 
       for (const memoryObject of extractedMemories) {
@@ -432,11 +505,17 @@ export default class MemoryExtractor {
           ((context as Record<string, unknown>).endpoint as string | null) ||
           "/agent",
         agent: context.agent || null,
+        profileId: context.profileId || null,
+        agentContext: context.options?.agentContext,
         toolCalls: toolCalls || [],
         emit: context.emit || null,
       })
         .then((stored) => {
-          if (stored?.length > 0 && context.emit) {
+          // Nothing stored, nothing new to consolidate — counting empty
+          // extractions triggered a consolidation every 5 Discord replies.
+          if (!stored?.length) return;
+
+          if (context.emit) {
             context.emit({
               type: SERVER_SENT_EVENT_TYPES.STATUS,
               message: STATUS_MESSAGES.MEMORIES_UPDATED,
@@ -452,7 +531,7 @@ export default class MemoryExtractor {
                 )
             : undefined;
 
-          // Check if consolidation should run (tracks conversation count)
+          // Check if consolidation should run (counts extractions that stored memories)
           MemoryConsolidationService.checkAndRun({
             project: context.project,
             username: context.username,

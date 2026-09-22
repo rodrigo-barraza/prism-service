@@ -52,6 +52,7 @@ export const COLLECTIONS = {
   MEMORIES: "memories",
   MEMORY_CONSOLIDATION_RUNS: "memory_consolidation_runs",
   MEMORY_CONSOLIDATION_HISTORY: "memory_consolidation_history",
+  MEMORY_EXTRACTION_WATERMARKS: "memory_extraction_watermarks",
   VRAM_BENCHMARKS: "vram_benchmarks",
   SETTINGS: "settings",
   CUSTOM_AGENTS: "custom_agents",
@@ -744,6 +745,23 @@ export const MEMORY = {
 
   /** Minimum conversation messages before memory extraction triggers. */
   MIN_MESSAGES_FOR_EXTRACTION: 4,
+
+  /**
+   * Already-extracted messages shown before an extraction's new span, so a
+   * reply like "yes, do that" can be read against what it answers.
+   */
+  EXTRACTION_CONTEXT_ENTRIES: 2,
+
+  /**
+   * An extraction span whose user-written text is shorter than this makes
+   * no model call ("ok", "thanks", "go on", a timer or sub-agent turn with
+   * no user text at all). The watermark stays put, so the span is carried
+   * into the next extraction rather than dropped.
+   */
+  EXTRACTION_MIN_AUTHORED_CHARACTERS: 12,
+
+  /** Extraction watermarks untouched this long expire (TTL index). */
+  EXTRACTION_WATERMARK_TTL_DAYS: 90,
 
   /** Memories older than this (days) are considered stale for consolidation. */
   STALENESS_DAYS: 30,
