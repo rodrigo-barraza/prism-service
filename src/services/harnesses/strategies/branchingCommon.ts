@@ -50,6 +50,7 @@ import {
   handleExitPlanMode,
   checkForPlanModeEntry,
 } from "#src/services/harnesses/lifecycle/PlanModeController";
+import { buildPlanSubmissionContinuation } from "#src/services/harnesses/lifecycle/PlanSubmissionContinuation";
 import { buildToolRetryGuidance } from "#src/services/harnesses/lifecycle/ToolRetryInterceptor";
 import {
   isOutputTruncated,
@@ -98,8 +99,9 @@ export type StandardHooks = ReturnType<typeof createStandardHooks>;
 
 /**
  * Provider-native state a pass produced (OpenAI Responses: message phase,
- * reasoning items no tool call claimed, response.id) — spread onto the
- * assistant message so it persists and is replayed next turn.
+ * reasoning items no tool call claimed, response.id; Anthropic: thinking
+ * blocks) — spread onto the assistant message so it persists and is
+ * replayed next turn.
  */
 export function providerNativeState(pass: PassState) {
   return {
@@ -109,6 +111,9 @@ export function providerNativeState(pass: PassState) {
     ...(pass.providerResponseId && {
       providerResponseId: pass.providerResponseId,
     }),
+    // Anthropic: the pass's thinking blocks, verbatim and in order
+    ...(pass.thinkingBlocks &&
+      pass.thinkingBlocks.length > 0 && { thinkingBlocks: pass.thinkingBlocks }),
   };
 }
 
@@ -416,8 +421,8 @@ export async function runPlanningPhase(
         state,
       );
 
-      if (!shouldContinueLoop) return { planApproved: false };
-
+      // Approved or not, the plan and its verdict are part of the turn —
+      // a rejected plan is pushed too, so the caller's finalize persists it.
       currentMessages.push({
         role: "assistant",
         content: pass.finalStreamedText || "",
@@ -437,6 +442,8 @@ export async function runPlanningPhase(
           },
         ],
       });
+
+      if (!shouldContinueLoop) return { planApproved: false };
 
       logger.info(
         `[${logLabel}] Plan approved — entering main loop with ${tools.finalTools.length} tool(s).`,
@@ -494,18 +501,25 @@ export async function runPlanningPhase(
         }),
       ...providerNativeState(pass),
       });
+      // Keep the plan, then ask for it to be submitted — the next request
+      // must not end on the assistant turn (no prefill).
+      currentMessages.push(
+        buildPlanSubmissionContinuation(options?.locale as string | undefined),
+      );
       continue;
     }
 
     logger.warn(
       `[${logLabel}] Planning phase iteration ${planningIteration}: empty output. Aborting planning phase.`,
     );
+    state.conversationOutcome = "exhausted";
     return { planApproved: false };
   }
 
   logger.warn(
     `[${logLabel}] Planning phase exhausted ${MAX_PLANNING_ITERATIONS} iterations without exit_plan_mode call.`,
   );
+  state.conversationOutcome = "exhausted";
   return { planApproved: false };
 }
 
@@ -1057,7 +1071,7 @@ export async function finalizeStrategyRun(
     state.streamedToolCalls.length > 0 &&
     !signal?.aborted
   ) {
-    state.conversationOutcome = "exhausted";
+    if (state.conversationOutcome === "completed") state.conversationOutcome = "exhausted";
     await runExhaustionRecoveryPass(harness, context, state, currentMessages);
   }
 

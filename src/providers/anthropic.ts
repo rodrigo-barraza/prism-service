@@ -13,6 +13,13 @@ import AnthropicFileCacheService, {
   ANTHROPIC_FILES_API_BETA,
   type FileSourceApplication,
 } from "#src/services/AnthropicFileCacheService";
+import { mergeUsage } from "#src/utils/CostCalculator";
+import SettingsService from "#src/services/SettingsService";
+import {
+  ANTHROPIC_SETTING_DEFAULTS,
+  type AnthropicSettings,
+} from "#src/constants/AnthropicRequestSettings";
+import type { AnthropicThinkingBlock } from "#src/types/admin";
 import { EMPTY_USAGE } from "#src/providers/openai-compat";
 import { ANTHROPIC_API_KEY } from "#config";
 import { MODALITY_TYPES, getDefaultModels, getModelByName } from "#src/config";
@@ -31,6 +38,15 @@ import {
 
 import { type ProviderOptions, type ChatMessage } from "#src/types/ProviderTypes";
 import type { TokenUsage } from "#src/types/admin";
+
+export type { AnthropicThinkingBlock };
+
+/** A `stop_reason: "refusal"` response's `stop_details`, normalised. */
+export interface AnthropicRefusal {
+  category: string | null;
+  explanation: string | null;
+  recommendedModel?: string | null;
+}
 
 export interface AnthropicBlock {
   type: string;
@@ -76,10 +92,26 @@ export interface AnthropicGenerateResult {
   rateLimits?: ReturnType<typeof extractAnthropicRateLimits>;
   stopReason?: string;
   stopDetails?: Record<string, unknown>;
+  /** Every thinking block of the response, verbatim and in order. */
+  thinkingBlocks?: AnthropicThinkingBlock[];
+  /** Set on `stop_reason: "refusal"` — `text` is then empty. */
+  refusal?: AnthropicRefusal;
+  /** The model that produced the response, when a fallback served it. */
+  servedModel?: string;
 }
 
 export type TransformedStreamEvent =
   | string
+  // A complete thinking / redacted_thinking block, exactly as the API sent
+  // it. `afterContent` marks a block that followed text or a tool call in
+  // the same response (a progress update) — the router places it in front
+  // of the next tool call.
+  | { type: "thinking_block"; block: AnthropicThinkingBlock; afterContent: boolean }
+  | { type: "refusal"; category: string | null; explanation: string | null; recommendedModel?: string | null }
+  // A server-side fallback took over mid-response: everything the declining
+  // model produced before it except text is not replayed.
+  | { type: "fallback"; from: string | null; to: string | null }
+  | { type: "servedModel"; model: string }
   | { type: "toolCallStart"; id: string; name: string }
   | { type: "codeExecutionResult"; output: string; outcome: string }
   | { type: "webSearchResult"; results: Array<{ url?: string; title?: string; pageAge?: string }> }
@@ -197,6 +229,441 @@ function getClient(): Anthropic {
     client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
   }
   return client;
+}
+
+// ── Request surface per model ────────────────────────────────
+// Every rule below reads the catalog flags documented at the top of the
+// Anthropic section of src/data/models.ts. An uncatalogued newer claude-*
+// ID resolves (getModelByName) to the current-generation surface.
+
+const ANTHROPIC_BETA_SERVER_SIDE_FALLBACK = "server-side-fallback-2026-07-01";
+const ANTHROPIC_BETA_THINKING_DISPLAY_UPDATES =
+  "thinking-display-updates-2026-08-18";
+const ANTHROPIC_BETA_THINKING_BINDING = "thinking-binding-controls-2026-08-01";
+
+const EFFORT_RANK: Record<string, number> = {
+  low: 0,
+  medium: 1,
+  high: 2,
+  xhigh: 3,
+  max: 4,
+};
+
+/** Enough output left over for a legacy thinking budget's answer. */
+const LEGACY_THINKING_ANSWER_TOKENS = 1024;
+
+/** How many times a `pause_turn` (server tool loop limit) is resumed. */
+const MAX_PAUSE_TURN_CONTINUATIONS = 5;
+
+/** Appended when a request would otherwise end on an assistant turn. */
+const ASSISTANT_PREFILL_CONTINUATION = "Continue.";
+
+const JSON_OBJECT_INSTRUCTION =
+  "Respond with a single JSON object and nothing else — no prose and no code fences.";
+
+export interface AnthropicModelProfile {
+  adaptiveThinking: boolean;
+  lockedSampling: boolean;
+  deprecatedTopK: boolean;
+  thinkingAlwaysOn: boolean;
+  thinkingDisableMaxEffort?: string;
+  noAssistantPrefill: boolean;
+  preservedThinking: boolean;
+  thinkingDisplayUpdates: boolean;
+  serverSideFallbacks: boolean;
+  maxOutputTokens?: number;
+}
+
+const warnedUncataloguedModels = new Set<string>();
+
+export function resolveAnthropicModelProfile(
+  model: string | undefined,
+): AnthropicModelProfile {
+  const definition = (model ? getModelByName(model) : null) as Record<
+    string,
+    unknown
+  > | null;
+  if (
+    model &&
+    definition?.uncatalogued === true &&
+    !warnedUncataloguedModels.has(model)
+  ) {
+    warnedUncataloguedModels.add(model);
+    logger.warn(
+      `[anthropic] "${model}" is not in the model catalog — using the current-generation request surface ` +
+        `(adaptive thinking, no sampling parameters, 1M / 128K budgets). Catalog it in src/data/models.ts.`,
+    );
+  }
+  const flag = (key: string) => definition?.[key] === true;
+  return {
+    adaptiveThinking: flag("adaptiveThinking"),
+    lockedSampling: flag("lockedSampling"),
+    deprecatedTopK: flag("deprecatedTopK"),
+    thinkingAlwaysOn: flag("thinkingAlwaysOn"),
+    thinkingDisableMaxEffort:
+      typeof definition?.thinkingDisableMaxEffort === "string"
+        ? definition.thinkingDisableMaxEffort
+        : undefined,
+    noAssistantPrefill: flag("noAssistantPrefill"),
+    preservedThinking: flag("preservedThinking"),
+    thinkingDisplayUpdates: flag("thinkingDisplayUpdates"),
+    serverSideFallbacks: flag("serverSideFallbacks"),
+    maxOutputTokens:
+      typeof definition?.maxOutputTokens === "number"
+        ? definition.maxOutputTokens
+        : undefined,
+  };
+}
+
+function getAnthropicSettings(): AnthropicSettings {
+  const configured = SettingsService.getCached?.()?.anthropic as
+    | Partial<AnthropicSettings>
+    | undefined;
+  return { ...ANTHROPIC_SETTING_DEFAULTS, ...(configured ?? {}) };
+}
+
+/**
+ * The API accepts `service_tier` "auto" (Priority Tier capacity when the org
+ * has it) and "standard_only". Prism's "priority" means the former; there is
+ * no Anthropic "flex", so it and anything unknown are omitted (= "auto").
+ */
+function mapServiceTier(serviceTier: string | undefined) {
+  switch (serviceTier) {
+    case "standard":
+    case "standard_only":
+      return "standard_only";
+    case "auto":
+    case "priority":
+      return "auto";
+    default:
+      return undefined;
+  }
+}
+
+function normalizeEffort(effort: unknown): string | undefined {
+  return typeof effort === "string" && effort in EFFORT_RANK ? effort : undefined;
+}
+
+function isJsonObjectFormat(responseFormat: ProviderOptions["responseFormat"]) {
+  return (
+    responseFormat === "json_object" ||
+    (typeof responseFormat === "object" && responseFormat?.type === "json_object")
+  );
+}
+
+/**
+ * Lenient JSON extraction for `json_object` requests sent without a schema:
+ * the reply is instructed, not constrained, so accept a fenced block or a
+ * JSON object embedded in prose. Returns the text unchanged when nothing
+ * parses.
+ */
+export function extractJsonObjectText(text: string): string {
+  const candidates: string[] = [text.trim()];
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced) candidates.push(fenced[1].trim());
+  const firstBrace = text.indexOf("{");
+  const lastBrace = text.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    candidates.push(text.slice(firstBrace, lastBrace + 1));
+  }
+  for (const candidate of candidates) {
+    try {
+      JSON.parse(candidate);
+      return candidate;
+    } catch {
+      // try the next shape
+    }
+  }
+  return text;
+}
+
+function matchesJsonType(value: unknown, type: string): boolean {
+  switch (type.toLowerCase()) {
+    case "string":
+      return typeof value === "string";
+    case "number":
+      return typeof value === "number" && Number.isFinite(value);
+    case "integer":
+      return Number.isInteger(value);
+    case "boolean":
+      return typeof value === "boolean";
+    case "array":
+      return Array.isArray(value);
+    case "object":
+      return typeof value === "object" && value !== null && !Array.isArray(value);
+    case "null":
+      return value === null;
+    default:
+      return true;
+  }
+}
+
+/**
+ * With `eager_input_streaming` the API no longer validates tool input, so
+ * check what the tool needs before running it: an object, every `required`
+ * key present, top-level property types and enums honoured. Returns the
+ * first violation, or null.
+ */
+export function findToolInputViolation(
+  input: unknown,
+  schema: Record<string, unknown> | undefined,
+): string | null {
+  if (!schema || typeof schema !== "object") return null;
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    return "input is not a JSON object";
+  }
+  const record = input as Record<string, unknown>;
+  const required = Array.isArray(schema.required) ? schema.required : [];
+  for (const key of required) {
+    if (typeof key === "string" && !(key in record)) {
+      return `missing required property "${key}"`;
+    }
+  }
+  const properties = (schema.properties ?? {}) as Record<
+    string,
+    { type?: unknown; enum?: unknown }
+  >;
+  for (const [key, value] of Object.entries(record)) {
+    const property = properties[key];
+    if (!property) continue;
+    const types = Array.isArray(property.type)
+      ? property.type
+      : typeof property.type === "string"
+        ? [property.type]
+        : [];
+    if (
+      types.length > 0 &&
+      !types.some((type) => typeof type === "string" && matchesJsonType(value, type))
+    ) {
+      return `property "${key}" is not ${types.join(" | ")}`;
+    }
+    if (Array.isArray(property.enum) && !property.enum.includes(value)) {
+      return `property "${key}" is not one of ${JSON.stringify(property.enum)}`;
+    }
+  }
+  return null;
+}
+
+/**
+ * `input_transformations` (thinking-binding-controls beta): each thinking
+ * block the API dropped because the model or the conversation prefix
+ * changed. An entry means Prism edited history (or switched models).
+ */
+function logInputTransformations(transformations: unknown, model: string) {
+  if (Array.isArray(transformations) && transformations.length > 0) {
+    logger.warn(
+      `[anthropic] ${model}: the API dropped replayed thinking — input_transformations=${JSON.stringify(transformations)}`,
+    );
+  }
+}
+
+/** Request options carrying every beta the request needs. */
+function anthropicRequestOptions(
+  betas: string[],
+  signal?: AbortSignal,
+): { headers?: Record<string, string>; signal?: AbortSignal } | undefined {
+  const uniqueBetas = [...new Set(betas)];
+  if (uniqueBetas.length === 0 && !signal) return undefined;
+  return {
+    ...(signal && { signal }),
+    ...(uniqueBetas.length > 0 && {
+      headers: { "anthropic-beta": uniqueBetas.join(",") },
+    }),
+  };
+}
+
+export interface AnthropicRequest {
+  payload: Record<string, unknown>;
+  /** Beta headers this request needs (Files API is added by the caller). */
+  betas: string[];
+}
+
+/**
+ * Build the Messages API payload for `model` — the single place the
+ * sampling, thinking, effort, output-cap and beta rules live, shared by the
+ * streaming and non-streaming paths.
+ */
+export function buildAnthropicRequest(
+  prepared: { systemMessage?: string; messages: ChatMessage[] },
+  model: string,
+  options: ProviderOptions,
+  { streaming }: { streaming: boolean },
+): AnthropicRequest {
+  const profile = resolveAnthropicModelProfile(model);
+  const settings = getAnthropicSettings();
+  const betas: string[] = [];
+
+  const jsonObjectRequested = isJsonObjectFormat(options.responseFormat);
+  const jsonSchema =
+    jsonObjectRequested && options.responseSchema ? options.responseSchema : null;
+  let systemPrompt = resolveSystemPrompt(
+    options.systemPrompt,
+    prepared.systemMessage,
+  );
+  if (jsonObjectRequested && !jsonSchema) {
+    // No real schema: `{type:"object", additionalProperties:false}` only
+    // admits `{}`. Instruct instead, and parse the reply leniently.
+    systemPrompt = systemPrompt
+      ? `${systemPrompt}\n\n${JSON_OBJECT_INSTRUCTION}`
+      : JSON_OBJECT_INSTRUCTION;
+  }
+
+  const payload: Record<string, unknown> = {
+    ...(systemPrompt && { system: systemPrompt }),
+    model,
+    messages: prepared.messages,
+    max_tokens: options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS,
+    temperature:
+      options.temperature !== undefined
+        ? Math.min(options.temperature, 1)
+        : undefined,
+    top_p:
+      options.temperature === undefined && options.topP !== undefined
+        ? options.topP
+        : undefined,
+    top_k: options.topK !== undefined ? options.topK : undefined,
+    stop_sequences:
+      options.stopSequences !== undefined ? options.stopSequences : undefined,
+  };
+  const serviceTier = mapServiceTier(options.serviceTier);
+  if (serviceTier) payload.service_tier = serviceTier;
+  if (jsonSchema) {
+    payload.output_config = {
+      format: { type: "json_schema" as const, schema: jsonSchema },
+    };
+  }
+
+  // Locked-sampling models reject temperature / top_p / top_k whatever the
+  // thinking state (utility calls send thinking off plus a temperature).
+  if (profile.lockedSampling || profile.adaptiveThinking) {
+    delete payload.temperature;
+    delete payload.top_p;
+    delete payload.top_k;
+  }
+  if (profile.deprecatedTopK) delete payload.top_k;
+
+  const tools = buildTools(options, { eagerInputStreaming: streaming });
+  if (tools) payload.tools = tools;
+
+  const requestedEffort = normalizeEffort(options.reasoningEffort);
+  const thinkingOff =
+    options.thinkingEnabled === false ||
+    (options.reasoningEffort as string | undefined) === "none";
+
+  if (profile.adaptiveThinking) {
+    let effort = requestedEffort;
+    if (!thinkingOff) {
+      payload.thinking = { type: "adaptive", ...thinkingDisplay(profile, settings, betas) };
+    } else if (profile.thinkingAlwaysOn) {
+      // {type:"disabled"} is a 400 here: omit `thinking` and think as
+      // little as the model allows.
+      effort = "low";
+    } else if (
+      profile.thinkingDisableMaxEffort &&
+      effort &&
+      EFFORT_RANK[effort] > EFFORT_RANK[profile.thinkingDisableMaxEffort]
+    ) {
+      // Disabling thinking above this effort is a 400. The model thinks by
+      // default, so omitting `thinking` keeps the requested effort valid.
+      logger.info(
+        `[anthropic] ${model}: thinking stays on at effort "${effort}" (it can only be disabled at "${profile.thinkingDisableMaxEffort}" or below)`,
+      );
+    } else {
+      payload.thinking = { type: "disabled" };
+    }
+    if (effort) {
+      payload.output_config = {
+        ...((payload.output_config as Record<string, unknown>) || {}),
+        effort,
+      };
+    }
+    applyThinkingBinding(payload, profile, settings, betas);
+  } else if (
+    !thinkingOff &&
+    (options.thinkingEnabled === true ||
+      options.thinkingBudget ||
+      options.reasoningEffort)
+  ) {
+    // Legacy models (Haiku 4.5, 4.5 and older, Opus/Sonnet 4.6's deprecated
+    // escape hatch): manual extended thinking with budget_tokens.
+    let budget = options.thinkingBudget
+      ? parseInt(String(options.thinkingBudget))
+      : (requestedEffort ? EFFORT_BUDGET_MAP[requestedEffort] : undefined) ||
+        EFFORT_BUDGET_MAP.high;
+    let maxTokens = Math.max(
+      payload.max_tokens as number,
+      budget + LEGACY_THINKING_ANSWER_TOKENS,
+    );
+    if (profile.maxOutputTokens) {
+      maxTokens = Math.min(maxTokens, profile.maxOutputTokens);
+    }
+    // budget_tokens must stay below max_tokens (the output ceiling caps both)
+    budget = Math.max(
+      1024,
+      Math.min(budget, maxTokens - LEGACY_THINKING_ANSWER_TOKENS),
+    );
+    payload.thinking = { type: "enabled", budget_tokens: budget };
+    payload.max_tokens = maxTokens;
+    // Anthropic requires temperature=1 and top_p/top_k unset when thinking is enabled
+    payload.temperature = 1;
+    delete payload.top_p;
+    delete payload.top_k;
+  }
+
+  if (
+    profile.maxOutputTokens &&
+    (payload.max_tokens as number) > profile.maxOutputTokens
+  ) {
+    payload.max_tokens = profile.maxOutputTokens;
+  }
+
+  if (profile.serverSideFallbacks && settings.serverSideFallbacks) {
+    payload.fallbacks = "default";
+    betas.push(ANTHROPIC_BETA_SERVER_SIDE_FALLBACK);
+  }
+
+  return { payload, betas };
+}
+
+/** `thinking.display` for an adaptive request, per the setting. */
+function thinkingDisplay(
+  profile: AnthropicModelProfile,
+  settings: AnthropicSettings,
+  betas: string[],
+): { display?: string } {
+  if (settings.thinkingDisplay === "omitted") return {};
+  if (settings.thinkingDisplay === "updates" && profile.thinkingDisplayUpdates) {
+    betas.push(ANTHROPIC_BETA_THINKING_DISPLAY_UPDATES);
+    return { display: "updates" };
+  }
+  return { display: "summarized" };
+}
+
+/**
+ * Preserved thinking: on models that bind a block to the conversation
+ * prefix, a history edit invalidates later blocks. `drop_block` turns that
+ * into a logged drop (input_transformations) instead of a 400.
+ */
+function applyThinkingBinding(
+  payload: Record<string, unknown>,
+  profile: AnthropicModelProfile,
+  settings: AnthropicSettings,
+  betas: string[],
+) {
+  if (!profile.preservedThinking || settings.thinkingBlockBinding === "off") {
+    return;
+  }
+  const thinking = payload.thinking as Record<string, unknown> | undefined;
+  if (thinking?.type === "adaptive") {
+    thinking.block_binding = {
+      prefix_mismatch_behavior: settings.thinkingBlockBinding,
+    };
+    betas.push(ANTHROPIC_BETA_THINKING_BINDING);
+  } else if (settings.thinkingBlockBinding === "drop_block") {
+    // No `thinking` object to carry the field: the beta header alone opts
+    // the request into its default, drop_block.
+    betas.push(ANTHROPIC_BETA_THINKING_BINDING);
+  }
 }
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -458,6 +925,50 @@ function mergeConsecutiveSameRole(messages: ChatMessage[]): ChatMessage[] {
   }, []);
 }
 
+/** A stored thinking block as the API wants it back: Prism's placement keys removed. */
+function replayableThinkingBlock(block: AnthropicThinkingBlock): AnthropicBlock {
+  if (block.type === "redacted_thinking") {
+    return { type: "redacted_thinking", data: block.data } as AnthropicBlock;
+  }
+  return { type: "thinking", thinking: block.thinking, signature: block.signature };
+}
+
+/**
+ * Lay out an assistant turn's content with its stored thinking blocks in
+ * the order the model produced them: leading blocks first, a progress
+ * update in front of the tool call it introduced, trailing blocks last.
+ * Blocks are replayed byte-for-byte — never merged, trimmed or skipped for
+ * being empty (display "omitted" returns empty text with a valid signature).
+ */
+function layoutAssistantTurn(
+  thinkingBlocks: AnthropicThinkingBlock[],
+  textBlocks: AnthropicBlock[],
+  toolUseBlocks: AnthropicBlock[],
+): AnthropicBlock[] {
+  const toolIds = new Set(toolUseBlocks.map((block) => block.id));
+  const leading: AnthropicBlock[] = [];
+  const trailing: AnthropicBlock[] = [];
+  const beforeTool = new Map<string, AnthropicBlock[]>();
+  for (const block of thinkingBlocks) {
+    const replayable = replayableThinkingBlock(block);
+    if (block.beforeToolCallId && toolIds.has(block.beforeToolCallId)) {
+      const queue = beforeTool.get(block.beforeToolCallId) ?? [];
+      queue.push(replayable);
+      beforeTool.set(block.beforeToolCallId, queue);
+    } else if (block.beforeToolCallId || block.trailing) {
+      trailing.push(replayable);
+    } else {
+      leading.push(replayable);
+    }
+  }
+  const content: AnthropicBlock[] = [...leading, ...textBlocks];
+  for (const toolUse of toolUseBlocks) {
+    content.push(...(beforeTool.get(toolUse.id as string) ?? []), toolUse);
+  }
+  content.push(...trailing);
+  return content;
+}
+
 /**
  * Anthropic requires alternating user/assistant roles and handles system messages separately.
  * This helper extracts the system message and merges consecutive same-role messages.
@@ -547,12 +1058,33 @@ export async function prepareMessages(messages: ChatMessage[], model?: string) {
           message.toolCalls &&
           message.toolCalls.length > 0
         ) {
+          const textBlocks: AnthropicBlock[] =
+            typeof message.content === "string" && message.content.trim()
+              ? [{ type: "text", text: message.content }]
+              : [];
+          const toolUseBlocks: AnthropicBlock[] = message.toolCalls.map(
+            (toolCall) => ({
+              type: "tool_use",
+              id: toolCall.id || toolCall.name || `toolCall-${Date.now()}`,
+              name: toolCall.name,
+              input: (toolCall.args as Record<string, unknown>) || {},
+            }),
+          );
+          // Every thinking block of the turn, verbatim and in order.
+          if (message.thinkingBlocks?.length) {
+            return {
+              role: "assistant",
+              content: layoutAssistantTurn(
+                message.thinkingBlocks,
+                textBlocks,
+                toolUseBlocks,
+              ),
+            };
+          }
+          // Legacy documents (before thinkingBlocks): one merged thinking
+          // text with the last block's signature. Only replayed when both
+          // exist — the API rejects a thinking block without its signature.
           const contentBlocks: AnthropicBlock[] = [];
-          // Preserve thinking blocks for multi-step reasoning continuity.
-          // The signature field is REQUIRED by Anthropic's API for multi-turn
-          // conversations — without it the API returns a 400.
-          // Only include thinking when we have the signature; conversations
-          // missing it must omit the block to avoid API 400 errors.
           if (message.thinking && message.thinkingSignature) {
             contentBlocks.push({
               type: "thinking",
@@ -560,17 +1092,7 @@ export async function prepareMessages(messages: ChatMessage[], model?: string) {
               signature: message.thinkingSignature,
             });
           }
-          if (typeof message.content === "string" && message.content.trim()) {
-            contentBlocks.push({ type: "text", text: message.content });
-          }
-          for (const toolCall of message.toolCalls) {
-            contentBlocks.push({
-              type: "tool_use",
-              id: toolCall.id || toolCall.name || `toolCall-${Date.now()}`,
-              name: toolCall.name,
-              input: (toolCall.args as Record<string, unknown>) || {},
-            });
-          }
+          contentBlocks.push(...textBlocks, ...toolUseBlocks);
           return {
             role: "assistant",
             content: contentBlocks,
@@ -627,6 +1149,25 @@ export async function prepareMessages(messages: ChatMessage[], model?: string) {
         // not top-level fields — convert them into the proper format.
         // Only include thinking when we have the signature; conversations
         // without it must omit the block to avoid API 400 errors.
+        if (
+          message.role === "assistant" &&
+          message.thinkingBlocks?.length &&
+          !message.toolCalls?.length
+        ) {
+          const textBlocks: AnthropicBlock[] = [
+            {
+              type: "text",
+              text:
+                typeof message.content === "string" && message.content.trim()
+                  ? message.content
+                  : " ",
+            },
+          ];
+          return {
+            role: "assistant",
+            content: layoutAssistantTurn(message.thinkingBlocks, textBlocks, []),
+          };
+        }
         if (
           message.role === "assistant" &&
           message.thinking &&
@@ -764,9 +1305,26 @@ export async function prepareMessages(messages: ChatMessage[], model?: string) {
     }
   }
 
+  // Defense in depth: every Claude 4.6+ model rejects a request that ends
+  // on an assistant turn (prefill). The harness never builds one; if some
+  // path does, continue the turn instead of sending a guaranteed 400.
+  if (
+    merged.length > 0 &&
+    merged[merged.length - 1].role === "assistant" &&
+    resolveAnthropicModelProfile(model).noAssistantPrefill
+  ) {
+    logger.warn(
+      `[anthropic] Request for ${model} ended on an assistant turn — appending a user continuation (this model rejects prefill).`,
+    );
+    merged.push({ role: "user", content: ASSISTANT_PREFILL_CONTINUATION });
+  }
+
   return { systemMessage, messages: merged };
 }
-export function buildTools(options: ProviderOptions) {
+export function buildTools(
+  options: ProviderOptions,
+  { eagerInputStreaming = false }: { eagerInputStreaming?: boolean } = {},
+) {
   const tools: Array<Record<string, unknown>> = [];
   if (options.webSearch) {
     tools.push({
@@ -795,6 +1353,10 @@ export function buildTools(options: ProviderOptions) {
         name: tool.name,
         description: tool.description || "",
         input_schema: tool.parameters || { type: "object", properties: {} },
+        // Streamed requests: input arrives as it is generated instead of
+        // after server-side buffering — which also means unvalidated, so
+        // the stream checks it against the schema (findToolInputViolation).
+        ...(eagerInputStreaming && { eager_input_streaming: true }),
       });
     }
   }
@@ -811,8 +1373,59 @@ export function extractResponseContent(contentBlocks: AnthropicBlock[]) {
     name?: string;
     args: Record<string, unknown>;
   }> = [];
+  const thinkingBlocks: AnthropicThinkingBlock[] = [];
+  let fallbackTo: string | null = null;
 
-  for (const block of contentBlocks || []) {
+  // A `fallback` block marks a server-side fallback: the thinking and
+  // client tool calls the declining model produced before the last one are
+  // never echoed back (the fallback model cannot read them).
+  const blocks = contentBlocks || [];
+  const lastFallbackIndex = blocks.map((block) => block.type).lastIndexOf("fallback");
+  let sawContent = false;
+  let pendingPlacement: AnthropicThinkingBlock[] = [];
+
+  for (const [blockIndex, block] of blocks.entries()) {
+    const beforeFallback = blockIndex < lastFallbackIndex;
+    if (block.type === "fallback") {
+      fallbackTo =
+        ((block as { to?: { model?: string } }).to?.model as string) ?? fallbackTo;
+      continue;
+    }
+    if (block.type === "thinking" || block.type === "redacted_thinking") {
+      if (block.type === "thinking") {
+        thinking = block.thinking;
+        if (block.signature) thinkingSignature = block.signature;
+      }
+      if (beforeFallback) continue;
+      // Unsigned (cut off mid-thought): cannot be replayed.
+      if (block.type === "thinking" && !block.signature) continue;
+      const stored: AnthropicThinkingBlock =
+        block.type === "thinking"
+          ? {
+              type: "thinking",
+              thinking: block.thinking ?? "",
+              signature: block.signature ?? "",
+            }
+          : {
+              type: "redacted_thinking",
+              data: (block as { data?: string }).data ?? "",
+            };
+      if (sawContent) {
+        stored.trailing = true;
+        pendingPlacement.push(stored);
+      }
+      thinkingBlocks.push(stored);
+      continue;
+    }
+    if (block.type === "tool_use") {
+      if (beforeFallback) continue;
+      for (const pending of pendingPlacement) {
+        delete pending.trailing;
+        pending.beforeToolCallId = block.id;
+      }
+      pendingPlacement = [];
+    }
+    sawContent = true;
     if (block.type === "text") {
       text += block.text || "";
       // Collect inline citations from this text block
@@ -827,9 +1440,6 @@ export function extractResponseContent(contentBlocks: AnthropicBlock[]) {
           }
         }
       }
-    } else if (block.type === "thinking") {
-      thinking = block.thinking;
-      if (block.signature) thinkingSignature = block.signature;
     } else if (block.type === "tool_use") {
       toolCalls.push({
         id: block.id,
@@ -840,25 +1450,72 @@ export function extractResponseContent(contentBlocks: AnthropicBlock[]) {
     // server_tool_use and *_tool_result blocks are informational — skip
   }
 
-  return { text, thinking, thinkingSignature, citations, toolCalls };
+  return {
+    text,
+    thinking,
+    thinkingSignature,
+    citations,
+    toolCalls,
+    thinkingBlocks,
+    fallbackTo,
+  };
 }
+interface AnthropicUsageCounts {
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+  cache_creation_input_tokens?: number | null;
+}
+
+/** One attempt in `usage.iterations` (server-side fallback). */
+interface AnthropicUsageIteration extends AnthropicUsageCounts {
+  type?: string;
+  model?: string;
+}
+
+/**
+ * Token usage of a response. With server-side fallback, top-level `usage`
+ * covers only the attempt that produced the message, and
+ * `usage.iterations` is the per-attempt billing record: an attempt that
+ * declined before any output is not billed, every other attempt bills at
+ * its own model's rates. Those are summed, and `byModel` carries the split
+ * so calculateTextCost prices each part correctly.
+ */
 export function buildUsage(
   responseUsage:
-    | {
-        input_tokens?: number | null;
-        output_tokens?: number | null;
-        cache_read_input_tokens?: number | null;
-        cache_creation_input_tokens?: number | null;
-      }
+    | (AnthropicUsageCounts & { iterations?: AnthropicUsageIteration[] | null })
     | null
     | undefined,
 ): TokenUsage {
-  return {
-    inputTokens: responseUsage?.input_tokens ?? 0,
-    outputTokens: responseUsage?.output_tokens ?? 0,
-    cacheReadInputTokens: responseUsage?.cache_read_input_tokens ?? 0,
-    cacheCreationInputTokens: responseUsage?.cache_creation_input_tokens ?? 0,
+  const iterations = responseUsage?.iterations;
+  if (!Array.isArray(iterations) || iterations.length === 0) {
+    return {
+      inputTokens: responseUsage?.input_tokens ?? 0,
+      outputTokens: responseUsage?.output_tokens ?? 0,
+      cacheReadInputTokens: responseUsage?.cache_read_input_tokens ?? 0,
+      cacheCreationInputTokens: responseUsage?.cache_creation_input_tokens ?? 0,
+    };
+  }
+  const usage: TokenUsage = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadInputTokens: 0,
+    cacheCreationInputTokens: 0,
   };
+  for (const iteration of iterations) {
+    if (!iteration.output_tokens) continue; // declined before output: not billed
+    const counts = {
+      inputTokens: iteration.input_tokens ?? 0,
+      outputTokens: iteration.output_tokens ?? 0,
+      cacheReadInputTokens: iteration.cache_read_input_tokens ?? 0,
+      cacheCreationInputTokens: iteration.cache_creation_input_tokens ?? 0,
+    };
+    mergeUsage(usage, {
+      ...counts,
+      ...(iteration.model && { byModel: { [iteration.model]: counts } }),
+    });
+  }
+  return usage;
 }
 
 /**
@@ -957,108 +1614,9 @@ const anthropicProvider = {
     logger.provider("Anthropic", `generateText model=${model}`);
 
     const prepared = await prepareMessages(messages, model);
-    const effectiveSystemPrompt = resolveSystemPrompt(
-      options.systemPrompt,
-      prepared.systemMessage,
-    );
-    const payload: Record<string, unknown> = {
-      ...(effectiveSystemPrompt && { system: effectiveSystemPrompt }),
-      model,
-      messages: prepared.messages,
-      max_tokens: options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS,
-      temperature:
-        options.temperature !== undefined
-          ? Math.min(options.temperature, 1)
-          : undefined,
-      top_p:
-        options.temperature === undefined && options.topP !== undefined
-          ? options.topP
-          : undefined,
-      top_k: options.topK !== undefined ? options.topK : undefined,
-      stop_sequences:
-        options.stopSequences !== undefined ? options.stopSequences : undefined,
-      ...(options.serviceTier && {
-        service_tier:
-          options.serviceTier === "standard"
-            ? "standard_only"
-            : options.serviceTier,
-      }),
-      ...(options.responseFormat === "json_object" && {
-        output_config: {
-          format: {
-            type: "json_schema" as const,
-            schema: { type: "object", additionalProperties: false },
-          },
-        },
-      }),
-    };
-
-    // Opus 4.7+ lock sampling parameters — API rejects non-default values
-    const modelDefinition = getModelByName(model);
-    const hasLockedSampling =
-      (modelDefinition as Record<string, unknown> | null)?.lockedSampling ===
-      true;
-    if (hasLockedSampling) {
-      delete payload.temperature;
-      delete payload.top_p;
-      delete payload.top_k;
-    }
-
-    const isAdaptiveThinking =
-      (modelDefinition as Record<string, unknown> | null)?.adaptiveThinking ===
-      true;
-    if (isAdaptiveThinking) {
-      delete payload.top_k;
-    }
-
-    // Sonnet 5+ deprecated top_k — API rejects requests containing it
-    const hasDeprecatedTopK =
-      (modelDefinition as Record<string, unknown> | null)?.deprecatedTopK ===
-      true;
-    if (hasDeprecatedTopK) {
-      delete payload.top_k;
-    }
-
-    // Server tools
-    const tools = buildTools(options);
-    if (tools) payload.tools = tools;
-
-    // Adaptive thinking models (Fable 5, Mythos 5, Opus 4.7+): thinking is
-    // inherent to the model — enable by default unless explicitly disabled.
-    if (options.thinkingEnabled !== false && isAdaptiveThinking) {
-      payload.thinking = { type: "adaptive" };
-      if (options.reasoningEffort) {
-        payload.output_config = {
-          ...((payload.output_config as Record<string, unknown>) || {}),
-          effort: options.reasoningEffort,
-        };
-      }
-      // Sampling params are deprecated on adaptive-thinking models — omit
-      // entirely rather than sending the tolerated default value.
-      delete payload.temperature;
-      delete payload.top_p;
-      delete payload.top_k;
-    } else if (
-      options.thinkingEnabled !== false &&
-      (options.thinkingEnabled === true ||
-        options.thinkingBudget ||
-        options.reasoningEffort)
-    ) {
-      // Legacy models (Opus 4.x, Sonnet 4.x): manual extended thinking with budget_tokens
-      const budget = options.thinkingBudget
-        ? parseInt(String(options.thinkingBudget))
-        : (options.reasoningEffort
-            ? EFFORT_BUDGET_MAP[options.reasoningEffort]
-            : undefined) || EFFORT_BUDGET_MAP.high;
-      payload.thinking = { type: "enabled", budget_tokens: budget };
-      if ((payload.max_tokens as number) <= budget) {
-        payload.max_tokens = budget + 1024;
-      }
-      // Anthropic requires temperature=1 and top_p/top_k unset when thinking is enabled
-      payload.temperature = 1;
-      delete payload.top_p;
-      delete payload.top_k;
-    }
+    const { payload, betas } = buildAnthropicRequest(prepared, model, options, {
+      streaming: false,
+    });
 
     // Upload-once media: swap large inline base64 image/PDF blocks for
     // Files API file_id references (first-party API only). Falls back to
@@ -1075,41 +1633,107 @@ const anthropicProvider = {
     }
 
     applyCacheBreakpoints(payload);
+    const requestBetas = [
+      ...(fileSources.applied ? [ANTHROPIC_FILES_API_BETA] : []),
+      ...betas,
+    ];
 
     try {
-      // Transient failures (overloaded, rate limit, network) retry via the
-      // shared provider resilience policy — same classification and jittered
-      // backoff the harness applies to streams.
-      const { data: response, response: rawResponse } = await callWithRetries(
-        () =>
-          getClient()
-            .messages.create(
-              payload as unknown as Anthropic.MessageCreateParamsNonStreaming,
-              fileSources.applied
-                ? { headers: { "anthropic-beta": ANTHROPIC_FILES_API_BETA } }
-                : undefined,
-            )
-            .withResponse(),
-        { signal: options.signal, label: "anthropic" },
-      );
-      const rateLimits = extractAnthropicRateLimits(rawResponse, model);
-      const message = response as Anthropic.Messages.Message;
+      // A server tool loop that hits its iteration limit stops with
+      // `pause_turn`: send the paused assistant content back as-is (no
+      // extra user turn) and the API resumes where it left off.
+      const pages: Anthropic.Messages.Message[] = [];
+      let rateLimits: ReturnType<typeof extractAnthropicRateLimits> | null =
+        null;
+      for (let continuation = 0; ; continuation++) {
+        // Transient failures (overloaded, rate limit, network) retry via the
+        // shared provider resilience policy — same classification and jittered
+        // backoff the harness applies to streams.
+        const { data: response, response: rawResponse } = await callWithRetries(
+          () =>
+            getClient()
+              .messages.create(
+                payload as unknown as Anthropic.MessageCreateParamsNonStreaming,
+                anthropicRequestOptions(requestBetas),
+              )
+              .withResponse(),
+          { signal: options.signal, label: "anthropic" },
+        );
+        rateLimits ??= extractAnthropicRateLimits(rawResponse, model);
+        const page = response as Anthropic.Messages.Message;
+        pages.push(page);
+        logInputTransformations(
+          (page as { input_transformations?: unknown }).input_transformations,
+          model,
+        );
+        if (
+          page.stop_reason !== "pause_turn" ||
+          continuation >= MAX_PAUSE_TURN_CONTINUATIONS
+        ) {
+          break;
+        }
+        payload.messages = [
+          ...(payload.messages as unknown[]),
+          { role: "assistant", content: page.content },
+        ];
+      }
 
-      const { text, thinking, thinkingSignature, citations, toolCalls } =
-        extractResponseContent(message.content as AnthropicBlock[]);
-      const result: AnthropicGenerateResult = {
+      const message = pages[pages.length - 1];
+      const usage: TokenUsage = buildUsage(pages[0].usage);
+      for (const page of pages.slice(1)) mergeUsage(usage, buildUsage(page.usage));
+      const stopDetails =
+        "stop_details" in message && message.stop_details
+          ? { ...(message.stop_details as unknown as Record<string, unknown>) }
+          : undefined;
+
+      // A refusal is read before content: whatever partial output came
+      // with it is incomplete and never returned as the answer.
+      if (message.stop_reason === "refusal") {
+        return {
+          text: "",
+          usage,
+          refusal: {
+            category: (stopDetails?.category as string | null) ?? null,
+            explanation: (stopDetails?.explanation as string | null) ?? null,
+            recommendedModel:
+              (stopDetails?.recommended_model as string | null) ?? null,
+          },
+          stopReason: message.stop_reason,
+          ...(stopDetails && { stopDetails }),
+          ...(message.model && message.model !== model && { servedModel: message.model }),
+          ...(rateLimits && { rateLimits }),
+        };
+      }
+
+      const {
         text,
-        usage: buildUsage(message.usage),
+        thinking,
+        thinkingSignature,
+        citations,
+        toolCalls,
+        thinkingBlocks,
+        fallbackTo,
+      } = extractResponseContent(
+        pages.flatMap((page) => page.content) as AnthropicBlock[],
+      );
+      const result: AnthropicGenerateResult = {
+        text: isJsonObjectFormat(options.responseFormat) && !options.responseSchema
+          ? extractJsonObjectText(text)
+          : text,
+        usage,
       };
       if (thinking) result.thinking = thinking;
       if (thinkingSignature) result.thinkingSignature = thinkingSignature;
+      if (thinkingBlocks.length > 0) result.thinkingBlocks = thinkingBlocks;
       if (citations.length > 0) result.citations = citations;
       if (toolCalls.length > 0) result.toolCalls = toolCalls;
       if (rateLimits) result.rateLimits = rateLimits;
+      const servedModel =
+        message.model && message.model !== model ? message.model : fallbackTo;
+      if (servedModel && servedModel !== model) result.servedModel = servedModel;
       // Forward structured stop details for observability (SDK 0.82+)
       if (message.stop_reason) result.stopReason = message.stop_reason;
-      if ("stop_details" in message && message.stop_details)
-        result.stopDetails = { ...message.stop_details };
+      if (stopDetails) result.stopDetails = stopDetails;
       return result;
     } catch (error: unknown) {
       // A rejected file_id (deleted server-side, beta unavailable) —
@@ -1216,6 +1840,12 @@ const anthropicProvider = {
     options: ProviderOptions = {},
   ): AsyncGenerator<TransformedStreamEvent> {
     logger.provider("Anthropic", `generateTextStream model=${model}`);
+    // The tool_use block currently streaming its input. With eager input
+    // streaming the SDK materializes the input at content_block_stop and
+    // throws from the iterator when it cannot parse it — the catch below
+    // turns that into the malformed-arguments path instead of a failed turn.
+    let openToolUse: { id: string | null; name: string | null; rawInput: string } | null =
+      null;
     let fileSources: FileSourceApplication = {
       applied: false,
       substitutions: [],
@@ -1227,110 +1857,24 @@ const anthropicProvider = {
       !!cacheTelemetry && !isProviderDiagnosticsRejected("anthropic", model);
     try {
       const prepared = await prepareMessages(messages, model);
-      const effectiveSystemPrompt = resolveSystemPrompt(
-        options.systemPrompt,
-        prepared.systemMessage,
-      );
-      const streamPayload: Record<string, unknown> = {
-        ...(effectiveSystemPrompt && { system: effectiveSystemPrompt }),
+      const { payload: streamPayload, betas } = buildAnthropicRequest(
+        prepared,
         model,
-        messages: prepared.messages,
-        max_tokens: options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS,
-        temperature:
-          options.temperature !== undefined
-            ? Math.min(options.temperature, 1)
-            : undefined,
-        top_p:
-          options.temperature === undefined && options.topP !== undefined
-            ? options.topP
-            : undefined,
-        top_k: options.topK !== undefined ? options.topK : undefined,
-        stop_sequences:
-          options.stopSequences !== undefined
-            ? options.stopSequences
-            : undefined,
-        ...(options.serviceTier && {
-          service_tier:
-            options.serviceTier === "standard"
-              ? "standard_only"
-              : options.serviceTier,
-        }),
-        ...(options.responseFormat === "json_object" && {
-          output_config: {
-            format: {
-              type: "json_schema" as const,
-              schema: { type: "object", additionalProperties: false },
-            },
-          },
-        }),
-      };
-
-      // Opus 4.7+ lock sampling parameters — API rejects non-default values
-      const modelDefinition = getModelByName(model);
-      const hasLockedSampling =
-        (modelDefinition as Record<string, unknown> | null)?.lockedSampling ===
-        true;
-      if (hasLockedSampling) {
-        delete streamPayload.temperature;
-        delete streamPayload.top_p;
-        delete streamPayload.top_k;
+        options,
+        { streaming: true },
+      );
+      // Resuming a `pause_turn`: the paused assistant content goes back
+      // as-is, with no extra user turn, and the API continues it.
+      const pausedTurn = options.anthropicPausedTurn;
+      if (Array.isArray(pausedTurn) && pausedTurn.length > 0) {
+        streamPayload.messages = [
+          ...(streamPayload.messages as unknown[]),
+          { role: "assistant", content: pausedTurn },
+        ];
       }
-
-      const isAdaptiveThinking =
-        (modelDefinition as Record<string, unknown> | null)
-          ?.adaptiveThinking === true;
-      if (isAdaptiveThinking) {
-        delete streamPayload.top_k;
-      }
-
-      // Sonnet 5+ deprecated top_k — API rejects requests containing it
-      const hasDeprecatedTopK =
-        (modelDefinition as Record<string, unknown> | null)?.deprecatedTopK ===
-        true;
-      if (hasDeprecatedTopK) {
-        delete streamPayload.top_k;
-      }
-
-      // Server tools
-      const tools = buildTools(options);
-      if (tools) streamPayload.tools = tools;
-
-      // Adaptive thinking models (Fable 5, Mythos 5, Opus 4.7+): thinking is
-      // inherent to the model — enable by default unless explicitly disabled.
-      if (options.thinkingEnabled !== false && isAdaptiveThinking) {
-        streamPayload.thinking = { type: "adaptive" };
-        if (options.reasoningEffort) {
-          streamPayload.output_config = {
-            ...((streamPayload.output_config as Record<string, unknown>) || {}),
-            effort: options.reasoningEffort,
-          };
-        }
-        // Sampling params are deprecated on adaptive-thinking models — omit
-        // entirely rather than sending the tolerated default value.
-        delete streamPayload.temperature;
-        delete streamPayload.top_p;
-        delete streamPayload.top_k;
-      } else if (
-        options.thinkingEnabled !== false &&
-        (options.thinkingEnabled === true ||
-          options.thinkingBudget ||
-          options.reasoningEffort)
-      ) {
-        // Legacy models (Opus 4.x, Sonnet 4.x): manual extended thinking with budget_tokens
-        const budget = options.thinkingBudget
-          ? parseInt(String(options.thinkingBudget))
-          : (options.reasoningEffort
-              ? EFFORT_BUDGET_MAP[options.reasoningEffort]
-              : undefined) || EFFORT_BUDGET_MAP.high;
-        streamPayload.thinking = { type: "enabled", budget_tokens: budget };
-        if ((streamPayload.max_tokens as number) <= budget) {
-          streamPayload.max_tokens = budget + 1024;
-        }
-        // Anthropic requires temperature=1 and top_p/top_k unset when thinking is enabled
-        streamPayload.temperature = 1;
-        delete streamPayload.top_p;
-        delete streamPayload.top_k;
-      }
+      const toolSchemas = new Map(
+        (options.tools ?? []).map((tool) => [tool.name, tool.parameters]),
+      );
 
       await enforceImageSizeLimits(
         streamPayload.messages as ChatMessage[],
@@ -1359,19 +1903,16 @@ const anthropicProvider = {
           previous_message_id: cacheTelemetry?.previousResponseId ?? null,
         };
       }
-      const betaHeaders = [
-        ...(fileSources.applied ? [ANTHROPIC_FILES_API_BETA] : []),
-        ...(requestsCacheDiagnostics ? [ANTHROPIC_CACHE_DIAGNOSIS_BETA] : []),
-      ];
-
       const stream = getClient().messages.stream(
         streamPayload as unknown as Anthropic.MessageCreateParamsNonStreaming,
-        {
-          ...(options.signal && { signal: options.signal }),
-          ...(betaHeaders.length > 0 && {
-            headers: { "anthropic-beta": betaHeaders.join(",") },
-          }),
-        },
+        anthropicRequestOptions(
+          [
+            ...(fileSources.applied ? [ANTHROPIC_FILES_API_BETA] : []),
+            ...betas,
+            ...(requestsCacheDiagnostics ? [ANTHROPIC_CACHE_DIAGNOSIS_BETA] : []),
+          ],
+          options.signal,
+        ),
       );
       let anthropicMessageId: string | undefined;
       let diagnosticsEnvelope: unknown;
@@ -1390,6 +1931,15 @@ const anthropicProvider = {
       } | null = null;
       let rateLimits: ReturnType<typeof extractAnthropicRateLimits> | null =
         null;
+      // Thinking blocks are accumulated verbatim (text + signature) and
+      // emitted whole at content_block_stop. `sawContent`: a text / tool
+      // block already streamed, so a later thinking block is a progress
+      // update placed in front of the next tool call.
+      let currentThinkingBlock: AnthropicThinkingBlock | null = null;
+      let currentThinkingAfterContent = false;
+      let sawContent = false;
+      let finalStopReason: string | null = null;
+      let usageIterations: unknown[] | null = null;
 
       for await (const chunk of stream) {
         receivedAnyStreamChunk = true;
@@ -1410,6 +1960,20 @@ const anthropicProvider = {
         // cache_creation_input_tokens here — message_delta only has output_tokens.
         if (chunk.type === "message_start" && chunk.message?.usage) {
           messageStartUsage = chunk.message.usage;
+          // Sticky routing / a pre-output fallback: the stream opens on the
+          // fallback model already.
+          if (chunk.message.model && chunk.message.model !== model) {
+            yield { type: "servedModel", model: chunk.message.model };
+          }
+          logInputTransformations(
+            (chunk.message as { input_transformations?: unknown })
+              .input_transformations,
+            model,
+          );
+          const startIterations = (
+            chunk.message.usage as { iterations?: unknown[] }
+          ).iterations;
+          if (Array.isArray(startIterations)) usageIterations = startIterations;
           // Capture rate-limit headers from the stream's initial response
           if (!rateLimits && stream.response) {
             rateLimits = extractAnthropicRateLimits(stream.response, model);
@@ -1425,6 +1989,49 @@ const anthropicProvider = {
             | null;
           currentToolUseId = ("id" in block ? block.id : null) as string | null;
           codeInput = "";
+
+          const blockType = block?.type as string | undefined;
+          if (blockType === "thinking") {
+            const opened = block as { thinking?: string; signature?: string };
+            currentThinkingBlock = {
+              type: "thinking",
+              thinking: opened.thinking ?? "",
+              signature: opened.signature ?? "",
+            };
+            currentThinkingAfterContent = sawContent;
+          } else if (blockType === "redacted_thinking") {
+            currentThinkingBlock = {
+              type: "redacted_thinking",
+              data: (block as { data?: string }).data ?? "",
+            };
+            currentThinkingAfterContent = sawContent;
+          } else if (blockType === "fallback") {
+            // A server-side fallback took over. Streamed content stays valid;
+            // the declining model's thinking and tool calls are not replayed.
+            const handoff = block as unknown as {
+              from?: { model?: string };
+              to?: { model?: string };
+            };
+            yield {
+              type: "fallback",
+              from: handoff.from?.model ?? null,
+              to: handoff.to?.model ?? null,
+            };
+            if (handoff.to?.model) {
+              yield { type: "servedModel", model: handoff.to.model };
+            }
+            sawContent = false;
+            continue;
+          } else {
+            sawContent = true;
+          }
+          if (blockType === "tool_use") {
+            openToolUse = {
+              id: currentToolUseId,
+              name: currentBlockName,
+              rawInput: "",
+            };
+          }
 
           // Server tool use start — yield the tool name being invoked
           if (
@@ -1511,6 +2118,20 @@ const anthropicProvider = {
 
         // Content block stop
         if (chunk.type === "content_block_stop") {
+          // A thinking block cut off before its signature (max_tokens mid-
+          // thought) cannot be replayed — the API rejects it unsigned.
+          if (
+            currentThinkingBlock &&
+            (currentThinkingBlock.type === "redacted_thinking" ||
+              currentThinkingBlock.signature)
+          ) {
+            yield {
+              type: "thinking_block",
+              block: currentThinkingBlock,
+              afterContent: currentThinkingAfterContent,
+            };
+          }
+          currentThinkingBlock = null;
           // Server code execution — yield code. Legacy tool sends
           // name "code_execution" with {code}; code_execution_20260120
           // sends the "bash_code_execution" sub-tool with {command}.
@@ -1549,6 +2170,23 @@ const anthropicProvider = {
                 argsParseError = true;
               }
             }
+            // Eager input streaming skips the API's validation: input that
+            // parses but breaks the tool's schema takes the same path.
+            const violation = argsParseError
+              ? null
+              : findToolInputViolation(
+                  args,
+                  toolSchemas.get(currentBlockName ?? "") as
+                    | Record<string, unknown>
+                    | undefined,
+                );
+            if (violation) {
+              logger.warn(
+                `[anthropic] ${currentBlockName} input fails its schema (${violation}) — returning it to the model`,
+              );
+              argsParseError = true;
+            }
+            openToolUse = null;
             yield {
               type: "toolCall",
               id: currentToolUseId,
@@ -1571,6 +2209,9 @@ const anthropicProvider = {
         if (chunk.type === "content_block_delta") {
           // Thinking delta
           if (chunk.delta.type === "thinking_delta") {
+            if (currentThinkingBlock?.type === "thinking") {
+              currentThinkingBlock.thinking += chunk.delta.thinking;
+            }
             yield { type: "thinking", content: chunk.delta.thinking };
             continue;
           }
@@ -1579,6 +2220,9 @@ const anthropicProvider = {
           // back verbatim in multi-turn conversations, otherwise the API rejects
           // the request with a 400.
           if (chunk.delta.type === "signature_delta") {
+            if (currentThinkingBlock?.type === "thinking") {
+              currentThinkingBlock.signature = chunk.delta.signature;
+            }
             yield {
               type: "thinking_signature",
               signature: chunk.delta.signature,
@@ -1598,6 +2242,7 @@ const anthropicProvider = {
           ) {
             const partial = chunk.delta.partial_json || "";
             codeInput += partial;
+            if (openToolUse) openToolUse.rawInput += partial;
             // Yield progress event for tool_use blocks so generation
             // throughput tracking stays alive during FC argument streaming.
             if (currentBlockType === "tool_use" && partial.length > 0) {
@@ -1625,7 +2270,28 @@ const anthropicProvider = {
           }
           // Forward structured stop details for observability (SDK 0.82+)
           if (chunk.delta?.stop_reason) {
+            finalStopReason = chunk.delta.stop_reason;
             yield { type: "stopReason", stopReason: chunk.delta.stop_reason };
+          }
+          const deltaIterations = (
+            chunk.usage as { iterations?: unknown[] } | undefined
+          )?.iterations;
+          if (Array.isArray(deltaIterations)) usageIterations = deltaIterations;
+          logInputTransformations(
+            (chunk as { input_transformations?: unknown }).input_transformations,
+            model,
+          );
+          // Read before anything treats the output as an answer: a refusal
+          // (before or during output) is not an empty response to retry.
+          if (chunk.delta?.stop_reason === "refusal") {
+            const details = (chunk.delta as { stop_details?: Record<string, unknown> | null })
+              .stop_details;
+            yield {
+              type: "refusal",
+              category: (details?.category as string | null) ?? null,
+              explanation: (details?.explanation as string | null) ?? null,
+              recommendedModel: (details?.recommended_model as string | null) ?? null,
+            };
           }
           if (chunk.delta && "stop_details" in chunk.delta) {
             yield {
@@ -1649,14 +2315,21 @@ const anthropicProvider = {
       } catch {
         // finalMessage() can throw for tool_use stop reasons — use message_delta usage
       }
+      // Server-side fallback: bill each attempt at its own model's rates.
+      if (usageIterations && usage) {
+        usage = buildUsage({
+          input_tokens: usage.inputTokens,
+          output_tokens: usage.outputTokens,
+          iterations: usageIterations as never,
+        });
+      }
       if (usage) {
         yield { type: "usage", usage };
       } else {
         yield { type: "usage", usage: EMPTY_USAGE };
       }
-      if (rateLimits) {
-        yield { type: "rateLimits", rateLimits };
-      }
+      // Before any pause_turn continuation: the pass keeps the LAST request's
+      // telemetry, and the continuation is the request sent last.
       if (cacheTelemetry) {
         yield requestTelemetryChunk(prefixHashes, {
           providerResponseId: anthropicMessageId,
@@ -1668,8 +2341,52 @@ const anthropicProvider = {
             : null,
         });
       }
+      const pauseContinuations = options.anthropicPauseContinuations ?? 0;
+      if (
+        finalStopReason === "pause_turn" &&
+        pauseContinuations < MAX_PAUSE_TURN_CONTINUATIONS
+      ) {
+        const pausedMessage = await stream.finalMessage().catch(() => null);
+        if (pausedMessage) {
+          yield* anthropicProvider.generateTextStream(messages, model, {
+            ...options,
+            anthropicPausedTurn: [
+              ...(options.anthropicPausedTurn ?? []),
+              ...(pausedMessage.content as unknown[]),
+            ],
+            anthropicPauseContinuations: pauseContinuations + 1,
+            ...(cacheTelemetry && {
+              cacheTelemetry: { previousResponseId: anthropicMessageId ?? null },
+            }),
+          });
+        }
+      }
+      if (rateLimits) {
+        yield { type: "rateLimits", rateLimits };
+      }
     } catch (error: unknown) {
       if (error instanceof Error && error.name === "AbortError") return;
+      // The SDK could not parse a streamed tool input (eager input
+      // streaming): hand the raw text back to the model as a malformed call.
+      // API errors (they carry an HTTP status) are never mistaken for it.
+      if (
+        openToolUse &&
+        typeof (error as AnthropicSdkError | null)?.status !== "number"
+      ) {
+        logger.warn(
+          `[anthropic] ${openToolUse.name} input could not be parsed (${getErrorMessage(error)}) — returning it to the model`,
+        );
+        yield {
+          type: "toolCall",
+          id: openToolUse.id,
+          name: openToolUse.name,
+          args: {},
+          argsParseError: true,
+          rawArgs: openToolUse.rawInput.slice(0, 2000),
+        };
+        yield { type: "usage", usage: EMPTY_USAGE };
+        return;
+      }
       // A rejected file_id (deleted server-side, beta unavailable) surfaces
       // at request validation — before any chunk. Invalidate the stale cache
       // entries and retry once fully inline. Zero-chunk guard ensures the

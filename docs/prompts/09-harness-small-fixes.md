@@ -21,75 +21,25 @@ Every item below is independent. For each one: write a red test, fix it, and kee
 
 ## Landing 1 — `loop-small-fixes`
 
-**a. The cost cap can't be set.**
-- *Bug:* `maxCostDollars` from the request body or settings is never copied into the loop options (`src/routes/ChatRoutes.ts` ~236–359), so `SharedCostBudget` is never created (`AgenticLoopService.ts` ~172–181).
-- *Fix:* thread it through. Default from settings if one exists.
-- *Test:* a request with `maxCostDollars: 0.01` and a scripted provider reporting costlier usage stops with a budget reason, and the reason is persisted. (Red: runs on.)
-
-**b. `create_subagent(s)` can hang forever.**
-- *Bug:* the dispatcher waits for every member to register (`OrchestratorService.ts` ~1260–1280, ~1380). Cap, depth and breaker errors return before registration (~243–284). The concurrency cap is counted process-wide, and the tool is exempt from the tool timeout (`ToolExecutor.ts` ~32–40).
-- *Fix:*
-  - register failed members as terminal entries, or resolve the waiters on error;
-  - count concurrency per root conversation;
-  - put a timeout on the dispatch wait.
-- *Test* (fake timers): spawn 3 where #2 hits the depth cap. The tool returns promptly with 2 started and 1 error. (Red: never resolves.)
-
-**c. Rejecting a plan loses the turn.**
-- *Bug:* on rejection or timeout the harness returns before finalize (`ReActHarness.ts` ~907; `TreeOfThoughtsStrategy.ts` ~135; `GraphOfThoughtsStrategy.ts` ~108). The prompt and the plan go unsaved, and `isGenerating` stays true.
-- *Fix:* finalize with the user prompt, the plan, and a rejection note; clear `isGenerating`; emit `done`.
-- *Test:* `planFirst` + reject → `Finalizer` called, messages persisted, `isGenerating` false, `done` emitted. Do the same for ToT and GoT. (Red.)
-
-**d. Tool results are cut without a pointer.**
-- *Bug:* `truncateToolResult` (`src/utils/FunctionCallingUtilities.ts` ~79–110, applied on every model call via `BaseAgenticHarness.ts` ~745) head-cuts objects over 8,000 chars and arrays over 10 items, with no way back.
-- *Fix:*
-  - route the overflow through `ToolResultOffloadService`: store the full value and show a preview plus an offload id and the `retrieve_offloaded_content` hint;
-  - clamp long strings the same way;
-  - make the result deterministic, since the same input must produce the same bytes (prefix stability, prompt 10).
-- *Test:* a 20K-char object result → the model-visible content has a preview and an id, and `retrieve_offloaded_content` returns the original. (Red: no pointer.)
-
-**f. Scheduled and timer runs skip custom-agent DENY policies.**
-- *Bug:* policies are injected only at the HTTP route (`ChatRoutes.ts` ~923–931). Scheduled and timer runs use `autoApprove: true` (`ScheduledTaskService.ts` ~437, ~652; `ConversationTimerService.ts` ~544).
-- *Fix:* resolve policies inside the loop (`AgenticLoopService`) for every entry point.
-- *Test:* a scheduled run of a custom agent with a DENY rule on a tool → the call is denied with `POLICY_DENIED`. (Red: it executes.)
-
-**Live** (isolated): (a) with a cheap model and a tiny cap; (c) reject a plan via `/agent/approve` and check the conversation document in the test DB.
+**Done 2026-09-22:** (a) `maxCostDollars` is threaded from the request and a budget stop persists `conversationOutcome: "budget_exhausted"` with a "Cost cap reached" note and no further model call; (b) `createTeam` settles refused members, is released when the router settles and is bounded by `ORCHESTRATOR.DISPATCH_REGISTRATION_TIMEOUT_MILLISECONDS`, and `MAX_SUB_AGENTS` counts per root conversation; (c) a rejected plan finalizes (ReAct, ToT, GoT) with outcome `plan_rejected`, and the plan falls back to `exit_plan_mode`'s `summary`; (d) `truncateToolResult` offloads what it cuts under a content-hash id and shows a preview + `offload_id` + retrieve hint, strings included; (f) persona policies are resolved in `AgenticLoopService` for every entry point. Live-checked (a) and (c) in `prism_test_loop-small-fixes`.
+**Branch:** `loop-small-fixes`.
+**Tests:** `src/services/harnesses/__tests__/loopSmallFixes.test.ts` (a, c, f on the real loop), `tests/agentCostCapRoutes.test.ts` (a), `tests/orchestratorDispatchWait.test.ts` (b), `src/utils/__tests__/toolResultTruncationOffload.test.ts` (d).
 
 ---
 
 ## Landing 2 — `cron-matcher`
 
-**e. The cron matcher** (`ScheduledTaskService.ts` ~107–141) has four errors:
-- `a-b/n` ignores the upper bound `b`;
-- `*/n` on day-of-month and month fires on even values (should be 1, 3, 5, …);
-- day-of-month and day-of-week are ANDed (cron ORs them when both are restricted);
-- day-of-week `7` (Sunday) never matches.
-
-*Fix:* replace it with a maintained parser (e.g. `croner`, MIT, no dependencies; add it per README §Conventions 2) or a corrected local implementation. Timezone handling must match today's behaviour, so check how tasks store a timezone.
-
-*Tests, red first:* a table test with `1-10/3`, `*/2` on day-of-month, `0 9 1 * 1` (OR semantics), `0 0 * * 7`, month steps, and a DST boundary in the configured timezone. Compare next-run times against the library or hand-computed values. Also test that existing stored tasks still parse.
+**Done 2026-09-22:** `matchCron` (`src/services/ScheduledTaskService.ts`) is a corrected local 5-field matcher with crontab(5) semantics: `a-b/n` stops at `b`, `*/n` on 1-based fields starts at 1, day-of-month and day-of-week are ORed when both are restricted, day-of-week 7 is Sunday, and JAN–DEC / SUN–SAT names are accepted. There is no new dependency, and timezone and DST behaviour is unchanged (process-local time).
+**Branch:** `cron-matcher`.
+**Tests:** `src/services/__tests__/cronMatcher.test.ts`, a next-run table in America/Los_Angeles covering both DST boundaries and the stored and documented expressions.
 
 ---
 
 ## Landing 3 — `provider-small-fixes`
 
-**g. OpenAI strict schemas collapse open objects.**
-- *Bug:* strict function tools turn open-ended objects into `{properties: {}, additionalProperties: false}` (`src/providers/openai.ts` ~264–272, ~376). `run_async_task.toolArguments`, `execute_skill.variables` and `authenticate_mcp_server.env` can then only ever be `{}`.
-- *Fix:* mark those tools non-strict, or carry open objects as JSON strings with a parse step.
-- *Test:* a request-shape test on the three tools under strict mode. (Red.)
-
-**h. OpenAI `response.incomplete`.**
-- *Bug:* only `response.completed` is handled (~1640). An incomplete response loses usage and reasoning items, and no "length" stop is reported.
-- *Fix:* handle it. Also stop the Chat Completions stream sending effort to models that reject it (~1737–1740).
-- *Test:* a stream fixture per case.
-
-**i. Gemini non-streaming appends thoughts to the answer text** (`src/providers/google.ts` ~397 with ~692–693).
-- *Fix:* keep thought parts out of the answer.
-- *Test:* a non-streaming fixture with thought and text parts → the answer text excludes the thoughts. (Red.)
-
-**j. The Ollama provider has no tool calling** (`src/providers/ollama.ts` ~23–42), even though its models are labelled "Tool Calling".
-- *Fix:* implement tools through Ollama's `/api/chat` `tools` / `tool_calls`, and make capability detection honest.
-- *Tests:* a provider test with mocked `fetch`; tool calls emitted as chunks.
-- *Live:* optional, against a local Ollama if one is running.
+Done: OpenAI tools with an open object go out `strict: false` (`hasOpenObjectSchema`); a `response.incomplete` stream keeps usage and reasoning items and reports `length` (`content_filter` for a filter); the Chat Completions stream gates effort through `effortForModel`; Gemini non-streaming thought parts go to `thinking`; Ollama calls tools through `/api/chat` and labels Tool Calling from `/api/show` capabilities.
+Branch: `provider-small-fixes`.
+Tests: `tests/openaiStrictToolSchemas.test.ts`, `tests/openaiStreamStops.test.ts`, `tests/googleProvider.test.ts` (thought parts), `tests/ollamaProviderTools.test.ts`, `src/providers/__tests__/openai/sanitizeSchemaForOpenAI.test.ts`.
 
 ---
 

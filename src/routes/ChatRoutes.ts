@@ -270,6 +270,7 @@ async function prepareGenerationContext(
     maxIterations,
     maxSubAgentIterations,
     maxRecursionDepth,
+    maxCostDollars,
     agentContext,
     // Multi-workspace: user-selected workspace root path (absolute fs path).
     workspaceRoot,
@@ -332,6 +333,8 @@ async function prepareGenerationContext(
     ...(maxIterations != null && { maxIterations }),
     ...(maxSubAgentIterations != null && { maxSubAgentIterations }),
     ...(maxRecursionDepth != null && { maxRecursionDepth }),
+    ...(typeof maxCostDollars === "number" &&
+      maxCostDollars > 0 && { maxCostDollars }),
     ...(agentContext != null && { agentContext }),
     ...(enableCriticGate != null && { enableCriticGate }),
     ...(criticModel != null && { criticModel }),
@@ -920,16 +923,8 @@ export async function handleAgent(
       const { default: AgenticLoopService } =
         await import("#src/services/AgenticLoopService");
 
-      // Inject persona-level policies into options (if the agent has them)
-      if (agent && !options.policies) {
-        const { default: AgentPersonaRegistry } =
-          await import("#src/services/AgentPersonaRegistry");
-        const persona = AgentPersonaRegistry.get(agent);
-        if (persona?.policies && persona.policies.length > 0) {
-          options.policies = persona.policies;
-        }
-      }
-
+      // Persona-level policies are resolved inside the loop, so scheduled,
+      // timer and sub-agent runs get them too.
       await AgenticLoopService.runAgenticLoop({
         provider:
           context.provider as import("../services/harnesses/types.ts").LLMProvider,
@@ -1401,6 +1396,10 @@ async function handleStreamingText(context: GenerationContext) {
       ...(streamState.providerResponseId
         ? { providerResponseId: streamState.providerResponseId }
         : {}),
+      // Anthropic thinking blocks — replayed verbatim on the follow-up.
+      ...(streamState.thinkingBlocks?.length
+        ? { thinkingBlocks: streamState.thinkingBlocks }
+        : {}),
     };
     const toolResultMillisecondsgs = streamState.toolCalls
       .filter((toolCall) => toolCall.result)
@@ -1426,6 +1425,7 @@ async function handleStreamingText(context: GenerationContext) {
     streamState.phase = undefined;
     streamState.reasoningItems = undefined;
     streamState.providerResponseId = undefined;
+    streamState.thinkingBlocks = undefined;
     streamState.toolCalls.length = 0;
     const followUpStream = streamWithRetries(
       () =>
@@ -1495,12 +1495,18 @@ async function handleStreamingText(context: GenerationContext) {
     });
     streamState.text = truncationWarning;
   }
+  // A safety-classifier refusal: whatever streamed before it is not the
+  // answer (the typed refusal event already reached the client).
+  if (streamState.refusal) streamState.text = "";
   // Build normalized result for shared finalization
   const now = performance.now();
   await finalizeTextGeneration(context, {
     text: streamState.text,
     thinking: streamState.thinking,
     images: streamState.images,
+    ...(streamState.thinkingBlocks?.length && { thinkingBlocks: streamState.thinkingBlocks }),
+    ...(streamState.refusal && { refusal: streamState.refusal }),
+    ...(streamState.servedModel && { servedModel: streamState.servedModel }),
     ...(streamState.phase !== undefined && { phase: streamState.phase }),
     ...(streamState.reasoningItems && streamState.reasoningItems.length > 0 && { reasoningItems: streamState.reasoningItems }),
     ...(streamState.providerResponseId && { providerResponseId: streamState.providerResponseId }),
@@ -1653,6 +1659,9 @@ async function handleNonStreamingText(context: GenerationContext) {
     ...(genResult.phase !== undefined && { phase: genResult.phase }),
     ...(genResult.reasoningItems && genResult.reasoningItems.length > 0 && { reasoningItems: genResult.reasoningItems }),
     ...(genResult.providerResponseId && { providerResponseId: genResult.providerResponseId }),
+    ...(genResult.thinkingBlocks && genResult.thinkingBlocks.length > 0 && { thinkingBlocks: genResult.thinkingBlocks }),
+    ...(genResult.refusal && { refusal: genResult.refusal }),
+    ...(genResult.servedModel && { servedModel: genResult.servedModel }),
     toolCalls:
       genResult.toolCalls?.map((toolCall) => ({
         id: toolCall.id || null,

@@ -54,6 +54,8 @@ import { logKVCacheHitRate } from "./lifecycle/KVCacheReporter.ts";
 import { injectToolDiscoveryNudge } from "./lifecycle/ToolDiscoveryNudge.ts";
 import { finalizePassTracker } from "./lifecycle/TrackerFinalizer.ts";
 import { handleCodexPlanningResponse } from "./lifecycle/CodexPlanningDetector.ts";
+import { buildPlanSubmissionContinuation } from "./lifecycle/PlanSubmissionContinuation.ts";
+import { recordRefusal } from "./lifecycle/RefusalHandler.ts";
 import {
   drainTurnInput,
   hasPendingTurnInput,
@@ -92,8 +94,9 @@ interface IterationPassOptions extends AgenticOptions {
 
 /**
  * Provider-native state a pass produced (OpenAI Responses: message phase,
- * reasoning items no tool call claimed, response.id) — spread onto the
- * assistant message so it persists and is replayed next turn.
+ * reasoning items no tool call claimed, response.id; Anthropic: thinking
+ * blocks) — spread onto the assistant message so it persists and is
+ * replayed next turn.
  */
 function providerNativeState(pass: PassState) {
   return {
@@ -103,6 +106,9 @@ function providerNativeState(pass: PassState) {
     ...(pass.providerResponseId && {
       providerResponseId: pass.providerResponseId,
     }),
+    // Anthropic: the pass's thinking blocks, verbatim and in order
+    ...(pass.thinkingBlocks &&
+      pass.thinkingBlocks.length > 0 && { thinkingBlocks: pass.thinkingBlocks }),
   };
 }
 
@@ -693,6 +699,18 @@ export default class ReActHarness extends BaseAgenticHarness {
         logKVCacheHitRate(pass.usage, state.iterations, "ReActHarness");
         this.emitGenerationProgress();
 
+        // ── Safety-classifier refusal ──────────────────────────
+        // Checked before anything reads the pass as output: a refusal is
+        // not an empty response (no retry nudge), its partial text,
+        // thinking and tool calls are discarded, and the turn ends.
+        if (pass.refusal) {
+          this.rollbackStreamStateToSnapshot(streamStateSnapshot);
+          recordRefusal(pass.refusal, state, emit, "ReActHarness");
+          this.logIteration(pass, currentMessages);
+          hasCleanTextBreak = true;
+          break;
+        }
+
         // ── Truncation recovery ────────────────────────────────
         if (isOutputTruncated(pass)) {
           truncationRecoveryCount++;
@@ -900,11 +918,12 @@ export default class ReActHarness extends BaseAgenticHarness {
           );
 
           const exitPlanToolCall = pass.pendingToolCalls.find(tc => tc.name === TOOL_NAMES.EXIT_PLAN_MODE);
+          let isPlanRejected = false;
           if (exitPlanToolCall) {
             const { shouldContinueLoop } = await handleExitPlanMode(
               exitPlanToolCall, pass, results, currentMessages, context, state,
             );
-            if (!shouldContinueLoop) return { messages: currentMessages };
+            isPlanRejected = !shouldContinueLoop;
           }
 
           const assistantMessage: ConversationMessage = {
@@ -937,6 +956,16 @@ export default class ReActHarness extends BaseAgenticHarness {
               stc.result = res.result;
               stc.durationMilliseconds = res.durationMilliseconds;
             }
+          }
+
+          // A rejected (or timed-out) plan ends the turn, but the turn still
+          // happened: the plan and the verdict are in the assistant message
+          // just pushed, and finalize() persists them, clears isGenerating
+          // and emits `done`. Nothing is left to recover.
+          if (isPlanRejected) {
+            this.logIteration(pass, currentMessages);
+            hasCleanTextBreak = true;
+            break;
           }
 
           const retryGuidance = buildToolRetryGuidance(
@@ -1069,6 +1098,13 @@ export default class ReActHarness extends BaseAgenticHarness {
                 ...computePassPhaseDurations(pass),
                 ...providerNativeState(pass),
               });
+              // Keep the plan, then ask for it to be submitted — the next
+              // request must not end on the assistant turn (no prefill).
+              currentMessages.push(
+                buildPlanSubmissionContinuation(
+                  this.context.options?.locale as string | undefined,
+                ),
+              );
               this.logIteration(pass, currentMessages);
               continue;
             }
@@ -1145,7 +1181,7 @@ export default class ReActHarness extends BaseAgenticHarness {
       }
 
       if (!hasCleanTextBreak && state.streamedToolCalls.length > 0 && !signal?.aborted) {
-        state.conversationOutcome = "exhausted";
+        if (state.conversationOutcome === "completed") state.conversationOutcome = "exhausted";
         await runExhaustionRecoveryPass(this, context, state, currentMessages);
       }
 

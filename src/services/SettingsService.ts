@@ -5,6 +5,10 @@ import { MONGO_DB_NAME } from "#config";
 import { COLLECTIONS, PROVIDERS } from "#src/constants";
 import { MODELS } from "#src/config";
 import logger from "#src/utils/logger";
+import {
+  ANTHROPIC_SETTING_DEFAULTS,
+  type AnthropicSettings,
+} from "#src/constants/AnthropicRequestSettings";
 
 // ─── In-memory cache ──────────────────────────────────────────────────────────
 // Hot path: MemoryService + EmbeddingService read these on every call.
@@ -63,6 +67,7 @@ export interface SettingsData {
   workspace?: {
     agentSecret: string;
   };
+  anthropic?: AnthropicSettings;
   [key: string]: unknown;
 }
 
@@ -112,6 +117,7 @@ const DEFAULTS: SettingsData = {
   workspace: {
     agentSecret: "",
   },
+  anthropic: { ...ANTHROPIC_SETTING_DEFAULTS },
 };
 
 // ─── Service ──────────────────────────────────────────────────────────────────

@@ -1,3 +1,4 @@
+import type { AnthropicThinkingBlock } from "./admin.ts";
 import type { ToolSchema } from "#src/services/harnesses/types";
 import type { ChatMessage, ProviderOptions } from "./ProviderTypes.ts";
 import type { ResponsesPhase, ResponsesReasoningItem } from "./admin.ts";
@@ -86,6 +87,10 @@ export interface StreamToolCallChunk {
   thoughtSignature?: string;
   responsesItemId?: string;
   reasoningItem?: ResponsesReasoningItem;
+  /** The arguments were not valid JSON; the harness asks for a re-emit. */
+  argsParseError?: boolean;
+  /** The unparseable arguments, truncated, for that re-emit message. */
+  rawArgs?: string;
 }
 
 /**
@@ -187,6 +192,12 @@ export interface GenerateTextResult {
   reasoningItems?: ResponsesReasoningItem[];
   /** OpenAI Responses API `response.id`. */
   providerResponseId?: string;
+  /** Anthropic thinking blocks, verbatim and in order. */
+  thinkingBlocks?: AnthropicThinkingBlock[];
+  /** Anthropic safety-classifier refusal — `text` is then empty. */
+  refusal?: { category: string | null; explanation: string | null };
+  /** The model that served the response when a fallback did. */
+  servedModel?: string;
 }
 
 export interface GenerateImageResult {

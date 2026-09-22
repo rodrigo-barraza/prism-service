@@ -7,10 +7,14 @@
  * logic to avoid duplication.
  */
 
-import type { ChatMessage, ResponsesPhase,
+import crypto from "node:crypto";
+import type { AnthropicThinkingBlock, ChatMessage, ResponsesPhase,
   ResponsesReasoningItem,
   ToolCallEntry } from "#src/types/admin";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import ToolResultOffloadService, {
+  OFFLOAD_STUB_HEADER,
+} from "#src/services/compact/ToolResultOffloadService";
 
 export type ToolResultValue =
   | string
@@ -70,45 +74,138 @@ const TRUNCATABLE_ARRAY_KEYS = [
   "commodities",
 ];
 
+const TRUNCATED_ARRAY_ITEMS = 10;
+
+const OFFLOAD_RETRIEVE_HINT =
+  "call retrieve_offloaded_content with this offload_id and a pattern or startLine/endLine to read the rest";
+
 /**
- * Truncate a tool result to avoid blowing up the model's context window.
- * Caps arrays at 10 items and the serialized JSON at ~maximumCharacters.
+ * Store the FULL tool result with ToolResultOffloadService under an id
+ * derived from its content, so the same result always yields the same id —
+ * and so the same model-visible bytes on every call (prompt-prefix
+ * stability). Pretty-printed so retrieval can address it by line.
+ */
+function offloadFullResult(
+  toolName: string,
+  result: ToolResultValue,
+): { offloadId: string; content: string } {
+  const content =
+    typeof result === "string"
+      ? result
+      : (JSON.stringify(result, null, 2) ?? String(result));
+  const offloadId = `tr_${crypto
+    .createHash("sha256")
+    .update(`${toolName}\0${content}`)
+    .digest("hex")
+    .slice(0, 24)}`;
+  ToolResultOffloadService.offloadToolResult({
+    id: offloadId,
+    name: toolName,
+    result: content,
+  } as ToolCallEntry);
+  return { offloadId, content };
+}
+
+/**
+ * The model-visible stand-in for an offloaded result: whole leading lines of
+ * the stored content up to the character budget, the offload_id, and how to
+ * read the rest. Line numbers match retrieve_offloaded_content's.
+ */
+function buildOffloadPreview(
+  toolName: string,
+  offloadId: string,
+  content: string,
+  maximumCharacters: number,
+): string {
+  const lines = content.split("\n");
+  const previewBudget = Math.max(200, maximumCharacters - 600);
+  const previewLines: string[] = [];
+  let used = 0;
+  for (const line of lines) {
+    if (used + line.length + 1 > previewBudget) {
+      if (previewLines.length === 0) {
+        previewLines.push(`${line.slice(0, previewBudget)}…`);
+      }
+      break;
+    }
+    previewLines.push(line);
+    used += line.length + 1;
+  }
+  const shown = previewLines.length;
+  const isFirstLineCut = shown === 1 && lines[0].length > previewBudget;
+  return [
+    OFFLOAD_STUB_HEADER,
+    `offload_id: ${offloadId} (${toolName}, ${lines.length} lines, ${content.length} characters — too large to include in full)`,
+    `Preview (${isFirstLineCut ? `first ${previewBudget} characters of line 1` : `lines 1–${shown}`}):`,
+    ...previewLines,
+    `[${shown < lines.length || isFirstLineCut ? "Truncated here — " : ""}${OFFLOAD_RETRIEVE_HINT}.]`,
+  ].join("\n");
+}
+
+/**
+ * Bound a tool result for the model's context window. Within the limit it
+ * passes through untouched. Anything cut is RECOVERABLE: the full value is
+ * offloaded (ToolResultOffloadService) and the model sees a pointer to it.
+ *   - Arrays over 10 items (top level, or under a known wrapper key) are
+ *     capped to 10, with an offload_id marker for the rest.
+ *   - A result (object, array or string) still over ~maximumCharacters
+ *     becomes a text preview + offload_id + retrieve_offloaded_content hint.
+ * Deterministic: the same input produces the same bytes.
  * The full result is still stored in the DB and shown in the UI;
  * this only affects what gets re-sent to the model.
  */
 export function truncateToolResult(
   result: ToolResultValue,
   maximumCharacters = 8000,
+  toolName = "tool_result",
 ): ToolResultValue {
+  if (typeof result === "string") {
+    if (result.length <= maximumCharacters) return result;
+    const { offloadId, content } = offloadFullResult(toolName, result);
+    return buildOffloadPreview(toolName, offloadId, content, maximumCharacters);
+  }
   if (!result || typeof result !== "object") return result;
 
-  // Also handle top-level arrays (e.g. tides, earthquakes)
+  // Cap known list shapes — top-level arrays (e.g. tides, earthquakes) and
+  // arrays under a known wrapper key — to keep a representative view.
+  let capped: ToolResultValue[] | { [key: string]: ToolResultValue } | null =
+    null;
   if (Array.isArray(result)) {
-    if (result.length > 10) {
-      const sliced = result.slice(0, 10);
-      sliced.push({ _truncated: `Showing 10 of ${result.length}` });
-      const serialized = JSON.stringify(sliced);
-      return serialized.length > maximumCharacters
-        ? serialized.slice(0, maximumCharacters) + "…}"
-        : sliced;
+    if (result.length > TRUNCATED_ARRAY_ITEMS) {
+      capped = result.slice(0, TRUNCATED_ARRAY_ITEMS);
+    }
+  } else {
+    const resultRecord = result as { [key: string]: ToolResultValue };
+    for (const key of TRUNCATABLE_ARRAY_KEYS) {
+      const items = resultRecord[key];
+      if (Array.isArray(items) && items.length > TRUNCATED_ARRAY_ITEMS) {
+        capped ??= { ...resultRecord };
+        const cappedRecord = capped as { [key: string]: ToolResultValue };
+        cappedRecord[key] = items.slice(0, TRUNCATED_ARRAY_ITEMS);
+        cappedRecord[`_${key}Truncated`] =
+          `Showing ${TRUNCATED_ARRAY_ITEMS} of ${items.length}`;
+      }
     }
   }
 
-  // If result has a known array wrapper, cap items at 10
-  const resultRecord = result as { [key: string]: ToolResultValue };
-  const trimmed = { ...resultRecord };
-  for (const key of TRUNCATABLE_ARRAY_KEYS) {
-    const items = trimmed[key];
-    if (Array.isArray(items) && items.length > 10) {
-      const total = items.length;
-      trimmed[key] = items.slice(0, 10);
-      trimmed[`_${key}Truncated`] = `Showing 10 of ${total}`;
-    }
+  if (!capped && JSON.stringify(result).length <= maximumCharacters) {
+    return result;
   }
 
-  const serialized = JSON.stringify(trimmed);
-  if (serialized.length <= maximumCharacters) return trimmed;
-  return serialized.slice(0, maximumCharacters) + "…}";
+  const { offloadId, content } = offloadFullResult(toolName, result);
+  if (capped) {
+    if (Array.isArray(capped)) {
+      capped.push({
+        _truncated: `Showing ${TRUNCATED_ARRAY_ITEMS} of ${(result as ToolResultValue[]).length}`,
+        offload_id: offloadId,
+        retrieve: OFFLOAD_RETRIEVE_HINT,
+      });
+    } else {
+      capped._offload = { offload_id: offloadId, retrieve: OFFLOAD_RETRIEVE_HINT };
+    }
+    if (JSON.stringify(capped).length <= maximumCharacters) return capped;
+  }
+  return buildOffloadPreview(toolName, offloadId, content, maximumCharacters);
 }
 
 interface ExpandOptions {
@@ -173,6 +270,8 @@ interface ExpandedMessage {
   tool_call_id?: string | null;
   thinking?: string;
   thinkingSignature?: string;
+  /** Anthropic thinking blocks — replayed verbatim next turn. */
+  thinkingBlocks?: AnthropicThinkingBlock[];
   /** OpenAI Responses API state — replayed verbatim next turn. */
   phase?: ResponsesPhase;
   reasoningItems?: ResponsesReasoningItem[];
@@ -249,6 +348,7 @@ export function expandMessagesForFunctionCall(
         ...(message.thinkingSignature && {
           thinkingSignature: message.thinkingSignature,
         }),
+        ...thinkingBlockFields(message),
         ...responsesNativeFields(message),
         toolCalls: message.toolCalls.map((toolCall: ToolCallEntry) => ({
           id: toolCall.id,
@@ -298,10 +398,15 @@ export function expandMessagesForFunctionCall(
             );
           }
 
+          const modelVisibleResult = truncateToolResult(
+            finalResult,
+            undefined,
+            toolCall.name,
+          );
           const serializedResult =
-            typeof finalResult === "string"
-              ? finalResult
-              : JSON.stringify(truncateToolResult(finalResult));
+            typeof modelVisibleResult === "string"
+              ? modelVisibleResult
+              : JSON.stringify(modelVisibleResult);
 
           return {
             role: "tool",
@@ -391,10 +496,20 @@ export function expandMessagesForFunctionCall(
         ...(message.role === "assistant" && message.thinkingSignature
           ? { thinkingSignature: message.thinkingSignature }
           : {}),
+        ...(message.role === "assistant" ? thinkingBlockFields(message) : {}),
         ...(message.role === "assistant" ? responsesNativeFields(message) : {}),
       },
     ];
   });
+}
+
+/** Anthropic thinking blocks stored on an assistant message — carried unchanged. */
+function thinkingBlockFields(message: ChatMessage): {
+  thinkingBlocks?: AnthropicThinkingBlock[];
+} {
+  return Array.isArray(message.thinkingBlocks) && message.thinkingBlocks.length > 0
+    ? { thinkingBlocks: message.thinkingBlocks }
+    : {};
 }
 
 /**

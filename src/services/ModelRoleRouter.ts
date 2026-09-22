@@ -11,6 +11,7 @@ import { getProvider } from "#src/providers/index";
 import { listInstances } from "#src/providers/instance-registry";
 import SettingsService from "#src/services/SettingsService";
 import { isTransientProviderError } from "#src/utils/ProviderStreamResilience";
+import { ProviderError } from "#src/utils/errors";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import logger from "#src/utils/logger";
 
@@ -36,8 +37,10 @@ import logger from "#src/utils/logger";
 //
 // Execution: `runWithChain` advances to the next chain entry on
 // transient provider failures (connection refused, 429, 5xx, timeout
-// — classified by isTransientProviderError) with a structured log
-// line per advance. Non-transient errors propagate immediately.
+// — classified by isTransientProviderError) and on a 400
+// `invalid_request_error` (the model rejected the request surface — e.g.
+// a sampling parameter or thinking mode it does not accept), with a
+// structured log line per advance. Other errors propagate immediately.
 // ────────────────────────────────────────────────────────────
 
 export const MODEL_ROLES = {
@@ -203,6 +206,20 @@ async function resolveRoleFromSettings(
   return null;
 }
 
+/**
+ * A 400 `invalid_request_error` rejects the request surface for THIS model
+ * (a sampling parameter, a thinking mode, a context limit) — another model
+ * in the chain may accept the same call, so it is worth advancing.
+ */
+function isModelRejection(error: unknown): boolean {
+  if (!(error instanceof ProviderError)) return false;
+  const errorType =
+    error.errorType ??
+    ((error.originalError as { error?: { type?: string } } | null)?.error
+      ?.type as string | undefined);
+  return error.statusCode === 400 && errorType === "invalid_request_error";
+}
+
 /** Built-in default chain for the utility role: local instance → cheap cloud. */
 async function resolveUtilityDefaults(): Promise<RoleChainEntry[]> {
   const defaults: RoleChainEntry[] = [];
@@ -328,12 +345,13 @@ export default class ModelRoleRouter {
       } catch (error: unknown) {
         lastError = error;
         const hasNext = index < chain.length - 1;
-        if (hasNext && isTransientProviderError(error)) {
+        const isTransient = isTransientProviderError(error);
+        if (hasNext && (isTransient || isModelRejection(error))) {
           const next = chain[index + 1];
           logger.warn(
             `[ModelRoleRouter] role=${role} operation=${operation} ` +
               `attempt=${index + 1}/${chain.length} provider=${entry.provider} model=${entry.model} ` +
-              `transient failure (${errorMessage(error)}) — advancing to ${next.provider}/${next.model}`,
+              `${isTransient ? "transient failure" : "model rejected the request"} (${errorMessage(error)}) — advancing to ${next.provider}/${next.model}`,
           );
           continue;
         }

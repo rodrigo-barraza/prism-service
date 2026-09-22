@@ -26,6 +26,8 @@ type Script = () => AsyncGenerator<Record<string, unknown>>;
 
 const anthropicCalls: Array<{ payload: Record<string, any>; requestOptions: Record<string, any> }> = [];
 const anthropicScript: Script[] = [];
+/** finalMessage() results, one per stream call (undefined → it throws). */
+const anthropicFinalMessages: unknown[] = [];
 vi.mock("@anthropic-ai/sdk", () => ({
   default: class MockAnthropic {
     messages = {
@@ -36,8 +38,10 @@ vi.mock("@anthropic-ai/sdk", () => ({
         const stream = next() as any;
         stream.abort = () => {};
         stream.response = { headers: { get: () => null } };
+        const finalMessage = anthropicFinalMessages.shift();
         stream.finalMessage = async () => {
-          throw new Error("no final message in test");
+          if (finalMessage === undefined) throw new Error("no final message in test");
+          return finalMessage;
         };
         return stream;
       },
@@ -118,6 +122,7 @@ describe("Anthropic cache diagnosis (beta)", () => {
   beforeEach(() => {
     anthropicCalls.length = 0;
     anthropicScript.length = 0;
+    anthropicFinalMessages.length = 0;
     _resetProviderDiagnosticsSupport();
   });
 
@@ -150,6 +155,28 @@ describe("Anthropic cache diagnosis (beta)", () => {
       missedTokens: 4096,
       comparedResponseId: "msg_1",
     });
+  });
+
+  it("a pause_turn continuation reports last, compared against the paused message", async () => {
+    const pausedContent = [{ type: "server_tool_use", id: "srvtoolu_1", name: "web_search", input: { query: "x" } }];
+    anthropicScript.push(
+      async function* () {
+        yield { type: "message_start", message: { id: "msg_paused", usage: { input_tokens: 10, output_tokens: 0 } } };
+        yield { type: "message_delta", delta: { stop_reason: "pause_turn" }, usage: { output_tokens: 1 } };
+      },
+      anthropicTurn("msg_continued"),
+    );
+    anthropicFinalMessages.push({ id: "msg_paused", content: pausedContent, usage: { input_tokens: 10, output_tokens: 1 } });
+    const chunks = await drain(
+      anthropicProvider.generateTextStream(messages as any, "claude-sonnet-5", { cacheTelemetry: { previousResponseId: "msg_0" } }),
+    );
+    expect(anthropicCalls).toHaveLength(2);
+    expect(anthropicCalls[1].payload.diagnostics).toEqual({ previous_message_id: "msg_paused" });
+    const telemetry = telemetryOf(chunks);
+    expect(telemetry.map((chunk) => chunk.providerResponseId)).toEqual(["msg_paused", "msg_continued"]);
+    // The continuation re-sent the paused assistant content: one more message.
+    expect(telemetry[1].prefixHashes.messages.slice(0, 1)).toEqual(telemetry[0].prefixHashes.messages);
+    expect(telemetry[1].prefixHashes.messages).toHaveLength(2);
   });
 
   it("without cacheTelemetry: no diagnostics field, no beta header, no telemetry chunk", async () => {

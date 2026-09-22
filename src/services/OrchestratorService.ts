@@ -38,6 +38,12 @@ import {
 } from "./orchestrator/InstanceResolver.ts";
 import { GitWorktreeHelper } from "./orchestrator/GitWorktreeHelper.ts";
 import {
+  settleSubAgentWorktree,
+  syncWorktreeState,
+  isMergeBackKept,
+  describeKeptWork,
+} from "./orchestrator/WorktreeMergeBack.ts";
+import {
   getLastAssistantText,
   buildSubAgentResult,
   toLiveSubAgentSummary,
@@ -147,7 +153,14 @@ registerCleanup(async () => {
         subAgent.repositoryPath,
         subAgent.worktreePath!,
       )
-        .then(() => {
+        .then((removal) => {
+          // A refused removal kept unmerged work on disk: keep pointing at it.
+          if (removal.error) {
+            logger.warn(
+              `[Orchestrator] Shutdown kept worktree ${subAgent.worktreePath} (${subAgent.branchName}) for ${subAgent.agentId}: ${removal.error}`,
+            );
+            return;
+          }
           subAgent.worktreePath = null;
         })
         .catch((error: Error) =>
@@ -273,9 +286,18 @@ export class OrchestratorService {
           )
         : baseMaxIterations;
 
-    // Check concurrency limit (global)
+    // Concurrency limit — counted per ROOT conversation, not process-wide:
+    // a global count let one conversation's fan-out refuse every spawn in
+    // every other conversation.
+    const concurrencyRootId = OrchestratorService.getRootConversationId(
+      parentConversationId || agentConversationId || "",
+    );
     const runningCount = Array.from(activeSubAgents.values()).filter(
-      (subAgent) => subAgent.status === SYSTEM_STATUSES.RUNNING,
+      (subAgent) =>
+        subAgent.status === SYSTEM_STATUSES.RUNNING &&
+        OrchestratorService.getRootConversationId(
+          subAgent.parentConversationId || subAgent.parentAgentConversationId || "",
+        ) === concurrencyRootId,
     ).length;
     if (runningCount >= ORCHESTRATOR.MAX_SUB_AGENTS) {
       return {
@@ -422,7 +444,9 @@ export class OrchestratorService {
       subAgentConversationId,
       parentAgentConversationId: agentConversationId,
       description,
-      branchName: worktreeResult.error ? null : branchName,
+      // The name tools-service created — used verbatim for diff, merge and
+      // remove, never recomputed from the agent id.
+      branchName: worktreeResult.error ? null : worktreeResult.branch ?? null,
       worktreePath,
       repositoryPath,
       isolated: !worktreeResult.error, // true if running in a worktree
@@ -480,7 +504,7 @@ export class OrchestratorService {
         subAgentModel,
         currentRecursionDepth,
         globalSpawnIndex,
-        branchName,
+        branchName: subAgentState.branchName,
         files: files || [],
         agentConversationId: agentConversationId || "",
         subAgentAgentType,
@@ -692,13 +716,20 @@ export class OrchestratorService {
       subAgent.abortController.abort();
     }
 
-    // Clean up worktree (only if sub-agent was running in an isolated worktree)
+    // Clean up worktree (only if sub-agent was running in an isolated worktree).
+    // tools-service refuses when that would lose work, and the worktree stays.
     if (subAgent.isolated && subAgent.worktreePath) {
-      await GitWorktreeHelper.removeWorktree(
+      const removal = await GitWorktreeHelper.removeWorktree(
         subAgent.repositoryPath,
         subAgent.worktreePath,
       );
-      subAgent.worktreePath = null;
+      if (removal.error) {
+        logger.warn(
+          `[Orchestrator] Stop kept worktree ${subAgent.worktreePath} (${subAgent.branchName}) for ${agentId}: ${removal.error}`,
+        );
+      } else {
+        subAgent.worktreePath = null;
+      }
     }
 
     subAgent.status = SYSTEM_STATUSES.STOPPED;
@@ -1262,21 +1293,43 @@ export class OrchestratorService {
       resolveRegistrationBarrier = resolve;
     });
     let registrationCount = 0;
+    const settledMemberIndexes = new Set<number>();
+    const settleMember = (
+      memberIndex: number,
+      memberResult: SubAgentResult | { error: string },
+    ) => {
+      if (settledMemberIndexes.has(memberIndex)) return;
+      settledMemberIndexes.add(memberIndex);
+      registeredResults.push(memberResult);
+      registrationCount++;
+      if (registrationCount >= memberCount) {
+        resolveRegistrationBarrier();
+      }
+    };
 
-    // Wrap the spawn callback to inject onRegistered into each assignment
+    // Wrap the spawn callback to inject onRegistered into each assignment.
+    // A member refused before registration (concurrency cap, depth cap,
+    // circuit breaker) never calls onRegistered — it settles the barrier
+    // with its error instead, or the dispatcher would wait forever.
     const spawnWithRegistration = (
       assignment: OrchestratorSpawnParams,
     ): Promise<SubAgentResult | { error: string }> => {
-      return OrchestratorService.spawnFromTool({
+      const memberIndex = assignment.agentIndex ?? registrationCount;
+      const spawnPromise = OrchestratorService.spawnFromTool({
         ...assignment,
-        onRegistered: (registeredResult) => {
-          registeredResults.push(registeredResult);
-          registrationCount++;
-          if (registrationCount >= memberCount) {
-            resolveRegistrationBarrier();
+        onRegistered: (registeredResult) =>
+          settleMember(memberIndex, registeredResult),
+      });
+      spawnPromise.then(
+        (spawnResult) => {
+          if (spawnResult && "error" in spawnResult) {
+            settleMember(memberIndex, spawnResult);
           }
         },
-      });
+        (spawnError: unknown) =>
+          settleMember(memberIndex, { error: getErrorMessage(spawnError) }),
+      );
+      return spawnPromise;
     };
 
     const routerPromise = router.execute(
@@ -1377,7 +1430,33 @@ export class OrchestratorService {
 
     // Wait only for agent registration (fast: ID + worktree allocation),
     // NOT for the agentic loops to finish. This unblocks the parent LLM.
-    await registrationBarrier;
+    // Also released when the router settles (members it never spawned —
+    // e.g. a sequence that stopped at a refused step — will never register)
+    // and, as the last bound, after DISPATCH_REGISTRATION_TIMEOUT_MILLISECONDS.
+    let registrationTimer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      registrationBarrier,
+      wrappedRouterPromise,
+      new Promise<void>((resolve) => {
+        registrationTimer = setTimeout(
+          resolve,
+          ORCHESTRATOR.DISPATCH_REGISTRATION_TIMEOUT_MILLISECONDS,
+        );
+      }),
+    ]);
+    clearTimeout(registrationTimer);
+
+    for (
+      let memberIndex = 0;
+      memberIndex < memberCount && registeredResults.length < memberCount;
+      memberIndex++
+    ) {
+      if (settledMemberIndexes.has(memberIndex)) continue;
+      const member = teamCreationArguments.members[memberIndex];
+      settleMember(memberIndex, {
+        error: `Member ${memberIndex + 1} ("${member?.description || "sub-agent"}") did not register within ${Math.round(ORCHESTRATOR.DISPATCH_REGISTRATION_TIMEOUT_MILLISECONDS / 1000)}s or was never started by the "${topology}" router. If it starts later, its result arrives with the team's completion notification.`,
+      });
+    }
 
     logger.info(
       `[Orchestrator] createTeam dispatched (non-blocking): team "${teamCreationArguments.name}" via topology "${topology}" — ${registeredResults.length} agent(s) registered`,
@@ -1611,7 +1690,9 @@ export class OrchestratorService {
       subAgent,
       prompt,
       orchestratorContext,
-      true, // preserveWorktree — keep file state alive for potential further resumptions
+      // Not preserved: a resumed agent's work merges back like a fresh one's.
+      // (Running in a worktree kept by a conflict, this retries the merge.)
+      false,
     )
       .then(() => {
         if (orchestratorContext.emit) {
@@ -1698,7 +1779,12 @@ export class OrchestratorService {
         : JSON.stringify(agentResult.result)
       : noOutputFallback;
 
-    const truncatedOutput = truncateAgentOutput(agentOutput, locale);
+    const truncatedOutput = [
+      truncateAgentOutput(agentOutput, locale),
+      ...(isMergeBackKept(agentResult.mergeBack)
+        ? [describeKeptWork(agentResult.mergeBack!, locale)]
+        : []),
+    ].join("\n\n");
 
     const resumedAgentCompletedSummary = PromptLocaleService.get(
       locale,
@@ -1794,6 +1880,8 @@ export class OrchestratorService {
     orchestratorContext: OrchestratorContext,
     preserveWorktree = false,
   ) {
+    // A router may have settled (removed) a preserved worktree since last run.
+    syncWorktreeState(subAgent);
     const { default: AgenticLoopService } =
       await OrchestratorService.getAgenticLoopService();
 
@@ -2234,41 +2322,13 @@ export class OrchestratorService {
     subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
 
     if (subAgent.status !== SYSTEM_STATUSES.STOPPED) {
-      // Stage and commit changes in the worktree
-      await GitWorktreeHelper.toolsApiPost("/agentic/command/run", {
-        command: "git add -A",
-        cwd: subAgent.worktreePath,
+      // Commit, diff and merge the worktree back into the parent's branch —
+      // then remove it. A conflict or failure keeps worktree and branch and
+      // says so in the result. A preserved worktree is its owner's to settle.
+      await settleSubAgentWorktree(subAgent, {
+        defer: preserveWorktree,
+        emit: orchestratorContext.emit,
       });
-      await GitWorktreeHelper.toolsApiPost("/agentic/command/run", {
-        command: `git commit -m "orchestrator: ${subAgent.agentId} — ${subAgent.description}" --allow-empty`,
-        cwd: subAgent.worktreePath,
-      });
-
-      // Collect diff (only if the worktree created a branch)
-      if (subAgent.branchName) {
-        const diffResult = await GitWorktreeHelper.getWorktreeDiff(
-          subAgent.repositoryPath,
-          subAgent.branchName,
-        );
-        if (
-          !("error" in diffResult) &&
-          typeof diffResult.hasChanges === "boolean" &&
-          typeof diffResult.additions === "number" &&
-          typeof diffResult.deletions === "number" &&
-          Array.isArray(diffResult.files)
-        ) {
-          subAgent.diff = {
-            hasChanges: diffResult.hasChanges,
-            additions: diffResult.additions,
-            deletions: diffResult.deletions,
-            files: diffResult.files,
-          };
-        } else {
-          subAgent.diff = null;
-        }
-      } else {
-        subAgent.diff = null;
-      }
       subAgent.status = SYSTEM_STATUSES.COMPLETE;
       subAgent.completedAt = Date.now();
     }
@@ -2279,26 +2339,6 @@ export class OrchestratorService {
     // in spawnFromTool and getTaskOutput once the orchestrator builds
     // the result payload.
     subAgent.abortController = null;
-
-    // Remove worktree now that the diff has been collected — prevents orphaned
-    // worktrees from accumulating on disk across conversations.
-    // When preserveWorktree is true (P2P mesh turns), the worktree stays alive
-    // so the agent can be continued with its local file state intact.
-    if (
-      !preserveWorktree &&
-      subAgent.status !== SYSTEM_STATUSES.STOPPED &&
-      subAgent.isolated &&
-      subAgent.worktreePath
-    ) {
-      await GitWorktreeHelper.removeWorktree(
-        subAgent.repositoryPath,
-        subAgent.worktreePath,
-      ).catch((error: unknown) =>
-        logger.warn(
-          `[Orchestrator] Post-completion worktree cleanup failed for ${subAgent.agentId}: ${getErrorMessage(error)}`,
-        ),
-      );
-    }
 
     // Transfer cost/usage/iterations captured by telemetry from streamed events
     subAgent.totalCost = telemetry.totalCost;
@@ -2345,7 +2385,7 @@ export class OrchestratorService {
         subAgentDurationMilliseconds: subAgent.durationMilliseconds,
         subAgentToolUses: telemetry.toolCalls.length,
         subAgentTotalCost: subAgent.totalCost,
-        subAgentHasChanges: subAgent.diff?.hasChanges || false,
+        subAgentHasChanges: (subAgent.diff?.files.length ?? 0) > 0,
         subAgentToolNames: toolNamesSummary,
       },
     });
@@ -2396,6 +2436,9 @@ export class OrchestratorService {
         : noOutputFallback;
       const truncatedOutput = truncateAgentOutput(agentOutput, locale);
       return [
+        ...(isMergeBackKept(result.mergeBack)
+          ? [describeKeptWork(result.mergeBack!, locale)]
+          : []),
         PromptLocaleService.get(locale, "orchestrator.notifications.agentStatus", {
           agentNumber,
           agentDescription: result.description || result.agent_id,
