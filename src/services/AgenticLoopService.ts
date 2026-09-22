@@ -9,15 +9,17 @@ import {
   pendingApprovals,
   pendingQuestions,
   type PendingToolCallSummary,
-  type PendingQuestionEntry,
   type QuestionDefinition,
   type QuestionAnswer,
 } from "./ApprovalRegistry.ts";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
-import { resolveLoopKey } from "./LoopKey.ts";
 import ConversationGenerationTracker from "./ConversationGenerationTracker.ts";
 import ConversationStatusRegistry from "./ConversationStatusRegistry.ts";
 import ToolContext from "./ToolContext.ts";
+import QuestionRegistry, {
+  type PendingQuestionSummary,
+  type QuestionAnswerOutcome,
+} from "./QuestionRegistry.ts";
 import { runPreflightToolDiscovery } from "./harnesses/lifecycle/PreflightToolDiscovery.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
@@ -26,58 +28,6 @@ import {
 import logger from "#src/utils/logger";
 
 import type { AgenticContext, ConversationMessage } from "./harnesses/types.ts";
-
-/** What `/agent/answer` did with an answer — see resolveUserQuestion. */
-export type QuestionAnswerOutcome =
-  | {
-      resolved: true;
-      questionId: string;
-      blocking: boolean;
-      loopKey: string;
-      /** How the id found the loop; `agent_conversation_id` is the legacy key. */
-      matchedBy: "loop_key" | "agent_conversation_id";
-    }
-  | {
-      resolved: false;
-      reason: "no_pending_question" | "unknown_question" | "no_active_turn";
-      questionId?: string;
-    };
-
-/** One open question as listed for a loop (no resolver). */
-export interface PendingQuestionSummary {
-  questionId: string;
-  blocking: boolean;
-  createdAt: number;
-  question?: string;
-  questions?: QuestionDefinition[];
-  choices?: string[];
-}
-
-function summarizeQuestion(entry: PendingQuestionEntry): PendingQuestionSummary {
-  return {
-    questionId: entry.questionId,
-    blocking: entry.blocking,
-    createdAt: entry.createdAt,
-    question: entry.question,
-    questions: entry.questions,
-    choices: entry.choices,
-  };
-}
-
-/** The oldest blocking question, else the oldest one (a lone non-blocking card). */
-function pickDefaultQuestion(
-  questions: Map<string, PendingQuestionEntry>,
-): PendingQuestionEntry | undefined {
-  let oldestBlocking: PendingQuestionEntry | undefined;
-  let oldest: PendingQuestionEntry | undefined;
-  for (const entry of questions.values()) {
-    if (!oldest || entry.createdAt < oldest.createdAt) oldest = entry;
-    if (entry.blocking && (!oldestBlocking || entry.createdAt < oldestBlocking.createdAt)) {
-      oldestBlocking = entry;
-    }
-  }
-  return oldestBlocking ?? oldest;
-}
 
 /**
  * AgenticLoopService — public façade for agentic loop execution.
@@ -110,9 +60,6 @@ export default class AgenticLoopService {
 
     const resolvedAgentConversationId = agentConversationId || "";
     const resolvedParentAgentConversationId = parentAgentConversationId || null;
-    // What the client (or a parent agent) addresses this turn by — the
-    // mailbox and pending questions live under it.
-    const loopKey = resolveLoopKey(context);
 
     // Load any persisted tool state from MongoDB (e.g. after server restart or previous turn)
     await ToolContext.ensureLoaded(resolvedAgentConversationId);
@@ -297,7 +244,7 @@ export default class AgenticLoopService {
     const harness = new HarnessClass(context, state, resolvedTools);
     // Accept mid-turn input (steering, non-blocking answers, completions)
     // for the life of this turn; the harness drains it at its boundaries.
-    TurnInputMailbox.open(loopKey);
+    TurnInputMailbox.open(conversationId);
     try {
       return await harness.run();
     } finally {
@@ -306,8 +253,8 @@ export default class AgenticLoopService {
 
       // Clean up in-memory state keyed by conversationId (client-facing)
       pendingApprovals.delete(conversationId);
-      pendingQuestions.delete(loopKey);
-      TurnInputMailbox.close(loopKey);
+      pendingQuestions.delete(conversationId);
+      TurnInputMailbox.close(conversationId);
 
       // Always clean up per-session tracker entries to prevent memory leaks —
       // sub-agent sessions have their own agentConversationId that must be released.
@@ -375,108 +322,58 @@ export default class AgenticLoopService {
   }
 
   // ── Ask User Question — Resolution API ─────────────────
-  // Keyed by the loop key (LoopKey.resolveLoopKey): the id the client holds
-  // for a root turn, the sub-agent's own conversation id for a sub-agent.
-  // Several questions can be open per loop, each by its questionId.
+  // Filed under the LOOP KEY (LoopKey.resolveLoopKey) — the id the client
+  // answers with; several per loop, each by questionId. See QuestionRegistry.
 
   /** File a pending question under its loop (called by the ask_user tool). */
-  static _setPendingQuestion(loopKey: string, entry: PendingQuestionEntry): void {
-    let questions = pendingQuestions.get(loopKey);
-    if (!questions) {
-      questions = new Map();
-      pendingQuestions.set(loopKey, questions);
-    }
-    questions.set(entry.questionId, entry);
+  static _setPendingQuestion(
+    loopKey: string,
+    entry: {
+      questionId: string;
+      blocking: boolean;
+      createdAt: number;
+      agentConversationId?: string | null;
+      resolve: (value: {
+        answers: QuestionAnswer[] | null;
+        isTimedOut?: boolean;
+      }) => { delivered: boolean; reason?: string } | void;
+      question?: string;
+      questions?: QuestionDefinition[];
+      choices?: string[];
+    },
+  ): void {
+    QuestionRegistry.register(loopKey, entry);
   }
 
   /** Drop one question without answering it (its blocking wait timed out). */
   static _removePendingQuestion(loopKey: string, questionId: string): void {
-    const questions = pendingQuestions.get(loopKey);
-    if (!questions) return;
-    questions.delete(questionId);
-    if (questions.size === 0) pendingQuestions.delete(loopKey);
+    QuestionRegistry.remove(loopKey, questionId);
   }
 
   /**
-   * The loop an answer's id addresses: the id itself as a loop key, else —
-   * for one release — the loop whose agentConversationId it is (the key
-   * questions used to be filed under).
-   */
-  private static findQuestionLoop(
-    id: string,
-  ): { loopKey: string; matchedBy: "loop_key" | "agent_conversation_id" } | null {
-    if (pendingQuestions.has(id)) return { loopKey: id, matchedBy: "loop_key" };
-    for (const [loopKey, questions] of pendingQuestions) {
-      for (const entry of questions.values()) {
-        if (entry.agentConversationId === id) {
-          return { loopKey, matchedBy: "agent_conversation_id" };
-        }
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Answer a pending question. `conversationId` is the loop key (a root
-   * turn's conversation id, or a sub-agent's own); `agentConversationId` is
-   * also tried, as the legacy key. With `questionId`, exactly that question;
-   * without, the oldest blocking one (else the oldest open card).
+   * Answer a pending question: `conversationId` is the loop key, the legacy
+   * `agentConversationId` is also tried; `questionId` picks the card, else
+   * the oldest blocking question is answered.
    */
   static resolveUserQuestion(
     conversationId: string,
     answers: QuestionAnswer[],
-    {
-      questionId,
-      agentConversationId,
-    }: { questionId?: string; agentConversationId?: string } = {},
+    options: { questionId?: string; agentConversationId?: string } = {},
   ): QuestionAnswerOutcome {
-    const loop =
-      (conversationId && AgenticLoopService.findQuestionLoop(conversationId)) ||
-      (agentConversationId && AgenticLoopService.findQuestionLoop(agentConversationId)) ||
-      null;
-    if (!loop) {
-      return questionId
-        ? { resolved: false, reason: "unknown_question", questionId }
-        : { resolved: false, reason: "no_pending_question" };
-    }
-    if (loop.matchedBy === "agent_conversation_id") {
-      logger.warn(
-        `[AgenticLoop] Answer addressed by legacy agentConversationId resolved to loop ${loop.loopKey} — send the conversationId`,
-      );
-    }
-    const questions = pendingQuestions.get(loop.loopKey)!;
-    const entry = questionId ? questions.get(questionId) : pickDefaultQuestion(questions);
-    if (!entry) return { resolved: false, reason: "unknown_question", questionId };
-
-    AgenticLoopService._removePendingQuestion(loop.loopKey, entry.questionId);
-    const delivery = entry.resolve({ answers });
-    if (delivery && !delivery.delivered) {
-      return { resolved: false, reason: "no_active_turn", questionId: entry.questionId };
-    }
-    return {
-      resolved: true,
-      questionId: entry.questionId,
-      blocking: entry.blocking,
-      loopKey: loop.loopKey,
-      matchedBy: loop.matchedBy,
-    };
+    return QuestionRegistry.answer(conversationId, answers, options);
   }
 
   /** Every open question on a loop, oldest first. */
   static listPendingQuestions(loopKey: string): PendingQuestionSummary[] {
-    const questions = pendingQuestions.get(loopKey);
-    if (!questions) return [];
-    return [...questions.values()]
-      .sort((left, right) => left.createdAt - right.createdAt)
-      .map(summarizeQuestion);
+    return QuestionRegistry.list(loopKey);
   }
 
   /** The question a reloaded client shows: the oldest blocking one, else the oldest open card. */
-  static getPendingQuestion(loopKey: string): { isPending: boolean } & Partial<PendingQuestionSummary> {
-    const questions = pendingQuestions.get(loopKey);
-    const entry = questions && pickDefaultQuestion(questions);
-    if (!entry) return { isPending: false };
-    return { isPending: true, ...summarizeQuestion(entry) };
+  static getPendingQuestion(
+    loopKey: string,
+  ): { isPending: boolean } & Partial<PendingQuestionSummary> {
+    const pending = QuestionRegistry.getPending(loopKey);
+    return pending ? { isPending: true, ...pending } : { isPending: false };
   }
 
   // ── Harness Discovery API ──────────────────────────────
