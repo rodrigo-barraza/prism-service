@@ -8,6 +8,7 @@ import { handleAgent } from "./ChatRoutes.ts";
 import logger from "#src/utils/logger";
 import { handleSseRequest, handleJsonRequest } from "#src/utils/SseUtilities";
 import { TIMERS } from "#src/constants";
+import { handleQuestionAnswer } from "./QuestionAnswerHandler.ts";
 
 const router = express.Router();
 
@@ -59,56 +60,13 @@ router.post(
 /**
  * POST /agent/answer
  *
- * Body:
- *   { conversationId: string, answer: string }          ← simple (backward-compat)
- *   { conversationId: string, answers: Array<{ answer: string|string[], annotations?: string }> }  ← structured multi-question
- *
- * Resolves the pending question promise in AgenticLoopService
- * so the agentic loop can continue with the user's answer(s).
+ * Body: { conversationId, questionId?, answer | answers } — see
+ * QuestionAnswerHandler. Resolves the pending question in
+ * AgenticLoopService so the agentic loop continues with the answer(s).
  */
 router.post(
   "/answer",
-  asyncHandler(async (request: Request, response: Response) => {
-    const { conversationId, answer, answers } = request.body;
-
-    if (!conversationId) {
-      return response.status(400).json({ error: "Missing conversationId" });
-    }
-
-    // Normalize: structured answers take priority, fall back to simple string
-    let normalizedAnswers: {
-      answer: string | string[];
-      annotations?: string;
-    }[];
-    if (Array.isArray(answers) && answers.length > 0) {
-      normalizedAnswers = answers as {
-        answer: string | string[];
-        annotations?: string;
-      }[];
-    } else if (answer !== undefined && answer !== null) {
-      normalizedAnswers = [{ answer: String(answer) }];
-    } else {
-      return response.status(400).json({ error: "Missing answer or answers" });
-    }
-
-    const resolved = AgenticLoopService.resolveUserQuestion(
-      conversationId,
-      normalizedAnswers,
-    );
-
-    if (!resolved) {
-      return response.status(404).json({
-        error: "No pending question for this conversation",
-        conversationId,
-      });
-    }
-
-    logger.info(
-      `[agent/answer] ${normalizedAnswers.length} answer(s) for conversation ${conversationId}`,
-    );
-
-    response.json({ ok: true });
-  }),
+  asyncHandler(handleQuestionAnswer("agent/answer")),
 );
 
 

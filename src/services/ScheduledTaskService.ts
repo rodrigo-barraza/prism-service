@@ -97,47 +97,129 @@ export function minuteKeyFor(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
-// ─── Simple Zero-Dependency Cron Matcher ───────────────────────────────────────
+// ─── Zero-Dependency Cron Matcher (5-field, crontab(5) semantics) ─────────────
 
-function matchCronField(pattern: string, value: number): boolean {
-  if (pattern === "*") return true;
-  if (pattern.includes(",")) {
-    return pattern.split(",").some((pattern) => matchCronField(pattern, value));
-  }
-  if (pattern.includes("/")) {
-    const [range, stepString] = pattern.split("/");
-    const step = parseInt(stepString, 10);
-    if (isNaN(step)) return false;
-    if (range === "*") {
-      return value % step === 0;
-    }
-    const [startString] = range.split("-");
-    const start = parseInt(startString, 10);
-    return !isNaN(start) && value >= start && (value - start) % step === 0;
-  }
-  if (pattern.includes("-")) {
-    const [startString, endString] = pattern.split("-");
-    const start = parseInt(startString, 10);
-    const end = parseInt(endString, 10);
-    return !isNaN(start) && !isNaN(end) && value >= start && value <= end;
-  }
-  return parseInt(pattern, 10) === value;
+interface CronFieldBounds {
+  min: number;
+  max: number;
+  /** Three-letter names the field accepts (case-insensitive). */
+  names?: ReadonlyMap<string, number>;
 }
 
+const CRON_MONTH_NAMES: ReadonlyMap<string, number> = new Map(
+  "jan feb mar apr may jun jul aug sep oct nov dec"
+    .split(" ")
+    .map((name, index) => [name, index + 1]),
+);
+
+const CRON_WEEKDAY_NAMES: ReadonlyMap<string, number> = new Map(
+  "sun mon tue wed thu fri sat".split(" ").map((name, index) => [name, index]),
+);
+
+/** minute, hour, day of month, month, day of week (0 and 7 are Sunday). */
+const CRON_FIELD_BOUNDS: readonly CronFieldBounds[] = [
+  { min: 0, max: 59 },
+  { min: 0, max: 23 },
+  { min: 1, max: 31 },
+  { min: 1, max: 12, names: CRON_MONTH_NAMES },
+  { min: 0, max: 7, names: CRON_WEEKDAY_NAMES },
+];
+
+const CRON_NUMBER = /^\d+$/;
+
+function parseCronValue(token: string, bounds: CronFieldBounds): number | null {
+  const named = bounds.names?.get(token.toLowerCase());
+  if (named !== undefined) return named;
+  if (!CRON_NUMBER.test(token)) return null;
+  const value = Number(token);
+  return value >= bounds.min && value <= bounds.max ? value : null;
+}
+
+/**
+ * Expands one field (`*`, `a`, `a-b`, any of those `/n`, comma lists) into the
+ * values it allows, or null when it is malformed. A step counts from the start
+ * of its range, and `*` starts at the field's minimum: every 2nd day of the
+ * month is 1, 3, 5, …, not 2, 4, 6. `a/n` runs from `a` to the field's end.
+ */
+function expandCronField(
+  field: string,
+  bounds: CronFieldBounds,
+): Set<number> | null {
+  const values = new Set<number>();
+  for (const item of field.split(",")) {
+    const [range, stepToken, ...extraSteps] = item.split("/");
+    if (extraSteps.length > 0) return null;
+
+    let step = 1;
+    if (stepToken !== undefined) {
+      if (!CRON_NUMBER.test(stepToken)) return null;
+      step = Number(stepToken);
+      if (step === 0) return null;
+    }
+
+    let start: number;
+    let end: number;
+    if (range === "*") {
+      start = bounds.min;
+      end = bounds.max;
+    } else {
+      const [startToken, endToken, ...extraBounds] = range.split("-");
+      if (extraBounds.length > 0) return null;
+      const parsedStart = parseCronValue(startToken, bounds);
+      if (parsedStart === null) return null;
+      start = parsedStart;
+      if (endToken !== undefined) {
+        const parsedEnd = parseCronValue(endToken, bounds);
+        if (parsedEnd === null || parsedEnd < start) return null;
+        end = parsedEnd;
+      } else {
+        end = stepToken !== undefined ? bounds.max : start;
+      }
+    }
+
+    for (let value = start; value <= end; value += step) values.add(value);
+  }
+  return values;
+}
+
+/**
+ * Whether `date`'s minute matches a 5-field cron expression, read in the
+ * process's local time (tasks carry no timezone; the container sets `TZ`).
+ * Malformed expressions never match.
+ *
+ * Day of month and day of week follow crontab(5): when both are restricted
+ * (neither starts with `*`) a day matching EITHER one runs; otherwise both
+ * must match, which leaves the restricted one in charge.
+ */
 export function matchCron(
   expression: string,
   date: Date = new Date(),
 ): boolean {
-  const parts = expression.trim().split(/\s+/);
-  if (parts.length !== 5) return false;
-  const [min, hour, dom, month, dow] = parts;
+  const fields = expression.trim().split(/\s+/);
+  if (fields.length !== CRON_FIELD_BOUNDS.length) return false;
+
+  const allowed: Set<number>[] = [];
+  for (const [index, field] of fields.entries()) {
+    const values = expandCronField(field, CRON_FIELD_BOUNDS[index]);
+    if (!values) return false;
+    allowed.push(values);
+  }
+  const [minutes, hours, daysOfMonth, months, daysOfWeek] = allowed;
+  if (daysOfWeek.has(7)) daysOfWeek.add(0);
+
+  const dayOfMonthMatches = daysOfMonth.has(date.getDate());
+  const dayOfWeekMatches = daysOfWeek.has(date.getDay());
+  const bothDaysRestricted =
+    !fields[2].startsWith("*") && !fields[4].startsWith("*");
+  const dayMatches = bothDaysRestricted
+    ? dayOfMonthMatches || dayOfWeekMatches
+    : dayOfMonthMatches && dayOfWeekMatches;
 
   return (
-    matchCronField(min, date.getMinutes()) &&
-    matchCronField(hour, date.getHours()) &&
-    matchCronField(dom, date.getDate()) &&
-    matchCronField(month, date.getMonth() + 1) &&
-    matchCronField(dow, date.getDay())
+    dayMatches &&
+    minutes.has(date.getMinutes()) &&
+    hours.has(date.getHours()) &&
+    months.has(date.getMonth() + 1)
   );
 }
 
