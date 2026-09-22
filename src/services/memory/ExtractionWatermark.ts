@@ -24,8 +24,10 @@ import logger from "#src/utils/logger";
 // not always one conversation: a platform bot (Lupos on Discord) opens a
 // NEW conversation per reply and sends the channel's recent history as
 // context, so 358 of 367 extractions over 30 days were first-and-only
-// calls on their conversation. Such a turn is keyed by its channel
-// (`agentContext.platform/guildId/channelId`); every other turn by its
+// calls on their conversation. With MEMORY_EXTRACTION_CHANNEL_WATERMARK
+// on, such a turn is keyed by its channel (`agentContext.platform/
+// guildId/channelId`); every other turn — and a platform turn with the
+// flag off, the default (see config.ts for the measurement) — by its
 // conversation id. Both live in one small collection, so nothing that
 // rewrites a conversation document (compaction, a PATCH, a rewind) can
 // reset a watermark.
@@ -337,8 +339,9 @@ export function watermarkThroughEnd(
 
 /**
  * The extraction scope of a turn: its platform channel when the caller sent
- * one (a bot that opens a conversation per reply), else its conversation.
- * Null when the turn has neither — it then reads its whole transcript.
+ * one (a bot that opens a conversation per reply) and channel scoping is
+ * on, else its conversation. Null when the turn has neither — it then
+ * reads its whole transcript.
  */
 export function resolveWatermarkScope({
   project,
@@ -346,15 +349,17 @@ export function resolveWatermarkScope({
   profileId,
   conversationId,
   agentContext,
+  channelScope,
 }: {
   project: string;
   agent: string;
   profileId: string;
   conversationId?: string | null;
   agentContext?: unknown;
+  channelScope: boolean;
 }): WatermarkScope | null {
   let scope: string | null = null;
-  if (agentContext && typeof agentContext === "object") {
+  if (channelScope && agentContext && typeof agentContext === "object") {
     const { platform, guildId, channelId } = agentContext as Record<
       string,
       unknown

@@ -1,5 +1,6 @@
 import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import crypto from "crypto";
+import { isMemoryExtractionChannelWatermarkEnabled } from "#config";
 import { getProvider } from "#src/providers/index";
 import ModelRoleRouter, { MODEL_ROLES } from "./ModelRoleRouter.ts";
 import MemoryService, { CODING_MEMORY_TYPES } from "./MemoryService.ts";
@@ -52,7 +53,10 @@ function renderEntries(entries: TranscriptEntry[]): string {
 }
 
 /** The user turn of an extraction call: the new span, after its context if any. */
-function buildExtractionRequest({ context, span }: ExtractionSpan): string {
+export function buildExtractionRequest({
+  context,
+  span,
+}: ExtractionSpan): string {
   if (context.length === 0) {
     return `Extract memories from this coding session:\n\n${renderEntries(span)}`;
   }
@@ -169,6 +173,7 @@ export default class MemoryExtractor {
         profileId || getRequestContext().profileId || DEFAULT_PROFILE_ID,
       conversationId,
       agentContext,
+      channelScope: isMemoryExtractionChannelWatermarkEnabled(),
     });
     const watermark = watermarkScope
       ? await ExtractionWatermarkStore.read(watermarkScope)
