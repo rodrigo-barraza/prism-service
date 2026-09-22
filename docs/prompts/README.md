@@ -23,7 +23,6 @@ Self-contained task prompts for the items in `docs/harness_modernization_2026-09
 | 12 | `12-permission-rules-and-modes.md` | `permission-rules-store`, `permission-modes`, `auto-mode-classifier` | service, client | L | 05 | 13, 18, 20 (`AutoApprovalEngine.ts`) |
 | 13 | `13-durable-run-state.md` | `persist-pending-decisions`, `resume-parked-turns`, `budget-pause` | service, client | L | 05 | 12, 17 |
 | 15 | `15-rewind-and-fork.md` | `rewind-and-fork` | service, tools, client | M | 08 | 26 |
-| 16 | `16-needs-you-inbox.md` | `needs-you-inbox` | service, client | M | 05 | 26 |
 | 17 | `17-subagents-modern.md` | `nonblocking-subagent-dispatch`, `agent-definitions-as-files`, `oracle-and-independent-branches` | service | L | 04, 09 | 11, 21 |
 | 18 | `18-hooks-parity.md` | `hooks-parity` | service, client | M | 05 | 12 |
 | 19 | `19-skills-progressive-disclosure.md` | `skills-catalog-and-loader`, `skill-folders-and-plugins`, `workspace-instructions` | service, client | L | 07 | 10 (`system-prompt/index.ts`) |
