@@ -669,13 +669,16 @@ describe("Flow 5: ApprovalRegistry Promise Lifecycle", () => {
 
   it("should store and retrieve a pending question", () => {
     const resolveFunction = vi.fn();
-    pendingQuestions.set("conv-question", {
+    pendingQuestions.set("conv-question", new Map([["q-1", {
+      questionId: "q-1",
+      blocking: true,
+      createdAt: Date.now(),
       resolve: resolveFunction,
       question: "What should I do?",
       choices: ["option-a", "option-b"],
-    });
+    }]]));
 
-    const entry = pendingQuestions.get("conv-question");
+    const entry = pendingQuestions.get("conv-question")?.get("q-1");
     expect(entry).toBeDefined();
     expect(entry!.question).toBe("What should I do?");
     expect(entry!.choices).toHaveLength(2);
@@ -692,10 +695,13 @@ describe("Flow 5: ApprovalRegistry Promise Lifecycle", () => {
       toolCalls: [],
     });
 
-    pendingQuestions.set("conv-shared", {
+    pendingQuestions.set("conv-shared", new Map([["q-1", {
+      questionId: "q-1",
+      blocking: true,
+      createdAt: Date.now(),
       resolve: questionResolver,
       question: "confirm?",
-    });
+    }]]));
 
     expect(pendingApprovals.get("conv-shared")).toBeDefined();
     expect(pendingQuestions.get("conv-shared")).toBeDefined();
@@ -1104,13 +1110,16 @@ describe("Flow 10: AgenticLoopService Approval API", () => {
 
   it("should handle resolving a question with answers", () => {
     const resolverFunction = vi.fn();
-    pendingQuestions.set("conv-question-resolve", {
+    pendingQuestions.set("conv-question-resolve", new Map([["q-1", {
+      questionId: "q-1",
+      blocking: true,
+      createdAt: Date.now(),
       resolve: resolverFunction,
       question: "What should I do?",
       choices: ["deploy", "rollback"],
-    });
+    }]]));
 
-    const entry = pendingQuestions.get("conv-question-resolve");
+    const entry = pendingQuestions.get("conv-question-resolve")?.get("q-1");
     entry!.resolve({
       answers: [{ answer: "deploy" }],
     });
@@ -1122,12 +1131,15 @@ describe("Flow 10: AgenticLoopService Approval API", () => {
 
   it("should handle resolving a question with null answers (timeout)", () => {
     const resolverFunction = vi.fn();
-    pendingQuestions.set("conv-question-timeout", {
+    pendingQuestions.set("conv-question-timeout", new Map([["q-1", {
+      questionId: "q-1",
+      blocking: true,
+      createdAt: Date.now(),
       resolve: resolverFunction,
       question: "Still there?",
-    });
+    }]]));
 
-    const entry = pendingQuestions.get("conv-question-timeout");
+    const entry = pendingQuestions.get("conv-question-timeout")?.get("q-1");
     entry!.resolve({
       answers: null,
       isTimedOut: true,

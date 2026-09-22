@@ -799,14 +799,17 @@ describe('ApprovalRegistry adversarial', () => {
 
   it('should handle question resolution with null answers', () => {
     let receivedResolution: QuestionResolution | null = null;
-    pendingQuestions.set('conv-q', {
+    pendingQuestions.set('conv-q', new Map([['q-1', {
+      questionId: 'q-1',
+      blocking: true,
+      createdAt: Date.now(),
       resolve: (value: QuestionResolution) => {
         receivedResolution = value;
       },
       question: 'What color?',
-    });
+    }]]));
 
-    pendingQuestions.get('conv-q')!.resolve({ answers: null });
+    pendingQuestions.get('conv-q')!.get('q-1')!.resolve({ answers: null });
     expect(receivedResolution).not.toBeNull();
     expect(receivedResolution!.answers).toBeNull();
   });

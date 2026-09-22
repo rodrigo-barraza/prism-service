@@ -16,6 +16,7 @@ import {
   COLLECTIONS,
 } from "#src/constants";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
+import { resolveLoopKey } from "#src/services/LoopKey";
 import type { InternalToolContext } from "./InternalToolRegistry.ts";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 
@@ -816,8 +817,10 @@ export async function deliverTaskCompletion(
   //    (NON_BLOCKING_DISPATCH) root dispatch has already broken its loop,
   //    and a post there would sit in a mailbox nobody drains again.
   if (continueWorking || isSubAgent) {
-    const mailboxKey =
-      taskState.conversationId || context.conversationId || taskState.agentConversationId;
+    const mailboxKey = resolveLoopKey({
+      conversationId: taskState.conversationId || context.conversationId,
+      agentConversationId: taskState.agentConversationId,
+    });
     if (mailboxKey && TurnInputMailbox.isOpen(mailboxKey)) {
       const notification = formatTaskCompletionNotification(taskState);
       const posted = TurnInputMailbox.post(mailboxKey, {
