@@ -4,6 +4,7 @@ import { DEFAULT_CONVERSATION_TITLE } from "@rodrigo-barraza/utilities-library/t
 import { COLLECTIONS } from "#src/constants";
 import type { ChatMessage } from "#src/types/admin";
 import logger from "#src/utils/logger";
+import { SYSTEM_MESSAGE_TAGS } from "#src/utils/SystemMessageTags";
 import type { ProfileIdFilter } from "#src/utils/ProfileScope";
 import {
   USER_REWIND_PRUNED_BY,
@@ -120,6 +121,15 @@ export function extendThroughToolResults(messages: ChatMessage[], index: number)
   let end = index;
   while (messages[end + 1]?.role === "tool") end += 1;
   return end;
+}
+
+/** The per-turn `<system-context>` note the server persists just before a turn's user message. */
+function isTurnContextNote(message: ChatMessage | undefined): boolean {
+  return (
+    message?.role === "system" &&
+    typeof message.content === "string" &&
+    message.content.trimStart().startsWith(`<${SYSTEM_MESSAGE_TAGS.SYSTEM_CONTEXT}>`)
+  );
 }
 
 /**
@@ -501,7 +511,13 @@ export async function forkConversation(
   if (isHiddenFromDisplay(messages[index])) {
     throw new BranchingError(400, "That message was rewound out of the conversation.");
   }
-  const end = position === "before" ? index - 1 : extendThroughToolResults(messages, index);
+  let end = position === "before" ? index - 1 : extendThroughToolResults(messages, index);
+  // "Before" a user message leaves its turn behind whole: the context note
+  // persisted ahead of it would sit stale in the fork, beside the fresh
+  // one the edited message's own turn brings.
+  if (position === "before") {
+    while (end >= 0 && isTurnContextNote(messages[end])) end -= 1;
+  }
   const copied = ensureMessageIds(
     messages
       .slice(0, end + 1)

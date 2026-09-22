@@ -154,6 +154,41 @@ describe('ChatRoutes Integration', () => {
       expect(response.body.conversationId).toBeDefined();
     });
 
+    it.each([
+      ['streaming', '/agent'],
+      ['non-streaming', '/agent?stream=false'],
+    ])('registers a %s turn that brings no conversationId under the id it runs with — /agent/stop reaches it', async (_mode, path) => {
+      const { default: AgenticLoopService } = await import('#src/services/AgenticLoopService');
+      const { default: AgentSessionRegistry } = await import('#src/services/AgentSessionRegistry');
+      let seen: { conversationId?: string; active?: boolean } = {};
+      vi.mocked(AgenticLoopService.runAgenticLoop).mockImplementationOnce(async (opts: any) => {
+        seen = {
+          conversationId: opts.conversationId,
+          active: AgentSessionRegistry.isActive(opts.conversationId),
+        };
+        opts.emit({ type: 'done', conversationId: opts.conversationId });
+        return { messages: [] } as never;
+      });
+
+      const response = await agent
+        .post(path)
+        .set('x-project', 'test')
+        .set('x-username', 'testuser')
+        .send({
+          provider: PROVIDERS.OPENAI,
+          agent: 'CODING',
+          messages: [{ role: 'user', content: 'Help me write code' }],
+        });
+
+      expect(response.status).toBe(200);
+      expect(seen.conversationId).toEqual(expect.any(String));
+      // The session layer registered the turn under the same id the loop ran with.
+      expect(seen.active).toBe(true);
+      expect(response.text).toContain(seen.conversationId);
+      // ...and let go of it when the turn ended.
+      expect(AgentSessionRegistry.isActive(seen.conversationId!)).toBe(false);
+    });
+
     it('should trigger agent loop in streaming mode', async () => {
       const response = await agent
         .post('/agent')
