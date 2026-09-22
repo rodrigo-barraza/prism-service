@@ -3,6 +3,7 @@ import { MODALITY_TYPES } from "#src/config";
 import {
   detectCapabilities,
   detectOllamaCapabilities,
+  detectSglangCapabilities,
 } from "./detectCapabilities.ts";
 import {
   parseParamsFromName,
@@ -14,6 +15,7 @@ import {
   type LmStudioRawModel,
   type OllamaRawModel,
   type OpenAICompatRawModel,
+  type SglangRawModel,
 } from "./types.ts";
 
 /**
@@ -111,12 +113,14 @@ export function normalizeOllamaModel(raw: OllamaRawModel): ModelEntry {
  * Normalize a vLLM or llama.cpp model into a canonical model entry.
  * Both use the OpenAI-compatible /v1/models which returns { id, object, owned_by }.
  * Enriches with name-parsed attributes; HF enrichment is done separately.
+ * `capabilities` defaults to name-based detection; a server that reports its
+ * own (SGLang) passes them in.
  */
 export function normalizeOpenAICompatModel(
   raw: OpenAICompatRawModel,
+  capabilities = detectCapabilities(raw.key || raw.id || ""),
 ): ModelEntry {
   const modelKey = raw.key || raw.id || "";
-  const capabilities = detectCapabilities(modelKey);
 
   const parsedParams = parseParamsFromName(modelKey);
   const parsedQuant = parseQuantFromName(modelKey);
@@ -169,10 +173,49 @@ export function normalizeVllmModel(raw: OpenAICompatRawModel): ModelEntry {
   return entry;
 }
 
+/**
+ * Normalize an SGLang model. /v1/models gives the id and the context length
+ * the server enforces; the provider's listModels adds `sglangCapabilities`
+ * from /model_info. A server launched with --is-embedding serves only
+ * /v1/embeddings. SGLang serves exactly the models it has loaded, so every
+ * entry is loaded.
+ */
+export function normalizeSglangModel(raw: SglangRawModel): ModelEntry {
+  const modelKey = raw.key;
+  const contextLength = raw.max_model_len;
+
+  if (raw.type === "embedding") {
+    return {
+      name: modelKey,
+      label: raw.display_name || modelKey,
+      modelType: "embed",
+      inputTypes: [MODALITY_TYPES.TEXT],
+      outputTypes: [MODALITY_TYPES.EMBEDDING],
+      supportsSystemPrompt: false,
+      streaming: false,
+      pricing: { inputPerMillion: 0, outputPerMillion: 0 },
+      ...(contextLength && { contextLength }),
+      loaded: true,
+    };
+  }
+
+  const entry = normalizeOpenAICompatModel(
+    raw,
+    detectSglangCapabilities(modelKey, raw.sglangCapabilities),
+  );
+  if (contextLength) {
+    entry.contextLength = contextLength;
+    // Nothing caps a completion below the window but the prompt itself
+    entry.maxOutputTokens = contextLength;
+  }
+  entry.loaded = true;
+  return entry;
+}
+
 import { PROVIDERS, LOCAL_PROVIDER } from "#src/constants";
 
 export type NormalizerFunction = (
-  raw: LmStudioRawModel & OllamaRawModel & OpenAICompatRawModel,
+  raw: LmStudioRawModel & OllamaRawModel & OpenAICompatRawModel & SglangRawModel,
 ) => ModelEntry;
 
 export const NORMALIZER_BY_TYPE: Record<string, NormalizerFunction> = {
@@ -180,10 +223,12 @@ export const NORMALIZER_BY_TYPE: Record<string, NormalizerFunction> = {
   [PROVIDERS.OLLAMA]: normalizeOllamaModel as NormalizerFunction,
   [PROVIDERS.VLLM]: normalizeVllmModel as NormalizerFunction,
   [PROVIDERS.LLAMA_CPP]: normalizeOpenAICompatModel as NormalizerFunction,
+  [PROVIDERS.SGLANG]: normalizeSglangModel as NormalizerFunction,
 };
 
 /** Provider types that should get HuggingFace metadata enrichment. */
 export const HF_ENRICHED_TYPES = new Set<string>([
   PROVIDERS.VLLM,
   PROVIDERS.LLAMA_CPP,
+  PROVIDERS.SGLANG,
 ]);

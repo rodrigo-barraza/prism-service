@@ -19,6 +19,7 @@ vi.mock("#src/utils/config", () => ({
   PROVIDER_VLLM: [],
   PROVIDER_OLLAMA: [],
   PROVIDER_LLAMA_CPP: [],
+  PROVIDER_SGLANG: [],
   TOOLS_SERVICE_URL: "http://localhost:5590",
   MONGO_URI: "mongodb://test:test@localhost:27017",
   MONGO_DB_NAME: "prism-test",
