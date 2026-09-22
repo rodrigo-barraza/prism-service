@@ -23,10 +23,8 @@ import { HARNESS_IDENTIFIERS, PROVIDERS, MODALITY_TYPES } from "#src/constants";
 import { ChatRequestSchema } from "#src/types/schemas";
 import AgenticLoopState from "#src/services/AgenticLoopState";
 import ToolContext from "#src/services/ToolContext";
-import {
-  ApprovalRegistry,
-  pendingQuestions,
-} from "#src/services/ApprovalRegistry";
+import { ApprovalRegistry } from "#src/services/ApprovalRegistry";
+import QuestionRegistry from "#src/services/QuestionRegistry";
 import HarnessRegistry from "#src/services/harnesses/HarnessRegistry";
 
 
@@ -582,87 +580,84 @@ describe("Flow 5: ApprovalRegistry Promise Lifecycle", () => {
 
   afterEach(() => {
     ApprovalRegistry._clearAll();
-    pendingQuestions.clear();
+    QuestionRegistry._clearAll();
   });
 
-  function parkBatch(loopKey: string, type: "tool" | "plan", toolCallIds: string[]) {
-    return ApprovalRegistry.waitForDecisions(loopKey, {
+  /** Park a batch; resolves once it is recorded, carrying the decisions promise. */
+  async function parkBatch(loopKey: string, type: "tool" | "plan", toolCallIds: string[]) {
+    const { decisions } = await ApprovalRegistry.open(loopKey, {
       type,
       batchId: `batch-${loopKey}-${toolCallIds.join("-")}`,
       calls: toolCallIds.map((toolCallId) => ({ toolCallId, name: "shell_execute", args: { command: "ls" } })),
-      timeoutMilliseconds: 60_000,
     });
+    return { decisions };
   }
 
-  it("should store and retrieve a pending tool approval", () => {
-    parkBatch("conv-1", "tool", ["tc-1"]);
+  it("should store and retrieve a pending tool approval", async () => {
+    await parkBatch("conv-1", "tool", ["tc-1"]);
 
-    const pending = ApprovalRegistry.getPending("conv-1");
+    const pending = await ApprovalRegistry.getPending("conv-1");
     expect(pending).not.toBeNull();
     expect(pending!.type).toBe("tool");
     expect(pending!.toolCalls.map((toolCall) => toolCall.name)).toContain("shell_execute");
   });
 
-  it("should store and retrieve a pending plan approval", () => {
-    parkBatch("conv-plan", "plan", ["plan-call"]);
+  it("should store and retrieve a pending plan approval", async () => {
+    await parkBatch("conv-plan", "plan", ["plan-call"]);
 
-    expect(ApprovalRegistry.getPending("conv-plan")?.type).toBe("plan");
+    expect((await ApprovalRegistry.getPending("conv-plan"))?.type).toBe("plan");
   });
 
   it("should supersede the previous batch when the same loop parks a new one (never orphaned)", async () => {
-    const first = parkBatch("conv-overwrite", "tool", ["old"]);
-    parkBatch("conv-overwrite", "tool", ["new"]);
+    const first = await parkBatch("conv-overwrite", "tool", ["old"]);
+    await parkBatch("conv-overwrite", "tool", ["new"]);
 
-    expect(ApprovalRegistry.getPending("conv-overwrite")?.toolCalls.map((toolCall) => toolCall.id)).toEqual(["new"]);
-    expect((await first).get("old")).toMatchObject({ decision: "deny", source: "superseded" });
+    expect((await ApprovalRegistry.getPending("conv-overwrite"))?.toolCalls.map((toolCall) => toolCall.id)).toEqual(["new"]);
+    expect((await first.decisions).get("old")).toMatchObject({ decision: "deny", source: "superseded" });
   });
 
   it("should answer stale for a call whose batch was already settled", async () => {
-    const batch = parkBatch("conv-deleted", "tool", ["tc-1"]);
-    ApprovalRegistry.cancel("conv-deleted");
-    await batch;
+    const batch = await parkBatch("conv-deleted", "tool", ["tc-1"]);
+    await ApprovalRegistry.cancel("conv-deleted");
+    await batch.decisions;
 
-    expect(ApprovalRegistry.getPending("conv-deleted")).toBeNull();
-    expect(ApprovalRegistry.decide("conv-deleted", { toolCallId: "tc-1", decision: "allow" }).status).toBe("stale");
+    expect(await ApprovalRegistry.getPending("conv-deleted")).toBeNull();
+    expect((await ApprovalRegistry.decide("conv-deleted", { toolCallId: "tc-1", decision: "allow" })).status).toBe("stale");
   });
 
-  it("should store and retrieve a pending question", () => {
-    const resolveFunction = vi.fn();
-    pendingQuestions.set("conv-question", new Map([["q-1", {
+  it("should store and retrieve a pending question", async () => {
+    await QuestionRegistry.register("conv-question", {
       questionId: "q-1",
       blocking: true,
       createdAt: Date.now(),
-      resolve: resolveFunction,
+      resolve: vi.fn(),
       question: "What should I do?",
       choices: ["option-a", "option-b"],
-    }]]));
+    });
 
-    const entry = pendingQuestions.get("conv-question")?.get("q-1");
+    const entry = await QuestionRegistry.getPending("conv-question");
     expect(entry).toBeDefined();
     expect(entry!.question).toBe("What should I do?");
     expect(entry!.choices).toHaveLength(2);
   });
 
-  it("should isolate approvals from questions with same conversationId", () => {
-    const questionResolver = vi.fn();
-
-    parkBatch("conv-shared", "tool", ["test"]);
-
-    pendingQuestions.set("conv-shared", new Map([["q-1", {
+  it("should isolate approvals from questions with same conversationId", async () => {
+    await parkBatch("conv-shared", "tool", ["test"]);
+    await QuestionRegistry.register("conv-shared", {
       questionId: "q-1",
       blocking: true,
       createdAt: Date.now(),
-      resolve: questionResolver,
+      resolve: vi.fn(),
       question: "confirm?",
-    }]]));
+    });
 
-    expect(ApprovalRegistry.getPending("conv-shared")).not.toBeNull();
-    expect(pendingQuestions.get("conv-shared")).toBeDefined();
+    expect(await ApprovalRegistry.getPending("conv-shared")).not.toBeNull();
+    expect(await QuestionRegistry.list("conv-shared")).toHaveLength(1);
 
     // Clearing one should not affect the other
-    ApprovalRegistry.cancel("conv-shared");
-    expect(ApprovalRegistry.getPending("conv-shared")).toBeNull();
-    expect(pendingQuestions.get("conv-shared")).toBeDefined();
+    await ApprovalRegistry.cancel("conv-shared");
+    expect(await ApprovalRegistry.getPending("conv-shared")).toBeNull();
+    expect(await QuestionRegistry.list("conv-shared")).toHaveLength(1);
   });
 });
 
@@ -1015,78 +1010,69 @@ describe("Flow 10: AgenticLoopService Approval API", () => {
 
   afterEach(() => {
     ApprovalRegistry._clearAll();
-    pendingQuestions.clear();
+    QuestionRegistry._clearAll();
   });
 
   it("should resolve a tool approval through the registry, per call", async () => {
-    const decisions = ApprovalRegistry.waitForDecisions("conv-resolve-test", {
+    const { decisions } = await ApprovalRegistry.open("conv-resolve-test", {
       type: "tool",
       batchId: "batch-resolve",
       calls: [{ toolCallId: "tc-1", name: "shell_execute", args: {} }],
-      timeoutMilliseconds: 60_000,
     });
 
     // What AgenticLoopService.decideApproval() does for POST /agent/approve
     expect(
-      ApprovalRegistry.decide("conv-resolve-test", { toolCallId: "tc-1", decision: "allow" }),
-    ).toMatchObject({ status: "decided", decidedToolCallIds: ["tc-1"] });
+      await ApprovalRegistry.decide("conv-resolve-test", { toolCallId: "tc-1", decision: "allow" }),
+    ).toMatchObject({ status: "decided", decidedToolCallIds: ["tc-1"], delivered: true });
 
     expect((await decisions).get("tc-1")).toMatchObject({ decision: "allow", source: "user" });
   });
 
   it("should resolve a plan approval like any other call", async () => {
-    const decisions = ApprovalRegistry.waitForDecisions("conv-plan-resolve", {
+    const { decisions } = await ApprovalRegistry.open("conv-plan-resolve", {
       type: "plan",
       batchId: "batch-plan",
       calls: [{ toolCallId: "exit-plan", name: "exit_plan_mode", args: { plan: "1. do it" } }],
-      timeoutMilliseconds: 60_000,
     });
 
-    ApprovalRegistry.decide("conv-plan-resolve", { decision: "allow" });
+    await ApprovalRegistry.decide("conv-plan-resolve", { decision: "allow" });
 
     expect((await decisions).get("exit-plan")?.decision).toBe("allow");
   });
 
-  it("should handle resolving a question with answers", () => {
+  it("should handle resolving a question with answers", async () => {
     const resolverFunction = vi.fn();
-    pendingQuestions.set("conv-question-resolve", new Map([["q-1", {
+    await QuestionRegistry.register("conv-question-resolve", {
       questionId: "q-1",
       blocking: true,
       createdAt: Date.now(),
       resolve: resolverFunction,
       question: "What should I do?",
       choices: ["deploy", "rollback"],
-    }]]));
-
-    const entry = pendingQuestions.get("conv-question-resolve")?.get("q-1");
-    entry!.resolve({
-      answers: [{ answer: "deploy" }],
     });
+
+    await QuestionRegistry.answer("conv-question-resolve", [{ answer: "deploy" }], { questionId: "q-1" });
 
     expect(resolverFunction).toHaveBeenCalledWith({
       answers: [{ answer: "deploy" }],
     });
   });
 
-  it("should handle resolving a question with null answers (timeout)", () => {
+  it("should release a question with null answers when its turn ends (no timeout)", async () => {
     const resolverFunction = vi.fn();
-    pendingQuestions.set("conv-question-timeout", new Map([["q-1", {
+    await QuestionRegistry.register("conv-question-ended", {
       questionId: "q-1",
       blocking: true,
       createdAt: Date.now(),
       resolve: resolverFunction,
       question: "Still there?",
-    }]]));
-
-    const entry = pendingQuestions.get("conv-question-timeout")?.get("q-1");
-    entry!.resolve({
-      answers: null,
-      isTimedOut: true,
     });
+
+    await QuestionRegistry.cancelAll("conv-question-ended");
 
     expect(resolverFunction).toHaveBeenCalledWith({
       answers: null,
-      isTimedOut: true,
+      isCancelled: true,
     });
   });
 });

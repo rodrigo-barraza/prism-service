@@ -79,6 +79,8 @@ export interface InternalToolContext {
   agent?: string | null;
   isSubAgent?: boolean;
   enabledTools?: string[];
+  /** The loop's abort signal (with the per-tool timeout) — ToolExecutor passes it. */
+  signal?: AbortSignal;
 }
 
 // ─── Tool Definition (flat — matches tools-service pattern) ────

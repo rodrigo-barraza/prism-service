@@ -65,8 +65,7 @@
     "duplicateQuestion": "Duplicate: \"{{preview}}\"",
     "duplicateOption": "Duplicate option \"{{label}}\" in \"{{question}}\"",
     "tooManyQuestions": "Max 4 per call.",
-    "noConversation": "No session.",
-    "timedOut": "No response within 5 min."
+    "noConversation": "No session."
   },
   "list_mcp_resources": {
     "noServers": "No MCP server connected."

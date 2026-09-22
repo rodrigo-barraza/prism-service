@@ -93,6 +93,6 @@
   "approval": {
     "declined": "The user declined this {{toolName}} call. It was not executed. Do not retry it as is; continue without it or ask the user how to proceed.",
     "declinedWithReason": "The user declined this {{toolName}} call. It was not executed. The user's reason: {{reason}}. Take the reason into account; do not retry the call as is.",
-    "timedOut": "No approval arrived in time for this {{toolName}} call, so it was not executed. Do not assume it ran; continue without it or ask the user whether to try again."
+    "lapsed": "This {{toolName}} call was not decided before its turn moved on, so it was not executed. Do not assume it ran; continue without it or ask the user whether to try again."
   }
 }

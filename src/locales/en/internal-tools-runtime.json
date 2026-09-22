@@ -65,8 +65,7 @@
     "duplicateQuestion": "Duplicate question text: \"{{preview}}\"",
     "duplicateOption": "Duplicate option label \"{{label}}\" in question \"{{question}}\"",
     "tooManyQuestions": "Maximum 4 questions per call",
-    "noConversation": "No conversation — ask_user_question requires an active conversation",
-    "timedOut": "The user did not respond within 5 minutes."
+    "noConversation": "No conversation — ask_user_question requires an active conversation"
   },
   "list_mcp_resources": {
     "noServers": "No MCP servers connected."
