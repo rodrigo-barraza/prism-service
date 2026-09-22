@@ -224,8 +224,9 @@ describe("CompactionService", () => {
     });
 
     // Long filler makes the dropped history genuinely large — the shrink
-    // guard discards compactions that don't reduce token count. The last
-    // 3 user turns (kept in the tail) stay small and pristine.
+    // guard discards compactions that don't reduce token count. The
+    // recency-protected window (the last 4 model calls, kept in the tail)
+    // stays small and pristine.
     const filler = " lorem ipsum dolor sit amet".repeat(400);
     const messages: ChatMessage[] = [
       { role: "system", content: "You are an assistant." },
@@ -235,6 +236,10 @@ describe("CompactionService", () => {
       { role: "assistant", content: "Historical A1" },
       { role: "user", content: "Historical Q2" },
       { role: "assistant", content: "Historical A2" },
+      { role: "user", content: "Historical Q3" },
+      { role: "assistant", content: "Historical A3" },
+      { role: "user", content: "Historical Q4" },
+      { role: "assistant", content: "Historical A4" },
       { role: "user", content: "Active Q" },
     ];
 
@@ -258,7 +263,7 @@ describe("CompactionService", () => {
     expect(compacted[1].content).toContain(summaryContent);
     expect((compacted[1] as any).isCompactSummary).toBe(true);
 
-    // Verify recent tail has been appended (last 3 user turns: in this case Q1, Q2, and Active Q are user turns)
+    // Verify the recent tail has been appended (Q1 onward — the last 4 model calls)
     // The active Q should be at the very end
     expect(compacted[compacted.length - 1].content).toBe("Active Q");
 
@@ -272,14 +277,10 @@ describe("CompactionService", () => {
     );
   });
 
-  it("rejects non-shrinking compaction when fewer than 3 user turns (tail preserves everything)", async () => {
-    const summaryContent = "Conversation summarized elegantly.";
-    MOCK_GENERATE_TEXT.mockResolvedValueOnce({
-      text: `<analysis>Drafting compaction...</analysis>\n<summary>${summaryContent}</summary>`,
-      usage: { inputTokens: 50, outputTokens: 25 },
-    });
+  it("skips, without an LLM call, a history entirely inside the protected recent window", async () => {
+    MOCK_GENERATE_TEXT.mockClear();
 
-    // Conversation has only 2 user turns: "Historical Q" and "Active Q"
+    // One model call so far: the whole history is the recent window.
     const messages: ChatMessage[] = [
       { role: "system", content: "You are an assistant." },
       { role: "user", content: "Historical Q" },
@@ -295,13 +296,13 @@ describe("CompactionService", () => {
       emit: mockEmit,
     });
 
-    // With 2 user turns (< 3), the recent tail preserves ALL messages, so a
-    // "compaction" would only ADD a summary on top of the full history. The
-    // shrink guard rejects that (post >= pre) — the conversation is left
-    // untouched instead of growing.
+    // Everything is inside the recency-protected window, so a "compaction"
+    // could only ADD a summary on top of the full history. It is skipped
+    // before the summarizer is paid for — the conversation is left untouched.
     expect(result).toBeNull();
-    expect(mockEmit).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "status", message: "compaction_failed" }),
+    expect(MOCK_GENERATE_TEXT).not.toHaveBeenCalled();
+    expect(mockEmit).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "status", message: "compaction_started" }),
     );
   });
 
@@ -309,11 +310,12 @@ describe("CompactionService", () => {
     // Force 3 consecutive failures
     MOCK_GENERATE_TEXT.mockRejectedValue(new Error("API Rate Limit exceeded"));
 
-    const messages: ChatMessage[] = [
-      { role: "system", content: "Sys" },
-      { role: "user", content: "User query text here" },
-      { role: "assistant", content: "Ok" },
-    ];
+    // Older than the 4-call recent window, so there is a span to summarize.
+    const messages: ChatMessage[] = [{ role: "system", content: "Sys" }];
+    for (let turn = 0; turn < 6; turn++) {
+      messages.push({ role: "user", content: `User query ${turn}` });
+      messages.push({ role: "assistant", content: `Ok ${turn}` });
+    }
 
     // Trigger failure 1
     const res1 = await CompactionService.compactConversation(messages, {
@@ -366,6 +368,7 @@ describe("Compaction Integration with Harness and WindowManager", () => {
       modelDefinition: { maxInputTokens: 15_000 },
       options: { maxTokens: 1000 },
       emit: vi.fn(),
+      messages: [],
     };
 
     const harness = new BaseAgenticHarness(context, state, {
@@ -402,16 +405,22 @@ describe("Compaction Integration with Harness and WindowManager", () => {
         content: "read file done",
         toolCalls: [{ id: "toolCall-old", name: "read_file", args: {}, result: largeResult }],
       },
-      // Protected window user messages (5 turns total, placing index 2 outside boundary)
+      // Four newer model calls: the protected window, placing index 2 outside it
       { role: "user", content: "Q2" },
+      { role: "assistant", content: "A2" },
       { role: "user", content: "Q3" },
+      { role: "assistant", content: "A3" },
       { role: "user", content: "Q4" },
+      { role: "assistant", content: "A4" },
       { role: "user", content: "Q5" },
+      { role: "assistant", content: "A5" },
     ];
 
-    // Tight budget so that micro-compaction is needed and fits (maxInputTokens=20_000 gives a positive budget, but lower than ~10,000 tokens of uncompacted messages)
+    // Tight budget so that micro-compaction is needed and fits: a 12K window
+    // leaves a (12,000 − 1,024 − 4,096) / 1.1 − 2,000 ≈ 4,250-token message
+    // budget, below the ~9,500 tokens of the uncompacted result.
     const result = ContextWindowManager.enforce(messages, {
-      maxInputTokens: 20_000,
+      maxInputTokens: 12_000,
       maxOutputTokens: 1000,
     });
 

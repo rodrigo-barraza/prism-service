@@ -288,6 +288,30 @@ describe("ConversationService.appendMessages", () => {
       expect(result.title).toBe("My custom title");
     });
 
+    it("should persist the compaction boundary from conversationMeta", async () => {
+      await createStub();
+      const boundary = {
+        summary: "Earlier work, summarized.",
+        throughMessageId: "message-7",
+        createdAt: "2026-09-22T12:00:00.000Z",
+        provider: PROVIDERS.GOOGLE,
+        model: "gemini-3.5-flash",
+        tokensBefore: 120_000,
+        tokensAfter: 30_000,
+      };
+
+      const result = await ConversationService.appendMessages(
+        BASE_ARGS.conversationId,
+        BASE_ARGS.project,
+        BASE_ARGS.username,
+        makeMessages(1),
+        { compaction: boundary },
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS },
+      );
+
+      expect(result.compaction).toEqual(boundary);
+    });
+
     it("should accumulate messages across multiple appends", async () => {
       const sessionId = "multi-append-session";
 

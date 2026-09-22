@@ -4,7 +4,7 @@ import ModelRoleRouter, { MODEL_ROLES } from "#src/services/ModelRoleRouter";
 import RequestLogger from "#src/services/RequestLogger";
 import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
-import { PROMPT_DELIMITERS, COMPACTION } from "#src/constants";
+import { COMPACTION } from "#src/constants";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
@@ -26,6 +26,12 @@ import ToolResultOffloadService, {
   OFFLOAD_STUB_HEADER,
   type OffloadMetadata,
 } from "./ToolResultOffloadService.ts";
+import { findRecencyBoundary } from "./RecencyProtection.ts";
+import {
+  buildCompactionSummaryMessage,
+  resolveBoundaryAnchorId,
+  type CompactionBoundary,
+} from "./CompactionBoundary.ts";
 import { SYSTEM_MESSAGE_TAGS } from "#src/utils/SystemMessageTags";
 import type { ChatMessage as AdminChatMessage } from "#src/types/admin";
 import type { ChatMessage, GenerateTextResult } from "#src/types/provider";
@@ -57,7 +63,10 @@ import type { EmitFunction } from "#src/services/harnesses/types";
 const COMPACT_MAX_OUTPUT_TOKENS = COMPACTION.COMPACT_MAX_OUTPUT_TOKENS;
 
 /**
- * Circuit breaker: stop retrying after this many consecutive failures.
+ * Circuit breaker: stop retrying after this many consecutive failures —
+ * per conversation. Claude Code's breaker is per session; a process-wide
+ * one (what this was until 2026-09) let three failures anywhere disable
+ * compaction for every conversation until restart.
  *
  * From claude-code/src/services/compact/autoCompact.ts:
  *   "BQ 2026-03-10: 1,279 sessions had 50+ consecutive failures
@@ -65,12 +74,43 @@ const COMPACT_MAX_OUTPUT_TOKENS = COMPACTION.COMPACT_MAX_OUTPUT_TOKENS;
  */
 const MAX_CONSECUTIVE_COMPACT_FAILURES = COMPACTION.MAX_CONSECUTIVE_COMPACT_FAILURES;
 
+/** Breaker key for calls that carry no conversation id (tests, one-off callers). */
+const UNSCOPED_BREAKER_KEY = "__unscoped__";
+
+interface BreakerEntry {
+  /** Consecutive LLM failures (call error, no extractable summary). */
+  failures: number;
+  /** History size at the last shrink-guard bail-out — retried only once it grows. */
+  noShrinkAtTokens: number | null;
+  updatedAt: number;
+}
+
 export interface CompactionResult {
   compactedMessages: AdminChatMessage[];
   summaryText: string;
   preCompactTokenCount: number;
   postCompactTokenCount: number;
   compactionUsage: { inputTokens: number; outputTokens: number };
+  /**
+   * The boundary to persist, so the next turn loads summary + tail instead
+   * of re-summarizing. Null when the covered span ends in a message that
+   * cannot be addressed (persisted before message ids existed).
+   */
+  boundary: CompactionBoundary | null;
+}
+
+/** Why an attempt produced no compaction — the truncation fallback logs it. */
+export type CompactionSkipReason =
+  | "breaker_open"
+  | "nothing_to_summarize"
+  | "no_shrink_cooldown"
+  | "no_model"
+  | "failed"
+  | "did_not_shrink";
+
+export interface CompactionAttempt {
+  result: CompactionResult | null;
+  skipReason: CompactionSkipReason | null;
 }
 
 interface CompactionOptions {
@@ -134,7 +174,45 @@ function estimateTotalTokens(messages: AdminChatMessage[]): number {
 }
 
 export default class CompactionService {
-  private static consecutiveFailures = 0;
+  private static breakers = new Map<string, BreakerEntry>();
+
+  private static breakerKey(conversationId?: string | null): string {
+    return conversationId || UNSCOPED_BREAKER_KEY;
+  }
+
+  /** Drop entries idle past the TTL, then return this key's entry. */
+  private static breakerEntry(key: string): BreakerEntry | undefined {
+    const now = Date.now();
+    for (const [entryKey, entry] of this.breakers) {
+      if (now - entry.updatedAt > COMPACTION.CIRCUIT_BREAKER_TTL_MILLISECONDS) {
+        this.breakers.delete(entryKey);
+      }
+    }
+    return this.breakers.get(key);
+  }
+
+  private static touchBreaker(key: string): BreakerEntry {
+    const entry = this.breakerEntry(key) || {
+      failures: 0,
+      noShrinkAtTokens: null,
+      updatedAt: Date.now(),
+    };
+    entry.updatedAt = Date.now();
+    this.breakers.set(key, entry);
+    return entry;
+  }
+
+  private static recordFailure(key: string): number {
+    const entry = this.touchBreaker(key);
+    entry.failures++;
+    return entry.failures;
+  }
+
+  /** Whether compaction is disabled for this conversation (null → unscoped callers). */
+  static isCircuitBreakerOpen(conversationId?: string | null): boolean {
+    const entry = this.breakerEntry(this.breakerKey(conversationId));
+    return (entry?.failures ?? 0) >= MAX_CONSECUTIVE_COMPACT_FAILURES;
+  }
 
   /**
    * Summarize a conversation using an LLM call.
@@ -152,12 +230,60 @@ export default class CompactionService {
     messages: AdminChatMessage[],
     options: CompactionOptions,
   ): Promise<CompactionResult | null> {
-    // ── Circuit breaker ────────────────────────────────────────
-    if (this.consecutiveFailures >= MAX_CONSECUTIVE_COMPACT_FAILURES) {
+    return (await this.attemptCompaction(messages, options)).result;
+  }
+
+  /** compactConversation, plus why nothing was compacted when it wasn't. */
+  static async attemptCompaction(
+    messages: AdminChatMessage[],
+    options: CompactionOptions,
+  ): Promise<CompactionAttempt> {
+    const breakerKey = this.breakerKey(options.agentConversationId);
+    const skip = (skipReason: CompactionSkipReason): CompactionAttempt => ({
+      result: null,
+      skipReason,
+    });
+
+    // ── Circuit breaker (this conversation only) ──────────────
+    if (this.isCircuitBreakerOpen(options.agentConversationId)) {
       logger.warn(
-        `[CompactionService] Circuit breaker open: ${this.consecutiveFailures} consecutive failures. Skipping compaction.`,
+        `[CompactionService] Circuit breaker open for ${breakerKey}: ` +
+          `${MAX_CONSECUTIVE_COMPACT_FAILURES} consecutive failures. Skipping compaction.`,
       );
-      return null;
+      return skip("breaker_open");
+    }
+
+    // ── Split: recent window stays verbatim, the rest is summarized ──
+    const recentTail = extractRecentTail(messages);
+    const systemMessage = messages.find((message) => message.role === "system");
+    const recentTailSet = new Set<AdminChatMessage>(recentTail);
+    const droppedSpan = messages.filter(
+      (message) => message !== systemMessage && !recentTailSet.has(message),
+    );
+    if (!droppedSpan.some((message) => message.role !== "system")) {
+      logger.info(
+        `[CompactionService] Nothing older than the protected recent window — skipping compaction (${breakerKey}).`,
+      );
+      return skip("nothing_to_summarize");
+    }
+
+    const preCompactTokenCount = estimateTotalTokens(messages);
+
+    // ── Shrink-guard cooldown ─────────────────────────────────
+    // A history that already failed to shrink is not re-summarized until it
+    // has grown — the same input would fail the same way, for the same price.
+    const cooldownEntry = this.breakerEntry(breakerKey);
+    if (
+      cooldownEntry?.noShrinkAtTokens != null &&
+      preCompactTokenCount <
+        cooldownEntry.noShrinkAtTokens *
+          (1 + COMPACTION.NO_SHRINK_RETRY_GROWTH_FRACTION)
+    ) {
+      logger.info(
+        `[CompactionService] Skipping compaction for ${breakerKey}: the last summary did not shrink a ` +
+          `${cooldownEntry.noShrinkAtTokens}-token history and it is only ${preCompactTokenCount} tokens now.`,
+      );
+      return skip("no_shrink_cooldown");
     }
 
     // ── Resolve the compaction model through the utility role ──
@@ -178,14 +304,12 @@ export default class CompactionService {
       logger.error(
         "[CompactionService] Utility role resolved to an empty model chain — cannot compact.",
       );
-      return null;
+      return skip("no_model");
     }
     // Updated per attempt inside the chain runner so the request log
     // records whichever model actually served the call.
     let compactionProvider = roleChain[0].provider;
     let compactionModel = roleChain[0].model;
-
-    const preCompactTokenCount = estimateTotalTokens(messages);
 
     // ── Strip images before summarizing ────────────────────────
     // Claude Code equivalent: stripImagesFromMessages() in compact.ts
@@ -262,15 +386,15 @@ export default class CompactionService {
     } catch (error: unknown) {
       success = false;
       compactionError = errorMessage(error);
-      this.consecutiveFailures++;
+      const failures = this.recordFailure(breakerKey);
       logger.error(
-        `[CompactionService] LLM call failed (failure ${this.consecutiveFailures}/${MAX_CONSECUTIVE_COMPACT_FAILURES}): ${compactionError}`,
+        `[CompactionService] LLM call failed for ${breakerKey} (failure ${failures}/${MAX_CONSECUTIVE_COMPACT_FAILURES}): ${compactionError}`,
       );
       options.emit?.({
         type: SERVER_SENT_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.COMPACTION_FAILED,
       });
-      return null;
+      return skip("failed");
     } finally {
       // Log the compaction LLM call for cost tracking
       const realUsage = result?.usage || null;
@@ -304,15 +428,15 @@ export default class CompactionService {
     // ── Extract summary from response ─────────────────────────
     let summaryText = extractSummaryFromResponse(result!.text);
     if (!summaryText) {
-      this.consecutiveFailures++;
+      const failures = this.recordFailure(breakerKey);
       logger.warn(
-        `[CompactionService] LLM returned no extractable summary. Failure ${this.consecutiveFailures}/${MAX_CONSECUTIVE_COMPACT_FAILURES}`,
+        `[CompactionService] LLM returned no extractable summary for ${breakerKey}. Failure ${failures}/${MAX_CONSECUTIVE_COMPACT_FAILURES}`,
       );
       options.emit?.({
         type: SERVER_SENT_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.COMPACTION_FAILED,
       });
-      return null;
+      return skip("failed");
     }
 
     // ── Judge pass: validate the summary before adopting it ───
@@ -324,13 +448,12 @@ export default class CompactionService {
     // error keeps the original summary.
     summaryText = await validateSummaryAgainstTail(
       summaryText,
-      extractRecentTail(messages),
+      recentTail,
       { compactionProvider, compactionModel, options, preCompactTokenCount },
     );
 
     // ── Build compacted message array ─────────────────────────
     // Structure: [system prompt, summary as user message, ...recent tail]
-    const systemMessage = messages.find((message) => message.role === "system");
     const compactedMessages: AdminChatMessage[] = [];
 
     if (systemMessage) {
@@ -344,7 +467,6 @@ export default class CompactionService {
     // uses) and append a recovery index to the summary, so the model can
     // still pull back an exact value the summary glossed over. Mirrors A2's
     // offload for LLM compaction (survey follow-up).
-    const recentTail = extractRecentTail(messages);
     const offloadIndex = offloadDroppedSpanResults(
       messages,
       recentTail,
@@ -359,12 +481,12 @@ export default class CompactionService {
       ? `${summaryText}\n\n## Recoverable offloaded tool results\nThese detailed results were removed from context but preserved verbatim — recover any with retrieve_offloaded_content:\n${offloadIndex}`
       : summaryText;
 
-    // Insert the summary as a user message with a marker
-    compactedMessages.push({
-      role: "user",
-      content: `${PROMPT_DELIMITERS.CONVERSATION_SUMMARY_PREFIX} — auto-generated by compaction]\n\n${summaryWithRecovery}`,
-      isCompactSummary: true,
-    });
+    // Insert the summary as a user message with a marker. It names the last
+    // message it covers — the boundary the next turn loads through.
+    const throughMessageId = resolveBoundaryAnchorId(droppedSpan);
+    compactedMessages.push(
+      buildCompactionSummaryMessage(summaryWithRecovery, throughMessageId),
+    );
 
     // Carry active deviation-rule reminders from the dropped span across
     // the boundary — losing one re-opens the loop it was injected to break.
@@ -380,23 +502,44 @@ export default class CompactionService {
     // ── Shrink guard ───────────────────────────────────────────
     // If the "compacted" conversation is not actually smaller (a tail-heavy
     // history can produce summary-of-summary growth), keep the original
-    // messages — repeated compaction of a non-shrinking history only burns
-    // LLM calls and can loop.
+    // messages. Not a breaker failure — the model worked; instead the
+    // conversation cools down until its history has grown (see above).
     if (postCompactTokenCount >= preCompactTokenCount) {
-      this.consecutiveFailures++;
+      const entry = this.touchBreaker(breakerKey);
+      entry.noShrinkAtTokens = preCompactTokenCount;
       logger.warn(
-        `[CompactionService] Compaction did not shrink the conversation ` +
-          `(${preCompactTokenCount} → ${postCompactTokenCount} tokens). Discarding result.`,
+        `[CompactionService] Compaction did not shrink ${breakerKey} ` +
+          `(${preCompactTokenCount} → ${postCompactTokenCount} tokens). Discarding result; ` +
+          `shrink-guard bail-out (not a breaker failure) — next attempt once the history grows ` +
+          `${Math.round(COMPACTION.NO_SHRINK_RETRY_GROWTH_FRACTION * 100)}%.`,
       );
       options.emit?.({
         type: SERVER_SENT_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.COMPACTION_FAILED,
       });
-      return null;
+      return skip("did_not_shrink");
     }
 
     // ── Reset circuit breaker on success ──────────────────────
-    this.consecutiveFailures = 0;
+    this.breakers.delete(breakerKey);
+
+    const boundary: CompactionBoundary | null = throughMessageId
+      ? {
+          summary: summaryWithRecovery,
+          throughMessageId,
+          createdAt: new Date().toISOString(),
+          provider: compactionProvider,
+          model: compactionModel,
+          tokensBefore: preCompactTokenCount,
+          tokensAfter: postCompactTokenCount,
+        }
+      : null;
+    if (!boundary) {
+      logger.info(
+        `[CompactionService] The summarized span of ${breakerKey} ends in a message persisted before ` +
+          `message ids — the boundary is not persisted; the next turn re-summarizes.`,
+      );
+    }
 
     logger.info(
       `[CompactionService] Compaction complete: ${preCompactTokenCount} → ${postCompactTokenCount} tokens ` +
@@ -409,6 +552,9 @@ export default class CompactionService {
       message: STATUS_MESSAGES.COMPACTION_COMPLETE,
       preCompactTokens: preCompactTokenCount,
       postCompactTokens: postCompactTokenCount,
+      // The boundary the turn persists — the client's compaction marker
+      // (null when the covered span cannot be addressed yet).
+      boundary,
     });
 
     // Emit usage for the compaction call so the UI token badge updates
@@ -442,49 +588,41 @@ export default class CompactionService {
     }
 
     return {
-      compactedMessages,
-      summaryText,
-      preCompactTokenCount,
-      postCompactTokenCount,
-      compactionUsage: result!.usage || { inputTokens: 0, outputTokens: 0 },
+      result: {
+        compactedMessages,
+        summaryText,
+        preCompactTokenCount,
+        postCompactTokenCount,
+        compactionUsage: result!.usage || { inputTokens: 0, outputTokens: 0 },
+        boundary,
+      },
+      skipReason: null,
     };
   }
 
-  /** Reset the circuit breaker (for testing or session boundaries). */
-  static resetCircuitBreaker(): void {
-    this.consecutiveFailures = 0;
+  /** Reset one conversation's breaker, or every breaker (tests, session boundaries). */
+  static resetCircuitBreaker(conversationId?: string | null): void {
+    if (conversationId === undefined) {
+      this.breakers.clear();
+    } else {
+      this.breakers.delete(this.breakerKey(conversationId));
+    }
   }
 }
 
 // ── Helper: Extract recent conversation tail ──────────────────
 
 /**
- * Extract the most recent user turns and their assistant responses.
- * These are appended after the summary so the model has immediate
- * context to continue from.
+ * Extract the recency-protected window (RecencyProtection.ts): the last
+ * few model calls and everything after the first of them. Appended after
+ * the summary so the model has immediate context to continue from — and
+ * everything older, including earlier iterations of the CURRENT run, is
+ * what the summary replaces.
  *
- * Claude Code equivalent: the "messagesToKeep" logic in compact.ts
- * which preserves the last N turns after compaction.
+ * Claude Code equivalent: the "messagesToKeep" logic in compact.ts.
  */
-const RECENT_TAIL_TURN_COUNT = COMPACTION.RECENT_TAIL_TURN_COUNT;
-
 function extractRecentTail(messages: AdminChatMessage[]): AdminChatMessage[] {
-  // Walk backwards counting user turns
-  let userTurnsSeen = 0;
-  // Default to 0 so that if the conversation has fewer user turns than
-  // RECENT_TAIL_TURN_COUNT, we preserve all messages (except system)
-  // in the tail instead of discarding the entire history.
-  let tailStartIndex = 0;
-
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === "user") {
-      userTurnsSeen++;
-      if (userTurnsSeen >= RECENT_TAIL_TURN_COUNT) {
-        tailStartIndex = i;
-        break;
-      }
-    }
-  }
+  const tailStartIndex = findRecencyBoundary(messages);
 
   // Extract the tail, skipping system messages (already in
   // compactedMessages) — EXCEPT deviation-rule reminders, which must

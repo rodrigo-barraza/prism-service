@@ -43,6 +43,7 @@ import type {
   PassState,
 } from "../types.ts";
 import type { ChatMessage } from "#src/types/admin";
+import type { CompactionBoundary } from "#src/services/compact/CompactionBoundary";
 
 // ── Mocks: model, tools, database — the context pipeline stays real ──
 
@@ -501,14 +502,7 @@ describe("compaction is paid once", () => {
     expect(statusEvents(turn1.emit, STATUS_MESSAGES.COMPACTION_COMPLETE)).toHaveLength(1);
 
     const { messages: persistedTurn1, meta } = lastAppend();
-    const boundary = meta.compaction as {
-      summary: string;
-      throughMessageId: string;
-      createdAt: string;
-      model: string;
-      tokensBefore: number;
-      tokensAfter: number;
-    };
+    const boundary = meta.compaction as CompactionBoundary;
     expect(boundary).toBeDefined();
     expect(boundary.summary).toContain(SUMMARY_TEXT);
     expect(boundary.tokensAfter).toBeLessThan(boundary.tokensBefore);
@@ -610,7 +604,9 @@ describe("summarization comes before lossy truncation (200K window, 64K max outp
     const compacted = statusEvents(emit, STATUS_MESSAGES.COMPACTION_COMPLETE);
     expect(compacted.length).toBeGreaterThan(0);
     expect(statusEvents(emit, STATUS_MESSAGES.CONTEXT_TRUNCATED)).toHaveLength(0);
-    expect(Math.max(...seen.map(estimateOf))).toBeLessThan(WINDOW - MAX_OUT / 2);
+    // Compaction fires at its force threshold (167K + 6.5K); no call ever
+    // needed the ~177K truncation budget ((200K − 1,024 − 4,096) / 1.1).
+    expect(Math.max(...seen.map(estimateOf))).toBeLessThan(177_000);
   });
 
   it("truncates only when compaction cannot run, and logs why", async () => {

@@ -144,6 +144,8 @@ export async function runGraphOfThoughts(
         context,
         state,
         "GraphOfThoughts",
+        undefined,
+        harness.estimateRequestOverheadTokens(),
       );
       currentMessages = pressureResult.messages;
 

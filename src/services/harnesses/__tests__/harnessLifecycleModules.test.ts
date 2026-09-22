@@ -136,11 +136,20 @@ vi.mock("#src/services/compact/AutoCompactionTrigger", () => ({
   },
 }));
 
-vi.mock("#src/services/compact/CompactionService", () => ({
-  default: {
-    compactConversation: vi.fn(),
-  },
-}));
+vi.mock("#src/services/compact/CompactionService", () => {
+  const compactConversation = vi.fn();
+  return {
+    default: {
+      compactConversation,
+      // ContextShrinkStrategy calls attemptCompaction; route it through the
+      // compactConversation mock the assertions below read.
+      attemptCompaction: async (...args: unknown[]) => ({
+        result: await compactConversation(...args),
+        skipReason: null,
+      }),
+    },
+  };
+});
 
 vi.mock("#src/services/ConversationEmbeddingService", () => ({
   default: {
@@ -601,6 +610,7 @@ describe("Harness Lifecycle Modules", () => {
       traceId: "trace",
       conversationId: "conv",
       emit: vi.fn(),
+      messages: [],
     };
 
     const mockAgenticLoopState = {
@@ -608,6 +618,8 @@ describe("Harness Lifecycle Modules", () => {
       compactionPerformed: false,
       preCompactTokenCount: 0,
       postCompactTokenCount: 0,
+      turnTranscript: null,
+      turnTranscriptSeen: new WeakSet(),
     };
 
     it("should return messages unchanged when pressure is low", async () => {
