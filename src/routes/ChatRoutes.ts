@@ -19,6 +19,7 @@ import {
   applyCompactionBoundary,
   loadCompactionBoundary,
 } from "#src/services/compact/CompactionBoundary";
+import { applyContextWindowLimit } from "#src/services/compact/ContextBudgets";
 import crypto from "crypto";
 import { getProvider } from "#src/providers/index";
 import { ProviderError } from "#src/utils/errors";
@@ -558,7 +559,12 @@ async function prepareGenerationContext(
   // ── Resolve model ─────────────────────────────────────────
   // resolvedModel is set earlier (before load balancing) and may have
   // been updated to a quant variant by the model availability check.
-  const modelDefinition = getModelByName(resolvedModel);
+  // `contextWindowLimit` (optional, tokens) caps the window context
+  // management works from — see applyContextWindowLimit.
+  const modelDefinition = applyContextWindowLimit(
+    getModelByName(resolvedModel),
+    (params as Record<string, unknown>).contextWindowLimit,
+  );
   const isImageAPIModel =
     (modelDefinition as Record<string, unknown> | null)?.imageAPI &&
     provider.generateImage;
