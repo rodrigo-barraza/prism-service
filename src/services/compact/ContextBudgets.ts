@@ -85,39 +85,116 @@ export interface RequestInputEstimate {
   source: "reported" | "estimated";
 }
 
+/** Real-to-chars/4 ratios outside this band are treated as measurement noise. */
+const MINIMUM_CALIBRATION_RATIO = 0.5;
+const MAXIMUM_CALIBRATION_RATIO = 2;
+
+function clampCalibrationRatio(ratio: number): number {
+  return Math.min(
+    MAXIMUM_CALIBRATION_RATIO,
+    Math.max(MINIMUM_CALIBRATION_RATIO, ratio),
+  );
+}
+
+export interface RequestEstimateInputs {
+  /** chars/4 system prompt + tool schema tokens. */
+  overheadTokens: number;
+  /** The latest model call of this loop (reported input + the messages it carried). */
+  baseline?: ProviderInputBaseline | null;
+  /**
+   * real ÷ chars/4 measured on an earlier turn of the same conversation
+   * (its persisted contextBudget) — calibrates the estimate before this
+   * turn's first report.
+   */
+  calibrationRatio?: number | null;
+}
+
+/**
+ * real ÷ chars/4 for the call behind `baseline` — how far the heuristic is
+ * off for THIS conversation's content (dense JSON, PDFs, code, schemas).
+ */
+function baselineRatio(
+  baseline: ProviderInputBaseline,
+  overheadTokens: number,
+): number {
+  const estimated = baseline.messageTokens + overheadTokens;
+  return estimated > 0
+    ? clampCalibrationRatio(baseline.inputTokens / estimated)
+    : 1;
+}
+
+function fallbackRatio(calibrationRatio?: number | null): number {
+  return typeof calibrationRatio === "number" &&
+    Number.isFinite(calibrationRatio) &&
+    calibrationRatio > 0
+    ? clampCalibrationRatio(calibrationRatio)
+    : 1;
+}
+
 /**
  * Estimate the input tokens the NEXT request will carry.
  *
  * With a baseline (the previous model call of this loop reported its real
- * input): reported tokens + the chars/4 change in the message array since.
- * The report already contains the system prompt, tool schemas and cached
- * prefix, and it reflects the real tokenizer — dense content (JSON, hex,
- * code) that chars/4 undercounts by 2–3× is counted as it is billed.
+ * input): reported tokens + the chars/4 growth of the message array since,
+ * scaled by that same call's real÷estimate ratio. The report already
+ * contains the system prompt, tool schemas and cached prefix, counted by
+ * the real tokenizer — chars/4 is off by 30 % either way depending on the
+ * content (a live PDF-reading run measured 0.70; dense JSON and code go
+ * the other way).
  *
- * Without one (the first call of a turn, or a harness that records none):
- * chars/4 of the messages plus the system prompt and tool schemas
- * (`overheadTokens`) — the categories ContextBudgetTracker reports, which
- * the old trigger left out.
+ * Without one (the first call of a turn): chars/4 of the messages plus the
+ * system prompt and tool schemas (`overheadTokens`) — the categories
+ * ContextBudgetTracker reports, which the old trigger left out — scaled by
+ * the ratio an earlier turn of this conversation measured, when known.
  */
 export function estimateRequestInputTokens({
   messageTokens,
   overheadTokens,
   baseline,
-}: {
-  messageTokens: number;
-  overheadTokens: number;
-  baseline?: ProviderInputBaseline | null;
-}): RequestInputEstimate {
+  calibrationRatio,
+}: RequestEstimateInputs & { messageTokens: number }): RequestInputEstimate {
   if (baseline && baseline.inputTokens > 0) {
     return {
       tokens: Math.max(
         0,
-        baseline.inputTokens + (messageTokens - baseline.messageTokens),
+        Math.round(
+          baseline.inputTokens +
+            (messageTokens - baseline.messageTokens) *
+              baselineRatio(baseline, overheadTokens),
+        ),
       ),
       source: "reported",
     };
   }
-  return { tokens: messageTokens + overheadTokens, source: "estimated" };
+  return {
+    tokens: Math.round(
+      (messageTokens + overheadTokens) * fallbackRatio(calibrationRatio),
+    ),
+    source: "estimated",
+  };
+}
+
+/**
+ * The inverse: the largest chars/4 message size whose request estimate
+ * stays within `requestBudget`. ContextWindowManager measures only the
+ * messages; this puts its budget in the same units as the trigger, so the
+ * truncation budget and the compaction threshold cannot cross through a
+ * unit mismatch.
+ */
+export function messageTokenBudget(
+  requestBudget: number,
+  { overheadTokens, baseline, calibrationRatio }: RequestEstimateInputs,
+): number {
+  if (baseline && baseline.inputTokens > 0) {
+    return Math.floor(
+      baseline.messageTokens +
+        (requestBudget - baseline.inputTokens) /
+          baselineRatio(baseline, overheadTokens),
+    );
+  }
+  return Math.floor(
+    requestBudget / fallbackRatio(calibrationRatio) - overheadTokens,
+  );
 }
 
 /** Smallest `contextWindowLimit` honoured — below it a turn cannot hold a system prompt, tools and a reply. */

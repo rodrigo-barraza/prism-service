@@ -9,6 +9,7 @@ import {
   computeContextBudgets,
   estimateRequestInputTokens,
   applyContextWindowLimit,
+  messageTokenBudget,
   MINIMUM_CONTEXT_WINDOW_LIMIT,
 } from "#src/services/compact/ContextBudgets";
 import { findRecencyBoundary } from "#src/services/compact/RecencyProtection";
@@ -74,11 +75,47 @@ describe("estimateRequestInputTokens — the trigger counts the whole request", 
     const estimate = estimateRequestInputTokens({
       messageTokens: 42_000,
       overheadTokens: 12_000,
-      baseline: { inputTokens: 90_000, messageTokens: 40_000 },
+      baseline: { inputTokens: 52_000, messageTokens: 40_000 },
     });
     // The report already contains system, tools and the real tokenizer's
     // count; only the 2K of new messages is added on top.
-    expect(estimate).toEqual({ tokens: 92_000, source: "reported" });
+    expect(estimate).toEqual({ tokens: 54_000, source: "reported" });
+  });
+
+  it("scales the growth by the ratio the report measured", () => {
+    // Real input was 70 % of chars/4 (a live PDF run measured 0.68–0.76):
+    // 4K chars/4 of new content is ~2.8K real tokens, not 4K.
+    const estimate = estimateRequestInputTokens({
+      messageTokens: 44_000,
+      overheadTokens: 30_000,
+      baseline: { inputTokens: 49_000, messageTokens: 40_000 },
+    });
+    expect(estimate.tokens).toBe(51_800);
+  });
+
+  it("calibrates the first call of a turn with an earlier turn's ratio", () => {
+    expect(
+      estimateRequestInputTokens({
+        messageTokens: 20_000,
+        overheadTokens: 30_000,
+        calibrationRatio: 0.7,
+      }),
+    ).toEqual({ tokens: 35_000, source: "estimated" });
+    // Implausible ratios are clamped, not trusted.
+    expect(
+      estimateRequestInputTokens({ messageTokens: 10_000, overheadTokens: 0, calibrationRatio: 0.01 }).tokens,
+    ).toBe(5_000);
+  });
+
+  it("messageTokenBudget is the inverse — truncation and trigger share units", () => {
+    const inputs = {
+      overheadTokens: 30_000,
+      baseline: { inputTokens: 49_000, messageTokens: 40_000 },
+    };
+    const budget = messageTokenBudget(60_000, inputs);
+    expect(estimateRequestInputTokens({ messageTokens: budget, ...inputs }).tokens).toBeLessThanOrEqual(60_000);
+    expect(estimateRequestInputTokens({ messageTokens: budget + 10, ...inputs }).tokens).toBeGreaterThan(60_000);
+    expect(messageTokenBudget(60_000, { overheadTokens: 30_000, calibrationRatio: 0.75 })).toBe(50_000);
   });
 
   it("the reported tokens dominate the chars/4 heuristic once available", () => {
@@ -96,9 +133,9 @@ describe("estimateRequestInputTokens — the trigger counts the whole request", 
     const estimate = estimateRequestInputTokens({
       messageTokens: 10_000,
       overheadTokens: 2_000,
-      baseline: { inputTokens: 100_000, messageTokens: 80_000 },
+      baseline: { inputTokens: 82_000, messageTokens: 80_000 },
     });
-    expect(estimate.tokens).toBe(30_000);
+    expect(estimate.tokens).toBe(12_000);
   });
 
   it("ignores a baseline without reported input", () => {

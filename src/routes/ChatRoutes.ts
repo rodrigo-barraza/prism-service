@@ -17,7 +17,7 @@ import {
 } from "#src/services/harnesses/lifecycle/Finalizer";
 import {
   applyCompactionBoundary,
-  loadCompactionBoundary,
+  loadCompactionState,
 } from "#src/services/compact/CompactionBoundary";
 import { applyContextWindowLimit } from "#src/services/compact/ContextBudgets";
 import crypto from "crypto";
@@ -422,12 +422,13 @@ async function prepareGenerationContext(
   let activeMessages = strippedMessages;
   const agentCollection = getCollectionOpts(project, agent)?.collection;
   if (agenticLoopEnabled && incomingConversationId && agentCollection) {
-    const boundary = await loadCompactionBoundary(
+    const { boundary, calibrationRatio } = await loadCompactionState(
       incomingConversationId,
       String(project),
       String(username),
       agentCollection,
     );
+    if (calibrationRatio) options._inputCalibrationRatio = calibrationRatio;
     if (boundary) {
       const loaded = applyCompactionBoundary(strippedMessages, boundary);
       activeMessages = loaded.messages;

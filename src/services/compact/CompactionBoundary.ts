@@ -228,27 +228,51 @@ export function applyCompactionBoundary<T extends object>(
   };
 }
 
+export interface CompactionState {
+  boundary: CompactionBoundary | null;
+  /**
+   * real ÷ chars/4 input ratio the conversation's last turn measured
+   * (its persisted contextBudget) — calibrates the next turn's first
+   * compaction-trigger estimate (ContextBudgets.estimateRequestInputTokens).
+   */
+  calibrationRatio: number | null;
+}
+
+/** The compaction state carried by a loaded conversation document. */
+export function readCompactionState(document: unknown): CompactionState {
+  const fields = (document || {}) as {
+    compaction?: unknown;
+    contextBudget?: { calibrationRatio?: unknown } | null;
+  };
+  const ratio = fields.contextBudget?.calibrationRatio;
+  return {
+    boundary: isCompactionBoundary(fields.compaction) ? fields.compaction : null,
+    calibrationRatio:
+      typeof ratio === "number" && Number.isFinite(ratio) && ratio > 0 ? ratio : null,
+  };
+}
+
 /**
- * Read a conversation's boundary. Fail-open: any read error means "no
- * boundary" — the turn then loads the full history, exactly as before.
+ * Read a conversation's boundary and calibration. Fail-open: any read error
+ * means "nothing known" — the turn then loads the full history, exactly as
+ * before.
  */
-export async function loadCompactionBoundary(
+export async function loadCompactionState(
   conversationId: string,
   project: string,
   username: string,
   collection: string,
-): Promise<CompactionBoundary | null> {
+): Promise<CompactionState> {
   try {
     const document = await MongoWrapper.getCollection(MONGO_DB_NAME, collection).findOne(
       { id: conversationId, project, username },
-      { projection: { compaction: 1 } },
+      { projection: { compaction: 1, "contextBudget.calibrationRatio": 1 } },
     );
-    const boundary = (document as { compaction?: unknown } | null)?.compaction;
-    return isCompactionBoundary(boundary) ? boundary : null;
+    return readCompactionState(document);
   } catch (error: unknown) {
     logger.warn(
       `[CompactionBoundary] Could not read the boundary of ${conversationId} — loading full history: ${errorMessage(error)}`,
     );
-    return null;
+    return { boundary: null, calibrationRatio: null };
   }
 }

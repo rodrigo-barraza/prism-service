@@ -499,6 +499,8 @@ export default class BaseAgenticHarness {
         maxOutputTokens: options.maxTokens || DEFAULT_MAX_OUTPUT_TOKENS,
         toolCount,
         fixedOverheadTokens: this.estimateRequestOverheadTokens(),
+        providerInputBaseline: this.state.providerInputBaseline,
+        calibrationRatio: options._inputCalibrationRatio as number | undefined,
         truncationReason: truncationReason || undefined,
         locale: options?.locale as string | undefined || DEFAULT_LOCALE,
       },
