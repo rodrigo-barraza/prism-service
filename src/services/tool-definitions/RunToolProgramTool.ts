@@ -225,6 +225,7 @@ function abortPromise(signal: AbortSignal): { promise: Promise<never>; dispose: 
 
 const runToolProgramTool = {
   name: RUN_TOOL_PROGRAM_NAME,
+  capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS[RUN_TOOL_PROGRAM_NAME],
   description:
     "Run a small JavaScript program that calls several READ-ONLY tools and returns only the " +
@@ -314,6 +315,7 @@ const runToolProgramTool = {
     // Tier AUTO (read-only) calls pass `check()`.
     const approvalEngine = new AutoApprovalEngine({
       policies: context._policies ?? [],
+      permissionRules: context._permissionRules ?? null,
       fullAuto: false,
     });
     const enabledTools = Array.isArray(context.enabledTools)

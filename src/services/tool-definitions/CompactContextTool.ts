@@ -27,6 +27,7 @@ const COMPACT_CONTEXT_NAME = TOOL_NAMES.COMPACT_CONTEXT;
 
 const compactContext = {
   name: COMPACT_CONTEXT_NAME,
+  capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS[COMPACT_CONTEXT_NAME],
   description:
     "Compress this conversation's older context into a summary at the next step. " +

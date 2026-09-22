@@ -32,6 +32,7 @@ const PROTECTED_TOOL_NAMES = new Set<string>([
 // ── enable_tools ─────────────────────────────────────────────
 const enableTools = {
   name: TOOL_NAMES.ENABLE_TOOLS,
+  capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.ENABLE_TOOLS],
   description:
     "REQUIRED after search_tools: Activate tools discovered by search_tools so you can call them. " +
@@ -206,6 +207,7 @@ const enableTools = {
 // ── disable_tools ────────────────────────────────────────────
 const disableTools = {
   name: TOOL_NAMES.DISABLE_TOOLS,
+  capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.DISABLE_TOOLS],
   description:
     "Dynamically disable tools from this conversation to reduce token usage and tool interference. " +

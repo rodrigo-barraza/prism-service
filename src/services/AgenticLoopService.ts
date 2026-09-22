@@ -68,6 +68,24 @@ export default class AgenticLoopService {
     // Load any persisted tool state from MongoDB (e.g. after server restart or previous turn)
     await ToolContext.ensureLoaded(resolvedAgentConversationId);
 
+    // Permission rules resolve here, inside the loop, so every entry point —
+    // the chat route, scheduled tasks, conversation timers, sub-agents and
+    // auto-responses — is checked against them. A sub-agent arrives with its
+    // parent's rule set already on the options and keeps it.
+    if (!options._permissionRules) {
+      const { default: PermissionRuleSet } = await import(
+        "./permissions/PermissionRuleSet.ts"
+      );
+      options._permissionRules = await PermissionRuleSet.load({
+        username,
+        profileId: context.profileId,
+        project,
+        agent,
+        conversationId,
+        workspaceRoot: context.workspaceRoot,
+      });
+    }
+
     // 1. Resolve tools (passing agentConversationId so dynamicEnabledTools is merged)
     let resolvedTools = await AgenticToolResolver.resolve({
       options,

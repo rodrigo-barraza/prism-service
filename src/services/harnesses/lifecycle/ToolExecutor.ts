@@ -310,6 +310,7 @@ export async function executeToolBatch(
               // the spawn path let delegated work bypass every safety gate.
               _autoApprove: context.options?.autoApprove === true,
               _policies: context.options?.policies,
+              _permissionRules: context.options?._permissionRules,
               _enableCriticGate: context.options?.enableCriticGate,
               _criticModel: context.options?.criticModel,
               _maxCostDollars: context.options?.maxCostDollars,

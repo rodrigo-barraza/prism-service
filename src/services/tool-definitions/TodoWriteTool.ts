@@ -36,6 +36,7 @@ interface TodoContext extends InternalToolContext {
 
 export default {
   name: TOOL_NAMES.WRITE_TODO,
+  capabilities: [] as const,
 
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.WRITE_TODO],
   description:

@@ -75,6 +75,7 @@ import ollamaRouter from "./routes/OllamaRoutes.ts";
 import skillsRouter from "./routes/SkillsRoutes.ts";
 import rulesRouter from "./routes/RulesRoutes.ts";
 import hooksRouter from "./routes/HooksRoutes.ts";
+import permissionsRouter from "./routes/PermissionsRoutes.ts";
 import projectInstructionsRouter from "./routes/ProjectInstructionsRoutes.ts";
 import agentMemoriesRouter from "./routes/AgentMemoriesRoutes.ts";
 import workflowMemoriesRouter from "./routes/WorkflowMemoriesRoutes.ts";
@@ -214,6 +215,7 @@ app.use("/ollama", ollamaRouter);
 app.use("/skills", skillsRouter);
 app.use("/rules", rulesRouter);
 app.use("/hooks", hooksRouter);
+app.use("/permissions", permissionsRouter);
 app.use("/project-instructions", projectInstructionsRouter);
 app.use("/agent-memories", agentMemoriesRouter);
 app.use("/workflow-memories", workflowMemoriesRouter);
@@ -260,7 +262,7 @@ setupWebSocket(wss);
       const indexDefinitions: Array<{
         collection: string;
         keys: Record<string, number>;
-        options?: { unique: boolean };
+        options?: { unique?: boolean; expireAfterSeconds?: number };
       }> = [
         // requests — primary lookup by requestId (admin detail view)
         {
@@ -544,6 +546,27 @@ setupWebSocket(wss);
           collection: COLLECTIONS.WORKFLOW_MEMORIES,
           keys: { conversationId: 1, agentConversationId: 1 },
           options: { unique: true },
+        },
+        // permission_rules — loaded per profile, addressed by generated id
+        {
+          collection: COLLECTIONS.PERMISSION_RULES,
+          keys: { id: 1 },
+          options: { unique: true },
+        },
+        {
+          collection: COLLECTIONS.PERMISSION_RULES,
+          keys: { username: 1, profileId: 1, createdAt: -1 },
+        },
+        // permission_decisions — approval history behind rule suggestions,
+        // expired after APPROVAL_HISTORY.RETENTION_DAYS (90)
+        {
+          collection: COLLECTIONS.PERMISSION_DECISIONS,
+          keys: { username: 1, profileId: 1, at: -1 },
+        },
+        {
+          collection: COLLECTIONS.PERMISSION_DECISIONS,
+          keys: { at: 1 },
+          options: { expireAfterSeconds: 90 * 86_400 },
         },
         // profiles — roster of switchable identities per {project, username};
         // profileId keys every profile-partitioned collection above (legacy

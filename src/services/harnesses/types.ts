@@ -55,6 +55,11 @@ export interface ToolCall {
   _approval?: {
     tier: number | string;
     tierLabel: string;
+    /** Which permission layer decided, and by which rule (permissions/types). */
+    layer?: string;
+    rule?: string;
+    ruleId?: string;
+    ruleScope?: string;
     isApproved?: boolean;
     isDenied?: boolean;
     reason?: string;
@@ -255,6 +260,11 @@ export interface AgenticOptions {
    * the sub-agent tree so delegation cannot escape the budget.
    */
   _sharedCostBudget?: import("./lifecycle/CostBudgetEnforcer.ts").SharedCostBudget;
+  /**
+   * The run's stored permission rules. Loaded by AgenticLoopService for every
+   * entry point; a sub-agent inherits its parent's (see `forSubAgent`).
+   */
+  _permissionRules?: import("#src/services/permissions/PermissionRuleSet").default;
   /** Per-tool wall-clock timeout in milliseconds. 0 disables. Defaults to HARNESS.DEFAULT_TOOL_TIMEOUT_MILLISECONDS. */
   toolTimeoutMilliseconds?: number;
   /** Iteration interval at which abbreviated system prompt reminders are re-injected to counteract instruction fade-out. Default: 8. */
