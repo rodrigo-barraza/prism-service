@@ -189,6 +189,17 @@ export interface SseRequestOptions {
  * When `persistOnDisconnect` is false (default), connection close also
  * aborts the stop controller (legacy behavior for non-agentic routes).
  */
+/**
+ * The id an agent turn's session is registered under: the request's
+ * conversationId, else the one /agent minted for a new conversation
+ * (`serverConversationId`, which handleAgent adopts).
+ */
+function agentSessionKey(params: ChatRequest): string | undefined {
+  const fields = params as Record<string, unknown>;
+  const id = fields.conversationId || fields.serverConversationId;
+  return typeof id === "string" && id ? id : undefined;
+}
+
 export async function handleSseRequest(
   req: Request,
   res: Response,
@@ -227,9 +238,7 @@ export async function handleSseRequest(
   // in the session registry so POST /agent/stop can abort it explicitly.
   // For non-persistent sessions (/chat), reuse the connection controller
   // as the stop signal (legacy behavior: disconnect = abort).
-  const conversationId = (params as Record<string, unknown>).conversationId as
-    | string
-    | undefined;
+  const conversationId = agentSessionKey(params);
   let stopController: AbortController;
 
   if (persistOnDisconnect && conversationId) {
@@ -325,9 +334,7 @@ export async function handleJsonRequest(
   options: { registerAgentSession?: boolean } = {},
 ) {
   const connectionStartTime = Date.now();
-  const conversationId = (params as Record<string, unknown>).conversationId as
-    | string
-    | undefined;
+  const conversationId = agentSessionKey(params);
 
   // Agent turns must register in the session registry even on the JSON
   // (?stream=false) path — otherwise POST /agent/stop cannot find them and

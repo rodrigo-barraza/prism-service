@@ -883,7 +883,13 @@ export async function handleAgent(
   // ── Agent conversation identity ─────────────────────────────────
   const resolvedAgentConversationId =
     agentConversationId || crypto.randomUUID();
-  const conversationId = incomingConversationId || crypto.randomUUID();
+  // A new conversation's id was minted by /agent before the session layer
+  // registered the turn under it (AgentRoutes: serverConversationId).
+  const serverConversationId =
+    typeof params.serverConversationId === "string" && params.serverConversationId
+      ? params.serverConversationId
+      : null;
+  const conversationId = incomingConversationId || serverConversationId || crypto.randomUUID();
   // The request layer binds the direct-viewer broadcast to the REQUEST's
   // conversationId — undefined when the id is minted server-side (every
   // lupos turn, any new conversation). Rebind here with the resolved id or
