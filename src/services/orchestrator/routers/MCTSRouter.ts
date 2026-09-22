@@ -21,6 +21,7 @@ import RequestLogger from "#src/services/RequestLogger";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { ORCHESTRATOR, SYSTEM_STATUSES } from "#src/constants";
+import { settleCompetingWorktrees } from "#src/services/orchestrator/WorktreeMergeBack";
 
 const DEFAULT_MAXIMUM_DEPTH = ORCHESTRATOR.ROUTERS.DEFAULT_MCTS_DEPTH;
 const DEFAULT_BRANCH_FACTOR = ORCHESTRATOR.ROUTERS.DEFAULT_MCTS_BRANCH_FACTOR;
@@ -492,6 +493,8 @@ export class MCTSRouter implements TopologyRouter {
           totalRounds: searchIterations,
           orchestratorContext,
           awaitCompletion: true,
+          // Sibling nodes are alternatives: none merges until the search picks one.
+          preserveWorktree: true,
         });
       }
 
@@ -721,10 +724,12 @@ export class MCTSRouter implements TopologyRouter {
     // BUILD FINAL RESULT — select highest-scoring node across the tree
     // ════════════════════════════════════════════════════════════════════
 
+    let bestNodeAgentId: string | null = null;
     if (allTreeNodes.length > 0) {
       const bestOverallNode = allTreeNodes.reduce((bestNode, currentNode) =>
         currentNode.score > bestNode.score ? currentNode : bestNode,
       );
+      bestNodeAgentId = bestOverallNode.result.agent_id;
 
       const treeDepthReached = Math.max(
         ...allTreeNodes.map((node) => node.depth),
@@ -753,6 +758,12 @@ export class MCTSRouter implements TopologyRouter {
       allResults.push(searchSummary);
     }
 
+    // Only the best node's work merges back; every other node keeps a branch.
+    await settleCompetingWorktrees(
+      allResults,
+      bestNodeAgentId,
+      orchestratorContext.emit,
+    );
     return allResults;
   }
 }

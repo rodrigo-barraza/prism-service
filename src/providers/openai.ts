@@ -200,25 +200,86 @@ const OPENAI_ALLOWED_SCHEMA_KEYWORDS = new Set([
   "$ref",
 ]);
 
+/** Schema keywords whose value is a map of name → subschema. */
+const SCHEMA_MAP_KEYWORDS = new Set([
+  "properties",
+  "$defs",
+  "definitions",
+  "patternProperties",
+]);
+
+/** Schema keywords whose value is data, not a subschema. */
+const SCHEMA_VALUE_KEYWORDS = new Set(["enum", "const", "default", "examples"]);
+
 /**
- * Recursively sanitize a JSON Schema for OpenAI strict mode (Responses API).
+ * True when a JSON Schema contains an OPEN object anywhere: `type: "object"`
+ * with no `properties` (a free-form map such as `run_async_task.toolArguments`
+ * or `authenticate_mcp_server.env`), or with `additionalProperties` set to
+ * anything but `false`. Strict mode requires every object to be closed, so
+ * such a tool cannot be strict — strict sanitization would turn the map into
+ * `{properties: {}, additionalProperties: false}` and the model could only
+ * ever send `{}` for it. An explicit empty `properties: {}` (a no-argument
+ * tool) counts as closed.
+ */
+export function hasOpenObjectSchema(schema: unknown): boolean {
+  if (!schema || typeof schema !== "object") return false;
+  if (Array.isArray(schema)) return schema.some(hasOpenObjectSchema);
+
+  const node = schema as Record<string, unknown>;
+  const isObjectType =
+    node.type === "object" ||
+    (Array.isArray(node.type) && node.type.includes("object"));
+  if (isObjectType) {
+    const hasProperties =
+      !!node.properties &&
+      typeof node.properties === "object" &&
+      !Array.isArray(node.properties);
+    if (!hasProperties) return true;
+    if (
+      node.additionalProperties !== undefined &&
+      node.additionalProperties !== false
+    ) {
+      return true;
+    }
+  }
+
+  for (const [key, value] of Object.entries(node)) {
+    if (!value || typeof value !== "object") continue;
+    if (SCHEMA_VALUE_KEYWORDS.has(key)) continue;
+    if (SCHEMA_MAP_KEYWORDS.has(key) && !Array.isArray(value)) {
+      if (Object.values(value).some(hasOpenObjectSchema)) return true;
+    } else if (hasOpenObjectSchema(value)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Recursively sanitize a JSON Schema for OpenAI function tools (Responses API).
  *
  * OpenAI strict mode requires:
  * - Every type:"object" must have `properties`, `required` (all keys), and `additionalProperties: false`
  * - Nullable types must use `anyOf: [{type:"T"}, {type:"null"}]`, NOT `type: ["T", "null"]`
  * - Forbidden keywords (pattern, minimum, maximum, default, etc.) must be stripped
  * - `anyOf` branches must each be independently valid
+ *
+ * With `strict = false` (a tool that carries an open object, see
+ * `hasOpenObjectSchema`) only the keyword allowlist and the `type`-array →
+ * `anyOf` rewrite apply: objects keep the openness and the optional fields
+ * their source schema declares.
  */
 export function sanitizeSchemaForOpenAI(
   schema: JsonValue | undefined,
   isInsidePropertiesMap = false,
+  strict = true,
 ): JsonValue | undefined {
   if (schema === undefined) return undefined;
   if (!schema || typeof schema !== "object") return schema;
 
   if (Array.isArray(schema)) {
     return (schema as JsonValue[]).map((item: JsonValue) =>
-      sanitizeSchemaForOpenAI(item),
+      sanitizeSchemaForOpenAI(item, false, strict),
     ) as JsonValue[];
   }
 
@@ -244,16 +305,16 @@ export function sanitizeSchemaForOpenAI(
       typeof value === "object" &&
       !Array.isArray(value)
     ) {
-      cleaned[key] = sanitizeSchemaForOpenAI(value, true) as JsonValue;
+      cleaned[key] = sanitizeSchemaForOpenAI(value, true, strict) as JsonValue;
     } else {
-      cleaned[key] = sanitizeSchemaForOpenAI(value) as JsonValue;
+      cleaned[key] = sanitizeSchemaForOpenAI(value, false, strict) as JsonValue;
     }
   }
 
   // Sanitize anyOf branches (each must be a valid strict-mode schema)
   if (Array.isArray(cleaned.anyOf)) {
     cleaned.anyOf = (cleaned.anyOf as JsonValue[]).map((branch: JsonValue) =>
-      sanitizeSchemaForOpenAI(branch) as JsonValue,
+      sanitizeSchemaForOpenAI(branch, false, strict) as JsonValue,
     );
   }
 
@@ -262,6 +323,7 @@ export function sanitizeSchemaForOpenAI(
   // field names). A field named "properties" would trigger `cleaned.properties !== undefined`
   // and corrupt the map with injected additionalProperties/required keys.
   if (
+    strict &&
     !isInsidePropertiesMap &&
     (cleaned.type === "object" || cleaned.properties !== undefined)
   ) {
@@ -365,17 +427,24 @@ function convertToolsToResponsesAPI(
   tools?: ToolSchema[] | null,
 ): OpenAI.Responses.Tool[] | null {
   if (!tools || !Array.isArray(tools) || tools.length === 0) return null;
-  return tools.map(
-    (tool: ToolSchema): OpenAI.Responses.Tool => ({
+  return tools.map((tool: ToolSchema): OpenAI.Responses.Tool => {
+    const parameters = (tool.parameters || {}) as unknown as JsonValue;
+    // A tool that takes a free-form map cannot be strict (strict mode closes
+    // every object). It goes out non-strict — explicitly, since the
+    // Responses API defaults `strict` to true — and every other tool keeps
+    // strict validation.
+    const strict = !hasOpenObjectSchema(parameters);
+    return {
       type: "function" as const,
       name: tool.name,
       description: tool.description || "",
-      parameters: sanitizeSchemaForOpenAI(
-        (tool.parameters || {}) as unknown as JsonValue,
-      ) as Record<string, unknown>,
-      strict: true,
-    }),
-  );
+      parameters: sanitizeSchemaForOpenAI(parameters, false, strict) as Record<
+        string,
+        unknown
+      >,
+      strict,
+    };
+  });
 }
 
 /** Narrow any errors into ProviderError for all catch blocks. */
@@ -472,6 +541,25 @@ function readMessagePhase(item: unknown): ResponsesPhase | undefined {
   return raw.phase === "commentary" || raw.phase === "final_answer"
     ? raw.phase
     : null;
+}
+
+/**
+ * The stop reason a finished Responses response reports, if any. Only an
+ * `incomplete` response has one: the output token cap is "length" — the
+ * value truncation recovery keys on — and a content filter is reported as
+ * itself, since re-asking for a continuation would just be filtered again.
+ */
+function responsesStopReason(response: unknown): string | undefined {
+  const record = response as {
+    status?: string;
+    incomplete_details?: { reason?: string } | null;
+  } | null;
+  const reason = record?.incomplete_details?.reason;
+  if (reason === "content_filter") return "content_filter";
+  if (reason === "max_output_tokens" || record?.status === "incomplete") {
+    return "length";
+  }
+  return undefined;
 }
 
 export function normalizeResponsesUsage(
@@ -1636,16 +1724,25 @@ const openaiProvider = {
         // Clean up
         delete pendingFunctions[typedEvent.item_id];
       }
-      // Completed response — extract usage and detect truncation
-      if (event.type === "response.completed") {
-        const typedEvent = event as OpenAI.Responses.ResponseCompletedEvent;
+      // Terminal response — extract usage, backfill output state, report
+      // how it ended. `response.incomplete` (the output token cap, or a
+      // content filter) carries the same usage and output as
+      // `response.completed`; reading only `completed` lost both and never
+      // reported the truncation.
+      if (
+        event.type === "response.completed" ||
+        event.type === "response.incomplete"
+      ) {
+        const typedEvent = event as
+          | OpenAI.Responses.ResponseCompletedEvent
+          | OpenAI.Responses.ResponseIncompleteEvent;
         if (typedEvent.response?.usage) {
           usage = normalizeResponsesUsage(typedEvent.response.usage);
         }
         if (typedEvent.response?.id) {
           providerResponseId = typedEvent.response.id;
         }
-        // The completed response carries the whole output: backfill any
+        // The terminal response carries the whole output: backfill any
         // encrypted_content / summary / phase a done event did not deliver.
         for (const item of typedEvent.response?.output ?? []) {
           if (item.type === "reasoning") {
@@ -1680,21 +1777,9 @@ const openaiProvider = {
             ? { reasoningItems: pendingReasoningItems.splice(0) }
             : {}),
         };
-        // Detect max_tokens truncation (Responses API uses "incomplete" status)
-        const responseRecord = typedEvent.response as unknown as Record<
-          string,
-          unknown
-        >;
-        const responseStatus = responseRecord?.status;
-        const incompleteReason = responseRecord?.incomplete_details;
-        if (
-          responseStatus === "incomplete" ||
-          (incompleteReason &&
-            typeof incompleteReason === "object" &&
-            (incompleteReason as Record<string, unknown>).reason ===
-              "max_output_tokens")
-        ) {
-          yield { type: "stopReason", stopReason: "length" };
+        const stopReason = responsesStopReason(typedEvent.response);
+        if (stopReason) {
+          yield { type: "stopReason", stopReason };
         }
       }
     }
@@ -1734,9 +1819,12 @@ const openaiProvider = {
     }
     if (isReasoning) {
       if (options.maxTokens) payload.max_completion_tokens = options.maxTokens;
-      if (options.reasoningEffort) {
+      // Same per-model vocabulary guard as the non-streaming and Responses
+      // paths: a level the model does not declare is a 400, not a downgrade.
+      const effort = effortForModel(model, options.reasoningEffort);
+      if (effort) {
         payload.reasoning_effort =
-          options.reasoningEffort as OpenAI.Chat.ChatCompletionCreateParamsStreaming["reasoning_effort"];
+          effort as OpenAI.Chat.ChatCompletionCreateParamsStreaming["reasoning_effort"];
       }
     } else {
       if (options.temperature !== undefined)

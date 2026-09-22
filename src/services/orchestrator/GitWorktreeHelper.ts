@@ -4,9 +4,69 @@ import { TOOLS_SERVICE_URL } from "#config";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import type {
   ToolsApiResponse,
+  WorktreeCommitResponse,
   WorktreeCreateResponse,
   WorktreeDiff,
+  WorktreeDiffFile,
+  WorktreeMergeResponse,
+  WorktreeRemoveResponse,
 } from "#src/types/orchestrator";
+
+const WORKTREE_FILE_STATUSES = new Set<string>([
+  "added",
+  "modified",
+  "deleted",
+  "renamed",
+  "copied",
+  "type-changed",
+]);
+
+function isWorktreeDiffFile(value: unknown): value is WorktreeDiffFile {
+  if (!value || typeof value !== "object") return false;
+  const file = value as Record<string, unknown>;
+  return (
+    typeof file.path === "string" &&
+    typeof file.status === "string" &&
+    WORKTREE_FILE_STATUSES.has(file.status) &&
+    (file.previousPath === undefined || typeof file.previousPath === "string")
+  );
+}
+
+/**
+ * Validate a tools-service diff response against the contract. Anything else
+ * (an error, an older tools-service's `{hasChanges, diff}` shape) is null, and
+ * a null diff never merges and never cleans up.
+ */
+export function parseWorktreeDiff(value: unknown): WorktreeDiff | null {
+  if (!value || typeof value !== "object") return null;
+  const diff = value as Record<string, unknown>;
+  const stats = diff.stats as Record<string, unknown> | undefined;
+  if (
+    typeof diff.branch !== "string" ||
+    typeof diff.base !== "string" ||
+    typeof diff.patch !== "string" ||
+    !Array.isArray(diff.files) ||
+    !diff.files.every(isWorktreeDiffFile) ||
+    !stats ||
+    typeof stats.filesChanged !== "number" ||
+    typeof stats.additions !== "number" ||
+    typeof stats.deletions !== "number"
+  ) {
+    return null;
+  }
+  return {
+    branch: diff.branch,
+    base: diff.base,
+    files: diff.files,
+    patch: diff.patch,
+    stats: {
+      filesChanged: stats.filesChanged,
+      additions: stats.additions,
+      deletions: stats.deletions,
+    },
+    ...(diff.patchTruncated === true && { patchTruncated: true }),
+  };
+}
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 export class GitWorktreeHelper {
@@ -67,7 +127,9 @@ export class GitWorktreeHelper {
           typeof errorData.error === "string"
             ? errorData.error
             : `API returned ${response.status}`;
-        return { error: errorMessage } as unknown as T;
+        // Keep the rest of the body: a refused merge names its conflicting
+        // files, a refused remove says it kept the worktree.
+        return { ...errorData, error: errorMessage } as unknown as T;
       }
       return (await response.json()) as T;
     } catch (error: unknown) {
@@ -90,15 +152,37 @@ export class GitWorktreeHelper {
     );
   }
 
+  /** Stage and commit everything in a worktree (tools-service runs git by argv). */
+  static async commitWorktree(
+    repositoryPath: string,
+    worktreePath: string,
+    message: string,
+  ): Promise<WorktreeCommitResponse> {
+    return GitWorktreeHelper.toolsApiPost<WorktreeCommitResponse>(
+      "/agentic/git/worktree/commit",
+      {
+        path: repositoryPath,
+        worktreePath,
+        message,
+      },
+    );
+  }
+
+  /**
+   * Remove a worktree and delete its branch. tools-service refuses (and keeps
+   * both) when that would lose work; `force` is for an explicit discard only.
+   */
   static async removeWorktree(
     repositoryPath: string,
     worktreePath: string,
-  ): Promise<ToolsApiResponse> {
-    return GitWorktreeHelper.toolsApiPost<ToolsApiResponse>(
+    options: { force?: boolean; deleteBranch?: boolean } = {},
+  ): Promise<WorktreeRemoveResponse> {
+    return GitWorktreeHelper.toolsApiPost<WorktreeRemoveResponse>(
       "/agentic/git/worktree/remove",
       {
         path: repositoryPath,
         worktreePath,
+        ...options,
       },
     );
   }
@@ -106,21 +190,28 @@ export class GitWorktreeHelper {
   static async getWorktreeDiff(
     repositoryPath: string,
     branchName: string,
-  ): Promise<ToolsApiResponse & Partial<WorktreeDiff>> {
-    return GitWorktreeHelper.toolsApiPost<
-      ToolsApiResponse & Partial<WorktreeDiff>
-    >("/agentic/git/worktree/diff", {
-      path: repositoryPath,
-      branch: branchName,
-    });
+  ): Promise<WorktreeDiff | { error: string }> {
+    const response = await GitWorktreeHelper.toolsApiPost<ToolsApiResponse>(
+      "/agentic/git/worktree/diff",
+      {
+        path: repositoryPath,
+        branch: branchName,
+      },
+    );
+    if (typeof response.error === "string") return { error: response.error };
+    return (
+      parseWorktreeDiff(response) ?? {
+        error: `tools-service returned a diff outside the contract for '${branchName}'`,
+      }
+    );
   }
 
   static async mergeWorktree(
     repositoryPath: string,
     branchName: string,
     message: string,
-  ): Promise<ToolsApiResponse> {
-    return GitWorktreeHelper.toolsApiPost<ToolsApiResponse>(
+  ): Promise<WorktreeMergeResponse> {
+    return GitWorktreeHelper.toolsApiPost<WorktreeMergeResponse>(
       "/agentic/git/worktree/merge",
       {
         path: repositoryPath,
