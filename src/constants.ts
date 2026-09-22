@@ -1144,6 +1144,21 @@ export const DIRECTORY_TREE_CHILD_LIMIT = 20;
 /** Maximum execution time for long-running database aggregation queries (milliseconds). */
 export const AGGREGATE_MAX_TIME_MILLISECONDS = 30_000;
 
+// ─── Workspace Snapshots (rewind) ────────────────────────────
+
+/**
+ * Shadow git snapshots taken around every writing tool batch so a user can
+ * rewind a conversation's CODE (see services/conversation/workspaceSnapshots).
+ */
+export const WORKSPACE_SNAPSHOTS = {
+  /** tools-service only ever writes refs under this namespace. */
+  REF_PREFIX: "refs/prism/checkpoints/",
+  /** A snapshot `git add`s the workspace; generous for large repos. */
+  REQUEST_TIMEOUT_MILLISECONDS: 120_000,
+  /** Snapshot refs and records older than this are pruned by housekeeping. */
+  RETENTION_MILLISECONDS: 14 * 24 * 60 * 60 * 1000,
+} as const;
+
 // ─── Encoding & Media Format Constants ───────────────────────
 
 export const ENCODINGS = {

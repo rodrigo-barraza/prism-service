@@ -84,7 +84,6 @@ import { injectToolDiscoveryNudge } from "#src/services/harnesses/lifecycle/Tool
 import { finalizePassTracker } from "#src/services/harnesses/lifecycle/TrackerFinalizer";
 import { handleCodexPlanningResponse } from "#src/services/harnesses/lifecycle/CodexPlanningDetector";
 import { cleanupReminderCache } from "#src/services/harnesses/lifecycle/SystemReminderInjector";
-import { createSandboxCheckpoint } from "#src/services/harnesses/lifecycle/SandboxExecutor";
 import { streamWithRetries } from "#src/utils/ProviderStreamResilience";
 import PlanningModeService from "#src/services/PlanningModeService";
 import { HARNESS } from "#src/constants";
@@ -787,14 +786,11 @@ export async function executeApprovedToolBatch(
   pass: PassState,
   currentMessages: ConversationMessage[],
   standardHooks: StandardHooks,
-): Promise<{
-  results: ToolResult[];
-  sandboxCheckpointReference: string | null;
-}> {
+): Promise<{ results: ToolResult[] }> {
   const context = harness["context"];
   const state: AgenticLoopState = harness["state"];
   const tools = harness["tools"];
-  const { options, workspaceRoot, emit } = context;
+  const { options, emit } = context;
   const { hooks, approvalEngine } = standardHooks;
 
   // Context from a batch that was backtracked (validation failure) must not
@@ -823,15 +819,9 @@ export async function executeApprovedToolBatch(
   // Denied calls (rule, PreToolUse or PermissionRequest hook, the user)
   // never run; every call the gate cleared runs in one batch. Results keep
   // the model's order.
-  let sandboxCheckpointReference: string | null = null;
   let executedResults: ToolResult[] = [];
   if (executableToolCalls.length > 0) {
     context._currentMessages = currentMessages;
-
-    // ── Sandbox checkpoint (git-based rollback) ────────────
-    sandboxCheckpointReference = options.enableSandbox
-      ? createSandboxCheckpoint(workspaceRoot, emit)
-      : null;
 
     executedResults = await executeToolBatch(
       executableToolCalls,
@@ -869,7 +859,7 @@ export async function executeApprovedToolBatch(
 
   await runPostToolBatchStage(context, hooks, state, pass.pendingToolCalls, results);
 
-  return { results, sandboxCheckpointReference };
+  return { results };
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

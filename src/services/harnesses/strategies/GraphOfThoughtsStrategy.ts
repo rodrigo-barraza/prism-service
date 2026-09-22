@@ -39,7 +39,6 @@ import { logKVCacheHitRate } from "#src/services/harnesses/lifecycle/KVCacheRepo
 import { finalizePassTracker } from "#src/services/harnesses/lifecycle/TrackerFinalizer";
 import { maybeInjectSystemReminder } from "#src/services/harnesses/lifecycle/SystemReminderInjector";
 import { checkCostBudget } from "#src/services/harnesses/lifecycle/CostBudgetEnforcer";
-import { restoreSandboxCheckpoint } from "#src/services/harnesses/lifecycle/SandboxExecutor";
 import { HARNESS } from "#src/constants";
 import type {
   IterationPassOptions,
@@ -87,7 +86,7 @@ async function runGraphOfThoughtsTurn(
   const context = harness["context"];
   const state: AgenticLoopState = harness["state"];
   const tools = harness["tools"];
-  const { options, project, username, agent, workspaceRoot, emit, signal } =
+  const { options, project, username, agent, emit, signal } =
     context;
 
   const initialBranchCount = Math.min(
@@ -338,7 +337,7 @@ async function runGraphOfThoughtsTurn(
 
       // ── Tool execution from synthesized output ──────────────
       if (synthesizedPass.pendingToolCalls.length > 0) {
-        const { results, sandboxCheckpointReference } =
+        const { results } =
           await executeApprovedToolBatch(
             harness,
             synthesizedPass,
@@ -363,15 +362,6 @@ async function runGraphOfThoughtsTurn(
                 `### ${feedback.filePath} (${feedback.validatorType})\n${feedback.rawOutput}`,
             )
             .join("\n\n");
-
-          // Restore sandbox checkpoint on validation failure
-          if (sandboxCheckpointReference) {
-            restoreSandboxCheckpoint(
-              workspaceRoot,
-              sandboxCheckpointReference,
-              emit,
-            );
-          }
 
           currentMessages.push({
             role: "system",

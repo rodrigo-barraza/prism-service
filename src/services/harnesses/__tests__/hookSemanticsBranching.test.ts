@@ -65,10 +65,6 @@ vi.mock("#src/services/ToolContext", () => ({
 vi.mock("#src/utils/logger", () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
-vi.mock("#src/services/harnesses/lifecycle/SandboxExecutor", () => ({
-  createSandboxCheckpoint: vi.fn().mockReturnValue(null),
-  restoreSandboxCheckpoint: vi.fn(),
-}));
 vi.mock("#src/services/harnesses/lifecycle/ValidationInterceptor", () => ({
   validateAfterToolExecution: vi.fn().mockResolvedValue([]),
 }));

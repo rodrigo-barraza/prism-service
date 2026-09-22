@@ -31,6 +31,26 @@ import {
 } from "#src/types/index";
 import { CONVERSATION_LIST_BASE_PROJECTION } from "#src/utils/QueryBuilders";
 import { profileFilter, resolveScope } from "#src/utils/ProfileScope";
+import { isHiddenFromDisplay } from "#src/services/conversation/checkpoints";
+import { withServedMessageIds } from "#src/services/conversation/messageIds";
+import {
+  deleteConversationSnapshotRefs,
+  snapshotRootsOf,
+} from "#src/services/conversation/workspaceSnapshots";
+
+/**
+ * Raw messages → what the client is served: every message carries its id
+ * (the rewind/fork anchor) and messages a user rewind removed are hidden.
+ */
+function servedDisplayMessages(
+  rawMessages: import("../types/admin.ts").ChatMessage[],
+) {
+  return prepareDisplayMessages(
+    withServedMessageIds(rawMessages).filter(
+      (message) => !isHiddenFromDisplay(message),
+    ),
+  );
+}
 
 const router = express.Router();
 router.use(requireDb);
@@ -45,6 +65,7 @@ const CONVERSATION_LIST_PROJECTION: import("mongodb").Document = {
   settings: 1,
   parentAgentConversationId: 1,
   subAgents: 1,
+  forkedFrom: 1,
 };
 
 interface ConversationDocument {
@@ -523,7 +544,7 @@ router.get(
           messageCount: (
             (rawMessages as import("../types/admin.ts").ChatMessage[]) || []
           ).length,
-          displayMessages: prepareDisplayMessages(
+          displayMessages: servedDisplayMessages(
             (rawMessages as import("../types/admin.ts").ChatMessage[]) || [],
           ),
           liveStatus: (chat.isGenerating || chat.isActive)
@@ -591,7 +612,7 @@ router.get(
             (rawAgentMessages as import("../types/admin.ts").ChatMessage[]) ||
             []
           ).length,
-          displayMessages: prepareDisplayMessages(
+          displayMessages: servedDisplayMessages(
             (rawAgentMessages as import("../types/admin.ts").ChatMessage[]) || [],
           ),
           liveStatus: isConversationActive
@@ -877,6 +898,32 @@ router.delete(
       const usernameFilter = username;
       const profileIdFilter = profileFilter(resolveScope(req).profileId);
 
+      // Workspace snapshot refs die with their conversations — note which
+      // workspaces each one snapshotted before the documents are gone.
+      const snapshotOwners: Array<{ conversationId: string; workspaceRoots: string[] }> = [];
+      const noteSnapshotOwner = (document: Document | null) => {
+        const workspaceRoots = snapshotRootsOf(document);
+        if (document && workspaceRoots.length > 0) {
+          snapshotOwners.push({ conversationId: document.id as string, workspaceRoots });
+        }
+      };
+      for (const collectionName of [
+        COLLECTIONS.MODEL_CONVERSATIONS,
+        COLLECTIONS.AGENT_CONVERSATIONS,
+      ]) {
+        noteSnapshotOwner(
+          await db.collection(collectionName).findOne(
+            {
+              id: conversationId,
+              project,
+              username: usernameFilter,
+              profileId: profileIdFilter,
+            },
+            { projection: { id: 1, "workspaceSnapshots.workspaceRoot": 1 } },
+          ),
+        );
+      }
+
       // Try deleting from conversations first
       let result = await db
         .collection(COLLECTIONS.MODEL_CONVERSATIONS)
@@ -936,14 +983,15 @@ router.delete(
           db
             .collection(COLLECTIONS.AGENT_CONVERSATIONS)
             .find(parentFilter)
-            .project({ id: 1 })
+            .project({ id: 1, "workspaceSnapshots.workspaceRoot": 1 })
             .toArray(),
           db
             .collection(COLLECTIONS.MODEL_CONVERSATIONS)
             .find(parentFilter)
-            .project({ id: 1 })
+            .project({ id: 1, "workspaceSnapshots.workspaceRoot": 1 })
             .toArray(),
         ]);
+        [...agentChildren, ...modelChildren].forEach(noteSnapshotOwner);
 
         const childIds = [
           ...agentChildren.map(
@@ -974,6 +1022,15 @@ router.delete(
       if (descendantDeletedCount > 0) {
         logger.info(
           `Cascade-deleted ${descendantDeletedCount} descendant conversation(s) for ${conversationId}`,
+        );
+      }
+
+      if (snapshotOwners.length > 0) {
+        void deleteConversationSnapshotRefs(snapshotOwners).catch(
+          (error: unknown) =>
+            logger.warn(
+              `Snapshot ref cleanup failed for ${conversationId}: ${errorMessage(error)}`,
+            ),
         );
       }
 

@@ -17,6 +17,7 @@ import type {
   ConversationPatchInput,
   ConversationPatchFields,
 } from "./types.ts";
+import { ensureMessageIds } from "./messageIds.ts";
 
 interface ConversationDocument {
   id: string;
@@ -482,7 +483,8 @@ export function buildConversationPatchFields({
   };
   if (title !== undefined) setFields.title = title;
   if (messages !== undefined) {
-    setFields.messages = messages;
+    // Keep the ids the client round-tripped; mint any missing ones.
+    setFields.messages = ensureMessageIds(messages);
     setFields.messageCount = messages.length;
     setFields.modalities = computeModalities(messages);
     setFields.providers = extractProviders(messages, settings || null);
