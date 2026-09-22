@@ -452,7 +452,7 @@ export function hookMatcherProblem(
   if (!matcher || !matcher.trim()) return null;
   if (!eventAcceptsMatcher(event)) {
     return (
-      `matcher "${matcher}" can never narrow event "${event}" — that event has ` +
+      `matcher "${matcher}" can never match on event "${event}" — that event has ` +
       `nothing to match against. Leave matcher empty for this event.`
     );
   }
