@@ -15,7 +15,7 @@ describe('Admin Routes Integration Tests', () => {
   beforeEach(() => {
     // Stub collection query helpers
     mockDb = {
-      collection: vi.fn().mockImplementation((collectionName) => {
+      collection: vi.fn().mockImplementation(() => {
         return {
           find: vi.fn().mockReturnValue({
             project: vi.fn().mockReturnThis(),

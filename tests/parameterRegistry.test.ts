@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { PROVIDERS } from "#src/constants";
 import request from 'supertest';
 import { app } from './setup.ts';

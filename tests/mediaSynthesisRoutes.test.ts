@@ -2,7 +2,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { app } from './setup.ts';
 import request from 'supertest';
 import MongoWrapper from '#src/wrappers/MongoWrapper';
-import { COLLECTIONS, PROVIDERS, MODALITY_TYPES } from '#src/constants';
+import { PROVIDERS, MODALITY_TYPES } from '#src/constants';
 import { errorHandler } from '#src/utils/errors';
 import EmbeddingService from '#src/services/EmbeddingService';
 

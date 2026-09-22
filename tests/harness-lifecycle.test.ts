@@ -5,7 +5,7 @@
  * to verify behavior without requiring a running service.
  */
 import "./setup.ts";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TEST_PROJECT, TEST_USER, TEST_CONVERSATION_ID, MOCK_GENERATE_TEXT_STREAM } from "./setup.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
@@ -633,7 +633,6 @@ describe("ExhaustionRecovery", () => {
 import type {
   AgenticContext,
   ResolvedTools,
-  PassState,
   ToolSchema,
   ToolCall,
   ToolResult,

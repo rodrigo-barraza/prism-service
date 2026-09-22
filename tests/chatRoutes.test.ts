@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import supertest from 'supertest';
-import { app, MOCK_GENERATE_TEXT, MOCK_GENERATE_TEXT_STREAM } from './setup.ts';
+import { app, MOCK_GENERATE_TEXT_STREAM } from './setup.ts';
 import agentRouter from '#src/routes/AgentRoutes';
 import { PROVIDERS } from '#src/constants';
 import { ProviderError } from '#src/utils/errors';
@@ -224,6 +224,7 @@ describe('ChatRoutes Integration', () => {
 
   describe('Error handling & Isolation', () => {
     it('should propagate service errors with proper status code (500 via JSON)', async () => {
+      // oxlint-disable-next-line require-yield -- throws on the first pull, like a provider rejecting the request
       MOCK_GENERATE_TEXT_STREAM.mockImplementation(async function* () {
         throw new ProviderError(PROVIDERS.GOOGLE, 'API key invalid', 401);
       });

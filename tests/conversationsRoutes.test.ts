@@ -63,7 +63,7 @@ describe('ConversationsRoutes Integration', () => {
             return { deletedCount: 1 };
           },
           deleteMany: async (query: any) => {
-            let deletedCount = 0;
+            let deletedCount: number;
             if (query && query.id && query.id.$in) {
               const idsToDelete = query.id.$in;
               const originalLength = mockConversations.length;
@@ -119,7 +119,7 @@ describe('ConversationsRoutes Integration', () => {
             return { deletedCount: 1 };
           },
           deleteMany: async (query: any) => {
-            let deletedCount = 0;
+            let deletedCount: number;
             if (query && query.id && query.id.$in) {
               const idsToDelete = query.id.$in;
               const originalLength = mockAgentConversations.length;
