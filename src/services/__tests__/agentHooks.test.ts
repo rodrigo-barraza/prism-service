@@ -222,4 +222,22 @@ describe("AgentHooks Lifecycle Suite", () => {
     expect(loggerWarnSpy).toHaveBeenCalledTimes(2);
     loggerWarnSpy.mockRestore();
   });
+
+  it("merges permission verdicts by strength — deny > ask > allow — whatever the order", async () => {
+    const agentHooks = new AgentHooks();
+    agentHooks.register("preToolUse", async () => ({ permissionDecision: "ask", reason: "confirm" }), "asker", "decide");
+    agentHooks.register("preToolUse", async () => ({ permissionDecision: "allow", reason: "fine" }), "allower", "decide");
+    const result = await agentHooks.run("preToolUse", { name: "x", args: {} });
+    expect(result).toMatchObject({ permissionDecision: "ask", reason: "confirm" });
+  });
+
+  it("accumulates additionalContext and systemMessage from several hooks", async () => {
+    const agentHooks = new AgentHooks();
+    agentHooks.register("postToolBatch", async () => ({ additionalContext: "first" }), "one", "transform");
+    agentHooks.register("postToolBatch", async () => ({ additionalContext: "second", systemMessage: "note" }), "two", "transform");
+    const result = await agentHooks.run("postToolBatch", {});
+    expect(result?.additionalContext).toBe("first\n\nsecond");
+    expect(result?.systemMessage).toBe("note");
+  });
 });
+

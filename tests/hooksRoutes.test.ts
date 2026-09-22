@@ -581,4 +581,200 @@ describe('HooksRoutes', () => {
       expect(runConfiguredHook).not.toHaveBeenCalled();
     });
   });
+
+  // ── Hooks parity (docs/prompts/18): strict config, new events and handlers ──
+  describe('config validation — unknown events and fields are rejected', () => {
+    it('rejects an unknown event', async () => {
+      await post({ name: 'x', event: 'BeforeEverything', handler: PROMPT_HANDLER }).expect(400);
+    });
+
+    it('rejects an unknown top-level field instead of silently dropping it', async () => {
+      const response = await post({
+        name: 'x',
+        event: 'PreToolUse',
+        handler: PROMPT_HANDLER,
+        if: 'Bash(git *)',
+      }).expect(400);
+      expect(JSON.stringify(response.body)).toContain('if');
+      expect(hooks).toHaveLength(0);
+    });
+
+    it('rejects an unknown handler field', async () => {
+      await post({
+        name: 'x',
+        event: 'PreToolUse',
+        handler: { type: 'http', url: 'https://hooks.example.com/x', method: 'PUT' },
+      }).expect(400);
+    });
+
+    it('rejects an unknown field on PUT too', async () => {
+      const created = await post({ name: 'x', event: 'Stop', handler: PROMPT_HANDLER }).expect(201);
+      await agent
+        .put(`/hooks/${created.body.id}`)
+        .set('x-project', PROJECT)
+        .set('x-username', USERNAME)
+        .send({ enabled: false, requiresApproval: true })
+        .expect(400);
+    });
+
+    it('accepts every new event', async () => {
+      for (const event of [
+        'TurnStart',
+        'TurnEnd',
+        'PermissionRequest',
+        'PermissionDenied',
+        'PostToolBatch',
+        'StopFailure',
+        'PreModelSwitch',
+        'PostModelSwitch',
+        'Interrupt',
+        'InstructionsLoaded',
+      ]) {
+        await post({ name: `on ${event}`, event, handler: PROMPT_HANDLER }).expect(201);
+      }
+    });
+
+    it('accepts a Tool(argPattern) matcher on a tool event and refuses it elsewhere', async () => {
+      await post({
+        name: 'git only',
+        event: 'PreToolUse',
+        matcher: 'execute_shell(git *)',
+        handler: PROMPT_HANDLER,
+      }).expect(201);
+      const response = await post({
+        name: 'nonsense',
+        event: 'StopFailure',
+        matcher: 'execute_shell(git *)',
+        handler: PROMPT_HANDLER,
+      }).expect(400);
+      expect(JSON.stringify(response.body)).toContain('Tool(argPattern)');
+    });
+
+    it('accepts a field matcher on the events that have one', async () => {
+      await post({ name: 'rate limits', event: 'StopFailure', matcher: 'rate_limit|overloaded', handler: PROMPT_HANDLER }).expect(201);
+      await post({ name: 'fresh sessions', event: 'SessionStart', matcher: 'startup', handler: PROMPT_HANDLER }).expect(201);
+    });
+
+    it('rejects a matcher that can never compile', async () => {
+      const response = await post({
+        name: 'broken',
+        event: 'PreToolUse',
+        matcher: 'write_file(path=/[/)',
+        handler: PROMPT_HANDLER,
+      }).expect(400);
+      expect(JSON.stringify(response.body)).toContain('not a valid pattern');
+    });
+
+    it('stores the async flag, false by default', async () => {
+      const background = await post({ name: 'bg', event: 'PostToolUse', async: true, handler: PROMPT_HANDLER }).expect(201);
+      const foreground = await post({ name: 'fg', event: 'PostToolUse', handler: PROMPT_HANDLER }).expect(201);
+      expect(background.body.async).toBe(true);
+      expect(foreground.body.async).toBe(false);
+    });
+
+    it('accepts the agent handler', async () => {
+      await post({
+        name: 'verifier',
+        event: 'Stop',
+        handler: { type: 'agent', prompt: 'Did it finish? $ARGUMENTS' },
+      }).expect(201);
+    });
+  });
+
+  describe('command hooks are owner-only', () => {
+    const COMMAND_HANDLER = { type: 'command', command: './check.sh', timeoutBehavior: 'fail_closed' };
+    let previousOwners: string | undefined;
+
+    beforeEach(() => {
+      previousOwners = process.env[HOOKS.COMMAND_OWNERS_ENV_VAR];
+    });
+    afterEach(() => {
+      if (previousOwners === undefined) delete process.env[HOOKS.COMMAND_OWNERS_ENV_VAR];
+      else process.env[HOOKS.COMMAND_OWNERS_ENV_VAR] = previousOwners;
+    });
+
+    it('refuses to create one when no owner is configured', async () => {
+      delete process.env[HOOKS.COMMAND_OWNERS_ENV_VAR];
+      const response = await post({ name: 'gate', event: 'PreToolUse', handler: COMMAND_HANDLER }).expect(403);
+      expect(response.body.error).toContain('owner-only');
+      expect(hooks).toHaveLength(0);
+    });
+
+    it('refuses a non-owner and accepts an owner', async () => {
+      process.env[HOOKS.COMMAND_OWNERS_ENV_VAR] = 'someone-else';
+      await post({ name: 'gate', event: 'PreToolUse', handler: COMMAND_HANDLER }).expect(403);
+
+      process.env[HOOKS.COMMAND_OWNERS_ENV_VAR] = `someone-else, ${USERNAME}`;
+      const created = await post({ name: 'gate', event: 'PreToolUse', handler: COMMAND_HANDLER }).expect(201);
+      expect(created.body.handler).toEqual(COMMAND_HANDLER);
+    });
+
+    it('refuses turning an existing hook into a command hook, or editing one, as a non-owner', async () => {
+      delete process.env[HOOKS.COMMAND_OWNERS_ENV_VAR];
+      const created = await post({ name: 'plain', event: 'PreToolUse', handler: PROMPT_HANDLER }).expect(201);
+      await agent
+        .put(`/hooks/${created.body.id}`)
+        .set('x-project', PROJECT)
+        .set('x-username', USERNAME)
+        .send({ handler: COMMAND_HANDLER })
+        .expect(403);
+
+      // A command hook that reached the collection some other way cannot be
+      // re-enabled by a non-owner either.
+      hooks[0].handler = COMMAND_HANDLER;
+      await agent
+        .put(`/hooks/${created.body.id}`)
+        .set('x-project', PROJECT)
+        .set('x-username', USERNAME)
+        .send({ enabled: true })
+        .expect(403);
+    });
+
+    it('rejects an unknown timeout behavior', async () => {
+      process.env[HOOKS.COMMAND_OWNERS_ENV_VAR] = USERNAME;
+      await post({
+        name: 'gate',
+        event: 'PreToolUse',
+        handler: { type: 'command', command: './x', timeoutBehavior: 'maybe' },
+      }).expect(400);
+    });
+  });
+
+  describe('legacy documents keep working', () => {
+    it('lists and updates a SessionStart hook stored before the new fields existed', async () => {
+      // Exactly the shape POST wrote before this change: no `async`, no profileId.
+      hooks.push({
+        id: 'legacy-1',
+        project: PROJECT,
+        username: USERNAME,
+        agent: null,
+        name: 'session ping',
+        description: '',
+        event: 'SessionStart',
+        matcher: '',
+        handler: { type: 'http', url: 'https://hooks.example.com/ping' },
+        enabled: true,
+        timeoutMilliseconds: 10_000,
+        secret: 'x'.repeat(64),
+        createdAt: '2026-09-01T00:00:00.000Z',
+        updatedAt: '2026-09-01T00:00:00.000Z',
+      });
+
+      const listed = await agent
+        .get('/hooks')
+        .set('x-project', PROJECT)
+        .set('x-username', USERNAME)
+        .expect(200);
+      expect(listed.body).toEqual([expect.objectContaining({ id: 'legacy-1', event: 'SessionStart' })]);
+
+      const updated = await agent
+        .put('/hooks/legacy-1')
+        .set('x-project', PROJECT)
+        .set('x-username', USERNAME)
+        .send({ enabled: false })
+        .expect(200);
+      expect(updated.body).toMatchObject({ event: 'SessionStart', enabled: false });
+    });
+  });
 });
+
