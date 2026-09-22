@@ -83,8 +83,16 @@ const AgentPersonaRegistry = {
           rule.when = (args: Record<string, unknown>) =>
             regex.test(String(args[field] ?? ""));
         } catch {
+          // FAIL CLOSED. Dropping the predicate made the rule match every
+          // call of its tool — right for DENY and ASK_USER, but an APPROVE
+          // with a typo'd pattern approved everything. It now approves
+          // nothing; DENY and ASK_USER keep covering every call.
+          if (rule.decision === "APPROVE") rule.when = () => false;
           logger.warn(
-            `[AgentPersonaRegistry] Invalid regex pattern "${serializedPolicy.pattern}" in policy for agent ${doc.agentId}`,
+            `[AgentPersonaRegistry] Invalid regex pattern "${serializedPolicy.pattern}" in ${rule.decision} policy for agent ${doc.agentId} — ` +
+              (rule.decision === "APPROVE"
+                ? "it approves nothing"
+                : `it applies to every ${rule.tool} call`),
           );
         }
       }
