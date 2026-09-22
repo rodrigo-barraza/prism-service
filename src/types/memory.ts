@@ -34,7 +34,12 @@ export interface MemoryDocument {
 }
 
 export interface MemorySearchResult {
-  id: unknown;
+  /**
+   * The document's Mongo `_id` as a hex string — never the ObjectId itself,
+   * which only equals its own instance under `Set.has` / `===`. This is the
+   * id persisted on a conversation's `injectedMemoryIds`.
+   */
+  id: string;
   type: string;
   title: string;
   content: string;
@@ -45,6 +50,7 @@ export interface MemorySearchResult {
   age: string;
   ageDays: number;
   score: number;
+  matchSignals: { bm25: boolean; exact: boolean; fused: number };
 }
 
 export interface MemoryStoreParams {

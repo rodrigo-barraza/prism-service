@@ -33,6 +33,8 @@ export interface SubAgentState {
   output: string;
   toolCalls: ToolCall[];
   diff: WorktreeDiff | null;
+  /** Set when an isolated loop ends; shared by reference with its results. */
+  mergeBack?: MergeBackReport;
   error: string | null;
   startedAt: number;
   durationMilliseconds: number;
@@ -84,12 +86,75 @@ export interface SubAgentState {
   completedAt?: number;
 }
 
-export interface WorktreeDiff {
-  hasChanges: boolean;
+// ── Worktree diff contract (tools-service) ─────────────────
+// POST /agentic/git/worktree/diff. tools-service declares the same types in
+// src/services/AgenticGitService.ts, and both repos pin the same fixture:
+// tests/fixtures/worktree-diff-contract.json.
+
+export type WorktreeFileStatus =
+  | "added"
+  | "modified"
+  | "deleted"
+  | "renamed"
+  | "copied"
+  | "type-changed";
+
+export interface WorktreeDiffFile {
+  path: string;
+  status: WorktreeFileStatus;
+  /** Source path of a rename or copy. */
+  previousPath?: string;
+}
+
+export interface WorktreeDiffStats {
+  filesChanged: number;
   additions: number;
   deletions: number;
-  files: string[];
-  diff?: string;
+}
+
+/** What `branch` changed since it left `base` (`git diff base...branch`). */
+export interface WorktreeDiff {
+  branch: string;
+  base: string;
+  files: WorktreeDiffFile[];
+  patch: string;
+  stats: WorktreeDiffStats;
+  /** The patch hit tools-service's output cap; `files` and `stats` are complete. */
+  patchTruncated?: boolean;
+}
+
+// ── Merge-back ─────────────────────────────────────────────
+
+/**
+ * What became of a sub-agent's worktree once its loop ended.
+ * - merged: the branch was merged into the repository's current branch.
+ * - no-changes: nothing to merge.
+ * - deferred: the caller owns the worktree (`preserveWorktree`) and settles it.
+ * - conflict: the merge conflicted (aborted) or would overwrite uncommitted
+ *   edits in the parent's tree; worktree and branch are KEPT.
+ * - failed: commit, diff or merge failed; worktree and branch are KEPT.
+ * - not-selected: a competing candidate that lost; its worktree was removed and
+ *   its branch KEPT.
+ */
+export type MergeBackStatus =
+  | "merged"
+  | "no-changes"
+  | "deferred"
+  | "conflict"
+  | "failed"
+  | "not-selected";
+
+export interface MergeBackReport {
+  status: MergeBackStatus;
+  /** The branch tools-service created — the only name ever used for it. */
+  branch: string;
+  repositoryPath: string;
+  /** Null once the worktree is removed. */
+  worktreePath: string | null;
+  /** True when the branch no longer exists. */
+  branchDeleted: boolean;
+  conflictingFiles?: string[];
+  error?: string;
 }
 
 // ── Sub-Agent Result ───────────────────────────────────────
@@ -110,6 +175,7 @@ export interface SubAgentResult {
     deletions: number;
     files: string[];
   };
+  mergeBack?: MergeBackReport;
   error?: string;
   recursionDepth?: number;
   subtreeMetrics?: SubtreeMetrics;
@@ -284,6 +350,30 @@ export interface ToolsApiResponse {
 
 export interface WorktreeCreateResponse extends ToolsApiResponse {
   worktreePath?: string;
+  /** The branch as created; stored and used verbatim, never recomputed. */
+  branch?: string;
+}
+
+export interface WorktreeCommitResponse extends ToolsApiResponse {
+  branch?: string;
+  committed?: boolean;
+  commit?: string;
+}
+
+export interface WorktreeMergeResponse extends ToolsApiResponse {
+  merged?: string;
+  into?: string;
+  reason?: "conflict" | "local-changes";
+  conflictingFiles?: string[];
+}
+
+export interface WorktreeRemoveResponse extends ToolsApiResponse {
+  removed?: string;
+  branch?: string | null;
+  branchDeleted?: boolean;
+  branchError?: string;
+  /** Nothing was removed because it would have lost work. */
+  kept?: boolean;
 }
 
 // ── Team Management ─────────────────────────────────────────

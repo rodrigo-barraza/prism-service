@@ -16,7 +16,7 @@ import {
   selectInstanceForMember,
 } from "#src/services/orchestrator/InstanceResolver";
 import logger from "#src/utils/logger";
-import { GitWorktreeHelper } from "#src/services/orchestrator/GitWorktreeHelper";
+import { isMergeBackKept } from "#src/services/orchestrator/WorktreeMergeBack";
 
 /**
  * Sequential Router — Serial Pipeline (SP)
@@ -106,41 +106,14 @@ export class SequentialRouter implements TopologyRouter {
         break;
       }
 
-      // 4. Merge changes back to main branch so subsequent worktrees inherit them (only if files changed)
-      const hasFileChanges =
-        spawnResult.status === "completed" &&
-        spawnResult.agent_id &&
-        spawnResult.diff;
-
-      if (hasFileChanges) {
-        const subAgentId = spawnResult.agent_id!;
-        const branchName = `orchestrator/${subAgentId}`;
-        const workspaceRoot = GitWorktreeHelper.getDefaultWorkspaceRoot(
-          orchestratorContext.workspaceRoot ?? undefined,
-        );
-        const repositoryPath = GitWorktreeHelper.resolveRepositoryPath(
-          workspaceRoot,
-          member.files || [],
-        );
-
-        logger.info(
-          `[SequentialRouter] Merging branch ${branchName} back into main repo`,
-        );
-        const mergeResult = await GitWorktreeHelper.mergeWorktree(
-          repositoryPath,
-          branchName,
-          `chore(sequence): merge work from sequential sub-agent ${subAgentId}`,
-        );
-
-        if (mergeResult.error) {
-          const errorMessage = `Failed to merge branch for ${subAgentId}: ${mergeResult.error}`;
-          logger.error(`[SequentialRouter] ${errorMessage}`);
-          return [...results, { error: errorMessage }];
-        }
-      } else if (spawnResult.status === "completed") {
-        logger.info(
-          `[SequentialRouter] No file changes from step ${index + 1} — skipping merge step`,
-        );
+      // 4. The step's work merged back when its loop ended (WorktreeMergeBack),
+      //    so the next step's worktree branches from it. Work that could not
+      //    merge is kept on its branch — and the next step must not run
+      //    without it.
+      if (isMergeBackKept(spawnResult.mergeBack)) {
+        const errorMessage = `Step ${index + 1} (${spawnResult.agent_id}) did not merge back: ${spawnResult.mergeBack!.error ?? spawnResult.mergeBack!.status}. Its work is kept on branch ${spawnResult.mergeBack!.branch}. Aborting sequence.`;
+        logger.error(`[SequentialRouter] ${errorMessage}`);
+        return [...results, { error: errorMessage }];
       }
 
       // 5. Accumulate text result for subsequent agents (append, not overwrite)
