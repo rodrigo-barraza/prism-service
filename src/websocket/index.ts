@@ -783,14 +783,22 @@ function handleWebsocketLive(
                       });
                     }
 
-                    const functionResponses = results.map((toolResult) => ({
-                      id: toolResult.id,
-                      name: toolResult.name,
-                      response: truncateToolResult(toolResult.result) as Record<
-                        string,
-                        unknown
-                      >,
-                    }));
+                    const functionResponses = results.map((toolResult) => {
+                      const modelVisibleResult = truncateToolResult(
+                        toolResult.result,
+                        undefined,
+                        toolResult.name,
+                      );
+                      // A function response must be an object; an offloaded
+                      // result comes back as its text preview.
+                      return {
+                        id: toolResult.id,
+                        name: toolResult.name,
+                        response: (typeof modelVisibleResult === "string"
+                          ? { output: modelVisibleResult }
+                          : modelVisibleResult) as Record<string, unknown>,
+                      };
+                    });
 
                     if (liveSession) {
                       liveSession.sendToolResponse({ functionResponses });
