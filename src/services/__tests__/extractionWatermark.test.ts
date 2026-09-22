@@ -300,7 +300,12 @@ describe("selectExtractionSpan", () => {
 });
 
 describe("resolveWatermarkScope", () => {
-  const base = { project: "lupos", agent: "LUPOS", profileId: "default" };
+  const base = {
+    project: "lupos",
+    agent: "LUPOS",
+    profileId: "default",
+    channelScope: true,
+  };
 
   it("keys a platform turn by its channel, not its (per-reply) conversation", () => {
     const scope = resolveWatermarkScope({
@@ -335,6 +340,17 @@ describe("resolveWatermarkScope", () => {
       agentContext: channel,
     });
     expect(lupos?.key).not.toBe(other?.key);
+  });
+
+  it("with channel scoping off, a platform turn is keyed by its conversation — the pre-diet read", () => {
+    expect(
+      resolveWatermarkScope({
+        ...base,
+        channelScope: false,
+        conversationId: "conversation-a",
+        agentContext: { platform: "discord", guildId: "g1", channelId: "c1" },
+      })?.scope,
+    ).toBe("conversation:conversation-a");
   });
 
   it("has no scope without a conversation or channel", () => {

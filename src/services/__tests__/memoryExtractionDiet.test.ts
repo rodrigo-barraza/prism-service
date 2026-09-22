@@ -561,6 +561,9 @@ describe("memory-extraction diet — quality sample: watermark ≡ full context"
     resetMocks();
     mockGenerateText.mockImplementation(factExtractor);
   });
+  afterEach(() => {
+    delete process.env.MEMORY_EXTRACTION_CHANNEL_WATERMARK;
+  });
 
   it("a coding conversation with a trivial turn, a timer turn and two compactions", async () => {
     const turns = [
@@ -643,7 +646,8 @@ describe("memory-extraction diet — quality sample: watermark ≡ full context"
     expect(storedFacts()).toEqual(fullContext);
   });
 
-  it("a Discord channel read through a sliding window, one new conversation per reply", async () => {
+  it("a Discord channel read through a sliding window, one new conversation per reply (channel scoping on)", async () => {
+    process.env.MEMORY_EXTRACTION_CHANNEL_WATERMARK = "true";
     const discord = (id: number, text: string) => ({
       role: "user",
       content:
@@ -748,5 +752,41 @@ describe("memory-extraction diet — quality sample: watermark ≡ full context"
     expect(watermarked.at(-1)!).toBeLessThanOrEqual(watermarked[1] * 1.05);
     expect(sum(watermarked)).toBeLessThan(sum(wholeEachTurn) * 0.4);
     expect(storedFacts()).toHaveLength(turns.length);
+  });
+});
+
+describe("memory-extraction diet — channel scoping is opt-in", () => {
+  beforeEach(resetMocks);
+
+  it("by default a platform bot's reply reads its whole history, as before the diet", async () => {
+    const history = [
+      ...FIRST_TURN.map((message, index) => ({
+        role: message.role,
+        content:
+          message.role === "user"
+            ? `<discord-message id="${500 + index}" author="a" author-id="1" time="t">\n<content>\n${message.content}\n</content>\n</discord-message>`
+            : message.content,
+      })),
+    ];
+    for (const [reply, messages] of [
+      history,
+      [...history, { role: "user", content: `<discord-message id="600" author="a" author-id="1" time="t">\n<content>\nSECOND-TURN-MARKER: I moved to Toronto.\n</content>\n</discord-message>` }, { role: "assistant", content: "Welcome to Toronto." }],
+    ].entries()) {
+      await MemoryExtractor.extractAndStore({
+        project: "lupos",
+        username: "quark",
+        agent: "LUPOS",
+        conversationId: `lupos-default-${reply}`,
+        agentContext: { platform: "discord", guildId: "g1", channelId: "c1" },
+        messages,
+      });
+    }
+    expect(mockGenerateText).toHaveBeenCalledTimes(2);
+    expect(extractionPrompt(1)).toContain("FIRST-TURN-MARKER");
+    expect(extractionPrompt(1)).toContain("SECOND-TURN-MARKER");
+    expect(watermarkDocuments().map((document) => document.scope)).toEqual([
+      "conversation:lupos-default-0",
+      "conversation:lupos-default-1",
+    ]);
   });
 });

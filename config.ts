@@ -140,6 +140,19 @@ export function getModelRoleChainFromEnvironment(
   return chain;
 }
 
+// ── Memory Extraction ─────────────────────────────────────────
+// MEMORY_EXTRACTION_CHANNEL_WATERMARK=true lets a platform bot's turns
+// (agentContext.platform + channelId — Lupos on Discord) share one
+// extraction watermark per channel, so each reply extracts only the
+// channel messages no earlier reply extracted. Default OFF: measured
+// 2026-09-22 on real channels it cut Lupos extraction input ~60% but also
+// most of its memory yield, which comes from re-reading overlapping
+// windows. Off, each reply reads its whole history as before. Read per
+// call so it can be flipped without a code change.
+export function isMemoryExtractionChannelWatermarkEnabled(): boolean {
+  return process.env.MEMORY_EXTRACTION_CHANNEL_WATERMARK === "true";
+}
+
 // ── Default Model Names ───────────────────────────────────────
 // Vault-backed model identifiers — swap models without code deploys.
 
