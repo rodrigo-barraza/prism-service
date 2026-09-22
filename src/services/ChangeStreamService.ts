@@ -32,6 +32,8 @@ export interface ChangeStreamEventPayload {
   isActive?: boolean;
   conversationId?: string | null;
   parentAgentConversationId?: string | null;
+  /** Synthetic `conversation_attention` events: the conversation's new counts. */
+  attention?: import("./ConversationAttentionRegistry.ts").ConversationAttention;
 }
 
 export type ChangeStreamCallback = (payload: ChangeStreamEventPayload) => void;
@@ -53,6 +55,17 @@ const WATCHED_COLLECTIONS = [
   COLLECTIONS.AGENT_CONVERSATIONS,
   COLLECTIONS.REQUESTS,
 ];
+
+/** Deliver one payload to every registered listener. */
+function broadcast(payload: ChangeStreamEventPayload): void {
+  for (const listener of listeners) {
+    try {
+      listener(payload);
+    } catch (error: unknown) {
+      logger.error(`ChangeStream listener error: ${errorMessage(error)}`);
+    }
+  }
+}
 
 /**
  * Attempt to open a Change Stream on a single collection.
@@ -165,14 +178,7 @@ function openStream(db: Db, collectionName: string) {
           fullDocument.parentAgentConversationId as string;
       }
 
-      // Broadcast to all registered listeners
-      for (const listener of listeners) {
-        try {
-          listener(payload);
-        } catch (error: unknown) {
-          logger.error(`ChangeStream listener error: ${errorMessage(error)}`);
-        }
-      }
+      broadcast(payload);
     });
 
     stream.on("error", (error: Error) => {
@@ -276,6 +282,14 @@ const ChangeStreamService = {
   },
   subscribe(callback: ChangeStreamCallback) {
     listeners.add(callback);
+  },
+  /**
+   * Broadcast a synthetic change for state that lives in memory rather than
+   * in a watched collection (ConversationAttentionRegistry). Listeners get
+   * it exactly like a MongoDB change.
+   */
+  publish(payload: ChangeStreamEventPayload) {
+    broadcast(payload);
   },
   unsubscribe(callback: ChangeStreamCallback) {
     listeners.delete(callback);

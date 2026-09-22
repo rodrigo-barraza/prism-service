@@ -7,14 +7,59 @@
  * stay in sync (the client keeps a copy because live sidebar surfaces derive
  * from SSE-patched props where a server snapshot would go stale).
  *
- * Priority order under test: generating → orchestrating → completed →
- * completed-with-errors → sub-agents-running → background-tasks → active.
+ * Priority order under test: awaiting-approval → awaiting-answer →
+ * generating → orchestrating → completed → completed-with-errors →
+ * sub-agents-running → background-tasks → active.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import {
   attachConversationState,
   deriveAgentConversationState,
 } from "#src/services/ConversationService";
+import ConversationAttentionRegistry from "#src/services/ConversationAttentionRegistry";
+
+describe("deriveAgentConversationState — attention states", () => {
+  it("returns 'awaiting-approval' while a tool call waits for approval", () => {
+    expect(deriveAgentConversationState({ pendingApprovalCount: 1 })).toBe(
+      "awaiting-approval",
+    );
+  });
+
+  it("returns 'awaiting-answer' while a question waits for an answer", () => {
+    expect(deriveAgentConversationState({ pendingQuestionCount: 2 })).toBe(
+      "awaiting-answer",
+    );
+  });
+
+  it("outranks generating — a waiting turn is still isGenerating", () => {
+    expect(
+      deriveAgentConversationState({
+        isGenerating: true,
+        hasSubAgents: true,
+        pendingApprovalCount: 1,
+      }),
+    ).toBe("awaiting-approval");
+    expect(
+      deriveAgentConversationState({ isGenerating: true, pendingQuestionCount: 1 }),
+    ).toBe("awaiting-answer");
+  });
+
+  it("an approval outranks a question", () => {
+    expect(
+      deriveAgentConversationState({ pendingApprovalCount: 1, pendingQuestionCount: 1 }),
+    ).toBe("awaiting-approval");
+  });
+
+  it("zero counts fall through to the persisted ladder", () => {
+    expect(
+      deriveAgentConversationState({
+        isGenerating: true,
+        pendingApprovalCount: 0,
+        pendingQuestionCount: 0,
+      }),
+    ).toBe("generating");
+  });
+});
 
 describe("deriveAgentConversationState", () => {
   it("returns 'generating' when isGenerating and no sub-agents", () => {
@@ -83,6 +128,38 @@ describe("deriveAgentConversationState", () => {
 });
 
 describe("attachConversationState", () => {
+  afterEach(() => ConversationAttentionRegistry.reset());
+
+  it("stamps the attention counts and derives the state from them", () => {
+    ConversationAttentionRegistry.observeEvent("conversation-3", {
+      type: "user_question",
+      questionId: "q-1",
+      blocking: true,
+    });
+    const record: Record<string, unknown> = {
+      id: "conversation-3",
+      isGenerating: true,
+    };
+    attachConversationState(record);
+    expect(record).toMatchObject({
+      pendingApprovalCount: 0,
+      pendingQuestionCount: 1,
+      state: "awaiting-answer",
+    });
+    expect(typeof record.awaitingSince).toBe("string");
+  });
+
+  it("stamps zeros and a null awaitingSince when nothing waits", () => {
+    const record: Record<string, unknown> = { id: "conversation-4", isActive: false };
+    attachConversationState(record);
+    expect(record).toMatchObject({
+      pendingApprovalCount: 0,
+      pendingQuestionCount: 0,
+      awaitingSince: null,
+      state: "completed",
+    });
+  });
+
   it("stamps the derived state onto the record in place", () => {
     const record: Record<string, unknown> = {
       id: "conversation-1",

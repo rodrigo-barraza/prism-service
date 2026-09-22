@@ -69,6 +69,7 @@ export const COLLECTIONS = {
   AGENT_ARTIFACTS: "agent_artifacts",
   ANTHROPIC_FILE_CACHE: "anthropic_file_cache",
   PROFILES: "profiles",
+  PUSH_SUBSCRIPTIONS: "push_subscriptions",
 };
 
 /** Shared system-wide statuses for agents, tasks, and workflows. */

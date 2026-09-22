@@ -1,4 +1,5 @@
 import WebSocketConnectionRegistry from "#src/websocket/WebSocketConnectionRegistry";
+import { observeTurnEvent } from "#src/services/TurnAttentionObserver";
 import type { WebSocket } from "ws";
 import type { SseEvent } from "#src/types/SseTypes";
 
@@ -18,6 +19,10 @@ import type { SseEvent } from "#src/types/SseTypes";
  *      Every event is stamped with a per-conversation monotonic `seq`, so a
  *      viewer that reconnects sends the last seq it saw (`afterSeq`) and is
  *      replayed only what it missed — never a duplicate of what it rendered.
+ *
+ * The same wrap is where the "needs you" features see a turn: every event
+ * is handed to observeTurnEvent (attention counts, webhooks, push), which
+ * relies on this exactly-once delivery.
  *
  * IMPORTANT — wrap-exactly-once invariant: the request layers
  * (handleSseRequest / handleJsonRequest / the WebSocket chat handler) wrap
@@ -327,6 +332,10 @@ export function withDirectViewerBroadcast<TEvent extends object>(
       conversationId,
       event as unknown as SseEvent,
       options,
+    );
+    observeTurnEvent(
+      conversationId,
+      event as unknown as { type?: unknown; [key: string]: unknown },
     );
   };
 }

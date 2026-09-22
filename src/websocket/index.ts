@@ -229,6 +229,13 @@ function handleWebsocketChat(
       return;
     }
 
+    // Page visibility — a viewer in a background tab still streams, but
+    // no longer counts as watching (PushNotifier pushes to it instead).
+    if (data.type === "visibility") {
+      WebSocketConnectionRegistry.setVisibility(websocket, data.hidden === true);
+      return;
+    }
+
     // Register this WebSocket for auto-response streaming so background
     // sub-agent completion notifications can stream directly to the client
     // (Antigravity reactive wake-up pattern).

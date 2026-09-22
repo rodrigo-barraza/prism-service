@@ -99,6 +99,20 @@ export const MINIO_PUBLIC_URL = process.env.MINIO_PUBLIC_URL;
 // ── Tools API ──────────────────────────────────────────────────
 export const TOOLS_SERVICE_URL = process.env.TOOLS_SERVICE_URL;
 
+// ── Web Push (browser notifications) ──────────────────────────
+// VAPID key pair (base64url: 65-byte public point, 32-byte private
+// scalar) and the operator contact (`https:` or `mailto:`) the push
+// services see. Unset → Web Push is off; everything else still works.
+export const PRISM_VAPID_PUBLIC_KEY = process.env.PRISM_VAPID_PUBLIC_KEY;
+export const PRISM_VAPID_PRIVATE_KEY = process.env.PRISM_VAPID_PRIVATE_KEY;
+export const PRISM_VAPID_SUBJECT = process.env.PRISM_VAPID_SUBJECT;
+// Optional fallback channel: an ntfy topic, delivered through
+// tools-service's /communication/push, used when the conversation's
+// owner has no browser subscribed.
+export const PRISM_PUSH_NTFY_TOPIC = process.env.PRISM_PUSH_NTFY_TOPIC;
+// Public origin of prism-client, for absolute links in ntfy messages.
+export const PRISM_CLIENT_PUBLIC_URL = process.env.PRISM_CLIENT_PUBLIC_URL;
+
 // ── Anthropic Files API ───────────────────────────────────────
 // Upload-once media caching against Anthropic's Files API
 // (beta: files-api-2025-04-14). Default ON for the first-party API;
