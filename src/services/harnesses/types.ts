@@ -212,12 +212,8 @@ export interface AgenticOptions {
   valueThreshold?: number;
   /** Thought structure for the agentic loop: "chain_of_thought" (default single-pass) or "tree_of_thoughts" (parallel branching with scoring). */
   thoughtStructure?: string;
-  /** Enable sandbox execution with git-based rollback for destructive tools. */
-  enableSandbox?: boolean;
   /** Skip CriticGate review for this session. */
   skipCritic?: boolean;
-  /** Skip sandbox for destructive tools. */
-  skipSandbox?: boolean;
   /** Maximum cost in dollars before the loop terminates with an exhaustion recovery. */
   maxCostDollars?: number;
   /**

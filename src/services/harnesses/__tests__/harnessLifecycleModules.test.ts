@@ -28,10 +28,6 @@ import {
 } from "#src/services/harnesses/lifecycle/SystemReminderInjector";
 import { extractReminderViaLLM } from "#src/services/harnesses/lifecycle/SystemReminderExtractor";
 import {
-  createSandboxCheckpoint,
-  restoreSandboxCheckpoint,
-} from "#src/services/harnesses/lifecycle/SandboxExecutor";
-import {
   executeToolBatch,
   executeToolSingle,
 } from "#src/services/harnesses/lifecycle/ToolExecutor";
@@ -44,7 +40,6 @@ import {
   sanitizeMessagesForPersistence,
 } from "#src/services/harnesses/lifecycle/Finalizer";
 
-import { execSync } from "node:child_process";
 import logger from "#src/utils/logger";
 import RequestLogger from "#src/services/RequestLogger";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
@@ -1116,71 +1111,6 @@ describe("Harness Lifecycle Modules", () => {
       expect(currentMessages).toHaveLength(2);
       expect(currentMessages[1].content).toContain("SYSTEM REMINDER");
       cleanupReminderCache("session-id-456");
-    });
-  });
-
-  describe("SandboxExecutor", () => {
-    it("should create stash checkpoint when inside git repository", () => {
-      vi.mocked(execSync).mockReturnValue("stash-sha-123");
-      const emitSpy = vi.fn();
-      const stashReference = createSandboxCheckpoint("/my-git-repo", emitSpy);
-      expect(stashReference).toBe("stash-sha-123");
-      expect(emitSpy).toHaveBeenCalled();
-    });
-
-    it("should restore stash checkpoint successfully", () => {
-      vi.mocked(execSync).mockReturnValue("");
-      const emitSpy = vi.fn();
-      const success = restoreSandboxCheckpoint("/my-git-repo", "stash-sha-123", emitSpy);
-      expect(success).toBe(true);
-      expect(emitSpy).toHaveBeenCalled();
-    });
-
-    it("should fail open and return null if workspaceRoot is undefined", () => {
-      const result = createSandboxCheckpoint(undefined, vi.fn());
-      expect(result).toBeNull();
-    });
-
-    it("should return false when restoring sandbox if workspaceRoot is undefined", () => {
-      const result = restoreSandboxCheckpoint(undefined, "stash-reference-123", vi.fn());
-      expect(result).toBe(false);
-    });
-
-    it("should fail open if isGitRepository returns false", () => {
-      vi.mocked(execSync).mockImplementation(() => {
-        throw new Error("not a git repo");
-      });
-      const result = createSandboxCheckpoint("/non-git-directory", vi.fn());
-      expect(result).toBeNull();
-    });
-
-    it("should fail open and return null if git stash create returns empty string", () => {
-      vi.mocked(execSync)
-        .mockReturnValueOnce("" as any)
-        .mockReturnValueOnce("" as any)
-        .mockReturnValueOnce("" as any);
-
-      const result = createSandboxCheckpoint("/git-repo", vi.fn());
-      expect(result).toBeNull();
-    });
-
-    it("should log warning and return null if git add fails", () => {
-      vi.mocked(execSync)
-        .mockReturnValueOnce("" as any)
-        .mockImplementationOnce(() => {
-          throw new Error("git add failed");
-        });
-
-      const result = createSandboxCheckpoint("/git-repo", vi.fn());
-      expect(result).toBeNull();
-    });
-
-    it("should log error and return false if git checkout fails during restore", () => {
-      vi.mocked(execSync).mockImplementation(() => {
-        throw new Error("git checkout failed");
-      });
-      const result = restoreSandboxCheckpoint("/git-repo", "stash-reference-123", vi.fn());
-      expect(result).toBe(false);
     });
   });
 

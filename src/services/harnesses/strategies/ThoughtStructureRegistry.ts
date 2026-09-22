@@ -133,9 +133,9 @@ export const THOUGHT_STRUCTURE_DEFINITIONS: ThoughtStructureDefinition[] = [
       },
       {
         component: "BFS search",
-        status: "aligned",
+        status: "simplified",
         detail:
-          "BFS generates N branches in parallel, retains top-b as frontier candidates. On validation failure, falls back to the next-best frontier state before re-branching — mirrors the paper's 'b best states' (Algorithm 1)",
+          "BFS generates N branches in parallel and retains top-b as frontier candidates — the paper's 'b best states' (Algorithm 1). On validation failure it backtracks the conversation and re-branches; falling back to the next frontier state would need the failed branch's file changes rolled back, which is not implemented",
       },
       {
         component: "DFS search",
@@ -174,12 +174,6 @@ export const THOUGHT_STRUCTURE_DEFINITIONS: ThoughtStructureDefinition[] = [
           "Tracks failed approaches and injects them as anti-patterns into subsequent branch generation — inspired by Reflexion (Shinn et al. 2023), not in ToT paper",
       },
       {
-        component: "Sandbox checkpointing",
-        status: "extended",
-        detail:
-          "Git-based filesystem state capture and rollback on backtrack — novel engineering, not in paper",
-      },
-      {
         component: "Multi-criteria scoring rubric",
         status: "extended",
         detail:
@@ -187,7 +181,7 @@ export const THOUGHT_STRUCTURE_DEFINITIONS: ThoughtStructureDefinition[] = [
       },
     ],
     flowDescription:
-      "BFS: [B₁ B₂ B₃] → [Score] → [Best + Frontier] → [Execute] → [Validate / Frontier Fallback]  |  DFS: [B₁] → [Score] → [Accept/Prune] → [B₂] → … → [Execute Best]",
+      "BFS: [B₁ B₂ B₃] → [Score] → [Best + Frontier] → [Execute] → [Validate / Backtrack]  |  DFS: [B₁] → [Score] → [Accept/Prune] → [B₂] → … → [Execute Best]",
   },
   {
     id: THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS,
@@ -254,12 +248,6 @@ export const THOUGHT_STRUCTURE_DEFINITIONS: ThoughtStructureDefinition[] = [
         status: "simplified",
         detail:
           "Loops re-branch and re-synthesize, but no concept of refining individual thought nodes within a persistent graph — paper's Refine operation not discretely implemented",
-      },
-      {
-        component: "Sandbox checkpointing",
-        status: "extended",
-        detail:
-          "Git-based filesystem state capture and rollback on validation failure — novel engineering, not in paper",
       },
     ],
     flowDescription:
