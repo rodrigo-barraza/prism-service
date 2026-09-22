@@ -18,6 +18,7 @@ vi.mock("#src/services/AgenticLoopService", () => ({
 
 vi.mock("#src/services/orchestrator/GitWorktreeHelper", () => ({
   GitWorktreeHelper: {
+    getDefaultWorkspaceRoot: vi.fn().mockReturnValue("/workspace"),
     removeWorktree: vi.fn().mockResolvedValue({ branchDeleted: true }),
     commitWorktree: vi.fn().mockResolvedValue({ committed: false }),
     mergeWorktree: vi.fn().mockResolvedValue({ merged: "branch-agent-1", into: "main" }),
@@ -125,7 +126,7 @@ describe("OrchestratorService Resume Agent", () => {
     expect((result as { error: string }).error).toContain("cannot be resumed");
   });
 
-  it("should successfully trigger background loop and return NON_BLOCKING_DISPATCH at recursionDepth 0", async () => {
+  it("should successfully trigger background loop and return DETACHED_WORK at recursionDepth 0", async () => {
     const subAgent = registerMockSubAgent("agent-1", "complete");
 
     // Spy on _triggerParentAutoResponse to avoid database operations
@@ -135,8 +136,8 @@ describe("OrchestratorService Resume Agent", () => {
 
     const result = await OrchestratorService.resumeAgent("agent-1", "do more", context);
 
-    // Should return non-blocking directive immediately
-    expect(result).toHaveProperty("_directive", "NON_BLOCKING_DISPATCH");
+    // The parent keeps working: the resume is detached work, not a turn end
+    expect(result).toHaveProperty("_directive", "DETACHED_WORK");
     expect(result).toHaveProperty("agent");
     expect((result as any).agent.agent_id).toBe("agent-1");
     expect((result as any).agent.status).toBe("running");
@@ -157,7 +158,7 @@ describe("OrchestratorService Resume Agent", () => {
 
     // Auto-response spy should have been called
     expect(autoResponseSpy).toHaveBeenCalledOnce();
-    const [convId, proj, user, ctx, msg] = autoResponseSpy.mock.calls[0];
+    const [convId, proj, user, _ctx, msg] = autoResponseSpy.mock.calls[0];
     expect(convId).toBe("conv-parent");
     expect(proj).toBe("test-project");
     expect(user).toBe("test-user");

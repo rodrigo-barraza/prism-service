@@ -222,6 +222,12 @@
       "description": "Optional: short label shown to user."
     }
   },
+  "report_progress": {
+    "description": "Tell parent agent short progress while you keep work. Only at real milestone (finding parent can use now, blocker, plan change) — not every step. Not final answer: finish task, end with full summary. Max 10 update per task; parent only get them while it work.",
+    "parameters": {
+      "message": "Update, one or two sentence (max 2000 char)."
+    }
+  },
   "wait_for_tasks": {
     "description": "Block until background work finish, return result in place. Wait on async task (run_async_task) and/or sub-agent (create_subagent). No id = wait all running. Bounded by timeoutSeconds.",
     "parameters": {

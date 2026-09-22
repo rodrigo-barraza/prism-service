@@ -35,6 +35,7 @@ import artifactTools from "./ArtifactTools.ts";
 import projectInstructionsTools from "./ProjectInstructionsTools.ts";
 import runToolProgramTool from "./RunToolProgramTool.ts";
 import goalTools from "./GoalTools.ts";
+import subAgentProgressTool from "./SubAgentProgressTool.ts";
 
 // ─── Parameter Types (aligned with tools-service) ──────────────
 
@@ -139,6 +140,7 @@ function initialize() {
     projectInstructionsTools,
     runToolProgramTool,
     goalTools,
+    subAgentProgressTool,
   ];
 
   for (const toolOrTools of toolModulesList) {

@@ -60,7 +60,14 @@ vi.mock("#src/routes/ChatRoutes", async (importOriginal) => {
 
 // ── Harness lifecycle mocks (mirrors turnInputAcceptance.test.ts) ──
 vi.mock("#src/services/ConversationStatusRegistry", () => ({
-  default: { set: vi.fn(), patch: vi.fn(), delete: vi.fn(), remove: vi.fn() },
+  default: {
+    set: vi.fn(),
+    patch: vi.fn(),
+    patchSubAgent: vi.fn(),
+    removeSubAgent: vi.fn(),
+    get: vi.fn().mockReturnValue(null),
+    remove: vi.fn(),
+  },
 }));
 vi.mock("#src/services/ConversationGenerationTracker", () => ({
   default: { register: vi.fn(), complete: vi.fn(), setEstimatedInputTokens: vi.fn(), cleanup: vi.fn() },
@@ -460,7 +467,7 @@ describe("non-blocking sub-agent dispatch — the parent keeps working (real har
     const subAgentEntries = waitResult.tasks.filter((entry) => entry.kind === "subagent");
     expect(subAgentEntries).toHaveLength(2);
     for (const entry of subAgentEntries) {
-      expect(entry.status).toBe("complete");
+      expect(entry.status).toBe("completed");
       expect(String(entry.result)).toContain("result from");
     }
 
@@ -518,6 +525,9 @@ describe("non-blocking sub-agent dispatch — the parent keeps working (real har
       .filter((event) => event.type === TURN_INPUT.EVENT_TYPE);
     expect(turnInputEvents).toHaveLength(1);
     expect(turnInputEvents[0].kind).toBe("agent_message");
+    // Viewers get the child's words; the model gets the tagged version.
+    expect(turnInputEvents[0].content).toBe("Found 3 of 5 sources");
+    expect(progress.rawContent).toBe("Found 3 of 5 sources");
     expect(seenMessages.flat().some((message) => message._notificationSource === NOTIFICATION_SOURCES.USER_UPDATE)).toBe(false);
   });
 
