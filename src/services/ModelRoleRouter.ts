@@ -28,7 +28,7 @@ import logger from "#src/utils/logger";
 //   4. Built-in defaults — for `utility`: the first configured local
 //      instance (vLLM / LM Studio / Ollama / llama-cpp) with a
 //      discoverable model, else the cheapest available cloud model.
-//      `critic` defaults to the utility chain.
+//      `critic` and `memory` default to the utility chain.
 //
 // The `utility` role is NEVER silently disabled: when no explicit
 // config exists it degrades to local-instance → cheap-cloud defaults,
@@ -46,6 +46,8 @@ export const MODEL_ROLES = {
   CRITIC: "critic",
   PLAN: "plan",
   VISION: "vision",
+  /** Memory extraction — its own knob, so it can run cheaper than compaction. */
+  MEMORY: "memory",
 } as const;
 
 /** Extensible — any string is a valid role; the named ones get defaults. */
@@ -85,6 +87,13 @@ const ROLE_SETTINGS: Record<
     section: "creative",
     providerField: "visionProvider",
     modelField: "visionModel",
+  },
+  // Same knob the utility role reads (Settings → Memory Models). The env
+  // override MODEL_ROLE_MEMORY is what moves extraction alone.
+  [MODEL_ROLES.MEMORY]: {
+    section: "memory",
+    providerField: "extractionProvider",
+    modelField: "extractionModel",
   },
 };
 
@@ -267,7 +276,7 @@ export default class ModelRoleRouter {
    *
    * Order: env (`MODEL_ROLE_<ROLE>`) → DB knob → caller fallback →
    * built-in defaults (utility: local instance then cheap cloud;
-   * critic: the utility chain; vision: cheap cloud vision model).
+   * critic and memory: the utility chain; vision: cheap cloud vision model).
    * Entries are de-duplicated preserving first occurrence.
    */
   static async resolveChain(
@@ -288,6 +297,8 @@ export default class ModelRoleRouter {
     } else if (role === MODEL_ROLES.CRITIC) {
       // Critic defaults to the utility chain — a danger-pattern review
       // needs a fast cheap model, never the main conversation model.
+      chain.push(...(await this.resolveChain(MODEL_ROLES.UTILITY)));
+    } else if (role === MODEL_ROLES.MEMORY) {
       chain.push(...(await this.resolveChain(MODEL_ROLES.UTILITY)));
     } else if (role === MODEL_ROLES.VISION) {
       chain.push(...resolveVisionDefaults());
