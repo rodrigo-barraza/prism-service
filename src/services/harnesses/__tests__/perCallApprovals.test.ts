@@ -11,6 +11,10 @@
  *   - Denying #1 with a reason puts that reason in #1's tool result.
  *   - Allowing #3 runs it; the batch then runs #2 and #3 together.
  *   - The next model request carries the three results in the model's order.
+ *
+ * Plus: an edited call runs with the user's arguments and the edit is kept
+ * on the persisted call; "auto-approve this conversation" clears its batch
+ * and every later batch of the turn.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import express from "express";
@@ -64,6 +68,7 @@ vi.mock("#src/services/PlanningModeService", () => ({
 vi.mock("#src/services/PromptLocaleService", () => ({
   default: {
     getDefaultLocale: () => "en",
+    getAvailableLocales: () => ["en"],
     get: (_locale: string, key: string, variables?: Record<string, string>) =>
       `[locale:${key}]${variables ? ` ${JSON.stringify(variables)}` : ""}`,
   },
@@ -396,5 +401,59 @@ describe("per-call approvals — one batch, three cards, three decisions", () =>
     expect(first.result).toMatchObject({ success: false, error: "USER_REJECTED" });
     expect(second.result).toMatchObject({ success: true, wrote: "two.txt" });
     expect(third.result).toMatchObject({ success: true, wrote: "three.txt" });
+  });
+
+  it("runs an edited call with the user's arguments and records the edit on the persisted call", async () => {
+    const conversationId = "per-call-edit";
+    const { harness, emit, seenMessages } = buildScriptedHarness(conversationId, [
+      { kind: "tools", calls: [THREE_WRITES[0]] },
+      { kind: "text", text: "done" },
+    ]);
+
+    const running = harness.run();
+    await vi.waitFor(() => expect(approvalEvents(emit)).toHaveLength(1));
+
+    const edited = await http.post("/agent/approve").send({
+      conversationId,
+      toolCallId: "call-1",
+      decision: "allow",
+      editedArgs: { path: "renamed.txt", content: "one\n" },
+    });
+    expect(edited.status).toBe(200);
+    await running;
+
+    const executed = executeToolBatchMock.mock.calls[0][0] as ScriptedCall[];
+    expect(executed[0].args).toEqual({ path: "renamed.txt", content: "one\n" });
+    const persisted = seenMessages[1].find((message) => (message.toolCalls?.length ?? 0) > 0)!.toolCalls![0];
+    expect(persisted.args).toEqual({ path: "renamed.txt", content: "one\n" });
+    expect(persisted._approval).toMatchObject({
+      isApproved: true,
+      decidedBy: "user",
+      editedByUser: true,
+      originalArgs: { path: "one.txt", content: "one\n" },
+    });
+  });
+
+  it('"auto-approve this conversation" clears the batch and every later batch of the turn', async () => {
+    const conversationId = "per-call-conversation-scope";
+    const { harness, emit, context } = buildScriptedHarness(conversationId, [
+      { kind: "tools", calls: THREE_WRITES.slice(0, 2) },
+      { kind: "tools", calls: [{ id: "call-9", name: "write_file", args: { path: "nine.txt", content: "9" } }] },
+      { kind: "text", text: "done" },
+    ]);
+
+    const running = harness.run();
+    await vi.waitFor(() => expect(approvalEvents(emit)).toHaveLength(2));
+    const response = await http
+      .post("/agent/approve")
+      .send({ conversationId, toolCallId: "call-1", decision: "allow", scope: "conversation" });
+    expect(response.status).toBe(200);
+    expect(response.body.decidedToolCallIds).toEqual(["call-1", "call-2"]);
+    await running;
+
+    expect(executedIds()).toEqual(["call-1", "call-2", "call-9"]);
+    // The second batch never asked.
+    expect(approvalEvents(emit)).toHaveLength(2);
+    expect(context.options.autoApprove).toBe(true);
   });
 });

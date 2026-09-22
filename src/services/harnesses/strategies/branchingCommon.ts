@@ -39,7 +39,11 @@ import {
   attachConfiguredHooks,
 } from "#src/services/harnesses/lifecycle/HookInitializer";
 import { executeToolBatch } from "#src/services/harnesses/lifecycle/ToolExecutor";
-import { checkAndWaitForApproval } from "#src/services/harnesses/lifecycle/ApprovalGate";
+import {
+  approvalRecordFor,
+  checkAndWaitForApproval,
+  orderResultsLikeCalls,
+} from "#src/services/harnesses/lifecycle/ApprovalGate";
 import {
   emitPostExecutionStatus,
   processToolResultMedia,
@@ -717,48 +721,22 @@ export async function executeApprovedToolBatch(
   const { options, workspaceRoot, emit } = context;
   const { hooks, approvalEngine } = standardHooks;
 
-  const { isApproved, shouldApproveAll, deniedToolCalls = [] } =
+  const { executableToolCalls, blockedResults, shouldApproveAll } =
     await checkAndWaitForApproval(
       pass.pendingToolCalls,
       context,
       approvalEngine,
+      { toolSchemas: tools.finalTools },
     );
+  if (shouldApproveAll) {
+    options.autoApprove = true;
+  }
 
-  // Policy-denied calls are terminal — never executed, never approvable.
-  const deniedIds = new Set(deniedToolCalls.map((toolCall) => toolCall.id));
-  const deniedResults: ToolResult[] = deniedToolCalls.map((toolCall) => ({
-    name: toolCall.name,
-    id: toolCall.id,
-    result: {
-      success: false,
-      error: "POLICY_DENIED",
-      message: `Tool execution denied by policy: ${toolCall._approval?.reason || "policy rule"}`,
-    },
-  }));
-  const executableToolCalls = pass.pendingToolCalls.filter(
-    (toolCall) => !deniedIds.has(toolCall.id),
-  );
-
-  let results: ToolResult[];
+  // Policy-denied and user-declined calls never run; every call the gate
+  // cleared runs in one batch. Results keep the model's order.
   let sandboxCheckpointReference: string | null = null;
-  if (!isApproved) {
-    results = [
-      ...executableToolCalls.map((toolCall) => ({
-        name: toolCall.name,
-        id: toolCall.id,
-        result: {
-          success: false,
-          error: "USER_REJECTED",
-          message: "Tool execution was manually rejected by the user.",
-        },
-      })),
-      ...deniedResults,
-    ];
-  } else {
-    if (shouldApproveAll) {
-      options.autoApprove = true;
-    }
-
+  let executedResults: ToolResult[] = [];
+  if (executableToolCalls.length > 0) {
     context._currentMessages = currentMessages;
 
     // ── Sandbox checkpoint (git-based rollback) ────────────
@@ -766,17 +744,18 @@ export async function executeApprovedToolBatch(
       ? createSandboxCheckpoint(workspaceRoot, emit)
       : null;
 
-    results = [
-      ...(await executeToolBatch(
-        executableToolCalls,
-        context,
-        tools,
-        hooks,
-        state,
-      )),
-      ...deniedResults,
-    ];
+    executedResults = await executeToolBatch(
+      executableToolCalls,
+      context,
+      tools,
+      hooks,
+      state,
+    );
   }
+  const results: ToolResult[] = orderResultsLikeCalls(pass.pendingToolCalls, [
+    ...executedResults,
+    ...blockedResults,
+  ]);
 
   // ── Post-execution processing ─────────────────────────
   await processToolResultMedia(
@@ -857,6 +836,7 @@ export async function commitToolCallResults(
         reasoningItem: toolCall.reasoningItem || undefined,
         result: matchingResult ? matchingResult.result : null,
         durationMilliseconds: matchingResult?.durationMilliseconds,
+        ...approvalRecordFor(toolCall),
       };
     }),
   };

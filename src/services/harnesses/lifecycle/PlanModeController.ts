@@ -1,8 +1,10 @@
 import PlanningModeService from "#src/services/PlanningModeService";
-import { pendingApprovals } from "#src/services/ApprovalRegistry";
+import crypto from "node:crypto";
+import { ApprovalRegistry } from "#src/services/ApprovalRegistry";
+import { resolveLoopKey } from "#src/services/LoopKey";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import logger from "#src/utils/logger";
-import { HARNESS } from "#src/constants";
+import { APPROVALS, HARNESS } from "#src/constants";
 import {
   SYSTEM_MESSAGE_TAGS,
   wrapSystemMessage,
@@ -115,7 +117,7 @@ export async function handleExitPlanMode(
   context: AgenticContext,
   state: AgenticLoopState,
 ): Promise<{ shouldContinueLoop: boolean }> {
-  const { options, emit, signal, conversationId } = context;
+  const { options, emit, signal } = context;
 
   const planText = state.planModeText.trim() || pass.streamedText.trim();
   const planSteps = PlanningModeService.extractSteps(planText);
@@ -124,39 +126,57 @@ export async function handleExitPlanMode(
     `[PlanningMode] exit_plan_mode called — planText=${planText.length} chars, steps=${planSteps.length}, autoApprove=${!!options.autoApprove}`,
   );
 
+  // The plan is decided like any other call: by the exit_plan_mode call's
+  // id, through the same registry and POST /agent/approve as tool cards.
+  const batchId = crypto.randomUUID();
+  const toolCallId = exitPlanToolCall.id || `${batchId}:plan`;
+
   emit({
     type: "plan_proposal",
     plan: planText,
     steps: planSteps,
     autoApproved: !!options.autoApprove,
+    toolCallId,
+    batchId,
   });
 
   let planApproved: boolean;
+  let rejectionReason: string | undefined;
   if (options.autoApprove) {
     planApproved = true;
     logger.info("[PlanningMode] Auto-approved plan (autoApprove=true)");
   } else {
-    planApproved = await new Promise<boolean>((resolve) => {
-      const timeoutId = setTimeout(() => {
-        pendingApprovals.delete(conversationId);
-        resolve(false);
-      }, PLAN_APPROVAL_TIMEOUT_MILLISECONDS);
-
-      const existingApproval = pendingApprovals.get(conversationId);
-      if (existingApproval) {
-        existingApproval.resolve(false as never);
-        pendingApprovals.delete(conversationId);
-      }
-
-      pendingApprovals.set(conversationId, {
-        resolve: (value: boolean) => {
-          clearTimeout(timeoutId);
-          pendingApprovals.delete(conversationId);
-          resolve(value);
-        },
-        type: "plan",
-      });
+    const loopKey = resolveLoopKey(context);
+    const decisionsPromise = ApprovalRegistry.waitForDecisions(loopKey, {
+      type: "plan",
+      batchId,
+      calls: [{ toolCallId, name: exitPlanToolCall.name, args: { plan: planText } }],
+      timeoutMilliseconds: PLAN_APPROVAL_TIMEOUT_MILLISECONDS,
+      onDecided: (decidedToolCallId, decision) => {
+        emit({
+          type: APPROVALS.DECIDED_EVENT_TYPE,
+          toolCallId: decidedToolCallId,
+          batchId,
+          decision: decision.decision,
+          scope: decision.scope,
+          source: decision.source,
+          ...(decision.reason ? { reason: decision.reason } : {}),
+        });
+      },
     });
+    const cancelOnAbort = () => ApprovalRegistry.cancel(loopKey);
+    signal?.addEventListener("abort", cancelOnAbort, { once: true });
+    if (signal?.aborted) cancelOnAbort();
+    try {
+      const decision = (await decisionsPromise).get(toolCallId);
+      planApproved = decision?.decision === "allow";
+      rejectionReason = decision?.reason;
+      if (planApproved && decision?.scope === "conversation") {
+        options.autoApprove = true;
+      }
+    } finally {
+      signal?.removeEventListener("abort", cancelOnAbort);
+    }
   }
 
   if (!planApproved || signal?.aborted) {
@@ -165,7 +185,10 @@ export async function handleExitPlanMode(
       message: PromptLocaleService.get(
         (options?.locale as string | undefined) ||
           PromptLocaleService.getDefaultLocale(),
-        "harness.planningMode.rejectionStatus",
+        rejectionReason
+          ? "harness.planningMode.rejectionStatusWithReason"
+          : "harness.planningMode.rejectionStatus",
+        rejectionReason ? { reason: rejectionReason } : undefined,
       ),
     });
     emit({

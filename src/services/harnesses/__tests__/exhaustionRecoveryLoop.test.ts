@@ -94,7 +94,15 @@ vi.mock("../lifecycle/ToolExecutor.ts", () => ({
 }));
 
 vi.mock("../lifecycle/ApprovalGate.ts", () => ({
-  checkAndWaitForApproval: vi.fn().mockResolvedValue({ isApproved: true, shouldApproveAll: false }),
+  // Every call cleared, nothing blocked — the gate's per-call verdict.
+  checkAndWaitForApproval: vi.fn().mockImplementation(async (toolCalls: unknown[]) => ({
+    executableToolCalls: toolCalls,
+    blockedResults: [],
+    deniedToolCalls: [],
+    shouldApproveAll: false,
+  })),
+  orderResultsLikeCalls: (_toolCalls: unknown[], results: unknown[]) => results,
+  approvalRecordFor: () => ({}),
 }));
 
 vi.mock("../lifecycle/PostExecutionEmitter.ts", () => ({
