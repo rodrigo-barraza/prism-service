@@ -359,5 +359,11 @@ export interface ChatMessage {
   /** Soft rewind-pruned flag — excluded from model context, kept for the UI. */
   pruned?: boolean;
   tool_call_id?: string;
+  /** Stable id stamped at persistence — what a compaction boundary names (CompactionBoundary.ts). */
+  messageId?: string;
+  /** Marks the synthetic compaction summary — context for the model, never persisted. */
+  isCompactSummary?: boolean;
+  /** On a compaction summary: the id of the last message it covers. */
+  compactionThroughMessageId?: string;
   [key: string]: unknown;
 }

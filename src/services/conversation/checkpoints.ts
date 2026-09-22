@@ -28,9 +28,12 @@ import logger from "#src/utils/logger";
 // COVERING PRUNED MESSAGES. This holds by construction:
 //   1. Compaction summaries are never persisted to the messages array
 //      (Finalizer.sanitizeMessagesForPersistence filters
-//      `isCompactSummary`), so a summary only ever covers pruned
-//      messages inside the live in-memory loop that created it — and
-//      the next history load starts from the document, summary-free.
+//      `isCompactSummary`). The latest summary is persisted beside it,
+//      as the document's `compaction` boundary, and a history load
+//      applies it only when its `throughMessageId` is still in the
+//      stripped history (compact/CompactionBoundary.ts). Pruning is a
+//      suffix from the marker on, so a summary covering a pruned message
+//      has a pruned `throughMessageId` — and is ignored.
 //   2. If a summary-like message ever does sit in the array (legacy or
 //      imported docs), a summary always sits AFTER every message it
 //      covers, so index-based pruning can never keep a summary whose

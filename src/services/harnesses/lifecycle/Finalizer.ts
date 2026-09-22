@@ -69,6 +69,10 @@ export interface FinalizerContext {
 
 import type { ContextBudgetSnapshot } from "#src/services/harnesses/ContextBudgetTracker";
 import type { ModelRefusal } from "#src/services/harnesses/types";
+import {
+  stampMessageIds,
+  type CompactionBoundary,
+} from "#src/services/compact/CompactionBoundary";
 
 export interface FinalizerPayload {
   text: string | null;
@@ -104,6 +108,11 @@ export interface FinalizerPayload {
   refusal?: ModelRefusal;
   /** The model that served the response when a fallback did (request row). */
   servedModel?: string;
+  /**
+   * The turn's latest compaction boundary — persisted as the document's
+   * `compaction` so the next turn loads summary + tail (CompactionBoundary.ts).
+   */
+  compactionBoundary?: CompactionBoundary | null;
 }
 
 /**
@@ -191,6 +200,7 @@ export async function finalizeTextGeneration(
     thinkingBlocks,
     refusal,
     servedModel,
+    compactionBoundary,
   }: FinalizerPayload,
   overrideMessagesToAppend: MessagePayload[] | null = null,
   finalizerOptions?: { deferDoneEmission?: boolean },
@@ -532,6 +542,14 @@ export async function finalizeTextGeneration(
     // All agent conversations (including sub-agents) track their own budget.
     if (contextBudget) {
       finalMeta.contextBudget = contextBudget;
+    }
+    if (compactionBoundary) {
+      finalMeta.compaction = compactionBoundary;
+    }
+    // Agent turns address their messages by id — a later compaction
+    // boundary names the last message its summary covers.
+    if (options.agenticLoopEnabled) {
+      stampMessageIds(messagesToAppend);
     }
     // Ensure all user messages to append are properly swapped/sanitized,
     // then filter out synthetic compaction artifacts that should never
@@ -944,50 +962,6 @@ export function assembleMessagesToAppend(options: {
   return messagesToAppend;
 }
 
-/**
- * Slice and filter message history to identify new messages for the current turn.
- * Shared between BaseAgenticHarness execution and test suite assertion suites to ensure
- * they do not diverge.
- *
- * For sub-agents, the initial messages array contains both a system message
- * (operational context: topology, workspace, delegation rules) and a user
- * message (the task prompt). Both are new and must be persisted. The scan
- * below walks backward from the default slice point to find the earliest
- * consecutive non-persisted original message so nothing is dropped.
- */
-export function computeNewTurnMessages(
-  originalMessages: MessagePayload[],
-  currentMessages: MessagePayload[],
-  originalMessageCount: number,
-): MessagePayload[] {
-  const lastOriginalMessage = originalMessages[originalMessageCount - 1];
-  const isLastAlreadyPersisted =
-    lastOriginalMessage && lastOriginalMessage._alreadyPersisted === true;
-
-  let sliceIndex: number;
-  if (isLastAlreadyPersisted) {
-    // All originals are already in the DB — only persist new messages
-    sliceIndex = originalMessageCount;
-  } else {
-    // Default: include the last original message (the triggering user input)
-    sliceIndex = Math.max(0, originalMessageCount - 1);
-
-    // Walk backward to include any preceding non-persisted original messages
-    // (e.g. sub-agent operational context system message at index 0)
-    for (let scanIndex = sliceIndex - 1; scanIndex >= 0; scanIndex--) {
-      if (originalMessages[scanIndex]?._alreadyPersisted) break;
-      sliceIndex = scanIndex;
-    }
-  }
-
-  return currentMessages
-    .slice(sliceIndex)
-    .filter(
-      (message) =>
-        !(
-          message.role === "user" &&
-          typeof message.content === "string" &&
-          message.content.startsWith(PROMPT_DELIMITERS.CONTEXT_NOTE_PREFIX)
-        ) && !message._alreadyPersisted,
-    );
-}
+// Moved to TurnTranscript.ts (persistence now reads the turn transcript);
+// re-exported here for the harnesses and test suites that import it.
+export { computeNewTurnMessages } from "./TurnTranscript.ts";

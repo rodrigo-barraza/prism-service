@@ -193,6 +193,8 @@ async function runTreeOfThoughtsTurn(
         context,
         state,
         "TreeOfThoughts",
+        undefined,
+        harness.estimateRequestOverheadTokens(),
       );
       currentMessages = pressureResult.messages;
 

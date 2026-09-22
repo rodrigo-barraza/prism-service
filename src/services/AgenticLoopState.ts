@@ -1,11 +1,18 @@
-import { createUsageAccumulator } from "#src/utils/CostCalculator";
+import {
+  createUsageAccumulator,
+  getTotalInputTokens,
+} from "#src/utils/CostCalculator";
 import type {
   UsageAccumulator,
   DisplaySegment,
   ToolCall,
   AgenticLoopStateInit,
   PassState,
+  ConversationMessage,
 } from "./harnesses/types.ts";
+import type { ProviderInputBaseline } from "#src/services/compact/ContextBudgets";
+import type { CompactionBoundary } from "#src/services/compact/CompactionBoundary";
+import type { TokenUsage } from "#src/types/admin";
 import { MEDIA } from "#src/constants";
 import type { ModelRefusal } from "./harnesses/types.ts";
 import type { AnthropicThinkingBlock } from "#src/types/admin";
@@ -81,6 +88,31 @@ export default class AgenticLoopState {
    * (CompactionDeferralGuard).
    */
   lastStallWarningIteration: number | null;
+  /**
+   * The latest model call's provider-reported input (cache included) and the
+   * chars/4 size of the messages it carried — the compaction trigger's
+   * baseline (ContextBudgets.estimateRequestInputTokens).
+   */
+  providerInputBaseline: ProviderInputBaseline | null;
+  /** The boundary of this turn's latest compaction — persisted by the Finalizer. */
+  compactionBoundary: CompactionBoundary | null;
+  /**
+   * Why summarization did not (or could not) keep this iteration under
+   * budget — set by ContextPressureManager, logged by ContextWindowManager
+   * if lossy truncation has to run.
+   */
+  truncationReason: string | null;
+
+  // ── Turn transcript (lifecycle/TurnTranscript.ts) ───────
+  /**
+   * Every message this turn produced, verbatim and in order — recorded
+   * before anything shrinks the loop's message array, so compaction,
+   * offload and truncation of the CURRENT run never reach persistence.
+   * Null until the first context-pressure boundary.
+   */
+  turnTranscript: ConversationMessage[] | null;
+  /** Originals already classified by the transcript (recorded or not part of the turn). */
+  turnTranscriptSeen: WeakSet<object>;
 
   // ── Provider-native state of the FINAL pass (OpenAI Responses) ──
   // response.id, assistant message phase and unpaired reasoning items of
@@ -206,6 +238,12 @@ export default class AgenticLoopState {
     this.postCompactTokenCount = null;
     this.compactionRequested = false;
     this.lastStallWarningIteration = null;
+    this.providerInputBaseline = null;
+    this.compactionBoundary = null;
+    this.truncationReason = null;
+
+    this.turnTranscript = null;
+    this.turnTranscriptSeen = new WeakSet();
 
     this.turnInputApplied = 0;
     this.detachedWorkDispatched = false;
@@ -234,6 +272,22 @@ export default class AgenticLoopState {
 
     this.lastProgressEmitTime = 0;
     this.chunksSinceLastProgress = 0;
+  }
+
+  /**
+   * Record a finished model call's reported input as the next trigger
+   * baseline. Calls that report no input keep the previous baseline.
+   */
+  recordProviderInput(
+    usage: TokenUsage | null | undefined,
+    sentMessageTokens: number,
+  ): void {
+    const inputTokens = getTotalInputTokens(usage);
+    if (inputTokens <= 0) return;
+    this.providerInputBaseline = {
+      inputTokens,
+      messageTokens: sentMessageTokens,
+    };
   }
 
   /** Get clean display segments (trimmed, empty-filtered) for DB persistence. */

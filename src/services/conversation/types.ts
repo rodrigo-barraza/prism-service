@@ -1,5 +1,6 @@
 import type { ChatMessage } from "#src/types/admin";
 import type { ConversationGoal } from "#src/services/ConversationGoalService";
+import type { CompactionBoundary } from "#src/services/compact/CompactionBoundary";
 
 export interface ConversationMeta {
   title?: string;
@@ -17,6 +18,12 @@ export interface ConversationMeta {
   conversationOutcome?: string | null;
   /** Persistent objective of the conversation — owned by ConversationGoalService. */
   goal?: ConversationGoal | null;
+  /**
+   * The latest compaction boundary: its summary replaces every message up to
+   * `throughMessageId` when the next turn loads (CompactionBoundary.ts).
+   * `null` clears it (a PATCH that rewrites messages).
+   */
+  compaction?: CompactionBoundary | null;
   /** Runtime-only: memory IDs injected this turn, written via $addToSet to the document's injectedMemoryIds array. Not stored as a top-level field. */
   _newInjectedMemoryIds?: string[];
 }
@@ -48,6 +55,8 @@ export interface ConversationPatchFields {
   modelNames?: string[];
   systemPrompt?: string;
   settings?: ConversationSettings;
+  /** Rewriting the messages invalidates the compaction boundary (always null here). */
+  compaction?: null;
 }
 
 export interface ToolCallPayload {
@@ -74,6 +83,8 @@ export interface MessagePayload {
   name?: string;
   /** Foreign key linking this message to the `requests` collection for telemetry data. */
   requestId?: string;
+  /** Stable id stamped at persistence — what a compaction boundary names (CompactionBoundary.ts). */
+  messageId?: string;
   isCompactSummary?: boolean;
   _isInjectedContext?: boolean;
   _isPlanningInjection?: boolean;

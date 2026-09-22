@@ -156,6 +156,12 @@ export interface ConversationMessage {
   generationSettings?: Record<string, unknown>;
   /** Internal marker — message already persisted to database, skip double persistence. */
   _alreadyPersisted?: boolean;
+  /** Stable id stamped at persistence — what a compaction boundary names (CompactionBoundary.ts). */
+  messageId?: string;
+  /** Marks the synthetic compaction summary — context for the model, never persisted. */
+  isCompactSummary?: boolean;
+  /** On a compaction summary: the id of the last message it covers. */
+  compactionThroughMessageId?: string;
   /** Internal marker — planning injection message, stripped on plan exit and DB persistence. */
   _isPlanningInjection?: boolean;
   /** Notification origin — identifies system-generated messages for deterministic detection.

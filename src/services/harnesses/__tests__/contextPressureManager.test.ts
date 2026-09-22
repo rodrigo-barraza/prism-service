@@ -40,6 +40,12 @@ const mockCompactConversation = vi.fn().mockResolvedValue(null);
 vi.mock("#src/services/compact/CompactionService", () => ({
   default: {
     compactConversation: (...arguments_: unknown[]) => mockCompactConversation(...arguments_),
+    // ContextShrinkStrategy calls attemptCompaction; route it through the
+    // compactConversation mock the assertions below read.
+    attemptCompaction: async (...arguments_: unknown[]) => ({
+      result: await mockCompactConversation(...arguments_),
+      skipReason: null,
+    }),
   },
 }));
 
@@ -95,6 +101,7 @@ describe("ContextPressureManager — manageContextPressure", () => {
       signal: undefined,
       options: { maxTokens: 8192 },
       modelDefinition: { maxInputTokens: 128000 },
+      messages: [],
     } as unknown as AgenticContext;
 
     mockState = {
@@ -102,6 +109,8 @@ describe("ContextPressureManager — manageContextPressure", () => {
       compactionPerformed: false,
       preCompactTokenCount: null,
       postCompactTokenCount: null,
+      turnTranscript: null,
+      turnTranscriptSeen: new WeakSet(),
     } as unknown as AgenticLoopState;
   });
 

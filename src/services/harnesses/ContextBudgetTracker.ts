@@ -82,29 +82,40 @@ export default class ContextBudgetTracker {
     adjustedInput: number;
     availableForOutput: number;
   } {
-    this.systemPromptTokensEstimate = estimateTokens(systemPromptText);
-    this.toolSchemaTokensEstimate =
-      toolSchemas.length > 0
-        ? estimateTokens(JSON.stringify(toolSchemas))
-        : 0;
+    const fixedOverhead = ContextBudgetTracker.estimateFixedOverhead(
+      systemPromptText,
+      toolSchemas,
+    );
+    this.systemPromptTokensEstimate = fixedOverhead.systemPromptTokens;
+    this.toolSchemaTokensEstimate = fixedOverhead.toolSchemaTokens;
     // Skills are injected into the messages array (system context message),
     // so their tokens are a carve-out of the message estimate — never
     // additive on top of it.
     this.skillTokensEstimate = Math.min(skillTokens, estimatedMessageTokens);
     this.toolCount = toolSchemas.length;
 
-    // Apply calibration ratio to the heuristic estimate if we have one
-    const calibratedMessageTokens = this.calibrationRatio !== null
-      ? Math.ceil(estimatedMessageTokens * this.calibrationRatio)
-      : estimatedMessageTokens;
-    const calibratedSkillTokens = this.calibrationRatio !== null
-      ? Math.ceil(this.skillTokensEstimate * this.calibrationRatio)
-      : this.skillTokensEstimate;
+    // Apply the calibration ratio to EVERY category. The ratio is measured
+    // as real ÷ (messages + system prompt + tool schemas); scaling only the
+    // messages and adding the raw overhead back overstated the request by
+    // (1 − ratio) × overhead — ~16K tokens on a live PDF run, enough for the
+    // exhaustion guard to end a turn below the compaction threshold. The
+    // calibrated total is the compaction trigger's estimate
+    // (ContextBudgets.estimateRequestInputTokens: reported + scaled growth).
+    const calibrate = (tokens: number) =>
+      this.calibrationRatio !== null
+        ? Math.ceil(tokens * this.calibrationRatio)
+        : tokens;
+    const calibratedMessageTokens = calibrate(estimatedMessageTokens);
+    const calibratedSkillTokens = calibrate(this.skillTokensEstimate);
+    const calibratedSystemPromptTokens = calibrate(
+      this.systemPromptTokensEstimate,
+    );
+    const calibratedToolSchemaTokens = calibrate(this.toolSchemaTokensEstimate);
 
     const totalEstimatedInput =
       calibratedMessageTokens +
-      this.systemPromptTokensEstimate +
-      this.toolSchemaTokensEstimate;
+      calibratedSystemPromptTokens +
+      calibratedToolSchemaTokens;
 
     const safetyMargin =
       Math.ceil(totalEstimatedInput * OUTPUT_TOKEN_CLAMP_SAFETY_MULTIPLIER) +
@@ -118,8 +129,8 @@ export default class ContextBudgetTracker {
         calibratedMessageTokens - calibratedSkillTokens,
         0,
       ),
-      systemPromptTokens: this.systemPromptTokensEstimate,
-      toolSchemaTokens: this.toolSchemaTokensEstimate,
+      systemPromptTokens: calibratedSystemPromptTokens,
+      toolSchemaTokens: calibratedToolSchemaTokens,
       skillTokens: calibratedSkillTokens,
       safetyMarginTokens: safetyMargin,
       totalInputTokens: adjustedInput,
@@ -254,6 +265,22 @@ export default class ContextBudgetTracker {
 
     this.lastSnapshot = snapshot;
     this.emitSnapshot(snapshot);
+  }
+
+  /**
+   * The request's fixed categories besides the messages — the system prompt
+   * (sent as a first-class parameter) and the serialized tool schemas. The
+   * compaction trigger and truncation budget count them too.
+   */
+  static estimateFixedOverhead(
+    systemPromptText: string,
+    toolSchemas: unknown[],
+  ): { systemPromptTokens: number; toolSchemaTokens: number } {
+    return {
+      systemPromptTokens: estimateTokens(systemPromptText),
+      toolSchemaTokens:
+        toolSchemas.length > 0 ? estimateTokens(JSON.stringify(toolSchemas)) : 0,
+    };
   }
 
   /** Get the latest budget snapshot for persistence. */

@@ -94,6 +94,9 @@ const ConversationService: ConversationServiceInterface = {
       if (conversationMeta.contextBudget) {
         setFields.contextBudget = conversationMeta.contextBudget;
       }
+      if (conversationMeta.compaction !== undefined) {
+        setFields.compaction = conversationMeta.compaction;
+      }
       if (conversationMeta.agent) {
         setFields.agent = conversationMeta.agent;
       }

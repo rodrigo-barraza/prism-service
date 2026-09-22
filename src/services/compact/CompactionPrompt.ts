@@ -60,17 +60,28 @@ export function buildCompactionJudgeUserPrompt(
 export function extractSummaryFromResponse(
   responseText: string,
 ): string | null {
-  const summaryMatch = responseText.match(/<summary>([\s\S]*?)<\/summary>/i);
-  if (summaryMatch?.[1]) {
-    return summaryMatch[1].trim();
+  // The analysis often restates the instructions ("…wrap it in `<summary>`
+  // tags"), so a first-match search started mid-analysis and persisted its
+  // tail as part of the summary (seen live). Drop the analysis, then take the
+  // LAST <summary> that opens before the final </summary>.
+  const withoutAnalysis = responseText
+    .replace(/<analysis>[\s\S]*?<\/analysis>/gi, "")
+    .trim();
+  const lowerCased = withoutAnalysis.toLowerCase();
+  const closingIndex = lowerCased.lastIndexOf("</summary>");
+  if (closingIndex >= 0) {
+    const openingIndex = lowerCased.lastIndexOf("<summary>", closingIndex);
+    if (openingIndex >= 0) {
+      const summary = withoutAnalysis
+        .slice(openingIndex + "<summary>".length, closingIndex)
+        .trim();
+      if (summary) return summary;
+    }
   }
 
   // Fallback: if no <summary> tags but text exists, use the whole response
   // minus any <analysis> block. This handles models that don't follow the
   // tag format exactly.
-  const withoutAnalysis = responseText
-    .replace(/<analysis>[\s\S]*?<\/analysis>/gi, "")
-    .trim();
   if (withoutAnalysis.length > 200) {
     return withoutAnalysis;
   }

@@ -469,6 +469,49 @@ describe("ConversationTimerService", () => {
       expect(mockRunAgenticLoop).toHaveBeenCalled();
     });
 
+    it("reloads a compacted conversation through its boundary (summary + tail)", async () => {
+      mockGetDocuments(COLLECTIONS.CONVERSATION_TIMERS).push({ ...TIMER_FIXTURE });
+      mockGetDocuments(COLLECTIONS.AGENT_CONVERSATIONS).push({
+        ...CONVERSATION_FIXTURE,
+        isGenerating: false,
+        messages: [
+          { role: "user", content: "set up the ledger", messageId: "u-1" },
+          {
+            role: "assistant",
+            content: "reading it",
+            messageId: "a-1",
+            toolCalls: [{ id: "call-1", name: "read_file", args: {} }],
+          },
+          { role: "tool", tool_call_id: "call-1", name: "read_file", content: "ledger.csv" },
+          { role: "user", content: "agree the totals", messageId: "u-2" },
+          { role: "assistant", content: "totals agreed", messageId: "a-2" },
+        ],
+        compaction: {
+          summary: "SUMMARY: the ledger was read.",
+          throughMessageId: "a-1",
+          createdAt: new Date().toISOString(),
+          provider: PROVIDERS.GOOGLE,
+          model: "gemini-3-flash",
+          tokensBefore: 100_000,
+          tokensAfter: 20_000,
+        },
+      });
+
+      await ConversationTimerService.tick();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mockRunAgenticLoop).toHaveBeenCalled();
+      const loaded = mockRunAgenticLoop.mock.calls[0][0].messages as Array<Record<string, unknown>>;
+      expect(loaded[0].isCompactSummary).toBe(true);
+      expect(loaded[0].content).toContain("SUMMARY: the ledger was read.");
+      // The anchor's own tool result is folded with it — no orphaned tool message.
+      expect(loaded.map((message) => message.content).slice(1, 3)).toEqual([
+        "agree the totals",
+        "totals agreed",
+      ]);
+      expect(loaded.some((message) => message.role === "tool")).toBe(false);
+    });
+
     it("should defer execution when conversation isGenerating is true", async () => {
       mockGetDocuments(COLLECTIONS.CONVERSATION_TIMERS).push({ ...TIMER_FIXTURE });
       mockGetDocuments(COLLECTIONS.AGENT_CONVERSATIONS).push({
