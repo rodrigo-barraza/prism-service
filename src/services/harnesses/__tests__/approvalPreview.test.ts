@@ -63,6 +63,13 @@ describe("createUnifiedDiff", () => {
     );
   });
 
+  it("never writes a double slash for an absolute path", () => {
+    expect(createUnifiedDiff("/abs/x.txt", "a\n", "b\n").split("\n").slice(0, 2)).toEqual([
+      "--- a/abs/x.txt",
+      "+++ b/abs/x.txt",
+    ]);
+  });
+
   it("is empty when nothing changes", () => {
     expect(createUnifiedDiff("same.txt", "x\n", "x\n")).toBe("");
   });
@@ -151,6 +158,16 @@ describe("buildApprovalPreview", () => {
         "+gamma-and-a-half",
       ].join("\n"),
     );
+  });
+
+  it("labels the diff with the path relative to the workspace root", async () => {
+    serveFile(null);
+    const preview = await buildApprovalPreview(
+      { id: "c7", name: "write_file", args: { path: "/scratch/docs/a.md", content: "x\n" } },
+      context,
+    );
+    expect(preview?.path).toBe("/scratch/docs/a.md");
+    expect(preview?.diff.split("\n")[1]).toBe("+++ b/docs/a.md");
   });
 
   it("apply_patch: the patch the call carries, as is — no read", async () => {

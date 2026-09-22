@@ -134,9 +134,10 @@ export function createUnifiedDiff(
     if (operation.kind !== "-") newLine++;
   }
 
+  const headerPath = filePath.replace(/^\/+/, "");
   const output = [
-    oldText === null ? "--- /dev/null" : `--- a/${filePath}`,
-    `+++ b/${filePath}`,
+    oldText === null ? "--- /dev/null" : `--- a/${headerPath}`,
+    `+++ b/${headerPath}`,
   ];
   for (const [start, end] of hunkRanges) {
     const slice = operations.slice(start, end + 1);
