@@ -21,38 +21,9 @@ Every item below is independent. For each one: write a red test, fix it, and kee
 
 ## Landing 1 — `loop-small-fixes`
 
-**a. The cost cap can't be set.**
-- *Bug:* `maxCostDollars` from the request body or settings is never copied into the loop options (`src/routes/ChatRoutes.ts` ~236–359), so `SharedCostBudget` is never created (`AgenticLoopService.ts` ~172–181).
-- *Fix:* thread it through. Default from settings if one exists.
-- *Test:* a request with `maxCostDollars: 0.01` and a scripted provider reporting costlier usage stops with a budget reason, and the reason is persisted. (Red: runs on.)
-
-**b. `create_subagent(s)` can hang forever.**
-- *Bug:* the dispatcher waits for every member to register (`OrchestratorService.ts` ~1260–1280, ~1380). Cap, depth and breaker errors return before registration (~243–284). The concurrency cap is counted process-wide, and the tool is exempt from the tool timeout (`ToolExecutor.ts` ~32–40).
-- *Fix:*
-  - register failed members as terminal entries, or resolve the waiters on error;
-  - count concurrency per root conversation;
-  - put a timeout on the dispatch wait.
-- *Test* (fake timers): spawn 3 where #2 hits the depth cap. The tool returns promptly with 2 started and 1 error. (Red: never resolves.)
-
-**c. Rejecting a plan loses the turn.**
-- *Bug:* on rejection or timeout the harness returns before finalize (`ReActHarness.ts` ~907; `TreeOfThoughtsStrategy.ts` ~135; `GraphOfThoughtsStrategy.ts` ~108). The prompt and the plan go unsaved, and `isGenerating` stays true.
-- *Fix:* finalize with the user prompt, the plan, and a rejection note; clear `isGenerating`; emit `done`.
-- *Test:* `planFirst` + reject → `Finalizer` called, messages persisted, `isGenerating` false, `done` emitted. Do the same for ToT and GoT. (Red.)
-
-**d. Tool results are cut without a pointer.**
-- *Bug:* `truncateToolResult` (`src/utils/FunctionCallingUtilities.ts` ~79–110, applied on every model call via `BaseAgenticHarness.ts` ~745) head-cuts objects over 8,000 chars and arrays over 10 items, with no way back.
-- *Fix:*
-  - route the overflow through `ToolResultOffloadService`: store the full value and show a preview plus an offload id and the `retrieve_offloaded_content` hint;
-  - clamp long strings the same way;
-  - make the result deterministic, since the same input must produce the same bytes (prefix stability, prompt 10).
-- *Test:* a 20K-char object result → the model-visible content has a preview and an id, and `retrieve_offloaded_content` returns the original. (Red: no pointer.)
-
-**f. Scheduled and timer runs skip custom-agent DENY policies.**
-- *Bug:* policies are injected only at the HTTP route (`ChatRoutes.ts` ~923–931). Scheduled and timer runs use `autoApprove: true` (`ScheduledTaskService.ts` ~437, ~652; `ConversationTimerService.ts` ~544).
-- *Fix:* resolve policies inside the loop (`AgenticLoopService`) for every entry point.
-- *Test:* a scheduled run of a custom agent with a DENY rule on a tool → the call is denied with `POLICY_DENIED`. (Red: it executes.)
-
-**Live** (isolated): (a) with a cheap model and a tiny cap; (c) reject a plan via `/agent/approve` and check the conversation document in the test DB.
+**Done 2026-09-22:** (a) `maxCostDollars` is threaded from the request and a budget stop persists `conversationOutcome: "budget_exhausted"` with a "Cost cap reached" note and no further model call; (b) `createTeam` settles refused members, is released when the router settles and is bounded by `ORCHESTRATOR.DISPATCH_REGISTRATION_TIMEOUT_MILLISECONDS`, and `MAX_SUB_AGENTS` counts per root conversation; (c) a rejected plan finalizes (ReAct, ToT, GoT) with outcome `plan_rejected`, and the plan falls back to `exit_plan_mode`'s `summary`; (d) `truncateToolResult` offloads what it cuts under a content-hash id and shows a preview + `offload_id` + retrieve hint, strings included; (f) persona policies are resolved in `AgenticLoopService` for every entry point. Live-checked (a) and (c) in `prism_test_loop-small-fixes`.
+**Branch:** `loop-small-fixes`.
+**Tests:** `src/services/harnesses/__tests__/loopSmallFixes.test.ts` (a, c, f on the real loop), `tests/agentCostCapRoutes.test.ts` (a), `tests/orchestratorDispatchWait.test.ts` (b), `src/utils/__tests__/toolResultTruncationOffload.test.ts` (d).
 
 ---
 
