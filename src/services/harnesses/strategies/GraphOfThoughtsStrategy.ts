@@ -74,7 +74,7 @@ export async function runGraphOfThoughts(
   const context = harness["context"];
   const state: AgenticLoopState = harness["state"];
   const tools = harness["tools"];
-  const { options, project, username, agent, workspaceRoot, emit, signal } =
+  const { options, project, username, agent, emit, signal } =
     context;
 
   const initialBranchCount = Math.min(
