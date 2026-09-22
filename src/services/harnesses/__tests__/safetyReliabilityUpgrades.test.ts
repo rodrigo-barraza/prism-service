@@ -196,8 +196,9 @@ describe("A3 — policy DENY is terminal at the ApprovalGate", () => {
 
     // read_file auto-approves; the denied shell call is terminal — no
     // approval prompt is registered, so the gate resolves immediately.
-    expect(verdict.isApproved).toBe(true);
+    expect(verdict.executableToolCalls.map((toolCall) => toolCall.id)).toEqual(["tc-2"]);
     expect(verdict.deniedToolCalls.map((toolCall) => toolCall.id)).toEqual(["tc-1"]);
+    expect(verdict.blockedResults.map((result) => result.id)).toEqual(["tc-1"]);
     expect(emit).toHaveBeenCalledWith(
       expect.objectContaining({
         message: expect.stringContaining("denied by policy"),
@@ -220,6 +221,7 @@ describe("A3 — policy DENY is terminal at the ApprovalGate", () => {
     );
     expect(verdict.deniedToolCalls).toHaveLength(1);
     expect(verdict.deniedToolCalls[0]._approval?.isDenied).toBe(true);
+    expect(verdict.executableToolCalls).toEqual([]);
   });
 });
 

@@ -437,7 +437,8 @@ describe("ApprovalGate", () => {
       approvalEngine as any,
     );
 
-    expect(result.isApproved).toBe(true);
+    expect(result.executableToolCalls).toEqual(toolCalls);
+    expect(result.blockedResults).toEqual([]);
   });
 
   it("should auto-approve when options.autoApprove is true", async () => {
@@ -466,7 +467,8 @@ describe("ApprovalGate", () => {
       approvalEngine as any,
     );
 
-    expect(result.isApproved).toBe(true);
+    expect(result.executableToolCalls).toEqual(toolCalls);
+    expect(result.blockedResults).toEqual([]);
   });
 });
 

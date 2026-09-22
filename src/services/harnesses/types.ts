@@ -56,6 +56,13 @@ export interface ToolCall {
     isApproved?: boolean;
     isDenied?: boolean;
     reason?: string;
+    /** Set by the ApprovalGate for a call a human decided (or that timed out waiting). */
+    decidedBy?: "user" | "timeout" | "superseded" | "turn_ended";
+    /** The user's own reason for declining. */
+    userReason?: string;
+    /** The user edited the arguments on the approval card; `args` holds the edit. */
+    editedByUser?: boolean;
+    originalArgs?: Record<string, unknown>;
   };
   result?: unknown;
   status?: string;

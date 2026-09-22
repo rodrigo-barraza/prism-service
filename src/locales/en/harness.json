@@ -8,7 +8,8 @@
     "blocked": "You are in PLANNING MODE. Tool call(s) [{{blockedNames}}] were blocked — only exit_plan_mode is available. Write your complete plan as text output, then call exit_plan_mode to submit it for user approval.",
     "approvalResult": "User has approved your plan. You can now start coding. Start with updating your todo list if applicable.",
     "rejectionStatus": "Plan rejected — execution cancelled.",
-    "planningInstruction": "## ⚠️ PLANNING MODE ACTIVE — TOOL ACCESS RESTRICTED\n\nYou are in PLANNING MODE. The ONLY tools available are:\n- **exit_plan_mode** — Submit your plan for user approval\n- **think** — Internal reasoning\n\nAll other tool calls WILL BE BLOCKED.\n\n**What to do:**\n1. Analyze the user's request\n2. Design your implementation approach as text output\n3. Call exit_plan_mode when ready — the user will review and approve before you can execute\n\nKeep your plan concise. For simple tasks, a brief summary is sufficient."
+    "planningInstruction": "## ⚠️ PLANNING MODE ACTIVE — TOOL ACCESS RESTRICTED\n\nYou are in PLANNING MODE. The ONLY tools available are:\n- **exit_plan_mode** — Submit your plan for user approval\n- **think** — Internal reasoning\n\nAll other tool calls WILL BE BLOCKED.\n\n**What to do:**\n1. Analyze the user's request\n2. Design your implementation approach as text output\n3. Call exit_plan_mode when ready — the user will review and approve before you can execute\n\nKeep your plan concise. For simple tasks, a brief summary is sufficient.",
+    "rejectionStatusWithReason": "Plan rejected — execution cancelled. Reason: {{reason}}"
   },
   "reminderExtractor": {
     "extractionPrompt": "You are analyzing a system prompt to extract its most critical behavioral rules.\n\nExtract exactly 8–12 of the most important constraints — rules the AI agent MUST follow throughout the entire session.\n\nFocus on:\n- Hard prohibitions (never do X, do not Y)\n- Mandatory behaviors (always do X, you must Y)\n- Safety and security constraints\n- Output format and code style requirements\n- Identity and persona boundaries\n- Tool usage rules and restrictions\n\nRules for your output:\n- Output ONLY a bullet-point list using `- ` prefix\n- Each bullet must be a single concise sentence (max 30 words)\n- No headers, no explanations, no numbering, no markdown formatting\n- Prioritize constraints that would cause the most damage if forgotten\n- Ignore trivial or obvious rules (e.g. 'be helpful')\n\nSystem prompt to analyze:\n<system_prompt>"
@@ -86,5 +87,10 @@
   "graphOfThoughts": {
     "proactiveBacktrack": "[PROACTIVE BACKTRACK — ALL BRANCHES SCORED BELOW THRESHOLD (best: {{bestScore}}/{{threshold}})]\n\nAll candidate approaches scored poorly on the multi-criteria evaluation. The current trajectory appears unpromising.\n\nBefore retrying, reconsider the problem from a higher level:\n1. Is the current approach fundamentally flawed?\n2. What alternative strategy would be more robust?\n3. Are there simpler, safer paths to the same goal?\n\nTake a DIFFERENT approach on the next attempt.",
     "synthesizedValidationError": "[VALIDATION ERROR — SYNTHESIZED OUTPUT]\n\nThe merged approach produced {{errorCount}} validation error(s):\n\n{{errorBlock}}\n\nThe synthesized approach combined insights from {{branchCount}} branches but the merged tool calls still caused validation failures.\nFix the remaining issues directly — do NOT repeat the same tool calls."
+  },
+  "approval": {
+    "declined": "The user declined this {{toolName}} call. It was not executed. Do not retry it as is; continue without it or ask the user how to proceed.",
+    "declinedWithReason": "The user declined this {{toolName}} call. It was not executed. The user's reason: {{reason}}. Take the reason into account; do not retry the call as is.",
+    "timedOut": "No approval arrived in time for this {{toolName}} call, so it was not executed. Do not assume it ran; continue without it or ask the user whether to try again."
   }
 }

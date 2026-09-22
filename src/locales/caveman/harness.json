@@ -8,7 +8,8 @@
     "blocked": "PLAN MODE active. Tool [{{blockedNames}}] blocked — only exit_plan_mode works. Write plan as text, then call exit_plan_mode.",
     "approvalResult": "Plan approved. Proceed with execution. Update todo if applicable.",
     "rejectionStatus": "Plan rejected — cancelled.",
-    "planningInstruction": "## PLANNING MODE — TOOL RESTRICTED\n\nPLAN MODE. Only available:\n- **exit_plan_mode** — submit plan\n- **think** — reasoning\n\nAll other tool BLOCKED.\n\n**Steps:**\n1. Analyze request\n2. Design approach as text\n3. Call exit_plan_mode — user reviews before execution\n\nKeep concise. Simple task need brief summary."
+    "planningInstruction": "## PLANNING MODE — TOOL RESTRICTED\n\nPLAN MODE. Only available:\n- **exit_plan_mode** — submit plan\n- **think** — reasoning\n\nAll other tool BLOCKED.\n\n**Steps:**\n1. Analyze request\n2. Design approach as text\n3. Call exit_plan_mode — user reviews before execution\n\nKeep concise. Simple task need brief summary.",
+    "rejectionStatusWithReason": "Plan rejected — cancelled. Reason: {{reason}}"
   },
   "reminderExtractor": {
     "extractionPrompt": "Analyze system prompt, extract critical behavioral rule.\n\nExtract 8-12 most important constraint agent MUST follow.\n\nFocus on:\n- Prohibition (never X, no Y)\n- Mandatory behavior (always X, must Y)\n- Safety constraint\n- Output format requirement\n- Identity boundary\n- Tool restriction\n\nOutput:\n- ONLY bullet list with `- ` prefix\n- Each bullet: one sentence, max 30 word\n- No header, explanation, numbering, formatting\n- Prioritize high-damage-if-forgotten rule\n- Skip obvious (e.g. 'be helpful')\n\nSystem prompt:\n<system_prompt>"
@@ -86,5 +87,10 @@
   "graphOfThoughts": {
     "proactiveBacktrack": "[BACKTRACK — ALL BRANCH BELOW THRESHOLD (best: {{bestScore}}/{{threshold}})]\n\nAll branch scored poorly. Approach failing.\n\nReconsider:\n1. Approach fundamentally flawed?\n2. Different strategy?\n3. Simpler, safer path?\n\nDIFFERENT approach next attempt.",
     "synthesizedValidationError": "[VALIDATION ERROR — MERGED RESULT]\n\nMerged approach: {{errorCount}} error:\n\n{{errorBlock}}\n\nCombined {{branchCount}} branch but tool call still failed.\nFix remaining — NOT same tool call."
+  },
+  "approval": {
+    "declined": "User say no to {{toolName}}. Not run. No retry same call; go on without or ask user.",
+    "declinedWithReason": "User say no to {{toolName}}. Not run. User reason: {{reason}}. Heed reason; no retry same call.",
+    "timedOut": "No approval in time for {{toolName}}. Not run. No assume ran; go on without or ask user."
   }
 }

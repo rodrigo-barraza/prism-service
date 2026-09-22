@@ -80,7 +80,13 @@ vi.mock('#src/services/OrchestratorService', () => ({
 
 vi.mock('#src/services/AgenticLoopService', () => ({
   default: {
-    resolveApproval: vi.fn().mockReturnValue(true),
+    decideApproval: vi.fn().mockReturnValue({
+      status: 'decided',
+      type: 'tool',
+      batchId: 'batch-1',
+      decidedToolCallIds: ['tc-1'],
+      remaining: 0,
+    }),
     resolveUserQuestion: vi.fn().mockReturnValue(true),
     listHarnesses: vi.fn().mockReturnValue([
       { id: 'standard', label: 'Standard', description: 'ReAct harness' },

@@ -132,6 +132,25 @@ export const TURN_INPUT = {
   MESSAGE_KEY: "_turnInput",
 } as const;
 
+/**
+ * Per-call approvals (ApprovalRegistry, ApprovalGate, POST /agent/approve).
+ * Event literals are local until promoted to the shared taxonomy.
+ */
+export const APPROVALS = {
+  /** SSE event: one pending call was decided (user, another tab, scope, timeout). */
+  DECIDED_EVENT_TYPE: "approval_decided",
+  /** Settled toolCallIds remembered so a late decision answers 409, not 404. */
+  SETTLED_MEMORY: 5_000,
+  /** A denial reason longer than this is cut before it reaches the model. */
+  MAXIMUM_REASON_LENGTH: 2_000,
+  /** File-write previews: a diff is only computed when both sides fit. */
+  PREVIEW_MAXIMUM_CHARACTERS: 200_000,
+  /** File-write previews: the diff itself is cut to this many characters. */
+  PREVIEW_MAXIMUM_DIFF_CHARACTERS: 40_000,
+  /** File-write previews: reading the current file must not stall the gate. */
+  PREVIEW_TIMEOUT_MILLISECONDS: 5_000,
+} as const;
+
 /** Priorities specifically for Todo items and task ranking. */
 export const TODO_PRIORITIES = {
   HIGH: "high",

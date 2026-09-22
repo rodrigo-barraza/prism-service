@@ -94,6 +94,23 @@ export function evaluateMongoExpression(doc: any, expression: any): any {
   return expression;
 }
 
+/**
+ * `$set` the way MongoDB applies it: a dotted key ("settings.autoApprove")
+ * writes into the nested document, creating missing levels, and leaves the
+ * sibling fields alone.
+ */
+function applySetFields(doc: any, $set: Record<string, any>) {
+  for (const [path, value] of Object.entries($set)) {
+    const segments = path.split(".");
+    let target = doc;
+    for (const segment of segments.slice(0, -1)) {
+      if (target[segment] === undefined || target[segment] === null) target[segment] = {};
+      target = target[segment];
+    }
+    target[segments[segments.length - 1]] = value;
+  }
+}
+
 export function createMockCollection(initialData: any[] = []) {
   const documents = new Map<string, any>();
   
@@ -184,7 +201,7 @@ export function createMockCollection(initialData: any[] = []) {
       }
 
       if (doc) {
-        Object.assign(doc, $set);
+        applySetFields(doc, $set);
         if (isInsert) Object.assign(doc, $setOnInsert);
 
         for (const [field, val] of Object.entries($push)) {
