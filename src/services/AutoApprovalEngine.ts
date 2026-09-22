@@ -268,8 +268,7 @@ export default class AutoApprovalEngine {
    *     is for.
    *   - A hook `allow` stands in for the tier/mode prompt only.
    *
-   * Every result names the layer (and rule) that decided; a hook-decided
-   * result names none.
+   * Every result names the layer (and rule) that decided.
    */
   explain(toolCall: ToolCall): ApprovalExplanation {
     const tier = this.getTier(toolCall.name);
@@ -338,16 +337,16 @@ export default class AutoApprovalEngine {
           if (!this.fullAuto || hookAsks) return { ...stamp, isApproved: false };
           break; // full auto answers "ask" with yes — unless a hook asked too
         case "allow":
-          if (hookAsks) return { ...base, isApproved: false, reason: hookAskReason };
+          if (hookAsks) return { ...base, isApproved: false, reason: hookAskReason, layer: "hook" };
           return { ...stamp, isApproved: true };
       }
     }
 
     if (hookAsks) {
-      return { ...base, isApproved: false, reason: hookAskReason };
+      return { ...base, isApproved: false, reason: hookAskReason, layer: "hook" };
     }
     if (hookPermission?.decision === "allow") {
-      return { ...base, isApproved: true, reason: "hook_allow" };
+      return { ...base, isApproved: true, reason: "hook_allow", layer: "hook" };
     }
 
     // Full Auto mode: everything not denied runs
