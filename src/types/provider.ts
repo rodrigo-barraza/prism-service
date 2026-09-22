@@ -86,6 +86,10 @@ export interface StreamToolCallChunk {
   thoughtSignature?: string;
   responsesItemId?: string;
   reasoningItem?: ResponsesReasoningItem;
+  /** The arguments were not valid JSON; the harness asks for a re-emit. */
+  argsParseError?: boolean;
+  /** The unparseable arguments, truncated, for that re-emit message. */
+  rawArgs?: string;
 }
 
 /**

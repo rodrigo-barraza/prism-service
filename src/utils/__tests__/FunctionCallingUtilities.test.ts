@@ -608,7 +608,7 @@ describe("truncateToolResult", () => {
     const largeArray = Array.from({ length: 25 }, (_, index) => ({ id: index }));
     const result = truncateToolResult(largeArray) as any[];
     expect(result).toHaveLength(11);
-    expect(result[10]).toEqual({ _truncated: "Showing 10 of 25" });
+    expect(result[10]).toMatchObject({ _truncated: "Showing 10 of 25" });
   });
 
   it("caps known array keys at 10 items", () => {

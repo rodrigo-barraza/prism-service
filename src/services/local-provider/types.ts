@@ -53,11 +53,15 @@ export interface LmStudioRawModel {
 export interface OllamaRawModel {
   model?: string;
   name?: string;
+  /** The provider's listModels key (same tag as `model`). */
+  key?: string;
   size?: number;
   details?: {
     family?: string;
     parameter_size?: string;
   };
+  /** What /api/show reports the model's template supports ("tools", "thinking", "vision", …). */
+  ollamaCapabilities?: string[];
 }
 
 export interface OpenAICompatRawModel {

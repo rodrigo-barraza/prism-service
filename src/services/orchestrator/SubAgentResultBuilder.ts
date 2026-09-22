@@ -65,7 +65,7 @@ export function toLiveSubAgentSummary(
         ? Date.now() - subAgent.startedAt
         : subAgent.durationMilliseconds,
     toolUses: subAgent.toolCalls?.length || 0,
-    hasChanges: subAgent.diff?.hasChanges || false,
+    hasChanges: (subAgent.diff?.files.length ?? 0) > 0,
     totalCost: subAgent.totalCost,
     branchName: subAgent.branchName,
     files: subAgent.files,
@@ -230,12 +230,18 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
       }),
   };
 
-  if (subAgent.diff?.hasChanges) {
+  if (subAgent.diff && subAgent.diff.files.length > 0) {
     result.diff = {
-      additions: subAgent.diff.additions || 0,
-      deletions: subAgent.diff.deletions || 0,
-      files: subAgent.diff.files || [],
+      additions: subAgent.diff.stats.additions,
+      deletions: subAgent.diff.stats.deletions,
+      files: subAgent.diff.files.map((file) => file.path),
     };
+  }
+
+  // Shared by reference: a router settling a deferred worktree later updates
+  // this result too.
+  if (subAgent.mergeBack) {
+    result.mergeBack = subAgent.mergeBack;
   }
 
   // Populate error for both explicit failures AND silent empty-result completions.
