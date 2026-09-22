@@ -95,7 +95,7 @@ export function evaluateMongoExpression(doc: any, expression: any): any {
 }
 
 /**
- * `$set` the way MongoDB applies it: a dotted key ("settings.autoApprove")
+ * `$set` the way MongoDB applies it: a dotted key ("approvals.autoApprove")
  * writes into the nested document, creating missing levels, and leaves the
  * sibling fields alone.
  */

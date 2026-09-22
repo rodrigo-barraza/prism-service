@@ -201,7 +201,7 @@ describe("POST /agent/approve — one decision per call", () => {
     });
   });
 
-  it('scope "conversation" allows the batch and persists on THAT conversation only', async () => {
+  it('scope "conversation" allows the batch and persists on THAT conversation only, past the turn end', async () => {
     const agentConversations = createMockCollection([
       { id: "conversation-a", project: "test", username: "testuser", settings: { model: "m" } },
       { id: "conversation-b", project: "test", username: "testuser", settings: { model: "m" } },
@@ -224,9 +224,18 @@ describe("POST /agent/approve — one decision per call", () => {
     expect(executableToolCalls.map((toolCall) => toolCall.id)).toEqual(["one", "two"]);
     expect(shouldApproveAll).toBe(true);
 
-    expect(agentConversations._docs.get("conversation-a").settings).toEqual({ model: "m", autoApprove: true });
-    expect(agentConversations._docs.get("conversation-b").settings).toEqual({ model: "m" });
+    expect(agentConversations._docs.get("conversation-a").approvals).toMatchObject({ autoApprove: true });
+    expect(agentConversations._docs.get("conversation-b").approvals).toBeUndefined();
     expect(await ConversationApprovalSettings.isAutoApproveEnabled("conversation-a", "test", "testuser")).toBe(true);
     expect(await ConversationApprovalSettings.isAutoApproveEnabled("conversation-b", "test", "testuser")).toBe(false);
+
+    // The turn finalizer rewrites `settings` wholesale when the turn ends
+    // (ConversationService.appendMessages). The flag must survive that —
+    // live, it did not while it lived inside `settings`.
+    await agentConversations.updateOne(
+      { id: "conversation-a" },
+      { $set: { settings: { provider: "google", model: "gemini-3.6-flash" } } },
+    );
+    expect(await ConversationApprovalSettings.isAutoApproveEnabled("conversation-a", "test", "testuser")).toBe(true);
   });
 });
