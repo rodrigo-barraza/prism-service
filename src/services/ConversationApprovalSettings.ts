@@ -5,18 +5,20 @@ import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 /**
- * "Auto-approve this conversation" — a per-conversation flag, persisted in
- * the conversation document's `settings`, that the approval card's
- * conversation scope sets. Every later turn of THAT conversation starts with
- * `options.autoApprove` on (AgenticLoopService); other conversations, and a
- * new one in the same browser tab, are untouched.
+ * "Auto-approve this conversation" — a per-conversation setting, persisted
+ * on the conversation document as `approvals.autoApprove`, that the approval
+ * card's conversation scope sets. Every later turn of THAT conversation
+ * starts with `options.autoApprove` on (AgenticLoopService); other
+ * conversations, and a new one in the same browser tab, are untouched.
  *
- * Written with a dotted `$set` so the rest of `settings` is kept. Looked up
- * with the same `{ id, project, username }` scope as goals, agent
- * conversations first.
+ * Not inside `settings`: the turn finalizer rewrites `settings` wholesale
+ * from the request (ConversationService.appendMessages), which erased a flag
+ * set mid-turn before the next turn could read it (seen live). `approvals`
+ * is written by nothing else. Looked up with the same
+ * `{ id, project, username }` scope as goals, agent conversations first.
  */
 
-export const CONVERSATION_AUTO_APPROVE_SETTING = "autoApprove";
+export const CONVERSATION_APPROVALS_FIELD = "approvals";
 
 const SEARCHED_COLLECTIONS = [
   COLLECTIONS.AGENT_CONVERSATIONS,
@@ -45,11 +47,9 @@ const ConversationApprovalSettings = {
           .collection(collection)
           .findOne(
             { id: conversationId, project, username },
-            { projection: { settings: 1 } },
-          )) as { settings?: Record<string, unknown> | null } | null;
-        if (document) {
-          return document.settings?.[CONVERSATION_AUTO_APPROVE_SETTING] === true;
-        }
+            { projection: { [CONVERSATION_APPROVALS_FIELD]: 1 } },
+          )) as { approvals?: { autoApprove?: unknown } | null } | null;
+        if (document) return document.approvals?.autoApprove === true;
       }
     } catch (error: unknown) {
       logger.warn(
@@ -72,8 +72,8 @@ const ConversationApprovalSettings = {
         { id: conversationId, project, username },
         {
           $set: {
-            [`settings.${CONVERSATION_AUTO_APPROVE_SETTING}`]: true,
-            updatedAt: new Date().toISOString(),
+            [`${CONVERSATION_APPROVALS_FIELD}.autoApprove`]: true,
+            [`${CONVERSATION_APPROVALS_FIELD}.autoApproveSetAt`]: new Date().toISOString(),
           },
         },
       );
