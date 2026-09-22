@@ -363,6 +363,56 @@ describe("SubAgentTelemetryEmitter", () => {
     });
   });
 
+  describe("approval events", () => {
+    const card = {
+      type: "approval_required",
+      toolCallId: "call-1",
+      batchId: "batch-1",
+      batchSize: 1,
+      toolCall: { name: "write_file", args: { path: "a.txt" }, id: "call-1" },
+      tier: 2,
+      tierLabel: "write",
+    };
+
+    it("forwards the sub-agent's card to the parent, tagged with the conversation its decision goes to", () => {
+      const emitFunction = createEmitter().createEmitFunction();
+
+      emitFunction(card);
+
+      expect(parentEmitMock).toHaveBeenCalledWith({
+        ...card,
+        subAgentId: "sub-agent-test-1",
+        subAgentDescription: "Test sub-agent",
+        approvalConversationId: "sub-conv-test-1",
+      });
+    });
+
+    it("forwards the decision too, so the parent's card closes", () => {
+      const emitFunction = createEmitter().createEmitFunction();
+
+      emitFunction({ type: "approval_decided", toolCallId: "call-1", batchId: "batch-1", decision: "deny", source: "timeout" });
+
+      expect(parentEmitMock).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "approval_decided", toolCallId: "call-1", approvalConversationId: "sub-conv-test-1" }),
+      );
+    });
+
+    it("keeps a grandchild's tags when forwarding its card up", () => {
+      const emitFunction = createEmitter().createEmitFunction();
+
+      emitFunction({
+        ...card,
+        subAgentId: "grandchild-1",
+        subAgentDescription: "Grandchild",
+        approvalConversationId: "grandchild-conv",
+      });
+
+      expect(parentEmitMock).toHaveBeenCalledWith(
+        expect.objectContaining({ subAgentId: "grandchild-1", approvalConversationId: "grandchild-conv" }),
+      );
+    });
+  });
+
   describe("recursive sub-agent event forwarding", () => {
     it("should forward sub_agent_status events from grandchildren directly to parent", () => {
       const emitter = createEmitter();

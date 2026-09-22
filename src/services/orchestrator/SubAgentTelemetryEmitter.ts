@@ -14,6 +14,7 @@ import {
   STATUS_MESSAGES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import type { EmitFunction, ToolCall } from "#src/services/harnesses/types";
+import { APPROVALS } from "#src/constants";
 
 interface SubAgentTelemetryConfig {
   subAgentId: string;
@@ -368,6 +369,27 @@ export class SubAgentTelemetryEmitter {
         this.broadcastToDirectViewers(event);
         if (this.parentEmit) {
           this.parentEmit(event);
+        }
+      } else if (
+        event.type === "approval_required" ||
+        event.type === APPROVALS.DECIDED_EVENT_TYPE
+      ) {
+        // The sub-agent's own approval cards. Its loop is keyed by its own
+        // conversation id (LoopKey), so a decision must be sent there: a
+        // viewer of that conversation decides them directly, and the
+        // parent's stream gets them tagged with where to send it — without
+        // this the call sat out the approval timeout with nobody asked.
+        // A grandchild's card, forwarded up by its own emitter, keeps its tags.
+        this.broadcastToDirectViewers(event);
+        if (this.parentEmit) {
+          this.parentEmit({
+            ...event,
+            subAgentId: event.subAgentId ?? this.subAgentId,
+            subAgentDescription: event.subAgentDescription ?? this.subAgentDescription,
+            ...((event.approvalConversationId ?? this.subAgentConversationId) && {
+              approvalConversationId: event.approvalConversationId ?? this.subAgentConversationId,
+            }),
+          });
         }
       } else if (
         event.type === "sub_agent_status" ||
