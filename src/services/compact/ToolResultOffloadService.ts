@@ -261,12 +261,17 @@ export default class ToolResultOffloadService {
       createdAt: new Date().toISOString(),
     };
 
-    stashInMemory(record);
-    persistToMongo(record).catch((error: Error) =>
-      logger.error(
-        `[ToolResultOffload] Persist failed for ${record.id}: ${error.message}`,
-      ),
-    );
+    // Content-addressed callers (truncateToolResult) offload the same
+    // result on every model call — identical content is already stored.
+    const alreadyStored = memoryCache.get(record.id);
+    if (alreadyStored?.content !== content) {
+      stashInMemory(record);
+      persistToMongo(record).catch((error: Error) =>
+        logger.error(
+          `[ToolResultOffload] Persist failed for ${record.id}: ${error.message}`,
+        ),
+      );
+    }
 
     return (
       `${OFFLOAD_STUB_HEADER}\n` +
