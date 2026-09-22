@@ -33,6 +33,7 @@ import {
   normalizeOllamaModel,
   normalizeOpenAICompatModel,
   normalizeVllmModel,
+  normalizeSglangModel,
   NORMALIZER_BY_TYPE,
   HF_ENRICHED_TYPES,
 } from '#src/services/local-provider/normalizers';
@@ -40,6 +41,7 @@ import type {
   LmStudioRawModel,
   OllamaRawModel,
   OpenAICompatRawModel,
+  SglangRawModel,
 } from '#src/services/local-provider/types';
 
 describe('normalizers', () => {
@@ -279,6 +281,80 @@ describe('normalizers', () => {
     });
   });
 
+  describe('normalizeSglangModel', () => {
+    const qwen: SglangRawModel = {
+      key: 'Qwen/Qwen3.6-27B-AWQ',
+      display_name: 'Qwen/Qwen3.6-27B-AWQ',
+      type: 'llm',
+      max_model_len: 131072,
+    };
+
+    it('takes the context length the server enforces and marks the model loaded', () => {
+      const entry = normalizeSglangModel(qwen);
+      expect(entry.contextLength).toBe(131072);
+      expect(entry.maxOutputTokens).toBe(131072);
+      expect(entry.loaded).toBe(true);
+      expect(entry.params).toBe('27B');
+      expect(entry.quantization).toBe('AWQ');
+      expect(entry.publisher).toBe('Qwen');
+    });
+
+    it('labels Tool Calling only when the server runs a tool-call parser', () => {
+      const withParser = normalizeSglangModel({
+        ...qwen,
+        sglangCapabilities: { toolCallParser: 'qwen25', reasoningParser: null },
+      });
+      expect(withParser.tools).toContain('Tool Calling');
+
+      const withoutParser = normalizeSglangModel({
+        ...qwen,
+        sglangCapabilities: { toolCallParser: null, reasoningParser: null },
+      });
+      expect(withoutParser.tools ?? []).not.toContain('Tool Calling');
+      // An unparsed Qwen still thinks in <think> tags — the name keeps that
+      expect(withoutParser.thinking).toBe(true);
+    });
+
+    it('falls back to the name when the server reported nothing', () => {
+      expect(normalizeSglangModel(qwen).tools).toContain('Tool Calling');
+    });
+
+    it("lets /model_info's image understanding override the name", () => {
+      const textOnly = normalizeSglangModel({
+        ...qwen,
+        sglangCapabilities: { imageUnderstanding: false },
+      });
+      expect(textOnly.vision).toBeUndefined();
+      expect(textOnly.inputTypes).toEqual(['text']);
+
+      const vlm = normalizeSglangModel({
+        key: 'org/unrecognised-name',
+        type: 'llm',
+        sglangCapabilities: { imageUnderstanding: true, audioUnderstanding: true },
+      });
+      expect(vlm.vision).toBe(true);
+      expect(vlm.inputTypes).toEqual(['text', 'image', 'audio']);
+    });
+
+    it('normalizes an embedding server as an embed model', () => {
+      const entry = normalizeSglangModel({
+        key: 'Qwen/Qwen3-Embedding-4B',
+        type: 'embedding',
+        max_model_len: 32768,
+      });
+      expect(entry).toMatchObject({
+        name: 'Qwen/Qwen3-Embedding-4B',
+        modelType: 'embed',
+        inputTypes: ['text'],
+        outputTypes: ['embedding'],
+        streaming: false,
+        contextLength: 32768,
+        loaded: true,
+      });
+      expect(entry.tools).toBeUndefined();
+    });
+  });
+
   describe('NORMALIZER_BY_TYPE', () => {
     it('maps lm-studio to normalizeLmStudioModel', () => {
       expect(NORMALIZER_BY_TYPE[PROVIDERS.LM_STUDIO]).toBe(normalizeLmStudioModel);
@@ -296,8 +372,12 @@ describe('normalizers', () => {
       expect(NORMALIZER_BY_TYPE[PROVIDERS.LLAMA_CPP]).toBe(normalizeOpenAICompatModel);
     });
 
-    it('has exactly 4 entries', () => {
-      expect(Object.keys(NORMALIZER_BY_TYPE)).toHaveLength(4);
+    it('maps sglang to normalizeSglangModel', () => {
+      expect(NORMALIZER_BY_TYPE[PROVIDERS.SGLANG]).toBe(normalizeSglangModel);
+    });
+
+    it('has exactly 5 entries', () => {
+      expect(Object.keys(NORMALIZER_BY_TYPE)).toHaveLength(5);
     });
   });
 
@@ -308,6 +388,10 @@ describe('normalizers', () => {
 
     it('includes llama-cpp', () => {
       expect(HF_ENRICHED_TYPES.has(PROVIDERS.LLAMA_CPP)).toBe(true);
+    });
+
+    it('includes sglang', () => {
+      expect(HF_ENRICHED_TYPES.has(PROVIDERS.SGLANG)).toBe(true);
     });
 
     it('does not include lm-studio', () => {

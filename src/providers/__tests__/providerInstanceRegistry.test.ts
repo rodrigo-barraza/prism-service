@@ -5,6 +5,7 @@ const mockLmStudioProvider = { name: 'lm-studio-mock' };
 const mockOllamaProvider = { name: 'ollama-mock' };
 const mockVllmProvider = { name: 'vllm-mock' };
 const mockLlamaCppProvider = { name: 'llama-cpp-mock' };
+const mockSglangProvider = { name: 'sglang-mock' };
 
 vi.mock('#src/providers/lm-studio', () => ({
   createLmStudioProvider: vi.fn((_url: string, _id: string) => mockLmStudioProvider),
@@ -17,6 +18,9 @@ vi.mock('#src/providers/vllm', () => ({
 }));
 vi.mock('#src/providers/llama-cpp', () => ({
   createLlamaCppProvider: vi.fn((_url: string, _id: string) => mockLlamaCppProvider),
+}));
+vi.mock('#src/providers/sglang', () => ({
+  createSglangProvider: vi.fn((_url: string, _id: string, _config: unknown) => mockSglangProvider),
 }));
 vi.mock('#src/utils/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -31,6 +35,10 @@ vi.mock('#config', () => ({
   PROVIDER_VLLM: [{ url: 'http://vllm-host:8000', concurrency: 8 }],
   PROVIDER_OLLAMA: [],
   PROVIDER_LLAMA_CPP: [],
+  PROVIDER_SGLANG: [
+    { url: 'http://gpu-1:30000', concurrency: 4, nickname: 'Desktop', apiKey: 'sk-desktop' },
+    { url: 'http://gpu-2:30000', concurrency: 2 },
+  ],
 }));
 
 let getInstance: typeof import('../instance-registry.ts').getInstance;
@@ -94,6 +102,31 @@ describe('Provider Instance Registry', () => {
       expect(entry!.concurrency).toBe(8);
     });
 
+    it('registers sglang instances with numbered IDs', () => {
+      expect(getInstance(PROVIDERS.SGLANG)).toMatchObject({
+        id: PROVIDERS.SGLANG,
+        type: PROVIDERS.SGLANG,
+        baseUrl: 'http://gpu-1:30000',
+        concurrency: 4,
+        nickname: 'Desktop',
+      });
+      expect(getInstanceType('sglang-2')).toBe(PROVIDERS.SGLANG);
+      expect(getInstanceProvider('sglang-2')).toBe(mockSglangProvider);
+    });
+
+    it("hands each factory its instance's config, API key included", async () => {
+      const { createSglangProvider } = await import('#src/providers/sglang');
+      expect(createSglangProvider).toHaveBeenCalledWith(
+        'http://gpu-1:30000',
+        PROVIDERS.SGLANG,
+        expect.objectContaining({ apiKey: 'sk-desktop' }),
+      );
+    });
+
+    it('keeps the API key out of the registry entry', () => {
+      expect(JSON.stringify(listInstances())).not.toContain('sk-desktop');
+    });
+
     it('does not register entries for empty provider arrays', () => {
       const ollamaInstances = getInstancesByType(PROVIDERS.OLLAMA);
       expect(ollamaInstances).toHaveLength(0);
@@ -147,7 +180,7 @@ describe('Provider Instance Registry', () => {
     it('returns all registered instances as an array', () => {
       const allInstances = listInstances();
       expect(Array.isArray(allInstances)).toBe(true);
-      expect(allInstances.length).toBe(3);
+      expect(allInstances.length).toBe(5);
     });
 
     it('returns copies (not the internal map values reference)', () => {

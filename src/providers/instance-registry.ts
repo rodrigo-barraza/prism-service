@@ -6,6 +6,7 @@ import {
   PROVIDER_VLLM,
   PROVIDER_OLLAMA,
   PROVIDER_LLAMA_CPP,
+  PROVIDER_SGLANG,
 } from "#config";
 import { PROVIDERS } from "#src/constants";
 
@@ -14,17 +15,27 @@ import { createLmStudioProvider } from "./lm-studio.ts";
 import { createOllamaProvider } from "./ollama.ts";
 import { createVllmProvider } from "./vllm.ts";
 import { createLlamaCppProvider } from "./llama-cpp.ts";
+import { createSglangProvider } from "./sglang.ts";
 import {
   type InstanceEntry,
   type ProviderInstanceConfig,
 } from "#src/types/ProviderTypes";
+import type { Provider } from "#src/types/provider";
 
 // ── Factory map ─────────────────────────────────────────────
-const FACTORIES = {
+// Each factory gets the instance's whole config; most read only the URL.
+type ProviderFactory = (
+  baseUrl: string,
+  instanceId: string,
+  config: ProviderInstanceConfig,
+) => Provider;
+
+const FACTORIES: Record<string, ProviderFactory> = {
   [PROVIDERS.LM_STUDIO]: createLmStudioProvider,
   [PROVIDERS.OLLAMA]: createOllamaProvider,
   [PROVIDERS.VLLM]: createVllmProvider,
   [PROVIDERS.LLAMA_CPP]: createLlamaCppProvider,
+  [PROVIDERS.SGLANG]: createSglangProvider,
 };
 
 // ── Provider arrays from secrets ────────────────────────────
@@ -33,6 +44,7 @@ const PROVIDER_ARRAYS = {
   [PROVIDERS.VLLM]: PROVIDER_VLLM || [],
   [PROVIDERS.OLLAMA]: PROVIDER_OLLAMA || [],
   [PROVIDERS.LLAMA_CPP]: PROVIDER_LLAMA_CPP || [],
+  [PROVIDERS.SGLANG]: PROVIDER_SGLANG || [],
 };
 
 // ── Registry ────────────────────────────────────────────────
@@ -49,7 +61,7 @@ const PROVIDER_ARRAYS = {
 
 const registry = new Map<string, InstanceEntry>();
 function registerType(type: string, instances: ProviderInstanceConfig[]) {
-  const factory = FACTORIES[type as keyof typeof FACTORIES];
+  const factory = FACTORIES[type];
   if (!factory) return;
 
   for (let i = 0; i < instances.length; i++) {
@@ -64,7 +76,7 @@ function registerType(type: string, instances: ProviderInstanceConfig[]) {
         ? concurrency
         : parseInt(String(concurrency), 10) || 1,
     );
-    const provider = factory(url, id);
+    const provider = factory(url, id, instances[i]);
 
     const entry: InstanceEntry = {
       id,

@@ -137,6 +137,13 @@ describe("STREAMING_DISPATCHER coverage audit", () => {
     expect(result.missingDispatcher).toEqual([]);
   });
 
+  it("sglang.ts: uses fetchOpenAICompat (which includes STREAMING_DISPATCHER)", () => {
+    const source = readFileSync(resolve(PROVIDERS_DIR, "sglang.ts"), "utf-8");
+    expect(source).toContain("fetchOpenAICompat");
+    const result = auditStreamingFetchCalls("sglang.ts");
+    expect(result.missingDispatcher).toEqual([]);
+  });
+
   it("llama-cpp.ts: uses fetchOpenAICompat (which includes STREAMING_DISPATCHER)", () => {
     const source = readFileSync(resolve(PROVIDERS_DIR, "llama-cpp.ts"), "utf-8");
     expect(source).toContain("fetchOpenAICompat");
@@ -179,6 +186,56 @@ describe("STREAMING_DISPATCHER coverage audit", () => {
 });
 
 // ── 2. parseSSEStream Partial Usage on Error ────────────────────
+
+describe("parseSSEStream — errors a server reports inside the stream", () => {
+  function readerOf(events: string[]): ReadableStreamDefaultReader<Uint8Array> {
+    return new Response(
+      events.map((event) => `data: ${event}\n\n`).join(""),
+    ).body!.getReader();
+  }
+
+  async function drain(events: string[]): Promise<{ chunks: unknown[]; error: unknown }> {
+    const { parseSSEStream } = await import("#src/providers/openai-compat");
+    const chunks: unknown[] = [];
+    try {
+      for await (const chunk of parseSSEStream(readerOf(events))) chunks.push(chunk);
+      return { chunks, error: null };
+    } catch (error) {
+      return { chunks, error };
+    }
+  }
+
+  it("throws SGLang's {error: {...}} event with its message and status", async () => {
+    const { chunks, error } = await drain([
+      '{"choices":[{"delta":{"role":"assistant","content":"Hi"}}]}',
+      '{"error":{"message":"Input length (40000 tokens) exceeds the maximum allowed length (32762 tokens).","type":"BAD_REQUEST","code":400}}',
+      "[DONE]",
+    ]);
+    expect(chunks[0]).toBe("Hi");
+    expect((error as Error).message).toContain("exceeds the maximum allowed length");
+    expect((error as { status?: number }).status).toBe(400);
+  });
+
+  it("throws a flat {object: \"error\"} event and a bare error string", async () => {
+    const flat = await drain([
+      '{"object":"error","message":"flat failure","type":"BadRequestError","param":null,"code":400}',
+    ]);
+    expect((flat.error as Error).message).toBe("flat failure");
+    expect((flat.error as { status?: number }).status).toBe(400);
+
+    const bare = await drain(['{"error":"Unauthorized"}']);
+    expect((bare.error as Error).message).toBe("Unauthorized");
+  });
+
+  it("reads on past chunks that carry a null error", async () => {
+    const { chunks, error } = await drain([
+      '{"choices":[{"delta":{"content":"fine"}}],"error":null}',
+      "[DONE]",
+    ]);
+    expect(error).toBeNull();
+    expect(chunks[0]).toBe("fine");
+  });
+});
 
 describe("parseSSEStream — partial usage on premature termination", () => {
   /**

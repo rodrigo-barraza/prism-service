@@ -102,6 +102,7 @@ describe("LocalProviderGateway Unit Tests", () => {
 
     it("should correctly determine defaultsThinkingEnabled", () => {
       expect(LocalProviderGateway.defaultsThinkingEnabled(PROVIDERS.LM_STUDIO)).toBe(true);
+      expect(LocalProviderGateway.defaultsThinkingEnabled(PROVIDERS.SGLANG)).toBe(true);
       expect(LocalProviderGateway.defaultsThinkingEnabled(PROVIDERS.OPENAI)).toBe(false);
       expect(LocalProviderGateway.defaultsThinkingEnabled("")).toBe(false);
       expect(LocalProviderGateway.defaultsThinkingEnabled(null)).toBe(false);
