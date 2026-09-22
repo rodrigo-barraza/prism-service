@@ -25,6 +25,7 @@ import {
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { getRequestContext } from "#src/utils/RequestContext";
+import { mintMessageIds } from "./messageIds.ts";
 
 const DEFAULT_COLLECTION = COLLECTIONS.MODEL_CONVERSATIONS;
 
@@ -49,11 +50,10 @@ const ConversationService: ConversationServiceInterface = {
     const traceId = conversationMeta?.traceId || null;
     const dbCollection = MongoWrapper.getCollection(MONGO_DB_NAME, collection);
 
-    // Extract files (upload base64 data to MinIO)
-    const processedMessages = await extractFiles(
-      newMessages,
-      project,
-      username,
+    // Extract files (upload base64 data to MinIO), then give every appended
+    // message a fresh server-minted id — the anchor rewind/fork address.
+    const processedMessages = mintMessageIds(
+      await extractFiles(newMessages, project, username),
     );
 
     const now = new Date().toISOString();

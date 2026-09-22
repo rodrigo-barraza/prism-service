@@ -966,7 +966,10 @@ describe("Conversation Utilities (utils.ts)", () => {
         model: "gpt-4",
         provider: PROVIDERS.OPENAI
       });
-      expect(patchFields.messages).toEqual(messages);
+      // Messages without an id get one minted (the rewind/fork anchor).
+      expect(patchFields.messages).toEqual(
+        messages.map((message) => ({ ...message, id: expect.stringMatching(/^msg_/) })),
+      );
       expect(patchFields.modalities?.textIn).toBe(true);
       expect(patchFields.providers).toContain(PROVIDERS.OPENAI);
       // totalCost/inputTokens/outputTokens are deliberately NOT set on PATCH:

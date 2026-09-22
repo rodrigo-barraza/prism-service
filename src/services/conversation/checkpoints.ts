@@ -67,6 +67,46 @@ function getCollection(collection: string) {
 }
 
 /**
+ * `prunedBy` marker of a USER rewind (POST /conversations/:id/rewind). A
+ * model rewind stamps its checkpoint name and its pruned messages stay
+ * visible; a user rewind is the user asking for the transcript to end at
+ * the chosen message, so display serving hides these (isHiddenFromDisplay).
+ */
+export const USER_REWIND_PRUNED_BY = "user-rewind";
+
+/** True for messages a user rewind removed from the visible transcript. */
+export function isHiddenFromDisplay(message: object): boolean {
+  const prunable = message as PrunableMessage;
+  return prunable.pruned === true && prunable.prunedBy === USER_REWIND_PRUNED_BY;
+}
+
+/**
+ * Soft-prune every message at or after `boundary`: flag it `pruned` with
+ * who pruned it and when. Already-pruned messages keep their original
+ * stamp. Pure — the caller persists the result. Shared by the model's
+ * `rewind` tool and the user rewind route.
+ */
+export function pruneMessagesFrom<T extends object>(
+  messages: T[],
+  boundary: number,
+  prunedBy: string,
+  now: string = new Date().toISOString(),
+): { messages: T[]; prunedCount: number; remainingCount: number } {
+  let prunedCount = 0;
+  const nextMessages = messages.map((message, index) => {
+    if (index < boundary || (message as PrunableMessage).pruned === true) {
+      return message;
+    }
+    prunedCount += 1;
+    return { ...message, pruned: true, prunedAt: now, prunedBy };
+  });
+  const remainingCount = nextMessages.filter(
+    (message) => (message as PrunableMessage).pruned !== true,
+  ).length;
+  return { messages: nextMessages, prunedCount, remainingCount };
+}
+
+/**
  * Exclude soft-pruned messages from a loaded history. Every path that
  * feeds persisted conversation messages back into a model context must
  * pass through this filter so a reloaded session honors rewind.
@@ -215,19 +255,16 @@ export async function rewindToCheckpoint({
 
   const boundary = checkpoint.messageIndex;
   const now = new Date().toISOString();
-  const messages = (document.messages as PrunableMessage[]) || [];
-
-  let prunedCount = 0;
-  const nextMessages = messages.map((message, index) => {
-    if (index < boundary || message.pruned === true) return message;
-    prunedCount += 1;
-    return {
-      ...message,
-      pruned: true,
-      prunedAt: now,
-      prunedBy: checkpoint.name,
-    };
-  });
+  const {
+    messages: nextMessages,
+    prunedCount,
+    remainingCount,
+  } = pruneMessagesFrom(
+    (document.messages as PrunableMessage[]) || [],
+    boundary,
+    checkpoint.name,
+    now,
+  );
 
   // Checkpoints recorded beyond the boundary point into pruned territory —
   // drop them so they can never be rewound to.
@@ -245,10 +282,6 @@ export async function rewindToCheckpoint({
       },
     },
   );
-
-  const remainingCount = nextMessages.filter(
-    (message) => message.pruned !== true,
-  ).length;
 
   logger.info(
     `[checkpoints] Rewound ${conversationId} to "${checkpoint.name}" (index ${boundary}): ` +
