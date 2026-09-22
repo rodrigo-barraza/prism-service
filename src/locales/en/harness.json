@@ -6,6 +6,7 @@
   },
   "planningMode": {
     "blocked": "You are in PLANNING MODE. Tool call(s) [{{blockedNames}}] were blocked — only exit_plan_mode is available. Write your complete plan as text output, then call exit_plan_mode to submit it for user approval.",
+    "submitPlan": "Your plan is written. Now call exit_plan_mode with that plan so the user can review and approve it — do not restate it as text.",
     "approvalResult": "User has approved your plan. You can now start coding. Start with updating your todo list if applicable.",
     "rejectionStatus": "Plan rejected — execution cancelled.",
     "rejectionResult": "The user did not approve this plan, so it was not carried out. Do not act on it. Wait for the user's next message: they may revise the request or ask for a different plan.",

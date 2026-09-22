@@ -5,7 +5,8 @@
  * text-to-text, audio-to-text, live API sessions, and image generation.
  */
 
-import type { TokenUsage } from "#src/types/admin";
+import type { TokenUsage, ModelTokenUsage } from "#src/types/admin";
+import { getModelByName } from "#src/config";
 
 // ── Pricing interfaces ──────────────────────────────────────
 
@@ -72,7 +73,7 @@ export function withTotalInputTokens<T extends TokenUsage>(
 }
 
 export function createUsageAccumulator(): Required<
-  Omit<TokenUsage, "totalTokens" | "totalInputTokens">
+  Omit<TokenUsage, "totalTokens" | "totalInputTokens" | "byModel">
 > {
   return {
     inputTokens: 0,
@@ -90,9 +91,9 @@ export function createUsageAccumulator(): Required<
  * across AgenticLoopService, chat.js, and StreamChunkDispatcher.
  */
 export function mergeUsage(
-  target: Required<Omit<TokenUsage, "totalTokens">> | TokenUsage,
+  target: Required<Omit<TokenUsage, "totalTokens" | "byModel">> | TokenUsage,
   source: TokenUsage | null | undefined,
-): Required<Omit<TokenUsage, "totalTokens">> | TokenUsage {
+): Required<Omit<TokenUsage, "totalTokens" | "byModel">> | TokenUsage {
   if (!source) return target;
   target.inputTokens = (target.inputTokens ?? 0) + (source.inputTokens || 0);
   target.outputTokens = (target.outputTokens ?? 0) + (source.outputTokens || 0);
@@ -105,6 +106,24 @@ export function mergeUsage(
     (target.reasoningOutputTokens ?? 0) + (source.reasoningOutputTokens || 0);
   if (source.tokensPerSec != null) {
     target.tokensPerSec = source.tokensPerSec;
+  }
+  if (source.byModel) {
+    // Accumulators are typed without byModel (RequestLogger's usage type is
+    // numeric-only); the split still rides along for calculateTextCost.
+    const splitTarget = target as TokenUsage;
+    const byModel = (splitTarget.byModel ??= {});
+    for (const [model, part] of Object.entries(source.byModel)) {
+      const existing = (byModel[model] ??= {
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadInputTokens: 0,
+        cacheCreationInputTokens: 0,
+      });
+      existing.inputTokens += part.inputTokens || 0;
+      existing.outputTokens += part.outputTokens || 0;
+      existing.cacheReadInputTokens += part.cacheReadInputTokens || 0;
+      existing.cacheCreationInputTokens += part.cacheCreationInputTokens || 0;
+    }
   }
   return target;
 }
@@ -121,6 +140,33 @@ export function calculateTextCost(
   pricing: TextPricing | null | undefined,
 ): number | null {
   if (!pricing || !usage) return null;
+
+  // Tokens another model produced (server-side fallback) bill at that
+  // model's rates; only the remainder bills at the requested model's.
+  if (usage.byModel && Object.keys(usage.byModel).length > 0) {
+    const remainder: ModelTokenUsage = {
+      inputTokens: usage.inputTokens || 0,
+      outputTokens: usage.outputTokens || 0,
+      cacheReadInputTokens: usage.cacheReadInputTokens || 0,
+      cacheCreationInputTokens: usage.cacheCreationInputTokens || 0,
+    };
+    let splitCost = 0;
+    for (const [model, part] of Object.entries(usage.byModel)) {
+      const modelPricing =
+        ((getModelByName(model) as { pricing?: TextPricing } | null)
+          ?.pricing as TextPricing | undefined) ?? pricing;
+      splitCost += calculateTextCost(part, modelPricing) ?? 0;
+      remainder.inputTokens -= part.inputTokens || 0;
+      remainder.outputTokens -= part.outputTokens || 0;
+      remainder.cacheReadInputTokens -= part.cacheReadInputTokens || 0;
+      remainder.cacheCreationInputTokens -= part.cacheCreationInputTokens || 0;
+    }
+    for (const key of Object.keys(remainder) as Array<keyof ModelTokenUsage>) {
+      remainder[key] = Math.max(0, remainder[key]);
+    }
+    splitCost += calculateTextCost(remainder, pricing) ?? 0;
+    return parseFloat(splitCost.toFixed(8));
+  }
 
   let cost =
     ((usage.inputTokens || 0) / 1_000_000) * (pricing.inputPerMillion || 0) +

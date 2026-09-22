@@ -6,6 +6,7 @@
   },
   "planningMode": {
     "blocked": "PLAN MODE active. Tool [{{blockedNames}}] blocked — only exit_plan_mode works. Write plan as text, then call exit_plan_mode.",
+    "submitPlan": "Plan written. Now call exit_plan_mode with plan so user review. No repeat as text.",
     "approvalResult": "Plan approved. Proceed with execution. Update todo if applicable.",
     "rejectionStatus": "Plan rejected — cancelled.",
     "rejectionResult": "User no approve plan. Plan not done. No act. Wait for user next message.",
