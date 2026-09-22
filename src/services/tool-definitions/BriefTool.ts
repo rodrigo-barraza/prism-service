@@ -14,6 +14,7 @@ interface BriefContext extends InternalToolContext {
 
 export default {
   name: TOOL_NAMES.SUMMARIZE_CONVERSATION,
+  capabilities: [] as const,
 
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.SUMMARIZE_CONVERSATION],
   description:

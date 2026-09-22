@@ -101,6 +101,7 @@ function failure(error: unknown, action: string) {
 
 const setGoalTool: InternalToolDefinition = {
   name: GOAL_TOOL_NAMES.SET_GOAL,
+  capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS[GOAL_TOOL_NAMES.SET_GOAL],
   description:
     "Set (or replace) the persistent goal of this conversation: what 'done' means, in the user's words. " +
@@ -183,6 +184,7 @@ const setGoalTool: InternalToolDefinition = {
 
 const updateGoalTool: InternalToolDefinition = {
   name: GOAL_TOOL_NAMES.UPDATE_GOAL,
+  capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS[GOAL_TOOL_NAMES.UPDATE_GOAL],
   description:
     "Update the conversation's goal: report progress (summary and/or percent), record what you are blocked on, " +
@@ -280,6 +282,7 @@ const updateGoalTool: InternalToolDefinition = {
 
 const clearGoalTool: InternalToolDefinition = {
   name: GOAL_TOOL_NAMES.CLEAR_GOAL,
+  capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS[GOAL_TOOL_NAMES.CLEAR_GOAL],
   description:
     "Remove the conversation's persistent goal. Use it when the user drops the objective; " +

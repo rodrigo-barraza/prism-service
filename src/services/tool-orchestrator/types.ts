@@ -58,6 +58,8 @@ export interface ToolExecutionContext {
   _autoApprove?: boolean;
   /** Parent loop's declarative tool policies — inherited by spawned sub-agents. */
   _policies?: import("#src/services/PolicyEngine").PolicyRule[];
+  /** Parent loop's stored permission rules — inherited by spawned sub-agents. */
+  _permissionRules?: import("#src/services/permissions/PermissionRuleSet").default;
   /** Parent loop's CriticGate toggle — inherited by spawned sub-agents. */
   _enableCriticGate?: boolean;
   /** Parent loop's CriticGate model — inherited by spawned sub-agents. */

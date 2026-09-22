@@ -96,6 +96,7 @@ const DISALLOWED_ASYNC_TOOL_NAMES = new Set<string>([
 // ── run_async_task ─────────────────────────────────────────
 const runAsyncTask = {
   name: ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
+  capabilities: ["subagent"] as const,
   emoji: INTERNAL_TOOL_EMOJIS[ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK],
   description:
     "Dispatch a tool to run asynchronously in the background. " +
@@ -307,6 +308,7 @@ const runAsyncTask = {
 // ── list_async_tasks ───────────────────────────────────────
 const listAsyncTasks = {
   name: ASYNC_TASK_TOOL_NAMES.LIST_ASYNC_TASKS,
+  capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS[ASYNC_TASK_TOOL_NAMES.LIST_ASYNC_TASKS],
   description:
     "List all async background tasks dispatched in this conversation. " +
@@ -382,6 +384,7 @@ const listAsyncTasks = {
 // ── cancel_async_task ──────────────────────────────────────
 const cancelAsyncTask = {
   name: ASYNC_TASK_TOOL_NAMES.CANCEL_ASYNC_TASK,
+  capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS[ASYNC_TASK_TOOL_NAMES.CANCEL_ASYNC_TASK],
   description:
     "Cancel a running async background task. " +
@@ -473,6 +476,7 @@ const cancelAsyncTask = {
 // ── wait_for_tasks ─────────────────────────────────────────
 const waitForTasks = {
   name: ASYNC_TASK_TOOL_NAMES.WAIT_FOR_TASKS,
+  capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS[ASYNC_TASK_TOOL_NAMES.WAIT_FOR_TASKS],
   description:
     "Block until background work finishes and return its results in place. " +

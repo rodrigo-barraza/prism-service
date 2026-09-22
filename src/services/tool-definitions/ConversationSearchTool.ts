@@ -32,6 +32,7 @@ const MAXIMUM_CANDIDATES = MEMORY.MAXIMUM_CANDIDATES;
 
 const searchConversations = {
   name: SEARCH_CONVERSATIONS_NAME,
+  capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS[SEARCH_CONVERSATIONS_NAME],
   description:
     "Search past agent conversations using a natural language query. " +

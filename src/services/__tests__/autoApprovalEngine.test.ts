@@ -308,11 +308,13 @@ describe("checkBatch", () => {
 
     const { autoApproved, needsApproval } = engine.checkBatch(toolCalls);
 
+    // `layer` names who decided — the tier system, for both of these.
     expect(autoApproved[0]._approval).toEqual({
       isApproved: true,
       tier: APPROVAL_TIERS.AUTO,
       tierLabel: "auto",
       reason: "read_only",
+      layer: "tier",
     });
 
     expect(needsApproval[0]._approval).toEqual({
@@ -320,6 +322,7 @@ describe("checkBatch", () => {
       tier: APPROVAL_TIERS.DANGER,
       tierLabel: "danger",
       reason: "requires_approval",
+      layer: "tier",
     });
   });
 

@@ -1,6 +1,8 @@
 import logger from "#src/utils/logger";
 import { errorMessage, type ToolDisplayMetadata } from "@rodrigo-barraza/utilities-library";
 import PromptLocaleService from "#src/services/PromptLocaleService";
+import { registerToolCapabilities } from "#src/services/permissions/ToolCapabilities";
+import type { Capability } from "#src/services/permissions/types";
 
 // ────────────────────────────────────────────────────────────
 // Internal Tool Registry
@@ -88,6 +90,12 @@ export interface InternalToolDefinition {
   display: ToolDisplayMetadata;
   domain: string;
   labels: string[];
+  /**
+   * What the tool can do, for `capability:<tag>` permission rules. Every
+   * internal tool declares it (internalToolCapabilities.test.ts); `[]` means
+   * it only touches the agent's own conversation state.
+   */
+  capabilities?: readonly Capability[];
   buildSchema?: (locale: string) => InternalToolSchema;
   execute: (
     toolArguments: Record<string, unknown>,
@@ -142,6 +150,8 @@ function initialize() {
       register(toolOrTools);
     }
   }
+
+  registerToolCapabilities(registry.values(), "internal");
 
   logger.info(
     `[InternalToolRegistry] Registered ${registry.size} internal tools: [${[...registry.keys()].join(", ")}]`,
@@ -244,6 +254,7 @@ export default class InternalToolRegistry {
       ...localizeSchema(tool, activeLocale),
       domain: tool.domain,
       labels: tool.labels,
+      ...(tool.capabilities && { capabilities: tool.capabilities }),
     }));
   }
 

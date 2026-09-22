@@ -47,6 +47,8 @@ export const COLLECTIONS = {
   AGENT_SKILLS: "agent_skills",
   AGENT_RULES: "agent_rules",
   AGENT_HOOKS: "agent_hooks",
+  PERMISSION_RULES: "permission_rules",
+  PERMISSION_DECISIONS: "permission_decisions",
   AGENT_INSTRUCTIONS: "agent_instructions",
   MCP_SERVERS: "mcp_servers",
   MEMORIES: "memories",

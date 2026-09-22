@@ -12,6 +12,11 @@ import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { COLLECTIONS } from "#src/constants";
 import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
 import { getRequestContext } from "#src/utils/RequestContext";
+import {
+  capabilitiesFromMcpAnnotations,
+  registerToolCapabilities,
+} from "#src/services/permissions/ToolCapabilities";
+import type { Capability } from "#src/services/permissions/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -23,6 +28,8 @@ export interface MCPToolSchema {
   _mcpOriginalName: string;
   domain?: string;
   labels?: string[];
+  /** Permission capability tags, derived from the server's annotations. */
+  capabilities?: Capability[];
 }
 
 export interface TransformedMCPToolResult {
@@ -39,6 +46,8 @@ interface MCPRawTool {
   labels?: string[];
   /** MCP-standard extension point — survives Zod validation unlike top-level custom fields */
   _meta?: Record<string, unknown>;
+  /** MCP tool annotations (readOnlyHint, destructiveHint, openWorldHint, …). Untrusted hints. */
+  annotations?: Record<string, unknown>;
 }
 
 export interface MCPServerConfig {
@@ -160,6 +169,7 @@ function mcpToolToSchema(
     _mcpOriginalName: mcpTool.name,
     domain,
     labels,
+    capabilities: capabilitiesFromMcpAnnotations(mcpTool.annotations),
   };
 }
 
@@ -280,6 +290,7 @@ const MCPClientService = {
 
     // Convert to our schema format
     const schemas = mcpTools.map((tool) => mcpToolToSchema(serverName, tool));
+    registerToolCapabilities(schemas, `mcp:${serverName}`);
 
     connections.set(serverName, {
       client,

@@ -9,6 +9,7 @@ import MCPClientService from "#src/services/MCPClientService";
 
 const listMcpResources = {
   name: TOOL_NAMES.LIST_MCP_RESOURCES,
+  capabilities: ["mcp", "network"] as const,
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.LIST_MCP_RESOURCES],
   description: "List available resources from a connected MCP server.",
   parameters: {
@@ -79,6 +80,7 @@ const listMcpResources = {
 
 const readMcpResource = {
   name: TOOL_NAMES.READ_MCP_RESOURCE,
+  capabilities: ["mcp", "network"] as const,
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.READ_MCP_RESOURCE],
   description:
     "Read a specific resource from a connected MCP server by its URI.",
@@ -125,6 +127,7 @@ const readMcpResource = {
 
 const mcpAuthenticate = {
   name: TOOL_NAMES.AUTHENTICATE_MCP_SERVER,
+  capabilities: ["mcp", "network", "external_side_effect"] as const,
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.AUTHENTICATE_MCP_SERVER],
   description:
     "Authenticate with a connected MCP server by providing credentials.",

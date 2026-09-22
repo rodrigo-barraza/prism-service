@@ -36,6 +36,7 @@ import {
 } from "#src/constants";
 import FileService from "#src/services/FileService";
 import InternalToolRegistry from "#src/services/tool-definitions/InternalToolRegistry";
+import { registerToolCapabilities } from "#src/services/permissions/ToolCapabilities";
 import SettingsService from "#src/services/SettingsService";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import {
@@ -160,6 +161,9 @@ async function fetchSchemas() {
     for (const schema of schemas) {
       toolMap.set(schema.name, schema);
     }
+
+    // Capability tags feed `capability:<tag>` permission rules.
+    registerToolCapabilities(schemas, "tools-service");
 
     initialized = true;
 
@@ -2109,6 +2113,7 @@ export default class ToolOrchestratorService {
       // the loop that spawned them.
       autoApprove: context._autoApprove === true,
       policies: context._policies,
+      permissionRules: context._permissionRules,
       enableCriticGate: context._enableCriticGate,
       criticModel: context._criticModel,
       maxCostDollars: context._maxCostDollars,
