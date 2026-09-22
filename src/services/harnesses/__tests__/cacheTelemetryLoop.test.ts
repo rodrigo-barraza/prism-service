@@ -11,6 +11,9 @@
  * sent (`prefixHashes`), and — because the harness only appended between
  * the two requests — iteration 2's `firstDivergenceIndex` must equal
  * iteration 1's message count, with system and tool hashes unchanged.
+ *
+ * Where the provider diagnoses misses itself (Anthropic, OpenAI), request 2
+ * names request 1's response id, and its diagnosis lands on row 2.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -25,6 +28,8 @@ import ReActHarness from "../ReActHarness.ts";
 import AgenticLoopState from "#src/services/AgenticLoopState";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import RequestLogger from "#src/services/RequestLogger";
+import PromptCacheTelemetry from "#src/services/PromptCacheTelemetry";
+import { _resetProviderDiagnosticsSupport } from "#src/utils/PromptPrefixHashes";
 import anthropicProvider from "#src/providers/anthropic";
 import openaiProvider from "#src/providers/openai";
 import googleProvider from "#src/providers/google";
@@ -222,9 +227,17 @@ function anthropicToolCallTurn(messageId: string) {
     yield { type: "message_delta", delta: { stop_reason: "tool_use" }, usage: { output_tokens: 12 } };
   };
 }
+const ANTHROPIC_DIAGNOSTICS = { cache_miss_reason: { type: "messages_changed", cache_missed_input_tokens: 40 } };
 function anthropicTextTurn(messageId: string) {
   return async function* () {
-    yield { type: "message_start", message: { id: messageId, usage: { input_tokens: 10, output_tokens: 0, cache_read_input_tokens: 90, cache_creation_input_tokens: 0 } } };
+    yield {
+      type: "message_start",
+      message: {
+        id: messageId,
+        usage: { input_tokens: 10, output_tokens: 0, cache_read_input_tokens: 90, cache_creation_input_tokens: 0 },
+        diagnostics: ANTHROPIC_DIAGNOSTICS,
+      },
+    };
     yield { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } };
     yield { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "All done." } };
     yield { type: "content_block_stop", index: 0 };
@@ -240,11 +253,21 @@ function openaiToolCallTurn(responseId: string) {
     yield { type: "response.completed", response: { id: responseId, status: "completed", output: [], usage: { input_tokens: 90, output_tokens: 12, input_tokens_details: { cached_tokens: 0 } } } };
   };
 }
+const OPENAI_DIAGNOSTICS = { type: "cache_hit", comparison_reusable_tokens: 90 };
 function openaiTextTurn(responseId: string) {
   return async function* () {
     yield { type: "response.created", response: { id: responseId } };
     yield { type: "response.output_text.delta", delta: "All done." };
-    yield { type: "response.completed", response: { id: responseId, status: "completed", output: [], usage: { input_tokens: 100, output_tokens: 4, input_tokens_details: { cached_tokens: 90 } } } };
+    yield {
+      type: "response.completed",
+      response: {
+        id: responseId,
+        status: "completed",
+        output: [],
+        usage: { input_tokens: 100, output_tokens: 4, input_tokens_details: { cached_tokens: 90 } },
+        prompt_cache_diagnostics: OPENAI_DIAGNOSTICS,
+      },
+    };
   };
 }
 
@@ -365,6 +388,8 @@ describe("cache telemetry — a two-iteration loop through each provider adapter
   beforeEach(() => {
     vi.clearAllMocks();
     TurnInputMailbox._clearAll();
+    PromptCacheTelemetry._clear();
+    _resetProviderDiagnosticsSupport();
     anthropicStreamCalls.length = 0;
     openaiResponsesCalls.length = 0;
     googleStreamCalls.length = 0;
@@ -377,14 +402,39 @@ describe("cache telemetry — a two-iteration loop through each provider adapter
     anthropicScript.push(anthropicToolCallTurn("msg_1"), anthropicTextTurn("msg_2"));
     await buildLoop("anthropic", "claude-sonnet-5", anthropicProvider, "conv-anthropic").run();
     expect(anthropicStreamCalls).toHaveLength(2);
-    expectAppendOnlyTelemetry(await loggedIterationRows());
+    const rows = await loggedIterationRows();
+    expectAppendOnlyTelemetry(rows);
+
+    // Diagnostics: opt in on request 1, compare request 2 against msg_1.
+    expect(anthropicStreamCalls[0].diagnostics).toEqual({ previous_message_id: null });
+    expect(anthropicStreamCalls[1].diagnostics).toEqual({ previous_message_id: "msg_1" });
+    expect(rows[0].cacheTelemetry.providerResponseId).toBe("msg_1");
+    expect(rows[1].cacheTelemetry.providerDiagnostics).toMatchObject({
+      source: "anthropic",
+      status: "cache_miss",
+      reason: "messages_changed",
+      missedTokens: 40,
+      comparedResponseId: "msg_1",
+      raw: ANTHROPIC_DIAGNOSTICS,
+    });
   });
 
   it("OpenAI (Responses): rows carry hashes and the append-only divergence index", async () => {
     openaiScript.push(openaiToolCallTurn("resp_1"), openaiTextTurn("resp_2"));
     await buildLoop("openai", "gpt-6-astra", openaiProvider, "conv-openai").run();
     expect(openaiResponsesCalls).toHaveLength(2);
-    expectAppendOnlyTelemetry(await loggedIterationRows());
+    const rows = await loggedIterationRows();
+    expectAppendOnlyTelemetry(rows);
+
+    // Diagnostics: request 2 compares against request 1's response.
+    expect(openaiResponsesCalls[0].prompt_cache_options).toBeUndefined();
+    expect(openaiResponsesCalls[1].prompt_cache_options).toEqual({ comparison_response_id: "resp_1" });
+    expect(rows[1].cacheTelemetry.providerDiagnostics).toMatchObject({
+      source: "openai",
+      status: "cache_hit",
+      comparedResponseId: "resp_1",
+      raw: OPENAI_DIAGNOSTICS,
+    });
   });
 
   it("Google: rows carry hashes and the append-only divergence index", async () => {

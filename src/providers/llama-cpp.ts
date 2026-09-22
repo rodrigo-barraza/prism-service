@@ -52,6 +52,10 @@ import {
   MEDIA_STRATEGIES,
   type OpenAICompletionResponse,
 } from "#src/providers/openai-compat";
+import {
+  hashChatPrefix,
+  requestTelemetryChunk,
+} from "#src/utils/PromptPrefixHashes";
 import type { TokenUsage } from "#src/types/admin";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
@@ -338,6 +342,9 @@ export function createLlamaCppProvider(
           payload.tool_choice = "auto";
         }
 
+        const prefixHashes = options.cacheTelemetry
+          ? hashChatPrefix(prepared, tools)
+          : null;
         const response = await fetchOpenAICompat(
           `${baseUrl}/v1/chat/completions`,
           payload,
@@ -383,6 +390,7 @@ export function createLlamaCppProvider(
             yield chunk;
           }
         }
+        if (options.cacheTelemetry) yield requestTelemetryChunk(prefixHashes);
       } catch (error: unknown) {
         if (error instanceof Error && error.name === "AbortError") return; // Client disconnected
         if (error instanceof ProviderError) throw error;

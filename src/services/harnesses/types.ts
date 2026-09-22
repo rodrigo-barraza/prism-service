@@ -11,6 +11,7 @@ import type { DeviationVerdict } from "./lifecycle/DeviationRuleEngine.ts";
 // ── Usage & Cost ────────────────────────────────────────────
 
 import type { TokenUsage } from "#src/services/RequestLogger";
+import type { RequestTelemetryChunk } from "#src/utils/PromptPrefixHashes";
 import type {
   ResponsesPhase,
   ResponsesReasoningItem,
@@ -312,6 +313,8 @@ export interface PassState {
   reasoningItems?: ResponsesReasoningItem[];
   /** OpenAI Responses API `response.id` of this pass. */
   providerResponseId?: string;
+  /** Prompt-cache telemetry the adapter reported for this pass's request. */
+  requestTelemetry?: RequestTelemetryChunk;
 }
 
 // ── Deviation Abort/Retry Snapshot ──────────────────────────
@@ -399,6 +402,9 @@ export interface StreamChunk {
   providerResponseId?: string;
   phase?: ResponsesPhase;
   reasoningItems?: ResponsesReasoningItem[];
+  // Prompt-cache telemetry (type: "requestTelemetry")
+  prefixHashes?: RequestTelemetryChunk["prefixHashes"];
+  cacheDiagnostics?: RequestTelemetryChunk["cacheDiagnostics"];
   [key: string]: unknown;
 }
 

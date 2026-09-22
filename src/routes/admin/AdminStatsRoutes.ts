@@ -17,6 +17,11 @@ import {
 import requireDb from "#src/middleware/RequireDbMiddleware";
 import { hours as hoursToMilliseconds } from "@rodrigo-barraza/utilities-library";
 import { StatsCache } from "#src/caches/StatsCache";
+import {
+  computeCacheStats,
+  DEFAULT_MAX_GAP_SECONDS,
+  type CacheStatsRow,
+} from "#src/services/PromptCacheStats";
 
 export interface TransformedStatsMatchFilter {
   project?: unknown;
@@ -1629,6 +1634,79 @@ router.get(
       res.json(responseData);
     } catch (error: unknown) {
       logger.error(`Admin /stats/agents error: ${getErrorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+// ─── GET /stats/cache — prompt-cache effectiveness ────
+// Agent iterations only (the rows that carry prefix hashes). Without
+// from/to the window is the last 30 days. `maxGapSeconds` bounds which
+// consecutive requests count as a pair (default 300 s — the shortest
+// provider cache TTL).
+const CACHE_STATS_DEFAULT_WINDOW_DAYS = 30;
+const CACHE_STATS_MAX_ROWS = 200_000;
+
+router.get(
+  "/cache",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const cacheKey = StatsCache.buildCacheKey("/stats/cache", req.query);
+      const responseData = await StatsCache.getOrFetch(cacheKey, async () => {
+        const match = await buildMatchFilter(req);
+        if (!req.query.from && !req.query.to) {
+          match.createdAt = {
+            $gte: new Date(
+              Date.now() - CACHE_STATS_DEFAULT_WINDOW_DAYS * 24 * 3600 * 1000,
+            ).toISOString(),
+          } as unknown as { $gte: Date };
+        }
+        match.operation = "agent:iteration";
+        match.status = "completed";
+        const requestedGap = Number(req.query.maxGapSeconds);
+        const maxGapSeconds =
+          Number.isFinite(requestedGap) && requestedGap > 0
+            ? requestedGap
+            : DEFAULT_MAX_GAP_SECONDS;
+
+        const rows = (await req.db
+          .collection(REQUESTS_COLLECTION)
+          .find(match, {
+            projection: {
+              _id: 0,
+              requestId: 1,
+              agentConversationId: 1,
+              conversationId: 1,
+              createdAt: 1,
+              provider: 1,
+              model: 1,
+              agenticIteration: 1,
+              inputTokens: 1,
+              cacheReadInputTokens: 1,
+              cacheCreationInputTokens: 1,
+              estimatedCost: 1,
+              "cacheTelemetry.prefixChange": 1,
+              "cacheTelemetry.providerDiagnostics.source": 1,
+              "cacheTelemetry.providerDiagnostics.status": 1,
+              "cacheTelemetry.providerDiagnostics.reason": 1,
+            },
+          })
+          .sort({ createdAt: 1 })
+          .limit(CACHE_STATS_MAX_ROWS)
+          .toArray()) as unknown as CacheStatsRow[];
+
+        return {
+          window: {
+            from: (match.createdAt as { $gte?: unknown })?.$gte ?? null,
+            to: (match.createdAt as { $lte?: unknown })?.$lte ?? null,
+          },
+          ...computeCacheStats(rows, { maxGapSeconds }),
+        };
+      });
+
+      res.json(responseData);
+    } catch (error: unknown) {
+      logger.error(`Admin /stats/cache error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
