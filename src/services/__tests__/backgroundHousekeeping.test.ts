@@ -109,6 +109,32 @@ describe("BackgroundHousekeepingService", () => {
       expect(subAgentSweepCall![1].$set.subAgentCompletedAt).toBeDefined();
     });
 
+    it("leaves a turn parked on its user alone: waiting is not a crash", async () => {
+      const { createMockCollection } = await import("../../../tests/mongoMock.ts");
+      const longAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+      const agentConversations = createMockCollection([
+        { id: "crashed", isGenerating: true, isActive: true, updatedAt: longAgo },
+        { id: "parked", isGenerating: true, isActive: true, updatedAt: longAgo, runState: "awaiting_user" },
+      ]);
+      const collections = new Map<string, ReturnType<typeof createMockCollection>>();
+      vi.spyOn(MongoWrapper, "getDb").mockReturnValue({
+        collection: (name: string) => {
+          if (name === "agent_conversations") return agentConversations;
+          if (!collections.has(name)) collections.set(name, createMockCollection());
+          return collections.get(name);
+        },
+      } as any);
+
+      await BackgroundHousekeepingService.run({ trigger: "test" });
+
+      expect(agentConversations._docs.get("crashed")).toMatchObject({ isGenerating: false, isActive: false });
+      expect(agentConversations._docs.get("parked")).toMatchObject({
+        isGenerating: true,
+        isActive: true,
+        runState: "awaiting_user",
+      });
+    });
+
     it("should handle MongoDB connection errors gracefully", async () => {
       vi.spyOn(MongoWrapper, "getDb").mockImplementation(() => {
         throw new Error("MongoDB down");

@@ -14,10 +14,8 @@ vi.mock("#src/utils/logger", () => ({
 import AutoApprovalEngine, {
   APPROVAL_TIERS,
 } from "#src/services/AutoApprovalEngine";
-import {
-  ApprovalRegistry,
-  pendingQuestions,
-} from "#src/services/ApprovalRegistry";
+import { ApprovalRegistry } from "#src/services/ApprovalRegistry";
+import QuestionRegistry from "#src/services/QuestionRegistry";
 import type { QuestionResolution } from "#src/services/ApprovalRegistry";
 import {
   allow,
@@ -749,64 +747,63 @@ describe('AutoApprovalEngine adversarial', () => {
 describe('ApprovalRegistry adversarial', () => {
   afterEach(() => {
     ApprovalRegistry._clearAll();
-    pendingQuestions.clear();
+    QuestionRegistry._clearAll();
   });
 
-  function parkOne(loopKey: string, toolCallId: string) {
-    return ApprovalRegistry.waitForDecisions(loopKey, {
+  // Wrapped: an async function returning the decisions promise would adopt
+  // it, and awaiting the park would wait for the decision itself.
+  async function parkOne(loopKey: string, toolCallId: string) {
+    return ApprovalRegistry.open(loopKey, {
       type: 'tool',
       batchId: `batch-${loopKey}`,
       calls: [{ toolCallId, name: 'execute_shell', args: {} }],
-      timeoutMilliseconds: 60_000,
     });
   }
 
   it('should treat a double decision as stale — the first one stands', async () => {
-    const decisions = parkOne('conv-1', 'tc-1');
-    expect(ApprovalRegistry.decide('conv-1', { toolCallId: 'tc-1', decision: 'allow' }).status).toBe('decided');
-    expect(ApprovalRegistry.decide('conv-1', { toolCallId: 'tc-1', decision: 'deny' }).status).toBe('stale');
+    const { decisions } = await parkOne('conv-1', 'tc-1');
+    expect((await ApprovalRegistry.decide('conv-1', { toolCallId: 'tc-1', decision: 'allow' })).status).toBe('decided');
+    expect((await ApprovalRegistry.decide('conv-1', { toolCallId: 'tc-1', decision: 'deny' })).status).toBe('stale');
     expect((await decisions).get('tc-1')?.decision).toBe('allow');
   });
 
-  it('should answer not_found for a conversation with nothing pending', () => {
-    expect(ApprovalRegistry.decide('nonexistent-conv', { decision: 'allow' })).toEqual({ status: 'not_found' });
+  it('should answer not_found for a conversation with nothing pending', async () => {
+    expect(await ApprovalRegistry.decide('nonexistent-conv', { decision: 'allow' })).toEqual({ status: 'not_found' });
   });
 
   it('should keep concurrent approvals of different conversations apart', async () => {
-    const decisionsA = parkOne('conv-a', 'tc-a');
-    const decisionsB = parkOne('conv-b', 'tc-b');
+    const { decisions: decisionsA } = await parkOne('conv-a', 'tc-a');
+    const { decisions: decisionsB } = await parkOne('conv-b', 'tc-b');
 
     // A decision addressed to conversation A's call id under B's key finds nothing.
-    expect(ApprovalRegistry.decide('conv-b', { toolCallId: 'tc-a', decision: 'allow' }).status).toBe('not_found');
-    ApprovalRegistry.decide('conv-b', { toolCallId: 'tc-b', decision: 'deny' });
-    ApprovalRegistry.decide('conv-a', { toolCallId: 'tc-a', decision: 'allow' });
+    expect((await ApprovalRegistry.decide('conv-b', { toolCallId: 'tc-a', decision: 'allow' })).status).toBe('not_found');
+    await ApprovalRegistry.decide('conv-b', { toolCallId: 'tc-b', decision: 'deny' });
+    await ApprovalRegistry.decide('conv-a', { toolCallId: 'tc-a', decision: 'allow' });
 
     expect((await decisionsA).get('tc-a')?.decision).toBe('allow');
     expect((await decisionsB).get('tc-b')?.decision).toBe('deny');
   });
 
-  it('should handle question resolution with null answers', () => {
-    let receivedResolution: QuestionResolution | null = null;
-    pendingQuestions.set('conv-q', new Map([['q-1', {
-      questionId: 'q-1',
-      blocking: true,
-      createdAt: Date.now(),
-      resolve: (value: QuestionResolution) => {
-        receivedResolution = value;
-      },
-      question: 'What color?',
-    }]]));
-
-    pendingQuestions.get('conv-q')!.get('q-1')!.resolve({ answers: null });
-    expect(receivedResolution).not.toBeNull();
-    expect(receivedResolution!.answers).toBeNull();
+  it('should release a blocking question with null answers when its turn ends', async () => {
+    const resolution = new Promise<QuestionResolution>((resolve) => {
+      void QuestionRegistry.register('conv-q', {
+        questionId: 'q-1',
+        blocking: true,
+        createdAt: Date.now(),
+        resolve,
+        question: 'What color?',
+      });
+    });
+    await vi.waitFor(async () => expect(await QuestionRegistry.list('conv-q')).toHaveLength(1));
+    await QuestionRegistry.cancelAll('conv-q');
+    expect((await resolution).answers).toBeNull();
   });
 
   it('should leave no dangling waiter once the turn ends', async () => {
-    const decisions = parkOne('stale-conv', 'tc-1');
-    ApprovalRegistry.cancel('stale-conv');
+    const { decisions } = await parkOne('stale-conv', 'tc-1');
+    await ApprovalRegistry.cancel('stale-conv');
     expect((await decisions).get('tc-1')).toMatchObject({ decision: 'deny', source: 'turn_ended' });
-    expect(ApprovalRegistry.getPending('stale-conv')).toBeNull();
+    expect(await ApprovalRegistry.getPending('stale-conv')).toBeNull();
   });
 });
 

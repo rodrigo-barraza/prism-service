@@ -362,7 +362,7 @@ describe("per-call approvals — one batch, three cards, three decisions", () =>
     // Give a wrongly-resolved batch every chance to start executing.
     await new Promise((resolve) => setTimeout(resolve, 25));
     expect(executedIds(), "nothing runs until every call in the batch is decided").toEqual([]);
-    const pending = AgenticLoopService.getPendingApproval(conversationId);
+    const pending = await AgenticLoopService.getPendingApproval(conversationId);
     expect(pending.isPending).toBe(true);
     expect((pending.toolCalls ?? []).map((toolCall) => toolCall.id).sort()).toEqual(["call-1", "call-3"]);
 

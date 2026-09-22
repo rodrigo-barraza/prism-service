@@ -15,7 +15,8 @@ import type AutoApprovalEngine from "#src/services/AutoApprovalEngine";
 import type AgentHooks from "#src/services/AgentHooks";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import { resolveLoopKey } from "#src/services/LoopKey";
-import { APPROVALS, HARNESS } from "#src/constants";
+import { decisionOwnerOf } from "#src/services/conversation/ConversationRunState";
+import { APPROVALS } from "#src/constants";
 import { buildHookPayload } from "#src/services/hooks/buildPayload";
 import { HOOK_EVENTS } from "#src/services/hooks/types";
 import { buildApprovalPreview } from "./ApprovalPreview.ts";
@@ -29,8 +30,14 @@ import { buildDeniedToolResult, firePermissionDenied } from "./TurnHooks.ts";
  * `approval_required` event (toolCallId, batchId, tier, full args, and a
  * diff preview for file writes) and its own decision in the
  * ApprovalRegistry; the batch proceeds once every one of them is decided —
- * allowed (possibly with edited arguments), denied (possibly with a reason),
- * or timed out (denied). Results are then assembled in the model's order.
+ * allowed (possibly with edited arguments) or denied (possibly with a
+ * reason). Results are then assembled in the model's order.
+ *
+ * There is no timeout (prompt 13). The batch is recorded in
+ * PendingDecisionStore before its cards go out, and the turn parks
+ * `awaiting_user` until the user decides — however long that takes, and
+ * across a restart. Only the end of the turn (or a newer batch of the same
+ * loop) lapses a card unanswered.
  *
  * Where configured hooks meet it (Claude Code's order: hooks → rules → mode
  * → ask). The PreToolUse hooks ran BEFORE this gate and stamped their `ask` /
@@ -40,13 +47,11 @@ import { buildDeniedToolResult, firePermissionDenied } from "./TurnHooks.ts";
  *   2. `Notification` fires once — the loop is about to go idle on a person;
  *   3. the cards go out and the gate waits.
  * `PermissionDenied` fires for every call denied along the way (rule, hook,
- * user) and every card that lapsed unanswered (timeout, superseded,
- * turn_ended). A batch that needs nobody fires none of this.
+ * user) and every card that lapsed unanswered (superseded, turn_ended). A
+ * batch that needs nobody fires none of this.
  *
  * Reusable by any harness that executes write/danger-tier tools.
  */
-
-const APPROVAL_TIMEOUT_MILLISECONDS = HARNESS.APPROVAL_TIMEOUT_MILLISECONDS;
 
 export interface ApprovalVerdict {
   /**
@@ -57,7 +62,7 @@ export interface ApprovalVerdict {
   executableToolCalls: ToolCall[];
   /**
    * One tool result per call that must not run (policy DENY, hook deny, user
-   * deny, approval timeout), in the model's order.
+   * deny, a card that lapsed with its turn), in the model's order.
    */
   blockedResults: ToolResult[];
   /** Denied calls (rule or hook) — terminal rejections that must not execute and are never user-approvable. */
@@ -121,9 +126,9 @@ function userDeclinedResult(
   decision: ToolCallDecision,
   locale: string,
 ): ToolResult {
-  const isTimeout = decision.source === "timeout";
-  const messageKey = isTimeout
-    ? "harness.approval.timedOut"
+  const isLapsed = decision.source !== "user";
+  const messageKey = isLapsed
+    ? "harness.approval.lapsed"
     : decision.reason
       ? "harness.approval.declinedWithReason"
       : "harness.approval.declined";
@@ -132,7 +137,7 @@ function userDeclinedResult(
     id: toolCall.id,
     result: {
       success: false,
-      error: isTimeout ? "APPROVAL_TIMED_OUT" : "USER_REJECTED",
+      error: isLapsed ? "APPROVAL_LAPSED" : "USER_REJECTED",
       message: PromptLocaleService.get(locale, messageKey, {
         toolName: toolCall.name,
         reason: decision.reason ?? "",
@@ -228,8 +233,7 @@ async function runPermissionRequestHooks(
 
 /**
  * Check a batch of tool calls against the approval engine and, if any
- * require approval, pause until the user has decided every one of them
- * (or the timeout denies the rest).
+ * require approval, park until the user has decided every one of them.
  */
 export async function checkAndWaitForApproval(
   toolCalls: ToolCall[],
@@ -355,6 +359,31 @@ export async function checkAndWaitForApproval(
     preview: previews[index],
   }));
 
+  // Recorded first, THEN shown: a decision can only land on a call that
+  // exists, and a card must never outlive the process that showed it.
+  const loopKey = resolveLoopKey(context);
+  const { decisions: decisionsPromise } = await ApprovalRegistry.open(
+    loopKey,
+    {
+      type: "tool",
+      batchId,
+      calls: requests,
+      onDecided: (toolCallId, decision) => {
+        emit({
+          type: APPROVALS.DECIDED_EVENT_TYPE,
+          toolCallId,
+          batchId,
+          decision: decision.decision,
+          scope: decision.scope,
+          source: decision.source,
+          ...(decision.reason ? { reason: decision.reason } : {}),
+          ...(decision.editedArgs ? { editedByUser: true } : {}),
+        });
+      },
+    },
+    decisionOwnerOf(context),
+  );
+
   requests.forEach((request, index) => {
     const hookPermission = awaiting[index].toolCall._hookPermission;
     emit({
@@ -377,27 +406,8 @@ export async function checkAndWaitForApproval(
     });
   });
 
-  const loopKey = resolveLoopKey(context);
-  const decisionsPromise = ApprovalRegistry.waitForDecisions(loopKey, {
-    type: "tool",
-    batchId,
-    calls: requests,
-    timeoutMilliseconds: APPROVAL_TIMEOUT_MILLISECONDS,
-    onDecided: (toolCallId, decision) => {
-      emit({
-        type: APPROVALS.DECIDED_EVENT_TYPE,
-        toolCallId,
-        batchId,
-        decision: decision.decision,
-        scope: decision.scope,
-        source: decision.source,
-        ...(decision.reason ? { reason: decision.reason } : {}),
-        ...(decision.editedArgs ? { editedByUser: true } : {}),
-      });
-    },
-  });
-  // A stopped turn must not sit out the timeout on a card nobody will click.
-  const cancelOnAbort = () => ApprovalRegistry.cancel(loopKey);
+  // A stopped turn must not park forever on a card nobody will click.
+  const cancelOnAbort = () => void ApprovalRegistry.cancel(loopKey);
   context.signal?.addEventListener("abort", cancelOnAbort, { once: true });
   if (context.signal?.aborted) cancelOnAbort();
   let decisions: Awaited<typeof decisionsPromise>;
@@ -443,7 +453,7 @@ export async function checkAndWaitForApproval(
       };
       executableToolCalls.push(toolCall);
     } else {
-      const declined = decision ?? { decision: "deny", scope: "call", source: "timeout" };
+      const declined = decision ?? { decision: "deny", scope: "call", source: "turn_ended" };
       const reason = declined.source === "user" ? "user_rejected" : declined.source;
       toolCall._approval = {
         ...toolCall._approval!,

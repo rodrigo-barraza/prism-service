@@ -161,4 +161,24 @@ describe("ConversationAttentionRegistry", () => {
     observe({ type: "approval_required", toolCall: { id: "call-1", name: "write_file" } });
     expect(ConversationAttentionRegistry.get("another-conversation").pendingApprovalCount).toBe(0);
   });
+
+  it("restores the waits of stored decisions (a restart) and forgets them once settled without a turn", () => {
+    const createdAt = "2026-09-22T09:00:00.000Z";
+    const stored = [
+      { id: "a", loopKey: CONVERSATION, kind: "tool", itemId: "call-1", batchId: "b-1", position: 0, status: "pending", createdAt, name: "write_file" },
+      { id: "q", loopKey: CONVERSATION, kind: "question", itemId: "q-1", batchId: null, position: 0, status: "pending", createdAt, blocking: true },
+      // A sub-agent's card is the parent conversation's "needs you".
+      { id: "s", loopKey: "sub-agent-1", parentConversationId: CONVERSATION, kind: "tool", itemId: "call-9", batchId: "b-9", position: 0, status: "pending", createdAt },
+      { id: "done", loopKey: CONVERSATION, kind: "tool", itemId: "call-0", batchId: "b-0", position: 0, status: "decided", createdAt },
+    ] as const;
+
+    ConversationAttentionRegistry.restore(stored as never);
+    expect(attention()).toEqual({ pendingApprovalCount: 2, pendingQuestionCount: 1, awaitingSince: createdAt });
+    expect(published.at(-1)).toMatchObject({ id: CONVERSATION, attention: { pendingApprovalCount: 2 } });
+
+    ConversationAttentionRegistry.forget([stored[0], stored[2]] as never);
+    expect(attention()).toMatchObject({ pendingApprovalCount: 0, pendingQuestionCount: 1 });
+    ConversationAttentionRegistry.forget([stored[1]] as never);
+    expect(attention()).toEqual({ pendingApprovalCount: 0, pendingQuestionCount: 0, awaitingSince: null });
+  });
 });

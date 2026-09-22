@@ -1,12 +1,30 @@
 /**
- * ApprovalRegistry — shared mutable state for pending tool/plan approvals
- * and user-question prompts during agentic loop execution.
+ * ApprovalRegistry — the tool and plan approvals a turn is waiting on.
  *
+ * Durable (prompt 13): every call awaiting a human is a record in
+ * PendingDecisionStore, written before its card goes out; a decision is a
+ * conditional write on that record, and this process's waiter — if the turn
+ * that asked is still running here — is woken with it. So the database, not
+ * this module, says what is pending: a decision survives a restart (stored;
+ * the turn resumes when it is re-driven) and is applied exactly once.
+ *
+ * No timeout: a batch waits until the user decides every call, a newer batch
+ * of the same loop supersedes it, or its turn ends.
+ *
+ * Also home to the question types (QuestionRegistry holds the questions).
  * Lives in its own module to avoid circular imports between
  * AgenticLoopService (the public façade) and harness implementations.
  */
 import { APPROVALS } from "#src/constants";
 import { validateToolArgs } from "#src/utils/ToolArgsValidator";
+import PendingDecisionStore, {
+  pendingDecisionId,
+  type DecisionOwner,
+  type PendingDecisionRecord,
+} from "#src/services/PendingDecisionStore";
+import ConversationRunState, { locatorFor } from "#src/services/conversation/ConversationRunState";
+import logger from "#src/utils/logger";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 // ── Approval Types ─────────────────────────────────────────
 
@@ -19,12 +37,11 @@ export type ApprovalDecisionKind = "allow" | "deny";
  */
 export type ApprovalScope = "call" | "batch" | "conversation";
 
-/** Who settled a call: the user, or the gate on the user's behalf. */
-export type ApprovalDecisionSource =
-  | "user"
-  | "timeout"
-  | "superseded"
-  | "turn_ended";
+/**
+ * Who settled a call: the user — or, when the wait lapsed without them, a
+ * newer batch of the same loop ("superseded") or the end of the turn.
+ */
+export type ApprovalDecisionSource = "user" | "superseded" | "turn_ended";
 
 export interface ToolCallDecision {
   decision: ApprovalDecisionKind;
@@ -71,7 +88,6 @@ export interface ApprovalBatchRequest {
   type: "tool" | "plan";
   batchId: string;
   calls: ApprovalRequestCall[];
-  timeoutMilliseconds: number;
   /** Runs once per call, as it is decided — the gate turns it into an event. */
   onDecided?: (toolCallId: string, decision: ToolCallDecision) => void;
 }
@@ -95,6 +111,12 @@ export type ApprovalDecisionOutcome =
       decidedToolCallIds: string[];
       /** Calls of the batch still waiting for a decision. */
       remaining: number;
+      /**
+       * A turn running in this process took the decision. False after a
+       * restart: the decision is stored and the turn picks it up when it
+       * is re-driven.
+       */
+      delivered: boolean;
     }
   /** No batch is waiting on this loop, and the id was never seen here. */
   | { status: "not_found" }
@@ -120,7 +142,8 @@ export interface QuestionAnswer {
 
 export interface QuestionResolution {
   answers: QuestionAnswer[] | null;
-  isTimedOut?: boolean;
+  /** The wait ended without an answer — its turn was stopped. */
+  isCancelled?: boolean;
 }
 
 export interface QuestionDefinition {
@@ -159,48 +182,28 @@ export interface PendingQuestionEntry {
 }
 
 // ── Approval Registry ──────────────────────────────────────
-// One pending batch per loop key (resolveLoopKey: the client-facing
-// conversation id of a root turn, a sub-agent's own id for a sub-agent).
-// Every call of the batch is decided on its own; the batch's promise
-// resolves when the last one is, so results can keep the model's order.
+// The truth is PendingDecisionStore: one record per call, keyed by the loop
+// (resolveLoopKey: the client-facing conversation id of a root turn, a
+// sub-agent's own id for a sub-agent) and the batch. What lives here is only
+// the WAITER of a batch whose turn is running in this process: every
+// decision the store accepts is applied to it, and it resolves when the last
+// call of its batch is decided, so results keep the model's order.
 
-interface PendingCall extends ApprovalRequestCall {
-  decision?: ToolCallDecision;
-}
+const APPROVAL_KINDS = ["tool", "plan"] as const;
 
-interface PendingBatch {
+interface BatchWaiter {
   loopKey: string;
   type: "tool" | "plan";
   batchId: string;
-  calls: PendingCall[];
+  /** toolCallIds in the model's order. */
+  order: string[];
+  decisions: Map<string, ToolCallDecision>;
   onDecided?: ApprovalBatchRequest["onDecided"];
   resolve: (decisions: Map<string, ToolCallDecision>) => void;
-  timeoutId: ReturnType<typeof setTimeout> | null;
+  owner: DecisionOwner;
 }
 
-const pendingBatches = new Map<string, PendingBatch>();
-
-/**
- * Settled `(loopKey, toolCallId)` pairs, oldest first, bounded. Lets a
- * decision for a call that is already done answer 409 ("stale") instead of
- * 404, even after its turn ended.
- */
-const settledToolCalls = new Map<string, string>();
-
-function settledKey(loopKey: string, toolCallId: string): string {
-  return `${loopKey}\u0000${toolCallId}`;
-}
-
-function rememberSettled(loopKey: string, toolCallId: string, batchId: string): void {
-  const key = settledKey(loopKey, toolCallId);
-  settledToolCalls.delete(key);
-  settledToolCalls.set(key, batchId);
-  while (settledToolCalls.size > APPROVALS.SETTLED_MEMORY) {
-    const oldest = settledToolCalls.keys().next().value;
-    if (oldest === undefined) break;
-    settledToolCalls.delete(oldest);
-  }
-}
+const waiters = new Map<string, BatchWaiter>();
 
 function normalizeReason(reason: unknown): string | undefined {
   if (typeof reason !== "string") return undefined;
@@ -211,89 +214,160 @@ function normalizeReason(reason: unknown): string | undefined {
     : trimmed;
 }
 
-function decideCall(batch: PendingBatch, call: PendingCall, decision: ToolCallDecision): void {
-  call.decision = decision;
-  batch.onDecided?.(call.toolCallId, decision);
+/**
+ * Hand one decision the store accepted to the waiting batch, if its turn is
+ * running here. True when a waiter took it.
+ */
+function deliver(loopKey: string, batchId: string, toolCallId: string, decision: ToolCallDecision): boolean {
+  const waiter = waiters.get(loopKey);
+  if (!waiter || waiter.batchId !== batchId) return false;
+  if (!waiter.order.includes(toolCallId) || waiter.decisions.has(toolCallId)) return false;
+  waiter.decisions.set(toolCallId, decision);
+  waiter.onDecided?.(toolCallId, decision);
+  if (waiter.decisions.size === waiter.order.length) {
+    waiters.delete(loopKey);
+    void ConversationRunState.unpark(locatorFor(loopKey, waiter.owner));
+    waiter.resolve(
+      new Map(waiter.order.map((id) => [id, waiter.decisions.get(id)!] as const)),
+    );
+  }
+  return true;
 }
 
-function finishIfDecided(batch: PendingBatch): void {
-  if (batch.calls.some((call) => !call.decision)) return;
-  if (batch.timeoutId) clearTimeout(batch.timeoutId);
-  if (pendingBatches.get(batch.loopKey) === batch) pendingBatches.delete(batch.loopKey);
-  const decisions = new Map<string, ToolCallDecision>();
-  for (const call of batch.calls) {
-    rememberSettled(batch.loopKey, call.toolCallId, batch.batchId);
-    decisions.set(call.toolCallId, call.decision!);
-  }
-  batch.resolve(decisions);
+function recordDecision(record: PendingDecisionRecord): ToolCallDecision | null {
+  const stored = record.decision;
+  if (!stored) return null;
+  return {
+    decision: stored.decision,
+    scope: stored.scope,
+    source: stored.source,
+    ...(stored.reason ? { reason: stored.reason } : {}),
+    ...(stored.editedArgs ? { editedArgs: stored.editedArgs } : {}),
+  };
 }
 
-/** Deny every still-pending call of a batch on the user's behalf. */
-function settleRemaining(batch: PendingBatch, source: Exclude<ApprovalDecisionSource, "user">): void {
-  for (const call of batch.calls) {
-    if (!call.decision) decideCall(batch, call, { decision: "deny", scope: "call", source });
+/**
+ * Settle every pending call of a loop on the user's behalf (a newer batch,
+ * or the end of the turn), and wake its waiter with the same decision. A
+ * waiter whose calls the store could not settle — the write failed, or the
+ * record was never persisted — is still resolved: a lapsed wait must never
+ * hang the turn.
+ */
+async function lapse(
+  loopKey: string,
+  source: Exclude<ApprovalDecisionSource, "user">,
+): Promise<PendingDecisionRecord[]> {
+  const decision: ToolCallDecision = { decision: "deny", scope: "call", source };
+  const waiter = waiters.get(loopKey);
+  let settled: PendingDecisionRecord[] = [];
+  try {
+    settled = await PendingDecisionStore.settleAll(
+      { loopKey, kinds: APPROVAL_KINDS },
+      () => ({ status: "decided", decision }),
+    );
+  } catch (error: unknown) {
+    logger.error(
+      `[ApprovalRegistry] Could not settle pending approvals of ${loopKey} (${source}): ${getErrorMessage(error)}`,
+    );
   }
-  finishIfDecided(batch);
+  for (const record of settled) {
+    if (record.batchId) deliver(loopKey, record.batchId, record.itemId, decision);
+  }
+  if (waiter && waiters.get(loopKey) === waiter) {
+    for (const toolCallId of waiter.order) {
+      if (!waiter.decisions.has(toolCallId)) deliver(loopKey, waiter.batchId, toolCallId, decision);
+    }
+  }
+  return settled;
 }
 
 export const ApprovalRegistry = {
   /**
-   * Park a batch until every call in it is decided (or the timeout denies
-   * the rest). A batch still open under the same key is superseded: its
-   * undecided calls are denied — one loop runs one tool batch at a time.
+   * Record a batch as pending and park it: the returned promise resolves
+   * when every call in it is decided. Call BEFORE the cards go out — a
+   * decision can only land on a call that exists. A batch still open under
+   * the same loop key is superseded (its undecided calls are denied): one
+   * loop runs one tool batch at a time.
    */
-  waitForDecisions(
+  async open(
     loopKey: string,
     request: ApprovalBatchRequest,
-  ): Promise<Map<string, ToolCallDecision>> {
-    const existing = pendingBatches.get(loopKey);
-    if (existing) settleRemaining(existing, "superseded");
+    owner: DecisionOwner = {},
+  ): Promise<{ decisions: Promise<Map<string, ToolCallDecision>> }> {
+    await lapse(loopKey, "superseded");
+    if (request.calls.length === 0) return { decisions: Promise.resolve(new Map()) };
 
-    return new Promise((resolve) => {
-      const batch: PendingBatch = {
+    const createdAt = new Date().toISOString();
+    await PendingDecisionStore.insert(
+      request.calls.map((call, position) => ({
+        ...owner,
+        id: pendingDecisionId(loopKey, request.batchId, call.toolCallId),
         loopKey,
-        type: request.type,
+        kind: request.type,
+        itemId: call.toolCallId,
         batchId: request.batchId,
-        calls: request.calls.map((call) => ({ ...call })),
-        onDecided: request.onDecided,
-        resolve,
-        timeoutId: null,
-      };
-      pendingBatches.set(loopKey, batch);
-      if (batch.calls.length === 0) {
-        finishIfDecided(batch);
-        return;
-      }
-      batch.timeoutId = setTimeout(
-        () => settleRemaining(batch, "timeout"),
-        request.timeoutMilliseconds,
-      );
+        position,
+        status: "pending",
+        createdAt,
+        name: call.name,
+        args: call.args,
+        ...(call.tier !== undefined ? { tier: call.tier } : {}),
+        ...(call.tierLabel !== undefined ? { tierLabel: call.tierLabel } : {}),
+        argsSchema: call.argsSchema ?? null,
+        ...(call.preview ? { preview: call.preview } : {}),
+      })),
+    );
+
+    let resolve!: BatchWaiter["resolve"];
+    const decisions = new Promise<Map<string, ToolCallDecision>>((settle) => {
+      resolve = settle;
     });
+    waiters.set(loopKey, {
+      loopKey,
+      type: request.type,
+      batchId: request.batchId,
+      order: request.calls.map((call) => call.toolCallId),
+      decisions: new Map(),
+      onDecided: request.onDecided,
+      resolve,
+      owner,
+    });
+    await ConversationRunState.park(locatorFor(loopKey, owner));
+    return { decisions };
   },
 
-  /** Apply one decision from the client. Never approves anything implicitly. */
-  decide(loopKey: string, input: ApprovalDecisionInput): ApprovalDecisionOutcome {
-    const batch = pendingBatches.get(loopKey);
+  /**
+   * Apply one decision from the client. Never approves anything implicitly;
+   * each call is decided at most once (a conditional write on its record),
+   * however many POSTs race for it.
+   */
+  async decide(loopKey: string, input: ApprovalDecisionInput): Promise<ApprovalDecisionOutcome> {
     const toolCallId = input.toolCallId;
+    const pending = await PendingDecisionStore.find({
+      loopKey,
+      kinds: APPROVAL_KINDS,
+      status: "pending",
+    });
+    // One batch is pending per loop; if a race ever left two, the newest is it.
+    const batchId = pending.at(-1)?.batchId ?? null;
+    const batch = pending.filter((record) => record.batchId === batchId);
 
-    if (!batch) {
-      return toolCallId && settledToolCalls.has(settledKey(loopKey, toolCallId))
-        ? { status: "stale", toolCallId }
-        : { status: "not_found" };
+    if (batch.length === 0) {
+      if (!toolCallId) return { status: "not_found" };
+      const known = await PendingDecisionStore.findItem(loopKey, toolCallId, APPROVAL_KINDS);
+      return known ? { status: "stale", toolCallId } : { status: "not_found" };
     }
-    if (input.batchId && input.batchId !== batch.batchId) {
+    if (input.batchId && input.batchId !== batchId) {
       return { status: "stale", toolCallId };
     }
 
-    let target: PendingCall | undefined;
+    let target: PendingDecisionRecord | undefined;
     if (toolCallId) {
-      target = batch.calls.find((call) => call.toolCallId === toolCallId);
+      target = batch.find((record) => record.itemId === toolCallId);
       if (!target) {
-        return settledToolCalls.has(settledKey(loopKey, toolCallId))
-          ? { status: "stale", toolCallId }
-          : { status: "not_found" };
+        const known = await PendingDecisionStore.findItem(loopKey, toolCallId, APPROVAL_KINDS);
+        return known ? { status: "stale", toolCallId } : { status: "not_found" };
       }
-      if (target.decision) return { status: "stale", toolCallId };
     }
 
     const scope: ApprovalScope = input.scope ?? "call";
@@ -301,23 +375,23 @@ export const ApprovalRegistry = {
       return { status: "invalid", error: `scope "${scope}" can only allow` };
     }
 
-    const undecided = batch.calls.filter((call) => !call.decision);
     if (!target && scope === "call") {
-      if (undecided.length !== 1) {
+      if (batch.length !== 1) {
         return {
           status: "ambiguous",
-          pendingToolCallIds: undecided.map((call) => call.toolCallId),
+          pendingToolCallIds: batch.map((record) => record.itemId),
         };
       }
-      target = undecided[0];
+      target = batch[0];
     }
 
+    const type = batch[0].kind === "plan" ? "plan" : "tool";
     if (input.editedArgs !== undefined) {
       if (!target) return { status: "invalid", error: "editedArgs needs a toolCallId" };
       if (input.decision !== "allow") {
         return { status: "invalid", error: "editedArgs can only accompany an allow" };
       }
-      if (batch.type === "plan") {
+      if (type === "plan") {
         return { status: "invalid", error: "a plan's arguments cannot be edited" };
       }
       const validation = validateToolArgs(target.argsSchema, input.editedArgs);
@@ -326,75 +400,111 @@ export const ApprovalRegistry = {
       }
     }
 
-    const decidedToolCallIds: string[] = [];
+    const decisionsToApply: Array<[PendingDecisionRecord, ToolCallDecision]> = [];
     if (target) {
-      decideCall(batch, target, {
-        decision: input.decision,
-        scope,
-        source: "user",
-        ...(input.decision === "deny" && normalizeReason(input.reason)
-          ? { reason: normalizeReason(input.reason) }
-          : {}),
-        ...(input.editedArgs !== undefined ? { editedArgs: input.editedArgs } : {}),
-      });
-      decidedToolCallIds.push(target.toolCallId);
+      const reason = input.decision === "deny" ? normalizeReason(input.reason) : undefined;
+      decisionsToApply.push([
+        target,
+        {
+          decision: input.decision,
+          scope,
+          source: "user",
+          ...(reason ? { reason } : {}),
+          ...(input.editedArgs !== undefined ? { editedArgs: input.editedArgs } : {}),
+        },
+      ]);
     }
     if (scope !== "call") {
-      for (const call of batch.calls) {
-        if (call.decision) continue;
-        decideCall(batch, call, { decision: "allow", scope, source: "user" });
-        decidedToolCallIds.push(call.toolCallId);
+      for (const record of batch) {
+        if (record === target) continue;
+        decisionsToApply.push([record, { decision: "allow", scope, source: "user" }]);
       }
     }
 
-    const remaining = batch.calls.filter((call) => !call.decision).length;
-    const { type, batchId } = batch;
-    finishIfDecided(batch);
-    return { status: "decided", type, batchId, decidedToolCallIds, remaining };
-  },
+    const decidedToolCallIds: string[] = [];
+    let delivered = false;
+    for (const [record, decision] of decisionsToApply) {
+      const won = await PendingDecisionStore.settle(record.id, { status: "decided", decision });
+      if (!won) {
+        // Another POST decided it first: that one was the decision.
+        if (record === target) return { status: "stale", toolCallId: record.itemId };
+        continue;
+      }
+      decidedToolCallIds.push(record.itemId);
+      if (deliver(loopKey, record.batchId!, record.itemId, decision)) delivered = true;
+    }
 
-  /** The undecided calls of the batch waiting on this loop, if any. */
-  getPending(loopKey: string): PendingApprovalSnapshot | null {
-    const batch = pendingBatches.get(loopKey);
-    if (!batch) return null;
+    const remaining = (
+      await PendingDecisionStore.find({ loopKey, kinds: APPROVAL_KINDS, status: "pending" })
+    ).filter((record) => record.batchId === batchId).length;
+    if (!delivered && !(await PendingDecisionStore.isParked(loopKey))) {
+      // No turn here was waiting (the process that asked is gone): nothing
+      // is awaited any more; the decisions wait for the re-driven turn.
+      await ConversationRunState.clear(locatorFor(loopKey, batch[0]));
+    }
     return {
-      type: batch.type,
-      batchId: batch.batchId,
-      toolCalls: batch.calls
-        .filter((call) => !call.decision)
-        .map((call) => ({
-          id: call.toolCallId,
-          name: call.name,
-          args: call.args,
-          batchId: batch.batchId,
-          ...(call.preview ? { preview: call.preview } : {}),
-          _approval: {
-            tier: String(call.tier ?? ""),
-            tierLabel: call.tierLabel ?? "",
-          },
-        })),
+      status: "decided",
+      type,
+      batchId: batchId!,
+      decidedToolCallIds,
+      remaining,
+      delivered,
     };
   },
 
-  /** The turn is over: deny whatever it was still waiting on. */
-  cancel(loopKey: string): void {
-    const batch = pendingBatches.get(loopKey);
-    if (batch) settleRemaining(batch, "turn_ended");
+  /** The undecided calls of the batch pending on this loop, if any. */
+  async getPending(loopKey: string): Promise<PendingApprovalSnapshot | null> {
+    const pending = await PendingDecisionStore.find({
+      loopKey,
+      kinds: APPROVAL_KINDS,
+      status: "pending",
+    });
+    if (pending.length === 0) return null;
+    const batchId = pending.at(-1)!.batchId!;
+    const batch = pending.filter((record) => record.batchId === batchId);
+    return {
+      type: batch[0].kind === "plan" ? "plan" : "tool",
+      batchId,
+      toolCalls: batch.map((record) => ({
+        id: record.itemId,
+        name: record.name ?? "",
+        args: record.args ?? {},
+        batchId,
+        ...(record.preview ? { preview: record.preview as ApprovalPreview } : {}),
+        _approval: {
+          tier: String(record.tier ?? ""),
+          tierLabel: record.tierLabel ?? "",
+        },
+      })),
+    };
   },
 
-  /** Test helper — forget every pending batch and settled id. */
+  /** A decided call, as recorded — null while pending or never seen. */
+  async getDecision(loopKey: string, toolCallId: string): Promise<ToolCallDecision | null> {
+    const record = await PendingDecisionStore.findItem(loopKey, toolCallId, APPROVAL_KINDS);
+    return record ? recordDecision(record) : null;
+  },
+
+  /** The turn is over (ended, or stopped): deny whatever it was still waiting on. */
+  async cancel(loopKey: string): Promise<void> {
+    await lapse(loopKey, "turn_ended");
+  },
+
+  /**
+   * A new turn starts on this loop: calls still pending from a turn that is
+   * not running here (it died with a previous process) will never be acted
+   * on by this one — supersede them. A live batch is left alone. Returns
+   * the records it settled.
+   */
+  async retireOrphans(loopKey: string): Promise<PendingDecisionRecord[]> {
+    if (waiters.has(loopKey)) return [];
+    return lapse(loopKey, "superseded");
+  },
+
+  /** Test helper — forget every waiter and every in-memory record. */
   _clearAll(): void {
-    for (const batch of pendingBatches.values()) {
-      if (batch.timeoutId) clearTimeout(batch.timeoutId);
-    }
-    pendingBatches.clear();
-    settledToolCalls.clear();
+    waiters.clear();
+    PendingDecisionStore._clearMemory();
+    ConversationRunState._reset();
   },
 };
-
-// ── Question Resolver Registry ─────────────────────────────
-// loop key (LoopKey.resolveLoopKey — the id the client answers with) →
-// questionId → entry. Several can be open at once: non-blocking cards stay
-// open while the loop keeps working and may ask again.
-// The HTTP endpoint resolves these when the user answers an ask_user_question.
-export const pendingQuestions = new Map<string, Map<string, PendingQuestionEntry>>();

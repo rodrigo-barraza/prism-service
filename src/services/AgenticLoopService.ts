@@ -7,7 +7,6 @@ import AgenticLoopState from "./AgenticLoopState.ts";
 import HarnessRegistry from "./harnesses/HarnessRegistry.ts";
 import {
   ApprovalRegistry,
-  pendingQuestions,
   type ApprovalDecisionInput,
   type ApprovalDecisionOutcome,
   type PendingToolCallSummary,
@@ -24,6 +23,7 @@ import QuestionRegistry, {
   type PendingQuestionSummary,
   type QuestionAnswerOutcome,
 } from "./QuestionRegistry.ts";
+import type { DecisionOwner } from "./PendingDecisionStore.ts";
 import { runPreflightToolDiscovery } from "./harnesses/lifecycle/PreflightToolDiscovery.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
@@ -298,6 +298,11 @@ export default class AgenticLoopService {
 
     // 4. Instantiate and run
     const harness = new HarnessClass(context, state, resolvedTools);
+    const loopKey = resolveLoopKey(context);
+    // Decisions still pending from a turn that died with a previous process
+    // will never be acted on by this one: the user moved on. Supersede them
+    // (and close their "needs you" entries) before this turn asks anything.
+    await AgenticLoopService.retireOrphanedDecisions(loopKey);
     // Accept mid-turn input (steering, non-blocking answers, completions)
     // for the life of this turn; the harness drains it at its boundaries.
     TurnInputMailbox.open(conversationId);
@@ -307,9 +312,9 @@ export default class AgenticLoopService {
       // Clean up in-memory cache keyed by agentConversationId (keeps MongoDB state for next turn)
       ToolContext.cleanupInMemory(resolvedAgentConversationId);
 
-      // Clean up in-memory state keyed by conversationId (client-facing)
-      ApprovalRegistry.cancel(resolveLoopKey(context));
-      pendingQuestions.delete(conversationId);
+      // The turn is over: whatever it still waited on lapses (persisted as such).
+      await ApprovalRegistry.cancel(loopKey);
+      await QuestionRegistry.cancelAll(loopKey);
       TurnInputMailbox.close(conversationId);
 
       // Always clean up per-session tracker entries to prevent memory leaks —
@@ -339,22 +344,25 @@ export default class AgenticLoopService {
   // client-facing conversation id. One decision per tool call.
 
   /** Apply the user's decision for one pending call (POST /agent/approve). */
-  static decideApproval(
+  static async decideApproval(
     conversationId: string,
     input: ApprovalDecisionInput,
-  ): ApprovalDecisionOutcome {
+  ): Promise<ApprovalDecisionOutcome> {
     return ApprovalRegistry.decide(resolveLoopKey({ conversationId }), input);
   }
 
-  /** The calls still waiting for a decision on a conversation's running turn. */
-  static getPendingApproval(conversationId: string): {
+  /**
+   * The calls still waiting for a decision on a conversation — its running
+   * turn's, or those of a turn parked when the previous process stopped.
+   */
+  static async getPendingApproval(conversationId: string): Promise<{
     isPending: boolean;
     type?: string;
     batchId?: string;
     tools?: string[];
     toolCalls?: PendingToolCallSummary[];
-  } {
-    const pending = ApprovalRegistry.getPending(resolveLoopKey({ conversationId }));
+  }> {
+    const pending = await ApprovalRegistry.getPending(resolveLoopKey({ conversationId }));
     if (!pending || pending.toolCalls.length === 0) return { isPending: false };
     return {
       isPending: true,
@@ -370,7 +378,7 @@ export default class AgenticLoopService {
   // answers with; several per loop, each by questionId. See QuestionRegistry.
 
   /** File a pending question under its loop (called by the ask_user tool). */
-  static _setPendingQuestion(
+  static async _setPendingQuestion(
     loopKey: string,
     entry: {
       questionId: string;
@@ -379,19 +387,20 @@ export default class AgenticLoopService {
       agentConversationId?: string | null;
       resolve: (value: {
         answers: QuestionAnswer[] | null;
-        isTimedOut?: boolean;
+        isCancelled?: boolean;
       }) => { delivered: boolean; reason?: string } | void;
       question?: string;
       questions?: QuestionDefinition[];
       choices?: string[];
     },
-  ): void {
-    QuestionRegistry.register(loopKey, entry);
+    owner: DecisionOwner = {},
+  ): Promise<void> {
+    await QuestionRegistry.register(loopKey, entry, owner);
   }
 
-  /** Drop one question without answering it (its blocking wait timed out). */
-  static _removePendingQuestion(loopKey: string, questionId: string): void {
-    QuestionRegistry.remove(loopKey, questionId);
+  /** Withdraw one question unanswered (its turn was stopped). */
+  static async _removePendingQuestion(loopKey: string, questionId: string): Promise<void> {
+    await QuestionRegistry.remove(loopKey, questionId);
   }
 
   /**
@@ -399,25 +408,51 @@ export default class AgenticLoopService {
    * `agentConversationId` is also tried; `questionId` picks the card, else
    * the oldest blocking question is answered.
    */
-  static resolveUserQuestion(
+  static async resolveUserQuestion(
     conversationId: string,
     answers: QuestionAnswer[],
     options: { questionId?: string; agentConversationId?: string } = {},
-  ): QuestionAnswerOutcome {
+  ): Promise<QuestionAnswerOutcome> {
     return QuestionRegistry.answer(conversationId, answers, options);
   }
 
   /** Every open question on a loop, oldest first. */
-  static listPendingQuestions(loopKey: string): PendingQuestionSummary[] {
+  static async listPendingQuestions(loopKey: string): Promise<PendingQuestionSummary[]> {
     return QuestionRegistry.list(loopKey);
   }
 
   /** The question a reloaded client shows: the oldest blocking one, else the oldest open card. */
-  static getPendingQuestion(
+  static async getPendingQuestion(
     loopKey: string,
-  ): { isPending: boolean } & Partial<PendingQuestionSummary> {
-    const pending = QuestionRegistry.getPending(loopKey);
+  ): Promise<{ isPending: boolean } & Partial<PendingQuestionSummary>> {
+    const pending = await QuestionRegistry.getPending(loopKey);
     return pending ? { isPending: true, ...pending } : { isPending: false };
+  }
+
+  /**
+   * Supersede the decisions a dead turn left pending on this loop (see
+   * runAgenticLoop) and close their "needs you" entries. Best-effort.
+   */
+  static async retireOrphanedDecisions(loopKey: string): Promise<void> {
+    if (!loopKey) return;
+    try {
+      const retired = [
+        ...(await ApprovalRegistry.retireOrphans(loopKey)),
+        ...(await QuestionRegistry.retireOrphans(loopKey)),
+      ];
+      if (retired.length === 0) return;
+      logger.info(
+        `[AgenticLoop] A new turn on ${loopKey} superseded ${retired.length} decision(s) left pending by an earlier process`,
+      );
+      const { default: ConversationAttentionRegistry } = await import(
+        "./ConversationAttentionRegistry.ts"
+      );
+      ConversationAttentionRegistry.forget(retired);
+    } catch (error: unknown) {
+      logger.warn(
+        `[AgenticLoop] Could not retire orphaned decisions on ${loopKey}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   // ── Harness Discovery API ──────────────────────────────

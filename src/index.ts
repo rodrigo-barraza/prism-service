@@ -557,6 +557,28 @@ setupWebSocket(wss);
           collection: COLLECTIONS.PERMISSION_RULES,
           keys: { username: 1, profileId: 1, createdAt: -1 },
         },
+        // pending_decisions — the approvals and questions turns wait on
+        // (PendingDecisionStore): addressed by id, looked up per loop, and
+        // restored at boot by status. A settled record carries `expiresAt`
+        // (PENDING_DECISIONS.SETTLED_RETENTION_DAYS); a pending one never expires.
+        {
+          collection: COLLECTIONS.PENDING_DECISIONS,
+          keys: { id: 1 },
+          options: { unique: true },
+        },
+        {
+          collection: COLLECTIONS.PENDING_DECISIONS,
+          keys: { loopKey: 1, status: 1, createdAt: 1 },
+        },
+        {
+          collection: COLLECTIONS.PENDING_DECISIONS,
+          keys: { status: 1, createdAt: 1 },
+        },
+        {
+          collection: COLLECTIONS.PENDING_DECISIONS,
+          keys: { expiresAt: 1 },
+          options: { expireAfterSeconds: 0 },
+        },
         // permission_decisions — approval history behind rule suggestions,
         // expired after APPROVAL_HISTORY.RETENTION_DAYS (90)
         {
@@ -657,7 +679,10 @@ setupWebSocket(wss);
     );
   }
 
-  // Clear any stale isGenerating flags left over from a previous crash/restart
+  // Clear any stale isGenerating flags left over from a previous crash/restart.
+  // A turn that was parked on its user keeps `runState: "awaiting_user"`:
+  // nothing is generating any more, but its decisions are still pending
+  // (PendingDecisionStore) and the conversation still waits on its user.
   try {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (db) {
@@ -715,6 +740,28 @@ setupWebSocket(wss);
   } catch (error: unknown) {
     logger.error(
       `Failed to clear stale isGenerating flags: ${getErrorMessage(error)}`,
+    );
+  }
+
+  // Re-open the "needs you" waits of turns parked on their user when the
+  // previous process stopped — their decisions outlive it (prompt 13).
+  try {
+    const { default: PendingDecisionStore } = await import(
+      "./services/PendingDecisionStore.ts"
+    );
+    const { default: ConversationAttentionRegistry } = await import(
+      "./services/ConversationAttentionRegistry.ts"
+    );
+    const pendingDecisions = await PendingDecisionStore.listAllPending();
+    if (pendingDecisions.length > 0) {
+      ConversationAttentionRegistry.restore(pendingDecisions);
+      logger.info(
+        `Restored ${pendingDecisions.length} pending decision(s) still awaiting their user`,
+      );
+    }
+  } catch (error: unknown) {
+    logger.error(
+      `Failed to restore pending decisions: ${getErrorMessage(error)}`,
     );
   }
 

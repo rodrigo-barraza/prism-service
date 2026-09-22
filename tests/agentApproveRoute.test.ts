@@ -86,7 +86,7 @@ describe("POST /agent/approve — fails closed", () => {
     expect(response.status).toBe(400);
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(isSettled()).toBe(false);
-    expect(AgenticLoopService.getPendingApproval(conversationId).isPending).toBe(true);
+    expect((await AgenticLoopService.getPendingApproval(conversationId)).isPending).toBe(true);
   });
 
   it('400 for `approved: "false"` (a string is not a boolean) — and the call stays pending', async () => {
@@ -133,7 +133,7 @@ describe("POST /agent/approve — one decision per call", () => {
       .post("/agent/approve")
       .send({ conversationId: "approve-unknown-id", toolCallId: "never-issued", decision: "allow" });
     expect(unknown.status).toBe(404);
-    expect(AgenticLoopService.getPendingApproval("approve-unknown-id").isPending).toBe(true);
+    expect((await AgenticLoopService.getPendingApproval("approve-unknown-id")).isPending).toBe(true);
   });
 
   it("409 for a toolCallId from an earlier batch, and for a card of a superseded batch", async () => {
@@ -166,7 +166,7 @@ describe("POST /agent/approve — one decision per call", () => {
 
     expect(response.status).toBe(400);
     expect(response.body.pendingToolCallIds).toEqual(["a", "b"]);
-    expect(AgenticLoopService.getPendingApproval(conversationId).toolCalls).toHaveLength(2);
+    expect((await AgenticLoopService.getPendingApproval(conversationId)).toolCalls).toHaveLength(2);
     expect(isSettled()).toBe(false);
   });
 
@@ -182,7 +182,7 @@ describe("POST /agent/approve — one decision per call", () => {
     });
     expect(invalid.status).toBe(400);
     expect(invalid.body.error).toMatch(/path|content/);
-    expect(AgenticLoopService.getPendingApproval(conversationId).isPending).toBe(true);
+    expect((await AgenticLoopService.getPendingApproval(conversationId)).isPending).toBe(true);
 
     const valid = await http.post("/agent/approve").send({
       conversationId,
@@ -206,9 +206,15 @@ describe("POST /agent/approve — one decision per call", () => {
       { id: "conversation-a", project: "test", username: "testuser", settings: { model: "m" } },
       { id: "conversation-b", project: "test", username: "testuser", settings: { model: "m" } },
     ]);
+    // One collection per name, as a real database hands out (the pending
+    // decisions of the batch are written to one and read back from it).
+    const otherCollections = new Map<string, ReturnType<typeof createMockCollection>>();
     vi.mocked(MongoWrapper.getDb).mockReturnValue({
-      collection: (name: string) =>
-        name === COLLECTIONS.AGENT_CONVERSATIONS ? agentConversations : createMockCollection(),
+      collection: (name: string) => {
+        if (name === COLLECTIONS.AGENT_CONVERSATIONS) return agentConversations;
+        if (!otherCollections.has(name)) otherCollections.set(name, createMockCollection());
+        return otherCollections.get(name);
+      },
     } as never);
 
     const { verdict } = await parkWriteCalls("conversation-a", ["one", "two"]);
