@@ -312,6 +312,40 @@ describe("ConversationService.appendMessages", () => {
       expect(result.compaction).toEqual(boundary);
     });
 
+    it("should re-point a boundary anchored in this append at the id it mints", async () => {
+      await createStub();
+      // The loop named the anchor by a provisional id; appendMessages
+      // replaces every appended id, so the boundary must follow its message.
+      const appended = [
+        { role: "user", content: "reconcile the ledger", id: "client-local-7" },
+        { role: "assistant", content: "reconciled", id: "msg_provisional-anchor" },
+      ];
+      const boundary = {
+        summary: "Earlier work, summarized.",
+        throughMessageId: "msg_provisional-anchor",
+        createdAt: "2026-09-22T12:00:00.000Z",
+        provider: PROVIDERS.GOOGLE,
+        model: "gemini-3.5-flash",
+        tokensBefore: 120_000,
+        tokensAfter: 30_000,
+      };
+
+      const result = await ConversationService.appendMessages(
+        BASE_ARGS.conversationId,
+        BASE_ARGS.project,
+        BASE_ARGS.username,
+        appended,
+        { compaction: boundary },
+        { collection: COLLECTIONS.AGENT_CONVERSATIONS },
+      );
+
+      const stored = result.messages as Array<{ id: string; content: string }>;
+      const anchor = stored.find((message) => message.content === "reconciled")!;
+      expect(anchor.id).toMatch(/^msg_/);
+      expect(anchor.id).not.toBe("msg_provisional-anchor");
+      expect(result.compaction).toEqual({ ...boundary, throughMessageId: anchor.id });
+    });
+
     it("should accumulate messages across multiple appends", async () => {
       const sessionId = "multi-append-session";
 

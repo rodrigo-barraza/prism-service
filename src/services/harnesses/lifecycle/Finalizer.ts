@@ -69,10 +69,7 @@ export interface FinalizerContext {
 
 import type { ContextBudgetSnapshot } from "#src/services/harnesses/ContextBudgetTracker";
 import type { ModelRefusal } from "#src/services/harnesses/types";
-import {
-  stampMessageIds,
-  type CompactionBoundary,
-} from "#src/services/compact/CompactionBoundary";
+import type { CompactionBoundary } from "#src/services/compact/CompactionBoundary";
 
 export interface FinalizerPayload {
   text: string | null;
@@ -545,11 +542,6 @@ export async function finalizeTextGeneration(
     }
     if (compactionBoundary) {
       finalMeta.compaction = compactionBoundary;
-    }
-    // Agent turns address their messages by id — a later compaction
-    // boundary names the last message its summary covers.
-    if (options.agenticLoopEnabled) {
-      stampMessageIds(messagesToAppend);
     }
     // Ensure all user messages to append are properly swapped/sanitized,
     // then filter out synthetic compaction artifacts that should never

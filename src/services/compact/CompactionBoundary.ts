@@ -1,10 +1,10 @@
-import crypto from "crypto";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { MONGO_DB_NAME } from "#config";
 import { PROMPT_DELIMITERS } from "#src/constants";
 import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { pristineOf } from "./MessageLineage.ts";
+import { isStoredMessageId, newMessageId } from "#src/services/conversation/messageIds";
 
 // ────────────────────────────────────────────────────────────
 // CompactionBoundary — a summary that is paid for once
@@ -20,10 +20,13 @@ import { pristineOf } from "./MessageLineage.ts";
 // summary (system → summary → the messages after the boundary). The
 // persisted transcript itself is untouched — the boundary is a view.
 //
-// Messages are addressed by `messageId`, stamped on every user/assistant
-// message the Finalizer persists. It survives the round trip the client
-// makes (persist → displayMessages → client → next request body), and it
-// is independent of any other id scheme on the document.
+// Messages are addressed by their `id` — the one server-minted id every
+// persisted message carries (conversation/messageIds.ts), the same one
+// rewind and fork address. It survives the round trip the client makes
+// (persist → displayMessages → client → next request body). A boundary
+// anchored in the CURRENT turn names a provisional id the loop gives the
+// message; appendMessages mints the real one and re-points the boundary
+// (followMintedAnchor). A served-only `legacy-<index>` id is never named.
 //
 // Falls back to today's behaviour (full history, re-summarized if still
 // over the threshold) whenever the boundary cannot be trusted:
@@ -36,7 +39,7 @@ import { pristineOf } from "./MessageLineage.ts";
 export interface CompactionBoundary {
   /** The summary text (with its recovery index) that stands in for the covered span. */
   summary: string;
-  /** `messageId` of the last message the summary covers. */
+  /** `id` of the last message the summary covers. */
   throughMessageId: string;
   createdAt: string;
   /** The utility model that wrote the summary. */
@@ -52,7 +55,7 @@ interface BoundaryMessage {
   content?: unknown;
   toolCalls?: Array<{ id?: string | null }> | unknown;
   tool_call_id?: string | null;
-  messageId?: string;
+  id?: unknown;
   isCompactSummary?: boolean;
   compactionThroughMessageId?: string;
   _alreadyPersisted?: boolean;
@@ -70,6 +73,27 @@ export function isCompactionBoundary(value: unknown): value is CompactionBoundar
     typeof boundary.throughMessageId === "string" &&
     boundary.throughMessageId.length > 0
   );
+}
+
+/**
+ * appendMessages mints a fresh id for every message it appends, replacing
+ * whatever id the message came with — including the provisional id
+ * resolveBoundaryAnchorId gave a current-turn anchor. A boundary persisted
+ * in the same append follows its message to the minted id. `before` and
+ * `minted` are the appended messages before and after minting (same order).
+ */
+export function followMintedAnchor<T>(
+  boundary: T,
+  before: ReadonlyArray<object>,
+  minted: ReadonlyArray<object>,
+): T {
+  if (!isCompactionBoundary(boundary)) return boundary;
+  const index = before.findIndex(
+    (message) => (message as { id?: unknown }).id === boundary.throughMessageId,
+  );
+  const mintedId = index >= 0 ? (minted[index] as { id?: unknown } | undefined)?.id : undefined;
+  if (typeof mintedId !== "string" || mintedId === boundary.throughMessageId) return boundary;
+  return { ...boundary, throughMessageId: mintedId };
 }
 
 /**
@@ -94,22 +118,16 @@ function isAddressable(message: BoundaryMessage): boolean {
   return true;
 }
 
-/** Give every addressable message without one a `messageId` (mutates). */
-export function stampMessageIds(messages: BoundaryMessage[]): void {
-  for (const message of messages) {
-    if (typeof message.messageId === "string" && message.messageId) continue;
-    if (isAddressable(message)) message.messageId = crypto.randomUUID();
-  }
-}
-
 /**
- * The `messageId` a boundary covering `droppedSpan` should name: the newest
- * addressable message in the span. A message of the current turn has no id
- * yet — it gets one now (on its verbatim original too, so the Finalizer
- * persists it with the id). A message persisted before ids existed cannot
- * be named: returns null and the boundary is not persisted (the next turn
- * re-summarizes, as before, until the span reaches newer messages). A
- * summary from an earlier boundary stands for that boundary's message.
+ * The `id` a boundary covering `droppedSpan` should name: the newest
+ * addressable message in the span. A message of the current turn has no
+ * stored id yet — it gets a provisional one now (on its verbatim original
+ * too, so the Finalizer appends it with that id and appendMessages can
+ * re-point the boundary at the id it mints). A message persisted before
+ * ids existed (served as `legacy-<index>`) cannot be named: returns null
+ * and the boundary is not persisted (the next turn re-summarizes, as
+ * before, until the span reaches newer messages). A summary from an
+ * earlier boundary stands for that boundary's message.
  */
 export function resolveBoundaryAnchorId(droppedSpan: BoundaryMessage[]): string | null {
   for (let index = droppedSpan.length - 1; index >= 0; index--) {
@@ -121,13 +139,12 @@ export function resolveBoundaryAnchorId(droppedSpan: BoundaryMessage[]): string 
         : null;
     }
     if (!isAddressable(message)) continue;
-    if (typeof message.messageId === "string" && message.messageId) {
-      return message.messageId;
-    }
+    if (isStoredMessageId(message.id)) return message.id;
     if (message._alreadyPersisted === true) return null;
-    message.messageId = crypto.randomUUID();
-    viewMessage.messageId = message.messageId;
-    return message.messageId;
+    const provisionalId = newMessageId();
+    message.id = provisionalId;
+    viewMessage.id = provisionalId;
+    return provisionalId;
   }
   return null;
 }
@@ -179,7 +196,7 @@ export function applyCompactionBoundary<T extends object>(
   const history = messages as unknown as BoundaryMessage[];
   let anchorIndex = -1;
   for (let index = history.length - 1; index >= 0; index--) {
-    if (history[index].messageId === boundary.throughMessageId) {
+    if (history[index].id === boundary.throughMessageId) {
       anchorIndex = index;
       break;
     }

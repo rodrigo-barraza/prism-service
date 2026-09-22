@@ -83,8 +83,11 @@ export interface MessagePayload {
   name?: string;
   /** Foreign key linking this message to the `requests` collection for telemetry data. */
   requestId?: string;
-  /** Stable id stamped at persistence — what a compaction boundary names (CompactionBoundary.ts). */
-  messageId?: string;
+  /**
+   * Stable server-minted id (conversation/messageIds.ts) — what rewind,
+   * fork and a compaction boundary address.
+   */
+  id?: string;
   isCompactSummary?: boolean;
   _isInjectedContext?: boolean;
   _isPlanningInjection?: boolean;
