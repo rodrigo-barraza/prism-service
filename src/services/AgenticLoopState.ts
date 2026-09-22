@@ -5,10 +5,10 @@ import type {
   ToolCall,
   AgenticLoopStateInit,
   PassState,
-  ModelRefusal,
 } from "./harnesses/types.ts";
-import type { AnthropicThinkingBlock } from "#src/types/admin";
 import { MEDIA } from "#src/constants";
+import type { ModelRefusal } from "./harnesses/types.ts";
+import type { AnthropicThinkingBlock } from "#src/types/admin";
 interface CriteriaScores {
   correctness: number;
   risk: number;
@@ -119,7 +119,17 @@ export default class AgenticLoopState {
   // Set by harnesses before finalization to indicate how the
   // conversation ended. Used by afterResponse hooks (e.g. AWM) to
   // gate actions that should only run on successful completions.
-  conversationOutcome: "completed" | "exhausted" | "error" | "aborted" | "refused";
+  // Persisted on the conversation document by the Finalizer.
+  conversationOutcome:
+    | "completed"
+    | "exhausted"
+    | "budget_exhausted"
+    | "plan_rejected"
+    | "error"
+    | "aborted"
+    | "refused";
+  /** Spend at the moment the cost cap stopped the loop (null = no stop). */
+  costBudgetStop: { spentDollars: number; maxCostDollars: number } | null;
 
   // ── Branch tracking (TreeOfThought) ─────────────────────
   branchesExplored: number;
@@ -195,6 +205,7 @@ export default class AgenticLoopState {
     this.toolErrorCounts = new Map();
     this.pendingRequestLogWrites = [];
     this.conversationOutcome = "completed";
+    this.costBudgetStop = null;
 
     this.branchesExplored = 0;
     this.branchesBacktracked = 0;

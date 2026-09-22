@@ -9,6 +9,7 @@
     "submitPlan": "Plan written. Now call exit_plan_mode with plan so user review. No repeat as text.",
     "approvalResult": "Plan approved. Proceed with execution. Update todo if applicable.",
     "rejectionStatus": "Plan rejected — cancelled.",
+    "rejectionResult": "User no approve plan. Plan not done. No act. Wait for user next message.",
     "planningInstruction": "## PLANNING MODE — TOOL RESTRICTED\n\nPLAN MODE. Only available:\n- **exit_plan_mode** — submit plan\n- **think** — reasoning\n\nAll other tool BLOCKED.\n\n**Steps:**\n1. Analyze request\n2. Design approach as text\n3. Call exit_plan_mode — user reviews before execution\n\nKeep concise. Simple task need brief summary."
   },
   "reminderExtractor": {

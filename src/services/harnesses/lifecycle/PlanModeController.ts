@@ -109,6 +109,12 @@ export function blockUnauthorizedToolCalls(
 /**
  * Handle the exit_plan_mode tool call: emit the plan proposal,
  * wait for user approval, and transition out of plan mode.
+ *
+ * Either way the decision is written into the exit_plan_mode tool result, so
+ * the caller's assistant message carries the plan AND the verdict. On a
+ * rejection, a timeout or an abort the caller must still finalize the turn
+ * (persist, clear isGenerating, emit `done`) — this function emits no `done`
+ * of its own.
  */
 export async function handleExitPlanMode(
   exitPlanToolCall: ToolCall,
@@ -120,7 +126,12 @@ export async function handleExitPlanMode(
 ): Promise<{ shouldContinueLoop: boolean }> {
   const { options, emit, signal, conversationId } = context;
 
-  const planText = state.planModeText.trim() || pass.streamedText.trim();
+  // Models that stream no plan text put it in the tool's `summary` argument.
+  const summaryArgument = exitPlanToolCall.args?.summary;
+  const planText =
+    state.planModeText.trim() ||
+    pass.streamedText.trim() ||
+    (typeof summaryArgument === "string" ? summaryArgument.trim() : "");
   const planSteps = PlanningModeService.extractSteps(planText);
 
   logger.info(
@@ -134,15 +145,15 @@ export async function handleExitPlanMode(
     autoApproved: !!options.autoApprove,
   });
 
-  let planApproved: boolean;
+  let planDecision: "approved" | "rejected" | "timed_out";
   if (options.autoApprove) {
-    planApproved = true;
+    planDecision = "approved";
     logger.info("[PlanningMode] Auto-approved plan (autoApprove=true)");
   } else {
-    planApproved = await new Promise<boolean>((resolve) => {
+    planDecision = await new Promise<"approved" | "rejected" | "timed_out">((resolve) => {
       const timeoutId = setTimeout(() => {
         pendingApprovals.delete(conversationId);
-        resolve(false);
+        resolve("timed_out");
       }, PLAN_APPROVAL_TIMEOUT_MILLISECONDS);
 
       const existingApproval = pendingApprovals.get(conversationId);
@@ -155,42 +166,52 @@ export async function handleExitPlanMode(
         resolve: (value: boolean) => {
           clearTimeout(timeoutId);
           pendingApprovals.delete(conversationId);
-          resolve(value);
+          resolve(value ? "approved" : "rejected");
         },
         type: "plan",
       });
     });
   }
 
-  if (!planApproved || signal?.aborted) {
-    emit({
-      type: SERVER_SENT_EVENT_TYPES.STATUS,
-      message: PromptLocaleService.get(
-        (options?.locale as string | undefined) ||
-          PromptLocaleService.getDefaultLocale(),
-        "harness.planningMode.rejectionStatus",
-      ),
-    });
-    emit({
-      type: SERVER_SENT_EVENT_TYPES.DONE,
-      usage: state.overallUsage,
-      totalTime:
-        (performance.now() - (context.requestStart ?? performance.now())) /
-        1000,
-    });
-    return { shouldContinueLoop: false };
-  }
-
-  // Inject approved plan text into the exit_plan_mode result
+  const locale =
+    (options?.locale as string | undefined) ||
+    PromptLocaleService.getDefaultLocale();
   const exitResult = toolResults.find(
     (result) =>
       result.id === exitPlanToolCall.id ||
       result.name === TOOL_NAMES.EXIT_PLAN_MODE,
   );
+
+  if (planDecision !== "approved" || signal?.aborted) {
+    emit({
+      type: SERVER_SENT_EVENT_TYPES.STATUS,
+      message: PromptLocaleService.get(
+        locale,
+        "harness.planningMode.rejectionStatus",
+      ),
+    });
+    // The plan and the verdict are part of the turn: the caller pushes the
+    // assistant message carrying this result and finalizes.
+    if (exitResult) {
+      exitResult.result = {
+        isApproved: false,
+        status: signal?.aborted ? "aborted" : planDecision,
+        message: PromptLocaleService.get(
+          locale,
+          "harness.planningMode.rejectionResult",
+        ),
+        plan: planText,
+      };
+    }
+    state.conversationOutcome = "plan_rejected";
+    return { shouldContinueLoop: false };
+  }
+
+  // Inject approved plan text into the exit_plan_mode result
   if (exitResult) {
     exitResult.result = {
       isApproved: true,
-      message: `${PromptLocaleService.get((options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale(), "harness.planningMode.approvalResult")}\n\n${planText}`,
+      message: `${PromptLocaleService.get(locale, "harness.planningMode.approvalResult")}\n\n${planText}`,
     };
   }
 

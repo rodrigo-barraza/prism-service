@@ -19,6 +19,7 @@ import SettingsService from "./SettingsService.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
 import { getRequestContext } from "#src/utils/RequestContext";
+import type { MemorySearchResult } from "#src/types/memory";
 // ─── Constants ────────────────────────────────────────────────────────────────
 /** Single unified collection for all agent memories. */
 const COLLECTION = COLLECTIONS.MEMORIES;
@@ -524,7 +525,7 @@ const MemoryService = {
     agentConversationId,
     endpoint,
     username,
-  }: MemorySearchParams) {
+  }: MemorySearchParams): Promise<MemorySearchResult[]> {
     if (!agent)
       throw new Error("MemoryService.search requires an agent identifier");
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
@@ -590,21 +591,22 @@ const MemoryService = {
       queryEmbedding as number[],
       { relevanceThreshold: RELEVANCE_THRESHOLD, limit },
     );
-    const scored = hybridScores.map((hybrid) => {
+    const scored = hybridScores.map((hybrid): MemorySearchResult => {
       const memory = memories[hybrid.key] as Record<string, unknown>;
       return {
-        id: memory._id,
-        type: memory.type || "other",
+        // A string, so callers compare ids by value — see MemorySearchResult.
+        id: String(memory._id),
+        type: (memory.type as string) || "other",
         title:
-          memory.title ||
+          (memory.title as string) ||
           (memory.content
             ? (memory.content as string).substring(0, LOG_PREVIEW.SHORT)
             : "untitled"),
-        content: memory.content || "",
-        aboutUserId: memory.aboutUserId,
-        aboutUsername: memory.aboutUsername,
-        confidence: memory.confidence,
-        createdAt: memory.createdAt,
+        content: (memory.content as string) || "",
+        aboutUserId: memory.aboutUserId as string | undefined,
+        aboutUsername: memory.aboutUsername as string | undefined,
+        confidence: memory.confidence as number | undefined,
+        createdAt: memory.createdAt as string,
         age: memoryAge(memory.createdAt as string),
         ageDays: memoryAgeDays(memory.createdAt as string),
         // score stays cosine similarity for consumer compatibility;
@@ -834,18 +836,20 @@ const MemoryService = {
    * Adds type badges and staleness caveats.
    */
   formatForPrompt(
-    memories: Record<string, unknown>[],
+    memories: Array<
+      Pick<MemorySearchResult, "type" | "title" | "content" | "age" | "createdAt">
+    >,
     options: { plainCaveats?: boolean } = {},
   ) {
     if (!memories || memories.length === 0) return "";
     return memories
       .filter((memory) => !!memory)
-      .map((memory: Record<string, unknown>) => {
+      .map((memory) => {
         const badge = `[${memory.type || "other"}]`;
         const plain = options.plainCaveats === true;
         const age =
           !plain && memory.age !== "today" ? ` (${memory.age || ""})` : "";
-        const caveat = freshnessCaveat(memory.createdAt as string, plain);
+        const caveat = freshnessCaveat(memory.createdAt, plain);
         const title = memory.title || "Untitled";
         const content = memory.content || "";
         return `- ${badge} **${title}**${age}: ${content}${caveat}`;

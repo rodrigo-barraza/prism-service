@@ -369,10 +369,26 @@ describe("Orchestrator Infrastructure Suite", () => {
         ok: true,
         status: 200,
         statusText: "OK",
-        json: async () => ({ diff: "fake diff" }),
+        json: async () => ({
+          branch: "branch-xyz",
+          base: "main",
+          files: [{ path: "a.ts", status: "added" }],
+          patch: "fake diff",
+          stats: { filesChanged: 1, additions: 1, deletions: 0 },
+        }),
       });
       const diffResult = await GitWorktreeHelper.getWorktreeDiff("/workspace", "branch-xyz");
-      expect(diffResult.diff).toBe("fake diff");
+      expect(diffResult).toMatchObject({ patch: "fake diff", files: [{ path: "a.ts", status: "added" }] });
+
+      // Anything outside the contract is an error, never a diff.
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        json: async () => ({ hasChanges: true, additions: 1, deletions: 0, diff: "old shape" }),
+      });
+      const legacyResult = await GitWorktreeHelper.getWorktreeDiff("/workspace", "branch-xyz");
+      expect(legacyResult).toEqual({ error: expect.stringContaining("outside the contract") });
 
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
