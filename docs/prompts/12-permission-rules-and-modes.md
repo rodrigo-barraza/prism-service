@@ -3,6 +3,10 @@
 > Hand to ONE session per landing: *"Read prism-service/docs/prompts/12-permission-rules-and-modes.md and execute Landing N."*
 > Conventions, gates and the isolated live recipe: `docs/prompts/README.md`. Source: `docs/harness_modernization_2026-09.md` §4.2.
 
+> **Landing 1 (`permission-rules-store`) — done 2026-09-22.** Stored rules behind `/permissions/rules` (`src/services/permissions/*`, `src/routes/PermissionsRoutes.ts`): `Tool(glob)`, `Tool(arg=glob)`, anchored `/regex/`, `capability:<tag>`, invalid patterns fail closed; capability tags from tools-service `TOOL_CAPABILITIES`, internal-tool `capabilities` and MCP annotations; self-protection; approval-history suggestions; rules load in `AgenticLoopService` for every entry point, sub-agents inherit via `forSubAgent`. `AutoApprovalEngine.explain()` names the deciding layer (`self_protection` > `rules`+`agent_policy` > `full_auto` > `tier`) — Landing 2's modes and Landing 3's classifier slot in there. Client: Settings → Permissions, `AlwaysAllowControlComponent` on the approval card.
+> Tests: `src/services/permissions/__tests__/*` (real-loop scheduler DENY, mid-turn rule), `tests/permissionsRoutes.test.ts`, `src/services/__tests__/policyInvalidPatternFailsClosed.test.ts`; client `permissionRulesPanelComponent` / `alwaysAllowControlComponent` / `permissionRulesService` tests; tools-service `src/services/__tests__/ToolCapabilities.test.ts`.
+> Recon correction: on master an invalid regex in a DENY policy already denied (the loader dropped the predicate, so the rule matched every call); the fail-open case was an invalid APPROVE, and that is what the red test pins.
+
 **Repos:** prism-service, prism-client, and tools-service (Landing 1: capability tags on its tool schemas) · **Size:** L · **Depends on:** 05 (per-call approvals; must have landed) · **Shares hubs with:** 13, 18, 20 (`src/services/AutoApprovalEngine.ts`, `PolicyEngine.ts`, the approval gate).
 
 ## What Prism has today
@@ -21,36 +25,6 @@ Read these before designing:
   6. sub-agents are checked at spawn, per action and on their final report.
 - **Codex Guardian V2.** One-token risk scoring by a cheap model, escalation to a full reviewer, and stopping the turn after 3 consecutive denials or 10 of the last 50.
 - **Kiro / Devin Desktop.** Capability-tagged tools. Deny always wins and names its layer. The agent can't edit its own permission files.
-
----
-
-## Landing 1 — `permission-rules-store`
-
-**Changes.**
-- **Rules collection.** Add `permission_rules`, scoped by `{project, username, profileId}` with optional `agent`.
-  - Syntax: `Tool(argumentPattern)` or `capability:<tag>`, each marked allow/ask/deny.
-  - Argument patterns are glob or anchored regex over one named argument or the canonical command string.
-  - An invalid pattern **fails closed**: it matches nothing for allow and everything for deny, and logs. Today an invalid policy regex matches every call (`AgentPersonaRegistry.ts` ~80–89); fix that here.
-- **Capability tags on every tool:** `fs_read`, `fs_write`, `shell`, `network`, `mcp`, `subagent`, `memory_write`, `external_side_effect`.
-  - Internal tools declare them.
-  - tools-service tools declare them in their schema metadata. This touches tools-service; keep it additive.
-  - MCP tools map from annotations: `readOnlyHint` → `fs_read`-like, `destructiveHint` → DANGER, `openWorldHint` → `network`.
-- **Evaluation inside the loop,** not at the route, so scheduler and timer runs honour rules (this overlaps prompt 09f; if 09 landed, reuse it). Precedence: deny > ask > allow. Every decision records which layer and rule decided.
-- **"Always allow" from the approval card** (prompt 05's card) writes a rule with a chosen scope: this conversation, project or profile.
-  - The server suggests rules from approval history ("allowed `read_file(src/**)` 5×").
-  - The agent's own tools cannot create, edit or delete rules or permission settings: protect the collection and the settings keys.
-- **Routes.** REST CRUD under `/permissions/rules`. Validation uses zod.
-- **Client.** A settings page listing rules (scope, pattern, decision, origin). Add, edit, delete and test a rule ("would this call be allowed?").
-
-**Tests.**
-- **Red first.** An invalid regex in a DENY rule must deny. (Red: master matches everything and so allows.)
-- **Matcher.** Globs, anchoring, the canonical command string, capability rules.
-- **Precedence and layer naming.**
-- **"Always allow"** writes the right scope, and the rule applies on the next call without prompting.
-- **Scheduler.** A scheduled run honours DENY.
-- **Self-protection.** An agent tool call that tries to change rules is denied.
-- **Routes.** Supertest CRUD with zod errors.
-- **Client (RTL).** Rule form validation and list rendering.
 
 ---
 
