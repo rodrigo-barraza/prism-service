@@ -191,15 +191,76 @@ function getPricing(
 }
 
 /**
+ * Claude IDs from before the 4.6 generation (Claude 2/3.x, and the 4.0 / 4.1 /
+ * 4.5 Opus, Sonnet and Haiku). An uncatalogued ID matching this keeps the
+ * legacy request surface; any other uncatalogued `claude-*` ID is assumed to
+ * be a newer model.
+ */
+export const LEGACY_CLAUDE_MODEL_ID =
+  /^claude-(?:[0-3](?:[-.]|$)|instant|(?:opus|sonnet|haiku)-4(?:-[015])?(?:-\d{8})?$)/;
+
+/**
+ * Uncatalogued `claude-*` IDs newer than the catalog get the modern surface:
+ * adaptive thinking (so never `budget_tokens`), no sampling parameters, no
+ * prefill, and 1M / 128K budgets — the shape every Claude model since the
+ * 4.6 generation shares. Cached per ID so callers see one stable object.
+ */
+const synthesizedClaudeDefinitions = new Map<string, ModelDefinition>();
+
+function synthesizeClaudeDefinition(name: string): ModelDefinition | null {
+  if (!name.startsWith("claude-") || LEGACY_CLAUDE_MODEL_ID.test(name)) {
+    return null;
+  }
+  const cached = synthesizedClaudeDefinitions.get(name);
+  if (cached) return cached;
+  const definition = {
+    description: `Uncatalogued Claude model "${name}" — request surface assumed from the current generation.`,
+    name,
+    label: name,
+    provider: PROVIDERS.ANTHROPIC,
+    modelType: MODEL_TYPES.CONVERSATION,
+    uncatalogued: true,
+    defaultTemperature: 1.0,
+    lockedSampling: true,
+    noAssistantPrefill: true,
+    // Treated as always-on: "thinking off" then omits `thinking` (valid on
+    // every current model) instead of sending {type:"disabled"}, a 400 on
+    // the always-on models.
+    thinkingAlwaysOn: true,
+    maxInputTokens: 1_000_000,
+    maxOutputTokens: 128_000,
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
+    streaming: true,
+    thinking: true,
+    adaptiveThinking: true,
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    tools: ["Thinking", "Tool Calling"],
+  } as unknown as ModelDefinition;
+  synthesizedClaudeDefinitions.set(name, definition);
+  return definition;
+}
+
+/**
  * Find a single model object by its API name.
  * Returns the model object or null.
+ *
+ * Anthropic IDs also resolve through their undated alias
+ * (`claude-haiku-4-5` → `claude-haiku-4-5-20251001`), and an uncatalogued
+ * newer `claude-*` ID resolves to a synthesized current-generation
+ * definition (see synthesizeClaudeDefinition) instead of null.
  */
 function getModelByName(name: string): ModelDefinition | null {
-  return (
-    (Object.values(MODELS).find(
-      (model) => (model as ModelDefinition).name === name,
-    ) as ModelDefinition | null) ?? null
+  const models = Object.values(MODELS) as ModelDefinition[];
+  const exact = models.find((model) => model.name === name);
+  if (exact) return exact;
+  if (typeof name !== "string" || !name.startsWith("claude-")) return null;
+  const datedSnapshot = models.find(
+    (model) =>
+      model.name.startsWith(`${name}-`) &&
+      /^\d{8}$/.test(model.name.slice(name.length + 1)),
   );
+  return datedSnapshot ?? synthesizeClaudeDefinition(name);
 }
 
 /**

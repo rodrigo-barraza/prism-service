@@ -16,6 +16,10 @@ import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import ConversationGenerationTracker from "./ConversationGenerationTracker.ts";
 import ConversationStatusRegistry from "./ConversationStatusRegistry.ts";
 import ToolContext from "./ToolContext.ts";
+import QuestionRegistry, {
+  type PendingQuestionSummary,
+  type QuestionAnswerOutcome,
+} from "./QuestionRegistry.ts";
 import { runPreflightToolDiscovery } from "./harnesses/lifecycle/PreflightToolDiscovery.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
@@ -157,6 +161,22 @@ export default class AgenticLoopService {
     ) {
       for (let i = 0; i < messages.length - 1; i++) {
         messages[i]._alreadyPersisted = true;
+      }
+    }
+
+    // Persona-level policies (a custom agent's DENY/ASK_USER/APPROVE rules)
+    // are resolved HERE, for every entry point — the HTTP route, scheduled
+    // tasks, conversation timers and sub-agents. Those other entry points run
+    // with autoApprove, so a policy that only the route injected was a DENY
+    // that silently did not apply. Policies already on the options (e.g.
+    // inherited from a parent orchestrator) win.
+    if (agent && !options.policies) {
+      const { default: AgentPersonaRegistry } = await import(
+        "./AgentPersonaRegistry.ts"
+      );
+      const persona = AgentPersonaRegistry.get(agent);
+      if (persona?.policies && persona.policies.length > 0) {
+        options.policies = persona.policies;
       }
     }
 
@@ -318,50 +338,58 @@ export default class AgenticLoopService {
   }
 
   // ── Ask User Question — Resolution API ─────────────────
+  // Filed under the LOOP KEY (LoopKey.resolveLoopKey) — the id the client
+  // answers with; several per loop, each by questionId. See QuestionRegistry.
 
-  /** Store a pending question resolver (called by ToolOrchestratorService). */
+  /** File a pending question under its loop (called by the ask_user tool). */
   static _setPendingQuestion(
-    conversationId: string,
+    loopKey: string,
     entry: {
+      questionId: string;
+      blocking: boolean;
+      createdAt: number;
+      agentConversationId?: string | null;
       resolve: (value: {
         answers: QuestionAnswer[] | null;
         isTimedOut?: boolean;
-      }) => void;
+      }) => { delivered: boolean; reason?: string } | void;
       question?: string;
       questions?: QuestionDefinition[];
       choices?: string[];
     },
   ): void {
-    pendingQuestions.set(conversationId, entry);
+    QuestionRegistry.register(loopKey, entry);
   }
 
-  /** Resolve a pending question for a conversation. */
+  /** Drop one question without answering it (its blocking wait timed out). */
+  static _removePendingQuestion(loopKey: string, questionId: string): void {
+    QuestionRegistry.remove(loopKey, questionId);
+  }
+
+  /**
+   * Answer a pending question: `conversationId` is the loop key, the legacy
+   * `agentConversationId` is also tried; `questionId` picks the card, else
+   * the oldest blocking question is answered.
+   */
   static resolveUserQuestion(
     conversationId: string,
     answers: QuestionAnswer[],
-  ): boolean {
-    const entry = pendingQuestions.get(conversationId);
-    if (!entry) return false;
-    pendingQuestions.delete(conversationId);
-    entry.resolve({ answers });
-    return true;
+    options: { questionId?: string; agentConversationId?: string } = {},
+  ): QuestionAnswerOutcome {
+    return QuestionRegistry.answer(conversationId, answers, options);
   }
 
-  /** Check if a conversation has a pending question. */
-  static getPendingQuestion(conversationId: string): {
-    isPending: boolean;
-    question?: string;
-    questions?: QuestionDefinition[];
-    choices?: string[];
-  } {
-    const entry = pendingQuestions.get(conversationId);
-    if (!entry) return { isPending: false };
-    return {
-      isPending: true,
-      question: entry.question,
-      questions: entry.questions,
-      choices: entry.choices,
-    };
+  /** Every open question on a loop, oldest first. */
+  static listPendingQuestions(loopKey: string): PendingQuestionSummary[] {
+    return QuestionRegistry.list(loopKey);
+  }
+
+  /** The question a reloaded client shows: the oldest blocking one, else the oldest open card. */
+  static getPendingQuestion(
+    loopKey: string,
+  ): { isPending: boolean } & Partial<PendingQuestionSummary> {
+    const pending = QuestionRegistry.getPending(loopKey);
+    return pending ? { isPending: true, ...pending } : { isPending: false };
   }
 
   // ── Harness Discovery API ──────────────────────────────

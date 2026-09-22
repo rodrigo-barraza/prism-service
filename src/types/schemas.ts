@@ -56,6 +56,8 @@ export const ChatMessageSchema = z.object({
     .optional(),
   thinking: z.string().optional(),
   thinkingSignature: z.string().optional(),
+  /** Anthropic thinking blocks, verbatim — replayed as sent. */
+  thinkingBlocks: z.array(z.record(z.string(), z.unknown())).optional(),
 }).passthrough(); // Preserve transient metadata (_alreadyPersisted, timestamp, etc.)
 
 export const ChatRequestSchema = z
@@ -118,6 +120,9 @@ export const ChatRequestSchema = z
     maxIterations: z.number().nullable().optional(),
     maxSubAgentIterations: z.number().nullable().optional(),
     maxRecursionDepth: z.number().int().min(0).max(10).nullable().optional(),
+    // Cost ceiling in dollars for the whole delegation tree of this turn
+    // (AgenticLoopService turns it into a SharedCostBudget). <= 0 = no cap.
+    maxCostDollars: z.number().nullable().optional(),
     agentContext: z.unknown().nullable().optional(),
     workspaceRoot: z.string().nullable().optional(),
     workspaceEnabled: z.boolean().nullable().optional(),

@@ -301,6 +301,30 @@ describe("ModelRoleRouter — runWithChain fallback semantics", () => {
     expect(attempt).toHaveBeenCalledTimes(1);
   });
 
+  it("advances on a 400 invalid_request_error — the model rejected the request surface", async () => {
+    // e.g. Sonnet 5 rejecting a utility call's temperature: another model in
+    // the chain can still serve compaction / memory extraction.
+    const rejection = new ProviderError(
+      "anthropic",
+      "temperature: not supported for this model",
+      400,
+      Object.assign(new Error("400"), { status: 400, type: "invalid_request_error" }),
+    );
+    const attempt = vi
+      .fn()
+      .mockRejectedValueOnce(rejection)
+      .mockResolvedValueOnce("recovered");
+
+    const { value, entry } = await ModelRoleRouter.runWithChain(chain, attempt, {
+      role: MODEL_ROLES.UTILITY,
+      operation: "compaction",
+    });
+
+    expect(value).toBe("recovered");
+    expect(entry).toEqual(chain[1]);
+    expect(attempt).toHaveBeenCalledTimes(2);
+  });
+
   it("is bounded — the final entry's transient failure propagates", async () => {
     const attempt = vi
       .fn()

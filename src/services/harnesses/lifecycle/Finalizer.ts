@@ -34,6 +34,7 @@ import {
 } from "#src/services/RequestLogger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import type {
+  AnthropicThinkingBlock,
   ResponsesPhase,
   ResponsesReasoningItem,
 } from "#src/types/admin";
@@ -67,6 +68,7 @@ export interface FinalizerContext {
 }
 
 import type { ContextBudgetSnapshot } from "#src/services/harnesses/ContextBudgetTracker";
+import type { ModelRefusal } from "#src/services/harnesses/types";
 
 export interface FinalizerPayload {
   text: string | null;
@@ -96,6 +98,12 @@ export interface FinalizerPayload {
   phase?: ResponsesPhase;
   reasoningItems?: ResponsesReasoningItem[];
   providerResponseId?: string;
+  /** Anthropic thinking blocks of the final pass, verbatim and in order. */
+  thinkingBlocks?: AnthropicThinkingBlock[];
+  /** A safety-classifier refusal that ended the turn. */
+  refusal?: ModelRefusal;
+  /** The model that served the response when a fallback did (request row). */
+  servedModel?: string;
 }
 
 /**
@@ -180,6 +188,9 @@ export async function finalizeTextGeneration(
     phase,
     reasoningItems,
     providerResponseId,
+    thinkingBlocks,
+    refusal,
+    servedModel,
   }: FinalizerPayload,
   overrideMessagesToAppend: MessagePayload[] | null = null,
   finalizerOptions?: { deferDoneEmission?: boolean },
@@ -357,6 +368,7 @@ export async function finalizeTextGeneration(
       agent,
       provider: providerName,
       model: resolvedModel,
+      ...(servedModel && { servedModel }),
       conversationId,
       agentConversationId: agentConversationId || null,
       parentAgentConversationId: parentAgentConversationId || null,
@@ -418,6 +430,8 @@ export async function finalizeTextGeneration(
       phase,
       reasoningItems,
       providerResponseId,
+      thinkingBlocks,
+      refusal,
     });
     let toolConfig: Record<string, unknown> | undefined = undefined;
     if (resolvedEnabledTools) {
@@ -569,6 +583,7 @@ export async function finalizeTextGeneration(
       ...(contentDurationSeconds != null && { contentDurationSeconds }),
       ...(traceId && { traceId }),
       ...(conversationId && { conversationId }),
+      ...(refusal && { refusal }),
     };
 
     if (finalizerOptions?.deferDoneEmission) {
@@ -768,6 +783,10 @@ export function assembleMessagesToAppend(options: {
   phase?: ResponsesPhase;
   reasoningItems?: ResponsesReasoningItem[];
   providerResponseId?: string;
+  /** Anthropic thinking blocks of the final pass. */
+  thinkingBlocks?: AnthropicThinkingBlock[];
+  /** A safety-classifier refusal that ended the turn. */
+  refusal?: ModelRefusal;
 }): MessagePayload[] {
   const {
     overrideMessagesToAppend,
@@ -788,6 +807,8 @@ export function assembleMessagesToAppend(options: {
     phase,
     reasoningItems,
     providerResponseId,
+    thinkingBlocks,
+    refusal,
   } = options;
 
   // Provider-native state persists on the assistant message so the next
@@ -796,6 +817,7 @@ export function assembleMessagesToAppend(options: {
     ...(phase !== undefined && { phase }),
     ...(reasoningItems && reasoningItems.length > 0 && { reasoningItems }),
     ...(providerResponseId && { providerResponseId }),
+    ...(thinkingBlocks && thinkingBlocks.length > 0 && { thinkingBlocks }),
   };
 
   let messagesToAppend: MessagePayload[] = [];
@@ -823,7 +845,9 @@ export function assembleMessagesToAppend(options: {
 
     const hasFinalContent = text?.trim();
 
-    if (hasFinalContent || !hasIntermediateToolMessages) {
+    // A declined turn always ends with its own (empty) assistant message
+    // carrying the refusal, never merged into an earlier tool round.
+    if (hasFinalContent || !hasIntermediateToolMessages || refusal) {
       // The final iteration produced text — push it as a proper message
       // with content only (no telemetry). Also used for non-agentic
       // single-shot tool calls where there are no intermediate iterations.
@@ -848,6 +872,7 @@ export function assembleMessagesToAppend(options: {
         ...(thinkingDurationSeconds != null && { thinkingDurationSeconds }),
         ...(contentDurationSeconds != null && { contentDurationSeconds }),
         ...providerNativeFields,
+        ...(refusal && { refusal }),
         timestamp: new Date().toISOString(),
         ...(requestId && { requestId }),
       } as MessagePayload);
@@ -882,7 +907,13 @@ export function assembleMessagesToAppend(options: {
         if (audioReference) {
           messagesToAppend[lastAssistantIndex].audio = audioReference;
         }
-        Object.assign(messagesToAppend[lastAssistantIndex], providerNativeFields);
+        // Never overwrite the blocks an earlier pass stored on that message.
+        const { thinkingBlocks: finalBlocks, ...otherNativeFields } =
+          providerNativeFields;
+        Object.assign(messagesToAppend[lastAssistantIndex], otherNativeFields);
+        if (finalBlocks && !messagesToAppend[lastAssistantIndex].thinkingBlocks) {
+          messagesToAppend[lastAssistantIndex].thinkingBlocks = finalBlocks;
+        }
       }
     }
   } else {
@@ -904,6 +935,7 @@ export function assembleMessagesToAppend(options: {
       ...(thinkingDurationSeconds != null && { thinkingDurationSeconds }),
       ...(contentDurationSeconds != null && { contentDurationSeconds }),
       ...providerNativeFields,
+      ...(refusal && { refusal }),
       timestamp: new Date().toISOString(),
       ...(requestId && { requestId }),
     } as MessagePayload);

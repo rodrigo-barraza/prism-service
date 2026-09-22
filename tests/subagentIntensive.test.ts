@@ -31,14 +31,19 @@ vi.mock("#src/services/AgenticLoopService", () => ({
 }));
 
 // Mock GitWorktreeHelper
-const mockCreateWorktree = vi.fn().mockResolvedValue({ worktreePath: "/workspace/worktree-mock" });
-const mockRemoveWorktree = vi.fn().mockResolvedValue({});
-const mockMergeWorktree = vi.fn().mockResolvedValue({ success: true });
+const mockCreateWorktree = vi.fn().mockResolvedValue({
+  worktreePath: "/workspace/worktree-mock",
+  branch: "orchestrator/agent-mock",
+});
+const mockCommitWorktree = vi.fn().mockResolvedValue({ committed: true });
+const mockRemoveWorktree = vi.fn().mockResolvedValue({ branchDeleted: true });
+const mockMergeWorktree = vi.fn().mockResolvedValue({ merged: "orchestrator/agent-mock", into: "main" });
 const mockGetWorktreeDiff = vi.fn().mockResolvedValue({
-  hasChanges: true,
-  additions: 10,
-  deletions: 2,
-  files: ["changed.txt"],
+  branch: "orchestrator/agent-mock",
+  base: "main",
+  files: [{ path: "changed.txt", status: "modified" }],
+  patch: "",
+  stats: { filesChanged: 1, additions: 10, deletions: 2 },
 });
 const mockToolsApiPost = vi.fn().mockResolvedValue({});
 
@@ -47,6 +52,7 @@ vi.mock("#src/services/orchestrator/GitWorktreeHelper", () => ({
     getDefaultWorkspaceRoot: () => "/workspace",
     resolveRepositoryPath: () => "/workspace/repo",
     createWorktree: (...args: unknown[]) => mockCreateWorktree(...args),
+    commitWorktree: (...args: unknown[]) => mockCommitWorktree(...args),
     removeWorktree: (...args: unknown[]) => mockRemoveWorktree(...args),
     mergeWorktree: (...args: unknown[]) => mockMergeWorktree(...args),
     getWorktreeDiff: (...args: unknown[]) => mockGetWorktreeDiff(...args),
@@ -96,6 +102,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
     vi.clearAllMocks();
     mockRunAgenticLoop.mockClear();
     mockCreateWorktree.mockClear();
+    mockCommitWorktree.mockClear();
     mockRemoveWorktree.mockClear();
     mockMergeWorktree.mockClear();
     mockGetWorktreeDiff.mockClear();
@@ -295,7 +302,12 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       });
 
       expect(result.error).toBeUndefined();
-      expect(mockRemoveWorktree).toHaveBeenCalled();
+      // Merged back first, then removed.
+      expect(mockMergeWorktree).toHaveBeenCalledWith("/workspace/repo", "orchestrator/agent-mock", expect.any(String));
+      expect(mockRemoveWorktree).toHaveBeenCalledWith("/workspace/repo", "/workspace/worktree-mock");
+      expect(mockMergeWorktree.mock.invocationCallOrder[0]).toBeLessThan(
+        mockRemoveWorktree.mock.invocationCallOrder[0],
+      );
     });
 
     it("should remove worktree on loop failure/throwing", async () => {
@@ -476,15 +488,12 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       expect("status" in results[0] && results[0].status).toBe("failed");
     });
 
-    it("should abort sequential routing if worktree merge fails", async () => {
+    it("should abort sequential routing if a step's work could not merge back", async () => {
       const sequentialRouter = new SequentialRouter();
       const members = [
         { description: "Step 1", prompt: "Prompt 1" },
         { description: "Step 2", prompt: "Prompt 2" },
       ];
-
-      // Simulate git merge conflict on step 1
-      mockMergeWorktree.mockResolvedValueOnce({ error: "Git merge conflict details" });
 
       const spawnMock = vi.fn().mockImplementation(async (assignment) => {
         return {
@@ -502,6 +511,16 @@ describe("Sub-Agent Intensive Integration Tests", () => {
             deletions: 0,
             files: ["test.txt"],
           },
+          // Step 1's merge-back conflicted (git merge conflict details).
+          mergeBack: {
+            status: "conflict",
+            branch: "orchestrator/agent-1",
+            repositoryPath: "/workspace/repo",
+            worktreePath: "/workspace/worktree-mock",
+            branchDeleted: false,
+            conflictingFiles: ["test.txt"],
+            error: "Git merge conflict details",
+          },
         };
       });
 
@@ -514,7 +533,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
 
       expect(results).toHaveLength(2);
       expect("error" in results[1]).toBe(true);
-      expect((results[1] as { error: string }).error).toContain("Failed to merge branch");
+      expect((results[1] as { error: string }).error).toContain("did not merge back: Git merge conflict details");
     });
   });
 
@@ -566,8 +585,12 @@ describe("Sub-Agent Intensive Integration Tests", () => {
         { agent: "Arguer2", description: "Con", prompt: "Con arguments" },
       ];
 
-      // Simulate git merge conflict
-      mockMergeWorktree.mockResolvedValueOnce({ error: "Git merge conflict details" });
+      // Simulate git merge conflict on the first turn's merge
+      mockMergeWorktree.mockResolvedValueOnce({
+        error: "Git merge conflict details",
+        reason: "conflict",
+        conflictingFiles: ["test.txt"],
+      });
 
       const spawnMock = vi.fn().mockImplementation(async (assignment) => {
         return {
@@ -585,6 +608,14 @@ describe("Sub-Agent Intensive Integration Tests", () => {
             deletions: 0,
             files: ["test.txt"],
           },
+          // A speaker's worktree is preserved: the mesh merges it per turn.
+          mergeBack: {
+            status: "deferred",
+            branch: "orchestrator/agent-arg",
+            repositoryPath: "/workspace/repo",
+            worktreePath: "/workspace/worktree-mock",
+            branchDeleted: false,
+          },
         };
       });
 
@@ -597,7 +628,8 @@ describe("Sub-Agent Intensive Integration Tests", () => {
 
       expect(results).toHaveLength(2);
       expect("error" in results[1]).toBe(true);
-      expect((results[1] as { error: string }).error).toContain("Failed to merge branch");
+      expect((results[1] as { error: string }).error).toContain("Failed to merge turn 1");
+      expect((results[1] as { error: string }).error).toContain("Git merge conflict details");
     });
   });
 

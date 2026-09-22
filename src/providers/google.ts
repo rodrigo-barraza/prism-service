@@ -703,6 +703,9 @@ const googleProvider = {
       }
       const toolCalls: ToolCallResult[] = [];
       const textParts: string[] = [];
+      // includeThoughts returns the thought summary as `thought: true` text
+      // parts — thinking, not answer, exactly as the streaming path routes it.
+      const thoughtParts: string[] = [];
       const images: ImageResult[] = [];
       const maxImages = options.imageCount || 1;
       for (const part of response.candidates?.[0]?.content?.parts || []) {
@@ -714,6 +717,8 @@ const googleProvider = {
             thoughtSignature: (part as PartWithThoughtSignature)
               .thoughtSignature,
           });
+        } else if (part.thought && part.text) {
+          thoughtParts.push(part.text);
         } else if (part.text) {
           textParts.push(part.text);
         } else if (part.inlineData && images.length < maxImages) {
@@ -725,9 +730,11 @@ const googleProvider = {
       }
 
       const result: GenerateTextResult = {
+        // `response.text` (the SDK getter) also skips thought parts.
         text: textParts.join("") || response.text || "",
         usage: normalizeGoogleUsage(response.usageMetadata),
       };
+      if (thoughtParts.length > 0) result.thinking = thoughtParts.join("");
       if (toolCalls.length > 0) result.toolCalls = toolCalls;
       if (images.length > 0) result.images = images;
       return result;

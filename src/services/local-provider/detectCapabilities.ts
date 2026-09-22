@@ -64,3 +64,42 @@ export function detectCapabilities(
     outputTypes: [MODALITY_TYPES.TEXT],
   };
 }
+
+/**
+ * Ollama variant: the server reports what each model's template supports on
+ * /api/show ("tools", "thinking", "vision", …). When it does, that list is
+ * authoritative — a name match must not label "Tool Calling" on a model
+ * whose template has none (Ollama answers tools with 400 "does not support
+ * tools"), nor withhold it from one that has them. An older server reports
+ * nothing and the name patterns stay the fallback. Video and audio are not
+ * reported by Ollama and still come from the name.
+ */
+export function detectOllamaCapabilities(
+  modelKey: string | null | undefined,
+  reportedCapabilities: readonly string[] | null | undefined,
+) {
+  const detected = detectCapabilities(modelKey);
+  if (!Array.isArray(reportedCapabilities) || reportedCapabilities.length === 0) {
+    return detected;
+  }
+  const reports = (capability: string) =>
+    reportedCapabilities.includes(capability);
+
+  const tools: string[] = [];
+  if (reports("thinking")) tools.push("Thinking");
+  if (reports("tools")) tools.push("Tool Calling");
+
+  const inputTypes = [MODALITY_TYPES.TEXT];
+  if (reports("vision")) inputTypes.push(MODALITY_TYPES.IMAGE);
+  if (detected.video) inputTypes.push(MODALITY_TYPES.VIDEO);
+  if (detected.audio) inputTypes.push(MODALITY_TYPES.AUDIO);
+
+  return {
+    ...detected,
+    thinking: reports("thinking"),
+    functionCalling: reports("tools"),
+    vision: reports("vision"),
+    tools,
+    inputTypes,
+  };
+}
