@@ -687,6 +687,22 @@ describe("AgenticToolResolver — native thinking collision", () => {
     expect(toolNames).not.toContain("think");
   });
 
+  it("excludes the think tool for a qwen3 model on a numbered SGLang instance", async () => {
+    const { finalTools } = await AgenticToolResolver.resolve({
+      options: {},
+      agent: undefined,
+      project: "coding",
+      username: "anonymous",
+      modelDefinition: undefined,
+      providerName: "sglang-2",
+      resolvedModel: "Qwen/Qwen3-8B",
+    });
+
+    const toolNames = finalTools.map((tool) => tool.name);
+
+    expect(toolNames).not.toContain("think");
+  });
+
   it("retains the think tool for LM Studio model without thinking pattern (e.g. llama)", async () => {
     const { finalTools } = await AgenticToolResolver.resolve({
       options: {},
