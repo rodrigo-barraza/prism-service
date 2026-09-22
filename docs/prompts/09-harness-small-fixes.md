@@ -72,24 +72,9 @@ Every item below is independent. For each one: write a red test, fix it, and kee
 
 ## Landing 3 — `provider-small-fixes`
 
-**g. OpenAI strict schemas collapse open objects.**
-- *Bug:* strict function tools turn open-ended objects into `{properties: {}, additionalProperties: false}` (`src/providers/openai.ts` ~264–272, ~376). `run_async_task.toolArguments`, `execute_skill.variables` and `authenticate_mcp_server.env` can then only ever be `{}`.
-- *Fix:* mark those tools non-strict, or carry open objects as JSON strings with a parse step.
-- *Test:* a request-shape test on the three tools under strict mode. (Red.)
-
-**h. OpenAI `response.incomplete`.**
-- *Bug:* only `response.completed` is handled (~1640). An incomplete response loses usage and reasoning items, and no "length" stop is reported.
-- *Fix:* handle it. Also stop the Chat Completions stream sending effort to models that reject it (~1737–1740).
-- *Test:* a stream fixture per case.
-
-**i. Gemini non-streaming appends thoughts to the answer text** (`src/providers/google.ts` ~397 with ~692–693).
-- *Fix:* keep thought parts out of the answer.
-- *Test:* a non-streaming fixture with thought and text parts → the answer text excludes the thoughts. (Red.)
-
-**j. The Ollama provider has no tool calling** (`src/providers/ollama.ts` ~23–42), even though its models are labelled "Tool Calling".
-- *Fix:* implement tools through Ollama's `/api/chat` `tools` / `tool_calls`, and make capability detection honest.
-- *Tests:* a provider test with mocked `fetch`; tool calls emitted as chunks.
-- *Live:* optional, against a local Ollama if one is running.
+Done: OpenAI tools with an open object go out `strict: false` (`hasOpenObjectSchema`); a `response.incomplete` stream keeps usage and reasoning items and reports `length` (`content_filter` for a filter); the Chat Completions stream gates effort through `effortForModel`; Gemini non-streaming thought parts go to `thinking`; Ollama calls tools through `/api/chat` and labels Tool Calling from `/api/show` capabilities.
+Branch: `provider-small-fixes`.
+Tests: `tests/openaiStrictToolSchemas.test.ts`, `tests/openaiStreamStops.test.ts`, `tests/googleProvider.test.ts` (thought parts), `tests/ollamaProviderTools.test.ts`, `src/providers/__tests__/openai/sanitizeSchemaForOpenAI.test.ts`.
 
 ---
 
