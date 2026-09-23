@@ -455,6 +455,9 @@ const TurnResumeService = {
         };
         const params: Record<string, unknown> = {
           ...claimed.request,
+          // The mode the turn was last in (a switch mid-turn included), not
+          // only the one its request named; bypass is re-checked on resolve.
+          ...(claimed.permissionMode ? { permissionMode: claimed.permissionMode } : {}),
           messages: history,
           conversationId: run.conversationId,
           agentConversationId: run.agentConversationId,

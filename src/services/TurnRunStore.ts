@@ -98,6 +98,11 @@ export interface TurnRunRecord {
   iteration: number;
   planModeActive: boolean;
   autoApprove: boolean;
+  /**
+   * The turn's live permission mode (permission-modes), kept current as it
+   * switches — a re-driven turn resumes in the mode the user last chose.
+   */
+  permissionMode?: string | null;
   pass?: StoredPass | null;
   /** `pass.iteration`, top-level so a call's progress can only land on its own pass. */
   passIteration?: number | null;
@@ -165,13 +170,20 @@ const TurnRunStore = {
   async checkpoint(
     id: string,
     turnId: string,
-    fields: { iteration: number; planModeActive: boolean; autoApprove: boolean },
+    fields: { iteration: number; planModeActive: boolean; autoApprove: boolean; permissionMode?: string | null },
   ): Promise<void> {
     await write(`checkpoint ${id}`, (runs) =>
       runs.updateOne(
         { id, turnId },
         { $set: { ...fields, updatedAt: new Date().toISOString() } },
       ),
+    );
+  },
+
+  /** The turn's permission mode switched (the selector, an approved plan). */
+  async recordPermissionMode(id: string, turnId: string, permissionMode: string): Promise<void> {
+    await write(`mode ${id}`, (runs) =>
+      runs.updateOne({ id, turnId }, { $set: { permissionMode, updatedAt: new Date().toISOString() } }),
     );
   },
 

@@ -241,7 +241,8 @@ vi.mock("#src/services/AgenticToolResolver", () => ({
 vi.mock("../lifecycle/HookInitializer.ts", async () => {
   const { default: AutoApprovalEngine } = await import("#src/services/AutoApprovalEngine");
   return {
-    createStandardHooks: ({ autoApprove }: { autoApprove: boolean }) => ({
+    // The engine gets the turn's mode handle, as the real createStandardHooks passes it.
+    createStandardHooks: ({ autoApprove, permissionMode }: { autoApprove: boolean; permissionMode?: never }) => ({
       hooks: {
         run: vi.fn().mockImplementation(async (name: string, hookContext: Record<string, unknown>) => {
           if (name === "beforePrompt") {
@@ -251,7 +252,7 @@ vi.mock("../lifecycle/HookInitializer.ts", async () => {
           return undefined;
         }),
       },
-      approvalEngine: new AutoApprovalEngine({ fullAuto: autoApprove }),
+      approvalEngine: new AutoApprovalEngine({ fullAuto: autoApprove, permissionMode }),
     }),
     attachConfiguredHooks: vi.fn().mockResolvedValue(0),
   };
@@ -340,10 +341,11 @@ async function bootProcess() {
   const { handleAgent } = await import("#src/routes/ChatRoutes");
   const { default: TurnInputMailbox } = await import("#src/services/TurnInputMailbox");
   const { default: AsyncTaskRegistry } = await import("#src/services/AsyncTaskRegistry");
+  const { PermissionModeRegistry } = await import("#src/services/permissions/PermissionModeState");
   const app = express();
   app.use(express.json());
   app.use("/agent", agentRouter);
-  return { TurnResumeService, http: supertest(app), handleAgent, TurnInputMailbox, AsyncTaskRegistry };
+  return { TurnResumeService, http: supertest(app), handleAgent, TurnInputMailbox, AsyncTaskRegistry, PermissionModeRegistry };
 }
 
 /** What a restarting process does at boot (src/index.ts). */
@@ -642,6 +644,29 @@ describe("calls running when the process died", () => {
 });
 
 // ── Mailbox ───────────────────────────────────────────────────────────
+
+describe("a permission mode switched while the turn waited", () => {
+  it("is the mode the re-driven turn runs in: switched to plan, the write neither runs nor asks", async () => {
+    const conversationId = "switched-to-plan";
+    seedConversation(conversationId);
+    shared.passes.set(conversationId, [
+      { calls: [{ id: "call-w", name: "write_file", args: { path: "w.txt" } }] },
+      { text: "Planned." },
+    ]);
+    const first = await bootProcess();
+    startTurn(first.handleAgent, conversationId, "Write w");
+    await until(() => eventsOf(1, conversationId, "approval_required").length === 1, "the card");
+    // The selector switches the running turn (PUT /permissions/mode does this).
+    first.PermissionModeRegistry.get(conversationId)!.set("plan", "user");
+    await until(() => turnRun(conversationId)?.permissionMode === "plan", "the switch on record");
+
+    await restart();
+    await until(() => finalAnswer(conversationId) === "Planned.", "the final answer");
+    expect(eventsOf(2, conversationId, "permission_mode")[0]).toMatchObject({ mode: "plan" });
+    expect(eventsOf(2, conversationId, "approval_required")).toHaveLength(0);
+    expect(executionsOf(2, "write_file")).toHaveLength(0);
+  });
+});
 
 describe("mid-turn input posted before the crash", () => {
   it("reaches the re-driven turn exactly once", async () => {
