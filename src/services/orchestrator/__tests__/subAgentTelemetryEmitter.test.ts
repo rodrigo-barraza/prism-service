@@ -429,7 +429,7 @@ describe("SubAgentTelemetryEmitter", () => {
       vi.restoreAllMocks();
     });
 
-    it("gives a forwarded card, decision, usage update and grandchild event the parent's next seq", () => {
+    it("gives a forwarded card, decision and grandchild event the parent's next seq", () => {
       vi.spyOn(Date, "now").mockReturnValue(1_790_000_000_000);
       const parentStream: Array<Record<string, unknown>> = [];
       const parentEmit = withDirectViewerBroadcast("parent-conv-1", (event: Record<string, unknown>) => {
@@ -450,7 +450,6 @@ describe("SubAgentTelemetryEmitter", () => {
         toolCall: { name: "write_file", args: { path: "a.txt" }, id: "call-1" },
       });
       emitFunction({ type: "approval_decided", toolCallId: "call-1", batchId: "batch-1", decision: "allow", scope: "call", source: "user" });
-      emitFunction({ type: "usage_update", usage: { inputTokens: 10, outputTokens: 2 } });
       emitFunction({ type: "sub_agent_status", subAgentId: "grandchild-1", message: "phase", phase: "thinking" });
 
       const seqs = parentStream.map((event) => event.seq as number);
@@ -543,22 +542,22 @@ describe("SubAgentTelemetryEmitter", () => {
   });
 
   describe("usage_update event handling", () => {
-    it("should forward usage_update events to parent", () => {
+    // On the parent stream a `usage_update` without `operation` is the PARENT
+    // turn's running total (docs/protocol.md). Forwarded as-is, a sub-agent's
+    // totals read as the parent's: prism-client filed them as the turn's
+    // intermediate usage, and the ACP server's cost went backwards. The
+    // sub-agent's spend reaches the parent on `sub_agent_status` (progress,
+    // `complete` with usage and estimatedCost).
+    it("keeps a sub-agent's running totals off the parent stream", () => {
       const emitter = createEmitter();
       const emitFunction = emitter.createEmitFunction();
 
-      const usageEvent = {
-        type: "usage_update",
-        inputTokens: 1000,
-        outputTokens: 500,
-      };
+      emitFunction({ type: "usage_update", usage: { inputTokens: 1000, outputTokens: 500 }, estimatedCost: 0.02 });
 
-      emitFunction(usageEvent);
-
-      const forwardedEvent = parentEmitMock.mock.calls.find(
+      const forwarded = parentEmitMock.mock.calls.find(
         (call: unknown[]) => (call[0] as Record<string, unknown>).type === "usage_update",
       );
-      expect(forwardedEvent).toBeDefined();
+      expect(forwarded).toBeUndefined();
     });
   });
 
