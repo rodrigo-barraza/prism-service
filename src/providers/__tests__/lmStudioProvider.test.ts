@@ -94,3 +94,64 @@ describe("LM Studio Provider generateText unit tests", () => {
     ).rejects.toThrow("The user aborted a request.");
   });
 });
+
+describe("LM Studio native /api/v1/chat stream — a cut-off reply", () => {
+  const baseUrl = "http://localhost:1234";
+  const nativeStream = (events: Array<Record<string, unknown>>) =>
+    new Response(
+      events.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join(""),
+      { status: 200, headers: { "content-type": "text/event-stream" } },
+    );
+
+  function stubServer(events: Array<Record<string, unknown>>) {
+    global.fetch = vi.fn().mockImplementation(async (url: string) => {
+      if (url.endsWith("/api/v1/models")) {
+        return new Response(
+          JSON.stringify({
+            models: [{ key: "test-model", loaded_instances: [{ id: "i-1", config: { context_length: 8192 } }] }],
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.endsWith("/api/v1/chat")) return nativeStream(events);
+      return new Response("Not Found", { status: 404 });
+    }) as never;
+  }
+
+  async function drain(stream: AsyncIterable<unknown>) {
+    const chunks: unknown[] = [];
+    let error: unknown = null;
+    try {
+      for await (const chunk of stream) chunks.push(chunk);
+    } catch (caught) {
+      error = caught;
+    }
+    return { chunks, error };
+  }
+
+  it("a body that ends before chat.end fails instead of ending like a finished reply", async () => {
+    const { isTransientProviderError } = await import("#src/utils/ProviderStreamResilience");
+    stubServer([
+      { type: "chat.start" },
+      { type: "message.start" },
+      { type: "message.delta", content: "The first half of" },
+    ]);
+    const provider = createLmStudioProvider(baseUrl);
+    const { chunks, error } = await drain(provider.generateTextStream!([{ role: "user", content: "hi" }], "test-model", {}));
+    expect(chunks).toContain("The first half of");
+    expect(String((error as Error)?.message)).toMatch(/ended before the response completed \(no chat\.end\)/);
+    expect(isTransientProviderError(error)).toBe(true);
+  });
+
+  it("a finished reply ends with its usage", async () => {
+    stubServer([
+      { type: "chat.start" },
+      { type: "message.delta", content: "Done." },
+      { type: "chat.end", result: { stats: { input_tokens: 12, total_output_tokens: 3 } } },
+    ]);
+    const provider = createLmStudioProvider(baseUrl);
+    const { chunks, error } = await drain(provider.generateTextStream!([{ role: "user", content: "hi" }], "test-model", {}));
+    expect(error).toBeNull();
+    expect(chunks).toContainEqual(expect.objectContaining({ type: "usage", usage: expect.objectContaining({ inputTokens: 12, outputTokens: 3 }) }));
+  });
+});

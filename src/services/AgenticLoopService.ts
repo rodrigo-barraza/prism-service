@@ -21,6 +21,7 @@ import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import ConversationGenerationTracker from "./ConversationGenerationTracker.ts";
 import ConversationStatusRegistry from "./ConversationStatusRegistry.ts";
 import ToolContext from "./ToolContext.ts";
+import { syncToolDiscoveryMode } from "./ToolDiscoveryScope.ts";
 import { recordAgentTurnOutcome, traceAgentTurn } from "./Tracing.ts";
 import type { Span } from "@opentelemetry/api";
 import QuestionRegistry, {
@@ -123,6 +124,9 @@ export default class AgenticLoopService {
         workspaceRoot: context.workspaceRoot,
       });
     }
+
+    // This turn's tool-discovery mode, where the activation tools read it.
+    syncToolDiscoveryMode(resolvedAgentConversationId, options.toolDiscovery);
 
     // 1. Resolve tools (passing agentConversationId so dynamicEnabledTools is merged)
     let resolvedTools = await AgenticToolResolver.resolve({

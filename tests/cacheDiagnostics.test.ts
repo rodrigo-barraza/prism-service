@@ -83,6 +83,7 @@ function anthropicTurn(messageId: string, diagnostics?: unknown): Script {
     yield { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "ok" } };
     yield { type: "content_block_stop", index: 0 };
     yield { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 1 } };
+    yield { type: "message_stop" };
   };
 }
 
@@ -164,6 +165,7 @@ describe("Anthropic cache diagnosis (beta)", () => {
       async function* () {
         yield { type: "message_start", message: { id: "msg_paused", usage: { input_tokens: 10, output_tokens: 0 } } };
         yield { type: "message_delta", delta: { stop_reason: "pause_turn" }, usage: { output_tokens: 1 } };
+        yield { type: "message_stop" };
       },
       anthropicTurn("msg_continued"),
     );

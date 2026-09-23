@@ -80,6 +80,8 @@ export const ChatRequestSchema = z
     harness: sanitizedString().nullable().optional(),
     topology: z.string().nullable().optional(),
     thoughtStructure: z.string().nullable().optional(),
+    /** Tool discovery for this turn (a benchmark sweep's axis). */
+    toolDiscovery: z.enum(["preflight", "on_demand", "off"]).nullable().optional(),
     /** A routing preset (routing/RoutingPresets) — e.g. "lead_sidekick". */
     routingPreset: z.string().nullable().optional(),
     // Names of user-pinned rules for this turn — content is resolved

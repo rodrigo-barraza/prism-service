@@ -199,25 +199,51 @@ export function describeMoment(
   }
 }
 
-async function sendThroughNtfy(payload: PushNotificationPayload): Promise<void> {
-  if (!PRISM_PUSH_NTFY_TOPIC || !TOOLS_SERVICE_URL) return;
+export interface NtfyMessage {
+  topic: string;
+  title: string;
+  message: string;
+  priority?: "default" | "high";
+  /** A path in prism-client, made absolute with PRISM_CLIENT_PUBLIC_URL. */
+  clickPath?: string;
+}
+
+/**
+ * Post one message to an ntfy topic through tools-service (its
+ * /communication/push). Resolves whether it was accepted.
+ */
+export async function sendNtfyMessage(message: NtfyMessage): Promise<boolean> {
+  if (!message.topic || !TOOLS_SERVICE_URL) return false;
   const response = await fetch(`${TOOLS_SERVICE_URL}/communication/push`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      topic: PRISM_PUSH_NTFY_TOPIC,
-      title: payload.title,
-      message: payload.body,
-      priority: isDecisionMoment(payload.kind) ? "high" : "default",
-      ...(PRISM_CLIENT_PUBLIC_URL
-        ? { clickUrl: new URL(payload.url, PRISM_CLIENT_PUBLIC_URL).toString() }
+      topic: message.topic,
+      title: message.title,
+      message: message.message,
+      priority: message.priority ?? "default",
+      ...(PRISM_CLIENT_PUBLIC_URL && message.clickPath
+        ? { clickUrl: new URL(message.clickPath, PRISM_CLIENT_PUBLIC_URL).toString() }
         : {}),
     }),
     signal: AbortSignal.timeout(10_000),
   });
   if (!response.ok) {
-    logger.warn(`[PushNotifier] ntfy fallback returned ${response.status}`);
+    logger.warn(`[PushNotifier] ntfy ${message.topic} returned ${response.status}`);
+    return false;
   }
+  return true;
+}
+
+async function sendThroughNtfy(payload: PushNotificationPayload): Promise<void> {
+  if (!PRISM_PUSH_NTFY_TOPIC) return;
+  await sendNtfyMessage({
+    topic: PRISM_PUSH_NTFY_TOPIC,
+    title: payload.title,
+    message: payload.body,
+    priority: isDecisionMoment(payload.kind) ? "high" : "default",
+    clickPath: payload.url,
+  });
 }
 
 async function sendToSubscriptions(

@@ -262,3 +262,283 @@ export const COMPARATORS: Record<ComparisonOperator, ComparatorFn> = {
   lt: (agent, b) => agent < b,
   eq: (agent, b) => agent === b,
 };
+
+// ── Datasets, reliability and sweeps ────────────────────────
+//
+// A dataset is many prompts (cases), each graded by its own graders, run
+// k times per case under one configuration — a target model and harness
+// settings. pass@k and pass^k summarise the k runs (ReliabilityMetrics);
+// a sweep runs the dataset once per cell of a settings matrix; a scheduled
+// sweep compares itself with the previous one (BenchmarkRegression).
+
+/**
+ * How a dataset case is graded. Every grader must pass for a run to pass.
+ *   regex         — the reply (or the thinking) matches a pattern
+ *   tool_used     — a tool was called between min and max times, optionally
+ *                   with arguments matching a pattern
+ *   tool_sequence — tools were called in this order (gaps allowed unless exactOrder)
+ *   file_exists   — a file exists in the case's scratch workspace afterwards,
+ *                   optionally with content matching a pattern
+ *   llm_rubric    — an LLM judge grades the reply against a rubric
+ *   baseline      — an LLM judge compares the reply with a reference answer;
+ *                   passes when the reply is at least as good
+ */
+export type DatasetGrader =
+  | {
+      type: "regex";
+      pattern: string;
+      flags?: string;
+      target?: "response" | "thinking";
+      /** Pass when the pattern does NOT match. */
+      negate?: boolean;
+    }
+  | {
+      type: "tool_used";
+      tool: string;
+      /** Minimum calls (default 1). `max: 0` asserts the tool was never called. */
+      min?: number;
+      max?: number;
+      /** A pattern at least one call's JSON arguments must match. */
+      argsMatch?: string;
+    }
+  | { type: "tool_sequence"; tools: string[]; exactOrder?: boolean }
+  | {
+      type: "file_exists";
+      /** Relative to the scratch workspace; a glob (`*`, `**`, `?`) matches any file. */
+      path: string;
+      /** A pattern some matching file's text must match, line-wise (`^`/`$` at line breaks). */
+      contentMatch?: string;
+    }
+  | { type: "llm_rubric"; rubric: string; judgeModel?: string }
+  | {
+      type: "baseline";
+      /** The reference answer the reply is compared with. */
+      reference: string;
+      /** What "better" means for this case (default: correctness and completeness). */
+      criteria?: string;
+      judgeModel?: string;
+    };
+
+export type DatasetGraderType = DatasetGrader["type"];
+
+export interface DatasetCase {
+  id: string;
+  name?: string;
+  prompt: string;
+  systemPrompt?: string | null;
+  graders: DatasetGrader[];
+  /** Files written into the case's scratch workspace before each run (path → content). */
+  files?: Record<string, string>;
+  tags?: string[];
+}
+
+export interface BenchmarkDataset {
+  id: string;
+  project: string | null;
+  username: string;
+  name: string;
+  description?: string;
+  cases: DatasetCase[];
+  /** The agent persona every case runs as (null: the model alone, no tools). */
+  agent?: string | null;
+  /** Tools every case runs with (default: the persona's). */
+  enabledTools?: string[];
+  /** Runs per case — the k of pass@k and pass^k. */
+  k: number;
+  temperature?: number;
+  maxTokens?: number;
+  /**
+   * A tools-service workspace root the scratch workspaces are made under
+   * (cases with files or a file_exists grader). Default: its first root.
+   */
+  workspaceRoot?: string | null;
+  tags?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ToolDiscoveryMode = "preflight" | "on_demand" | "off";
+
+/** Harness settings a run pins (unset: the service's own defaults). */
+export interface HarnessSettings {
+  /** reasoningEffort / thinkingLevel. */
+  effort?: string;
+  /**
+   * The context window compaction triggers against (`contextWindowLimit`,
+   * tokens): lower means earlier compaction.
+   */
+  compactionThreshold?: number;
+  /**
+   * preflight — tools matching the prompt are enabled before the first call;
+   * on_demand — only when the model calls discover_and_enable_tools;
+   * off — no activation beyond the resolved tool set.
+   */
+  toolDiscovery?: ToolDiscoveryMode;
+  /** Multi-agent topology id (TopologyRegistry). */
+  topology?: string;
+}
+
+/** One configuration a dataset runs under. */
+export interface BenchmarkRunConfig {
+  target: BenchmarkModelTarget;
+  settings: HarnessSettings;
+}
+
+export interface GraderResult {
+  type: DatasetGraderType;
+  label: string;
+  passed: boolean;
+  actual?: string;
+  error?: string;
+  judge?: JudgeVerdict;
+  /** A judge not paid for: a deterministic grader had already failed the run. */
+  skipped?: boolean;
+}
+
+/** One run (trial) of one case. */
+export interface CaseTrialResult {
+  caseId: string;
+  /** 1-based. */
+  trial: number;
+  passed: boolean;
+  graderResults: GraderResult[];
+  response: string | null;
+  toolNames: string[];
+  turnCount: number;
+  /** Seconds. */
+  latency: number;
+  usage: Record<string, number> | null;
+  /** The run's own cost plus its judges'. */
+  cost: number;
+  judgeCost?: number;
+  error: string | null;
+}
+
+/** pass@k / pass^k of one case over its n runs, c of which passed. */
+export interface CaseReliability {
+  caseId: string;
+  name?: string;
+  trials: number;
+  passed: number;
+  errored: number;
+  passAtK: number;
+  passHatK: number;
+}
+
+export interface ReliabilitySummary {
+  /** The k pass@k and pass^k are reported at. */
+  k: number;
+  cases: number;
+  trials: number;
+  passedTrials: number;
+  erroredTrials: number;
+  /** Passed runs over all runs. */
+  passRate: number;
+  /** Mean over cases: at least one of k runs passes. */
+  passAtK: number;
+  /** Mean over cases: all k runs pass (τ-bench's pass^k). */
+  passHatK: number;
+  totalCost: number;
+  meanCostPerTrial: number;
+  /** Seconds per run. */
+  meanLatency: number;
+  p50Latency: number;
+  p95Latency: number;
+}
+
+export interface DatasetRun {
+  id: string;
+  datasetId: string;
+  datasetName: string;
+  project: string | null;
+  config: BenchmarkRunConfig;
+  /** Stable id of the configuration (the sweep cell it ran as). */
+  configKey: string;
+  k: number;
+  trials: CaseTrialResult[];
+  cases: CaseReliability[];
+  summary: ReliabilitySummary;
+  aborted: boolean;
+  sweepId?: string | null;
+  scheduleId?: string | null;
+  startedAt: string;
+  completedAt: string;
+}
+
+/** A matrix of configurations: the cartesian product of every axis given. */
+export interface SweepAxes {
+  models: BenchmarkModelTarget[];
+  effort?: string[];
+  compactionThreshold?: number[];
+  toolDiscovery?: ToolDiscoveryMode[];
+  topology?: string[];
+}
+
+export interface SweepCell {
+  /** Stable across sweeps: the configuration itself, spelled out. */
+  key: string;
+  label: string;
+  config: BenchmarkRunConfig;
+}
+
+export interface SweepCellResult extends SweepCell {
+  runId: string | null;
+  summary: ReliabilitySummary | null;
+  /** No other cell is at least as cheap, as fast and as reliable (pass^k), and better at one. */
+  pareto: boolean;
+  error?: string;
+}
+
+export interface BenchmarkSweep {
+  id: string;
+  datasetId: string;
+  datasetName: string;
+  project: string | null;
+  username: string;
+  name: string;
+  axes: SweepAxes;
+  k: number;
+  cells: SweepCellResult[];
+  status: "running" | "complete" | "aborted" | "failed";
+  scheduleId?: string | null;
+  /** Set on a scheduled sweep: what changed against the previous one. */
+  regression?: RegressionReport | null;
+  totalCost: number;
+  startedAt: string;
+  completedAt: string | null;
+}
+
+export type ReliabilityMetric = "passHatK" | "passAtK" | "passRate";
+
+/** What a scheduled sweep runs and when it alerts. */
+export interface ScheduledBenchmarkConfig {
+  datasetId: string;
+  axes: SweepAxes;
+  /** Default: the dataset's k. */
+  k?: number;
+  /** The metric compared with the previous run (default passHatK). */
+  metric?: ReliabilityMetric;
+  /** A drop of more than this (absolute, 0–1) is a regression (default 0.1). */
+  threshold?: number;
+  /** Where a regression is announced: the benchmark.regression webhook event and/or ntfy. */
+  alert?: { webhook?: boolean; ntfyTopic?: string | null };
+}
+
+export interface CellRegression {
+  key: string;
+  label: string;
+  baseline: number;
+  current: number;
+  drop: number;
+  /** Cases that passed every run last time and no longer do. */
+  casesLost: string[];
+}
+
+export interface RegressionReport {
+  metric: ReliabilityMetric;
+  threshold: number;
+  baselineSweepId: string | null;
+  regressed: boolean;
+  cells: CellRegression[];
+  alerted: { webhook: boolean; ntfy: boolean };
+}

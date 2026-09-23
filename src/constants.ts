@@ -50,6 +50,9 @@ export const COLLECTIONS = {
   WORKFLOWS: "workflows",
   BENCHMARKS: "benchmarks",
   BENCHMARK_RUNS: "benchmark_runs",
+  BENCHMARK_DATASETS: "benchmark_datasets",
+  BENCHMARK_DATASET_RUNS: "benchmark_dataset_runs",
+  BENCHMARK_SWEEPS: "benchmark_sweeps",
   SYNTHESIS: "synthesis",
   FAVORITES: "favorites",
   AGENT_SKILLS: "agent_skills",
@@ -1345,6 +1348,31 @@ export const BENCHMARK = {
 
   /** Judge sampling temperature — deterministic grading. */
   JUDGE_TEMPERATURE: 0,
+
+  /** Runs per dataset case at most — the k of pass@k and pass^k. */
+  MAX_K: 10,
+
+  /** A dataset's runs per case when it names none. */
+  DEFAULT_K: 3,
+
+  /** Cases one dataset may hold. */
+  MAX_DATASET_CASES: 200,
+
+  /** Graders one case may carry. */
+  MAX_GRADERS_PER_CASE: 20,
+
+  /** Seed files per case, and their total size. */
+  MAX_SEED_FILES_PER_CASE: 20,
+  MAX_SEED_BYTES_PER_CASE: 256 * 1024,
+
+  /** Configurations one sweep may expand to (the product of its axes). */
+  MAX_SWEEP_CELLS: 24,
+
+  /** Runs of one dataset in flight at once (cases × k share it). */
+  DATASET_CONCURRENCY: 3,
+
+  /** A scheduled sweep's regression threshold when it names none (absolute drop, 0–1). */
+  DEFAULT_REGRESSION_THRESHOLD: 0.1,
 } as const;
 
 // ─── Miscellaneous Conversation & Routing Constants ──────────

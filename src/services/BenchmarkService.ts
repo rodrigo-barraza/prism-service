@@ -1,8 +1,6 @@
 import { sleep, roundMilliseconds } from "@rodrigo-barraza/utilities-library";
-import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 // ─── Custom LLM Accuracy & Behavior Benchmarking ─────────────
 import crypto from "crypto";
-import { handleConversation, handleAgent } from "#src/routes/ChatRoutes";
 import { MODELS, MODEL_TYPES, getModelByName } from "#src/config";
 import { getProvider } from "#src/providers/index";
 import { isInstance } from "#src/providers/instance-registry";
@@ -16,7 +14,11 @@ import {
   collectBehaviorAssertions,
 } from "#src/services/benchmark/BenchmarkEvaluator";
 import { runJudge } from "#src/services/benchmark/BenchmarkJudge";
-import type { SseEvent } from "#src/types/SseTypes";
+import {
+  executeBenchmarkPrompt,
+  resolveEnabledTools,
+  type BenchmarkEvent,
+} from "#src/services/benchmark/BenchmarkExecutor";
 import type {
   AgentAssertion,
   AssertionResult,
@@ -24,7 +26,6 @@ import type {
   JudgeVerdict,
   TextAssertion,
 } from "#src/types/benchmark";
-import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
 const BENCHMARKS_COLLECTION = COLLECTIONS.BENCHMARKS;
 const RUNS_COLLECTION = COLLECTIONS.BENCHMARK_RUNS;
@@ -77,27 +78,6 @@ interface ModelEntry {
   enabledTools?: string[];
   trial?: number;
   trialCount?: number;
-}
-
-interface BenchmarkEvent {
-  type: string;
-  content?: string;
-  message?: string;
-  status?: string;
-  usage?: Record<string, number>;
-  estimatedCost?: number | null;
-  tokensPerSecond?: number | null;
-  id?: string;
-  name?: string;
-  args?: Record<string, unknown>;
-  result?: unknown;
-  tool?: {
-    id?: string;
-    name?: string;
-    args?: Record<string, unknown>;
-    result?: unknown;
-  };
-  [key: string]: unknown;
 }
 
 interface ModelResult {
@@ -201,20 +181,6 @@ function filterAvailableModels(models: ModelEntry[]): ModelEntry[] {
   });
 }
 
-/**
- * Resolve which tools a target runs with. Per-target selection wins, then
- * the benchmark's own tool set, then the legacy calculator-only default.
- */
-function resolveEnabledTools(
-  benchmark: BenchmarkDoc,
-  model: ModelEntry,
-): string[] | undefined {
-  if (model.enabledTools?.length) return model.enabledTools;
-  if (benchmark.enabledTools?.length) return benchmark.enabledTools;
-  if (model.toolsEnabled) return [TOOL_NAMES.CALCULATE_PRECISE];
-  return undefined;
-}
-
 /** Run the llm_judge assertions of a benchmark and map verdicts by index. */
 async function collectJudgeVerdicts(
   benchmark: BenchmarkDoc,
@@ -298,247 +264,62 @@ async function runSingleModel(
     completedAt: new Date().toISOString(),
   });
 
-  // Bail immediately if already aborted
-  if (signal?.aborted) {
-    logger.info(
-      `[benchmark] ⏭ Skipping ${model.provider}/${model.model} — already aborted`,
-    );
-    return failureShell(0, "Aborted");
-  }
-  const start = performance.now();
-  let firstContentAt: number | null = null;
-  const messages: Array<{ role: string; content: string }> = [];
-  // Optional system prompt
-  if (benchmark.systemPrompt) {
-    messages.push({ role: "system", content: benchmark.systemPrompt });
-  }
-  messages.push({ role: "user", content: benchmark.prompt });
-  logger.info(`[benchmark] ▶ Running ${model.provider}/${model.model}`);
-  try {
-    const events: BenchmarkEvent[] = [];
-    const useAgentHandler = !!(model.agent || model.toolsEnabled);
-    const handler = useAgentHandler ? handleAgent : handleConversation;
-    const enabledTools = resolveEnabledTools(benchmark, model);
-    await handler(
-      {
-        provider: model.provider,
-        model: model.model,
-        messages,
-        temperature: benchmark.temperature ?? 0,
-        maxTokens: Math.max(benchmark.maxTokens ?? BENCHMARK.DEFAULT_MAX_TOKENS, BENCHMARK.DEFAULT_MAX_TOKENS),
-        project,
-        username,
-        skipConversation: true,
-        thinkingEnabled: model.thinkingEnabled || false,
-        ...(model.locale && { locale: model.locale }),
-        ...(useAgentHandler && {
-          ...(model.agent && { agent: model.agent }),
-          agenticLoopEnabled: true,
-          autoApprove: true,
-          // Unattended: an ask no "approve all" answers is denied, not parked.
-          unattended: true,
-          maxIterations: 10,
-        }),
-        // Plain models with tools get an explicit tool set; agents keep
-        // their persona's tools unless the benchmark constrains them.
-        ...(model.toolsEnabled &&
-          !model.agent &&
-          enabledTools && {
-            functionCallingEnabled: true,
-            enabledTools,
-          }),
-        ...(model.agent &&
-          enabledTools &&
-          (model.enabledTools?.length || benchmark.enabledTools?.length) && {
-            enabledTools,
-          }),
-      },
-      (event: SseEvent) => {
-        const benchmarkEvent = event as SseEvent & BenchmarkEvent;
-        events.push(benchmarkEvent);
-        const isContentEvent =
-          benchmarkEvent.type === "chunk" ||
-          benchmarkEvent.type === "thinking" ||
-          benchmarkEvent.type === "toolCall" ||
-          benchmarkEvent.type === "tool_execution" ||
-          benchmarkEvent.type === "tool_output";
-        // Time-to-first-token: first streamed content of any kind
-        if (isContentEvent && firstContentAt === null) {
-          firstContentAt = performance.now();
-        }
-        // Forward chunk/thinking/tool events in real-time for live preview
-        if (isContentEvent) {
-          if (onEvent) {
-            try {
-              onEvent(benchmarkEvent);
-            } catch {
-              /* noop */
-            }
-          }
-        }
-        // Log every event for debugging
-        if (benchmarkEvent.type === "chunk") {
-          logger.info(
-            `[benchmark]   📦 ${model.model} chunk (${benchmarkEvent.content?.length || 0} chars)`,
-          );
-        } else if (benchmarkEvent.type === "error") {
-          logger.error(
-            `[benchmark]   ❌ ${model.model} error: ${benchmarkEvent.message}`,
-          );
-        } else if (benchmarkEvent.type === "done") {
-          logger.info(
-            `[benchmark]   ✅ ${model.model} done — usage: ${JSON.stringify(benchmarkEvent.usage || null)}, cost: ${benchmarkEvent.estimatedCost ?? "N/A"}`,
-          );
-        } else {
-          logger.info(
-            `[benchmark]   📨 ${model.model} event: ${benchmarkEvent.type}`,
-          );
-        }
-      },
-      { signal },
-    );
-    const latency = (performance.now() - start) / 1000;
-    // Log all event types received
-    const eventTypes = events.map((e) => e.type);
-    logger.info(
-      `[benchmark] ◀ ${model.model} finished in ${latency.toFixed(2)}s — events: [${eventTypes.join(", ")}]`,
-    );
-    // Check for errors
-    const errorEvent = events.find((e) => e.type === "error");
-    if (errorEvent) {
-      logger.warn(
-        `[benchmark]   ⚠ ${model.model} returned error event: ${errorEvent.message}`,
-      );
-      return failureShell(latency, errorEvent.message || "Unknown error");
-    }
-    // Extract text response
-    const text = events
-      .filter((e) => e.type === "chunk")
-      .map((e) => e.content)
-      .join("");
-    if (!text) {
-      logger.warn(
-        `[benchmark]   ⚠ ${model.model} produced NO text — chunk count: ${events.filter((e) => e.type === "chunk").length}, all events: ${JSON.stringify(eventTypes)}`,
-      );
-    }
-    const doneEvent =
-      events.find((e) => e.type === "done") || ({} as BenchmarkEvent);
-    const matchMode = benchmark.matchMode || BENCHMARK_MATCH_MODES.CONTAINS;
-    // Extract thinking content (emitted as type: "thinking")
-    const thinkingText = events
-      .filter((e) => e.type === "thinking")
-      .map((e) => e.content)
-      .join("");
-    // Extract tool calls from both event paths:
-    // - "toolCall" with status "done" — native MCP path (e.g. LM Studio)
-    // - "tool_execution" with status "done"/"error" — standard agentic path
-    const nativeToolCalls: BenchmarkToolCall[] = events
-      .filter((e) => e.type === "toolCall" && e.status === "done")
-      .map((toolCall) => ({
-        id: toolCall.id,
-        name: toolCall.name,
-        args: toolCall.args,
-        result: toolCall.result,
-        status: "done",
-      }));
-    const agenticToolCalls: BenchmarkToolCall[] = events
-      .filter(
-        (eventItem) =>
-          eventItem.type === "tool_execution" &&
-          (eventItem.status === "done" || eventItem.status === "error"),
-      )
-      .map((eventItem) => ({
-        id: eventItem.tool?.id,
-        name: eventItem.tool?.name,
-        args: eventItem.tool?.args,
-        result: eventItem.tool?.result,
-        status: eventItem.status || "done",
-      }));
-    const toolCalls = [...nativeToolCalls, ...agenticToolCalls];
-    const toolCallsResult = toolCalls.length > 0 ? toolCalls : null;
-    const toolNames: string[] = toolCallsResult
-      ? [...new Set(
-          toolCallsResult
-            .map((toolCall) => toolCall.name)
-            .filter((name): name is string => Boolean(name)),
-        )]
-      : [];
-    // Count agentic loop turns (each chunk of tool calls + response = 1 turn)
-    // A turn is roughly: user→model→(tools)→model. Count "done" events as turn markers.
-    const turnCount = events.filter((e) => e.type === "done").length || 1;
+  const execution = await executeBenchmarkPrompt({
+    prompt: benchmark.prompt,
+    systemPrompt: benchmark.systemPrompt,
+    target: model,
+    enabledTools: resolveEnabledTools(benchmark.enabledTools, model),
+    constrainTools: !!(model.enabledTools?.length || benchmark.enabledTools?.length),
+    temperature: benchmark.temperature,
+    maxTokens: benchmark.maxTokens,
+    project,
+    username,
+    signal,
+    onEvent,
+  });
+  if (execution.error) return failureShell(execution.latency, execution.error);
 
-    // ── Timing metrics ────────────────────────────────────────
-    const ttftMs =
-      firstContentAt !== null ? Math.round(firstContentAt - start) : null;
-    const usage = (doneEvent.usage as Record<string, number>) || null;
-    let tokensPerSecond =
-      typeof doneEvent.tokensPerSecond === "number" &&
-      doneEvent.tokensPerSecond > 0
-        ? doneEvent.tokensPerSecond
-        : null;
-    if (tokensPerSecond === null && usage?.outputTokens) {
-      const generationSeconds =
-        ttftMs !== null ? Math.max(latency - ttftMs / 1000, 0.001) : latency;
-      if (generationSeconds > 0) {
-        tokensPerSecond =
-          Math.round((usage.outputTokens / generationSeconds) * 10) / 10;
-      }
-    }
+  // ── Evaluation: text + behavioral assertions (+ LLM judge) ─
+  const executionData = {
+    response: execution.response,
+    thinking: execution.thinking,
+    toolCalls: execution.toolCalls,
+    turnCount: execution.turnCount,
+  };
+  const hasJudge = collectBehaviorAssertions(benchmark).some(
+    (assertion) => assertion.type === "llm_judge",
+  );
+  const judgeVerdicts = hasJudge
+    ? await collectJudgeVerdicts(benchmark, executionData, project, username, signal)
+    : new Map<number, JudgeVerdict>();
+  const evaluation = evaluateBenchmark(benchmark, executionData, judgeVerdicts);
+  const judgeCost = [...judgeVerdicts.values()].reduce(
+    (sum, verdict) => sum + (verdict.cost || 0),
+    0,
+  );
 
-    // ── Evaluation: text + behavioral assertions (+ LLM judge) ─
-    const executionData = {
-      response: text,
-      thinking: thinkingText,
-      toolCalls,
-      turnCount,
-    };
-    const hasJudge = collectBehaviorAssertions(benchmark).some(
-      (assertion) => assertion.type === "llm_judge",
-    );
-    const judgeVerdicts = hasJudge
-      ? await collectJudgeVerdicts(
-          benchmark,
-          executionData,
-          project,
-          username,
-          signal,
-        )
-      : new Map<number, JudgeVerdict>();
-    const evaluation = evaluateBenchmark(benchmark, executionData, judgeVerdicts);
-    const judgeCost = [...judgeVerdicts.values()].reduce(
-      (sum, verdict) => sum + (verdict.cost || 0),
-      0,
-    );
-
-    return {
-      provider: model.provider,
-      model: model.model,
-      label: model.label,
-      ...configFlags,
-      response: text || null,
-      thinking: thinkingText || null,
-      toolCalls: toolCallsResult,
-      toolNames,
-      passed: evaluation.passed,
-      matchMode,
-      assertionResults: evaluation.assertionResults,
-      turnCount,
-      latency: roundMilliseconds(latency),
-      ttftMs,
-      tokensPerSecond,
-      usage,
-      estimatedCost: (doneEvent.estimatedCost as number) ?? null,
-      ...(judgeCost > 0 && { judgeCost }),
-      error: null,
-      completedAt: new Date().toISOString(),
-    };
-  } catch (error: unknown) {
-    const latency = (performance.now() - start) / 1000;
-    logger.error(
-      `[benchmark]   💥 ${model.model} threw: ${getErrorMessage(error)}`,
-    );
-    return failureShell(latency, getErrorMessage(error));
-  }
+  return {
+    provider: model.provider,
+    model: model.model,
+    label: model.label,
+    ...configFlags,
+    response: execution.response || null,
+    thinking: execution.thinking || null,
+    toolCalls: execution.toolCalls.length > 0 ? execution.toolCalls : null,
+    toolNames: execution.toolNames,
+    passed: evaluation.passed,
+    matchMode: benchmark.matchMode || BENCHMARK_MATCH_MODES.CONTAINS,
+    assertionResults: evaluation.assertionResults,
+    turnCount: execution.turnCount,
+    latency: roundMilliseconds(execution.latency),
+    ttftMs: execution.ttftMilliseconds,
+    tokensPerSecond: execution.tokensPerSecond,
+    usage: execution.usage,
+    estimatedCost: execution.estimatedCost,
+    ...(judgeCost > 0 && { judgeCost }),
+    error: null,
+    completedAt: new Date().toISOString(),
+  };
 }
 // ─── public API ─────────────────────────────────────────────
 const BenchmarkService = {

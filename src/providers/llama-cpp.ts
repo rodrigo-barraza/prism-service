@@ -362,6 +362,7 @@ export function createLlamaCppProvider(
         for await (const chunk of parseSSEStream(reader, {
           signal: options.signal,
           thinkingEnabled: options.thinkingEnabled,
+          label: instanceId,
           // llama.cpp extension: extract timings for tok/s
           onUsage: (json: OpenAICompletionResponse, usage: TokenUsage) => {
             const timings = (json as LlamaCppCompletionResponse).timings;

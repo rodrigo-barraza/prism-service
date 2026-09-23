@@ -115,6 +115,68 @@ function buildToolTrace(toolCalls: BenchmarkToolCall[] = []): string {
   return truncate(lines.join("\n"), JUDGE_TOOL_TRACE_CHAR_LIMIT);
 }
 
+interface JudgeCallResult {
+  text: string;
+  thinkingText: string;
+  cost?: number;
+  error?: string;
+}
+
+/** One judge call: strict-JSON mode, no thinking, temperature 0. Never throws. */
+async function callJudge(
+  target: JudgeTarget,
+  systemPrompt: string,
+  userPrompt: string,
+  request: Pick<JudgeRequest, "project" | "username" | "signal">,
+): Promise<JudgeCallResult> {
+  const events: Array<SseEvent & { estimatedCost?: number | null }> = [];
+  try {
+    await handleConversation(
+      {
+        provider: target.provider,
+        model: target.model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: BENCHMARK.JUDGE_TEMPERATURE,
+        maxTokens: BENCHMARK.JUDGE_MAX_TOKENS,
+        project: request.project,
+        username: request.username,
+        skipConversation: true,
+        // Deterministic verdict plumbing: JSON mode where the provider
+        // supports it, and no thinking — adaptive-thinking models (e.g.
+        // Gemini Flash) can otherwise stream the start of the JSON verdict
+        // inside a thought part, truncating the parseable text.
+        responseFormat: "json_object",
+        thinkingEnabled: false,
+      },
+      (event: SseEvent) => {
+        events.push(event as SseEvent & { estimatedCost?: number | null });
+      },
+      { signal: request.signal },
+    );
+  } catch (error: unknown) {
+    return { text: "", thinkingText: "", error: `Judge call failed: ${getErrorMessage(error)}` };
+  }
+  const errorEvent = events.find((event) => event.type === "error") as
+    | { message?: string }
+    | undefined;
+  const doneEvent = events.find((event) => event.type === "done") as
+    | { estimatedCost?: number | null }
+    | undefined;
+  const cost = doneEvent?.estimatedCost ?? undefined;
+  if (errorEvent) {
+    return { text: "", thinkingText: "", cost, error: `Judge error: ${errorEvent.message || "unknown"}` };
+  }
+  const collect = (type: string) =>
+    events
+      .filter((event) => event.type === type)
+      .map((event) => (event as { content?: string }).content || "")
+      .join("");
+  return { text: collect("chunk"), thinkingText: collect("thinking"), cost };
+}
+
 /**
  * Run the judge model and parse its verdict. Never throws — failures come
  * back as a failed verdict with `error` set so runs degrade gracefully.
@@ -141,66 +203,21 @@ export async function runJudge(request: JudgeRequest): Promise<JudgeVerdict> {
     .filter(Boolean)
     .join("\n\n");
 
-  const events: Array<SseEvent & { estimatedCost?: number | null }> = [];
-  try {
-    await handleConversation(
-      {
-        provider: target.provider,
-        model: target.model,
-        messages: [
-          { role: "system", content: JUDGE_SYSTEM_PROMPT },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: BENCHMARK.JUDGE_TEMPERATURE,
-        maxTokens: BENCHMARK.JUDGE_MAX_TOKENS,
-        project: request.project,
-        username: request.username,
-        skipConversation: true,
-        // Deterministic verdict plumbing: JSON mode where the provider
-        // supports it, and no thinking — adaptive-thinking models (e.g.
-        // Gemini Flash) can otherwise stream the start of the JSON verdict
-        // inside a thought part, truncating the parseable text.
-        responseFormat: "json_object",
-        thinkingEnabled: false,
-      },
-      (event: SseEvent) => {
-        events.push(event as SseEvent & { estimatedCost?: number | null });
-      },
-      { signal: request.signal },
-    );
-  } catch (error: unknown) {
+  const { text, thinkingText, cost, error } = await callJudge(
+    target,
+    JUDGE_SYSTEM_PROMPT,
+    userPrompt,
+    request,
+  );
+  if (error) {
     return {
       passed: false,
       model: target.model,
       provider: target.provider,
-      error: `Judge call failed: ${getErrorMessage(error)}`,
+      ...(cost !== undefined && { cost }),
+      error,
     };
   }
-
-  const errorEvent = events.find((event) => event.type === "error") as
-    | { message?: string }
-    | undefined;
-  if (errorEvent) {
-    return {
-      passed: false,
-      model: target.model,
-      provider: target.provider,
-      error: `Judge error: ${errorEvent.message || "unknown"}`,
-    };
-  }
-
-  const text = events
-    .filter((event) => event.type === "chunk")
-    .map((event) => (event as { content?: string }).content || "")
-    .join("");
-  const thinkingText = events
-    .filter((event) => event.type === "thinking")
-    .map((event) => (event as { content?: string }).content || "")
-    .join("");
-  const doneEvent = events.find((event) => event.type === "done") as
-    | { estimatedCost?: number | null }
-    | undefined;
-  const cost = doneEvent?.estimatedCost ?? undefined;
 
   // Parse the verdict from the response text; if the model leaked part of
   // the JSON into thinking content, retry on the combined stream.
@@ -237,5 +254,112 @@ export async function runJudge(request: JudgeRequest): Promise<JudgeVerdict> {
   };
 }
 
-const BenchmarkJudge = { runJudge, resolveJudgeTarget };
+// ── Pairwise comparison (the baseline grader) ───────────────
+
+const PAIRWISE_SYSTEM_PROMPT = `You are a strict, impartial judge comparing two answers to the same task.
+You will receive the TASK, the CRITERIA, ANSWER A and ANSWER B.
+Decide which answer better satisfies the criteria. Ignore length, order and style unless the criteria mention them.
+Respond with STRICT JSON only — no markdown, no commentary:
+{"winner": "A" or "B" or "tie", "reasoning": "<one or two short sentences>"}`;
+
+const DEFAULT_PAIRWISE_CRITERIA =
+  "Correctness first, then completeness: which answer solves the task better?";
+
+export interface PairwiseJudgeRequest {
+  task: string;
+  systemPrompt?: string | null;
+  criteria?: string;
+  /** The reply under test. */
+  candidate: string;
+  /** The reference answer it is compared with. */
+  reference: string;
+  judgeModel?: string;
+  project: string | null;
+  username: string;
+  signal?: AbortSignal;
+}
+
+export interface PairwiseVerdict {
+  winner: "candidate" | "reference" | "tie";
+  reasoning?: string;
+  model?: string;
+  provider?: string;
+  cost?: number;
+  error?: string;
+}
+
+async function askPairwise(
+  target: JudgeTarget,
+  request: PairwiseJudgeRequest,
+  answerA: string,
+  answerB: string,
+): Promise<{ winner: "A" | "B" | "tie" | null; reasoning?: string; cost?: number; error?: string }> {
+  const userPrompt = [
+    `CRITERIA:\n${request.criteria?.trim() || DEFAULT_PAIRWISE_CRITERIA}`,
+    request.systemPrompt ? `TASK SYSTEM PROMPT:\n${truncate(request.systemPrompt, 2000)}` : null,
+    `TASK:\n${truncate(request.task, 4000)}`,
+    `ANSWER A:\n${truncate(answerA || "(empty answer)", JUDGE_RESPONSE_CHAR_LIMIT)}`,
+    `ANSWER B:\n${truncate(answerB || "(empty answer)", JUDGE_RESPONSE_CHAR_LIMIT)}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  const { text, thinkingText, cost, error } = await callJudge(
+    target,
+    PAIRWISE_SYSTEM_PROMPT,
+    userPrompt,
+    request,
+  );
+  if (error) return { winner: null, cost, error };
+  type RawPairwise = { winner?: unknown; reasoning?: unknown };
+  let parsed = extractJson(text) as RawPairwise | undefined;
+  if (!parsed?.winner && thinkingText) {
+    parsed = extractJson(thinkingText + text) as RawPairwise | undefined;
+  }
+  const winner = typeof parsed?.winner === "string" ? parsed.winner.trim().toLowerCase() : "";
+  if (winner !== "a" && winner !== "b" && winner !== "tie") {
+    return { winner: null, cost, error: `Judge returned an unparseable verdict: ${truncate(text, 200)}` };
+  }
+  return {
+    winner: winner === "tie" ? "tie" : winner === "a" ? "A" : "B",
+    reasoning: typeof parsed?.reasoning === "string" ? truncate(parsed.reasoning, 600) : undefined,
+    cost,
+  };
+}
+
+/**
+ * Compare a reply with a reference answer — twice, with the positions
+ * swapped. LLM judges favour a position (Zheng et al. 2023, §3.4 "position
+ * bias", https://arxiv.org/abs/2306.05685), so a preference that flips with
+ * the order is a tie; either side wins only when both orders agree. Never
+ * throws — failures come back with `error` set.
+ */
+export async function runPairwiseJudge(
+  request: PairwiseJudgeRequest,
+): Promise<PairwiseVerdict> {
+  const target = resolveJudgeTarget(request.judgeModel);
+  if (!target) {
+    return { winner: "tie", error: "No judge model available (no providers configured)" };
+  }
+  const identity = { model: target.model, provider: target.provider };
+  const candidateFirst = await askPairwise(target, request, request.candidate, request.reference);
+  const referenceFirst = await askPairwise(target, request, request.reference, request.candidate);
+  const costs = [candidateFirst.cost, referenceFirst.cost].filter(
+    (cost): cost is number => typeof cost === "number",
+  );
+  const cost = costs.length > 0 ? costs.reduce((sum, value) => sum + value, 0) : undefined;
+  const failure = candidateFirst.error || referenceFirst.error;
+  if (failure) return { winner: "tie", ...identity, ...(cost !== undefined && { cost }), error: failure };
+  const asCandidateFirst = { A: "candidate", B: "reference", tie: "tie" } as const;
+  const asReferenceFirst = { A: "reference", B: "candidate", tie: "tie" } as const;
+  const first = asCandidateFirst[candidateFirst.winner!];
+  const second = asReferenceFirst[referenceFirst.winner!];
+  return {
+    winner: first === second ? first : "tie",
+    reasoning: candidateFirst.reasoning,
+    ...identity,
+    ...(cost !== undefined && { cost }),
+  };
+}
+
+const BenchmarkJudge = { runJudge, runPairwiseJudge, resolveJudgeTarget };
 export default BenchmarkJudge;
