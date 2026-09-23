@@ -100,6 +100,10 @@ export interface SubAgentState {
   partial?: boolean;
   /** The workspace its previous run was told it had (a resume says when it changed). */
   lastWorkspacePath?: string;
+  /** An external runtime runs it (a custom agent with `runtime: "acp"`). */
+  runtime?: import("#src/services/agents/AgentRuntime").AgentRuntime;
+  /** Its external agent reported no cost: `totalCost` is unknown, not zero. */
+  costUnknown?: boolean;
 }
 
 // ── Worktree diff contract (tools-service) ─────────────────

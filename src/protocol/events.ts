@@ -330,10 +330,12 @@ const ApprovalRequiredEvent = event("approval_required", {
     .optional(),
   /**
    * Who asked besides the tier: a PreToolUse hook, a restart re-asking a call
-   * that was running, or auto mode (its classifier asked, failed, or is
-   * paused by its breaker — `reason` says which).
+   * that was running, auto mode (its classifier asked, failed, or is paused
+   * by its breaker — `reason` says which), or an external ACP agent asking
+   * for its own call (`reason` names the agent and the call; its arguments
+   * cannot be edited).
    */
-  requestedBy: z.enum(["hook", "restart", "classifier"]).optional(),
+  requestedBy: z.enum(["hook", "restart", "classifier", "external_agent"]).optional(),
   reason: z.string().nullable().optional(),
   /** Auto mode: the classifier's named category (e.g. "Data Exfiltration"). */
   category: z.string().optional(),
@@ -547,6 +549,8 @@ const SubAgentStatusEvent = z.discriminatedUnion("message", [
     toolCount: z.number(),
     usage: z.record(z.string(), z.number()).nullable().optional(),
     estimatedCost: z.number().nullable().optional(),
+    /** An external agent (ACP) that reported no cost: `estimatedCost` is unknown, not zero. */
+    costUnknown: z.literal(true).optional(),
   }),
   subAgentStatus("failed", { conversationId: z.string().nullable(), error: z.string() }),
   subAgentStatus("merge_back", {

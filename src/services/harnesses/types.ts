@@ -271,6 +271,12 @@ import type { PolicyRule } from "#src/services/PolicyEngine";
 
 export interface AgenticOptions {
   harness?: string;
+  /**
+   * An external runtime that runs the turn instead of Prism's loop
+   * (HarnessRegistry.runtime — `acp`). Set only by the orchestrator, for a
+   * custom agent whose definition names one; never from a request body.
+   */
+  runtime?: string;
   planFirst?: boolean;
   autoApprove?: boolean;
   maxIterations?: number;

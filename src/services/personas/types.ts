@@ -2,6 +2,7 @@ import type {
   AgentEffort,
   AgentPermissionMode,
 } from "#src/services/agents/AgentDefinitionFields";
+import type { AcpAgentLaunch, AgentRuntime } from "#src/services/agents/AgentRuntime";
 import type { PolicyRule } from "#src/services/PolicyEngine";
 import type { PinnablePermissionMode } from "#src/services/permissions/PermissionModes";
 import type { EmotionPersonality } from "#src/services/somatic/SomaticConstants";
@@ -81,6 +82,15 @@ export interface Persona {
   effort?: AgentEffort;
   maxTurns?: number;
   permissionMode?: AgentPermissionMode;
+  /**
+   * What runs the agent as a sub-agent: Prism's own loop (absent), or an
+   * external ACP agent process (`acp`, with its `acp` launch configuration
+   * — agents/AgentRuntime). Only a stored (database) agent can name one.
+   */
+  runtime?: AgentRuntime;
+  acp?: AcpAgentLaunch;
+  /** Why a stored `acp` definition cannot run (its launch configuration is invalid). */
+  runtimeErrors?: string[];
   icon?: string;
   avatar?: string;
   color?: string;

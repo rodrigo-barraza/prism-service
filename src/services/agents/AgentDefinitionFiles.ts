@@ -19,7 +19,10 @@ import {
 //
 // Frontmatter keys Prism does not know (`hooks`, `mcpServers`, `skills`, …)
 // are ignored — a workspace file never gets to run commands or connect
-// servers through its agent definition.
+// servers through its agent definition. A file that names a `runtime` (an
+// external ACP agent process, agents/AgentRuntime) is rejected outright
+// rather than ignored: it would otherwise run as a Prism agent its author
+// did not write.
 //
 // Reads the LOCAL filesystem, like ClaudeConfigImportService.
 // ────────────────────────────────────────────────────────────
@@ -136,6 +139,12 @@ export function parseAgentDefinitionFile(content: string, filePath: string): Par
   }
 
   const { fields, errors } = normalizeAgentDefinitionFields(raw);
+  if (raw.acp !== undefined || (raw.runtime !== undefined && raw.runtime !== null && raw.runtime !== "prism")) {
+    errors.push(
+      "runtime / acp: an external ACP agent is defined only as an agent stored in Prism " +
+        "(POST /custom-agents, owner-only) — a workspace file never starts a process",
+    );
+  }
   if (!fields.description) {
     errors.unshift("description is required — it is how the orchestrator decides when to use this agent");
   }

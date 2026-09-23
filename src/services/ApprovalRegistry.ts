@@ -496,6 +496,12 @@ export const ApprovalRegistry = {
       if (type === "plan") {
         return { status: "invalid", error: "a plan's arguments cannot be edited" };
       }
+      if (target.requestedBy === APPROVALS.EXTERNAL_AGENT_REQUESTED_BY) {
+        return {
+          status: "invalid",
+          error: "an external agent's call cannot be edited — its agent runs it as it asked; allow or deny it",
+        };
+      }
       const validation = validateToolArgs(target.argsSchema, input.editedArgs);
       if (!validation.ok) {
         return { status: "invalid", error: `editedArgs rejected: ${validation.error}` };
