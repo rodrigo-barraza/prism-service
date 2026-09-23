@@ -7,36 +7,8 @@
 
 Verify every model id, price and parameter against the provider's current docs before committing; this prompt's numbers are from 2026-09-22.
 
----
-
-## Landing 1 — `openai-gpt6-native`
-
-**Changes** (`src/providers/openai.ts`, `src/data/models.ts`, `src/config.ts`: `getModelNativeCapabilities()`).
-- **Catalog.** Add `gpt-6-sol` and `gpt-6-luna`, released 2026-09-22:
-
-  | | `gpt-6-sol` | `gpt-6-luna` |
-  |---|---|---|
-  | Context / max input | 1,050,000 / 922K | same |
-  | Max output | 128K | same |
-  | Effort | `none` … `max`, default `medium` | same |
-  | Input / cached / cache write / output (per M) | $2 / $0.20 / $2.50 / $10 | $0.10 / $0.01 / $0.125 / $0.50 |
-  | Over 272K input | 2× input and cache, 1.5× output | same |
-  | Function calling in Chat Completions | requires effort `none`; route both through Responses | same |
-
-  Sources: https://developers.openai.com/api/docs/models/gpt-6-sol and …/gpt-6-luna.
-- **Native steering** (GPT-6 family, WebSocket mode; https://developers.openai.com/api/docs/guides/steering). When the `TurnInputMailbox` receives a `user_update` for a turn running on a steering-capable model over the WebSocket transport, send `response.steer`. On `accepted`, don't also inject through the mailbox. On `pending` or `failed`, fall back to the mailbox. Keep the mailbox the source of truth for the event stream.
-- **Per-turn effort.** Change effort mid-conversation with a `configuration_update` input item, never by changing the top-level effort, which busts the cache.
-- **Async tools** (`"async": true`; https://developers.openai.com/api/docs/guides/async-tool-calling). Map Prism's detached tools (`run_async_task` with `continueWorking`) onto native async calls on GPT-6 Astra and later: return `function_call_output` later with `previous_response_id`. They are not compatible with programmatic tool calling; gate on the flags.
-- **Error classes.** A 429 `slow_down` is retryable with backoff. A spend-cap 429 is terminal: surface it, don't retry. A 503 `server_is_overloaded` is retryable.
-
-**Tests.** Request-shape tests with a mocked SDK or WebSocket:
-- the steer message and its fallback on `pending`/`failed`;
-- the `configuration_update` item, with the top-level effort unchanged;
-- the async tool flag and the later `function_call_output` with `previous_response_id`;
-- error classification fixtures;
-- a catalog invariant: prices and effort sets present and valid.
-
-**Live** (isolated, very cheap on `gpt-6-luna`): a tool loop where you steer mid-run ("also include X"). The steer is accepted natively, and the final answer includes X. Report the event log and cost.
+**Landed record.**
+- Landing 1 `openai-gpt6-native` (2026-09-22): gpt-6-sol/luna in the catalog; GPT-6 turns stream over the Responses WebSocket with native `response.steer` behind the TurnInputMailbox (pending/failed fall back to it) and incremental `previous_response_id` continuation; per-turn effort as `configuration_update` items; `run_async_task` as a native async call whose result returns on the call id; spend-cap 429s terminal; GPT-6 cache writes billed. Tests: `src/providers/__tests__/openai/{gpt6SolLuna,configurationUpdate,responsesSocket,asyncTools}.test.ts`, `src/utils/__tests__/providerErrorClasses.test.ts`, `turnInputAcceptance.test.ts` scenarios 6–7.
 
 ---
 
