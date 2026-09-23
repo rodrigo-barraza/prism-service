@@ -38,6 +38,10 @@ const overrides = {
   ...(clientPort
     ? { PRISM_CLIENT_PORT: String(clientPort), PRISM_CLIENT_URL: `http://localhost:${clientPort}` }
     : {}),
+  // The client inlines these too: a dead port keeps the dev UI's page views
+  // out of the production sessions-service.
+  SESSIONS_SERVICE_URL: "http://127.0.0.1:9",
+  SESSIONS_SERVICE_PUBLIC_URL: "http://127.0.0.1:9",
 };
 
 http

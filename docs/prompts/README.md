@@ -107,6 +107,8 @@ PRISM_SERVICE_PORT=$PORT PRISM_SERVICE_MONGO_DB_NAME=prism_test_<slug> \
   - Then run `VAULT_SERVICE_URL=http://127.0.0.1:<port4> "$CLIENT_WT"/node_modules/.bin/next dev "$CLIENT_WT" -p <port3>`.
   - Before you drive anything, confirm the page's requests go to `localhost:$PORT` (Playwright `page.on("request")`).
   - Drive it with the recipe in `prism-client/.claude/skills/verify/SKILL.md`: Playwright borrowed from `tools-service/node_modules`, `waitUntil: "domcontentloaded"`, and remove `<nextjs-portal>` before clicking.
+  - **To open in the UI what you ran with curl, send the UI's identity.** The client loads a conversation and its memories under the agent's project (`/config/agents`; `prism-chat` for CODING) and sends the username stored in localStorage `prism:username`. Send those as `x-project` / `x-username`, and set the key in an init script. Otherwise the UI gets a 404 for your conversation (prompt 22 L3, 2026-09-23).
+  - `next dev` writes `AGENTS.md` and `CLAUDE.md` into the client worktree. Delete them; never commit them.
   - Save screenshots to the scratchpad and name them in the report.
 - **Clean up.** Stop your servers. You may drop only your own `prism_test_<slug>` / `tools_test_<slug>` databases. The services' Mongo user is not allowed `dropDatabase`: drop each collection instead (a database with no collections is gone).
 
