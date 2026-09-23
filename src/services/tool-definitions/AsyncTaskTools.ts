@@ -230,7 +230,13 @@ const runAsyncTask = {
       // Build the completion callback that delivers the result to the
       // parent — through the running turn's mailbox, or by waking a new
       // turn (same pattern as OrchestratorService._triggerParentAutoResponse).
-      const completionCallback = buildCompletionCallback(context, { continueWorking });
+      // A sub-agent's turn is its whole run: told to end it, the sub-agent
+      // ends, and a completion after that is dropped (deliverTaskCompletion).
+      // It keeps working; where its loop would end with this task still
+      // running, the loop waits for it (holdSubAgentForOwnTasks).
+      const keepWorking =
+        continueWorking || (await isSubAgentConversation(context, agentConversationId));
+      const completionCallback = buildCompletionCallback(context, { continueWorking: keepWorking });
 
       const dispatchResult = AsyncTaskRegistry.dispatch(
         toolName,
@@ -266,7 +272,7 @@ const runAsyncTask = {
         `[AsyncTaskTools] Dispatched async task ${dispatchedTask.taskId}: tool="${toolName}"${continueWorking ? " (continueWorking)" : ""}`,
       );
 
-      if (continueWorking) {
+      if (keepWorking) {
         // DETACHED_WORK: the harness keeps the loop going and only records
         // the flag; if the turn ends while this task is still running it
         // bumps pendingBackgroundTasks so the completion can wake a new turn.
@@ -873,6 +879,65 @@ export async function deliverTaskCompletion(
   // 4. Root conversation, turn already ended → wake a new turn.
   taskState.deliveredVia = "auto_response";
   await triggerAsyncTaskAutoResponse(taskState, context);
+}
+
+/**
+ * Hold a sub-agent's run open for the async tasks it started and did not
+ * wait for. A sub-agent's turn is its whole run, and a completion that
+ * arrives after it ends is dropped. Called where its loop would end:
+ * - waits for each still-running task the way wait_for_tasks does (the
+ *   completion callback leaves the result to the waiter);
+ * - then posts every result to the run's mailbox for the harness to drain.
+ * Returns how many results it posted.
+ *
+ * Residual window, documented rather than closed: a task that settled just
+ * before this call, with its completion callback still in flight, is not
+ * waited for. Its own post still lands if it beats the mailbox's close.
+ */
+export async function holdSubAgentForOwnTasks(
+  loop: { conversationId?: string | null; agentConversationId: string },
+  signal?: AbortSignal,
+): Promise<number> {
+  const { default: AsyncTaskRegistry } = await import("#src/services/AsyncTaskRegistry");
+  const running = AsyncTaskRegistry.listTasks(loop.agentConversationId).filter(
+    (task) => task.status === SYSTEM_STATUSES.RUNNING,
+  );
+  if (running.length === 0) return 0;
+  const mailboxKey = resolveLoopKey(loop);
+  if (!mailboxKey) return 0;
+
+  for (const task of running) task.awaitedBy = loop.agentConversationId;
+  logger.info(
+    `[AsyncTaskTools] Sub-agent ${loop.agentConversationId} would end with ${running.length} async task(s) still running — waiting for them`,
+  );
+  await AsyncTaskRegistry.waitForTasks(
+    running.map((task) => task.taskId),
+    { signal },
+  );
+
+  let posted = 0;
+  for (const task of running) {
+    if (task.status === SYSTEM_STATUSES.RUNNING) {
+      // Aborted before it settled: a later completion is delivered as usual.
+      delete task.awaitedBy;
+      continue;
+    }
+    const notification = formatTaskCompletionNotification(task);
+    const result = TurnInputMailbox.post(mailboxKey, {
+      kind: "task_completion",
+      text: notification.content,
+      meta: {
+        _notificationSource: NOTIFICATION_SOURCES.ASYNC_TASK,
+        _notificationId: notification.notificationId,
+        taskId: task.taskId,
+      },
+    });
+    if (result.accepted) {
+      task.deliveredVia = "mailbox";
+      posted++;
+    }
+  }
+  return posted;
 }
 
 async function triggerAsyncTaskAutoResponse(

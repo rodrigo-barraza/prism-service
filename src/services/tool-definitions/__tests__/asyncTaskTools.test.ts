@@ -239,6 +239,21 @@ describe("AsyncTaskTools Unit Tests", () => {
       );
     });
 
+    // Seen live 2026-09-22: a sub-agent told to END ITS TURN ended its whole
+    // run — its task's completion was then dropped, the work left undone.
+    it("RED: a sub-agent's dispatch keeps it working — its turn is its whole run", async () => {
+      mockDispatch.mockReturnValue({ ...FIXED_TASK_STATE });
+
+      const result = await InternalToolRegistry.execute(
+        ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
+        { toolName: "execute_command", toolArguments: { command: "make" } },
+        buildContext({ isSubAgent: true }),
+      );
+
+      expect(result).toEqual(expect.objectContaining({ _directive: AGENT_DIRECTIVES.DETACHED_WORK }));
+      expect(JSON.stringify(result)).not.toContain("END YOUR TURN");
+    });
+
     it("should treat a non-boolean continueWorking as false", async () => {
       mockDispatch.mockReturnValue({ ...FIXED_TASK_STATE });
       const result = await InternalToolRegistry.execute(

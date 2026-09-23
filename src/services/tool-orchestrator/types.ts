@@ -87,6 +87,8 @@ export interface WorktreeState {
   originalRoot: string;
   worktreePath: string;
   branch?: string;
+  /** The repository the worktree is a checkout of — may sit below originalRoot. */
+  repoPath?: string;
   [key: string]: unknown;
 }
 
