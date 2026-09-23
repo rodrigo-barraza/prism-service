@@ -21,10 +21,8 @@ vi.mock('#src/services/AgentPersonaRegistry', () => ({
   },
 }));
 
-vi.mock('#src/services/BenchmarkService', () => ({
-  default: {
-    activeGenerationCount: 0,
-  },
+vi.mock('#src/services/benchmark/RunEngine', () => ({
+  activeBenchmarkSamples: () => 0,
 }));
 
 vi.mock('#src/services/ActiveGenerationTracker', () => ({

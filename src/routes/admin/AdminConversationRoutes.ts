@@ -5,7 +5,7 @@ import type { Request, Response, NextFunction } from "express";
 import type { Document } from "mongodb";
 import { COLLECTIONS, SERVER_SENT_EVENTS_KEEPALIVE_INTERVAL_MILLISECONDS } from "#src/constants";
 import ChangeStreamService from "#src/services/ChangeStreamService";
-import BenchmarkService from "#src/services/BenchmarkService";
+import { activeBenchmarkSamples } from "#src/services/benchmark/RunEngine";
 import ActiveGenerationTracker from "#src/services/ActiveGenerationTracker";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
@@ -460,7 +460,7 @@ router.get(
       res.json({
         generatingCount:
           generatingCount +
-          BenchmarkService.activeGenerationCount +
+          activeBenchmarkSamples() +
           ActiveGenerationTracker.count,
         recentCount,
       });
@@ -514,7 +514,7 @@ router.get(
         const payload = JSON.stringify({
           generatingCount:
             generatingCount +
-            BenchmarkService.activeGenerationCount +
+            activeBenchmarkSamples() +
             ActiveGenerationTracker.count,
           recentCount,
         });
@@ -564,7 +564,7 @@ router.get(
       let previousNonConversationCount = 0;
       const generationPoll = setInterval(() => {
         const count =
-          BenchmarkService.activeGenerationCount +
+          activeBenchmarkSamples() +
           ActiveGenerationTracker.count;
         if (count > 0 || previousNonConversationCount > 0) sendStats();
         previousNonConversationCount = count;

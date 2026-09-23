@@ -48,11 +48,11 @@ export const COLLECTIONS = {
   MODEL_CONVERSATIONS: "model_conversations",
   AGENT_CONVERSATIONS: "agent_conversations",
   WORKFLOWS: "workflows",
-  BENCHMARKS: "benchmarks",
-  BENCHMARK_RUNS: "benchmark_runs",
-  BENCHMARK_DATASETS: "benchmark_datasets",
-  BENCHMARK_DATASET_RUNS: "benchmark_dataset_runs",
-  BENCHMARK_SWEEPS: "benchmark_sweeps",
+  BENCHMARK_SUITES: "benchmark_suites",
+  BENCHMARK_EVALS: "benchmark_evals",
+  BENCHMARK_SAMPLES: "benchmark_samples",
+  BENCHMARK_BATTLES: "benchmark_battles",
+  BENCHMARK_LINEUPS: "benchmark_lineups",
   SYNTHESIS: "synthesis",
   FAVORITES: "favorites",
   AGENT_SKILLS: "agent_skills",
@@ -362,19 +362,6 @@ export const FILE_CATEGORIES = {
   UPLOADS: "uploads",
   SCREENSHOTS: "screenshots",
   PROJECTS: "projects",
-} as const;
-
-// ─── Benchmark Constants ─────────────────────────────────────
-
-export const BENCHMARK_MATCH_MODES = {
-  CONTAINS: "contains",
-  NOT_CONTAINS: "notContains",
-  EXACT: "exact",
-  STARTS_WITH: "startsWith",
-  REGEX: "regex",
-  JSON_VALID: "jsonValid",
-  JSON_MATCH: "jsonMatch",
-  NUMERIC_EQUALS: "numericEquals",
 } as const;
 
 // ─── Localization Constants ──────────────────────────────────
@@ -1330,45 +1317,52 @@ export const TOOLS = {
 // ─── Benchmark Constants ────────────────────────────────────
 
 export const BENCHMARK = {
-  /** Delay between sequentially run models within the same provider (milliseconds). */
-  INTRA_PROVIDER_DELAY_MILLISECONDS: 100,
-
-  /** Default/minimum token budget for benchmark execution. */
-  DEFAULT_MAX_TOKENS: 2048,
-
-  /** Maximum trials (repeated executions) per model target in a single run. */
-  MAX_TRIALS: 10,
-
   /** Token budget for LLM-judge verdict calls. */
   JUDGE_MAX_TOKENS: 1024,
 
   /** Judge sampling temperature — deterministic grading. */
   JUDGE_TEMPERATURE: 0,
 
-  /** Runs per dataset case at most — the k of pass@k and pass^k. */
-  MAX_K: 10,
+  /** Epochs (samples per case per contestant) at most — the k of pass@k and pass^k. */
+  MAX_EPOCHS: 10,
 
-  /** A dataset's runs per case when it names none. */
-  DEFAULT_K: 3,
+  /** Cases one suite may hold. */
+  MAX_SUITE_CASES: 2000,
 
-  /** Cases one dataset may hold. */
-  MAX_DATASET_CASES: 200,
+  /** Cases one run may evaluate across its suites (after sampling). */
+  MAX_RUN_CASES: 2000,
 
-  /** Graders one case may carry. */
-  MAX_GRADERS_PER_CASE: 20,
+  /** Samples one run may schedule (cases × contestants × epochs). */
+  MAX_RUN_SAMPLES: 20_000,
+
+  /** Scorers one case may carry. */
+  MAX_SCORERS_PER_CASE: 20,
 
   /** Seed files per case, and their total size. */
-  MAX_SEED_FILES_PER_CASE: 20,
-  MAX_SEED_BYTES_PER_CASE: 256 * 1024,
+  MAX_FILES_PER_CASE: 30,
+  MAX_FILE_BYTES_PER_CASE: 512 * 1024,
 
-  /** Configurations one sweep may expand to (the product of its axes). */
-  MAX_SWEEP_CELLS: 24,
+  /** Samples in flight in one run, and per provider, when the run names none. */
+  DEFAULT_CONCURRENCY: 6,
+  DEFAULT_PROVIDER_CONCURRENCY: 3,
+  MAX_CONCURRENCY: 32,
 
-  /** Runs of one dataset in flight at once (cases × k share it). */
-  DATASET_CONCURRENCY: 3,
+  /** Attempts per sample on infrastructure errors when the run names none. */
+  DEFAULT_MAX_ATTEMPTS: 3,
 
-  /** A scheduled sweep's regression threshold when it names none (absolute drop, 0–1). */
-  DEFAULT_REGRESSION_THRESHOLD: 0.1,
+  /** Per-sample wall clock when the run names none (seconds): a model, an agent. */
+  DEFAULT_MODEL_TIMEOUT_SECONDS: 240,
+  DEFAULT_AGENT_TIMEOUT_SECONDS: 600,
+
+  /** A sample's stored reply / thinking / tool payload at most (characters). */
+  MAX_STORED_TEXT: 60_000,
+  MAX_STORED_TOOL_PAYLOAD: 4_000,
+
+  /** A scheduled run's regression threshold when it names none (absolute drop, 0–1). */
+  DEFAULT_REGRESSION_THRESHOLD: 0.05,
+
+  /** Bootstrap rounds behind arena rating intervals. */
+  ARENA_BOOTSTRAP_ROUNDS: 200,
 } as const;
 
 // ─── Miscellaneous Conversation & Routing Constants ──────────

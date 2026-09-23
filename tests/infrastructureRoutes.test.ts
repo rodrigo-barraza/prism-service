@@ -10,7 +10,6 @@ import * as instanceRegistryModule from '#src/providers/instance-registry';
 import LocalProviderGateway from '#src/services/local-provider/index';
 
 // Import the infrastructure routers
-import benchmarkRouter from '#src/routes/BenchmarkRoutes';
 import lmStudioRouter from '#src/routes/LmStudioRoutes';
 import vramBenchmarksRouter from '#src/routes/VramBenchmarksRoutes';
 import orchestratorRouter from '#src/routes/OrchestratorRoutes';
@@ -20,10 +19,9 @@ import filesRouter from '#src/routes/FilesRoutes';
 import statsRouter from '#src/routes/StatsRoutes';
 import settingsRouter from '#src/routes/SettingsRoutes';
 import ollamaRouter from '#src/routes/OllamaRoutes';
-import { PROVIDERS, COLLECTIONS } from "#src/constants";
+import { PROVIDERS } from "#src/constants";
 
 // Mount routers on app
-app.use('/benchmark', benchmarkRouter);
 app.use('/lm-studio', lmStudioRouter);
 app.use('/vram-benchmarks', vramBenchmarksRouter);
 app.use('/orchestrator', orchestratorRouter);
@@ -41,24 +39,6 @@ app.use((error: any, req: any, res: any, next: any) => {
 });
 
 // Mock services
-vi.mock('#src/services/BenchmarkService', () => ({
-  default: {
-    list: vi.fn().mockResolvedValue([{ id: 'bench-1', name: 'Test Benchmark' }]),
-    getLatestRun: vi.fn().mockResolvedValue({ id: 'run-1', summary: { totalCost: 0.01 } }),
-    getRuns: vi.fn().mockResolvedValue([{ id: 'run-1', summary: { totalCost: 0.01 }, models: [{ provider: 'openai', model: 'gpt-4o', passed: true, error: null, thinkingEnabled: false, toolsEnabled: false }] }]),
-    getConversationModels: vi.fn().mockReturnValue([{ provider: 'openai', model: 'gpt-4o', label: 'GPT-4o' }]),
-    create: vi.fn().mockImplementation((data) => Promise.resolve({ id: 'bench-1', ...data })),
-    getById: vi.fn().mockResolvedValue({ id: 'bench-1', name: 'Test Benchmark', prompt: 'test prompt' }),
-    remove: vi.fn().mockResolvedValue({ deleted: true }),
-    runBenchmark: vi.fn().mockResolvedValue({ id: 'run-1', models: [] }),
-    BENCHMARK_MATCH_MODES: {
-      CONTAINS: "contains",
-      EXACT: "exact",
-      STARTS_WITH: "startsWith",
-      REGEX: "regex",
-    }
-  }
-}));
 
 const { mockOrchestratorService } = vi.hoisted(() => ({
   mockOrchestratorService: {
@@ -244,120 +224,6 @@ describe('Infrastructure Routes Integration Tests', () => {
         unloadModel: vi.fn().mockResolvedValue({ success: true }),
         loadModel: vi.fn().mockResolvedValue({ success: true }),
       } as any;
-    });
-  });
-
-  describe('Benchmark Routes', () => {
-    it('GET /benchmark - lists all benchmark tests', async () => {
-      const response = await request(app)
-        .get('/benchmark')
-        .set('x-project', 'test-project')
-        .set('x-username', 'test-user')
-        .expect(200);
-
-      expect(response.body).toHaveProperty(COLLECTIONS.BENCHMARKS);
-      expect(response.body).toHaveProperty('count');
-    });
-
-    it('GET /benchmark/stats - aggregates performance stats', async () => {
-      const response = await request(app)
-        .get('/benchmark/stats')
-        .set('x-project', 'test-project')
-        .set('x-username', 'test-user')
-        .expect(200);
-
-      expect(response.body).toHaveProperty('models');
-      expect(response.body).toHaveProperty('totalModels');
-    });
-
-    it('GET /benchmark/models - lists models available', async () => {
-      const response = await request(app)
-        .get('/benchmark/models')
-        .expect(200);
-
-      expect(response.body).toHaveProperty('models');
-    });
-
-    it('GET /benchmark/active-list - lists active benchmark runs', async () => {
-      const response = await request(app)
-        .get('/benchmark/active-list')
-        .expect(200);
-
-      expect(response.body).toHaveProperty('activeIds');
-    });
-
-    it('GET /benchmark/presets - gets presets list', async () => {
-      const response = await request(app)
-        .get('/benchmark/presets')
-        .expect(200);
-
-      expect(response.body).toHaveProperty('presets');
-    });
-
-    it('POST /benchmark - creates a benchmark', async () => {
-      const response = await request(app)
-        .post('/benchmark')
-        .send({
-          name: 'New Benchmark',
-          prompt: 'Say hello',
-          expectedValue: 'hello'
-        })
-        .set('x-project', 'test-project')
-        .set('x-username', 'test-user')
-        .expect(201);
-
-      expect(response.body).toHaveProperty('id');
-    });
-
-    it('POST /benchmark - returns 400 on invalid input', async () => {
-      await request(app)
-        .post('/benchmark')
-        .send({})
-        .expect(400);
-    });
-
-    it('GET /benchmark/:id - retrieves a single benchmark', async () => {
-      const response = await request(app)
-        .get('/benchmark/bench-1')
-        .set('x-project', 'test-project')
-        .expect(200);
-
-      expect(response.body).toHaveProperty('id', 'bench-1');
-    });
-
-    it('DELETE /benchmark/:id - deletes a benchmark', async () => {
-      const response = await request(app)
-        .delete('/benchmark/bench-1')
-        .set('x-project', 'test-project')
-        .expect(200);
-
-      expect(response.body).toHaveProperty('deleted', true);
-    });
-
-    it('POST /benchmark/:id/run - starts execution and streams SSE', async () => {
-      const response = await request(app)
-        .post('/benchmark/bench-1/run')
-        .send({ models: [] })
-        .expect('Content-Type', /text\/event-stream/)
-        .expect(200);
-
-      expect(response.text).toBeDefined();
-    });
-
-    it('POST /benchmark/:id/abort - aborts a benchmark', async () => {
-      const response = await request(app)
-        .post('/benchmark/bench-1/abort')
-        .expect(200);
-
-      expect(response.body).toHaveProperty('aborted');
-    });
-
-    it('GET /benchmark/:id/active - returns active state', async () => {
-      const response = await request(app)
-        .get('/benchmark/bench-1/active')
-        .expect(200);
-
-      expect(response.body).toHaveProperty('active');
     });
   });
 
