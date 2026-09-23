@@ -173,6 +173,9 @@ vi.mock("#src/routes/ChatRoutes", () => ({
         enableCriticGate: false,
         maxIterations: 6,
         autoApprove: params.autoApprove === true,
+        // As the real prepareGenerationContext forwards them.
+        ...(params.permissionMode != null && { permissionMode: params.permissionMode }),
+        ...(params.unattended != null && { unattended: params.unattended }),
         agenticLoopEnabled: true,
         maxTokens: 8_192,
         ...(params.systemPrompt ? { systemPrompt: params.systemPrompt } : {}),
@@ -373,7 +376,7 @@ function startTurn(
   handleAgent: (params: Record<string, unknown>, emit: (event: unknown) => void) => Promise<unknown>,
   conversationId: string,
   prompt: string,
-  { autoApprove = false }: { autoApprove?: boolean } = {},
+  { autoApprove = false, unattended = false }: { autoApprove?: boolean; unattended?: boolean } = {},
 ) {
   void handleAgent(
     {
@@ -384,6 +387,7 @@ function startTurn(
       username: USERNAME,
       conversationId,
       autoApprove,
+      ...(unattended && { unattended }),
       messages: [{ role: "user", content: prompt }],
     },
     () => {},
@@ -575,6 +579,29 @@ describe("calls running when the process died", () => {
       .post("/agent/approve")
       .send({ conversationId, toolCallId: "call-w#retry", decision: "deny" });
     await until(() => finalAnswer(conversationId) === "Understood.", "the final answer");
+    expect(executionsOf(2, "write_file")).toHaveLength(0);
+    const sentToModel = JSON.stringify(modelCallsOf(2, conversationId)[0].messages);
+    expect(sentToModel).toContain("INTERRUPTED_BY_RESTART");
+    expect(sentToModel).toContain("harness.resume.notRerun");
+  });
+
+  it("where nobody can answer (an unattended run), 'run it again?' is not asked: the write is not run, and the model is told it may have partly happened", async () => {
+    const conversationId = "in-flight-unattended";
+    seedConversation(conversationId);
+    shared.passes.set(conversationId, [
+      { calls: [{ id: "call-w", name: "write_file", args: { path: "w.txt" } }] },
+      { text: "Reported." },
+    ]);
+    shared.hangingTools.add("write_file");
+    const first = await bootProcess();
+    startTurn(first.handleAgent, conversationId, "Write w", { autoApprove: true, unattended: true });
+    await until(() => turnRun(conversationId)?.pass?.calls?.["0"]?.status === "running", "the call running");
+
+    await restart();
+    // The re-driven turn is still unattended (its recorded request says so),
+    // so it never parks on a card nobody would click.
+    await until(() => finalAnswer(conversationId) === "Reported.", "the final answer");
+    expect(eventsOf(2, conversationId, "approval_required")).toHaveLength(0);
     expect(executionsOf(2, "write_file")).toHaveLength(0);
     const sentToModel = JSON.stringify(modelCallsOf(2, conversationId)[0].messages);
     expect(sentToModel).toContain("INTERRUPTED_BY_RESTART");
