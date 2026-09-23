@@ -227,7 +227,7 @@ export const TURN_RESUME = {
   MAXIMUM_STORED_RESULT_CHARACTERS: 1_000_000,
   /** SSE status: this turn was re-driven after a restart. */
   STATUS_RESUMED: "turn_resumed",
-  /** Settled mailbox and background-work records are kept this long (TTL on `expiresAt`). */
+  /** Delivered background-work records are kept this long (TTL on `expiresAt`). */
   SETTLED_RETENTION_DAYS: 7,
 } as const;
 

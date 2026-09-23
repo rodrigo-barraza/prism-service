@@ -581,8 +581,8 @@ setupWebSocket(wss);
         },
         // turn_runs — the turn each root loop is running (TurnRunStore),
         // one per loop; turn_inputs / detached_work — what a restart still
-        // owes someone (TurnInputStore, DetachedWorkStore). Kept once
-        // settled only until `expiresAt`.
+        // owes someone (TurnInputStore, DetachedWorkStore). A delivered
+        // piece of detached work is kept only until `expiresAt`.
         {
           collection: COLLECTIONS.TURN_RUNS,
           keys: { id: 1 },
@@ -592,11 +592,6 @@ setupWebSocket(wss);
           collection: COLLECTIONS.TURN_INPUTS,
           keys: { id: 1 },
           options: { unique: true },
-        },
-        {
-          collection: COLLECTIONS.TURN_INPUTS,
-          keys: { expiresAt: 1 },
-          options: { expireAfterSeconds: 0 },
         },
         {
           collection: COLLECTIONS.DETACHED_WORK,
