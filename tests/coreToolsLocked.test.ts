@@ -56,13 +56,17 @@ describe("GET /config/agents — coreToolsLocked field", () => {
     // against the user's message text, so reacting (which replaced
     // lupos-bot's unconditional per-reply emoji) and the gold trio (mugging
     // fires on rudeness, gifting on kindness) would never be reachable in
-    // the moments they exist for. Everything else in his availableTools is
-    // reachable via innate discovery, not enabled by default.
+    // the moments they exist for. generate_image too: an edit of a picture
+    // already in the channel — the commonest image request, about half his
+    // traffic — names no drawing verb, and 73% of image turns spent a model
+    // call discovering it (lupos-persona-fixes). Everything else in his
+    // availableTools is reachable via innate discovery, not enabled by default.
     expect(lupos!.enabledByDefaultToolNames).toEqual([
       "react_to_discord_message",
       "get_discord_gold_balance",
       "give_discord_gold",
       "mug_discord_gold",
+      "generate_image",
     ]);
   });
 });
