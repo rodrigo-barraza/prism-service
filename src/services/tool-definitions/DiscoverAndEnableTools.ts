@@ -223,6 +223,7 @@ const discoverAndEnableTools = {
         project: context.project,
         username: context.username,
         agent: context.agent,
+        agentContext: context.agentContext,
         agentConversationId: agentConversationId,
         enabledTools: context.enabledTools || [],
       },

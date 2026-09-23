@@ -1396,6 +1396,7 @@ async function handleStreamingText(context: GenerationContext) {
             project,
             username,
             agent: agent || null,
+            agentContext: options.agentContext,
             requestId,
             conversationId: conversationId || null,
             traceId: traceId || null,
