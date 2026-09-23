@@ -732,11 +732,14 @@ async function locate(
   const database = MongoWrapper.getDb(MONGO_DB_NAME);
   if (!database || !conversationId) return null;
   for (const collection of GOAL_COLLECTIONS) {
+    // `id` always rides along: every write goes back by it, and MongoDB
+    // returns only `_id` and the projected fields.
     const document = (await database
       .collection(collection)
-      .findOne({ id: conversationId, project, username }, { projection })) as
-      | GoalDocument
-      | null;
+      .findOne(
+        { id: conversationId, project, username },
+        { projection: { ...projection, id: 1 } },
+      )) as GoalDocument | null;
     if (document) return { collection, document };
   }
   return null;
@@ -751,6 +754,7 @@ async function persist(
 ): Promise<void> {
   const database = MongoWrapper.getDb(MONGO_DB_NAME);
   if (!database) throw new Error("Database not connected");
+  if (!located.document.id) throw new Error("Goal write without a conversation id");
   const unset: Record<string, ""> = {};
   if (!goal) unset.goal = "";
   if (dropProposal) unset.goalProposal = "";
@@ -771,6 +775,7 @@ async function persistProposal(
 ): Promise<void> {
   const database = MongoWrapper.getDb(MONGO_DB_NAME);
   if (!database) throw new Error("Database not connected");
+  if (!located.document.id) throw new Error("Goal write without a conversation id");
   const update = proposal
     ? { $set: { goalProposal: proposal } }
     : { $unset: { goalProposal: "" } };
