@@ -15,6 +15,7 @@ import {
   createUsageAccumulator,
   calculateTextCost,
   estimateTokens,
+  mergeUsage,
   withTotalInputTokens,
 } from "#src/utils/CostCalculator";
 import { calculateTokensPerSec } from "#src/utils/math";
@@ -158,6 +159,16 @@ export default class BaseAgenticHarness {
 
   /** Most recently registered tracker request id for this harness. */
   private lastTrackerRequestId: string | null = null;
+
+  /** The last request's prompt estimate — the fallback when a provider reports no usage. */
+  private lastPromptEstimateTokens = 0;
+
+  /**
+   * Each pass's own abort, by the stream createProviderStream returned: the
+   * idle watchdog fires it on a stall, so the provider request is closed
+   * instead of generating on for a pass that has already failed.
+   */
+  private readonly passAborts = new WeakMap<object, AbortController>();
 
   /** estimateRequestOverheadTokens() memo, keyed by prompt text and tool-set identity. */
   private requestOverheadCache: {
@@ -854,6 +865,11 @@ export default class BaseAgenticHarness {
     // A caller-requested maxTokens below the threshold is NOT exhaustion —
     // only fire when window pressure forced the reduction.
     const contextWindow = this.resolveContextWindow();
+    // The clamp's calibrated estimate when it ran (it needs the window);
+    // chars/4 of the messages and the fixed overhead otherwise.
+    this.lastPromptEstimateTokens = contextWindow
+      ? this.lastEstimatedTotalInputTokens
+      : this.estimateInputTokens(resolvedMessages) + this.estimateRequestOverheadTokens();
     const wasClampedByWindow =
       passOptions.maxTokens != null && clampedMaxTokens !== passOptions.maxTokens;
     if (wasClampedByWindow && isContextExhausted(clampedMaxTokens)) {
@@ -882,9 +898,11 @@ export default class BaseAgenticHarness {
       },
     );
 
+    // The turn's signal (a stop) or this pass's own (a stall) ends the request.
+    const passAbort = new AbortController();
     const providerOptions = {
       ...clampedPassOptions,
-      signal,
+      signal: signal ? AbortSignal.any([signal, passAbort.signal]) : passAbort.signal,
       // Set when this harness records input a provider applies mid-stream.
       turnInputKey: this.nativeTurnInputKey(),
       // Stable per-conversation prompt-cache key (used by OpenAI as
@@ -991,7 +1009,7 @@ export default class BaseAgenticHarness {
     // providers that validate/dispatch on invocation); retries create fresh
     // streams via the factory.
     let initialStream: AsyncIterable<unknown> | null = createStream();
-    return streamWithRetries(
+    const stream = streamWithRetries(
       () => {
         if (initialStream) {
           const firstStream = initialStream;
@@ -1006,6 +1024,8 @@ export default class BaseAgenticHarness {
         tryRecoverFromError: recoverFromContextOverflow,
       },
     );
+    this.passAborts.set(stream, passAbort);
+    return stream;
   }
 
   // ── Stream consumption ────────────────────────────────────
@@ -1033,7 +1053,42 @@ export default class BaseAgenticHarness {
       endChatSpan(chatSpan, pass, { costUsd: this.estimatePassCost(pass), error });
       throw error;
     }
+    this.estimateMissingUsage(pass);
     endChatSpan(chatSpan, pass, { costUsd: this.estimatePassCost(pass) });
+  }
+
+  /**
+   * A provider that reported no usage — an OpenAI-compatible server that
+   * ignores `stream_options.include_usage`, an Ollama build without eval
+   * counts, a proxy — leaves the pass at zero tokens, and it would be
+   * logged, priced and charged to the cost budget as free. Record an
+   * estimate instead: the calibrated prompt size this pass was clamped
+   * against, and chars/4 of what it produced. `usageEstimated` marks the
+   * request row, so the guess is never passed off as the provider's count.
+   * A pass that produced nothing (stopped before its first token) keeps
+   * its zero.
+   */
+  private estimateMissingUsage(pass: PassState): void {
+    if (pass.replayed) return;
+    if ((pass.usage.inputTokens || 0) > 0 || (pass.usage.outputTokens || 0) > 0) return;
+    const toolCallCharacters = pass.pendingToolCalls.reduce(
+      (sum, toolCall) => sum + toolCall.name.length + JSON.stringify(toolCall.args ?? {}).length,
+      0,
+    );
+    const outputCharacters =
+      pass.outputCharacters + pass.streamedThinking.length + toolCallCharacters;
+    if (outputCharacters === 0) return;
+    const estimate = {
+      inputTokens: this.lastPromptEstimateTokens,
+      outputTokens: Math.ceil(outputCharacters / 4),
+    };
+    mergeUsage(pass.usage, estimate);
+    mergeUsage(this.state.overallUsage, estimate);
+    pass.usageEstimated = true;
+    logger.warn(
+      `[BaseAgenticHarness] ${this.context.providerName} reported no usage for ${this.context.resolvedModel} — ` +
+        `recording an estimate (${estimate.inputTokens} in / ${estimate.outputTokens} out)`,
+    );
   }
 
   /** A pass's estimated cost at its model's text pricing (null when unpriced). */
@@ -1067,6 +1122,7 @@ export default class BaseAgenticHarness {
       stream,
       idleTimeoutMilliseconds,
       this.context.providerName,
+      () => this.passAborts.get(stream)?.abort(),
     );
 
     for await (const chunk of watchedStream) {
@@ -1374,6 +1430,7 @@ export default class BaseAgenticHarness {
       outputCharacters: pass.outputCharacters,
       agenticIteration: state.iterations,
       ...(toolExecutions.length > 0 && { toolExecutions }),
+      ...(pass.usageEstimated && { usageEstimated: true }),
       ...cacheTelemetryFields,
     };
 
@@ -1457,6 +1514,7 @@ export default class BaseAgenticHarness {
         usage: pass.usage,
       },
       ...(toolExecutions.length > 0 && { toolExecutions }),
+      ...(pass.usageEstimated && { usageEstimated: true }),
       ...cacheTelemetryFields,
     };
 

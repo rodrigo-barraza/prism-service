@@ -453,6 +453,8 @@ export interface PassState {
   thinkingEndTime: number | null;
   outputCharacters: number;
   usage: UsageAccumulator;
+  /** The provider reported no usage; `usage` holds the harness's estimate. */
+  usageEstimated?: boolean;
   options: AgenticOptions;
   requestId: string | null;
   // Promise resolving to the MongoDB _id of the pending request document inserted at iteration start.
