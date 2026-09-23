@@ -19,7 +19,10 @@ import { decisionOwnerOf } from "#src/services/conversation/ConversationRunState
 import { APPROVALS, TURN_RESUME } from "#src/constants";
 import { buildHookPayload } from "#src/services/hooks/buildPayload";
 import { HOOK_EVENTS } from "#src/services/hooks/types";
-import { hookPermissionModeName } from "#src/services/permissions/PermissionModes";
+import {
+  hookPermissionModeName,
+  unattendedDenialReason,
+} from "#src/services/permissions/PermissionModes";
 import { buildApprovalPreview } from "./ApprovalPreview.ts";
 import { buildDeniedToolResult, firePermissionDenied } from "./TurnHooks.ts";
 
@@ -136,27 +139,32 @@ export function approvalRecordFor(toolCall: ToolCall): Pick<ToolCall, "_approval
   };
 }
 
+/**
+ * The result of an interrupted call that is not run again. Not "declined":
+ * it ran (at least partly) before the restart; it was not run AGAIN. The
+ * model must not assume either outcome.
+ */
+function notRerunResult(toolCall: ToolCall, locale: string, reason?: string | null): ToolResult {
+  return {
+    name: toolCall.name,
+    id: toolCall.id,
+    result: {
+      success: false,
+      error: "INTERRUPTED_BY_RESTART",
+      message: PromptLocaleService.get(locale, "harness.resume.notRerun", {
+        toolName: toolCall.name,
+      }),
+      ...(reason ? { reason } : {}),
+    },
+  };
+}
+
 function userDeclinedResult(
   toolCall: ToolCall,
   decision: ToolCallDecision,
   locale: string,
 ): ToolResult {
-  if (isInterruptedCall(toolCall)) {
-    // Not "declined": it ran (at least partly) before the restart; it was
-    // not run AGAIN. The model must not assume either outcome.
-    return {
-      name: toolCall.name,
-      id: toolCall.id,
-      result: {
-        success: false,
-        error: "INTERRUPTED_BY_RESTART",
-        message: PromptLocaleService.get(locale, "harness.resume.notRerun", {
-          toolName: toolCall.name,
-        }),
-        ...(decision.reason ? { reason: decision.reason } : {}),
-      },
-    };
-  }
+  if (isInterruptedCall(toolCall)) return notRerunResult(toolCall, locale, decision.reason);
   const isLapsed = decision.source !== "user";
   const messageKey = isLapsed
     ? "harness.approval.lapsed"
@@ -279,6 +287,8 @@ export async function checkAndWaitForApproval(
   { toolSchemas = [], hooks, resume = false }: ApprovalGateOptions = {},
 ): Promise<ApprovalVerdict> {
   const { emit, options } = context;
+  const locale =
+    (options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale();
 
   const { needsApproval, denied = [] } = approvalEngine.checkBatch(toolCalls);
 
@@ -343,8 +353,34 @@ export async function checkAndWaitForApproval(
   // A call a restart cut off mid-run is asked about whatever its tier or the
   // mode, and only a person answers "run it again?" — not the mode, not a
   // PermissionRequest hook: it is not a permission anyone gave already.
+  // Where nobody can answer (dontAsk, an unattended run) it is not asked:
+  // it is not run again — denied by the mode — and the model is told it may
+  // have partly happened, as when a person says no.
+  const modeHandle = options._permissionMode;
+  const unanswerableRetries = new Set(
+    modeHandle?.cannotAsk
+      ? toolCalls.filter((toolCall) => isInterruptedCall(toolCall) && !deniedOriginals.has(toolCall))
+      : [],
+  );
+  for (const toolCall of unanswerableRetries) {
+    const reason = unattendedDenialReason(toolCall.name, modeHandle!.mode, "run it again after a restart");
+    toolCall._approval = {
+      ...(toolCall._approval ?? { tier: 2, tierLabel: "write" }),
+      isApproved: false,
+      isDenied: true,
+      deniedBy: "mode",
+      mode: modeHandle!.mode,
+      reason,
+    };
+    await firePermissionDenied(hooks, context, toolCall, "mode", reason);
+  }
+  const deniedResultOf = (toolCall: ToolCall): ToolResult =>
+    unanswerableRetries.has(toolCall)
+      ? notRerunResult(toolCall, locale, toolCall._approval?.reason)
+      : buildDeniedToolResult(toolCall);
   const interruptedCalls = toolCalls.filter(
-    (toolCall) => isInterruptedCall(toolCall) && !deniedOriginals.has(toolCall),
+    (toolCall) =>
+      isInterruptedCall(toolCall) && !deniedOriginals.has(toolCall) && !unanswerableRetries.has(toolCall),
   );
   pending = pending.filter((toolCall) => !isInterruptedCall(toolCall));
 
@@ -365,7 +401,7 @@ export async function checkAndWaitForApproval(
   if (pending.length === 0) {
     return {
       executableToolCalls: toolCalls.filter((toolCall) => !isDenied(toolCall)),
-      blockedResults: deniedToolCalls.map(buildDeniedToolResult),
+      blockedResults: deniedToolCalls.map(deniedResultOf),
       deniedToolCalls,
       shouldApproveAll: false,
     };
@@ -417,8 +453,6 @@ export async function checkAndWaitForApproval(
   const previews = await Promise.all(
     awaiting.map(({ toolCall }) => buildApprovalPreview(toolCall, context)),
   );
-  const locale =
-    (options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale();
   const requests: ApprovalRequestCall[] = awaiting.map(({ toolCallId, toolCall }, index) => ({
     toolCallId,
     name: toolCall.name,
@@ -527,7 +561,7 @@ export async function checkAndWaitForApproval(
 
   for (const toolCall of toolCalls) {
     if (isDenied(toolCall)) {
-      blockedResults.push(buildDeniedToolResult(toolCall));
+      blockedResults.push(deniedResultOf(toolCall));
       continue;
     }
     if (!decisionByCall.has(toolCall)) {
