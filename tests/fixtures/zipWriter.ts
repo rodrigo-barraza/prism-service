@@ -83,7 +83,12 @@ export async function zipDirectory(directory: string, prefix = ""): Promise<Buff
         await walk(absolute);
       } else if (item.isFile()) {
         const relative = path.relative(directory, absolute).split(path.sep).join("/");
-        entries.push({ name: `${prefix}${relative}`, content: await fs.readFile(absolute) });
+        const { mode } = await fs.stat(absolute);
+        entries.push({
+          name: `${prefix}${relative}`,
+          content: await fs.readFile(absolute),
+          unixMode: 0o100000 | (mode & 0o777),
+        });
       }
     }
   }

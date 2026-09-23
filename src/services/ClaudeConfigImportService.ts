@@ -1,10 +1,39 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import MongoWrapper from "#src/wrappers/MongoWrapper";
-import { MONGO_DB_NAME } from "#config";
-import { COLLECTIONS } from "#src/constants";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { normalizeProfileId } from "#src/utils/ProfileScope";
+import { getRequestContext } from "#src/utils/RequestContext";
+import {
+  AGENT_DEFINITION_DIRECTORIES,
+  parseAgentDefinitionFile,
+} from "#src/services/agents/AgentDefinitionFiles";
+import { MCP_SERVER_NAME_PATTERN } from "#src/services/mcp/McpNaming";
+import {
+  SKILL_FILE_NAME,
+  allowedToolsOf,
+  frontmatterText,
+  parseSkillMarkdown,
+} from "#src/services/skills/skillMarkdown";
+import {
+  SKILL_FOLDER_LIMITS,
+  readLocalFolder,
+  resolveInsideRegisteredWorkspace,
+} from "#src/services/skills/workspaceFolders";
+import {
+  emptyMcpSummary,
+  emptySkillSummary,
+  recordSkillResult,
+  recordSkippedServer,
+  recordSkippedSkill,
+  type ImportSkipped,
+  type McpImportSummary,
+  type SkillImportSummary,
+} from "#src/services/skills/importSummary";
+import {
+  importMcpServerConfigs,
+  type ImportableMcpServer,
+} from "#src/services/skills/mcpServerImport";
 
 // ────────────────────────────────────────────────────────────
 // ClaudeConfigImportService — .claude config inheritance
@@ -19,61 +48,75 @@ import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 //       injected into every system prompt. Re-import is idempotent —
 //       appendSection is a no-op when the content is unchanged.
 //   .claude/skills/*/SKILL.md
-//     → Prism skills (SkillService.upsertImported): frontmatter
-//       name/description, body = the skill body, in the importer's
+//     → Prism skills (SkillService.upsertImported): YAML frontmatter
+//       name/description/allowed-tools, body = the skill body, the
+//       whole folder stored (SkillFolderStore) so read_skill_file
+//       reaches its scripts and references. In the importer's
 //       project/user/profile scope. Upsert keyed by name + source; a
 //       name collision with a skill NOT imported from this workspace
 //       is skipped, never clobbered.
 //   .mcp.json + .claude/settings.json mcpServers
 //     → MCP server configs (mcp_servers collection, same shape as
-//       McpServersRoutes). Imported DISABLED — configs may contain
-//       arbitrary commands, so nothing is ever auto-connected; the
-//       user enables each server in the UI.
+//       McpServersRoutes), in the importer's user + profile. Imported
+//       DISABLED — configs may contain arbitrary commands, so nothing
+//       is ever auto-connected; the user enables each server in the UI.
 //   .claude/settings.json hooks
 //     → NEVER imported (arbitrary command execution on someone
 //       else's trigger schedule); counted in the summary as skipped.
+//   .claude/agents/*.md, .prism/agents/*.md
+//     → listed only: AgentPersonaRegistry reads them from the
+//       workspace at turn time, so there is nothing to copy.
 //
-// Reads the LOCAL filesystem only — agent-served remote workspaces
-// are not supported by this importer.
+// Only a path inside a registered workspace root is read, and a dry
+// run reports everything it would do without writing. Reads the LOCAL
+// filesystem only — agent-served remote workspaces are not supported
+// by this importer.
 // ────────────────────────────────────────────────────────────
 
 export const CLAUDE_MD_SECTION_HEADING = "Imported from CLAUDE.md";
 export const CLAUDE_CONFIG_SOURCE_PREFIX = "claude-config:";
 
-export interface ImportSkipped {
-  name: string;
-  reason: string;
-}
+export type { ImportSkipped };
+
+/** How long a preview of CLAUDE.md may be. */
+const INSTRUCTIONS_PREVIEW_MAX_CHARS = 2_000;
+const MCP_SERVER_NAME_MAX_CHARS = 40;
 
 export interface ClaudeConfigImportSummary {
   workspaceRoot: string;
+  dryRun: boolean;
   projectInstructions: {
     imported: boolean;
     unchanged: boolean;
     bytes: number;
     skipped: string | null;
+    /** The start of CLAUDE.md, for the preview. */
+    preview?: string;
   };
-  skills: {
-    created: number;
-    updated: number;
-    unchanged: number;
-    skipped: ImportSkipped[];
-  };
-  mcpServers: {
-    imported: number;
-    unchanged: number;
-    skipped: ImportSkipped[];
-  };
+  skills: SkillImportSummary;
+  mcpServers: McpImportSummary;
   hooks: {
     skippedCount: number;
     note: string | null;
   };
+  agents: {
+    found: Array<{ name: string; path: string; error?: string }>;
+    note: string | null;
+  };
+  /** Files left out of a skill folder (symlinks, oversized files). */
+  warnings: string[];
 }
 
 export interface ClaudeConfigImportScope {
   project: string;
   username: string;
+  /** Defaults to the request's profile. */
+  profileId?: string | null;
   agent?: string | null;
+}
+
+export interface ClaudeConfigImportOptions {
+  dryRun?: boolean;
 }
 
 interface RawMcpServerEntry {
@@ -94,56 +137,22 @@ async function readFileIfExists(filePath: string): Promise<string | null> {
   }
 }
 
-/**
- * Minimal YAML-frontmatter parser — enough for SKILL.md's flat
- * `name:` / `description:` keys. Returns the frontmatter map and the
- * body below it; a file without frontmatter is all body.
- */
+/** SKILL.md's frontmatter (real YAML) and the body below it. */
 export function parseFrontmatter(content: string): {
-  frontmatter: Record<string, string>;
+  frontmatter: Record<string, unknown>;
   body: string;
 } {
-  const frontmatter: Record<string, string> = {};
-  if (!content.startsWith("---")) {
-    return { frontmatter, body: content.trim() };
-  }
-  const closingIndex = content.indexOf("\n---", 3);
-  if (closingIndex === -1) {
-    return { frontmatter, body: content.trim() };
-  }
-  const header = content.slice(3, closingIndex);
-  const body = content.slice(closingIndex + 4).replace(/^-*\s*/, "");
-  for (const line of header.split("\n")) {
-    const separatorIndex = line.indexOf(":");
-    if (separatorIndex === -1) continue;
-    const key = line.slice(0, separatorIndex).trim();
-    const value = line
-      .slice(separatorIndex + 1)
-      .trim()
-      .replace(/^["']|["']$/g, "");
-    if (key) frontmatter[key] = value;
-  }
-  return { frontmatter, body: body.trim() };
+  const { frontmatter, body } = parseSkillMarkdown(content);
+  return { frontmatter, body };
 }
 
-function normalizeMcpEntry(
-  name: string,
-  entry: RawMcpServerEntry,
-): {
-  name: string;
-  transport: "stdio" | "sse" | "streamable-http";
-  command: string;
-  args: string[];
-  env: Record<string, string>;
-  url: string;
-  headers: Record<string, string>;
-} | null {
+function normalizeMcpEntry(name: string, entry: RawMcpServerEntry): ImportableMcpServer | null {
   const command = typeof entry.command === "string" ? entry.command : "";
   const url = typeof entry.url === "string" ? entry.url : "";
   if (!command && !url) return null;
 
   const declaredType = (entry.type || entry.transport || "").toLowerCase();
-  let transport: "stdio" | "sse" | "streamable-http";
+  let transport: ImportableMcpServer["transport"];
   if (command) {
     transport = "stdio";
   } else if (declaredType === "sse") {
@@ -154,6 +163,7 @@ function normalizeMcpEntry(
 
   return {
     name,
+    displayName: name,
     transport,
     command,
     args: Array.isArray(entry.args)
@@ -191,6 +201,7 @@ export function demoteMarkdownHeadings(body: string): string {
 async function importProjectInstructions(
   workspaceRoot: string,
   scope: ClaudeConfigImportScope,
+  dryRun: boolean,
 ): Promise<ClaudeConfigImportSummary["projectInstructions"]> {
   const content = await readFileIfExists(path.join(workspaceRoot, "CLAUDE.md"));
   if (content === null || !content.trim()) {
@@ -202,8 +213,9 @@ async function importProjectInstructions(
     };
   }
 
-  const { default: ProjectInstructionsService } =
-    await import("#src/services/ProjectInstructionsService");
+  const { default: ProjectInstructionsService, upsertMarkdownSection } = await import(
+    "#src/services/ProjectInstructionsService"
+  );
   const database = ProjectInstructionsService.getDatabase();
   if (!database) {
     return {
@@ -214,6 +226,8 @@ async function importProjectInstructions(
     };
   }
 
+  const section = demoteMarkdownHeadings(content.trim());
+  const preview = content.trim().slice(0, INSTRUCTIONS_PREVIEW_MAX_CHARS);
   const writeScope = await ProjectInstructionsService.resolveWriteScope(
     database,
     scope,
@@ -222,11 +236,21 @@ async function importProjectInstructions(
     database,
     writeScope,
   );
+  if (dryRun) {
+    const next = upsertMarkdownSection(before?.content ?? "", CLAUDE_MD_SECTION_HEADING, section);
+    return {
+      imported: false,
+      unchanged: !!before && next === before.content,
+      bytes: content.length,
+      skipped: null,
+      preview,
+    };
+  }
   const document = await ProjectInstructionsService.appendSection(
     database,
     writeScope,
     CLAUDE_MD_SECTION_HEADING,
-    demoteMarkdownHeadings(content.trim()),
+    section,
     "user",
   );
 
@@ -236,6 +260,7 @@ async function importProjectInstructions(
     unchanged,
     bytes: content.length,
     skipped: null,
+    preview,
   };
 }
 
@@ -243,13 +268,10 @@ async function importSkills(
   workspaceRoot: string,
   scope: ClaudeConfigImportScope,
   source: string,
-): Promise<ClaudeConfigImportSummary["skills"]> {
-  const summary: ClaudeConfigImportSummary["skills"] = {
-    created: 0,
-    updated: 0,
-    unchanged: 0,
-    skipped: [],
-  };
+  warnings: string[],
+  dryRun: boolean,
+): Promise<SkillImportSummary> {
+  const summary = emptySkillSummary();
 
   const skillsDirectory = path.join(workspaceRoot, ".claude", "skills");
   let entries: string[];
@@ -269,48 +291,53 @@ async function importSkills(
   const caller = resolveSkillCaller({
     project: scope.project,
     username: scope.username,
+    profileId: scope.profileId,
     agent: null,
   });
 
   for (const skillDirectory of entries.sort()) {
-    const skillFile = path.join(skillsDirectory, skillDirectory, "SKILL.md");
-    const content = await readFileIfExists(skillFile);
+    const folderPath = path.join(skillsDirectory, skillDirectory);
+    const content = await readFileIfExists(path.join(folderPath, SKILL_FILE_NAME));
+    const base = { name: skillDirectory, description: "", allowedTools: null, files: [] };
     if (content === null) {
-      summary.skipped.push({ name: skillDirectory, reason: "no SKILL.md" });
+      recordSkippedSkill(summary, base, `no ${SKILL_FILE_NAME}`);
       continue;
     }
 
-    const { frontmatter, body } = parseFrontmatter(content);
-    const name = frontmatter.name || skillDirectory;
+    const { frontmatter, body, error } = parseSkillMarkdown(content);
+    const name = frontmatterText(frontmatter.name) || skillDirectory;
+    const description = frontmatterText(frontmatter.description);
+    const allowedTools = allowedToolsOf(frontmatter);
+    if (error) {
+      recordSkippedSkill(summary, { ...base, name }, error);
+      continue;
+    }
     if (!body) {
-      summary.skipped.push({ name, reason: "empty skill body" });
+      recordSkippedSkill(summary, { ...base, name, description, allowedTools }, "empty skill body");
       continue;
     }
 
-    const result = await SkillService.upsertImported(
-      {
-        name,
-        description: frontmatter.description || "",
-        body,
-        source,
-      },
-      caller,
-    );
-
-    if ("error" in result && result.error) {
-      summary.skipped.push({ name, reason: result.error });
-    } else if (result.status === "created") {
-      summary.created += 1;
-    } else if (result.status === "updated") {
-      summary.updated += 1;
-    } else if (result.status === "unchanged") {
-      summary.unchanged += 1;
-    } else {
-      summary.skipped.push({
-        name,
-        reason: result.reason || "skipped",
-      });
+    const folder = await readLocalFolder(folderPath, SKILL_FOLDER_LIMITS);
+    if ("error" in folder) {
+      recordSkippedSkill(summary, { ...base, name, description, allowedTools }, folder.error);
+      continue;
     }
+    for (const skipped of folder.skipped) {
+      warnings.push(`.claude/skills/${skillDirectory}/${skipped.path}: ${skipped.reason}`);
+    }
+
+    const item = {
+      name,
+      description,
+      allowedTools,
+      files: folder.files.map((file) => file.path).sort(),
+    };
+    const result = await SkillService.upsertImported(
+      { name, description, body, source, allowedTools, files: folder.files },
+      caller,
+      { dryRun },
+    );
+    recordSkillResult(summary, item, result);
   }
 
   return summary;
@@ -321,13 +348,9 @@ async function importMcpServers(
   scope: ClaudeConfigImportScope,
   source: string,
   settings: Record<string, unknown> | null,
-): Promise<ClaudeConfigImportSummary["mcpServers"]> {
-  const summary: ClaudeConfigImportSummary["mcpServers"] = {
-    imported: 0,
-    unchanged: 0,
-    skipped: [],
-  };
-
+  dryRun: boolean,
+): Promise<McpImportSummary> {
+  const summary = emptyMcpSummary();
   const discovered = new Map<string, RawMcpServerEntry>();
 
   const mcpJsonRaw = await readFileIfExists(
@@ -342,10 +365,7 @@ async function importMcpServers(
         discovered.set(name, entry);
       }
     } catch (error: unknown) {
-      summary.skipped.push({
-        name: ".mcp.json",
-        reason: `unparseable: ${getErrorMessage(error)}`,
-      });
+      recordSkippedServer(summary, ".mcp.json", `unparseable: ${getErrorMessage(error)}`);
     }
   }
 
@@ -357,55 +377,34 @@ async function importMcpServers(
     }
   }
 
-  if (discovered.size === 0) return summary;
-
-  const collection = MongoWrapper.getCollection(
-    MONGO_DB_NAME,
-    COLLECTIONS.MCP_SERVERS,
-  );
-
+  const importable: ImportableMcpServer[] = [];
   for (const [name, entry] of discovered) {
     const normalized = normalizeMcpEntry(name, entry);
     if (!normalized) {
-      summary.skipped.push({ name, reason: "neither command nor url" });
-      continue;
+      recordSkippedServer(summary, name, "neither command nor url");
+    } else if (!MCP_SERVER_NAME_PATTERN.test(name) || name.length > MCP_SERVER_NAME_MAX_CHARS) {
+      recordSkippedServer(
+        summary,
+        name,
+        `a server name is up to ${MCP_SERVER_NAME_MAX_CHARS} letters and digits joined by single '-' or '_' (it namespaces the server's tools)`,
+        normalized.transport,
+      );
+    } else {
+      importable.push(normalized);
     }
-
-    const existing = await collection.findOne({
-      project: scope.project,
-      username: scope.username,
-      name,
-    });
-    if (existing) {
-      // Never touch an existing config — in particular, never flip a
-      // server the user already enabled, and never overwrite manual edits.
-      summary.unchanged += 1;
-      continue;
-    }
-
-    const now = new Date().toISOString();
-    await collection.insertOne({
-      project: scope.project,
-      username: scope.username,
-      name: normalized.name,
-      displayName: normalized.name,
-      transport: normalized.transport,
-      command: normalized.command,
-      args: normalized.args,
-      env: normalized.env,
-      url: normalized.url,
-      headers: normalized.headers,
-      // SECURITY: imported configs may contain arbitrary commands —
-      // always land disabled, never auto-connect (the user enables in
-      // the UI, and MCP tools stay Tier-3 DANGER regardless).
-      enabled: false,
-      importedFrom: source,
-      createdAt: now,
-      updatedAt: now,
-    });
-    summary.imported += 1;
   }
 
+  await importMcpServerConfigs(
+    importable,
+    {
+      project: scope.project,
+      username: scope.username,
+      profileId: normalizeProfileId(scope.profileId ?? getRequestContext().profileId),
+    },
+    source,
+    summary,
+    { dryRun },
+  );
   return summary;
 }
 
@@ -429,26 +428,55 @@ function summarizeHooks(
   };
 }
 
+/** Agent definition files: read live at turn time, so only listed here. */
+async function listAgentFiles(
+  workspaceRoot: string,
+): Promise<ClaudeConfigImportSummary["agents"]> {
+  const found: ClaudeConfigImportSummary["agents"]["found"] = [];
+  for (const directory of AGENT_DEFINITION_DIRECTORIES) {
+    let names: string[];
+    try {
+      names = (await fs.readdir(path.join(workspaceRoot, directory), { withFileTypes: true }))
+        .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+        .map((entry) => entry.name)
+        .sort();
+    } catch {
+      continue;
+    }
+    for (const fileName of names) {
+      const relative = `${directory}/${fileName}`;
+      const content = (await readFileIfExists(path.join(workspaceRoot, relative))) ?? "";
+      const parsed = parseAgentDefinitionFile(content, relative);
+      found.push(
+        "definition" in parsed
+          ? { name: parsed.definition.name, path: relative }
+          : { name: fileName.replace(/\.md$/, ""), path: relative, error: parsed.error },
+      );
+    }
+  }
+  return {
+    found,
+    note:
+      found.length > 0
+        ? "Agent files are read from the workspace at every turn — they are already live, nothing is copied."
+        : null,
+  };
+}
+
 const ClaudeConfigImportService = {
   /**
-   * Discover and import Claude Code assets from a workspace root.
-   * Idempotent: re-running against the same workspace creates nothing new.
+   * Discover and import Claude Code assets from a directory inside a
+   * registered workspace. Idempotent: re-running against the same
+   * workspace creates nothing new. `dryRun` previews without writing.
    */
   async importFromWorkspace(
     workspaceRoot: string,
     scope: ClaudeConfigImportScope,
-  ): Promise<ClaudeConfigImportSummary | { error: string }> {
-    const resolvedRoot = path.resolve(workspaceRoot);
-
-    let rootStat;
-    try {
-      rootStat = await fs.stat(resolvedRoot);
-    } catch {
-      return { error: `Workspace path not found: ${resolvedRoot}` };
-    }
-    if (!rootStat.isDirectory()) {
-      return { error: `Workspace path is not a directory: ${resolvedRoot}` };
-    }
+    { dryRun = false }: ClaudeConfigImportOptions = {},
+  ): Promise<ClaudeConfigImportSummary | { error: string; notFound?: true }> {
+    const resolved = await resolveInsideRegisteredWorkspace(workspaceRoot);
+    if ("error" in resolved) return resolved;
+    const resolvedRoot = resolved.path;
 
     const source = `${CLAUDE_CONFIG_SOURCE_PREFIX}${resolvedRoot}`;
 
@@ -466,19 +494,23 @@ const ClaudeConfigImportService = {
       }
     }
 
+    const warnings: string[] = [];
     const summary: ClaudeConfigImportSummary = {
       workspaceRoot: resolvedRoot,
-      projectInstructions: await importProjectInstructions(resolvedRoot, scope),
-      skills: await importSkills(resolvedRoot, scope, source),
-      mcpServers: await importMcpServers(resolvedRoot, scope, source, settings),
+      dryRun,
+      projectInstructions: await importProjectInstructions(resolvedRoot, scope, dryRun),
+      skills: await importSkills(resolvedRoot, scope, source, warnings, dryRun),
+      mcpServers: await importMcpServers(resolvedRoot, scope, source, settings, dryRun),
       hooks: summarizeHooks(settings),
+      agents: await listAgentFiles(resolvedRoot),
+      warnings,
     };
 
     logger.info(
-      `[ClaudeConfigImport] ${resolvedRoot}: instructions=${summary.projectInstructions.imported ? (summary.projectInstructions.unchanged ? "unchanged" : "imported") : "none"}, ` +
+      `[ClaudeConfigImport] ${dryRun ? "(dry run) " : ""}${resolvedRoot}: instructions=${summary.projectInstructions.imported ? (summary.projectInstructions.unchanged ? "unchanged" : "imported") : "none"}, ` +
         `skills +${summary.skills.created}/~${summary.skills.updated}/=${summary.skills.unchanged} (${summary.skills.skipped.length} skipped), ` +
         `mcp +${summary.mcpServers.imported}/=${summary.mcpServers.unchanged} (${summary.mcpServers.skipped.length} skipped), ` +
-        `hooks skipped=${summary.hooks.skippedCount}`,
+        `hooks skipped=${summary.hooks.skippedCount}, agents listed=${summary.agents.found.length}`,
     );
 
     return summary;

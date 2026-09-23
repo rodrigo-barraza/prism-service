@@ -117,6 +117,8 @@ export interface MCPServerConfig {
   command?: string;
   args?: string[];
   env?: Record<string, string>;
+  /** stdio: the subprocess working directory (an imported plugin's root). */
+  cwd?: string;
   url?: string;
   headers?: Record<string, string>;
   /** The document id — half of the pool key. Defaults to `name`. */
@@ -366,6 +368,7 @@ function createTransport(
       command: config.command!,
       args: config.args || [],
       env: buildStdioEnvironment(config.env),
+      ...(config.cwd ? { cwd: config.cwd } : {}),
     });
   }
 
