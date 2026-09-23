@@ -235,5 +235,32 @@ describe("Persona Utilities", () => {
       const addendumText = getToolPolicyAddendum(["random_tool"]);
       expect(addendumText).toBe("");
     });
+
+    describe("with the persona's own sections", () => {
+      const personaSections = [
+        { content: "# Always On", requires: [] },
+        { content: "# Polls", requires: ["create_discord_poll", "create_discord_thread"] },
+        { content: (locale: string) => `# Audio (${locale})`, requires: ["synthesize_*"] },
+      ];
+
+      it("renders the gated sections the new tools unlock, in the persona's locale", () => {
+        const addendumText = getToolPolicyAddendum(["create_discord_poll", "synthesize_speech"], "caveman", {
+          personaSections,
+        });
+        expect(addendumText).toBe("# Polls\n\n# Audio (caveman)");
+      });
+
+      it("skips a section a tool that was already callable satisfied — it is in the system prompt", () => {
+        const addendumText = getToolPolicyAddendum(["create_discord_poll"], "en", {
+          personaSections,
+          alreadyCallable: ["create_discord_thread", "search_web"],
+        });
+        expect(addendumText).toBe("");
+      });
+
+      it("never repeats an ungated section", () => {
+        expect(getToolPolicyAddendum(["random_tool"], "en", { personaSections })).toBe("");
+      });
+    });
   });
 });

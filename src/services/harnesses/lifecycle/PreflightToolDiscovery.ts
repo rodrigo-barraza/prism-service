@@ -72,7 +72,10 @@ function extractLastUserMessageText(
  * setting `toolSetDirty` — persistDynamicTools would flag the set as dirty
  * and cause checkAndApplyToolSetChanges() to fire after iteration 1,
  * re-introducing the cache thrash this module exists to prevent. The caller
- * re-resolves tools immediately, so the flag has no work to do.
+ * re-resolves tools immediately, so the flag has no work to do — except for
+ * a persona that takes its picks as an activation
+ * (Persona.activatePreflightTools): there the caller sets the flag itself
+ * and the harness applies it once, before its first model call.
  */
 export async function runPreflightToolDiscovery({
   context,

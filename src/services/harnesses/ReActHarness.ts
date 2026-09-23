@@ -516,6 +516,12 @@ export default class ReActHarness extends BaseAgenticHarness {
           // without this, the assistant message with tool results can fall
           // outside the persistence slice and tool results are lost.
           state.originalMessageCount = currentMessages.length;
+
+          // Pre-flight picks the loop routes through activation
+          // (Persona.activatePreflightTools): the system prompt above was
+          // assembled from the declared tools alone, and the picks arrive
+          // here, after the user's message, as one tool-update message.
+          this.checkAndApplyToolSetChanges(currentMessages);
         }
 
         // ── Build pass options ─────────────────────────────────
@@ -961,7 +967,7 @@ export default class ReActHarness extends BaseAgenticHarness {
           const assistantMessage: ConversationMessage = {
             role: "assistant",
             // Ending here, the reply is the turn's final message (finalize
-            // appends it, and `done` carries it), so it is not kept twice.
+            // appends it and records it as the turn's text): not kept twice.
             content: endsWithReply ? "" : pass.finalStreamedText || "",
             thinking: pass.streamedThinking.trim(),
             thinkingSignature: pass.thinkingSignature,
@@ -984,16 +990,6 @@ export default class ReActHarness extends BaseAgenticHarness {
               stc.result = res.result;
               stc.durationMilliseconds = res.durationMilliseconds;
             }
-          }
-
-          // A rejected (or timed-out) plan ends the turn, but the turn still
-          // happened: the plan and the verdict are in the assistant message
-          // just pushed, and finalize() persists them, clears isGenerating
-          // and emits `done`. Nothing is left to recover.
-          if (isPlanRejected) {
-            this.logIteration(pass, currentMessages);
-            hasCleanTextBreak = true;
-            break;
           }
 
           if (endsWithReply) {
@@ -1021,6 +1017,16 @@ export default class ReActHarness extends BaseAgenticHarness {
             // history as the model's own words, then the hook's reason.
             currentMessages.push({ role: "assistant", content: pass.finalStreamedText });
             currentMessages.push(buildStopContinuationMessage(stopOutcome.continueWith));
+          }
+
+          // A rejected (or timed-out) plan ends the turn, but the turn still
+          // happened: the plan and the verdict are in the assistant message
+          // just pushed, and finalize() persists them, clears isGenerating
+          // and emits `done`. Nothing is left to recover.
+          if (isPlanRejected) {
+            this.logIteration(pass, currentMessages);
+            hasCleanTextBreak = true;
+            break;
           }
 
           const retryGuidance = buildToolRetryGuidance(
