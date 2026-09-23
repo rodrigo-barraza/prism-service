@@ -115,12 +115,15 @@ and decisions, a grandchild's `sub_agent_*`) goes up without the seq the
 sub-agent's own conversation stamped on it, so the parent numbers it
 (`SubAgentTelemetryEmitter` `forParentStream`); a kept foreign seq ran
 backwards whenever the parent had emitted more, and the cursor dropped it.
-NOT done from §4 of the review: persisted run state (pending tools /
-approvals / questions / checkpoints) and the "safe retry vs uncertain
-outcome" recovery classification. `ApprovalRegistry` still holds live
-`resolve` closures; persisting the descriptor is the first step. The client's
-full typed-reducer migration of `AgentChatComponent` is also not done — new
-state lives in dedicated hooks/modules, the component's structure is unchanged.
+Persisted run state and the "safe retry vs uncertain outcome" recovery
+classification from §4 of the review were done later by prompt 13:
+Landing 1 (`PendingDecisionStore`: approvals and questions outlive the
+process) and Landing 2 (`TurnRunStore` + `TurnResumeService`: a turn a
+restart interrupted is re-driven — its pass replayed, read-only calls
+re-run, anything else asked about as uncertain; mailbox entries and
+background work delivered once). The client's full typed-reducer migration
+of `AgentChatComponent` is not done — new state lives in dedicated
+hooks/modules, the component's structure is unchanged.
 
 ### 2.5 OpenAI native state and catalog
 Messages carry `phase`, `reasoningItems[{id, summary, encrypted_content}]`,

@@ -69,6 +69,9 @@ export const COLLECTIONS = {
   CUSTOM_AGENTS: "custom_agents",
   WORKSPACES: "workspaces",
   TOOL_CONTEXT: "tool_context",
+  TURN_RUNS: "turn_runs",
+  TURN_INPUTS: "turn_inputs",
+  DETACHED_WORK: "detached_work",
   SCHEDULED_TASKS: "scheduled_tasks",
   CONVERSATION_TIMERS: "conversation_timers",
   PROMPTS: "prompts",
@@ -101,6 +104,8 @@ export const SYSTEM_STATUSES = {
   CANCELLED: "cancelled",
   ERROR: "error",
   WARNING: "warning",
+  /** Background work a restart cut off mid-run: it may have partly happened (TURN_RESUME). */
+  UNCERTAIN: "uncertain",
 } as const;
 
 export const APPROVAL_STATUS = {
@@ -174,6 +179,59 @@ export const PENDING_DECISIONS = {
   /** Conversation `runState` while a turn is parked on its user. */
   RUN_STATE_AWAITING_USER: "awaiting_user",
   /** A settled record is kept this long (TTL on `expiresAt`) — a late second POST still reads 409. */
+  SETTLED_RETENTION_DAYS: 7,
+} as const;
+
+/**
+ * Durable runs — a turn a restart interrupted is re-driven from what it
+ * recorded (TurnRunStore): the pass whose tool batch was in progress, each
+ * call's progress, and what the turn still owed its user. Background work
+ * and mid-turn input outlive the process too (DetachedWorkStore,
+ * TurnInputStore), each delivered at most once after a restart.
+ */
+export const TURN_RESUME = {
+  /** A turn re-driven this many times without finishing is salvaged instead (a crash loop). */
+  MAXIMUM_ATTEMPTS: 2,
+  /**
+   * Capability tags (permissions/ToolCapabilities) that make a call a side
+   * effect: an AUTO-tier call carrying none of them is read-only and re-runs
+   * after a restart interrupted it.
+   */
+  SIDE_EFFECT_CAPABILITIES: [
+    "fs_write",
+    "shell",
+    "subagent",
+    "memory_write",
+    "external_side_effect",
+    "mcp",
+  ],
+  /**
+   * Flagged idempotent: re-run after an interruption whatever their tier or
+   * tags — whether or not their capabilities were registered yet. ask_user
+   * finds its own question again, wait_for_tasks waits again, the plan tools
+   * pick up their decision.
+   */
+  RERUNNABLE_TOOL_NAMES: [
+    "ask_user",
+    "wait_for_tasks",
+    "enter_plan_mode",
+    "exit_plan_mode",
+    "sleep",
+    "list_async_tasks",
+    "list_timers",
+    "list_artifacts",
+  ],
+  /** AUTO tier, no side-effect tags, but they act through other tools: never re-run unasked. */
+  NOT_RERUNNABLE_TOOL_NAMES: ["run_tool_program"],
+  /** The decision id of "retry this interrupted call?" is the call's id plus this. */
+  RETRY_DECISION_SUFFIX: "#retry",
+  /** `requestedBy` on the approval card that asks it. */
+  RETRY_REQUESTED_BY: "restart",
+  /** A finished call's result longer than this (JSON) is not kept: the call counts as interrupted. */
+  MAXIMUM_STORED_RESULT_CHARACTERS: 1_000_000,
+  /** SSE status: this turn was re-driven after a restart. */
+  STATUS_RESUMED: "turn_resumed",
+  /** Delivered background-work records are kept this long (TTL on `expiresAt`). */
   SETTLED_RETENTION_DAYS: 7,
 } as const;
 

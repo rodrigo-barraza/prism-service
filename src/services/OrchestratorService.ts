@@ -1601,9 +1601,12 @@ export class OrchestratorService {
     }
 
     if (dispatch) {
-      dispatch.agentIds = registeredResults
-        .filter((result): result is SubAgentResult => !("error" in result))
-        .map((result) => result.agent_id);
+      DetachedDispatchRegistry.assignAgents(
+        dispatch,
+        registeredResults
+          .filter((result): result is SubAgentResult => !("error" in result))
+          .map((result) => result.agent_id),
+      );
     }
 
     logger.info(
@@ -1863,7 +1866,7 @@ export class OrchestratorService {
     );
 
     const dispatch = OrchestratorService._openDispatch(orchestratorContext);
-    if (dispatch) dispatch.agentIds = [agentId];
+    if (dispatch) DetachedDispatchRegistry.assignAgents(dispatch, [agentId]);
 
     // Fire detached background promise — same pattern as non-blocking spawnFromTool
     OrchestratorService._runSubAgentLoop(

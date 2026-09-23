@@ -52,6 +52,7 @@ import {
   collectTurnMessages,
 } from "./lifecycle/TurnTranscript.ts";
 import { routeStreamChunk } from "./lifecycle/StreamChunkRouter.ts";
+import { recordTurnCheckpoint } from "./lifecycle/TurnRunRecorder.ts";
 import { substituteToolOutputTokens } from "./lifecycle/ToolOutputSubstituter.ts";
 import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
@@ -1433,7 +1434,10 @@ export default class BaseAgenticHarness {
   // ── Per-iteration pass state factory ──────────────────────
 
   /** Create a fresh per-iteration pass state object. */
-  createPassState(passOptions: AgenticOptions): PassState {
+  createPassState(
+    passOptions: AgenticOptions,
+    { replayed = false }: { replayed?: boolean } = {},
+  ): PassState {
     const {
       resolvedModel,
       providerName,
@@ -1448,29 +1452,32 @@ export default class BaseAgenticHarness {
       requestId,
     } = this.context;
 
-    const pendingPromise = RequestLogger.insertPending({
-      requestId: `${requestId}-${this.state.iterations}`,
-      endpoint: "/agent",
-      operation: "agent:iteration",
-      project,
-      username,
-      profileId,
-      clientIp: this.context.clientIp,
-      agent: agent || null,
-      harness: (passOptions?.harness as string) || null,
-      provider: providerName,
-      model: resolvedModel,
-      conversationId,
-      traceId: traceId || null,
-      agentConversationId: agentConversationId || null,
-      parentAgentConversationId: parentAgentConversationId || null,
-      agenticIteration: this.state.iterations,
-    }).catch((error: Error) => {
-      logger.error(
-        `[BaseAgenticHarness] Failed to insert pending request: ${errorMessage(error)}`,
-      );
-      return null;
-    });
+    // A replayed pass (ResumedPass) makes no request: nothing to log.
+    const pendingPromise = replayed
+      ? Promise.resolve(null)
+      : RequestLogger.insertPending({
+          requestId: `${requestId}-${this.state.iterations}`,
+          endpoint: "/agent",
+          operation: "agent:iteration",
+          project,
+          username,
+          profileId,
+          clientIp: this.context.clientIp,
+          agent: agent || null,
+          harness: (passOptions?.harness as string) || null,
+          provider: providerName,
+          model: resolvedModel,
+          conversationId,
+          traceId: traceId || null,
+          agentConversationId: agentConversationId || null,
+          parentAgentConversationId: parentAgentConversationId || null,
+          agenticIteration: this.state.iterations,
+        }).catch((error: Error) => {
+          logger.error(
+            `[BaseAgenticHarness] Failed to insert pending request: ${errorMessage(error)}`,
+          );
+          return null;
+        });
 
     const passState: PassState = {
       streamedText: "",
@@ -1489,6 +1496,7 @@ export default class BaseAgenticHarness {
       options: passOptions,
       requestId: null, // set after tracker registration
       pendingRequestDocumentIdPromise: pendingPromise,
+      ...(replayed ? { replayed: true } : {}),
     };
     // A new pass: the previous pass's thinking blocks already went out with
     // its own assistant message; the loop state tracks the newest pass only.
@@ -1510,7 +1518,10 @@ export default class BaseAgenticHarness {
    * Called at the top of each loop iteration. Writes to a transient
    * `turnCheckpoint` field (never `messages`, so live clients see no
    * mid-turn duplication); the finalize append atomically clears it, and
-   * startup recovery merges any orphaned checkpoint into `messages`.
+   * startup recovery merges any orphaned checkpoint into `messages` — or,
+   * when the turn can be picked up again, re-drives it (TurnResumeService).
+   * The checkpoint carries its iteration: a recorded pass older than it is
+   * already in these messages.
    *
    * Best-effort: a failed checkpoint must never break the turn.
    */
@@ -1528,16 +1539,24 @@ export default class BaseAgenticHarness {
       const sanitizedMessages = sanitizeMessagesForPersistence(
         newTurnMessages as MessagePayload[],
       );
-      if (sanitizedMessages.length === 0) return;
-      const { default: ConversationService } =
-        await import("#src/services/ConversationService");
-      await ConversationService.saveTurnCheckpoint(
-        conversationId,
-        project,
-        username,
-        sanitizedMessages,
-        getCollectionOpts(project, agent) || {},
-      );
+      // A re-driven turn starts with nothing new (its earlier messages were
+      // persisted at boot); its checkpoint still marks it unfinished.
+      if (sanitizedMessages.length > 0 || this.context.resume) {
+        const { default: ConversationService } =
+          await import("#src/services/ConversationService");
+        await ConversationService.saveTurnCheckpoint(
+          conversationId,
+          project,
+          username,
+          sanitizedMessages,
+          {
+            ...(getCollectionOpts(project, agent) || {}),
+            iteration: this.state.iterations,
+            allowEmpty: !!this.context.resume,
+          },
+        );
+      }
+      await recordTurnCheckpoint(this.context, this.state);
     } catch (error: unknown) {
       logger.warn(
         `[BaseAgenticHarness] Turn checkpoint failed for ${conversationId}: ${errorMessage(error)}`,

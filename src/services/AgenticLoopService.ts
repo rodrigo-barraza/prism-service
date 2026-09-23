@@ -1,6 +1,7 @@
 import {
   DEFAULT_TOPOLOGY,
   DEFAULT_THOUGHT_STRUCTURE,
+  THOUGHT_STRUCTURES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import AgenticToolResolver from "./AgenticToolResolver.ts";
 import AgenticLoopState from "./AgenticLoopState.ts";
@@ -26,11 +27,14 @@ import QuestionRegistry, {
   type QuestionAnswerOutcome,
 } from "./QuestionRegistry.ts";
 import type { DecisionOwner } from "./PendingDecisionStore.ts";
+import { decisionOwnerOf } from "./conversation/ConversationRunState.ts";
+import { endTurnRun } from "./harnesses/lifecycle/TurnRunRecorder.ts";
 import { runPreflightToolDiscovery } from "./harnesses/lifecycle/PreflightToolDiscovery.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { TURN_RESUME } from "#src/constants";
 import logger from "#src/utils/logger";
 
 import type { AgenticContext, ConversationMessage } from "./harnesses/types.ts";
@@ -146,10 +150,14 @@ export default class AgenticLoopService {
     // common case. Runs AFTER the seeding block above so the merge preserves
     // the full resolved base set (dynamicEnabledTools now holds it).
     // Fail-open — any error and the loop proceeds with the original tools.
-    const preflight = await runPreflightToolDiscovery({
-      context,
-      resolvedTools,
-    });
+    // A re-driven turn already discovered what it needed: its tool set was
+    // persisted (ToolContext) before the restart.
+    const preflight = context.resume
+      ? { enabledTools: [] as string[] }
+      : await runPreflightToolDiscovery({
+          context,
+          resolvedTools,
+        });
     if (preflight.enabledTools.length > 0) {
       // Re-resolve so the enlarged dynamic set flows through the exact same
       // filter pipeline (blocked/disabled/native-collision/sub-agent rules).
@@ -192,9 +200,12 @@ export default class AgenticLoopService {
     // all messages except the last one (the triggering input) are already
     // persisted in the database. For new conversations (e.g. Discord channel
     // history passed as ephemeral context), nothing has been persisted yet.
+    // A re-driven turn arrives marked: its history is persisted, the
+    // messages its checkpoint carried are not (TurnResumeService).
     if (
       !options.isSubAgent &&
       !context.isNewConversation &&
+      !context.resume &&
       messages.length > 0
     ) {
       for (let i = 0; i < messages.length - 1; i++) {
@@ -246,7 +257,7 @@ export default class AgenticLoopService {
     // 2. Initialize shared state
     const state = new AgenticLoopState({
       originalMessageCount: messages.length,
-      planModeActive: !!options.planFirst,
+      planModeActive: context.resume ? context.resume.planModeActive : !!options.planFirst,
     });
 
     // Cost ceiling: create the tree-wide accumulator at the root loop.
@@ -319,16 +330,43 @@ export default class AgenticLoopService {
       `[AgenticLoop] Using harness: "${HarnessClass.id}" (${HarnessClass.label}), thoughtStructure: "${thoughtStructure}"`,
     );
 
+    // Only the ReAct chain of thought replays a stored pass; any other
+    // shape starts the interrupted step over (and supersedes its cards).
+    if (
+      context.resume &&
+      (HarnessClass.id !== "standard" ||
+        thoughtStructure === THOUGHT_STRUCTURES.TREE_OF_THOUGHTS ||
+        thoughtStructure === THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS)
+    ) {
+      logger.info(
+        `[AgenticLoop] ${conversationId}: harness "${HarnessClass.id}" / "${thoughtStructure}" cannot replay a pass — the interrupted step starts over`,
+      );
+      context.resume = null;
+    }
+
     // 4. Instantiate and run
     const harness = new HarnessClass(context, state, resolvedTools);
     const loopKey = resolveLoopKey(context);
-    // Decisions still pending from a turn that died with a previous process
-    // will never be acted on by this one: the user moved on. Supersede them
-    // (and close their "needs you" entries) before this turn asks anything.
-    await AgenticLoopService.retireOrphanedDecisions(loopKey);
+    if (context.resume) {
+      // Picks up where the restart interrupted it: the pass is replayed at
+      // its own iteration, and its decisions are its own — not orphans. The
+      // loop state a checkpoint does not carry comes back with it.
+      state.iterations = context.resume.pass.iteration - 1;
+      if (context.resume.autoApprove) options.autoApprove = true;
+      if (context.resume.skillsText && !options._skillsText) {
+        options._skillsText = context.resume.skillsText;
+      }
+    } else {
+      // Decisions still pending from a turn that died with a previous process
+      // will never be acted on by this one: the user moved on. Supersede them
+      // (and close their "needs you" entries) before this turn asks anything.
+      await AgenticLoopService.retireOrphanedDecisions(loopKey);
+    }
     // Accept mid-turn input (steering, non-blocking answers, completions)
     // for the life of this turn; the harness drains it at its boundaries.
-    TurnInputMailbox.open(conversationId);
+    // What it accepts is kept durably until the turn ends (TurnInputStore).
+    TurnInputMailbox.open(conversationId, decisionOwnerOf(context));
+    if (context.resume) await AgenticLoopService.reopenResumedTurn(context, loopKey);
     try {
       return await harness.run();
     } finally {
@@ -362,6 +400,9 @@ export default class AgenticLoopService {
           /* OrchestratorService may not be used */
         }
       }
+
+      // Nothing is left to re-drive: the turn ended in this process.
+      await endTurnRun(context);
     }
   }
 
@@ -497,6 +538,7 @@ export default class AgenticLoopService {
       question?: string;
       questions?: QuestionDefinition[];
       choices?: string[];
+      toolCallId?: string | null;
     },
     owner: DecisionOwner = {},
   ): Promise<void> {
@@ -558,6 +600,40 @@ export default class AgenticLoopService {
         `[AgenticLoop] Could not retire orphaned decisions on ${loopKey}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+  }
+
+  /**
+   * A re-driven turn's mailbox is open: give it what the restart owed it —
+   * the input accepted before the restart and never delivered (same ids),
+   * the notices of background work the restart cut off, and the
+   * non-blocking cards it asked before (open ones answer into it; answers
+   * that came while the server was down are delivered now). Each once.
+   */
+  static async reopenResumedTurn(context: AgenticContext, loopKey: string): Promise<void> {
+    const resume = context.resume;
+    if (!resume) return;
+    for (const entry of resume.inputs) TurnInputMailbox.restore(loopKey, entry);
+    for (const notice of resume.notices) TurnInputMailbox.post(loopKey, notice);
+    try {
+      const { adoptNonBlockingQuestions } = await import(
+        "./tool-definitions/AskUserQuestionTool.ts"
+      );
+      await adoptNonBlockingQuestions(loopKey, decisionOwnerOf(context));
+    } catch (error: unknown) {
+      logger.warn(
+        `[AgenticLoop] Could not adopt the open questions of ${loopKey}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    context.emit({
+      type: SERVER_SENT_EVENT_TYPES.STATUS,
+      message: TURN_RESUME.STATUS_RESUMED,
+      iteration: resume.pass.iteration,
+      attempt: resume.attempt,
+    });
+    logger.info(
+      `[AgenticLoop] Re-driving ${loopKey} from iteration ${resume.pass.iteration} (attempt ${resume.attempt}): ` +
+        `${resume.pass.toolCalls.length} call(s) replayed, ${resume.inputs.length} input(s) restored, ${resume.notices.length} notice(s)`,
+    );
   }
 
   // ── Harness Discovery API ──────────────────────────────
