@@ -61,6 +61,9 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   [TOOL_NAMES.GIT_STATUS]: APPROVAL_TIERS.AUTO,
   [TOOL_NAMES.GIT_DIFF]: APPROVAL_TIERS.AUTO,
   [TOOL_NAMES.GIT_LOG]: APPROVAL_TIERS.AUTO,
+  // tools-service's run_git takes only status / diff / log (fs_read). Unmapped,
+  // it asked in `default` and cost a classifier call per look in `auto`.
+  run_git: APPROVAL_TIERS.AUTO,
   [TOOL_NAMES.SUMMARIZE_PROJECT]: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — task management (agent's own scratchpad, not user files)
