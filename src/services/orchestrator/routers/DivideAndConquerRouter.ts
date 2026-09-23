@@ -523,6 +523,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
             files: referenceMember.files,
             model: referenceMember.model,
             agent: referenceMember.agent,
+            routing: referenceMember.routing,
             assignedProvider,
             assignedModel,
             agentIndex: subtaskIndex,
@@ -668,7 +669,6 @@ export class DivideAndConquerRouter implements TopologyRouter {
         toolUses: 0,
         iterations: 1,
         durationMilliseconds: synthesisDurationMilliseconds,
-        messages: [],
         diff: { additions: 0, deletions: 0, files: [] },
       };
 
@@ -814,6 +814,7 @@ export class DivideAndConquerRouter implements TopologyRouter {
               files: referenceMember.files,
               model: referenceMember.model,
               agent: referenceMember.agent,
+              routing: referenceMember.routing,
               assignedProvider,
               assignedModel,
               agentIndex: subtaskIndex,
@@ -919,7 +920,6 @@ export class DivideAndConquerRouter implements TopologyRouter {
         toolUses: 0,
         iterations: 1,
         durationMilliseconds: recursiveSynthesisDurationMilliseconds,
-        messages: [],
         diff: { additions: 0, deletions: 0, files: [] },
       };
 

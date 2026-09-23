@@ -6,7 +6,9 @@ import {
   TOOL_NAMES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { HARNESS } from "#src/constants";
+import { traceToolExecution } from "#src/services/Tracing";
 import { firePermissionDenied, rememberHookContext } from "./TurnHooks.ts";
+import { recordCallFinished, recordCallStarted } from "./TurnRunRecorder.ts";
 import {
   snapshotAfterToolBatch,
   snapshotBeforeToolBatch,
@@ -130,6 +132,19 @@ export async function executeToolBatch(
 
   const results = await Promise.all(
     toolCalls.map(async (toolCall) => {
+      // It already ran, before a restart interrupted the turn: the result it
+      // produced then stands (ResumedPass) — running it again could repeat it.
+      if (toolCall._resumed?.status === "finished") {
+        return {
+          name: toolCall.name,
+          id: toolCall.id,
+          result: toolCall._resumed.result,
+          ...(toolCall._resumed.durationMilliseconds !== undefined
+            ? { durationMilliseconds: toolCall._resumed.durationMilliseconds }
+            : {}),
+        };
+      }
+
       // Malformed tool-call JSON (flagged by the provider) — never execute
       // with silently-empty args. Return a synthetic error telling the model
       // its own JSON was broken so it can re-emit the call.
@@ -206,9 +221,13 @@ export async function executeToolBatch(
       const timeoutMilliseconds = resolveToolTimeout(toolCall.name, context);
       const toolSignal = buildToolSignal(context, timeoutMilliseconds);
 
+      // On record before it can have any effect: a restart that cuts it off
+      // finds it `running`, not unstarted (TurnRunRecorder).
+      await recordCallStarted(context, toolCall);
+
       if (ToolOrchestratorService.isStreamable(toolCall.name)) {
         const startTime = Date.now();
-        const result = await runWithTimeout(
+        const result = await traceToolExecution(context, toolCall, () => runWithTimeout(
           () =>
             ToolOrchestratorService.executeToolStreaming(
               toolCall.name,
@@ -231,6 +250,9 @@ export async function executeToolBatch(
                 project,
                 username,
                 agent,
+                // A Discord turn's scope rides every tools-service call as
+                // x-discord-* headers (DiscordContextHeaders).
+                agentContext: context.options?.agentContext,
                 requestId: context.requestId,
                 agentConversationId: resolvedAgentConversationId,
                 conversationId,
@@ -243,8 +265,9 @@ export async function executeToolBatch(
             ),
           timeoutMilliseconds,
           toolCall.name,
-        );
+        ));
         const durationMilliseconds = Date.now() - startTime;
+        state.recordToolExecution(toolCall, result, durationMilliseconds);
         const finalResult = await runPostToolHooks(
           hooks,
           toolCall,
@@ -252,6 +275,7 @@ export async function executeToolBatch(
           context,
           state,
         );
+        await recordCallFinished(context, toolCall, finalResult, durationMilliseconds);
         return {
           name: toolCall.name,
           id: toolCall.id,
@@ -261,7 +285,7 @@ export async function executeToolBatch(
       }
 
       const startTime = Date.now();
-      const result = await runWithTimeout(
+      const result = await traceToolExecution(context, toolCall, () => runWithTimeout(
         () =>
           ToolOrchestratorService.executeTool(
             toolCall.name,
@@ -270,7 +294,9 @@ export async function executeToolBatch(
               messages: context._currentMessages || context.messages,
               project,
               username,
+              profileId: context.profileId,
               agent: agent || null,
+              agentContext: context.options?.agentContext,
               traceId: traceId || null,
               agentConversationId: resolvedAgentConversationId,
               conversationId,
@@ -278,6 +304,10 @@ export async function executeToolBatch(
               requestId: context.requestId,
               iteration: state.iterations,
               signal: toolSignal,
+              // The call itself — a tool that parks on its user (ask_user)
+              // finds its own record again when a restart re-drives it.
+              _toolCallId: toolCall.id,
+              _resumedCall: toolCall._resumed !== undefined,
               _providerName: providerName,
               _resolvedModel: resolvedModel,
               _emit: emit,
@@ -311,10 +341,12 @@ export async function executeToolBatch(
               _autoApprove: context.options?.autoApprove === true,
               _policies: context.options?.policies,
               _permissionRules: context.options?._permissionRules,
+              _permissionMode: context.options?._permissionMode,
               _enableCriticGate: context.options?.enableCriticGate,
               _criticModel: context.options?.criticModel,
               _maxCostDollars: context.options?.maxCostDollars,
               _sharedCostBudget: context.options?._sharedCostBudget,
+              _routingPreset: context.options?.routingPreset as string | undefined,
               // A native async call (OpenAI async tools): run_async_task binds
               // its task to the call id the result must come back on.
               ...(toolCall.nativeAsync && toolCall.id ? { _nativeAsyncCallId: toolCall.id } : {}),
@@ -322,8 +354,9 @@ export async function executeToolBatch(
           ),
         timeoutMilliseconds,
         toolCall.name,
-      );
+      ));
       const durationMilliseconds = Date.now() - startTime;
+      state.recordToolExecution(toolCall, result, durationMilliseconds);
       const finalResult = await runPostToolHooks(
         hooks,
         toolCall,
@@ -331,6 +364,7 @@ export async function executeToolBatch(
         context,
         state,
       );
+      await recordCallFinished(context, toolCall, finalResult, durationMilliseconds);
       return {
         name: toolCall.name,
         id: toolCall.id,

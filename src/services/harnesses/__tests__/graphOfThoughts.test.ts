@@ -152,6 +152,7 @@ describe("GraphOfThoughtsStrategy", () => {
       streamedToolCalls: [],
       turnTranscript: null,
       turnTranscriptSeen: new WeakSet(),
+      recordToolExecution: vi.fn(),
     };
 
     mockHarnessInstance = {
@@ -200,6 +201,10 @@ describe("GraphOfThoughtsStrategy", () => {
       logIteration: vi.fn(),
       emitGenerationProgress: vi.fn(),
       emitUsageUpdate: vi.fn(),
+      // The turn's declared tool block (the real harness: lifecycle/ToolSurface.ts).
+      requestToolOptions(this: { tools: { finalTools: unknown[] } }) {
+        return { tools: this.tools.finalTools };
+      },
       checkAndApplyToolSetChanges: vi.fn(),
       finalize: vi.fn().mockResolvedValue(undefined),
     };

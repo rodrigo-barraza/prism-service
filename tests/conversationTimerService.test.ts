@@ -1,13 +1,11 @@
 import "./setup.ts";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { PROVIDERS, COLLECTIONS } from "#src/constants";
-import crypto from "crypto";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import ConversationService from "#src/services/ConversationService";
 import * as configModule from "#src/config";
 import * as scheduledTaskServiceModule from "#src/services/ScheduledTaskService";
 import * as providersModule from "#src/providers/index";
-import { registerCleanup } from "#src/utils/CleanupRegistry";
 
 // ── Mock logger (suppress output) ──────────────────────────────
 vi.mock("#src/utils/logger", () => ({
@@ -467,6 +465,21 @@ describe("ConversationTimerService", () => {
       expect(mockFindOneAndUpdate).toHaveBeenCalled();
       expect(ConversationService.appendMessages).toHaveBeenCalled();
       expect(mockRunAgenticLoop).toHaveBeenCalled();
+    });
+
+    it("a timer run is unattended — dontAsk unless its conversation names a mode, never full auto", async () => {
+      mockGetDocuments(COLLECTIONS.CONVERSATION_TIMERS).push({ ...TIMER_FIXTURE });
+      mockGetDocuments(COLLECTIONS.AGENT_CONVERSATIONS).push({
+        ...CONVERSATION_FIXTURE,
+        isGenerating: false,
+      });
+
+      await ConversationTimerService.tick();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const { options } = mockRunAgenticLoop.mock.calls[0][0] as { options: Record<string, unknown> };
+      expect(options.unattended).toBe(true);
+      expect(options.autoApprove).toBeUndefined();
     });
 
     it("reloads a compacted conversation through its boundary (summary + tail)", async () => {

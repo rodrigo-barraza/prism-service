@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import NativeSteerRegistry from "#src/services/NativeSteerRegistry";
 import { SYSTEM_MESSAGE_TAGS, wrapSystemMessage } from "#src/utils/SystemMessageTags";
 import logger from "#src/utils/logger";
+import type { DecisionOwner } from "#src/services/PendingDecisionStore";
 
 /**
  * TurnInputMailbox — input that arrives WHILE a turn is running.
@@ -29,10 +30,13 @@ import logger from "#src/utils/logger";
  * conversation id (the orchestrator posts with that). One turn per
  * conversation at a time, same invariant as ApprovalRegistry.
  *
- * In-memory by design: an entry is only accepted while a turn is OPEN, so a
- * caller that gets `accepted: false` knows to queue the message as the next
- * turn instead. Nothing here needs to survive a restart — a restart ends the
- * turn, and the client falls back to the queue.
+ * An entry is only accepted while a turn is OPEN, so a caller that gets
+ * `accepted: false` knows to queue the message as the next turn instead.
+ * What a box accepts is also written through to TurnInputStore (when the
+ * turn opened it with its owner) and forgotten when the turn closes it: an
+ * entry accepted by a turn a restart interrupted is delivered once after
+ * the restart — into the re-driven turn, or into the transcript
+ * (TurnResumeService).
  *
  * A turn that has decided to end SEALS its box first (ReActHarness, before
  * it counts background work and finalizes): from then on a post is refused
@@ -81,6 +85,22 @@ interface Mailbox {
   acceptedCount: number;
   /** The turn is ending: posts are refused as `no_active_turn`. */
   sealed: boolean;
+  /** Who runs the turn — set when its entries are kept durably (TurnInputStore). */
+  owner: DecisionOwner | null;
+  /** Durably kept entries of this box, forgotten when it closes. */
+  recordedIds: string[];
+}
+
+/** Write an accepted entry through to TurnInputStore (lazily: this module stays light). */
+function recordDurably(conversationId: string, box: Mailbox, entry: TurnInputEntry): void {
+  if (!box.owner) return;
+  box.recordedIds.push(entry.id);
+  const owner = box.owner;
+  void import("./TurnInputStore.ts")
+    .then(({ default: TurnInputStore }) => TurnInputStore.record(conversationId, entry, owner))
+    .catch(() => {
+      /* best-effort: the entry still reaches the running turn */
+    });
 }
 
 const mailboxes = new Map<string, Mailbox>();
@@ -91,15 +111,26 @@ export const TURN_INPUT_MAXIMUM_PENDING = 50;
 export const TURN_INPUT_MAXIMUM_TEXT_LENGTH = 20_000;
 
 const TurnInputMailbox = {
-  /** Open the mailbox for a turn. Idempotent; re-opening keeps pending entries. */
-  open(conversationId: string): void {
+  /**
+   * Open the mailbox for a turn. Idempotent; re-opening keeps pending
+   * entries. With the turn's `owner`, what it accepts is kept durably.
+   */
+  open(conversationId: string, owner?: DecisionOwner | null): void {
     if (!conversationId) return;
     const existing = mailboxes.get(conversationId);
     if (existing) {
       existing.sealed = false;
+      if (owner) existing.owner = owner;
       return;
     }
-    mailboxes.set(conversationId, { entries: [], openedAt: Date.now(), acceptedCount: 0, sealed: false });
+    mailboxes.set(conversationId, {
+      entries: [],
+      openedAt: Date.now(),
+      acceptedCount: 0,
+      sealed: false,
+      owner: owner ?? null,
+      recordedIds: [],
+    });
     logger.debug(`[TurnInputMailbox] Opened for ${conversationId} (open=${mailboxes.size})`);
   },
 
@@ -155,11 +186,29 @@ const TurnInputMailbox = {
     };
     box.entries.push(entry);
     box.acceptedCount++;
+    recordDurably(conversationId, box, entry);
     logger.info(
       `[TurnInputMailbox] ${input.kind} ${entry.id} queued for ${conversationId} (pending=${box.entries.length})`,
     );
     offerNatively(conversationId, entry);
     return { accepted: true, id: entry.id, position: box.entries.length };
+  },
+
+  /**
+   * Put back an entry a restart interrupted before its turn took it — same
+   * id, same arrival time (TurnResumeService). It is already kept durably;
+   * this box forgets it when it closes. False when no turn is open.
+   */
+  restore(conversationId: string, entry: TurnInputEntry): boolean {
+    const box = mailboxes.get(conversationId);
+    if (!box || box.sealed) return false;
+    box.entries.push({ ...entry });
+    box.acceptedCount++;
+    if (box.owner) box.recordedIds.push(entry.id);
+    logger.info(
+      `[TurnInputMailbox] ${entry.kind} ${entry.id} restored for ${conversationId} after a restart`,
+    );
+    return true;
   },
 
   /** Take every pending entry, in arrival order. Empty when nothing is pending. */
@@ -204,6 +253,14 @@ const TurnInputMailbox = {
     const box = mailboxes.get(conversationId);
     if (!box) return [];
     mailboxes.delete(conversationId);
+    if (box.recordedIds.length > 0) {
+      const ids = box.recordedIds;
+      void import("./TurnInputStore.ts")
+        .then(({ default: TurnInputStore }) => TurnInputStore.forget(ids))
+        .catch(() => {
+          /* best-effort: a leftover entry is recognised by its id at the next boot */
+        });
+    }
     if (box.entries.length > 0) {
       logger.warn(
         `[TurnInputMailbox] Closed ${conversationId} with ${box.entries.length} undelivered entr${box.entries.length === 1 ? "y" : "ies"}`,

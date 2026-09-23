@@ -68,7 +68,7 @@ function buildExecutorFixture() {
     messages: [],
   } as unknown as AgenticContext;
   const tools = { finalTools: [], resolvedEnabledTools: [] } as unknown as ResolvedTools;
-  const state = { iterations: 1 } as unknown as AgenticLoopState;
+  const state = { iterations: 1, recordToolExecution: vi.fn() } as unknown as AgenticLoopState;
   return { context, tools, state };
 }
 

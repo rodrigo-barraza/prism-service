@@ -12,7 +12,6 @@ import { checkCostBudget } from "#src/services/harnesses/lifecycle/CostBudgetEnf
 import { runExhaustionRecoveryPass } from "#src/services/harnesses/lifecycle/ExhaustionRecovery";
 import { createStandardHooks } from "#src/services/harnesses/lifecycle/HookInitializer";
 import {
-  blockUnauthorizedToolCalls,
   handleExitPlanMode,
   checkForPlanModeEntry,
 } from "#src/services/harnesses/lifecycle/PlanModeController";
@@ -761,6 +760,10 @@ describe("Harness Lifecycle Modules", () => {
   describe("ExhaustionRecovery", () => {
     it("should push recovery prompt and trigger recovery stream call", async () => {
       const mockHarness = {
+        requestToolOptions: vi.fn().mockReturnValue({ tools: [], toolLoadingMode: "bridge" }),
+        createProviderStream: vi.fn((messages: unknown[], options: unknown) =>
+          mockProvider.generateTextStream(messages, "gemini-3.5-flash", options),
+        ),
         enforceContextWindow: vi.fn().mockImplementation((msgs) => msgs),
         registerTrackerRequest: vi.fn(),
         createPassState: vi.fn().mockReturnValue({ usage: { inputTokens: 0, outputTokens: 0 } }),
@@ -811,35 +814,6 @@ describe("Harness Lifecycle Modules", () => {
   });
 
   describe("PlanModeController", () => {
-    it("should block non-exit_plan_mode tools during plan mode", () => {
-      const pendingToolCalls = [
-        { id: "call-1", name: "read_file", args: {} },
-        { id: "call-2", name: "exit_plan_mode", args: {} },
-      ];
-      const currentMessages: any[] = [];
-      const pass = { streamedText: "" };
-
-      const result = blockUnauthorizedToolCalls(pendingToolCalls as any, currentMessages, pass as any, {} as any);
-      expect(result.allBlocked).toBe(false);
-      expect(pendingToolCalls).toHaveLength(1);
-      expect(pendingToolCalls[0].name).toBe("exit_plan_mode");
-    });
-
-    it("should block all tools during plan mode and append warning message", () => {
-      const pendingToolCalls = [
-        { id: "call-1", name: "read_file", args: {} },
-      ];
-      const currentMessages: any[] = [];
-      const pass = { streamedText: "distilled plan text", streamedThinking: "thinking content", thinkingSignature: "signature" };
-
-      const result = blockUnauthorizedToolCalls(pendingToolCalls as any, currentMessages, pass as any, {} as any);
-      expect(result.allBlocked).toBe(true);
-      expect(pendingToolCalls).toHaveLength(0);
-      expect(currentMessages).toHaveLength(2);
-      expect(currentMessages[0].content).toBe("distilled plan text");
-      expect(currentMessages[1].content).toContain("You are in PLANNING MODE");
-    });
-
     it("should enter plan mode when enter_plan_mode is encountered", async () => {
       const state = { planModeActive: false, planModeText: "" };
       const emitSpy = vi.fn();
@@ -1208,7 +1182,7 @@ describe("Harness Lifecycle Modules", () => {
         context as any,
         tools as any,
         hooks,
-        { iterations: 1 } as any,
+        { iterations: 1, recordToolExecution: vi.fn() } as any,
       );
 
       expect(results).toHaveLength(1);
@@ -1234,7 +1208,7 @@ describe("Harness Lifecycle Modules", () => {
         context as any,
         tools as any,
         hooks,
-        { iterations: 2 } as any,
+        { iterations: 2, recordToolExecution: vi.fn() } as any,
       );
 
       expect(results).toHaveLength(1);
@@ -1261,7 +1235,7 @@ describe("Harness Lifecycle Modules", () => {
         context as any,
         tools as any,
         hooks,
-        { iterations: 1 } as any,
+        { iterations: 1, recordToolExecution: vi.fn() } as any,
       );
 
       expect(result.result).toBe("single-val");
@@ -1801,6 +1775,23 @@ describe("Harness Lifecycle Modules", () => {
         const result = sanitizeMessagesForPersistence(messages as any);
         expect(result).toHaveLength(1);
         expect(result[0].content).toBe("Normal user message content");
+      });
+
+      it("drops plan-mode notices and keeps a tool update's text without its activation", () => {
+        const messages = [
+          { role: "system", content: "<plan-mode>Plan mode is on.</plan-mode>", _isPlanModeNotice: true },
+          {
+            role: "system",
+            content: "<tool-update>get_element is available.</tool-update>",
+            toolActivation: { added: [{ name: "get_element" }], removed: [] },
+          },
+        ];
+
+        const result = sanitizeMessagesForPersistence(messages as any);
+        expect(result).toHaveLength(1);
+        expect(result[0].content).toContain("get_element is available");
+        // Next turn declares the tool outright — replaying the activation would load it twice.
+        expect((result[0] as Record<string, unknown>).toolActivation).toBeUndefined();
       });
     });
   });

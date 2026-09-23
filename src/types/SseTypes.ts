@@ -10,7 +10,8 @@ export interface SseEvent {
     args: Record<string, unknown>;
     result?: unknown;
   };
-  status?: string;
+  /** A tool's lifecycle (`tool_execution`), or an `error` event's HTTP status. */
+  status?: string | number;
   /** Message role for `user_message` turn-start events */
   role?: string;
   /** Emission time (epoch ms) for viewer-facing events */
@@ -22,6 +23,9 @@ export interface SseEvent {
   audioRef?: string;
   traceId?: string;
   conversationId?: string;
+  /** A `refusal` event's reason code and the provider's explanation. */
+  category?: string | null;
+  explanation?: string | null;
   /**
    * Per-conversation monotonic sequence number, stamped by
    * withDirectViewerBroadcast / LiveTurnBuffer. Never resets between turns,

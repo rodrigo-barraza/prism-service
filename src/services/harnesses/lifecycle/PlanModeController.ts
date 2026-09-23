@@ -6,10 +6,7 @@ import { decisionOwnerOf } from "#src/services/conversation/ConversationRunState
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import logger from "#src/utils/logger";
 import { APPROVALS } from "#src/constants";
-import {
-  SYSTEM_MESSAGE_TAGS,
-  wrapSystemMessage,
-} from "#src/utils/SystemMessageTags";
+import ConversationApprovalSettings from "#src/services/ConversationApprovalSettings";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
@@ -30,7 +27,6 @@ import type {
  * PlanModeController — manages plan mode state transitions during the agentic loop.
  *
  * Handles:
- *   - Blocking unauthorized tool calls during planning mode
  *   - Processing exit_plan_mode (proposal emission + user approval gate)
  *   - Entering/exiting plan mode based on tool calls
  *
@@ -39,72 +35,24 @@ import type {
  */
 
 /**
- * Filter out unauthorized tool calls during plan mode.
- * Only exit_plan_mode is allowed; all others are blocked and logged.
+ * An approved plan ends plan mode: the conversation's permission mode goes
+ * back to `default` — for this turn (the handle every engine in the tree
+ * reads) and for the turns after it (stored on the conversation). Anything
+ * other than `plan` is left as the user set it.
  */
-export function blockUnauthorizedToolCalls(
-  pendingToolCalls: ToolCall[],
-  currentMessages: ConversationMessage[],
-  pass: PassState,
-  _state: AgenticLoopState,
-  locale?: string,
-): { allBlocked: boolean } {
-  const blockedToolCalls = pendingToolCalls.filter(
-    (toolCall) => toolCall.name !== TOOL_NAMES.EXIT_PLAN_MODE,
+function leavePlanPermissionMode(context: AgenticContext): void {
+  const handle = context.options._permissionMode;
+  if (handle?.mode !== "plan") return;
+  handle.set("default", "plan_approved");
+  if (context.options.isSubAgent || !context.conversationId) return;
+  void ConversationApprovalSettings.setPermissionMode(
+    context.conversationId,
+    context.project,
+    context.username,
+    "default",
+  ).catch((error: unknown) =>
+    logger.warn(`[PlanningMode] Could not store the mode after the plan was approved: ${String(error)}`),
   );
-
-  if (blockedToolCalls.length === 0) {
-    return { allBlocked: false };
-  }
-
-  const blockedToolNames = blockedToolCalls
-    .map((toolCall) => toolCall.name)
-    .join(", ");
-
-  logger.warn(
-    `[PlanningMode] Blocked ${blockedToolCalls.length} unauthorized tool call(s): ${blockedToolNames}`,
-  );
-
-  // Remove blocked calls from the pending array
-  for (const blockedCall of blockedToolCalls) {
-    const index = pendingToolCalls.indexOf(blockedCall);
-    if (index >= 0) pendingToolCalls.splice(index, 1);
-  }
-
-  if (pendingToolCalls.length === 0) {
-    // All tool calls were blocked — add system feedback and continue loop
-    if (pass.finalStreamedText || pass.streamedText) {
-      currentMessages.push({
-        role: "assistant",
-        content: pass.finalStreamedText || pass.streamedText,
-        ...(pass.streamedThinking && {
-          thinking: pass.streamedThinking,
-        }),
-        ...(pass.thinkingSignature && {
-          thinkingSignature: pass.thinkingSignature,
-        }),
-        ...(pass.thinkingBlocks?.length && {
-          thinkingBlocks: pass.thinkingBlocks,
-        }),
-      });
-    }
-
-    currentMessages.push({
-      role: "system",
-      content: wrapSystemMessage(
-        SYSTEM_MESSAGE_TAGS.PLAN_MODE,
-        PromptLocaleService.get(
-          locale || PromptLocaleService.getDefaultLocale(),
-          "harness.planningMode.blocked",
-          { blockedNames: blockedToolNames },
-        ),
-      ),
-    });
-
-    return { allBlocked: true };
-  }
-
-  return { allBlocked: false };
 }
 
 /**
@@ -129,6 +77,13 @@ export async function handleExitPlanMode(
 ): Promise<{ shouldContinueLoop: boolean }> {
   const { options, emit, signal } = context;
 
+  // A denied exit_plan_mode proposes nothing: its tool result already says
+  // why (a deny rule, or a run nobody watches — where a plan card would
+  // park the turn on a person who will never come). The loop goes on.
+  if (exitPlanToolCall._approval?.isDenied) {
+    return { shouldContinueLoop: true };
+  }
+
   // Models that stream no plan text put it in the tool's `summary` argument.
   const summaryArgument = exitPlanToolCall.args?.summary;
   const planText =
@@ -143,16 +98,19 @@ export async function handleExitPlanMode(
 
   // The plan is decided like any other call: by the exit_plan_mode call's
   // id, through the same registry and POST /agent/approve as tool cards.
-  const batchId = crypto.randomUUID();
+  let batchId: string = crypto.randomUUID();
   const toolCallId = exitPlanToolCall.id || `${batchId}:plan`;
 
   let planDecision: "approved" | "rejected";
   let rejectionReason: string | undefined;
   let decisionsPromise: Promise<Map<string, ToolCallDecision>> | null = null;
+  // A pass replayed after a restart picks up the proposal it made before
+  // (ResumedPass): a decision already made is applied, not asked again.
+  let isProposalPending = true;
   const loopKey = resolveLoopKey(context);
   if (!options.autoApprove) {
     // Recorded first, THEN shown — as ApprovalGate does for tool cards.
-    ({ decisions: decisionsPromise } = await ApprovalRegistry.open(
+    const opened = await ApprovalRegistry.open(
       loopKey,
       {
         type: "plan",
@@ -171,17 +129,23 @@ export async function handleExitPlanMode(
         },
       },
       decisionOwnerOf(context),
-    ));
+      { resume: pass.replayed === true },
+    );
+    decisionsPromise = opened.decisions;
+    batchId = opened.batchId;
+    isProposalPending = opened.pendingToolCallIds.length > 0;
   }
 
-  emit({
-    type: "plan_proposal",
-    plan: planText,
-    steps: planSteps,
-    autoApproved: !!options.autoApprove,
-    toolCallId,
-    batchId,
-  });
+  if (isProposalPending) {
+    emit({
+      type: "plan_proposal",
+      plan: planText,
+      steps: planSteps,
+      autoApproved: !!options.autoApprove,
+      toolCallId,
+      batchId,
+    });
+  }
 
   if (!decisionsPromise) {
     planDecision = "approved";
@@ -251,6 +215,7 @@ export async function handleExitPlanMode(
   state.planModeActive = false;
   state.planModeText = "";
   PlanningModeService.stripPlanningInstruction(currentMessages);
+  leavePlanPermissionMode(context);
   emit({
     type: SERVER_SENT_EVENT_TYPES.STATUS,
     message: STATUS_MESSAGES.PLAN_MODE_EXITED,
@@ -259,25 +224,27 @@ export async function handleExitPlanMode(
   return { shouldContinueLoop: true };
 }
 
-/** Check if any tool calls enter plan mode and apply the transition. */
+/**
+ * Check if any tool calls enter plan mode and apply the transition. The
+ * tool list stays as it is (PlanModeGate.ts enforces read-only), and the
+ * "plan mode is on" notice is appended after the batch's assistant message
+ * (PlanModeNotice.ts) — never spliced into history.
+ */
 export async function checkForPlanModeEntry(
   executedToolCalls: ToolCall[],
-  currentMessages: ConversationMessage[],
+  _currentMessages: ConversationMessage[],
   state: AgenticLoopState,
   emit: EmitFunction,
-  locale?: string,
+  _locale?: string,
 ): Promise<void> {
   const hasEnterPlanMode = executedToolCalls.some(
     (toolCall) => toolCall.name === TOOL_NAMES.ENTER_PLAN_MODE,
   );
 
-  if (hasEnterPlanMode) {
+  if (hasEnterPlanMode && !state.planModeActive) {
     state.planModeActive = true;
     state.planModeText = "";
-    await PlanningModeService.injectPlanningInstruction(
-      currentMessages,
-      locale,
-    );
+    state.pendingPlanModeNotice = "entered";
     emit({
       type: SERVER_SENT_EVENT_TYPES.STATUS,
       message: STATUS_MESSAGES.PLAN_MODE_ENTERED,

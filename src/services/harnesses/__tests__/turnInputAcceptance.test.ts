@@ -195,7 +195,6 @@ vi.mock("../lifecycle/CostBudgetEnforcer.ts", () => ({
 }));
 
 vi.mock("../lifecycle/PlanModeController.ts", () => ({
-  blockUnauthorizedToolCalls: vi.fn(),
   handleExitPlanMode: vi.fn(),
   checkForPlanModeEntry: vi.fn().mockResolvedValue(undefined),
 }));

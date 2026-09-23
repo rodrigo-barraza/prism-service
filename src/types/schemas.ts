@@ -10,6 +10,7 @@ import {
 } from "#src/services/hooks/types";
 import type { HookEventName } from "#src/services/hooks/types";
 import { describeMatcher, isArgumentRule } from "#src/services/hooks/HookMatcher";
+import { MCP_SERVER_NAME_PATTERN, MCP_SERVER_NAME_RULE } from "#src/services/mcp/McpNaming";
 
 /**
  * Zod Schemas for Runtime Payload Validation
@@ -79,6 +80,8 @@ export const ChatRequestSchema = z
     harness: sanitizedString().nullable().optional(),
     topology: z.string().nullable().optional(),
     thoughtStructure: z.string().nullable().optional(),
+    /** A routing preset (routing/RoutingPresets) — e.g. "lead_sidekick". */
+    routingPreset: z.string().nullable().optional(),
     // Names of user-pinned rules for this turn — content is resolved
     // server-side by SystemPromptAssembler from the rules collection
     activeRuleNames: z.array(z.string()).nullable().optional(),
@@ -119,6 +122,13 @@ export const ChatRequestSchema = z
     textOnly: z.boolean().nullable().optional(),
     skipConversation: z.boolean().nullable().optional(),
     autoApprove: z.boolean().nullable().optional(),
+    // The conversation's permission mode for this turn (permissions/PermissionModes).
+    permissionMode: z
+      .enum(["default", "plan", "acceptEdits", "auto", "dontAsk", "bypass"])
+      .nullable()
+      .optional(),
+    // Nobody is watching this turn: anything that would ask is denied instead.
+    unattended: z.boolean().nullable().optional(),
     planFirst: z.boolean().nullable().optional(),
     maxIterations: z.number().nullable().optional(),
     maxSubAgentIterations: z.number().nullable().optional(),
@@ -249,8 +259,35 @@ export const DeleteFavoritesQuerySchema = z.object({
   key: z.string().min(1, "key is required"),
 });
 
+/** The server name is the tool namespace: `mcp__{name}__{tool}`. */
+const McpServerNameSchema = z
+  .string()
+  .min(1, "name is required")
+  .max(40)
+  .regex(MCP_SERVER_NAME_PATTERN, `name must be ${MCP_SERVER_NAME_RULE}`);
+
+const McpOutputCapSchema = z.number().int().positive().max(1_000_000);
+
+/**
+ * Owner-editable trust settings. `shared` is deliberately absent: only the
+ * boot seed (DEFAULT_MCP_SERVERS) makes a server visible to every profile.
+ */
+const McpServerSettingsSchema = {
+  /** Only a trusted server's readOnlyHint lowers a tool to the AUTO tier. */
+  trusted: z.boolean().optional(),
+  /** `auto` probes for the 2026-07-28 revision and falls back to 2025. */
+  protocol: z.enum(["auto", "legacy", "2026-07-28"]).optional(),
+  outputCapTokens: McpOutputCapSchema.nullable().optional(),
+  toolOutputCapTokens: z.record(z.string(), McpOutputCapSchema).optional(),
+  /** OAuth 2.1 (PKCE + dynamic registration) instead of static headers. */
+  auth: z
+    .object({ type: z.literal("oauth"), scope: z.string().max(500).nullable().optional() })
+    .nullable()
+    .optional(),
+};
+
 export const PostMcpServerSchema = z.object({
-  name: z.string().min(1, "name is required"),
+  name: McpServerNameSchema,
   displayName: z.string().optional(),
   transport: z
     .enum(["stdio", "sse", "streamable-http"])
@@ -262,10 +299,11 @@ export const PostMcpServerSchema = z.object({
   url: z.string().optional().default(""),
   headers: z.record(z.string(), z.string()).optional().default({}),
   enabled: z.boolean().optional().default(true),
+  ...McpServerSettingsSchema,
 });
 
 export const PutMcpServerSchema = z.object({
-  name: z.string().min(1).optional(),
+  name: McpServerNameSchema.optional(),
   displayName: z.string().optional(),
   transport: z.enum(["stdio", "sse", "streamable-http"]).optional(),
   command: z.string().optional(),
@@ -274,6 +312,25 @@ export const PutMcpServerSchema = z.object({
   url: z.string().optional(),
   headers: z.record(z.string(), z.string()).optional(),
   enabled: z.boolean().optional(),
+  ...McpServerSettingsSchema,
+});
+
+/** `POST /mcp-servers/prompts/get` — fill one MCP prompt. */
+export const GetMcpPromptSchema = z.object({
+  server: z.string().min(1),
+  name: z.string().min(1),
+  arguments: z.record(z.string(), z.string()).optional().default({}),
+});
+
+/** `POST /mcp-servers/resources/read` — read one MCP resource. */
+export const ReadMcpResourceSchema = z.object({
+  server: z.string().min(1),
+  uri: z.string().min(1),
+});
+
+/** `POST /mcp-servers/:id/tools/approve` — no `tools` approves every quarantined tool. */
+export const ApproveMcpToolsSchema = z.object({
+  tools: z.array(z.string().min(1)).min(1).optional(),
 });
 
 export const GetConversationsQuerySchema = z.object({

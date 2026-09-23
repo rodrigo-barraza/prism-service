@@ -125,12 +125,12 @@ vi.mock('#src/services/AgenticLoopService', () => ({
 }));
 
 vi.mock('#src/utils/SseUtilities', () => ({
-  handleSseRequest: vi.fn().mockImplementation(async (req, res, params, handler) => {
+  handleSseRequest: vi.fn().mockImplementation(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/event-stream' });
     res.write('data: {}\n\n');
     res.end();
   }),
-  handleJsonRequest: vi.fn().mockImplementation(async (req, res, next, params, handler) => {
+  handleJsonRequest: vi.fn().mockImplementation(async (req, res) => {
     res.json({ ok: true });
   }),
 }));
@@ -145,13 +145,16 @@ vi.mock('#src/services/WebhookEventBus', () => ({
 }));
 
 vi.mock('#src/services/MCPClientService', () => ({
+  McpServerNameConflictError: class McpServerNameConflictError extends Error {},
   default: {
     getConnectedServers: vi.fn().mockReturnValue([
-      { name: 'mock-mcp-server', status: 'connected', toolCount: 2, tools: [], transport: 'stdio', connectedAt: new Date() }
+      { name: 'mock-mcp-server', serverId: '507f1f77bcf86cd799439011', status: 'connected', toolCount: 2, tools: [], transport: 'stdio', connectedAt: new Date() }
     ]),
     isConnected: vi.fn().mockReturnValue(true),
     connect: vi.fn().mockResolvedValue({ serverName: 'mock-mcp-server', tools: [] }),
     disconnect: vi.fn().mockResolvedValue(true),
+    disconnectServer: vi.fn().mockResolvedValue(undefined),
+    updateServerSettings: vi.fn().mockReturnValue(false),
   }
 }));
 
@@ -160,7 +163,7 @@ describe('Feature Routes Integration Tests', () => {
 
   beforeEach(() => {
     // Intercept fetch calls to Tools Service
-    vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+    vi.spyOn(global, 'fetch').mockImplementation(async (url) => {
       const urlString = String(url);
       if (urlString.includes('/agentic/project/summary')) {
         return {
@@ -389,7 +392,9 @@ describe('Feature Routes Integration Tests', () => {
         .expect(200);
       expect(listResponse.body).toBeInstanceOf(Array);
 
-      // Create
+      // Create — the name-clash lookup finds nothing (this mock's findOne
+      // otherwise answers every query with the same document).
+      mockDb.collection().findOne.mockResolvedValueOnce(null);
       const createResponse = await request(app)
         .post('/mcp-servers-test')
         .send({
@@ -486,6 +491,26 @@ describe('Feature Routes Integration Tests', () => {
   });
 
   describe('SkillsRoutes', () => {
+    // SkillService reads agent_skills through getCollection, and finds a
+    // skill to update or delete among those the caller can see — so the
+    // update and delete address the one stub document by its id.
+    let previousGetCollection: ((...args: any[]) => any) | undefined;
+    beforeEach(() => {
+      previousGetCollection = vi
+        .mocked(MongoWrapper.getCollection)
+        .getMockImplementation();
+      vi.mocked(MongoWrapper.getCollection).mockReturnValue(
+        mockDb.collection() as any,
+      );
+    });
+    afterEach(() => {
+      if (previousGetCollection) {
+        vi.mocked(MongoWrapper.getCollection).mockImplementation(
+          previousGetCollection,
+        );
+      }
+    });
+
     it('CRUD operations', async () => {
       // List
       const listResponse = await request(app)
@@ -507,7 +532,7 @@ describe('Feature Routes Integration Tests', () => {
 
       // Update
       const updateResponse = await request(app)
-        .put('/skills-test/507f1f77bcf86cd799439011')
+        .put('/skills-test/mock-id-123')
         .send({
           name: 'updated-skill',
         })
@@ -516,7 +541,7 @@ describe('Feature Routes Integration Tests', () => {
 
       // Delete
       const deleteResponse = await request(app)
-        .delete('/skills-test/507f1f77bcf86cd799439011')
+        .delete('/skills-test/mock-id-123')
         .expect(200);
       expect(deleteResponse.body).toHaveProperty('success', true);
     });

@@ -548,6 +548,33 @@ describe("ScheduledTaskService — Comprehensive Tests", () => {
       });
     });
 
+    it("runs unattended in dontAsk by default — never full auto (prompt 12 L2)", async () => {
+      mockRunAgenticLoop.mockResolvedValueOnce(undefined);
+
+      await ScheduledTaskService.executeTask(TASK_FIXTURE as any, undefined, { username: "rodrigo" });
+
+      const { options } = mockRunAgenticLoop.mock.calls[0][0];
+      // `unattended` + no mode → AgenticLoopService resolves dontAsk: what
+      // would ask is denied, nothing parks on a card nobody will see.
+      expect(options.unattended).toBe(true);
+      expect(options.autoApprove).toBeUndefined();
+      expect(options.permissionMode).toBeUndefined();
+    });
+
+    it("a task that names a permission mode runs in it (still unattended)", async () => {
+      mockRunAgenticLoop.mockResolvedValueOnce(undefined);
+
+      await ScheduledTaskService.executeTask(
+        { ...TASK_FIXTURE, permissionMode: "acceptEdits" } as any,
+        undefined,
+        { username: "rodrigo" },
+      );
+
+      const { options } = mockRunAgenticLoop.mock.calls[0][0];
+      expect(options.permissionMode).toBe("acceptEdits");
+      expect(options.unattended).toBe(true);
+    });
+
     it("should spawn background agent with only disabledTools when the parent agent has wildcard availableTools", async () => {
       mockRunAgenticLoop.mockResolvedValueOnce(undefined);
 
@@ -736,7 +763,10 @@ describe("ScheduledTaskService — Comprehensive Tests", () => {
       expect(loopArguments.agent).toBe("OMNI");
       expect(loopArguments.workspaceRoot).toBe("/work/target");
       expect(loopArguments.traceId).toBe("trace-target");
-      expect(loopArguments.options.autoApprove).toBe(true);
+      // Unattended, not full auto (prompt 12 L2): the conversation's own
+      // mode holds and anything that would ask is denied.
+      expect(loopArguments.options.unattended).toBe(true);
+      expect(loopArguments.options.autoApprove).toBeUndefined();
       expect(loopArguments.options.disabledTools).toEqual(["execute_shell"]);
       expect(loopArguments.userMessage).toBe(notification);
       // Full history + the notification, every message marked persisted.

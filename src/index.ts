@@ -80,6 +80,7 @@ import projectInstructionsRouter from "./routes/ProjectInstructionsRoutes.ts";
 import agentMemoriesRouter from "./routes/AgentMemoriesRoutes.ts";
 import workflowMemoriesRouter from "./routes/WorkflowMemoriesRoutes.ts";
 import mcpServersRouter from "./routes/McpServersRoutes.ts";
+import mcpOAuthRouter from "./routes/McpOAuthRoutes.ts";
 import favoritesRouter from "./routes/FavoritesRoutes.ts";
 import conversationRouter from "./routes/ConversationExecutionRoute.ts";
 import statsRouter from "./routes/StatsRoutes.ts";
@@ -220,6 +221,8 @@ app.use("/project-instructions", projectInstructionsRouter);
 app.use("/agent-memories", agentMemoriesRouter);
 app.use("/workflow-memories", workflowMemoriesRouter);
 app.use("/mcp-servers", mcpServersRouter);
+// Browser redirects from MCP authorization servers (no identity headers).
+app.use("/mcp/oauth", mcpOAuthRouter);
 app.use("/favorites", favoritesRouter);
 app.use("/conversation", conversationRouter);
 
@@ -579,6 +582,34 @@ setupWebSocket(wss);
           keys: { expiresAt: 1 },
           options: { expireAfterSeconds: 0 },
         },
+        // turn_runs — the turn each root loop is running (TurnRunStore),
+        // one per loop; turn_inputs / detached_work — what a restart still
+        // owes someone (TurnInputStore, DetachedWorkStore). A delivered
+        // piece of detached work is kept only until `expiresAt`.
+        {
+          collection: COLLECTIONS.TURN_RUNS,
+          keys: { id: 1 },
+          options: { unique: true },
+        },
+        {
+          collection: COLLECTIONS.TURN_INPUTS,
+          keys: { id: 1 },
+          options: { unique: true },
+        },
+        {
+          collection: COLLECTIONS.DETACHED_WORK,
+          keys: { id: 1 },
+          options: { unique: true },
+        },
+        {
+          collection: COLLECTIONS.DETACHED_WORK,
+          keys: { status: 1, createdAt: 1 },
+        },
+        {
+          collection: COLLECTIONS.DETACHED_WORK,
+          keys: { expiresAt: 1 },
+          options: { expireAfterSeconds: 0 },
+        },
         // permission_decisions — approval history behind rule suggestions,
         // expired after APPROVAL_HISTORY.RETENTION_DAYS (90)
         {
@@ -651,31 +682,19 @@ setupWebSocket(wss);
     logger.error(`Failed to ensure indexes: ${getErrorMessage(error)}`);
   }
 
-  // Recover turn checkpoints orphaned by a crash/restart BEFORE clearing
-  // stale flags — a checkpoint surviving to startup means the process died
-  // mid-turn and the shadow-persisted messages must be merged into the
-  // conversation, otherwise the turn (user message included) is lost and
-  // the conversation appears as an empty stub.
+  // Turns the previous process never finished, BEFORE clearing stale flags
+  // (prompt 13). A turn whose tool batch was in progress is re-driven
+  // (TurnResumeService.start, below); every other checkpoint surviving to
+  // startup is merged into its conversation — otherwise the turn (user
+  // message included) is lost and the conversation appears as an empty
+  // stub — and the decisions of turns that will not run again lapse.
+  let resumePlan: import("./services/TurnResumeService.ts").ResumePlan = { resumable: [] };
   try {
-    const { default: ConversationService } =
-      await import("./services/ConversationService.ts");
-    for (const collection of [
-      COLLECTIONS.AGENT_CONVERSATIONS,
-      COLLECTIONS.MODEL_CONVERSATIONS,
-    ]) {
-      const recoveredCount =
-        await ConversationService.recoverOrphanedTurnCheckpoints({
-          collection,
-        });
-      if (recoveredCount > 0) {
-        logger.info(
-          `Recovered ${recoveredCount} interrupted turn(s) in ${collection} from crash checkpoints`,
-        );
-      }
-    }
+    const { default: TurnResumeService } = await import("./services/TurnResumeService.ts");
+    resumePlan = await TurnResumeService.prepare();
   } catch (error: unknown) {
     logger.error(
-      `Failed to recover orphaned turn checkpoints: ${getErrorMessage(error)}`,
+      `Failed to recover interrupted turns: ${getErrorMessage(error)}`,
     );
   }
 
@@ -770,6 +789,14 @@ setupWebSocket(wss);
     const { default: AgentPersonaRegistryCustom } =
       await import("./services/AgentPersonaRegistry.ts");
     await AgentPersonaRegistryCustom.loadCustomAgents();
+    // …and from `.prism/agents` / `.claude/agents` under the workspace roots
+    // (read per scan: roots that arrive from tools-service later count too).
+    const { default: ToolOrchestratorServiceRoots } = await import(
+      "./services/ToolOrchestratorService.ts"
+    );
+    AgentPersonaRegistryCustom.useAgentDefinitionFiles(() =>
+      ToolOrchestratorServiceRoots.getWorkspaceRoots(),
+    );
   } catch (error: unknown) {
     logger.warn(`Custom agent loading failed: ${getErrorMessage(error)}`);
   }
@@ -803,6 +830,10 @@ setupWebSocket(wss);
                 env,
                 headers,
                 enabled,
+                trusted,
+                protocol,
+                outputCapTokens,
+                toolOutputCapTokens,
               } = serverConfig;
               if (!name || !transport) continue;
 
@@ -821,6 +852,13 @@ setupWebSocket(wss);
                     env: env || {},
                     headers: headers || {},
                     enabled: enabled !== false,
+                    // Seeded servers are the deployment's: every profile
+                    // sees their tools (MCPClientService visibility).
+                    shared: true,
+                    trusted: trusted === true,
+                    ...(protocol && { protocol }),
+                    ...(outputCapTokens && { outputCapTokens }),
+                    ...(toolOutputCapTokens && { toolOutputCapTokens }),
                     updatedAt: new Date().toISOString(),
                   },
                 },
@@ -837,6 +875,9 @@ setupWebSocket(wss);
           );
         }
       }
+
+      const { seedBuiltinMcpServers } = await import("./services/mcp/McpBuiltinServers.ts");
+      await seedBuiltinMcpServers(mcpDb, codingProject);
 
       await MCPClientService.connectAllFromDB(mcpDb, codingProject, "admin");
     }
@@ -986,6 +1027,19 @@ setupWebSocket(wss);
     logger.info(
       "MinIO not configured — files will be stored inline in MongoDB",
     );
+  }
+
+  // Re-drive the turns a restart interrupted, and deliver what the previous
+  // process still owed (mailbox input, background work outcomes) — once.
+  // The turns run detached, like requests.
+  try {
+    const { default: TurnResumeService } = await import("./services/TurnResumeService.ts");
+    await TurnResumeService.start(resumePlan);
+    if (resumePlan.resumable.length > 0) {
+      logger.info(`Re-driving ${resumePlan.resumable.length} turn(s) interrupted by the restart`);
+    }
+  } catch (error: unknown) {
+    logger.error(`Failed to re-drive interrupted turns: ${getErrorMessage(error)}`);
   }
 
   server.listen(PORT, () => {

@@ -4,6 +4,16 @@ import { MONGO_DB_NAME } from "#config";
 import { COLLECTIONS } from "#src/constants";
 import { deriveAgentId } from "@rodrigo-barraza/utilities-library";
 import logger from "#src/utils/logger";
+import { AGENT_DEFINITION_PIN_KEYS } from "#src/services/agents/AgentDefinitionFields";
+
+/** The definition pins a document stores, only those that are set. */
+function pickAgentDefinitionPins(data: Record<string, unknown>) {
+  const pins: Record<string, unknown> = {};
+  for (const key of AGENT_DEFINITION_PIN_KEYS) {
+    if (data[key] !== undefined && data[key] !== null && data[key] !== "") pins[key] = data[key];
+  }
+  return pins;
+}
 
 /** @returns {import("mongodb").Collection} */
 function getCollection() {
@@ -43,6 +53,9 @@ const CustomAgentService = {
       agentId,
       type: data.type || "",
       description: data.description || "",
+      // Sub-agent pins (prompt 17), validated by the route:
+      // model/provider/effort/maxTurns/permissionMode/disallowedTools.
+      ...pickAgentDefinitionPins(data),
       project: data.project || "coding",
       icon: data.icon || "",
       avatar: data.avatar || "",
@@ -70,6 +83,13 @@ const CustomAgentService = {
         : [],
       usesDirectoryTree: data.usesDirectoryTree || false,
       usesCodingGuidelines: data.usesCodingGuidelines || false,
+      // Role models this agent pins ({ main: { provider, model, effort }, … })
+      // and its routing preset — routing/RoleModelResolver.
+      modelRoles:
+        typeof data.modelRoles === "object" && data.modelRoles !== null
+          ? data.modelRoles
+          : {},
+      routingPreset: typeof data.routingPreset === "string" ? data.routingPreset : "",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

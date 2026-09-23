@@ -47,6 +47,7 @@ import {
 import {
   getLastAssistantText,
   buildSubAgentResult,
+  describeSubAgentOutcome,
   toLiveSubAgentSummary,
   toPersistedSubAgentSummary,
   type SubAgentSummary,
@@ -62,6 +63,14 @@ import {
   type DetachedSubAgentDispatch,
   type DispatchDelivery,
 } from "./orchestrator/DetachedDispatchRegistry.ts";
+import {
+  applyRunPins,
+  composeSubAgentPolicies,
+  pinnedSubAgentModel,
+  resolveSubAgentApproval,
+  subAgentModeHandle,
+  withoutDisallowedTools,
+} from "./orchestrator/SubAgentDefinitionPins.ts";
 
 import type {
   SubAgentState,
@@ -78,6 +87,9 @@ import type {
 import type { ConversationMessage, LLMProvider } from "./harnesses/types.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import ConversationService from "./ConversationService.ts";
+import { resolveSubAgentModel } from "./routing/RoleModelResolver.ts";
+import { recordRoutingDecision } from "./routing/RoutingDecisionLog.ts";
+import { getInstanceType } from "#src/providers/instance-registry";
 import { COLLECTIONS, ORCHESTRATOR, NOTIFICATION_SOURCES, SYSTEM_STATUSES, AGENT_DIRECTIVES } from "#src/constants";
 
 type AgenticLoopServiceModule = typeof import("./AgenticLoopService.ts");
@@ -160,6 +172,14 @@ function resolveMaxSubAgentIterations(
         ),
       )
     : baseMaxIterations;
+}
+
+/** Two provider ids of one family — a local instance ("lm-studio-2") counts as its type. */
+function isSameProviderFamily(firstProvider: string, secondProvider: string): boolean {
+  return (
+    (getInstanceType(firstProvider) || firstProvider) ===
+    (getInstanceType(secondProvider) || secondProvider)
+  );
 }
 
 /** Active sub-agents spawned via chat tools, keyed by agentId */
@@ -255,6 +275,7 @@ export class OrchestratorService {
     agent: memberAgentName,
     assignedProvider,
     assignedModel,
+    routing: memberRouting,
     agentIndex,
     globalSpawnIndex,
     teamSize,
@@ -351,16 +372,33 @@ export class OrchestratorService {
       }
     }
 
+    // ── Role routing: the model this sub-agent runs on ──────────
+    // createTeam decided it per member (the routers carry it here); a
+    // direct caller gets the same decision now. It may name another
+    // provider than the parent's — and, for a sub-agent nothing pins,
+    // the parent's model at a lower effort (RoleModelResolver).
+    const routing =
+      memberRouting ??
+      (await resolveSubAgentModel({
+        memberAgent: memberAgentName ?? null,
+        parentAgent: agent,
+        explicitModel: model ?? null,
+        parent: {
+          provider: providerName,
+          model: resolvedModel,
+          effort: reasoningEffort ?? null,
+        },
+      }));
+
     // ── Pre-assigned instance (from createTeam batch assignment) ──
     // When createTeam calls us, it has already resolved model availability
     // and assigned instances serially with proper reservation counting.
     // Skip the entire instance selection path to avoid double-counting.
-    let subAgentProvider = assignedProvider || providerName;
-    // For local providers, the LLM can't know valid GGUF identifiers —
-    // skip the LLM-provided `model` param to prevent hallucinated names.
-    const isLocal = localModelQueue.isLocal(providerName);
-    let subAgentModel =
-      assignedModel || (isLocal ? resolvedModel : model || resolvedModel);
+    let subAgentProvider = assignedProvider || routing.provider;
+    // A local provider's GGUF identifiers were never taken from the LLM's
+    // `model` guess — resolveSubAgentModel ignores it there.
+    const isLocal = localModelQueue.isLocal(routing.provider);
+    let subAgentModel = assignedModel || routing.model;
     const isPreAssigned = !!assignedProvider;
 
     if (isPreAssigned) {
@@ -374,7 +412,10 @@ export class OrchestratorService {
       // the topology routers use (InstanceResolver / InstanceLoadBalancer).
       // Passing activeSubAgents lets load accounting see already-running
       // agents in addition to synchronous reservations.
-      const instanceContext = { providerName, resolvedModel: subAgentModel };
+      const instanceContext = {
+        providerName: routing.provider,
+        resolvedModel: subAgentModel,
+      };
       const resolvedSiblings = await resolveSiblingInstances(
         instanceContext,
         "Orchestrator",
@@ -440,12 +481,14 @@ export class OrchestratorService {
 
     const subAgentConversationId = crypto.randomUUID();
 
-    // Resolve sub-agent type and its tools
+    // Resolve sub-agent type and its tools. By name OR id: the tool schema
+    // lists agents by name ("Clankerbox", "code-reviewer"), and a lookup by
+    // id alone spawned the parent's type for every custom agent.
     let subAgentAgentType = agent;
     let subAgentEnabledTools = enabledTools || null;
 
     if (memberAgentName) {
-      const persona = AgentPersonaRegistry.get(memberAgentName);
+      const persona = AgentPersonaRegistry.resolve(memberAgentName);
       if (persona) {
         subAgentAgentType = persona.id;
         subAgentEnabledTools = persona.availableTools.includes("*")
@@ -459,6 +502,26 @@ export class OrchestratorService {
           `[Orchestrator] Requested agent type "${memberAgentName}" not found in registry. Spawning default "${agent}".`,
         );
       }
+    }
+
+    // The definition's model pin outranks the parent's model and any
+    // instance a router assigned. (Its effort and maxTurns apply per run,
+    // in _runSubAgentLoop — so a resume honours them too.)
+    const pinnedModel = pinnedSubAgentModel(
+      AgentPersonaRegistry.resolve(subAgentAgentType),
+      subAgentProvider,
+    );
+    if (pinnedModel) {
+      if (pinnedModel.providerName !== subAgentProvider && localModelQueue.isLocal(subAgentProvider)) {
+        // The local instance a router (or the selection above) reserved
+        // for this member will not be used.
+        InstanceLoadBalancer.releaseReservation(subAgentProvider);
+      }
+      subAgentProvider = pinnedModel.providerName;
+      subAgentModel = pinnedModel.resolvedModel;
+      logger.info(
+        `[Orchestrator] Sub-agent type "${subAgentAgentType}" pins ${subAgentProvider}/${subAgentModel}`,
+      );
     }
 
     const subAgentState: SubAgentState = {
@@ -502,11 +565,30 @@ export class OrchestratorService {
       totalRounds,
       recursionDepth: currentRecursionDepth + 1,
       thinkingEnabled,
-      reasoningEffort,
-      thinkingBudget,
+      reasoningEffort: routing.effort ?? reasoningEffort,
+      // A token budget is an Anthropic knob of the parent's model; a
+      // sub-agent routed to another provider does not carry it.
+      thinkingBudget: isSameProviderFamily(subAgentProvider, providerName)
+        ? thinkingBudget
+        : undefined,
     };
 
     activeSubAgents.set(agentId, subAgentState);
+
+    await recordRoutingDecision({
+      decision: { ...routing, provider: subAgentProvider, model: subAgentModel },
+      project,
+      username,
+      conversationId: concurrencyRootId || parentConversationId || null,
+      agentConversationId: subAgentConversationId,
+      agent,
+      subAgentId: agentId,
+      memberAgent: subAgentAgentType,
+      preset: orchestratorContext.routingPreset ?? null,
+      relatedConversationIds: [parentConversationId, agentConversationId].filter(
+        (conversationId): conversationId is string => !!conversationId,
+      ),
+    });
 
     logger.info(
       `[Orchestrator] Spawned sub-agent ${agentId}: "${description}" → ${subAgentProvider} (model="${subAgentModel}") in ${worktreePath}${subAgentState.isolated ? " (isolated worktree)" : " (shared workspace)"}`,
@@ -1306,6 +1388,15 @@ export class OrchestratorService {
       return [{ error: errorMessage }];
     }
 
+    // ── Role routing: each member's model, decided at spawn ─────
+    // (RoleModelResolver) — the member's own agent pin, the parent
+    // agent's `subagent` pin, Settings, else the parent's model at a
+    // lower effort. The routers carry the decision to spawnFromTool.
+    await OrchestratorService._routeMembers(
+      teamCreationArguments.members,
+      orchestratorContext,
+    );
+
     // Sync the active topology to the conversation settings in MongoDB so the UI badge and state match execution
     if (orchestratorContext.conversationId) {
       await TopologyExecutionService.syncTopologyToDatabase(
@@ -1511,9 +1602,12 @@ export class OrchestratorService {
     }
 
     if (dispatch) {
-      dispatch.agentIds = registeredResults
-        .filter((result): result is SubAgentResult => !("error" in result))
-        .map((result) => result.agent_id);
+      DetachedDispatchRegistry.assignAgents(
+        dispatch,
+        registeredResults
+          .filter((result): result is SubAgentResult => !("error" in result))
+          .map((result) => result.agent_id),
+      );
     }
 
     logger.info(
@@ -1521,6 +1615,28 @@ export class OrchestratorService {
     );
 
     return registeredResults;
+  }
+
+  /** Decide each member's model (subagent role) before a router assigns instances. */
+  static async _routeMembers(
+    members: TeamMember[],
+    orchestratorContext: OrchestratorContext,
+  ): Promise<void> {
+    for (const member of members) {
+      const decision = await resolveSubAgentModel({
+        memberAgent: member.agent ?? null,
+        parentAgent: orchestratorContext.agent,
+        explicitModel: member.model ?? null,
+        parent: {
+          provider: orchestratorContext.providerName,
+          model: orchestratorContext.resolvedModel,
+          effort: orchestratorContext.reasoningEffort ?? null,
+        },
+      });
+      member.routing = decision;
+      member.provider = decision.provider;
+      member.model = decision.model;
+    }
   }
 
   static async deleteTeam(
@@ -1751,7 +1867,7 @@ export class OrchestratorService {
     );
 
     const dispatch = OrchestratorService._openDispatch(orchestratorContext);
-    if (dispatch) dispatch.agentIds = [agentId];
+    if (dispatch) DetachedDispatchRegistry.assignAgents(dispatch, [agentId]);
 
     // Fire detached background promise — same pattern as non-blocking spawnFromTool
     OrchestratorService._runSubAgentLoop(
@@ -1868,11 +1984,11 @@ export class OrchestratorService {
       },
     );
 
-    const agentStatusEmoji = agentResult.status === SYSTEM_STATUSES.COMPLETE ? "✅" : "❌";
-
     await OrchestratorService._sendParentCompletionNotification(
       {
-        status: `${agentStatusEmoji} ${agentResult.status}`,
+        // (A result's status is "completed"; comparing it with the state's
+        // "complete" labelled every resumed agent ❌.)
+        status: describeSubAgentOutcome(agentResult, { withStatus: true }),
         summary: resumedAgentCompletedSummary,
         toolUses: agentResult.toolUses || 0,
         durationMilliseconds: agentResult.durationMilliseconds || 0,
@@ -2187,6 +2303,22 @@ export class OrchestratorService {
   }
 
   /**
+   * The permission mode of the loop calling a spawn tool: a sub-agent's
+   * own (so a grandchild is never looser than its parent); none for a root
+   * conversation.
+   */
+  static _callerPermissionMode(orchestratorContext: OrchestratorContext) {
+    const callerConversationId = orchestratorContext.agentConversationId;
+    if (!callerConversationId) return undefined;
+    for (const candidate of activeSubAgents.values()) {
+      if (candidate.subAgentConversationId === callerConversationId) {
+        return candidate.permissionMode;
+      }
+    }
+    return undefined;
+  }
+
+  /**
    * Run the sub-agent's agentic loop in its isolated worktree.
    *
    * @param preserveWorktree When true, the worktree is NOT removed on completion.
@@ -2263,9 +2395,27 @@ export class OrchestratorService {
       ? `- Only modify files within your workspace\n`
       : "";
 
-    const workspaceIntroLine = shouldShowWorkspaceConstraint
-      ? `Your workspace is: ${subAgent.worktreePath}\n`
-      : "";
+    // Where this run works. A resumed agent whose worktree was merged back
+    // and removed runs in the parent's workspace — its transcript still
+    // names the old worktree, so say that it is gone (it used to read
+    // "Your workspace is: null", and the model reused the dead paths).
+    // An isolated sub-agent is told what its worktree is a checkout of: its
+    // task may name the parent's paths (tool calls redirect them into the
+    // worktree — WorktreePathRewrite), and its report should name files
+    // where they land once its changes merge back.
+    const runWorkspacePath = subAgent.worktreePath || parentWorkspaceRoot;
+    const previousWorkspacePath = subAgent.lastWorkspacePath;
+    subAgent.lastWorkspacePath = runWorkspacePath;
+    const workspaceIntroLine = !shouldShowWorkspaceConstraint
+      ? ""
+      : (subAgent.isolated && subAgent.worktreePath
+          ? `Your workspace is: ${subAgent.worktreePath}, your own checkout of ${subAgent.repositoryPath}. ` +
+            `Paths under ${subAgent.repositoryPath} are redirected here, and your changes merge back into it when you finish: ` +
+            `name files relative to ${subAgent.repositoryPath} in your report.\n`
+          : `Your workspace is: ${runWorkspacePath}\n`) +
+        (previousWorkspacePath && previousWorkspacePath !== runWorkspacePath
+          ? `Your previous run's workspace (${previousWorkspacePath}) no longer exists — its changes were merged into this one. Use paths under ${runWorkspacePath}.\n`
+          : "");
 
     // ── Recursive spawning: depth tracking ──────────────────────────
     // Paper alignment: THREAD (arXiv:2405.17402), RAH (2026), Anthropic production architecture.
@@ -2543,6 +2693,55 @@ export class OrchestratorService {
       }
     }
 
+    // ── Its agent definition's pins, applied per run ─────────────
+    // maxTurns and effort (so a resume honours them too), disallowedTools
+    // out of whatever it inherited, a permission mode that only narrows
+    // the parent's, and its own policies beside the parent's.
+    const subAgentDefinition = AgentPersonaRegistry.resolve(subAgent.agent);
+    const runPins = applyRunPins(subAgentDefinition, {
+      maxIterations: subAgent.maxIterations,
+      thinkingEnabled: subAgent.thinkingEnabled,
+      reasoningEffort: subAgent.reasoningEffort,
+    });
+    subAgent.maxIterations = runPins.maxIterations;
+    if (subAgentDefinition?.custom && subAgentEnabledTools) {
+      subAgentEnabledTools = withoutDisallowedTools(
+        subAgentEnabledTools,
+        subAgentDefinition.blockedTools,
+        ToolOrchestratorService.getClientToolSchemas() || [],
+      );
+    }
+    // The parent's mode is its live handle's (permission-modes); a caller
+    // without one falls back to what its own definition resolved to.
+    const parentModeHandle = orchestratorContext.permissionMode;
+    const approval = resolveSubAgentApproval(
+      {
+        autoApprove: orchestratorContext.autoApprove === true,
+        permissionMode:
+          parentModeHandle?.mode ?? OrchestratorService._callerPermissionMode(orchestratorContext),
+      },
+      subAgentDefinition?.permissionMode,
+    );
+    const subAgentMode = parentModeHandle
+      ? subAgentModeHandle(
+          parentModeHandle,
+          orchestratorContext.autoApprove === true,
+          subAgentDefinition?.permissionMode,
+        )
+      : null;
+    subAgent.permissionMode = approval.permissionMode;
+    if (approval.narrowedFrom) {
+      logger.info(
+        `[Orchestrator] Sub-agent ${subAgent.agentId}: permissionMode "${approval.narrowedFrom}" is wider than its parent's approval mode — it runs with the parent's instead`,
+      );
+    }
+    const subAgentPolicies = composeSubAgentPolicies(
+      orchestratorContext.policies,
+      orchestratorContext.agent,
+      subAgentDefinition,
+    );
+    subAgent.partial = false;
+
     const subAgentProviderInstance = getProvider(subAgent.providerName);
     if (!subAgentProviderInstance) {
       throw new Error(`Provider not found: ${subAgent.providerName}`);
@@ -2561,11 +2760,10 @@ export class OrchestratorService {
         options: {
           // Inherit the parent's approval mode — a hardcoded autoApprove here
           // let any delegated tool call bypass the user's approval choices.
-          autoApprove: orchestratorContext.autoApprove === true,
-          ...(Array.isArray(orchestratorContext.policies) &&
-            orchestratorContext.policies.length > 0 && {
-              policies: orchestratorContext.policies,
-            }),
+          // Its definition may only narrow it (resolveSubAgentApproval).
+          autoApprove: approval.autoApprove,
+          ...(approval.permissionMode && { permissionMode: approval.permissionMode }),
+          ...(subAgentPolicies && { policies: subAgentPolicies }),
           // The parent's permission rules, widened to cover the sub-agent's
           // own conversation — a "this conversation" deny keeps holding here.
           ...(orchestratorContext.permissionRules && {
@@ -2574,6 +2772,10 @@ export class OrchestratorService {
               conversationId: subAgent.subAgentConversationId,
             }),
           }),
+          // The parent's mode handle itself: plan mode stays read-only all the
+          // way down, and a switch of the parent's mode reaches its sub-agents.
+          // A definition that names a mode gets it narrowed (subAgentModeHandle).
+          ...(subAgentMode && { _permissionMode: subAgentMode.handle }),
           ...(orchestratorContext.enableCriticGate !== undefined && {
             enableCriticGate: orchestratorContext.enableCriticGate,
           }),
@@ -2589,17 +2791,26 @@ export class OrchestratorService {
           agenticLoopEnabled: true,
           isSubAgent: true,
           enabledTools: subAgentEnabledTools,
-          maxIterations: subAgent.maxIterations,
+          maxIterations: runPins.maxIterations,
           maxTokens: ORCHESTRATOR.SYNTHESIS_MAX_TOKENS,
           ...(subAgent.minContextLength && {
             minContextLength: subAgent.minContextLength,
           }),
-          ...(subAgent.thinkingEnabled !== undefined && {
-            thinkingEnabled: subAgent.thinkingEnabled,
+          ...(runPins.thinkingEnabled !== undefined && {
+            thinkingEnabled: runPins.thinkingEnabled,
           }),
-          ...(subAgent.reasoningEffort !== undefined && {
-            reasoningEffort: subAgent.reasoningEffort,
+          ...(runPins.reasoningEffort !== undefined && {
+            reasoningEffort: runPins.reasoningEffort,
           }),
+          ...(runPins.thinkingLevel !== undefined && {
+            thinkingLevel: runPins.thinkingLevel,
+          }),
+          // Gemini reads its effort as thinkingLevel (the /agent route
+          // mirrors the two; a sub-agent's options are built here).
+          ...(subAgent.reasoningEffort !== undefined &&
+            subAgent.thinkingEnabled !== false && {
+              thinkingLevel: subAgent.reasoningEffort,
+            }),
           ...(subAgent.thinkingBudget !== undefined && {
             thinkingBudget: subAgent.thinkingBudget,
           }),
@@ -2638,6 +2849,8 @@ export class OrchestratorService {
         }
         throw error;
       }
+    } finally {
+      subAgentMode?.dispose();
     }
 
     // Capture the full conversation from the loop (includes all assistant
@@ -2662,6 +2875,11 @@ export class OrchestratorService {
     subAgent.toolCalls = telemetry.toolCalls;
     subAgent.messages = finalMessages;
     subAgent.durationMilliseconds = Date.now() - subAgent.startedAt;
+    // Stopped at its turn cap while still working: the result is partial,
+    // and resume_subagent continues it from this transcript.
+    subAgent.partial =
+      telemetry.iterationLimitReached &&
+      (telemetry.iterations ?? 0) >= subAgent.maxIterations;
 
     if (subAgent.status !== SYSTEM_STATUSES.STOPPED) {
       // Commit, diff and merge the worktree back into the parent's branch —
@@ -2769,8 +2987,7 @@ export class OrchestratorService {
           errorMessage: String(result.error),
         });
       }
-      const agentStatus =
-        result.status === "completed" ? "✅" : `⚠️ ${result.status}`;
+      const agentStatus = describeSubAgentOutcome(result);
       const noOutputFallback = PromptLocaleService.get(locale, "orchestrator.notifications.noOutput");
       const agentOutput = result.result
         ? typeof result.result === "string"

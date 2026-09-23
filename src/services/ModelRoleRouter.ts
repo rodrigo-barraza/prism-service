@@ -24,13 +24,20 @@ import logger from "#src/utils/logger";
 // (provider, model) pairs instead of a single hard-wired knob.
 //
 // Resolution order per role:
+//   0. Agent definitions — a pin in the running agent's definition
+//      (`modelRoles.<role>`), custom agents before built-in personas
+//      (see routing/AgentModelPins). Only when the caller names agents.
 //   1. Explicit env config — MODEL_ROLE_<ROLE>="provider=model,..."
 //   2. DB config — the role's SettingsService knob (see ROLE_SETTINGS)
 //   3. Caller-supplied fallback (e.g. the conversation's own model)
 //   4. Built-in defaults — for `utility`: the first configured local
 //      instance (vLLM / LM Studio / Ollama / llama-cpp) with a
 //      discoverable model, else the cheapest available cloud model.
-//      `critic` and `memory` default to the utility chain.
+//      `critic`, `memory`, `compaction` and `classifier` default to the
+//      utility chain.
+//
+// The conversation-level roles (`main`, `subagent`, `oracle`) resolve
+// to ONE decision, not a chain: routing/RoleModelResolver.
 //
 // The `utility` role is NEVER silently disabled: when no explicit
 // config exists it degrades to local-instance → cheap-cloud defaults,
@@ -52,7 +59,25 @@ export const MODEL_ROLES = {
   VISION: "vision",
   /** Memory extraction — its own knob, so it can run cheaper than compaction. */
   MEMORY: "memory",
+  /** The model a conversation runs on — decided once, at its start. */
+  MAIN: "main",
+  /** The model a sub-agent runs on — decided at each spawn. */
+  SUBAGENT: "subagent",
+  /** A stronger second opinion (prompt 17's ask_oracle consults it). */
+  ORACLE: "oracle",
+  /** Conversation summarization (CompactionService). */
+  COMPACTION: "compaction",
+  /** Short labelling calls (prompt 12's auto-mode classifier). */
+  CLASSIFIER: "classifier",
 } as const;
+
+/** Roles whose default is the utility chain. */
+const UTILITY_DERIVED_ROLES: ReadonlySet<string> = new Set([
+  MODEL_ROLES.CRITIC,
+  MODEL_ROLES.MEMORY,
+  MODEL_ROLES.COMPACTION,
+  MODEL_ROLES.CLASSIFIER,
+]);
 
 /** Extensible — any string is a valid role; the named ones get defaults. */
 export type ModelRole = string;
@@ -65,6 +90,11 @@ export interface RoleChainEntry {
 export interface ResolveChainOptions {
   /** Appended after env/DB config (e.g. the conversation's own model). */
   fallback?: RoleChainEntry | null;
+  /**
+   * Agents whose definitions may pin this role (`modelRoles.<role>`),
+   * most specific first. Their pins head the chain.
+   */
+  agents?: Array<string | null | undefined>;
 }
 
 /** DB knobs per role: settings section + provider/model field names. */
@@ -98,6 +128,34 @@ const ROLE_SETTINGS: Record<
     section: "memory",
     providerField: "extractionProvider",
     modelField: "extractionModel",
+  },
+  // Settings → Harness Models → Model roles.
+  [MODEL_ROLES.MAIN]: {
+    section: "agents",
+    providerField: "mainProvider",
+    modelField: "mainModel",
+  },
+  // The knob Settings has long called "Sub-Agent Model"; before role
+  // routing it was only read when every local instance was busy.
+  [MODEL_ROLES.SUBAGENT]: {
+    section: "agents",
+    providerField: "subAgentProvider",
+    modelField: "subAgentModel",
+  },
+  [MODEL_ROLES.ORACLE]: {
+    section: "agents",
+    providerField: "oracleProvider",
+    modelField: "oracleModel",
+  },
+  [MODEL_ROLES.COMPACTION]: {
+    section: "agents",
+    providerField: "compactionProvider",
+    modelField: "compactionModel",
+  },
+  [MODEL_ROLES.CLASSIFIER]: {
+    section: "agents",
+    providerField: "classifierProvider",
+    modelField: "classifierModel",
   },
 };
 
@@ -174,7 +232,7 @@ async function discoverInstanceModel(
 }
 
 /** Cloud providers with configured secrets (mirrors ConfigRoutes). */
-function getAvailableCloudProviders(): Set<string> {
+export function getAvailableCloudProviders(): Set<string> {
   const secrets: Record<string, string | undefined> = {
     [PROVIDERS.OPENAI]: OPENAI_API_KEY,
     [PROVIDERS.ANTHROPIC]: ANTHROPIC_API_KEY,
@@ -189,7 +247,7 @@ function getAvailableCloudProviders(): Set<string> {
 }
 
 /** Read the role's DB knob from SettingsService, if one is mapped. */
-async function resolveRoleFromSettings(
+export async function resolveRoleFromSettings(
   role: ModelRole,
 ): Promise<RoleChainEntry | null> {
   const mapping = ROLE_SETTINGS[role];
@@ -299,25 +357,37 @@ export default class ModelRoleRouter {
    */
   static async resolveChain(
     role: ModelRole,
-    { fallback }: ResolveChainOptions = {},
+    { fallback, agents }: ResolveChainOptions = {},
   ): Promise<RoleChainEntry[]> {
     const chain: RoleChainEntry[] = [];
+
+    if (agents && agents.some(Boolean)) {
+      const { findAgentModelPin } = await import("./routing/AgentModelPins.ts");
+      const pin = await findAgentModelPin(
+        agents.map((agent) => ({ agent, role })),
+      );
+      if (pin?.spec.provider && pin.spec.model) {
+        chain.push({ provider: pin.spec.provider, model: pin.spec.model });
+      }
+    }
 
     chain.push(...getModelRoleChainFromEnvironment(role));
 
     const settingsEntry = await resolveRoleFromSettings(role);
     if (settingsEntry) chain.push(settingsEntry);
 
-    if (fallback) chain.push(fallback);
+    // A utility-derived role hands its fallback to the utility chain, so
+    // the configured utility model still comes before it (compaction ran
+    // env/DB utility → the conversation's model → defaults before it had
+    // a role of its own, and still does when its own knob is unset).
+    if (fallback && !UTILITY_DERIVED_ROLES.has(role)) chain.push(fallback);
 
     if (role === MODEL_ROLES.UTILITY) {
       chain.push(...(await resolveUtilityDefaults()));
-    } else if (role === MODEL_ROLES.CRITIC) {
-      // Critic defaults to the utility chain — a danger-pattern review
-      // needs a fast cheap model, never the main conversation model.
-      chain.push(...(await this.resolveChain(MODEL_ROLES.UTILITY)));
-    } else if (role === MODEL_ROLES.MEMORY) {
-      chain.push(...(await this.resolveChain(MODEL_ROLES.UTILITY)));
+    } else if (UTILITY_DERIVED_ROLES.has(role)) {
+      // A danger-pattern review, a summary, an extraction, a label: fast
+      // cheap work — never the main conversation model by default.
+      chain.push(...(await this.resolveChain(MODEL_ROLES.UTILITY, { fallback })));
     } else if (role === MODEL_ROLES.VISION) {
       chain.push(...resolveVisionDefaults());
     }

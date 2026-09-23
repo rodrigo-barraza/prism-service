@@ -88,6 +88,12 @@ export interface SubAgentState {
   progressReportCount?: number;
   /** The latest report_progress message, delivered or not. */
   lastProgress?: { message: string; reportedAt: number };
+  /** The permission mode its last run had (its definition's, narrowed to the parent's). */
+  permissionMode?: import("#src/services/agents/AgentDefinitionFields").AgentPermissionMode;
+  /** Its last run stopped at its turn cap (maxTurns) before finishing — resumable. */
+  partial?: boolean;
+  /** The workspace its previous run was told it had (a resume says when it changed). */
+  lastWorkspacePath?: string;
 }
 
 // ── Worktree diff contract (tools-service) ─────────────────
@@ -163,6 +169,12 @@ export interface MergeBackReport {
 
 // ── Sub-Agent Result ───────────────────────────────────────
 
+/**
+ * What a parent model reads about a sub-agent — a BRIEF: its final report
+ * (`result`) and counts, never its transcript. Its raw tool output stays
+ * in the sub-agent's own conversation (the client reads it from there),
+ * so a lead's context — and its cached prefix — holds only the briefs.
+ */
 export interface SubAgentResult {
   agent_id: string;
   description: string;
@@ -173,7 +185,6 @@ export interface SubAgentResult {
   toolNames?: Record<string, number>;
   iterations: number;
   durationMilliseconds: number;
-  messages: ConversationMessage[];
   diff?: {
     additions: number;
     deletions: number;
@@ -181,6 +192,8 @@ export interface SubAgentResult {
   };
   mergeBack?: MergeBackReport;
   error?: string;
+  /** Stopped at its turn cap before finishing; `resume_subagent` continues it. */
+  partial?: boolean;
   recursionDepth?: number;
   subtreeMetrics?: SubtreeMetrics;
 }
@@ -257,6 +270,8 @@ export interface OrchestratorSpawnParams {
   agent?: string;
   assignedProvider?: string;
   assignedModel?: string;
+  /** The member's subagent role decision (TeamMember.routing) — its model, provider and effort. */
+  routing?: import("#src/services/routing/RoleModelResolver").RoleDecision;
   agentIndex?: number;
   /** Conversation-scoped monotonically increasing spawn index (0-based, unique across all teams). */
   globalSpawnIndex?: number;
@@ -323,6 +338,8 @@ export interface OrchestratorContext {
   policies?: import("#src/services/PolicyEngine").PolicyRule[];
   /** Parent loop's stored permission rules — a sub-agent gets `forSubAgent()` of them. */
   permissionRules?: import("#src/services/permissions/PermissionRuleSet").default;
+  /** Parent loop's mode handle — a sub-agent shares it, so a switch reaches it too. */
+  permissionMode?: import("#src/services/permissions/PermissionModeState").PermissionModeHandle;
   /** Parent loop's CriticGate toggle — inherited by sub-agents. */
   enableCriticGate?: boolean;
   /** Parent loop's CriticGate model — inherited by sub-agents. */
@@ -331,6 +348,8 @@ export interface OrchestratorContext {
   maxCostDollars?: number;
   /** Shared cost accumulator threaded through the whole sub-agent tree. */
   sharedCostBudget?: import("#src/services/harnesses/lifecycle/CostBudgetEnforcer").SharedCostBudget;
+  /** The conversation's routing preset (routing/RoutingPresets) — e.g. lead_sidekick. */
+  routingPreset?: string | null;
   /** Extensibility for custom orchestrator data. */
   extensionData?: Record<string, string | number | boolean | null | undefined>;
 }
@@ -395,6 +414,13 @@ export interface TeamMember {
   files?: string[];
   model?: string;
   agent?: string;
+  /**
+   * The provider `model` runs on, when role routing put the member on
+   * another provider than its parent's (cross-provider sub-agents).
+   */
+  provider?: string;
+  /** The subagent role decision createTeam made for this member. */
+  routing?: import("#src/services/routing/RoleModelResolver").RoleDecision;
 }
 
 export interface TeamMemberResult {

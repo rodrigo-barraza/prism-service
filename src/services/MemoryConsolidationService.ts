@@ -5,7 +5,14 @@ import crypto from "crypto";
 import { getProvider } from "#src/providers/index";
 import type { ChatMessage } from "#src/types/provider";
 import type { MessagePayload } from "./conversation/types.ts";
-import MemoryService, { CURRENT_MEMORY_FILTER } from "./MemoryService.ts";
+import MemoryService, {
+  CURRENT_MEMORY_FILTER,
+  NOT_QUARANTINED_FILTER,
+} from "./MemoryService.ts";
+import {
+  combineProvenance,
+  provenanceOfDocument,
+} from "./memory/MemoryProvenance.ts";
 import RequestLogger from "./RequestLogger.ts";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { MONGO_DB_NAME } from "#config";
@@ -102,6 +109,9 @@ function daysSince(isoDate: string) {
 /**
  * Apply consolidation actions. For conversational agent merges, memoryLookup
  * is used to preserve source attribution metadata on the merged document.
+ * For every merge it carries provenance: the merged memory takes the lowest
+ * trust among its sources and cites each of them — consolidation can
+ * rewrite a memory's words but never raise how far it is trusted.
  *
  * NON-DESTRUCTIVE (Graphiti-style edge invalidation,
  * https://github.com/getzep/graphiti): merge and delete/
@@ -179,6 +189,15 @@ async function applyActions(
           }
         }
 
+        // Provenance of the merge: the lowest trust among its sources (an
+        // id the model invented has no document and adds nothing).
+        const provenance = combineProvenance(
+          action.sourceIds
+            .map((id: string) => memoryLookup?.get(id))
+            .filter((source): source is MemoryDoc => !!source)
+            .map((source) => provenanceOfDocument(source)),
+        );
+
         // Store the consolidated memory FIRST (dedupe off — it is
         // intentionally similar to its still-current sources), then
         // soft-close each source pointing at it.
@@ -194,6 +213,9 @@ async function applyActions(
           traceId: traceId || undefined,
           endpoint: endpoint || undefined,
           dedupe: false,
+          provenance,
+          // Its sources were live (quarantined memories are never loaded).
+          quarantined: false,
           ...attributionMetadata,
         });
         if (!merged) {
@@ -428,10 +450,13 @@ async function runConsolidation({
 
     // Current rows only — soft-closed memories are history, not candidates.
     // Scoped to one profile so a run never clusters/merges across profiles.
+    // Quarantined memories wait for the user; a merge would put their
+    // words in a live memory.
     const query: Record<string, unknown> = {
       agent: agentId,
       profileId: profileFilter(runProfileId),
       ...CURRENT_MEMORY_FILTER,
+      ...NOT_QUARANTINED_FILTER,
     };
     if (project) query.project = project;
     if (isConversational && guildId) query.guildId = guildId;
@@ -449,8 +474,21 @@ async function runConsolidation({
           sourceUserId: 1,
           sourceUsername: 1,
           guildId: 1,
+          source: 1,
+          trust: 1,
+          sourceRefs: 1,
         }
-      : { embedding: 1, id: 1, type: 1, title: 1, content: 1, createdAt: 1 };
+      : {
+          embedding: 1,
+          id: 1,
+          type: 1,
+          title: 1,
+          content: 1,
+          createdAt: 1,
+          source: 1,
+          trust: 1,
+          sourceRefs: 1,
+        };
 
     const allMemories = (await db
       .collection(COLLECTIONS.MEMORIES)
@@ -686,7 +724,7 @@ async function runConsolidation({
       {
         traceId,
         endpoint,
-        memoryLookup: isConversational ? memoryLookup : undefined,
+        memoryLookup,
         profileId: runProfileId,
       },
     );

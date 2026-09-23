@@ -355,4 +355,57 @@ describe("ContextPressureManager — manageContextPressure", () => {
       expect(mockEvaluate).toHaveBeenCalledWith(5000, 128000, 16384, 5, false);
     });
   });
+
+  describe("micro-compaction is a declared, re-armed boundary", () => {
+    // 128000 window − 8192 output = 119808 budget; 70% = 83866; re-arm = +11981.
+    const evictionResult = () => ({
+      messages: createMessages(15),
+      clearedResultCount: 3,
+      freedTokens: 20000,
+    });
+
+    it("declares the eviction on the request and records the size it left", async () => {
+      mockEstimateTokens.mockReturnValueOnce(90000).mockReturnValueOnce(88000);
+      mockMicrocompactMessages.mockReturnValue(evictionResult());
+
+      await manageContextPressure(createMessages(20), mockContext, mockState, "TestHarness");
+
+      expect(mockMicrocompactMessages).toHaveBeenCalledTimes(1);
+      expect(mockState.pendingPrefixBoundary).toBe("micro_compaction");
+      expect(mockState.lastMicroCompactionTokens).toBe(88000);
+    });
+
+    it("does not stub again on the next iteration while the request has barely grown", async () => {
+      mockState.lastMicroCompactionTokens = 88000;
+      mockEstimateTokens.mockReturnValue(91000);
+      mockMicrocompactMessages.mockReturnValue(evictionResult());
+
+      await manageContextPressure(createMessages(22), mockContext, mockState, "TestHarness");
+
+      expect(mockMicrocompactMessages).not.toHaveBeenCalled();
+      expect(mockState.pendingPrefixBoundary ?? null).toBeNull();
+    });
+
+    it("evicts again once the request has grown past the re-arm margin", async () => {
+      mockState.lastMicroCompactionTokens = 80000;
+      mockEstimateTokens.mockReturnValueOnce(95000).mockReturnValueOnce(90000);
+      mockMicrocompactMessages.mockReturnValue(evictionResult());
+
+      await manageContextPressure(createMessages(24), mockContext, mockState, "TestHarness");
+
+      expect(mockMicrocompactMessages).toHaveBeenCalledTimes(1);
+      expect(mockState.lastMicroCompactionTokens).toBe(90000);
+    });
+
+    it("never stubs on Claude — the request clears old tool results server-side", async () => {
+      mockContext.providerName = "anthropic";
+      mockContext.resolvedModel = "claude-sonnet-5";
+      mockEstimateTokens.mockReturnValue(110000);
+      mockMicrocompactMessages.mockReturnValue(evictionResult());
+
+      await manageContextPressure(createMessages(20), mockContext, mockState, "TestHarness");
+
+      expect(mockMicrocompactMessages).not.toHaveBeenCalled();
+    });
+  });
 });

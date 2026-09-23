@@ -105,7 +105,7 @@ vi.mock("#src/providers/index", () => ({
 }));
 
 vi.mock("#src/services/ModelRoleRouter", () => ({
-  MODEL_ROLES: { UTILITY: "utility" },
+  MODEL_ROLES: { UTILITY: "utility", COMPACTION: "compaction" },
   default: {
     resolveChain: vi.fn().mockResolvedValue([{ provider: "utility-provider", model: "utility-model" }]),
     runWithChain: vi.fn().mockImplementation(
@@ -203,7 +203,6 @@ vi.mock("../lifecycle/SandboxExecutor.ts", () => ({
   restoreSandboxCheckpoint: vi.fn(),
 }));
 vi.mock("../lifecycle/PlanModeController.ts", () => ({
-  blockUnauthorizedToolCalls: vi.fn(),
   handleExitPlanMode: vi.fn(),
   checkForPlanModeEntry: vi.fn().mockResolvedValue(undefined),
 }));

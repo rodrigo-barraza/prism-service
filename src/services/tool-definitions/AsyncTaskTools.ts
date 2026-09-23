@@ -18,6 +18,8 @@ import {
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import { resolveLoopKey } from "#src/services/LoopKey";
 import type { InternalToolContext } from "./InternalToolRegistry.ts";
+import type { ToolExecutionContext } from "#src/services/tool-orchestrator/types";
+import AutoApprovalEngine from "#src/services/AutoApprovalEngine";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 
 type AsyncTaskState = import("../AsyncTaskRegistry.ts").AsyncTaskState;
@@ -94,6 +96,43 @@ const DISALLOWED_ASYNC_TOOL_NAMES = new Set<string>([
   TOOL_NAMES.DISCOVER_AND_ENABLE_TOOLS,
   TOOL_NAMES.SEARCH_TOOLS,
 ]);
+
+/**
+ * Why the dispatched call may not run, or null when it may: it must be in
+ * the conversation's enabled tools (when the loop supplied them) and must
+ * not be denied by the loop's permission rules, agent policies or
+ * self-protection.
+ */
+function governInnerCall(
+  toolName: string,
+  toolArguments: Record<string, unknown>,
+  context: RuntimeToolContext & ToolExecutionContext,
+): string | null {
+  const locale = PromptLocaleService.getDefaultLocale();
+  if (
+    Array.isArray(context.enabledTools) &&
+    !context.enabledTools.includes(toolName)
+  ) {
+    return PromptLocaleService.get(
+      locale,
+      "internal-tools-runtime.run_async_task.notEnabled",
+      { toolName },
+    );
+  }
+  const approval = new AutoApprovalEngine({
+    policies: context._policies ?? [],
+    permissionRules: context._permissionRules ?? null,
+    fullAuto: true,
+  }).check({ id: null, name: toolName, args: toolArguments });
+  if (approval.isDenied) {
+    return PromptLocaleService.get(
+      locale,
+      "internal-tools-runtime.run_async_task.denied",
+      { toolName, reason: approval.reason },
+    );
+  }
+  return null;
+}
 
 // ── run_async_task ─────────────────────────────────────────
 const runAsyncTask = {
@@ -194,6 +233,19 @@ const runAsyncTask = {
       };
     }
 
+    // A dispatcher must never widen what the loop may run. The approval
+    // stack only ever sees `run_async_task`, so the inner call faces here
+    // what a direct call would: the conversation's enabled set (a
+    // persona's blocked tool is absent from it) and every DENY — rules,
+    // agent policies, self-protection. The tier prompt is not re-asked:
+    // the dispatch itself already passed it, or ran under full auto.
+    const governance = governInnerCall(
+      toolName,
+      innerToolArguments,
+      context as RuntimeToolContext & ToolExecutionContext,
+    );
+    if (governance) return { error: governance };
+
     try {
       const { default: AsyncTaskRegistry } =
         await import("#src/services/AsyncTaskRegistry");
@@ -216,6 +268,7 @@ const runAsyncTask = {
               project: context.project || undefined,
               username: context.username || undefined,
               agentConversationId: context.agentConversationId || undefined,
+              agentContext: context.agentContext,
               signal: abortSignal,
             },
           );
@@ -228,6 +281,8 @@ const runAsyncTask = {
             project: context.project || undefined,
             username: context.username || undefined,
             agentConversationId: context.agentConversationId || undefined,
+            // The dispatching turn's Discord scope (x-discord-* headers).
+            agentContext: context.agentContext,
             signal: abortSignal,
           },
         );
@@ -236,7 +291,13 @@ const runAsyncTask = {
       // Build the completion callback that delivers the result to the
       // parent — through the running turn's mailbox, or by waking a new
       // turn (same pattern as OrchestratorService._triggerParentAutoResponse).
-      const completionCallback = buildCompletionCallback(context, { continueWorking });
+      // A sub-agent's turn is its whole run: told to end it, the sub-agent
+      // ends, and a completion after that is dropped (deliverTaskCompletion).
+      // It keeps working; where its loop would end with this task still
+      // running, the loop waits for it (holdSubAgentForOwnTasks).
+      const keepWorking =
+        continueWorking || (await isSubAgentConversation(context, agentConversationId));
+      const completionCallback = buildCompletionCallback(context, { continueWorking: keepWorking });
 
       const dispatchResult = AsyncTaskRegistry.dispatch(
         toolName,
@@ -273,7 +334,7 @@ const runAsyncTask = {
         `[AsyncTaskTools] Dispatched async task ${dispatchedTask.taskId}: tool="${toolName}"${continueWorking ? " (continueWorking)" : ""}`,
       );
 
-      if (continueWorking) {
+      if (keepWorking) {
         // DETACHED_WORK: the harness keeps the loop going and only records
         // the flag; if the turn ends while this task is still running it
         // bumps pendingBackgroundTasks so the completion can wake a new turn.
@@ -609,7 +670,7 @@ const waitForTasks = {
           });
           return;
         }
-        if (!taskState.deliveredVia) taskState.deliveredVia = "wait";
+        AsyncTaskRegistry.markDelivered(taskState, "wait");
         entries.push({
           taskId,
           kind: "async_task",
@@ -641,6 +702,8 @@ const waitForTasks = {
             : agentResult.error
               ? { error: agentResult.error }
               : { result: truncateForNotification(stringifyResult(agentResult.result)) }),
+          // Stopped at its turn cap: say so, and how to continue it.
+          ...(!agentEntry.running && agentResult.partial && { partial: true, resume: agentResult.summary }),
         });
       }
 
@@ -736,18 +799,29 @@ export interface TaskCompletionNotification {
 export function formatTaskCompletionNotification(
   taskState: AsyncTaskState,
 ): TaskCompletionNotification {
-  const taskStatusEmoji = taskState.status === SYSTEM_STATUSES.COMPLETED ? "✅" : "❌";
+  const isUncertain = taskState.status === SYSTEM_STATUSES.UNCERTAIN;
+  const taskStatusEmoji =
+    taskState.status === SYSTEM_STATUSES.COMPLETED ? "✅" : isUncertain ? "⚠️" : "❌";
   const resultSummary =
     taskState.status === SYSTEM_STATUSES.COMPLETED
       ? stringifyResult(taskState.result)
       : taskState.error || "Unknown error";
+  // A restart cut it off mid-run (TurnResumeService): it may have partly
+  // happened, and it was not run again.
+  const summary = isUncertain
+    ? PromptLocaleService.get(
+        PromptLocaleService.getDefaultLocale(),
+        "harness.resume.interruptedTaskSummary",
+        { toolName: taskState.toolName, taskId: taskState.taskId },
+      )
+    : `[ASYNC TASK COMPLETED] Tool "${taskState.toolName}" (task ${taskState.taskId}) has ${taskState.status}.`;
 
   const timestamp = new Date().toISOString();
   return {
     content: [
       `<task-notification>`,
       `<status>${taskStatusEmoji} ${taskState.status}</status>`,
-      `<summary>[ASYNC TASK COMPLETED] Tool "${taskState.toolName}" (task ${taskState.taskId}) has ${taskState.status}.</summary>`,
+      `<summary>${summary}</summary>`,
       `<duration_ms>${taskState.durationMilliseconds || 0}</duration_ms>`,
       `<result>`,
       truncateForNotification(resultSummary),
@@ -816,7 +890,7 @@ export async function deliverTaskCompletion(
 ): Promise<void> {
   // 1. A wait_for_tasks call owns this result.
   if (taskState.awaitedBy) {
-    taskState.deliveredVia = "wait";
+    await markTaskDelivered(taskState, "wait");
     logger.info(
       `[AsyncTaskTools] Task ${taskState.taskId} is awaited by ${taskState.awaitedBy} — delivery left to the waiter`,
     );
@@ -861,7 +935,7 @@ export async function deliverTaskCompletion(
         // drain and TurnInputMailbox.close is returned by close() and
         // dropped (microseconds — the loop has already decided to end).
         // `deliveredVia` records the intent for a later audit.
-        taskState.deliveredVia = "mailbox";
+        await markTaskDelivered(taskState, "mailbox");
         await payBackCountedPending(taskState);
         logger.info(
           `[AsyncTaskTools] Task ${taskState.taskId} delivered to the running turn ${mailboxKey} (${posted.id})`,
@@ -879,12 +953,83 @@ export async function deliverTaskCompletion(
     logger.info(
       `[AsyncTaskTools] Task ${taskState.taskId} completed for sub-agent ${taskState.agentConversationId} after its turn ended — dropped (the orchestrator owns sub-agent wake-ups)`,
     );
+    const { default: AsyncTaskRegistry } = await import("#src/services/AsyncTaskRegistry");
+    AsyncTaskRegistry.markDelivered(taskState, "dropped");
     return;
   }
 
   // 4. Root conversation, turn already ended → wake a new turn.
-  taskState.deliveredVia = "auto_response";
+  await markTaskDelivered(taskState, "auto_response");
   await triggerAsyncTaskAutoResponse(taskState, context);
+}
+
+/**
+ * Hold a sub-agent's run open for the async tasks it started and did not
+ * wait for. A sub-agent's turn is its whole run, and a completion that
+ * arrives after it ends is dropped. Called where its loop would end:
+ * - waits for each still-running task the way wait_for_tasks does (the
+ *   completion callback leaves the result to the waiter);
+ * - then posts every result to the run's mailbox for the harness to drain.
+ * Returns how many results it posted.
+ *
+ * Residual window, documented rather than closed: a task that settled just
+ * before this call, with its completion callback still in flight, is not
+ * waited for. Its own post still lands if it beats the mailbox's close.
+ */
+export async function holdSubAgentForOwnTasks(
+  loop: { conversationId?: string | null; agentConversationId: string },
+  signal?: AbortSignal,
+): Promise<number> {
+  const { default: AsyncTaskRegistry } = await import("#src/services/AsyncTaskRegistry");
+  const running = AsyncTaskRegistry.listTasks(loop.agentConversationId).filter(
+    (task) => task.status === SYSTEM_STATUSES.RUNNING,
+  );
+  if (running.length === 0) return 0;
+  const mailboxKey = resolveLoopKey(loop);
+  if (!mailboxKey) return 0;
+
+  for (const task of running) task.awaitedBy = loop.agentConversationId;
+  logger.info(
+    `[AsyncTaskTools] Sub-agent ${loop.agentConversationId} would end with ${running.length} async task(s) still running — waiting for them`,
+  );
+  await AsyncTaskRegistry.waitForTasks(
+    running.map((task) => task.taskId),
+    { signal },
+  );
+
+  let posted = 0;
+  for (const task of running) {
+    if (task.status === SYSTEM_STATUSES.RUNNING) {
+      // Aborted before it settled: a later completion is delivered as usual.
+      delete task.awaitedBy;
+      continue;
+    }
+    const notification = formatTaskCompletionNotification(task);
+    const result = TurnInputMailbox.post(mailboxKey, {
+      kind: "task_completion",
+      text: notification.content,
+      meta: {
+        _notificationSource: NOTIFICATION_SOURCES.ASYNC_TASK,
+        _notificationId: notification.notificationId,
+        taskId: task.taskId,
+      },
+    });
+    if (result.accepted) {
+      // Recorded durably (DetachedWorkStore), so a restart never delivers it again.
+      AsyncTaskRegistry.markDelivered(task, "mailbox");
+      posted++;
+    }
+  }
+  return posted;
+}
+
+/** Record how a completion reached its parent (DetachedWorkStore) — once. */
+async function markTaskDelivered(
+  taskState: AsyncTaskState,
+  via: NonNullable<AsyncTaskState["deliveredVia"]>,
+): Promise<void> {
+  const { default: AsyncTaskRegistry } = await import("#src/services/AsyncTaskRegistry");
+  AsyncTaskRegistry.markDelivered(taskState, via);
 }
 
 async function triggerAsyncTaskAutoResponse(
@@ -1062,6 +1207,10 @@ async function triggerAsyncTaskAutoResponse(
         agenticLoopEnabled: true,
         functionCallingEnabled: true,
         autoApprove: true,
+        // Nobody is watching the continuation: an ask no "approve all"
+        // answers is denied, and the conversation's mode (plan stays
+        // read-only) still holds.
+        unattended: true,
         planFirst: false,
         minContextLength: 120_000,
         ...(workspaceRoot ? { workspaceRoot } : {}),

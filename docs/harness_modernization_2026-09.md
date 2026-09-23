@@ -688,9 +688,9 @@ The same discipline, applied to every provider, is K1.
 
 ### 4.14 Observability and evals
 **Prism today:**
-- No OpenTelemetry or metrics.
-- `traceId` comes only from the request body.
-- The "tool latency" figure is actually LLM time.
+- OpenTelemetry GenAI spans since 2026-09-22 (`invoke_agent` → `chat` / `execute_tool`, off unless `OTEL_EXPORTER_OTLP_ENDPOINT`; prompt 23 Landing 1). No metrics.
+- `traceId` is minted server-side when the request has none; W3C `traceparent` reaches tools-service (forwarded on) and MCP.
+- The "tool latency" figure is the tools' own measured durations (`toolExecutions` on request rows).
 - Benchmarks are one prompt × models × trials, with assertions and an LLM judge.
 - Missing: pass^k, datasets, scheduled regression runs, trajectory replay.
 

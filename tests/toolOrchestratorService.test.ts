@@ -27,7 +27,7 @@ vi.mock("#src/services/FileService", () => {
   };
 });
 
-import MCPClientService, { MCP_PREFIX } from "#src/services/MCPClientService";
+import MCPClientService from "#src/services/MCPClientService";
 
 vi.mock("#src/services/MCPClientService", () => ({
   default: {
@@ -77,7 +77,7 @@ describe("ToolOrchestratorService", () => {
         },
       ];
 
-      vi.mocked(global.fetch).mockImplementation(async (url, requestOptions) => {
+      vi.mocked(global.fetch).mockImplementation(async (url) => {
         const urlString = String(url);
         if (urlString.includes("/admin/tool-schemas")) {
           return {
@@ -865,6 +865,8 @@ describe("ToolOrchestratorService", () => {
         criticModel: undefined,
         maxCostDollars: undefined,
         sharedCostBudget: undefined,
+        // The conversation's routing preset (none here).
+        routingPreset: null,
       });
     });
 
@@ -940,11 +942,20 @@ describe("ToolOrchestratorService", () => {
       });
       vi.mocked(MCPClientService.callTool).mockResolvedValue({ result: "ok" });
 
-      const result = await ToolOrchestratorService.executeTool("mcp__server__tool", { arg: 1 }, {} as any);
+      const result = await ToolOrchestratorService.executeTool("mcp__server__tool", { arg: 1 }, {
+        username: "rodrigo",
+        profileId: "work",
+        project: "coding",
+        conversationId: "conversation-1",
+      } as any);
       expect(result).toEqual({ result: "ok" });
       expect(MCPClientService.parseMCPToolName).toHaveBeenCalledWith("mcp__server__tool");
+      // The call reaches the servers of the run's own profile.
       expect(MCPClientService.callTool).toHaveBeenCalledWith("server", "tool", { arg: 1 }, {
         signal: undefined,
+        scope: { username: "rodrigo", profileId: "work" },
+        conversationId: "conversation-1",
+        project: "coding",
       });
     });
 
@@ -1820,7 +1831,7 @@ describe("ToolOrchestratorService", () => {
         },
       ];
 
-      vi.mocked(global.fetch).mockImplementation(async (url) => {
+      vi.mocked(global.fetch).mockImplementation(async () => {
         return {
           ok: true,
           status: 200,
@@ -1834,7 +1845,7 @@ describe("ToolOrchestratorService", () => {
       const synthSchema = aiSchemas.find((s) => s.name === "synthesize_speech");
 
       expect(synthSchema).toBeDefined();
-      const voiceDesc = (synthSchema?.parameters as any).properties.voice.description;
+      const voiceDesc = (synthSchema!.parameters as any).properties.voice.description;
       expect(voiceDesc).not.toContain(TTS_VOICE_CATALOG_PLACEHOLDER);
     });
 

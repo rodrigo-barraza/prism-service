@@ -449,6 +449,12 @@ export async function runConfiguredHook(
           signal,
           timeoutMilliseconds,
           hookName: hook.name,
+          // The hook reaches its OWNER's MCP servers, like a command hook
+          // runs with its owner's rights.
+          scope: {
+            username: hook.username,
+            profileId: (hook as { profileId?: string | null }).profileId ?? null,
+          },
         });
         break;
 

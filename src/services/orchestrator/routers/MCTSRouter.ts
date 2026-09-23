@@ -484,6 +484,7 @@ export class MCTSRouter implements TopologyRouter {
           files: referenceMember.files,
           model: referenceMember.model,
           agent: referenceMember.agent,
+          routing: referenceMember.routing,
           assignedProvider,
           assignedModel,
           agentIndex: branchIndex,
@@ -751,7 +752,6 @@ export class MCTSRouter implements TopologyRouter {
         durationMilliseconds: allResults
           .filter((result): result is SubAgentResult => !("error" in result))
           .reduce((total, result) => total + (result.durationMilliseconds || 0), 0),
-        messages: [],
         diff: bestOverallNode.result.diff,
       };
 

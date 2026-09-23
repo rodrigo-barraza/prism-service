@@ -1,4 +1,3 @@
-import { expandMessagesForFunctionCall } from "#src/utils/FunctionCallingUtilities";
 import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import logger from "#src/utils/logger";
@@ -14,14 +13,15 @@ import {
 import type BaseAgenticHarness from "#src/services/harnesses/BaseAgenticHarness";
 import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type { AgenticContext, ConversationMessage } from "#src/services/harnesses/types";
-import { streamWithRetries } from "#src/utils/ProviderStreamResilience";
 
 /**
  * ExhaustionRecovery — handles the iteration-limit summary pass.
  *
  * When the agentic loop hits its maximum iteration count without producing
- * a final text response, this module runs one last LLM call (with no tools)
- * asking the model to summarize progress and state what remains.
+ * a final text response, this module runs one last LLM call asking the
+ * model to summarize progress and state what remains — with the turn's tool
+ * block unchanged and `tool_choice: "none"`, so the request still starts
+ * with everything the loop sent.
  *
  * If the recovery LLM call itself produces empty output (common with
  * self-hosted or low-capability models that hit context limits), a synthetic
@@ -37,7 +37,7 @@ const MAXIMUM_FALLBACK_TOOL_RESULTS = 10;
 const MAXIMUM_RESULT_EXCERPT_LENGTH = 500;
 
 /**
- * Run a tool-free exhaustion recovery pass.
+ * Run the exhaustion recovery pass (tools declared, calling off).
  *
  * Appends a system instruction asking for a progress summary, streams the
  * response through the harness's `consumeStream`, and updates state.
@@ -50,8 +50,7 @@ export async function runExhaustionRecoveryPass(
   state: AgenticLoopState,
   currentMessages: ConversationMessage[],
 ): Promise<void> {
-  const { emit, signal, options, resolvedModel, modelDefinition, provider } =
-    context;
+  const { emit, options } = context;
 
   // A cost-cap stop must not spend again: no summary pass — the turn ends
   // with a note built from the tool activity so far, naming the real reason.
@@ -88,63 +87,48 @@ export async function runExhaustionRecoveryPass(
     ),
   });
 
-  const { tools: _tools, ...exhaustionOptions } = options;
-
-  const enforcedMessages = harness.enforceContextWindow(currentMessages, 0);
-  const expandedMessages = expandMessagesForFunctionCall(enforcedMessages, {
-    filterDeleted: false,
-  });
-
+  // Same tool block as every other request of the turn — only calling is
+  // off. Dropping `tools` here rewrote the front of the prompt, so the
+  // summary pass was a full cache miss.
   const augmentedOptions = {
-    ...exhaustionOptions,
+    ...options,
+    ...harness.requestToolOptions(),
+    toolChoice: "none" as const,
     project: context.project,
     agent: context.agent,
     username: context.username,
   };
 
+  const enforcedMessages = harness.enforceContextWindow(
+    currentMessages,
+    augmentedOptions.tools.length,
+  );
+
   const exhaustionRequestId = `${context.requestId || context.agentConversationId}-exhaustion`;
   harness.registerTrackerRequest(exhaustionRequestId);
 
-  // Shared transient-error retry (zero-chunk only) — providers no longer
-  // retry internally, so unwrapped call sites must wrap here.
-  const createExhaustionStream = () =>
-    modelDefinition?.liveAPI && provider.generateTextStreamLive
-      ? provider.generateTextStreamLive(expandedMessages, resolvedModel, {
-          ...augmentedOptions,
-          signal,
-        })
-      : provider.generateTextStream(expandedMessages, resolvedModel, {
-          ...augmentedOptions,
-          signal,
-        });
-
-  // Create the first stream eagerly (preserves call-time semantics for
-  // providers that validate/dispatch on invocation); retries create fresh
-  // streams via the factory.
-  let initialExhaustionStream: AsyncIterable<unknown> | null =
-    createExhaustionStream();
-  const exhaustionStream = streamWithRetries(
-    () => {
-      if (initialExhaustionStream) {
-        const firstStream = initialExhaustionStream;
-        initialExhaustionStream = null;
-        return firstStream;
-      }
-      return createExhaustionStream();
-    },
-    { signal, label: context.providerName },
+  // The harness's own request path: media resolution, output clamping,
+  // cache key, cache telemetry and the shared zero-chunk retry.
+  const exhaustionStream = await harness.createProviderStream(
+    enforcedMessages,
+    augmentedOptions,
   );
 
   // Create a pass state for chunk routing through the shared processStreamChunk
   const exhaustionPass = harness.createPassState(augmentedOptions);
   exhaustionPass.requestId = exhaustionRequestId;
 
-  // No tools in the exhaustion pass
+  // No tool may run in the exhaustion pass (tool_choice "none"; a call the
+  // model makes anyway is dropped by the empty allow-list).
   const emptyToolNames = new Set<string>();
 
   // Use the shared consumeStream — all chunk routing goes through processStreamChunk,
   // so new chunk types added to the base dispatcher are automatically handled.
-  await harness.consumeStream(exhaustionStream, exhaustionPass, emptyToolNames);
+  // A null stream is the context-exhaustion pre-flight: nothing to consume,
+  // the synthetic fallback below covers it.
+  if (exhaustionStream) {
+    await harness.consumeStream(exhaustionStream, exhaustionPass, emptyToolNames);
+  }
 
   // ── Empty recovery fallback ──────────────────────────────────
   // Self-hosted or low-capability models sometimes produce empty output on

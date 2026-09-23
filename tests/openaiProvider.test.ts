@@ -547,7 +547,7 @@ describe("OpenAI Provider Adapter", () => {
 
     it("applies strict schema sanitization for responses API with complex tools", async () => {
       const messages: OpenAIMessage[] = [{ role: MESSAGE_ROLES.USER, content: "Action" }];
-      const result = await openaiProvider.generateText(messages, "gpt-5.5", {
+      await openaiProvider.generateText(messages, "gpt-5.5", {
         responseFormat: "json_schema",
         responseSchema: {
           name: "schema",
@@ -738,7 +738,7 @@ describe("OpenAI Provider Adapter", () => {
     });
 
     it("includes system instruction when systemPrompt is passed", async () => {
-      const result = await openaiProvider.captionImage(
+      await openaiProvider.captionImage(
         ["http://example.com/img.jpg"],
         "Describe",
         "gpt-5.5",
@@ -910,7 +910,7 @@ describe("OpenAI Provider Adapter", () => {
       const stream = openaiProvider.generateTextStream(messages, "gpt-4o");
 
       await expect(async () => {
-        for await (const chunk of stream) {
+        for await (const _chunk of stream) {
           // pull
         }
       }).rejects.toThrow("Invalid request parameter structure");

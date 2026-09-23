@@ -15,6 +15,8 @@ vi.mock("#src/utils/logger", () => ({
 vi.mock("#src/services/ConversationApprovalSettings", () => ({
   default: {
     isAutoApproveEnabled: vi.fn(async (conversationId: string) => conversationId === "conversation-a"),
+    getPermissionMode: vi.fn(async () => null),
+    setPermissionMode: vi.fn(async () => true),
   },
 }));
 vi.mock("#src/services/harnesses/HarnessRegistry", () => ({

@@ -42,6 +42,20 @@ function isUsageRecord(value: object | null | undefined): value is Record<string
 }
 
 /**
+ * `event` as the parent stream should receive it: without the `seq` this
+ * sub-agent's conversation stamped on it (broadcastToDirectViewers →
+ * LiveTurnBuffer.record). The parent numbers its own stream, and a stamp
+ * the event already carries is kept — so a foreign seq there runs
+ * backwards whenever the parent has emitted more than this sub-agent, and
+ * a client cursor (afterSeq) drops the event as already seen. A copy: the
+ * stamped original stays in this sub-agent's replay buffer.
+ */
+function forParentStream(event: Parameters<EmitFunction>[0]): Parameters<EmitFunction>[0] {
+  const { seq: _subAgentSeq, ...forParent } = event;
+  return forParent;
+}
+
+/**
  * Manages per-sub-agent SSE telemetry for the Orchestrator.
  *
  * Tracks burst-scoped token counters, phase transitions
@@ -87,6 +101,8 @@ export class SubAgentTelemetryEmitter {
   totalCost: number | null = null;
   usage: Record<string, number> | null = null;
   iterations: number | null = null;
+  /** The harness ended the run at its iteration limit while it was still calling tools. */
+  iterationLimitReached = false;
 
   constructor(config: SubAgentTelemetryConfig) {
     this.subAgentId = config.subAgentId;
@@ -368,7 +384,7 @@ export class SubAgentTelemetryEmitter {
         // Broadcast usage updates to direct WebSocket viewers
         this.broadcastToDirectViewers(event);
         if (this.parentEmit) {
-          this.parentEmit(event);
+          this.parentEmit(forParentStream(event));
         }
       } else if (
         event.type === "approval_required" ||
@@ -383,7 +399,7 @@ export class SubAgentTelemetryEmitter {
         this.broadcastToDirectViewers(event);
         if (this.parentEmit) {
           this.parentEmit({
-            ...event,
+            ...forParentStream(event),
             subAgentId: event.subAgentId ?? this.subAgentId,
             subAgentDescription: event.subAgentDescription ?? this.subAgentDescription,
             ...((event.approvalConversationId ?? this.subAgentConversationId) && {
@@ -403,13 +419,21 @@ export class SubAgentTelemetryEmitter {
         // Also broadcast to direct viewers of this sub-agent's conversation
         this.broadcastToDirectViewers(event);
         if (this.parentEmit) {
-          this.parentEmit(event);
+          this.parentEmit(forParentStream(event));
         }
       }
     };
   }
 
   private handleStatusEvent(event: Record<string, unknown>) {
+    // Recorded whether or not a parent stream is attached — the result
+    // (partial or not) depends on them.
+    if (event.message === STATUS_MESSAGES.ITERATION_PROGRESS && typeof event.iteration === "number") {
+      this.iterations = event.iteration;
+    }
+    if (event.message === STATUS_MESSAGES.ITERATION_LIMIT_REACHED) {
+      this.iterationLimitReached = true;
+    }
     if (
       this.parentEmit &&
       (event.message === "iteration_progress" ||

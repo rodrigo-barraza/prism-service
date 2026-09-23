@@ -6,11 +6,14 @@
   },
   "planningMode": {
     "blocked": "You are in PLANNING MODE. Tool call(s) [{{blockedNames}}] were blocked — only exit_plan_mode is available. Write your complete plan as text output, then call exit_plan_mode to submit it for user approval.",
+    "blockedNotReadOnly": "Plan mode is on: {{blockedNames}} did not run — only read-only tools run while you plan. Keep exploring with read-only tools, write your plan, then call exit_plan_mode to submit it for approval.",
     "submitPlan": "Your plan is written. Now call exit_plan_mode with that plan so the user can review and approve it — do not restate it as text.",
     "approvalResult": "User has approved your plan. You can now start coding. Start with updating your todo list if applicable.",
     "rejectionStatus": "Plan rejected — execution cancelled.",
     "rejectionResult": "The user did not approve this plan, so it was not carried out. Do not act on it. Wait for the user's next message: they may revise the request or ask for a different plan.",
     "planningInstruction": "## ⚠️ PLANNING MODE ACTIVE — TOOL ACCESS RESTRICTED\n\nYou are in PLANNING MODE. The ONLY tools available are:\n- **exit_plan_mode** — Submit your plan for user approval\n- **think** — Internal reasoning\n\nAll other tool calls WILL BE BLOCKED.\n\n**What to do:**\n1. Analyze the user's request\n2. Design your implementation approach as text output\n3. Call exit_plan_mode when ready — the user will review and approve before you can execute\n\nKeep your plan concise. For simple tasks, a brief summary is sufficient.",
+    "planModeOn": "Plan mode is on. Every tool stays in your list, but only read-only calls run (reading files, searching, looking things up); calls that write, execute or change state are blocked until the plan is approved. Explore as needed, write your plan as text, then call exit_plan_mode to submit it for the user's approval. Keep the plan concise — for simple tasks a brief summary is enough.",
+    "planModeOff": "Plan mode is off: the plan was approved, and every tool runs again. Carry out the plan.",
     "rejectionStatusWithReason": "Plan rejected — execution cancelled. Reason: {{reason}}"
   },
   "reminderExtractor": {
@@ -46,7 +49,8 @@
   "toolSetUpdated": {
     "header": "[TOOL SET UPDATED] {{count}} new tool(s) have been dynamically enabled: {{toolNames}}",
     "availableDocumentation": "The following tools are now available with full documentation:",
-    "usageGuidelines": "## Tool Usage Guidelines"
+    "usageGuidelines": "## Tool Usage Guidelines",
+    "removed": "No longer available in this conversation: {{toolNames}}. Calls to them will not run."
   },
   "validationError": {
     "header": "[VALIDATION ERROR] Your recent edit(s) introduced {{errorCount}} error(s):",
@@ -94,5 +98,12 @@
     "declined": "The user declined this {{toolName}} call. It was not executed. Do not retry it as is; continue without it or ask the user how to proceed.",
     "declinedWithReason": "The user declined this {{toolName}} call. It was not executed. The user's reason: {{reason}}. Take the reason into account; do not retry the call as is.",
     "lapsed": "This {{toolName}} call was not decided before its turn moved on, so it was not executed. Do not assume it ran; continue without it or ask the user whether to try again."
+  },
+  "resume": {
+    "retryReason": "The server restarted while this {{toolName}} call was running. It may have partly run, and its result was lost. Run it again?",
+    "notRerun": "The server restarted while this {{toolName}} call was running, and it was not run again. It may have partly run: do not assume it did or did not take effect — check before relying on it, or ask the user.",
+    "interruptedTaskSummary": "[ASYNC TASK INTERRUPTED] Tool \"{{toolName}}\" (task {{taskId}}) was still running when the server restarted. It may have partly run; its result is unknown. It was not run again.",
+    "interruptedSubAgent": "Sub-agent {{agentId}} (\"{{description}}\") was still running when the server restarted. It stopped there; its work may be partial. resume_subagent continues it from its transcript.",
+    "interruptedSubAgentsSummary": "[SUB-AGENTS INTERRUPTED] The server restarted while {{count}} sub-agent(s) of this conversation were running or undelivered."
   }
 }

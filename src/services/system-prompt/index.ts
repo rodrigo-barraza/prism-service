@@ -7,6 +7,7 @@ import {
   ORCHESTRATOR_ONLY_TOOLS,
 } from "#src/services/OrchestratorPrompt";
 import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";
+import { ROUTING_PRESETS } from "#src/services/routing/RoutingPresetIds";
 import { resolveLockedOffToolNames } from "#src/utils/resolveLockedOffToolNames";
 import SettingsService from "#src/services/SettingsService";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
@@ -24,6 +25,7 @@ const CORE_AGENTIC_TOOLS = new Set<string>(CORE_AGENTIC_TOOLS_LIST);
 import { DirectoryTreeFormatter } from "./DirectoryTreeFormatter.ts";
 import { ToolDocFormatter, type ToolDocMode } from "./ToolDocFormatter.ts";
 import { SkillMemoryScorer } from "./SkillMemoryScorer.ts";
+import { SKILL_TOOL_NAMES } from "#src/services/tool-definitions/SkillTools";
 import { type AssemblerContext } from "./types.ts";
 import SomaticStateService, {
   type SomaticStateEvent,
@@ -734,6 +736,12 @@ export default class SystemPromptAssembler {
           (toolName) =>
             !orchestratorSet.has(toolName) && !lockedOffSet.has(toolName),
         );
+        // lead_sidekick: the lead delegates execution to one persistent
+        // sidekick and reads only its briefs (routing/LeadSidekick).
+        const leadSidekickAddendum =
+          context.routingPreset === ROUTING_PRESETS.LEAD_SIDEKICK
+            ? "\n\n" + PromptLocaleService.get(locale, "orchestrator.leadSidekick")
+            : "";
         sections.push(
           wrapSection(
             SYSTEM_PROMPT_SECTIONS.ORCHESTRATOR,
@@ -741,7 +749,7 @@ export default class SystemPromptAssembler {
               subAgentTools,
               defaultTopology,
               locale,
-            }),
+            }) + leadSidekickAddendum,
           ),
         );
       }
@@ -809,9 +817,15 @@ export default class SystemPromptAssembler {
       }
     }
 
-    // ── 8. Project Skills (relevance-filtered) ────────────────────
+    // ── 8. Skill Catalog (progressive disclosure) ─────────────────
+    // One line per skill — its name and what it is for — in name order,
+    // inside the cached system prompt: it changes only when a skill does.
+    // Bodies never ride the prompt; the model reads one with load_skill
+    // when a task needs it. Relevance scoring only highlights catalog
+    // entries for this turn, in the per-turn context message.
     // Skills are workspace-scoped context — skip entirely when workspace
-    // is disabled to avoid injecting irrelevant coding/project instructions.
+    // is disabled — and a catalog is useless when load_skill is not in the
+    // resolved tool set.
     const lastUserMessage = [...(context.messages || [])]
       .reverse()
       .find((message) => message.role === "user");
@@ -819,8 +833,12 @@ export default class SystemPromptAssembler {
 
     const skillNames: string[] = [];
     let skillsText = "";
-    if (isWorkspaceEnabled) {
-      const skills = await this.scorer.fetchSkills(
+    let skillCatalogText = "";
+    const canLoadSkills =
+      !context.resolvedToolNames?.length ||
+      context.resolvedToolNames.includes(SKILL_TOOL_NAMES.LOAD_SKILL);
+    if (isWorkspaceEnabled && canLoadSkills) {
+      const catalog = await this.scorer.fetchSkillCatalog(
         context.project || null,
         context.username || "",
         queryText,
@@ -828,18 +846,34 @@ export default class SystemPromptAssembler {
           traceId: context.traceId,
           agentConversationId: context.agentConversationId,
           endpoint: "/agent",
-          agent: agentId,
+          // The persona the tools will see (ToolExecutor passes
+          // `agent || null`), not the CODING fallback: load_skill must
+          // find every skill the catalog lists.
+          agent: context.agent || null,
           profileId: context.profileId,
         },
       );
-      if (skills.length > 0) {
-        const skillBlocks = skills.map((s) => {
-          skillNames.push(s.name);
-          return `### ${s.name}\n${s.content}`;
-        });
+      if (catalog.entries.length > 0) {
+        const catalogLines = catalog.entries.map((entry) =>
+          entry.description
+            ? `- ${entry.name}: ${entry.description}`
+            : `- ${entry.name}`,
+        );
+        skillCatalogText = wrapSection(
+          SYSTEM_PROMPT_SECTIONS.SKILLS,
+          PromptLocaleService.get(locale, "system-prompt.skillCatalogHeader") +
+            "\n" +
+            catalogLines.join("\n"),
+        );
+        sections.push(skillCatalogText);
+      }
+      if (catalog.highlighted.length > 0) {
+        skillNames.push(...catalog.highlighted);
         skillsText = wrapSystemMessage(
           SYSTEM_MESSAGE_TAGS.PROJECT_SKILLS,
-          skillBlocks.join("\n\n"),
+          PromptLocaleService.get(locale, "system-prompt.skillHighlight", {
+            names: catalog.highlighted.join(", "),
+          }),
         );
       }
     }
@@ -966,6 +1000,7 @@ export default class SystemPromptAssembler {
           : null,
       skillNames,
       skillsText,
+      skillCatalogText,
       memoriesText,
       workflowsText,
       goalText,
@@ -983,6 +1018,7 @@ export default class SystemPromptAssembler {
           selfContextMessage,
           skillNames,
           skillsText,
+          skillCatalogText,
           memoriesText,
           workflowsText,
           goalText,
@@ -997,6 +1033,7 @@ export default class SystemPromptAssembler {
 
         context._injectedSkills = skillNames;
         context._skillsText = skillsText;
+        context._skillCatalogText = skillCatalogText;
         context._assembledSystemPrompt = systemPrompt;
 
         // Propagate newly injected memory IDs to the hook context so the
@@ -1020,7 +1057,7 @@ export default class SystemPromptAssembler {
         });
 
         logger.info(
-          `[SystemPromptAssembler] Assembled ${systemPrompt.length} char static system prompt for agent="${context.agent || "DIRECT"}" (${skillNames.length} skills injected into user context, ${injectedMemoryIds.length} new memories injected, ~${estimateTokens(memoriesText)} memory tokens)`,
+          `[SystemPromptAssembler] Assembled ${systemPrompt.length} char static system prompt for agent="${context.agent || "DIRECT"}" (${skillNames.length} skills highlighted, ${injectedMemoryIds.length} new memories injected, ~${estimateTokens(memoriesText)} memory tokens)`,
         );
       } catch (error: unknown) {
         logger.error(
@@ -1032,7 +1069,7 @@ export default class SystemPromptAssembler {
 }
 
 /**
- * Standard utility to inject system prompts and contexts (platform context, somatic state, skills, memories)
+ * Standard utility to inject system prompts and contexts (platform context, somatic state, skill highlights, memories)
  * into a conversation message history. Exposed so that both production assembler hooks and test harnesses
  * use the identical alignment algorithm without code duplication.
  */
@@ -1109,7 +1146,7 @@ export function injectSystemPromptContext(
   }
 
   // ── 3. Inject system-originated context as a dedicated system message ──
-  // Local time, skills, memories, and workflows are system-injected metadata,
+  // Local time, skill highlights, memories, and workflows are system-injected metadata,
   // not user input. They belong in a system message so the LLM treats them as
   // authoritative grounding context rather than conversational user intent.
   // The _isInjectedContext marker prevents double-injection on the same turn

@@ -51,9 +51,13 @@
     }
   },
   "list_skills": {
-    "description": "List all available skill.",
+    "description": "List skill in this scope: name, skillId, what for. Read skill with load_skill.",
+    "parameters": {}
+  },
+  "load_skill": {
+    "description": "Read skill full instruction by name. System prompt list skill as `name: what for`; task match → call this, follow what come back. Give skill body and bundled resource.",
     "parameters": {
-      "project": "Optional: filter by project."
+      "name": "Skill name, same as skill list."
     }
   },
   "delete_skill": {

@@ -84,6 +84,23 @@ path instead of being dropped at `close()`. A running sub-agent can
 `report_progress` into its parent's turn as an `agent_message` with
 `_authority: "sub-agent"`; `resume_subagent` restores the persisted
 transcript (and rebuilds an evicted agent from its document).
+Agents can be defined as files (prompt 17 Landing 2,
+`agent-definitions-as-files`): `.prism/agents/*.md` and `.claude/agents/*.md`
+under the workspace roots — YAML frontmatter (`name`, `description`,
+`model`, `provider`, `effort`, `tools`, `disallowedTools`, `maxTurns`,
+`permissionMode`; Claude Code's tool names and `sonnet`/`opus`/`haiku`
+aliases map to Prism's), the Markdown body as the system prompt, cached by
+mtime (`agents/AgentDefinitionFiles.ts`). They sit below built-ins and Mongo
+custom agents, which win a clash (logged; `GET /custom-agents/files` lists
+file agents, rejected files and shadowed ones). Mongo agents take the same
+fields. The spawn tools resolve an agent by name or id and list each one's
+description. A sub-agent runs on its definition's model/provider, effort and
+`maxTurns`, without its `disallowedTools`, with its own policies beside the
+parent's, and with a `permissionMode` that only narrows the parent's (it
+rides `options.permissionMode`; until prompt 12's mode layer lands,
+`plan`/`default` turn auto-approval off). A run stopped by its turn cap is
+`partial` — in the completion message and in `wait_for_tasks` — and a
+resume is told its current workspace when merge-back removed the old one.
 
 ### 2.4 Event sequence ids and cursor replay
 `SseEvent.seq` stamped in `withDirectViewerBroadcast` (monotonic per
@@ -93,12 +110,20 @@ reports `droppedCount`. WebSocket subscribe accepts `afterSeq`, acks
 `{type:"subscribed", conversationId, lastSeq, replayedCount, droppedCount}`
 before the replay. Client: `liveTurnCursor` (the ack's `lastSeq` is
 informational; replay dedupes against the pre-subscribe mark).
-NOT done from §4 of the review: persisted run state (pending tools /
-approvals / questions / checkpoints) and the "safe retry vs uncertain
-outcome" recovery classification. `ApprovalRegistry` still holds live
-`resolve` closures; persisting the descriptor is the first step. The client's
-full typed-reducer migration of `AgentChatComponent` is also not done — new
-state lives in dedicated hooks/modules, the component's structure is unchanged.
+A sub-agent event forwarded to the parent stream (usage, its approval cards
+and decisions, a grandchild's `sub_agent_*`) goes up without the seq the
+sub-agent's own conversation stamped on it, so the parent numbers it
+(`SubAgentTelemetryEmitter` `forParentStream`); a kept foreign seq ran
+backwards whenever the parent had emitted more, and the cursor dropped it.
+Persisted run state and the "safe retry vs uncertain outcome" recovery
+classification from §4 of the review were done later by prompt 13:
+Landing 1 (`PendingDecisionStore`: approvals and questions outlive the
+process) and Landing 2 (`TurnRunStore` + `TurnResumeService`: a turn a
+restart interrupted is re-driven — its pass replayed, read-only calls
+re-run, anything else asked about as uncertain; mailbox entries and
+background work delivered once). The client's full typed-reducer migration
+of `AgentChatComponent` is not done — new state lives in dedicated
+hooks/modules, the component's structure is unchanged.
 
 ### 2.5 OpenAI native state and catalog
 Messages carry `phase`, `reasoningItems[{id, summary, encrypted_content}]`,

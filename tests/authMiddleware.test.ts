@@ -7,7 +7,7 @@
  *
  * These tests ensure the priority chain and edge-case normalizations are correct.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Request, Response, NextFunction } from "express";
 import { requestContext } from "#src/utils/RequestContext";
 import supertest from "supertest";

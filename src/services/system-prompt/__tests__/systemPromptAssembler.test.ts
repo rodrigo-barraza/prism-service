@@ -470,6 +470,23 @@ describe("SystemPromptAssembler", () => {
       expect(getOrchestratorPromptAddendum).toHaveBeenCalled();
     });
 
+    it("a lead_sidekick lead carries the lead addendum in its orchestrator section; nobody else does", async () => {
+      const assembler = createAssembler();
+      const base = {
+        agent: "CODING",
+        project: "prism-chat",
+        messages: [{ role: "user", content: "Hello" }],
+        enabledTools: ["read_file", "create_subagent"],
+      };
+
+      const lead = await assembler.assemble({ ...base, routingPreset: "lead_sidekick" });
+      const plain = await assembler.assemble(base);
+
+      expect(lead.prompt).toContain("### Lead and Sidekick");
+      expect(lead.prompt).toContain("never its raw tool output");
+      expect(plain.prompt).not.toContain("### Lead and Sidekick");
+    });
+
     it("skips orchestrator prompt when enabledTools resolves to no orchestrator tools", async () => {
       const assembler = createAssembler();
       const { prompt } = await assembler.assemble({

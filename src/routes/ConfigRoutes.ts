@@ -679,10 +679,11 @@ router.post(
       const fullPromptTokens = estimateTokens(fullPrompt);
 
       // Skills are reported as their own budget category, so carve them
+      // (the catalog inside the prompt, the per-turn highlight beside it)
       // out of the assembled prompt's token estimate.
-      const skillTokens = result.skillsText
-        ? estimateTokens(result.skillsText)
-        : 0;
+      const skillTokens =
+        (result.skillCatalogText ? estimateTokens(result.skillCatalogText) : 0) +
+        (result.skillsText ? estimateTokens(result.skillsText) : 0);
       const systemPromptTokens = Math.max(fullPromptTokens - skillTokens, 0);
 
       // ── Baseline context budget estimation ──

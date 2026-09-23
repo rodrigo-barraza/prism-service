@@ -3,14 +3,17 @@
 > **Landing 1 done** (`nonblocking-subagent-dispatch`, service + client): root `create_subagent(s)`/`resume_subagent` return DETACHED_WORK and deliver once via `DetachedDispatchRegistry` (wait_for_tasks → running turn's mailbox → auto-response; counted only when the dispatching turn ends undelivered); `POST /orchestrator/sub-agents/:agentId/stop` + panel Stop; `report_progress` (sub-agents only, `agent_message` with `_authority: "sub-agent"`); resume restores persisted history and rehydrates evicted agents; turns seal their mailbox when they end.
 > Tests: `tests/nonBlockingSubAgentDispatch.test.ts` (real harness), `tests/subAgentDispatchAccounting.test.ts`, `tests/orchestratorSubAgentStop.test.ts`, `tests/subAgentReportProgress.test.ts`, `tests/orchestratorServiceResume.test.ts`, `turnInputAcceptance` 4–5; client `subAgentsPanelComponent.test.tsx`, `utils/__tests__/subAgentActivity.test.ts`.
 
+> **Landing 2 done** (`agent-definitions-as-files`): custom agents (Mongo + `.prism/agents`/`.claude/agents` files, `agents/AgentDefinitionFields.ts`/`AgentDefinitionFiles.ts`, `yaml` dep, mtime cache, Mongo wins a clash) gain model/provider/effort/tools/disallowedTools/maxTurns/permissionMode/description; `AgentPersonaRegistry.resolve()` spawns by name or id (every custom agent used to spawn as the parent's type); roster lists descriptions; pins applied in `orchestrator/SubAgentDefinitionPins.ts`; turn cap → `partial` (notification + `wait_for_tasks`), resumable.
+> Tests: `src/services/agents/__tests__/agentDefinitionFiles.test.ts`, `src/services/orchestrator/__tests__/subAgentDefinitionPins.test.ts`, `tests/agentDefinitionRegistry.test.ts`, `tests/agentDefinitionSubAgentPins.test.ts` (real harness, scripted provider), `tests/customAgentSubAgentSpawn.test.ts` (red first), `tests/subAgentResumeWorkspace.test.ts`, `tests/customAgentsDefinitionFieldsRoutes.test.ts`. `permissionMode` enforcement is prompt 12 Landing 2's mode layer (reads `options.permissionMode`).
+
 > Hand to ONE session per landing: *"Read prism-service/docs/prompts/17-subagents-modern.md and execute Landing N."*
 > Conventions, gates and the isolated live recipe: `docs/prompts/README.md`. Source: `docs/harness_modernization_2026-09.md` §4.7 (and harness-next §2.3).
 
 **Repos:** prism-service (small client additions in Landing 1) · **Size:** L · **Depends on:** 04 (worktree merge-back), 09 Landing 1 (the `create_subagent` hang). Prompt 11 (role models) is a soft dependency. · **Shares hubs with:** 11, 21 (`OrchestratorService.ts`, `ToolOrchestratorService.ts`, `AgentPersonaRegistry.ts`).
 
 ## Today
-- **Custom agents are limited.** They can't pin a model, effort or max turns, and can't be spawned as sub-agents (`ToolOrchestratorService.ts` ~545). The model sees agent names but not their descriptions.
-- **Resuming is in place** (Landing 1): `resume_subagent` continues from the persisted transcript, and a `partial` result from Landing 2's `maxTurns` can use it.
+- **Agent definitions** (Landing 2): custom agents pin model/effort/maxTurns, spawn as sub-agents by name, and a `maxTurns` cap returns a resumable `partial` result.
+- **Resuming is in place** (Landing 1): `resume_subagent` continues from the persisted transcript.
 
 ## Reference designs
 - **Claude Code.** Sub-agents are Markdown files with frontmatter (tools, model, permission mode). They run in the background by default and can be resumed by id. Caps: 200 spawns per session, 20 concurrent, depth 3.
@@ -19,22 +22,6 @@
 - **Research.**
   - Agents that read each other's full solutions converge within one round; independent proposals avoid that (arXiv 2608.23541).
   - Reject authority only helps when the reviewer can verify the work (2609.14767).
-
----
-
-## Landing 2 — `agent-definitions-as-files`
-
-**Changes.**
-- **New definition fields.** Custom agents gain `model`, `provider`, `effort`, `tools`, `disallowedTools`, `maxTurns`, `permissionMode` and `description`.
-- **Load from files.** Load definitions from the workspace's `.claude/agents/*.md` and `.prism/agents/*.md` (YAML frontmatter plus a Markdown body as the system prompt), cached by mtime, merged with Mongo definitions. Mongo wins on a name clash, and the clash is logged.
-- **Visibility and spawning.** The orchestrator prompt lists each agent's name **and description**, and custom agents are spawnable as sub-agents.
-- **`maxTurns`.** When the limit is hit, the result is marked `partial` and can be resumed.
-
-**Tests.**
-- **Frontmatter parsing.** Multi-line strings, lists, a missing optional field, malformed YAML (a clear error, not a crash).
-- **Precedence and caching.** File vs database; mtime invalidation.
-- **Fields honoured.** A scripted provider asserts the `model` and `effort` used. `maxTurns` gives a partial, resumable result.
-- **Red first.** Spawning a custom agent as a sub-agent works.
 
 ---
 

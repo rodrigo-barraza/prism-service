@@ -32,9 +32,32 @@ export interface ChatMessageContent {
   image_url?: { url: string };
 }
 
+/**
+ * Tools activated (or deactivated) mid-conversation, carried on the
+ * harness's `role: "system"` tool-update message. The adapter of the
+ * request's `toolLoadingMode` renders it natively (providers/toolLoading.ts);
+ * every other adapter sends the message's text only.
+ */
+export interface ToolActivation {
+  /** Full definitions of the tools that became callable. */
+  added: Array<{ name: string; description?: string; parameters?: Record<string, unknown> }>;
+  /** Names of tools that stopped being callable. */
+  removed: string[];
+  /** The tool call whose result activated them — `tool_reference` blocks attach to its result. */
+  sourceToolCallId?: string | null;
+}
+
 export interface ChatMessage {
   role: string;
   content?: string | ChatMessageContent[];
+  /** Mid-conversation tool activation (system messages only). */
+  toolActivation?: ToolActivation;
+  /**
+   * A one-turn system nudge. Claude models with mid-conversation system
+   * messages render it `clear_at: "next_user_message"`: it stops rendering
+   * once a later user message exists, and stays in the transcript.
+   */
+  turnScoped?: boolean;
   name?: string;
   images?: string[];
   audio?: string[];
@@ -116,6 +139,38 @@ export interface ProviderOptions {
    * (`diagnostics.previous_message_id`) diagnose a cache miss against.
    */
   cacheTelemetry?: { previousResponseId?: string | null };
+  /**
+   * How tools activated mid-conversation reach the model (agent loop only;
+   * providers/toolLoading.ts). Adapters render `toolActivation` messages
+   * natively only for their own mode.
+   */
+  toolLoadingMode?: import("#src/providers/toolLoading").ToolLoadingMode;
+  /**
+   * Tools declared but not loaded (`defer_loading: true`, Anthropic modes) —
+   * activated later by a `tool_addition` / `tool_reference`. Sent after
+   * `tools`, in the same order on every request.
+   */
+  deferredTools?: Array<{
+    name: string;
+    description?: string;
+    parameters?: Record<string, unknown>;
+  }>;
+  /**
+   * `"none"` keeps the tool block but forbids tool calls — the exhaustion
+   * pass sends it instead of dropping `tools` (a changed tool block is a
+   * cache miss from the first token).
+   */
+  toolChoice?: "auto" | "none";
+  /**
+   * Anthropic server-side context editing: clear old tool results once the
+   * prompt passes `triggerInputTokens`, keeping the last `keepToolUses`.
+   * Replaces client-side offload stubs, which rewrite the history.
+   */
+  contextEditing?: {
+    triggerInputTokens: number;
+    keepToolUses: number;
+    clearAtLeastInputTokens: number;
+  };
   webSearch?: boolean | string;
   webFetch?: boolean;
   codeExecution?: boolean;

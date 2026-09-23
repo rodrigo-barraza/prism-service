@@ -400,6 +400,8 @@ async function executeModelNode(
       generationParams.functionCallingEnabled = true;
       generationParams.agenticLoopEnabled = true;
       generationParams.autoApprove = true;
+      // Unattended: an ask no "approve all" answers is denied, not parked.
+      generationParams.unattended = true;
       generationParams.maxIterations = 10;
       await handleAgent(generationParams, emitCollector, { signal });
     } else {

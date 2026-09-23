@@ -1,7 +1,9 @@
 import {
   DEFAULT_TOPOLOGY,
   DEFAULT_THOUGHT_STRUCTURE,
+  THOUGHT_STRUCTURES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { PROTOCOL_EVENT_TYPES } from "#src/protocol/events";
 import AgenticToolResolver from "./AgenticToolResolver.ts";
 import AgenticLoopState from "./AgenticLoopState.ts";
 import HarnessRegistry from "./harnesses/HarnessRegistry.ts";
@@ -19,16 +21,21 @@ import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import ConversationGenerationTracker from "./ConversationGenerationTracker.ts";
 import ConversationStatusRegistry from "./ConversationStatusRegistry.ts";
 import ToolContext from "./ToolContext.ts";
+import { recordAgentTurnOutcome, traceAgentTurn } from "./Tracing.ts";
+import type { Span } from "@opentelemetry/api";
 import QuestionRegistry, {
   type PendingQuestionSummary,
   type QuestionAnswerOutcome,
 } from "./QuestionRegistry.ts";
 import type { DecisionOwner } from "./PendingDecisionStore.ts";
+import { decisionOwnerOf } from "./conversation/ConversationRunState.ts";
+import { endTurnRun } from "./harnesses/lifecycle/TurnRunRecorder.ts";
 import { runPreflightToolDiscovery } from "./harnesses/lifecycle/PreflightToolDiscovery.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { TURN_RESUME } from "#src/constants";
 import logger from "#src/utils/logger";
 
 import type { AgenticContext, ConversationMessage } from "./harnesses/types.ts";
@@ -46,9 +53,21 @@ import type { AgenticContext, ConversationMessage } from "./harnesses/types.ts";
  * Also exposes approval/question resolution APIs used by AgentRoutes.
  */
 export default class AgenticLoopService {
-  /** Run an agentic loop using the specified (or default) harness. */
+  /**
+   * Run an agentic loop using the specified (or default) harness, as one
+   * `invoke_agent` span (Tracing) — every entry point comes through here.
+   */
   static async runAgenticLoop(
     context: AgenticContext,
+  ): Promise<{ messages: ConversationMessage[] }> {
+    return traceAgentTurn(context, (turnSpan) =>
+      AgenticLoopService.runTurn(context, turnSpan),
+    );
+  }
+
+  private static async runTurn(
+    context: AgenticContext,
+    turnSpan: Span,
   ): Promise<{ messages: ConversationMessage[] }> {
     const {
       options,
@@ -92,6 +111,7 @@ export default class AgenticLoopService {
       agent: agent || undefined,
       project,
       username,
+      profileId: context.profileId,
       modelDefinition: modelDefinition || undefined,
       agentConversationId: resolvedAgentConversationId,
       providerName: context.providerName,
@@ -131,10 +151,14 @@ export default class AgenticLoopService {
     // common case. Runs AFTER the seeding block above so the merge preserves
     // the full resolved base set (dynamicEnabledTools now holds it).
     // Fail-open — any error and the loop proceeds with the original tools.
-    const preflight = await runPreflightToolDiscovery({
-      context,
-      resolvedTools,
-    });
+    // A re-driven turn already discovered what it needed: its tool set was
+    // persisted (ToolContext) before the restart.
+    const preflight = context.resume
+      ? { enabledTools: [] as string[] }
+      : await runPreflightToolDiscovery({
+          context,
+          resolvedTools,
+        });
     if (preflight.enabledTools.length > 0) {
       // Re-resolve so the enlarged dynamic set flows through the exact same
       // filter pipeline (blocked/disabled/native-collision/sub-agent rules).
@@ -158,6 +182,7 @@ export default class AgenticLoopService {
         agent: agent || undefined,
         project,
         username,
+        profileId: context.profileId,
         modelDefinition: modelDefinition || undefined,
         agentConversationId: resolvedAgentConversationId,
         providerName: context.providerName,
@@ -176,9 +201,12 @@ export default class AgenticLoopService {
     // all messages except the last one (the triggering input) are already
     // persisted in the database. For new conversations (e.g. Discord channel
     // history passed as ephemeral context), nothing has been persisted yet.
+    // A re-driven turn arrives marked: its history is persisted, the
+    // messages its checkpoint carried are not (TurnResumeService).
     if (
       !options.isSubAgent &&
       !context.isNewConversation &&
+      !context.resume &&
       messages.length > 0
     ) {
       for (let i = 0; i < messages.length - 1; i++) {
@@ -220,10 +248,17 @@ export default class AgenticLoopService {
       options.autoApprove = true;
     }
 
+    // The turn's permission mode. A sub-agent arrives with its parent's
+    // handle and keeps it; a root turn resolves one and registers it, so the
+    // selector can switch the mode while the turn runs.
+    const permissionModeCleanup = options._permissionMode
+      ? null
+      : await AgenticLoopService.openPermissionMode(context);
+
     // 2. Initialize shared state
     const state = new AgenticLoopState({
       originalMessageCount: messages.length,
-      planModeActive: !!options.planFirst,
+      planModeActive: context.resume ? context.resume.planModeActive : !!options.planFirst,
     });
 
     // Cost ceiling: create the tree-wide accumulator at the root loop.
@@ -296,19 +331,49 @@ export default class AgenticLoopService {
       `[AgenticLoop] Using harness: "${HarnessClass.id}" (${HarnessClass.label}), thoughtStructure: "${thoughtStructure}"`,
     );
 
+    // Only the ReAct chain of thought replays a stored pass; any other
+    // shape starts the interrupted step over (and supersedes its cards).
+    if (
+      context.resume &&
+      (HarnessClass.id !== "standard" ||
+        thoughtStructure === THOUGHT_STRUCTURES.TREE_OF_THOUGHTS ||
+        thoughtStructure === THOUGHT_STRUCTURES.GRAPH_OF_THOUGHTS)
+    ) {
+      logger.info(
+        `[AgenticLoop] ${conversationId}: harness "${HarnessClass.id}" / "${thoughtStructure}" cannot replay a pass — the interrupted step starts over`,
+      );
+      context.resume = null;
+    }
+
     // 4. Instantiate and run
     const harness = new HarnessClass(context, state, resolvedTools);
     const loopKey = resolveLoopKey(context);
-    // Decisions still pending from a turn that died with a previous process
-    // will never be acted on by this one: the user moved on. Supersede them
-    // (and close their "needs you" entries) before this turn asks anything.
-    await AgenticLoopService.retireOrphanedDecisions(loopKey);
+    if (context.resume) {
+      // Picks up where the restart interrupted it: the pass is replayed at
+      // its own iteration, and its decisions are its own — not orphans. The
+      // loop state a checkpoint does not carry comes back with it.
+      state.iterations = context.resume.pass.iteration - 1;
+      if (context.resume.autoApprove) options.autoApprove = true;
+      if (context.resume.skillsText && !options._skillsText) {
+        options._skillsText = context.resume.skillsText;
+      }
+    } else {
+      // Decisions still pending from a turn that died with a previous process
+      // will never be acted on by this one: the user moved on. Supersede them
+      // (and close their "needs you" entries) before this turn asks anything.
+      await AgenticLoopService.retireOrphanedDecisions(loopKey);
+    }
     // Accept mid-turn input (steering, non-blocking answers, completions)
     // for the life of this turn; the harness drains it at its boundaries.
-    TurnInputMailbox.open(conversationId);
+    // What it accepts is kept durably until the turn ends (TurnInputStore).
+    TurnInputMailbox.open(conversationId, decisionOwnerOf(context));
+    if (context.resume) await AgenticLoopService.reopenResumedTurn(context, loopKey);
     try {
       return await harness.run();
     } finally {
+      recordAgentTurnOutcome(turnSpan, state);
+      permissionModeCleanup?.();
+
       // Clean up in-memory cache keyed by agentConversationId (keeps MongoDB state for next turn)
       ToolContext.cleanupInMemory(resolvedAgentConversationId);
 
@@ -336,7 +401,84 @@ export default class AgenticLoopService {
           /* OrchestratorService may not be used */
         }
       }
+
+      // Nothing is left to re-drive: the turn ended in this process.
+      await endTurnRun(context);
     }
+  }
+
+  /**
+   * Resolve the turn's permission mode into a live handle on the options
+   * (`_permissionMode`), tell the client which mode the turn runs in, and —
+   * for a root turn — register the handle so `PUT /permissions/mode` can
+   * switch it mid-turn. Returns the cleanup for the turn's end.
+   *
+   * A new conversation keeps the mode its first request named (the client's
+   * selector); after that only the selector (`PUT /permissions/mode`) and an
+   * approved plan change what is stored, so a timer's `dontAsk` never
+   * overwrites the user's choice.
+   */
+  static async openPermissionMode(context: AgenticContext): Promise<() => void> {
+    const { options, conversationId, project, username } = context;
+    const { PermissionModeHandle, PermissionModeRegistry, resolveTurnPermissionMode } =
+      await import("./permissions/PermissionModeState.ts");
+    const isRoot = !options.isSubAgent;
+    // A sub-agent's own conversation never stores a mode; it inherits one.
+    const storedMode =
+      isRoot && conversationId && !context.isNewConversation
+        ? await ConversationApprovalSettings.getPermissionMode(conversationId, project, username)
+        : null;
+    const resolved = await resolveTurnPermissionMode({
+      requested: options.permissionMode,
+      unattended: options.unattended === true,
+      storedMode,
+      username,
+    });
+    const handle = new PermissionModeHandle(resolved.mode, {
+      source: resolved.source,
+      unattended: options.unattended === true,
+    });
+    options._permissionMode = handle;
+    if (resolved.refusedBypass) {
+      logger.warn(
+        `[PermissionModes] ${conversationId}: ${resolved.refusedBypass.reason}; running in ${resolved.mode}`,
+      );
+    }
+    if (!isRoot || !conversationId) return () => {};
+
+    if (context.isNewConversation && resolved.source === "request") {
+      void ConversationApprovalSettings.setPermissionMode(
+        conversationId,
+        project,
+        username,
+        resolved.mode,
+      ).catch((error: unknown) =>
+        logger.warn(`[PermissionModes] Could not store the mode of ${conversationId}: ${String(error)}`),
+      );
+    }
+
+    context.emit({
+      type: PROTOCOL_EVENT_TYPES.PERMISSION_MODE,
+      conversationId,
+      mode: resolved.mode,
+      source: resolved.source,
+      ...(options.unattended === true && { unattended: true }),
+      ...(resolved.refusedBypass && { refused: "bypass", reason: resolved.refusedBypass.reason }),
+    });
+    const stopListening = handle.onChange((change) => {
+      context.emit({
+        type: PROTOCOL_EVENT_TYPES.PERMISSION_MODE,
+        conversationId,
+        mode: change.mode,
+        previousMode: change.previousMode,
+        source: change.source,
+      });
+    });
+    PermissionModeRegistry.register(conversationId, handle);
+    return () => {
+      stopListening();
+      PermissionModeRegistry.unregister(conversationId, handle);
+    };
   }
 
   // ── Approval Resolution API ─────────────────────────────
@@ -392,6 +534,7 @@ export default class AgenticLoopService {
       question?: string;
       questions?: QuestionDefinition[];
       choices?: string[];
+      toolCallId?: string | null;
     },
     owner: DecisionOwner = {},
   ): Promise<void> {
@@ -453,6 +596,40 @@ export default class AgenticLoopService {
         `[AgenticLoop] Could not retire orphaned decisions on ${loopKey}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+  }
+
+  /**
+   * A re-driven turn's mailbox is open: give it what the restart owed it —
+   * the input accepted before the restart and never delivered (same ids),
+   * the notices of background work the restart cut off, and the
+   * non-blocking cards it asked before (open ones answer into it; answers
+   * that came while the server was down are delivered now). Each once.
+   */
+  static async reopenResumedTurn(context: AgenticContext, loopKey: string): Promise<void> {
+    const resume = context.resume;
+    if (!resume) return;
+    for (const entry of resume.inputs) TurnInputMailbox.restore(loopKey, entry);
+    for (const notice of resume.notices) TurnInputMailbox.post(loopKey, notice);
+    try {
+      const { adoptNonBlockingQuestions } = await import(
+        "./tool-definitions/AskUserQuestionTool.ts"
+      );
+      await adoptNonBlockingQuestions(loopKey, decisionOwnerOf(context));
+    } catch (error: unknown) {
+      logger.warn(
+        `[AgenticLoop] Could not adopt the open questions of ${loopKey}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    context.emit({
+      type: SERVER_SENT_EVENT_TYPES.STATUS,
+      message: TURN_RESUME.STATUS_RESUMED,
+      iteration: resume.pass.iteration,
+      attempt: resume.attempt,
+    });
+    logger.info(
+      `[AgenticLoop] Re-driving ${loopKey} from iteration ${resume.pass.iteration} (attempt ${resume.attempt}): ` +
+        `${resume.pass.toolCalls.length} call(s) replayed, ${resume.inputs.length} input(s) restored, ${resume.notices.length} notice(s)`,
+    );
   }
 
   // ── Harness Discovery API ──────────────────────────────

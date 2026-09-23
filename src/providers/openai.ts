@@ -1,4 +1,5 @@
-import { type ProviderOptions } from "#src/types/ProviderTypes";
+import { type ProviderOptions, type ToolActivation } from "#src/types/ProviderTypes";
+import { TOOL_LOADING_MODES, type ToolLoadingMode } from "#src/providers/toolLoading";
 import OpenAI, { toFile } from "openai";
 import type { Stream } from "openai/streaming";
 import type { Reasoning, ReasoningEffort } from "openai/resources/shared";
@@ -67,6 +68,8 @@ const PRIORITY_TOOL_NAMES = new Set<string>([
   TOOL_NAMES.DISCOVER_AND_ENABLE_TOOLS,
   TOOL_NAMES.SEARCH_TOOLS,
   TOOL_NAMES.ENABLE_TOOLS,
+  // The bridge to tools activated mid-conversation (lifecycle/ToolSurface.ts).
+  "tool_call",
 ]);
 
 /**
@@ -203,6 +206,8 @@ export interface OpenAIMessage {
   name?: string;
   images?: string[];
   documents?: string[];
+  /** Tools activated mid-conversation (system messages; `additional_tools` mode). */
+  toolActivation?: ToolActivation;
   toolCalls?: Array<{
     id?: string;
     name: string;
@@ -1095,9 +1100,31 @@ export function replayNativeAsyncCalls(
  */
 export function prepareResponsesInput(
   messages: OpenAIMessage[],
+  { toolLoadingMode }: { toolLoadingMode?: ToolLoadingMode } = {},
 ): OpenAI.Responses.ResponseInputItem[] {
   const result: OpenAI.Responses.ResponseInputItem[] = [];
   for (const message of messages) {
+    // Tools activated mid-conversation: an `additional_tools` item right
+    // after the developer message that announces them — the request's
+    // `tools` never change (providers/toolLoading.ts).
+    const additionalTools =
+      message.role === "system" &&
+      toolLoadingMode === TOOL_LOADING_MODES.OPENAI_ADDITIONAL_TOOLS &&
+      message.toolActivation?.added.length
+        ? convertToolsToResponsesAPI(message.toolActivation.added as ToolSchema[])
+        : null;
+    if (additionalTools) {
+      result.push({
+        role: "developer",
+        content: message.content ?? "",
+      } as OpenAI.Responses.ResponseInputItem);
+      result.push({
+        type: "additional_tools",
+        role: "developer",
+        tools: additionalTools,
+      } as unknown as OpenAI.Responses.ResponseInputItem);
+      continue;
+    }
     // Assistant message with tool calls → expand into function_call items
     if (
       message.role === "assistant" &&
@@ -1336,7 +1363,9 @@ const openaiProvider = {
   ) {
     messages = replayNativeAsyncCalls(messages, model);
     const effortPlan = planResponsesEffort(model, messages, requestedResponsesEffort(model, options));
-    const input = withConfigurationUpdates(messages, effortPlan.updates, prepareResponsesInput);
+    const input = withConfigurationUpdates(messages, effortPlan.updates, (run) =>
+      prepareResponsesInput(run, { toolLoadingMode: options.toolLoadingMode }),
+    );
     const payload: OpenAI.Responses.ResponseCreateParamsNonStreaming & {
       seed?: number;
       frequency_penalty?: number;
@@ -1456,6 +1485,12 @@ const openaiProvider = {
     // Parallel tool calls — defaults to true; set false for sequential FC
     if (options.parallelToolCalls === false) {
       payload.parallel_tool_calls = false;
+    }
+
+    // The exhaustion pass keeps the tool block and forbids calls — a
+    // changed `tools` list would rewrite the cached prefix.
+    if (options.toolChoice === "none" && payload.tools?.length) {
+      payload.tool_choice = "none";
     }
 
     // Response persistence — defaults to true; set false for privacy
@@ -1619,6 +1654,7 @@ const openaiProvider = {
         ...customTools,
       ];
       payload.tools = truncateToolsForChatCompletions(allTools);
+      if (options.toolChoice === "none") payload.tool_choice = "none";
     }
 
     try {
@@ -1730,7 +1766,9 @@ const openaiProvider = {
   ) {
     messages = replayNativeAsyncCalls(messages, model);
     const effortPlan = planResponsesEffort(model, messages, requestedResponsesEffort(model, options));
-    const input = withConfigurationUpdates(messages, effortPlan.updates, prepareResponsesInput);
+    const input = withConfigurationUpdates(messages, effortPlan.updates, (run) =>
+      prepareResponsesInput(run, { toolLoadingMode: options.toolLoadingMode }),
+    );
     const payload: OpenAI.Responses.ResponseCreateParamsStreaming & {
       seed?: number;
       frequency_penalty?: number;
@@ -1850,6 +1888,12 @@ const openaiProvider = {
     // Parallel tool calls — defaults to true; set false for sequential FC
     if (options.parallelToolCalls === false) {
       payload.parallel_tool_calls = false;
+    }
+
+    // The exhaustion pass keeps the tool block and forbids calls — a
+    // changed `tools` list would rewrite the cached prefix.
+    if (options.toolChoice === "none" && payload.tools?.length) {
+      payload.tool_choice = "none";
     }
 
     // Response persistence — defaults to true; set false for privacy
@@ -2318,6 +2362,7 @@ const openaiProvider = {
         ...customTools,
       ];
       payload.tools = truncateToolsForChatCompletions(allTools);
+      if (options.toolChoice === "none") payload.tool_choice = "none";
     }
 
     const cacheTelemetry = options.cacheTelemetry;
@@ -2653,10 +2698,10 @@ const openaiProvider = {
   ) {
     logger.provider("OpenAI", `transcribeAudio model=${model}`);
     try {
-      const subType = mimeType.split("/")[1] || "wav";
-      const ext = ["wav", "mp3", "opus", "aac", "flac", "pcm"].includes(subType)
-        ? (subType as "wav" | "mp3" | "opus" | "aac" | "flac" | "pcm")
-        : "wav";
+      const { transcriptionFileExtension } = await import(
+        "./transcriptionFileExtension.ts"
+      );
+      const ext = transcriptionFileExtension(mimeType);
       const file = await toFile(audioBuffer, `audio.${ext}`, {
         type: mimeType,
       });
