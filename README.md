@@ -13,6 +13,10 @@ npm run dev
 
 Configuration is environment variables, read by `config.ts`. At boot, `boot.ts` fills in any that are unset from the vault service (`VAULT_SERVICE_URL`), so a variable you export yourself always wins.
 
+### Tracing
+
+OpenTelemetry traces are off by default. Point `OTEL_EXPORTER_OTLP_ENDPOINT` (or `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`) at an OTLP/HTTP collector and `boot.ts` exports, per the GenAI semantic conventions, one `invoke_agent` span per agent turn with a `chat` span per model call and an `execute_tool` span per tool call beneath it; a sub-agent's turn nests under the call that spawned it. The standard `OTEL_*` variables (service name, sampler, headers) apply. Tool calls send W3C `traceparent` to tools-service, which forwards it on its own outgoing calls, and to MCP servers (HTTP header and `params._meta`). Span and attribute names: `src/services/Tracing.ts`.
+
 ## Provider Capabilities
 
 | Provider | Text | Stream | TTS | STT | Image | Vision | Embed | Think | Search | Code |
@@ -102,6 +106,7 @@ Prism reads the model list and context window from `/v1/models`, and the parsers
 | `GET` | `/admin/requests` | Paginated request logs with filters |
 | `GET` | `/admin/stats` | Aggregate stats (tokens, cost, latency) |
 | `GET` | `/admin/stats/models` | Per-model breakdown |
+| `GET` | `/admin/stats/tools` | Per-tool calls, share of the calling requests' cost, and the tools' own latency (ms) and error rate |
 | `GET` | `/admin/stats/timeline` | Hourly request/cost timeline |
 | `GET` | `/admin/health` | System health, memory, DB stats |
 | `POST` | `/admin/lm-studio/load` | Load/unload LM Studio models |

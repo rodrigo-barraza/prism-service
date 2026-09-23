@@ -152,6 +152,7 @@ describe("GraphOfThoughtsStrategy", () => {
       streamedToolCalls: [],
       turnTranscript: null,
       turnTranscriptSeen: new WeakSet(),
+      recordToolExecution: vi.fn(),
     };
 
     mockHarnessInstance = {

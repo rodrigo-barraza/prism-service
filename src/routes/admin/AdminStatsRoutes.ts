@@ -517,14 +517,18 @@ router.get(
 );
 
 // ─── GET /stats/tools — per-tool lifetime usage breakdown ─
+// Cost and tokens are the calling model requests', shared among the tools
+// each request asked for. Latency (ms) and error rate are the tools' own,
+// from the `toolExecutions` agent iterations record; rows logged before
+// those existed count as calls but are never timed.
 router.get(
   "/tools",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const cacheKey = StatsCache.buildCacheKey("/stats/tools", req.query);
       const responseData = await StatsCache.getOrFetch(cacheKey, async () => {
-        const match = await buildMatchFilter(req);
-        match.toolApiNames = { $exists: true, $ne: [] };
+        const baseMatch = await buildMatchFilter(req);
+        const match = { ...baseMatch, toolApiNames: { $exists: true, $ne: [] } };
         const { tool } = req.query;
 
         const pipeline: Record<string, unknown>[] = [
@@ -572,7 +576,6 @@ router.get(
                   ],
                 },
               },
-              avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
               firstUsed: { $min: "$createdAt" },
               lastUsed: { $max: "$createdAt" },
               _models: { $push: "$model" },
@@ -594,12 +597,41 @@ router.get(
           { $sort: { totalCalls: -1 } },
         ];
 
-        const results = await req.db
-          .collection(REQUESTS_COLLECTION)
-          .aggregate(pipeline)
-          .toArray();
+        const executionPipeline: Record<string, unknown>[] = [
+          { $match: { ...baseMatch, "toolExecutions.0": { $exists: true } } },
+          { $unwind: "$toolExecutions" },
+          ...(tool ? [{ $match: { "toolExecutions.name": tool } }] : []),
+          {
+            $group: {
+              _id: "$toolExecutions.name",
+              timedCalls: { $sum: 1 },
+              avgLatency: { $avg: "$toolExecutions.durationMilliseconds" },
+              minLatency: { $min: "$toolExecutions.durationMilliseconds" },
+              maxLatency: { $max: "$toolExecutions.durationMilliseconds" },
+              errorCount: {
+                $sum: { $cond: [{ $eq: ["$toolExecutions.success", false] }, 1, 0] },
+              },
+            },
+          },
+        ];
+
+        const [results, executionResults] = await Promise.all([
+          req.db.collection(REQUESTS_COLLECTION).aggregate(pipeline).toArray(),
+          req.db
+            .collection(REQUESTS_COLLECTION)
+            .aggregate(executionPipeline)
+            .toArray(),
+        ]);
+        const executionsByTool = new Map(
+          executionResults.map((execution: Record<string, unknown>) => [
+            execution._id as string,
+            execution,
+          ]),
+        );
 
         return results.map((result: Record<string, unknown>) => {
+          const execution = executionsByTool.get(result._id as string);
+          const timedCalls = (execution?.timedCalls as number) || 0;
           const modelCounts: Record<string, number> = {};
           for (const model of (result._models as string[]) || []) {
             if (model) modelCounts[model] = (modelCounts[model] || 0) + 1;
@@ -625,7 +657,15 @@ router.get(
             totalCost: result.totalCost,
             totalInputTokens: result.totalInputTokens,
             totalOutputTokens: result.totalOutputTokens,
-            avgLatency: result.avgLatency,
+            timedCalls,
+            avgLatency: timedCalls > 0 ? (execution!.avgLatency as number) : null,
+            minLatency: timedCalls > 0 ? (execution!.minLatency as number) : null,
+            maxLatency: timedCalls > 0 ? (execution!.maxLatency as number) : null,
+            // Percent of timed calls that failed — tools-service's convention.
+            errorRate:
+              timedCalls > 0
+                ? Math.round(((execution!.errorCount as number) / timedCalls) * 10000) / 100
+                : null,
             firstUsed: result.firstUsed,
             lastUsed: result.lastUsed,
             providers: (result._providers as string[])?.filter(Boolean) || [],
