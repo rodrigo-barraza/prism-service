@@ -1158,6 +1158,31 @@ export const LOG_PREVIEW = {
   LONG: 500,
 } as const;
 
+// ─── Log Redaction ──────────────────────────────────────────
+
+/**
+ * Secrets at rest (`utils/SecretRedaction.ts`): what request rows, hook
+ * payload rows and log lines mask on the way out.
+ */
+export const LOG_REDACTION = {
+  /** Replaces a secret; followed by its last four characters when it is long enough. */
+  MASK: "***",
+  /** A masked secret keeps its last four characters only from this length on. */
+  MIN_LENGTH_FOR_LAST_FOUR: 16,
+  /** Secret variable values shorter than this are not matched by value. */
+  MIN_SECRET_VALUE_LENGTH: 8,
+  /** How long the secret values read from the environment are reused. */
+  SECRET_VALUES_TIME_TO_LIVE_MILLISECONDS: 60_000,
+  /** Extra values to mask: comma- or newline-separated literals, or `/regex/flags`. */
+  DENYLIST_ENVIRONMENT_VARIABLE: "PRISM_LOG_REDACTION_DENYLIST",
+  /** Nesting depth past which a structure is written as it is. */
+  MAX_DEPTH: 64,
+  /** Strings at least this long have their redaction memoised. */
+  MEMO_MIN_LENGTH: 512,
+  /** Characters the memo may retain (keys plus changed values). */
+  MEMO_MAX_CHARACTERS: 16_000_000,
+} as const;
+
 // ─── Local Provider Constants ───────────────────────────────
 
 export const LOCAL_PROVIDER = {
