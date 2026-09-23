@@ -23,7 +23,7 @@ http
     req.on("data", (chunk) => (raw += chunk));
     req.on("end", () => {
       const url = new URL(req.url, "http://stub");
-      let body = null;
+      let body;
       try {
         body = raw ? JSON.parse(raw) : null;
       } catch {
