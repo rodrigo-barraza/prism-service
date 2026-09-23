@@ -308,6 +308,11 @@ export async function runBeforePromptSetup(
     });
   }
 
+  // Pre-flight picks routed through activation (Persona.activatePreflightTools)
+  // arrive once the prompt is assembled from the declared tools, as in the
+  // ReAct loop.
+  harness.checkAndApplyToolSetChanges(currentMessages);
+
   return standardHooks;
 }
 

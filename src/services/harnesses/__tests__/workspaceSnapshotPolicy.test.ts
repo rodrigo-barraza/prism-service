@@ -105,7 +105,7 @@ vi.mock("#src/utils/FunctionCallingUtilities", () => ({
 vi.mock("#src/services/ToolContext", () => ({ default: { getStore: vi.fn().mockReturnValue(new Map()) } }));
 vi.mock("#src/services/FileService", () => ({ default: { upsertFile: vi.fn().mockResolvedValue(undefined) } }));
 vi.mock("#src/services/WebhookEventBus", () => ({ default: { emit: vi.fn() } }));
-vi.mock("#src/services/AgentPersonaRegistry", () => ({ default: { isAgentProject: () => false } }));
+vi.mock("#src/services/AgentPersonaRegistry", () => ({ default: { isAgentProject: () => false, get: () => undefined } }));
 
 // The tools themselves: the real ToolExecutor dispatches through this.
 const executeToolMock = vi.fn();
