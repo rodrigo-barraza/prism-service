@@ -30,7 +30,7 @@
 **Tests.**
 - **Precedence.** Resolution order is correct.
 - **Cross-provider sub-agents.** A sub-agent spawns on its role's provider and model (red: `InstanceResolver.ts` ~95 only allows the parent's provider).
-- **Brief-only lead/sidekick.** The lead's provider payload never contains the sidekick's tool results. The lead's prefix is stable across sidekick runs (use prompt 10's prefix assertion if it has landed).
+- **Brief-only lead/sidekick.** The lead's provider payload never contains the sidekick's tool results. The lead's prefix is stable across sidekick runs (assert it the way `src/services/harnesses/__tests__/prefixStableRequests.test.ts` does: `expectPrefixStable` over the flattened payloads).
 - **Decision log.** Rows are written.
 
 **Live.** Isolated. Lead `claude-sonnet-5`, sidekick `gemini-3.6-flash`, on a two-step task. Report the cost against a single-model baseline and the lead's cache-read share.
