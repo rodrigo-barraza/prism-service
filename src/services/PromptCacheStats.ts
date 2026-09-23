@@ -29,6 +29,8 @@ export interface CacheStatsRow {
   estimatedCost?: number | null;
   cacheTelemetry?: {
     prefixChange?: string | null;
+    /** The harness rewrote the prefix on purpose (micro_compaction, compaction). */
+    declaredBoundary?: string | null;
     providerDiagnostics?: {
       source?: string;
       status?: string;
@@ -65,7 +67,7 @@ export interface CacheStats {
     carry: { zero: number; underHalf: number; underThreeQuarters: number; atLeastThreeQuarters: number };
   };
   byModel: Array<CacheTotals & { provider: string | null; model: string | null }>;
-  missReasons: Array<{ reason: string; source: "provider" | "prefix_hashes" | "none"; count: number; share: number }>;
+  missReasons: Array<{ reason: string; source: "provider" | "prefix_hashes" | "declared" | "none"; count: number; share: number }>;
 }
 
 export const DEFAULT_MAX_GAP_SECONDS = 300;
@@ -112,8 +114,10 @@ function finishTotals<T extends CacheTotals>(totals: T): T {
 
 function missReason(row: CacheStatsRow): {
   reason: string;
-  source: "provider" | "prefix_hashes" | "none";
+  source: "provider" | "prefix_hashes" | "declared" | "none";
 } {
+  const declaredBoundary = row.cacheTelemetry?.declaredBoundary;
+  if (declaredBoundary) return { reason: declaredBoundary, source: "declared" };
   const diagnostics = row.cacheTelemetry?.providerDiagnostics;
   if (diagnostics?.status === "cache_miss" && diagnostics.reason) {
     return { reason: diagnostics.reason, source: "provider" };
@@ -135,7 +139,7 @@ export function computeCacheStats(
     carry: { zero: 0, underHalf: 0, underThreeQuarters: 0, atLeastThreeQuarters: 0 },
   };
   const byModel = new Map<string, CacheTotals & { provider: string | null; model: string | null }>();
-  const reasons = new Map<string, { reason: string; source: "provider" | "prefix_hashes" | "none"; count: number }>();
+  const reasons = new Map<string, { reason: string; source: "provider" | "prefix_hashes" | "declared" | "none"; count: number }>();
   const previousByConversation = new Map<string, CacheStatsRow>();
 
   for (const row of rows) {

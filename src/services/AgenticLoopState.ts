@@ -106,6 +106,19 @@ export default class AgenticLoopState {
    * if lossy truncation has to run.
    */
   truncationReason: string | null;
+  /**
+   * Set when this iteration's request deliberately rewrites what an earlier
+   * request sent (micro-compaction offload, LLM compaction) — recorded on
+   * the request's cache telemetry as a declared boundary, then cleared.
+   */
+  pendingPrefixBoundary: "micro_compaction" | "compaction" | null;
+  /**
+   * Request estimate right after the last micro-compaction eviction — the
+   * next one waits until the request has grown past it (ContextPressureManager).
+   */
+  lastMicroCompactionTokens: number | null;
+  /** Plan mode changed: a notice goes in after the batch's assistant message. */
+  pendingPlanModeNotice: "entered" | "exited" | null;
 
   // ── Turn transcript (lifecycle/TurnTranscript.ts) ───────
   /**
@@ -253,6 +266,9 @@ export default class AgenticLoopState {
     this.providerInputBaseline = null;
     this.compactionBoundary = null;
     this.truncationReason = null;
+    this.pendingPrefixBoundary = null;
+    this.lastMicroCompactionTokens = null;
+    this.pendingPlanModeNotice = null;
 
     this.turnTranscript = null;
     this.turnTranscriptSeen = new WeakSet();

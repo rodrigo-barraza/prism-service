@@ -8,6 +8,7 @@ import {
   type Part,
   type GenerateContentConfig,
   type ThinkingLevel,
+  type FunctionCallingConfigMode,
   type LiveServerMessage,
   MediaResolution,
   ServiceTier,
@@ -1046,6 +1047,12 @@ const googleProvider = {
       if (customTools) tools.push(...customTools);
 
       if (tools.length > 0) config.tools = tools;
+      // The exhaustion pass: declarations stay, calls are off.
+      if (customTools && options.toolChoice === "none") {
+        config.toolConfig = {
+          functionCallingConfig: { mode: "NONE" as FunctionCallingConfigMode },
+        };
+      }
 
       // For models that output images, set responseModalities explicitly.
       if (

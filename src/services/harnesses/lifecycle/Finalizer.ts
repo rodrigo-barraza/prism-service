@@ -753,6 +753,7 @@ export function sanitizeMessagesForPersistence(
         if (message.isCompactSummary === true) return false;
       }
       if (message._isPlanningInjection === true) return false;
+      if (message._isPlanModeNotice === true) return false;
       if (message._alreadyPersisted === true) return false;
       return true;
     })
@@ -761,6 +762,9 @@ export function sanitizeMessagesForPersistence(
       swapMessageContent(cloned);
       delete cloned._isIdentityPrompt;
       delete cloned._isInjectedContext;
+      // The next turn declares the activated tool outright; replaying the
+      // activation would load it twice. The message's text is kept.
+      delete cloned.toolActivation;
       return cloned;
     });
 

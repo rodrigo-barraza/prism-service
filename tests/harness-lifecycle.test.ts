@@ -570,6 +570,8 @@ describe("ExhaustionRecovery", () => {
       requestId: "req-123",
     };
     const mockHarness: any = {
+      requestToolOptions: vi.fn().mockReturnValue({ tools: [], toolLoadingMode: "bridge" }),
+      createProviderStream: vi.fn().mockResolvedValue("mock-stream"),
       enforceContextWindow: vi.fn().mockImplementation((messages) => messages),
       registerTrackerRequest: vi.fn(),
       createPassState: vi.fn().mockReturnValue({}),
@@ -596,22 +598,24 @@ describe("ExhaustionRecovery", () => {
     expect(ConversationGenerationTracker.complete).toHaveBeenCalledWith("req-123-exhaustion");
   });
 
-  it("should call generateTextStreamLive when liveAPI is true", async () => {
-    const mockProvider = {
-      generateTextStreamLive: vi.fn().mockReturnValue("mock-live-stream"),
-    };
+  it("should send the turn's tools with tool_choice none through the harness's request path", async () => {
+    const turnTools = [{ name: "search_web", description: "Search", parameters: { type: "object", properties: {} } }];
     const mockContext: any = {
       emit: vi.fn(),
       signal: new AbortController().signal,
-      options: {},
+      options: { maxTokens: 4096 },
       resolvedModel: "test-model",
       modelDefinition: { liveAPI: true },
-      provider: mockProvider,
+      provider: {},
       project: TEST_PROJECT,
       username: TEST_USER,
       agentConversationId: TEST_CONVERSATION_ID,
     };
     const mockHarness: any = {
+      requestToolOptions: vi.fn().mockReturnValue({ tools: turnTools, toolLoadingMode: "bridge" }),
+      // The live-API choice, media resolution and retries live in the
+      // harness's createProviderStream — the exhaustion pass reuses it.
+      createProviderStream: vi.fn().mockResolvedValue("mock-live-stream"),
       enforceContextWindow: vi.fn().mockImplementation((messages) => messages),
       registerTrackerRequest: vi.fn(),
       createPassState: vi.fn().mockReturnValue({}),
@@ -624,9 +628,11 @@ describe("ExhaustionRecovery", () => {
 
     await runExhaustionRecoveryPass(mockHarness, mockContext, mockState, currentMessages);
 
-    expect(mockProvider.generateTextStreamLive).toHaveBeenCalled();
-    // The stream is wrapped in the shared retry generator before being consumed
-    expect(mockHarness.consumeStream).toHaveBeenCalledWith(expect.anything(), expect.any(Object), expect.any(Set));
+    expect(mockHarness.createProviderStream).toHaveBeenCalledWith(
+      currentMessages,
+      expect.objectContaining({ tools: turnTools, toolChoice: "none", maxTokens: 4096 }),
+    );
+    expect(mockHarness.consumeStream).toHaveBeenCalledWith("mock-live-stream", expect.any(Object), expect.any(Set));
   });
 });
 

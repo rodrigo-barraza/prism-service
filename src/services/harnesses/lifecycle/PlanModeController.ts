@@ -298,25 +298,27 @@ export async function handleExitPlanMode(
   return { shouldContinueLoop: true };
 }
 
-/** Check if any tool calls enter plan mode and apply the transition. */
+/**
+ * Check if any tool calls enter plan mode and apply the transition. The
+ * tool list stays as it is (PlanModeGate.ts enforces read-only), and the
+ * "plan mode is on" notice is appended after the batch's assistant message
+ * (PlanModeNotice.ts) — never spliced into history.
+ */
 export async function checkForPlanModeEntry(
   executedToolCalls: ToolCall[],
-  currentMessages: ConversationMessage[],
+  _currentMessages: ConversationMessage[],
   state: AgenticLoopState,
   emit: EmitFunction,
-  locale?: string,
+  _locale?: string,
 ): Promise<void> {
   const hasEnterPlanMode = executedToolCalls.some(
     (toolCall) => toolCall.name === TOOL_NAMES.ENTER_PLAN_MODE,
   );
 
-  if (hasEnterPlanMode) {
+  if (hasEnterPlanMode && !state.planModeActive) {
     state.planModeActive = true;
     state.planModeText = "";
-    await PlanningModeService.injectPlanningInstruction(
-      currentMessages,
-      locale,
-    );
+    state.pendingPlanModeNotice = "entered";
     emit({
       type: SERVER_SENT_EVENT_TYPES.STATUS,
       message: STATUS_MESSAGES.PLAN_MODE_ENTERED,

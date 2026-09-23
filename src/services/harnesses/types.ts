@@ -121,6 +121,11 @@ export interface ToolResult {
 export interface ResolvedTools {
   finalTools: ToolSchema[];
   resolvedEnabledTools: string[] | null;
+  /**
+   * Tools discovery may activate this turn (AgenticToolResolver) — declared
+   * up front where the provider defer-loads, never added to `tools`.
+   */
+  discoverableTools?: ToolSchema[];
 }
 
 // ── Display Segments ────────────────────────────────────────

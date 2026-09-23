@@ -58,6 +58,8 @@ export interface RequestTelemetryChunk {
   prefixHashes: PromptPrefixHashes | null;
   providerResponseId?: string;
   cacheDiagnostics?: ProviderCacheDiagnostics;
+  /** Anthropic, with the thinking-binding beta: blocks the API dropped (empty = none). */
+  inputTransformations?: unknown[];
 }
 
 /** Keys that mark cache breakpoints rather than prompt content. */
@@ -171,6 +173,7 @@ export function requestTelemetryChunk(
   extra: {
     providerResponseId?: string | null;
     cacheDiagnostics?: ProviderCacheDiagnostics | null;
+    inputTransformations?: unknown[] | null;
   } = {},
 ): RequestTelemetryChunk {
   return {
@@ -180,6 +183,9 @@ export function requestTelemetryChunk(
       providerResponseId: extra.providerResponseId,
     }),
     ...(extra.cacheDiagnostics && { cacheDiagnostics: extra.cacheDiagnostics }),
+    ...(Array.isArray(extra.inputTransformations) && {
+      inputTransformations: extra.inputTransformations,
+    }),
   };
 }
 

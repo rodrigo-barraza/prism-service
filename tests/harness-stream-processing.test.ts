@@ -636,9 +636,14 @@ describe('checkAndApplyToolSetChanges — dynamic tool activation doc sync', () 
       agentConversationId: sessionId,
       conversationId: 'conv-1',
     };
+    const schemaOf = (name: string) => ({ name, description: `${name} tool`, parameters: { type: 'object', properties: {} } });
     const tools: ResolvedTools = {
-      finalTools: initialToolNames.map((name) => ({ name, description: `${name} tool`, parameters: { type: 'object', properties: {} } })) as any,
+      finalTools: initialToolNames.map(schemaOf) as any,
       resolvedEnabledTools: initialToolNames,
+      // What this turn may activate (AgenticToolResolver computes it in production).
+      discoverableTools: ['search_web', 'get_weather']
+        .filter((name) => !initialToolNames.includes(name))
+        .map(schemaOf) as any,
     };
 
     const harness = new BaseAgenticHarness(

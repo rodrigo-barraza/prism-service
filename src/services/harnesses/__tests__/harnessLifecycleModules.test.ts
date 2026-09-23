@@ -761,6 +761,10 @@ describe("Harness Lifecycle Modules", () => {
   describe("ExhaustionRecovery", () => {
     it("should push recovery prompt and trigger recovery stream call", async () => {
       const mockHarness = {
+        requestToolOptions: vi.fn().mockReturnValue({ tools: [], toolLoadingMode: "bridge" }),
+        createProviderStream: vi.fn((messages: unknown[], options: unknown) =>
+          mockProvider.generateTextStream(messages, "gemini-3.5-flash", options),
+        ),
         enforceContextWindow: vi.fn().mockImplementation((msgs) => msgs),
         registerTrackerRequest: vi.fn(),
         createPassState: vi.fn().mockReturnValue({ usage: { inputTokens: 0, outputTokens: 0 } }),
@@ -1801,6 +1805,23 @@ describe("Harness Lifecycle Modules", () => {
         const result = sanitizeMessagesForPersistence(messages as any);
         expect(result).toHaveLength(1);
         expect(result[0].content).toBe("Normal user message content");
+      });
+
+      it("drops plan-mode notices and keeps a tool update's text without its activation", () => {
+        const messages = [
+          { role: "system", content: "<plan-mode>Plan mode is on.</plan-mode>", _isPlanModeNotice: true },
+          {
+            role: "system",
+            content: "<tool-update>get_element is available.</tool-update>",
+            toolActivation: { added: [{ name: "get_element" }], removed: [] },
+          },
+        ];
+
+        const result = sanitizeMessagesForPersistence(messages as any);
+        expect(result).toHaveLength(1);
+        expect(result[0].content).toContain("get_element is available");
+        // Next turn declares the tool outright — replaying the activation would load it twice.
+        expect((result[0] as Record<string, unknown>).toolActivation).toBeUndefined();
       });
     });
   });

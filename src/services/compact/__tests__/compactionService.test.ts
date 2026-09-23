@@ -265,6 +265,34 @@ describe("CompactionService", () => {
     expect(result).toBeNull();
   });
 
+  it("replays the kept tail without thinking bound to the replaced history", async () => {
+    const thinkingBlocks = [{ type: "thinking", thinking: "reasoning", signature: "sig_tail" }];
+    const messagesWithThinking = sampleMessages.map((message, index) =>
+      index === sampleMessages.length - 1
+        ? { ...message, thinking: "reasoning", thinkingSignature: "sig_tail", thinkingBlocks }
+        : message,
+    );
+    mockGenerateText.mockResolvedValueOnce({
+      text: "<summary>Summary of the dropped span.</summary>",
+      usage: { inputTokens: 100, outputTokens: 50 },
+    });
+    mockGenerateText.mockResolvedValueOnce({ text: "<ok/>", usage: { inputTokens: 10, outputTokens: 2 } });
+
+    const result = await CompactionService.compactConversation(messagesWithThinking as never, {
+      project: "test-proj",
+      username: "rodrigo",
+    });
+
+    expect(result).not.toBeNull();
+    const kept = result!.compactedMessages[result!.compactedMessages.length - 1] as Record<string, unknown>;
+    expect(kept.content).toBe("Assistant response 5");
+    expect(kept.thinkingBlocks).toBeUndefined();
+    expect(kept.thinkingSignature).toBeUndefined();
+    expect(kept.thinking).toBe("reasoning");
+    // The loop's copy is derived — persistence still writes the original.
+    expect((messagesWithThinking[messagesWithThinking.length - 1] as Record<string, unknown>).thinkingBlocks).toBe(thinkingBlocks);
+  });
+
   it("carries deviation-rule reminders across the compaction boundary", async () => {
     const reminderContent =
       "<deviation-rule-reminder>\n\n[DEVIATION RULE — SEMANTIC STALL] Stop repeating read_file.\n\n</deviation-rule-reminder>";
