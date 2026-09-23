@@ -81,6 +81,10 @@ import {
   MAX_OUTPUT_TRUNCATION_RECOVERIES,
 } from "#src/services/harnesses/lifecycle/OutputTruncationRecovery";
 import { injectToolDiscoveryNudge } from "#src/services/harnesses/lifecycle/ToolDiscoveryNudge";
+import {
+  transcriptCallOf,
+  unwrapBridgedToolCalls,
+} from "#src/services/harnesses/lifecycle/ToolSurface";
 import { finalizePassTracker } from "#src/services/harnesses/lifecycle/TrackerFinalizer";
 import { handleCodexPlanningResponse } from "#src/services/harnesses/lifecycle/CodexPlanningDetector";
 import { cleanupReminderCache } from "#src/services/harnesses/lifecycle/SystemReminderInjector";
@@ -798,9 +802,13 @@ export async function executeApprovedToolBatch(
   // leak into the next committed one.
   state.pendingHookContext = [];
 
+  // A `tool_call` bridge call becomes the call it names before hooks,
+  // rules and approval see it, as in the ReAct loop.
+  const bridge = unwrapBridgedToolCalls(pass.pendingToolCalls, tools.finalTools);
+
   // PreToolUse BEFORE the gate, as in the ReAct loop.
   const preToolUse = await runPreToolUseStage(
-    pass.pendingToolCalls,
+    bridge.callable,
     context,
     hooks,
     state,
@@ -836,6 +844,7 @@ export async function executeApprovedToolBatch(
     ...executedResults,
     ...blockedResults,
     ...preToolUse.blocked,
+    ...bridge.rejected,
   ]);
 
   // ── Post-execution processing ─────────────────────────
@@ -910,11 +919,14 @@ export async function commitToolCallResults(
       const matchingResult = results.find(
         (result) => result.id === toolCall.id,
       );
+      // What the model sent (a bridged call stays `tool_call`).
+      const sent = transcriptCallOf(toolCall);
       return {
         id: toolCall.id || null,
         responsesItemId: toolCall.responsesItemId || undefined,
-        name: toolCall.name,
-        args: toolCall.args,
+        name: sent.name,
+        args: sent.args,
+        ...(sent.bridgedName && { bridgedName: sent.bridgedName }),
         thoughtSignature: toolCall.thoughtSignature || undefined,
         reasoningItem: toolCall.reasoningItem || undefined,
         result: matchingResult ? matchingResult.result : null,
@@ -937,20 +949,9 @@ export async function commitToolCallResults(
     currentMessages.push(retryGuidanceMessage);
   }
 
-  // Drop empty assistant messages — but NEVER thinking-only ones.
-  // Deleting a mid-history thinking message orphans its
-  // "[System: …]" continuation nudge, loses the thinking signature,
-  // and mutates the prompt prefix (full re-prefill, busting the
-  // provider prompt cache).
-  const updatedMessages = currentMessages.filter(
-    (message) =>
-      !(
-        message.role === "assistant" &&
-        !message.content?.trim() &&
-        !message.thinking?.trim() &&
-        (!message.toolCalls || message.toolCalls.length === 0)
-      ),
-  );
+  // Empty assistant messages stay: history is only ever appended to, so
+  // every request starts with the previous one.
+  const updatedMessages = currentMessages;
 
   injectToolDiscoveryNudge(
     pass.pendingToolCalls,
@@ -959,7 +960,11 @@ export async function commitToolCallResults(
     context,
   );
 
-  harness.checkAndApplyToolSetChanges(updatedMessages, pass.usage);
+  harness.checkAndApplyToolSetChanges(
+    updatedMessages,
+    pass.usage,
+    pass.pendingToolCalls,
+  );
 
   return { planAborted: false, messages: updatedMessages };
 }
