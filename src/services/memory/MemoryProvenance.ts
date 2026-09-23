@@ -441,6 +441,65 @@ export function agentWriteProvenance(
   );
 }
 
+// ── Corroboration ───────────────────────────────────────────
+
+/**
+ * Cosine similarity at which a user-sourced memory is a CANDIDATE to
+ * corroborate a quarantined one (MemoryService.store). Only a candidate:
+ * embeddings barely separate "freeze starts 2026-10-05" from "…2026-11-05",
+ * so promotion also needs `restates`. Measured live 2026-09-22 with
+ * gemini-embedding-2-preview: the same fact reworded by the user 0.847,
+ * unrelated memories 0.61–0.65.
+ */
+export const CORROBORATION_CANDIDATE_THRESHOLD = 0.8;
+
+const STOPWORDS = new Set([
+  "about", "after", "also", "been", "before", "being", "does", "every", "from",
+  "have", "into", "just", "like", "more", "must", "only", "over", "should",
+  "that", "their", "them", "then", "there", "these", "they", "this", "user",
+  "very", "what", "when", "where", "which", "will", "with", "would", "your",
+]);
+
+/** Tokens that pin a claim down: anything with a digit, or code/URL punctuation. */
+function specificTokens(text: string): string[] {
+  return text
+    .split(/\s+/)
+    .map((token) => token.replace(/^[("'`[{<]+|[)"'`\]}>.,;:!?]+$/g, "").toLowerCase())
+    .filter((token) => token.length > 1 && (/\d/.test(token) || /[/:_|$@=`]|\w\.\w/.test(token)));
+}
+
+/** A crude stem — enough that "starting" meets "starts". */
+function stem(word: string): string {
+  return word.replace(/(ing|ed|es|s)$/, "");
+}
+
+function contentStems(text: string): Set<string> {
+  return new Set(
+    (text.toLowerCase().match(/\p{L}+/gu) || [])
+      .filter((word) => word.length >= 4 && !STOPWORDS.has(word))
+      .map(stem),
+  );
+}
+
+/**
+ * True when `statement` (what the user said) restates `claim` (what an
+ * untrusted source said): every specific token of the claim — a date, a
+ * number, a URL, a command — appears in the statement, and at least half of
+ * the claim's content words do. Embedding similarity only nominates a
+ * candidate; this is what stops a user's "the freeze starts 2026-10-05"
+ * from vouching for a page's "the freeze starts 2026-11-05".
+ */
+export function restates(claim: string, statement: string): boolean {
+  const said = statement.toLowerCase();
+  if (!specificTokens(claim).every((token) => said.includes(token))) return false;
+  const claimed = contentStems(claim);
+  if (claimed.size === 0) return true;
+  const saidStems = contentStems(statement);
+  let agreed = 0;
+  for (const word of claimed) if (saidStems.has(word)) agreed++;
+  return agreed / claimed.size >= 0.5;
+}
+
 // ── Attribution backstop ────────────────────────────────────
 
 const PHRASE_WORDS = 5;
