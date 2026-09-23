@@ -64,7 +64,10 @@ export interface TurnOutcome {
   iterationLimit: boolean;
   /** The Prism conversation the turn ran in, as the stream named it. */
   conversationId: string | null;
-  /** The turn's cumulative cost so far (USD), when reported. */
+  /**
+   * What this prompt's turns cost so far (USD), when reported: the turn, plus
+   * the auto-response turns its background work started.
+   */
   turnCost: number | null;
   /** The newest `seq` seen — where a `/ws/chat` subscription picks up without repeats. */
   lastSeq: number | null;
@@ -180,6 +183,10 @@ export class TurnTranslator {
   private codeRuns = 0;
   private contextWindow: number | null = null;
   private contextUsed: number | null = null;
+  /** Cost of the turns that already ended (`done`) in this prompt. */
+  private endedTurnsCost: number | null = null;
+  /** The running turn's cumulative cost (its `usage_update` / `done`). */
+  private runningTurnCost: number | null = null;
   private readonly costBeforeTurn: number;
 
   constructor({
@@ -284,14 +291,20 @@ export class TurnTranslator {
       case "permission_mode":
         return { updates: [{ sessionUpdate: "current_mode_update", currentModeId: event.mode }] };
       case "context_budget":
+        // A running sub-agent's budget reaches this stream untagged; the
+        // context that matters here is the turn's own.
+        if (this.subAgentRunning()) return { updates: [] };
         this.contextWindow = event.contextWindow;
         this.contextUsed = event.totalInputTokens;
         return this.usage();
       case "usage_update":
         // A background operation (`operation` set) bills separately; the turn's
-        // own running total is the one without it.
-        if (event.operation) return { updates: [] };
-        if (typeof event.estimatedCost === "number") this.outcome.turnCost = event.estimatedCost;
+        // own running total is the one without it. A running sub-agent's
+        // totals arrive untagged too: its cost is counted from its
+        // `complete` instead.
+        if (event.operation || this.subAgentRunning()) return { updates: [] };
+        if (typeof event.estimatedCost === "number") this.runningTurnCost = event.estimatedCost;
+        this.updateCost();
         return this.usage();
       case "status":
         if (event.message === "iteration_limit_reached") this.outcome.iterationLimit = true;
@@ -300,7 +313,14 @@ export class TurnTranslator {
         this.outcome.done = true;
         if (event.conversationId) this.outcome.conversationId = event.conversationId;
         if (event.refusal) this.outcome.refusal = true;
-        if (typeof event.estimatedCost === "number") this.outcome.turnCost = event.estimatedCost;
+        if (typeof event.estimatedCost === "number") this.runningTurnCost = event.estimatedCost;
+        // One prompt can span several turns (an auto-response follows a
+        // background dispatch): each `done` closes one turn's running total.
+        if (this.runningTurnCost !== null) {
+          this.endedTurnsCost = (this.endedTurnsCost ?? 0) + this.runningTurnCost;
+          this.runningTurnCost = null;
+        }
+        this.updateCost();
         return this.finishOpenTools("completed");
       case "error":
         this.outcome.error = event;
@@ -504,6 +524,10 @@ export class TurnTranslator {
         const state = this.tools.get(id);
         if (!state) return { updates: [] };
         state.status = event.message === "complete" ? "completed" : "failed";
+        if (event.message === "complete" && typeof event.estimatedCost === "number") {
+          this.endedTurnsCost = (this.endedTurnsCost ?? 0) + event.estimatedCost;
+          this.updateCost();
+        }
         const summary =
           event.message === "complete"
             ? `Finished in ${(event.durationMilliseconds / 1000).toFixed(1)} s with ${event.toolCount} tool call${event.toolCount === 1 ? "" : "s"}.`
@@ -600,6 +624,20 @@ export class TurnTranslator {
       ],
       interaction: { kind: "plan", event, toolCall },
     };
+  }
+
+  private subAgentRunning(): boolean {
+    for (const state of this.tools.values()) {
+      if (state.name === "sub_agent" && state.status === "in_progress") return true;
+    }
+    return false;
+  }
+
+  private updateCost(): void {
+    this.outcome.turnCost =
+      this.endedTurnsCost === null && this.runningTurnCost === null
+        ? null
+        : (this.endedTurnsCost ?? 0) + (this.runningTurnCost ?? 0);
   }
 
   private usage(): TranslatedEvent {

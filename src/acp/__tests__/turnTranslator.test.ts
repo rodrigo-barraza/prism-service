@@ -196,6 +196,33 @@ describe("TurnTranslator — plans, modes and outcomes", () => {
     expect(translator.outcome.turnCost).toBe(0.5);
   });
 
+  it("sums the cost of every turn in one prompt (an auto-response after a dispatch)", () => {
+    const translator = new TurnTranslator({ workspaceRoot: null, costBeforeTurn: 1 });
+    translator.translate(valid({ type: "usage_update", usage: {}, estimatedCost: 0.2 }));
+    translator.translate(valid({ type: "done", provider: "p", model: "m", usage: null, estimatedCost: 0.25, totalTime: 1 }));
+    translator.translate(valid({ type: "usage_update", usage: {}, estimatedCost: 0.1 }));
+    expect(translator.outcome.turnCost).toBeCloseTo(0.35, 10);
+    translator.translate(valid({ type: "done", provider: "p", model: "m", usage: null, estimatedCost: 0.15, totalTime: 1 }));
+    expect(translator.outcome.turnCost).toBeCloseTo(0.4, 10);
+    expect(translator.sessionCost).toBeCloseTo(1.4, 10);
+  });
+
+  it("counts a sub-agent's cost once, from its `complete`, not from the totals it forwards untagged", () => {
+    const translator = new TurnTranslator({ workspaceRoot: null });
+    translator.translate(valid({ type: "usage_update", usage: {}, estimatedCost: 0.01 }));
+    translator.translate(valid({ type: "done", provider: "p", model: "m", usage: null, estimatedCost: 0.01, totalTime: 1 }));
+    translator.translate(valid({ type: "sub_agent_status", subAgentId: "s", message: "spawned", description: "d" }));
+    const during = translator.translate(valid({ type: "usage_update", usage: {}, estimatedCost: 0.5 }));
+    expect(during.updates).toEqual([]);
+    expect(translator.outcome.turnCost).toBeCloseTo(0.01, 10);
+    translator.translate(
+      valid({ type: "sub_agent_status", subAgentId: "s", message: "complete", durationMilliseconds: 1, toolCount: 0, estimatedCost: 0.04 }),
+    );
+    translator.translate(valid({ type: "usage_update", usage: {}, estimatedCost: 0.02 }));
+    translator.translate(valid({ type: "done", provider: "p", model: "m", usage: null, estimatedCost: 0.03, totalTime: 1 }));
+    expect(translator.outcome.turnCost).toBeCloseTo(0.01 + 0.04 + 0.03, 10);
+  });
+
   it("adds the turn's cost to what the session spent before", () => {
     const translator = new TurnTranslator({ workspaceRoot: null, costBeforeTurn: 1.25 });
     translator.translate(valid({ type: "usage_update", usage: {}, estimatedCost: 0.5 }));

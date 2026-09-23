@@ -65,6 +65,17 @@ function isBusy(status: ConversationStatus | null): boolean {
   return !!status && (status.isGenerating === true || (status.pendingBackgroundTasks ?? 0) > 0);
 }
 
+/**
+ * Whether the prompt must wait for more after its stream ended. Background
+ * work pending, always — a dispatch that let the turn finish (`done`) still
+ * answers later, in an auto-response turn. Without `done`, a turn still
+ * generating too: the dispatch deferred `done`, or the connection dropped.
+ */
+function hasMoreToFollow(status: ConversationStatus | null, sawDone: boolean): boolean {
+  if (!status) return false;
+  return (status.pendingBackgroundTasks ?? 0) > 0 || (!sawDone && status.isGenerating === true);
+}
+
 const ALLOW_ONCE = "allow";
 const ALLOW_ALWAYS = "allow-always";
 const REJECT_ONCE = "deny";
@@ -441,11 +452,11 @@ export class PrismAcpAgent {
     settled = true;
     session.previousStream = pump;
 
-    // A turn that handed work to a non-blocking sub-agent ends its stream
-    // without `done`; the report and the answer written from it arrive over
-    // /ws/chat. The prompt is not over until they have (ACP: a prompt ends
-    // when the agent is done).
-    if (!turn.cancelled && !translator.outcome.done && !translator.outcome.error && !streamFailure) {
+    // A turn that handed work to a non-blocking sub-agent or a detached task
+    // ends its stream (with or without `done`) while that work runs on; its
+    // report and the answer written from it arrive over /ws/chat. The prompt
+    // is not over until they have (ACP: a prompt ends when the agent is done).
+    if (!turn.cancelled && !translator.outcome.error && !streamFailure) {
       await this.followBackground(session, turn, translator, client, sendUpdate, history.length + 1);
     }
     turn.interactions.abort();
@@ -516,7 +527,7 @@ export class PrismAcpAgent {
       this.log(`[acp] status of ${session.id}: ${errorMessage(error)}`);
       return;
     }
-    if (!isBusy(status) || turn.cancelled) return;
+    if (!hasMoreToFollow(status, translator.outcome.done) || turn.cancelled) return;
     this.log(`[acp] ${session.id}: the turn handed work to the background; following it over /ws/chat`);
 
     const follow = new AbortController();
