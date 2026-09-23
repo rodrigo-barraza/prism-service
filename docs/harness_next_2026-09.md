@@ -175,7 +175,9 @@ The shared taxonomy (`@rodrigo-barraza/utilities-library`) has no
 
 ### 2.9 Not adopted from the review
 - Codex App Server as an optional runtime through `HarnessRegistry`: not
-  started (version-pinned stdio pilot is a separate spike).
+  started (version-pinned stdio pilot is a separate spike). Superseded on
+  2026-09-23 by the ACP client runtime (`HarnessRegistry.runtime("acp")`,
+  `docs/acp.md`). It is built, but off until `PRISM_ACP_AGENT_OWNERS` is set.
 - Review workspace (changes panel, inline comments, test evidence beside the
   conversation): not started.
 - Benchmark-infrastructure acceptance scenarios: the scenarios exist as

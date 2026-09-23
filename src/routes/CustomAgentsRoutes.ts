@@ -5,8 +5,51 @@ import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { normalizeAgentDefinitionBody } from "#src/services/agents/AgentDefinitionFields";
+import {
+  ACP_RUNTIME,
+  acpOwnershipError,
+  isAcpAgentOwner,
+  normalizeAgentRuntime,
+} from "#src/services/agents/AgentRuntime";
+import { resolveScope } from "#src/utils/ProfileScope";
 
 const router = express.Router();
+
+/**
+ * A create/update body's `runtime` and `acp` fields, checked. An `acp`
+ * agent starts a process on this host (agents/AgentRuntime), so writing
+ * one — `runtime: "acp"`, or any `acp` launch configuration — is for the
+ * usernames in PRISM_ACP_AGENT_OWNERS only, and the writer is stamped as
+ * the configuration's `owner` (a client-sent owner is ignored). Going back
+ * to `runtime: "prism"` narrows, so anyone may. A body that names neither
+ * leaves the stored ones alone. An update that sets `runtime: "acp"` alone
+ * validates the stored launch configuration.
+ */
+function withCheckedRuntime(
+  body: Record<string, unknown>,
+  username: string,
+  stored: Record<string, unknown> | null = null,
+): { body: Record<string, unknown> } | { status: 400 | 403; error: string } {
+  if (body.runtime === undefined && body.acp === undefined) return { body };
+  const checked = { ...body };
+  if (body.runtime !== ACP_RUNTIME && body.acp === undefined) {
+    const normalized = normalizeAgentRuntime({ runtime: body.runtime });
+    if (normalized.errors.length > 0) return { status: 400, error: normalized.errors.join("; ") };
+    checked.runtime = normalized.runtime ?? "prism";
+    return { body: checked };
+  }
+  if (!isAcpAgentOwner(username)) return { status: 403, error: acpOwnershipError(username) };
+  const normalized = normalizeAgentRuntime({
+    runtime: ACP_RUNTIME,
+    acp: body.acp !== undefined ? body.acp : stored?.acp,
+  });
+  if (normalized.errors.length > 0 || !normalized.acp) {
+    return { status: 400, error: normalized.errors.join("; ") };
+  }
+  checked.acp = { ...normalized.acp, owner: username };
+  if (body.runtime !== undefined) checked.runtime = ACP_RUNTIME;
+  return { body: checked };
+}
 
 /**
  * GET /custom-agents
@@ -54,8 +97,12 @@ router.post(
       if ("errors" in normalized) {
         return res.status(400).json({ error: normalized.errors.join("; ") });
       }
+      const checked = withCheckedRuntime(normalized.body, resolveScope(req).username);
+      if ("error" in checked) {
+        return res.status(checked.status).json({ error: checked.error });
+      }
 
-      const created = await CustomAgentService.create(normalized.body);
+      const created = await CustomAgentService.create(checked.body);
 
       // Register into live persona registry
       AgentPersonaRegistry.registerCustom(created);
@@ -89,13 +136,21 @@ router.put(
       if ("errors" in normalized) {
         return res.status(400).json({ error: normalized.errors.join("; ") });
       }
-      const updates = normalized.body;
 
       // Get the old doc to unregister the old agentId if name changed
       const oldDoc = await CustomAgentService.get(String(id));
       if (!oldDoc) {
         return res.status(404).json({ error: "Agent not found" });
       }
+      const checked = withCheckedRuntime(
+        normalized.body,
+        resolveScope(req).username,
+        oldDoc as Record<string, unknown>,
+      );
+      if ("error" in checked) {
+        return res.status(checked.status).json({ error: checked.error });
+      }
+      const updates = checked.body;
 
       const updated = await CustomAgentService.update(String(id), updates);
 

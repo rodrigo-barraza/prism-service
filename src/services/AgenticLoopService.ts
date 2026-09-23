@@ -6,7 +6,7 @@ import {
 import { PROTOCOL_EVENT_TYPES } from "#src/protocol/events";
 import AgenticToolResolver from "./AgenticToolResolver.ts";
 import AgenticLoopState from "./AgenticLoopState.ts";
-import HarnessRegistry from "./harnesses/HarnessRegistry.ts";
+import HarnessRegistry, { type ExternalRuntimeConstructor } from "./harnesses/HarnessRegistry.ts";
 import {
   ApprovalRegistry,
   type ApprovalDecisionInput,
@@ -103,6 +103,14 @@ export default class AgenticLoopService {
 
     const resolvedAgentConversationId = agentConversationId || "";
     const resolvedParentAgentConversationId = parentAgentConversationId || null;
+
+    // An external runtime (an ACP agent process) runs the turn itself: no
+    // Prism tools, provider or harness are resolved for it.
+    if (options.runtime) {
+      const Runtime = HarnessRegistry.runtime(options.runtime);
+      if (!Runtime) throw new Error(`Unknown agent runtime "${options.runtime}"`);
+      return AgenticLoopService.runExternalTurn(context, Runtime);
+    }
 
     // Load any persisted tool state from MongoDB (e.g. after server restart or previous turn)
     await ToolContext.ensureLoaded(resolvedAgentConversationId);
@@ -434,6 +442,34 @@ export default class AgenticLoopService {
 
       // Nothing is left to re-drive: the turn ended in this process.
       await endTurnRun(context);
+    }
+  }
+
+  /**
+   * A turn an external runtime runs (HarnessRegistry.runtime): the loop
+   * lifecycle it shares with Prism's own turns — a mailbox that takes the
+   * parent's follow-ups while it runs, approval and question cards that
+   * lapse when it ends (never a card left parked on a person), and the live
+   * status entries cleared. Its permission mode is its parent's handle.
+   */
+  static async runExternalTurn(
+    context: AgenticContext,
+    Runtime: ExternalRuntimeConstructor,
+  ): Promise<{ messages: ConversationMessage[] }> {
+    const { conversationId } = context;
+    const resolvedAgentConversationId = context.agentConversationId || "";
+    const loopKey = resolveLoopKey(context);
+    logger.info(`[AgenticLoop] ${conversationId}: running on the "${Runtime.id}" runtime (${Runtime.label})`);
+    await AgenticLoopService.retireOrphanedDecisions(loopKey);
+    TurnInputMailbox.open(conversationId, decisionOwnerOf(context));
+    try {
+      return await new Runtime(context).run();
+    } finally {
+      await ApprovalRegistry.cancel(loopKey);
+      await QuestionRegistry.cancelAll(loopKey);
+      TurnInputMailbox.close(conversationId);
+      ConversationGenerationTracker.cleanup(resolvedAgentConversationId);
+      ConversationStatusRegistry.remove(resolvedAgentConversationId);
     }
   }
 
