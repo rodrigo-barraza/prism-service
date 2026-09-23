@@ -6,7 +6,7 @@
  */
 import "./setup.ts";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { TEST_PROJECT, TEST_USER, TEST_CONVERSATION_ID, MOCK_GENERATE_TEXT_STREAM } from "./setup.ts";
+import { TEST_PROJECT, TEST_USER, TEST_CONVERSATION_ID } from "./setup.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
@@ -604,7 +604,6 @@ function createMockAgenticContext(overrides?: Partial<AgenticContext>): AgenticC
     ...overrides,
   } as AgenticContext;
 }
-import CriticGate from "#src/services/harnesses/lifecycle/CriticGate";
 
 import AgenticLoopState from "#src/services/AgenticLoopState";
 
@@ -706,17 +705,6 @@ describe("HookInitializer", () => {
     expect(internalHooks.get("afterResponse")[3].name).toBe("ConversationGoal");
   });
 
-  it("should register CriticGate when enableCriticGate is true", () => {
-    const { hooks } = createStandardHooks({
-      enableCriticGate: true,
-      criticModel: "my-critic-model",
-    });
-
-    const internalHooks = (hooks as any)._hooks;
-    expect(internalHooks.get("beforeToolCall")).toHaveLength(2);
-    expect(internalHooks.get("beforeToolCall")[0].name).toBe("CriticGate");
-    expect(internalHooks.get("beforeToolCall")[1].name).toBe("AutoApprovalEngine");
-  });
 });
 
 describe("ValidationInterceptor", () => {
@@ -860,132 +848,3 @@ describe("ValidationInterceptor", () => {
   });
 });
 
-describe("CriticGate", () => {
-  let mockContext: AgenticContext;
-  let mockProvider: any;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockProvider = {
-      generateTextStream: vi.fn(),
-    };
-    mockContext = createMockAgenticContext({ provider: mockProvider });
-  });
-
-  it("should auto-approve any tool calls that are not in the DANGER tier without resolving the critic role chain", async () => {
-    const criticGate = new CriticGate();
-    const toolCall: ToolCall = {
-      id: "call-1",
-      name: "write_file",
-      args: { path: "test.ts", content: "hello" },
-      _approval: { tier: 2 } as any, // WRITE tier
-    };
-
-    const reviewResult = await criticGate.review(toolCall, mockContext);
-    expect(reviewResult.isApproved).toBe(true);
-    expect(reviewResult.reason).toBe("below_danger_tier");
-    expect(reviewResult.criticModel).toBe("critic"); // unresolved role placeholder — chain is only resolved for DANGER reviews
-    expect(mockProvider.generateTextStream).not.toHaveBeenCalled();
-  });
-
-  it("should skip critic safety review if skipCritic options is true", async () => {
-    const criticGate = new CriticGate();
-    const toolCall: ToolCall = {
-      id: "call-1",
-      name: "execute_shell",
-      args: { command: "rm -rf /" },
-      _approval: { tier: 3 } as any, // DANGER tier
-    };
-    mockContext.options = { skipCritic: true };
-
-    const reviewResult = await criticGate.review(toolCall, mockContext);
-    expect(reviewResult.isApproved).toBe(true);
-    expect(reviewResult.reason).toBe("critic_skipped");
-    expect(mockProvider.generateTextStream).not.toHaveBeenCalled();
-  });
-
-  it("should return approved when the critic model responds with APPROVE", async () => {
-    const criticGate = new CriticGate({ model: "fast-critic-model" });
-    const toolCall: ToolCall = {
-      id: "call-1",
-      name: "execute_shell",
-      args: { command: "npm run build" },
-      _approval: { tier: 3 } as any,
-    };
-
-    const mockStream = (async function* () {
-      yield "APPROVE\nThe command is safe and standard.";
-    })();
-    // The gate streams via getProvider(chainEntry.provider) now — the
-    // explicit model heads the chain on the conversation's provider.
-    const context = createMockAgenticContext({ providerName: "google" });
-    MOCK_GENERATE_TEXT_STREAM.mockReturnValueOnce(mockStream);
-
-    const reviewResult = await criticGate.review(toolCall, context);
-    expect(reviewResult.isApproved).toBe(true);
-    expect(reviewResult.reason).toBe("critic_approved");
-    expect(reviewResult.criticModel).toBe("google/fast-critic-model");
-
-    expect(MOCK_GENERATE_TEXT_STREAM).toHaveBeenCalledWith(
-      expect.any(Array),
-      "fast-critic-model",
-      expect.any(Object),
-    );
-  });
-
-  it("should deny tool execution and provide a reason when the critic model responds with DENY", async () => {
-    const criticGate = new CriticGate();
-    const toolCall: ToolCall = {
-      id: "call-1",
-      name: "execute_shell",
-      args: { command: "rm -rf /usr/bin" },
-      _approval: { tier: 3 } as any,
-    };
-
-    const mockStream = (async function* () {
-      yield "DENY\nContains destructive rm -rf command targeting critical directories.";
-    })();
-    MOCK_GENERATE_TEXT_STREAM.mockReturnValueOnce(mockStream);
-
-    const reviewResult = await criticGate.review(toolCall, mockContext);
-    expect(reviewResult.isApproved).toBe(false);
-    expect(reviewResult.reason).toBe("Contains destructive rm -rf command targeting critical directories.");
-  });
-
-  it("should fail closed (deny) if the response is ambiguous", async () => {
-    const criticGate = new CriticGate();
-    const toolCall: ToolCall = {
-      id: "call-1",
-      name: "execute_shell",
-      args: { command: "ls -la" },
-      _approval: { tier: 3 } as any,
-    };
-
-    const mockStream = (async function* () {
-      yield "Maybe this is ok? I am not entirely sure.";
-    })();
-    MOCK_GENERATE_TEXT_STREAM.mockReturnValueOnce(mockStream);
-
-    const reviewResult = await criticGate.review(toolCall, mockContext);
-    expect(reviewResult.isApproved).toBe(false);
-    expect(reviewResult.reason).toBe("critic_ambiguous_fail_closed");
-  });
-
-  it("should fail-open and approve if the critic model call throws an error", async () => {
-    const criticGate = new CriticGate();
-    const toolCall: ToolCall = {
-      id: "call-1",
-      name: "execute_shell",
-      args: { command: "chmod 777 script.sh" },
-      _approval: { tier: 3 } as any,
-    };
-
-    MOCK_GENERATE_TEXT_STREAM.mockImplementationOnce(() => {
-      throw new Error("Model rate limit reached");
-    });
-
-    const reviewResult = await criticGate.review(toolCall, mockContext);
-    expect(reviewResult.isApproved).toBe(true);
-    expect(reviewResult.reason).toBe("critic_error_fallback");
-  });
-});

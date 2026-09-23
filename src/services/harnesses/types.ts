@@ -81,6 +81,16 @@ export interface ToolCall {
     /** The user edited the arguments on the approval card; `args` holds the edit. */
     editedByUser?: boolean;
     originalArgs?: Record<string, unknown>;
+    /** `auto` mode: the classifier is to decide (AutoApprovalEngine → ApprovalGate). */
+    awaitsClassifier?: boolean;
+    /** The classifier's named category, when it denied or asked. */
+    category?: string;
+    /** provider/model whose verdict decided, when the classifier did. */
+    classifierModel?: string;
+    /** The card was put out by auto mode (the classifier asked, failed, or is paused). */
+    askedByAutoMode?: boolean;
+    /** An allow rule `auto` mode set aside as too broad. */
+    setAsideRule?: string;
   };
   /**
    * The configured PreToolUse hooks' verdict, stamped BEFORE the approval
@@ -278,9 +288,10 @@ export interface AgenticOptions {
   tools?: ToolSchema[];
   /** Declarative tool call policies (allow/deny/askUser with argument predicates). */
   policies?: PolicyRule[];
-  /** Enable CriticGate multi-model review of dangerous tool calls. */
-  enableCriticGate?: boolean;
-  /** Model to use for CriticGate reviews (resolved from settings). */
+  /**
+   * The auto-mode reviewer's model (stage 2 of AutoModeClassifier), on the
+   * conversation's provider. Unset: MODEL_ROLE_CRITIC, then Settings → critic.
+   */
   criticModel?: string;
   /** Number of parallel branches for TreeOfThought harness (default: 3, max: 5). */
   branchCount?: number;
@@ -290,8 +301,6 @@ export interface AgenticOptions {
   valueThreshold?: number;
   /** Thought structure for the agentic loop: "chain_of_thought" (default single-pass) or "tree_of_thoughts" (parallel branching with scoring). */
   thoughtStructure?: string;
-  /** Skip CriticGate review for this session. */
-  skipCritic?: boolean;
   /** Maximum cost in dollars before the loop terminates with an exhaustion recovery. */
   maxCostDollars?: number;
   /**

@@ -192,7 +192,9 @@ export default class AgenticLoopState {
     | "plan_rejected"
     | "error"
     | "aborted"
-    | "refused";
+    | "refused"
+    /** Auto mode's breaker tripped where nobody could answer (AutoModeGate). */
+    | "auto_mode_stopped";
   /** Spend at the moment the cost cap stopped the loop (null = no stop). */
   costBudgetStop: { spentDollars: number; maxCostDollars: number } | null;
 

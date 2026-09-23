@@ -15,8 +15,11 @@ import type { Capability } from "./types.ts";
  *   acceptEdits  file edits inside the workspace run without asking;
  *                everything else is as in `default`.
  *   auto         read-only tools and workspace edits run; the rest goes to
- *                the auto-mode classifier (Landing 3). Until there is one,
- *                the classifier's slot answers "ask" — its failure mode.
+ *                the auto-mode classifier (AutoModeClassifier.ts), which
+ *                allows, denies with a named category, or asks. Handing a
+ *                sub-agent a task goes to it too, and allow rules broad
+ *                enough to skip it (any shell command, any delegation) are
+ *                set aside while auto mode is on.
  *   dontAsk      anything that would ask is denied instead. The default for
  *                runs nobody is watching (scheduled tasks, timers).
  *   bypass       everything runs. Owner only, chosen per conversation, never
@@ -105,14 +108,6 @@ export function canUseBypass(username: string | null | undefined): boolean {
   return Boolean(username) && bypassOwners().has(username!);
 }
 
-/**
- * Whether the auto-mode classifier can decide. Landing 3 ships it; until
- * then `auto` asks where the classifier would have decided.
- */
-export function isAutoModeClassifierAvailable(): boolean {
-  return false;
-}
-
 // ── What each mode lets through ──────────────────────────────────
 
 /** Capabilities a plan-mode call may carry: reading, and delegating (sub-agents inherit the mode). */
@@ -159,6 +154,52 @@ export function isWorkspaceEdit(
   if (kind !== "path" || values.length === 0) return false;
   // With a root, `~/…` and absolute paths elsewhere read as outside.
   return values.every((value) => value.trim() !== "" && !normalizePath(value, workspaceRoot).isOutside);
+}
+
+/**
+ * Tools that hand another agent instructions. In `auto` mode the classifier
+ * reads the task before a sub-agent starts on it (Claude Code checks a
+ * sub-agent at spawn, per action and on its report) — they are read-only
+ * as tools, but what they delegate is not.
+ */
+const DELEGATION_TOOLS = new Set([
+  "create_subagent",
+  "create_subagents",
+  "send_subagent_message",
+  "resume_subagent",
+]);
+
+export function delegatesTask(toolName: string): boolean {
+  return DELEGATION_TOOLS.has(toolName);
+}
+
+/** An argument pattern that matches anything: `*`, `**`, or the regex `.*` between slashes. */
+function matchesAnything(argument: string): boolean {
+  const pattern = argument.includes("=") ? argument.slice(argument.indexOf("=") + 1) : argument;
+  return /^(\*+|\/\^?\.\*\$?\/)$/.test(pattern.trim());
+}
+
+/**
+ * An allow rule too broad for `auto` mode: it would let a call skip the
+ * classifier where the classifier matters most. Claude Code drops the same
+ * rules on entering auto mode (blanket `Bash(*)`, interpreters, `Agent`).
+ *
+ *   capability:shell / capability:subagent          always broad
+ *   <tool> or <tool>(*) on a shell or delegation    broad
+ *   `*` (every tool)                                 broad
+ *
+ * A narrow rule (`execute_shell(npm test)`) keeps working. The rule is set
+ * aside only while the mode is `auto`; nothing is deleted.
+ */
+export function isTooBroadForAutoMode(ruleText: string, capabilities: readonly Capability[]): boolean {
+  const text = ruleText.trim();
+  if (text === "capability:shell" || text === "capability:subagent") return true;
+  if (text.startsWith("capability:")) return false;
+  const reachesShellOrDelegation = capabilities.includes("shell") || capabilities.includes("subagent");
+  if (!reachesShellOrDelegation) return false;
+  const open = text.indexOf("(");
+  if (open === -1) return true;
+  return text.endsWith(")") && matchesAnything(text.slice(open + 1, -1));
 }
 
 /** Tools that need a person to answer — refused where nobody will. */
