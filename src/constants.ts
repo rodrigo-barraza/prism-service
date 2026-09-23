@@ -619,6 +619,24 @@ export const NOTIFICATION_SOURCES = {
   SUB_AGENT_PROGRESS: "subagent-progress",
 } as const;
 
+// ─── Auto Mode (permissions/AutoModeClassifier) ─────────────
+
+export const AUTO_MODE = {
+  /** Stage 1 answers one word (`low` / `high`); room for a model that pads it. */
+  CLASSIFIER_MAX_TOKENS: 32,
+  CLASSIFIER_TIMEOUT_MILLISECONDS: 15_000,
+  /** Stage 2 answers a one-sentence JSON verdict. */
+  REVIEWER_MAX_TOKENS: 512,
+  REVIEWER_TIMEOUT_MILLISECONDS: 45_000,
+  /** What the classifier is shown, at most (head and tail kept when cut). */
+  TRANSCRIPT_MAX_CHARACTERS: 24_000,
+  USER_MESSAGE_MAX_CHARACTERS: 4_000,
+  TRANSCRIPT_ARGS_MAX_CHARACTERS: 1_000,
+  PENDING_ARGS_MAX_CHARACTERS: 20_000,
+  INSTRUCTIONS_MAX_CHARACTERS: 8_000,
+  REPORT_MAX_CHARACTERS: 20_000,
+} as const;
+
 // ─── Harness Constants ──────────────────────────────────────
 
 export const HARNESS = {
@@ -667,12 +685,6 @@ export const HARNESS = {
   MAX_PLANNING_ITERATIONS: 10,
 
   // ─── Lifecycle Gate Defaults ───────────────────────────────
-
-  /** Critic gate LLM output token limit. */
-  CRITIC_MAX_TOKENS: 200,
-
-  /** Critic gate timeout (milliseconds). */
-  CRITIC_TIMEOUT_MILLISECONDS: 10_000,
 
   /** System reminder extraction LLM output token limit. */
   EXTRACTION_MAX_TOKENS: 600,

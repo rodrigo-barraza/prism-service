@@ -170,7 +170,6 @@ vi.mock("#src/routes/ChatRoutes", () => ({
         harness: "standard",
         topology: "single",
         thoughtStructure: "chain_of_thought",
-        enableCriticGate: false,
         maxIterations: 6,
         autoApprove: params.autoApprove === true,
         // As the real prepareGenerationContext forwards them.

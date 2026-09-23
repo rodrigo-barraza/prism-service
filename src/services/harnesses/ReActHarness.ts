@@ -311,8 +311,6 @@ export default class ReActHarness extends BaseAgenticHarness {
       policies: options.policies,
       permissionRules: options._permissionRules,
     permissionMode: options._permissionMode,
-      enableCriticGate: options.enableCriticGate === true,
-      criticModel: options.criticModel || undefined,
     });
     const { hooks, approvalEngine } = standardHooks;
 
@@ -838,7 +836,10 @@ export default class ReActHarness extends BaseAgenticHarness {
             state,
           );
 
-          const { executableToolCalls, blockedResults, shouldApproveAll } =
+          // The transcript so far — what auto mode's classifier reads (its
+          // tool calls, never their results) and what history-aware tools use.
+          context._currentMessages = currentMessages;
+          const { executableToolCalls, blockedResults, shouldApproveAll, stopTurnReason } =
             await checkAndWaitForApproval(
               preToolUse.executable,
               context,
@@ -848,9 +849,8 @@ export default class ReActHarness extends BaseAgenticHarness {
           if (shouldApproveAll) options.autoApprove = true;
 
           // Denied calls (rule, PreToolUse or PermissionRequest hook, the
-          // user) never run; every call the gate cleared runs in one batch.
-          // Results keep the model's order.
-          context._currentMessages = currentMessages;
+          // classifier, the user) never run; every call the gate cleared
+          // runs in one batch. Results keep the model's order.
           const callsToRun = [...executableToolCalls, ...resumedFinished];
           const executedResults =
             callsToRun.length > 0
@@ -953,6 +953,7 @@ export default class ReActHarness extends BaseAgenticHarness {
           // run, the turn ends with that reply instead of another model call —
           // unless input is waiting for an answer in this same turn.
           const endsWithReply =
+            !stopTurnReason &&
             !isPlanRejected &&
             !state.planModeActive &&
             !signal?.aborted &&
@@ -990,6 +991,16 @@ export default class ReActHarness extends BaseAgenticHarness {
               stc.result = res.result;
               stc.durationMilliseconds = res.durationMilliseconds;
             }
+          }
+
+          // Auto mode's breaker tripped and nobody is watching to answer: the
+          // turn ends here, and the summary pass (ExhaustionRecovery) tells
+          // the user what was refused and what they would have to allow.
+          if (stopTurnReason) {
+            state.conversationOutcome = "auto_mode_stopped";
+            emit({ type: SERVER_SENT_EVENT_TYPES.STATUS, message: `Auto mode stopped this run: ${stopTurnReason}` });
+            this.logIteration(pass, currentMessages);
+            break;
           }
 
           if (endsWithReply) {

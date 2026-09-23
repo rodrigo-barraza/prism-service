@@ -229,8 +229,6 @@ export async function runBeforePromptSetup(
     policies: options.policies,
     permissionRules: options._permissionRules,
     permissionMode: options._permissionMode,
-    enableCriticGate: options.enableCriticGate === true,
-    criticModel: options.criticModel || undefined,
   });
   const { hooks } = standardHooks;
 
@@ -855,6 +853,8 @@ export async function executeApprovedToolBatch(
     state,
   );
 
+  // What auto mode's classifier reads (tool calls, never their results).
+  context._currentMessages = currentMessages;
   const { executableToolCalls, blockedResults, shouldApproveAll } =
     await checkAndWaitForApproval(
       preToolUse.executable,

@@ -292,8 +292,7 @@ async function prepareGenerationContext(
     workspaceRoot,
     // Workspace toggle: when false, workspace tools are excluded from the agent session.
     workspaceEnabled,
-    // CriticGate: multi-model review of dangerous tool calls.
-    enableCriticGate,
+    // The auto-mode reviewer's model, on the conversation's provider.
     criticModel,
     parallelToolCalls,
     candidateCount,
@@ -363,7 +362,6 @@ async function prepareGenerationContext(
     ...(typeof maxCostDollars === "number" &&
       maxCostDollars > 0 && { maxCostDollars }),
     ...(agentContext != null && { agentContext }),
-    ...(enableCriticGate != null && { enableCriticGate }),
     ...(criticModel != null && { criticModel }),
     ...(workspaceEnabled != null && { workspaceEnabled }),
     ...(harness != null && { harness }),

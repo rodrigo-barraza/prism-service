@@ -11,7 +11,9 @@ import { checkSelfProtection } from "./permissions/SelfProtection.ts";
 import { strongestVerdict } from "./permissions/PermissionEvaluator.ts";
 import { recordUserApproval } from "./permissions/ApprovalHistory.ts";
 import {
+  delegatesTask,
   isPlanSafe,
+  isTooBroadForAutoMode,
   isWorkspaceEdit,
   planModeDenialReason,
   requiresUserInteraction,
@@ -60,6 +62,9 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   [TOOL_NAMES.GIT_STATUS]: APPROVAL_TIERS.AUTO,
   [TOOL_NAMES.GIT_DIFF]: APPROVAL_TIERS.AUTO,
   [TOOL_NAMES.GIT_LOG]: APPROVAL_TIERS.AUTO,
+  // tools-service's run_git takes only status / diff / log (fs_read). Unmapped,
+  // it asked in `default` and cost a classifier call per look in `auto`.
+  run_git: APPROVAL_TIERS.AUTO,
   [TOOL_NAMES.SUMMARIZE_PROJECT]: APPROVAL_TIERS.AUTO,
   // A no-tools reader over untrusted text; the read is ALSO judged as the
   // fetch it makes (explainReaderRead) — this tier covers the text alone
@@ -207,6 +212,18 @@ export interface ApprovalResult {
   alwaysAsks?: boolean;
   /** The protected path an `alwaysAsks` write names. */
   protectedPath?: string;
+  /**
+   * `auto` mode: the classifier decides this call. The engine is synchronous
+   * and the classifier is a model, so the ApprovalGate runs it and replaces
+   * this stamp with the verdict (allowed, denied by `classifier`, or asked).
+   */
+  awaitsClassifier?: boolean;
+  /** Set when the classifier denied or asked: the named category (AutoModeClassifier). */
+  category?: string;
+  /** provider/model whose verdict decided, when the classifier did. */
+  classifierModel?: string;
+  /** An allow rule `auto` mode set aside as too broad (isTooBroadForAutoMode). */
+  setAsideRule?: string;
 }
 
 /** `check()` plus the evidence behind it — what the rules page's tester shows. */
@@ -393,10 +410,16 @@ export default class AutoApprovalEngine {
    *      no mode does.
    *   6. Full auto — everything not stopped above runs.
    *   7. The mode — `bypass` runs everything; `acceptEdits` and `auto` run
-   *      file edits inside the workspace.
-   *   8. The tier — AUTO runs. For the rest, `auto` would consult its
-   *      classifier (Landing 3; until then, and whenever it fails, it asks),
-   *      and every other mode asks.
+   *      file edits inside the workspace; `auto` sends a sub-agent's task to
+   *      its classifier before the sub-agent starts.
+   *   8. The tier — AUTO runs. For the rest, `auto` hands the call to its
+   *      classifier (`awaitsClassifier`: the ApprovalGate runs it — allow,
+   *      deny with a category, or ask; a failure asks), and every other
+   *      mode asks.
+   *
+   * In `auto`, an allow rule broad enough to skip the classifier (any shell
+   * command, any delegation — isTooBroadForAutoMode) is set aside, as Claude
+   * Code drops blanket rules on entering auto mode.
    *
    * Every "ask" is then checked against the run: where nobody can answer
    * (`dontAsk`, an unattended scheduled or timer run), it is a denial that
@@ -498,7 +521,19 @@ export default class AutoApprovalEngine {
       }
     }
 
-    const decided = strongestVerdict(verdicts);
+    let decided = strongestVerdict(verdicts);
+    let setAsideRule: string | undefined;
+    if (
+      mode === "auto" &&
+      decided?.decision === "allow" &&
+      decided.layer === "rules" &&
+      decided.rule &&
+      isTooBroadForAutoMode(decided.rule, capabilities)
+    ) {
+      setAsideRule = decided.rule;
+      const setAside = decided;
+      decided = strongestVerdict(verdicts.filter((verdict) => verdict !== setAside));
+    }
     const stamp = decided
       ? {
           ...base,
@@ -568,19 +603,32 @@ export default class AutoApprovalEngine {
       return { ...base, isApproved: true, reason: "workspace_edit", layer: "mode" };
     }
 
+    // `auto` hands the call to its classifier — not through `ask()`: where
+    // nobody can answer, the classifier still decides, and only its "ask"
+    // (or its failure) becomes a denial (ApprovalGate).
+    const toClassifier = (reason: string): ApprovalExplanation => ({
+      ...base,
+      isApproved: false,
+      awaitsClassifier: true,
+      reason,
+      layer: "classifier",
+      ...(setAsideRule && { setAsideRule }),
+    });
+    if (mode === "auto" && delegatesTask(toolCall.name)) {
+      return toClassifier("auto mode: the classifier reads a sub-agent's task before it starts");
+    }
+
     // Tier 1: always auto-approve
     if (tier === APPROVAL_TIERS.AUTO) {
       return { ...base, isApproved: true, reason: "read_only", layer: "tier" };
     }
 
-    // The auto-mode classifier's slot. It isn't here yet (Landing 3), and a
-    // classifier that cannot decide asks — it never allows.
     if (mode === "auto") {
-      return ask({
-        ...base,
-        reason: "auto mode: the classifier is not available, so this asks",
-        layer: "mode",
-      });
+      return toClassifier(
+        setAsideRule
+          ? `auto mode: the classifier decides (the allow rule \`${setAsideRule}\` is too broad for auto mode)`
+          : "auto mode: the classifier decides",
+      );
     }
 
     // Tier 2 and 3: require approval
@@ -599,8 +647,8 @@ export default class AutoApprovalEngine {
       const result = this.check(toolCall);
       // Stamp the approval onto the ORIGINAL tool call object, not just the
       // categorized copy — downstream consumers (ToolExecutor's hook pass,
-      // CriticGate's tier check) receive the originals, and without the stamp
-      // CriticGate sees every call as WRITE tier and never reviews anything.
+      // the auto-mode stage of the ApprovalGate) receive the originals and
+      // read the stamp there.
       toolCall._approval = result;
       if (result.isDenied) {
         denied.push({ ...toolCall, _approval: result });
@@ -612,10 +660,14 @@ export default class AutoApprovalEngine {
     }
 
     if (needsApproval.length > 0 || denied.length > 0) {
+      // `auto` mode's classifier decides some of these; the rest ask a person.
+      const toClassifier = needsApproval.filter((call) => call._approval.awaitsClassifier);
+      const toPerson = needsApproval.filter((call) => !call._approval.awaitsClassifier);
       logger.info(
-        `[AutoApproval] ${autoApproved.length} auto-approved, ${needsApproval.length} need approval` +
-          (needsApproval.length
-            ? `: ${needsApproval.map((approvedToolCall) => approvedToolCall.name).join(", ")}`
+        `[AutoApproval] ${autoApproved.length} auto-approved, ${toPerson.length} need approval` +
+          (toPerson.length ? `: ${toPerson.map((approvedToolCall) => approvedToolCall.name).join(", ")}` : "") +
+          (toClassifier.length
+            ? `; ${toClassifier.length} to the auto-mode classifier: ${toClassifier.map((call) => call.name).join(", ")}`
             : "") +
           (denied.length
             ? `; ${denied.length} denied by policy: ${denied.map((deniedToolCall) => deniedToolCall.name).join(", ")}`

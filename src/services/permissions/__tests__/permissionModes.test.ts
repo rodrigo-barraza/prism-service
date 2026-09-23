@@ -142,10 +142,10 @@ describe("the engine, mode by mode", () => {
     expect(outcome(engine, editInside)).toBe("allow");
   });
 
-  it("auto asks where the classifier would decide — its failure mode — and runs reads and workspace edits", () => {
+  it("auto hands the rest to its classifier (the ApprovalGate runs it) and runs reads and workspace edits", () => {
     const result = engineIn("auto").check({ ...shell });
-    expect(result).toMatchObject({ isApproved: false, layer: "mode" });
-    expect(result.reason).toMatch(/classifier/);
+    expect(result).toMatchObject({ isApproved: false, awaitsClassifier: true, layer: "classifier" });
+    expect(result.isDenied).toBeFalsy();
   });
 
   it("reads the live handle on every check — a switch applies to the next call", () => {

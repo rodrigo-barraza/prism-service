@@ -282,9 +282,15 @@ const ApprovalRequiredEvent = event("approval_required", {
       isTruncated: z.boolean().optional(),
     })
     .optional(),
-  /** Who asked besides the tier: a PreToolUse hook, or a restart re-asking a call that was running. */
-  requestedBy: z.enum(["hook", "restart"]).optional(),
+  /**
+   * Who asked besides the tier: a PreToolUse hook, a restart re-asking a call
+   * that was running, or auto mode (its classifier asked, failed, or is
+   * paused by its breaker — `reason` says which).
+   */
+  requestedBy: z.enum(["hook", "restart", "classifier"]).optional(),
   reason: z.string().nullable().optional(),
+  /** Auto mode: the classifier's named category (e.g. "Data Exfiltration"). */
+  category: z.string().optional(),
   /** A write to a protected path: it asks in every mode, and "Always allow" cannot stop it asking. */
   protectedPath: z.string().optional(),
   alwaysAsks: z.literal(true).optional(),

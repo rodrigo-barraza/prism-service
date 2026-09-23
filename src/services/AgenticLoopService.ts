@@ -299,8 +299,7 @@ export default class AgenticLoopService {
     if (
       !harnessId ||
       !topologyId ||
-      !thoughtStructure ||
-      options.enableCriticGate === undefined
+      !thoughtStructure
     ) {
       try {
         const { default: SettingsService } =
@@ -313,17 +312,6 @@ export default class AgenticLoopService {
           thoughtStructure =
             (agentSettings?.thoughtStructure as string) ||
             DEFAULT_THOUGHT_STRUCTURE;
-
-        // CriticGate: auto-enable from settings when a critic model is configured
-        // and the request didn't explicitly set enableCriticGate.
-        if (
-          options.enableCriticGate === undefined &&
-          agentSettings?.criticModel
-        ) {
-          options.enableCriticGate = true;
-          options.criticModel =
-            options.criticModel || agentSettings.criticModel;
-        }
 
         // SystemReminderInjector: auto-populate from settings when a reminder model is configured
         if (agentSettings?.reminderModel) {

@@ -65,19 +65,26 @@ export async function runExhaustionRecoveryPass(
     return;
   }
 
-  emit({
-    type: SERVER_SENT_EVENT_TYPES.STATUS,
-    message: STATUS_MESSAGES.ITERATION_LIMIT_REACHED,
-  });
+  // Auto mode stopped the run (AutoModeGate): the summary names that,
+  // not an iteration limit that was never reached.
+  const autoModeStopped = state.conversationOutcome === "auto_mode_stopped";
+  if (!autoModeStopped) {
+    emit({
+      type: SERVER_SENT_EVENT_TYPES.STATUS,
+      message: STATUS_MESSAGES.ITERATION_LIMIT_REACHED,
+    });
+  }
 
   const activeLocale =
     (options?.locale as string | undefined) ||
     PromptLocaleService.getDefaultLocale();
 
   const isSubAgent = !!context.parentAgentConversationId;
-  const recoveryMessageKey = isSubAgent
-    ? "harness.exhaustionRecovery.subAgentMessage"
-    : "harness.exhaustionRecovery.message";
+  const recoveryMessageKey = autoModeStopped
+    ? "harness.autoModeStopped.message"
+    : isSubAgent
+      ? "harness.exhaustionRecovery.subAgentMessage"
+      : "harness.exhaustionRecovery.message";
 
   currentMessages.push({
     role: "system",

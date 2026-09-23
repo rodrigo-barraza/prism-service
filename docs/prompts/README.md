@@ -10,7 +10,6 @@ Self-contained task prompts for the items in `docs/harness_modernization_2026-09
 
 | # | File | Branch slug(s) | Repos | Size | Depends on | Shares hub files with |
 |---|---|---|---|---|---|---|
-| 12 | `12-permission-rules-and-modes.md` | `permission-rules-store`, `permission-modes`, `auto-mode-classifier` | service, client | L | 05 | 13, 18, 20 (`AutoApprovalEngine.ts`) |
 | 13 | `13-durable-run-state.md` | `persist-pending-decisions`, `resume-parked-turns`, `budget-pause` | service, client | L | 05 | 12, 17 |
 | 19 | `19-skills-progressive-disclosure.md` | `skills-catalog-and-loader`, `skill-folders-and-plugins`, `workspace-instructions` | service, client | L | 07 | 10 (`system-prompt/index.ts`) |
 | 21 | `21-goals-verified-outcomes.md` | `goals-verified-outcomes` | service, client | M | 17 (soft), 13 (soft) | 26 |

@@ -702,7 +702,8 @@
               "type": "string",
               "enum": [
                 "hook",
-                "restart"
+                "restart",
+                "classifier"
               ]
             },
             "reason": {
@@ -714,6 +715,9 @@
                   "type": "null"
                 }
               ]
+            },
+            "category": {
+              "type": "string"
             },
             "protectedPath": {
               "type": "string"
