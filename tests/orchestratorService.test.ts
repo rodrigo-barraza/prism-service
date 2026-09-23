@@ -953,7 +953,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
 
       mockRunAgenticLoop.mockReturnValue(deferredPromise);
 
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < ORCHESTRATOR.MAX_SUB_AGENTS; i++) {
         runningPromises.push(
           OrchestratorService.spawnFromTool({
             description: `Agent ${i}`,
@@ -985,7 +985,7 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       resolveLoop({ messages: [] });
       await Promise.all(runningPromises);
 
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < ORCHESTRATOR.MAX_SUB_AGENTS; i++) {
         OrchestratorService.cleanupConversation(`session-id-456-${i}`);
       }
       mockRunAgenticLoop.mockResolvedValue({
@@ -1100,39 +1100,41 @@ describe("OrchestratorService Spawning & Agent Types", () => {
     });
   });
 
-  describe("Circuit Breaker - Concurrent Agents Limit Per Conversation", () => {
-    it("should reject spawn when total concurrent agents per conversation exceeds limit", async () => {
+  describe("Runaway cap - spawns per conversation", () => {
+    it("should reject a spawn once the conversation has started MAX_SPAWNS_PER_CONVERSATION sub-agents", async () => {
       OrchestratorService.cleanupConversation("session-id-456");
 
       const parentConversationId = "conv-id-789";
-      
-      for (let i = 0; i < ORCHESTRATOR.MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION; i++) {
+
+      for (let i = 0; i < ORCHESTRATOR.MAX_SPAWNS_PER_CONVERSATION; i++) {
         await OrchestratorService.spawnFromTool({
-          description: `CB Agent ${i}`,
+          description: `Cap Agent ${i}`,
           prompt: "Do work",
           awaitCompletion: true,
           orchestratorContext: {
             ...orchestratorContext,
-            agentConversationId: `session-id-cb-${i}`,
+            agentConversationId: `session-id-cap-${i}`,
             conversationId: parentConversationId,
           },
         });
       }
 
       const resultExceeded = await OrchestratorService.spawnFromTool({
-        description: `CB Agent ${ORCHESTRATOR.MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}`,
+        description: `Cap Agent ${ORCHESTRATOR.MAX_SPAWNS_PER_CONVERSATION}`,
         prompt: "Do work",
         awaitCompletion: true,
         orchestratorContext: {
           ...orchestratorContext,
-          agentConversationId: `session-id-cb-${ORCHESTRATOR.MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}`,
+          agentConversationId: `session-id-cap-${ORCHESTRATOR.MAX_SPAWNS_PER_CONVERSATION}`,
           conversationId: parentConversationId,
         },
       });
 
       expect(resultExceeded).toBeDefined();
       expect("error" in resultExceeded).toBe(true);
-      expect((resultExceeded as any).error).toContain("Circuit breaker: maximum concurrent agents per conversation");
+      expect((resultExceeded as any).error).toContain(
+        `max ${ORCHESTRATOR.MAX_SPAWNS_PER_CONVERSATION} per conversation`,
+      );
     });
   });
 

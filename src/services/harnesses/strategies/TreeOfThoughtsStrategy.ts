@@ -23,10 +23,12 @@
  *   try the next sibling. Accept best available after exhausting
  *   the sibling budget.
  *
- * Proactive backtracking: If all branches score below the value
- * threshold (default 5.0), the iteration is discarded and a
- * reflexion prompt is injected before re-branching — matching
- * the paper's state evaluator V(s) pruning.
+ * Siblings are independent: DFS's next sibling never sees the one the
+ * scorer pruned, and a round the scorer rates low is not discarded and
+ * redone — the scorer selects, it cannot verify (branchingCommon.ts).
+ * Backtracking is the validators': a branch whose tool calls fail
+ * type-check / lint / parse is rolled back and re-branched with the
+ * errors (Reflexion).
  *
  * Shared branching machinery (branch generation, scoring, planning
  * phase, tool execution, commit, no-tool outcomes) lives in
@@ -82,7 +84,6 @@ const {
   DEFAULT_BRANCH_COUNT,
   MAX_BACKTRACK_ATTEMPTS_PER_ITERATION,
   DEFAULT_VALUE_THRESHOLD,
-  MAX_PROACTIVE_BACKTRACKS,
   DEFAULT_BFS_BEAM_WIDTH,
 } = HARNESS;
 
@@ -255,6 +256,7 @@ async function runTreeOfThoughtsTurn(
             harness,
             [branch],
             LOG_LABEL,
+            { absolute: true },
           );
           exploredSiblings.push(scoredSibling);
 
@@ -267,10 +269,8 @@ async function runTreeOfThoughtsTurn(
             break;
           }
 
+          // The next sibling is drawn independently: it never sees this one.
           state.branchesBacktracked++;
-          failedApproachDescriptions.push(
-            (scoredSibling.text || scoredSibling.thinking || "").slice(0, 300),
-          );
 
           emit({
             type: SERVER_SENT_EVENT_TYPES.STATUS,
@@ -382,63 +382,6 @@ async function runTreeOfThoughtsTurn(
           `risk: ${selectedBranch.criteriaScores.risk}, efficiency: ${selectedBranch.criteriaScores.efficiency}, ` +
           `completeness: ${selectedBranch.criteriaScores.completeness})`,
       );
-
-      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      //  PHASE 2.5: Proactive value-threshold pruning (Paper §2.1)
-      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-      if (
-        selectedBranch.score < valueThreshold &&
-        state.iterations > 1 &&
-        state.proactiveBacktracks < MAX_PROACTIVE_BACKTRACKS
-      ) {
-        state.proactiveBacktracks++;
-        state.branchesBacktracked++;
-
-        const failedSummary = (
-          selectedBranch.text ||
-          selectedBranch.thinking ||
-          ""
-        )
-          .slice(0, 300)
-          .trim();
-        if (failedSummary) failedApproachDescriptions.push(failedSummary);
-
-        emit({
-          type: SERVER_SENT_EVENT_TYPES.STATUS,
-          message: STATUS_MESSAGES.BRANCH_BACKTRACKED,
-          branchIndex: selectedBranch.branchIndex,
-          reason: "proactive_value_threshold",
-          bestScore: selectedBranch.score,
-          threshold: valueThreshold,
-          proactiveBacktracks: state.proactiveBacktracks,
-          maxProactiveBacktracks: MAX_PROACTIVE_BACKTRACKS,
-        });
-
-        logger.info(
-          `[TreeOfThoughts] Proactive backtrack — best score ${selectedBranch.score.toFixed(1)} ` +
-            `< threshold ${valueThreshold}. Re-branching (${state.proactiveBacktracks}/${MAX_PROACTIVE_BACKTRACKS}).`,
-        );
-
-        currentMessages.push({
-          role: "system",
-          content: wrapSystemMessage(
-            SYSTEM_MESSAGE_TAGS.BACKTRACK,
-            PromptLocaleService.get(
-              (options?.locale as string | undefined) ||
-                PromptLocaleService.getDefaultLocale(),
-              "harness.treeOfThoughts.proactiveBacktrack",
-              {
-                branchCount: String(scoredBranches.length),
-                bestScore: selectedBranch.score.toFixed(1),
-                threshold: String(valueThreshold),
-              },
-            ),
-          ),
-        });
-
-        continue;
-      }
 
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
       //  PHASE 3: Execute selected branch with backtracking
@@ -654,7 +597,7 @@ async function runTreeOfThoughtsTurn(
       LOG_LABEL,
       `${state.iterations} iterations, ` +
         `${state.branchesExplored} branches explored, ` +
-        `${state.branchesBacktracked} backtracked (${state.proactiveBacktracks} proactive), ` +
+        `${state.branchesBacktracked} backtracked, ` +
         `strategy: ${searchStrategy}`,
     );
     return { messages: currentMessages };

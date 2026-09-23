@@ -2,7 +2,7 @@ import { DEFAULT_TOPOLOGY } from "@rodrigo-barraza/utilities-library/taxonomy";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { deepMerge, getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { MONGO_DB_NAME } from "#config";
-import { COLLECTIONS, PROVIDERS } from "#src/constants";
+import { COLLECTIONS, ORCHESTRATOR, PROVIDERS } from "#src/constants";
 import { MODELS } from "#src/config";
 import logger from "#src/utils/logger";
 import {
@@ -66,6 +66,16 @@ export interface SettingsData {
   };
   security: {
     allowEnvFiles: boolean;
+  };
+  /**
+   * Runaway caps on delegation, per root conversation
+   * (orchestrator/SpawnCaps.ts): sub-agents started over its life, running
+   * at once, and how deep delegation nests (0 turns it off).
+   */
+  subAgentCaps?: {
+    maxSpawnsPerConversation: number;
+    maxConcurrentPerConversation: number;
+    maxDepth: number;
   };
   /**
    * `defaultMode` — the permission mode a conversation starts in when it
@@ -135,6 +145,11 @@ const DEFAULTS: SettingsData = {
   },
   security: {
     allowEnvFiles: false,
+  },
+  subAgentCaps: {
+    maxSpawnsPerConversation: ORCHESTRATOR.MAX_SPAWNS_PER_CONVERSATION,
+    maxConcurrentPerConversation: ORCHESTRATOR.MAX_SUB_AGENTS,
+    maxDepth: ORCHESTRATOR.MAX_DELEGATION_DEPTH,
   },
   permissions: {
     defaultMode: "default",
