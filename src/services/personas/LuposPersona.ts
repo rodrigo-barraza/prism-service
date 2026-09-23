@@ -243,6 +243,26 @@ const LUPOS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
       "mug_discord_gold",
     ],
   },
+  {
+    // Discord actions: polls, threads, reminders, his own nickname —
+    // tools-service definitions that act through lupos-bot. Discoverable,
+    // not enabled by default, so the rules render once any of them reaches
+    // the model (pre-flight on "should we…", "remind me…"). `requires` is
+    // an OR, and the section names all six, so every one is listed. The
+    // hard limits (one poll/thread per channel per 10 min, 5 pending
+    // reminders per member, reminders pinging only the asker) are enforced
+    // in lupos-bot; this is when to reach for them.
+    content: (locale) =>
+      PromptLocaleService.get(locale, "personas.lupos.toolPolicyDiscordActions"),
+    requires: [
+      "create_discord_poll",
+      "create_discord_thread",
+      "schedule_discord_reminder",
+      "list_discord_reminders",
+      "cancel_discord_reminder",
+      "set_discord_nickname",
+    ],
+  },
 ];
 
 // Lupos lives on Discord, so his tool surface is bounded by what lupos-bot
