@@ -143,7 +143,6 @@ describe("TreeOfThoughtsStrategy", () => {
       iterations: 0,
       branchesExplored: 0,
       branchesBacktracked: 0,
-      proactiveBacktracks: 0,
       selectedBranchScores: [],
       originalMessageCount: 1,
       planModeActive: false,
@@ -384,7 +383,7 @@ describe("TreeOfThoughtsStrategy", () => {
     expect(mockAgenticLoopState.branchesBacktracked).toBe(2);
   });
 
-  it("should perform proactive backtracking when all branches score below threshold in BFS mode", async () => {
+  it("should run the best branch — not discard and redo the round — when all score below threshold in BFS mode", async () => {
     mockAgenticContext.options.branchCount = 2;
     mockAgenticContext.options.searchStrategy = "bfs";
     mockAgenticContext.options.valueThreshold = 8.0;
@@ -402,9 +401,12 @@ describe("TreeOfThoughtsStrategy", () => {
 
     const treeOfThoughtsResult = await runTreeOfThoughts(mockHarnessInstance as any);
 
+    // The scorer selects; it cannot verify, so it never sends the round
+    // back (prompt 17 L3 — see independentBranches.test.ts).
     expect(treeOfThoughtsResult).toBeDefined();
-    expect(mockAgenticLoopState.branchesBacktracked).toBe(1);
-    expect(treeOfThoughtsResult.messages.some((msg: any) => msg.content && msg.content.includes("PROACTIVE BACKTRACK"))).toBe(true);
+    expect(mockAgenticLoopState.branchesBacktracked).toBe(0);
+    expect(mockAgenticLoopState.selectedBranchScores).toEqual([4]);
+    expect(treeOfThoughtsResult.messages.some((msg: any) => msg.content && msg.content.includes("PROACTIVE BACKTRACK"))).toBe(false);
   });
 
   it("should execute tools and carry results back in tree of thoughts", async () => {

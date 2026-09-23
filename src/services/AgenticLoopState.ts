@@ -199,7 +199,6 @@ export default class AgenticLoopState {
   // ── Branch tracking (TreeOfThought) ─────────────────────
   branchesExplored: number;
   branchesBacktracked: number;
-  proactiveBacktracks: number;
   selectedBranchScores: number[];
   frontierCandidates: Array<{
     pass: PassState;
@@ -286,7 +285,6 @@ export default class AgenticLoopState {
 
     this.branchesExplored = 0;
     this.branchesBacktracked = 0;
-    this.proactiveBacktracks = 0;
     this.selectedBranchScores = [];
     this.frontierCandidates = [];
 

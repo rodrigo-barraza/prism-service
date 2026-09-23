@@ -48,6 +48,15 @@ export class SharedCostBudget {
     this.perLoopCost.set(loopId, cumulativeCostDollars);
   }
 
+  /**
+   * Add a one-off spend outside any loop's usage — an `ask_oracle` call runs
+   * on another model, priced at its own rates — under its own key.
+   */
+  charge(key: string, costDollars: number): void {
+    if (!key || !Number.isFinite(costDollars) || costDollars <= 0) return;
+    this.perLoopCost.set(key, (this.perLoopCost.get(key) ?? 0) + costDollars);
+  }
+
   /** Total spend across every loop in the tree. */
   totalSpentDollars(): number {
     let total = 0;

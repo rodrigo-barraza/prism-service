@@ -7,6 +7,19 @@
  * planning phase, tool approval/execution, result commit, and the
  * no-tool-call outcome handling — is identical and lives here.
  *
+ * Two rules hold for both (prompt 17, Landing 3):
+ *   - Siblings are generated INDEPENDENTLY: a branch's prompt is the
+ *     turn's committed history plus its own diversity instruction, never a
+ *     sibling's output. Agents that read each other's solutions converge
+ *     within a round (arXiv 2608.23541); GoT's synthesis reads every branch
+ *     only after they are scored.
+ *   - The scorer SELECTS; it does not send work back. It reads previews and
+ *     runs nothing, and a reviewer's reject/redo authority costs tokens
+ *     without improving the result unless it can verify the work
+ *     (arXiv 2609.14767). Redo authority stays with the validators
+ *     (ValidationInterceptor: type-check, lint, parse) — a branch that
+ *     fails them is backtracked, and what failed is fed to the re-branch.
+ *
  * Every function takes a `logLabel` so log lines still identify the
  * calling strategy ("TreeOfThoughts" / "GraphOfThoughts").
  */
@@ -320,6 +333,11 @@ export async function runBeforePromptSetup(
 //  Branch generation with structured diversity
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+/**
+ * One branch, generated from the committed history alone. `failedApproaches`
+ * are branches a VALIDATOR rejected after they ran — never a sibling of this
+ * round, never one the scorer merely rated low.
+ */
 export async function generateBranch(
   harness: BaseAgenticHarness,
   branchIndex: number,
@@ -613,8 +631,19 @@ export async function scoreBranchesMultiCriteria(
   harness: BaseAgenticHarness,
   branches: ScoredBranch[],
   logLabel = "Branching",
+  {
+    absolute = false,
+  }: {
+    /**
+     * The score is compared with a threshold, not with siblings (DFS scores
+     * one sibling at a time): a lone candidate is scored too. Without it a
+     * lone candidate is the winner by default — and DFS accepted its first
+     * sibling at 10/10 whatever the threshold.
+     */
+    absolute?: boolean;
+  } = {},
 ): Promise<ScoredBranch[]> {
-  if (branches.length <= 1) {
+  if (branches.length === 0 || (branches.length === 1 && !absolute)) {
     if (branches[0]) {
       branches[0].score = 10;
       branches[0].criteriaScores = {

@@ -454,11 +454,19 @@ export const PROMPT_DELIMITERS = {
 
 export const ORCHESTRATOR = {
   /**
-   * Maximum RUNNING sub-agents per root conversation (the whole delegation
-   * tree of one user conversation). Counted per conversation so one busy
-   * conversation cannot starve every other one in the process.
+   * Runaway caps on delegation, per ROOT conversation (the whole delegation
+   * tree of one user conversation) — the defaults of Settings →
+   * `subAgentCaps` (orchestrator/SpawnCaps.ts). Counted per conversation so
+   * one busy conversation cannot starve every other one in the process.
+   *   MAX_SUB_AGENTS              — sub-agents RUNNING at once
+   *   MAX_SPAWNS_PER_CONVERSATION — sub-agents started over its life
+   *   MAX_DELEGATION_DEPTH        — how deep delegation nests (root = 0);
+   *                                 bounds the conversation's own
+   *                                 maxRecursionDepth, never raises it
    */
-  MAX_SUB_AGENTS: 10,
+  MAX_SUB_AGENTS: 20,
+  MAX_SPAWNS_PER_CONVERSATION: 200,
+  MAX_DELEGATION_DEPTH: 3,
 
   /**
    * How long a non-blocking create_subagent(s) call waits for its members to
@@ -478,13 +486,6 @@ export const ORCHESTRATOR = {
 
   /** Minimum iterations floor after scope attenuation at deeper recursion depths. */
   MIN_ATTENUATED_ITERATIONS: 5,
-
-  /**
-   * Max total concurrent sub-agents across all recursion depths for a single conversation.
-   * Circuit breaker to prevent exponential agent fan-out from recursive spawning.
-   * Paper reference: Intelligence Entropy (arXiv:2606.18065) — disorder grows exponentially.
-   */
-  MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION: 100,
 
   /**
    * Scope attenuation factor for maxIterations at each recursion depth hop.
@@ -650,11 +651,11 @@ export const HARNESS = {
   /** Default number of parallel branches for ToT / GoT exploration. */
   DEFAULT_BRANCH_COUNT: 3,
 
-  /** Default node value threshold below which branches are pruned. */
+  /**
+   * Score (0–10) a DFS sibling needs to be accepted without drawing the next
+   * one; in GoT, the score a branch needs to feed the synthesis.
+   */
   DEFAULT_VALUE_THRESHOLD: 5.0,
-
-  /** Max proactive backtracks per iteration. */
-  MAX_PROACTIVE_BACKTRACKS: 3,
 
   /** Max backtrack attempts per iteration (ToT-specific). */
   MAX_BACKTRACK_ATTEMPTS_PER_ITERATION: 2,

@@ -243,6 +243,13 @@
       "message": "Update, one or two sentence (max 2000 char)."
     }
   },
+  "ask_oracle": {
+    "description": "Ask stronger model for second opinion on hard choice: design, bug you no understand, shaky plan. Oracle see ONLY what you write — no conversation, no files, no tools — so put all it need in `context` (code, error, what you tried). Oracle no act, only advise; you decide. Cost more than normal step, count against cost budget: use when wrong answer expensive, not routine.",
+    "parameters": {
+      "question": "Question, answerable without this conversation (up to 4000 characters).",
+      "context": "All oracle need: code, errors, constraints, what you tried (up to 24000 characters)."
+    }
+  },
   "wait_for_tasks": {
     "description": "Block until background work finish, return result in place. Wait on async task (run_async_task) and/or sub-agent (create_subagent). No id = wait all running. Bounded by timeoutSeconds.",
     "parameters": {

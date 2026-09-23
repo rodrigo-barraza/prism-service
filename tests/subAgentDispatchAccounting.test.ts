@@ -202,6 +202,41 @@ describe("detached sub-agent dispatch — pendingBackgroundTasks returns to zero
     expect(mockHandleAgent).not.toHaveBeenCalled();
   });
 
+  it("completed into the running turn's mailbox, then returned by wait_for_tasks: the wait is the one delivery", async () => {
+    // Live run 2026-09-22: the team finished while the parent's model was
+    // still generating; the model then called wait_for_tasks, got the
+    // results — and the mailbox entry was drained after the tool batch,
+    // delivering them a second time.
+    TurnInputMailbox.open(CONVERSATION_ID);
+    finish(await dispatchTeam());
+    await vi.waitFor(() => expect(TurnInputMailbox.pendingCount(CONVERSATION_ID)).toBe(1));
+
+    const agentIds = [...OrchestratorService._getActiveSubAgents().keys()];
+    const entries = await OrchestratorService.waitForAgents(agentIds, {
+      timeoutMilliseconds: 1_000,
+      parentAgentConversationId: TURN_ONE,
+    });
+
+    expect(entries.map((entry) => entry.result?.status)).toEqual(["completed", "completed"]);
+    expect(TurnInputMailbox.pendingCount(CONVERSATION_ID)).toBe(0);
+    expect(TurnInputMailbox.drain(CONVERSATION_ID)).toEqual([]);
+  });
+
+  it("wait_for_tasks for part of a team leaves the team's completion in the mailbox", async () => {
+    TurnInputMailbox.open(CONVERSATION_ID);
+    finish(await dispatchTeam());
+    await vi.waitFor(() => expect(TurnInputMailbox.pendingCount(CONVERSATION_ID)).toBe(1));
+
+    const [firstAgentId] = OrchestratorService._getActiveSubAgents().keys();
+    await OrchestratorService.waitForAgents([firstAgentId], {
+      timeoutMilliseconds: 1_000,
+      parentAgentConversationId: TURN_ONE,
+    });
+
+    // The entry also carries the second agent, which the wait did not return.
+    expect(TurnInputMailbox.pendingCount(CONVERSATION_ID)).toBe(1);
+  });
+
   it("counted at turn end, then the user stops the conversation: paid back once, never delivered", async () => {
     await dispatchTeam();
     await endTurn(TURN_ONE);
