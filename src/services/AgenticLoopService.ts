@@ -105,6 +105,11 @@ export default class AgenticLoopService {
 
     // Load any persisted tool state from MongoDB (e.g. after server restart or previous turn)
     await ToolContext.ensureLoaded(resolvedAgentConversationId);
+    // What the run may do at all (a sub-agent's spawn, a scheduled task),
+    // as a live handle a goal's continuation can narrow further — and the
+    // untrusted text the conversation has read, rebuilt from its transcript,
+    // for the taint check. Both in memory only (CapabilityScope, UntrustedSpans).
+    await AgenticLoopService.openRunSafety(context);
 
     // Permission rules resolve here, inside the loop, so every entry point —
     // the chat route, scheduled tasks, conversation timers, sub-agents and
@@ -123,12 +128,6 @@ export default class AgenticLoopService {
         workspaceRoot: context.workspaceRoot,
       });
     }
-
-    // What the run may do at all (a sub-agent's spawn, a scheduled task),
-    // as a live handle a goal's continuation can narrow further — and the
-    // untrusted text the turn has seen, rebuilt from its transcript, for the
-    // taint check. Both in memory only (CapabilityScope, UntrustedSpans).
-    await AgenticLoopService.openRunSafety(context);
 
     // 1. Resolve tools (passing agentConversationId so dynamicEnabledTools is merged)
     let resolvedTools = await AgenticToolResolver.resolve({
