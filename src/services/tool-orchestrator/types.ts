@@ -68,6 +68,8 @@ export interface ToolExecutionContext {
   _maxCostDollars?: number;
   /** Shared cost accumulator threaded through the whole sub-agent tree. */
   _sharedCostBudget?: import("../harnesses/lifecycle/CostBudgetEnforcer.ts").SharedCostBudget;
+  /** The provider call id of a native async tool call (OpenAI async tools). */
+  _nativeAsyncCallId?: string;
 }
 
 export interface TransformedSearchToolsResult {

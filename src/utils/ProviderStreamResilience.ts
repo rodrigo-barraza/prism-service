@@ -35,6 +35,46 @@ const RETRYABLE_ERROR_TYPES = new Set([
   "rate_limit_error",
 ]);
 
+/**
+ * 429s that no amount of waiting clears: a spend cap, an exhausted credit
+ * balance or a usage limit stays until someone changes a billing setting
+ * (OpenAI error codes, 2026-09). They share the status with `slow_down` and
+ * plain rate limits, which DO clear with backoff — so the code decides.
+ */
+const TERMINAL_QUOTA_ERROR_CODES = new Set([
+  "insufficient_quota",
+  "credit_balance_exhausted",
+  "organization_spend_limit_exceeded",
+  "project_spend_limit_exceeded",
+  "organization_usage_limit_exceeded",
+]);
+
+/**
+ * The provider's own error code, wherever the SDK or transport put it: the
+ * error itself (`APIError.code`), its response body (`error.code`), or the
+ * original error a ProviderError wraps.
+ */
+function providerErrorCodes(error: unknown, depth = 0): string[] {
+  if (!error || typeof error !== "object" || depth > 3) return [];
+  const record = error as Record<string, unknown>;
+  const body = record.error as Record<string, unknown> | undefined;
+  const codes = [record.code, body?.code, body?.type, record.type].filter(
+    (code): code is string => typeof code === "string",
+  );
+  if (error instanceof ProviderError && error.originalError) {
+    codes.push(...providerErrorCodes(error.originalError, depth + 1));
+  }
+  return codes;
+}
+
+/**
+ * A quota/billing rejection: terminal, surfaced to the user as is. The
+ * retry wrappers never retry it and a StopFailure hook sees `billing_error`.
+ */
+export function isTerminalQuotaError(error: unknown): boolean {
+  return providerErrorCodes(error).some((code) => TERMINAL_QUOTA_ERROR_CODES.has(code));
+}
+
 /** Classify an error as a transient provider failure worth retrying. */
 export function isTransientProviderError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -42,6 +82,9 @@ export function isTransientProviderError(error: unknown): boolean {
 
   // Deliberate aborts are never retryable
   if (errorRecord.name === "AbortError") return false;
+
+  // A spend cap is a 429 too, but waiting does not clear it.
+  if (isTerminalQuotaError(error)) return false;
 
   const statusCode =
     error instanceof ProviderError

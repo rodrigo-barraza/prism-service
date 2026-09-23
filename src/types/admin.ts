@@ -355,6 +355,8 @@ export interface ChatMessage {
   reasoningItems?: ResponsesReasoningItem[];
   /** OpenAI Responses API `response.id` that produced this message. */
   providerResponseId?: string;
+  /** OpenAI Responses API reasoning effort in effect when this message was produced — where a configuration_update goes on replay. */
+  responsesEffort?: string;
   deleted?: boolean;
   /** Soft rewind-pruned flag — excluded from model context, kept for the UI. */
   pruned?: boolean;

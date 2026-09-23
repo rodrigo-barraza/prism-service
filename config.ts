@@ -60,6 +60,14 @@ export const PRISM_SERVICE_PORT = process.env.PRISM_SERVICE_PORT || 7777;
 
 // ── AI Provider API Keys ───────────────────────────────────────
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+/**
+ * Transport for OpenAI Responses agent turns on models that steer natively
+ * (GPT-6): "websocket" (default — native `response.steer` and incremental
+ * continuation) or "http" (the SSE stream every other model uses).
+ */
+export function openAIResponsesTransport(): "websocket" | "http" {
+  return process.env.OPENAI_RESPONSES_TRANSPORT === "http" ? "http" : "websocket";
+}
 export const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 export const GOOGLE_CLOUD_GEMINI_API_KEY =
   process.env.GOOGLE_CLOUD_GEMINI_API_KEY;

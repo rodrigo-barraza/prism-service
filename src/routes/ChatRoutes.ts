@@ -1432,6 +1432,9 @@ async function handleStreamingText(context: GenerationContext) {
       ...(streamState.providerResponseId
         ? { providerResponseId: streamState.providerResponseId }
         : {}),
+      ...(streamState.responsesEffort
+        ? { responsesEffort: streamState.responsesEffort }
+        : {}),
       // Anthropic thinking blocks — replayed verbatim on the follow-up.
       ...(streamState.thinkingBlocks?.length
         ? { thinkingBlocks: streamState.thinkingBlocks }
@@ -1461,6 +1464,7 @@ async function handleStreamingText(context: GenerationContext) {
     streamState.phase = undefined;
     streamState.reasoningItems = undefined;
     streamState.providerResponseId = undefined;
+    streamState.responsesEffort = undefined;
     streamState.thinkingBlocks = undefined;
     streamState.toolCalls.length = 0;
     const followUpStream = streamWithRetries(
@@ -1546,6 +1550,7 @@ async function handleStreamingText(context: GenerationContext) {
     ...(streamState.phase !== undefined && { phase: streamState.phase }),
     ...(streamState.reasoningItems && streamState.reasoningItems.length > 0 && { reasoningItems: streamState.reasoningItems }),
     ...(streamState.providerResponseId && { providerResponseId: streamState.providerResponseId }),
+    ...(streamState.responsesEffort && { responsesEffort: streamState.responsesEffort }),
     toolCalls: streamState.toolCalls.map(
       (toolCall): ToolCallPayload => ({
         name: toolCall.name,
@@ -1695,6 +1700,7 @@ async function handleNonStreamingText(context: GenerationContext) {
     ...(genResult.phase !== undefined && { phase: genResult.phase }),
     ...(genResult.reasoningItems && genResult.reasoningItems.length > 0 && { reasoningItems: genResult.reasoningItems }),
     ...(genResult.providerResponseId && { providerResponseId: genResult.providerResponseId }),
+    ...(genResult.responsesEffort && { responsesEffort: genResult.responsesEffort }),
     ...(genResult.thinkingBlocks && genResult.thinkingBlocks.length > 0 && { thinkingBlocks: genResult.thinkingBlocks }),
     ...(genResult.refusal && { refusal: genResult.refusal }),
     ...(genResult.servedModel && { servedModel: genResult.servedModel }),

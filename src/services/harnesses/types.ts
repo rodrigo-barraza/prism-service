@@ -52,6 +52,8 @@ export interface ToolCall {
   thoughtSignature?: string;
   /** OpenAI Responses API reasoning output item paired with this function call. */
   reasoningItem?: ResponsesReasoningItem;
+  /** A native async call (OpenAI async tools): its result is returned later on its id. */
+  nativeAsync?: boolean;
   /** Populated by AutoApprovalEngine.checkBatch / the ApprovalGate. */
   _approval?: {
     tier: number | string;
@@ -142,6 +144,8 @@ export interface ConversationMessage {
   reasoningItems?: ResponsesReasoningItem[];
   /** OpenAI Responses API `response.id` that produced this message. */
   providerResponseId?: string;
+  /** OpenAI Responses API reasoning effort in effect when this message was produced — where a configuration_update goes on replay. */
+  responsesEffort?: string;
   images?: string[];
   audio?: string;
   timestamp?: string;
@@ -370,6 +374,10 @@ export interface PassState {
   reasoningItems?: ResponsesReasoningItem[];
   /** OpenAI Responses API `response.id` of this pass. */
   providerResponseId?: string;
+  /** OpenAI Responses API reasoning effort this pass ran at (configuration_update models). */
+  responsesEffort?: string;
+  /** Mid-turn input the provider applied natively during this pass (OpenAI response.steer). */
+  nativeTurnInput?: ConversationMessage[];
   /** Prompt-cache telemetry the adapter reported for this pass's request. */
   requestTelemetry?: RequestTelemetryChunk;
 }
@@ -459,6 +467,11 @@ export interface StreamChunk {
   providerResponseId?: string;
   phase?: ResponsesPhase;
   reasoningItems?: ResponsesReasoningItem[];
+  responsesEffort?: string;
+  // Native steering applied (type: "turnInputApplied")
+  inputIds?: string[];
+  // A native async tool call (type: "toolCall")
+  nativeAsync?: boolean;
   // Prompt-cache telemetry (type: "requestTelemetry")
   prefixHashes?: RequestTelemetryChunk["prefixHashes"];
   cacheDiagnostics?: RequestTelemetryChunk["cacheDiagnostics"];

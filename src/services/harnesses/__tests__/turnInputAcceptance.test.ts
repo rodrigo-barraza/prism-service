@@ -18,6 +18,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import ReActHarness from "../ReActHarness.ts";
 import AgenticLoopState from "#src/services/AgenticLoopState";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
+import NativeSteerRegistry from "#src/services/NativeSteerRegistry";
+import { routeStreamChunk } from "../lifecycle/StreamChunkRouter.ts";
 import { AGENT_DIRECTIVES, TURN_INPUT } from "#src/constants";
 import type {
   AgenticContext,
@@ -495,5 +497,104 @@ describe("TurnInputMailbox acceptance — a running agent receives mid-turn inpu
       accepted: false,
       reason: "no_active_turn",
     });
+  });
+  it("6. an update the provider applied natively (response.steer) is recorded once, ahead of the answer, and never injected again", async () => {
+    const { harness, state, emit, seenMessages, conversationId, iterations } = buildScriptedHarness([
+      { kind: "tool", toolName: "search_web", args: { query: "plan" } },
+      { kind: "text", text: "Plan, with a PURPLE risks section." },
+    ]);
+    TurnInputMailbox.open(conversationId);
+    // The running stream can steer natively and accepts the offer.
+    let answerSteer: ((outcome: "applied" | "fallback") => void) | undefined;
+    const steer = vi.fn().mockImplementation(
+      () => new Promise<"applied" | "fallback">((resolve) => (answerSteer = resolve)),
+    );
+    NativeSteerRegistry.register(conversationId, { steer });
+
+    const scriptedConsume = (harness as any).consumeStream;
+    let inputId = "";
+    (harness as any).consumeStream = vi.fn().mockImplementation(
+      async (stream: unknown, pass: PassState, allowedToolNames: Set<string>) => {
+        if (iterations() === 1) {
+          // Typed while iteration 1 streams; the provider's continuation carries it.
+          inputId = TurnInputMailbox.post(conversationId, {
+            kind: "user_update",
+            text: "Add a risks section that mentions PURPLE",
+          }).id!;
+          expect(TurnInputMailbox.pendingCount(conversationId)).toBe(0);
+          answerSteer!("applied");
+          await routeStreamChunk(harness, { type: "turnInputApplied", inputIds: [inputId] } as never, pass, allowedToolNames);
+          NativeSteerRegistry._clearAll(); // the stream ends with its sender
+        }
+        return scriptedConsume(stream, pass, allowedToolNames);
+      },
+    );
+
+    const { messages } = await harness.run();
+
+    expect(iterations()).toBe(2);
+    expect(steer).toHaveBeenCalledTimes(1);
+    // The second model call sees the update exactly once, BEFORE the
+    // assistant message that already acted on it.
+    const secondInput = seenMessages[1];
+    const updates = secondInput.filter((message) => message._notificationSource === "user-update");
+    expect(updates).toHaveLength(1);
+    expect(updates[0]._nativeSteer).toBe(true);
+    const assistantIndex = secondInput.findIndex(
+      (message) => message.role === "assistant" && (message.toolCalls?.length ?? 0) > 0,
+    );
+    expect(secondInput.indexOf(updates[0])).toBeLessThan(assistantIndex);
+
+    // Acknowledged once, as a native steer.
+    expect(state.turnInputApplied).toBe(1);
+    const turnInputEvents = emit.mock.calls
+      .map((call) => call[0])
+      .filter((event) => event.type === TURN_INPUT.EVENT_TYPE);
+    expect(turnInputEvents).toEqual([
+      expect.objectContaining({ id: inputId, boundary: "native_steer", content: "Add a risks section that mentions PURPLE" }),
+    ]);
+    expect(messages.filter((message) => message._notificationSource === "user-update")).toHaveLength(1);
+    expect(TurnInputMailbox.pendingCount(conversationId)).toBe(0);
+  });
+  it("7. a pass whose only calls are native async ends the turn — unless input is waiting", async () => {
+    const nativeAck = (toolCalls: Array<{ name: string; id: string }>) =>
+      toolResults(toolCalls, {
+        _directive: AGENT_DIRECTIVES.DETACHED_WORK,
+        nativeAsyncCallId: toolCalls[0].id,
+        task: { taskId: "task-1" },
+      });
+
+    // The model already worked past the call inside its response: no second model call.
+    const ended = buildScriptedHarness([
+      { kind: "tool", toolName: "run_async_task", args: { toolName: "lookup_price" } },
+      { kind: "text", text: "never reached" },
+    ]);
+    TurnInputMailbox.open(ended.conversationId);
+    executeToolBatchMock.mockImplementationOnce(async (toolCalls: Array<{ name: string; id: string }>) =>
+      nativeAck(toolCalls),
+    );
+    countRunningTasksMock.mockReturnValue(1); // the lookup is still running
+    const { messages } = await ended.harness.run();
+    expect(ended.iterations()).toBe(1);
+    // The pass's text lives on its tool-call message; nothing appends it again.
+    expect(ended.state.finalStreamedText).toBe("");
+    expect(messages.filter((message) => message.role === "assistant")).toHaveLength(1);
+    // Still running when the turn ended: its completion wakes a new turn.
+    expect(adjustPendingBackgroundTasksMock).toHaveBeenCalledWith(
+      ended.conversationId, "prism-chat", "test-user", 1, expect.anything(),
+    );
+
+    // An update typed during the batch keeps the turn going instead.
+    const kept = buildScriptedHarness([
+      { kind: "tool", toolName: "run_async_task", args: { toolName: "lookup_price" } },
+      { kind: "text", text: "answered the update" },
+    ]);
+    TurnInputMailbox.open(kept.conversationId);
+    executeToolBatchMock.mockImplementationOnce(async (toolCalls: Array<{ name: string; id: string }>) => {
+      TurnInputMailbox.post(kept.conversationId, { kind: "user_update", text: "also EUR" });
+      return nativeAck(toolCalls);
+    });
+    await kept.harness.run();
+    expect(kept.iterations()).toBe(2);
   });
 });

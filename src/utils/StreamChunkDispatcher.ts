@@ -49,6 +49,8 @@ export interface StreamState {
   reasoningItems?: ResponsesReasoningItem[];
   /** OpenAI Responses API `response.id`. */
   providerResponseId?: string;
+  /** OpenAI Responses API reasoning effort in effect (configuration_update models). */
+  responsesEffort?: string;
   /** Anthropic thinking blocks, verbatim and in order. */
   thinkingBlocks?: AnthropicThinkingBlock[];
   /** Anthropic safety-classifier refusal — the streamed text is not an answer. */
@@ -97,6 +99,7 @@ interface StreamChunk {
   characters?: number;
   providerResponseId?: string;
   reasoningItems?: ResponsesReasoningItem[];
+  responsesEffort?: string;
 }
 
 /** Union of all SSE event shapes emitted to the client. */
@@ -418,6 +421,9 @@ export async function dispatchChunk(
       }
       if (chunk.phase !== undefined) {
         state.phase = chunk.phase as ResponsesPhase;
+      }
+      if (chunk.responsesEffort) {
+        state.responsesEffort = chunk.responsesEffort;
       }
       if (chunk.reasoningItems && chunk.reasoningItems.length > 0) {
         state.reasoningItems = [

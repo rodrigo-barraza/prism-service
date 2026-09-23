@@ -71,8 +71,10 @@ import { recordRefusal } from "./lifecycle/RefusalHandler.ts";
 import {
   drainTurnInput,
   hasPendingTurnInput,
+  recordNativeTurnInput,
   sealTurnInput,
 } from "./lifecycle/TurnInputDrain.ts";
+import { resolveLoopKey } from "#src/services/LoopKey";
 import {
   maybeInjectSystemReminder,
   cleanupReminderCache,
@@ -119,6 +121,7 @@ function providerNativeState(pass: PassState) {
     ...(pass.providerResponseId && {
       providerResponseId: pass.providerResponseId,
     }),
+    ...(pass.responsesEffort && { responsesEffort: pass.responsesEffort }),
     // Anthropic: the pass's thinking blocks, verbatim and in order
     ...(pass.thinkingBlocks &&
       pass.thinkingBlocks.length > 0 && { thinkingBlocks: pass.thinkingBlocks }),
@@ -543,7 +546,10 @@ export default class ReActHarness extends BaseAgenticHarness {
         // aborted partial content, inject the rule's reminder as a
         // system message, and regenerate the SAME iteration from the
         // same message state — bounded, then fall through to the
-        // existing post-hoc failure handling.
+        // existing post-hoc failure handling. Input the provider applied
+        // natively during the pass is recorded first, so a regenerated
+        // pass still carries it.
+        recordNativeTurnInput(currentMessages, pass);
         if (pass.deviation) {
           finalizePassTracker(pass, passRequestId);
           this.emitGenerationProgress();
@@ -612,6 +618,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             }
 
             await this.consumeStream(retryStream, retryPass, allowedToolNames);
+            recordNativeTurnInput(currentMessages, retryPass);
 
             finalizePassTracker(retryPass, retryRequestId);
 
@@ -969,6 +976,22 @@ export default class ReActHarness extends BaseAgenticHarness {
             break;
           }
 
+          // Native async calls only (OpenAI async tools): the model already
+          // worked past them inside its response and ended it, so another
+          // model call would have nothing new to answer. Unless input is
+          // waiting, the turn ends here like a text answer — the pass's text
+          // is already on the message just pushed — and each result comes
+          // back later as its call's output (mailbox or a new turn).
+          if (
+            results.length > 0 &&
+            results.every((r) => (r.result as { nativeAsyncCallId?: string } | null)?.nativeAsyncCallId) &&
+            !hasPendingTurnInput(context)
+          ) {
+            state.finalStreamedText = "";
+            hasCleanTextBreak = true;
+            break;
+          }
+
           // Input that arrived during the tool batch is observed together
           // with the tool results, before the next model call.
           drainTurnInput(currentMessages, state, context, "after_tools");
@@ -1272,5 +1295,10 @@ export default class ReActHarness extends BaseAgenticHarness {
       // bookkeeping that later fires SessionEnd when the conversation idles.
       await closeTurnHooks(context, hooks, state, turnHooks);
     }
+  }
+
+  /** The mailbox key: input applied natively mid-stream is recorded by this loop. */
+  protected nativeTurnInputKey(): string | undefined {
+    return resolveLoopKey(this.context) || undefined;
   }
 }

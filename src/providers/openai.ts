@@ -6,13 +6,18 @@ import { ProviderError } from "#src/utils/errors";
 import logger from "#src/utils/logger";
 import { extractOpenAIRateLimits } from "#src/utils/rateLimits";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { OPENAI_API_KEY, OPENAI_TRANSCRIPTION_MODEL } from "#config";
+import {
+  OPENAI_API_KEY,
+  OPENAI_TRANSCRIPTION_MODEL,
+  openAIResponsesTransport,
+} from "#config";
 import {
   MODALITY_TYPES,
   MODELS,
   DEFAULT_VOICES,
   getDefaultModels,
   getModelByName,
+  getModelNativeCapabilities,
 } from "#src/config";
 import {
   convertToolsToOpenAI,
@@ -32,6 +37,13 @@ import {
 } from "#src/utils/media";
 import { getDocumentContextText } from "#src/utils/documentContext";
 import { LOG_PREVIEW } from "#src/constants";
+import { mergeUsage } from "#src/utils/CostCalculator";
+import { ASYNC_TASK_TOOL_NAMES } from "#src/services/AsyncTaskConstants";
+import {
+  TURN_INPUT_APPLIED_EVENT,
+  isResponsesSocketTransportFailure,
+  openResponsesSocketStream,
+} from "#src/providers/openai-responses-socket";
 
 import type { ToolSchema } from "#src/services/harnesses/types";
 import {
@@ -93,6 +105,35 @@ export function normalizeOpenAICacheDiagnostics(
     comparedResponseId,
     raw,
   };
+}
+
+/** When the socket last failed to connect: HTTP until this passes. */
+let responsesSocketUnavailableUntil = 0;
+const RESPONSES_SOCKET_RETRY_MILLISECONDS = 5 * 60_000;
+
+function markResponsesSocketUnavailable(error: unknown): void {
+  responsesSocketUnavailableUntil = Date.now() + RESPONSES_SOCKET_RETRY_MILLISECONDS;
+  logger.warn(
+    `[OpenAI/WS] Responses WebSocket unavailable (${(error as Error)?.message ?? error}) — streaming over HTTP for ${RESPONSES_SOCKET_RETRY_MILLISECONDS / 60_000} min`,
+  );
+}
+
+/**
+ * The loop key to stream a request over the Responses WebSocket with, or
+ * null for HTTP: a turn that can take native steering (`turnInputKey`), on
+ * a model that steers, with the transport enabled and reachable.
+ */
+function responsesSocketKey(model: string, options: ProviderOptions): string | null {
+  if (!options.turnInputKey) return null;
+  if (!getModelNativeCapabilities(model).steering) return null;
+  if (openAIResponsesTransport() !== "websocket") return null;
+  if (Date.now() < responsesSocketUnavailableUntil) return null;
+  return options.turnInputKey;
+}
+
+/** Tests: forget a socket failure. */
+export function resetResponsesSocketAvailability(): void {
+  responsesSocketUnavailableUntil = 0;
 }
 
 function useResponsesAPI(model: string): boolean {
@@ -180,6 +221,10 @@ export interface OpenAIMessage {
   reasoningItems?: ResponsesReasoningItem[];
   /** Responses API `response.id` that produced this message. */
   providerResponseId?: string;
+  /** Reasoning effort in effect for the response that produced this message. */
+  responsesEffort?: string;
+  /** A completion delivered for this native async call id (replayed as its output). */
+  asyncCallId?: string;
 }
 
 /**
@@ -601,6 +646,8 @@ function responsesStopReason(response: unknown): string | undefined {
     incomplete_details?: { reason?: string } | null;
   } | null;
   const reason = record?.incomplete_details?.reason;
+  // Steered: interrupted by a steer; its continuation follows on the stream.
+  if (reason === "steered") return undefined;
   if (reason === "content_filter") return "content_filter";
   if (reason === "max_output_tokens" || record?.status === "incomplete") {
     return "length";
@@ -613,7 +660,10 @@ export function normalizeResponsesUsage(
     | {
         input_tokens?: number;
         output_tokens?: number;
-        input_tokens_details?: { cached_tokens?: number };
+        input_tokens_details?: {
+          cached_tokens?: number;
+          cache_write_tokens?: number;
+        };
         output_tokens_details?: { reasoning_tokens?: number };
       }
     | null
@@ -624,10 +674,17 @@ export function normalizeResponsesUsage(
     outputTokens: rawUsage?.output_tokens ?? 0,
   };
 
+  // input_tokens counts every prompt token; the cache read and (GPT-6) cache
+  // write buckets are carved out of it, since they bill at their own rates.
   const cachedTokens = rawUsage?.input_tokens_details?.cached_tokens;
   if (cachedTokens && cachedTokens > 0) {
     usage.cacheReadInputTokens = cachedTokens;
     usage.inputTokens = Math.max(0, (usage.inputTokens ?? 0) - cachedTokens);
+  }
+  const cacheWriteTokens = rawUsage?.input_tokens_details?.cache_write_tokens;
+  if (cacheWriteTokens && cacheWriteTokens > 0) {
+    usage.cacheCreationInputTokens = cacheWriteTokens;
+    usage.inputTokens = Math.max(0, (usage.inputTokens ?? 0) - cacheWriteTokens);
   }
 
   const reasoningTokens = rawUsage?.output_tokens_details?.reasoning_tokens;
@@ -804,6 +861,14 @@ export function effortForModel(
 ): string | undefined {
   if (!effort) return undefined;
   const modelDefinition = getModelByName(model);
+  // "none" is thinking off, never a listed level: a model that can switch
+  // thinking off takes it (gpt-6-sol/luna); one that cannot, rejects it.
+  if (
+    effort === "none" &&
+    (modelDefinition as { canDisableThinking?: boolean } | null)?.canDisableThinking === true
+  ) {
+    return "none";
+  }
   const levels =
     modelDefinition && "thinkingLevels" in modelDefinition
       ? ((modelDefinition as { thinkingLevels?: string[] }).thinkingLevels ?? [])
@@ -812,6 +877,211 @@ export function effortForModel(
   // OpenAI-compatible passthroughs never listed levels).
   if (levels.length === 0) return effort;
   return levels.includes(effort) ? effort : undefined;
+}
+
+/**
+ * How a request expresses its reasoning effort on a model that takes
+ * `configuration_update` items (the GPT-6 family).
+ *
+ * The request-level `reasoning.effort` is part of the cached prefix, so it
+ * stays pinned to the conversation's FIRST recorded effort; every later
+ * change is a `{type:"configuration_update", reasoning:{effort}}` input item
+ * — before the user message that brought it, or at the end of the input for
+ * a change mid-turn. Each assistant message records the effort its response
+ * ran at (`responsesEffort`), so a replay puts every earlier update back at
+ * the position it was first sent: the prefix of every earlier request is
+ * reproduced byte for byte and the cache holds across effort changes.
+ *
+ * Measured live on gpt-6-luna (2026-09-22): the item takes effect in a
+ * stateless replay (top-level none + update high → 1,327 reasoning tokens),
+ * is accepted before a user message, after a function_call_output and at the
+ * end of the input, and two adjacent updates are a 400 — adjacent changes
+ * collapse to the later one here.
+ */
+export interface ResponsesEffortPlan {
+  /** `reasoning.effort` at the top of the request. */
+  requestEffort: string | undefined;
+  /** The effort this request runs at — the sampling gate and what the message records. */
+  effectiveEffort: string | undefined;
+  /** Update items to insert, keyed by the message index they go before (length = append). */
+  updates: Map<number, string>;
+}
+
+export function planResponsesEffort(
+  model: string,
+  messages: OpenAIMessage[],
+  requestedEffort: string | undefined,
+): ResponsesEffortPlan {
+  const current = effortForModel(model, requestedEffort);
+  const noUpdates: ResponsesEffortPlan = {
+    requestEffort: current,
+    effectiveEffort: current,
+    updates: new Map(),
+  };
+  if (!current || !getModelNativeCapabilities(model).configurationUpdate) {
+    return noUpdates;
+  }
+  // A recorded effort counts only if this model accepts it (a conversation
+  // that switched models may carry another model's vocabulary).
+  const recordedEffort = (message: OpenAIMessage): string | undefined =>
+    message.role === "assistant" &&
+    typeof message.responsesEffort === "string" &&
+    effortForModel(model, message.responsesEffort) === message.responsesEffort
+      ? message.responsesEffort
+      : undefined;
+  const baseline = messages.map(recordedEffort).find(Boolean);
+  if (!baseline) return noUpdates;
+
+  // Where a change that first shows on the message at `index` was sent:
+  // before the first user message since the previous assistant message,
+  // else at the end of that request's input (= right before `index`).
+  const insertionPoint = (afterAssistant: number, index: number): number => {
+    for (let position = afterAssistant + 1; position < index; position++) {
+      if (messages[position].role === "user") return position;
+    }
+    return index;
+  };
+
+  const updates = new Map<number, string>();
+  let effective = baseline;
+  let lastAssistant = -1;
+  messages.forEach((message, index) => {
+    if (message.role !== "assistant") return;
+    const effort = recordedEffort(message);
+    if (effort && effort !== effective) {
+      updates.set(insertionPoint(lastAssistant, index), effort);
+      effective = effort;
+    }
+    lastAssistant = index;
+  });
+  if (current !== effective) {
+    updates.set(insertionPoint(lastAssistant, messages.length), current);
+  }
+  return { requestEffort: baseline, effectiveEffort: current, updates };
+}
+
+function configurationUpdateItem(effort: string): OpenAI.Responses.ResponseInputItem {
+  return {
+    type: "configuration_update",
+    reasoning: { effort },
+  } as unknown as OpenAI.Responses.ResponseInputItem;
+}
+
+/**
+ * The Responses input for `messages` with the plan's configuration_update
+ * items in place. `convert` turns a run of messages into input items
+ * (prepareResponsesInput, which converts every message on its own, so a
+ * split at an update point changes nothing else).
+ */
+export function withConfigurationUpdates(
+  messages: OpenAIMessage[],
+  updates: Map<number, string>,
+  convert: (run: OpenAIMessage[]) => OpenAI.Responses.ResponseInputItem[],
+): OpenAI.Responses.ResponseInputItem[] {
+  if (updates.size === 0) return convert(messages);
+  const result: OpenAI.Responses.ResponseInputItem[] = [];
+  let start = 0;
+  for (const index of [...updates.keys()].sort((left, right) => left - right)) {
+    result.push(...convert(messages.slice(start, index)));
+    result.push(configurationUpdateItem(updates.get(index)!));
+    start = index;
+  }
+  result.push(...convert(messages.slice(start)));
+  return result;
+}
+
+/**
+ * The effort a request asks for: thinking switched off is effort "none" on
+ * a model that takes it (the routes drop `reasoningEffort` then); anything
+ * else is the requested effort.
+ */
+function requestedResponsesEffort(model: string, options: ProviderOptions): string | undefined {
+  if (options.thinkingEnabled === false && effortForModel(model, "none") === "none") {
+    return "none";
+  }
+  return options.reasoningEffort;
+}
+
+/** Whether a response's effort is recorded on its message (configuration_update models). */
+function recordsResponsesEffort(
+  model: string,
+  effort: string | undefined,
+): effort is string {
+  return !!effort && getModelNativeCapabilities(model).configurationUpdate;
+}
+
+/**
+ * Async tool calling (GPT-6 Astra and later): Prism's detached dispatch —
+ * `run_async_task`, which the model keeps working past — is declared
+ * `"async": true`, so the call does not pause the model's response and its
+ * result is returned later as a `function_call_output` on the call's id.
+ * Not with programmatic tool calling (incompatible, per the async tools
+ * guide); not on models without the flag.
+ */
+export function markNativeAsyncTools(
+  tools: OpenAI.Responses.Tool[] | undefined,
+  model: string,
+): void {
+  if (!tools?.length || !getModelNativeCapabilities(model).asyncTools) return;
+  if (tools.some((tool) => (tool as { type: string }).type === "programmatic_tool_calling")) return;
+  for (const tool of tools) {
+    if (tool.type === "function" && tool.name === ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK) {
+      (tool as unknown as { async: boolean }).async = true;
+    }
+  }
+}
+
+/** A run_async_task acknowledgement of a native async call (the tool's own result). */
+function nativeAsyncAckCallId(message: OpenAIMessage): string | undefined {
+  if (message.role !== "tool" || typeof message.content !== "string") return undefined;
+  if (!message.content.includes('"nativeAsyncCallId"')) return undefined;
+  try {
+    const parsed = JSON.parse(message.content) as { nativeAsyncCallId?: unknown };
+    return parsed.nativeAsyncCallId === message.tool_call_id
+      ? (parsed.nativeAsyncCallId as string)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The replay of native async calls on a model that takes them: the call
+ * stays pending (its immediate acknowledgement is not sent — measured live,
+ * a pending async call replays fine without an output), and the completion
+ * that arrives later (a message carrying `asyncCallId`) becomes that call's
+ * `function_call_output` where it was delivered. On any other model the
+ * history is unchanged: the acknowledgement is the call's output and the
+ * completion a <task-notification> message, as for every provider.
+ */
+export function replayNativeAsyncCalls(
+  messages: OpenAIMessage[],
+  model: string,
+): OpenAIMessage[] {
+  if (!getModelNativeCapabilities(model).asyncTools) return messages;
+  const pending = new Set<string>();
+  let changed = false;
+  const replayed: OpenAIMessage[] = [];
+  for (const message of messages) {
+    const ackCallId = nativeAsyncAckCallId(message);
+    if (ackCallId) {
+      pending.add(ackCallId);
+      changed = true;
+      continue;
+    }
+    if (message.asyncCallId && pending.has(message.asyncCallId)) {
+      pending.delete(message.asyncCallId);
+      changed = true;
+      replayed.push({
+        role: "tool",
+        tool_call_id: message.asyncCallId,
+        content: message.content ?? "",
+      });
+      continue;
+    }
+    replayed.push(message);
+  }
+  return changed ? replayed : messages;
 }
 
 /**
@@ -1059,7 +1329,9 @@ const openaiProvider = {
     model: string,
     options: ProviderOptions,
   ) {
-    const input = prepareResponsesInput(messages);
+    messages = replayNativeAsyncCalls(messages, model);
+    const effortPlan = planResponsesEffort(model, messages, requestedResponsesEffort(model, options));
+    const input = withConfigurationUpdates(messages, effortPlan.updates, prepareResponsesInput);
     const payload: OpenAI.Responses.ResponseCreateParamsNonStreaming & {
       seed?: number;
       frequency_penalty?: number;
@@ -1074,11 +1346,12 @@ const openaiProvider = {
         options.promptCacheKey;
     }
 
-    // Reasoning
+    // Reasoning — the request-level effort stays pinned on configuration_update
+    // models (planResponsesEffort); `effort` is the one this request runs at.
     const reasoning: Reasoning = {};
-    const effort = effortForModel(model, options.reasoningEffort);
-    if (effort) {
-      reasoning.effort = effort as ReasoningEffort;
+    const effort = effortPlan.effectiveEffort;
+    if (effortPlan.requestEffort) {
+      reasoning.effort = effortPlan.requestEffort as ReasoningEffort;
     }
     if (options.reasoningSummary) {
       reasoning.summary = options.reasoningSummary as
@@ -1142,9 +1415,10 @@ const openaiProvider = {
       payload.previous_response_id = options.previousResponseId;
     }
 
-    // Temperature/topP only work with reasoning.effort=none — and only when
-    // the model actually accepted "none" (gpt-6-astra rejects it with a 400
-    // and takes no sampling parameters at all).
+    // Temperature/topP only work at effort none — the effort in effect, after
+    // any configuration_update (live: top-level none + update high rejects
+    // temperature) — and only when the model accepts "none" at all
+    // (gpt-6-astra rejects it with a 400 and takes no sampling parameters).
     if (effort === "none") {
       if (options.temperature !== undefined)
         payload.temperature = options.temperature;
@@ -1172,6 +1446,7 @@ const openaiProvider = {
         ...customTools,
       ];
     }
+    markNativeAsyncTools(payload.tools as OpenAI.Responses.Tool[] | undefined, model);
 
     // Parallel tool calls — defaults to true; set false for sequential FC
     if (options.parallelToolCalls === false) {
@@ -1207,6 +1482,7 @@ const openaiProvider = {
       name: string;
       args: Record<string, unknown>;
       reasoningItem?: ResponsesReasoningItem;
+      nativeAsync?: boolean;
     }> = [];
     // Track pending reasoning items to pair with subsequent function calls;
     // whatever is left unpaired belongs to the message itself.
@@ -1244,6 +1520,7 @@ const openaiProvider = {
             ...(pairedReasoningItem
               ? { reasoningItem: pairedReasoningItem }
               : {}),
+            ...((item as { async?: boolean }).async ? { nativeAsync: true } : {}),
           });
         }
       }
@@ -1257,6 +1534,7 @@ const openaiProvider = {
     if (toolCalls.length > 0) result.toolCalls = toolCalls;
     if (rateLimits) result.rateLimits = rateLimits;
     if (response.id) result.providerResponseId = response.id;
+    if (recordsResponsesEffort(model, effort)) result.responsesEffort = effort;
     if (phase !== undefined) result.phase = phase;
     if (pendingReasoningItems.length > 0) {
       result.reasoningItems = pendingReasoningItems;
@@ -1445,7 +1723,9 @@ const openaiProvider = {
     model: string,
     options: ProviderOptions,
   ) {
-    const input = prepareResponsesInput(messages);
+    messages = replayNativeAsyncCalls(messages, model);
+    const effortPlan = planResponsesEffort(model, messages, requestedResponsesEffort(model, options));
+    const input = withConfigurationUpdates(messages, effortPlan.updates, prepareResponsesInput);
     const payload: OpenAI.Responses.ResponseCreateParamsStreaming & {
       seed?: number;
       frequency_penalty?: number;
@@ -1460,11 +1740,12 @@ const openaiProvider = {
         options.promptCacheKey;
     }
 
-    // Reasoning
+    // Reasoning — the request-level effort stays pinned on configuration_update
+    // models (planResponsesEffort); `effort` is the one this request runs at.
     const reasoning: Reasoning = {};
-    const effort = effortForModel(model, options.reasoningEffort);
-    if (effort) {
-      reasoning.effort = effort as ReasoningEffort;
+    const effort = effortPlan.effectiveEffort;
+    if (effortPlan.requestEffort) {
+      reasoning.effort = effortPlan.requestEffort as ReasoningEffort;
     }
     if (options.reasoningSummary) {
       reasoning.summary = options.reasoningSummary as
@@ -1528,9 +1809,10 @@ const openaiProvider = {
       payload.previous_response_id = options.previousResponseId;
     }
 
-    // Temperature/topP only work with reasoning.effort=none — and only when
-    // the model actually accepted "none" (gpt-6-astra rejects it with a 400
-    // and takes no sampling parameters at all).
+    // Temperature/topP only work at effort none — the effort in effect, after
+    // any configuration_update (live: top-level none + update high rejects
+    // temperature) — and only when the model accepts "none" at all
+    // (gpt-6-astra rejects it with a 400 and takes no sampling parameters).
     if (effort === "none") {
       if (options.temperature !== undefined)
         payload.temperature = options.temperature;
@@ -1558,6 +1840,7 @@ const openaiProvider = {
         ...customTools,
       ];
     }
+    markNativeAsyncTools(payload.tools as OpenAI.Responses.Tool[] | undefined, model);
 
     // Parallel tool calls — defaults to true; set false for sequential FC
     if (options.parallelToolCalls === false) {
@@ -1596,12 +1879,38 @@ const openaiProvider = {
       `[OpenAI/Responses] Sending stream payload: ${JSON.stringify(payload)}`,
     );
 
-    const createResponseStream = () =>
-      getClient()
+    // GPT-6 agent turns stream over the Responses WebSocket (native
+    // steering, incremental continuation); the SSE request is the fallback
+    // when the socket is busy or cannot connect.
+    const socketKey = responsesSocketKey(model, options);
+    const createResponseStream = async (): Promise<{
+      data: AsyncIterable<OpenAI.Responses.ResponseStreamEvent>;
+      response: Response | null;
+    }> => {
+      if (socketKey) {
+        try {
+          const socketEvents = await openResponsesSocketStream(
+            socketKey,
+            payload as unknown as Record<string, unknown> & { input: unknown[] },
+            { signal: options.signal, steering: true, client: getClient },
+          );
+          if (socketEvents) {
+            return {
+              data: socketEvents as unknown as AsyncIterable<OpenAI.Responses.ResponseStreamEvent>,
+              response: null,
+            };
+          }
+        } catch (error: unknown) {
+          if (!isResponsesSocketTransportFailure(error)) throw error;
+          markResponsesSocketUnavailable(error);
+        }
+      }
+      return getClient()
         .responses.create(payload, {
           ...(options.signal && { signal: options.signal }),
         })
         .withResponse();
+    };
     let createdStream: Awaited<ReturnType<typeof createResponseStream>>;
     try {
       createdStream = await createResponseStream();
@@ -1628,12 +1937,14 @@ const openaiProvider = {
     const { data: streamData, response: rawStreamResponse } = createdStream;
     const rateLimits = extractOpenAIRateLimits(rawStreamResponse, model);
     let promptCacheDiagnostics: unknown;
-    let usage = null;
+    // Summed over the responses of one stream (a steer's continuation is a
+    // second response on the same socket stream).
+    let usage: TokenUsage | null = null;
     // Track function names from output_item.added events; the arguments.done
     // event may not include the name property (known OpenAI SDK issue).
     const pendingFunctions: Record<
       string,
-      { name: string; callId: string; args: string }
+      { name: string; callId: string; args: string; nativeAsync?: boolean }
     > = {};
     // Track reasoning output items so we can pair them with subsequent function calls.
     // The Responses API emits reasoning items before their paired function_call items.
@@ -1647,6 +1958,15 @@ const openaiProvider = {
     let phase: ResponsesPhase | undefined;
     for await (const event of streamData) {
       if (options.signal?.aborted) break;
+      // Native steering applied mid-stream: the harness records the inputs
+      // the continuation now starting carries.
+      if ((event as { type: string }).type === TURN_INPUT_APPLIED_EVENT) {
+        yield {
+          type: "turnInputApplied",
+          inputIds: (event as unknown as { inputIds: string[] }).inputIds,
+        };
+        continue;
+      }
       // Response id — the handle for stateful continuation
       if (event.type === "response.created") {
         const typedEvent = event as OpenAI.Responses.ResponseCreatedEvent;
@@ -1719,6 +2039,8 @@ const openaiProvider = {
               name: item.name,
               callId: item.call_id,
               args: "",
+              // A native async call: the model keeps going past it.
+              ...((item as { async?: boolean }).async ? { nativeAsync: true } : {}),
             };
             if (item.name && item.call_id) {
               yield {
@@ -1819,6 +2141,7 @@ const openaiProvider = {
           ...(pairedReasoningItem
             ? { reasoningItem: pairedReasoningItem }
             : {}),
+          ...(tracked?.nativeAsync ? { nativeAsync: true } : {}),
         };
         // Clean up
         delete pendingFunctions[typedEvent.item_id];
@@ -1836,7 +2159,8 @@ const openaiProvider = {
           | OpenAI.Responses.ResponseCompletedEvent
           | OpenAI.Responses.ResponseIncompleteEvent;
         if (typedEvent.response?.usage) {
-          usage = normalizeResponsesUsage(typedEvent.response.usage);
+          const responseUsage = normalizeResponsesUsage(typedEvent.response.usage);
+          usage = usage ? (mergeUsage(usage, responseUsage) as TokenUsage) : responseUsage;
         }
         if (typedEvent.response?.id) {
           providerResponseId = typedEvent.response.id;
@@ -1871,6 +2195,7 @@ const openaiProvider = {
         yield {
           type: "providerState",
           ...(providerResponseId ? { providerResponseId } : {}),
+          ...(recordsResponsesEffort(model, effort) ? { responsesEffort: effort } : {}),
           ...(phase !== undefined ? { phase } : {}),
           ...(pendingReasoningItems.length > 0
             ? { reasoningItems: pendingReasoningItems.splice(0) }

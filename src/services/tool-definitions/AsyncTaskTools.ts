@@ -32,6 +32,8 @@ type SubAgentResult = import("#src/types/orchestrator").SubAgentResult;
 type RuntimeToolContext = InternalToolContext & {
   signal?: AbortSignal;
   requestId?: string;
+  /** Set when the model made this a native async call (OpenAI async tools). */
+  _nativeAsyncCallId?: string;
 };
 
 
@@ -155,7 +157,11 @@ const runAsyncTask = {
         ? (toolArguments.toolArguments as Record<string, unknown>)
         : {};
 
-    const continueWorking = toolArguments.continueWorking === true;
+    // A native async call (OpenAI async tools): the model is already
+    // working past it inside its response, and the result goes back on the
+    // call's own id — keep-working semantics, whatever the argument says.
+    const nativeAsyncCallId = (context as RuntimeToolContext)._nativeAsyncCallId;
+    const continueWorking = toolArguments.continueWorking === true || !!nativeAsyncCallId;
 
     const agentConversationId = context.agentConversationId;
 
@@ -267,6 +273,7 @@ const runAsyncTask = {
       }
 
       const dispatchedTask = dispatchResult as AsyncTaskState;
+      if (nativeAsyncCallId) dispatchedTask.nativeCallId = nativeAsyncCallId;
 
       logger.info(
         `[AsyncTaskTools] Dispatched async task ${dispatchedTask.taskId}: tool="${toolName}"${continueWorking ? " (continueWorking)" : ""}`,
@@ -278,6 +285,9 @@ const runAsyncTask = {
         // bumps pendingBackgroundTasks so the completion can wake a new turn.
         return {
           _directive: AGENT_DIRECTIVES.DETACHED_WORK,
+          // The provider replays a native async call as pending, without
+          // this acknowledgement, until the completion arrives on the id.
+          ...(nativeAsyncCallId ? { nativeAsyncCallId } : {}),
           task: {
             taskId: dispatchedTask.taskId,
             toolName: dispatchedTask.toolName,
@@ -840,6 +850,8 @@ export async function deliverTaskCompletion(
           _notificationSource: NOTIFICATION_SOURCES.ASYNC_TASK,
           _notificationId: notification.notificationId,
           taskId: taskState.taskId,
+          // A native async call's result, returned on its call id.
+          ...(taskState.nativeCallId ? { asyncCallId: taskState.nativeCallId } : {}),
         },
       });
       if (posted.accepted) {
@@ -1034,6 +1046,7 @@ async function triggerAsyncTaskAutoResponse(
     _alreadyPersisted: true,
     _notificationSource: NOTIFICATION_SOURCES.ASYNC_TASK,
     _notificationId: notification.notificationId,
+    ...(taskState.nativeCallId ? { asyncCallId: taskState.nativeCallId } : {}),
   };
 
   // Persist the completion message

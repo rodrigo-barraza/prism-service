@@ -127,6 +127,7 @@ export default class AgenticLoopState {
   phase?: "commentary" | "final_answer" | null;
   reasoningItems?: Array<{ id: string; summary: Array<{ type: string; text: string }>; encrypted_content?: string }>;
   providerResponseId?: string;
+  responsesEffort?: string;
   /** Anthropic thinking blocks of the final pass (reset with each pass). */
   thinkingBlocks?: AnthropicThinkingBlock[];
   /** Set when a safety classifier declined the turn; stored on the final message. */

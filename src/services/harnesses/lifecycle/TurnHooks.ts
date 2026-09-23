@@ -8,6 +8,7 @@ import {
 import { extractLatestUserMessageText } from "#src/utils/ConversationUtilities";
 import { estimateTokens } from "#src/utils/CostCalculator";
 import { ProviderError } from "#src/utils/errors";
+import { isTerminalQuotaError } from "#src/utils/ProviderStreamResilience";
 import { COLLECTIONS, HOOKS } from "#src/constants";
 import {
   buildHookPayload,
@@ -645,6 +646,8 @@ export function classifyStopFailure(error: unknown): string {
   );
   const message = String(record.message ?? "");
 
+  // A spend cap shares 429 with rate limits but is a billing state, not a wait.
+  if (isTerminalQuotaError(error)) return "billing_error";
   if (status === 429 || type === "rate_limit_error") return "rate_limit";
   if (status === 529 || type === "overloaded_error") return "overloaded";
   if (status === 401 || status === 403 || type === "authentication_error" || type === "permission_error") {

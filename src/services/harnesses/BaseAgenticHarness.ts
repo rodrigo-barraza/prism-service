@@ -704,6 +704,15 @@ export default class BaseAgenticHarness {
   }
 
   /**
+   * The loop key under which a provider may apply mid-turn input natively
+   * (OpenAI `response.steer`). Undefined here: only a harness that records
+   * the `turnInputApplied` chunk's inputs (ReActHarness) opts in.
+   */
+  protected nativeTurnInputKey(): string | undefined {
+    return undefined;
+  }
+
+  /**
    * Create an LLM text stream from the provider.
    * Handles liveAPI fallback, message expansion, and dynamic output
    * token clamping to prevent context window overflow.
@@ -813,6 +822,8 @@ export default class BaseAgenticHarness {
     const providerOptions = {
       ...clampedPassOptions,
       signal,
+      // Set when this harness records input a provider applies mid-stream.
+      turnInputKey: this.nativeTurnInputKey(),
       // Stable per-conversation prompt-cache key (used by OpenAI as
       // prompt_cache_key for cache-shard routing; ignored elsewhere).
       promptCacheKey:
@@ -1644,6 +1655,7 @@ export default class BaseAgenticHarness {
         ...(state.phase !== undefined && { phase: state.phase }),
         ...(state.reasoningItems && state.reasoningItems.length > 0 && { reasoningItems: state.reasoningItems }),
         ...(state.providerResponseId && { providerResponseId: state.providerResponseId }),
+        ...(state.responsesEffort && { responsesEffort: state.responsesEffort }),
         ...(state.thinkingBlocks && state.thinkingBlocks.length > 0 && { thinkingBlocks: state.thinkingBlocks }),
         ...(state.refusal && { refusal: state.refusal }),
         compactionBoundary: state.compactionBoundary,
@@ -1679,6 +1691,7 @@ export default class BaseAgenticHarness {
       ...(state.phase !== undefined && { phase: state.phase }),
       ...(state.reasoningItems && state.reasoningItems.length > 0 && { reasoningItems: state.reasoningItems }),
       ...(state.providerResponseId && { providerResponseId: state.providerResponseId }),
+      ...(state.responsesEffort && { responsesEffort: state.responsesEffort }),
       ...(state.thinkingBlocks && state.thinkingBlocks.length > 0 && { thinkingBlocks: state.thinkingBlocks }),
       ...(state.refusal && { refusal: state.refusal }),
       ...(state.streamedThinking.trim() && {
