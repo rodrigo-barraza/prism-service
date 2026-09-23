@@ -11,6 +11,9 @@ approvals and cost as a conversation in the web UI, and it appears in the web UI
   pinned to `1.5.0`.
 - **The Prism side:** the event protocol in [`protocol.md`](protocol.md). The server reads
   `TurnEvent`s through `src/protocol/events.ts` and never raw records.
+- **The other direction** — Prism as the ACP *client*, delegating a sub-agent to an
+  external agent such as Claude Code or Codex — is
+  [below](#prism-as-an-acp-client-external-agents-as-sub-agents).
 
 ## Run it
 
@@ -152,3 +155,180 @@ reports no cost, and background work such as memory extraction.
   which the SDK's zod accepts loosely, and only stable session updates are allowed.
 - `src/acp/__tests__/acpSupport.test.ts` covers configuration, SSE frame parsing and
   prompt conversion.
+
+## Prism as an ACP client: external agents as sub-agents
+
+A custom agent can run on an external ACP agent instead of Prism's own loop. Candidates
+are Claude Code (through its ACP adapter), Codex (through `codex-acp`), Gemini CLI
+(`--experimental-acp`), or any other program that speaks ACP v1 on stdio. The parent spawns
+it like any sub-agent, with `create_subagent` and the agent's name. Prism starts the agent
+as a process in the sub-agent's worktree and acts as its ACP client. The parent sees an
+ordinary sub-agent:
+
+- live events and tool calls;
+- approval cards;
+- a report, merged back like any sub-agent's work.
+
+It is the `acp` external runtime in `HarnessRegistry` (`src/services/harnesses/AcpAgentRuntime.ts`).
+The orchestrator selects it with `options.runtime`, never `options.harness`, so a request
+cannot pick it.
+
+### Define one
+
+It must be a stored custom agent (`POST` / `PUT /custom-agents`):
+
+```json
+{
+  "name": "Claude Code",
+  "description": "Claude Code, for changes that need its own tools.",
+  "runtime": "acp",
+  "acp": {
+    "command": "npx",
+    "args": ["-y", "@zed-industries/claude-code-acp"],
+    "envAllowlist": ["ANTHROPIC_API_KEY"]
+  }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `runtime` | `"acp"`. `"prism"`, or no value, means Prism's own loop. |
+| `acp.command` | The program to start, without a shell (one line). |
+| `acp.args` | Its argv (up to 64 one-line strings). |
+| `acp.envAllowlist` | The names of prism-service's environment variables the process may see. Names only; values are never stored. |
+| `acp.owner` | Set by the route to whoever wrote the configuration. A value the client sends is ignored. |
+
+**Owner-only.** The agent is a process prism-service starts on its own host, with its
+privileges and no OS sandbox (#14). So, like a command hook, it is limited to the usernames
+in `PRISM_ACP_AGENT_OWNERS` (comma-separated; empty means nobody):
+
+- **Writing a definition.** Only those users may write `runtime: "acp"` or an `acp` object;
+  anyone else gets a 403. Switching back to `runtime: "prism"` narrows, so anyone may.
+- **Running it.** It runs only in a turn of one of those users, and only while its
+  configuration's `owner` is still one of them. Both are checked again before every run.
+
+A `.prism/agents` or `.claude/agents` file that names a `runtime` or `acp` is rejected: a
+workspace file never starts a process.
+
+### Where it runs
+
+- **In its own git worktree, always.** This is the sub-agent's Prism worktree (tools-service
+  creates it). A resumed agent whose worktree was merged back gets a fresh one for the run.
+  If no worktree can be created, the sub-agent fails; it never falls back to the shared
+  workspace. When the run ends, the worktree is committed and merged back like every
+  sub-agent's (a conflict keeps the branch).
+- **On the prism-service host.** It runs in the directory tools-service created, so the two
+  services must share that filesystem: the worktree base (`WORKTREE_DIR`, default
+  `/tmp/prism-worktrees`) has to exist for both. If it does not, the run fails, naming the
+  missing path.
+- **Environment.** The base variables, plus the allowlisted names, and nothing else:
+  - `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`;
+  - the locale: `LANG`, `LANGUAGE`, `LC_ALL`, `LC_CTYPE`;
+  - `TERM` and `TZ`;
+  - the temp and XDG directories;
+  - the Windows equivalents.
+
+  prism-service's own environment holds every secret the vault serves, and none of it is
+  passed.
+- **Sign-in.** The agent signs in with its own credentials on that host (in its `HOME`, as
+  the user prism-service runs as). Prism does not authenticate agents. If an agent answers
+  `session/new` with `auth_required`, the run fails with a message saying so.
+
+### What maps to what
+
+| ACP (the agent) | Prism (the sub-agent) |
+|---|---|
+| `initialize` | v1. The client has no file system and no terminal capabilities: the agent works on its worktree itself. An agent that answers another protocol version is refused. |
+| `session/new` | `cwd` = the worktree, no MCP servers. If Prism is in plan mode and the agent has a mode called `plan`, that mode is selected. A switch of the parent's mode into or out of plan mode follows it while the agent runs. |
+| `session/prompt` | The orchestrator's context for the run, then the task. For a continuation, the earlier runs' transcript comes before the task (up to 20,000 characters): every run starts a fresh process and session. Each follow-up the parent sends to the running sub-agent (`send_subagent_message`) goes in as the next prompt. |
+| `agent_message_chunk` / `agent_thought_chunk` | `chunk` / `thinking`. A link becomes a Markdown link and an image an `image` event. |
+| `tool_call`, `tool_call_update` | `tool_execution` (`calling`, then `done` or `error`), plus `tool_output` for the output as it grows. The tool name is the agent's programmatic name, else its title. `args` = `{title, kind, input, locations}`, and the result is `{output}` or `{error}`. On the parent stream these arrive as `sub_agent_tool_execution` / `sub_agent_tool_output`. |
+| `plan` | `todo_update`. |
+| `usage_update` with a `cost` | `usage_update` with `estimatedCost`. Only a cost in USD is counted; any other currency leaves the cost unknown (and says so). |
+| `notice`, `current_mode_update` | A `status` notice naming the agent. |
+| Stop reason | `end_turn`: the run's report is its last message. `max_tokens`, `max_turn_requests` and `refusal` are said in a notice. `cancelled`: open calls are closed as failed. |
+
+The transcript is persisted to the sub-agent's conversation the way a ReAct loop's is: one
+assistant message per step, each step's tool results as `tool` messages, and the report
+last. One `requests` row records the run: provider `acp`, model = the agent's name. The
+sub-agent shows as provider `acp`, with the agent's name as its model.
+
+### Permission requests
+
+Each `session/request_permission` becomes an ordinary approval card of the sub-agent's
+loop. It is recorded in `pending_decisions`, shown on the parent's stream with the
+sub-agent's tags, and listed in the needs-you inbox. The card carries
+`requestedBy: "external_agent"`, a `reason` naming the agent and the call, and a diff
+preview when the agent attached one. It is decided through `POST /agent/approve` like any
+other card, and the answer goes back as the option the agent offered:
+
+- **allow** → `allow_once`;
+- **auto-approve this conversation** → `allow_always`, and the run's later requests are
+  allowed;
+- **deny** → `reject_once`.
+
+Requests are put to the person one at a time. The arguments are the agent's own, so they
+cannot be edited (400), and "Always allow…" rules are not offered: Prism's rules do not
+reach the agent's tools.
+
+**Never auto-approved by default.** Prism cannot see what an external agent's call will do,
+because its tool kinds are the agent's own labels. So `default`, `acceptEdits`, `auto` and
+"approve all" (autoApprove, full auto) all put the card to a person. What answers without
+one:
+
+- **`plan` mode** denies anything that is not reading (read, search, think).
+- **A run nobody watches** (`dontAsk`, a scheduled task or a timer) denies.
+- **`bypass` mode** allows. It is owner-only and chosen per conversation.
+
+Configured hooks (`PermissionRequest`, `Notification`) do not run for these requests.
+
+### Cost
+
+If the agent reports a cost in USD (`usage_update.cost`, cumulative for its session), Prism
+uses it in four places:
+
+- the sub-agent's cost;
+- its `requests` row, so the conversation's totals include it;
+- the delegation tree's budget. When the cap is reached, the prompt is cancelled
+  (`cost_limit_reached`).
+- the completion, which carries it as `estimatedCost`.
+
+If the agent reports no cost, the cost is **unknown**, not zero. The completion carries
+`costUnknown: true` (with `estimatedCost: null`), prism-client's sub-agents panel says
+"cost unknown", and the conversation's totals leave it out.
+
+### Stop, crashes and timeouts
+
+- **A stop** (the parent's stop button, `stop_subagent`) does four things:
+  - sends `session/cancel`;
+  - answers an open permission request `cancelled` and lapses its card;
+  - gives the agent 5 s to answer its prompt `cancelled`;
+  - ends the process and its whole process group: first stdin EOF, then SIGTERM, then
+    SIGKILL.
+- **A process that dies**, cannot be started (`ENOENT`) or breaks the protocol fails the
+  sub-agent with a clean error. The error names what happened (`exited with code 3 during
+  the prompt`, `could not be started (ENOENT)`) and quotes the tail of its stderr. The
+  parent sees the sub-agent `failed` with that error.
+- **Timeouts.** `initialize` has 120 s (an `npx` agent may be downloading) and `session/new`
+  has 60 s. The prompt itself has none, like any Prism turn: stop it.
+
+### Tests
+
+- `src/acp/__tests__/acpClientRuntime.test.ts` runs the real `AgenticLoopService` →
+  `AcpAgentRuntime` against a real process: `src/acp/__tests__/fixtures/fakeAcpAgent.ts`, a
+  small agent on the same SDK. It covers:
+  - the mapped events, each validated against the protocol;
+  - persistence;
+  - permission bridging through `POST /agent/approve` (allow, deny, allow always, a refused
+    edit, autoApprove still asking, and each mode);
+  - cancel, including with an open card;
+  - a crash, a missing command, sign-in and version errors;
+  - the environment allowlist;
+  - follow-ups, continuations, the cost cap, and who may run it.
+- `tests/acpSubAgentSpawn.test.ts` covers the parent's view, through the real
+  `create_subagent`: the `acp` provider, tool events, the tagged approval card,
+  `costUnknown`, a crash as `failed`, and no worktree as `failed`.
+- `src/acp/__tests__/updateTranslator.test.ts` covers the pure mapping.
+- `src/services/agents/__tests__/agentRuntime.test.ts` covers configuration, the environment
+  and the file-agent rejection.
+- `tests/customAgentsAcpRuntimeRoutes.test.ts` covers the owner-only routes.

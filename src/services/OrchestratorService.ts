@@ -53,6 +53,8 @@ import {
   type SubAgentSummary,
 } from "./orchestrator/SubAgentResultBuilder.ts";
 import { SubAgentTelemetryEmitter } from "./orchestrator/SubAgentTelemetryEmitter.ts";
+import { acpRunMessages, ensureAcpWorktree } from "./orchestrator/AcpSubAgentRun.ts";
+import { ACP_RUNTIME } from "./agents/AgentRuntime.ts";
 import { evictIdleSecondaryModel } from "./orchestrator/VramEvictionPolicy.ts";
 import { SubAgentIdGenerator } from "./orchestrator/SubAgentIdGenerator.ts";
 import { getTopologyPromptSummary } from "./orchestrator/TopologyRegistry.ts";
@@ -544,11 +546,19 @@ export class OrchestratorService {
 
     // The definition's model pin outranks the parent's model and any
     // instance a router assigned. (Its effort and maxTurns apply per run,
-    // in _runSubAgentLoop — so a resume honours them too.)
-    const pinnedModel = pinnedSubAgentModel(
-      AgentPersonaRegistry.resolve(subAgentAgentType),
-      subAgentProvider,
-    );
+    // in _runSubAgentLoop — so a resume honours them too.) An external ACP
+    // agent runs on no Prism model at all: it shows as the `acp` provider,
+    // with the agent's name for its model.
+    const subAgentDefinition = AgentPersonaRegistry.resolve(subAgentAgentType);
+    const isAcpAgent = subAgentDefinition?.runtime === ACP_RUNTIME;
+    const pinnedModel = isAcpAgent ? null : pinnedSubAgentModel(subAgentDefinition, subAgentProvider);
+    if (isAcpAgent) {
+      if (localModelQueue.isLocal(subAgentProvider)) {
+        InstanceLoadBalancer.releaseReservation(subAgentProvider);
+      }
+      subAgentProvider = ACP_RUNTIME;
+      subAgentModel = subAgentDefinition!.name;
+    }
     if (pinnedModel) {
       if (pinnedModel.providerName !== subAgentProvider && localModelQueue.isLocal(subAgentProvider)) {
         // The local instance a router (or the selection above) reserved
@@ -603,6 +613,7 @@ export class OrchestratorService {
       totalRounds,
       recursionDepth: currentRecursionDepth + 1,
       rootConversationId: concurrencyRootId,
+      ...(isAcpAgent && { runtime: ACP_RUNTIME }),
       thinkingEnabled,
       reasoningEffort: routing.effort ?? reasoningEffort,
       // A token budget is an Anthropic knob of the parent's model; a
@@ -2428,6 +2439,12 @@ export class OrchestratorService {
       );
     }
 
+    // A custom agent on the `acp` runtime is an external agent process.
+    if (AgentPersonaRegistry.resolve(subAgent.agent)?.runtime === ACP_RUNTIME) {
+      subAgent.runtime = ACP_RUNTIME;
+      return OrchestratorService._runAcpSubAgentLoop(subAgent, prompt, orchestratorContext, preserveWorktree);
+    }
+
     // Build the sub-agent's initial messages
     const commitInstructions = subAgent.isolated
       ? `- Commit your changes when done and report what you accomplished`
@@ -2923,10 +2940,143 @@ export class OrchestratorService {
       subAgentMode?.dispose();
     }
 
+    await OrchestratorService._finishSubAgentRun(subAgent, orchestratorContext, {
+      loopResult,
+      fallbackMessages: subAgentMessages,
+      telemetry,
+      reportModeHandle: subAgentMode?.handle ?? orchestratorContext.permissionMode,
+      preserveWorktree,
+    });
+  }
+
+  /**
+   * A sub-agent run delegated to an external ACP agent (HarnessRegistry's
+   * `acp` runtime, harnesses/AcpAgentRuntime), through AgenticLoopService
+   * like any other run. Always in a worktree of its own (ensureAcpWorktree);
+   * the parent's approval mode, narrowed by the agent's definition, decides
+   * what its permission requests do; its events reach the parent through
+   * the same telemetry; the run ends like every other (_finishSubAgentRun).
+   */
+  static async _runAcpSubAgentLoop(
+    subAgent: SubAgentState,
+    prompt: string,
+    orchestratorContext: OrchestratorContext,
+    preserveWorktree: boolean,
+  ): Promise<void> {
+    const { default: AgenticLoopService } = await OrchestratorService.getAgenticLoopService();
+    await ensureAcpWorktree(subAgent);
+    const runMessages = acpRunMessages(subAgent, prompt, formatParentFollowUp);
+    subAgent.lastWorkspacePath = subAgent.worktreePath ?? undefined;
+
+    const telemetry = new SubAgentTelemetryEmitter({
+      subAgentId: subAgent.agentId,
+      subAgentDescription: subAgent.description,
+      subAgentConversationId: subAgent.subAgentConversationId,
+      parentEmit: orchestratorContext.emit,
+      parentConversationId: orchestratorContext.agentConversationId,
+      recursionDepth: (orchestratorContext.recursionDepth ?? 0) + 1,
+    });
+
+    const definition = AgentPersonaRegistry.resolve(subAgent.agent);
+    const parentModeHandle = orchestratorContext.permissionMode;
+    const approval = resolveSubAgentApproval(
+      {
+        autoApprove: orchestratorContext.autoApprove === true,
+        permissionMode:
+          parentModeHandle?.mode ?? OrchestratorService._callerPermissionMode(orchestratorContext),
+      },
+      definition?.permissionMode,
+    );
+    const subAgentMode = parentModeHandle
+      ? subAgentModeHandle(parentModeHandle, orchestratorContext.autoApprove === true, definition?.permissionMode)
+      : null;
+    subAgent.permissionMode = approval.permissionMode;
+    subAgent.partial = false;
+
+    let loopResult: { messages?: ConversationMessage[] } | undefined;
+    try {
+      loopResult = await AgenticLoopService.runAgenticLoop({
+        // An external runtime calls no Prism provider.
+        provider: null as unknown as LLMProvider,
+        providerName: ACP_RUNTIME,
+        resolvedModel: subAgent.resolvedModel,
+        modelDefinition: null,
+        messages: runMessages,
+        options: {
+          runtime: ACP_RUNTIME,
+          isSubAgent: true,
+          agenticLoopEnabled: true,
+          autoApprove: approval.autoApprove,
+          ...(approval.permissionMode && { permissionMode: approval.permissionMode }),
+          ...(subAgentMode && { _permissionMode: subAgentMode.handle }),
+          ...(orchestratorContext.sharedCostBudget
+            ? { _sharedCostBudget: orchestratorContext.sharedCostBudget }
+            : {}),
+        },
+        agentConversationId: subAgent.subAgentConversationId,
+        parentAgentConversationId: subAgent.parentAgentConversationId,
+        conversationId: subAgent.subAgentConversationId,
+        parentConversationId: subAgent.parentConversationId,
+        traceId: subAgent.traceId,
+        project: subAgent.project,
+        username: subAgent.username,
+        agent: subAgent.agent,
+        requestId: crypto.randomUUID(),
+        requestStart: performance.now(),
+        emit: telemetry.createEmitFunction(),
+        signal: subAgent.abortController?.signal,
+        workspaceRoot: subAgent.worktreePath,
+      });
+    } catch (error: unknown) {
+      if (subAgent.abortController?.signal.aborted) {
+        subAgent.status = SYSTEM_STATUSES.STOPPED;
+      } else {
+        if (!preserveWorktree && subAgent.isolated) {
+          ToolOrchestratorService._clearWorktree(subAgent.subAgentConversationId);
+        }
+        throw error;
+      }
+    } finally {
+      subAgentMode?.dispose();
+    }
+
+    await OrchestratorService._finishSubAgentRun(subAgent, orchestratorContext, {
+      loopResult,
+      fallbackMessages: runMessages,
+      telemetry,
+      reportModeHandle: subAgentMode?.handle ?? orchestratorContext.permissionMode,
+      preserveWorktree,
+    });
+  }
+
+  /**
+   * The end of a sub-agent run, whoever ran it (Prism's loop or an external
+   * runtime): its report and transcript, its worktree settled, its cost and
+   * completion reported, its terminal state persisted.
+   */
+  static async _finishSubAgentRun(
+    subAgent: SubAgentState,
+    orchestratorContext: OrchestratorContext,
+    {
+      loopResult,
+      fallbackMessages,
+      telemetry,
+      reportModeHandle,
+      preserveWorktree,
+    }: {
+      loopResult: { messages?: ConversationMessage[] } | undefined;
+      /** The run's initial messages — the transcript when the loop did not return. */
+      fallbackMessages: ConversationMessage[];
+      telemetry: SubAgentTelemetryEmitter;
+      /** The permission mode that reads the report (auto mode reviews it). */
+      reportModeHandle: OrchestratorContext["permissionMode"];
+      preserveWorktree: boolean;
+    },
+  ): Promise<void> {
     // Capture the full conversation from the loop (includes all assistant
     // responses, tool calls, and results). Falls back to the initial
-    // subAgentMessages on error/abort paths where the loop didn't return.
-    const finalMessages = loopResult?.messages || subAgentMessages;
+    // messages on error/abort paths where the loop didn't return.
+    const finalMessages = loopResult?.messages || fallbackMessages;
 
     // Capture output using a robust fallback chain:
     // 1. Last assistant message from the harness's returned conversation
@@ -2945,7 +3095,6 @@ export class OrchestratorService {
     // Auto mode reads the report before the parent does (its task was read
     // at spawn and each of its actions as it ran): a flagged report arrives
     // with a security warning on top (AutoModeGate).
-    const reportModeHandle = subAgentMode?.handle ?? orchestratorContext.permissionMode;
     if (reportModeHandle?.mode === "auto" && subAgent.status !== SYSTEM_STATUSES.STOPPED && subAgent.output) {
       const { reviewedSubAgentReport } = await import("./harnesses/lifecycle/AutoModeGate.ts");
       subAgent.output = await reviewedSubAgentReport({
@@ -2988,6 +3137,8 @@ export class OrchestratorService {
     subAgent.usage = telemetry.usage;
     if (telemetry.iterations != null)
       subAgent.iterations = telemetry.iterations;
+    // An external agent that reported no cost: unknown, not free.
+    subAgent.costUnknown = subAgent.runtime === ACP_RUNTIME && subAgent.totalCost === null;
 
     // Notify frontend immediately so the per-sub-agent StatusBar updates
     // from "Generating..." to a completed state.
@@ -2995,6 +3146,7 @@ export class OrchestratorService {
       subAgent.durationMilliseconds,
       subAgent.usage || null,
       subAgent.totalCost || null,
+      { costUnknown: subAgent.costUnknown },
     );
 
     // Release the per-instance reservation (synchronous counter)
@@ -3030,6 +3182,8 @@ export class OrchestratorService {
         subAgentTotalCost: subAgent.totalCost,
         subAgentHasChanges: (subAgent.diff?.files.length ?? 0) > 0,
         subAgentToolNames: toolNamesSummary,
+        ...(subAgent.runtime && { subAgentRuntime: subAgent.runtime }),
+        ...(subAgent.costUnknown && { subAgentCostUnknown: true }),
       },
     });
 
@@ -3039,11 +3193,14 @@ export class OrchestratorService {
     }
 
     // ── VRAM eviction for secondary instances ──────────────────
-    await evictIdleSecondaryModel(
-      subAgent,
-      orchestratorContext.providerName,
-      activeSubAgents,
-    );
+    // (An external runtime loaded no model on any instance.)
+    if (!subAgent.runtime) {
+      await evictIdleSecondaryModel(
+        subAgent,
+        orchestratorContext.providerName,
+        activeSubAgents,
+      );
+    }
   }
 
   // ── Router Completion Notification ──────────────────────────

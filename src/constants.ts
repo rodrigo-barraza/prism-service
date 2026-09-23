@@ -168,6 +168,12 @@ export const APPROVALS = {
   PREVIEW_MAXIMUM_DIFF_CHARACTERS: 40_000,
   /** File-write previews: reading the current file must not stall the gate. */
   PREVIEW_TIMEOUT_MILLISECONDS: 5_000,
+  /**
+   * `requestedBy` of a card an external ACP agent asked for (its
+   * `session/request_permission`, harnesses/AcpAgentRuntime). Its arguments
+   * are the agent's own, so it cannot be edited — only allowed or denied.
+   */
+  EXTERNAL_AGENT_REQUESTED_BY: "external_agent",
 } as const;
 
 /**
