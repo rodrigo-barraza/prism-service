@@ -43,7 +43,7 @@ describe("GET /config/agents — coreToolsLocked field", () => {
     }
   });
 
-  it("returns only the mood-triggered tools in enabledByDefaultToolNames for LUPOS — the rest available but not enabled", async () => {
+  it("returns only the tools pre-flight cannot reach in time in enabledByDefaultToolNames for LUPOS — the rest available but not enabled", async () => {
     const response = await authenticatedGet("/config/agents").expect(200);
     const agents = response.body as AgentConfigResponse[];
 
@@ -59,14 +59,20 @@ describe("GET /config/agents — coreToolsLocked field", () => {
     // the moments they exist for. generate_image too: an edit of a picture
     // already in the channel — the commonest image request, about half his
     // traffic — names no drawing verb, and 73% of image turns spent a model
-    // call discovering it (lupos-persona-fixes). Everything else in his
-    // availableTools is reachable via innate discovery, not enabled by default.
+    // call discovering it (lupos-persona-fixes). And the two lookups his own
+    // prompt sends him to — get_discord_user_profile (the Discord IDs block)
+    // and search_discord_messages (the Discord History section) — so obeying
+    // it costs no discovery round (lupos-agent-hardening). Everything else in
+    // his availableTools is reachable via innate discovery, not enabled by
+    // default.
     expect(lupos!.enabledByDefaultToolNames).toEqual([
       "react_to_discord_message",
       "get_discord_gold_balance",
       "give_discord_gold",
       "mug_discord_gold",
       "generate_image",
+      "get_discord_user_profile",
+      "search_discord_messages",
     ]);
   });
 });

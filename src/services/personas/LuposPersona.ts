@@ -1,5 +1,10 @@
 import { AGENT_IDS, DISCORD_GUILDS } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { DOMAIN_KEY_TAGS, TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
+import {
+  DOMAIN_KEY_TAGS,
+  LOCAL_TOOL_NAMES,
+  TOOL_NAMES,
+} from "#src/services/ToolTaxonomyConstants";
+import { ASYNC_TASK_TOOL_NAMES } from "#src/services/AsyncTaskConstants";
 import { type Persona, type ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
 import PromptLocaleService from "#src/services/PromptLocaleService";
@@ -250,8 +255,6 @@ const LUPOS_AVAILABLE_TOOLS = [
   DOMAIN_KEY_TAGS.MOVIES,
   DOMAIN_KEY_TAGS.WEB,
   DOMAIN_KEY_TAGS.CORE_HARNESS,
-  DOMAIN_KEY_TAGS.CORE_SKILL,
-  DOMAIN_KEY_TAGS.CORE_TASK,
   // Community surface — all-text or Discord-attachable domains
   DOMAIN_KEY_TAGS.KNOWLEDGE, // youtube/anime/books/dictionary/classifieds/trim_video…
   DOMAIN_KEY_TAGS.CREATIVE, // image gen/edit, emoji kitchen, QR, TTS, remixing…
@@ -298,6 +301,42 @@ const LUPOS_DISCORD_INCOMPATIBLE_TOOLS = [
   TOOL_NAMES.CREATE_ARTIFACT,
   TOOL_NAMES.UPDATE_ARTIFACT,
   TOOL_NAMES.LIST_ARTIFACTS,
+];
+
+// Core harness tools a Discord reply never uses. coreToolsLocked hands every
+// system:true core tool to the first iteration, so before this list his
+// iteration 1 carried ~45 tools — the handful of defaults plus ~40 core
+// harness/skill/task/discovery schemas, ≈13K tokens re-sent on every reply.
+// Each reply is a fresh one-shot conversation, and 30 days of his traffic
+// (2026-08-23 → 09-22) called exactly one of them: execute_python, 10 times.
+// save_memory, datastores, skills, tasks, goals, programs and async tasks:
+// zero. What stays is what a chat answer can use — read_url, search_web,
+// the python/js sandboxes, evaluate_expression, retrieve_offloaded_content,
+// think (dropped by the resolver under native thinking) and discovery.
+const LUPOS_UNUSED_CORE_HARNESS_TOOLS = [
+  TOOL_NAMES.SAVE_MEMORY,
+  TOOL_NAMES.SLEEP,
+  TOOL_NAMES.EMIT_STRUCTURED_OUTPUT,
+  LOCAL_TOOL_NAMES.WRITE_DATASTORE,
+  LOCAL_TOOL_NAMES.QUERY_DATASTORE,
+  LOCAL_TOOL_NAMES.DELETE_DATASTORE,
+  TOOL_NAMES.WRITE_TODO,
+  TOOL_NAMES.SUMMARIZE_CONVERSATION,
+  TOOL_NAMES.SEARCH_CONVERSATIONS,
+  TOOL_NAMES.COMPACT_CONTEXT,
+  LOCAL_TOOL_NAMES.CHECKPOINT,
+  LOCAL_TOOL_NAMES.REWIND,
+  ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
+  ASYNC_TASK_TOOL_NAMES.LIST_ASYNC_TASKS,
+  ASYNC_TASK_TOOL_NAMES.CANCEL_ASYNC_TASK,
+  ASYNC_TASK_TOOL_NAMES.WAIT_FOR_TASKS,
+  LOCAL_TOOL_NAMES.READ_PROJECT_INSTRUCTIONS,
+  LOCAL_TOOL_NAMES.UPDATE_PROJECT_INSTRUCTIONS,
+  LOCAL_TOOL_NAMES.EDIT_PROJECT_INSTRUCTIONS,
+  LOCAL_TOOL_NAMES.RUN_TOOL_PROGRAM,
+  LOCAL_TOOL_NAMES.SET_GOAL,
+  LOCAL_TOOL_NAMES.UPDATE_GOAL,
+  LOCAL_TOOL_NAMES.CLEAR_GOAL,
 ];
 
 // ────────────────────────────────────────────────────────────
@@ -363,6 +402,11 @@ export const LuposPersona: Persona = {
     DOMAIN_KEY_TAGS.CORE_SCHEDULE,
     DOMAIN_KEY_TAGS.CORE_USER,
     DOMAIN_KEY_TAGS.CORE_PLAN,
+    // Skills and tasks: coding-agent scaffolding, 0 calls in 30 days of
+    // Discord replies (see LUPOS_UNUSED_CORE_HARNESS_TOOLS).
+    DOMAIN_KEY_TAGS.CORE_SKILL,
+    DOMAIN_KEY_TAGS.CORE_TASK,
+    ...LUPOS_UNUSED_CORE_HARNESS_TOOLS,
     DOMAIN_KEY_TAGS.SKILLS,
     DOMAIN_KEY_TAGS.CONTROL,
     DOMAIN_KEY_TAGS.TASKS,
@@ -377,10 +421,11 @@ export const LuposPersona: Persona = {
   // Core tools only on the first iteration — everything in
   // LUPOS_AVAILABLE_TOOLS is available but NOT enabled, reachable via
   // innate discovery or pre-flight (same shape as Omni). The exceptions
-  // are the tools whose trigger is emotional rather than lexical:
-  // pre-flight matches the catalog against the user's message text, so a
-  // tool that fires on being insulted or charmed — words that never name
-  // it — is unreachable in exactly the moments it exists for.
+  // are the tools pre-flight cannot find in time: it matches the catalog
+  // against the user's message text, so a tool that fires on being
+  // insulted or charmed — words that never name it — is unreachable in
+  // exactly the moments it exists for, and a tool his own prompt tells him
+  // to call should not cost a discovery round to obey.
   //   - react_to_discord_message replaces lupos-bot's old unconditional
   //     per-reply emoji reaction.
   //   - The gold trio backs the Gold Rules policy section: mugging keys
@@ -394,12 +439,21 @@ export const LuposPersona: Persona = {
   //     to match. Left to discovery, 73% of image turns (2026-08-23 →
   //     09-22) spent a whole model call on discover_and_enable_tools
   //     first: 18% of his iteration cost, several seconds each.
+  //   - get_discord_user_profile is what his own Discord IDs block and
+  //     Participant Context section tell him to call for anyone beyond the
+  //     one-line roster; left to discovery, following that instruction
+  //     cost a discovery round first.
+  //   - search_discord_messages answers "what did X say" / "who said Y",
+  //     the channel's commonest lookup, and gates the Discord History
+  //     section that teaches its count/compact modes.
   enabledByDefaultTools: [
     "react_to_discord_message",
     "get_discord_gold_balance",
     "give_discord_gold",
     "mug_discord_gold",
     "generate_image",
+    "get_discord_user_profile",
+    "search_discord_messages",
   ],
   capabilities: "",
   hasSomaticState: true,

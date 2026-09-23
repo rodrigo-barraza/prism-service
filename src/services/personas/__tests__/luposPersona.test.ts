@@ -99,4 +99,27 @@ describe("Lupos persona default tools", () => {
   it("can draw on the first iteration without a discovery round", () => {
     expect(defaultEnabledTools).toContain("generate_image");
   });
+
+  // His Discord IDs block and the Participant Context section send him to
+  // get_discord_user_profile for anyone beyond the one-line roster, and the
+  // Discord History section to search_discord_messages. An instruction to
+  // call a tool that discovery must first enable costs a model call to obey.
+  it.each(["get_discord_user_profile", "search_discord_messages"])(
+    "starts with %s, which his own prompt tells him to call",
+    (toolName) => {
+      expect(defaultEnabledTools).toContain(toolName);
+    },
+  );
+
+  it.each(["en", "caveman"])(
+    "renders the participant and history guidance on a turn that discovered nothing (%s)",
+    (locale) => {
+      const policy = buildColdStartPolicy(locale);
+      for (const toolName of ["get_discord_user_profile", "search_discord_messages"]) {
+        expect(policy).toContain(toolName);
+      }
+      expect(policy).toContain("get_discord_user_profile(guildId, userId)");
+      expect(policy).toContain("## search_discord_messages");
+    },
+  );
 });
