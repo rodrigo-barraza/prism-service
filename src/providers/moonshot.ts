@@ -23,7 +23,7 @@ import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { PROVIDERS } from "#src/constants";
 import { MODALITY_TYPES, getDefaultModels, getModelByName } from "#src/config";
-import { MOONSHOT_API_KEY, MOONSHOT_BASE_URL, moonshotTransport } from "#config";
+import { MOONSHOT_API_KEY, MOONSHOT_BASE_URL } from "#config";
 import anthropicProvider from "#src/providers/anthropic";
 import { onKimiEndpoint, streamOnKimiEndpoint } from "#src/providers/moonshot-anthropic";
 import { getModelProfile } from "#src/providers/ModelProfiles";
@@ -44,7 +44,7 @@ import {
   hashChatPrefix,
   requestTelemetryChunk,
 } from "#src/utils/PromptPrefixHashes";
-import { TOOL_LOADING_MODES } from "#src/providers/toolLoading";
+import { TOOL_LOADING_MODES, usesKimiAnthropicEndpoint } from "#src/providers/toolLoading";
 
 const DEFAULT_BASE_URL = "https://api.moonshot.ai/v1";
 
@@ -66,17 +66,6 @@ function authHeaders(): Record<string, string> {
     throw new ProviderError("moonshot", "MOONSHOT_API_KEY is not set", 401);
   }
   return { Authorization: `Bearer ${MOONSHOT_API_KEY}` };
-}
-
-/**
- * Kimi K3 goes through Moonshot's Anthropic-compatible endpoint and the
- * Anthropic adapter (moonshot-anthropic.ts): top-level cache_control, signed
- * thinking, effort low|high|max. MOONSHOT_TRANSPORT=openai keeps it on the
- * Chat Completions path below, as every other Kimi model is.
- */
-function usesAnthropicEndpoint(model: string): boolean {
-  const definition = getModelByName(model) as { anthropicCompatible?: boolean } | null;
-  return definition?.anthropicCompatible === true && moonshotTransport() === "anthropic";
 }
 
 /** Anthropic-adapter options for a Kimi call: Kimi has no Files API. */
@@ -187,7 +176,11 @@ const moonshotProvider = {
     options: ProviderOptions = {},
   ): Promise<GenerateTextResult> {
     logger.provider("Moonshot", `generateText model=${model}`);
-    if (usesAnthropicEndpoint(model)) {
+    // Kimi K3 goes through Moonshot's Anthropic-compatible endpoint and the
+    // Anthropic adapter (moonshot-anthropic.ts): top-level cache_control,
+    // signed thinking, effort low|high|max. MOONSHOT_TRANSPORT=openai keeps
+    // it on the Chat Completions path below, as every other Kimi model is.
+    if (usesKimiAnthropicEndpoint(model)) {
       return onKimiEndpoint(options, () =>
         anthropicProvider.generateText(messages, model, anthropicOptions(options)),
       ) as Promise<GenerateTextResult>;
@@ -248,7 +241,7 @@ const moonshotProvider = {
     options: ProviderOptions = {},
   ) {
     logger.provider("Moonshot", `generateTextStream model=${model}`);
-    if (usesAnthropicEndpoint(model)) {
+    if (usesKimiAnthropicEndpoint(model)) {
       yield* streamOnKimiEndpoint(options, () =>
         anthropicProvider.generateTextStream(messages, model, anthropicOptions(options)),
       );

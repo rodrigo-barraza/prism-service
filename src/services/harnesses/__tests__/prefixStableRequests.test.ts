@@ -373,10 +373,10 @@ type ScriptTurn =
  * reports the cleared size). No cap = no report, so the harness estimates.
  */
 const reportedInputTokens = vi.hoisted(() => ({ capByProvider: {} as Record<string, number> }));
-function inputTokensFor(provider: string): number {
-  const cap = reportedInputTokens.capByProvider[provider];
+function inputTokensFor(adapter: AdapterCase): number {
+  const cap = reportedInputTokens.capByProvider[adapter.provider];
   if (!cap) return 0;
-  const sent = captured[provider as "anthropic" | "openai" | "google" | "vllm" | "moonshot"];
+  const sent = rawRequests(adapter);
   const lastRequest = sent[sent.length - 1];
   return Math.min(cap, Math.ceil(JSON.stringify(lastRequest ?? {}).length / 4));
 }
@@ -385,17 +385,24 @@ interface AdapterCase {
   id: string;
   provider: string;
   model: string;
+  /** The API the request goes out on ("chat": Chat Completions over fetch). */
+  wire: "anthropic" | "openai" | "google" | "chat";
   /** Tools activated mid-loop are reached through `tool_call` on this adapter. */
   bridged: boolean;
+  /** Environment for the case (restored after it). */
+  env?: Record<string, string>;
 }
 
 const ADAPTERS: AdapterCase[] = [
-  { id: "anthropic (tool_addition)", provider: "anthropic", model: "claude-opus-5-5", bridged: false },
-  { id: "anthropic (tool_reference)", provider: "anthropic", model: "claude-sonnet-5", bridged: false },
-  { id: "openai (additional_tools)", provider: "openai", model: "gpt-6-astra", bridged: false },
-  { id: "moonshot (system tools)", provider: "moonshot", model: "kimi-k3", bridged: false },
-  { id: "google (bridge)", provider: "google", model: "gemini-3.6-flash", bridged: true },
-  { id: "vllm (bridge)", provider: "vllm", model: "qwen-test", bridged: true },
+  { id: "anthropic (tool_addition)", provider: "anthropic", wire: "anthropic", model: "claude-opus-5-5", bridged: false },
+  { id: "anthropic (tool_reference)", provider: "anthropic", wire: "anthropic", model: "claude-sonnet-5", bridged: false },
+  { id: "openai (additional_tools)", provider: "openai", wire: "openai", model: "gpt-6-astra", bridged: false },
+  // Kimi K3's default wire is its Anthropic-compatible endpoint (no
+  // defer_loading, tool_reference or mid-conversation system message).
+  { id: "moonshot (anthropic endpoint, bridge)", provider: "moonshot", wire: "anthropic", model: "kimi-k3", bridged: true },
+  { id: "moonshot (system tools)", provider: "moonshot", wire: "chat", model: "kimi-k3", bridged: false, env: { MOONSHOT_TRANSPORT: "openai" } },
+  { id: "google (bridge)", provider: "google", wire: "google", model: "gemini-3.6-flash", bridged: true },
+  { id: "vllm (bridge)", provider: "vllm", wire: "chat", model: "qwen-test", bridged: true },
 ];
 
 function effectiveCalls(turn: { calls: ScriptCall[] }, adapter: AdapterCase): Array<{ name: string; args: Record<string, unknown> }> {
@@ -410,7 +417,7 @@ function anthropicTurn(turn: ScriptTurn, adapter: AdapterCase, turnIndex: number
   return async function* () {
     yield {
       type: "message_start",
-      message: { id: `msg_${turnIndex}`, usage: { input_tokens: inputTokensFor("anthropic"), output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } },
+      message: { id: `msg_${turnIndex}`, usage: { input_tokens: inputTokensFor(adapter), output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } },
     };
     let blockIndex = 0;
     if ("empty" in turn) {
@@ -455,7 +462,7 @@ function openaiTurn(turn: ScriptTurn, adapter: AdapterCase, turnIndex: number) {
         yield { type: "response.function_call_arguments.done", item_id: itemId, name: call.name, arguments: JSON.stringify(call.args) };
       }
     }
-    yield { type: "response.completed", response: { id, status: "completed", output: [], usage: { input_tokens: inputTokensFor("openai"), output_tokens: 7, input_tokens_details: { cached_tokens: 0 } } } };
+    yield { type: "response.completed", response: { id, status: "completed", output: [], usage: { input_tokens: inputTokensFor(adapter), output_tokens: 7, input_tokens_details: { cached_tokens: 0 } } } };
   };
 }
 
@@ -470,7 +477,7 @@ function googleTurn(turn: ScriptTurn, adapter: AdapterCase, turnIndex: number) {
     yield {
       responseId: `g_${turnIndex}`,
       candidates: [{ content: { role: "model", parts }, finishReason: "STOP" }],
-      usageMetadata: { promptTokenCount: inputTokensFor("google"), candidatesTokenCount: 7 },
+      usageMetadata: { promptTokenCount: inputTokensFor(adapter), candidatesTokenCount: 7 },
     };
   };
 }
@@ -504,7 +511,7 @@ function chatCompletionsTurn(turn: ScriptTurn, adapter: AdapterCase, turnIndex: 
         events.push({ id, choices: [{ index: 0, delta: {}, finish_reason: "stop" }] });
       }
     }
-    events.push({ id, choices: [], usage: { prompt_tokens: inputTokensFor(adapter.provider), completion_tokens: 7 } });
+    events.push({ id, choices: [], usage: { prompt_tokens: inputTokensFor(adapter), completion_tokens: 7 } });
     const encoder = new TextEncoder();
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -519,7 +526,7 @@ function chatCompletionsTurn(turn: ScriptTurn, adapter: AdapterCase, turnIndex: 
 
 function queueScript(adapter: AdapterCase, script: ScriptTurn[]) {
   script.forEach((turn, turnIndex) => {
-    switch (adapter.provider) {
+    switch (adapter.wire) {
       case "anthropic":
         captured.scripts.anthropic.push(anthropicTurn(turn, adapter, turnIndex));
         break;
@@ -529,11 +536,8 @@ function queueScript(adapter: AdapterCase, script: ScriptTurn[]) {
       case "google":
         captured.scripts.google.push(googleTurn(turn, adapter, turnIndex));
         break;
-      case "vllm":
-        captured.scripts.vllm.push(chatCompletionsTurn(turn, adapter, turnIndex));
-        break;
-      case "moonshot":
-        captured.scripts.moonshot.push(chatCompletionsTurn(turn, adapter, turnIndex));
+      case "chat":
+        captured.scripts[adapter.provider as "vllm" | "moonshot"].push(chatCompletionsTurn(turn, adapter, turnIndex));
         break;
     }
   });
@@ -616,19 +620,16 @@ function flattenChat(payload: Record<string, unknown>): SentRequest {
 }
 
 function sentRequests(adapter: AdapterCase): SentRequest[] {
-  switch (adapter.provider) {
+  const sent = rawRequests(adapter);
+  switch (adapter.wire) {
     case "anthropic":
-      return captured.anthropic.map(flattenAnthropic);
+      return sent.map(flattenAnthropic);
     case "openai":
-      return captured.openai.map(flattenOpenAI);
+      return sent.map(flattenOpenAI);
     case "google":
-      return captured.google.map(flattenGoogle);
-    case "vllm":
-      return captured.vllm.map(flattenChat);
-    case "moonshot":
-      return captured.moonshot.map(flattenChat);
-    default:
-      throw new Error(adapter.provider);
+      return sent.map(flattenGoogle);
+    case "chat":
+      return sent.map(flattenChat);
   }
 }
 
@@ -671,7 +672,7 @@ async function declaredBoundaryIndices(): Promise<Set<number>> {
 // ── Mechanism probes on the raw payloads ────────────────────
 
 function rawRequests(adapter: AdapterCase): Array<Record<string, unknown>> {
-  return captured[adapter.provider as "anthropic" | "openai" | "google" | "vllm" | "moonshot"];
+  return adapter.wire === "chat" ? captured[adapter.provider as "vllm" | "moonshot"] : captured[adapter.wire];
 }
 
 /** Every value in a payload, flattened — for "does this block appear anywhere". */
@@ -711,6 +712,14 @@ function expectActivationDelivered(adapter: AdapterCase, payload: Record<string,
     case "openai (additional_tools)":
       expect(findObjects(payload.input, (entry) => entry.type === "additional_tools").flatMap((entry) => (entry.tools as Array<{ name: string }>).map((tool) => tool.name))).toEqual(["get_element"]);
       break;
+    case "moonshot (anthropic endpoint, bridge)":
+      // Nothing the endpoint does not document: no deferred declarations,
+      // no tool references, no mid-conversation system message.
+      expect(findObjects(payload, (entry) => "defer_loading" in entry || entry.type === "tool_reference" || entry.type === "tool_addition")).toEqual([]);
+      expect((payload.messages as Array<{ role: string }>).some((message) => message.role === "system")).toBe(false);
+      expect(payloadText).toContain('"tool_call"');
+      expect(payloadText).toContain("Call these through `tool_call`");
+      break;
     case "moonshot (system tools)": {
       const toolMessages = (payload.messages as Array<Record<string, unknown>>).filter((message) => message.role === "system" && Array.isArray(message.tools));
       expect(toolMessages).toHaveLength(1);
@@ -726,7 +735,7 @@ function expectActivationDelivered(adapter: AdapterCase, payload: Record<string,
 }
 
 function expectToolChoiceNone(adapter: AdapterCase, payload: Record<string, unknown>) {
-  switch (adapter.provider) {
+  switch (adapter.wire) {
     case "anthropic":
       expect(payload.tool_choice).toEqual({ type: "none" });
       break;
@@ -1007,14 +1016,23 @@ describe("prefix-stable requests — scripted loops through every adapter", () =
     describe(scenario.name, () => {
       for (const adapter of ADAPTERS) {
         it(adapter.id, async () => {
-          reportedInputTokens.capByProvider = scenario.reportedInputTokens ?? {};
-          queueScript(adapter, scenario.script);
-          const conversationId = `conv-${adapter.provider}-${scenario.name.replace(/\W+/g, "-")}`;
-          const { harness, state } = buildLoop(adapter, conversationId, scenario.setup);
-          await harness.run();
-          const requests = sentRequests(adapter);
-          expectPrefixStable(requests, await declaredBoundaryIndices());
-          await scenario.verify(adapter, requests, state);
+          const previousEnv = Object.fromEntries(Object.keys(adapter.env ?? {}).map((key) => [key, process.env[key]]));
+          Object.assign(process.env, adapter.env);
+          try {
+            reportedInputTokens.capByProvider = scenario.reportedInputTokens ?? {};
+            queueScript(adapter, scenario.script);
+            const conversationId = `conv-${adapter.id.replace(/\W+/g, "-")}-${scenario.name.replace(/\W+/g, "-")}`;
+            const { harness, state } = buildLoop(adapter, conversationId, scenario.setup);
+            await harness.run();
+            const requests = sentRequests(adapter);
+            expectPrefixStable(requests, await declaredBoundaryIndices());
+            await scenario.verify(adapter, requests, state);
+          } finally {
+            for (const [key, value] of Object.entries(previousEnv)) {
+              if (value === undefined) delete process.env[key];
+              else process.env[key] = value;
+            }
+          }
         });
       }
     });
