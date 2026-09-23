@@ -40,6 +40,8 @@ export interface McpToolHookOptions {
   signal?: AbortSignal;
   timeoutMilliseconds?: number;
   hookName?: string;
+  /** Whose MCP servers the hook reaches — the hook document's owner. */
+  scope?: { username?: string | null; profileId?: string | null };
 }
 
 /**
@@ -186,7 +188,7 @@ export default async function runMcpToolHook(
     return { _handlerFailed: true, _reason: "mcp_target_unresolved" };
   }
 
-  if (!MCPClientService.isConnected(target.server)) {
+  if (!MCPClientService.isConnected(target.server, options.scope)) {
     logger.warn(
       `[McpToolHookHandler] "${hookName}" skipped: MCP server "${target.server}" is not connected.`,
     );
@@ -204,6 +206,7 @@ export default async function runMcpToolHook(
         ...(options.timeoutMilliseconds && {
           timeoutMilliseconds: options.timeoutMilliseconds,
         }),
+        ...(options.scope && { scope: options.scope }),
       },
     )) as Record<string, unknown>;
   } catch (callError: unknown) {

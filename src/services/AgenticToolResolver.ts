@@ -64,6 +64,8 @@ interface ResolveParams {
   agent?: string;
   project?: string;
   username?: string;
+  /** Whose MCP servers the run sees (with `username`). */
+  profileId?: string | null;
   modelDefinition?: ModelDefinition;
   agentConversationId?: string;
   providerName?: string;
@@ -95,7 +97,8 @@ export default class AgenticToolResolver {
     options,
     agent,
     project: _project,
-    username: _username,
+    username,
+    profileId,
     modelDefinition,
     agentConversationId,
     providerName,
@@ -111,8 +114,8 @@ export default class AgenticToolResolver {
 
     const dynamicTools: ToolSchema[] = [...toolsApiSchemas];
 
-    // Merge MCP tools from connected servers
-    const mcpTools = ToolOrchestratorService.getMCPToolSchemas();
+    // Merge MCP tools from the servers this run's profile can see
+    const mcpTools = ToolOrchestratorService.getMCPToolSchemas({ username, profileId });
     if (mcpTools.length > 0) {
       // Strip internal metadata before passing to LLM
       for (const tool of mcpTools) {

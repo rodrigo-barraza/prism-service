@@ -31,6 +31,10 @@ vi.mock('#config', () => ({
     PRISM_VAPID_SUBJECT: undefined,
     PRISM_PUSH_NTFY_TOPIC: undefined,
     PRISM_CLIENT_PUBLIC_URL: undefined,
+    PRISM_SERVICE_PUBLIC_URL: undefined,
+    // A fixed test key for MCP OAuth tokens at rest.
+    MCP_OAUTH_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+    GITHUB_MCP_TOKEN: undefined,
     MONGO_URI: 'mongodb://test:test@localhost:27017/?directConnection=true&replicaSet=rs0&authSource=admin',
     MONGO_DB_NAME: 'prism-test',
     LIVE_AUDIO_MODEL: 'gemini-2.0-flash-live-001',

@@ -272,6 +272,7 @@ export async function executeToolBatch(
               messages: context._currentMessages || context.messages,
               project,
               username,
+              profileId: context.profileId,
               agent: agent || null,
               traceId: traceId || null,
               agentConversationId: resolvedAgentConversationId,

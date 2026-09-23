@@ -80,6 +80,7 @@ import projectInstructionsRouter from "./routes/ProjectInstructionsRoutes.ts";
 import agentMemoriesRouter from "./routes/AgentMemoriesRoutes.ts";
 import workflowMemoriesRouter from "./routes/WorkflowMemoriesRoutes.ts";
 import mcpServersRouter from "./routes/McpServersRoutes.ts";
+import mcpOAuthRouter from "./routes/McpOAuthRoutes.ts";
 import favoritesRouter from "./routes/FavoritesRoutes.ts";
 import conversationRouter from "./routes/ConversationExecutionRoute.ts";
 import statsRouter from "./routes/StatsRoutes.ts";
@@ -220,6 +221,8 @@ app.use("/project-instructions", projectInstructionsRouter);
 app.use("/agent-memories", agentMemoriesRouter);
 app.use("/workflow-memories", workflowMemoriesRouter);
 app.use("/mcp-servers", mcpServersRouter);
+// Browser redirects from MCP authorization servers (no identity headers).
+app.use("/mcp/oauth", mcpOAuthRouter);
 app.use("/favorites", favoritesRouter);
 app.use("/conversation", conversationRouter);
 
@@ -803,6 +806,10 @@ setupWebSocket(wss);
                 env,
                 headers,
                 enabled,
+                trusted,
+                protocol,
+                outputCapTokens,
+                toolOutputCapTokens,
               } = serverConfig;
               if (!name || !transport) continue;
 
@@ -821,6 +828,13 @@ setupWebSocket(wss);
                     env: env || {},
                     headers: headers || {},
                     enabled: enabled !== false,
+                    // Seeded servers are the deployment's: every profile
+                    // sees their tools (MCPClientService visibility).
+                    shared: true,
+                    trusted: trusted === true,
+                    ...(protocol && { protocol }),
+                    ...(outputCapTokens && { outputCapTokens }),
+                    ...(toolOutputCapTokens && { toolOutputCapTokens }),
                     updatedAt: new Date().toISOString(),
                   },
                 },
@@ -837,6 +851,9 @@ setupWebSocket(wss);
           );
         }
       }
+
+      const { seedBuiltinMcpServers } = await import("./services/mcp/McpBuiltinServers.ts");
+      await seedBuiltinMcpServers(mcpDb, codingProject);
 
       await MCPClientService.connectAllFromDB(mcpDb, codingProject, "admin");
     }

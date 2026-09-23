@@ -940,11 +940,20 @@ describe("ToolOrchestratorService", () => {
       });
       vi.mocked(MCPClientService.callTool).mockResolvedValue({ result: "ok" });
 
-      const result = await ToolOrchestratorService.executeTool("mcp__server__tool", { arg: 1 }, {} as any);
+      const result = await ToolOrchestratorService.executeTool("mcp__server__tool", { arg: 1 }, {
+        username: "rodrigo",
+        profileId: "work",
+        project: "coding",
+        conversationId: "conversation-1",
+      } as any);
       expect(result).toEqual({ result: "ok" });
       expect(MCPClientService.parseMCPToolName).toHaveBeenCalledWith("mcp__server__tool");
+      // The call reaches the servers of the run's own profile.
       expect(MCPClientService.callTool).toHaveBeenCalledWith("server", "tool", { arg: 1 }, {
         signal: undefined,
+        scope: { username: "rodrigo", profileId: "work" },
+        conversationId: "conversation-1",
+        project: "coding",
       });
     });
 
