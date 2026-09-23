@@ -1,6 +1,7 @@
 import { TOOLS_SERVICE_URL } from "#config";
 import { IDENTITY_HEADERS } from "@rodrigo-barraza/utilities-library/service";
-import MCPClientService from "#src/services/MCPClientService";
+import MCPClientService, { type MCPCallOptions } from "#src/services/MCPClientService";
+import { createLoopElicitHandler } from "#src/services/mcp/McpElicitation";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 import {
   partitionByDiscoverableUniverse,
@@ -1761,8 +1762,15 @@ export default class ToolOrchestratorService {
     // Route MCP tools to MCPClientService — thread the loop's abort signal
     // so user stops / per-tool timeouts actually cancel the in-flight call.
     if (MCPClientService.isMCPTool(name)) {
+      const serverName = MCPClientService.parseMCPToolName(name)?.serverName;
+      const elicit = serverName ? createLoopElicitHandler(context, serverName) : undefined;
       return ToolOrchestratorService.executeMCPTool(name, args, {
         signal: context.signal,
+        scope: { username: context.username, profileId: context.profileId },
+        conversationId: context.conversationId,
+        project: context.project,
+        // A server that asks for input mid-call gets a question card.
+        ...(elicit && { elicit }),
       });
     }
 
@@ -2246,7 +2254,7 @@ export default class ToolOrchestratorService {
   static async executeMCPTool(
     fullName: string,
     args: Record<string, unknown> = {},
-    options: { signal?: AbortSignal; timeoutMilliseconds?: number } = {},
+    options: MCPCallOptions = {},
   ) {
     const parsed = MCPClientService.parseMCPToolName(fullName);
     if (!parsed) {
@@ -2259,8 +2267,9 @@ export default class ToolOrchestratorService {
       options,
     );
   }
-  static getMCPToolSchemas() {
-    return MCPClientService.getToolSchemas();
+  /** Approved MCP tools of the servers `scope` sees (default: the request's). */
+  static getMCPToolSchemas(scope?: MCPCallOptions["scope"]) {
+    return MCPClientService.getToolSchemas(scope);
   }
 
   /**
@@ -2345,7 +2354,10 @@ export default class ToolOrchestratorService {
       }
     }
 
-    const mcpSchemas = MCPClientService.getToolSchemas();
+    const mcpSchemas = MCPClientService.getToolSchemas({
+      username: context.username,
+      profileId: context.profileId,
+    });
     if (mcpSchemas.length === 0) return toolsApiResult;
 
     const queryText = typeof args.query === "string" ? args.query.trim() : "";

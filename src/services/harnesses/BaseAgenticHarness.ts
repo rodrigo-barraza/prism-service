@@ -212,7 +212,10 @@ export default class BaseAgenticHarness {
 
     const allSchemas = [
       ...ToolOrchestratorService.getToolSchemas(),
-      ...ToolOrchestratorService.getMCPToolSchemas().map((mcpTool) => {
+      ...ToolOrchestratorService.getMCPToolSchemas({
+        username: this.context.username,
+        profileId: this.context.profileId,
+      }).map((mcpTool) => {
         const { _mcpServer, _mcpOriginalName, ...schema } =
           mcpTool as unknown as Record<string, unknown>;
         return schema as { name: string; [key: string]: unknown };

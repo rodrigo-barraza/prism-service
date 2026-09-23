@@ -8,7 +8,7 @@ const mockCallTool = vi.fn();
 const mockListResources = vi.fn().mockResolvedValue({ resources: [] });
 const mockReadResource = vi.fn();
 
-vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
+vi.mock('@modelcontextprotocol/client', () => {
   return {
     Client: class Client {
       connect = mockConnect;
@@ -17,11 +17,22 @@ vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
       callTool = mockCallTool;
       listResources = mockListResources;
       readResource = mockReadResource;
+      getNegotiatedProtocolVersion = () => '2026-07-28';
+      getProtocolEra = () => 'modern';
+      getServerCapabilities = () => ({ tools: {} });
+      setRequestHandler = vi.fn();
+    },
+    UnauthorizedError: class UnauthorizedError extends Error {},
+    StreamableHTTPClientTransport: class StreamableHTTPClientTransport {
+      close = vi.fn();
+    },
+    SSEClientTransport: class SSEClientTransport {
+      close = vi.fn();
     },
   };
 });
 
-vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => {
+vi.mock('@modelcontextprotocol/client/stdio', () => {
   return {
     StdioClientTransport: class StdioClientTransport {
       close = vi.fn();
@@ -29,22 +40,6 @@ vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => {
     // Safe-inheritance env builder (PATH/HOME/... only) used by
     // buildStdioEnvironment — the env-leak fix
     getDefaultEnvironment: vi.fn().mockReturnValue({ PATH: "/usr/bin" }),
-  };
-});
-
-vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => {
-  return {
-    StreamableHTTPClientTransport: class StreamableHTTPClientTransport {
-      close = vi.fn();
-    },
-  };
-});
-
-vi.mock('@modelcontextprotocol/sdk/client/sse.js', () => {
-  return {
-    SSEClientTransport: class SSEClientTransport {
-      close = vi.fn();
-    },
   };
 });
 
@@ -140,6 +135,47 @@ describe('MCPClientService Unit Tests', () => {
     });
   });
 
+  describe('Namespacing', () => {
+    it('rejects every tool whose namespaced name collides with another on the same server', async () => {
+      mockListTools.mockResolvedValue({
+        tools: [
+          { name: 'read.file', description: 'one' },
+          { name: 'read_file', description: 'two' },
+          { name: 'ok', description: 'fine' },
+        ],
+      });
+
+      const result = await MCPClientService.connect({
+        name: 'collide',
+        transport: 'stdio',
+        command: 'node',
+      });
+
+      expect(result.tools.map((tool) => tool.name)).toEqual(['mcp__collide__ok']);
+      expect(result.quarantinedTools).toEqual([
+        expect.objectContaining({ name: 'read.file', reason: 'duplicate' }),
+        expect.objectContaining({ name: 'read_file', reason: 'duplicate' }),
+      ]);
+      const call = await MCPClientService.callTool('collide', 'read_file');
+      expect(call.error).toMatch(/rejected/);
+      expect(mockCallTool).not.toHaveBeenCalled();
+    });
+
+    it('calls a sanitized tool by its original name', async () => {
+      mockListTools.mockResolvedValue({ tools: [{ name: 'files/list', description: 'list' }] });
+      mockCallTool.mockResolvedValue({ content: [{ type: 'text', text: 'done' }] });
+
+      const result = await MCPClientService.connect({ name: 'fs', transport: 'stdio', command: 'node' });
+      expect(result.tools[0].name).toBe('mcp__fs__files_list');
+
+      await MCPClientService.callTool('fs', 'files_list');
+      expect(mockCallTool).toHaveBeenCalledWith(
+        { name: 'files/list', arguments: {} },
+        expect.any(Object),
+      );
+    });
+  });
+
   describe('Tool Execution', () => {
     beforeEach(async () => {
       const config: MCPServerConfig = {
@@ -170,8 +206,11 @@ describe('MCPClientService Unit Tests', () => {
           name: 'add',
           arguments: { a: 4, b: 6 },
         },
-        undefined,
-        expect.objectContaining({ resetTimeoutOnProgress: true }),
+        expect.objectContaining({
+          resetTimeoutOnProgress: true,
+          // The APPROVED definition — the SDK validates output against it.
+          toolDefinition: expect.objectContaining({ name: 'add' }),
+        }),
       );
       expect(result).toEqual({ sum: 10 });
     });

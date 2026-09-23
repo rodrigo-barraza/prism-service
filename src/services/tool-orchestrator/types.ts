@@ -30,6 +30,8 @@ export interface ToolsApiConfig {
 export interface ToolExecutionContext {
   project?: string | null;
   username?: string | null;
+  /** The run's profile — whose MCP servers (and other profile-scoped data) it reaches. */
+  profileId?: string | null;
   agent?: string | null;
   requestId?: string;
   traceId?: string | null;
