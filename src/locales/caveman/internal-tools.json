@@ -226,6 +226,17 @@
       "description": "Optional: short label shown to user."
     }
   },
+  "read_untrusted": {
+    "description": "Read untrusted stuff WITHOUT it enter your head. Other reader, no tools, read source and answer question as JSON that fit your schema. You get only { result }. Use for facts from web page, email, message, MCP resource. One source: url, resource {server_name, uri}, tool {name, arguments} (e.g. read_email), or content. Schema objects closed. Bad answer: one retry, then { error, issues }.",
+    "parameters": {
+      "url": "Web page to read.",
+      "resource": "MCP resource to read.",
+      "tool": "Tool that return stranger content, and its arguments.",
+      "content": "Text you already have.",
+      "schema": "JSON Schema of answer you want. Ask for fields, not text.",
+      "question": "What to find in content."
+    }
+  },
   "report_progress": {
     "description": "Tell parent agent short progress while you keep work. Only at real milestone (finding parent can use now, blocker, plan change) — not every step. Not final answer: finish task, end with full summary. Max 10 update per task; parent only get them while it work.",
     "parameters": {

@@ -35,10 +35,51 @@ describe("toolResultProvenance", () => {
       source: "mcp:notion",
       trust: "untrusted",
     });
+    // The tool's own parameter is `server_name`.
+    expect(toolResultProvenance(TOOL_NAMES.READ_MCP_RESOURCE, { server_name: "linear", uri: "linear://i/1" })).toEqual({
+      source: "mcp:linear",
+      trust: "untrusted",
+    });
     expect(toolResultProvenance("read_email")).toEqual({ source: "tool:read_email", trust: "untrusted" });
     // The workspace is the user's: a file read is derived, not quarantined.
     expect(toolResultProvenance(TOOL_NAMES.READ_FILE)).toEqual({ source: "tool:read_file", trust: "derived" });
     expect(toolResultProvenance("get_weather")).toEqual({ source: "tool:get_weather", trust: "derived" });
+  });
+});
+
+describe("read_untrusted (prompt 22 L2)", () => {
+  // The reader's JSON is chosen by whoever wrote the source: untrusted, and
+  // labelled by what was read — so it is enveloped for the planner and
+  // taints what the assistant writes next, like the source would have.
+  it("is untrusted whatever it read, and labelled by the source", () => {
+    const read = (source: Record<string, unknown>) =>
+      toolResultProvenance("read_untrusted", { ...source, schema: {}, question: "q" });
+    expect(read({ url: "https://x.test" })).toEqual({ source: "web", trust: "untrusted" });
+    expect(read({ resource: { server_name: "notion", uri: "notion://p" } })).toEqual({ source: "mcp:notion", trust: "untrusted" });
+    expect(read({ tool: { name: "read_email", arguments: { id: "m" } } })).toEqual({ source: "tool:read_email", trust: "untrusted" });
+    expect(read({ tool: { name: "mcp__github__get_issue", arguments: {} } })).toEqual({ source: "mcp:github", trust: "untrusted" });
+    expect(read({ content: "pasted" })).toEqual({ source: "tool:read_untrusted", trust: "untrusted" });
+    expect(toolResultProvenance("read_untrusted")).toEqual({ source: "tool:read_untrusted", trust: "untrusted" });
+  });
+
+  it("taints what the assistant writes after it", () => {
+    const annotated = annotateMessageProvenance([
+      { role: "user", content: "What does the kettle cost?" },
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          {
+            id: "c1",
+            name: "read_untrusted",
+            args: { url: "https://shop.test", schema: {}, question: "price?" },
+            result: { result: { price: 42 } },
+          },
+        ],
+      },
+      { role: "assistant", content: "It costs $42." },
+    ]);
+    expect(trustsOf(annotated).at(-1)).toBe("web/untrusted");
   });
 });
 
