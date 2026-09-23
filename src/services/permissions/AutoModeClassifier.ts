@@ -609,7 +609,7 @@ export async function classifyToolCall(
       decision: "ask",
       stage: 1,
       failed: true,
-      reason: `the auto-mode classifier could not decide (${errorMessage(error)})`,
+      reason: `the classifier could not decide (${errorMessage(error)})`,
     };
   }
 
@@ -638,7 +638,7 @@ export async function classifyToolCall(
         stage: 2,
         failed: true,
         model: stageTwo.model,
-        reason: "the auto-mode reviewer gave no clear verdict",
+        reason: "the reviewer gave no clear verdict",
       };
     }
     return { ...review, stage: 2, model: stageTwo.model };
@@ -648,7 +648,7 @@ export async function classifyToolCall(
       decision: "ask",
       stage: 2,
       failed: true,
-      reason: `the auto-mode reviewer could not decide (${errorMessage(error)})`,
+      reason: `the reviewer could not decide (${errorMessage(error)})`,
     };
   }
 }

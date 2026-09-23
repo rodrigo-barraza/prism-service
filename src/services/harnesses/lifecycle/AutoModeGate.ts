@@ -196,7 +196,7 @@ export async function applyAutoModeVerdicts(
     ask(
       toolCall,
       verdict.failed
-        ? `auto mode could not decide — ${verdict.reason}`
+        ? verdict.reason
         : `auto mode asks${verdict.category ? ` [${verdict.category}]` : ""}: ${verdict.reason || "the reviewer wants your say"}`,
       decided,
     );
