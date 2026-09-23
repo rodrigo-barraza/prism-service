@@ -23,6 +23,9 @@ export interface SseEvent {
   audioRef?: string;
   traceId?: string;
   conversationId?: string;
+  /** A `refusal` event's reason code and the provider's explanation. */
+  category?: string | null;
+  explanation?: string | null;
   /**
    * Per-conversation monotonic sequence number, stamped by
    * withDirectViewerBroadcast / LiveTurnBuffer. Never resets between turns,

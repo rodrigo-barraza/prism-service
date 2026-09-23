@@ -316,6 +316,59 @@ function isSafetyBlockError(error: Error | string | number | boolean | null | un
     message.includes("response was blocked")
   );
 }
+
+export interface ImageRefusal {
+  category: string;
+  explanation: string | null;
+}
+
+/**
+ * Why a forced image generation came back without an image, in the typed
+ * refusal shape /chat already carries for Anthropic's classifier refusals.
+ * A Gemini image model that declines rarely throws: it ends the candidate
+ * with IMAGE_SAFETY / PROHIBITED_CONTENT / NO_IMAGE, or blocks the prompt
+ * outright, and returns no image part. Callers saw only "no image" — so
+ * generate_image told the agent to try a more specific prompt, and it
+ * redrew the same refused subject up to five times (18% of Lupos's image
+ * calls, 2026-08-23 → 09-22). MAX_TOKENS is truncation, not a decline, and
+ * keeps its own stopReason.
+ */
+export function imageRefusalOf({
+  forceImageGeneration,
+  imageCount,
+  finishReason,
+  blockReason,
+  finishMessage,
+  text,
+}: {
+  forceImageGeneration?: boolean;
+  imageCount: number;
+  finishReason?: string | null;
+  blockReason?: string | null;
+  finishMessage?: string | null;
+  text?: string | null;
+}): ImageRefusal | null {
+  if (!forceImageGeneration || imageCount > 0) return null;
+  if (finishReason === "MAX_TOKENS") return null;
+  const declined =
+    finishReason && finishReason !== "STOP" && finishReason !== "FINISH_REASON_UNSPECIFIED"
+      ? finishReason
+      : null;
+  return {
+    category: blockReason || declined || "NO_IMAGE",
+    explanation: finishMessage?.trim() || text?.trim() || null,
+  };
+}
+
+const SAFETY_CATEGORY_PATTERN =
+  /\b(IMAGE_PROHIBITED_CONTENT|PROHIBITED_CONTENT|IMAGE_SAFETY|SAFETY|BLOCKLIST|SPII|JAILBREAK)\b/i;
+
+/** The refusal a thrown safety block amounts to on a forced image generation. */
+function imageRefusalFromError(error: Error): ImageRefusal {
+  const message = getErrorMessage(error);
+  const category = message.match(SAFETY_CATEGORY_PATTERN)?.[1]?.toUpperCase() || "SAFETY";
+  return { category, explanation: message || null };
+}
 function addWavHeader(
   buffer: Buffer,
   sampleRate: number = 24000,
@@ -966,10 +1019,26 @@ const googleProvider = {
         }
       }
 
+      const refusal = imageRefusalOf({
+        forceImageGeneration: options.forceImageGeneration,
+        imageCount: images.length,
+        finishReason: response.candidates?.[0]?.finishReason,
+        blockReason: response.promptFeedback?.blockReason,
+        finishMessage: response.candidates?.[0]?.finishMessage,
+        text: textParts.join(""),
+      });
+      if (refusal) {
+        logger.warn(
+          `[Google] ${model} declined the image (${refusal.category})${refusal.explanation ? `: ${refusal.explanation.slice(0, 200)}` : ""}`,
+        );
+      }
+
       const result: GenerateTextResult = {
-        // `response.text` (the SDK getter) also skips thought parts.
-        text: textParts.join("") || response.text || "",
+        // `response.text` (the SDK getter) also skips thought parts. A
+        // declined image's text is its explanation, not an answer.
+        text: refusal ? "" : textParts.join("") || response.text || "",
         usage: normalizeGoogleUsage(response.usageMetadata),
+        ...(refusal && { refusal }),
       };
       if (thoughtParts.length > 0) result.thinking = thoughtParts.join("");
       if (toolCalls.length > 0) result.toolCalls = toolCalls;
@@ -991,6 +1060,9 @@ const googleProvider = {
           text: "",
           usage: { inputTokens: 0, outputTokens: 0 },
           safetyBlock: true,
+          ...(options.forceImageGeneration && {
+            refusal: imageRefusalFromError(error as Error),
+          }),
         };
       }
       throw new ProviderError("google", getErrorMessage(error), 500, error as Error);
@@ -1082,6 +1154,10 @@ const googleProvider = {
       const maxImages = options.imageCount || 1;
       let imageCount = 0;
       let lastFinishReason: string | null = null;
+      // What a declined forced image generation says about itself.
+      let promptBlockReason: string | null = null;
+      let lastFinishMessage: string | null = null;
+      let streamedText = "";
       // The response's parts in order (signatures) and its search grounding,
       // handed to the harness at the end to store on the assistant message.
       const replayParts = new GeminiPartsRecorder();
@@ -1095,6 +1171,12 @@ const googleProvider = {
         // Track finishReason for truncation detection
         const candidateFinishReason = chunk.candidates?.[0]?.finishReason;
         if (candidateFinishReason) lastFinishReason = candidateFinishReason;
+        if (chunk.promptFeedback?.blockReason) {
+          promptBlockReason = chunk.promptFeedback.blockReason;
+        }
+        if (chunk.candidates?.[0]?.finishMessage) {
+          lastFinishMessage = chunk.candidates[0].finishMessage;
+        }
         // Process all parts in the chunk
         if (chunk.candidates?.[0]?.content?.parts) {
           for (const part of chunk.candidates[0].content.parts) {
@@ -1111,6 +1193,7 @@ const googleProvider = {
             } else if (part.thought && part.text) {
               yield { type: "thinking", content: part.text };
             } else if (part.text) {
+              streamedText += part.text;
               yield part.text;
             } else if (part.inlineData && imageCount < maxImages) {
               imageCount++;
@@ -1134,6 +1217,7 @@ const googleProvider = {
             }
           }
         } else if (chunk.text) {
+          streamedText += chunk.text;
           yield chunk.text;
         }
         if (chunk.usageMetadata) {
@@ -1145,6 +1229,22 @@ const googleProvider = {
       yield { type: "providerState", geminiParts: replayParts.parts() ?? [] };
       const citations = citationsFromGrounding(groundingMetadata);
       if (citations) yield citations;
+      const refusal = options.signal?.aborted
+        ? null
+        : imageRefusalOf({
+            forceImageGeneration: options.forceImageGeneration,
+            imageCount,
+            finishReason: lastFinishReason,
+            blockReason: promptBlockReason,
+            finishMessage: lastFinishMessage,
+            text: streamedText,
+          });
+      if (refusal) {
+        logger.warn(
+          `[Google] ${model} declined the image (${refusal.category})${refusal.explanation ? `: ${refusal.explanation.slice(0, 200)}` : ""}`,
+        );
+        yield { type: "refusal", ...refusal };
+      }
       // Surface max_tokens truncation so harnesses can detect and warn the user
       if (lastFinishReason === "MAX_TOKENS") {
         yield { type: "stopReason", stopReason: "max_tokens" };
@@ -1165,6 +1265,9 @@ const googleProvider = {
         logger.error(
           `[Google] Content safety block (stream): ${getErrorMessage(error)}`,
         );
+        if (options.forceImageGeneration) {
+          yield { type: "refusal", ...imageRefusalFromError(error as Error) };
+        }
         yield {
           type: "usage",
           usage: { inputTokens: 0, outputTokens: 0 },
