@@ -1,9 +1,4 @@
 {
-  "criticGate": {
-    "safetyReviewer": "Code safety reviewer. Agent wants to run tool call.",
-    "reviewCriteria": "Check safety — destructive command (rm -rf, DROP, DELETE, format), data exfiltration (curl to external, unauthorized network), privilege escalation (sudo, chmod 777), resource exhaustion.",
-    "responseFormat": "One word on first line: APPROVE or DENY\nIf DENY, explain why on second line."
-  },
   "planningMode": {
     "blocked": "PLAN MODE active. Tool [{{blockedNames}}] blocked — only exit_plan_mode works. Write plan as text, then call exit_plan_mode.",
     "blockedNotReadOnly": "PLAN MODE on. {{blockedNames}} not run — only read-only tools work while plan. Explore read-only, write plan, then call exit_plan_mode.",
@@ -22,6 +17,9 @@
   "exhaustionRecovery": {
     "message": "Max iteration reached. Summarize progress, report partial result, state remaining work.",
     "subAgentMessage": "CRITICAL: Sub-agent iteration limit reached. MUST produce final response NOW. Synthesize ALL gathered information into comprehensive summary. No more iteration — work with what have. Response return to orchestrator."
+  },
+  "autoModeStopped": {
+    "message": "Auto mode stop run: classifier refuse too many action, nobody watch to approve. No more tool call. Summarize what did, which action refused and why, what user must allow for work continue."
   },
   "gotSynthesis": {
     "instruction": "[GRAPH-OF-THOUGHTS SYNTHESIS]\n\n{{branchCount}} parallel branch generated and scored. Produce single optimal response SYNTHESIZING best aspect.\n\nRULE:\n1. Merge complementary strength — NOT just highest-scoring.\n2. COMPLEMENTARY (non-conflicting) tool call from different branch: include all.\n3. Disagreement: prefer highest CORRECTNESS, then RISK score.\n4. Incorporate defensive measure from THOROUGH branch even with MINIMAL core approach.\n5. Produce merged response with tool call as if executing.\n\n-- BRANCH OUTPUT --\n\n"
@@ -85,13 +83,11 @@
     "wrapper": "**error:** {{errorDescription}}"
   },
   "treeOfThoughts": {
-    "proactiveBacktrack": "[BACKTRACK — ALL {{branchCount}} BRANCH BELOW THRESHOLD (best: {{bestScore}}/{{threshold}})]\n\nAll branch scored poorly. Approach failing.\n\nReconsider:\n1. Approach fundamentally flawed?\n2. Different strategy?\n3. Simpler, safer path?\n\nDIFFERENT approach next attempt.",
     "frontierFallback": "[SWITCH — BRANCH {{branchIndex}} FAILED]\n\nPrevious: {{errorCount}} error:\n\n{{errorBlock}}\n\nSwitching to next-best. Avoid same error.",
     "reflexion": "[REFLEXION — BRANCH {{branchIndex}} FAILED]\n\nPrevious: {{errorCount}} error:\n\n{{errorBlock}}\n\nANALYZE:\n1. What assumption caused failure?\n2. How correct solution differs?\n3. Alternative avoiding this error class?\n\nAnalyze, then DIFFERENT approach.",
     "budgetExhausted": "[VALIDATION ERROR — NO RETRY LEFT]\n\n{{errorBlock}}\n\nMultiple approach failed. Fix remaining directly."
   },
   "graphOfThoughts": {
-    "proactiveBacktrack": "[BACKTRACK — ALL BRANCH BELOW THRESHOLD (best: {{bestScore}}/{{threshold}})]\n\nAll branch scored poorly. Approach failing.\n\nReconsider:\n1. Approach fundamentally flawed?\n2. Different strategy?\n3. Simpler, safer path?\n\nDIFFERENT approach next attempt.",
     "synthesizedValidationError": "[VALIDATION ERROR — MERGED RESULT]\n\nMerged approach: {{errorCount}} error:\n\n{{errorBlock}}\n\nCombined {{branchCount}} branch but tool call still failed.\nFix remaining — NOT same tool call."
   },
   "approval": {

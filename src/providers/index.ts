@@ -8,6 +8,7 @@ import ActiveGenerationTracker from "#src/services/ActiveGenerationTracker";
 import { getInstanceProvider, isInstance } from "./instance-registry.ts";
 import type { Provider } from "#src/types/provider";
 import { PROVIDERS } from "#src/constants";
+import { applyModelProfile, getModelProfile } from "./ModelProfiles.ts";
 
 // Static cloud providers — local providers are resolved via instance registry
 const providers: Record<string, Provider> = {
@@ -32,6 +33,26 @@ function isTrackedMethod(name: string | symbol): boolean {
   );
 }
 
+/** Text generation calls: (messages, model, options) — the model profile applies. */
+const PROFILED_METHODS = new Set(["generateText", "generateTextStream", "generateTextStreamLive"]);
+
+/**
+ * The model profile (ModelProfiles.ts) for every text generation call, in
+ * one place: rejected sampling parameters dropped, effort clamped to the
+ * model's vocabulary, tool_choice mapped — before any adapter sees them.
+ */
+function withModelProfile(providerName: string, method: string | symbol, args: unknown[]): unknown[] {
+  if (typeof method !== "string" || !PROFILED_METHODS.has(method)) return args;
+  const model = args[1];
+  if (typeof model !== "string" || !model) return args;
+  const options = args[2] as Record<string, unknown> | undefined;
+  const profiled = applyModelProfile(getModelProfile(model, providerName), options);
+  if (profiled === options) return args;
+  const next = [...args];
+  next[2] = profiled;
+  return next;
+}
+
 /**
  * Wrap an async generator (generateTextStream, generateTextStreamLive)
  * so the tracker stays incremented for the entire iteration lifetime.
@@ -53,7 +74,7 @@ async function* wrapAsyncGenerator(
  * - Async generators (streams): decrement when the iterator finishes/returns
  * - Promises (generateText, generateImage, etc.): decrement on settle
  */
-function wrapProvider(provider: Provider): Provider {
+function wrapProvider(provider: Provider, providerName: string): Provider {
   return new Proxy(provider, {
     get(target: Provider, prop: string | symbol, receiver: Provider): unknown {
       const value = Reflect.get(target, prop, receiver);
@@ -68,7 +89,7 @@ function wrapProvider(provider: Provider): Provider {
         try {
           result = (value as (...agent: unknown[]) => unknown).apply(
             target,
-            args,
+            withModelProfile(providerName, prop, args),
           );
         } catch (error: unknown) {
           // Synchronous throw (rare but possible)
@@ -110,7 +131,7 @@ export function getProvider(name: string): Provider {
   if (isInstance(name)) {
     if (wrappedCache.has(name)) return wrappedCache.get(name)!;
     const instanceProvider = getInstanceProvider(name);
-    const wrapped = wrapProvider(instanceProvider as Provider);
+    const wrapped = wrapProvider(instanceProvider as Provider, name);
     wrappedCache.set(name, wrapped);
     return wrapped;
   }
@@ -127,7 +148,7 @@ export function getProvider(name: string): Provider {
   // Return cached proxy
   if (wrappedCache.has(name)) return wrappedCache.get(name)!;
 
-  const wrapped = wrapProvider(provider);
+  const wrapped = wrapProvider(provider, name);
   wrappedCache.set(name, wrapped);
   return wrapped;
 }

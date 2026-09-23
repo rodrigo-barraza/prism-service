@@ -183,6 +183,24 @@ export const PENDING_DECISIONS = {
 } as const;
 
 /**
+ * Budget pause (prompt 13, Landing 3) — a turn that reaches its cost cap
+ * parks on its user (a `budget` decision in PendingDecisionStore) instead of
+ * ending, and resumes when the cap is raised.
+ */
+export const BUDGET_PAUSE = {
+  /** `status` message: the tree reached its cap and waits for a raise. */
+  STATUS_REACHED: "budget_reached",
+  /** `status` message: the pause is over — the cap was raised, or the turn stops. */
+  STATUS_RESOLVED: "budget_resolved",
+  /** What a turn does at its cap: wait for its user, or end as before. */
+  ACTIONS: ["pause", "stop"],
+  /** The share of a re-driven turn's spend its previous process made (SharedCostBudget). */
+  CARRIED_SPEND_LOOP_ID: "before-restart",
+} as const;
+
+export type BudgetAction = (typeof BUDGET_PAUSE.ACTIONS)[number];
+
+/**
  * Durable runs — a turn a restart interrupted is re-driven from what it
  * recorded (TurnRunStore): the pass whose tool batch was in progress, each
  * call's progress, and what the turn still owed its user. Background work
@@ -454,11 +472,19 @@ export const PROMPT_DELIMITERS = {
 
 export const ORCHESTRATOR = {
   /**
-   * Maximum RUNNING sub-agents per root conversation (the whole delegation
-   * tree of one user conversation). Counted per conversation so one busy
-   * conversation cannot starve every other one in the process.
+   * Runaway caps on delegation, per ROOT conversation (the whole delegation
+   * tree of one user conversation) — the defaults of Settings →
+   * `subAgentCaps` (orchestrator/SpawnCaps.ts). Counted per conversation so
+   * one busy conversation cannot starve every other one in the process.
+   *   MAX_SUB_AGENTS              — sub-agents RUNNING at once
+   *   MAX_SPAWNS_PER_CONVERSATION — sub-agents started over its life
+   *   MAX_DELEGATION_DEPTH        — how deep delegation nests (root = 0);
+   *                                 bounds the conversation's own
+   *                                 maxRecursionDepth, never raises it
    */
-  MAX_SUB_AGENTS: 10,
+  MAX_SUB_AGENTS: 20,
+  MAX_SPAWNS_PER_CONVERSATION: 200,
+  MAX_DELEGATION_DEPTH: 3,
 
   /**
    * How long a non-blocking create_subagent(s) call waits for its members to
@@ -478,13 +504,6 @@ export const ORCHESTRATOR = {
 
   /** Minimum iterations floor after scope attenuation at deeper recursion depths. */
   MIN_ATTENUATED_ITERATIONS: 5,
-
-  /**
-   * Max total concurrent sub-agents across all recursion depths for a single conversation.
-   * Circuit breaker to prevent exponential agent fan-out from recursive spawning.
-   * Paper reference: Intelligence Entropy (arXiv:2606.18065) — disorder grows exponentially.
-   */
-  MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION: 100,
 
   /**
    * Scope attenuation factor for maxIterations at each recursion depth hop.
@@ -620,6 +639,24 @@ export const NOTIFICATION_SOURCES = {
   GOAL_VERIFIER: "goal-verifier",
 } as const;
 
+// ─── Auto Mode (permissions/AutoModeClassifier) ─────────────
+
+export const AUTO_MODE = {
+  /** Stage 1 answers one word (`low` / `high`); room for a model that pads it. */
+  CLASSIFIER_MAX_TOKENS: 32,
+  CLASSIFIER_TIMEOUT_MILLISECONDS: 15_000,
+  /** Stage 2 answers a one-sentence JSON verdict. */
+  REVIEWER_MAX_TOKENS: 512,
+  REVIEWER_TIMEOUT_MILLISECONDS: 45_000,
+  /** What the classifier is shown, at most (head and tail kept when cut). */
+  TRANSCRIPT_MAX_CHARACTERS: 24_000,
+  USER_MESSAGE_MAX_CHARACTERS: 4_000,
+  TRANSCRIPT_ARGS_MAX_CHARACTERS: 1_000,
+  PENDING_ARGS_MAX_CHARACTERS: 20_000,
+  INSTRUCTIONS_MAX_CHARACTERS: 8_000,
+  REPORT_MAX_CHARACTERS: 20_000,
+} as const;
+
 // ─── Harness Constants ──────────────────────────────────────
 
 export const HARNESS = {
@@ -652,11 +689,11 @@ export const HARNESS = {
   /** Default number of parallel branches for ToT / GoT exploration. */
   DEFAULT_BRANCH_COUNT: 3,
 
-  /** Default node value threshold below which branches are pruned. */
+  /**
+   * Score (0–10) a DFS sibling needs to be accepted without drawing the next
+   * one; in GoT, the score a branch needs to feed the synthesis.
+   */
   DEFAULT_VALUE_THRESHOLD: 5.0,
-
-  /** Max proactive backtracks per iteration. */
-  MAX_PROACTIVE_BACKTRACKS: 3,
 
   /** Max backtrack attempts per iteration (ToT-specific). */
   MAX_BACKTRACK_ATTEMPTS_PER_ITERATION: 2,
@@ -668,12 +705,6 @@ export const HARNESS = {
   MAX_PLANNING_ITERATIONS: 10,
 
   // ─── Lifecycle Gate Defaults ───────────────────────────────
-
-  /** Critic gate LLM output token limit. */
-  CRITIC_MAX_TOKENS: 200,
-
-  /** Critic gate timeout (milliseconds). */
-  CRITIC_TIMEOUT_MILLISECONDS: 10_000,
 
   /** System reminder extraction LLM output token limit. */
   EXTRACTION_MAX_TOKENS: 600,
@@ -1158,6 +1189,31 @@ export const LOG_PREVIEW = {
 
   /** Long preview — consolidation snippets, content previews (500 characters). */
   LONG: 500,
+} as const;
+
+// ─── Log Redaction ──────────────────────────────────────────
+
+/**
+ * Secrets at rest (`utils/SecretRedaction.ts`): what request rows, hook
+ * payload rows and log lines mask on the way out.
+ */
+export const LOG_REDACTION = {
+  /** Replaces a secret; followed by its last four characters when it is long enough. */
+  MASK: "***",
+  /** A masked secret keeps its last four characters only from this length on. */
+  MIN_LENGTH_FOR_LAST_FOUR: 16,
+  /** Secret variable values shorter than this are not matched by value. */
+  MIN_SECRET_VALUE_LENGTH: 8,
+  /** How long the secret values read from the environment are reused. */
+  SECRET_VALUES_TIME_TO_LIVE_MILLISECONDS: 60_000,
+  /** Extra values to mask: comma- or newline-separated literals, or `/regex/flags`. */
+  DENYLIST_ENVIRONMENT_VARIABLE: "PRISM_LOG_REDACTION_DENYLIST",
+  /** Nesting depth past which a structure is written as it is. */
+  MAX_DEPTH: 64,
+  /** Strings at least this long have their redaction memoised. */
+  MEMO_MIN_LENGTH: 512,
+  /** Characters the memo may retain (keys plus changed values). */
+  MEMO_MAX_CHARACTERS: 16_000_000,
 } as const;
 
 // ─── Local Provider Constants ───────────────────────────────

@@ -282,6 +282,7 @@ async function prepareGenerationContext(
     autoApprove,
     permissionMode,
     unattended,
+    onBudgetReached,
     planFirst,
     maxIterations,
     maxSubAgentIterations,
@@ -292,8 +293,7 @@ async function prepareGenerationContext(
     workspaceRoot,
     // Workspace toggle: when false, workspace tools are excluded from the agent session.
     workspaceEnabled,
-    // CriticGate: multi-model review of dangerous tool calls.
-    enableCriticGate,
+    // The auto-mode reviewer's model, on the conversation's provider.
     criticModel,
     parallelToolCalls,
     candidateCount,
@@ -356,6 +356,7 @@ async function prepareGenerationContext(
     ...(autoApprove != null && { autoApprove }),
     ...(permissionMode != null && { permissionMode }),
     ...(unattended != null && { unattended }),
+    ...(onBudgetReached != null && { onBudgetReached }),
     ...(planFirst != null && { planFirst }),
     ...(maxIterations != null && { maxIterations }),
     ...(maxSubAgentIterations != null && { maxSubAgentIterations }),
@@ -363,7 +364,6 @@ async function prepareGenerationContext(
     ...(typeof maxCostDollars === "number" &&
       maxCostDollars > 0 && { maxCostDollars }),
     ...(agentContext != null && { agentContext }),
-    ...(enableCriticGate != null && { enableCriticGate }),
     ...(criticModel != null && { criticModel }),
     ...(workspaceEnabled != null && { workspaceEnabled }),
     ...(harness != null && { harness }),

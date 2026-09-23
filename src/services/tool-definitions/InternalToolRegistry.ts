@@ -28,6 +28,7 @@ import mcpTools from "./McpTools.ts";
 import reminderTools from "./ReminderTools.ts";
 import conversationSearchTool from "./ConversationSearchTool.ts";
 import retrieveOffloadedContentTool from "./RetrieveOffloadedContentTool.ts";
+import readUntrustedTool from "./ReadUntrustedTool.ts";
 import compactContextTool from "./CompactContextTool.ts";
 import checkpointTools from "./CheckpointTools.ts";
 import asyncTaskTools from "./AsyncTaskTools.ts";
@@ -36,6 +37,7 @@ import projectInstructionsTools from "./ProjectInstructionsTools.ts";
 import runToolProgramTool from "./RunToolProgramTool.ts";
 import goalTools from "./GoalTools.ts";
 import subAgentProgressTool from "./SubAgentProgressTool.ts";
+import oracleTool from "./OracleTool.ts";
 
 // ─── Parameter Types (aligned with tools-service) ──────────────
 
@@ -138,6 +140,7 @@ function initialize() {
     reminderTools,
     conversationSearchTool,
     retrieveOffloadedContentTool,
+    readUntrustedTool,
     compactContextTool,
     checkpointTools,
     asyncTaskTools,
@@ -146,6 +149,7 @@ function initialize() {
     runToolProgramTool,
     goalTools,
     subAgentProgressTool,
+    oracleTool,
   ];
 
   for (const toolOrTools of toolModulesList) {

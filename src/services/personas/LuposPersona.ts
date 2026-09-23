@@ -5,7 +5,7 @@ import {
   TOOL_NAMES,
 } from "#src/services/ToolTaxonomyConstants";
 import { ASYNC_TASK_TOOL_NAMES } from "#src/services/AsyncTaskConstants";
-import { deny, type PolicyRule } from "#src/services/PolicyEngine";
+import { allow, deny, type PolicyRule } from "#src/services/PolicyEngine";
 import { type Persona, type ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
 import PromptLocaleService from "#src/services/PromptLocaleService";
@@ -171,7 +171,7 @@ function buildInteractionRules(isAprilFools: boolean, locale = "en"): string {
 // Tool Policy Sections (conditionally injected)
 // ────────────────────────────────────────────────────────────
 
-const LUPOS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
+export const LUPOS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   {
     content: (locale) =>
       PromptLocaleService.get(locale, "personas.lupos.toolPolicyCore"),
@@ -358,22 +358,25 @@ const LUPOS_UNUSED_CORE_HARNESS_TOOLS = [
   LOCAL_TOOL_NAMES.PROPOSE_GOAL,
   LOCAL_TOOL_NAMES.UPDATE_GOAL,
   LOCAL_TOOL_NAMES.CLEAR_GOAL,
+  // New since the trim (prompt 22 L2, 2026-09-22): reaching him is a call
+  // to make on its own, so his pages stay on read_url until it is made.
+  LOCAL_TOOL_NAMES.READ_UNTRUSTED,
 ];
 
 // ────────────────────────────────────────────────────────────
-// Tool Policies (defence in depth)
+// Tool Policies — deny list (defence in depth)
 // ────────────────────────────────────────────────────────────
-// A Discord reply runs under autoApprove on behalf of whoever pinged the
-// wolf, so no approval card stands between a model's call and its effect.
-// availableTools/blockedTools already keep every tool below out of his
-// resolved set; these DENY rules hold if some future path makes one
-// reachable anyway (a client toggle, an explicit enabledTools, a tool
-// program or async dispatcher re-checking an inner call). A DENY is final
-// in the approval stack — full auto, every permission mode and sub-agents
-// included (AutoApprovalEngine.explain). Names are the live catalog's
-// (tools-service ToolSchemaService / Prism's InternalToolRegistry,
-// 2026-09-22); tools-service names absent from the shared TOOL_NAMES are
-// spelled out.
+// A Discord reply acts for whoever pinged the wolf, and nobody in the
+// channel can answer an approval card. availableTools/blockedTools already
+// keep every tool below out of his resolved set; these DENY rules hold if
+// some future path makes one reachable anyway (a client toggle, an explicit
+// enabledTools, a tool program or async dispatcher re-checking an inner
+// call). A DENY is final in the approval stack — full auto, every
+// permission mode and sub-agents included (AutoApprovalEngine.explain), and
+// it beats any APPROVE below (PolicyEngine: specific DENY first). Names are
+// the live catalog's (tools-service ToolSchemaService / Prism's
+// InternalToolRegistry, 2026-09-22); tools-service names absent from the
+// shared TOOL_NAMES are spelled out.
 const LUPOS_DENIED_TOOLS = [
   // Shell and command execution — the python/js sandboxes are his.
   TOOL_NAMES.EXECUTE_SHELL,
@@ -428,9 +431,196 @@ const LUPOS_DENIED_TOOLS = [
   "enable_light_night_lock",
 ];
 
-const LUPOS_POLICIES: PolicyRule[] = LUPOS_DENIED_TOOLS.map((toolName) =>
-  deny(toolName),
-);
+// ────────────────────────────────────────────────────────────
+// Tool Policies — allow list (least privilege)
+// ────────────────────────────────────────────────────────────
+// His turns are pinned to `dontAsk` (pinnedPermissionMode below): a request's
+// autoApprove or permissionMode no longer widens them, and a call runs
+// without a person only when its tier is AUTO or an APPROVE rule here names
+// it. Anything else his tier would put on an approval card is refused with
+// the don't-ask message, which the model reads and answers around.
+//
+// Every tools-service tool AutoApprovalEngine does not map is WRITE tier,
+// so this is most of his reachable universe: enabledByDefaultTools plus
+// what discovery may activate (availableTools minus blockedTools) — 160
+// tools on the 2026-09-22 catalog, of which only search_web, read_web_page,
+// retrieve_offloaded_content and the four discovery tools are AUTO. Left
+// out, so refused:
+//   - get_ip_info — with no argument it looks up the server's own IP: the
+//     owner's address, city and ISP, handed to anyone in a channel.
+// A tool tools-service later files under one of his domains is refused
+// until it is listed here — new reach for a public bot is a decision, not
+// a side effect of a catalog sync.
+const LUPOS_ALLOWED_TOOLS = [
+  // Discord — his own reach into the channel. Reads are scoped by
+  // tools-service to the conversation's guild and the channels the
+  // requester can see; actions carry lupos-bot's caps (round-1 contract).
+  "react_to_discord_message",
+  "search_discord_messages",
+  "get_discord_user_profile",
+  "get_discord_guild_members",
+  "get_discord_guild_channels",
+  "get_discord_guild_emojis",
+  "get_discord_voice_channel_members",
+  "get_discord_channel_activity_stats",
+  "get_discord_server_activity",
+  "get_discord_message_analytics",
+  "get_discord_message_leaderboard",
+  "get_discord_mention_leaderboard",
+  "get_discord_user_heatmap_data",
+  "get_discord_word_frequencies",
+  "get_bot_guilds",
+  "get_bot_stats",
+  "get_bot_activity_timeline",
+  "create_discord_poll",
+  "create_discord_thread",
+  "schedule_discord_reminder",
+  "list_discord_reminders",
+  "cancel_discord_reminder",
+  "set_discord_nickname",
+  // Gold — the hoard (capped per requester and per day by lupos-bot).
+  "get_discord_gold_balance",
+  "give_discord_gold",
+  "mug_discord_gold",
+  // Sandboxes and scratch reasoning (DANGER / WRITE tier by default).
+  TOOL_NAMES.EXECUTE_PYTHON,
+  TOOL_NAMES.EXECUTE_JAVASCRIPT,
+  TOOL_NAMES.CALCULATE_PRECISE,
+  TOOL_NAMES.THINK,
+  // Web reads beyond the AUTO-tier search_web / read_web_page.
+  TOOL_NAMES.READ_URL,
+  "search_news",
+  "search_images",
+  "search_videos",
+  "read_pdf",
+  "read_docx",
+  "read_csv",
+  "read_spreadsheet",
+  "read_image_text",
+  "read_rss_feed",
+  "get_wayback_snapshot",
+  // Images, audio and video — making and editing what Discord can attach.
+  TOOL_NAMES.GENERATE_IMAGE,
+  "manipulate_image",
+  "remove_background",
+  "describe_image",
+  "detect_objects",
+  "scan_barcode",
+  "generate_qr_code",
+  "generate_avatar",
+  "generate_ascii_banner",
+  "render_code",
+  "convert_color",
+  "get_emoji_combination",
+  "get_emoji_combinations",
+  "generate_chart",
+  TOOL_NAMES.GENERATE_AUDIO,
+  "remix_audio",
+  TOOL_NAMES.SYNTHESIZE_SPEECH,
+  "synthesize_speech_local",
+  "transcribe_audio",
+  TOOL_NAMES.TRIM_VIDEO,
+  "download_video",
+  "convert_video_to_gif",
+  // Pure computation.
+  "analyze_csv",
+  "compare_json",
+  "convert_encoding",
+  "convert_units",
+  "diff_text",
+  "generate_csv",
+  "generate_hash",
+  "parse_cron_expression",
+  "parse_datetime",
+  "test_regex",
+  "transform_json",
+  "validate_json_schema",
+  // Read-only lookups across his granted domains: knowledge, film and TV,
+  // music, Reddit, games, weather and space, events, trends, shopping,
+  // markets, places and time.
+  "get_anime",
+  "get_country",
+  "get_element",
+  "get_exoplanet",
+  "get_music",
+  "get_on_this_day",
+  "get_package_info",
+  "get_pypi_package",
+  "get_spotify",
+  TOOL_NAMES.SEARCH_SPOTIFY,
+  "get_stackoverflow_questions",
+  "get_wikipedia_summary",
+  "get_word_definition",
+  "get_youtube_video",
+  "search_youtube",
+  "list_development_indicators",
+  "search_books",
+  "search_library_docs",
+  "search_papers",
+  "search_patents",
+  "search_autotrader",
+  "search_craigslist",
+  "search_kijiji",
+  "browse_media",
+  "search_media",
+  "search_person",
+  "get_media_details",
+  "get_media_credits",
+  "get_media_genres",
+  "get_media_recommendations",
+  "get_now_playing_media",
+  "get_trending_media",
+  "get_watch_providers",
+  "search_reddit",
+  "search_reddit_subreddits",
+  "get_reddit_subreddit_feed",
+  "get_reddit_subreddit_info",
+  "get_reddit_subreddit_rules",
+  "get_reddit_subreddit_wiki_page",
+  "get_reddit_subreddit_wiki_pages",
+  "get_reddit_user_history",
+  "get_reddit_user_profile",
+  "get_dota",
+  "get_steam_profile",
+  "get_weather",
+  "get_weather_forecast",
+  "get_local_environment",
+  "get_detailed_air_quality",
+  "get_canada_weather_warnings",
+  "get_canada_avalanche_forecast",
+  "get_earthquakes",
+  "get_wildfires",
+  "get_tides",
+  "get_twilight",
+  "get_moon_phase",
+  "get_aurora_forecast",
+  "get_solar_activity",
+  "get_solar_wind",
+  "get_satellite_imagery",
+  "get_iss_location",
+  "get_near_earth_objects",
+  "get_space_launches",
+  "get_nasa_apod",
+  "get_events",
+  "get_trends",
+  "get_github_trending",
+  TOOL_NAMES.SEARCH_PRODUCTS,
+  TOOL_NAMES.GET_TRENDING_PRODUCTS,
+  TOOL_NAMES.GET_STOCK,
+  TOOL_NAMES.GET_FEAR_GREED_INDEX,
+  TOOL_NAMES.GET_POLLEN_FORECAST,
+  "convert_currency",
+  "get_time_in_timezone",
+  "search_places",
+  "search_nearby_places",
+  "search_airports",
+  "get_public_webcams",
+];
+
+const LUPOS_POLICIES: PolicyRule[] = [
+  ...LUPOS_DENIED_TOOLS.map((toolName) => deny(toolName)),
+  ...LUPOS_ALLOWED_TOOLS.map((toolName) => allow(toolName)),
+];
 
 // ────────────────────────────────────────────────────────────
 // Persona Definition
@@ -485,6 +675,18 @@ export const LuposPersona: Persona = {
       ),
   },
   toolPolicy: (context) => buildToolPolicy(LUPOS_TOOL_POLICY_SECTIONS, context),
+  // A tool he activates mid-turn — a pre-flight pick included — brings the
+  // sections it unlocks (Audio, Video, Music, Discord Actions) in its
+  // tool-update message.
+  toolPolicySections: LUPOS_TOOL_POLICY_SECTIONS,
+  // Every reply is a fresh conversation, so what makes his requests cheap is
+  // a prefix shared ACROSS conversations: the same tools and system prompt
+  // whatever the message. Pre-flight picks used to be declared among his
+  // defaults, reshuffling the tool block (sorted by name) and gating policy
+  // sections into the middle of the system prompt: two Discord messages
+  // shared ~140 tokens of a ~14K prefix. Activated instead, the picks ride
+  // a tool-update message after the user's message (audit K1).
+  activatePreflightTools: true,
   availableTools: LUPOS_AVAILABLE_TOOLS,
   // CORE_DISCOVER is deliberately NOT blocked: Lupos starts lean (see
   // enabledByDefaultTools) and relies on innate tool discovery to reach
@@ -549,6 +751,13 @@ export const LuposPersona: Persona = {
     "search_discord_messages",
   ],
   policies: LUPOS_POLICIES,
+  // Least privilege (see the allow list above): no request widens his turns,
+  // and nothing he calls waits on a card nobody in the channel can answer.
+  pinnedPermissionMode: "dontAsk",
+  // A reaction sent with the reply ends the turn: nothing in the reaction's
+  // `{ ok: true }` is worth another model call (EndTurnAfterTools). His
+  // Emoji Reactions section tells him to write the reply in that response.
+  endTurnAfterTools: ["react_to_discord_message"],
   capabilities: "",
   hasSomaticState: true,
   // Lupos's resting temperament: mildly cynical, restless, a buried streak

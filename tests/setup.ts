@@ -17,6 +17,9 @@ vi.mock('#config', () => ({
     geminiTransport: () => 'generate_content',
     ELEVENLABS_API_KEY: 'fake',
     MOONSHOT_API_KEY: 'fake',
+    // Same env parsing as the real accessor (tests switch it per case).
+    moonshotTransport: () => (process.env.MOONSHOT_TRANSPORT === 'openai' ? 'openai' : 'anthropic'),
+    moonshotCacheTtl: () => '5m',
     MOONSHOT_BASE_URL: undefined,
     INWORLD_BASIC: 'fake',
     PROVIDER_LM_STUDIO: [],

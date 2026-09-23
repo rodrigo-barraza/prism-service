@@ -74,9 +74,7 @@ export interface ToolExecutionContext {
   /** Parent loop's stored permission rules — inherited by spawned sub-agents. */
   _permissionRules?: import("#src/services/permissions/PermissionRuleSet").default;
   _permissionMode?: import("#src/services/permissions/PermissionModeState").PermissionModeHandle;
-  /** Parent loop's CriticGate toggle — inherited by spawned sub-agents. */
-  _enableCriticGate?: boolean;
-  /** Parent loop's CriticGate model — inherited by spawned sub-agents. */
+  /** Parent loop's auto-mode reviewer model — inherited by spawned sub-agents. */
   _criticModel?: string;
   /** Parent loop's cost ceiling — inherited by spawned sub-agents. */
   _maxCostDollars?: number;

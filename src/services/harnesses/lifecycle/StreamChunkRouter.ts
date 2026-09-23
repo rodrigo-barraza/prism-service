@@ -12,6 +12,7 @@ import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { mergeUsage } from "#src/utils/CostCalculator";
 import { takeNativeTurnInput } from "#src/services/harnesses/lifecycle/TurnInputDrain";
 import { stripToolCallMarkup } from "#src/utils/StreamChunkDispatcher";
+import { displayedToolCall } from "#src/services/harnesses/lifecycle/ToolSurface";
 import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
 import WebhookEventBus from "#src/services/WebhookEventBus";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
@@ -472,28 +473,27 @@ export function routeStreamChunk(
     pass.pendingToolCalls.push(toolCall);
     state.streamedToolCalls.push({ ...toolCall });
     trackToolDisplaySegment(harness, standardToolCallId);
+    // A bridged call is announced as the tool it names — the same name its
+    // `done` frame carries once the bridge is unwrapped.
+    const shown = displayedToolCall(toolName, streamChunk.args || {});
     emit({
       type: SERVER_SENT_EVENT_TYPES.TOOL_EXECUTION,
       tool: {
-        name: toolName,
-        args: streamChunk.args || {},
+        name: shown.name,
+        args: shown.args,
         id: standardToolCallId,
       },
-      toolEmoji: ToolOrchestratorService.getToolEmoji(toolName),
-      toolLabel: ToolOrchestratorService.getToolLabel(
-        toolName,
-        streamChunk.args || {},
-        true,
-      ),
+      toolEmoji: ToolOrchestratorService.getToolEmoji(shown.name),
+      toolLabel: ToolOrchestratorService.getToolLabel(shown.name, shown.args, true),
       status: "calling",
       timestamp: Date.now(),
     });
     WebhookEventBus.emit("request.tool_call.started", {
       requestId: context.requestId || null,
-      toolName,
-      toolEmoji: ToolOrchestratorService.getToolEmoji(toolName),
+      toolName: shown.name,
+      toolEmoji: ToolOrchestratorService.getToolEmoji(shown.name),
       toolCallId: standardToolCallId,
-      toolArgs: streamChunk.args || {},
+      toolArgs: shown.args,
       agent: context.agent || null,
       conversationId: context.conversationId || null,
       agentConversationId: context.agentConversationId || null,

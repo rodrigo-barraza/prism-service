@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { ProviderError } from "#src/utils/errors";
 import logger from "#src/utils/logger";
 import { extractAnthropicRateLimits } from "#src/utils/rateLimits";
@@ -233,7 +234,19 @@ const EFFORT_BUDGET_MAP: Record<string, number> = {
 
 let client: Anthropic | null = null;
 
+/**
+ * An Anthropic Messages–compatible endpoint this adapter runs against for
+ * the duration of a call (Kimi K3, providers/moonshot.ts): its client
+ * replaces Anthropic's, and adapts each request to what the endpoint takes.
+ */
+export interface AnthropicCompatibleEndpoint {
+  client: () => Anthropic;
+}
+export const anthropicCompatibleEndpoint = new AsyncLocalStorage<AnthropicCompatibleEndpoint>();
+
 function getClient(): Anthropic {
+  const endpoint = anthropicCompatibleEndpoint.getStore();
+  if (endpoint) return endpoint.client();
   if (!client) {
     if (!ANTHROPIC_API_KEY) {
       throw new ProviderError("anthropic", "ANTHROPIC_API_KEY is not set", 401);

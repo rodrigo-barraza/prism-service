@@ -133,6 +133,8 @@ export function subAgentModeHandle(
     source: parent.source,
     unattended: parent.unattended,
   });
+  // One auto-mode breaker and classifier bill for the whole delegation tree.
+  handle.autoMode = parent.autoMode;
   const dispose = parent.onChange((change) => {
     handle.set(narrow(change.mode), change.source);
   });

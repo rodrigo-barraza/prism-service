@@ -618,8 +618,8 @@ describe("check — policy integration", () => {
       { name: "execute_shell", args: {}, id: "tc2" },
     ];
     engine.checkBatch(toolCalls);
-    // The originals (which flow to ToolExecutor/CriticGate) must carry the
-    // tier — without this, CriticGate saw every call as WRITE and never fired.
+    // The originals (which flow to ToolExecutor and the auto-mode stage of
+    // the ApprovalGate) must carry the stamp.
     expect((toolCalls[0] as { _approval?: { tier: number } })._approval?.tier).toBe(APPROVAL_TIERS.AUTO);
     expect((toolCalls[1] as { _approval?: { tier: number } })._approval?.tier).toBe(APPROVAL_TIERS.DANGER);
   });

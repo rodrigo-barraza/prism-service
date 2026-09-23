@@ -10,14 +10,10 @@ Self-contained task prompts for the items in `docs/harness_modernization_2026-09
 
 | # | File | Branch slug(s) | Repos | Size | Depends on | Shares hub files with |
 |---|---|---|---|---|---|---|
-| 12 | `12-permission-rules-and-modes.md` | `permission-rules-store`, `permission-modes`, `auto-mode-classifier` | service, client | L | 05 | 13, 18, 20 (`AutoApprovalEngine.ts`) |
-| 13 | `13-durable-run-state.md` | `persist-pending-decisions`, `resume-parked-turns`, `budget-pause` | service, client | L | 05 | 12, 17 |
-| 17 | `17-subagents-modern.md` | `nonblocking-subagent-dispatch`, `agent-definitions-as-files`, `oracle-and-independent-branches` | service | L | 04, 09 | 11, 21 |
 | 19 | `19-skills-progressive-disclosure.md` | `skills-catalog-and-loader`, `skill-folders-and-plugins`, `workspace-instructions` | service, client | L | 07 | 10 (`system-prompt/index.ts`) |
 | 22 | `22-security-depth.md` | `memory-provenance`, `quarantined-reader`, `external-input-lane` | service | L | — | 19 (memory/system prompt) |
 | 23 | `23-observability-and-evals.md` | `otel-tracing`, `log-redaction`, `benchmark-reliability` | service | L | — | 10 (`RequestLogger.ts`) |
 | 24 | `24-event-protocol-and-acp.md` | `event-protocol-v1`, `acp-server`, `acp-client-runtime` | service, client | L | — | 26 (client event types) |
-| 25 | `25-provider-native-features.md` | `openai-gpt6-native`, `gemini-current`, `kimi-and-model-profiles` | service | L | 02 | 02, 10 |
 | 26 | `26-client-chat-architecture.md` | `chat-characterization-tests`, `chat-event-reducer`, `chat-component-split` | client | L | 08 | every client prompt |
 
 ## Waves
@@ -99,6 +95,7 @@ PRISM_SERVICE_PORT=$PORT PRISM_SERVICE_MONGO_DB_NAME=prism_test_<slug> \
   - Use `POST http://localhost:$PORT/agent?stream=false` with headers `x-username: rodrigo` and `x-project: prism-test`.
   - The body is flat: `provider`, `model`, `agent`, `messages`, `conversationId`, `autoApprove`, `workspaceRoot`, and so on.
   - Streaming is the same endpoint without `stream=false`, read with `curl -N`.
+- **What the model saw.** The `requests` rows keep message text, not tool-result bodies: a page fetched with `read_web_page` does not show up in them, so a sentinel search there passes whether or not the page leaked. Search the turn's `agent_conversations` document instead (its `tool` messages are the history the next request is built from); a `?stream=false` turn lands there, not in `conversations`. Run a control turn that is supposed to leak, to prove the search can see it (prompt 22 L2, 2026-09-22).
 - **Live test files.** `tests/live/*.live.test.ts` default `PRISM_TEST_URL` to production. Always pass `PRISM_TEST_URL=http://localhost:$PORT`, then run `"$WT"/node_modules/.bin/vitest run --root "$WT" --config "$WT"/vitest.live.config.ts <file>`.
 - **tools-service.**
   - If your task changes tools-service, boot it from its worktree: `TOOLS_SERVICE_PORT=<port2> TOOLS_SERVICE_MONGO_DB_NAME=tools_test_<slug> node "$TOOLS_WT"/src/boot.ts`.

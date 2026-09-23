@@ -70,7 +70,7 @@ export interface PendingToolCallSummary {
   batchId?: string;
   preview?: ApprovalPreview | null;
   _approval?: { tier: string; tierLabel: string };
-  /** Who asked for the card besides the tier: a hook, or a restart ("run it again?"). */
+  /** Who asked for the card besides the tier: a hook, a restart ("run it again?"), or auto mode ("classifier"). */
   requestedBy?: string;
   reason?: string | null;
 }
@@ -85,7 +85,7 @@ export interface ApprovalRequestCall {
   /** The tool's JSON-Schema `parameters`; edited arguments must satisfy it. */
   argsSchema?: Record<string, unknown> | null;
   preview?: ApprovalPreview | null;
-  /** Who asked for the card besides the tier: a hook, or a restart ("run it again?"). */
+  /** Who asked for the card besides the tier: a hook, a restart ("run it again?"), or auto mode ("classifier"). */
   requestedBy?: string;
   reason?: string | null;
 }

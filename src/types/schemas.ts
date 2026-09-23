@@ -129,6 +129,10 @@ export const ChatRequestSchema = z
       .optional(),
     // Nobody is watching this turn: anything that would ask is denied instead.
     unattended: z.boolean().nullable().optional(),
+    // At the cost cap: "pause" parks the turn until its cap is raised (PATCH
+    // /conversations/:id/budget), "stop" ends it. Unset: pause, unless
+    // autoApprove / unattended say nobody will answer — then stop.
+    onBudgetReached: z.enum(["pause", "stop"]).nullable().optional(),
     planFirst: z.boolean().nullable().optional(),
     maxIterations: z.number().nullable().optional(),
     maxSubAgentIterations: z.number().nullable().optional(),
@@ -139,7 +143,6 @@ export const ChatRequestSchema = z
     agentContext: z.unknown().nullable().optional(),
     workspaceRoot: z.string().nullable().optional(),
     workspaceEnabled: z.boolean().nullable().optional(),
-    enableCriticGate: z.boolean().nullable().optional(),
     criticModel: z.string().nullable().optional(),
     reminderModel: z.string().nullable().optional(),
     reminderProvider: z.string().nullable().optional(),
@@ -632,4 +635,25 @@ export const GetPromptsQuerySchema = z.object({
 export const PostClaudeConfigImportSchema = z.object({
   workspacePath: z.string().min(1, "workspacePath is required"),
   agent: z.string().nullable().optional(),
+  /** Preview what would be imported; write nothing. */
+  dryRun: z.boolean().optional().default(false),
 });
+
+/** A plugin zip is at most this big (base64 is 4/3 of it). */
+export const PLUGIN_ARCHIVE_MAX_BYTES = 25 * 1024 * 1024;
+
+export const PostPluginImportSchema = z
+  .object({
+    workspacePath: z.string().min(1).optional(),
+    archiveBase64: z
+      .string()
+      .min(1)
+      .max(Math.ceil((PLUGIN_ARCHIVE_MAX_BYTES * 4) / 3) + 4, "the plugin archive is larger than 25 MB")
+      .optional(),
+    archiveName: z.string().max(255).optional(),
+    agent: z.string().nullable().optional(),
+    dryRun: z.boolean().optional().default(false),
+  })
+  .refine((body) => (body.workspacePath ? 1 : 0) + (body.archiveBase64 ? 1 : 0) === 1, {
+    message: "send exactly one source: workspacePath or archiveBase64",
+  });

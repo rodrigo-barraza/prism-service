@@ -79,7 +79,7 @@ export const THOUGHT_STRUCTURE_DEFINITIONS: ThoughtStructureDefinition[] = [
     displayName: "Tree of Thoughts",
     abbreviation: "ToT",
     description:
-      "Generates N parallel reasoning branches per iteration, scores each on correctness/risk/efficiency/completeness via a separate LLM judge, selects the best branch, and backtracks with reflexion-based self-correction on validation failure. Supports configurable BFS/DFS search strategies, adaptive branch count decay, and failed-approach memory to prevent repeating unsuccessful strategies. Filesystem state is checkpointed and restored on backtrack.",
+      "Generates N independent reasoning branches per iteration, scores each on correctness/risk/efficiency/completeness via a separate LLM judge, selects the best branch, and backtracks with reflexion-based self-correction when a validator (type-check, lint, parse) rejects what it ran. Siblings never see each other's output, and the judge only selects — it cannot verify, so it never sends a round back. Supports configurable BFS/DFS search strategies, adaptive branch count decay, and a memory of validator-rejected approaches. Filesystem state is checkpointed and restored on backtrack.",
     paperTitle:
       "Tree of Thoughts: Deliberate Problem Solving with Large Language Models",
     paperAuthors: "Yao et al.",
@@ -115,7 +115,7 @@ export const THOUGHT_STRUCTURE_DEFINITIONS: ThoughtStructureDefinition[] = [
         type: "number",
         defaultValue: "5.0",
         description:
-          "Score threshold (0-10) for proactive backtracking. Branches scoring below this are pruned before tool execution. Set lower to be more tolerant, higher to be more selective.",
+          "DFS only: the score (0-10) a sibling needs to be accepted; below it the next sibling is drawn, independently of the pruned one. BFS runs its best branch whatever it scores — the judge selects, it never discards a round.",
       },
     ],
     alignment: [
@@ -124,6 +124,12 @@ export const THOUGHT_STRUCTURE_DEFINITIONS: ThoughtStructureDefinition[] = [
         status: "aligned",
         detail:
           "Generates N parallel branches with structured diversity descriptors (minimal, thorough, alternative, risk-minimizing) — maps to the paper's thought generator G(pθ, s, k)",
+      },
+      {
+        component: "Independent siblings",
+        status: "extended",
+        detail:
+          "A branch's prompt is the committed history plus its own diversity instruction — never a sibling's output, in BFS or DFS. Agents that read each other's solutions converge within one round (arXiv 2608.23541)",
       },
       {
         component: "Deliberate evaluation",
@@ -141,13 +147,13 @@ export const THOUGHT_STRUCTURE_DEFINITIONS: ThoughtStructureDefinition[] = [
         component: "DFS search",
         status: "aligned",
         detail:
-          "DFS explores siblings sequentially: generate one branch, score it, accept if above value threshold, else try next sibling. Falls back to best available after exhausting budget — mirrors the paper's depth-first pruning (Algorithm 2)",
+          "DFS explores siblings sequentially: generate one branch, score it on its own, accept if above value threshold, else draw the next sibling independently. Falls back to best available after exhausting budget — mirrors the paper's depth-first pruning (Algorithm 2)",
       },
       {
-        component: "Proactive backtracking",
-        status: "aligned",
+        component: "State-evaluator pruning (paper)",
+        status: "simplified",
         detail:
-          "Value-threshold pruning before tool execution: if best branch scores below configurable threshold, all branches are discarded and the iteration re-branches with reflexion — matches the paper's state evaluator V(s) pruning",
+          "Not implemented as a redo: the paper's V(s) discards states rated low. Here the evaluator is an LLM reading previews that runs nothing, and a reviewer's reject/redo authority costs tokens without improving results unless it can verify the work (arXiv 2609.14767) — so it selects the best branch and never discards a round. Redo is the validators' (reactive backtracking)",
       },
       {
         component: "Reactive backtracking",
@@ -171,7 +177,7 @@ export const THOUGHT_STRUCTURE_DEFINITIONS: ThoughtStructureDefinition[] = [
         component: "Failed approach memory",
         status: "extended",
         detail:
-          "Tracks failed approaches and injects them as anti-patterns into subsequent branch generation — inspired by Reflexion (Shinn et al. 2023), not in ToT paper",
+          "Approaches a validator rejected after they ran are injected as anti-patterns into the re-branch — inspired by Reflexion (Shinn et al. 2023), not in ToT paper. A sibling the judge merely rated low is not remembered",
       },
       {
         component: "Multi-criteria scoring rubric",
@@ -218,6 +224,12 @@ export const THOUGHT_STRUCTURE_DEFINITIONS: ThoughtStructureDefinition[] = [
         status: "aligned",
         detail:
           "Generates N parallel branches with structured diversity descriptors — maps to the paper's Generate operation",
+      },
+      {
+        component: "Independent generation",
+        status: "extended",
+        detail:
+          "Branches never see each other before they are scored; only the synthesis pass reads them all (arXiv 2608.23541: agents that read each other's solutions converge). A round that scores low is synthesized from its best branch, not discarded — the judge cannot verify (arXiv 2609.14767)",
       },
       {
         component: "Multi-criteria evaluation",

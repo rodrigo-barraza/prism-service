@@ -142,10 +142,10 @@ describe("the engine, mode by mode", () => {
     expect(outcome(engine, editInside)).toBe("allow");
   });
 
-  it("auto asks where the classifier would decide — its failure mode — and runs reads and workspace edits", () => {
+  it("auto hands the rest to its classifier (the ApprovalGate runs it) and runs reads and workspace edits", () => {
     const result = engineIn("auto").check({ ...shell });
-    expect(result).toMatchObject({ isApproved: false, layer: "mode" });
-    expect(result.reason).toMatch(/classifier/);
+    expect(result).toMatchObject({ isApproved: false, awaitsClassifier: true, layer: "classifier" });
+    expect(result.isDenied).toBeFalsy();
   });
 
   it("reads the live handle on every check — a switch applies to the next call", () => {
@@ -282,6 +282,35 @@ describe("the mode a turn starts in", () => {
       mode: "default",
       source: "settings",
     });
+  });
+
+  it("a persona's pinned mode wins over the request, the conversation, the settings and an owner's bypass", async () => {
+    process.env[BYPASS_OWNERS_ENV_VAR] = "rodrigo";
+    settingsSection.permissions = { defaultMode: "acceptEdits" };
+    for (const requested of ["bypass", "acceptEdits", "auto", undefined]) {
+      expect(
+        await resolveTurnPermissionMode({ requested, storedMode: "bypass", username: "rodrigo", pinned: "dontAsk" }),
+        String(requested),
+      ).toEqual({ mode: "dontAsk", source: "persona" });
+    }
+    expect(
+      await resolveTurnPermissionMode({ unattended: true, storedMode: "plan", pinned: "dontAsk" }),
+    ).toEqual({ mode: "dontAsk", source: "persona" });
+    // Only a narrowing mode pins; anything else is ignored.
+    expect(
+      await resolveTurnPermissionMode({ requested: "plan", storedMode: null, username: "u", pinned: "bypass" }),
+    ).toMatchObject({ mode: "plan", source: "request" });
+  });
+
+  it("a pinned handle cannot be switched — not by the selector, not by an approved plan", () => {
+    const handle = new PermissionModeHandle("dontAsk", { source: "persona", pinned: true });
+    const changes: unknown[] = [];
+    handle.onChange((change) => changes.push(change));
+    expect(handle.set("bypass", "user")).toBe(false);
+    expect(handle.set("default", "plan_approved")).toBe(false);
+    expect(handle.mode).toBe("dontAsk");
+    expect(handle.cannotAsk).toBe(true);
+    expect(changes).toEqual([]);
   });
 
   it("a handle tells its listeners about real changes only", () => {

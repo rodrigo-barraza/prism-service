@@ -3,6 +3,7 @@ import type {
   AgentPermissionMode,
 } from "#src/services/agents/AgentDefinitionFields";
 import type { PolicyRule } from "#src/services/PolicyEngine";
+import type { PinnablePermissionMode } from "#src/services/permissions/PermissionModes";
 import type { EmotionPersonality } from "#src/services/somatic/SomaticConstants";
 import type { RoleModelSpec } from "#src/services/routing/AgentModelPins";
 
@@ -97,6 +98,43 @@ export interface Persona {
   coreToolsLocked?: boolean;
   /** Declarative tool call policies (serialized for custom agents). */
   policies?: PolicyRule[];
+  /**
+   * The permission mode every root turn of this agent runs in, whatever the
+   * request (`permissionMode`, `autoApprove`), the conversation or the
+   * settings say — and "approve all" (full auto) never applies to it
+   * (PermissionModeState.resolveTurnPermissionMode). Only modes that narrow
+   * can be pinned. For an agent that acts for whoever talks to it: LUPOS runs
+   * `dontAsk`, so a tool his APPROVE policies do not list and whose tier
+   * would ask is refused, never parked on a card nobody in the channel sees.
+   */
+  pinnedPermissionMode?: PinnablePermissionMode;
+  /**
+   * Fire-and-forget tools (the StopAtTools pattern): when EVERY call of a
+   * model response is one of these and the same response carried reply
+   * text, the calls run and the turn ends with that text — no further model
+   * call to read results nobody needs (harnesses/lifecycle/EndTurnAfterTools).
+   * Any other tool in the batch, or no text, and the loop goes on as usual.
+   * LUPOS: his emoji reaction.
+   */
+  endTurnAfterTools?: string[];
+  /**
+   * Pre-flight tool discovery's picks reach the model as an activation — a
+   * tool-update message after the user's message, called through the fixed
+   * `tool_call` bridge — instead of joining the declared tool block
+   * (AgenticLoopService). Every conversation of the persona then sends the
+   * same tools and the same system prompt, so a new conversation starts on
+   * a cached prefix (audit K1). For personas whose every turn is a fresh
+   * conversation (LUPOS: one per Discord reply). Bridge-mode providers
+   * (Gemini, local models) only; elsewhere picks are declared as before.
+   */
+  activatePreflightTools?: boolean;
+  /**
+   * The persona's `requires`-gated tool-policy sections, when its toolPolicy
+   * is built from them. A tool activated mid-turn brings the sections it
+   * unlocks in its tool-update message — the system prompt was assembled
+   * before it was callable.
+   */
+  toolPolicySections?: ToolPolicySection[];
   capabilities: string;
   /** When true, tool descriptions in the system prompt are truncated to the first sentence and optional parameters are omitted. Saves ~1,500 tokens for conversational agents that don't need full parameter docs. */
   compactToolDocs?: boolean;

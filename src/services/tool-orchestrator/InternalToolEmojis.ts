@@ -14,6 +14,7 @@ export const INTERNAL_TOOL_EMOJIS: Record<string, string[]> = {
   execute_skill: ["⚡", "🪄"],
   list_skills: ["📋", "🪄"],
   load_skill: ["📖", "🪄"],
+  read_skill_file: ["📄", "🪄"],
   delete_skill: ["🗑️", "🪄"],
 
   // Worktree
@@ -52,6 +53,7 @@ export const INTERNAL_TOOL_EMOJIS: Record<string, string[]> = {
   delete_subagents: ["🗑️", "👥"],
   resume_subagent: ["🔄", "🤖"],
   report_progress: ["📣", "🤖"],
+  ask_oracle: ["🔮", "💬"],
 
   // Async tasks
   run_async_task: ["⚡", "🔄"],
@@ -60,6 +62,9 @@ export const INTERNAL_TOOL_EMOJIS: Record<string, string[]> = {
 
   // Programmatic tool composition
   run_tool_program: ["🧮", "🔧"],
+
+  // Quarantined reader (untrusted content → schema-valid JSON)
+  read_untrusted: ["🧪", "📄"],
 
   // Goals (persistent objective on the conversation)
   propose_goal: ["🎯", "📝"],

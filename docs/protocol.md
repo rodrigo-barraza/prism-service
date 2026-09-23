@@ -14,6 +14,9 @@ two disagree, `events.ts` is right.
 | `/ws/chat` — a turn it drives, a conversation it views (`subscribe`) | WebSocket, one JSON object per text frame | `TurnEvent` |
 | `POST /synthesis/generate` | SSE response body | `SynthesisEvent` (below) |
 
+Two clients read these streams: prism-client, and the ACP server (`src/acp/server.ts`,
+[`acp.md`](acp.md)), which turns them into Agent Client Protocol updates for editors.
+
 The benchmark, workflow, webhook, LM Studio load and admin change streams, `/ws/live` (Gemini Live
 audio) and `/ws/text-to-audio` are endpoint-specific. They are not part of this protocol.
 
@@ -129,7 +132,7 @@ taken from recorded streams ([`tests/fixtures/sse-transcripts`](../tests/fixture
 | `tool_execution` | `status: streaming \| calling \| done \| error`, `tool: {id, name, args, responsesItemId?, result?, durationMilliseconds?, durationMs?}`, `toolEmoji?`, `toolLabel?`, `timestamp?` | An agent-loop tool call. `streaming` (arguments still arriving, `args: {}`), then `calling`, then `done` or `error` with `result`. `durationMs` is a deprecated duplicate of `durationMilliseconds`. |
 | `tool_output` | `toolCallId`, `name`, `event: start \| stdout \| stderr \| exit`, `data?`, `meta?` | Live output of a streaming tool (shell, python, javascript, run_command). |
 | `toolCall` | `id`, `name?`, `args`, `status?`, `result?`, `responsesItemId?`, `thoughtSignature?`, `durationMilliseconds?` | A provider-executed (native / MCP) call, and `/chat`'s function-calling rounds. |
-| `approval_required` | `toolCallId`, `batchId`, `batchSize`, `toolCall: {id, name, args}`, `tier?`, `tierLabel?`, `preview?: {kind: "diff", path, diff, isNewFile?, isTruncated?}`, `requestedBy?: "hook" \| "restart"`, `reason?`, `protectedPath?`, `alwaysAsks?: true`, `mode?`, `subAgentId?`, `subAgentDescription?`, `approvalConversationId?` | One card per call. Decide it with `POST /agent/approve`. `requestedBy: "restart"` asks whether to run again a call a server restart interrupted. `protectedPath` (with `alwaysAsks`) marks a write to a protected path, which asks in every mode; `mode` is the permission mode the call was judged in. The `subAgent*` fields appear when a sub-agent asked. |
+| `approval_required` | `toolCallId`, `batchId`, `batchSize`, `toolCall: {id, name, args}`, `tier?`, `tierLabel?`, `preview?: {kind: "diff", path, diff, isNewFile?, isTruncated?}`, `requestedBy?: "hook" \| "restart" \| "classifier"`, `reason?`, `category?`, `protectedPath?`, `alwaysAsks?: true`, `mode?`, `subAgentId?`, `subAgentDescription?`, `approvalConversationId?` | One card per call. Decide it with `POST /agent/approve`. `requestedBy: "restart"` asks whether to run again a call a server restart interrupted. `requestedBy: "classifier"` is auto mode putting the call to the user instead of deciding: its classifier asked, could not decide, or is paused after repeated denials (`reason` says which; `category` is the classifier's named category when it gave one). `protectedPath` (with `alwaysAsks`) marks a write to a protected path, which asks in every mode; `mode` is the permission mode the call was judged in. The `subAgent*` fields appear when a sub-agent asked. |
 | `approval_decided` | `toolCallId`, `batchId`, `decision: allow \| deny`, `scope: call \| batch \| conversation`, `source: user \| superseded \| turn_ended`, `reason?`, `editedByUser?`, `subAgent*?` | Close the card, whoever decided it. |
 | `plan_proposal` | `plan`, `steps`, `autoApproved`, `toolCallId`, `batchId` | Plan mode's proposal. It is decided like a tool approval. |
 | `user_question` | `questionId`, `blocking`, `context`, `questions: [{question, header, options: [{label, preview}], multiSelect, elicitation?: {server, mode: form \| url, requestedSchema?, url?}}]` | `ask_user`, and an MCP server's elicitation (`elicitation` set). Answer with `POST /agent/answer`. With `blocking: false`, the agent keeps working. |
@@ -207,6 +210,8 @@ Fields for each `sub_agent_status` `message`:
 | `context_exhausted` | `availableOutputTokens`, `contextWindow` |
 | `context_truncated` | `strategy`, `estimatedTokens` |
 | `cost_limit_reached` | `estimatedCost`, `maxCostDollars`, `iteration` |
+| `budget_reached` | `pauseId`, `spentDollars`, `maxCostDollars`, `limitedBy: "turn" \| "goal"`, `iteration`, `turnCapDollars?`, `goalMaxCostDollars?` — the tree paused at its cost cap; raise it with `PATCH /conversations/:id/budget` (or the goal's budget) |
+| `budget_resolved` | `pauseId`, `action: "raise" \| "stop"`, `source: "user" \| "superseded" \| "turn_ended"`, `maxCostDollars?` |
 | `repetition_detected`, `semantic_stall_detected` | `iteration`, `rule`, `retry` |
 | `system_reminder_injected` | `iteration`, `interval` |
 | `skills_injected` | `skills` |

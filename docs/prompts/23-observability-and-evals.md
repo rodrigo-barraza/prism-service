@@ -7,36 +7,17 @@
 
 > **Landing 1 `otel-tracing` — done** (prism-service + tools-service, branch `otel-tracing`, 2026-09-22): OpenTelemetry GenAI spans (`src/services/Tracing.ts`; off unless `OTEL_EXPORTER_OTLP_ENDPOINT`), W3C `traceparent` to tools-service (which forwards it on its fetches) and MCP (header and `params._meta`), a server-minted `traceId`, and each executed tool's own duration on its request row (`toolExecutions`), which `/admin/stats/tools` now reports.
 > Tests: `src/services/__tests__/{agentTracing,tracingDisabled,mcpTraceContext}.test.ts`, `tests/{toolsServiceTraceparent,chatRoutes,adminStats}.test.ts`; tools-service `tests/TraceContextForwarding.test.ts`.
-> For Landing 2: spans carry no messages, tool args or results, and `toolExecutions` only id/name/duration/outcome, so redaction still targets the existing row, hook and error writes; a new row field goes through RequestLogger's `*RowFields` helpers (both `log()` and `completePending()`).
+
+> **Landing 2 `log-redaction` — done** (prism-service, branch `log-redaction`, 2026-09-22): one function, `redactSecrets` (`src/utils/SecretRedaction.ts`), masks credentials to `***<last4>` in every request row (`log`, `insertPending`, `completePending`, their webhook copies — which is where prompt/agent hook payloads land) and every logger line. It catches provider key shapes, PEM keys, JWTs, Bearer/Basic, URL passwords, secret assignments, the values of the secret-named environment variables (the vault's suffixes; names never written) and `PRISM_LOG_REDACTION_DENYLIST`, with memoised long strings (~6 ms/MB once, then a lookup).
+> Tests: `src/utils/__tests__/{SecretRedaction,loggerRedaction}.test.ts` (per-shape fixtures, false-positive corpus, env/denylist values, backtracking guards), `src/services/__tests__/requestLogRedaction.test.ts` (rows, webhook copies, hook payloads).
 
 ## Today
-- **Secrets at rest.** Request logs store tool args, results and hook payloads verbatim (`RequestLogger.ts` ~161–184; only `data:` URIs are stripped).
 - **Benchmarks** cover one prompt × models × trials, with 8 match modes, an LLM judge and trajectory assertions (`benchmark/BenchmarkEvaluator.ts` ~268–331). They have no datasets, no pass^k, no harness-setting sweeps and no scheduled regression runs.
 
 ## Reference
 - **`claude plugin eval` graders**: regex, tool_used, file_exists, llm, baseline.
 - **Warp's scorers** sample 25% of runs.
 - **Research.** AgentChaos (arXiv 2608.06790): HTTP-level fault injection costs up to 50 points of pass@1, and robustness depends on the implementation. Also 2609.01660: per-step reliability decays over long runs.
-
----
-
-## Landing 2 — `log-redaction`
-
-**Changes.**
-- **One redaction function**, applied when request rows, hook payload logs and error logs are written. It catches:
-  - provider key shapes (`sk-…`, `sk-ant-…`, `AIza…`, `xox[abp]-…`, `ghp_…` / `github_pat_…`);
-  - bearer and Basic auth headers, JWTs, PEM private keys;
-  - **the values of known secret variables**: the vault key names for this service, matched by value, never logging the names themselves as data;
-  - a configurable denylist.
-- **Masking.** `***<last4>` keeps rows debuggable.
-- **No false positives.** Test on a corpus of normal text, code, base64 media stubs and UUIDs.
-
-**Tests.**
-- **Red first.** A tool result containing a fake `sk-ant-` key is stored masked. (Red: verbatim.)
-- **Per-pattern fixtures.**
-- **The false-positive corpus** passes unchanged.
-- **Secret-value matching** works on a fake variable set up in the test.
-- **Hook payloads** are masked too.
 
 ---
 

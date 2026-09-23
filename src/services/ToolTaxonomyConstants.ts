@@ -47,4 +47,5 @@ export const LOCAL_TOOL_NAMES = {
   PROPOSE_GOAL: "propose_goal",
   UPDATE_GOAL: "update_goal",
   CLEAR_GOAL: "clear_goal",
+  READ_UNTRUSTED: "read_untrusted",
 } as const;

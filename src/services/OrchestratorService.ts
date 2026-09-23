@@ -64,6 +64,12 @@ import {
   type DispatchDelivery,
 } from "./orchestrator/DetachedDispatchRegistry.ts";
 import {
+  admitSpawn,
+  capDelegationDepth,
+  resetSpawnLedgers,
+  resolveSpawnCaps,
+} from "./orchestrator/SpawnCaps.ts";
+import {
   applyRunPins,
   composeSubAgentPolicies,
   pinnedSubAgentModel,
@@ -185,6 +191,14 @@ function isSameProviderFamily(firstProvider: string, secondProvider: string): bo
 /** Active sub-agents spawned via chat tools, keyed by agentId */
 const activeSubAgents = new Map<string, SubAgentState>();
 
+/**
+ * Team completions posted into a running parent turn's mailbox and not yet
+ * known to be read, keyed by the mailbox entry id. A wait_for_tasks that
+ * returns every agent of one withdraws the entry before the turn drains it
+ * — the parent reads the results once (waitForAgents).
+ */
+const completionsInMailbox = new Map<string, { conversationId: string; agentIds: string[] }>();
+
 // Register shutdown cleanup — abort all running sub-agents and remove worktrees
 registerCleanup(async () => {
   const running = [...activeSubAgents.values()].filter(
@@ -267,25 +281,112 @@ export class OrchestratorService {
    * collects the diff when complete, and injects a [SUB-AGENT COMPLETED] notification into
    * the orchestrator's conversation.
    */
-  static async spawnFromTool({
-    description,
-    prompt,
-    files,
-    model,
-    agent: memberAgentName,
-    assignedProvider,
-    assignedModel,
-    routing: memberRouting,
-    agentIndex,
-    globalSpawnIndex,
-    teamSize,
-    round,
-    totalRounds,
-    orchestratorContext,
-    preserveWorktree,
-    awaitCompletion = false,
-    onRegistered,
-  }: OrchestratorSpawnParams): Promise<SubAgentResult | { error: string }> {
+  static async spawnFromTool(
+    assignment: OrchestratorSpawnParams,
+  ): Promise<SubAgentResult | { error: string }> {
+    const admission = await OrchestratorService._admitSpawn(assignment.orchestratorContext);
+    if (!admission.admitted) return { error: admission.error };
+    try {
+      return await OrchestratorService._spawnAdmitted(assignment, admission);
+    } finally {
+      // Released at registration already; this covers a spawn that threw first.
+      admission.release();
+    }
+  }
+
+  /**
+   * The runaway caps (orchestrator/SpawnCaps.ts), for one spawn from
+   * `orchestratorContext`'s agent: its delegation depth, then the spawn and
+   * concurrency caps of its ROOT conversation.
+   */
+  static async _admitSpawn(orchestratorContext: OrchestratorContext): Promise<
+    | { admitted: false; error: string }
+    | {
+        admitted: true;
+        release: () => void;
+        rootConversationId: string;
+        currentRecursionDepth: number;
+      }
+  > {
+    const caps = await resolveSpawnCaps();
+    const currentRecursionDepth = orchestratorContext.recursionDepth ?? 0;
+    const maxRecursionDepth = capDelegationDepth(orchestratorContext.maxRecursionDepth, caps);
+
+    // Depth 0 = sub-agent spawning disabled entirely
+    if (maxRecursionDepth === 0) {
+      return {
+        admitted: false,
+        error: "Sub-agent spawning is disabled (recursion depth is set to 0).",
+      };
+    }
+
+    if (currentRecursionDepth >= maxRecursionDepth) {
+      return {
+        admitted: false,
+        error: `Sub-agent spawning limit reached. Current depth ${currentRecursionDepth} exceeds or matches max depth ${maxRecursionDepth}.`,
+      };
+    }
+
+    // Counted per ROOT conversation, not process-wide: a global count let
+    // one conversation's fan-out refuse every spawn in every other one.
+    const rootConversationId = OrchestratorService.getRootConversationId(
+      orchestratorContext.conversationId || orchestratorContext.agentConversationId || "",
+    );
+    const runningCount = Array.from(activeSubAgents.values()).filter(
+      (subAgent) =>
+        subAgent.status === SYSTEM_STATUSES.RUNNING &&
+        OrchestratorService.rootOfSubAgent(subAgent) === rootConversationId,
+    ).length;
+    const admission = admitSpawn(rootConversationId, runningCount, caps);
+    if (!admission.admitted) {
+      logger.warn(`[Orchestrator] Spawn refused in conversation ${rootConversationId}: ${admission.error}`);
+      return admission;
+    }
+    return {
+      admitted: true,
+      release: admission.release,
+      rootConversationId,
+      currentRecursionDepth,
+    };
+  }
+
+  /** The root conversation a sub-agent's tree belongs to. */
+  private static rootOfSubAgent(subAgent: SubAgentState): string {
+    return (
+      subAgent.rootConversationId ??
+      OrchestratorService.getRootConversationId(
+        subAgent.parentConversationId || subAgent.parentAgentConversationId || "",
+      )
+    );
+  }
+
+  /** spawnFromTool past the runaway caps: the admission's reservation ends at registration. */
+  private static async _spawnAdmitted(
+    {
+      description,
+      prompt,
+      files,
+      model,
+      agent: memberAgentName,
+      assignedProvider,
+      assignedModel,
+      routing: memberRouting,
+      agentIndex,
+      globalSpawnIndex,
+      teamSize,
+      round,
+      totalRounds,
+      orchestratorContext,
+      preserveWorktree,
+      awaitCompletion = false,
+      onRegistered,
+    }: OrchestratorSpawnParams,
+    {
+      release: releaseReservation,
+      rootConversationId: concurrencyRootId,
+      currentRecursionDepth,
+    }: { release: () => void; rootConversationId: string; currentRecursionDepth: number },
+  ): Promise<SubAgentResult | { error: string }> {
     const {
       project,
       username,
@@ -304,73 +405,10 @@ export class OrchestratorService {
       thinkingBudget,
     } = orchestratorContext;
 
-    // ── Recursion depth tracking ──────────────────────────────
-    const currentRecursionDepth = orchestratorContext.recursionDepth ?? 0;
-    const maxRecursionDepth = Math.min(
-      MAXIMUM_RECURSIVE_SPAWNING_DEPTH,
-      orchestratorContext.maxRecursionDepth ?? DEFAULT_RECURSIVE_SPAWNING_DEPTH,
-    );
-
-    // Depth 0 = sub-agent spawning disabled entirely
-    if (maxRecursionDepth === 0) {
-      return {
-        error: "Sub-agent spawning is disabled (recursion depth is set to 0).",
-      };
-    }
-
-    if (currentRecursionDepth >= maxRecursionDepth) {
-      return {
-        error: `Sub-agent spawning limit reached. Current depth ${currentRecursionDepth} exceeds or matches max depth ${maxRecursionDepth}.`,
-      };
-    }
-
     const resolvedMaxSubAgentIterations = resolveMaxSubAgentIterations(
       clientMaxSubAgentIterations,
       currentRecursionDepth,
     );
-
-    // Concurrency limit — counted per ROOT conversation, not process-wide:
-    // a global count let one conversation's fan-out refuse every spawn in
-    // every other conversation.
-    const concurrencyRootId = OrchestratorService.getRootConversationId(
-      parentConversationId || agentConversationId || "",
-    );
-    const runningCount = Array.from(activeSubAgents.values()).filter(
-      (subAgent) =>
-        subAgent.status === SYSTEM_STATUSES.RUNNING &&
-        OrchestratorService.getRootConversationId(
-          subAgent.parentConversationId || subAgent.parentAgentConversationId || "",
-        ) === concurrencyRootId,
-    ).length;
-    if (runningCount >= ORCHESTRATOR.MAX_SUB_AGENTS) {
-      return {
-        error: `Maximum concurrent sub-agents (${ORCHESTRATOR.MAX_SUB_AGENTS}) reached. Wait for a sub-agent to complete or stop one.`,
-      };
-    }
-
-    // Circuit breaker: cap total agents per conversation across all recursion depths
-    if (parentConversationId) {
-      const rootConversationId =
-        OrchestratorService.getRootConversationId(parentConversationId);
-      const conversationAgentCount = Array.from(
-        activeSubAgents.values(),
-      ).filter(
-        (subAgent) =>
-          OrchestratorService.getRootConversationId(
-            subAgent.parentConversationId || "",
-          ) === rootConversationId,
-      ).length;
-      if (
-        conversationAgentCount >= ORCHESTRATOR.MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION
-      ) {
-        logger.warn(
-          `[Orchestrator] Circuit breaker: conversation ${rootConversationId} has reached total agent ceiling of ${conversationAgentCount} (max ${ORCHESTRATOR.MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}). Recursive spawning blocked.`,
-        );
-        return {
-          error: `Circuit breaker: maximum concurrent agents per conversation (${ORCHESTRATOR.MAXIMUM_CONCURRENT_AGENTS_PER_CONVERSATION}) reached. This limit prevents exponential agent fan-out from recursive spawning.`,
-        };
-      }
-    }
 
     // ── Role routing: the model this sub-agent runs on ──────────
     // createTeam decided it per member (the routers carry it here); a
@@ -564,6 +602,7 @@ export class OrchestratorService {
       round,
       totalRounds,
       recursionDepth: currentRecursionDepth + 1,
+      rootConversationId: concurrencyRootId,
       thinkingEnabled,
       reasoningEffort: routing.effort ?? reasoningEffort,
       // A token budget is an Anthropic knob of the parent's model; a
@@ -574,6 +613,8 @@ export class OrchestratorService {
     };
 
     activeSubAgents.set(agentId, subAgentState);
+    // Counted as running from here on.
+    releaseReservation();
 
     await recordRoutingDecision({
       decision: { ...routing, provider: subAgentProvider, model: subAgentModel },
@@ -1231,7 +1272,7 @@ export class OrchestratorService {
       });
     }
 
-    return targetAgentIds.map((agentId) => {
+    const entries = targetAgentIds.map((agentId) => {
       const subAgent = activeSubAgents.get(agentId);
       if (!subAgent) return { agentId, running: false, result: null };
       const running = subAgent.status === SYSTEM_STATUSES.RUNNING;
@@ -1241,6 +1282,32 @@ export class OrchestratorService {
       }
       return { agentId, running, result: buildSubAgentResult(subAgent) };
     });
+    OrchestratorService._withdrawCompletionsReturnedByWait(
+      entries.filter((entry) => entry.result && !entry.running).map((entry) => entry.agentId),
+    );
+    return entries;
+  }
+
+  /**
+   * A team completion can reach the parent's mailbox while its model is
+   * still generating — and that model may then call wait_for_tasks for
+   * agents that have already finished. The wait returns their results; the
+   * mailbox entry, drained after the tool batch, would deliver them again.
+   * Withdraw every still-pending entry whose agents this wait returned in
+   * full (an entry covering agents it did not return stays).
+   */
+  static _withdrawCompletionsReturnedByWait(returnedAgentIds: string[]): void {
+    if (returnedAgentIds.length === 0 || completionsInMailbox.size === 0) return;
+    const returned = new Set(returnedAgentIds);
+    for (const [inputId, completion] of completionsInMailbox) {
+      if (!completion.agentIds.every((agentId) => returned.has(agentId))) continue;
+      completionsInMailbox.delete(inputId);
+      if (TurnInputMailbox.take(completion.conversationId, [inputId]).length > 0) {
+        logger.info(
+          `[Orchestrator] Completion ${inputId} of ${completion.agentIds.join(", ")} withdrawn from ${completion.conversationId}'s mailbox — wait_for_tasks returned it`,
+        );
+      }
+    }
   }
 
   /**
@@ -1256,6 +1323,8 @@ export class OrchestratorService {
 
   static clearAllActiveSubAgents(): void {
     activeSubAgents.clear();
+    completionsInMailbox.clear();
+    resetSpawnLedgers();
     DetachedDispatchRegistry.clear();
     SubAgentIdGenerator.resetCounters();
     logger.info("[Orchestrator] Cleared all active sub-agents from registry");
@@ -1338,8 +1407,9 @@ export class OrchestratorService {
           : DEFAULT_RECURSIVE_SPAWNING_DEPTH;
     }
 
-    // Depth 0 = sub-agent spawning disabled entirely
-    if (orchestratorContext.maxRecursionDepth === 0) {
+    // Depth 0 = sub-agent spawning disabled entirely (by the conversation,
+    // or by the runaway depth cap)
+    if (capDelegationDepth(orchestratorContext.maxRecursionDepth, await resolveSpawnCaps()) === 0) {
       logger.info(
         `[Orchestrator] createTeam: sub-agent spawning disabled (maxRecursionDepth = 0)`,
       );
@@ -2061,11 +2131,14 @@ export class OrchestratorService {
         conversationId,
         completionMessage as ConversationMessage,
       );
-      if (delivery === "delivered") {
+      if (delivery.outcome === "delivered") {
+        if (options.agentIds?.length) {
+          completionsInMailbox.set(delivery.inputId, { conversationId, agentIds: options.agentIds });
+        }
         await OrchestratorService._payBackDispatch(dispatch, "mailbox", conversationId, project, username);
         return;
       }
-      parentTurnRuledOut = delivery === "idle";
+      parentTurnRuledOut = delivery.outcome === "idle";
     }
 
     const countedAsPending = dispatch
@@ -2100,7 +2173,7 @@ export class OrchestratorService {
   static async _deliverToParentTurn(
     conversationId: string,
     completionMessage: ConversationMessage,
-  ): Promise<"delivered" | "idle" | "timed_out"> {
+  ): Promise<{ outcome: "delivered"; inputId: string } | { outcome: "idle" | "timed_out" }> {
     const record = completionMessage as Record<string, unknown>;
     const deadline = Date.now() + ORCHESTRATOR.PARENT_TURN_WAIT_MAXIMUM_MILLISECONDS;
     for (;;) {
@@ -2116,16 +2189,16 @@ export class OrchestratorService {
         logger.info(
           `[Orchestrator] Completion delivered to the running turn of ${conversationId} (${posted.id})`,
         );
-        return "delivered";
+        return { outcome: "delivered", inputId: posted.id ?? "" };
       }
       const isParentTurnInProgress =
         TurnInputMailbox.hasTurn(conversationId) || AgentSessionRegistry.isActive(conversationId);
-      if (!isParentTurnInProgress) return "idle";
+      if (!isParentTurnInProgress) return { outcome: "idle" };
       if (Date.now() >= deadline) {
         logger.warn(
           `[Orchestrator] Parent ${conversationId} stayed mid-turn without accepting input — waking it anyway`,
         );
-        return "timed_out";
+        return { outcome: "timed_out" };
       }
       await new Promise((resolve) =>
         setTimeout(resolve, ORCHESTRATOR.PARENT_TURN_WAIT_POLL_MILLISECONDS),
@@ -2426,9 +2499,9 @@ export class OrchestratorService {
     // that would allow one extra level of delegation beyond maxRecursionDepth.
     const parentRecursionDepth = orchestratorContext.recursionDepth ?? 0;
     const childRecursionDepth = parentRecursionDepth + 1;
-    const maxRecursionDepth = Math.min(
-      MAXIMUM_RECURSIVE_SPAWNING_DEPTH,
-      orchestratorContext.maxRecursionDepth ?? DEFAULT_RECURSIVE_SPAWNING_DEPTH,
+    const maxRecursionDepth = capDelegationDepth(
+      orchestratorContext.maxRecursionDepth,
+      await resolveSpawnCaps(),
     );
     const canSpawnRecursively = childRecursionDepth < maxRecursionDepth;
 
@@ -2776,9 +2849,6 @@ export class OrchestratorService {
           // way down, and a switch of the parent's mode reaches its sub-agents.
           // A definition that names a mode gets it narrowed (subAgentModeHandle).
           ...(subAgentMode && { _permissionMode: subAgentMode.handle }),
-          ...(orchestratorContext.enableCriticGate !== undefined && {
-            enableCriticGate: orchestratorContext.enableCriticGate,
-          }),
           ...(orchestratorContext.criticModel && {
             criticModel: orchestratorContext.criticModel,
           }),
@@ -2871,6 +2941,19 @@ export class OrchestratorService {
         `[Orchestrator] Sub-agent ${subAgent.agentId} completed with empty output. ` +
           `messages=${finalMessages.length}, telemetryOutput=${telemetryOutput.length}chars`,
       );
+    }
+    // Auto mode reads the report before the parent does (its task was read
+    // at spawn and each of its actions as it ran): a flagged report arrives
+    // with a security warning on top (AutoModeGate).
+    const reportModeHandle = subAgentMode?.handle ?? orchestratorContext.permissionMode;
+    if (reportModeHandle?.mode === "auto" && subAgent.status !== SYSTEM_STATUSES.STOPPED && subAgent.output) {
+      const { reviewedSubAgentReport } = await import("./harnesses/lifecycle/AutoModeGate.ts");
+      subAgent.output = await reviewedSubAgentReport({
+        report: subAgent.output,
+        transcript: finalMessages,
+        handle: reportModeHandle,
+        parent: orchestratorContext,
+      });
     }
     subAgent.toolCalls = telemetry.toolCalls;
     subAgent.messages = finalMessages;
@@ -3382,9 +3465,6 @@ export class OrchestratorService {
         orchestratorContext.policies.length > 0 && {
           policies: orchestratorContext.policies,
         }),
-      ...(orchestratorContext.enableCriticGate !== undefined && {
-        enableCriticGate: orchestratorContext.enableCriticGate,
-      }),
       ...(orchestratorContext.criticModel && {
         criticModel: orchestratorContext.criticModel,
       }),

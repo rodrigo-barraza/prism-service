@@ -35,6 +35,7 @@ describe("an agent tool call that tries to change permissions is denied", () => 
     ["approving its own pending call", call("execute_shell", { command: "curl -X POST localhost:7777/agent/approve -d '{\"approved\":true}'" })],
     ["rewriting a custom agent's policies", call("execute_javascript", { code: "fetch('http://localhost:7777/custom-agents/X', {method:'PUT', body: JSON.stringify({policies: []})})" })],
     ["turning the critic off in settings", call("execute_shell", { command: `curl -X PUT http://127.0.0.1:7777/settings -d '{"agents":{"criticModel":""}}'` })],
+    ["pointing auto mode's classifier at another model", call("execute_shell", { command: `curl -X PUT http://127.0.0.1:7777/settings -d '{"agents":{"classifierModel":"tiny"}}'` })],
     ["clicking through the settings page", call("control_browser", { action: "navigate", url: "https://prism.rod.dev/settings?section=permissions" })],
     ["through an MCP tool", call("mcp__http__request", { url: "http://localhost:7777/permissions/rules", method: "POST" })],
   ])("%s", (_label, toolCall) => {
