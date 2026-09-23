@@ -98,7 +98,7 @@ vi.mock("../lifecycle/SystemReminderInjector.ts", () => ({
   maybeInjectSystemReminder: vi.fn().mockResolvedValue(undefined),
   cleanupReminderCache: vi.fn(),
 }));
-vi.mock("../lifecycle/CostBudgetEnforcer.ts", () => ({ checkCostBudget: vi.fn().mockReturnValue(false) }));
+vi.mock("../lifecycle/CostBudgetEnforcer.ts", () => ({ checkCostBudget: vi.fn().mockReturnValue(false), enforceCostBudget: vi.fn().mockResolvedValue(false), recordLoopSpend: vi.fn() }));
 vi.mock("#src/utils/FunctionCallingUtilities", () => ({
   expandMessagesForFunctionCall: vi.fn().mockImplementation((messages: unknown[]) => messages),
 }));

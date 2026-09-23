@@ -20,6 +20,7 @@ export type WebhookEventCallback = (event: WebhookEvent) => void;
 export const NEEDS_YOU_WEBHOOK_EVENTS = {
   APPROVAL_REQUIRED: "approval.required",
   QUESTION_ASKED: "question.asked",
+  BUDGET_REACHED: "budget.reached",
   GOAL_UPDATED: "goal.updated",
   TURN_COMPLETED: "turn.completed",
   TURN_FAILED: "turn.failed",

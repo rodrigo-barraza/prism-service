@@ -183,6 +183,24 @@ export const PENDING_DECISIONS = {
 } as const;
 
 /**
+ * Budget pause (prompt 13, Landing 3) — a turn that reaches its cost cap
+ * parks on its user (a `budget` decision in PendingDecisionStore) instead of
+ * ending, and resumes when the cap is raised.
+ */
+export const BUDGET_PAUSE = {
+  /** `status` message: the tree reached its cap and waits for a raise. */
+  STATUS_REACHED: "budget_reached",
+  /** `status` message: the pause is over — the cap was raised, or the turn stops. */
+  STATUS_RESOLVED: "budget_resolved",
+  /** What a turn does at its cap: wait for its user, or end as before. */
+  ACTIONS: ["pause", "stop"],
+  /** The share of a re-driven turn's spend its previous process made (SharedCostBudget). */
+  CARRIED_SPEND_LOOP_ID: "before-restart",
+} as const;
+
+export type BudgetAction = (typeof BUDGET_PAUSE.ACTIONS)[number];
+
+/**
  * Durable runs — a turn a restart interrupted is re-driven from what it
  * recorded (TurnRunStore): the pass whose tool batch was in progress, each
  * call's progress, and what the turn still owed its user. Background work

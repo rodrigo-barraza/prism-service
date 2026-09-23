@@ -5,6 +5,7 @@ import { getRequestContext } from "#src/utils/RequestContext";
 import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { BUDGET_PAUSE } from "#src/constants";
 
 /**
  * TurnAttentionObserver — the one tap on a running turn's events for the
@@ -13,8 +14,8 @@ import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxo
  * exactly once per request, so each event arrives here exactly once):
  *
  *   - ConversationAttentionRegistry — what the conversation waits on;
- *   - webhooks — approval.required, question.asked, turn.completed,
- *     turn.failed (goal.updated is ConversationGoalService's);
+ *   - webhooks — approval.required, question.asked, budget.reached,
+ *     turn.completed, turn.failed (goal.updated is ConversationGoalService's);
  *   - PushNotifier — a browser push when nobody is watching.
  *
  * Runs inside the request's AsyncLocalStorage context, which is where the
@@ -95,6 +96,14 @@ function momentOf(conversationId: string, event: TurnEvent): PushMoment | null {
         questionId: typeof event.questionId === "string" ? event.questionId : null,
         questionText: questionTexts(event)[0] ?? null,
       };
+    case SERVER_SENT_EVENT_TYPES.STATUS:
+      if (event.message !== BUDGET_PAUSE.STATUS_REACHED) return null;
+      return {
+        kind: "budget_reached",
+        conversationId,
+        spentDollars: typeof event.spentDollars === "number" ? event.spentDollars : null,
+        maxCostDollars: typeof event.maxCostDollars === "number" ? event.maxCostDollars : null,
+      };
     case SERVER_SENT_EVENT_TYPES.DONE:
       return { kind: "turn_completed", conversationId };
     case SERVER_SENT_EVENT_TYPES.ERROR:
@@ -141,6 +150,15 @@ function emitWebhook(
         blocking: event.blocking !== false,
         questions: questionTexts(event),
         context: event.context ?? null,
+      });
+      return;
+    case "budget_reached":
+      WebhookEventBus.emit(NEEDS_YOU_WEBHOOK_EVENTS.BUDGET_REACHED, {
+        ...common,
+        pauseId: event.pauseId ?? null,
+        spentDollars: moment.spentDollars ?? null,
+        maxCostDollars: moment.maxCostDollars ?? null,
+        limitedBy: event.limitedBy ?? null,
       });
       return;
     case "turn_completed":

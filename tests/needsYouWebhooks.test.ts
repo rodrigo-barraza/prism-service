@@ -28,6 +28,7 @@ const OWNER = {
 const NEEDS_YOU_TYPES = new Set([
   "approval.required",
   "question.asked",
+  "budget.reached",
   "goal.updated",
   "turn.completed",
   "turn.failed",
@@ -115,6 +116,25 @@ describe("needs-you webhook events", () => {
         blocking: false,
         questions: ["Which colour?"],
         context: "Picking a colour",
+      },
+    });
+  });
+
+  it("budget.reached — once per pause, with the spend against the cap", () => {
+    runTurn("conversation-budget", [
+      { type: "status", message: "budget_reached", pauseId: "pause-1", spentDollars: 2, maxCostDollars: 1.5, limitedBy: "goal", iteration: 3 },
+      { type: "status", message: "budget_resolved", pauseId: "pause-1", action: "raise", source: "user", maxCostDollars: 5 },
+    ]);
+    expect(received).toHaveLength(1);
+    expect(received[0]).toMatchObject({
+      eventType: "budget.reached",
+      data: {
+        conversationId: "conversation-budget",
+        username: "rodrigo",
+        pauseId: "pause-1",
+        spentDollars: 2,
+        maxCostDollars: 1.5,
+        limitedBy: "goal",
       },
     });
   });

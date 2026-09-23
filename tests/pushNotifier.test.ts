@@ -165,6 +165,21 @@ describe("PushNotifier — push gating", () => {
     expect(sentPayloads()[1].body).toBe("Provider returned 529");
   });
 
+  it("pushes a budget pause at high urgency, with the spend against the cap", async () => {
+    runTurn([
+      { type: "status", message: "budget_reached", pauseId: "pause-1", spentDollars: 2.004, maxCostDollars: 1.5, limitedBy: "turn", iteration: 2 },
+    ]);
+    await PushNotifier.whenIdle();
+
+    expect(sentPayloads()).toHaveLength(1);
+    expect(sentPayloads()[0]).toMatchObject({
+      kind: "budget_reached",
+      title: "Budget reached · Refactor the parser",
+      body: "$2.00 spent of the $1.50 cap — raise it to let the agent continue.",
+    });
+    expect(vi.mocked(sendWebPush).mock.calls[0][3]).toMatchObject({ urgency: "high" });
+  });
+
   it("only the owner's subscriptions are pushed", async () => {
     subscriptions._setData([
       { ...SUBSCRIPTION, id: "mine" },
