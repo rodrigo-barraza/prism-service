@@ -165,7 +165,7 @@ export async function executeToolBatch(
         };
       }
 
-      // Honor the built-in post-approval decide hooks (CriticGate, the
+      // Honor the built-in post-approval decide hook (the
       // AutoApprovalEngine re-check). AgentHooks.run short-circuits on a
       // deny, but the block only holds if the caller acts on the result.
       // Configured PreToolUse hooks are NOT here any more: they run before
@@ -183,15 +183,8 @@ export async function executeToolBatch(
           type: SERVER_SENT_EVENT_TYPES.STATUS,
           message: `Tool "${toolCall.name}" blocked: ${blockReason}`,
         });
-        // CriticGate stamps the model that reviewed the call; anything else
-        // vetoing here is the rule layer's re-check.
-        await firePermissionDenied(
-          hooks,
-          context,
-          toolCall,
-          hookResult.criticModel ? "classifier" : "rule",
-          blockReason,
-        );
+        // The rule layer's re-check (the classifier decided in the gate).
+        await firePermissionDenied(hooks, context, toolCall, "rule", blockReason);
         return {
           name: toolCall.name,
           id: toolCall.id,
@@ -342,7 +335,6 @@ export async function executeToolBatch(
               _policies: context.options?.policies,
               _permissionRules: context.options?._permissionRules,
               _permissionMode: context.options?._permissionMode,
-              _enableCriticGate: context.options?.enableCriticGate,
               _criticModel: context.options?.criticModel,
               _maxCostDollars: context.options?.maxCostDollars,
               _sharedCostBudget: context.options?._sharedCostBudget,

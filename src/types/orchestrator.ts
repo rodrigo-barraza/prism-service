@@ -340,9 +340,7 @@ export interface OrchestratorContext {
   permissionRules?: import("#src/services/permissions/PermissionRuleSet").default;
   /** Parent loop's mode handle — a sub-agent shares it, so a switch reaches it too. */
   permissionMode?: import("#src/services/permissions/PermissionModeState").PermissionModeHandle;
-  /** Parent loop's CriticGate toggle — inherited by sub-agents. */
-  enableCriticGate?: boolean;
-  /** Parent loop's CriticGate model — inherited by sub-agents. */
+  /** Parent loop's auto-mode reviewer model — inherited by sub-agents. */
   criticModel?: string;
   /** Parent loop's cost ceiling — inherited by sub-agents. */
   maxCostDollars?: number;

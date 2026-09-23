@@ -38,7 +38,7 @@ const PROTECTED_TARGETS: ProtectedTarget[] = [
     name: "approval settings",
     patterns: [
       /(https?:\/\/|localhost|127\.0\.0\.1|:\d{2,5})[^\s"'`]*\/settings\b/i,
-      /\b(permissions?|autoApprove|enableCriticGate|critic(Provider|Model))\b/i,
+      /\b(permissions?|autoApprove|critic(Provider|Model)|classifier(Provider|Model))\b/i,
     ],
   },
   { name: "permission settings page", patterns: [/[?&]section=permissions?\b/i] },

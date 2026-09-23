@@ -65,8 +65,8 @@ export const HOOK_EVENT_NAMES = Object.values(HOOK_EVENTS) as HookEventName[];
  * Config event name → `AgentHooks` internal event name.
  *
  * `PreToolUse` and `Stop` deliberately do NOT share the built-ins' events:
- * `beforeToolCall` runs after the human approved (it is where CriticGate and
- * the tier re-check live), and `afterResponse` runs inside finalize, after
+ * `beforeToolCall` runs after the human approved (it is where the tier
+ * re-check lives), and `afterResponse` runs inside finalize, after
  * the answer was persisted. A configured hook on either must run earlier —
  * before the approval gate, and before the turn is allowed to end — so each
  * has its own internal event fired at that earlier seam.
@@ -181,8 +181,8 @@ export type HookHandlerType =
   (typeof HOOK_HANDLER_TYPES)[keyof typeof HOOK_HANDLER_TYPES];
 
 /**
- * Ask a model. The strongest precedent in the codebase — `CriticGate` is
- * already an LLM-in-the-loop `decide` hook; this is that, generalized over a
+ * Ask a model — auto mode's classifier (permissions/AutoModeClassifier) is
+ * the built-in LLM-in-the-loop verdict; this is that, generalized over a
  * user-supplied template.
  */
 export interface PromptHookHandlerConfig {

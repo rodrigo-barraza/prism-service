@@ -34,7 +34,6 @@ import {
   PERMISSION_MODE_DESCRIPTIONS,
   PERMISSION_MODE_LABELS,
   canUseBypass,
-  isAutoModeClassifierAvailable,
   type PermissionMode,
 } from "#src/services/permissions/PermissionModes";
 import {
@@ -213,7 +212,6 @@ router.post(
 /** Every mode, with whether THIS user can pick it and why not. */
 function describeModes(username: string) {
   const bypassAllowed = canUseBypass(username);
-  const classifier = isAutoModeClassifierAvailable();
   return PERMISSION_MODES.map((id: PermissionMode) => ({
     id,
     label: PERMISSION_MODE_LABELS[id],
@@ -221,8 +219,6 @@ function describeModes(username: string) {
     available: id === "bypass" ? bypassAllowed : true,
     ...(id === "bypass" &&
       !bypassAllowed && { unavailableReason: `Owner only: add the username to ${BYPASS_OWNERS_ENV_VAR}.` }),
-    ...(id === "auto" &&
-      !classifier && { note: "The classifier arrives in a later release; until then auto mode asks where it would decide." }),
   }));
 }
 

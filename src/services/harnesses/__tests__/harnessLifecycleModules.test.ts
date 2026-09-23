@@ -4,7 +4,6 @@ import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxo
 import FileService from "#src/services/FileService";
 import { appendAndFinalize } from "#src/utils/ConversationUtilities";
 import { APPROVAL_TIERS } from "#src/services/AutoApprovalEngine";
-import CriticGate from "#src/services/harnesses/lifecycle/CriticGate";
 import { ApprovalRegistry } from "#src/services/ApprovalRegistry";
 import { checkAndWaitForApproval } from "#src/services/harnesses/lifecycle/ApprovalGate";
 import { manageContextPressure } from "#src/services/harnesses/lifecycle/ContextPressureManager";
@@ -50,9 +49,8 @@ import AgentHooks from "#src/services/AgentHooks";
 import AutoApprovalEngine from "#src/services/AutoApprovalEngine";
 
 // Mock child_process.execSync
-// CriticGate now streams through getProvider(chainEntry.provider) with a
-// role-resolved chain — delegate to a per-test provider stub so the
-// existing context-provider mocks keep driving the stream.
+// Role-chained utility calls stream through getProvider(chainEntry.provider)
+// — delegate to a per-test provider stub.
 const criticProviderHolder = vi.hoisted(() => ({
   current: null as null | {
     generateTextStream: (...args: unknown[]) => unknown;
@@ -202,241 +200,6 @@ vi.mock("#src/utils/ConversationUtilities", () => ({
 describe("Harness Lifecycle Modules", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  describe("CriticGate", () => {
-    const mockProvider = {
-      generateTextStream: vi.fn().mockImplementation(async function* () {
-        yield "APPROVE";
-      }),
-    };
-
-    beforeEach(() => {
-      criticProviderHolder.current = mockProvider;
-    });
-
-    const mockAgenticContext = {
-      project: "test-project",
-      username: "test-user",
-      agent: "CODING",
-      providerName: PROVIDERS.GOOGLE,
-      resolvedModel: "gemini-3.5-flash",
-      traceId: "trace-id-123",
-      agentConversationId: "session-id-456",
-      conversationId: "conv-id-789",
-      emit: vi.fn(),
-      provider: mockProvider,
-      options: {},
-    };
-
-    it("should approve tool immediately if it is below danger tier", async () => {
-      const criticGate = new CriticGate();
-      const toolCall = {
-        id: "call-1",
-        name: "read_file",
-        args: { path: "test.txt" },
-        _approval: { tier: APPROVAL_TIERS.WRITE as any, tierLabel: "WRITE" },
-      };
-
-      const reviewResult = await criticGate.review(toolCall, mockAgenticContext as any);
-      expect(reviewResult.isApproved).toBe(true);
-      expect(reviewResult.reason).toBe("below_danger_tier");
-    });
-
-    it("should skip critic if skipCritic option is configured", async () => {
-      const criticGate = new CriticGate();
-      const toolCall = {
-        id: "call-1",
-        name: "execute_command",
-        args: { command: "rm -rf /" },
-        _approval: { tier: APPROVAL_TIERS.DANGER as any, tierLabel: "DANGER" },
-      };
-      const contextWithSkip = {
-        ...mockAgenticContext,
-        options: { skipCritic: true },
-      };
-
-      const reviewResult = await criticGate.review(toolCall, contextWithSkip as any);
-      expect(reviewResult.isApproved).toBe(true);
-      expect(reviewResult.reason).toBe("critic_skipped");
-    });
-
-    it("should trigger critic model call and return approved when model responds APPROVE", async () => {
-      const criticGate = new CriticGate({ model: "critic-model" });
-      const toolCall = {
-        id: "call-1",
-        name: "execute_command",
-        args: { command: "ls" },
-        _approval: { tier: APPROVAL_TIERS.DANGER as any, tierLabel: "DANGER" },
-      };
-
-      const reviewResult = await criticGate.review(toolCall, mockAgenticContext as any);
-      expect(reviewResult.isApproved).toBe(true);
-      expect(reviewResult.reason).toBe("critic_approved");
-      expect(reviewResult.criticModel).toBe("google/critic-model");
-      expect(mockProvider.generateTextStream).toHaveBeenCalled();
-    });
-
-    it("should deny tool call when critic model responds DENY", async () => {
-      mockProvider.generateTextStream.mockImplementationOnce(async function* () {
-        yield "DENY\nDangerous command detected.";
-      });
-
-      const criticGate = new CriticGate();
-      const toolCall = {
-        id: "call-1",
-        name: "execute_command",
-        args: { command: "rm -rf /" },
-        _approval: { tier: APPROVAL_TIERS.DANGER as any, tierLabel: "DANGER" },
-      };
-
-      const reviewResult = await criticGate.review(toolCall, mockAgenticContext as any);
-      expect(reviewResult.isApproved).toBe(false);
-      expect(reviewResult.reason).toBe("Dangerous command detected.");
-    });
-
-    it("should fail-open when critic model call throws an error", async () => {
-      mockProvider.generateTextStream.mockImplementationOnce(() => {
-        throw new Error("Connection failed");
-      });
-
-      const criticGate = new CriticGate();
-      const toolCall = {
-        id: "call-1",
-        name: "execute_command",
-        args: { command: "sudo reboot" },
-        _approval: { tier: APPROVAL_TIERS.DANGER as any, tierLabel: "DANGER" },
-      };
-
-      const reviewResult = await criticGate.review(toolCall, mockAgenticContext as any);
-      expect(reviewResult.isApproved).toBe(true);
-      expect(reviewResult.reason).toBe("critic_error_fallback");
-    });
-
-    it("should approve tool immediately if toolCall approval info is undefined", async () => {
-      const criticGate = new CriticGate();
-      const toolCall = {
-        id: "call-1",
-        name: "read_file",
-        args: { path: "test.txt" },
-        _approval: undefined,
-      };
-
-      const reviewResult = await criticGate.review(toolCall, mockAgenticContext as any);
-      expect(reviewResult.isApproved).toBe(true);
-      expect(reviewResult.reason).toBe("below_danger_tier");
-    });
-
-    it("should fallback when logging details are missing in context", async () => {
-      const criticGate = new CriticGate();
-      const toolCall = {
-        id: "call-1",
-        name: "execute_command",
-        args: undefined,
-        _approval: { tier: APPROVAL_TIERS.DANGER as any, tierLabel: "DANGER" },
-      };
-
-      const mockProviderMinimal = {
-        generateTextStream: vi.fn().mockImplementation(async function* () {
-          yield "APPROVE";
-        }),
-      };
-
-      criticProviderHolder.current = mockProviderMinimal;
-      const contextMinimal = {
-        provider: mockProviderMinimal,
-        resolvedModel: "gemini-3.5-flash",
-        options: {},
-      };
-
-      const reviewResult = await criticGate.review(toolCall as any, contextMinimal as any);
-      expect(reviewResult.isApproved).toBe(true);
-      expect(reviewResult.reason).toBe("critic_approved");
-    });
-
-    it("should fallback to default reason if DENY first line has no other lines", async () => {
-      const criticGate = new CriticGate();
-      const toolCall = {
-        id: "call-1",
-        name: "execute_command",
-        args: { command: "rm -rf /" },
-        _approval: { tier: APPROVAL_TIERS.DANGER as any, tierLabel: "DANGER" },
-      };
-
-      const mockProviderDenyEmpty = {
-        generateTextStream: vi.fn().mockImplementation(async function* () {
-          yield "DENY";
-        }),
-      };
-
-      criticProviderHolder.current = mockProviderDenyEmpty;
-      const contextMinimal = {
-        provider: mockProviderDenyEmpty,
-        resolvedModel: "gemini-3.5-flash",
-        options: {},
-      };
-
-      const reviewResult = await criticGate.review(toolCall, contextMinimal as any);
-      expect(reviewResult.isApproved).toBe(false);
-      expect(reviewResult.reason).toBe("critic_denied");
-    });
-
-    it("should fail closed if critic response is ambiguous", async () => {
-      const criticGate = new CriticGate();
-      const toolCall = {
-        id: "call-1",
-        name: "execute_command",
-        args: { command: "rm -rf /" },
-        _approval: { tier: APPROVAL_TIERS.DANGER as any, tierLabel: "DANGER" },
-      };
-
-      const mockProviderAmbiguous = {
-        generateTextStream: vi.fn().mockImplementation(async function* () {
-          yield "MAYBE\nI am not sure about safety.";
-        }),
-      };
-
-      criticProviderHolder.current = mockProviderAmbiguous;
-      const contextMinimal = {
-        provider: mockProviderAmbiguous,
-        resolvedModel: "gemini-3.5-flash",
-        options: {},
-      };
-
-      const reviewResult = await criticGate.review(toolCall, contextMinimal as any);
-      // Ambiguous reviews fail closed — an unparseable verdict on a
-      // DANGER-tier call must not slip through on a parse fallback.
-      expect(reviewResult.isApproved).toBe(false);
-      expect(reviewResult.reason).toBe("critic_ambiguous_fail_closed");
-    });
-
-    it("should handle prompt without Tool heading when prompt is overridden", async () => {
-      vi.spyOn(CriticGate.prototype as any, "buildReviewPrompt").mockReturnValueOnce("Some prompt text without any colon heading");
-      const criticGate = new CriticGate();
-      const toolCall = {
-        id: "call-1",
-        name: "execute_command",
-        args: { command: "rm -rf /" },
-        _approval: { tier: APPROVAL_TIERS.DANGER as any, tierLabel: "DANGER" },
-      };
-
-      const mockProviderApprove = {
-        generateTextStream: vi.fn().mockImplementation(async function* () {
-          yield "APPROVE";
-        }),
-      };
-
-      criticProviderHolder.current = mockProviderApprove;
-      const contextMinimal = {
-        provider: mockProviderApprove,
-        resolvedModel: "gemini-3.5-flash",
-        options: {},
-      };
-
-      const reviewResult = await criticGate.review(toolCall, contextMinimal as any);
-      expect(reviewResult.isApproved).toBe(true);
-      expect(reviewResult.reason).toBe("critic_approved");
-    });
   });
 
   describe("ApprovalGate", () => {
@@ -804,7 +567,6 @@ describe("Harness Lifecycle Modules", () => {
   describe("HookInitializer", () => {
     it("should register standard hooks", () => {
       const { hooks, approvalEngine } = createStandardHooks({
-        enableCriticGate: true,
         autoApprove: true,
       });
 
