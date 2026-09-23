@@ -8,6 +8,11 @@
  * the best aspects of ALL branches into a unified response
  * (aggregation > selection). Core differentiator from ToT.
  *
+ * Branches are generated independently and read each other only in the
+ * synthesis pass, after scoring. The scorer picks which branches feed the
+ * synthesis; it never discards a round and forces a redo — that is the
+ * validators' call (branchingCommon.ts).
+ *
  * Shared branching machinery (branch generation, scoring, planning
  * phase, tool execution, commit, no-tool outcomes) lives in
  * branchingCommon.ts — this file holds only the GoT synthesis logic.
@@ -61,7 +66,6 @@ import {
 const {
   DEFAULT_BRANCH_COUNT,
   DEFAULT_VALUE_THRESHOLD,
-  MAX_PROACTIVE_BACKTRACKS,
 } = HARNESS;
 
 const LOG_LABEL = "GraphOfThoughts";
@@ -239,53 +243,12 @@ async function runGraphOfThoughtsTurn(
           `scores: [${scoredBranches.map((branch) => branch.score.toFixed(1)).join(", ")}]`,
       );
 
-      // ── Proactive value-threshold pruning & filtering ──
+      // ── Value-threshold filtering: which branches feed the synthesis ──
+      // A round where none reaches the threshold is synthesized from its
+      // best branch — the scorer selects, it does not send work back.
       const activeBranches = scoredBranches.filter(
         (branch) => branch.score >= valueThreshold,
       );
-
-      if (
-        activeBranches.length === 0 &&
-        state.iterations > 1 &&
-        state.proactiveBacktracks < MAX_PROACTIVE_BACKTRACKS
-      ) {
-        state.proactiveBacktracks++;
-        state.branchesBacktracked++;
-
-        emit({
-          type: SERVER_SENT_EVENT_TYPES.STATUS,
-          message: STATUS_MESSAGES.BRANCH_BACKTRACKED,
-          branchIndex: -1,
-          reason: "proactive_value_threshold",
-          bestScore: scoredBranches[0]?.score ?? 0,
-          threshold: valueThreshold,
-          proactiveBacktracks: state.proactiveBacktracks,
-          maxProactiveBacktracks: MAX_PROACTIVE_BACKTRACKS,
-        });
-
-        logger.info(
-          `[GraphOfThoughts] Proactive backtrack — best score ${(scoredBranches[0]?.score ?? 0).toFixed(1)} ` +
-            `< threshold ${valueThreshold}. Re-branching (${state.proactiveBacktracks}/${MAX_PROACTIVE_BACKTRACKS}).`,
-        );
-
-        currentMessages.push({
-          role: "system",
-          content: wrapSystemMessage(
-            SYSTEM_MESSAGE_TAGS.BACKTRACK,
-            PromptLocaleService.get(
-              (options?.locale as string | undefined) ||
-                PromptLocaleService.getDefaultLocale(),
-              "harness.graphOfThoughts.proactiveBacktrack",
-              {
-                bestScore: (scoredBranches[0]?.score ?? 0).toFixed(1),
-                threshold: String(valueThreshold),
-              },
-            ),
-          ),
-        });
-
-        continue;
-      }
 
       const branchesToSynthesize =
         activeBranches.length > 0 ? activeBranches : [scoredBranches[0]];

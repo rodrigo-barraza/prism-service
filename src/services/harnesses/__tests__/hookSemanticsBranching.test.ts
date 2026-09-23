@@ -117,7 +117,6 @@ function buildBranchingHarness(passFor: (iteration: number) => { text: string; t
     iterations: 0,
     branchesExplored: 0,
     branchesBacktracked: 0,
-    proactiveBacktracks: 0,
     selectedBranchScores: [],
     originalMessageCount: 1,
     planModeActive: false,

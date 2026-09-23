@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import "./setup.ts";
-import { PROVIDERS } from "#src/constants";
+import { ORCHESTRATOR, PROVIDERS } from "#src/constants";
 
 // ── Mocks ─────────────────────────────────────────────────────
 
@@ -762,7 +762,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       });
 
       const spawnPromises = [];
-      for (let index = 0; index < 10; index++) {
+      for (let index = 0; index < ORCHESTRATOR.MAX_SUB_AGENTS; index++) {
         spawnPromises.push(
           OrchestratorService.spawnFromTool({
             description: `Concurrent Agent ${index}`,
@@ -774,17 +774,17 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       }
 
       // Allow all spawns to register and start running
-      await waitForCondition(() => loopResolvers.length === 10);
+      await waitForCondition(() => loopResolvers.length === ORCHESTRATOR.MAX_SUB_AGENTS);
 
       const activeList = OrchestratorService.listSubAgents({
         parentConversationId: orchestratorContext.conversationId!,
       });
-      expect(activeList).toHaveLength(10);
+      expect(activeList).toHaveLength(ORCHESTRATOR.MAX_SUB_AGENTS);
       for (const activeAgent of activeList) {
         expect(activeAgent.status).toBe("running");
       }
 
-      // Try to spawn the 11th agent
+      // Try to spawn one past the cap
       const overflowSpawnResult = await OrchestratorService.spawnFromTool({
         description: "Over the limit agent",
         prompt: "This should fail",
@@ -793,7 +793,7 @@ describe("Sub-Agent Intensive Integration Tests", () => {
       });
 
       expect(overflowSpawnResult).toEqual({
-        error: "Maximum concurrent sub-agents (10) reached. Wait for a sub-agent to complete or stop one.",
+        error: `Maximum concurrent sub-agents (${ORCHESTRATOR.MAX_SUB_AGENTS}) reached in this conversation. Wait for a sub-agent to complete or stop one.`,
       });
 
       // Clean up: resolve all loops to finalize execution

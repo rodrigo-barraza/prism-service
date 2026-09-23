@@ -232,6 +232,13 @@
       "message": "The update, in one or two sentences (up to 2000 characters)."
     }
   },
+  "ask_oracle": {
+    "description": "Ask a stronger model for a second opinion on a hard decision: a design choice, a bug you cannot explain, a plan you are unsure of. The oracle sees ONLY what you write here — not this conversation, the files or your tools — so put everything it needs into `context` (the relevant code, the error, what you tried). It cannot act; it returns advice, and you decide what to do with it. It costs more than a normal step and counts against the cost budget: use it when being wrong would be expensive, not for routine questions.",
+    "parameters": {
+      "question": "The question, stated so it can be answered without this conversation (up to 4000 characters).",
+      "context": "Everything the oracle needs to answer: relevant code, errors, constraints, what you tried (up to 24000 characters)."
+    }
+  },
   "wait_for_tasks": {
     "description": "Block until background work finishes and return its results in place. Waits on async tasks (from run_async_task) and/or sub-agents (from create_subagent / create_subagents). With no ids it waits on every running async task and sub-agent of this conversation. Returns each item's status and result (or error); items still running when the timeout elapses are listed in stillRunning. Use this when you actually need a result to continue — do not poll with list_async_tasks.",
     "parameters": {

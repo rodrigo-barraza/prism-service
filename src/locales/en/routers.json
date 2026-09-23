@@ -10,6 +10,7 @@
     "verdictInstruction": "Respond with ONE of these verdicts:",
     "passVerdict": "**PASS** — The output fully and correctly satisfies the task. Explain briefly why it passes.",
     "failVerdict": "**FAIL** — The output has issues that need fixing. Provide specific, actionable feedback:\n- What exactly is wrong or missing\n- What specific changes are needed\n- Reference file paths, line numbers, or code snippets where applicable",
+    "verifyToFail": "A FAIL sends the work back for revision only when a check you RAN backs it — tests, a type-check, a schema or output validation (execute_command and the like). Run the check and quote what failed. A FAIL from reading alone is passed on as advice, and the work is not revised.",
     "verdictFormat": "Start your response with either **PASS** or **FAIL** on the first line.",
     "revisionHeader": "Your previous work was reviewed by {{criticCount}} critic(s) in round {{roundNumber}} and needs revision.",
     "failedCount": "{{failedCount}} critic(s) FAILED your output. You must address ALL their feedback.",
@@ -20,9 +21,7 @@
     "judge": "You are a judge evaluating multiple competing solutions to the same task.",
     "evaluateInstruction": "Evaluate all {{actorCount}} solutions and select the BEST one.\nScore each on: correctness, completeness, code quality, and verification.",
     "responseFormat": "Respond with ONLY a JSON object. No markdown fences, no explanations outside the JSON.",
-    "bestActorDescription": "- `bestActorIndex`: 0-based index of the best actor\n- `verdict`: PASS if the best solution is complete, FAIL if it needs refinement\n- `feedback`: If FAIL, specific actionable feedback for improvement. If PASS, brief explanation.",
-    "revisionHeader": "Your previous work was selected as the best among competing actors, but it needs revision (round {{roundNumber}}).",
-    "revisionInstructions": "1. Address ALL issues raised by the judge.\n2. Make the specific changes requested.\n3. Verify your corrections (run tests, typecheck, etc.).\n4. Commit and report what you changed.\n\nFocus on fixing the identified issues — do not restart from scratch unless the feedback requires it."
+    "bestActorDescription": "- `bestActorIndex`: 0-based index of the best actor\n- `verdict`: PASS if the best solution is complete, FAIL if it needs refinement\n- `feedback`: If FAIL, specific actionable feedback for improvement. If PASS, brief explanation."
   },
   "divideAndConquer": {
     "planner": "You are a task decomposition planner.",

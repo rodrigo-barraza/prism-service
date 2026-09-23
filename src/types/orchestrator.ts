@@ -77,6 +77,12 @@ export interface SubAgentState {
   round?: number;
   totalRounds?: number;
   recursionDepth?: number;
+  /**
+   * The user conversation at the top of its delegation tree — what the
+   * runaway caps count against (orchestrator/SpawnCaps.ts). Kept on the
+   * agent so the count holds after an ancestor is evicted from memory.
+   */
+  rootConversationId?: string;
   thinkingEnabled?: boolean;
   reasoningEffort?: string;
   thinkingBudget?: number;
