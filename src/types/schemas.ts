@@ -122,6 +122,13 @@ export const ChatRequestSchema = z
     textOnly: z.boolean().nullable().optional(),
     skipConversation: z.boolean().nullable().optional(),
     autoApprove: z.boolean().nullable().optional(),
+    // The conversation's permission mode for this turn (permissions/PermissionModes).
+    permissionMode: z
+      .enum(["default", "plan", "acceptEdits", "auto", "dontAsk", "bypass"])
+      .nullable()
+      .optional(),
+    // Nobody is watching this turn: anything that would ask is denied instead.
+    unattended: z.boolean().nullable().optional(),
     planFirst: z.boolean().nullable().optional(),
     maxIterations: z.number().nullable().optional(),
     maxSubAgentIterations: z.number().nullable().optional(),

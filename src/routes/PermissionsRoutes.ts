@@ -22,8 +22,25 @@ import {
   PostPermissionProposeSchema,
   PostPermissionRuleSchema,
   PostPermissionTestSchema,
+  PutDefaultPermissionModeSchema,
+  PutPermissionModeSchema,
   PutPermissionRuleSchema,
 } from "#src/services/permissions/schemas";
+import ConversationApprovalSettings from "#src/services/ConversationApprovalSettings";
+import SettingsService from "#src/services/SettingsService";
+import {
+  BYPASS_OWNERS_ENV_VAR,
+  PERMISSION_MODES,
+  PERMISSION_MODE_DESCRIPTIONS,
+  PERMISSION_MODE_LABELS,
+  canUseBypass,
+  isAutoModeClassifierAvailable,
+  type PermissionMode,
+} from "#src/services/permissions/PermissionModes";
+import {
+  PermissionModeRegistry,
+  readDefaultPermissionMode,
+} from "#src/services/permissions/PermissionModeState";
 import { CAPABILITIES, type PermissionRuleDocument } from "#src/services/permissions/types";
 
 /**
@@ -38,6 +55,9 @@ import { CAPABILITIES, type PermissionRuleDocument } from "#src/services/permiss
  *   POST   /permissions/rules/propose      the rule "Always allow" would write for one call
  *   GET    /permissions/rules/suggestions  rules the approval history argues for
  *   GET    /permissions/capabilities       the capability vocabulary
+ *   GET    /permissions/mode               a conversation's mode (?conversationId=), the default, the modes
+ *   PUT    /permissions/mode               switch a conversation's mode — a running turn too
+ *   PUT    /permissions/mode/default       the mode conversations start in (never bypass)
  *
  * Rules belong to a user profile ({username, profileId}); `project` records
  * where a rule was saved and binds the project and conversation scopes.
@@ -140,7 +160,8 @@ router.post(
     try {
       const parsed = PostPermissionTestSchema.safeParse(req.body ?? {});
       if (!parsed.success) return res.status(400).json(formatZodError(parsed.error));
-      const { toolName, args, conversationId, agent, workspaceRoot, autoApprove, draft } = parsed.data;
+      const { toolName, args, conversationId, agent, workspaceRoot, autoApprove, permissionMode, draft } =
+        parsed.data;
       const { project } = resolveScope(req);
 
       const stored = await reloadRules(req.db, identityOf(req));
@@ -176,10 +197,107 @@ router.post(
         fullAuto: autoApprove === true,
         policies: persona?.policies ?? [],
         permissionRules: ruleSet,
+        permissionMode: permissionMode ?? null,
       });
       const explanation = engine.explain({ id: "test", name: toolName, args });
       const decision = explanation.isDenied ? "deny" : explanation.isApproved ? "allow" : "ask";
       res.json({ decision, ...explanation });
+    } catch (error: unknown) {
+      next(error);
+    }
+  }),
+);
+
+// ── Modes ──────────────────────────────────────────────────────────
+
+/** Every mode, with whether THIS user can pick it and why not. */
+function describeModes(username: string) {
+  const bypassAllowed = canUseBypass(username);
+  const classifier = isAutoModeClassifierAvailable();
+  return PERMISSION_MODES.map((id: PermissionMode) => ({
+    id,
+    label: PERMISSION_MODE_LABELS[id],
+    description: PERMISSION_MODE_DESCRIPTIONS[id],
+    available: id === "bypass" ? bypassAllowed : true,
+    ...(id === "bypass" &&
+      !bypassAllowed && { unavailableReason: `Owner only: add the username to ${BYPASS_OWNERS_ENV_VAR}.` }),
+    ...(id === "auto" &&
+      !classifier && { note: "The classifier arrives in a later release; until then auto mode asks where it would decide." }),
+  }));
+}
+
+router.get(
+  "/mode",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { project, username } = resolveScope(req);
+      const conversationId =
+        typeof req.query.conversationId === "string" ? req.query.conversationId : "";
+      const defaultMode = await readDefaultPermissionMode();
+      const stored = conversationId
+        ? await ConversationApprovalSettings.getPermissionMode(conversationId, project, username)
+        : null;
+      // A running turn's mode is the truth — it may differ from the stored
+      // one (a timer's dontAsk, a bypass that was refused).
+      const running = conversationId ? PermissionModeRegistry.get(conversationId) : null;
+      res.json({
+        conversationId: conversationId || null,
+        mode: running?.mode ?? stored ?? defaultMode,
+        source: running ? "running" : stored ? "conversation" : "default",
+        defaultMode,
+        bypassAllowed: canUseBypass(username),
+        modes: describeModes(username),
+      });
+    } catch (error: unknown) {
+      next(error);
+    }
+  }),
+);
+
+router.put(
+  "/mode",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = PutPermissionModeSchema.safeParse(req.body ?? {});
+      if (!parsed.success) return res.status(400).json(formatZodError(parsed.error));
+      const { conversationId, mode } = parsed.data;
+      const { project, username } = resolveScope(req);
+      if (mode === "bypass" && !canUseBypass(username)) {
+        return res.status(403).json({
+          error: `bypass is owner-only: "${username}" is not in ${BYPASS_OWNERS_ENV_VAR}.`,
+        });
+      }
+      const stored = await ConversationApprovalSettings.setPermissionMode(
+        conversationId,
+        project,
+        username,
+        mode,
+      );
+      // The running turn (and every sub-agent sharing its handle) switches at
+      // its next tool call, and its stream carries the change.
+      const running = PermissionModeRegistry.get(conversationId);
+      if (!stored && !running) {
+        return res.status(404).json({ error: `No conversation ${conversationId}.` });
+      }
+      running?.set(mode, "user");
+      logger.info(
+        `[Permissions] ${username} set ${conversationId} to ${mode}${running ? " (running turn switched)" : ""}`,
+      );
+      res.json({ conversationId, mode, stored, live: Boolean(running) });
+    } catch (error: unknown) {
+      next(error);
+    }
+  }),
+);
+
+router.put(
+  "/mode/default",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = PutDefaultPermissionModeSchema.safeParse(req.body ?? {});
+      if (!parsed.success) return res.status(400).json(formatZodError(parsed.error));
+      await SettingsService.update({ permissions: { defaultMode: parsed.data.mode } });
+      res.json({ defaultMode: parsed.data.mode });
     } catch (error: unknown) {
       next(error);
     }

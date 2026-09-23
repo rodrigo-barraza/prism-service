@@ -3,6 +3,10 @@ import { MONGO_DB_NAME } from "#config";
 import { COLLECTIONS } from "#src/constants";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import {
+  isPermissionMode,
+  type PermissionMode,
+} from "#src/services/permissions/PermissionModes";
 
 /**
  * "Auto-approve this conversation" — a per-conversation setting, persisted
@@ -16,6 +20,9 @@ import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
  * set mid-turn before the next turn could read it (seen live). `approvals`
  * is written by nothing else. Looked up with the same
  * `{ id, project, username }` scope as goals, agent conversations first.
+ *
+ * The conversation's permission mode (`approvals.permissionMode`, see
+ * permissions/PermissionModes.ts) lives beside it for the same reason.
  */
 
 export const CONVERSATION_APPROVALS_FIELD = "approvals";
@@ -74,6 +81,59 @@ const ConversationApprovalSettings = {
           $set: {
             [`${CONVERSATION_APPROVALS_FIELD}.autoApprove`]: true,
             [`${CONVERSATION_APPROVALS_FIELD}.autoApproveSetAt`]: new Date().toISOString(),
+          },
+        },
+      );
+      if (result.matchedCount > 0) return true;
+    }
+    return false;
+  },
+
+  /** The conversation's stored permission mode, or `null` when it names none. */
+  async getPermissionMode(
+    conversationId: string,
+    project: string,
+    username: string,
+  ): Promise<PermissionMode | null> {
+    const database = getDatabase();
+    if (!database || !conversationId || !project || !username) return null;
+    try {
+      for (const collection of SEARCHED_COLLECTIONS) {
+        const document = (await database
+          .collection(collection)
+          .findOne(
+            { id: conversationId, project, username },
+            { projection: { [CONVERSATION_APPROVALS_FIELD]: 1 } },
+          )) as { approvals?: { permissionMode?: unknown } | null } | null;
+        if (document) {
+          const stored = document.approvals?.permissionMode;
+          return isPermissionMode(stored) ? stored : null;
+        }
+      }
+    } catch (error: unknown) {
+      logger.warn(
+        `[ConversationApprovalSettings] mode read failed for ${conversationId}: ${getErrorMessage(error)}`,
+      );
+    }
+    return null;
+  },
+
+  /** Store the conversation's mode. Resolves false when no such conversation exists. */
+  async setPermissionMode(
+    conversationId: string,
+    project: string,
+    username: string,
+    mode: PermissionMode,
+  ): Promise<boolean> {
+    const database = getDatabase();
+    if (!database || !conversationId || !project || !username) return false;
+    for (const collection of SEARCHED_COLLECTIONS) {
+      const result = await database.collection(collection).updateOne(
+        { id: conversationId, project, username },
+        {
+          $set: {
+            [`${CONVERSATION_APPROVALS_FIELD}.permissionMode`]: mode,
+            [`${CONVERSATION_APPROVALS_FIELD}.permissionModeSetAt`]: new Date().toISOString(),
           },
         },
       );

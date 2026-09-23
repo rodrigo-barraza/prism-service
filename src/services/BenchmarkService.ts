@@ -335,6 +335,8 @@ async function runSingleModel(
           ...(model.agent && { agent: model.agent }),
           agenticLoopEnabled: true,
           autoApprove: true,
+          // Unattended: an ask no "approve all" answers is denied, not parked.
+          unattended: true,
           maxIterations: 10,
         }),
         // Plain models with tools get an explicit tool set; agents keep

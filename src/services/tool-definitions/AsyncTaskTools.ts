@@ -1129,6 +1129,10 @@ async function triggerAsyncTaskAutoResponse(
         agenticLoopEnabled: true,
         functionCallingEnabled: true,
         autoApprove: true,
+        // Nobody is watching the continuation: an ask no "approve all"
+        // answers is denied, and the conversation's mode (plan stays
+        // read-only) still holds.
+        unattended: true,
         planFirst: false,
         minContextLength: 120_000,
         ...(workspaceRoot ? { workspaceRoot } : {}),

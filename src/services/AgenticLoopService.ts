@@ -236,6 +236,13 @@ export default class AgenticLoopService {
       options.autoApprove = true;
     }
 
+    // The turn's permission mode. A sub-agent arrives with its parent's
+    // handle and keeps it; a root turn resolves one and registers it, so the
+    // selector can switch the mode while the turn runs.
+    const permissionModeCleanup = options._permissionMode
+      ? null
+      : await AgenticLoopService.openPermissionMode(context);
+
     // 2. Initialize shared state
     const state = new AgenticLoopState({
       originalMessageCount: messages.length,
@@ -326,6 +333,7 @@ export default class AgenticLoopService {
       return await harness.run();
     } finally {
       recordAgentTurnOutcome(turnSpan, state);
+      permissionModeCleanup?.();
 
       // Clean up in-memory cache keyed by agentConversationId (keeps MongoDB state for next turn)
       ToolContext.cleanupInMemory(resolvedAgentConversationId);
@@ -355,6 +363,85 @@ export default class AgenticLoopService {
         }
       }
     }
+  }
+
+  /**
+   * Resolve the turn's permission mode into a live handle on the options
+   * (`_permissionMode`), tell the client which mode the turn runs in, and —
+   * for a root turn — register the handle so `PUT /permissions/mode` can
+   * switch it mid-turn. Returns the cleanup for the turn's end.
+   *
+   * A new conversation keeps the mode its first request named (the client's
+   * selector); after that only the selector (`PUT /permissions/mode`) and an
+   * approved plan change what is stored, so a timer's `dontAsk` never
+   * overwrites the user's choice.
+   */
+  static async openPermissionMode(context: AgenticContext): Promise<() => void> {
+    const { options, conversationId, project, username } = context;
+    const [
+      { PermissionModeHandle, PermissionModeRegistry, resolveTurnPermissionMode },
+      { PERMISSION_MODE_EVENT_TYPE },
+    ] = await Promise.all([
+      import("./permissions/PermissionModeState.ts"),
+      import("./permissions/PermissionModes.ts"),
+    ]);
+    const isRoot = !options.isSubAgent;
+    // A sub-agent's own conversation never stores a mode; it inherits one.
+    const storedMode =
+      isRoot && conversationId && !context.isNewConversation
+        ? await ConversationApprovalSettings.getPermissionMode(conversationId, project, username)
+        : null;
+    const resolved = await resolveTurnPermissionMode({
+      requested: options.permissionMode,
+      unattended: options.unattended === true,
+      storedMode,
+      username,
+    });
+    const handle = new PermissionModeHandle(resolved.mode, {
+      source: resolved.source,
+      unattended: options.unattended === true,
+    });
+    options._permissionMode = handle;
+    if (resolved.refusedBypass) {
+      logger.warn(
+        `[PermissionModes] ${conversationId}: ${resolved.refusedBypass.reason}; running in ${resolved.mode}`,
+      );
+    }
+    if (!isRoot || !conversationId) return () => {};
+
+    if (context.isNewConversation && resolved.source === "request") {
+      void ConversationApprovalSettings.setPermissionMode(
+        conversationId,
+        project,
+        username,
+        resolved.mode,
+      ).catch((error: unknown) =>
+        logger.warn(`[PermissionModes] Could not store the mode of ${conversationId}: ${String(error)}`),
+      );
+    }
+
+    context.emit({
+      type: PERMISSION_MODE_EVENT_TYPE,
+      conversationId,
+      mode: resolved.mode,
+      source: resolved.source,
+      ...(options.unattended === true && { unattended: true }),
+      ...(resolved.refusedBypass && { refused: "bypass", reason: resolved.refusedBypass.reason }),
+    });
+    const stopListening = handle.onChange((change) => {
+      context.emit({
+        type: PERMISSION_MODE_EVENT_TYPE,
+        conversationId,
+        mode: change.mode,
+        previousMode: change.previousMode,
+        source: change.source,
+      });
+    });
+    PermissionModeRegistry.register(conversationId, handle);
+    return () => {
+      stopListening();
+      PermissionModeRegistry.unregister(conversationId, handle);
+    };
   }
 
   // ── Approval Resolution API ─────────────────────────────

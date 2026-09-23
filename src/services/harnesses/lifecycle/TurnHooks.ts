@@ -459,6 +459,19 @@ export async function runPreToolUseStage(
  */
 export function buildDeniedToolResult(toolCall: ToolCall): ToolResult {
   const reason = toolCall._approval?.reason || "policy rule";
+  if (toolCall._approval?.deniedBy === "mode") {
+    // The reason is written for the model: which mode, and what to do instead.
+    return {
+      name: toolCall.name,
+      id: toolCall.id,
+      result: {
+        success: false,
+        error: "PERMISSION_MODE_DENIED",
+        ...(toolCall._approval.mode ? { mode: toolCall._approval.mode } : {}),
+        message: reason,
+      },
+    };
+  }
   if (toolCall._approval?.deniedBy === "hook") {
     return {
       name: toolCall.name,
@@ -490,7 +503,7 @@ export async function firePermissionDenied(
   hooks: AgentHooks | undefined,
   context: AgenticContext,
   toolCall: ToolCall,
-  deniedBy: "rule" | "classifier" | "hook" | ApprovalDecisionSource,
+  deniedBy: "rule" | "classifier" | "hook" | "mode" | ApprovalDecisionSource,
   reason: string,
 ): Promise<void> {
   if (!hooks) return;

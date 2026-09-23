@@ -6,6 +6,12 @@ import { COLLECTIONS } from "#src/constants";
 import PermissionRuleSet from "#src/services/permissions/PermissionRuleSet";
 import { clearPermissionRuleCache } from "#src/services/permissions/PermissionRuleStore";
 import AutoApprovalEngine from "#src/services/AutoApprovalEngine";
+import SettingsService from "#src/services/SettingsService";
+import {
+  PermissionModeHandle,
+  PermissionModeRegistry,
+} from "#src/services/permissions/PermissionModeState";
+import { BYPASS_OWNERS_ENV_VAR } from "#src/services/permissions/PermissionModes";
 
 const { default: permissionsRouter } = await import("#src/routes/PermissionsRoutes");
 app.use("/permissions", permissionsRouter);
@@ -63,6 +69,17 @@ function memoryCollection(store: any[]) {
       Object.assign(found, update.$set);
       return { ...found };
     },
+    updateOne: async (query: any, update: any) => {
+      const found = store.find((document) => matches(document, query));
+      if (!found) return { matchedCount: 0, modifiedCount: 0 };
+      for (const [path, value] of Object.entries(update.$set ?? {})) {
+        const keys = path.split(".");
+        let target = found;
+        for (const key of keys.slice(0, -1)) target = target[key] ??= {};
+        target[keys[keys.length - 1]] = value;
+      }
+      return { matchedCount: 1, modifiedCount: 1 };
+    },
     findOneAndDelete: async (query: any) => {
       const index = store.findIndex((document) => matches(document, query));
       return index === -1 ? null : store.splice(index, 1)[0];
@@ -74,6 +91,7 @@ describe("PermissionsRoutes", () => {
   const agent = supertest(app);
   let rules: any[];
   let decisions: any[];
+  let conversations: any[];
 
   const mockDb = {
     collection: (name: string) =>
@@ -81,7 +99,9 @@ describe("PermissionsRoutes", () => {
         ? memoryCollection(rules)
         : name === COLLECTIONS.PERMISSION_DECISIONS
           ? memoryCollection(decisions)
-          : memoryCollection([]),
+          : name === COLLECTIONS.AGENT_CONVERSATIONS
+            ? memoryCollection(conversations)
+            : memoryCollection([]),
   };
 
   const as = (request: supertest.Test, profile?: string) => {
@@ -95,6 +115,7 @@ describe("PermissionsRoutes", () => {
   beforeEach(() => {
     rules = [];
     decisions = [];
+    conversations = [];
     clearPermissionRuleCache();
     vi.mocked(MongoWrapper.getDb).mockReturnValue(mockDb as any);
   });
@@ -273,6 +294,93 @@ describe("PermissionsRoutes", () => {
       expect(response.body).toEqual([
         { rule: "read_file(src/**)", toolName: "read_file", count: 5, lastApprovedAt: at.toISOString() },
       ]);
+    });
+  });
+
+  describe("modes", () => {
+    const put = (path: string, body: unknown) => as(agent.put(`/permissions${path}`)).send(body as object);
+    const previousOwners = process.env[BYPASS_OWNERS_ENV_VAR];
+
+    afterEach(() => {
+      PermissionModeRegistry.clear();
+      if (previousOwners === undefined) delete process.env[BYPASS_OWNERS_ENV_VAR];
+      else process.env[BYPASS_OWNERS_ENV_VAR] = previousOwners;
+    });
+
+    it("describes the modes, and which this user may pick", async () => {
+      delete process.env[BYPASS_OWNERS_ENV_VAR];
+      const response = await as(agent.get("/permissions/mode")).expect(200);
+      expect(response.body).toMatchObject({ mode: "default", source: "default", defaultMode: "default", bypassAllowed: false });
+      expect(response.body.modes.map((mode: any) => mode.id)).toEqual([
+        "default",
+        "plan",
+        "acceptEdits",
+        "auto",
+        "dontAsk",
+        "bypass",
+      ]);
+      const bypass = response.body.modes.find((mode: any) => mode.id === "bypass");
+      expect(bypass).toMatchObject({ available: false });
+      expect(bypass.unavailableReason).toContain(BYPASS_OWNERS_ENV_VAR);
+    });
+
+    it("stores a conversation's mode and switches its running turn", async () => {
+      conversations.push({ id: "conv-1", project: PROJECT, username: USERNAME });
+      const handle = new PermissionModeHandle("default", { source: "conversation" });
+      const heard: unknown[] = [];
+      handle.onChange((change) => heard.push(change));
+      PermissionModeRegistry.register("conv-1", handle);
+
+      const response = await put("/mode", { conversationId: "conv-1", mode: "plan" }).expect(200);
+
+      expect(response.body).toEqual({ conversationId: "conv-1", mode: "plan", stored: true, live: true });
+      expect(conversations[0].approvals.permissionMode).toBe("plan");
+      expect(handle.mode).toBe("plan");
+      expect(heard).toEqual([{ mode: "plan", previousMode: "default", source: "user" }]);
+      // While the turn runs, its mode is what GET reports.
+      const current = await as(agent.get("/permissions/mode?conversationId=conv-1")).expect(200);
+      expect(current.body).toMatchObject({ mode: "plan", source: "running" });
+    });
+
+    it("bypass is owner-only", async () => {
+      conversations.push({ id: "conv-1", project: PROJECT, username: USERNAME });
+      delete process.env[BYPASS_OWNERS_ENV_VAR];
+      const refused = await put("/mode", { conversationId: "conv-1", mode: "bypass" }).expect(403);
+      expect(refused.body.error).toContain("owner-only");
+      expect(conversations[0].approvals).toBeUndefined();
+
+      process.env[BYPASS_OWNERS_ENV_VAR] = USERNAME;
+      await put("/mode", { conversationId: "conv-1", mode: "bypass" }).expect(200);
+      expect(conversations[0].approvals.permissionMode).toBe("bypass");
+    });
+
+    it("404s on an unknown conversation and 400s on an unknown mode", async () => {
+      await put("/mode", { conversationId: "nope", mode: "plan" }).expect(404);
+      await put("/mode", { conversationId: "nope", mode: "yolo" }).expect(400);
+    });
+
+    it("sets the default mode — never bypass", async () => {
+      // tests/setup.ts's SettingsService double has no `update`; lend it one.
+      const update = vi.fn().mockResolvedValue({});
+      (SettingsService as any).update = update;
+      try {
+        await put("/mode/default", { mode: "bypass" }).expect(400);
+        expect(update).not.toHaveBeenCalled();
+        await put("/mode/default", { mode: "acceptEdits" }).expect(200);
+        expect(update).toHaveBeenCalledWith({ permissions: { defaultMode: "acceptEdits" } });
+      } finally {
+        delete (SettingsService as any).update;
+      }
+    });
+
+    it("the tester judges a call in a given mode", async () => {
+      const response = await post("/rules/test", {
+        toolName: "write_file",
+        args: { path: "src/a.ts" },
+        workspaceRoot: "/ws",
+        permissionMode: "plan",
+      }).expect(200);
+      expect(response.body).toMatchObject({ decision: "deny", layer: "mode", mode: "plan" });
     });
   });
 

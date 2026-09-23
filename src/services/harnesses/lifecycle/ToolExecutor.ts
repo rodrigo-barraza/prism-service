@@ -314,6 +314,7 @@ export async function executeToolBatch(
               _autoApprove: context.options?.autoApprove === true,
               _policies: context.options?.policies,
               _permissionRules: context.options?._permissionRules,
+              _permissionMode: context.options?._permissionMode,
               _enableCriticGate: context.options?.enableCriticGate,
               _criticModel: context.options?.criticModel,
               _maxCostDollars: context.options?.maxCostDollars,
