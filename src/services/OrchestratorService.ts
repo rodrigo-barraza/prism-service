@@ -2574,6 +2574,11 @@ export class OrchestratorService {
               conversationId: subAgent.subAgentConversationId,
             }),
           }),
+          // The parent's mode handle itself: plan mode stays read-only all the
+          // way down, and a switch of the parent's mode reaches its sub-agents.
+          ...(orchestratorContext.permissionMode && {
+            _permissionMode: orchestratorContext.permissionMode,
+          }),
           ...(orchestratorContext.enableCriticGate !== undefined && {
             enableCriticGate: orchestratorContext.enableCriticGate,
           }),

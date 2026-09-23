@@ -261,6 +261,7 @@ export default class ReActHarness extends BaseAgenticHarness {
       autoApprove: options.autoApprove === true,
       policies: options.policies,
       permissionRules: options._permissionRules,
+    permissionMode: options._permissionMode,
       enableCriticGate: options.enableCriticGate === true,
       criticModel: options.criticModel || undefined,
     });

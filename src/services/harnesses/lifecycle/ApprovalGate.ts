@@ -19,6 +19,7 @@ import { decisionOwnerOf } from "#src/services/conversation/ConversationRunState
 import { APPROVALS } from "#src/constants";
 import { buildHookPayload } from "#src/services/hooks/buildPayload";
 import { HOOK_EVENTS } from "#src/services/hooks/types";
+import { hookPermissionModeName } from "#src/services/permissions/PermissionModes";
 import { buildApprovalPreview } from "./ApprovalPreview.ts";
 import { buildDeniedToolResult, firePermissionDenied } from "./TurnHooks.ts";
 
@@ -113,6 +114,7 @@ export function approvalRecordFor(toolCall: ToolCall): Pick<ToolCall, "_approval
       isApproved: stamp.isApproved === true,
       ...(stamp.isDenied ? { isDenied: true } : {}),
       ...(stamp.deniedBy ? { deniedBy: stamp.deniedBy } : {}),
+      ...(stamp.deniedBy === "mode" && stamp.mode ? { mode: stamp.mode } : {}),
       ...(stamp.reason ? { reason: stamp.reason } : {}),
       ...(stamp.decidedBy ? { decidedBy: stamp.decidedBy } : {}),
       ...(stamp.userReason ? { userReason: stamp.userReason } : {}),
@@ -175,8 +177,14 @@ async function runPermissionRequestHooks(
   pending: ToolCall[],
   context: AgenticContext,
   hooks: AgentHooks,
+  approvalEngine: AutoApprovalEngine,
 ): Promise<ToolCall[]> {
-  const permissionMode = context.options?.autoApprove ? "auto" : "default";
+  // Claude Code's names: "approve all" on top of the default mode is what
+  // Claude Code calls bypassing permissions.
+  const mode = approvalEngine.mode ?? "default";
+  const permissionMode = hookPermissionModeName(
+    context.options?.autoApprove && mode === "default" ? "bypass" : mode,
+  );
   const verdicts = await Promise.all(
     pending.map((call) =>
       hooks.run(
@@ -247,16 +255,27 @@ export async function checkAndWaitForApproval(
 
   const deniedOriginals = matchOriginals(toolCalls, denied);
   if (deniedOriginals.size > 0) {
+    // "denied by policy: a" / "denied by plan mode: b" — one clause per layer.
+    const byLayer = new Map<string, string[]>();
+    for (const toolCall of denied) {
+      const label =
+        toolCall._approval?.deniedBy === "mode"
+          ? `${toolCall._approval.mode ?? "permission"} mode`
+          : "policy";
+      byLayer.set(label, [...(byLayer.get(label) ?? []), toolCall.name]);
+    }
     emit({
       type: SERVER_SENT_EVENT_TYPES.STATUS,
-      message: `Tool execution denied by policy: ${denied.map((toolCall) => toolCall.name).join(", ")}`,
+      message: `Tool execution denied by ${[...byLayer]
+        .map(([label, names]) => `${label}: ${names.join(", ")}`)
+        .join("; ")}`,
     });
     for (const deniedCall of deniedOriginals) {
       await firePermissionDenied(
         hooks,
         context,
         deniedCall,
-        "rule",
+        deniedCall._approval?.deniedBy === "mode" ? "mode" : "rule",
         deniedCall._approval?.reason || "policy rule",
       );
     }
@@ -264,12 +283,15 @@ export async function checkAndWaitForApproval(
   const awaitingOriginals = matchOriginals(toolCalls, needsApproval);
 
   // Mid-loop "auto-approve this conversation" (options.autoApprove flipped
-  // after engine construction) answers every prompt — except the ones a
-  // PreToolUse hook explicitly asked for, which is the whole point of `ask`.
+  // after engine construction) answers every prompt — except those no
+  // "approve all" answers: a PreToolUse hook's `ask` (the whole point of
+  // `ask`) and a write to a protected path.
   let pending = toolCalls.filter(
     (toolCall) =>
       awaitingOriginals.has(toolCall) &&
-      (!options.autoApprove || toolCall._hookPermission?.decision === "ask"),
+      (!options.autoApprove ||
+        toolCall._hookPermission?.decision === "ask" ||
+        toolCall._approval?.alwaysAsks === true),
   );
 
   if (options.autoApprove) {
@@ -290,7 +312,7 @@ export async function checkAndWaitForApproval(
   }
 
   if (pending.length > 0 && hooks) {
-    pending = await runPermissionRequestHooks(pending, context, hooks);
+    pending = await runPermissionRequestHooks(pending, context, hooks, approvalEngine);
   }
 
   const isDenied = (toolCall: ToolCall) =>
@@ -402,6 +424,14 @@ export async function checkAndWaitForApproval(
       ...(hookPermission?.decision === "ask" && {
         requestedBy: "hook",
         reason: hookPermission.reason ?? null,
+      }),
+      // A protected-path write: "Always allow" cannot stop this card asking.
+      ...(awaiting[index].toolCall._approval?.protectedPath && {
+        protectedPath: awaiting[index].toolCall._approval!.protectedPath,
+        alwaysAsks: true,
+      }),
+      ...(awaiting[index].toolCall._approval?.mode && {
+        mode: awaiting[index].toolCall._approval!.mode,
       }),
     });
   });
