@@ -587,6 +587,37 @@ const MemoryService = {
     const existing = await collection.findOne({ id: memoryId }, { projection: { id: 1 } });
     return existing ? "not-pending" : "not-found";
   },
+  /**
+   * The user's decision on EVERY memory awaiting review in a scope — the
+   * answer to a review list that grew long. Returns how many were decided.
+   */
+  async reviewAll(
+    {
+      agent,
+      project,
+      profileId,
+    }: { agent?: string | null; project?: string | null; profileId?: string },
+    decision: "accept" | "reject",
+    { by = "user" }: { by?: string } = {},
+  ): Promise<number> {
+    const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
+    const now = new Date().toISOString();
+    const filter: Record<string, unknown> = {
+      quarantined: true,
+      ...CURRENT_MEMORY_FILTER,
+      profileId: profileFilter(resolveProfileId(profileId)),
+    };
+    if (agent) filter.agent = agent;
+    if (project) filter.project = project;
+    const $set: Record<string, unknown> =
+      decision === "accept"
+        ? { quarantined: false, reviewDecision: "accepted" }
+        : { reviewDecision: "rejected", validTo: now, closedReason: "rejected" };
+    const result = await collection.updateMany(filter, {
+      $set: { ...$set, reviewedAt: now, reviewedBy: by, updatedAt: now },
+    });
+    return result.modifiedCount;
+  },
   /** Corroboration (store): a quarantined memory the user has now stated goes live. */
   async promoteCorroborated(
     memoryId: string,

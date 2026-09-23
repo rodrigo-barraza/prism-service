@@ -453,6 +453,7 @@ export function agentWriteProvenance(
  */
 export const CORROBORATION_CANDIDATE_THRESHOLD = 0.8;
 
+/** English function words; other languages only make the check stricter, never looser. */
 const STOPWORDS = new Set([
   "about", "after", "also", "been", "before", "being", "does", "every", "from",
   "have", "into", "just", "like", "more", "must", "only", "over", "should",
@@ -460,43 +461,59 @@ const STOPWORDS = new Set([
   "very", "what", "when", "where", "which", "will", "with", "would", "your",
 ]);
 
-/** Tokens that pin a claim down: anything with a digit, or code/URL punctuation. */
+const WORDS = new Intl.Segmenter(undefined, { granularity: "word" });
+const CJK = /[\p{Script=Han}\p{Script=Katakana}\p{Script=Hangul}]/u;
+const HIRAGANA_ONLY = /^\p{Script=Hiragana}+$/u;
+
+/**
+ * Tokens that pin a claim down: a run of ASCII letters, digits and code
+ * punctuation that holds a digit or code punctuation — a date, a version,
+ * a URL, a command. ASCII runs, so "2026-10-05から" still yields the date.
+ */
 function specificTokens(text: string): string[] {
-  return text
-    .split(/\s+/)
-    .map((token) => token.replace(/^[("'`[{<]+|[)"'`\]}>.,;:!?]+$/g, "").toLowerCase())
+  return (text.toLowerCase().match(/[a-z0-9._/:|$@=`~+#%-]+/g) || [])
+    .map((token) => token.replace(/^[.:-]+|[.,:;!?-]+$/g, ""))
     .filter((token) => token.length > 1 && (/\d/.test(token) || /[/:_|$@=`]|\w\.\w/.test(token)));
 }
 
-/** A crude stem — enough that "starting" meets "starts". */
-function stem(word: string): string {
-  return word.replace(/(ing|ed|es|s)$/, "");
-}
-
-function contentStems(text: string): Set<string> {
-  return new Set(
-    (text.toLowerCase().match(/\p{L}+/gu) || [])
-      .filter((word) => word.length >= 4 && !STOPWORDS.has(word))
-      .map(stem),
-  );
+/**
+ * The content words of a text, as comparison keys, in any language:
+ * words from Intl.Segmenter; CJK words of two or more characters whole
+ * (hiragana-only ones are particles and endings); other words of four or
+ * more letters by their first five — enough that "starting" meets "starts"
+ * and "congelación" meets "congelamiento". Digits are specificTokens' job.
+ */
+function contentKeys(text: string): Set<string> {
+  const keys = new Set<string>();
+  for (const { segment, isWordLike } of WORDS.segment(text.toLowerCase())) {
+    if (!isWordLike || /^\p{N}+$/u.test(segment)) continue;
+    if (CJK.test(segment)) {
+      if (segment.length >= 2) keys.add(segment);
+      continue;
+    }
+    if (HIRAGANA_ONLY.test(segment)) continue;
+    if (segment.length < 4 || STOPWORDS.has(segment)) continue;
+    keys.add(segment.slice(0, 5));
+  }
+  return keys;
 }
 
 /**
  * True when `statement` (what the user said) restates `claim` (what an
  * untrusted source said): every specific token of the claim — a date, a
  * number, a URL, a command — appears in the statement, and at least half of
- * the claim's content words do. Embedding similarity only nominates a
+ * the claim's content words do, in whatever language (contentKeys). Embedding similarity only nominates a
  * candidate; this is what stops a user's "the freeze starts 2026-10-05"
  * from vouching for a page's "the freeze starts 2026-11-05".
  */
 export function restates(claim: string, statement: string): boolean {
   const said = statement.toLowerCase();
   if (!specificTokens(claim).every((token) => said.includes(token))) return false;
-  const claimed = contentStems(claim);
+  const claimed = contentKeys(claim);
   if (claimed.size === 0) return true;
-  const saidStems = contentStems(statement);
+  const saidKeys = contentKeys(statement);
   let agreed = 0;
-  for (const word of claimed) if (saidStems.has(word)) agreed++;
+  for (const key of claimed) if (saidKeys.has(key)) agreed++;
   return agreed / claimed.size >= 0.5;
 }
 
