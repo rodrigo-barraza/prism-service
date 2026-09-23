@@ -116,27 +116,17 @@ export type {
   ChatMessage,
 } from "./admin.ts";
 
-export { MATCH_MODES, COMPARATORS } from "./benchmark.ts";
-
 export type {
-  MatchMode,
-  TextAssertion,
-  ComparisonOperator,
-  AgentAssertion,
-  AgentAssertionType,
-  AssertionResult,
-  JudgeVerdict,
-  BenchmarkDefinition,
-  BenchmarkModelTarget,
-  ResolvedBenchmarkModel,
-  BenchmarkModelResult,
-  BenchmarkToolCall,
   BenchmarkRun,
-  BenchmarkRunSummary,
-  BenchmarkExecutionData,
-  BenchmarkRunCallbacks,
-  BenchmarkStreamEvent,
-  ComparatorFn,
+  BenchmarkSample,
+  BenchmarkSuite,
+  Battle,
+  Contestant,
+  ContestantSpec,
+  RunReport,
+  RunSettings,
+  ScorerSpec,
+  SuiteCase,
 } from "./benchmark.ts";
 
 export type {

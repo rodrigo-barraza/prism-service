@@ -1,1082 +1,743 @@
-import { DEFAULT_USERNAME } from "@rodrigo-barraza/utilities-library/taxonomy";
+/**
+ * /benchmark — suites, runs, reports, the arena, the leaderboard and
+ * scheduled runs (docs/benchmarks.md).
+ *
+ * Runs are background jobs: POST /runs answers at once with the stored
+ * run, GET /runs/:id/events streams its progress (and can be reopened at
+ * any time), and a page that closes does not stop it — POST /runs/:id/cancel
+ * does.
+ */
+import express, { type NextFunction, type Request, type Response } from "express";
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
-import express, { type Request, type Response, type NextFunction } from "express";
-import { EventEmitter } from "node:events";
-import BenchmarkService from "#src/services/BenchmarkService";
-import logger from "#src/utils/logger";
-import { createAbortController } from "#src/utils/AbortController";
-import { registerCleanup } from "#src/utils/CleanupRegistry";
-import { BENCHMARK } from "#src/constants";
-import type { WithId, Document } from "mongodb";
-import type { AgentAssertion, TextAssertion } from "#src/types/benchmark";
+import { DEFAULT_USERNAME } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
-import { BENCHMARK_PRESETS } from "#src/data/benchmarkPresets";
+import crypto from "crypto";
+import logger from "#src/utils/logger";
+import { BENCHMARK } from "#src/constants";
+import { resolveScope } from "#src/utils/ProfileScope";
+import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
+import ScheduledTaskService from "#src/services/ScheduledTaskService";
+import BenchmarkStore from "#src/services/benchmark/BenchmarkStore";
+import Suites, { type SuiteInput } from "#src/services/benchmark/Suites";
+import { importCatalogSuite, listCatalog } from "#src/services/benchmark/SuiteCatalog";
+import { estimateRun, prepareRun, startRun, type RunRequest } from "#src/services/benchmark/Runs";
+import RunEngine, { RunEvents, emptyProgress, type RunEvent } from "#src/services/benchmark/RunEngine";
+import { buildReport, type ErrorPolicy } from "#src/services/benchmark/RunReport";
+import { compareRuns } from "#src/services/benchmark/BenchmarkRegression";
+import { validateScheduledBenchmark } from "#src/services/benchmark/BenchmarkRegression";
+import { buildLeaderboard } from "#src/services/benchmark/Leaderboard";
+import { prepareContestants } from "#src/services/benchmark/Contestants";
+import { defaultJudge } from "#src/services/benchmark/BenchmarkJudge";
+import { describeScorer } from "#src/services/benchmark/Scorers";
+import {
+  arenaStandings,
+  nextBlindPair,
+  recordBlindVote,
+  recordLiveVote,
+  runLiveBattle,
+} from "#src/services/benchmark/ArenaService";
+import type {
+  BenchmarkRun,
+  BenchmarkSample,
+  ContestantLineup,
+  RunListItem,
+  ScheduledBenchmarkConfig,
+  SampleStatus,
+} from "#src/types/benchmark";
 
 const router = express.Router();
 
-// ── Internal Types ──────────────────────────────────────────
+const projectOf = (req: Request) => req.project || null;
+const usernameOf = (req: Request) => req.username || DEFAULT_USERNAME;
+const identityOf = (req: Request) => ({ project: projectOf(req), username: usernameOf(req) });
+const param = (req: Request, name: string) => String(req.params[name] ?? "");
 
-interface BenchmarkModelStartData {
-  provider: string;
-  model: string;
-  label: string;
-  isLocal: boolean;
-}
+const SCHEDULE_TYPES = new Set(["hourly", "daily", "weekly", "cron", "once", "custom"]);
+const SAMPLE_STATUSES: ReadonlySet<string> = new Set(["pending", "running", "done", "error", "cancelled"]);
 
-interface RunState {
-  completedResults: Record<string, unknown>[];
-  activeModel: BenchmarkModelStartData | null;
-  totalModels: number;
-  startedAt: string;
-}
-
-interface BenchmarkResult {
-  provider: string;
-  model: string;
-  label: string;
-  thinkingEnabled: boolean;
-  toolsEnabled: boolean;
-  agent?: string | null;
-  passed: boolean;
-  error: string | null;
-  estimatedCost?: number | null;
-  judgeCost?: number;
-  latency?: number;
-  ttftMs?: number | null;
-  [key: string]: unknown;
-}
-
-interface BenchmarkRunSummary {
-  total: number;
-  passed: number;
-  failed: number;
-  errored: number;
-  totalCost: number;
-}
-
-interface BenchmarkRunDoc extends WithId<Document> {
-  id: string;
-  summary?: BenchmarkRunSummary;
-  models?: BenchmarkResult[];
-  completedAt?: string;
-  [key: string]: unknown;
-}
-
-interface BenchmarkDoc extends WithId<Document> {
-  id: string;
-  name: string;
-  [key: string]: unknown;
-}
-
-interface PerBenchmarkStat {
-  name: string;
-  total: number;
-  passed: number;
-  failed: number;
-  errored: number;
-}
-
-interface RunTotal {
-  totalCost: number;
-  totalLatency: number;
-  totalTtftMs: number;
-  ttftCount: number;
-  runCount: number;
-}
-
-interface LatestResult {
-  benchmarkId: string;
-  benchmarkName: string;
-  provider: string;
-  model: string;
-  label: string;
-  thinkingEnabled: boolean;
-  toolsEnabled: boolean;
-  agent: string | null;
-  passed: boolean;
-  error: string | null;
-}
-
-// ── Shared write validation ─────────────────────────────────
-
-const AGENT_ASSERTION_TYPES = new Set([
-  "replied",
-  "thought",
-  "max_turns",
-  "used_tool_calls",
-  "used_tool",
-  "not_used_tool",
-  "first_tool",
-  "tool_sequence",
-  "tool_args_match",
-  "tool_result_match",
-  "tool_calls_ok",
-  "llm_judge",
-]);
-
-/** Assertion types that require a toolName to be meaningful. */
-const TOOL_NAME_REQUIRED_TYPES = new Set([
-  "used_tool",
-  "first_tool",
-  "tool_sequence",
-]);
-
-interface BenchmarkWriteBody {
-  name?: string;
-  prompt?: string;
-  expectedValue?: string;
-  assertions?: TextAssertion[];
-  assertionOperator?: string;
-  agentAssertions?: AgentAssertion[];
-  agentAssertionOperator?: string;
-  enabledTools?: unknown;
-  trials?: unknown;
-  [key: string]: unknown;
-}
-
-/**
- * Validate a benchmark create/update body. Returns an error string or null.
- * When `requireComplete` is true (create), name/prompt/≥1 assertion are
- * mandatory; updates only validate the fields present.
- */
-function validateBenchmarkWrite(
-  body: BenchmarkWriteBody,
-  requireComplete: boolean,
-): string | null {
-  if (requireComplete && (!body.name || !body.prompt)) {
-    return "Missing required fields: name, prompt";
-  }
-
-  const validModes = Object.values(BenchmarkService.BENCHMARK_MATCH_MODES);
-  if (body.assertions !== undefined) {
-    if (!Array.isArray(body.assertions)) return "assertions must be an array";
-    for (const assertion of body.assertions) {
-      if (assertion.matchMode && !validModes.includes(assertion.matchMode)) {
-        return `Invalid matchMode in assertion. Must be one of: ${validModes.join(", ")}`;
+/** Errors that carry a status (validation) answer with it; others go to the error handler. */
+function handled(handler: (req: Request, res: Response) => Promise<unknown>) {
+  return asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await handler(req, res);
+    } catch (error: unknown) {
+      const status = (error as { status?: number }).status;
+      if (typeof status === "number" && status >= 400 && status < 500) {
+        res.status(status).json({ error: getErrorMessage(error) });
+        return;
       }
+      logger.error(`[benchmark] ${req.method} ${req.originalUrl}: ${getErrorMessage(error)}`);
+      next(error);
     }
-  }
-
-  for (const field of ["assertionOperator", "agentAssertionOperator"] as const) {
-    if (body[field] !== undefined && !["AND", "OR"].includes(String(body[field]))) {
-      return `Invalid ${field}. Must be AND or OR.`;
-    }
-  }
-
-  if (body.agentAssertions !== undefined) {
-    if (!Array.isArray(body.agentAssertions)) {
-      return "agentAssertions must be an array";
-    }
-    for (const assertion of body.agentAssertions) {
-      if (!assertion?.type || !AGENT_ASSERTION_TYPES.has(assertion.type)) {
-        return `Invalid agent assertion type: ${assertion?.type}. Must be one of: ${[...AGENT_ASSERTION_TYPES].join(", ")}`;
-      }
-      if (
-        TOOL_NAME_REQUIRED_TYPES.has(assertion.type) &&
-        !assertion.toolName?.trim()
-      ) {
-        return `Agent assertion "${assertion.type}" requires a toolName`;
-      }
-      if (assertion.type === "llm_judge" && !assertion.rubric?.trim()) {
-        return `Agent assertion "llm_judge" requires a rubric`;
-      }
-      if (
-        (assertion.type === "tool_args_match" ||
-          assertion.type === "tool_result_match") &&
-        !assertion.expectedValue?.trim()
-      ) {
-        return `Agent assertion "${assertion.type}" requires an expectedValue`;
-      }
-      if (assertion.matchMode && !validModes.includes(assertion.matchMode)) {
-        return `Invalid matchMode in agent assertion. Must be one of: ${validModes.join(", ")}`;
-      }
-    }
-  }
-
-  if (body.enabledTools !== undefined) {
-    if (
-      !Array.isArray(body.enabledTools) ||
-      body.enabledTools.some((tool) => typeof tool !== "string")
-    ) {
-      return "enabledTools must be an array of tool names";
-    }
-  }
-
-  if (body.trials !== undefined && body.trials !== null) {
-    const trialCount = Number(body.trials);
-    if (
-      !Number.isInteger(trialCount) ||
-      trialCount < 1 ||
-      trialCount > BENCHMARK.MAX_TRIALS
-    ) {
-      return `trials must be an integer between 1 and ${BENCHMARK.MAX_TRIALS}`;
-    }
-  }
-
-  if (requireComplete) {
-    const hasTextAssertion =
-      !!body.expectedValue ||
-      (Array.isArray(body.assertions) &&
-        body.assertions.some(
-          (assertion) =>
-            assertion.expectedValue?.trim() ||
-            assertion.matchMode === "jsonValid",
-        ));
-    const hasBehaviorAssertion =
-      Array.isArray(body.agentAssertions) && body.agentAssertions.length > 0;
-    if (!hasTextAssertion && !hasBehaviorAssertion) {
-      return "Benchmarks require at least one assertion (output match or behavior)";
-    }
-  }
-
-  return null;
+  });
 }
 
-/** Pick only the benchmark-editable fields from a request body. */
-function pickBenchmarkFields(body: Record<string, unknown>) {
-  const {
-    name,
-    prompt,
-    systemPrompt,
-    expectedValue,
-    matchMode,
-    temperature,
-    maxTokens,
-    tags,
-    assertions,
-    assertionOperator,
-    benchmarkMode,
-    agentAssertions,
-    agentAssertionOperator,
-    enabledTools,
-    trials,
-  } = body;
+async function loadRun(req: Request, res: Response): Promise<BenchmarkRun | null> {
+  const run = await BenchmarkStore.getRun(param(req, "runId"), projectOf(req));
+  if (!run) res.status(404).json({ error: "Run not found" });
+  return run;
+}
+
+/** A run for lists: suites without their cases, live progress when it is running here. */
+function listItem(run: BenchmarkRun): RunListItem {
   return {
-    name,
-    prompt,
-    systemPrompt,
-    expectedValue,
-    matchMode,
-    temperature,
-    maxTokens,
-    tags,
-    assertions,
-    assertionOperator,
-    benchmarkMode,
-    agentAssertions,
-    agentAssertionOperator,
-    enabledTools,
-    trials,
-  } as Record<string, unknown>;
+    ...run,
+    progress: RunEvents.progressOf(run.id) ?? run.progress,
+    suites: run.suites.map((suite) => ({
+      id: suite.id,
+      name: suite.name,
+      version: suite.version,
+      totalCases: suite.totalCases,
+      caseCount: suite.cases.length,
+    })),
+  };
 }
 
-// Process-level registry of in-flight benchmark runs → AbortControllers
-// Used by the explicit POST /benchmark/abort/:runId endpoint.
-const activeRuns = new Map<string, AbortController>();
-
-// Pub/sub for live benchmark progress — allows reconnecting clients
-// to receive events from an already-running benchmark.
-const runEmitters = new Map<string, EventEmitter>();
-const runStates = new Map<string, RunState>();
-
-// Shutdown cleanup — abort any running benchmarks
-registerCleanup(async () => {
-  if (activeRuns.size === 0) return;
-  logger.info(
-    `[Benchmark] Shutdown: aborting ${activeRuns.size} active run(s)`,
-  );
-  for (const [id, controller] of activeRuns) {
-    controller.abort();
-    activeRuns.delete(id);
-  }
-});
-
-// ─── GET /benchmark — List all benchmark tests for the caller's project ─
+// ── Options & catalog ───────────────────────────────────────
 
 router.get(
-  "/",
-  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const benchmarks = (await BenchmarkService.list(
-        req.project || null,
-      )) as BenchmarkDoc[];
-
-      // Attach latest run summary + cumulative cost across ALL runs
-      const enriched = await Promise.all(
-        benchmarks.map(async (b) => {
-          const [latestRun, allRuns] = await Promise.all([
-            BenchmarkService.getLatestRun(
-              b.id,
-              req.project || null,
-            ) as Promise<BenchmarkRunDoc | null>,
-            BenchmarkService.getRuns(b.id, req.project || null) as Promise<
-              BenchmarkRunDoc[]
-            >,
-          ]);
-          const cumulativeCost = allRuns.reduce(
-            (sum, r) => sum + (r.summary?.totalCost || 0),
-            0,
-          );
-          return {
-            ...b,
-            cumulativeCost,
-            runCount: allRuns.length,
-            latestRun: latestRun
-              ? {
-                  id: latestRun.id,
-                  summary: latestRun.summary,
-                  completedAt: latestRun.completedAt,
-                }
-              : null,
-          };
-        }),
-      );
-
-      res.json({ benchmarks: enriched, count: enriched.length });
-    } catch (error: unknown) {
-      logger.error(`GET /benchmark error: ${getErrorMessage(error)}`);
-      next(error);
-    }
+  "/options",
+  handled(async (_req, res) => {
+    const judge = defaultJudge();
+    res.json({
+      agents: AgentPersonaRegistry.list(),
+      defaultJudge: judge ? `${judge.provider}:${judge.model}` : null,
+      limits: {
+        maxEpochs: BENCHMARK.MAX_EPOCHS,
+        maxRunCases: BENCHMARK.MAX_RUN_CASES,
+        maxRunSamples: BENCHMARK.MAX_RUN_SAMPLES,
+        maxConcurrency: BENCHMARK.MAX_CONCURRENCY,
+        defaultConcurrency: BENCHMARK.DEFAULT_CONCURRENCY,
+        defaultProviderConcurrency: BENCHMARK.DEFAULT_PROVIDER_CONCURRENCY,
+      },
+    });
   }),
 );
 
-// ─── GET /benchmark/stats — Aggregate model performance across all runs ─
-// Per model+benchmark pair, only the LATEST run's result counts toward
-// pass/fail/error (unique test results). Cost and latency accumulate
-// across all runs for accurate historical totals.
-
 router.get(
-  "/stats",
-  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const benchmarks = (await BenchmarkService.list(
-        req.project || null,
-      )) as BenchmarkDoc[];
-
-      // Phase 1: For each benchmark, find the latest result per model config.
-      // getRuns() returns runs sorted by startedAt DESC, so the first
-      // occurrence of a model key is its most recent result.
-      // Composite key: "provider:model:thinking:tools:agent" so the same
-      // model with different configs appears as separate rows.
-      // latestResults: Map<compositeKey, Map<benchmarkId, result>>
-      const latestResults = new Map<string, Map<string, LatestResult>>();
-      // allRunTotals: Map<compositeKey, { totalCost, totalLatency, runCount }>
-      const allRunTotals = new Map<string, RunTotal>();
-      // cumulativeBenchmarks: Map<"compositeKey::benchmarkId", { name, total, passed, failed, errored }>
-      const cumulativeBenchmarks = new Map<string, PerBenchmarkStat>();
-
-      /** Build a composite grouping key from a result object. */
-      const makeKey = (r: BenchmarkResult) => {
-        const thinking = r.thinkingEnabled ? "T" : "";
-        const tools = r.toolsEnabled ? "F" : "";
-        const agent = r.agent || "";
-        return `${r.provider}:${r.model}:${thinking}:${tools}:${agent}`;
-      };
-
-      for (const b of benchmarks) {
-        const runs = (await BenchmarkService.getRuns(
-          b.id,
-          req.project || null,
-        )) as BenchmarkRunDoc[];
-        const seenForBenchmark = new Set(); // track which model configs we've already recorded as "latest"
-
-        for (const run of runs) {
-          for (const result of (run.models || []) as BenchmarkResult[]) {
-            const modelKey = makeKey(result);
-
-            // Accumulate ALL-run cost/latency regardless of dedup
-            if (!allRunTotals.has(modelKey)) {
-              allRunTotals.set(modelKey, {
-                totalCost: 0,
-                totalLatency: 0,
-                totalTtftMs: 0,
-                ttftCount: 0,
-                runCount: 0,
-              });
-            }
-            const runTotal = allRunTotals.get(modelKey)!;
-            runTotal.totalCost +=
-              (result.estimatedCost || 0) + (result.judgeCost || 0);
-            runTotal.totalLatency += result.latency || 0;
-            if (typeof result.ttftMs === "number" && result.ttftMs > 0) {
-              runTotal.totalTtftMs += result.ttftMs;
-              runTotal.ttftCount++;
-            }
-            runTotal.runCount++;
-
-            // Accumulate ALL-run per-benchmark stats (for detail cards)
-            const cumulKey = `${modelKey}::${b.id}`;
-            if (!cumulativeBenchmarks.has(cumulKey)) {
-              cumulativeBenchmarks.set(cumulKey, {
-                name: b.name,
-                total: 0,
-                passed: 0,
-                failed: 0,
-                errored: 0,
-              });
-            }
-            const callback = cumulativeBenchmarks.get(cumulKey)!;
-            callback.total++;
-            if (result.error) callback.errored++;
-            else if (result.passed) callback.passed++;
-            else callback.failed++;
-
-            // Only record the first (latest) result per model config per benchmark
-            if (seenForBenchmark.has(cumulKey)) continue;
-            seenForBenchmark.add(cumulKey);
-
-            if (!latestResults.has(modelKey)) {
-              latestResults.set(modelKey, new Map());
-            }
-            latestResults.get(modelKey)!.set(b.id, {
-              benchmarkId: b.id,
-              benchmarkName: b.name,
-              provider: result.provider,
-              model: result.model,
-              label: result.label || result.model,
-              thinkingEnabled: result.thinkingEnabled || false,
-              toolsEnabled: result.toolsEnabled || false,
-              agent: result.agent || null,
-              passed: result.passed,
-              error: result.error,
-            });
-          }
-        }
-      }
-
-      // Phase 2: Build per-model-config stats from deduplicated latest results
-      const models = [...latestResults.entries()].map(
-        ([modelKey, benchmarkMap]: [string, Map<string, LatestResult>]) => {
-          const benchmarkResults = [...benchmarkMap.values()];
-          const first = benchmarkResults[0];
-          const runTotal = allRunTotals.get(modelKey) || {
-            totalCost: 0,
-            totalLatency: 0,
-            totalTtftMs: 0,
-            ttftCount: 0,
-            runCount: 0,
-          };
-
-          let passed = 0;
-          let failed = 0;
-          let errored = 0;
-          const perBenchmark: (PerBenchmarkStat & {
-            latestPassed: boolean;
-            latestErrored: boolean;
-          })[] = [];
-
-          for (const benchmarkResult of benchmarkResults) {
-            if (benchmarkResult.error) errored++;
-            else if (benchmarkResult.passed) passed++;
-            else failed++;
-
-            // Detail card uses cumulative (all runs) stats
-            const cumulKey = `${modelKey}::${benchmarkResult.benchmarkId}`;
-            const cumul = cumulativeBenchmarks.get(cumulKey);
-
-            perBenchmark.push({
-              name: benchmarkResult.benchmarkName,
-              // Latest result (for the status badge)
-              latestPassed: !benchmarkResult.error && benchmarkResult.passed,
-              latestErrored: !!benchmarkResult.error,
-              // Cumulative stats (all runs)
-              total: cumul?.total || 0,
-              passed: cumul?.passed || 0,
-              failed: cumul?.failed || 0,
-              errored: cumul?.errored || 0,
-            });
-          }
-
-          const total = benchmarkResults.length;
-
-          return {
-            provider: first.provider,
-            model: first.model,
-            label: first.label,
-            thinkingEnabled: first.thinkingEnabled || false,
-            toolsEnabled: first.toolsEnabled || false,
-            agent: first.agent || null,
-            total,
-            passed,
-            failed,
-            errored,
-            totalCost: runTotal.totalCost,
-            totalLatency: runTotal.totalLatency,
-            runCount: runTotal.runCount,
-            passRate: total > 0 ? passed / total : 0,
-            avgLatency:
-              runTotal.runCount > 0
-                ? runTotal.totalLatency / runTotal.runCount
-                : 0,
-            avgTtftMs:
-              runTotal.ttftCount > 0
-                ? Math.round(runTotal.totalTtftMs / runTotal.ttftCount)
-                : 0,
-            benchmarks: perBenchmark,
-          };
-        },
-      );
-
-      // Sort by pass rate descending, then by total benchmarks descending
-      models.sort(
-        (firstModel, secondModel) =>
-          secondModel.passRate - firstModel.passRate ||
-          secondModel.total - firstModel.total,
-      );
-
-      res.json({
-        models,
-        totalModels: models.length,
-        totalBenchmarks: benchmarks.length,
-      });
-    } catch (error: unknown) {
-      logger.error(`GET /benchmark/stats error: ${getErrorMessage(error)}`);
-      next(error);
-    }
+  "/catalog",
+  handled(async (_req, res) => {
+    res.json({ entries: listCatalog() });
   }),
 );
 
-// ─── GET /benchmark/models — List available conversation models for benchmarking ─
+// ── Suites ──────────────────────────────────────────────────
 
-router.get("/models", (_req: Request, res: Response) => {
-  const models = BenchmarkService.getConversationModels();
-  res.json({ models, count: models.length });
-});
-
-// ─── GET /benchmark/active-list — List all benchmarks with active runs ─
-// Returns an array of benchmark IDs that currently have in-progress runs.
-// Used by the benchmark list page to show running indicators on cards.
-
-router.get("/active-list", (_req: Request, res: Response) => {
-  const activeIds = [...runStates.keys()];
-  res.json({ activeIds });
-});
-
-// ─── GET /benchmark/presets — Return industry-standard benchmark presets ──
-
-router.get("/presets", (_req: Request, res: Response) => {
-  res.json({ presets: BENCHMARK_PRESETS, count: BENCHMARK_PRESETS.length });
-});
-
-// ─── POST /benchmark — Create a new benchmark test ──────────
+router.get(
+  "/suites",
+  handled(async (req, res) => {
+    const suites = await Suites.list(projectOf(req));
+    res.json({ suites, count: suites.length });
+  }),
+);
 
 router.post(
-  "/",
-  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const validationError = validateBenchmarkWrite(
-        req.body as BenchmarkWriteBody,
-        true,
-      );
-      if (validationError) {
-        return res.status(400).json({ error: validationError });
-      }
-
-      const benchmark = await BenchmarkService.create(
-        pickBenchmarkFields(req.body) as unknown as Parameters<
-          typeof BenchmarkService.create
-        >[0],
-        req.project || null,
-        req.username || DEFAULT_USERNAME,
-      );
-
-      res.status(201).json(benchmark);
-    } catch (error: unknown) {
-      logger.error(`POST /benchmark error: ${getErrorMessage(error)}`);
-      next(error);
-    }
+  "/suites",
+  handled(async (req, res) => {
+    const suite = await Suites.create((req.body ?? {}) as SuiteInput, identityOf(req));
+    res.status(201).json(suite);
   }),
 );
 
-// ─── PUT /benchmark/:id — Update an existing benchmark test ─
+router.post(
+  "/suites/import",
+  handled(async (req, res) => {
+    const { catalogId, limit, seed, name } = req.body ?? {};
+    const suite = await importCatalogSuite(
+      { catalogId: String(catalogId ?? ""), limit: limit == null ? null : Number(limit), seed: seed == null ? null : Number(seed), name },
+      identityOf(req),
+    );
+    await Suites.save(suite);
+    res.status(201).json(BenchmarkStore.summariseSuite(suite));
+  }),
+);
+
+router.get(
+  "/suites/:suiteId",
+  handled(async (req, res) => {
+    const suite = await Suites.get(param(req, "suiteId"), projectOf(req));
+    if (!suite) return res.status(404).json({ error: "Suite not found" });
+    res.json({ ...suite, scorerLabels: suite.scorers.map(describeScorer) });
+  }),
+);
 
 router.put(
-  "/:id",
-  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const existing = await BenchmarkService.getById(
-        String(req.params.id),
-        req.project || null,
-      );
-      if (!existing) {
-        return res.status(404).json({ error: "Benchmark not found" });
-      }
-
-      // Validate the merged document so an update can't strip every assertion
-      const merged = { ...existing, ...req.body } as BenchmarkWriteBody;
-      const validationError = validateBenchmarkWrite(merged, true);
-      if (validationError) {
-        return res.status(400).json({ error: validationError });
-      }
-
-      const updated = await BenchmarkService.update(
-        String(req.params.id),
-        pickBenchmarkFields(req.body) as Parameters<
-          typeof BenchmarkService.update
-        >[1],
-        req.project || null,
-      );
-
-      res.json(updated);
-    } catch (error: unknown) {
-      logger.error(`PUT /benchmark/:id error: ${getErrorMessage(error)}`);
-      next(error);
-    }
+  "/suites/:suiteId",
+  handled(async (req, res) => {
+    const suite = await Suites.update(param(req, "suiteId"), (req.body ?? {}) as SuiteInput, projectOf(req));
+    if (!suite) return res.status(404).json({ error: "Suite not found" });
+    res.json(suite);
   }),
 );
-
-// ─── GET /benchmark/:id — Get a single benchmark test + latest run ─
-
-router.get(
-  "/:id",
-  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const benchmark = await BenchmarkService.getById(
-        String(req.params.id),
-        req.project || null,
-      );
-      if (!benchmark) {
-        return res.status(404).json({ error: "Benchmark not found" });
-      }
-
-      const latestRun = await BenchmarkService.getLatestRun(
-        benchmark.id as string,
-        req.project || null,
-      );
-
-      res.json({ ...benchmark, latestRun: latestRun || null });
-    } catch (error: unknown) {
-      logger.error(`GET /benchmark/:id error: ${getErrorMessage(error)}`);
-      next(error);
-    }
-  }),
-);
-
-// ─── DELETE /benchmark/:id — Delete a benchmark test and its runs ─
-
-router.delete(
-  "/:id",
-  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const existing = await BenchmarkService.getById(
-        String(req.params.id),
-        req.project || null,
-      );
-      if (!existing) {
-        return res.status(404).json({ error: "Benchmark not found" });
-      }
-
-      await BenchmarkService.remove(String(req.params.id), req.project || null);
-      res.json({ deleted: true, id: req.params.id });
-    } catch (error: unknown) {
-      logger.error(`DELETE /benchmark/:id error: ${getErrorMessage(error)}`);
-      next(error);
-    }
-  }),
-);
-
-// ─── POST /benchmark/:id/run — Execute a benchmark against models (SSE) ─
-// Body (optional):
-//   { models: [{ provider: "openai", model: "gpt-5.4" }, ...] }
-// If models is omitted, all available conversation models are tested.
-//
-// Streams SSE events:
-//   model_start   { provider, model, label }
-//   model_complete { ...result }
-//   run_complete  { ...run }
 
 router.post(
-  "/:id/run",
-  asyncHandler(async (req: Request, res: Response) => {
-    try {
-      const benchmark = await BenchmarkService.getById(
-        String(req.params.id),
-        req.project || null,
-      );
-      if (!benchmark) {
-        return res.status(404).json({ error: "Benchmark not found" });
-      }
-
-      // Disable Node's default socket/request timeout for long-running SSE streams
-      req.setTimeout(0);
-      if (req.socket) req.socket.setTimeout(0);
-
-      // Set up SSE headers
-      res.writeHead(200, {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-        "X-Accel-Buffering": "no",
-      });
-
-      // Abort controller — wired to client disconnect AND explicit abort endpoint
-      const abortController = createAbortController();
-      let clientClosed = false;
-
-      const registryKey = String(req.params.id);
-      activeRuns.set(registryKey, abortController);
-
-      // Set up pub/sub emitter and state for live reconnection
-      const emitter = new EventEmitter();
-      emitter.setMaxListeners(20);
-      runEmitters.set(registryKey, emitter);
-      runStates.set(registryKey, {
-        completedResults: [],
-        activeModel: null,
-        totalModels: 0,
-        startedAt: new Date().toISOString(),
-      });
-
-      // Keepalive: send SSE comment ping every 15s to prevent proxy/browser timeouts
-      const keepalive = setInterval(() => {
-        if (clientClosed) return;
-        try {
-          res.write(":keepalive\n\n");
-        } catch {
-          /* client already gone */
-        }
-      }, 15_000);
-
-      const cleanup = () => {
-        clientClosed = true;
-        clearInterval(keepalive);
-        activeRuns.delete(registryKey);
-        runEmitters.delete(registryKey);
-        runStates.delete(registryKey);
-      };
-
-      req.on("close", () => {
-        cleanup();
-        abortController.abort();
-      });
-
-      const send = (type: string, data: Record<string, unknown>) => {
-        if (clientClosed) return;
-        try {
-          res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
-        } catch {
-          /* client already gone */
-        }
-      };
-
-      const { models: modelTargets, trials } = req.body || {};
-
-      const run = await BenchmarkService.runBenchmark(
-        benchmark as unknown as Parameters<
-          typeof BenchmarkService.runBenchmark
-        >[0],
-        modelTargets,
-        req.project || null,
-        req.username || DEFAULT_USERNAME,
-        {
-          signal: abortController.signal,
-          ...(trials != null && { trials: Number(trials) }),
-          onRunStart: (info: { totalModels: number }) => {
-            // Store total model count for reconnecting clients
-            const state = runStates.get(registryKey);
-            if (state) state.totalModels = info.totalModels;
-            emitter.emit("event", {
-              type: "run_info",
-              totalModels: info.totalModels,
-            });
-            send("run_info", { totalModels: info.totalModels });
-          },
-          onModelStart: (model: BenchmarkModelStartData) => {
-            const data = {
-              provider: model.provider,
-              model: model.model,
-              label: model.label,
-              isLocal: !!model.isLocal,
-            };
-            // Update live state for followers
-            const state = runStates.get(registryKey);
-            if (state) state.activeModel = data;
-            // Emit to followers
-            emitter.emit("event", { type: "model_start", ...data });
-            // Send to original connection
-            send("model_start", data);
-          },
-          onModelComplete: (result) => {
-            // Update live state for followers
-            const state = runStates.get(registryKey);
-            if (state) {
-              state.completedResults.push({ ...result });
-              state.activeModel = null;
-            }
-            // Emit to followers
-            emitter.emit("event", { type: "model_complete", ...result });
-            // Send to original connection
-            send("model_complete", { ...result });
-          },
-          onEvent: (event: Record<string, unknown>) => {
-            // Forward live events for real-time preview
-            emitter.emit("event", event);
-            // Include _sourceModel for concurrent model attribution
-            const sourceTag = event._sourceModel
-              ? { _sourceModel: event._sourceModel }
-              : {};
-            // Tool events carry structured data beyond just content
-            if (
-              event.type === "toolCall" ||
-              event.type === "tool_execution" ||
-              event.type === "tool_output"
-            ) {
-              const { type, _sourceModel, ...rest } = event;
-              send(type as string, { ...rest, ...sourceTag });
-            } else {
-              send(event.type as string, {
-                content: event.content,
-                ...sourceTag,
-              });
-            }
-          },
-        },
-      );
-
-      // Emit run_complete to followers before cleanup
-      emitter.emit("event", { type: "run_complete", ...run });
-
-      send("run_complete", run as unknown as Record<string, unknown>);
-      if (!clientClosed) res.end();
-      cleanup();
-    } catch (error: unknown) {
-      logger.error(`POST /benchmark/:id/run error: ${getErrorMessage(error)}`);
-      if (res.headersSent) {
-        try {
-          res.write(
-            `data: ${JSON.stringify({ type: "error", message: getErrorMessage(error) })}\n\n`,
-          );
-          res.end();
-        } catch {
-          /* client already gone */
-        }
-      } else {
-        res.status(500).json({ error: "Benchmark execution failed" });
-      }
-    }
+  "/suites/:suiteId/duplicate",
+  handled(async (req, res) => {
+    const suite = await Suites.duplicate(param(req, "suiteId"), identityOf(req), req.body?.name);
+    if (!suite) return res.status(404).json({ error: "Suite not found" });
+    res.status(201).json(suite);
   }),
 );
 
-// ─── POST /benchmark/:id/abort — Explicitly cancel a running benchmark ─
+router.delete(
+  "/suites/:suiteId",
+  handled(async (req, res) => {
+    const removed = await Suites.remove(param(req, "suiteId"), projectOf(req));
+    if (!removed) return res.status(404).json({ error: "Suite not found" });
+    res.json({ success: true });
+  }),
+);
 
-router.post("/:id/abort", (req: Request, res: Response) => {
-  const controller = activeRuns.get(String(req.params.id));
-  if (controller) {
-    logger.info(
-      `[benchmark] Explicit abort requested for benchmark ${req.params.id}`,
-    );
-    controller.abort();
-    activeRuns.delete(String(req.params.id));
-    res.json({ aborted: true });
-  } else {
+// ── Lineups ─────────────────────────────────────────────────
+
+router.get(
+  "/lineups",
+  handled(async (req, res) => {
+    const lineups = await BenchmarkStore.listLineups(projectOf(req));
+    res.json({ lineups, count: lineups.length });
+  }),
+);
+
+router.post(
+  "/lineups",
+  handled(async (req, res) => {
+    const { id, name, contestants } = req.body ?? {};
+    if (typeof name !== "string" || !name.trim()) return res.status(400).json({ error: "a lineup needs a name" });
+    const prepared = prepareContestants(contestants);
+    if ("error" in prepared) return res.status(400).json({ error: prepared.error });
+    const now = new Date().toISOString();
+    const existing = typeof id === "string" ? (await BenchmarkStore.listLineups(projectOf(req))).find((lineup) => lineup.id === id) : null;
+    const lineup: ContestantLineup = {
+      id: existing?.id ?? crypto.randomUUID(),
+      project: projectOf(req),
+      username: usernameOf(req),
+      name: name.trim(),
+      contestants,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    await BenchmarkStore.saveLineup(lineup);
+    res.status(existing ? 200 : 201).json(lineup);
+  }),
+);
+
+router.delete(
+  "/lineups/:lineupId",
+  handled(async (req, res) => {
+    const removed = await BenchmarkStore.deleteLineup(param(req, "lineupId"), projectOf(req));
+    if (!removed) return res.status(404).json({ error: "Lineup not found" });
+    res.json({ success: true });
+  }),
+);
+
+// ── Runs ────────────────────────────────────────────────────
+
+router.post(
+  "/estimate",
+  handled(async (req, res) => {
+    const run = await prepareRun((req.body ?? {}) as RunRequest, identityOf(req));
+    const estimate = await estimateRun(run);
     res.json({
-      aborted: false,
-      message: "No active run found for this benchmark",
+      ...estimate,
+      contestants: run.contestants.map(({ key, label }) => ({ key, label })),
+      suites: run.suites.map((suite) => ({ id: suite.id, name: suite.name, cases: suite.cases.length, totalCases: suite.totalCases })),
+      settings: run.settings,
     });
-  }
-});
-
-// ─── GET /benchmark/:id/active — Check if a benchmark has an active run ─
-// Returns the current live state (completed results, active model)
-// so reconnecting clients can catch up immediately.
-
-router.get("/:id/active", (req: Request, res: Response) => {
-  const state = runStates.get(String(req.params.id));
-  if (!state) {
-    return res.json({ active: false });
-  }
-  res.json({
-    active: true,
-    totalModels: state.totalModels,
-    completedResults: state.completedResults,
-    activeModel: state.activeModel,
-    startedAt: state.startedAt,
-  });
-});
-
-// ─── GET /benchmark/:id/follow — Reconnect to an in-progress run (SSE) ─
-// Replays completed results, then streams live events from the
-// running benchmark. Allows clients that navigated away and
-// returned to see live progress without starting a new run.
-
-router.get("/:id/follow", (req: Request, res: Response) => {
-  const state = runStates.get(String(req.params.id));
-  const emitter = runEmitters.get(String(req.params.id));
-  if (!state || !emitter) {
-    return res.status(404).json({ error: "No active run for this benchmark" });
-  }
-
-  // Disable timeouts
-  req.setTimeout(0);
-  if (req.socket) req.socket.setTimeout(0);
-
-  // SSE headers
-  res.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-    Connection: "keep-alive",
-    "X-Accel-Buffering": "no",
-  });
-
-  // Send total model count first so the client knows the denominator
-  res.write(
-    `data: ${JSON.stringify({ type: "run_info", totalModels: state.totalModels })}\n\n`,
-  );
-
-  // Replay completed results
-  for (const result of state.completedResults) {
-    res.write(
-      `data: ${JSON.stringify({ type: "model_complete", ...result })}\n\n`,
-    );
-  }
-
-  // Send active model if one is currently running
-  if (state.activeModel) {
-    res.write(
-      `data: ${JSON.stringify({ type: "model_start", ...state.activeModel })}\n\n`,
-    );
-  }
-
-  // Subscribe to live events going forward
-  const handler = (event: Record<string, unknown>) => {
-    try {
-      res.write(`data: ${JSON.stringify(event)}\n\n`);
-    } catch {
-      /* follower disconnected */
-    }
-  };
-  emitter.on("event", handler);
-
-  // Keepalive
-  const keepalive = setInterval(() => {
-    try {
-      res.write(":keepalive\n\n");
-    } catch {
-      /* gone */
-    }
-  }, 15_000);
-
-  req.on("close", () => {
-    emitter.off("event", handler);
-    clearInterval(keepalive);
-  });
-});
-
-// ─── GET /benchmark/:id/runs — Get all past runs for a benchmark ─
-
-router.get(
-  "/:id/runs",
-  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const benchmark = await BenchmarkService.getById(
-        String(req.params.id),
-        req.project || null,
-      );
-      if (!benchmark) {
-        return res.status(404).json({ error: "Benchmark not found" });
-      }
-
-      const runs = await BenchmarkService.getRuns(
-        benchmark.id as string,
-        req.project || null,
-      );
-      res.json({ runs, count: runs.length });
-    } catch (error: unknown) {
-      logger.error(`GET /benchmark/:id/runs error: ${getErrorMessage(error)}`);
-      next(error);
-    }
   }),
 );
-
-// ─── DELETE /benchmark/:id/runs/:runId — Delete a single run ─
-
-router.delete(
-  "/:id/runs/:runId",
-  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const deleted = await BenchmarkService.removeRun(
-        String(req.params.runId),
-        req.project || null,
-      );
-      if (!deleted) {
-        return res.status(404).json({ error: "Run not found" });
-      }
-      res.json({ deleted: true, id: req.params.runId });
-    } catch (error: unknown) {
-      logger.error(
-        `DELETE /benchmark/:id/runs/:runId error: ${getErrorMessage(error)}`,
-      );
-      next(error);
-    }
-  }),
-);
-
-// ─── POST /benchmark/:id/runs/:runId/rerun — Re-run with same models ─
 
 router.post(
-  "/:id/runs/:runId/rerun",
-  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const benchmark = await BenchmarkService.getById(
-        String(req.params.id),
-        req.project || null,
-      );
-      if (!benchmark) {
-        return res.status(404).json({ error: "Benchmark not found" });
-      }
+  "/runs",
+  handled(async (req, res) => {
+    const run = await startRun((req.body ?? {}) as RunRequest, identityOf(req));
+    res.status(201).json(listItem(run));
+  }),
+);
 
-      const previousRun = (await BenchmarkService.getRunById(
-        String(req.params.runId),
-        req.project || null,
-      )) as BenchmarkRunDoc | null;
-      if (!previousRun) {
-        return res.status(404).json({ error: "Run not found" });
-      }
+router.get(
+  "/runs",
+  handled(async (req, res) => {
+    const scheduleId = typeof req.query.scheduleId === "string" ? req.query.scheduleId : null;
+    const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 100));
+    const runs = (await BenchmarkStore.listRuns(projectOf(req), { scheduleId, limit })).map(listItem);
+    res.json({ runs, count: runs.length });
+  }),
+);
 
-      // Re-run with the same model set from the previous run. Trial
-      // repetitions are deduped back to unique targets — the previous
-      // run's trial count is re-applied via the `trials` option.
-      const seenTargets = new Set<string>();
-      const modelTargets = (previousRun.models || [])
-        .filter((modelResult: BenchmarkResult) => {
-          const key = `${modelResult.provider}:${modelResult.model}:${modelResult.thinkingEnabled ? "T" : ""}:${modelResult.toolsEnabled ? "F" : ""}:${modelResult.agent || ""}`;
-          if (seenTargets.has(key)) return false;
-          seenTargets.add(key);
-          return true;
-        })
-        .map((modelResult: BenchmarkResult) => ({
-          provider: modelResult.provider,
-          model: modelResult.model,
-          display_name: modelResult.label,
-          thinkingEnabled: modelResult.thinkingEnabled,
-          toolsEnabled: modelResult.toolsEnabled,
-          agent: modelResult.agent || undefined,
-          locale: (modelResult.locale as string) || undefined,
-          enabledTools:
-            (modelResult.enabledTools as string[] | undefined) || undefined,
-        }));
+router.get(
+  "/runs/:runId",
+  handled(async (req, res) => {
+    const run = await loadRun(req, res);
+    if (!run) return;
+    res.json({ ...run, progress: RunEvents.progressOf(run.id) ?? run.progress, live: RunEvents.isLive(run.id) });
+  }),
+);
 
-      const run = await BenchmarkService.runBenchmark(
-        benchmark as unknown as Parameters<
-          typeof BenchmarkService.runBenchmark
-        >[0],
-        modelTargets,
-        req.project || null,
-        req.username || DEFAULT_USERNAME,
-        {
-          ...(typeof previousRun.trials === "number" && {
-            trials: previousRun.trials,
-          }),
-        },
-      );
+router.get(
+  "/runs/:runId/report",
+  handled(async (req, res) => {
+    const run = await loadRun(req, res);
+    if (!run) return;
+    const errorPolicy: ErrorPolicy = req.query.errors === "exclude" ? "exclude" : "fail";
+    const [samples, battles] = await Promise.all([
+      BenchmarkStore.listSamples(run.id),
+      BenchmarkStore.listBattles({ runId: run.id, source: "judge" }),
+    ]);
+    res.json(buildReport({ ...run, progress: RunEvents.progressOf(run.id) ?? run.progress }, samples, battles, { errorPolicy }));
+  }),
+);
 
-      res.json(run);
-    } catch (error: unknown) {
-      logger.error(
-        `POST /benchmark/:id/runs/:runId/rerun error: ${getErrorMessage(error)}`,
-      );
-      next(error);
+router.get(
+  "/runs/:runId/samples",
+  handled(async (req, res) => {
+    const run = await loadRun(req, res);
+    if (!run) return;
+    const query = req.query;
+    const status = typeof query.status === "string" && SAMPLE_STATUSES.has(query.status) ? (query.status as SampleStatus) : undefined;
+    const samples = await BenchmarkStore.listSamples(run.id, {
+      withOutput: query.full === "1" || query.full === "true",
+      filter: {
+        ...(typeof query.suiteId === "string" && { suiteId: query.suiteId }),
+        ...(typeof query.caseId === "string" && { caseId: query.caseId }),
+        ...(typeof query.contestantKey === "string" && { contestantKey: query.contestantKey }),
+        ...(status && { status }),
+      },
+    });
+    res.json({ samples, count: samples.length });
+  }),
+);
+
+router.get(
+  "/runs/:runId/samples/:sampleId",
+  handled(async (req, res) => {
+    const sample = await BenchmarkStore.getSample(param(req, "runId"), param(req, "sampleId"));
+    if (!sample || sample.project !== projectOf(req)) return res.status(404).json({ error: "Sample not found" });
+    res.json(sample);
+  }),
+);
+
+/** A person's verdict on a sample: `{override: {passed, note}}`, or `{override: null}` to clear it. */
+router.patch(
+  "/runs/:runId/samples/:sampleId",
+  handled(async (req, res) => {
+    const run = await loadRun(req, res);
+    if (!run) return;
+    const sample = await BenchmarkStore.getSample(run.id, param(req, "sampleId"));
+    if (!sample) return res.status(404).json({ error: "Sample not found" });
+    const override = req.body?.override;
+    if (override !== null && typeof override?.passed !== "boolean") {
+      return res.status(400).json({ error: "override must be {passed: boolean, note?} or null" });
     }
+    const value = override === null
+      ? null
+      : { passed: override.passed, note: typeof override.note === "string" ? override.note.slice(0, 2000) : null, by: usernameOf(req), at: new Date().toISOString() };
+    await BenchmarkStore.updateSample(sample.id, { override: value });
+    if (!RunEvents.isLive(run.id)) {
+      const { storeResults } = await import("#src/services/benchmark/RunEngine");
+      await storeResults(run);
+    }
+    res.json({ ...sample, override: value });
+  }),
+);
+
+/**
+ * The run's progress as Server-Sent Events: a `snapshot` first (status and
+ * progress), then `status` / `progress` / `sample` / `battle` while it is
+ * live here, and `end` when it stops (or at once, when it is not running).
+ */
+router.get(
+  "/runs/:runId/events",
+  handled(async (req, res) => {
+    const run = await loadRun(req, res);
+    if (!run) return;
+    req.setTimeout(0);
+    req.socket?.setTimeout(0);
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
+    const send = (event: Record<string, unknown>) => {
+      if (!res.writableEnded) res.write(`data: ${JSON.stringify(event)}\n\n`);
+    };
+    const live = RunEvents.isLive(run.id);
+    send({ type: "snapshot", runId: run.id, status: run.status, statusReason: run.statusReason ?? null, progress: RunEvents.progressOf(run.id) ?? run.progress, live });
+    if (!live) {
+      send({ type: "end", runId: run.id, status: run.status });
+      res.end();
+      return;
+    }
+    const keepalive = setInterval(() => {
+      if (!res.writableEnded) res.write(":keepalive\n\n");
+    }, 15_000);
+    let unsubscribe: (() => void) | null = null;
+    const close = () => {
+      clearInterval(keepalive);
+      unsubscribe?.();
+      if (!res.writableEnded) res.end();
+    };
+    unsubscribe = RunEvents.subscribe(run.id, (event: RunEvent) => {
+      send(event as unknown as Record<string, unknown>);
+      if (event.type === "status" && !["running", "judging", "queued"].includes(event.status)) {
+        send({ type: "end", runId: run.id, status: event.status });
+        close();
+      }
+    });
+    if (!unsubscribe) {
+      send({ type: "end", runId: run.id, status: run.status });
+      close();
+      return;
+    }
+    res.on("close", close);
+  }),
+);
+
+router.post(
+  "/runs/:runId/cancel",
+  handled(async (req, res) => {
+    const run = await loadRun(req, res);
+    if (!run) return;
+    const cancelled = RunEngine.cancel(run.id);
+    if (!cancelled && ["queued", "running", "judging"].includes(run.status)) {
+      // Not live here (a restart): record it as stopped.
+      await BenchmarkStore.updateRun(run.id, { status: "cancelled", statusReason: "Stopped" });
+    }
+    res.json({ success: true, live: cancelled });
+  }),
+);
+
+router.post(
+  "/runs/:runId/resume",
+  handled(async (req, res) => {
+    const run = await loadRun(req, res);
+    if (!run) return;
+    if (RunEvents.isLive(run.id)) return res.status(409).json({ error: "The run is already going" });
+    const budget = req.body?.budgetUsd;
+    await RunEngine.resume(run, {
+      retryErrors: req.body?.retryErrors !== false,
+      ...(budget !== undefined && { budgetUsd: budget === null ? null : Number(budget) > 0 ? Number(budget) : null }),
+    });
+    res.json({ success: true });
+  }),
+);
+
+/** Score the stored answers again with the suites' CURRENT scorers (or the run's own). */
+router.post(
+  "/runs/:runId/regrade",
+  handled(async (req, res) => {
+    const run = await loadRun(req, res);
+    if (!run) return;
+    if (RunEvents.isLive(run.id)) return res.status(409).json({ error: "The run is busy" });
+    const useCurrent = req.body?.useCurrentScorers !== false;
+    const suites = await Promise.all(
+      run.suites.map(async (snapshot) => {
+        if (!useCurrent) return snapshot;
+        const current = await Suites.get(snapshot.id, run.project);
+        if (!current) return snapshot;
+        const byId = new Map(current.cases.map((datasetCase) => [datasetCase.id, datasetCase]));
+        return {
+          ...snapshot,
+          version: current.version,
+          scorers: current.scorers,
+          systemPrompt: current.systemPrompt ?? snapshot.systemPrompt,
+          // Same cases as the run evaluated; their scorers and targets from the suite as it is now.
+          cases: snapshot.cases.map((datasetCase) => {
+            const now = byId.get(datasetCase.id);
+            return now ? { ...datasetCase, scorers: now.scorers ?? null, target: now.target ?? null, metadata: now.metadata ?? datasetCase.metadata ?? null } : datasetCase;
+          }),
+        };
+      }),
+    );
+    await RunEngine.regrade(run, suites);
+    res.status(202).json({ success: true });
+  }),
+);
+
+/** Judge a finished run's answers head to head: `{mode: "all_pairs" | "vs_baseline", baselineKey?, judges?}`. */
+router.post(
+  "/runs/:runId/pairwise",
+  handled(async (req, res) => {
+    const run = await loadRun(req, res);
+    if (!run) return;
+    if (RunEvents.isLive(run.id)) return res.status(409).json({ error: "The run is busy" });
+    const mode = req.body?.mode;
+    if (mode !== "all_pairs" && mode !== "vs_baseline") return res.status(400).json({ error: 'mode must be "all_pairs" or "vs_baseline"' });
+    const baselineKey = typeof req.body?.baselineKey === "string" && run.contestants.some((contestant) => contestant.key === req.body.baselineKey)
+      ? req.body.baselineKey
+      : run.contestants[0]?.key ?? null;
+    const judges = Array.isArray(req.body?.judges) ? req.body.judges.filter((judge: unknown) => typeof judge === "string") : null;
+    await RunEngine.judgePairwise(run, { mode, baselineKey: mode === "vs_baseline" ? baselineKey : null, judges: judges?.length ? judges : null });
+    res.status(202).json({ success: true });
+  }),
+);
+
+/** Run the same cases, contestants and settings again as a new run. */
+router.post(
+  "/runs/:runId/rerun",
+  handled(async (req, res) => {
+    const run = await loadRun(req, res);
+    if (!run) return;
+    const copy: BenchmarkRun = {
+      ...structuredClone(run),
+      id: crypto.randomUUID(),
+      name: typeof req.body?.name === "string" && req.body.name.trim() ? req.body.name.trim() : `${run.name} (again)`,
+      username: usernameOf(req),
+      status: "queued",
+      statusReason: null,
+      progress: emptyProgress(0),
+      scheduleId: null,
+      baselineRunId: run.id,
+      regression: null,
+      results: null,
+      createdAt: new Date().toISOString(),
+      startedAt: null,
+      completedAt: null,
+    };
+    const started = await RunEngine.start(copy);
+    res.status(201).json(listItem(started));
+  }),
+);
+
+router.delete(
+  "/runs/:runId",
+  handled(async (req, res) => {
+    const run = await loadRun(req, res);
+    if (!run) return;
+    RunEngine.cancel(run.id);
+    await BenchmarkStore.deleteRun(run.id, projectOf(req));
+    res.json({ success: true });
+  }),
+);
+
+const csvCell = (value: unknown) => {
+  const text = value === null || value === undefined ? "" : typeof value === "string" ? value : JSON.stringify(value);
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+
+router.get(
+  "/runs/:runId/export",
+  handled(async (req, res) => {
+    const run = await loadRun(req, res);
+    if (!run) return;
+    const samples: BenchmarkSample[] = await BenchmarkStore.listSamples(run.id, { withOutput: true });
+    const label = new Map(run.contestants.map((contestant) => [contestant.key, contestant.label]));
+    const fileName = `benchmark-${run.id.slice(0, 8)}`;
+    if (req.query.format === "csv") {
+      const header = ["suite", "case", "contestant", "epoch", "status", "passed", "score", "cost_usd", "judge_cost_usd", "latency_ms", "input_tokens", "output_tokens", "error", "answer"];
+      const rows = samples.map((sample) =>
+        [
+          sample.suiteId,
+          sample.caseId,
+          label.get(sample.contestantKey) ?? sample.contestantKey,
+          sample.epoch,
+          sample.status,
+          sample.override ? sample.override.passed : sample.passed,
+          sample.score,
+          sample.cost,
+          sample.judgeCost,
+          sample.latencyMs,
+          sample.usage?.inputTokens,
+          sample.usage?.outputTokens,
+          sample.error?.message,
+          sample.output?.text,
+        ]
+          .map(csvCell)
+          .join(","),
+      );
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${fileName}.csv"`);
+      return res.send([header.join(","), ...rows].join("\n"));
+    }
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}.json"`);
+    res.json({ run, samples });
+  }),
+);
+
+router.get(
+  "/compare",
+  handled(async (req, res) => {
+    const baseId = typeof req.query.base === "string" ? req.query.base : "";
+    const headId = typeof req.query.head === "string" ? req.query.head : "";
+    const [base, head] = await Promise.all([BenchmarkStore.getRun(baseId, projectOf(req)), BenchmarkStore.getRun(headId, projectOf(req))]);
+    if (!base || !head) return res.status(404).json({ error: "Run not found" });
+    const [baseSamples, headSamples] = await Promise.all([BenchmarkStore.listSamples(base.id), BenchmarkStore.listSamples(head.id)]);
+    res.json(compareRuns(base, head, baseSamples, headSamples));
+  }),
+);
+
+// ── Leaderboard & arena ─────────────────────────────────────
+
+router.get(
+  "/leaderboard",
+  handled(async (req, res) => {
+    res.json(await buildLeaderboard(projectOf(req)));
+  }),
+);
+
+router.get(
+  "/arena",
+  handled(async (req, res) => {
+    const source = req.query.source === "judge" || req.query.source === "all" ? req.query.source : "human";
+    res.json(
+      await arenaStandings(projectOf(req), {
+        source,
+        runId: typeof req.query.runId === "string" ? req.query.runId : null,
+        suiteId: typeof req.query.suiteId === "string" ? req.query.suiteId : null,
+        styleControl: req.query.styleControl === "1" || req.query.styleControl === "true",
+      }),
+    );
+  }),
+);
+
+router.get(
+  "/arena/battles",
+  handled(async (req, res) => {
+    const query: Record<string, unknown> = { project: projectOf(req) };
+    if (req.query.source === "human" || req.query.source === "judge") query.source = req.query.source;
+    if (typeof req.query.runId === "string") query.runId = req.query.runId;
+    const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 100));
+    const battles = await BenchmarkStore.listBattles(query, limit);
+    res.json({ battles, count: battles.length });
+  }),
+);
+
+router.delete(
+  "/arena/battles/:battleId",
+  handled(async (req, res) => {
+    const removed = await BenchmarkStore.deleteBattle(param(req, "battleId"), projectOf(req));
+    if (!removed) return res.status(404).json({ error: "Battle not found" });
+    res.json({ success: true });
+  }),
+);
+
+/** The next blind pair of a run's answers to vote on (`{pair: null}` when every pair has a vote). */
+router.get(
+  "/runs/:runId/arena/next",
+  handled(async (req, res) => {
+    const run = await loadRun(req, res);
+    if (!run) return;
+    res.json({ pair: await nextBlindPair(run) });
+  }),
+);
+
+router.post(
+  "/runs/:runId/arena/votes",
+  handled(async (req, res) => {
+    const run = await loadRun(req, res);
+    if (!run) return;
+    const battle = await recordBlindVote(run, req.body ?? {}, usernameOf(req));
+    res.status(201).json({ battle, reveal: { a: battle.a.label, b: battle.b.label } });
+  }),
+);
+
+/** Two contestants answer a prompt side by side, streamed; the vote follows with the token from `ready`. */
+router.post(
+  "/arena/live",
+  handled(async (req, res) => {
+    const abort = new AbortController();
+    req.setTimeout(0);
+    req.socket?.setTimeout(0);
+    res.on("close", () => {
+      if (!res.writableEnded) abort.abort();
+    });
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
+    const send = (event: Record<string, unknown>) => {
+      if (!res.writableEnded) res.write(`data: ${JSON.stringify(event)}\n\n`);
+    };
+    try {
+      await runLiveBattle(
+        { prompt: req.body?.prompt, systemPrompt: req.body?.systemPrompt ?? null, contestants: req.body?.contestants, ...identityOf(req), signal: abort.signal },
+        send as (event: unknown) => void,
+      );
+    } catch (error: unknown) {
+      send({ type: "error", message: getErrorMessage(error) });
+    }
+    if (!res.writableEnded) res.end();
+  }),
+);
+
+router.post(
+  "/arena/live/:token/vote",
+  handled(async (req, res) => {
+    const battle = await recordLiveVote(param(req, "token"), req.body?.winner, identityOf(req));
+    res.status(201).json({ battle, reveal: { a: battle.a.label, b: battle.b.label } });
+  }),
+);
+
+// ── Scheduled runs ──────────────────────────────────────────
+
+router.get(
+  "/schedules",
+  handled(async (req, res) => {
+    const { project, username, profileId } = resolveScope(req);
+    const tasks = (await ScheduledTaskService.listTasks(project, username, profileId)).filter((task) => task.kind === "benchmark");
+    res.json({ schedules: tasks, count: tasks.length });
+  }),
+);
+
+router.post(
+  "/schedules",
+  handled(async (req, res) => {
+    const { name, suiteIds, contestants, settings, threshold, alert, scheduleType, scheduleTime, scheduleDay, scheduleDate, cronExpression, recurrenceRule } =
+      req.body ?? {};
+    const benchmark: ScheduledBenchmarkConfig = {
+      name: typeof name === "string" && name.trim() ? name.trim() : "Scheduled benchmark",
+      suiteIds,
+      contestants,
+      settings: settings ?? {},
+      ...(threshold != null && { threshold: Number(threshold) }),
+      ...(alert != null && { alert }),
+    };
+    const invalid = validateScheduledBenchmark(benchmark);
+    if (invalid) return res.status(400).json({ error: invalid });
+    // Everything the run would refuse, refused now rather than at 3 a.m.
+    await prepareRun({ suiteIds, contestants, settings }, identityOf(req));
+    if (!SCHEDULE_TYPES.has(scheduleType)) {
+      return res.status(400).json({ error: `scheduleType must be one of ${[...SCHEDULE_TYPES].join(", ")}` });
+    }
+    if (scheduleType === "cron" && typeof cronExpression !== "string") {
+      return res.status(400).json({ error: "A cron schedule needs a cronExpression" });
+    }
+    if (scheduleType !== "cron" && scheduleType !== "hourly" && typeof scheduleTime !== "string") {
+      return res.status(400).json({ error: `A ${scheduleType} schedule needs a scheduleTime (HH:MM)` });
+    }
+    const { profileId } = resolveScope(req);
+    const [first] = contestants as Array<{ provider: string; model: string }>;
+    const task = await ScheduledTaskService.createTask({
+      name: benchmark.name,
+      prompt: `Benchmark: ${benchmark.name}`,
+      agent: null,
+      provider: first.provider,
+      model: first.model,
+      scheduleType,
+      scheduleTime,
+      scheduleDay,
+      scheduleDate,
+      cronExpression,
+      recurrenceRule,
+      kind: "benchmark",
+      benchmark,
+      enabled: true,
+      project: projectOf(req) as string,
+      username: usernameOf(req),
+      profileId,
+    });
+    res.status(201).json(task);
+  }),
+);
+
+router.delete(
+  "/schedules/:scheduleId",
+  handled(async (req, res) => {
+    const { project, username } = resolveScope(req);
+    await ScheduledTaskService.deleteTask(param(req, "scheduleId"), project, username);
+    res.json({ success: true });
   }),
 );
 
