@@ -206,6 +206,12 @@ const WebSearchResultEvent = event("webSearchResult", {
   ),
 });
 
+/** Sources a grounded answer cited (Gemini Google Search); a `webSearchResult` with the same sources follows. */
+const CitationsEvent = event("citations", {
+  sources: z.array(z.strictObject({ url: z.string(), title: z.string() })),
+  queries: z.array(z.string()),
+});
+
 /** A provider safety refusal: the text streamed before it is not an answer. */
 const RefusalEvent = event("refusal", {
   category: z.string().nullable(),
@@ -279,6 +285,11 @@ const ApprovalRequiredEvent = event("approval_required", {
   /** Who asked besides the tier: a PreToolUse hook, or a restart re-asking a call that was running. */
   requestedBy: z.enum(["hook", "restart"]).optional(),
   reason: z.string().nullable().optional(),
+  /** A write to a protected path: it asks in every mode, and "Always allow" cannot stop it asking. */
+  protectedPath: z.string().optional(),
+  alwaysAsks: z.literal(true).optional(),
+  /** The permission mode the call was judged in. */
+  mode: z.string().optional(),
   ...SubAgentTag,
 });
 
@@ -705,6 +716,7 @@ const TurnEventByType = z.discriminatedUnion("type", [
   ExecutableCodeEvent,
   CodeExecutionResultEvent,
   WebSearchResultEvent,
+  CitationsEvent,
   RefusalEvent,
   ToolCallEvent,
   ToolExecutionEvent,

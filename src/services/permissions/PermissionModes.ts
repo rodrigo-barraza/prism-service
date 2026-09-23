@@ -43,9 +43,6 @@ export const DEFAULT_PERMISSION_MODE: PermissionMode = "default";
 /** The mode unattended runs get when their conversation names none. */
 export const UNATTENDED_PERMISSION_MODE: PermissionMode = "dontAsk";
 
-/** SSE event: this conversation's mode is now `mode`. */
-export const PERMISSION_MODE_EVENT_TYPE = "permission_mode" as const;
-
 /** Env var naming the usernames allowed to turn `bypass` on. Empty = nobody. */
 export const BYPASS_OWNERS_ENV_VAR = "PRISM_PERMISSION_BYPASS_OWNERS";
 

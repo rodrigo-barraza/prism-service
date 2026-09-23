@@ -337,6 +337,49 @@
           "properties": {
             "type": {
               "type": "string",
+              "const": "citations"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "sources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "url",
+                  "title"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "queries": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "sources",
+            "queries"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
               "const": "refusal"
             },
             "seq": {
@@ -671,6 +714,16 @@
                   "type": "null"
                 }
               ]
+            },
+            "protectedPath": {
+              "type": "string"
+            },
+            "alwaysAsks": {
+              "type": "boolean",
+              "const": true
+            },
+            "mode": {
+              "type": "string"
             },
             "subAgentId": {
               "type": "string"
