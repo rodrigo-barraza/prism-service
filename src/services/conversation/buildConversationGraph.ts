@@ -35,14 +35,79 @@ interface GraphRequestEntry {
   inputTokens?: number;
   outputTokens?: number;
   duration?: number;
+  /** Seconds, end to end — what RequestLogger actually writes (not `duration`). */
+  totalTime?: number | null;
   timestamp?: string;
   createdAt?: string;
   status?: string;
+  success?: boolean | null;
+  errorMessage?: string | null;
   requestId?: string;
   model?: string;
   provider?: string;
   toolApiNames?: string[];
   username?: string;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Layout grid — hierarchical topology
+   ═══════════════════════════════════════════════════════════════════
+   Fixed spacing anchored at the top-left, so a live graph only ever
+   GROWS: a new request lands one row under the previous one and no
+   existing node moves. (Spacing used to be derived from the canvas and
+   the node count, so every arrival re-centred the column and the first
+   sub-agent shifted every column sideways.) ROW_SPACING matches the
+   client's pending-node offset (LAYOUT.NODE_SPACING_Y) and clears its
+   collision distance (2 × radius + 15). */
+const LAYOUT_ORIGIN_X = 80;
+const LAYOUT_ORIGIN_Y = 80;
+const COLUMN_SPACING = 240;
+const ROW_SPACING = 80;
+
+const SPAWN_TOOL_NAMES = new Set(["create_subagents", "create_subagent"]);
+const DETAIL_TEXT_LIMIT = 400;
+
+function getRequestTime(request: GraphRequestEntry): number {
+  const rawTime = request.createdAt || request.timestamp;
+  if (!rawTime) return 0;
+  const parsed = new Date(rawTime).getTime();
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+function truncateText(text: string, limit: number): string {
+  return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
+}
+
+/** Totals the /stats endpoint would report, from the rows the graph
+    already fetched — the session node used to carry nulls (the route
+    passes no stats), so its panel always read $0 / 0 requests. */
+function deriveConversationStats(requests: GraphRequestEntry[]): GraphConversationStats {
+  let totalCost = 0;
+  let totalTokens = 0;
+  let earliestTime = Infinity;
+  let latestTime = -Infinity;
+  for (const request of requests) {
+    totalCost += request.estimatedCost || 0;
+    totalTokens += (request.inputTokens || 0) + (request.outputTokens || 0);
+    const requestTime = getRequestTime(request);
+    if (requestTime > 0) {
+      earliestTime = Math.min(earliestTime, requestTime);
+      latestTime = Math.max(latestTime, requestTime);
+    }
+  }
+  return {
+    totalCost,
+    requestCount: requests.length,
+    totalTokens,
+    totalElapsedTime: latestTime > earliestTime ? (latestTime - earliestTime) / 1000 : 0,
+  };
+}
+
+interface AgentAggregate {
+  requestCount: number;
+  failedRequestCount: number;
+  totalCost: number;
+  totalTokens: number;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -88,16 +153,18 @@ export function buildConversationGraph(
 
   const conversationId = conversation.id || conversation._id || "";
   const conversationNodeId = `session:${conversationId}`;
+  const resolvedStats = conversationStats ?? deriveConversationStats(conversationRequests);
 
   addNode(conversationNodeId, conversation.title || "Conversation", "session", 24, {
     conversationId,
     status: conversation.status,
     createdAt: conversation.createdAt,
     updatedAt: conversation.updatedAt,
-    totalCost: conversationStats?.totalCost,
-    requestCount: conversationStats?.requestCount,
-    totalTokens: conversationStats?.totalTokens,
-    totalElapsedTime: conversationStats?.totalElapsedTime,
+    totalCost: resolvedStats.totalCost,
+    requestCount: resolvedStats.requestCount,
+    totalTokens: resolvedStats.totalTokens,
+    totalElapsedTime: resolvedStats.totalElapsedTime,
+    failedRequestCount: conversationRequests.filter((request) => request.success === false).length,
   });
 
   if (conversation.project) {
@@ -126,15 +193,9 @@ export function buildConversationGraph(
 
   const userSet = new Set<string>();
 
-  const sortedRequests = [...conversationRequests].sort((requestA, requestB) => {
-    const getRequestTime = (request: GraphRequestEntry): number => {
-      const rawTime = request.createdAt || request.timestamp;
-      if (!rawTime) return 0;
-      const parsed = new Date(rawTime).getTime();
-      return isNaN(parsed) ? 0 : parsed;
-    };
-    return getRequestTime(requestA) - getRequestTime(requestB);
-  });
+  const sortedRequests = [...conversationRequests].sort(
+    (requestA, requestB) => getRequestTime(requestA) - getRequestTime(requestB),
+  );
 
   // Pass 1: discover sub-agent parent relationships
   const subAgentParentMap = new Map<string, string>();
@@ -196,12 +257,13 @@ export function buildConversationGraph(
   // Pass 2: create nodes and edges for all requests
   const lastRequestNodeIdPerAgentContext = new Map<string, string>();
 
-  const userMessages = conversation.messages
+  const userMessageTexts = conversation.messages
     ?.filter((message) => message.role === "user")
-    .map((message) => {
-      const messageText = (typeof message.content === "string" ? message.content : "").trim();
-      return messageText.length > 30 ? `${messageText.slice(0, 28)}…` : messageText || "user message";
-    }) ?? [];
+    .map((message) => (typeof message.content === "string" ? message.content : "").trim()) ?? [];
+  const userMessages = userMessageTexts.map((messageText) =>
+    messageText.length > 30 ? `${messageText.slice(0, 28)}…` : messageText || "user message",
+  );
+  const agentAggregates = new Map<string, AgentAggregate>();
 
   let currentMainAgentConversationId: string | null = null;
   let mainAgentTurnIndex = 0;
@@ -221,9 +283,11 @@ export function buildConversationGraph(
 
       const turnNodeId = `turn:${mainAgentTurnIndex}`;
       const turnLabel = userMessages[mainAgentTurnIndex] || `Turn ${mainAgentTurnIndex + 1}`;
+      const turnMessage = userMessageTexts[mainAgentTurnIndex];
       addNode(turnNodeId, turnLabel, "turn", 24, {
         turnIndex: mainAgentTurnIndex,
         agentConversationId: requestAgentConversationId,
+        message: turnMessage ? truncateText(turnMessage, DETAIL_TEXT_LIMIT) : null,
       });
 
       const previousRequestNodeId = lastRequestNodeIdPerAgentContext.get("__main_agent__");
@@ -241,14 +305,20 @@ export function buildConversationGraph(
       ? [...new Set(request.toolApiNames)]
       : [];
 
+    const failed = request.success === false;
     addNode(requestNodeId, `#${sequenceNumber} ${operationLabel}`, "request", 24, {
       operation: operationLabel,
       estimatedCost: request.estimatedCost,
       inputTokens: request.inputTokens,
       outputTokens: request.outputTokens,
-      duration: request.duration,
-      timestamp: request.timestamp,
+      // RequestLogger writes totalTime/createdAt; duration/timestamp were never set.
+      duration: request.duration ?? request.totalTime ?? null,
+      timestamp: request.timestamp ?? request.createdAt ?? null,
       status: request.status,
+      success: typeof request.success === "boolean" ? request.success : null,
+      errorMessage: failed && request.errorMessage
+        ? truncateText(String(request.errorMessage), DETAIL_TEXT_LIMIT)
+        : null,
       requestId: request.requestId || request._id,
       model: request.model || null,
       provider: request.provider || null,
@@ -259,6 +329,14 @@ export function buildConversationGraph(
     const currentAgentNodeId = isSubAgent
       ? `agent:${requestAgentConversationId}:${request.agent || AGENT_IDS.OMNI}`
       : parentAgentNodeId;
+
+    const aggregate = agentAggregates.get(currentAgentNodeId)
+      ?? { requestCount: 0, failedRequestCount: 0, totalCost: 0, totalTokens: 0 };
+    aggregate.requestCount += 1;
+    if (failed) aggregate.failedRequestCount += 1;
+    aggregate.totalCost += request.estimatedCost || 0;
+    aggregate.totalTokens += (request.inputTokens || 0) + (request.outputTokens || 0);
+    agentAggregates.set(currentAgentNodeId, aggregate);
 
     if (isSubAgent) {
       const subAgentLabel = request.agent || AGENT_IDS.OMNI;
@@ -291,6 +369,16 @@ export function buildConversationGraph(
     const userNodeId = `user:${userName}`;
     addNode(userNodeId, userName, "user", 24, { username: userName });
     addEdge(userNodeId, conversationNodeId, 0.5);
+  }
+
+  for (const node of nodes) {
+    const aggregate = agentAggregates.get(node.id);
+    if (aggregate && (node.category === "agent" || node.category === "subagent")) {
+      node.metadata = { ...node.metadata, ...aggregate };
+    }
+    if (node.id === conversationNodeId) {
+      node.metadata = { ...node.metadata, subAgentCount: knownSubAgentConversationIds.size };
+    }
   }
 
   // Build sub-agent tree
@@ -330,15 +418,26 @@ export function buildConversationGraph(
         return !sortedRequestIsSubAgent && isParentMainAgent;
       });
 
+      // The spawning call is the LAST create_subagent(s) request that ran
+      // before this sub-agent's first request — a parent that spawns in
+      // several batches (or several turns) links each batch to its own call.
+      const spawnRequests = parentAgentRequests.filter((parentRequest) =>
+        parentRequest.toolApiNames?.some((toolName) => SPAWN_TOOL_NAMES.has(toolName)),
+      );
+      const firstChildRequest = sortedRequests.find(
+        (sortedRequest) => sortedRequest.agentConversationId === treeNode.agentConversationId,
+      );
+      const childStartTime = firstChildRequest ? getRequestTime(firstChildRequest) : Infinity;
+      const spawningRequest = spawnRequests.filter(
+        (spawnRequest) => getRequestTime(spawnRequest) <= childStartTime,
+      ).at(-1) ?? spawnRequests[0];
+
       let linkedToTool = false;
-      for (const parentRequest of parentAgentRequests) {
-        if (parentRequest.toolApiNames?.includes("create_subagents") || parentRequest.toolApiNames?.includes("create_subagent")) {
-          const requestNodeId = `request:${parentRequest._id || sortedRequests.indexOf(parentRequest)}`;
-          if (nodeIdSet.has(requestNodeId)) {
-            addEdge(requestNodeId, treeNode.nodeId, 0.9, false);
-            linkedToTool = true;
-            break;
-          }
+      if (spawningRequest) {
+        const requestNodeId = `request:${spawningRequest._id || sortedRequests.indexOf(spawningRequest)}`;
+        if (nodeIdSet.has(requestNodeId)) {
+          addEdge(requestNodeId, treeNode.nodeId, 0.9, false);
+          linkedToTool = true;
         }
       }
 
@@ -441,7 +540,7 @@ function computeNodeTier(node: GraphNode): number {
   }
 }
 
-function applyHierarchicalLayout(graphData: GraphData, canvasWidth: number, canvasHeight: number): void {
+function applyHierarchicalLayout(graphData: GraphData): void {
   const { nodes: graphNodes, edges: graphEdges } = graphData;
   if (graphNodes.length === 0) return;
 
@@ -498,26 +597,13 @@ function applyHierarchicalLayout(graphData: GraphData, canvasWidth: number, canv
     tierNodes.push(...sortedNodes);
   }
 
-  const populatedTierIndices = [...tierBuckets.keys()].sort((tierA, tierB) => tierA - tierB);
-  const totalColumns = populatedTierIndices.length;
-  const horizontalSpacing = Math.max(160, (canvasWidth - 100) / Math.max(totalColumns, 1));
-  const startX = 80;
-  const centerY = canvasHeight / 2;
-
-  for (let columnIndex = 0; columnIndex < populatedTierIndices.length; columnIndex++) {
-    const tierNodes = tierBuckets.get(populatedTierIndices[columnIndex])!;
-    const tierX = startX + columnIndex * horizontalSpacing;
-    const largestTierRadius = Math.max(...tierNodes.map((tierNode) => tierNode.radius));
-    const minimumNodeSpacing = largestTierRadius * 2 + 15;
-    const proportionalSpacing = tierNodes.length > 1
-      ? (canvasHeight * 0.9) / (tierNodes.length - 1)
-      : canvasHeight * 0.9;
-    const verticalSpacing = Math.max(minimumNodeSpacing, Math.min(80, proportionalSpacing));
-    const totalTierHeight = (tierNodes.length - 1) * verticalSpacing;
-    const tierStartY = centerY - totalTierHeight / 2;
+  // The tier IS the column, so a tier that appears later (the first user
+  // node, the first sub-agent) never shifts the columns already drawn.
+  for (const [tier, tierNodes] of tierBuckets) {
+    const tierX = LAYOUT_ORIGIN_X + tier * COLUMN_SPACING;
     for (let nodeIndex = 0; nodeIndex < tierNodes.length; nodeIndex++) {
       tierNodes[nodeIndex].x = tierX;
-      tierNodes[nodeIndex].y = tierStartY + nodeIndex * verticalSpacing;
+      tierNodes[nodeIndex].y = LAYOUT_ORIGIN_Y + nodeIndex * ROW_SPACING;
     }
   }
 }
@@ -653,7 +739,7 @@ function applyTopologyLayout(
   } else if (resolvedTopology === TOPOLOGIES.MCTS) {
     applyMCTSLayout(graphData, canvasWidth, canvasHeight);
   } else {
-    applyHierarchicalLayout(graphData, canvasWidth, canvasHeight);
+    applyHierarchicalLayout(graphData);
   }
 
   // Position sub-agent branches after base layout
@@ -664,131 +750,94 @@ function applyTopologyLayout(
 
 /* ═══════════════════════════════════════════════════════════════════
    Sub-agent branch positioning
-   ═══════════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════════
+   A sub-agent sits level with the request that spawned it, its request
+   chain one column to the right and its own children further right.
+   Siblings stack downward and a branch never starts above the bottom of
+   the branch before it, so branches cannot overlap however long they
+   grow. (Every group used to be centred on the main agent's row, so a
+   fan-out spawned by request #40 hung off the middle of the chain.) */
 
-const REQUEST_SPACING = 60;
-const BRANCH_GAP = REQUEST_SPACING * 2;
-const MINIMUM_BRANCH_HEIGHT = REQUEST_SPACING * 2;
-const COLUMN_SPACING = 200;
+const BRANCH_GAP = ROW_SPACING / 2;
 
 function positionSubAgentBranches(graphData: GraphData): void {
   const nodeMap = new Map(graphData.nodes.map((node) => [node.id, node]));
   const mainAgentNode = graphData.nodes.find((graphNode) => graphNode.category === "agent");
   if (!mainAgentNode) return;
 
+  const incomingEdges = new Map<string, GraphEdge[]>();
+  const outgoingEdges = new Map<string, GraphEdge[]>();
+  for (const edge of graphData.edges) {
+    if (!incomingEdges.has(edge.target)) incomingEdges.set(edge.target, []);
+    incomingEdges.get(edge.target)!.push(edge);
+    if (!outgoingEdges.has(edge.source)) outgoingEdges.set(edge.source, []);
+    outgoingEdges.get(edge.source)!.push(edge);
+  }
+
+  const requestDepthOf = (node: GraphNode): number => (node.metadata?.agentDepth as number) ?? 0;
+
   const rootRequestNodes = graphData.nodes.filter(
-    (graphNode) => graphNode.category === "request" && ((graphNode.metadata?.agentDepth as number) ?? 0) === 0,
+    (graphNode) => graphNode.category === "request" && requestDepthOf(graphNode) === 0,
   );
   const rightmostRootRequestX = rootRequestNodes.length > 0
     ? Math.max(...rootRequestNodes.map((requestNode) => requestNode.x))
     : mainAgentNode.x + COLUMN_SPACING;
 
-  const collectBranchNodes = (
-    treeChild: SubAgentTreeNode,
-    childNode: GraphNode,
-    depth: number,
-  ): GraphNode[] => {
-    const requestNodes: GraphNode[] = [];
-    const depthMatchedRequests = new Set(
-      graphData.nodes
-        .filter((graphNode) =>
-          graphNode.category === "request" &&
-          ((graphNode.metadata?.agentDepth as number) ?? 0) === depth,
-        )
-        .map((graphNode) => graphNode.id),
-    );
-
-    const firstRequestEdge = graphData.edges.find(
-      (edge) => edge.source === childNode.id && depthMatchedRequests.has(edge.target),
-    );
-    if (firstRequestEdge) {
-      const firstRequestNode = graphData.nodes.find((node) => node.id === firstRequestEdge.target);
-      if (firstRequestNode) {
-        requestNodes.push(firstRequestNode);
-        let currentRequestId = firstRequestNode.id;
-        while (true) {
-          const nextChainEdge = graphData.edges.find(
-            (edge) => edge.source === currentRequestId && depthMatchedRequests.has(edge.target),
-          );
-          if (!nextChainEdge) break;
-          const nextRequestNode = graphData.nodes.find((node) => node.id === nextChainEdge.target);
-          if (!nextRequestNode) break;
-          requestNodes.push(nextRequestNode);
-          currentRequestId = nextRequestNode.id;
-        }
-      }
+  // A sub-agent's own chain: its first request, then request→request edges
+  // at the same depth (sibling branches share a depth but never an edge).
+  const collectBranchRequests = (agentNode: GraphNode, depth: number): GraphNode[] => {
+    const chain: GraphNode[] = [];
+    const nextRequestAfter = (sourceId: string): GraphNode | undefined =>
+      (outgoingEdges.get(sourceId) ?? [])
+        .map((edge) => nodeMap.get(edge.target))
+        .find((target): target is GraphNode =>
+          !!target && target.category === "request" && requestDepthOf(target) === depth && !chain.includes(target),
+        );
+    let current = nextRequestAfter(agentNode.id);
+    while (current) {
+      chain.push(current);
+      current = nextRequestAfter(current.id);
     }
-
-    return requestNodes;
+    return chain;
   };
 
-  const measureBranchHeight = (
-    treeChild: SubAgentTreeNode,
-    depth: number,
-  ): number => {
-    const childNode = nodeMap.get(treeChild.nodeId);
-    if (!childNode) return MINIMUM_BRANCH_HEIGHT;
-
-    const requestNodes = collectBranchNodes(treeChild, childNode, depth);
-    const requestColumnHeight = requestNodes.length > 0
-      ? (requestNodes.length - 1) * REQUEST_SPACING
-      : 0;
-
-    const ownContentHeight = Math.max(requestColumnHeight, MINIMUM_BRANCH_HEIGHT);
-
-    if (treeChild.children.length > 0) {
-      let nestedTotalHeight = 0;
-      for (let nestedIndex = 0; nestedIndex < treeChild.children.length; nestedIndex++) {
-        nestedTotalHeight += measureBranchHeight(treeChild.children[nestedIndex], depth + 1);
-        if (nestedIndex < treeChild.children.length - 1) {
-          nestedTotalHeight += BRANCH_GAP;
-        }
-      }
-      return Math.max(ownContentHeight, nestedTotalHeight);
-    }
-
-    return ownContentHeight;
+  // The row a branch wants to start on: level with the request that
+  // spawned it, or its parent's row when no request edge leads in
+  // (sequential / critic-loop topologies chain sub-agents directly).
+  const spawnAnchorY = (treeNode: SubAgentTreeNode, fallbackY: number): number => {
+    const spawner = (incomingEdges.get(treeNode.nodeId) ?? [])
+      .map((edge) => nodeMap.get(edge.source))
+      .find((source) => source?.category === "request");
+    return spawner ? spawner.y : fallbackY;
   };
 
-  const positionBranch = (
-    treeNodes: SubAgentTreeNode[],
-    parentColumnX: number,
-    parentY: number,
-    depth: number,
-  ) => {
-    if (treeNodes.length === 0) return;
-
-    const branchHeights = treeNodes.map((treeChild) => measureBranchHeight(treeChild, depth));
-    const totalBranchesHeight = branchHeights.reduce((sum, height) => sum + height, 0)
-      + (treeNodes.length - 1) * BRANCH_GAP;
-    let currentY = parentY - totalBranchesHeight / 2;
-
-    for (let childIndex = 0; childIndex < treeNodes.length; childIndex++) {
-      const treeChild = treeNodes[childIndex];
-      const childNode = nodeMap.get(treeChild.nodeId);
-      if (!childNode) continue;
-
-      const branchHeight = branchHeights[childIndex];
-      const subAgentX = parentColumnX + COLUMN_SPACING;
-      childNode.x = subAgentX;
-      childNode.y = currentY + branchHeight / 2;
-
-      const subAgentRequestX = subAgentX + COLUMN_SPACING;
-      const subAgentRequestNodes = collectBranchNodes(treeChild, childNode, depth);
-
-      const requestStartY = childNode.y - ((subAgentRequestNodes.length - 1) * REQUEST_SPACING) / 2;
-      for (let requestIndex = 0; requestIndex < subAgentRequestNodes.length; requestIndex++) {
-        subAgentRequestNodes[requestIndex].x = subAgentRequestX;
-        subAgentRequestNodes[requestIndex].y = requestStartY + requestIndex * REQUEST_SPACING;
-      }
-
-      if (treeChild.children.length > 0) {
-        positionBranch(treeChild.children, subAgentRequestX, childNode.y, depth + 1);
-      }
-
-      currentY += branchHeight + BRANCH_GAP;
-    }
+  // Places one branch starting at `top`; returns the lowest row it uses.
+  const placeBranch = (treeNode: SubAgentTreeNode, columnX: number, top: number, depth: number): number => {
+    const agentNode = nodeMap.get(treeNode.nodeId);
+    if (!agentNode) return top;
+    agentNode.x = columnX;
+    agentNode.y = top;
+    const branchRequests = collectBranchRequests(agentNode, depth);
+    branchRequests.forEach((requestNode, requestIndex) => {
+      requestNode.x = columnX + COLUMN_SPACING;
+      requestNode.y = top + requestIndex * ROW_SPACING;
+    });
+    const ownBottom = top + Math.max(branchRequests.length - 1, 0) * ROW_SPACING;
+    const childrenBottom = placeSiblings(treeNode.children, columnX + COLUMN_SPACING * 2, top, depth + 1);
+    return Math.max(ownBottom, childrenBottom);
   };
 
-  positionBranch(graphData.subAgentTree, rightmostRootRequestX, mainAgentNode.y, 1);
+  const placeSiblings = (treeNodes: SubAgentTreeNode[], columnX: number, fallbackY: number, depth: number): number => {
+    const orderedSiblings = treeNodes
+      .map((treeNode, spawnOrder) => ({ treeNode, spawnOrder, anchorY: spawnAnchorY(treeNode, fallbackY) }))
+      .sort((siblingA, siblingB) => siblingA.anchorY - siblingB.anchorY || siblingA.spawnOrder - siblingB.spawnOrder);
+    let bottom = -Infinity;
+    for (const { treeNode, anchorY } of orderedSiblings) {
+      const top = Math.max(anchorY, bottom + ROW_SPACING + BRANCH_GAP);
+      bottom = placeBranch(treeNode, columnX, top, depth);
+    }
+    return bottom;
+  };
+
+  placeSiblings(graphData.subAgentTree, rightmostRootRequestX + COLUMN_SPACING, mainAgentNode.y, 1);
 }

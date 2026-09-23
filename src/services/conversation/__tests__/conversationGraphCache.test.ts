@@ -82,6 +82,19 @@ describe("ConversationGraphCache", () => {
       expect(keyFirst).toBe(keySecond);
     });
 
+    // A pending request completing keeps the count — only the caller's
+    // content version tells the two graphs apart.
+    it("should produce distinct keys for different content versions at the same count", () => {
+      const keyPending = buildGraphCacheKey("conv-a", 5, 1600, 900, "v-pending");
+      const keyCompleted = buildGraphCacheKey("conv-a", 5, 1600, 900, "v-completed");
+      expect(keyPending).not.toBe(keyCompleted);
+      expect(buildGraphCacheKey("conv-a", 5, 1600, 900, "v-pending")).toBe(keyPending);
+    });
+
+    it("should keep the legacy key when no content version is sent", () => {
+      expect(buildGraphCacheKey("conv-a", 5, 1600, 900, "")).toBe(buildGraphCacheKey("conv-a", 5, 1600, 900));
+    });
+
     it("should include all parameters in the key string", () => {
       const key = buildGraphCacheKey("conv-abc", 42, 1920, 1080);
       expect(key).toContain("conv-abc");
