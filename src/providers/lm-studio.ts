@@ -1299,6 +1299,7 @@ export function createLmStudioProvider(
       for await (const chunk of parseSSEStream(reader, {
         signal: options.signal,
         thinkingEnabled: options.thinkingEnabled,
+        label: "lm-studio",
       })) {
         // Emit the correct phase based on the first chunk type —
         // avoids a false "generating" → "thinking" flicker when the

@@ -26,7 +26,11 @@ import { ANTHROPIC_API_KEY } from "#config";
 import { MODALITY_TYPES, getDefaultModels, getModelByName } from "#src/config";
 import { DEFAULT_MAX_OUTPUT_TOKENS } from "#src/constants/TokenBudgetDefaults";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
-import { callWithRetries } from "#src/utils/ProviderStreamResilience";
+import {
+  callWithRetries,
+  isTransientProviderError,
+  streamEndedEarlyError,
+} from "#src/utils/ProviderStreamResilience";
 import {
   hashPromptPrefix,
   isDiagnosticsRejection,
@@ -494,10 +498,13 @@ function logInputTransformations(transformations: unknown, model: string) {
 function anthropicRequestOptions(
   betas: string[],
   signal?: AbortSignal,
-): { headers?: Record<string, string>; signal?: AbortSignal } | undefined {
+): { headers?: Record<string, string>; signal?: AbortSignal; maxRetries: number } {
   const uniqueBetas = [...new Set(betas)];
-  if (uniqueBetas.length === 0 && !signal) return undefined;
   return {
+    // Both call sites retry through ProviderStreamResilience (streams at
+    // the harness, callWithRetries here); the SDK's own retries would
+    // multiply the attempts and wait out a Retry-After twice.
+    maxRetries: 0,
     ...(signal && { signal }),
     ...(uniqueBetas.length > 0 && {
       headers: { "anthropic-beta": uniqueBetas.join(",") },
@@ -2212,6 +2219,9 @@ const anthropicProvider = {
       let sawContent = false;
       let finalStopReason: string | null = null;
       let usageIterations: unknown[] | null = null;
+      // Without `message_stop` the body ended mid-reply: the SDK accepts
+      // that, and the reply would end looking finished.
+      let sawMessageStop = false;
 
       for await (const chunk of stream) {
         receivedAnyStreamChunk = true;
@@ -2219,6 +2229,7 @@ const anthropicProvider = {
           stream.abort();
           break;
         }
+        if (chunk.type === "message_stop") sawMessageStop = true;
         if (chunk.type === "message_start") {
           anthropicMessageId = chunk.message?.id || anthropicMessageId;
           diagnosticsEnvelope = preferDiagnostics(
@@ -2579,6 +2590,10 @@ const anthropicProvider = {
         }
       }
 
+      if (!sawMessageStop && !options.signal?.aborted) {
+        throw streamEndedEarlyError("anthropic", "no message_stop");
+      }
+
       // Get full usage from the finalized message
       try {
         const finalMessage = await stream.finalMessage();
@@ -2646,10 +2661,13 @@ const anthropicProvider = {
       if (error instanceof Error && error.name === "AbortError") return;
       // The SDK could not parse a streamed tool input (eager input
       // streaming): hand the raw text back to the model as a malformed call.
-      // API errors (they carry an HTTP status) are never mistaken for it.
+      // API errors (they carry an HTTP status) are never mistaken for it,
+      // and neither is a connection that dropped or a body that ended
+      // mid-input: those are transport failures, and the pass fails.
       if (
         openToolUse &&
-        typeof (error as AnthropicSdkError | null)?.status !== "number"
+        typeof (error as AnthropicSdkError | null)?.status !== "number" &&
+        !isTransientProviderError(error)
       ) {
         logger.warn(
           `[anthropic] ${openToolUse.name} input could not be parsed (${getErrorMessage(error)}) — returning it to the model`,
@@ -2718,6 +2736,7 @@ const anthropicProvider = {
       // No provider-level retry: transient stream failures are retried by the
       // shared streamWithRetries wrapper at the call site (zero-chunk only,
       // so a retry never replays text or re-executes tool calls).
+      if (error instanceof ProviderError) throw error;
       throw new ProviderError(
         "anthropic",
         getErrorMessage(error),

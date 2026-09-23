@@ -71,11 +71,17 @@ const READ_FILE = {
   parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
 };
 
+/** Every Responses stream ends with its terminal event. */
+const TERMINAL_EVENTS = new Set(["response.completed", "response.incomplete", "response.failed"]);
+const completedEvent = { type: "response.completed", response: { id: "resp_test", status: "completed", output: [] } };
+
 function httpStream(events: unknown[]) {
+  const ended = events.some((event) => TERMINAL_EVENTS.has((event as { type?: string }).type ?? ""));
   return {
     withResponse: async () => ({
       data: (async function* () {
         for (const event of events) yield event;
+        if (!ended) yield completedEvent;
       })(),
       response: { headers: new Headers() },
     }),

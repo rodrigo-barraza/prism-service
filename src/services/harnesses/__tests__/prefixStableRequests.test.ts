@@ -422,6 +422,7 @@ function anthropicTurn(turn: ScriptTurn, adapter: AdapterCase, turnIndex: number
     let blockIndex = 0;
     if ("empty" in turn) {
       yield { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 0 } };
+      yield { type: "message_stop" };
       return;
     }
     if (turn.thinking) {
@@ -446,6 +447,7 @@ function anthropicTurn(turn: ScriptTurn, adapter: AdapterCase, turnIndex: number
       blockIndex++;
     }
     yield { type: "message_delta", delta: { stop_reason: calls.length > 0 ? "tool_use" : "end_turn" }, usage: { output_tokens: 7 } };
+    yield { type: "message_stop" };
   };
 }
 

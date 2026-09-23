@@ -103,14 +103,13 @@ async function queryContextLength(
   ) {
     return queryVllmContextLength(baseUrl, model);
   }
-  if (
-    normalizedProvider.includes("llama") ||
-    normalizedProvider.includes("llama-cpp")
-  ) {
-    return queryLlamaCppContextLength(baseUrl);
-  }
+  // Before llama.cpp: "ollama" contains "llama", and the llama.cpp branch
+  // used to take every Ollama instance to a /props it does not serve.
   if (normalizedProvider.includes("ollama")) {
     return queryOllamaContextLength(baseUrl, model);
+  }
+  if (normalizedProvider.includes("llama")) {
+    return queryLlamaCppContextLength(baseUrl);
   }
 
   // Unknown provider type — try vLLM-style /v1/models as a generic fallback
