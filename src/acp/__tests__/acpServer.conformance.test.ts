@@ -761,8 +761,8 @@ describe("ACP server — a turn that hands work to the background", () => {
     const response = await prompt;
     expect(response.result).toMatchObject({ stopReason: "end_turn" });
     // The prompt's cost is both turns': the dispatching one and the auto-response.
-    const meta = (response.result?._meta as { prism: { sessionCostUsd: number } }).prism;
-    expect(meta.sessionCostUsd).toBeCloseTo(0.01 + 0.02 + 0.03, 10);
+    const meta = response.result?._meta as { prism?: { sessionCostUsd?: number } } | undefined;
+    expect(meta?.prism?.sessionCostUsd).toBeCloseTo(0.01 + 0.02 + 0.03, 10);
     expect(JSON.stringify(client.updates(sessionId))).toContain("It found README.md.");
   });
 
