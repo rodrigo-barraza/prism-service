@@ -22,7 +22,6 @@ import type {
   StreamChunk,
   AgenticContext,
   ResolvedTools,
-  ToolCall,
   ConversationMessage,
 } from '#src/services/harnesses/types';
 
@@ -91,7 +90,7 @@ describe('BaseAgenticHarness processStreamChunk — adversarial chunks', () => {
   }
 
   it('should handle null chunk — treated as text chunk with empty string', () => {
-    const { harness, state } = createHarness();
+    const { harness } = createHarness();
     const pass = createMockPassState();
     const allowedToolNames = new Set<string>();
 
@@ -150,7 +149,7 @@ describe('BaseAgenticHarness processStreamChunk — adversarial chunks', () => {
   });
 
   it('should drop tool call not in allowed set — schema enforcement', () => {
-    const { harness, emittedEvents } = createHarness();
+    const { harness } = createHarness();
     const pass = createMockPassState();
     const allowedToolNames = new Set(['read_file', 'search']);
 
@@ -218,7 +217,7 @@ describe('BaseAgenticHarness processStreamChunk — adversarial chunks', () => {
   });
 
   it('should generate synthetic ID when tool call has no id', () => {
-    const { harness, state } = createHarness();
+    const { harness } = createHarness();
     const pass = createMockPassState();
     const allowedToolNames = new Set(['search']);
 
@@ -300,7 +299,7 @@ describe('BaseAgenticHarness processStreamChunk — adversarial chunks', () => {
   });
 
   it('should handle native MCP tool call passthrough', () => {
-    const { harness, state, emittedEvents } = createHarness();
+    const { harness, state } = createHarness();
     const pass = createMockPassState();
 
     const nativeMcpChunk: StreamChunk = {
@@ -469,18 +468,12 @@ describe('BaseAgenticHarness consumeStream — abort and error recovery', () => 
     (context as any).signal = controller.signal;
 
     const pass = createMockPassState();
-    let chunksYielded = 0;
-
     const stream = (async function* () {
       yield 'chunk 1';
-      chunksYielded++;
       yield 'chunk 2';
-      chunksYielded++;
       controller.abort(); // Abort mid-stream
       yield 'chunk 3'; // Should be processed but abort detected on next iteration
-      chunksYielded++;
       yield 'chunk 4'; // Should NOT be processed
-      chunksYielded++;
     })();
 
     await harness.consumeStream(stream, pass, new Set());
@@ -759,7 +752,7 @@ describe('checkAndApplyToolSetChanges — dynamic tool activation doc sync', () 
   });
 
   it('should update this.tools.resolvedEnabledTools after mutation', () => {
-    const { harness, sessionId, tools } = createTestHarnessWithTools(['read_file']);
+    const { harness, sessionId } = createTestHarnessWithTools(['read_file']);
     const store = ToolContext.getStore(sessionId);
     store.set('toolSetDirty', true);
     store.set('dynamicEnabledTools', ['read_file', 'get_weather', 'search_web']);

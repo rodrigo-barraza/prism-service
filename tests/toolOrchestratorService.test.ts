@@ -27,7 +27,7 @@ vi.mock("#src/services/FileService", () => {
   };
 });
 
-import MCPClientService, { MCP_PREFIX } from "#src/services/MCPClientService";
+import MCPClientService from "#src/services/MCPClientService";
 
 vi.mock("#src/services/MCPClientService", () => ({
   default: {
@@ -77,7 +77,7 @@ describe("ToolOrchestratorService", () => {
         },
       ];
 
-      vi.mocked(global.fetch).mockImplementation(async (url, requestOptions) => {
+      vi.mocked(global.fetch).mockImplementation(async (url) => {
         const urlString = String(url);
         if (urlString.includes("/admin/tool-schemas")) {
           return {
@@ -1831,7 +1831,7 @@ describe("ToolOrchestratorService", () => {
         },
       ];
 
-      vi.mocked(global.fetch).mockImplementation(async (url) => {
+      vi.mocked(global.fetch).mockImplementation(async () => {
         return {
           ok: true,
           status: 200,
@@ -1845,7 +1845,7 @@ describe("ToolOrchestratorService", () => {
       const synthSchema = aiSchemas.find((s) => s.name === "synthesize_speech");
 
       expect(synthSchema).toBeDefined();
-      const voiceDesc = (synthSchema?.parameters as any).properties.voice.description;
+      const voiceDesc = (synthSchema!.parameters as any).properties.voice.description;
       expect(voiceDesc).not.toContain(TTS_VOICE_CATALOG_PLACEHOLDER);
     });
 

@@ -87,6 +87,7 @@ function anthropicTurn(messageId: string, diagnostics?: unknown): Script {
 }
 
 function anthropicRejection(message: string): Script {
+  // oxlint-disable-next-line require-yield -- throws on the first pull, like a provider rejecting the request
   return async function* () {
     throw Object.assign(new Error(message), { status: 400 });
   };

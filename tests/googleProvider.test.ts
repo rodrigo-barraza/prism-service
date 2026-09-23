@@ -3,7 +3,6 @@ import "./setup.ts";
 import googleProvider, { convertToolsToGoogle } from "#src/providers/google";
 import { ConversationMessage } from "#src/providers/google";
 import { ProviderError } from "#src/utils/errors";
-import { Readable } from "stream";
 import { MODEL_TYPES } from "#src/constants";
 
 const mockGenerateContent = vi.fn();
