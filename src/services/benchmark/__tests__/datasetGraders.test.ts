@@ -325,3 +325,49 @@ describe("gradeCase", () => {
     expect(validateGrader({ type: "nope" } as never)).toMatch(/unknown grader/);
   });
 });
+
+describe("a dataset run's scratch workspaces, end to end", () => {
+  it("each run gets its own seeded directory as its workspace root; nothing is left afterwards", async () => {
+    const { handleAgent } = await import("#src/routes/ChatRoutes");
+    const { runDataset } = await import("#src/services/benchmark/DatasetRunner");
+    const { default: DatasetStore } = await import("#src/services/benchmark/DatasetStore");
+    const saved = vi.spyOn(DatasetStore, "saveRun").mockResolvedValue(undefined);
+    const roots: string[] = [];
+    (handleAgent as any).mockImplementation(async (parameters: any, emit: any) => {
+      roots.push(parameters.workspaceRoot);
+      // The seed is there when the turn starts; the agent writes its answer.
+      expect(files.get(`${parameters.workspaceRoot}/question.txt`)).toBe("6 × 7");
+      files.set(`${parameters.workspaceRoot}/answer.txt`, "42\n");
+      emit({ type: "chunk", content: "Wrote answer.txt" });
+      emit({ type: "done", estimatedCost: 0.001 });
+    });
+    const run = await runDataset({
+      dataset: {
+        id: "files",
+        project: "bench",
+        username: "tester",
+        name: "Files",
+        agent: "CODING",
+        k: 2,
+        cases: [
+          {
+            id: "write",
+            prompt: "Answer the question in question.txt into answer.txt",
+            files: { "question.txt": "6 × 7" },
+            graders: [{ type: "file_exists", path: "answer.txt", contentMatch: "^42$" }],
+          },
+        ],
+        createdAt: "",
+        updatedAt: "",
+      },
+      config: { target: { provider: "google", model: "gemini-3.5-flash-lite" }, settings: {} },
+      project: "bench",
+      username: "tester",
+    });
+    expect(run.summary).toMatchObject({ trials: 2, passRate: 1, passHatK: 1 });
+    expect(new Set(roots).size).toBe(2);
+    for (const root of roots) expect(root).toMatch(/^\/workspace\/\.prism-benchmarks\/[\w-]+\/write-[12]$/);
+    expect([...files.keys()].filter((path) => path.includes(SCRATCH_DIRECTORY))).toEqual([]);
+    expect(saved).toHaveBeenCalledTimes(1);
+  });
+});

@@ -210,7 +210,8 @@ async function gradeFileExists(
     const matches = await findWorkspaceFiles(context.workspace, grader.path, context.identity);
     if (matches.length === 0) return result(grader, false, { actual: "not found" });
     if (!grader.contentMatch) return result(grader, true, { actual: matches.slice(0, 3).join(", ") });
-    const pattern = new RegExp(grader.contentMatch);
+    // Line-wise, like grep: ^ and $ match at line breaks.
+    const pattern = new RegExp(grader.contentMatch, "m");
     for (const path of matches.slice(0, 20)) {
       const content = await readWorkspaceFile(context.workspace, path, context.identity);
       if (content !== null && pattern.test(content.slice(0, REGEX_INPUT_CHARACTER_LIMIT))) {

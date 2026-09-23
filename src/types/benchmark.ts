@@ -306,6 +306,7 @@ export type DatasetGrader =
       type: "file_exists";
       /** Relative to the scratch workspace; a glob (`*`, `**`, `?`) matches any file. */
       path: string;
+      /** A pattern some matching file's text must match, line-wise (`^`/`$` at line breaks). */
       contentMatch?: string;
     }
   | { type: "llm_rubric"; rubric: string; judgeModel?: string }

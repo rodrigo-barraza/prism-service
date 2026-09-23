@@ -690,8 +690,9 @@ The same discipline, applied to every provider, is K1.
 - OpenTelemetry GenAI spans since 2026-09-22 (`invoke_agent` → `chat` / `execute_tool`, off unless `OTEL_EXPORTER_OTLP_ENDPOINT`; prompt 23 Landing 1). No metrics.
 - `traceId` is minted server-side when the request has none; W3C `traceparent` reaches tools-service (forwarded on) and MCP.
 - The "tool latency" figure is the tools' own measured durations (`toolExecutions` on request rows).
-- Benchmarks are one prompt × models × trials, with assertions and an LLM judge.
-- Missing: pass^k, datasets, scheduled regression runs, trajectory replay.
+- Benchmarks are one prompt × models × trials, with assertions and an LLM judge — and, since 2026-09-23, datasets (prompt 23 Landing 3, `docs/benchmark-reliability.md`): many cases with graders (regex, tool_used, tool_sequence, file_exists in a scratch workspace, llm_rubric, a position-swapped pairwise baseline), k runs per case → pass@k and pass^k, harness-setting sweeps (model × effort × compaction threshold × tool discovery × topology) with a cost / latency / pass^k Pareto per cell, and scheduled regression sweeps that alert through the `benchmark.regression` webhook and ntfy.
+- Every provider adapter family is fault-tested at the HTTP layer (`tests/providerFaults.test.ts`, `docs/provider-faults.md`): cut-off streams fail instead of ending like finished replies, stalls abort the request, one retry layer honours Retry-After and never retries a spend cap, missing usage is estimated and marked.
+- Missing: metrics, trajectory replay.
 
 **Current practice:**
 - OpenTelemetry GenAI spans (`invoke_agent` / `chat` / `execute_tool`).
