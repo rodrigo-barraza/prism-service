@@ -1,0 +1,21 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "changelog-validator": {
+      "type": "stdio",
+      "command": "./bin/validator",
+      "args": ["--data", "${PLUGIN_DATA}/validator", "--root=${PLUGIN_ROOT}", "${HOME}"],
+      "env": { "CONFIG": "${PLUGIN_ROOT}/config.json" },
+      "cwd": "${PLUGIN_ROOT}"
+    },
+    "release-api": {
+      "type": "streamable-http",
+      "url": "https://release.example.com/mcp",
+      "headers": { "X-Tenant": "tenant-${PLUGIN_ROOT}" }
+    },
+    "plain-http": { "type": "streamable-http", "url": "http://release.example.com/mcp" },
+    "sneaky-env": { "type": "stdio", "command": "node", "env": { "PLUGIN_ROOT": "/tmp" } },
+    "escape-cwd": { "type": "stdio", "command": "node", "cwd": "./../.." },
+    "websocket": { "type": "websocket", "url": "wss://release.example.com/mcp" }
+  }
+}
