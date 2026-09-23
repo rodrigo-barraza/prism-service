@@ -4,11 +4,9 @@ import {
   errorMessage,
   parseJsonFromLargeLanguageModelResponse,
 } from "@rodrigo-barraza/utilities-library";
-import { getProvider } from "#src/providers/index";
-import ModelRoleRouter, { MODEL_ROLES } from "#src/services/ModelRoleRouter";
-import RequestLogger, { type MessagePayload } from "#src/services/RequestLogger";
 import logger from "#src/utils/logger";
 import type { ChatMessage, GenerateTextResult } from "#src/types/provider";
+import type { MessagePayload } from "#src/services/RequestLogger";
 
 // ────────────────────────────────────────────────────────────
 // QuarantinedReader — untrusted text in, schema-valid JSON out
@@ -315,12 +313,28 @@ function retryMessage(issues: string[]): string {
 
 // ── The read ────────────────────────────────────────────────
 
+/**
+ * The model-call path, loaded on first use: the providers pull every
+ * adapter (and its config) in at import, and this module is reached from
+ * InternalToolRegistry, which half the codebase imports.
+ */
+async function loadModelCall() {
+  const [{ getProvider }, { default: ModelRoleRouter, MODEL_ROLES }, { default: RequestLogger }] =
+    await Promise.all([
+      import("#src/providers/index"),
+      import("#src/services/ModelRoleRouter"),
+      import("#src/services/RequestLogger"),
+    ]);
+  return { getProvider, ModelRoleRouter, MODEL_ROLES, RequestLogger };
+}
+
 async function callReader(
   messages: ChatMessage[],
   attempt: number,
   request: ReaderRequest,
 ): Promise<{ text: string; provider: string; model: string }> {
   const caller = request.caller ?? {};
+  const { getProvider, ModelRoleRouter, MODEL_ROLES, RequestLogger } = await loadModelCall();
   const chain = await ModelRoleRouter.resolveChain(MODEL_ROLES.READER);
   let provider = chain[0]?.provider ?? "unknown";
   let model = chain[0]?.model ?? "unknown";
