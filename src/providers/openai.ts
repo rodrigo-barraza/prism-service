@@ -2320,10 +2320,10 @@ const openaiProvider = {
   ) {
     logger.provider("OpenAI", `transcribeAudio model=${model}`);
     try {
-      const subType = mimeType.split("/")[1] || "wav";
-      const ext = ["wav", "mp3", "opus", "aac", "flac", "pcm"].includes(subType)
-        ? (subType as "wav" | "mp3" | "opus" | "aac" | "flac" | "pcm")
-        : "wav";
+      const { transcriptionFileExtension } = await import(
+        "./transcriptionFileExtension.ts"
+      );
+      const ext = transcriptionFileExtension(mimeType);
       const file = await toFile(audioBuffer, `audio.${ext}`, {
         type: mimeType,
       });
