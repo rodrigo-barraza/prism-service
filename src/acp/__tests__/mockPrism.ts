@@ -6,6 +6,7 @@
  */
 import http from "node:http";
 import type { AddressInfo } from "node:net";
+import { WebSocketServer, type WebSocket } from "ws";
 import { validateTurnEvent, type TurnEvent } from "#src/protocol/events";
 
 export interface RecordedRequest {
@@ -30,6 +31,18 @@ export interface ScriptedTurn {
 
 export type AgentScript = (turn: ScriptedTurn) => Promise<void>;
 
+/** One `/ws/chat` client: its identity query and its `subscribe` message. */
+export interface Subscription {
+  query: URLSearchParams;
+  subscribe: Record<string, unknown>;
+  send(event: TurnEvent): void;
+}
+
+export interface ConversationStatus {
+  isGenerating: boolean;
+  pendingBackgroundTasks: number;
+}
+
 export const MODES = [
   { id: "default", label: "Ask", description: "Read-only tools run; writes ask.", available: true },
   { id: "plan", label: "Plan", description: "Read-only tools only.", available: true },
@@ -46,18 +59,53 @@ export class MockPrism {
   private readonly taken = new Set<RecordedRequest>();
   private readonly waiters: Array<{ path: string; resolve: (request: RecordedRequest) => void }> = [];
   private readonly activeStops = new Map<string, () => void>();
+  /** `GET /conversations/:id/status`; a conversation not listed is idle. */
+  readonly statuses = new Map<string, ConversationStatus>();
+  private readonly subscriptions: Subscription[] = [];
+  private readonly subscriptionWaiters: Array<(subscription: Subscription) => void> = [];
   private server: http.Server | null = null;
+  private sockets: WebSocketServer | null = null;
   url = "";
 
   async start(): Promise<void> {
     this.server = http.createServer((request, response) => {
       void this.handle(request, response);
     });
+    this.sockets = new WebSocketServer({ server: this.server, path: "/ws/chat" });
+    this.sockets.on("connection", (socket: WebSocket, request) => this.acceptSocket(socket, request));
     await new Promise<void>((resolve) => this.server!.listen(0, "127.0.0.1", resolve));
     this.url = `http://127.0.0.1:${(this.server!.address() as AddressInfo).port}`;
   }
 
+  /** The next `/ws/chat` subscription (one already made and not yet taken, or the next). */
+  nextSubscription(): Promise<Subscription> {
+    const waiting = this.subscriptions.shift();
+    if (waiting) return Promise.resolve(waiting);
+    return new Promise((resolve) => this.subscriptionWaiters.push(resolve));
+  }
+
+  private acceptSocket(socket: WebSocket, request: http.IncomingMessage): void {
+    const query = new URL(request.url ?? "/", "http://mock").searchParams;
+    const send = (event: TurnEvent) => {
+      const result = validateTurnEvent(event);
+      if (!result.success) this.invalidEvents.push({ event, issues: result.error.issues });
+      socket.send(JSON.stringify(event));
+    };
+    send({ type: "hello", protocolVersion: 1 });
+    socket.on("message", (data) => {
+      const subscribe = JSON.parse(String(data)) as Record<string, unknown>;
+      if (subscribe.type !== "subscribe") return;
+      send({ type: "subscribed", conversationId: String(subscribe.conversationId), lastSeq: 0, replayedCount: 0, droppedCount: 0 });
+      const subscription: Subscription = { query, subscribe, send };
+      const waiter = this.subscriptionWaiters.shift();
+      if (waiter) waiter(subscription);
+      else this.subscriptions.push(subscription);
+    });
+  }
+
   async close(): Promise<void> {
+    for (const client of this.sockets?.clients ?? []) client.terminate();
+    this.sockets?.close();
     this.server?.closeAllConnections();
     await new Promise<void>((resolve) => (this.server ? this.server.close(() => resolve()) : resolve()));
   }
@@ -124,6 +172,16 @@ export class MockPrism {
       return json(200, { rule: `${String(body.toolName)}(*)`, coversCall: true, capabilities: [] });
     }
     if (recorded.method === "POST" && recorded.path === "/permissions/rules") return json(201, { id: "rule-1", ...body });
+    if (recorded.method === "POST" && recorded.path === "/orchestrator/sub-agents/stop") {
+      return json(200, { stopped: ["s1"], alreadyStopped: [] });
+    }
+    const status = recorded.path.match(/^\/conversations\/([^/]+)\/status$/);
+    if (recorded.method === "GET" && status) {
+      const id = decodeURIComponent(status[1]!);
+      if (!this.conversations.has(id)) return json(404, { error: "Conversation not found" });
+      const { isGenerating, pendingBackgroundTasks } = this.statuses.get(id) ?? { isGenerating: false, pendingBackgroundTasks: 0 };
+      return json(200, { id, isGenerating, pendingBackgroundTasks, isActive: pendingBackgroundTasks > 0, type: "agent" });
+    }
     const conversation = recorded.path.match(/^\/conversations\/([^/]+)$/);
     if (recorded.method === "GET" && conversation) {
       const messages = this.conversations.get(decodeURIComponent(conversation[1]!));

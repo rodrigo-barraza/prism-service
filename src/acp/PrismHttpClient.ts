@@ -60,6 +60,13 @@ export interface PermissionRuleProposal {
   coversCall: boolean;
 }
 
+/** `GET /conversations/:id/status`: whether a turn or background work is still running. */
+export interface ConversationStatus {
+  isGenerating?: boolean;
+  isActive?: boolean;
+  pendingBackgroundTasks?: number;
+}
+
 /** One served conversation message, as `GET /conversations/:id` returns it. */
 export type ServedMessage = Record<string, unknown> & { role: string };
 
@@ -97,13 +104,11 @@ export class PrismHttpClient {
     method: "GET" | "POST" | "PUT",
     path: string,
     body?: unknown,
-    signal?: AbortSignal,
   ): Promise<T> {
     const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
       method,
       headers: this.headers(body !== undefined),
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-      ...(signal ? { signal } : {}),
     });
     const text = await response.text();
     let parsed: unknown = null;
@@ -129,16 +134,15 @@ export class PrismHttpClient {
   // ── The turn ─────────────────────────────────────────────────────
 
   /**
-   * POST /agent and yield its SSE events until the body ends. Aborting
-   * `signal` closes the connection only: the turn itself keeps running on
-   * the service (`persistOnDisconnect`) — `stop()` is what stops it.
+   * POST /agent and yield its SSE events until the body ends. Closing the
+   * connection would not stop the turn (`persistOnDisconnect`) — `stop()`
+   * does, and the body then ends once the turn has finalized.
    */
-  async *streamAgentTurn(body: Record<string, unknown>, signal: AbortSignal): AsyncGenerator<TurnEvent> {
+  async *streamAgentTurn(body: Record<string, unknown>): AsyncGenerator<TurnEvent> {
     const response = await this.fetchImpl(`${this.baseUrl}/agent`, {
       method: "POST",
       headers: { ...this.headers(true), accept: "text/event-stream" },
       body: JSON.stringify(body),
-      signal,
     });
     if (!response.ok || !response.body) {
       const text = await response.text().catch(() => "");
@@ -207,6 +211,92 @@ export class PrismHttpClient {
       }
     }
     return raw as TurnEvent;
+  }
+
+  /**
+   * The conversation's events after `afterSeq`, live, over `/ws/chat`
+   * (`subscribe`: the running turn's missed events are replayed first).
+   * Identity rides the query string, as it does for prism-client. Ends when
+   * the socket closes or `signal` aborts.
+   */
+  async *followConversation(
+    conversationId: string,
+    afterSeq: number | null,
+    signal: AbortSignal,
+  ): AsyncGenerator<TurnEvent> {
+    const url = new URL("/ws/chat", this.baseUrl);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    url.searchParams.set("project", this.identity.project);
+    if (this.identity.username) url.searchParams.set("username", this.identity.username);
+    if (this.identity.profileId) url.searchParams.set("profileId", this.identity.profileId);
+
+    const socket = new WebSocket(url);
+    const queue: TurnEvent[] = [];
+    let closed = false;
+    let wake: (() => void) | null = null;
+    const notify = () => {
+      wake?.();
+      wake = null;
+    };
+    socket.addEventListener("open", () => {
+      socket.send(JSON.stringify({ type: "subscribe", conversationId, ...(afterSeq !== null ? { afterSeq } : {}) }));
+    });
+    socket.addEventListener("message", (message) => {
+      if (typeof message.data !== "string") return;
+      let raw: unknown;
+      try {
+        raw = JSON.parse(message.data);
+      } catch {
+        this.log(`[protocol] dropped a /ws/chat frame that is not JSON`);
+        return;
+      }
+      const event = this.acceptEvent(raw);
+      if (event) {
+        queue.push(event);
+        notify();
+      }
+    });
+    const onClosed = () => {
+      closed = true;
+      notify();
+    };
+    socket.addEventListener("close", onClosed);
+    socket.addEventListener("error", onClosed);
+    signal.addEventListener("abort", onClosed, { once: true });
+    try {
+      while (true) {
+        const next = queue.shift();
+        if (next) {
+          yield next;
+          continue;
+        }
+        if (closed || signal.aborted) return;
+        await new Promise<void>((resolve) => {
+          wake = resolve;
+        });
+      }
+    } finally {
+      signal.removeEventListener("abort", onClosed);
+      if (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN) socket.close();
+    }
+  }
+
+  /** GET /conversations/:id/status, or null when the conversation does not exist. */
+  async conversationStatus(conversationId: string): Promise<ConversationStatus | null> {
+    try {
+      return await this.requestJson<ConversationStatus>(
+        "GET",
+        `/conversations/${encodeURIComponent(conversationId)}/status?project=${encodeURIComponent(this.identity.project)}`,
+      );
+    } catch (error: unknown) {
+      if (error instanceof PrismHttpError && error.status === 404) return null;
+      throw error;
+    }
+  }
+
+  /** POST /orchestrator/sub-agents/stop: abort the conversation's running sub-agents and their pending reports. */
+  stopSubAgents(conversationId: string): Promise<unknown> {
+    return this.requestJson("POST", "/orchestrator/sub-agents/stop", { conversationId });
   }
 
   /** POST /agent/stop. False when no turn was running (404). */

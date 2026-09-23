@@ -680,3 +680,92 @@ describe("ACP server — a client that renders forms", () => {
     expect(client.violations).toEqual([]);
   });
 });
+
+describe("ACP server — a turn that hands work to the background", () => {
+  const mock = new MockPrism();
+  let client: StdioClient;
+  let sessionId = "";
+
+  beforeAll(async () => {
+    await mock.start();
+    client = new StdioClient({ PRISM_URL: mock.url, PRISM_PROJECT: "prism-test", PRISM_USERNAME: "acp-test", PRISM_WORKSPACE_ROOT: "none" });
+    await client.request("initialize", { protocolVersion: 1 });
+    sessionId = String((await client.request("session/new", { cwd: "/tmp/bg", mcpServers: [] })).result?.sessionId);
+  });
+  afterAll(async () => {
+    client.close();
+    await mock.close();
+  });
+
+  /** A turn that dispatches a non-blocking sub-agent: its stream ends without `done`, the conversation stays busy. */
+  const dispatchingTurn = (subAgentId: string) => async (turn: ScriptedTurn) => {
+    const conversationId = String(turn.body.conversationId);
+    turn.send({ type: "user_message", role: "user", content: "Survey the repo", conversationId, timestamp: 1, seq: 101 });
+    turn.send({ type: "sub_agent_status", subAgentId, message: "spawned", description: "Survey the repo", seq: 102 });
+    turn.send({ type: "chunk", content: "A sub-agent is surveying the repo.", seq: 103 });
+    mock.statuses.set(conversationId, { isGenerating: true, pendingBackgroundTasks: 1 });
+  };
+
+  it("follows /ws/chat from the stream's last seq until the background answer is in, then ends the prompt", async () => {
+    mock.scripts.push(dispatchingTurn("s1"));
+    const prompt = client.request("session/prompt", { sessionId, prompt: text("Survey the repo") }, 20_000);
+
+    const subscription = await within(mock.nextSubscription(), 10_000, "the /ws/chat subscription");
+    expect(subscription.subscribe).toEqual({ type: "subscribe", conversationId: sessionId, afterSeq: 103 });
+    expect(Object.fromEntries(subscription.query)).toEqual({ project: "prism-test", username: "acp-test" });
+    let answered = false;
+    void prompt.then(() => (answered = true));
+
+    subscription.send({ type: "sub_agent_status", subAgentId: "s1", message: "complete", durationMilliseconds: 2000, toolCount: 3, seq: 104 });
+    subscription.send({ type: "task_notification", content: "Sub-agent report: 3 files.", timestamp: "2026-09-22T00:00:00.000Z", _notificationSource: "orchestrator", _notificationId: "n1" });
+    subscription.send({ type: "user_message", role: "user", content: "Sub-agent report: 3 files.", conversationId: sessionId, timestamp: 2, seq: 105 });
+    subscription.send({ type: "chunk", content: "The survey found 3 files.", seq: 106 });
+    subscription.send({ type: "done", provider: "google", model: "m", usage: null, estimatedCost: 0.01, totalTime: 1, conversationId: sessionId, seq: 107 });
+    await client.waitFor((message) => JSON.stringify(message.params ?? {}).includes("The survey found 3 files."), "the background answer");
+    expect(answered).toBe(false); // the background work is not over until the conversation says so
+    mock.statuses.set(sessionId, { isGenerating: false, pendingBackgroundTasks: 0 });
+    subscription.send({ type: "conversation_state_update", pendingBackgroundTasks: 0, isActive: false });
+
+    const response = await prompt;
+    expect(response.result).toMatchObject({ stopReason: "end_turn" });
+    const updates = client.updates(sessionId);
+    expect(updates.find((update) => update.toolCallId === "sub-agent/s1" && update.status === "completed")).toBeDefined();
+    const answer = updates
+      .filter((update) => update.sessionUpdate === "agent_message_chunk")
+      .map((update) => (update.content as { text: string }).text)
+      .join("");
+    expect(answer).toBe("A sub-agent is surveying the repo.The survey found 3 files.");
+  });
+
+  it("catches up from the persisted conversation when the socket delivered nothing", async () => {
+    mock.scripts.push(dispatchingTurn("s2"));
+    const prompt = client.request("session/prompt", { sessionId, prompt: text("Survey it again") }, 20_000);
+    await within(mock.nextSubscription(), 10_000, "the /ws/chat subscription");
+    // The auto-response ran and finished without this socket seeing it.
+    mock.conversations.get(sessionId)!.push(
+      { role: "assistant", content: "A sub-agent is surveying the repo." },
+      { role: "user", content: "Sub-agent report: 2 files." },
+      { role: "assistant", content: "This time it found 2 files." },
+    );
+    mock.statuses.set(sessionId, { isGenerating: false, pendingBackgroundTasks: 0 });
+
+    const response = await prompt;
+    expect(response.result).toMatchObject({ stopReason: "end_turn" });
+    const last = client.updates(sessionId).filter((update) => update.sessionUpdate === "agent_message_chunk").at(-1);
+    expect(last).toEqual({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: "\n\nThis time it found 2 files." } });
+  });
+
+  it("session/cancel while following stops the background sub-agents", async () => {
+    mock.scripts.push(dispatchingTurn("s3"));
+    const prompt = client.request("session/prompt", { sessionId, prompt: text("One more survey") }, 20_000);
+    await within(mock.nextSubscription(), 10_000, "the /ws/chat subscription");
+    client.notify("session/cancel", { sessionId });
+
+    const response = await prompt;
+    expect(response.result).toMatchObject({ stopReason: "cancelled" });
+    expect(mock.requestsTo("/orchestrator/sub-agents/stop").at(-1)?.body).toEqual({ conversationId: sessionId });
+    expect(client.updates(sessionId).filter((update) => update.toolCallId === "sub-agent/s3").at(-1)).toMatchObject({ status: "failed" });
+    expect(client.violations).toEqual([]);
+    expect(mock.invalidEvents).toEqual([]);
+  });
+});

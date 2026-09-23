@@ -16,7 +16,7 @@ import type {
   ToolCallUpdate,
 } from "@agentclientprotocol/sdk";
 import type { AcpServerConfig } from "./AcpConfig.ts";
-import { PrismHttpClient, PrismHttpError, type ServedMessage } from "./PrismHttpClient.ts";
+import { PrismHttpClient, PrismHttpError, type ConversationStatus, type ServedMessage } from "./PrismHttpClient.ts";
 import { TurnTranslator, type TurnInteraction } from "./TurnTranslator.ts";
 import type { ApprovalRequiredEvent, PlanProposalEvent, UserQuestionEvent } from "#src/protocol/events";
 
@@ -53,6 +53,17 @@ const STOP_RETRY_INTERVAL_MILLISECONDS = 250;
  * to wait for that cancel before reading the outcome as a dismissal.
  */
 export const CANCELLED_OUTCOME_GRACE_MILLISECONDS = 1_000;
+/** How long a cancelled prompt waits for the stopped turn's stream to close before answering. */
+export const CANCEL_SETTLE_MILLISECONDS = 1_000;
+/** While following background work: how often the conversation's status is checked. */
+export const FOLLOW_POLL_MILLISECONDS = 1_000;
+/** Once the status says idle, how long the socket may still deliver the last frames. */
+const FOLLOW_IDLE_GRACE_MILLISECONDS = 500;
+
+/** A turn or background work (a non-blocking sub-agent, a detached task) still runs. */
+function isBusy(status: ConversationStatus | null): boolean {
+  return !!status && (status.isGenerating === true || (status.pendingBackgroundTasks ?? 0) > 0);
+}
 
 const ALLOW_ONCE = "allow";
 const ALLOW_ALWAYS = "allow-always";
@@ -60,8 +71,6 @@ const REJECT_ONCE = "deny";
 const REJECT_ALWAYS = "deny-always";
 
 interface RunningTurn {
-  /** Closes the SSE connection (the service turn keeps running without `/agent/stop`). */
-  readonly connection: AbortController;
   /** Withdraws every open permission request and question (cancel, or the turn ended). */
   readonly interactions: AbortController;
   /** Open requests by tool call id, so a decision made elsewhere can withdraw them. */
@@ -72,6 +81,8 @@ interface RunningTurn {
   markCancelHandled: () => void;
   /** The SSE body ended (or was never opened). */
   streamEnded: boolean;
+  /** The turn's stream ended while its background work runs on; the prompt follows it. */
+  following: boolean;
   /** Serializes the questions put to the client, one at a time. */
   queue: Promise<void>;
 }
@@ -291,10 +302,19 @@ export class PrismAcpAgent {
     if (!turn || turn.cancelled) return;
     turn.cancelled = true;
     turn.interactions.abort();
-    // The turn may not be registered yet (the POST is still being admitted):
-    // retry until it is stopped, or its stream ends by itself.
     const deadline = Date.now() + STOP_RETRY_MILLISECONDS;
     try {
+      if (turn.following) {
+        // The turn itself has ended; what runs is the work it handed off.
+        // Stop it, so no report wakes the conversation for an answer nobody awaits.
+        const results = await Promise.allSettled([this.prism.stopSubAgents(sessionId), this.prism.stop(sessionId)]);
+        for (const result of results) {
+          if (result.status === "rejected") this.log(`[acp] stopping ${sessionId}'s background work: ${errorMessage(result.reason)}`);
+        }
+        return;
+      }
+      // The turn may not be registered yet (the POST is still being admitted):
+      // retry until it is stopped, or its stream ends by itself.
       while (!turn.streamEnded) {
         try {
           if (await this.prism.stop(sessionId)) return;
@@ -322,13 +342,13 @@ export class PrismAcpAgent {
       markCancelHandled = resolve;
     });
     const turn: RunningTurn = {
-      connection: new AbortController(),
       interactions: new AbortController(),
       openRequests: new Map(),
       cancelled: false,
       cancelHandled,
       markCancelHandled,
       streamEnded: false,
+      following: false,
       queue: Promise.resolve(),
     };
     session.turn = turn;
@@ -401,7 +421,7 @@ export class PrismAcpAgent {
     });
     let streamFailure: unknown = null;
     const pump = (async () => {
-      for await (const event of this.prism.streamAgentTurn(body, turn.connection.signal)) {
+      for await (const event of this.prism.streamAgentTurn(body)) {
         session.started = true;
         if (settled) continue;
         const { updates, interaction } = translator.translate(event);
@@ -411,7 +431,7 @@ export class PrismAcpAgent {
       }
     })()
       .catch((error: unknown) => {
-        if (!turn.connection.signal.aborted) streamFailure = error;
+        streamFailure = error;
       })
       .finally(() => {
         turn.streamEnded = true;
@@ -420,6 +440,14 @@ export class PrismAcpAgent {
     await Promise.race([pump, doneSettled, turn.cancelHandled]);
     settled = true;
     session.previousStream = pump;
+
+    // A turn that handed work to a non-blocking sub-agent ends its stream
+    // without `done`; the report and the answer written from it arrive over
+    // /ws/chat. The prompt is not over until they have (ACP: a prompt ends
+    // when the agent is done).
+    if (!turn.cancelled && !translator.outcome.done && !translator.outcome.error && !streamFailure) {
+      await this.followBackground(session, turn, translator, client, sendUpdate, history.length + 1);
+    }
     turn.interactions.abort();
 
     const { outcome } = translator;
@@ -433,9 +461,10 @@ export class PrismAcpAgent {
 
     if (turn.cancelled) {
       for (const update of translator.cancelOpenTools()) await sendUpdate(update);
-      // Leave the stream a moment to end after /agent/stop, then close it.
-      await Promise.race([pump, delay(1_000)]);
-      turn.connection.abort();
+      // The stopped turn finalizes (persists what it wrote) before its stream
+      // closes; the stream keeps draining as `previousStream`, which the next
+      // prompt waits for, so it is not refused as a turn still running.
+      await Promise.race([pump, delay(CANCEL_SETTLE_MILLISECONDS)]);
       return { stopReason: "cancelled", _meta: meta };
     }
     if (outcome.error) {
@@ -461,6 +490,95 @@ export class PrismAcpAgent {
         ? "max_turn_requests"
         : "end_turn";
     return { stopReason, _meta: meta };
+  }
+
+  // ── Background work ──────────────────────────────────────────────
+
+  /**
+   * Follow the conversation until its background work is done: the live
+   * events over /ws/chat (from the last `seq` the stream carried, so nothing
+   * repeats), with the conversation's status as the end condition — the
+   * socket's `conversation_state_update`, or a poll, in case a frame is missed.
+   */
+  private async followBackground(
+    session: AcpSession,
+    turn: RunningTurn,
+    translator: TurnTranslator,
+    client: AgentContext,
+    sendUpdate: (update: SessionUpdate) => Promise<void>,
+    sentMessageCount: number,
+  ): Promise<void> {
+    turn.following = true;
+    let status: ConversationStatus | null;
+    try {
+      status = await this.prism.conversationStatus(session.id);
+    } catch (error: unknown) {
+      this.log(`[acp] status of ${session.id}: ${errorMessage(error)}`);
+      return;
+    }
+    if (!isBusy(status) || turn.cancelled) return;
+    this.log(`[acp] ${session.id}: the turn handed work to the background; following it over /ws/chat`);
+
+    const follow = new AbortController();
+    void turn.cancelHandled.then(() => follow.abort());
+    let sawDone = false;
+    const socket = (async () => {
+      for await (const event of this.prism.followConversation(session.id, translator.outcome.lastSeq, follow.signal)) {
+        if (event.type === "conversation_state_update") {
+          if (!event.isActive && event.pendingBackgroundTasks === 0) follow.abort();
+          continue;
+        }
+        const { updates, interaction } = translator.translate(event);
+        for (const update of updates) await sendUpdate(update);
+        if (interaction) this.handleInteraction(session, turn, interaction, client, sendUpdate);
+        if (event.type === "done") sawDone = true;
+        if (event.type === "error") follow.abort();
+      }
+    })().catch((error: unknown) => this.log(`[acp] /ws/chat for ${session.id}: ${errorMessage(error)}`));
+    const poll = (async () => {
+      while (!follow.signal.aborted) {
+        if (await abortedWithin(follow.signal, FOLLOW_POLL_MILLISECONDS)) return;
+        try {
+          if (!isBusy(await this.prism.conversationStatus(session.id))) {
+            await abortedWithin(follow.signal, FOLLOW_IDLE_GRACE_MILLISECONDS);
+            follow.abort();
+          }
+        } catch (error: unknown) {
+          this.log(`[acp] status of ${session.id}: ${errorMessage(error)}`);
+        }
+      }
+    })();
+    await Promise.all([socket, poll]);
+
+    if (!sawDone && !turn.cancelled && !translator.outcome.error) {
+      await this.catchUp(session, sentMessageCount, sendUpdate);
+    }
+  }
+
+  /**
+   * The background answer the socket did not deliver (it finished before the
+   * subscription): the assistant messages persisted after the report that
+   * started it — the first user message after the ones this prompt sent.
+   */
+  private async catchUp(
+    session: AcpSession,
+    sentMessageCount: number,
+    sendUpdate: (update: SessionUpdate) => Promise<void>,
+  ): Promise<void> {
+    let messages: ServedMessage[] | null;
+    try {
+      messages = await this.prism.conversationMessages(session.id);
+    } catch (error: unknown) {
+      this.log(`[acp] catching up ${session.id}: ${errorMessage(error)}`);
+      return;
+    }
+    const later = (messages ?? []).slice(sentMessageCount);
+    const report = later.findIndex((message) => message.role === "user");
+    if (report === -1) return;
+    for (const message of later.slice(report + 1)) {
+      if (message.role !== "assistant" || typeof message.content !== "string" || !message.content) continue;
+      await sendUpdate({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: `\n\n${message.content}` } });
+    }
   }
 
   // ── Interactions ─────────────────────────────────────────────────
