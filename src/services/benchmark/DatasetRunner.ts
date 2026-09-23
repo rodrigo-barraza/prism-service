@@ -20,6 +20,7 @@ import {
 import { gradeCase } from "#src/services/benchmark/DatasetGraders";
 import {
   createScratchWorkspace,
+  removeScratchRun,
   removeScratchWorkspace,
   type ScratchWorkspace,
   type WorkspaceIdentity,
@@ -224,6 +225,9 @@ export async function runDataset(options: DatasetRunOptions): Promise<DatasetRun
       return result;
     },
   );
+  if (dataset.cases.some(needsWorkspace)) {
+    await removeScratchRun({ baseRoot: dataset.workspaceRoot, runId, identity });
+  }
   const cases = summarizeCases(dataset.cases, trials, k);
   const run: DatasetRun = {
     id: runId,

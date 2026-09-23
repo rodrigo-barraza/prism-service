@@ -59,6 +59,11 @@ function toolContext(workspaceRoot: string, identity: WorkspaceIdentity) {
 
 const pathSafe = (value: string) => value.replace(/[^A-Za-z0-9._-]/g, "_");
 
+/** The directory every scratch workspace of one dataset run sits in. */
+function runDirectory(base: string, runId: string): string {
+  return `${base.replace(/\/+$/, "")}/${SCRATCH_DIRECTORY}/${pathSafe(runId)}`;
+}
+
 /**
  * Make the directory for one run of one case and write its seed files.
  * `baseRoot`: a registered workspace root (default: tools-service's first).
@@ -84,7 +89,7 @@ export async function createScratchWorkspace({
       "No workspace root for the scratch workspace: the dataset names none and tools-service reports none",
     );
   }
-  const root = `${base.replace(/\/+$/, "")}/${SCRATCH_DIRECTORY}/${pathSafe(runId)}/${pathSafe(caseId)}-${trial}`;
+  const root = `${runDirectory(base, runId)}/${pathSafe(caseId)}-${trial}`;
   const marker = await ToolOrchestratorService.executeTool(
     TOOL_NAMES.WRITE_FILE,
     { path: `${root}/${MARKER_FILE}`, content: `${runId} ${caseId} ${trial}\n` },
@@ -153,6 +158,21 @@ export async function readWorkspaceFile(
   )) as { content?: unknown; error?: string };
   if (errorOf(result) || typeof result.content !== "string") return null;
   return result.content.replace(HASHLINE_PREFIX, "");
+}
+
+/** Remove what is left of a dataset run's directory once its runs are done (best-effort). */
+export async function removeScratchRun({
+  baseRoot,
+  runId,
+  identity,
+}: {
+  baseRoot?: string | null;
+  runId: string;
+  identity: WorkspaceIdentity;
+}): Promise<void> {
+  const base = baseRoot || ToolOrchestratorService.getWorkspaceRoot();
+  if (!base) return;
+  await removeScratchWorkspace({ root: runDirectory(base, runId) }, identity);
 }
 
 /** Remove the directory. Best-effort: a leftover scratch directory costs nothing but disk. */
