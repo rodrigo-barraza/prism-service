@@ -7,11 +7,13 @@ import {
   STATUS_MESSAGES,
   TOOL_NAMES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { TURN_INPUT } from "#src/constants";
+import { BUDGET_PAUSE, TURN_INPUT } from "#src/constants";
 
 /**
  * ConversationAttentionRegistry — what each conversation is waiting on from
  * its user: tool calls awaiting approval and questions awaiting an answer.
+ * A turn paused at its cost cap counts as one approval (more spend awaits
+ * the user's yes): `budget_reached` opens it, `budget_resolved` closes it.
  *
  * Keyed by the CLIENT-FACING conversation id, because that is what the
  * conversation list, the sidebar and the notifications speak. It is fed
@@ -40,6 +42,16 @@ export const ATTENTION_CHANGE_COLLECTION = "conversation_attention";
 
 /** Pending-approval key for a plan proposal (it has no tool-call id). */
 const PLAN_APPROVAL_KEY = "plan";
+
+/** Pending-approval key for a budget pause (one per turn). */
+const BUDGET_APPROVAL_KEY = "budget";
+
+/** The approval key a stored decision of an approval kind is counted under. */
+function approvalKeyOfRecord(record: PendingDecisionRecord): string {
+  if (record.kind === "plan") return PLAN_APPROVAL_KEY;
+  if (record.kind === "budget") return BUDGET_APPROVAL_KEY;
+  return record.itemId;
+}
 
 /** SSE event: one pending call was decided (per-call approvals). */
 const APPROVAL_DECIDED_EVENT_TYPE = "approval_decided";
@@ -291,6 +303,17 @@ const ConversationAttentionRegistry = {
         break;
       }
       case SERVER_SENT_EVENT_TYPES.STATUS: {
+        if (event.message === BUDGET_PAUSE.STATUS_REACHED) {
+          entryFor(conversationId).approvals.set(BUDGET_APPROVAL_KEY, {
+            since: Date.now(),
+            toolName: null,
+          });
+          break;
+        }
+        if (event.message === BUDGET_PAUSE.STATUS_RESOLVED) {
+          if (!entriesByConversation.get(conversationId)?.approvals.delete(BUDGET_APPROVAL_KEY)) return;
+          break;
+        }
         if (event.message !== STATUS_MESSAGES.PLAN_MODE_EXITED) return;
         if (!entriesByConversation.get(conversationId)?.approvals.delete(PLAN_APPROVAL_KEY)) return;
         break;
@@ -373,7 +396,7 @@ const ConversationAttentionRegistry = {
       if (record.kind === "question") {
         entry.questions.set(record.itemId, { since, blocking: record.blocking !== false });
       } else {
-        entry.approvals.set(record.kind === "plan" ? PLAN_APPROVAL_KEY : record.itemId, {
+        entry.approvals.set(approvalKeyOfRecord(record), {
           since,
           toolName: record.name ?? null,
         });
@@ -397,7 +420,7 @@ const ConversationAttentionRegistry = {
       const removed =
         record.kind === "question"
           ? entry.questions.delete(record.itemId)
-          : entry.approvals.delete(record.kind === "plan" ? PLAN_APPROVAL_KEY : record.itemId);
+          : entry.approvals.delete(approvalKeyOfRecord(record));
       if (removed) touched.add(conversationId);
     }
     for (const conversationId of touched) publishIfChanged(conversationId);

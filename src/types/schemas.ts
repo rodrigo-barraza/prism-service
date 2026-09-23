@@ -129,6 +129,10 @@ export const ChatRequestSchema = z
       .optional(),
     // Nobody is watching this turn: anything that would ask is denied instead.
     unattended: z.boolean().nullable().optional(),
+    // At the cost cap: "pause" parks the turn until its cap is raised (PATCH
+    // /conversations/:id/budget), "stop" ends it. Unset: pause, unless
+    // autoApprove / unattended say nobody will answer — then stop.
+    onBudgetReached: z.enum(["pause", "stop"]).nullable().optional(),
     planFirst: z.boolean().nullable().optional(),
     maxIterations: z.number().nullable().optional(),
     maxSubAgentIterations: z.number().nullable().optional(),
