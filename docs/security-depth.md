@@ -88,10 +88,19 @@ goals, budgets and the taint setting.
 ## 4. The taint check (`permissions/UntrustedSpans.ts`)
 
 Each turn keeps the untrusted text it has seen, **in memory only**: rebuilt
-at turn start from the transcript the model is shown (so a follow-up turn
-still knows the page an earlier one read), grown by untrusted tool results
-(`ToolExecutor`) and drained untrusted input (`TurnInputDrain`), and gone
-when the turn ends. A sub-agent's registry is chained to its parent's.
+at turn start, grown by untrusted tool results (`ToolExecutor`) and drained
+untrusted input (`TurnInputDrain`), and gone when the turn ends. A
+sub-agent's registry is chained to its parent's.
+
+The rebuild reads the conversation's **stored transcript**
+(`permissions/StoredTranscript.ts`, the Finalizer's record, where each tool
+result is a `tool` message paired with its call) as well as the history the
+turn was sent. The sent history alone is not enough: `ChatRequestSchema`
+drops a tool call's `result`, a relay may send none, and a model carries
+what it read forward in its encrypted reasoning. Live on 2026-09-23, Gemini
+quoted a page's install command exactly one turn after reading it, from a
+history that no longer held the page. Results held as JSON text are decoded
+before they are compared.
 
 A **shell, file-write or network-write** call (capability `shell`, `fs_write`,
 or `network` with `external_side_effect`) whose argument strings share a span
@@ -134,8 +143,9 @@ Inner checks — `run_async_task`, `run_tool_program`, `read_untrusted`'s fetch
   `tests/nonBlockingSubAgentDispatch.test.ts` (scenario 3, real harness),
   `src/services/__tests__/mcpClientService.test.ts` (server notifications),
   `tests/scheduledTasks-adversarial.test.ts` (trigger payload).
-- Taint check: `src/services/permissions/__tests__/taintCheckInTheLoop.test.ts` (real loop),
-  `untrustedSpans.test.ts`, `capabilityScope.test.ts`.
+- Taint check: `src/services/permissions/__tests__/taintCheckInTheLoop.test.ts` (real loop;
+  a follow-up turn whose history went through `ChatRequestSchema`),
+  `untrustedSpans.test.ts`, `storedTranscript.test.ts`, `capabilityScope.test.ts`.
 - Capability scopes: `tests/subAgentCapabilityScope.test.ts`,
   `src/services/permissions/__tests__/capabilityScopeInTheLoop.test.ts` (real loop),
   `goalVerifiedOutcomes.test.ts`, `conversationGoalRoutes.test.ts`,

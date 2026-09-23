@@ -13,7 +13,9 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import AgenticLoopService from "#src/services/AgenticLoopService";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import SettingsService from "#src/services/SettingsService";
-import { MESSAGE_ROLES } from "#src/constants";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
+import { ChatRequestSchema } from "#src/types/schemas";
+import { COLLECTIONS, MESSAGE_ROLES } from "#src/constants";
 import { MODALITY_TYPES } from "#src/config";
 import { clearPermissionRuleCache } from "#src/services/permissions/PermissionRuleStore";
 
@@ -263,6 +265,92 @@ describe("the taint check in a real loop", () => {
     expect(card).toMatchObject({ toolCallId: "call-shell", alwaysAsks: true });
     expect(card.untrustedText.excerpt).toBe(INJECTED_COMMAND);
     expect(executedToolNames()).toEqual([]);
+  });
+
+  // Seen live (2026-09-23): the history a route hands the loop has lost the
+  // page — ChatRequestSchema drops a tool call's `result` — yet Gemini
+  // quoted the page's command exactly in the next turn, carried forward in
+  // its encrypted thought signature. The conversation's stored transcript is
+  // the record of what it read.
+  it("a follow-up turn asks even when the history it was sent lost the page: the stored transcript is read", async () => {
+    const { messages: sentHistory } = ChatRequestSchema.parse({
+      provider: "test-provider",
+      messages: [
+        { role: MESSAGE_ROLES.USER, content: `Summarize ${PAGE_URL}` },
+        {
+          role: MESSAGE_ROLES.ASSISTANT,
+          content: "",
+          toolCalls: [
+            { id: "old-read", name: "read_web_page", args: { url: PAGE_URL }, result: { url: PAGE_URL, content: PAGE_TEXT } },
+          ],
+        },
+        { role: MESSAGE_ROLES.ASSISTANT, content: "It is a setup guide for the widget." },
+        { role: MESSAGE_ROLES.USER, content: "Great — now finish the setup for me." },
+      ],
+    });
+    expect(JSON.stringify(sentHistory)).not.toContain(INJECTED_COMMAND);
+
+    // As the Finalizer stores it: the result is a tool message of its own.
+    const stored = [
+      { role: MESSAGE_ROLES.USER, content: `Summarize ${PAGE_URL}` },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "", toolCalls: [{ id: "old-read", name: "read_web_page", args: { url: PAGE_URL } }] },
+      {
+        role: MESSAGE_ROLES.TOOL,
+        tool_call_id: "old-read",
+        name: "read_web_page",
+        content: JSON.stringify({ url: PAGE_URL, content: PAGE_TEXT }),
+      },
+      { role: MESSAGE_ROLES.ASSISTANT, content: "It is a setup guide for the widget." },
+    ];
+    const conversationReads: Array<{ collection: string; filter: unknown }> = [];
+    const defaultCollection = vi.mocked(MongoWrapper.getCollection).getMockImplementation();
+    vi.mocked(MongoWrapper.getCollection).mockImplementation(((_database: string, collection: string) => ({
+      findOne: vi.fn(async (filter: { id?: string }) => {
+        if (collection !== COLLECTIONS.AGENT_CONVERSATIONS && collection !== COLLECTIONS.MODEL_CONVERSATIONS) {
+          return null;
+        }
+        conversationReads.push({ collection, filter });
+        return filter?.id === CONVERSATION ? { messages: stored } : null;
+      }),
+      updateOne: vi.fn().mockResolvedValue({ modifiedCount: 0 }),
+      deleteOne: vi.fn().mockResolvedValue({ deletedCount: 0 }),
+    })) as any);
+
+    provider.generateTextStream
+      .mockImplementationOnce(async function* () {
+        yield { type: "toolCall", name: "execute_shell", args: { command: INJECTED_COMMAND }, id: "call-shell" };
+        yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
+      })
+      .mockImplementationOnce(async function* () {
+        yield "Not run.";
+        yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
+      });
+    try {
+      await run({ autoApprove: true }, sentHistory);
+    } finally {
+      vi.mocked(MongoWrapper.getCollection).mockImplementation(
+        defaultCollection ??
+          ((() => ({
+            findOne: vi.fn().mockResolvedValue(null),
+            updateOne: vi.fn().mockResolvedValue({ modifiedCount: 0 }),
+            deleteOne: vi.fn().mockResolvedValue({ deletedCount: 0 }),
+          })) as any),
+      );
+    }
+
+    const [card] = emitted.filter((event) => event.type === "approval_required");
+    expect(card).toMatchObject({
+      toolCallId: "call-shell",
+      alwaysAsks: true,
+      // The source names the page: the tool message is paired with its call.
+      untrustedText: { excerpt: INJECTED_COMMAND, source: `read_web_page ${PAGE_URL}` },
+    });
+    expect(executedToolNames()).toEqual([]);
+    // Read as its owner, by the conversation's id.
+    expect(conversationReads).toContainEqual({
+      collection: COLLECTIONS.MODEL_CONVERSATIONS,
+      filter: { id: CONVERSATION, project: "taint-project", username: "rodrigo" },
+    });
   });
 
   it("the check is off at security.taintMinimumCharacters = 0", async () => {

@@ -329,6 +329,22 @@ function messageText(message: ProvenanceMessage): unknown {
     : message.content;
 }
 
+/**
+ * A result held as JSON text (a stored `tool` message, a display message's
+ * result) as the value it encodes: serialized, a quoted or multi-line
+ * command is broken at every escape.
+ */
+function decodedResult(result: unknown): unknown {
+  if (typeof result !== "string") return result;
+  const trimmed = result.trimStart();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return result;
+  try {
+    return JSON.parse(result);
+  } catch {
+    return result;
+  }
+}
+
 /** Add one tool call's result, when the tool returns untrusted text. */
 export function addUntrustedToolResult(
   spans: UntrustedSpans,
@@ -339,20 +355,23 @@ export function addUntrustedToolResult(
   if (!name || result === undefined || result === null) return;
   const label = toolResultProvenance(name, (args ?? null) as Record<string, unknown> | null);
   if (label.trust !== "untrusted") return;
-  spans.add(result, toolLabel(name, args));
+  spans.add(decodedResult(result), toolLabel(name, args));
 }
 
 /**
  * Add everything untrusted a transcript holds: results of tools that return
- * third-party text (inside assistant `toolCalls`, or as `tool` messages),
- * external inputs and other untrusted notices. Works on the loop's messages
- * and on the history a client sends alike.
+ * third-party text (inside assistant `toolCalls`, or as `tool` messages —
+ * paired with their call, which names the source), external inputs and
+ * other untrusted notices. Works on the loop's messages, on the history a
+ * client sends and on a stored transcript alike.
  */
 export function addUntrustedMessages(spans: UntrustedSpans, messages: readonly ProvenanceMessage[]): void {
+  const callArgs = new Map<string, unknown>();
   for (const message of messages) {
     if (!message || typeof message !== "object") continue;
     if (message.role === "assistant" && Array.isArray(message.toolCalls)) {
       for (const toolCall of message.toolCalls as ToolCallLike[]) {
+        if (typeof toolCall?.id === "string") callArgs.set(toolCall.id, toolCall.args);
         addUntrustedToolResult(
           spans,
           typeof toolCall?.name === "string" ? toolCall.name : null,
@@ -361,7 +380,8 @@ export function addUntrustedMessages(spans: UntrustedSpans, messages: readonly P
         );
       }
     } else if (message.role === "tool") {
-      addUntrustedToolResult(spans, typeof message.name === "string" ? message.name : null, null, message.content);
+      const args = typeof message.tool_call_id === "string" ? callArgs.get(message.tool_call_id) : null;
+      addUntrustedToolResult(spans, typeof message.name === "string" ? message.name : null, args, message.content);
     } else if (message.role === "user") {
       const source = untrustedMessageSource(message);
       if (source) spans.add(messageText(message), source);
