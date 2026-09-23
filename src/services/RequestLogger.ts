@@ -99,6 +99,11 @@ export interface LogParams {
   cacheTelemetry?: CacheTelemetryRecord | null;
   /** The tools this agent iteration ran — their own durations and outcomes. */
   toolExecutions?: ToolExecutionRecord[] | null;
+  /**
+   * The provider reported no usage; the token counts (and so the cost) are
+   * the harness's estimate (BaseAgenticHarness.estimateMissingUsage).
+   */
+  usageEstimated?: boolean;
 }
 
 /** Row field for the iteration's tool executions — written only when there are any. */
@@ -106,6 +111,13 @@ function toolExecutionRowFields({
   toolExecutions,
 }: LogParams): Record<string, unknown> {
   return toolExecutions && toolExecutions.length > 0 ? { toolExecutions } : {};
+}
+
+/** Row field marking estimated usage — written only when it is one. */
+function usageEstimateRowFields({
+  usageEstimated,
+}: LogParams): Record<string, unknown> {
+  return usageEstimated ? { usageEstimated: true } : {};
 }
 
 /** Row fields for prompt-cache telemetry — written only when present. */
@@ -367,6 +379,7 @@ const RequestLogger = {
         ...(physicalBatchSize != null && { physicalBatchSize }),
         ...cacheTelemetryRowFields(cacheTelemetryParams),
         ...toolExecutionRowFields(cacheTelemetryParams),
+        ...usageEstimateRowFields(cacheTelemetryParams),
         status: SYSTEM_STATUSES.COMPLETED,
       });
       await db.collection(COLLECTION).insertOne(document);
@@ -425,6 +438,7 @@ const RequestLogger = {
     firstDivergenceIndex = null,
     cacheTelemetry = null,
     toolExecutions = null,
+    usageEstimated = false,
   }: LogChatGenerationParams) {
     // Build synthetic message array for computeModalities (same function used by conversations)
     const syntheticMessages = [
@@ -546,6 +560,7 @@ const RequestLogger = {
       firstDivergenceIndex,
       cacheTelemetry,
       toolExecutions,
+      usageEstimated,
     });
   },
   /**
@@ -854,6 +869,7 @@ const RequestLogger = {
         rateLimits,
         ...cacheTelemetryRowFields(fullPayload),
         ...toolExecutionRowFields(fullPayload),
+        ...usageEstimateRowFields(fullPayload),
       });
 
       if (agentConversationId)
