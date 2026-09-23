@@ -5,7 +5,8 @@ import type { Capability } from "./types.ts";
  *
  * The rules live in Mongo behind `/permissions/rules`, not in a file an
  * agent could be denied write access to, so the protection is on the ways a
- * tool call could reach them: the REST routes (rules, approvals, custom-agent
+ * tool call could reach them: the REST routes (rules, approvals, answers and
+ * mid-turn input — which speak as the user —, goals and budgets, custom-agent
  * policies, the settings keys that relax gating), the collections, and the
  * settings page a browser tool could click through.
  *
@@ -30,7 +31,12 @@ interface ProtectedTarget {
 const PROTECTED_TARGETS: ProtectedTarget[] = [
   { name: "permission rules API", patterns: [/\/permissions\/(rules|mode|settings)\b/i] },
   { name: "permission collections", patterns: [/\bpermission_(rules|decisions)\b/i] },
-  { name: "approval endpoint", patterns: [/\/agent\/approve\b/i] },
+  { name: "approval endpoint", patterns: [/\/(agent|conversation)\/approve\b/i] },
+  // Answering its own question, or posting to its own turn as the user,
+  // would speak with the user's authority (external/ExternalInput).
+  { name: "answer and input endpoints", patterns: [/\/(agent|conversation)\/(answer|input)\b/i] },
+  // A goal's capabilities and a turn's budget are the user's to change.
+  { name: "goal and budget endpoints", patterns: [/\/conversations\/[^/\s"'`]+\/(goal|budget)\b/i] },
   { name: "custom agent policies", patterns: [/\/custom-agents\b/i, /\bpolicies\b/i] },
   {
     // An HTTP origin in front of `/settings`, so a local `…/settings.json`
@@ -38,7 +44,7 @@ const PROTECTED_TARGETS: ProtectedTarget[] = [
     name: "approval settings",
     patterns: [
       /(https?:\/\/|localhost|127\.0\.0\.1|:\d{2,5})[^\s"'`]*\/settings\b/i,
-      /\b(permissions?|autoApprove|critic(Provider|Model)|classifier(Provider|Model))\b/i,
+      /\b(permissions?|autoApprove|critic(Provider|Model)|classifier(Provider|Model)|taintMinimumCharacters)\b/i,
     ],
   },
   { name: "permission settings page", patterns: [/[?&]section=permissions?\b/i] },

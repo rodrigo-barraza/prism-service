@@ -7,8 +7,51 @@ import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { PROVIDERS } from "#src/constants";
 import { PERMISSION_MODES, isPermissionMode } from "#src/services/permissions/PermissionModes";
 import { MODELS } from "#src/config";
+import { IDENTITY_HEADERS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import {
+  LiveCapabilityScopes,
+  declarationOfScope,
+  narrowScope,
+  parseCapabilityDeclaration,
+  scopeFromDeclaration,
+  type CapabilityDeclaration,
+  type CapabilityScope,
+} from "#src/services/permissions/CapabilityScope";
+import {
+  externalOriginOfRequest,
+  requireUserAuthority,
+} from "#src/middleware/ExternalAuthority";
 
 const router = express.Router();
+
+/**
+ * The scope of the run a request comes from, when one does: tools-service
+ * forwards the calling run's `x-conversation-id` (its loop key), so a task
+ * a narrowed sub-agent schedules keeps the narrowing (CapabilityScope).
+ */
+function callerScopeOf(req: Request): CapabilityScope | null {
+  const header = req.headers?.[IDENTITY_HEADERS.conversationId];
+  return LiveCapabilityScopes.current(typeof header === "string" ? header : null);
+}
+
+/**
+ * A new task's `capabilities`: what the request declares, narrowed by the
+ * scope of the run that asked. `undefined` when neither says anything; an
+ * error when the declaration is malformed (a typo in "no network" must not
+ * schedule with network).
+ */
+function taskCapabilities(
+  req: Request,
+  declared: unknown,
+): { capabilities?: CapabilityDeclaration | null } | { error: string } {
+  const parsed = parseCapabilityDeclaration(declared);
+  if (!parsed.ok) return { error: `Invalid capabilities: ${parsed.error}` };
+  const callerScope = callerScopeOf(req);
+  if (!callerScope && declared === undefined) return {};
+  return {
+    capabilities: declarationOfScope(narrowScope(scopeFromDeclaration(parsed.declaration), callerScope)),
+  };
+}
 
 /**
  * GET /scheduled-tasks
@@ -64,6 +107,8 @@ router.get(
  */
 router.post(
   "/",
+  // Scheduling an agent run is the user's: a relay cannot (ExternalAuthority).
+  requireUserAuthority("schedule a task"),
   asyncHandler(async (req: Request, res: Response) => {
     const project: string =
       typeof req.project === "string" ? req.project : "direct";
@@ -85,6 +130,7 @@ router.post(
       toolConfig,
       conversationId,
       permissionMode,
+      capabilities,
     } = req.body;
 
     if (permissionMode != null && !isPermissionMode(permissionMode)) {
@@ -92,6 +138,8 @@ router.post(
         error: `permissionMode must be one of ${PERMISSION_MODES.join(", ")}`,
       });
     }
+    const scoped = taskCapabilities(req, capabilities);
+    if ("error" in scoped) return res.status(400).json({ error: scoped.error });
 
     const finalProvider = provider || PROVIDERS.ANTHROPIC;
     const finalModel = model || MODELS.SONNET_45.name;
@@ -118,6 +166,7 @@ router.post(
         recurrenceRule,
         toolConfig,
         ...(permissionMode != null && { permissionMode }),
+        ...(scoped.capabilities !== undefined && { capabilities: scoped.capabilities }),
         // Optional target conversation — the task then continues it.
         conversationId:
           typeof conversationId === "string" && conversationId.trim()
@@ -148,6 +197,7 @@ router.post(
  */
 router.patch(
   "/:id",
+  requireUserAuthority("change a scheduled task"),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const project: string =
@@ -155,7 +205,14 @@ router.patch(
     const username: string =
       typeof req.username === "string" ? req.username : "system";
     const { profileId } = resolveScope(req);
-    const updates = req.body;
+    const updates = { ...(req.body ?? {}) };
+    if (updates.capabilities !== undefined) {
+      const parsed = parseCapabilityDeclaration(updates.capabilities);
+      if (!parsed.ok) return res.status(400).json({ error: `Invalid capabilities: ${parsed.error}` });
+      updates.capabilities = declarationOfScope(scopeFromDeclaration(parsed.declaration));
+    }
+    // From inside a narrowed run, a change can only add restrictions.
+    const callerScope = callerScopeOf(req);
 
     try {
       const updatedTask = await ScheduledTaskService.updateTask(
@@ -164,6 +221,7 @@ router.patch(
         username,
         updates,
         profileId,
+        { callerScope },
       );
       res.json(updatedTask);
     } catch (error: unknown) {
@@ -183,6 +241,7 @@ router.patch(
  */
 router.delete(
   "/:id",
+  requireUserAuthority("delete a scheduled task"),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const project: string =
@@ -211,6 +270,10 @@ router.delete(
 /**
  * POST /scheduled-tasks/:id/trigger
  * Triggers a scheduled task manually in the background immediately.
+ *
+ * The webhook lane: `payload` is whoever fired the trigger speaking, so the
+ * run reads it as external input (source `webhook`, or the relay's —
+ * ExternalAuthority), beside the task's own prompt and never inside it.
  */
 router.post(
   "/:id/trigger",
@@ -230,6 +293,7 @@ router.post(
         username,
         payload,
         profileId,
+        externalOriginOfRequest(req),
       );
       res.json(result);
     } catch (error: unknown) {

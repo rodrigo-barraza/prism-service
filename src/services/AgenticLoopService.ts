@@ -124,6 +124,12 @@ export default class AgenticLoopService {
       });
     }
 
+    // What the run may do at all (a sub-agent's spawn, a scheduled task),
+    // as a live handle a goal's continuation can narrow further — and the
+    // untrusted text the turn has seen, rebuilt from its transcript, for the
+    // taint check. Both in memory only (CapabilityScope, UntrustedSpans).
+    await AgenticLoopService.openRunSafety(context);
+
     // 1. Resolve tools (passing agentConversationId so dynamicEnabledTools is merged)
     let resolvedTools = await AgenticToolResolver.resolve({
       options,
@@ -388,11 +394,14 @@ export default class AgenticLoopService {
     // What it accepts is kept durably until the turn ends (TurnInputStore).
     TurnInputMailbox.open(conversationId, decisionOwnerOf(context));
     if (context.resume) await AgenticLoopService.reopenResumedTurn(context, loopKey);
+    // A task this run schedules inherits its scope (ScheduledTasksRoutes).
+    const liveScope = await AgenticLoopService.registerLiveScope(context, loopKey);
     try {
       return await harness.run();
     } finally {
       recordAgentTurnOutcome(turnSpan, state);
       permissionModeCleanup?.();
+      liveScope?.();
 
       // Clean up in-memory cache keyed by agentConversationId (keeps MongoDB state for next turn)
       ToolContext.cleanupInMemory(resolvedAgentConversationId);
@@ -430,6 +439,71 @@ export default class AgenticLoopService {
 
       // Nothing is left to re-drive: the turn ended in this process.
       await endTurnRun(context);
+    }
+  }
+
+  /**
+   * The run's capability scope handle and its taint registry.
+   *
+   * `_capabilityScope` arrives as a plain scope from whoever started the run
+   * (the orchestrator for a sub-agent, the scheduler for a task) and becomes
+   * a CapabilityScopeHandle the goal gate can narrow while the agent works
+   * on its own. `_untrustedSpans` arrives as the PARENT's registry for a
+   * sub-agent; the turn gets its own, seeded from the messages it starts
+   * with and chained to the parent's. A value a request body smuggled in is
+   * not an instance and is replaced.
+   */
+  static async openRunSafety(context: AgenticContext): Promise<void> {
+    const { options } = context;
+    const [{ CapabilityScopeHandle, currentScope }, { UntrustedSpans, openUntrustedSpans }] =
+      await Promise.all([
+        import("./permissions/CapabilityScope.ts"),
+        import("./permissions/UntrustedSpans.ts"),
+      ]);
+    if (!(options._capabilityScope instanceof CapabilityScopeHandle)) {
+      options._capabilityScope = new CapabilityScopeHandle(currentScope(options._capabilityScope));
+    }
+    const parentSpans =
+      options._untrustedSpans instanceof UntrustedSpans ? options._untrustedSpans : null;
+    const minimumCharacters = await AgenticLoopService.taintMinimumCharacters();
+    if (minimumCharacters <= 0) {
+      options._untrustedSpans = undefined;
+      return;
+    }
+    options._untrustedSpans = openUntrustedSpans(context.messages ?? [], {
+      minimumCharacters,
+      parent: parentSpans,
+    });
+  }
+
+  /** Publish the run's scope by its loop key while it runs; returns the unregister. */
+  static async registerLiveScope(
+    context: AgenticContext,
+    loopKey: string,
+  ): Promise<(() => void) | null> {
+    const { CapabilityScopeHandle, LiveCapabilityScopes } = await import(
+      "./permissions/CapabilityScope.ts"
+    );
+    const handle = context.options._capabilityScope;
+    if (!loopKey || !(handle instanceof CapabilityScopeHandle)) return null;
+    LiveCapabilityScopes.register(loopKey, handle);
+    return () => LiveCapabilityScopes.unregister(loopKey, handle);
+  }
+
+  /** Settings → security.taintMinimumCharacters (24 unless set; 0 = off). */
+  static async taintMinimumCharacters(): Promise<number> {
+    const { DEFAULT_TAINT_MINIMUM_CHARACTERS } = await import("./permissions/UntrustedSpans.ts");
+    try {
+      const { default: SettingsService } = await import("./SettingsService.ts");
+      const security = (await SettingsService.getSection("security")) as
+        | { taintMinimumCharacters?: unknown }
+        | undefined;
+      const configured = security?.taintMinimumCharacters;
+      return typeof configured === "number" && Number.isFinite(configured) && configured >= 0
+        ? configured
+        : DEFAULT_TAINT_MINIMUM_CHARACTERS;
+    } catch {
+      return DEFAULT_TAINT_MINIMUM_CHARACTERS;
     }
   }
 

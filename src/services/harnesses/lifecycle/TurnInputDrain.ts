@@ -9,6 +9,9 @@ import {
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import logger from "#src/utils/logger";
 import { resolveLoopKey } from "#src/services/LoopKey";
+import { externalInputMessageFields } from "#src/services/external/ExternalInput";
+import { recordUntrustedInput } from "#src/services/permissions/UntrustedSpans";
+import { CapabilityScopeHandle, GOAL_SCOPE_KEY } from "#src/services/permissions/CapabilityScope";
 
 import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type {
@@ -43,6 +46,14 @@ import type {
  * so it is injected as a system-role <hook-context> message with no
  * `_turnInput` marker (it must never render as a user bubble), and it is
  * acknowledged with a `hook_context_applied` status instead of `turn_input`.
+ *
+ * `external` (a webhook, a Discord user who is not the owner, an MCP server,
+ * a sub-agent's message) is user-role on the wire — no provider takes free
+ * text in another role but `system`, which would raise its authority — but
+ * never the user's: its content is the <external-input> envelope that names
+ * the source and gives it tool-level authority, the message carries its
+ * origin (`_external`, and on the `_turnInput` marker for viewers), and its
+ * text joins the turn's untrusted spans (permissions/UntrustedSpans).
  */
 
 /** Status acknowledging an async hook's context reached the model. */
@@ -65,6 +76,22 @@ export function buildTurnInputMessage(entry: TurnInputEntry): ConversationMessag
       // Not a bubble (no `_turnInput`), but still recognisable as delivered
       // when a restart asks which entries reached the turn (TurnInputStore).
       _turnInputId: entry.id,
+    } as ConversationMessage;
+  }
+  if (entry.kind === "external" && entry.origin) {
+    return {
+      role: "user",
+      ...(entry.images && entry.images.length > 0 ? { images: entry.images } : {}),
+      ...(entry.meta || {}),
+      // The model reads the producer's text in the envelope; viewers get the
+      // sender's own words (`meta.rawContent`, else the same text).
+      ...externalInputMessageFields(entry.origin, entry.text, displayTextOf(entry)),
+      [TURN_INPUT.MESSAGE_KEY]: {
+        id: entry.id,
+        kind: entry.kind,
+        receivedAt: entry.receivedAt,
+        ...entry.origin,
+      },
     } as ConversationMessage;
   }
   const base: ConversationMessage = {
@@ -138,7 +165,17 @@ export function drainTurnInput(
   if (entries.length === 0) return 0;
 
   for (const entry of entries) {
-    currentMessages.push(buildTurnInputMessage(entry));
+    const message = buildTurnInputMessage(entry);
+    currentMessages.push(message);
+    // The user is back at the wheel: the goal's autonomous-work narrowing
+    // no longer applies (lifecycle/GoalGate pauses the goal at the next end).
+    if (entry.kind === "user_update" || entry.kind === "question_answer") {
+      const scope = context.options?._capabilityScope;
+      if (scope instanceof CapabilityScopeHandle) scope.release(GOAL_SCOPE_KEY);
+    }
+    // What the turn now holds from outside it — a check on later tool
+    // arguments compares against it (permissions/UntrustedSpans).
+    recordUntrustedInput(context, message);
     acknowledgeTurnInput(entry, state, context, boundary);
   }
   logger.info(
@@ -174,6 +211,8 @@ function acknowledgeTurnInput(
     kind: entry.kind,
     content: displayTextOf(entry),
     ...(entry.images && entry.images.length > 0 ? { images: entry.images } : {}),
+    // An external input names its source, so a viewer never shows it as the user.
+    ...(entry.kind === "external" && entry.origin ? entry.origin : {}),
     boundary,
     iteration: state.iterations,
   });

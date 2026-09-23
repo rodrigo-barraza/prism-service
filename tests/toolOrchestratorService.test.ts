@@ -864,6 +864,10 @@ describe("ToolOrchestratorService", () => {
         criticModel: undefined,
         maxCostDollars: undefined,
         sharedCostBudget: undefined,
+        // What the parent may do at all (prompt 22 L3) — nothing narrowed
+        // here — and its untrusted text, which a sub-agent's registry sees.
+        capabilityScope: null,
+        untrustedSpans: undefined,
         // The conversation's routing preset (none here).
         routingPreset: null,
       });
@@ -955,6 +959,8 @@ describe("ToolOrchestratorService", () => {
         scope: { username: "rodrigo", profileId: "work" },
         conversationId: "conversation-1",
         project: "coding",
+        // The server's notifications during the call reach this turn (prompt 22 L3).
+        turnLoopKey: "conversation-1",
       });
     });
 

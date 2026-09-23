@@ -13,7 +13,7 @@
  *   2. wait_for_tasks returns both sub-agents, and the team completion is
  *      not delivered a second time.
  *   3. A sub-agent's report_progress reaches the parent's running turn
- *      exactly once, as an agent_message with sub-agent authority.
+ *      exactly once, as external input from the sub-agent (prompt 22 L3).
  *   4. A turn that ends with the team still running counts it once in
  *      pendingBackgroundTasks; the auto-response that later delivers the
  *      completion pays it back — the counter returns to zero.
@@ -479,7 +479,7 @@ describe("non-blocking sub-agent dispatch — the parent keeps working (real har
     expect(pendingBackgroundTasks).toBe(0);
   });
 
-  it("3. a sub-agent's report_progress reaches the running parent exactly once, as an agent_message", async () => {
+  it("3. a sub-agent's report_progress reaches the running parent exactly once, as external input", async () => {
     const { harness, emit, seenMessages, iterations } = buildParentHarness([
       { kind: "tool", toolName: "create_subagent", args: { description: "Alpha research", prompt: "Look up A" } },
       { kind: "tool", toolName: "search_web", args: { query: "meanwhile" } },
@@ -512,20 +512,23 @@ describe("non-blocking sub-agent dispatch — the parent keeps working (real har
 
     expect(iterations()).toBe(3);
     const progressMessages = seenMessages[2].filter(
-      (message) => message._notificationSource === NOTIFICATION_SOURCES.SUB_AGENT_PROGRESS,
+      (message) => message._notificationSource === NOTIFICATION_SOURCES.EXTERNAL_INPUT,
     );
     expect(progressMessages).toHaveLength(1);
     const [progress] = progressMessages;
     expect(progress.content).toContain("Found 3 of 5 sources");
     expect(progress.content).toContain("not from the user");
+    expect(progress.content).toMatch(/^<external-input>/);
     expect(progress._authority).toBe("sub-agent");
-    expect(progress._turnInput).toMatchObject({ kind: "agent_message" });
+    expect(progress._turnInput).toMatchObject({ kind: "external", source: "subagent" });
+    expect((progress as Record<string, unknown>)._external).toMatchObject({ source: "subagent" });
 
     const turnInputEvents = emit.mock.calls
       .map((call) => call[0])
       .filter((event) => event.type === TURN_INPUT.EVENT_TYPE);
     expect(turnInputEvents).toHaveLength(1);
-    expect(turnInputEvents[0].kind).toBe("agent_message");
+    expect(turnInputEvents[0].kind).toBe("external");
+    expect(turnInputEvents[0].source).toBe("subagent");
     // Viewers get the child's words; the model gets the tagged version.
     expect(turnInputEvents[0].content).toBe("Found 3 of 5 sources");
     expect(progress.rawContent).toBe("Found 3 of 5 sources");

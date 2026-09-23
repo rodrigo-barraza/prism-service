@@ -24,6 +24,14 @@ import {
 import { modeOf, type PermissionModeHandle } from "./permissions/PermissionModeState.ts";
 import { findProtectedPathWrite } from "./permissions/ProtectedPaths.ts";
 import { readerFetchCall, type ReaderFetchCall } from "./reader/ReaderSource.ts";
+import {
+  capabilityScopeDenialReason,
+  currentScope,
+  scopeDenial,
+  type CapabilityScope,
+  type CapabilityScopeHandle,
+} from "./permissions/CapabilityScope.ts";
+import { isTaintSensitive, type UntrustedSpans } from "./permissions/UntrustedSpans.ts";
 import type {
   Capability,
   PermissionDecision,
@@ -194,7 +202,7 @@ export interface ApprovalResult {
    */
   isDenied?: boolean;
   /** Which layer denied (set on every denial). */
-  deniedBy?: "rule" | "classifier" | "hook" | "user" | "mode";
+  deniedBy?: "rule" | "classifier" | "hook" | "user" | "mode" | "scope";
   tier: ApprovalTier;
   tierLabel: string;
   reason: string;
@@ -213,6 +221,8 @@ export interface ApprovalResult {
   alwaysAsks?: boolean;
   /** The protected path an `alwaysAsks` write names. */
   protectedPath?: string;
+  /** The untrusted text an `alwaysAsks` call carries, and where the turn read it. */
+  untrustedSpan?: { excerpt: string; source: string };
   /**
    * `auto` mode: the classifier decides this call. The engine is synchronous
    * and the classifier is a model, so the ApprovalGate runs it and replaces
@@ -253,6 +263,18 @@ export interface AutoApprovalEngineOptions {
   permissionMode?: PermissionModeHandle | PermissionMode | null;
   /** The run's workspace root — where `acceptEdits` lets edits run. */
   workspaceRoot?: string | null;
+  /**
+   * The run's capability scope (permissions/CapabilityScope) — fixed at
+   * spawn or schedule time, narrowed live by a goal's continuation. A tool
+   * carrying a capability it takes away is refused.
+   */
+  capabilityScope?: CapabilityScopeHandle | CapabilityScope | null;
+  /**
+   * The untrusted text the turn has seen (permissions/UntrustedSpans), read
+   * on every check: a shell, file-write or network-write call whose
+   * arguments carry a span of it asks.
+   */
+  untrustedSpans?: UntrustedSpans | null;
 }
 
 const POLICY_DECISION: Record<PolicyDecision, PermissionDecision> = {
@@ -285,6 +307,8 @@ export default class AutoApprovalEngine {
   private permissionRules: PermissionRuleSet | null;
   private permissionMode: PermissionModeHandle | PermissionMode | null;
   private workspaceRoot: string | null;
+  private capabilityScope: CapabilityScopeHandle | CapabilityScope | null;
+  private untrustedSpans: UntrustedSpans | null;
 
   constructor(options: AutoApprovalEngineOptions = {}) {
     this.fullAuto = options.fullAuto || false;
@@ -294,6 +318,8 @@ export default class AutoApprovalEngine {
     this.permissionMode = options.permissionMode ?? null;
     this.workspaceRoot =
       options.workspaceRoot ?? options.permissionRules?.context.workspaceRoot ?? null;
+    this.capabilityScope = options.capabilityScope ?? null;
+    this.untrustedSpans = options.untrustedSpans ?? null;
   }
 
   /** The mode calls are judged in right now. */
@@ -399,12 +425,18 @@ export default class AutoApprovalEngine {
    *
    *   1. Self-protection — built in; an agent cannot reach its own
    *      permissions. Nothing below relaxes it.
+   *   1b. Capability scope — a tool carrying a capability the run was
+   *      started without (a sub-agent spawned with `network: false`, a
+   *      scheduled task, a goal's continuation) is refused. Final.
    *   2. Deny — from permission rules or agent policies. Final in every
    *      mode, full auto and sub-agents included.
    *   3. The mode's refusals — `plan` refuses anything that is not
    *      read-only; a run nobody watches refuses tools that wait on a person.
-   *   4. Protected paths — a write to one asks. Nothing below answers it:
-   *      not an allow rule, not full auto, not `bypass`.
+   *   4. Protected paths and untrusted text — a write to a protected path
+   *      asks, and so does a shell, file-write or network-write call whose
+   *      arguments carry a span of untrusted text the turn has read (the
+   *      taint check, UntrustedSpans). Nothing below answers either: not an
+   *      allow rule, not full auto, not `bypass`.
    *   5. Ask/allow — rules and policies together: deny > ask > allow across
    *      both layers, so a persona's APPROVE cannot undo a user's ASK. Full
    *      auto (the legacy "approve all") answers a rule's "ask" with yes;
@@ -499,6 +531,20 @@ export default class AutoApprovalEngine {
       };
     }
 
+    const scope = currentScope(this.capabilityScope);
+    const outOfScope = scope ? scopeDenial(scope, capabilities) : null;
+    if (scope && outOfScope) {
+      return {
+        ...base,
+        isApproved: false,
+        isDenied: true,
+        deniedBy: "scope",
+        reason: capabilityScopeDenialReason(toolCall.name, outOfScope, scope),
+        layer: "capability_scope",
+        rule: outOfScope,
+      };
+    }
+
     const verdicts: PermissionVerdict[] = [];
     if (this.permissionRules) {
       const evaluation = this.permissionRules.explain(call, capabilities);
@@ -566,6 +612,20 @@ export default class AutoApprovalEngine {
         rule: protectedWrite.target,
         alwaysAsks: true,
         protectedPath: protectedWrite.path,
+      });
+    }
+
+    const tainted =
+      this.untrustedSpans && isTaintSensitive(capabilities) ? this.untrustedSpans.find(call.args) : null;
+    if (tainted) {
+      return ask({
+        ...base,
+        reason:
+          `untrusted text in the arguments: "${tainted.excerpt}" also appears in ${tainted.source}, ` +
+          `which this conversation read — a call that carries words from untrusted content always asks`,
+        layer: "taint",
+        alwaysAsks: true,
+        untrustedSpan: { excerpt: tainted.excerpt, source: tainted.source },
       });
     }
 

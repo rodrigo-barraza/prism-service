@@ -5,6 +5,12 @@ import logger from "#src/utils/logger";
 import WebhookEventBus, { NEEDS_YOU_WEBHOOK_EVENTS } from "#src/services/WebhookEventBus";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { PROTOCOL_EVENT_TYPES } from "#src/protocol/events";
+import {
+  declarationOfScope,
+  parseCapabilityDeclaration,
+  scopeFromDeclaration,
+  type CapabilityDeclaration,
+} from "#src/services/permissions/CapabilityScope";
 
 /**
  * ConversationGoalService — the persistent objective of a conversation.
@@ -150,6 +156,12 @@ export interface ConversationGoal {
   /** Revisions the verifier may ask for before the goal pauses. */
   maxIterations?: number;
   budget?: ConversationGoalBudget;
+  /**
+   * Capabilities the agent goes without while it works on the goal on its
+   * own — after the verifier sends it back (lifecycle/GoalGate). Declared
+   * with the goal (permissions/CapabilityScope).
+   */
+  capabilities?: CapabilityDeclaration;
   progress: ConversationGoalProgress;
   /** The current obstacle, if any. */
   blockedOn?: string | null;
@@ -205,6 +217,8 @@ export interface GoalSetInput {
   stepRubric?: unknown;
   verifier?: unknown;
   maxIterations?: unknown;
+  /** `{ network: false }` — what the agent goes without while continuing on its own. */
+  capabilities?: unknown;
 }
 
 export interface GoalPatch {
@@ -217,6 +231,8 @@ export interface GoalPatch {
   /** null = back to the default verifier. */
   verifier?: unknown;
   maxIterations?: unknown;
+  /** null = no narrowing while continuing. */
+  capabilities?: unknown;
   status?: ConversationGoalStatus;
   /** With status `paused`: why (default `user`). */
   pauseReason?: GoalPauseReason;
@@ -353,6 +369,25 @@ export function normalizeVerifierModel(value: unknown): GoalVerifierModel | unde
   const provider = typeof raw.provider === "string" ? raw.provider.trim() : "";
   const model = typeof raw.model === "string" ? raw.model.trim() : "";
   return provider && model ? { provider, model } : undefined;
+}
+
+/**
+ * A goal's declared capabilities, only what narrows (`false`); undefined
+ * for none. A malformed declaration throws: a typo in "no network" must not
+ * leave the goal's work with network (the routes answer 400).
+ */
+export function normalizeGoalCapabilities(value: unknown): CapabilityDeclaration | undefined {
+  const parsed = parseCapabilityDeclaration(value);
+  if (!parsed.ok) throw new InvalidGoalCapabilitiesError(parsed.error);
+  return declarationOfScope(scopeFromDeclaration(parsed.declaration)) ?? undefined;
+}
+
+/** A goal's `capabilities` is not a valid declaration. */
+export class InvalidGoalCapabilitiesError extends Error {
+  constructor(detail: string) {
+    super(`Invalid capabilities: ${detail}`);
+    this.name = "InvalidGoalCapabilitiesError";
+  }
 }
 
 export function normalizeMaxIterations(value: unknown): number | undefined {
@@ -532,6 +567,11 @@ export function applyGoalPatch(
   if (patch.maxIterations !== undefined) {
     const maxIterations = normalizeMaxIterations(patch.maxIterations);
     if (maxIterations) after.maxIterations = maxIterations;
+  }
+  if (patch.capabilities !== undefined) {
+    const capabilities = normalizeGoalCapabilities(patch.capabilities);
+    if (capabilities) after.capabilities = capabilities;
+    else delete after.capabilities;
   }
   if (
     !sameCriteria(before.rubric, after.rubric) ||
@@ -801,6 +841,7 @@ function buildGoal(
   const rubric = normalizeRubric(input.rubric);
   const stepRubric = normalizeRubric(input.stepRubric);
   const verifier = normalizeVerifierModel(input.verifier);
+  const capabilities = normalizeGoalCapabilities(input.capabilities);
   return {
     objective,
     ...(completionCriteria && { completionCriteria }),
@@ -810,6 +851,7 @@ function buildGoal(
     maxIterations:
       normalizeMaxIterations(input.maxIterations) ?? DEFAULT_GOAL_MAX_ITERATIONS,
     ...(budget && { budget }),
+    ...(capabilities && { capabilities }),
     progress: {
       summary: status === GOAL_STATUSES.PROPOSED ? "Proposed" : NOT_STARTED_SUMMARY,
       percent: 0,
