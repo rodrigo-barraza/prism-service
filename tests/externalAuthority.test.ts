@@ -26,7 +26,6 @@ import AutoApprovalEngine from "#src/services/AutoApprovalEngine";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import { checkAndWaitForApproval } from "#src/services/harnesses/lifecycle/ApprovalGate";
 import {
-  DISCORD_OWNER_IDS_ENV_VAR,
   EXTERNAL_SENDER_HEADER,
   EXTERNAL_SOURCE_HEADER,
   RELAY_PROJECTS_ENV_VAR,
@@ -168,11 +167,17 @@ describe("POST /agent/input from outside enters as `external`", () => {
   });
   afterEach(() => {
     TurnInputMailbox._clearAll();
-    delete process.env[DISCORD_OWNER_IDS_ENV_VAR];
     delete process.env[RELAY_PROJECTS_ENV_VAR];
   });
 
-  it("a Discord relay's follow-up is external input from its author", async () => {
+  /** A turn running as `username` of `project`, as the loop opens it (decisionOwnerOf). */
+  function runningTurnOf(project: string, username: string | null) {
+    TurnInputMailbox._clearAll();
+    TurnInputMailbox.open(CONVERSATION, { project, username });
+  }
+
+  it("a Discord relay's post into someone else's turn is external input from its author", async () => {
+    runningTurnOf("lupos", "alice");
     const response = await http
       .post("/agent/input")
       .set(DISCORD_RELAY)
@@ -186,16 +191,42 @@ describe("POST /agent/input from outside enters as `external`", () => {
     });
   });
 
-  it("Discord's owner typing keeps the user's authority (PRISM_DISCORD_OWNER_IDS)", async () => {
-    process.env[DISCORD_OWNER_IDS_ENV_VAR] = "111111111111111111, 123456789012345678";
+  // Lupos is agnostic — whoever talks is the user of their own reply — and
+  // folds a follow-up only into its author's own reply, posted as that
+  // reply's user. Nobody's id is special.
+  it("a follow-up the relay posts as the turn's own user joins as that user's update, whoever they are", async () => {
+    runningTurnOf("lupos", "mallory");
     const response = await http
       .post("/agent/input")
       .set(DISCORD_RELAY)
-      .send({ conversationId: CONVERSATION, text: discordEnvelope("123456789012345678", "Owner") });
+      .send({ conversationId: CONVERSATION, text: discordEnvelope("123456789012345678") });
     expect(response.body.kind).toBe("user_update");
     const [entry] = TurnInputMailbox.drain(CONVERSATION);
     expect(entry.kind).toBe("user_update");
     expect(entry.origin).toBeUndefined();
+  });
+
+  it("only as the turn's own user: another project's turn, no username, or a declared outside source stays external", async () => {
+    // The same name on a client's turn is not that user: a relay speaks only in its own project.
+    runningTurnOf("prism-chat", "mallory");
+    await http.post("/agent/input").set(DISCORD_RELAY).send({ conversationId: CONVERSATION, text: "hi there" });
+    expect(TurnInputMailbox.drain(CONVERSATION)[0].kind).toBe("external");
+
+    // No username is nobody's, even on a turn that has none.
+    runningTurnOf("lupos", null);
+    await http.post("/agent/input").set({ "x-project": "lupos" }).send({ conversationId: CONVERSATION, text: "hi there" });
+    expect(TurnInputMailbox.drain(CONVERSATION)[0].kind).toBe("external");
+
+    // A caller that declares its input external is taken at its word.
+    runningTurnOf("lupos", "mallory");
+    await http
+      .post("/agent/input")
+      .set({ ...DISCORD_RELAY, [EXTERNAL_SOURCE_HEADER]: "discord" })
+      .send({ conversationId: CONVERSATION, text: discordEnvelope("123456789012345678") });
+    expect(TurnInputMailbox.drain(CONVERSATION)[0]).toMatchObject({
+      kind: "external",
+      origin: { source: "discord", sender: "Mallory (123456789012345678)" },
+    });
   });
 
   it("a webhook bridge names itself; the user's own post is a steering update as before", async () => {

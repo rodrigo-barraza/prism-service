@@ -33,7 +33,7 @@ mailbox kind, **`external`**, with `origin: {source, sender?}`:
 | source | what it is | enters through |
 |---|---|---|
 | `subagent` | a sub-agent's `report_progress`; its output in a completion notice | OrchestratorService |
-| `discord` | a follow-up from a Discord user who is not the owner | `POST /agent/input` from the Discord bot |
+| `discord` | a Discord message relayed into someone else's turn | `POST /agent/input` from the Discord bot, posted as another user |
 | `webhook` | a relay that says so; a trigger's payload | `POST /agent/input` with `x-prism-external-source`; `POST /scheduled-tasks/:id/trigger` |
 | `mcp` | an MCP server's log message (warning or above) during a call | MCPClientService |
 
@@ -71,9 +71,13 @@ pairs, default `lupos=discord`). Such a request:
   proposal's approve/decline), budgets (`PATCH …/budget`) and scheduled-task
   create/change/delete. Reads stay open.
 - posts to a running turn as `external` (`POST /agent/input` answers with
-  `kind`). A Discord message whose `author-id` is in
-  `PRISM_DISCORD_OWNER_IDS` (empty = nobody) keeps the user's authority: it is
-  the owner typing.
+  `kind`), unless a relay project posts it as that turn's own user (the same
+  project and username). Lupos is agnostic about who is talking: whoever
+  writes is the user of their own reply, and it folds a follow-up only into
+  the reply its author started, posted as that reply's user. So the
+  follow-up has the standing of the message that started the reply, and
+  nobody's id is special. A caller that declares its input external (the
+  explicit header) is always external.
 - starts a turn (`POST /agent`, `POST /conversation`) that runs unattended,
   with the body's `autoApprove` and `permissionMode` ignored. A webhook's
   trigger message (explicit header) is itself external input; the Discord

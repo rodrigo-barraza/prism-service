@@ -2,7 +2,7 @@
  * Prompt 22, Landing 3 — the external-input lane.
  *
  * Input from outside the conversation — a sub-agent, a webhook, a Discord
- * user who is not the owner, an MCP server — reaches a running turn as its
+ * message relayed into someone else's turn, an MCP server — reaches a running turn as its
  * own mailbox kind, `external`, with its source and sender. The model reads
  * it as a tool-output-like block; nothing that reads "the user's words"
  * (memory provenance, auto mode's classifier) takes it for the user's.

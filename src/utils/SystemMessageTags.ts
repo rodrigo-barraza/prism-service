@@ -77,9 +77,10 @@ export const SYSTEM_MESSAGE_TAGS = {
    */
   SUB_AGENT_PROGRESS: "subagent-progress",
   /**
-   * Input from outside the conversation — a webhook, a Discord user who is
-   * not the owner, an MCP server, a sub-agent (external/ExternalInput). It
-   * carries tool-level authority, never the user's.
+   * Input from outside the conversation — a webhook, a Discord message
+   * relayed into someone else's turn, an MCP server, a sub-agent
+   * (external/ExternalInput). It carries tool-level authority, never the
+   * user's.
    */
   EXTERNAL_INPUT: "external-input",
   /** The conversation's persistent goal (objective, progress, budget) injected alongside system context. */

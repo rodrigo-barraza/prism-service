@@ -12,7 +12,6 @@ import { TIMERS } from "#src/constants";
 import { handleQuestionAnswer } from "./QuestionAnswerHandler.ts";
 import {
   applyExternalTurnAuthority,
-  externalOriginOfRequest,
   relayedInputOrigin,
   requireUserAuthority,
 } from "#src/middleware/ExternalAuthority";
@@ -69,8 +68,9 @@ router.post(
  *
  * A relay's post (a webhook bridge, the Discord bot — ExternalAuthority)
  * enters as `external` input with its source and sender: tool-level
- * authority, never the user steering. Discord's owner typing on Discord
- * keeps the user's (PRISM_DISCORD_OWNER_IDS). The response's `kind` says
+ * authority, never the user steering — unless a relay project posts it as
+ * the running turn's own user (Lupos folding a follow-up into its author's
+ * own reply), which is that user steering. The response's `kind` says
  * which it became.
  */
 router.post(
@@ -86,8 +86,7 @@ router.post(
     }
 
     const inputText = typeof text === "string" ? text : "";
-    const relayed = externalOriginOfRequest(request);
-    const origin = relayed ? relayedInputOrigin(relayed, inputText) : null;
+    const origin = relayedInputOrigin(request, inputText, TurnInputMailbox.ownerOf(conversationId));
     const posted = TurnInputMailbox.post(conversationId, {
       ...(origin ? { kind: "external" as const, origin } : { kind: "user_update" as const }),
       text: inputText,

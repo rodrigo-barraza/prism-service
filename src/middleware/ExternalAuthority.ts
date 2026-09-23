@@ -28,10 +28,14 @@ import logger from "#src/utils/logger";
 // default `lupos=discord`, the Discord bot, whose every request carries a
 // Discord user's words). A relay needs no change to be recognised.
 //
-// Discord's owner keeps the user's authority for what they type themselves:
-// a Discord message whose `author-id` is in `PRISM_DISCORD_OWNER_IDS` (empty
-// = nobody) is posted to a running turn as the user's update. It still
-// cannot approve: nobody answers a card from Discord.
+// A relay project is agnostic about who is talking: on Discord, whoever
+// writes is the user of their own reply. Lupos posts a follow-up only into
+// the reply its author started, as that reply's user — so a relay's post
+// made as the running turn's own user (same project, same username) joins
+// as that user's update, the standing of the message that started the
+// turn. A post made as anyone else, and anything a caller declares
+// external, is external input. Either way it cannot approve: nobody
+// answers a card from a relay.
 //
 // This is not authentication (modernization item #1): a caller that lies
 // about its project is not stopped here. It is the lane a well-behaved relay
@@ -46,9 +50,6 @@ export const EXTERNAL_SENDER_HEADER = "x-prism-external-sender";
 /** `project=source` pairs of relays — every request from those projects is external. */
 export const RELAY_PROJECTS_ENV_VAR = "PRISM_EXTERNAL_RELAY_PROJECTS";
 export const DEFAULT_RELAY_PROJECTS = "lupos=discord";
-
-/** Discord user ids whose own messages keep the user's authority. Empty = nobody. */
-export const DISCORD_OWNER_IDS_ENV_VAR = "PRISM_DISCORD_OWNER_IDS";
 
 function headerValue(request: Request, name: string): string | null {
   const value = request.headers?.[name];
@@ -66,16 +67,6 @@ export function relayProjects(): Map<string, ExternalInputSource> {
     if (project && isExternalInputSource(source)) relays.set(project, source);
   }
   return relays;
-}
-
-/** The Discord owner ids (PRISM_DISCORD_OWNER_IDS). */
-export function discordOwnerIds(): Set<string> {
-  return new Set(
-    (process.env[DISCORD_OWNER_IDS_ENV_VAR] ?? "")
-      .split(",")
-      .map((id) => id.trim())
-      .filter(Boolean),
-  );
 }
 
 /**
@@ -106,16 +97,34 @@ export function discordAuthorOf(text: string): { id: string; name: string | null
   return { id, name };
 }
 
+/** Who runs a turn, as its mailbox knows it (TurnInputMailbox.ownerOf). */
+export interface TurnUser {
+  project?: string | null;
+  username?: string | null;
+}
+
 /**
- * How a relayed message enters a running turn: as the user's update when
- * it is Discord's owner typing, else as external input naming its sender.
+ * How a post enters the running turn: null when it is the turn's own user
+ * speaking — no relay at all, or a relay project posting as the turn's
+ * user (Lupos folding a follow-up into its author's own reply) — else its
+ * external origin, naming the Discord author when the text carries one.
  */
-export function relayedInputOrigin(origin: ExternalOrigin, text: string): ExternalOrigin | null {
+export function relayedInputOrigin(
+  request: Request,
+  text: string,
+  turnUser: TurnUser | null,
+): ExternalOrigin | null {
+  const origin = externalOriginOfRequest(request);
+  if (!origin) return null;
+  const declared = headerValue(request, EXTERNAL_SOURCE_HEADER) !== null;
+  const project = headerValue(request, IDENTITY_HEADERS.project);
+  const username = headerValue(request, IDENTITY_HEADERS.username);
+  if (!declared && turnUser && username && project === turnUser.project && username === turnUser.username) {
+    return null;
+  }
   if (origin.source !== "discord") return origin;
   const author = discordAuthorOf(text);
-  if (!author) return origin;
-  if (discordOwnerIds().has(author.id)) return null;
-  return externalOrigin("discord", author.name ? `${author.name} (${author.id})` : author.id);
+  return author ? externalOrigin("discord", author.name ? `${author.name} (${author.id})` : author.id) : origin;
 }
 
 /**
