@@ -57,7 +57,11 @@ export type PermissionLayer =
   /** A write to a protected path (ProtectedPaths.ts) — always asks. */
   | "protected_path"
   /** `auto` mode's classifier (AutoModeClassifier.ts) — allowed, denied or asked. */
-  | "classifier";
+  | "classifier"
+  /** The run's capability scope (CapabilityScope.ts) — a capability it was started without. */
+  | "capability_scope"
+  /** Untrusted text in the arguments (UntrustedSpans.ts) — always asks. */
+  | "taint";
 
 /** A stored rule, as the API returns it. */
 export interface PermissionRuleDocument {

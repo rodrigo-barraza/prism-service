@@ -66,6 +66,13 @@ export interface SettingsData {
   };
   security: {
     allowEnvFiles: boolean;
+    /**
+     * The taint check (permissions/UntrustedSpans): a shell, file-write or
+     * network-write call whose arguments share this many characters with
+     * untrusted text the turn has read asks for confirmation. 0 turns the
+     * check off; below 12 counts as 12.
+     */
+    taintMinimumCharacters?: number;
   };
   /**
    * Runaway caps on delegation, per root conversation
@@ -145,6 +152,7 @@ const DEFAULTS: SettingsData = {
   },
   security: {
     allowEnvFiles: false,
+    taintMinimumCharacters: 24,
   },
   subAgentCaps: {
     maxSpawnsPerConversation: ORCHESTRATOR.MAX_SPAWNS_PER_CONVERSATION,

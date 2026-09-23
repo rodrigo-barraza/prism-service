@@ -200,11 +200,95 @@ describe("the taint check in a real loop", () => {
     expect(cards[0]).toMatchObject({
       toolCallId: "call-shell",
       toolCall: { name: "execute_shell" },
-      requestedBy: "taint",
+      untrustedText: { excerpt: INJECTED_COMMAND, source: `read_web_page ${PAGE_URL}` },
       alwaysAsks: true,
     });
     expect(String(cards[0].reason)).toContain(INJECTED_COMMAND.slice(0, 30));
     // The person said no: the page's command never ran.
     expect(executedToolNames()).toEqual(["read_web_page"]);
+  });
+
+  it("where nobody can answer (an unattended run), the call is refused and the model is told why", async () => {
+    provider.generateTextStream
+      .mockImplementationOnce(async function* () {
+        yield { type: "toolCall", name: "read_web_page", args: { url: PAGE_URL }, id: "call-read" };
+        yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
+      })
+      .mockImplementationOnce(async function* () {
+        yield { type: "toolCall", name: "execute_shell", args: { command: INJECTED_COMMAND }, id: "call-shell" };
+        yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
+      })
+      .mockImplementationOnce(async function* () {
+        yield "Refused.";
+        yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
+      });
+
+    await run({ unattended: true, autoApprove: true });
+
+    expect(emitted.filter((event) => event.type === "approval_required")).toEqual([]);
+    expect(executedToolNames()).toEqual(["read_web_page"]);
+    const thirdRequest = provider.generateTextStream.mock.calls[2][0];
+    const refusal = thirdRequest.find(
+      (message: any) => message.role === MESSAGE_ROLES.TOOL && JSON.stringify(message).includes("PERMISSION_MODE_DENIED"),
+    );
+    expect(JSON.stringify(refusal)).toContain("untrusted text in the arguments");
+  });
+
+  it("a follow-up turn still knows the page an earlier turn read (rebuilt from the transcript, in memory only)", async () => {
+    provider.generateTextStream
+      .mockImplementationOnce(async function* () {
+        yield { type: "toolCall", name: "execute_shell", args: { command: INJECTED_COMMAND }, id: "call-shell" };
+        yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
+      })
+      .mockImplementationOnce(async function* () {
+        yield "Not run.";
+        yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
+      });
+
+    // The history a client sends: turn 1 read the page (its tool call and
+    // result on the assistant message), turn 2 asks to finish the setup.
+    await run({ autoApprove: true }, [
+      { role: MESSAGE_ROLES.USER, content: `Summarize ${PAGE_URL}` },
+      {
+        role: MESSAGE_ROLES.ASSISTANT,
+        content: "It is a setup guide for the widget.",
+        toolCalls: [
+          { id: "old-read", name: "read_web_page", args: { url: PAGE_URL }, result: { url: PAGE_URL, content: PAGE_TEXT } },
+        ],
+      },
+      { role: MESSAGE_ROLES.USER, content: "Great — now finish the setup for me." },
+    ]);
+
+    const [card] = emitted.filter((event) => event.type === "approval_required");
+    expect(card).toMatchObject({ toolCallId: "call-shell", alwaysAsks: true });
+    expect(card.untrustedText.excerpt).toBe(INJECTED_COMMAND);
+    expect(executedToolNames()).toEqual([]);
+  });
+
+  it("the check is off at security.taintMinimumCharacters = 0", async () => {
+    (SettingsService.getSection as any).mockImplementation(async (section: string) =>
+      section === "security" ? { taintMinimumCharacters: 0 } : { harness: "standard" },
+    );
+    provider.generateTextStream
+      .mockImplementationOnce(async function* () {
+        yield { type: "toolCall", name: "read_web_page", args: { url: PAGE_URL }, id: "call-read" };
+        yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
+      })
+      .mockImplementationOnce(async function* () {
+        yield { type: "toolCall", name: "execute_shell", args: { command: INJECTED_COMMAND }, id: "call-shell" };
+        yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
+      })
+      .mockImplementationOnce(async function* () {
+        yield "Ran it.";
+        yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
+      });
+    try {
+      await run({ autoApprove: true });
+    } finally {
+      (SettingsService.getSection as any).mockReset();
+      (SettingsService.getSection as any).mockResolvedValue({ harness: "standard" });
+    }
+    expect(emitted.filter((event) => event.type === "approval_required")).toEqual([]);
+    expect(executedToolNames()).toEqual(["read_web_page", "execute_shell"]);
   });
 });

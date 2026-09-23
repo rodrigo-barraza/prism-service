@@ -41,6 +41,7 @@ import {
   readDefaultPermissionMode,
 } from "#src/services/permissions/PermissionModeState";
 import { CAPABILITIES, type PermissionRuleDocument } from "#src/services/permissions/types";
+import { requireUserAuthorityToChange } from "#src/middleware/ExternalAuthority";
 
 /**
  * /permissions — the user's permission rules.
@@ -73,6 +74,8 @@ import { CAPABILITIES, type PermissionRuleDocument } from "#src/services/permiss
 
 const router = express.Router();
 router.use(requireDb);
+// Modes and rules are the user's: a relay's request cannot change them.
+router.use(requireUserAuthorityToChange("change the permission mode or rules"));
 
 const COLLECTION = COLLECTIONS.PERMISSION_RULES;
 

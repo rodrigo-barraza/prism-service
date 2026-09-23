@@ -73,6 +73,8 @@ export interface PendingToolCallSummary {
   /** Who asked for the card besides the tier: a hook, a restart ("run it again?"), or auto mode ("classifier"). */
   requestedBy?: string;
   reason?: string | null;
+  /** The taint check asked: the untrusted text the arguments carry, and where it was read. */
+  untrustedText?: { excerpt: string; source: string };
 }
 
 export interface ApprovalRequestCall {
@@ -88,6 +90,8 @@ export interface ApprovalRequestCall {
   /** Who asked for the card besides the tier: a hook, a restart ("run it again?"), or auto mode ("classifier"). */
   requestedBy?: string;
   reason?: string | null;
+  /** The taint check asked: the untrusted text the arguments carry, and where it was read. */
+  untrustedText?: { excerpt: string; source: string };
 }
 
 export interface ApprovalBatchRequest {
@@ -324,6 +328,7 @@ function recordsFor(
     ...(call.preview ? { preview: call.preview } : {}),
     ...(call.requestedBy ? { requestedBy: call.requestedBy } : {}),
     ...(call.reason ? { reason: call.reason } : {}),
+    ...(call.untrustedText ? { untrustedText: call.untrustedText } : {}),
   }));
 }
 
@@ -579,6 +584,7 @@ export const ApprovalRegistry = {
         },
         ...(record.requestedBy ? { requestedBy: record.requestedBy } : {}),
         ...(record.reason ? { reason: record.reason } : {}),
+        ...(record.untrustedText ? { untrustedText: record.untrustedText } : {}),
       })),
     };
   },

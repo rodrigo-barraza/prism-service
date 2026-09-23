@@ -28,6 +28,18 @@ import {
 } from "#src/utils/ProfileScope";
 import { getRequestContext } from "#src/utils/RequestContext";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import {
+  externalInputMessageFields,
+  externalOrigin,
+  type ExternalOrigin,
+} from "./external/ExternalInput.ts";
+import {
+  declarationOfScope,
+  narrowScope,
+  scopeFromDeclaration,
+  type CapabilityDeclaration,
+  type CapabilityScope,
+} from "./permissions/CapabilityScope.ts";
 
 export interface TransformedScheduledTaskFilter {
   id?: string;
@@ -71,6 +83,12 @@ export interface ScheduledTask {
    * anything that would ask is denied. `bypass` holds only for an owner.
    */
   permissionMode?: import("./permissions/PermissionModes.ts").PermissionMode;
+  /**
+   * Capabilities its runs go without — `{ network: false }` — fixed when it
+   * is scheduled (permissions/CapabilityScope). A task created from inside
+   * a narrowed run keeps that run's narrowing too (ScheduledTasksRoutes).
+   */
+  capabilities?: CapabilityDeclaration | null;
   enabled: boolean;
   lastRunMinute?: string; // "YYYY-MM-DDTHH:mm"
   /**
@@ -90,6 +108,31 @@ interface ScheduledConversationSettings extends ConversationSettings {
   agent?: string | null;
   workspaceRoot?: string | null;
   toolConfig?: ScheduledTask["toolConfig"];
+}
+
+/**
+ * A trigger's payload, as the run reads it: external input from the webhook
+ * that fired it — its own message beside the task's prompt, never folded
+ * into the user's words (external/ExternalInput).
+ */
+export function triggerPayloadMessage(
+  payload: Record<string, unknown> | undefined,
+  origin: ExternalOrigin | null | undefined,
+  timestamp: string,
+): ConversationMessage | null {
+  if (!payload || Object.keys(payload).length === 0) return null;
+  let text: string;
+  try {
+    text = `Trigger payload:\n${JSON.stringify(payload, null, 2)}`;
+  } catch {
+    text = `Trigger payload: ${String(payload)}`;
+  }
+  return {
+    role: "user",
+    ...externalInputMessageFields(origin ?? externalOrigin("webhook", "trigger"), text),
+    timestamp,
+    _alreadyPersisted: true,
+  } as ConversationMessage;
 }
 
 export interface ScheduledTaskRunResult {
@@ -411,17 +454,20 @@ const ScheduledTaskService = {
       username = "system",
       profileId = getRequestContext().profileId ?? DEFAULT_PROFILE_ID,
       agentConversationId,
+      payloadOrigin,
     }: {
       username?: string;
       profileId?: string;
       agentConversationId?: string;
+      /** Who fired the trigger that carried `payload` (a webhook, by default). */
+      payloadOrigin?: ExternalOrigin | null;
     } = {},
   ): Promise<ScheduledTaskRunResult> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
 
     if (task.conversationId) {
-      return this.continueConversation(task, payload, { username, profileId });
+      return this.continueConversation(task, payload, { username, profileId, payloadOrigin });
     }
 
     const resolvedConversationId = agentConversationId || crypto.randomUUID();
@@ -450,18 +496,19 @@ const ScheduledTaskService = {
       // Best-effort
     }
 
-    // Build the final prompt with optional payload context
-    let finalPrompt = task.prompt;
-    if (payload && Object.keys(payload).length > 0) {
-      finalPrompt += `\n\nTrigger payload: ${JSON.stringify(payload)}`;
-    }
-
+    // The task's prompt is the user's (written when it was scheduled); a
+    // trigger's payload is the webhook's, and arrives as external input.
     const userTriggerMessage = {
       role: "user" as const,
-      content: finalPrompt,
+      content: task.prompt,
       timestamp: nowISO,
       _alreadyPersisted: true,
     };
+    const payloadMessage = triggerPayloadMessage(payload, payloadOrigin, nowISO);
+    const runMessages = [
+      userTriggerMessage as ConversationMessage,
+      ...(payloadMessage ? [payloadMessage] : []),
+    ];
 
     // 1. Create agent session stub document
     const settings = {
@@ -484,7 +531,7 @@ const ScheduledTaskService = {
       title: task.name,
       agent: task.agent,
       taskId: task.id,
-      messages: [userTriggerMessage],
+      messages: runMessages,
       systemPrompt: "",
       settings,
       modalities: { textIn: true, textOut: false },
@@ -516,8 +563,8 @@ const ScheduledTaskService = {
         providerName: task.provider,
         resolvedModel: task.model,
         modelDefinition,
-        messages: [userTriggerMessage as ConversationMessage],
-        originalMessages: [userTriggerMessage as ConversationMessage],
+        messages: runMessages,
+        originalMessages: runMessages,
         options: {
           agenticLoopEnabled: true,
           functionCallingEnabled: true,
@@ -526,6 +573,8 @@ const ScheduledTaskService = {
           // the mode is the task's own, else dontAsk.
           unattended: true,
           ...(task.permissionMode && { permissionMode: task.permissionMode }),
+          // What its runs may do at all, fixed when it was scheduled.
+          _capabilityScope: scopeFromDeclaration(task.capabilities),
           ...(task.toolConfig?.disabledTools && {
             disabledTools: task.toolConfig.disabledTools,
           }),
@@ -598,7 +647,8 @@ const ScheduledTaskService = {
     {
       username = "system",
       profileId = getRequestContext().profileId ?? DEFAULT_PROFILE_ID,
-    }: { username?: string; profileId?: string } = {},
+      payloadOrigin,
+    }: { username?: string; profileId?: string; payloadOrigin?: ExternalOrigin | null } = {},
   ): Promise<ScheduledTaskRunResult> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
@@ -648,18 +698,16 @@ const ScheduledTaskService = {
     }
 
     const nowISO = new Date().toISOString();
-    let finalPrompt = task.prompt;
-    if (payload && Object.keys(payload).length > 0) {
-      finalPrompt += `\n\nTrigger payload: ${JSON.stringify(payload)}`;
-    }
     const triggerMessage: ConversationMessage = {
       role: "user",
-      content: `🔔 Scheduled task "${task.name}": ${finalPrompt}`,
+      content: `🔔 Scheduled task "${task.name}": ${task.prompt}`,
       timestamp: nowISO,
       _alreadyPersisted: true,
       _notificationSource: NOTIFICATION_SOURCES.SCHEDULER,
       _notificationId: notificationId,
     };
+    // A trigger's payload is the webhook's words: external input of its own.
+    const payloadMessage = triggerPayloadMessage(payload, payloadOrigin, nowISO);
 
     logger.info(
       `[ScheduledTasks] Executing task "${task.name}" on existing conversation ${conversationId} (user: ${username})`,
@@ -669,7 +717,7 @@ const ScheduledTaskService = {
       conversationId,
       task.project,
       username,
-      [triggerMessage],
+      [triggerMessage, ...(payloadMessage ? [payloadMessage] : [])],
       null,
       { collection },
     );
@@ -689,6 +737,7 @@ const ScheduledTaskService = {
       : [
           ...((conversation.messages || []) as unknown as ConversationMessage[]),
           triggerMessage,
+          ...(payloadMessage ? [payloadMessage] : []),
         ];
     for (const message of freshMessages) {
       message._alreadyPersisted = true;
@@ -742,6 +791,7 @@ const ScheduledTaskService = {
           planFirst: false,
           unattended: true,
           ...(task.permissionMode && { permissionMode: task.permissionMode }),
+          _capabilityScope: scopeFromDeclaration(task.capabilities),
           ...(toolConfig?.disabledTools && {
             disabledTools: toolConfig.disabledTools,
           }),
@@ -911,12 +961,20 @@ const ScheduledTaskService = {
     return task;
   },
 
+  /**
+   * `callerScope`: the change comes from inside a narrowed run (its
+   * `x-conversation-id` names one — ScheduledTasksRoutes). Such a change
+   * can only add restrictions: the task keeps what it had, plus what the
+   * change declares, plus the run's own — so editing a task's prompt from a
+   * narrowed run cannot schedule the run's way out of its scope.
+   */
   async updateTask(
     id: string,
     project: string,
     username: string,
     updates: Partial<ScheduledTask>,
     profileId?: string,
+    { callerScope = null }: { callerScope?: CapabilityScope | null } = {},
   ): Promise<ScheduledTask> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
@@ -932,6 +990,18 @@ const ScheduledTaskService = {
     delete cleanUpdates.profileId;
 
     const filter = await this._getQueryFilter(id, project, username, profileId);
+    if (callerScope) {
+      const stored = (await db.collection(COLLECTIONS.SCHEDULED_TASKS).findOne(filter)) as
+        | ScheduledTask
+        | null;
+      cleanUpdates.capabilities = declarationOfScope(
+        narrowScope(
+          scopeFromDeclaration(stored?.capabilities),
+          scopeFromDeclaration(updates.capabilities),
+          callerScope,
+        ),
+      );
+    }
     const result = await db
       .collection(COLLECTIONS.SCHEDULED_TASKS)
       .findOneAndUpdate(
@@ -977,6 +1047,7 @@ const ScheduledTaskService = {
     username: string,
     payload?: Record<string, unknown>,
     profileId: string = getRequestContext().profileId ?? DEFAULT_PROFILE_ID,
+    payloadOrigin: ExternalOrigin | null = null,
   ): Promise<{ success: boolean; agentConversationId: string }> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
@@ -1007,6 +1078,7 @@ const ScheduledTaskService = {
       username,
       profileId,
       agentConversationId,
+      payloadOrigin,
     }).catch((error: Error) => {
       logger.error(
         `[ScheduledTasks] Manual trigger failed for task "${task.name}": ${getErrorMessage(error)}`,

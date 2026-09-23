@@ -53,6 +53,8 @@ function fetchRefusal(
     policies: context._policies ?? [],
     permissionRules: context._permissionRules ?? null,
     permissionMode: context._permissionMode ?? null,
+    // The fetch is judged in the run's capability scope like any call.
+    capabilityScope: context._capabilityScope ?? null,
     fullAuto: context._autoApprove === true,
   }).check({ id: null, name: READ_UNTRUSTED_TOOL_NAME, args: toolArguments });
   if (approval.isDenied) return `${call.name} is denied: ${approval.reason}`;

@@ -22,6 +22,7 @@ import type {
   AgenticContext,
   ResolvedTools,
 } from "#src/services/harnesses/types";
+import { recordUntrustedToolResults } from "#src/services/permissions/UntrustedSpans";
 
 /**
  * ToolExecutor — parallel and single tool execution extracted from
@@ -335,6 +336,11 @@ export async function executeToolBatch(
               _policies: context.options?.policies,
               _permissionRules: context.options?._permissionRules,
               _permissionMode: context.options?._permissionMode,
+              // What the loop may do at all, and what untrusted text it holds:
+              // inner approval checks (run_async_task, programs, read_untrusted)
+              // judge by them, and a sub-agent starts inside them.
+              _capabilityScope: context.options?._capabilityScope,
+              _untrustedSpans: context.options?._untrustedSpans,
               _criticModel: context.options?.criticModel,
               _maxCostDollars: context.options?.maxCostDollars,
               _sharedCostBudget: context.options?._sharedCostBudget,
@@ -367,6 +373,11 @@ export async function executeToolBatch(
   );
 
   await snapshotAfterToolBatch(workspaceSnapshot);
+
+  // Third-party text the turn has now read (web, MCP, mail, a sub-agent's
+  // output): a later shell, write or network-write argument is compared
+  // against it (permissions/UntrustedSpans).
+  recordUntrustedToolResults(context, toolCalls, results);
 
   return results;
 }

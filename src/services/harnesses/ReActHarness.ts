@@ -312,7 +312,9 @@ export default class ReActHarness extends BaseAgenticHarness {
       autoApprove: options.autoApprove === true,
       policies: options.policies,
       permissionRules: options._permissionRules,
-    permissionMode: options._permissionMode,
+      permissionMode: options._permissionMode,
+      capabilityScope: options._capabilityScope,
+      untrustedSpans: options._untrustedSpans,
     });
     const { hooks, approvalEngine } = standardHooks;
 

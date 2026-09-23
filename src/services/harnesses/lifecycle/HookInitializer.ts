@@ -8,6 +8,11 @@ import ConversationGoalService from "#src/services/ConversationGoalService";
 import type { PolicyRule } from "#src/services/PolicyEngine";
 import type PermissionRuleSet from "#src/services/permissions/PermissionRuleSet";
 import type { PermissionModeHandle } from "#src/services/permissions/PermissionModeState";
+import type {
+  CapabilityScope,
+  CapabilityScopeHandle,
+} from "#src/services/permissions/CapabilityScope";
+import type { UntrustedSpans } from "#src/services/permissions/UntrustedSpans";
 import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 
@@ -34,6 +39,10 @@ interface HookInitOptions {
   permissionRules?: PermissionRuleSet | null;
   /** The turn's permission mode handle, passed to AutoApprovalEngine. */
   permissionMode?: PermissionModeHandle | null;
+  /** The run's capability scope (sub-agent, scheduled task, goal continuation). */
+  capabilityScope?: CapabilityScopeHandle | CapabilityScope | null;
+  /** The untrusted text the turn has seen — the taint check's input. */
+  untrustedSpans?: UntrustedSpans | null;
 }
 
 /** Create a fully wired AgentHooks instance with standard lifecycle hooks. */
@@ -43,6 +52,8 @@ export function createStandardHooks({
   policies,
   permissionRules,
   permissionMode,
+  capabilityScope,
+  untrustedSpans,
 }: HookInitOptions = {}) {
   const hooks = new AgentHooks();
 
@@ -54,6 +65,8 @@ export function createStandardHooks({
     permissionRules: permissionRules ?? null,
     permissionMode: permissionMode ?? null,
     workspaceRoot: workspaceRoot ?? null,
+    capabilityScope: capabilityScope ?? null,
+    untrustedSpans: untrustedSpans ?? null,
   });
   hooks.register(
     "beforeToolCall",

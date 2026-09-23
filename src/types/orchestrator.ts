@@ -96,6 +96,12 @@ export interface SubAgentState {
   lastProgress?: { message: string; reportedAt: number };
   /** The permission mode its last run had (its definition's, narrowed to the parent's). */
   permissionMode?: import("#src/services/agents/AgentDefinitionFields").AgentPermissionMode;
+  /**
+   * What it may not do, fixed at spawn: its parent's scope plus what the
+   * spawn declared (permissions/CapabilityScope). Persisted, so a resume
+   * after an eviction stays inside it.
+   */
+  capabilityScope?: import("#src/services/permissions/CapabilityScope").CapabilityScope | null;
   /** Its last run stopped at its turn cap (maxTurns) before finishing — resumable. */
   partial?: boolean;
   /** The workspace its previous run was told it had (a resume says when it changed). */
@@ -297,6 +303,8 @@ export interface OrchestratorSpawnParams {
    * spawnFromTool returns immediately with status="running".
    */
   awaitCompletion?: boolean;
+  /** Capabilities the spawned agent runs without, on top of its parent's (permissions/CapabilityScope). */
+  capabilityScope?: import("#src/services/permissions/CapabilityScope").CapabilityScope | null;
   /**
    * Fires after the agent ID is allocated and state is registered in the
    * active sub-agents map, but BEFORE the agentic loop starts. Used by
@@ -346,6 +354,10 @@ export interface OrchestratorContext {
   permissionRules?: import("#src/services/permissions/PermissionRuleSet").default;
   /** Parent loop's mode handle — a sub-agent shares it, so a switch reaches it too. */
   permissionMode?: import("#src/services/permissions/PermissionModeState").PermissionModeHandle;
+  /** Parent loop's capability scope right now — a sub-agent's is this plus what its spawn declares. */
+  capabilityScope?: import("#src/services/permissions/CapabilityScope").CapabilityScope | null;
+  /** Parent loop's untrusted text — the parent of a sub-agent's own registry. */
+  untrustedSpans?: import("#src/services/permissions/UntrustedSpans").UntrustedSpans;
   /** Parent loop's auto-mode reviewer model — inherited by sub-agents. */
   criticModel?: string;
   /** Parent loop's cost ceiling — inherited by sub-agents. */

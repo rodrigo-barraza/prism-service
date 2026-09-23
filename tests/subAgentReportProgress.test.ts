@@ -62,7 +62,7 @@ describe("report_progress", () => {
     expect(TurnInputMailbox.pendingCount(PARENT_CONVERSATION_ID)).toBe(0);
   });
 
-  it("posts one agent_message with sub-agent authority, clipped, per call", async () => {
+  it("posts one external input from the sub-agent, clipped, per call", async () => {
     registerChild();
     TurnInputMailbox.open(PARENT_CONVERSATION_ID);
     const longMessage = "x".repeat(ORCHESTRATOR.PROGRESS_REPORT_MAXIMUM_CHARACTERS + 500);
@@ -70,13 +70,16 @@ describe("report_progress", () => {
     expect(await reportProgress(longMessage)).toMatchObject({ delivered: true });
 
     const [entry] = TurnInputMailbox.drain(PARENT_CONVERSATION_ID);
-    expect(entry.kind).toBe("agent_message");
+    // Prompt 22 L3: a sub-agent's words reach its parent as external input.
+    expect(entry.kind).toBe("external");
+    expect(entry.origin).toEqual({ source: "subagent", sender: "agent-7-beef" });
     expect(entry.meta).toMatchObject({
       _notificationSource: NOTIFICATION_SOURCES.SUB_AGENT_PROGRESS,
       _authority: "sub-agent",
       _subAgentId: "agent-7-beef",
     });
-    expect(entry.text).toContain("<subagent-progress>");
+    // Plain text: the mailbox renders it inside the external-input envelope.
+    expect(entry.text).toContain("Progress report from your sub-agent agent-7-beef");
     expect(entry.text).toContain("not from the user");
     expect(entry.text).not.toContain("x".repeat(ORCHESTRATOR.PROGRESS_REPORT_MAXIMUM_CHARACTERS + 1));
   });

@@ -28,6 +28,7 @@ export class SubAgentPersistenceService {
     agentConversationId,
     subAgentAgentType,
     worktreeError,
+    capabilityScope,
   }: {
     parentConversationId: string;
     project: string;
@@ -44,6 +45,8 @@ export class SubAgentPersistenceService {
     agentConversationId: string;
     subAgentAgentType: string | null;
     worktreeError: string | null;
+    /** The capability scope it was spawned with — kept for a resume after an eviction. */
+    capabilityScope?: import("#src/services/permissions/CapabilityScope").CapabilityScope | null;
   }): Promise<void> {
     try {
       const conversationCollection = MongoWrapper.getCollection(
@@ -92,6 +95,7 @@ export class SubAgentPersistenceService {
             subAgentGlobalSpawnIndex: globalSpawnIndex ?? null,
             subAgentBranchName: worktreeError ? null : branchName,
             subAgentFiles: files || [],
+            subAgentCapabilityScope: capabilityScope?.denied ?? null,
             parentConversationId,
             parentAgentConversationId: agentConversationId || null,
             project,

@@ -229,6 +229,8 @@ export async function runBeforePromptSetup(
     policies: options.policies,
     permissionRules: options._permissionRules,
     permissionMode: options._permissionMode,
+    capabilityScope: options._capabilityScope,
+    untrustedSpans: options._untrustedSpans,
   });
   const { hooks } = standardHooks;
 
