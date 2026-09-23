@@ -631,6 +631,8 @@ const waitForTasks = {
             : agentResult.error
               ? { error: agentResult.error }
               : { result: truncateForNotification(stringifyResult(agentResult.result)) }),
+          // Stopped at its turn cap: say so, and how to continue it.
+          ...(!agentEntry.running && agentResult.partial && { partial: true, resume: agentResult.summary }),
         });
       }
 

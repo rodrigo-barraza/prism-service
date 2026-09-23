@@ -92,6 +92,8 @@ export interface SubAgentState {
   permissionMode?: import("#src/services/agents/AgentDefinitionFields").AgentPermissionMode;
   /** Its last run stopped at its turn cap (maxTurns) before finishing — resumable. */
   partial?: boolean;
+  /** The workspace its previous run was told it had (a resume says when it changed). */
+  lastWorkspacePath?: string;
 }
 
 // ── Worktree diff contract (tools-service) ─────────────────

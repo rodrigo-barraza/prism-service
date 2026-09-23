@@ -359,6 +359,20 @@ You research questions and cite your sources.
         expect.objectContaining({ resultBody: expect.stringContaining("⏸ partial — stopped at its turn limit") }),
       ),
     );
+    // wait_for_tasks — how a parent usually collects it — says so too.
+    const waited = (await ToolOrchestratorService.executeTool(
+      "wait_for_tasks",
+      { agentIds: [subAgent.agentId] },
+      PARENT_TOOL_CONTEXT,
+    )) as { tasks: Array<Record<string, unknown>> };
+    expect(waited.tasks).toEqual([
+      expect.objectContaining({
+        agentId: subAgent.agentId,
+        status: "completed",
+        partial: true,
+        resume: expect.stringContaining("resume_subagent"),
+      }),
+    ]);
 
     // Resume: the loop continues from its transcript and finishes.
     script = [{ kind: "text", text: "Compared: both sources agree." }];
