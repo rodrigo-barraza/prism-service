@@ -255,6 +255,10 @@ export default class SystemPromptAssembler {
     const agentId = context.agent || AGENT_IDS.CODING;
     const persona = isDirectMode ? null : AgentPersonaRegistry.get(agentId);
     const isSubAgent = !!context.parentAgentConversationId;
+    // A benchmark sample carries none of the agent's learned state
+    // (AgenticOptions.evaluation): the sections a sub-agent skips, for the
+    // same reason plus one — a memory of the last sample is its answer.
+    const withoutLearnedState = isSubAgent || context.evaluation === true;
 
     const codingFallback =
       !isDirectMode && (!persona || persona.id === AGENT_IDS.CODING);
@@ -367,7 +371,7 @@ export default class SystemPromptAssembler {
     // even though only Discord sends agentContext.
     // Sub-agents are ephemeral workers — they don't maintain emotional
     // continuity, so somatic adaptation is skipped entirely.
-    if (persona?.hasSomaticState && agentId && !isSubAgent) {
+    if (persona?.hasSomaticState && agentId && !withoutLearnedState) {
       let somaticEvents: SomaticStateEvent[] = [];
       const userMessages =
         context.messages?.filter((message) => message.role === "user") || [];
@@ -401,7 +405,7 @@ export default class SystemPromptAssembler {
     // Conversational personas hold a separate conversation per user, so
     // without this they never see what they just said to other people and
     // every reply converges on the same openers and jokes.
-    if (persona?.usesResponseVariety && agentId && !isSubAgent) {
+    if (persona?.usesResponseVariety && agentId && !withoutLearnedState) {
       const varietyBlock = await ResponseVarietyService.renderBlock({
         agentId,
         project: context.project || persona.project || null,
@@ -888,7 +892,7 @@ export default class SystemPromptAssembler {
     let memoriesText = "";
     let injectedMemoryIds: string[] = [];
 
-    if (memoryQuery && !isSubAgent) {
+    if (memoryQuery && !withoutLearnedState) {
       const agentContextForMemory = context.agentContext || {};
       const memoryGuildId = agentContextForMemory.guildId;
       const memoryUserIds = agentContextForMemory.participantUserIds;
@@ -930,7 +934,7 @@ export default class SystemPromptAssembler {
     // Same rationale as Step 9 — sub-agents don't need cross-conversation
     // procedural workflows. They execute a single task and are destroyed.
     let workflowsText = "";
-    if (memoryQuery && !isDirectMode && !isSubAgent) {
+    if (memoryQuery && !isDirectMode && !withoutLearnedState) {
       try {
         const workflows = await WorkflowMemoryService.retrieveRelevantWorkflows(
           agentId,

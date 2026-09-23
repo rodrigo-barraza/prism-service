@@ -454,6 +454,7 @@ describe("runs", () => {
     const agentCall = params.find((parameters) => parameters.agent === "CODING");
     expect(agentCall).toMatchObject({
       agenticLoopEnabled: true,
+      evaluation: true,
       autoApprove: true,
       unattended: true,
       reasoningEffort: "low",

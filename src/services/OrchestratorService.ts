@@ -2852,6 +2852,7 @@ export class OrchestratorService {
           ...(orchestratorContext.criticModel && {
             criticModel: orchestratorContext.criticModel,
           }),
+          ...(orchestratorContext.evaluation === true && { evaluation: true }),
           ...(typeof orchestratorContext.maxCostDollars === "number" && {
             maxCostDollars: orchestratorContext.maxCostDollars,
           }),
@@ -3468,6 +3469,7 @@ export class OrchestratorService {
       ...(orchestratorContext.criticModel && {
         criticModel: orchestratorContext.criticModel,
       }),
+      ...(orchestratorContext.evaluation === true && { evaluation: true }),
       planFirst: false,
       minContextLength: 120_000,
       ...(workspaceRoot ? { workspaceRoot } : {}),

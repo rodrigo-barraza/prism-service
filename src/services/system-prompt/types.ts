@@ -65,6 +65,8 @@ export interface AssemblerContext {
   clientIp?: string | null;
   requestId?: string;
   options?: Record<string, unknown>;
+  /** A benchmark sample (AgenticOptions.evaluation) — no learned-state sections. */
+  evaluation?: boolean;
   workspaceEnabled?: boolean;
   locale?: string;
   /** Names of user-pinned rules to inject as an <active-rules> section */

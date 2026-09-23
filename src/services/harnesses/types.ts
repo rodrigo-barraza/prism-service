@@ -334,6 +334,15 @@ export interface AgenticOptions {
    */
   unattended?: boolean;
   /**
+   * A benchmark sample (BenchmarkExecutor): the turn neither reads nor writes
+   * the agent's learned state — no memories or workflows injected or
+   * extracted, no somatic adaptation, no response-variety block, no
+   * conversation embedding, no goal accounting — and runs no user hooks.
+   * One sample must not see another, or pass^k measures recall. A sub-agent
+   * inherits it.
+   */
+  evaluation?: boolean;
+  /**
    * What the turn does at its cost cap (prompt 13, Landing 3): "pause" parks
    * it on its user until the cap is raised, "stop" ends it with exhaustion
    * recovery. Unset: pause, unless the request said nobody answers cards
@@ -612,6 +621,8 @@ export interface BeforePromptHookContext {
   activeRuleNames?: string[];
   /** The conversation's routing preset — the lead's prompt carries its addendum. */
   routingPreset?: string;
+  /** A benchmark sample (AgenticOptions.evaluation) — no learned-state sections. */
+  evaluation?: boolean;
   _injectedSkills?: string[];
   _skillsText?: string;
   _skillCatalogText?: string;

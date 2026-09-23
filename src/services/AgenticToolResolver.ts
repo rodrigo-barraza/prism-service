@@ -28,6 +28,35 @@ import {
   LOCAL_PROVIDER_TYPES,
 } from "./local-provider/constants.ts";
 
+/**
+ * Tools a benchmark sample (AgenticOptions.evaluation) never gets, nor may
+ * discover: their effects outlive the sample or reach the user's own state.
+ * Memories and past conversations would let one sample read another's
+ * answer; timers and crons fire after the run into real conversations;
+ * skills and project instructions are the user's configuration.
+ */
+export const EVALUATION_EXCLUDED_TOOLS: ReadonlySet<string> = new Set([
+  TOOL_NAMES.SAVE_MEMORY,
+  TOOL_NAMES.EXTRACT_MEMORIES,
+  TOOL_NAMES.CONSOLIDATE_MEMORIES,
+  TOOL_NAMES.SEARCH_MEMORIES,
+  TOOL_NAMES.SEARCH_CONVERSATIONS,
+  TOOL_NAMES.SUMMARIZE_CONVERSATION,
+  TOOL_NAMES.SET_TIMER,
+  TOOL_NAMES.LIST_TIMERS,
+  TOOL_NAMES.CANCEL_TIMER,
+  TOOL_NAMES.CREATE_CRON,
+  TOOL_NAMES.REMOTE_TRIGGER,
+  TOOL_NAMES.CREATE_CRON_JOB,
+  TOOL_NAMES.LIST_CRON_JOBS,
+  TOOL_NAMES.DELETE_CRON_JOB,
+  TOOL_NAMES.TRIGGER_CRON_JOB,
+  TOOL_NAMES.CREATE_SKILL,
+  TOOL_NAMES.DELETE_SKILL,
+  "update_project_instructions",
+  "edit_project_instructions",
+]);
+
 // ── Types ────────────────────────────────────────────────────
 
 interface ToolSchema {
@@ -56,6 +85,7 @@ interface ResolveOptions {
   disabledTools?: string[];
   webSearch?: boolean;
   isSubAgent?: boolean;
+  evaluation?: boolean;
   workspaceEnabled?: boolean;
   mcpServers?: string[];
   thinkingEnabled?: boolean;
@@ -360,6 +390,22 @@ export default class AgenticToolResolver {
       );
       for (const toolName of SUB_AGENT_ONLY_TOOL_NAMES) {
         unreachableToolNames.add(toolName);
+      }
+    }
+
+    // ── Benchmark sample exclusion ─────────────────────────────────
+    if (options.evaluation === true) {
+      const previousCount = finalTools.length;
+      finalTools = finalTools.filter(
+        (tool) => !EVALUATION_EXCLUDED_TOOLS.has(tool.name),
+      );
+      for (const toolName of EVALUATION_EXCLUDED_TOOLS) {
+        unreachableToolNames.add(toolName);
+      }
+      if (finalTools.length < previousCount) {
+        logger.info(
+          `[AgenticToolResolver] Benchmark sample: removed ${previousCount - finalTools.length} tools with effects beyond the sample`,
+        );
       }
     }
 

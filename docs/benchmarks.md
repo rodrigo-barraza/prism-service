@@ -71,6 +71,15 @@ Deterministic scorers run first. Once a required one fails, the paid judges of t
 - **Budget.** `budgetUsd` is checked before every sample. When spend reaches it, the run stops starting samples and ends `cancelled`, with the reason recorded.
 - **Timeouts.** `timeoutSeconds` defaults to 240 s for a model and 600 s for an agent. A suite's `limits.timeoutSeconds` wins.
 - **Workspaces.** A workspace case runs in its own scratch directory under tools-service's first workspace root, `.prism-benchmarks/<runId>/…`. The directory is removed afterwards.
+- **Isolated agent samples.** An agent sample runs as an evaluation turn (`evaluation: true` on the agent request, inherited by its sub-agents). It keeps the persona's prompt, harness and tools, but none of its learned state:
+  - no memories or workflows are injected or extracted;
+  - no somatic adaptation and no response-variety block;
+  - no conversation embedding and no goal accounting;
+  - none of the user's configured hooks;
+  - no tools whose effects outlive the sample: memory, conversation search, timers, crons, skill writes and project-instruction writes are unreachable, even when a suite names them.
+
+  Otherwise one sample could recall another's answer (epoch 2 would remember epoch 1), and a benchmark would change the live agent. A restart does not re-drive a sample; the run's resume re-runs it.
+- **Approval.** Samples run unattended, so nothing waits for a click. Tools the suite (or the contestant) lists run on full auto. An agent on its persona's own tools runs the read-only ones, and any write or shell call is denied. To let an agent act, list the tools in the suite.
 - **Restarts and resume.** A restart marks unfinished runs `interrupted`. `POST /runs/:id/resume` runs only what is left: pending and cancelled samples, plus errored ones unless `retryErrors: false`. It optionally takes a new budget.
 - **Pairwise judging.** Set `settings.pairwise` to `{mode: "all_pairs" | "vs_baseline", baselineIndex | baselineKey, judges?}`. Pairwise judging follows the samples and turns pairs of answers into judge battles.
 
