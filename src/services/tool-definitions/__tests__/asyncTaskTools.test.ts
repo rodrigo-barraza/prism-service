@@ -460,6 +460,42 @@ describe("AsyncTaskTools Unit Tests", () => {
       expect(mockDispatch).not.toHaveBeenCalled();
     });
 
+    // A background task still acts for the turn that dispatched it: on a
+    // Discord turn its tools-service call must carry the same x-discord-*
+    // scope (DiscordContextHeaders) as a direct call would.
+    it.each([
+      ["standard", false, mockExecuteTool],
+      ["streaming", true, mockExecuteToolStreaming],
+    ] as const)(
+      "runs the dispatched tool with the turn's agentContext (%s path)",
+      async (_path, streamable, executeMock) => {
+        mockDispatch.mockReturnValue({ ...FIXED_TASK_STATE, toolName: "search_web" });
+        mockIsStreamable.mockReturnValue(streamable);
+        const agentContext = {
+          platform: "discord",
+          guildId: "123456789012345678",
+          channelId: "223456789012345678",
+          requesterUserId: "323456789012345678",
+        };
+
+        await InternalToolRegistry.execute(
+          ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
+          { toolName: "search_web", toolArguments: { query: "wolves" } },
+          buildContext({ enabledTools: ["search_web", "run_async_task"], agentContext }),
+        );
+        const taskExecutor = mockDispatch.mock.calls[0][3] as (
+          name: string,
+          args: Record<string, unknown>,
+          signal: AbortSignal,
+        ) => Promise<unknown>;
+        await taskExecutor("search_web", { query: "wolves" }, new AbortController().signal);
+
+        const passedContext = executeMock.mock.calls[0].at(-1) as { agentContext?: unknown };
+        expect(passedContext.agentContext).toEqual(agentContext);
+        mockIsStreamable.mockReturnValue(false);
+      },
+    );
+
     it("lets a call through when the only DENY names a different tool", async () => {
       mockDispatch.mockReturnValue({ ...FIXED_TASK_STATE });
 

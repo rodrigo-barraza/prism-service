@@ -268,6 +268,7 @@ const runAsyncTask = {
               project: context.project || undefined,
               username: context.username || undefined,
               agentConversationId: context.agentConversationId || undefined,
+              agentContext: context.agentContext,
               signal: abortSignal,
             },
           );
@@ -280,6 +281,8 @@ const runAsyncTask = {
             project: context.project || undefined,
             username: context.username || undefined,
             agentConversationId: context.agentConversationId || undefined,
+            // The dispatching turn's Discord scope (x-discord-* headers).
+            agentContext: context.agentContext,
             signal: abortSignal,
           },
         );

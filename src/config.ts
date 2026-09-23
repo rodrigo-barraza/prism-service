@@ -173,8 +173,31 @@ function getDefaultModels(
 }
 
 /**
+ * Model IDs callers still send for a model the catalog lists under another
+ * name, mapped to that catalog name. Google serves both IDs of each pair
+ * (models.list, 2026-09-22), so a request is sent, defined, logged and
+ * priced as the catalog model (prepareGenerationContext normalizes the
+ * requested ID; getModelByName and getPricing resolve it for any other
+ * lookup).
+ *
+ *   gemini-3-pro-image-preview — tools-service's generate_image model
+ *     (utilities-library MODEL_IDS.geminiImagePro). Before this mapping its
+ *     requests had no model definition (so no `streaming: false` and no
+ *     IMAGE output modality) and logged at $0: 194 images in 30 days.
+ */
+const MODEL_ID_ALIASES: Readonly<Record<string, string>> = {
+  "gemini-3-pro-image-preview": "gemini-3-pro-image",
+};
+
+/** The catalog name for a model ID — itself unless it is a known alias. */
+function resolveModelAlias(name: string): string {
+  return MODEL_ID_ALIASES[name] ?? name;
+}
+
+/**
  * Get pricing map for a given input→output type combination.
- * Returns: { [modelName]: pricingObject }
+ * Returns: { [modelName]: pricingObject } — aliases (MODEL_ID_ALIASES)
+ * included, priced as their catalog model.
  */
 function getPricing(
   inputType: string,
@@ -185,6 +208,11 @@ function getPricing(
     const modelRecord = model as ModelDefinition & Record<string, unknown>;
     if (modelRecord.pricing) {
       pricing[model.name] = modelRecord.pricing as Record<string, number>;
+    }
+  }
+  for (const [alias, catalogName] of Object.entries(MODEL_ID_ALIASES)) {
+    if (pricing[catalogName] && !pricing[alias]) {
+      pricing[alias] = pricing[catalogName];
     }
   }
   return pricing;
@@ -246,7 +274,8 @@ function synthesizeClaudeDefinition(name: string): ModelDefinition | null {
  * Returns the model object or null.
  *
  * Anthropic IDs also resolve through their undated alias
- * (`claude-haiku-4-5` → `claude-haiku-4-5-20251001`), and an uncatalogued
+ * (`claude-haiku-4-5` → `claude-haiku-4-5-20251001`), an ID in
+ * MODEL_ID_ALIASES resolves to its catalog model, and an uncatalogued
  * newer `claude-*` ID resolves to a synthesized current-generation
  * definition (see synthesizeClaudeDefinition) instead of null.
  */
@@ -254,6 +283,8 @@ function getModelByName(name: string): ModelDefinition | null {
   const models = Object.values(MODELS) as ModelDefinition[];
   const exact = models.find((model) => model.name === name);
   if (exact) return exact;
+  const aliased = MODEL_ID_ALIASES[name];
+  if (aliased) return models.find((model) => model.name === aliased) ?? null;
   if (typeof name !== "string" || !name.startsWith("claude-")) return null;
   const datedSnapshot = models.find(
     (model) =>
@@ -450,6 +481,7 @@ export {
   getDefaultModels,
   getPricing,
   getModelByName,
+  resolveModelAlias,
   getModelNativeCapabilities,
   resolveRecommendedDefault,
 

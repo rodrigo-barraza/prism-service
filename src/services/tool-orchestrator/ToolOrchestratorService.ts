@@ -60,6 +60,7 @@ import {
   type ToolEndpoint,
 } from "./types.ts";
 import { INTERNAL_TOOL_EMOJIS } from "./InternalToolEmojis.ts";
+import { buildDiscordContextHeaders } from "./DiscordContextHeaders.ts";
 import { recordSaveMemoryProvenance } from "#src/services/memory/SaveMemoryProvenance";
 
 // ────────────────────────────────────────────────────────────
@@ -433,8 +434,8 @@ function withWorktreeRedirect(
 
 /**
  * Build X-context headers from the caller context object.
- * These are consumed by tools-api's ToolCallLoggerMiddleware.
-
+ * These are consumed by tools-api's ToolCallLoggerMiddleware — and, on a
+ * Discord turn, by its Discord scope enforcement (x-discord-*).
  */
 function buildContextHeaders(
   context: ToolExecutionContext = {},
@@ -461,6 +462,9 @@ function buildContextHeaders(
   }
   if (context._providerName) headers["X-Provider"] = context._providerName;
   if (context._resolvedModel) headers["X-Model"] = context._resolvedModel;
+  // A Discord turn's guild/channel/requester, from its agentContext only —
+  // tools-service scopes the Discord tools to them.
+  Object.assign(headers, buildDiscordContextHeaders(context.agentContext));
   // W3C traceparent of the tool call's span, when tracing is on (Tracing).
   return { ...headers, ...traceHeaders() };
 }
