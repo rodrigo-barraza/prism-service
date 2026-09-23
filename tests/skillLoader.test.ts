@@ -165,6 +165,16 @@ describe("skill tools", () => {
       expect(result.body).toBeUndefined();
     });
 
+    it("loads a persona-bound skill only for that persona", async () => {
+      collection = createMockCollection([
+        panelSkill({ name: "howl", agent: "LUPOS" }),
+      ]);
+
+      expect((await run("load_skill", { name: "howl" }, { agent: "LUPOS" })).body).toBeTruthy();
+      expect((await run("load_skill", { name: "howl" }, { agent: "CODING" })).body).toBeUndefined();
+      expect((await run("load_skill", { name: "howl" }, { agent: null as any })).body).toBeUndefined();
+    });
+
     it("requires a name", async () => {
       const result = await run("load_skill", {});
       expect(result.error).toBeTruthy();

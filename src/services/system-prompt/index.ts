@@ -838,7 +838,10 @@ export default class SystemPromptAssembler {
           traceId: context.traceId,
           agentConversationId: context.agentConversationId,
           endpoint: "/agent",
-          agent: agentId,
+          // The persona the tools will see (ToolExecutor passes
+          // `agent || null`), not the CODING fallback: load_skill must
+          // find every skill the catalog lists.
+          agent: context.agent || null,
           profileId: context.profileId,
         },
       );

@@ -262,6 +262,18 @@ describe("skill catalog in the system prompt", () => {
     expect(result.prompt).toContain("- refactor: Coding only");
   });
 
+  it("in direct mode lists only skills bound to no persona", async () => {
+    skillsCollection = createMockCollection([
+      importedSkill({ _id: "coding-only", name: "refactor", description: "Coding only", agent: "CODING" }),
+      importedSkill({ _id: "any-persona", name: "notes", description: "Anyone" }),
+    ]);
+
+    const result = await assemble({ agent: null });
+
+    expect(result.prompt).toContain("- notes: Anyone");
+    expect(result.prompt).not.toContain("- refactor:");
+  });
+
   it("leaves out another user's and another profile's skills", async () => {
     skillsCollection = createMockCollection([
       panelSkill({ _id: "mine", name: "mine", description: "mine" }),

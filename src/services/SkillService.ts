@@ -252,7 +252,8 @@ export function resolveSkillCaller(
     project: known.project || request.project || "any",
     username: known.username || request.username || "any",
     profileId: normalizeProfileId(known.profileId || request.profileId),
-    agent: known.agent ?? request.agent ?? null,
+    // An explicit null (direct mode) means "no persona", not "ask the request".
+    agent: known.agent !== undefined ? known.agent : (request.agent ?? null),
   };
 }
 
