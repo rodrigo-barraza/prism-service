@@ -90,6 +90,11 @@ reports `droppedCount`. WebSocket subscribe accepts `afterSeq`, acks
 `{type:"subscribed", conversationId, lastSeq, replayedCount, droppedCount}`
 before the replay. Client: `liveTurnCursor` (the ack's `lastSeq` is
 informational; replay dedupes against the pre-subscribe mark).
+A sub-agent event forwarded to the parent stream (usage, its approval cards
+and decisions, a grandchild's `sub_agent_*`) goes up without the seq the
+sub-agent's own conversation stamped on it, so the parent numbers it
+(`SubAgentTelemetryEmitter` `forParentStream`); a kept foreign seq ran
+backwards whenever the parent had emitted more, and the cursor dropped it.
 NOT done from §4 of the review: persisted run state (pending tools /
 approvals / questions / checkpoints) and the "safe retry vs uncertain
 outcome" recovery classification. `ApprovalRegistry` still holds live
