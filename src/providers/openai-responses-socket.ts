@@ -459,6 +459,11 @@ export async function openResponsesSocketStream(
         ? continuationTail(session.lastExchange, body.input)
         : null;
     chainedFrom = tail ? session.lastExchange!.responseId : null;
+    logger.info(
+      tail
+        ? `[OpenAI/WS] ${key}: continuing ${chainedFrom} with ${tail.length} new of ${body.input.length} item(s)`
+        : `[OpenAI/WS] ${key}: full input, ${body.input.length} item(s)`,
+    );
     const { stream: _stream, background: _background, ...rest } = body as Record<string, unknown>;
     session.socket.send({
       type: "response.create",
