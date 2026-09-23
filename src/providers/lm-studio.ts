@@ -48,6 +48,7 @@ import {
   requestTelemetryChunk,
 } from "#src/utils/PromptPrefixHashes";
 import { ORCHESTRATOR_ONLY_TOOLS } from "#src/services/OrchestratorPrompt";
+import { streamEndedEarlyError } from "#src/utils/ProviderStreamResilience";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { PROVIDERS } from "#src/constants";
 // ── Native /api/v1/chat SSE stream parser ────────────────────
@@ -69,6 +70,8 @@ async function* parseNativeSSEStream(
   // Accumulate tool call arguments for streaming tool events
   let currentToolCall = null;
   let usageYielded = false;
+  // chat.end closes every reply; a body that ends without it was cut off.
+  let sawChatEnd = false;
   // Reactive abort: when the signal fires, cancel the reader immediately
   // so the pending reader.read() resolves with { done: true } instead of
   // blocking until the next chunk arrives from the upstream server.
@@ -239,6 +242,7 @@ async function* parseNativeSSEStream(
           }
           // ── Chat end with stats ──
           else if (type === "chat.end") {
+            sawChatEnd = true;
             const stats = json.result?.stats || json.stats;
             if (stats) {
               usage = {
@@ -257,6 +261,9 @@ async function* parseNativeSSEStream(
           // skip malformed JSON
         }
       }
+    }
+    if (!sawChatEnd && !options.signal?.aborted) {
+      throw streamEndedEarlyError("lm-studio", "no chat.end");
     }
   } catch (streamError) {
     // Yield partial usage BEFORE re-throwing — the for-await consumer

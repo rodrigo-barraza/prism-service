@@ -53,8 +53,9 @@ ends like a finished one).
   Chat Completions a `finish_reason`, Anthropic `message_stop`, Gemini a
   candidate `finishReason` (a blocked prompt has none, and is not a
   truncation), the shared OpenAI-compatible parser a `finish_reason` or
-  `[DONE]`, Ollama its `done: true` line. None of them throws when the
-  stream ended because the turn was stopped.
+  `[DONE]`, Ollama its `done: true` line, LM Studio's native
+  `/api/v1/chat` its `chat.end`. None of them throws when the stream ended
+  because the turn was stopped.
 - **Anthropic's malformed-call path** (eager input streaming: the SDK can
   throw while parsing a tool input) takes only parse failures. A dropped
   connection or a body that ended mid-input is a transport failure and fails
@@ -77,6 +78,11 @@ ends like a finished one).
 | `google` | `streamGenerateContent?alt=sse` | not the Interactions transport (`geminiTransport()`) |
 | `vllm` | OpenAI-compatible Chat Completions SSE (`parseSSEStream`) | llama.cpp, SGLang, Moonshot's OpenAI transport, LM Studio's `/v1` path — one parser |
 | `ollama` | `/api/chat` NDJSON | — |
+
+LM Studio's native `/api/v1/chat` path (plain chat without a persona; its
+tools run inside LM Studio over MCP) has its own parser: its cut-off check is
+tested in `src/providers/__tests__/lmStudioProvider.test.ts`, not in the
+suite. An in-stream `error` event there is shown as text on purpose.
 
 The OpenAI Responses **WebSocket** transport (GPT-6 turns with native
 steering) is not HTTP and is not in the suite; it falls back to HTTP when the
