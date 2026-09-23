@@ -245,6 +245,11 @@ export interface TokenUsage {
   outputTokens?: number;
   cacheReadInputTokens?: number;
   cacheCreationInputTokens?: number;
+  /**
+   * The part of cacheCreationInputTokens written at a 1-hour TTL (Kimi K3
+   * with MOONSHOT_CACHE_TTL=1h), billed at the model's 1-hour write rate.
+   */
+  cacheCreation1hInputTokens?: number;
   reasoningOutputTokens?: number;
   totalTokens?: number;
   /**
@@ -263,6 +268,13 @@ export interface TokenUsage {
    * each entry with that model's catalog pricing.
    */
   byModel?: Record<string, ModelTokenUsage>;
+  /**
+   * The part of these counts from requests whose prompt passed the model's
+   * long-context threshold (OpenAI: 272K tokens bills the whole request at
+   * its `…Over272kPerMillion` rates). Marked per request, where the prompt
+   * size is known (CostCalculator.markLongContext); summed like the rest.
+   */
+  longContext?: ModelTokenUsage;
 }
 
 export interface ModelTokenUsage {

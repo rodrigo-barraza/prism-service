@@ -14,10 +14,14 @@ import {
   createKimiAnthropicClient,
   kimiEffort,
   setKimiAnthropicClient,
+  withKimiCacheTtl,
 } from "#src/providers/moonshot-anthropic";
+import { calculateTextCost, createUsageAccumulator, mergeUsage } from "#src/utils/CostCalculator";
+import { getModelByName } from "#src/config";
 import moonshotProvider, { buildMoonshotPayload } from "#src/providers/moonshot";
 import type { ChatMessage, StreamChunk } from "#src/types/provider";
 import type { ProviderOptions } from "#src/types/ProviderTypes";
+import type { TokenUsage } from "#src/types/admin";
 
 interface Call {
   body: Record<string, unknown>;
@@ -242,5 +246,29 @@ describe("Kimi on the OpenAI-compatible fallback path (MOONSHOT_TRANSPORT=openai
 
   it("keeps the 0.6 default for K2.6", () => {
     expect(buildMoonshotPayload(conversation, "kimi-k2.6", {}, false).temperature).toBe(0.6);
+  });
+});
+
+describe("Kimi K3 — 1-hour cache writes are billed at the 1-hour rate", () => {
+  const pricing = (getModelByName("kimi-k3") as { pricing: Record<string, number> }).pricing;
+  const usage: TokenUsage = { inputTokens: 1_000, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 1_000_000 };
+
+  it("marks the writes of a 1h-TTL request, and leaves a 5m one alone", () => {
+    const marked = withKimiCacheTtl({ type: "usage", usage }, "1h");
+    expect(marked.usage.cacheCreation1hInputTokens).toBe(1_000_000);
+    const unmarked = withKimiCacheTtl({ type: "usage", usage }, "5m");
+    expect(unmarked.usage).toBe(usage);
+  });
+
+  it("prices 1h writes at $6 / M and 5m writes at $3 / M, through a turn's accumulated usage", () => {
+    expect(pricing.cacheWriteInputPerMillion).toBe(3);
+    expect(pricing.cacheWrite1hInputPerMillion).toBe(6);
+    const fiveMinute = calculateTextCost(usage, pricing)!;
+    const turn = createUsageAccumulator();
+    mergeUsage(turn, withKimiCacheTtl({ usage }, "1h").usage);
+    mergeUsage(turn, withKimiCacheTtl({ usage }, "1h").usage);
+    const oneHour = calculateTextCost(turn, pricing)!;
+    expect(fiveMinute).toBeCloseTo(0.003 + 3, 6);
+    expect(oneHour).toBeCloseTo(2 * (0.003 + 6), 6);
   });
 });

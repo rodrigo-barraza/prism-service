@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { MOONSHOT_API_KEY, moonshotCacheTtl } from "#config";
 import { ProviderError } from "#src/utils/errors";
 import type { ProviderOptions } from "#src/types/ProviderTypes";
+import type { TokenUsage } from "#src/types/admin";
 import {
   anthropicCompatibleEndpoint,
   type AnthropicCompatibleEndpoint,
@@ -190,9 +191,24 @@ export function kimiEndpoint(options: ProviderOptions): AnthropicCompatibleEndpo
   };
 }
 
+/**
+ * A usage report with its cache writes marked as 1-hour writes when that is
+ * the TTL they were made at (billed at the 1-hour rate — CostCalculator).
+ */
+export function withKimiCacheTtl<T>(value: T, cacheTtl: "5m" | "1h"): T {
+  if (cacheTtl !== "1h" || !value || typeof value !== "object") return value;
+  const usage = (value as { usage?: TokenUsage }).usage;
+  if (!usage?.cacheCreationInputTokens) return value;
+  return { ...value, usage: { ...usage, cacheCreation1hInputTokens: usage.cacheCreationInputTokens } };
+}
+
 /** Run a call of the Anthropic adapter against Kimi's endpoint. */
-export function onKimiEndpoint<T>(options: ProviderOptions, call: () => T): T {
-  return anthropicCompatibleEndpoint.run(kimiEndpoint(options), call);
+export async function onKimiEndpoint<T extends { usage?: TokenUsage }>(
+  options: ProviderOptions,
+  call: () => Promise<T>,
+): Promise<T> {
+  const result = await anthropicCompatibleEndpoint.run(kimiEndpoint(options), call);
+  return withKimiCacheTtl(result, moonshotCacheTtl());
 }
 
 /**
@@ -212,7 +228,8 @@ export async function* streamOnKimiEndpoint<T>(
     while (true) {
       const step = await anthropicCompatibleEndpoint.run(endpoint, () => iterator.next());
       if (step.done) return;
-      yield step.value;
+      const isUsage = (step.value as { type?: string } | null)?.type === "usage";
+      yield isUsage ? withKimiCacheTtl(step.value, moonshotCacheTtl()) : step.value;
     }
   } finally {
     await anthropicCompatibleEndpoint.run(endpoint, async () => {
