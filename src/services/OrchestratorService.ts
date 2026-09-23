@@ -2776,9 +2776,6 @@ export class OrchestratorService {
           // way down, and a switch of the parent's mode reaches its sub-agents.
           // A definition that names a mode gets it narrowed (subAgentModeHandle).
           ...(subAgentMode && { _permissionMode: subAgentMode.handle }),
-          ...(orchestratorContext.enableCriticGate !== undefined && {
-            enableCriticGate: orchestratorContext.enableCriticGate,
-          }),
           ...(orchestratorContext.criticModel && {
             criticModel: orchestratorContext.criticModel,
           }),
@@ -2871,6 +2868,19 @@ export class OrchestratorService {
         `[Orchestrator] Sub-agent ${subAgent.agentId} completed with empty output. ` +
           `messages=${finalMessages.length}, telemetryOutput=${telemetryOutput.length}chars`,
       );
+    }
+    // Auto mode reads the report before the parent does (its task was read
+    // at spawn and each of its actions as it ran): a flagged report arrives
+    // with a security warning on top (AutoModeGate).
+    const reportModeHandle = subAgentMode?.handle ?? orchestratorContext.permissionMode;
+    if (reportModeHandle?.mode === "auto" && subAgent.status !== SYSTEM_STATUSES.STOPPED && subAgent.output) {
+      const { reviewedSubAgentReport } = await import("./harnesses/lifecycle/AutoModeGate.ts");
+      subAgent.output = await reviewedSubAgentReport({
+        report: subAgent.output,
+        transcript: finalMessages,
+        handle: reportModeHandle,
+        parent: orchestratorContext,
+      });
     }
     subAgent.toolCalls = telemetry.toolCalls;
     subAgent.messages = finalMessages;
@@ -3382,9 +3392,6 @@ export class OrchestratorService {
         orchestratorContext.policies.length > 0 && {
           policies: orchestratorContext.policies,
         }),
-      ...(orchestratorContext.enableCriticGate !== undefined && {
-        enableCriticGate: orchestratorContext.enableCriticGate,
-      }),
       ...(orchestratorContext.criticModel && {
         criticModel: orchestratorContext.criticModel,
       }),

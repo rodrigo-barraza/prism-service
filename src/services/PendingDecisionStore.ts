@@ -78,7 +78,7 @@ export interface PendingDecisionRecord extends DecisionOwner {
   /** The tool's JSON-Schema `parameters` — edited arguments must satisfy it. */
   argsSchema?: Record<string, unknown> | null;
   preview?: unknown;
-  /** Who asked for the card besides the tier: a hook, or a restart ("run it again?"). */
+  /** Who asked for the card besides the tier: a hook, a restart ("run it again?"), or auto mode ("classifier"). */
   requestedBy?: string;
   reason?: string;
   decision?: StoredApprovalDecision;

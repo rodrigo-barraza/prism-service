@@ -24,6 +24,7 @@ import {
   unattendedDenialReason,
 } from "#src/services/permissions/PermissionModes";
 import { buildApprovalPreview } from "./ApprovalPreview.ts";
+import { applyAutoModeVerdicts, autoModeSessionOf } from "./AutoModeGate.ts";
 import { buildDeniedToolResult, firePermissionDenied } from "./TurnHooks.ts";
 
 /**
@@ -54,6 +55,10 @@ import { buildDeniedToolResult, firePermissionDenied } from "./TurnHooks.ts";
  * user) and every card that lapsed unanswered (superseded, turn_ended). A
  * batch that needs nobody fires none of this.
  *
+ * In `auto` mode the classifier (AutoModeGate) decides the calls the engine
+ * left to it before any of this: they run, are refused with a category, or
+ * join the cards.
+ *
  * Reusable by any harness that executes write/danger-tier tools.
  */
 
@@ -73,6 +78,11 @@ export interface ApprovalVerdict {
   deniedToolCalls: ToolCall[];
   /** The user chose "auto-approve this conversation": the rest of the turn skips the gate. */
   shouldApproveAll: boolean;
+  /**
+   * Auto mode's breaker tripped where nobody can answer: the loop ends the
+   * turn after this batch (the reason says why).
+   */
+  stopTurnReason?: string | null;
 }
 
 export interface ApprovalGateOptions {
@@ -131,6 +141,7 @@ export function approvalRecordFor(toolCall: ToolCall): Pick<ToolCall, "_approval
       ...(stamp.isDenied ? { isDenied: true } : {}),
       ...(stamp.deniedBy ? { deniedBy: stamp.deniedBy } : {}),
       ...(stamp.deniedBy === "mode" && stamp.mode ? { mode: stamp.mode } : {}),
+      ...(stamp.category ? { category: stamp.category } : {}),
       ...(stamp.reason ? { reason: stamp.reason } : {}),
       ...(stamp.decidedBy ? { decidedBy: stamp.decidedBy } : {}),
       ...(stamp.userReason ? { userReason: stamp.userReason } : {}),
@@ -290,7 +301,12 @@ export async function checkAndWaitForApproval(
   const locale =
     (options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale();
 
-  const { needsApproval, denied = [] } = approvalEngine.checkBatch(toolCalls);
+  // `auto` mode: the classifier decides what the engine left to it.
+  const { needsApproval, denied = [], stopTurnReason } = await applyAutoModeVerdicts(
+    toolCalls,
+    approvalEngine.checkBatch(toolCalls),
+    context,
+  );
 
   const deniedOriginals = matchOriginals(toolCalls, denied);
   if (deniedOriginals.size > 0) {
@@ -300,7 +316,9 @@ export async function checkAndWaitForApproval(
       const label =
         toolCall._approval?.deniedBy === "mode"
           ? `${toolCall._approval.mode ?? "permission"} mode`
-          : "policy";
+          : toolCall._approval?.deniedBy === "classifier"
+            ? "the auto-mode classifier"
+            : "policy";
       byLayer.set(label, [...(byLayer.get(label) ?? []), toolCall.name]);
     }
     emit({
@@ -310,11 +328,12 @@ export async function checkAndWaitForApproval(
         .join("; ")}`,
     });
     for (const deniedCall of deniedOriginals) {
+      const deniedBy = deniedCall._approval?.deniedBy;
       await firePermissionDenied(
         hooks,
         context,
         deniedCall,
-        deniedCall._approval?.deniedBy === "mode" ? "mode" : "rule",
+        deniedBy === "mode" || deniedBy === "classifier" ? deniedBy : "rule",
         deniedCall._approval?.reason || "policy rule",
       );
     }
@@ -404,6 +423,7 @@ export async function checkAndWaitForApproval(
       blockedResults: deniedToolCalls.map(deniedResultOf),
       deniedToolCalls,
       shouldApproveAll: false,
+      stopTurnReason,
     };
   }
 
@@ -468,7 +488,11 @@ export async function checkAndWaitForApproval(
             toolName: toolCall.name,
           }),
         }
-      : {}),
+      : toolCall._approval?.askedByAutoMode
+        ? // Auto mode put this to the user: its classifier asked, failed, or is
+          // paused by its breaker — the reason says which.
+          { requestedBy: "classifier", reason: toolCall._approval.reason ?? null }
+        : {}),
   }));
 
   // Recorded first, THEN shown: a decision can only land on a call that
@@ -536,6 +560,11 @@ export async function checkAndWaitForApproval(
       ...(awaiting[index].toolCall._approval?.mode && {
         mode: awaiting[index].toolCall._approval!.mode,
       }),
+      // Auto mode's card names the classifier's category, when it gave one.
+      ...(awaiting[index].toolCall._approval?.askedByAutoMode &&
+        awaiting[index].toolCall._approval!.category && {
+          category: awaiting[index].toolCall._approval!.category,
+        }),
     });
   });
 
@@ -571,6 +600,8 @@ export async function checkAndWaitForApproval(
     const decision = decisionByCall.get(toolCall);
     if (decision?.decision === "allow") {
       if (decision.scope === "conversation") shouldApproveAll = true;
+      // A person's yes on a card auto mode put out resumes auto mode.
+      if (toolCall._approval?.askedByAutoMode) autoModeSessionOf(context).recordUserAllowed();
       const originalArgs = toolCall.args;
       if (decision.editedArgs) toolCall.args = decision.editedArgs;
       // Stamp the user's decision onto the original call so the decide-hook
@@ -607,5 +638,5 @@ export async function checkAndWaitForApproval(
     });
   }
 
-  return { executableToolCalls, blockedResults, deniedToolCalls, shouldApproveAll };
+  return { executableToolCalls, blockedResults, deniedToolCalls, shouldApproveAll, stopTurnReason };
 }

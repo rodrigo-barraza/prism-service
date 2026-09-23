@@ -315,7 +315,6 @@ function buildLoopContext(overrides: {
       harness: "standard",
       topology: "hierarchical",
       thoughtStructure: "chain_of_thought",
-      enableCriticGate: false,
       ...overrides.options,
     },
     messages: [{ role: "user", content: "Do the task" }],

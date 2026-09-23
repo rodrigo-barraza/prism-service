@@ -476,6 +476,19 @@ export function buildDeniedToolResult(toolCall: ToolCall): ToolResult {
       },
     };
   }
+  if (toolCall._approval?.deniedBy === "classifier") {
+    // `[Category] reason` — written for the model, so it can try another way.
+    return {
+      name: toolCall.name,
+      id: toolCall.id,
+      result: {
+        success: false,
+        error: "AUTO_MODE_DENIED",
+        ...(toolCall._approval.category ? { category: toolCall._approval.category } : {}),
+        message: reason,
+      },
+    };
+  }
   if (toolCall._approval?.deniedBy === "hook") {
     return {
       name: toolCall.name,

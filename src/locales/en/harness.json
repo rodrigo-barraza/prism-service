@@ -1,9 +1,4 @@
 {
-  "criticGate": {
-    "safetyReviewer": "You are a code safety reviewer. An AI agent wants to execute the following tool call.",
-    "reviewCriteria": "Review for safety — destructive commands (rm -rf, DROP, DELETE, format), data exfiltration (curl to external servers, unauthorized network access), privilege escalation (sudo, chmod 777), or resource exhaustion.",
-    "responseFormat": "Respond with exactly one word on the first line: APPROVE or DENY\nIf DENY, explain why on the second line."
-  },
   "planningMode": {
     "blocked": "You are in PLANNING MODE. Tool call(s) [{{blockedNames}}] were blocked — only exit_plan_mode is available. Write your complete plan as text output, then call exit_plan_mode to submit it for user approval.",
     "blockedNotReadOnly": "Plan mode is on: {{blockedNames}} did not run — only read-only tools run while you plan. Keep exploring with read-only tools, write your plan, then call exit_plan_mode to submit it for approval.",
@@ -22,6 +17,9 @@
   "exhaustionRecovery": {
     "message": "Maximum tool-call iterations reached for this turn. Summarize progress so far, report partial results, and state what remains to be done.",
     "subAgentMessage": "CRITICAL: You are a sub-agent and your iteration limit has been reached. You MUST produce a final response NOW. Synthesize ALL information you have gathered from your tool calls into a comprehensive, well-structured summary. Do NOT say you need more iterations — work with what you have. Your response will be returned to the orchestrator."
+  },
+  "autoModeStopped": {
+    "message": "Auto mode stopped this run: its classifier refused too many actions, and nobody is watching to approve them. Do not call any more tools. Summarize what you did, which actions were refused and why, and what the user would need to allow for the work to continue."
   },
   "gotSynthesis": {
     "instruction": "[GRAPH-OF-THOUGHTS SYNTHESIS PASS]\n\n{{branchCount}} parallel reasoning branches were generated and scored. Produce a single, optimal response that SYNTHESIZES the best aspects of all branches into one unified action.\n\nRULES:\n1. Merge complementary strengths — do NOT simply repeat the highest-scoring branch.\n2. If multiple branches propose COMPLEMENTARY (non-conflicting) tool calls, include all of them.\n3. If branches disagree on approach, prefer the one with highest CORRECTNESS score, then RISK score.\n4. Incorporate defensive measures (error handling, validation) from the THOROUGH branch even if using a MINIMAL branch's core approach.\n5. Produce your merged response with tool calls as if you are executing the task.\n\n── BRANCH OUTPUTS ──\n\n"

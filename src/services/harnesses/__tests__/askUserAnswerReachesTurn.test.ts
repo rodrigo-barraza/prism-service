@@ -316,7 +316,6 @@ function startTurn(
       harness: "standard",
       topology: "single",
       thoughtStructure: "chain",
-      enableCriticGate: false,
       maxIterations: 6,
       autoApprove: true,
       agenticLoopEnabled: true,

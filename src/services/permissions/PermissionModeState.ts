@@ -1,5 +1,6 @@
 import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
+import { AutoModeSession } from "./AutoModeSession.ts";
 import {
   DEFAULT_PERMISSION_MODE,
   UNATTENDED_PERMISSION_MODE,
@@ -45,6 +46,12 @@ export interface PermissionModeChange {
 export class PermissionModeHandle {
   private current: PermissionMode;
   private currentSource: PermissionModeSource;
+  /**
+   * Auto mode's breaker, the user's words and the classifier's bill for this
+   * turn. A sub-agent's derived handle is given its parent's
+   * (subAgentModeHandle), so the delegation tree shares one.
+   */
+  autoMode = new AutoModeSession();
   /**
    * Nobody is watching this run: anything that would ask is denied, in any
    * mode. `dontAsk` implies it; a scheduled task or timer sets it on top of
