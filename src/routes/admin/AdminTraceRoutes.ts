@@ -10,11 +10,74 @@ import {
 } from "#src/utils/QueryBuilders";
 import requireDb from "#src/middleware/RequireDbMiddleware";
 import { StatsCache } from "#src/caches/StatsCache";
+import {
+  aggregateRequestStats,
+  isCoveredMatch,
+} from "#src/services/RequestStatsIndex";
 
 const router = express.Router();
 const { REQUESTS: REQUESTS_COLLECTION } = COLLECTIONS;
 
 router.use(requireDb);
+
+/**
+ * Trace sort keys the stats covering index can compute on its own. Sorting by
+ * one of them pages in two passes: pick the page's trace ids from index keys
+ * alone, then build the full summaries for those traces only. The one-pass
+ * pipeline grouped every request in range — ~17 KB each — to show a page of
+ * 5 or 50 (11.6 s all-time on prod, 2026-09-23).
+ */
+const INDEX_SORT_ACCUMULATORS: Record<string, Record<string, unknown>> = {
+  createdAt: { $min: "$createdAt" },
+  startedAt: { $min: "$createdAt" },
+  updatedAt: { $max: "$createdAt" },
+  finishedAt: { $max: "$createdAt" },
+  requestCount: { $sum: 1 },
+  totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
+  totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
+  totalCost: COST_SUMMATION_EXPRESSION,
+  totalLatency: { $sum: { $ifNull: ["$totalTime", 0] } },
+};
+
+/**
+ * First pass: one page of trace ids plus the trace total, from index keys.
+ * The trace list's `traceId: { $ne: null }` is applied to the group key
+ * inside the `$facet` — in the query it makes Mongo FETCH every row, and a
+ * `$match` on the group key outside a `$facet` is moved back into the query.
+ */
+export function buildTracePagePipeline(
+  match: Record<string, unknown>,
+  {
+    sortAccumulator,
+    sortDirection,
+    skip,
+    limit,
+  }: {
+    sortAccumulator: Record<string, unknown>;
+    sortDirection: 1 | -1;
+    skip: number;
+    limit: number;
+  },
+) {
+  const indexMatch = { ...match };
+  delete indexMatch.traceId;
+  const pipeline = [
+    ...(Object.keys(indexMatch).length ? [{ $match: indexMatch }] : []),
+    { $group: { _id: "$traceId", sortValue: sortAccumulator } },
+    {
+      $facet: {
+        ids: [
+          { $match: { _id: { $ne: null } } },
+          { $sort: { sortValue: sortDirection, _id: 1 } },
+          { $skip: skip },
+          { $limit: limit },
+        ],
+        metadata: [{ $match: { _id: { $ne: null } } }, { $count: "total" }],
+      },
+    },
+  ];
+  return { pipeline, covered: isCoveredMatch(indexMatch) };
+}
 
 // ─── GET /traces — paginated trace list (derived from requests) ─
 // Lightweight summary-only aggregate: no $push of full documents.
@@ -235,7 +298,46 @@ router.get(
           },
         };
 
-        const sortStage = { $sort: { [sort as string]: sortDirection } };
+        const sortKey = String(sort);
+        const indexSortAccumulator = INDEX_SORT_ACCUMULATORS[sortKey];
+        if (indexSortAccumulator) {
+          const { pipeline, covered } = buildTracePagePipeline(match, {
+            sortAccumulator: indexSortAccumulator,
+            sortDirection,
+            skip,
+            limit,
+          });
+          const [pageResult] = await aggregateRequestStats(req.db, pipeline, {
+            covered,
+            maxTimeMS: AGGREGATE_MAX_TIME_MILLISECONDS,
+          });
+          const traceIds: string[] = (pageResult?.ids || []).map(
+            (row: { _id: string }) => row._id,
+          );
+          const total = pageResult?.metadata?.[0]?.total || 0;
+          if (traceIds.length === 0) return { data: [], total, page, limit };
+
+          const summaries = await req.db
+            .collection(REQUESTS_COLLECTION)
+            .aggregate(
+              [
+                { $match: { ...match, traceId: { $in: traceIds } } },
+                groupStage,
+                projectStage,
+                cleanupStage,
+              ],
+              { maxTimeMS: AGGREGATE_MAX_TIME_MILLISECONDS },
+            )
+            .toArray();
+          const summaryById = new Map(summaries.map((summary) => [summary.id, summary]));
+          const data = traceIds
+            .map((traceId) => summaryById.get(traceId))
+            .filter(Boolean);
+          return { data, total, page, limit };
+        }
+
+        // Any other sort key needs every trace's full summary to order them.
+        const sortStage = { $sort: { [sortKey]: sortDirection, id: 1 } };
 
         const facetPipeline = [
           { $match: match },

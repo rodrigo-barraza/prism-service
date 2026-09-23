@@ -334,6 +334,9 @@ const RequestLogger = {
         toolsUsed,
         toolDisplayNames,
         toolApiNames,
+        // Scalar twin of toolApiNames for the stats covering index
+        // (RequestStatsIndex) — a multikey index covers nothing.
+        toolApiNameCount: toolApiNames.length,
         success,
         errorMessage,
         inputTokens,
@@ -829,6 +832,7 @@ const RequestLogger = {
         toolsUsed,
         toolDisplayNames,
         toolApiNames,
+        toolApiNameCount: toolApiNames?.length ?? 0,
         success,
         errorMessage,
         // Unconditional token fields (uniform schema for aggregations)
