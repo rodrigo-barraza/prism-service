@@ -6,6 +6,7 @@ import MemoryService from "#src/services/MemoryService";
 import EmbeddingService from "#src/services/EmbeddingService";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
+import { createMockCollection } from "../../../../tests/mongoMock.ts";
 
 // ── Mocks ──────────────────────────────────────────────────────
 vi.mock("#src/services/MemoryService", () => ({
@@ -32,6 +33,7 @@ vi.mock("#src/services/EmbeddingService", () => ({
 vi.mock("#src/wrappers/MongoWrapper", () => ({
   default: {
     getDb: vi.fn(),
+    getCollection: vi.fn(),
   },
 }));
 
@@ -138,81 +140,60 @@ describe("SkillMemoryScorer", () => {
     });
   });
 
-  describe("fetchSkills", () => {
-    it("should fallback to all skills with score=1 if queryText is empty", async () => {
-      const mockSkills = [
-        { name: "deploy", content: "deploy content", description: "deploy description" }
-      ];
-      const mockDatabase = {
-        collection: () => ({
-          find: () => ({
-            project: () => ({
-              toArray: async () => mockSkills
-            })
-          })
-        })
-      };
-      vi.mocked(MongoWrapper.getDb).mockReturnValueOnce(mockDatabase as any);
+  describe("fetchSkillCatalog", () => {
+    const panelSkill = (name: string, embedding?: number[]) => ({
+      _id: `id-${name}`,
+      project: "test-project",
+      username: "rodrigo",
+      profileId: "default",
+      name,
+      description: `${name} description`,
+      content: `${name} content`,
+      enabled: true,
+      ...(embedding ? { embedding } : {}),
+    });
+    const useSkills = (skills: Array<Record<string, unknown>>) =>
+      vi.mocked(MongoWrapper.getCollection).mockReturnValue(
+        createMockCollection(skills) as any,
+      );
+
+    it("returns the catalog without highlights when queryText is empty", async () => {
+      useSkills([panelSkill("deploy", [1, 0, 0])]);
 
       const scorer = new SkillMemoryScorer();
-      const result = await scorer.fetchSkills("test-project", "rodrigo", "");
+      const result = await scorer.fetchSkillCatalog("test-project", "rodrigo", "");
 
-      expect(result).toEqual([
-        { name: "deploy", content: "deploy content", description: "deploy description", score: 1 }
-      ]);
+      expect(result).toEqual({
+        entries: [{ name: "deploy", description: "deploy description" }],
+        highlighted: [],
+      });
+      expect(EmbeddingService.embed).not.toHaveBeenCalled();
     });
 
-    it("should score skills by similarity if embeddings are present", async () => {
-      const mockSkills = [
-        { name: "deploy", content: "deploy content", description: "deploy description", embedding: [1, 0, 0] },
-        { name: "build", content: "build content", description: "build description", embedding: [0, 1, 0] }
-      ];
-      const mockDatabase = {
-        collection: () => ({
-          find: () => ({
-            project: () => ({
-              toArray: async () => mockSkills
-            })
-          })
-        })
-      };
-      vi.mocked(MongoWrapper.getDb).mockReturnValueOnce(mockDatabase as any);
+    it("highlights skills by similarity, keeping every skill in the catalog", async () => {
+      useSkills([panelSkill("deploy", [1, 0, 0]), panelSkill("build", [0, 1, 0])]);
       vi.mocked(EmbeddingService.embed).mockResolvedValueOnce([1, 0, 0]); // matches deploy
 
       const scorer = new SkillMemoryScorer();
-      const result = await scorer.fetchSkills("test-project", "rodrigo", "deploy");
+      const result = await scorer.fetchSkillCatalog("test-project", "rodrigo", "deploy");
 
-      expect(result).toHaveLength(1); // deploy is 1.0 similarity, build is 0.0 (below 0.3 threshold)
-      expect(result[0]).toEqual({
-        name: "deploy",
-        content: "deploy content",
-        description: "deploy description",
-        score: 1,
-      });
+      // build is 0.0 similarity — below the 0.3 threshold, still in the catalog
+      expect(result.entries.map((entry) => entry.name)).toEqual(["build", "deploy"]);
+      expect(result.highlighted).toEqual(["deploy"]);
+      expect(JSON.stringify(result)).not.toContain("content");
     });
 
-    it("should return all skills with score=1 if embedding generation throws", async () => {
-      const mockSkills = [
-        { name: "deploy", content: "deploy content", description: "deploy description", embedding: [1, 0, 0] }
-      ];
-      const mockDatabase = {
-        collection: () => ({
-          find: () => ({
-            project: () => ({
-              toArray: async () => mockSkills
-            })
-          })
-        })
-      };
-      vi.mocked(MongoWrapper.getDb).mockReturnValueOnce(mockDatabase as any);
+    it("keeps the catalog and drops highlights if embedding generation throws", async () => {
+      useSkills([panelSkill("deploy", [1, 0, 0])]);
       vi.mocked(EmbeddingService.embed).mockRejectedValueOnce(new Error("Embedding API rate limit"));
 
       const scorer = new SkillMemoryScorer();
-      const result = await scorer.fetchSkills("test-project", "rodrigo", "deploy");
+      const result = await scorer.fetchSkillCatalog("test-project", "rodrigo", "deploy");
 
-      expect(result).toEqual([
-        { name: "deploy", content: "deploy content", description: "deploy description", score: 1 }
-      ]);
+      expect(result).toEqual({
+        entries: [{ name: "deploy", description: "deploy description" }],
+        highlighted: [],
+      });
     });
   });
 });

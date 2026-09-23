@@ -15,5 +15,7 @@
   "discordGuildIdLine": "- Guild ID: {{guildId}}",
   "discordChannelIdLine": "\n- Channel ID: {{channelId}}",
   "liveApiLanguageHint": "Respond in user's language. Primary: English.",
-  "constraintsHeader": "## Rules\nNEVER break these:"
+  "constraintsHeader": "## Rules\nNEVER break these:",
+  "skillCatalogHeader": "## Skill\nSaved instruction for common task, one per line `name: what for`. Only name here. Task match skill → call `load_skill` with name, follow what come back, then start.",
+  "skillHighlight": "Skill maybe useful for this message: {{names}}. Fit task → `load_skill` first."
 }

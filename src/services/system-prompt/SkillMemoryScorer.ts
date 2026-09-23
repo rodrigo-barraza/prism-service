@@ -1,16 +1,22 @@
 import MemoryService from "#src/services/MemoryService";
 import EmbeddingService from "#src/services/EmbeddingService";
-import MongoWrapper from "#src/wrappers/MongoWrapper";
-import { MONGO_DB_NAME } from "#config";
-import { COLLECTIONS, MEMORY } from "#src/constants";
+import SkillService, {
+  catalogDescription,
+  resolveSkillCaller,
+} from "#src/services/SkillService";
+import { MEMORY } from "#src/constants";
 import logger from "#src/utils/logger";
 import { cosineSimilarity } from "@rodrigo-barraza/utilities-library";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
-import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
-import { getRequestContext } from "#src/utils/RequestContext";
-import { type MemoryFetchOptions, type SkillFetchOptions, type ScoredSkill } from "./types.ts";
+import {
+  type MemoryFetchOptions,
+  type SkillCatalogResult,
+  type SkillFetchOptions,
+} from "./types.ts";
 
 const SKILL_RELEVANCE_THRESHOLD = MEMORY.SKILL_RELEVANCE_THRESHOLD;
+/** At most this many catalog entries are highlighted for one turn. */
+const SKILL_HIGHLIGHT_LIMIT = 3;
 
 export class SkillMemoryScorer {
   /**
@@ -109,7 +115,13 @@ export class SkillMemoryScorer {
     }
   }
 
-  async fetchSkills(
+  /**
+   * The skill catalog for this caller (scope + persona), in name order so the
+   * cached system prompt stays byte-stable, plus the entries this turn's
+   * message looks relevant to. Relevance only highlights — it never adds a
+   * body; bodies load through `load_skill`.
+   */
+  async fetchSkillCatalog(
     project: string | null,
     username: string,
     queryText: string,
@@ -120,43 +132,24 @@ export class SkillMemoryScorer {
       agent,
       profileId,
     }: SkillFetchOptions = {},
-  ): Promise<ScoredSkill[]> {
+  ): Promise<SkillCatalogResult> {
     try {
-      const db = MongoWrapper.getDb(MONGO_DB_NAME);
-      if (!db) return [];
+      const skills = await SkillService.catalog(
+        resolveSkillCaller({ project, username, profileId, agent }),
+      );
+      const entries = skills.map((skill) => ({
+        name: skill.name,
+        description: catalogDescription(skill),
+      }));
+      if (skills.length === 0) return { entries, highlighted: [] };
 
-      const skills = await db
-        .collection(COLLECTIONS.AGENT_SKILLS)
-        .find({
-          project,
-          username,
-          profileId: profileFilter(
-            profileId || getRequestContext().profileId || DEFAULT_PROFILE_ID,
-          ),
-          enabled: true,
-        })
-        .project({ name: 1, content: 1, description: 1, embedding: 1 })
-        .toArray();
-
-      if (skills.length === 0) return [];
-
-      // If no query or no skills have embeddings, return all (graceful fallback)
-      const hasEmbeddings = skills.some(
+      const embedded = skills.filter(
         (skill) => Array.isArray(skill.embedding) && skill.embedding.length > 0,
       );
-      if (!queryText || !hasEmbeddings) {
-        logger.info(
-          `[SystemPromptAssembler] Returning all ${skills.length} skills (no query or no embeddings)`,
-        );
-        return skills.map((skill) => ({
-          name: skill.name as string,
-          content: skill.content as string,
-          description: skill.description as string,
-          score: 1,
-        }));
+      if (!queryText || embedded.length === 0) {
+        return { entries, highlighted: [] };
       }
 
-      // Generate query embedding
       let queryEmbedding: number[];
       try {
         queryEmbedding = await EmbeddingService.embed(queryText, {
@@ -169,40 +162,29 @@ export class SkillMemoryScorer {
         });
       } catch (error: unknown) {
         logger.warn(
-          `[SystemPromptAssembler] Query embedding failed: ${getErrorMessage(error)} — returning all skills`,
+          `[SystemPromptAssembler] Skill relevance embedding failed: ${getErrorMessage(error)} — catalog without highlights`,
         );
-        return skills.map((skill) => ({
-          name: skill.name as string,
-          content: skill.content as string,
-          description: skill.description as string,
-          score: 1,
-        }));
+        return { entries, highlighted: [] };
       }
 
-      // Score and filter by relevance threshold
-      const scored: ScoredSkill[] = skills
-        .filter((skill) => !!skill)
+      const scored = embedded
         .map((skill) => ({
-          name: skill.name as string,
-          content: skill.content as string,
-          description: skill.description as string,
-          score: skill.embedding
-            ? cosineSimilarity(queryEmbedding, skill.embedding as number[])
-            : 0,
+          name: skill.name,
+          score: cosineSimilarity(queryEmbedding, skill.embedding as number[]),
         }))
         .filter((skill) => skill.score >= SKILL_RELEVANCE_THRESHOLD)
-        .sort((firstItem, b) => b.score - firstItem.score);
+        .sort((left, right) => right.score - left.score)
+        .slice(0, SKILL_HIGHLIGHT_LIMIT);
 
       logger.info(
-        `[SystemPromptAssembler] Skills: ${scored.length}/${skills.length} above threshold (${scored.map((skill) => `${skill.name}:${skill.score.toFixed(2)}`).join(", ")})`,
+        `[SystemPromptAssembler] Skills: ${entries.length} in catalog, ${scored.length} highlighted (${scored.map((skill) => `${skill.name}:${skill.score.toFixed(2)}`).join(", ")})`,
       );
-
-      return scored;
+      return { entries, highlighted: scored.map((skill) => skill.name) };
     } catch (error: unknown) {
       logger.warn(
-        `[SystemPromptAssembler] Skills fetch error: ${getErrorMessage(error)}`,
+        `[SystemPromptAssembler] Skill catalog fetch error: ${getErrorMessage(error)}`,
       );
-      return [];
+      return { entries: [], highlighted: [] };
     }
   }
 }

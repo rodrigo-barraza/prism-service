@@ -7,16 +7,36 @@ import {
 import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
 
 import { type InternalToolContext } from "./InternalToolRegistry.ts";
-import type { SkillDocument, SkillPrepareResult } from "#src/services/SkillService";
+import type {
+  SkillCaller,
+  SkillPrepareResult,
+  SkillWriteInput,
+} from "#src/services/SkillService";
 
-interface SkillCreateArgs extends Partial<SkillDocument> {
-  [key: string]: any;
-}
-
+/** Prism-local skill tool names, not yet in the shared taxonomy's TOOL_NAMES. */
+export const SKILL_TOOL_NAMES = {
+  LOAD_SKILL: "load_skill",
+} as const;
 
 // ── Skill Tools ────────────────────────────────────────────
-// CRUD operations for reusable workflow skills.
+// The system prompt lists a catalog of skills (name + one line);
+// load_skill reads one skill's body when a task needs it. The rest
+// manage skills. Every call reads and writes only the caller's scope
+// (project × username × profile, and the persona a skill is bound to).
 // Delegates to SkillService for MongoDB persistence.
+
+async function loadSkillService() {
+  return (await import("#src/services/SkillService")).default;
+}
+
+async function callerOf(context: InternalToolContext): Promise<SkillCaller> {
+  const { resolveSkillCaller } = await import("#src/services/SkillService");
+  return resolveSkillCaller({
+    project: context.project,
+    username: context.username,
+    agent: context.agent,
+  });
+}
 
 const createSkill = {
   name: TOOL_NAMES.CREATE_SKILL,
@@ -78,11 +98,11 @@ const createSkill = {
   domain: DOMAINS.CORE_SKILL.displayName,
   async execute(
     toolArguments: Record<string, unknown>,
-    _context: InternalToolContext,
+    context: InternalToolContext,
   ) {
-    const createArgs: SkillCreateArgs = {
+    const createArgs: SkillWriteInput = {
       name: typeof toolArguments.name === "string" ? toolArguments.name : "",
-      prompt:
+      body:
         typeof toolArguments.prompt === "string" ? toolArguments.prompt : "",
       description:
         typeof toolArguments.description === "string"
@@ -93,7 +113,7 @@ const createSkill = {
             (step) => typeof step === "string",
           ) as string[])
         : undefined,
-      tools: Array.isArray(toolArguments.tools)
+      allowedTools: Array.isArray(toolArguments.tools)
         ? (toolArguments.tools.filter(
             (tool) => typeof tool === "string",
           ) as string[])
@@ -106,16 +126,25 @@ const createSkill = {
         typeof toolArguments.model === "string"
           ? toolArguments.model
           : undefined,
+      source: "agent",
     };
-    if (!createArgs.name || !createArgs.prompt)
+    if (!createArgs.name || !createArgs.body)
       return {
         error: PromptLocaleService.get(
           PromptLocaleService.getDefaultLocale(),
           "internal-tools-runtime.create_skill.missingFields",
         ),
       };
-    const { default: SkillService } = await import("#src/services/SkillService");
-    return SkillService.create(createArgs);
+    const SkillService = await loadSkillService();
+    const result = await SkillService.create(createArgs, await callerOf(context));
+    if (!result || !("skill" in result) || !result.skill) return result;
+    // The stored skill carries its embedding; the model gets the handle.
+    return {
+      created: true,
+      name: result.skill.name,
+      skillId: result.skill.skillId,
+      message: result.message,
+    };
   },
 };
 
@@ -168,8 +197,12 @@ const executeSkill = {
         ),
       };
 
-    const { default: SkillService } = await import("#src/services/SkillService");
-    const prepared: SkillPrepareResult = await SkillService.prepare(skillId, variables);
+    const SkillService = await loadSkillService();
+    const prepared: SkillPrepareResult = await SkillService.prepare(
+      skillId,
+      variables,
+      await callerOf(context),
+    );
     if (prepared.error) return prepared;
 
     // Execute via orchestrator's create_subagent mechanism
@@ -202,21 +235,52 @@ const listSkills = {
   capabilities: [] as const,
   emoji: INTERNAL_TOOL_EMOJIS[TOOL_NAMES.LIST_SKILLS],
   description:
-    "List all available skills. Skills are reusable workflow templates created with create_skill.",
+    "List the skills available in this scope: name, skillId and what each is for. " +
+    "Read a skill's instructions with load_skill.",
   parameters: {
     type: "object",
-    properties: {
-      project: {
-        type: "string",
-        description: "Optional: filter by project scope.",
-      },
-    },
+    properties: {},
     required: [],
   },
   display: {
     activeVerb: "Listing skills",
     completedVerb: "Listed skills",
-    subjectParam: "project",
+    subjectParam: "",
+    subjectFormat: "truncate" as const,
+  },
+  labels: ["coding", "automation"],
+  domain: DOMAINS.CORE_SKILL.displayName,
+  async execute(
+    _toolArguments: Record<string, unknown>,
+    context: InternalToolContext,
+  ) {
+    const SkillService = await loadSkillService();
+    return SkillService.list(await callerOf(context));
+  },
+};
+
+const loadSkill = {
+  name: SKILL_TOOL_NAMES.LOAD_SKILL,
+  capabilities: [] as const,
+  emoji: INTERNAL_TOOL_EMOJIS[SKILL_TOOL_NAMES.LOAD_SKILL],
+  description:
+    "Read a skill's full instructions by name. The system prompt lists each available " +
+    "skill as `name: what it is for`; when your task matches one, call this and follow " +
+    "the instructions it returns. Returns the skill's body and its bundled resources.",
+  parameters: {
+    type: "object",
+    properties: {
+      name: {
+        type: "string",
+        description: "The skill's name, exactly as the skill catalog lists it.",
+      },
+    },
+    required: ["name"],
+  },
+  display: {
+    activeVerb: "Loading skill",
+    completedVerb: "Loaded skill",
+    subjectParam: "name",
     subjectFormat: "quoted" as const,
   },
   labels: ["coding", "automation"],
@@ -225,12 +289,17 @@ const listSkills = {
     toolArguments: Record<string, unknown>,
     context: InternalToolContext,
   ) {
-    const project =
-      typeof toolArguments.project === "string"
-        ? toolArguments.project
-        : context.project;
-    const { default: SkillService } = await import("#src/services/SkillService");
-    return SkillService.list({ project });
+    const name =
+      typeof toolArguments.name === "string" ? toolArguments.name.trim() : "";
+    if (!name)
+      return {
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.load_skill.missingName",
+        ),
+      };
+    const SkillService = await loadSkillService();
+    return SkillService.load(name, await callerOf(context));
   },
 };
 
@@ -256,7 +325,7 @@ const deleteSkill = {
   domain: DOMAINS.CORE_SKILL.displayName,
   async execute(
     toolArguments: Record<string, unknown>,
-    _context: InternalToolContext,
+    context: InternalToolContext,
   ) {
     const skillId =
       typeof toolArguments.skillId === "string" ? toolArguments.skillId : "";
@@ -267,9 +336,9 @@ const deleteSkill = {
           "internal-tools-runtime.delete_skill.missingSkillId",
         ),
       };
-    const { default: SkillService } = await import("#src/services/SkillService");
-    return SkillService.delete(skillId);
+    const SkillService = await loadSkillService();
+    return SkillService.delete(skillId, await callerOf(context));
   },
 };
 
-export default [createSkill, executeSkill, listSkills, deleteSkill];
+export default [createSkill, executeSkill, listSkills, loadSkill, deleteSkill];

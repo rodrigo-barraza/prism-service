@@ -486,6 +486,26 @@ describe('Feature Routes Integration Tests', () => {
   });
 
   describe('SkillsRoutes', () => {
+    // SkillService reads agent_skills through getCollection, and finds a
+    // skill to update or delete among those the caller can see — so the
+    // update and delete address the one stub document by its id.
+    let previousGetCollection: ((...args: any[]) => any) | undefined;
+    beforeEach(() => {
+      previousGetCollection = vi
+        .mocked(MongoWrapper.getCollection)
+        .getMockImplementation();
+      vi.mocked(MongoWrapper.getCollection).mockReturnValue(
+        mockDb.collection() as any,
+      );
+    });
+    afterEach(() => {
+      if (previousGetCollection) {
+        vi.mocked(MongoWrapper.getCollection).mockImplementation(
+          previousGetCollection,
+        );
+      }
+    });
+
     it('CRUD operations', async () => {
       // List
       const listResponse = await request(app)
@@ -507,7 +527,7 @@ describe('Feature Routes Integration Tests', () => {
 
       // Update
       const updateResponse = await request(app)
-        .put('/skills-test/507f1f77bcf86cd799439011')
+        .put('/skills-test/mock-id-123')
         .send({
           name: 'updated-skill',
         })
@@ -516,7 +536,7 @@ describe('Feature Routes Integration Tests', () => {
 
       // Delete
       const deleteResponse = await request(app)
-        .delete('/skills-test/507f1f77bcf86cd799439011')
+        .delete('/skills-test/mock-id-123')
         .expect(200);
       expect(deleteResponse.body).toHaveProperty('success', true);
     });

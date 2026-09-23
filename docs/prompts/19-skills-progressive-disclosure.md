@@ -1,15 +1,14 @@
 # 19 — Skills: progressive disclosure, real folders, plugins, workspace instructions (three landings)
 
+> **Landing 1 done** (`skills-catalog-and-loader`, service): one `Skill` type over both `agent_skills` schemas (`SkillService.toSkill`; no migration — an unset legacy scope field reads as "every value", new writes stamp project/user/profile); the system prompt carries a `<skills>` catalog (`name: description`, byte order, scope + persona filtered, only when `load_skill` is resolved); `load_skill(name)` returns body + `resources: []` + allowed tools/steps/template variables and counts `usageCount`/`lastUsedAt`; relevance only highlights ≤3 names per turn; `list_skills` has no bodies or vectors; routes, tools and the Claude importer all go through `SkillService`. 30 skills: +18,734 tokens/turn → +593 in the cached prompt.
+> Tests: `src/services/system-prompt/__tests__/skillCatalog.test.ts` (catalog, legacy, order, highlight, scope, token measurement), `tests/skillLoader.test.ts` (load_skill, list_skills, two users × two profiles), `tests/skillsRoutes.test.ts`, `tests/skillService.test.ts`, `contextBudgetTracker.test.ts` (skills category). `Skill.folderRef`, `SkillResource` and `load_skill`'s `resources` are the Landing 2 hooks.
+
 > Hand to ONE session per landing: *"Read prism-service/docs/prompts/19-skills-progressive-disclosure.md and execute Landing N."*
 > Conventions, gates and the isolated live recipe: `docs/prompts/README.md`. Source: `docs/harness_modernization_2026-09.md` §4.9, §2.3 B11.
 
 **Repos:** prism-service, prism-client (import UI and usage table) · **Size:** L · **Depends on:** 07 (`SkillMemoryScorer.ts` id fixes) · **Shares hubs with:** 10 (`src/services/system-prompt/index.ts`: if 10 is in flight, coordinate on the per-turn context block).
 
 ## Today
-- **Two schemas, one collection.** Two skill schemas share `agent_skills` (`SkillService.ts` ~32–48; `SkillsRoutes.ts` ~17–30). The injector requires `username`, `enabled` and `content` (`SkillMemoryScorer.ts` ~126–137), so SkillService- and Claude-imported skills are **never injected**.
-- **Scoping.** SkillService ignores user and project scoping (~106, ~172, ~289).
-- **Embeddings in context.** `list_skills` returns embedding vectors into the model's context (~233–240).
-- **Full bodies injected.** Whole skill bodies are injected when cosine ≥ 0.3, and all of them when there is no embedding (`system-prompt/index.ts` ~799–821; `SkillMemoryScorer.ts` ~141–155).
 - **Imports.** SKILL.md is read only by the one-shot importer (`ClaudeConfigImportService.ts` ~16–35), whose flat frontmatter parser drops `allowed-tools` and breaks on multi-line YAML. The folder path isn't stored, so bundled scripts can't be reached.
 - **Instructions.** PRISM.md lives in Mongo, and an agent-level doc *replaces* the project doc. Rules are injected only when pinned. AGENTS.md / CLAUDE.md are never read at turn time. `/claude-config-import` has no client UI.
 
@@ -17,24 +16,6 @@
 - **Agent Skills.** Progressive disclosure: descriptions in context, bodies on demand. https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview.md
 - **Agent Plugins 1.0.** https://agent-plugins.org/specification (2026-08-06): `plugin.json` + `skills/` + `mcp.json`, with `${PLUGIN_ROOT}` / `${PLUGIN_DATA}` expansion.
 - **Claude Code.** Reads AGENTS.md when there is no CLAUDE.md, and `/skill-doctor` reports per-skill usage and cost.
-
----
-
-## Landing 1 — `skills-catalog-and-loader`
-
-**Changes.**
-- **One schema.** Normalize both schemas to a single `Skill` type: `{name, description, body, scope: {project, username, profileId}, enabled, source, folderRef?, allowedTools?, embedding}`. Read legacy documents through an adapter. Use a one-off, idempotent migration script if cleaner, but never delete a field silently.
-- **Catalog only.** The system prompt carries a skill *catalog*: name plus a one-line description, filtered by scope and persona, in a stable order (so it caches).
-- **`load_skill(name)`.** A new internal tool that returns the body plus a resource listing. Keep relevance scoring only to *order* or *highlight* catalog entries, never to inject bodies.
-- **`list_skills`** stops returning vectors.
-- **Scoping.** SkillService honours scope on create, list and update.
-
-**Tests.**
-- **Red first.** Prompt assembly contains catalog lines and **no** skill bodies. (Red: bodies are injected.)
-- **Red first.** An imported skill (legacy schema) appears in the catalog. (Red: never injected.)
-- **Loader.** `load_skill` returns the body, and `list_skills` has no embeddings (red).
-- **Scope isolation.** Two users, two profiles.
-- **Token measurement.** Assembled-prompt tokens before and after on a fixture with 30 skills. Report the numbers.
 
 ---
 
@@ -74,10 +55,10 @@
 - **Merge order.** Deterministic.
 - **Usage report.** Counts match seeded usage rows.
 
-**Live** (isolated, Landing 1 at minimum):
-- Import a fixture skill.
-- Ask a question that needs it: the model calls `load_skill`, and the answer uses it.
-- Report system-prompt tokens before and after (request rows in the test DB).
+**Live** (isolated, each landing):
+- Import a fixture skill, ask a question that needs it: the model calls `load_skill` and the answer uses it. Report the request rows' input tokens before and after.
+- Landing 1 ran it (2026-09-22, `gemini-3.6-flash`, CODING, 10 panel skills + 1 imported): master's first iteration 111,516 input tokens, 26,017 chars of skill bodies in the per-turn block, the imported skill invisible and no answer; the branch 106,224, a 96-char per-turn block, one `load_skill` call, the right answer.
+- Landing 2 adds a bundled file the answer needs (`read_skill_file`); Landing 3 a workspace `AGENTS.md` rule the answer must follow.
 
 ## Done when (each landing)
 - The tests are green and the gates are clean.
