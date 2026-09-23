@@ -461,12 +461,28 @@ export class PrismAcpAgent {
     }
     turn.interactions.abort();
 
+    // The events give a live estimate; the conversation's recorded total is
+    // the truth (a failed sub-agent reports no cost; memory upkeep bills apart).
+    let recordedCost: number | null = null;
+    if (session.started) {
+      try {
+        recordedCost = await this.prism.conversationCost(session.id);
+      } catch (error: unknown) {
+        this.log(`[acp] cost of ${session.id}: ${errorMessage(error)}`);
+      }
+    }
+    const sessionCost = recordedCost ?? translator.sessionCost;
+    if (recordedCost !== null) {
+      const update = translator.usageWithCost(recordedCost);
+      if (update) await sendUpdate(update);
+    }
+    session.cost = sessionCost ?? session.cost;
+
     const { outcome } = translator;
-    session.cost = translator.sessionCost ?? session.cost;
     const meta = {
       prism: {
         conversationId: session.id,
-        ...(translator.sessionCost !== null ? { sessionCostUsd: translator.sessionCost } : {}),
+        ...(sessionCost !== null ? { sessionCostUsd: sessionCost } : {}),
       },
     };
 

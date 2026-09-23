@@ -328,6 +328,26 @@ export class PrismHttpClient {
     }
   }
 
+  /**
+   * What the conversation has cost so far (USD): `stats.totalCost` of
+   * `GET /conversations/:id` — every request of it and of its sub-agents at
+   * any depth (a failed one too), background operations included. The number
+   * prism-client shows. Null when there is none yet.
+   */
+  async conversationCost(conversationId: string): Promise<number | null> {
+    try {
+      const conversation = await this.requestJson<{ stats?: { totalCost?: unknown } }>(
+        "GET",
+        `/conversations/${encodeURIComponent(conversationId)}?project=${encodeURIComponent(this.identity.project)}`,
+      );
+      const totalCost = conversation?.stats?.totalCost;
+      return typeof totalCost === "number" && Number.isFinite(totalCost) ? totalCost : null;
+    } catch (error: unknown) {
+      if (error instanceof PrismHttpError && error.status === 404) return null;
+      throw error;
+    }
+  }
+
   // ── Decisions ────────────────────────────────────────────────────
 
   decideApproval(body: ApprovalDecisionBody): Promise<unknown> {

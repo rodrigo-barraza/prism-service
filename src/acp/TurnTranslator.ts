@@ -644,6 +644,15 @@ export class TurnTranslator {
     };
   }
 
+  /**
+   * The context `usage_update` with an authoritative session cost (the
+   * conversation's recorded total), or null before any context budget arrived.
+   */
+  usageWithCost(cost: number): SessionUpdate | null {
+    if (this.contextWindow === null || this.contextUsed === null) return null;
+    return { sessionUpdate: "usage_update", used: this.contextUsed, size: this.contextWindow, cost: { amount: cost, currency: "USD" } };
+  }
+
   /** At the end of a turn, close the calls the stream left open. */
   private finishOpenTools(status: "completed" | "failed"): TranslatedEvent {
     const updates: SessionUpdate[] = [];
