@@ -586,10 +586,14 @@ export default class AutoApprovalEngine {
     }
 
     if (needsApproval.length > 0 || denied.length > 0) {
+      // `auto` mode's classifier decides some of these; the rest ask a person.
+      const toClassifier = needsApproval.filter((call) => call._approval.awaitsClassifier);
+      const toPerson = needsApproval.filter((call) => !call._approval.awaitsClassifier);
       logger.info(
-        `[AutoApproval] ${autoApproved.length} auto-approved, ${needsApproval.length} need approval` +
-          (needsApproval.length
-            ? `: ${needsApproval.map((approvedToolCall) => approvedToolCall.name).join(", ")}`
+        `[AutoApproval] ${autoApproved.length} auto-approved, ${toPerson.length} need approval` +
+          (toPerson.length ? `: ${toPerson.map((approvedToolCall) => approvedToolCall.name).join(", ")}` : "") +
+          (toClassifier.length
+            ? `; ${toClassifier.length} to the auto-mode classifier: ${toClassifier.map((call) => call.name).join(", ")}`
             : "") +
           (denied.length
             ? `; ${denied.length} denied by policy: ${denied.map((deniedToolCall) => deniedToolCall.name).join(", ")}`

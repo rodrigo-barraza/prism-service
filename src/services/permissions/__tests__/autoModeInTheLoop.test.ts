@@ -313,7 +313,7 @@ describe("auto mode in a real loop", () => {
     const result = resultFor("call-shell");
     expect(result).toMatchObject({ success: false, error: "AUTO_MODE_DENIED", category: "Destructive Outside Workspace" });
     expect(result.message).toMatch(/^\[Destructive Outside Workspace\] Auto mode did not run "execute_shell"/);
-    expect(result.message).toContain("Try a different approach");
+    expect(result.message).toContain("Do not try the same action another way");
   });
 
   it("low risk runs after one classifier call; read-only and workspace edits never reach the classifier", async () => {

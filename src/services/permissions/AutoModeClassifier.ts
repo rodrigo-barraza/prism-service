@@ -117,7 +117,8 @@ export function autoModeDenialMessage(toolName: string, verdict: AutoModeVerdict
   const category = verdict.category ?? "Other Risk";
   return (
     `[${category}] Auto mode did not run "${toolName}": ${verdict.reason || AUTO_MODE_CATEGORIES[category]}. ` +
-    `Try a different approach that stays within what the user asked, or tell the user what you need ` +
+    `Do not try the same action another way (a different tool or command) — it is judged the same. ` +
+    `Take a different approach that stays within what the user asked, or tell the user what you need ` +
     `and let them allow it.`
   );
 }
