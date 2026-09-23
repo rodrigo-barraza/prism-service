@@ -770,6 +770,14 @@ setupWebSocket(wss);
     const { default: AgentPersonaRegistryCustom } =
       await import("./services/AgentPersonaRegistry.ts");
     await AgentPersonaRegistryCustom.loadCustomAgents();
+    // …and from `.prism/agents` / `.claude/agents` under the workspace roots
+    // (read per scan: roots that arrive from tools-service later count too).
+    const { default: ToolOrchestratorServiceRoots } = await import(
+      "./services/ToolOrchestratorService.ts"
+    );
+    AgentPersonaRegistryCustom.useAgentDefinitionFiles(() =>
+      ToolOrchestratorServiceRoots.getWorkspaceRoots(),
+    );
   } catch (error: unknown) {
     logger.warn(`Custom agent loading failed: ${getErrorMessage(error)}`);
   }
