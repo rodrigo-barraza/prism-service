@@ -1,5 +1,6 @@
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { NOTIFICATION_SOURCES, PROMPT_DELIMITERS } from "#src/constants";
+import { LOCAL_TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
 
 // ────────────────────────────────────────────────────────────
 // Memory provenance — where a memory came from, and how far to trust it
@@ -229,6 +230,30 @@ export function mcpServerOf(toolName: string): string | null {
   return delimiter > 0 ? rest.slice(0, delimiter) : rest || null;
 }
 
+/**
+ * read_untrusted returns a reader's JSON, not the source's text — but the
+ * JSON's strings were chosen by whoever wrote the source, so it is exactly
+ * as untrusted, and labelled by what it read (ReaderSource).
+ */
+function readUntrustedProvenance(args?: Record<string, unknown> | null): ProvenanceLabel {
+  const resource = args?.resource;
+  if (resource && typeof resource === "object") {
+    return toolResultProvenance(TOOL_NAMES.READ_MCP_RESOURCE, resource as Record<string, unknown>);
+  }
+  const tool = args?.tool as { name?: unknown; arguments?: unknown } | null | undefined;
+  if (tool && typeof tool.name === "string" && tool.name !== LOCAL_TOOL_NAMES.READ_UNTRUSTED) {
+    const inner = toolResultProvenance(
+      tool.name,
+      tool.arguments && typeof tool.arguments === "object"
+        ? (tool.arguments as Record<string, unknown>)
+        : null,
+    );
+    return { source: inner.source, trust: "untrusted" };
+  }
+  if (typeof args?.url === "string") return { source: "web", trust: "untrusted" };
+  return { source: `tool:${LOCAL_TOOL_NAMES.READ_UNTRUSTED}`, trust: "untrusted" };
+}
+
 /** Where a tool's result comes from, and how far its text can be trusted. */
 export function toolResultProvenance(
   toolName: string | null | undefined,
@@ -238,9 +263,13 @@ export function toolResultProvenance(
   const server = mcpServerOf(name);
   if (server) return { source: `mcp:${server}`, trust: "untrusted" };
   if (name === TOOL_NAMES.READ_MCP_RESOURCE) {
-    const named = typeof args?.serverName === "string" ? args.serverName : "";
+    // The tool's parameter is `server_name`; `serverName` is the older spelling.
+    const named = [args?.server_name, args?.serverName].find(
+      (value): value is string => typeof value === "string" && value.length > 0,
+    );
     return { source: `mcp:${named || "resource"}`, trust: "untrusted" };
   }
+  if (name === LOCAL_TOOL_NAMES.READ_UNTRUSTED) return readUntrustedProvenance(args);
   if (WEB_CONTENT_TOOLS.has(name)) return { source: "web", trust: "untrusted" };
   if (THIRD_PARTY_TEXT_TOOLS.has(name)) return { source: `tool:${name}`, trust: "untrusted" };
   return { source: `tool:${name}`, trust: "derived" };

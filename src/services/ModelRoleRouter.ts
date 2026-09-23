@@ -32,8 +32,8 @@ import logger from "#src/utils/logger";
 //   4. Built-in defaults — for `utility`: the first configured local
 //      instance (vLLM / LM Studio / Ollama / llama-cpp) with a
 //      discoverable model, else the cheapest available cloud model.
-//      `critic`, `memory`, `compaction` and `classifier` default to the
-//      utility chain.
+//      `critic`, `memory`, `compaction`, `classifier` and `reader` default
+//      to the utility chain.
 //
 // The conversation-level roles (`main`, `subagent`, `oracle`) resolve
 // to ONE decision, not a chain: routing/RoleModelResolver.
@@ -68,6 +68,11 @@ export const MODEL_ROLES = {
   COMPACTION: "compaction",
   /** Short labelling calls (prompt 12's auto-mode classifier). */
   CLASSIFIER: "classifier",
+  /**
+   * The quarantined reader (read_untrusted): a no-tools call that turns
+   * untrusted text into schema-valid JSON. A local model by default.
+   */
+  READER: "reader",
 } as const;
 
 /** Roles whose default is the utility chain. */
@@ -76,6 +81,7 @@ const UTILITY_DERIVED_ROLES: ReadonlySet<string> = new Set([
   MODEL_ROLES.MEMORY,
   MODEL_ROLES.COMPACTION,
   MODEL_ROLES.CLASSIFIER,
+  MODEL_ROLES.READER,
 ]);
 
 /** Extensible — any string is a valid role; the named ones get defaults. */
