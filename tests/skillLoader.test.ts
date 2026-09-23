@@ -33,7 +33,12 @@ import skillTools from "#src/services/tool-definitions/SkillTools";
 type ToolContext = Record<string, unknown>;
 
 function tool(name: string) {
-  const found = (skillTools as Array<{ name: string; execute: Function }>).find(
+  const found = (
+    skillTools as Array<{
+      name: string;
+      execute: (toolArguments: Record<string, unknown>, context: ToolContext) => Promise<unknown>;
+    }>
+  ).find(
     (candidate) => candidate.name === name,
   );
   if (!found) throw new Error(`no internal tool named ${name}`);

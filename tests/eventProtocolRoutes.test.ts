@@ -136,6 +136,7 @@ describe('POST /chat — the stream speaks the protocol', () => {
   });
 
   it('carries the typed code in the ?stream=false error body (status stays 500)', async () => {
+    // oxlint-disable-next-line require-yield -- throws on the first pull, like a provider rejecting the request
     MOCK_GENERATE_TEXT_STREAM.mockImplementation(async function* () {
       throw new ProviderError(PROVIDERS.GOOGLE, 'API key not valid. Please pass a valid API key.', 400);
     });
