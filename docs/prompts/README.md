@@ -18,7 +18,6 @@ Self-contained task prompts for the items in `docs/harness_modernization_2026-09
 | 22 | `22-security-depth.md` | `memory-provenance`, `quarantined-reader`, `external-input-lane` | service | L | — | 19 (memory/system prompt) |
 | 23 | `23-observability-and-evals.md` | `otel-tracing`, `log-redaction`, `benchmark-reliability` | service | L | — | 10 (`RequestLogger.ts`) |
 | 24 | `24-event-protocol-and-acp.md` | `event-protocol-v1`, `acp-server`, `acp-client-runtime` | service, client | L | — | 26 (client event types) |
-| 25 | `25-provider-native-features.md` | `openai-gpt6-native`, `gemini-current`, `kimi-and-model-profiles` | service | L | 02 | 02, 10 |
 | 26 | `26-client-chat-architecture.md` | `chat-characterization-tests`, `chat-event-reducer`, `chat-component-split` | client | L | 08 | every client prompt |
 
 ## Waves

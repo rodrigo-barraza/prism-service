@@ -3,6 +3,7 @@ import SettingsService from "./SettingsService.ts";
 import logger from "#src/utils/logger";
 import AgentPersonaRegistry from "./AgentPersonaRegistry.ts";
 import ToolContext from "./ToolContext.ts";
+import { applyToolBudget, budgetPresetFor, recordBudgetPreset } from "./BudgetPreset.ts";
 
 import InternalToolRegistry from "./tool-definitions/InternalToolRegistry.ts";
 import { SUB_AGENT_ONLY_TOOL_NAMES } from "./tool-definitions/SubAgentProgressTool.ts";
@@ -420,6 +421,21 @@ export default class AgenticToolResolver {
     if (hasNativeThinking) {
       finalTools = finalTools.filter((tool) => tool.name !== TOOL_NAMES.THINK);
       unreachableToolNames.add(TOOL_NAMES.THINK);
+    }
+
+    // ── Budget preset (ModelProfiles) ────────────────────────────
+    // A lightweight model gets no background-work tools and a capped set;
+    // the discovery tools restored below reach the rest.
+    const budgetPreset = budgetPresetFor(resolvedModel, providerName);
+    recordBudgetPreset(agentConversationId, budgetPreset);
+    if (budgetPreset.name !== "standard") {
+      const previousCount = finalTools.length;
+      const budgeted = applyToolBudget(finalTools, budgetPreset, resolvedEnabledTools ?? []);
+      finalTools = budgeted.tools;
+      for (const toolName of budgeted.unavailable) unreachableToolNames.add(toolName);
+      logger.info(
+        `[AgenticToolResolver] ${budgetPreset.name} budget for ${providerName}/${resolvedModel}: ${previousCount} → ${finalTools.length} tools`,
+      );
     }
 
     // ── Innate tool discovery ────────────────────────────────────

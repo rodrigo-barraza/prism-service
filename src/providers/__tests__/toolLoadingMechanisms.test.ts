@@ -11,10 +11,12 @@
  *     in the activating call's result (custom tool search), turn-scoped
  *     `clear_at` messages, cache breakpoints that skip both, `tool_choice`
  *     none, and server-side context editing;
- *   - Kimi K3: the content-less `{"role": "system", "tools": [...]}` message;
+ *   - Kimi K3: the bridge on its default Anthropic-compatible endpoint, and
+ *     on Chat Completions (MOONSHOT_TRANSPORT=openai) the content-less
+ *     `{"role": "system", "tools": [...]}` message;
  *   - OpenAI Responses: the `additional_tools` input item.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 
 import {
   applyCacheBreakpoints,
@@ -75,12 +77,28 @@ describe("resolveToolLoadingMode", () => {
     ["openai", "gpt-5.6-luna", TOOL_LOADING_MODES.OPENAI_ADDITIONAL_TOOLS],
     ["openai", "gpt-5.2", TOOL_LOADING_MODES.BRIDGE],
     ["openai", "gpt-4o", TOOL_LOADING_MODES.BRIDGE],
-    ["moonshot", "kimi-k3", TOOL_LOADING_MODES.KIMI_SYSTEM_TOOLS],
+    // Kimi K3's default wire is the Anthropic-compatible endpoint, which
+    // takes no defer_loading, tool_reference or mid-conversation system message.
+    ["moonshot", "kimi-k3", TOOL_LOADING_MODES.BRIDGE],
     ["moonshot", "kimi-k2.6", TOOL_LOADING_MODES.BRIDGE],
     ["google", "gemini-3.6-flash", TOOL_LOADING_MODES.BRIDGE],
     ["vllm-2", "qwen3-32b", TOOL_LOADING_MODES.BRIDGE],
   ])("%s / %s → %s", (provider, model, mode) => {
     expect(resolveToolLoadingMode(provider, model)).toBe(mode);
+  });
+
+  describe("Kimi on Chat Completions (MOONSHOT_TRANSPORT=openai)", () => {
+    afterEach(() => {
+      delete process.env.MOONSHOT_TRANSPORT;
+    });
+
+    it.each([
+      ["kimi-k3", TOOL_LOADING_MODES.KIMI_SYSTEM_TOOLS],
+      ["kimi-k2.6", TOOL_LOADING_MODES.BRIDGE],
+    ])("moonshot / %s → %s", (model, mode) => {
+      process.env.MOONSHOT_TRANSPORT = "openai";
+      expect(resolveToolLoadingMode("moonshot", model)).toBe(mode);
+    });
   });
 });
 
@@ -225,7 +243,7 @@ describe("Anthropic — tool_reference (custom tool search, every other current 
   });
 });
 
-describe("Kimi K3 — tools in a system message", () => {
+describe("Kimi K3 on Chat Completions — tools in a system message", () => {
   const options: ProviderOptions = {
     tools: [discoverTool],
     toolLoadingMode: TOOL_LOADING_MODES.KIMI_SYSTEM_TOOLS,

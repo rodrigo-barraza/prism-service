@@ -13,6 +13,7 @@ import SettingsService from "#src/services/SettingsService";
 import { isTransientProviderError } from "#src/utils/ProviderStreamResilience";
 import { ProviderError } from "#src/utils/errors";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
+import { runWithRequestPriority } from "#src/services/RequestPriority";
 import logger from "#src/utils/logger";
 
 // ────────────────────────────────────────────────────────────
@@ -412,6 +413,11 @@ export default class ModelRoleRouter {
    * Execute `attempt` against each chain entry in order, advancing to the
    * next entry on transient provider failures. Non-transient errors and
    * the final entry's failure propagate to the caller.
+   *
+   * Memory extraction runs after the turn has answered, so its calls are
+   * background priority (RequestPriority — a priority-scheduling vLLM serves
+   * interactive turns first). Compaction (`utility`) stays interactive: the
+   * turn waits on its summary.
    */
   static async runWithChain<T>(
     chain: RoleChainEntry[],
@@ -423,11 +429,12 @@ export default class ModelRoleRouter {
         `[ModelRoleRouter] Cannot run "${operation}": role "${role}" resolved to an empty model chain.`,
       );
     }
+    const priority = role === MODEL_ROLES.MEMORY ? "background" : "interactive";
     let lastError: unknown;
     for (let index = 0; index < chain.length; index++) {
       const entry = chain[index];
       try {
-        const value = await attempt(entry, index);
+        const value = await runWithRequestPriority(priority, () => attempt(entry, index));
         return { value, entry };
       } catch (error: unknown) {
         lastError = error;

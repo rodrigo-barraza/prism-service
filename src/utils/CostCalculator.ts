@@ -15,7 +15,17 @@ export interface TextPricing {
   outputPerMillion?: number;
   cachedInputPerMillion?: number;
   cacheWriteInputPerMillion?: number;
+  /** Cache writes at a 1-hour TTL, where the provider prices them apart. */
+  cacheWrite1hInputPerMillion?: number;
+  /** A request whose prompt passed LONG_CONTEXT_THRESHOLD_TOKENS bills whole at these (OpenAI). */
+  inputOver272kPerMillion?: number;
+  cachedInputOver272kPerMillion?: number;
+  cacheWriteInputOver272kPerMillion?: number;
+  outputOver272kPerMillion?: number;
 }
+
+/** Prompt size past which a model with `…Over272kPerMillion` prices bills the whole request at them. */
+export const LONG_CONTEXT_THRESHOLD_TOKENS = 272_000;
 
 export interface AudioPricing extends TextPricing {
   perMinute?: number;
@@ -73,7 +83,10 @@ export function withTotalInputTokens<T extends TokenUsage>(
 }
 
 export function createUsageAccumulator(): Required<
-  Omit<TokenUsage, "totalTokens" | "totalInputTokens" | "byModel">
+  Omit<
+    TokenUsage,
+    "totalTokens" | "totalInputTokens" | "byModel" | "cacheCreation1hInputTokens" | "longContext"
+  >
 > {
   return {
     inputTokens: 0,
@@ -91,9 +104,13 @@ export function createUsageAccumulator(): Required<
  * across AgenticLoopService, chat.js, and StreamChunkDispatcher.
  */
 export function mergeUsage(
-  target: Required<Omit<TokenUsage, "totalTokens" | "byModel">> | TokenUsage,
+  target:
+    | Required<Omit<TokenUsage, "totalTokens" | "byModel" | "cacheCreation1hInputTokens" | "longContext">>
+    | TokenUsage,
   source: TokenUsage | null | undefined,
-): Required<Omit<TokenUsage, "totalTokens" | "byModel">> | TokenUsage {
+):
+  | Required<Omit<TokenUsage, "totalTokens" | "byModel" | "cacheCreation1hInputTokens" | "longContext">>
+  | TokenUsage {
   if (!source) return target;
   target.inputTokens = (target.inputTokens ?? 0) + (source.inputTokens || 0);
   target.outputTokens = (target.outputTokens ?? 0) + (source.outputTokens || 0);
@@ -104,6 +121,24 @@ export function mergeUsage(
     (source.cacheCreationInputTokens || 0);
   target.reasoningOutputTokens =
     (target.reasoningOutputTokens ?? 0) + (source.reasoningOutputTokens || 0);
+  if (source.longContext) {
+    const longTarget = target as TokenUsage;
+    const long = (longTarget.longContext ??= {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadInputTokens: 0,
+      cacheCreationInputTokens: 0,
+    });
+    long.inputTokens += source.longContext.inputTokens || 0;
+    long.outputTokens += source.longContext.outputTokens || 0;
+    long.cacheReadInputTokens += source.longContext.cacheReadInputTokens || 0;
+    long.cacheCreationInputTokens += source.longContext.cacheCreationInputTokens || 0;
+  }
+  if (source.cacheCreation1hInputTokens) {
+    const oneHourTarget = target as TokenUsage;
+    oneHourTarget.cacheCreation1hInputTokens =
+      (oneHourTarget.cacheCreation1hInputTokens ?? 0) + source.cacheCreation1hInputTokens;
+  }
   if (source.tokensPerSec != null) {
     target.tokensPerSec = source.tokensPerSec;
   }
@@ -168,6 +203,25 @@ export function calculateTextCost(
     return parseFloat(splitCost.toFixed(8));
   }
 
+  // Requests past the long-context threshold bill at the long-context
+  // rates; the rest of the counts at the base ones.
+  if (usage.longContext && pricing.inputOver272kPerMillion) {
+    const long = usage.longContext;
+    const rest: TokenUsage = {
+      inputTokens: Math.max(0, (usage.inputTokens || 0) - long.inputTokens),
+      outputTokens: Math.max(0, (usage.outputTokens || 0) - long.outputTokens),
+      cacheReadInputTokens: Math.max(0, (usage.cacheReadInputTokens || 0) - long.cacheReadInputTokens),
+      cacheCreationInputTokens: Math.max(
+        0,
+        (usage.cacheCreationInputTokens || 0) - long.cacheCreationInputTokens,
+      ),
+    };
+    return parseFloat(
+      ((calculateTextCost(rest, pricing) ?? 0) +
+        (calculateTextCost(long, longContextPricing(pricing)) ?? 0)).toFixed(8),
+    );
+  }
+
   let cost =
     ((usage.inputTokens || 0) / 1_000_000) * (pricing.inputPerMillion || 0) +
     ((usage.outputTokens || 0) / 1_000_000) * (pricing.outputPerMillion || 0);
@@ -178,14 +232,63 @@ export function calculateTextCost(
       (usage.cacheReadInputTokens / 1_000_000) * pricing.cachedInputPerMillion;
   }
 
-  // Cache write tokens (Anthropic: 1.25x base rate)
+  // Cache write tokens (Anthropic: 1.25x base rate); the 1-hour part at its
+  // own rate where the model has one (Kimi K3: 2x base).
   if (usage.cacheCreationInputTokens && pricing.cacheWriteInputPerMillion) {
+    const oneHour = Math.min(
+      usage.cacheCreation1hInputTokens || 0,
+      usage.cacheCreationInputTokens,
+    );
     cost +=
-      (usage.cacheCreationInputTokens / 1_000_000) *
-      pricing.cacheWriteInputPerMillion;
+      ((usage.cacheCreationInputTokens - oneHour) / 1_000_000) *
+        pricing.cacheWriteInputPerMillion +
+      (oneHour / 1_000_000) *
+        (pricing.cacheWrite1hInputPerMillion ?? pricing.cacheWriteInputPerMillion);
   }
 
   return parseFloat(cost.toFixed(8));
+}
+
+/**
+ * The long-context rates. A bucket without its own long-context price moves
+ * with the input price (OpenAI raises every input bucket by one multiplier).
+ */
+function longContextPricing(pricing: TextPricing): TextPricing {
+  const inputRatio = pricing.inputPerMillion
+    ? pricing.inputOver272kPerMillion! / pricing.inputPerMillion
+    : 1;
+  return {
+    inputPerMillion: pricing.inputOver272kPerMillion,
+    outputPerMillion: pricing.outputOver272kPerMillion ?? pricing.outputPerMillion,
+    cachedInputPerMillion:
+      pricing.cachedInputOver272kPerMillion ??
+      (pricing.cachedInputPerMillion !== undefined ? pricing.cachedInputPerMillion * inputRatio : undefined),
+    cacheWriteInputPerMillion:
+      pricing.cacheWriteInputOver272kPerMillion ??
+      (pricing.cacheWriteInputPerMillion !== undefined
+        ? pricing.cacheWriteInputPerMillion * inputRatio
+        : undefined),
+  };
+}
+
+/**
+ * One request's usage, marked long-context when its prompt passed the
+ * threshold of a model priced that way. Call it per request, before usage
+ * from several requests is summed.
+ */
+export function markLongContext(usage: TokenUsage, pricing: TextPricing | null | undefined): TokenUsage {
+  if (!pricing?.inputOver272kPerMillion || getTotalInputTokens(usage) <= LONG_CONTEXT_THRESHOLD_TOKENS) {
+    return usage;
+  }
+  return {
+    ...usage,
+    longContext: {
+      inputTokens: usage.inputTokens || 0,
+      outputTokens: usage.outputTokens || 0,
+      cacheReadInputTokens: usage.cacheReadInputTokens || 0,
+      cacheCreationInputTokens: usage.cacheCreationInputTokens || 0,
+    },
+  };
 }
 
 /**

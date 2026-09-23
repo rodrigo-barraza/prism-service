@@ -25,6 +25,8 @@ import {
   type OpenAICompletionResponse,
 } from "#src/providers/openai-compat";
 import type { InputMessage } from "#src/providers/openai-compat";
+import { applyVllmRequestFeatures } from "#src/providers/local-request-features";
+import type { ProviderInstanceConfig } from "#src/types/ProviderTypes";
 import {
   hashChatPrefix,
   requestTelemetryChunk,
@@ -103,6 +105,7 @@ interface VllmModelsResponse {
 export function createVllmProvider(
   baseUrl: string,
   instanceId: string = "vllm",
+  config?: ProviderInstanceConfig,
 ): Provider {
   const getBaseUrl = () => baseUrl;
 
@@ -157,9 +160,17 @@ export function createVllmProvider(
           };
         }
 
+        const headers = await applyVllmRequestFeatures(payload, {
+          baseUrl,
+          model,
+          instanceId,
+          options,
+          config,
+        });
         const response = await fetchOpenAICompat(
           `${baseUrl}/v1/chat/completions`,
           payload,
+          { headers },
         );
         const data = (await response.json()) as OpenAICompletionResponse;
         const { text, thinking, usage, toolCalls } =
@@ -250,10 +261,17 @@ export function createVllmProvider(
         const prefixHashes = options.cacheTelemetry
           ? hashChatPrefix(prepared, tools)
           : null;
+        const headers = await applyVllmRequestFeatures(payload, {
+          baseUrl,
+          model,
+          instanceId,
+          options,
+          config,
+        });
         const response = await fetchOpenAICompat(
           `${baseUrl}/v1/chat/completions`,
           payload,
-          { signal: options.signal },
+          { signal: options.signal, headers },
         );
 
         const reader = response.body!.getReader();
