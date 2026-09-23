@@ -25,6 +25,10 @@ vi.mock("#src/services/PromptLocaleService", () => ({
           "Missing required parameter 'toolName'. Specify which tool to run asynchronously.",
         "internal-tools-runtime.run_async_task.disallowedTool":
           `Tool "${variables?.toolName || ""}" cannot be dispatched asynchronously.`,
+        "internal-tools-runtime.run_async_task.notEnabled":
+          `Tool "${variables?.toolName || ""}" is not enabled in this conversation, so it cannot be dispatched asynchronously either.`,
+        "internal-tools-runtime.run_async_task.denied":
+          `Tool "${variables?.toolName || ""}" is denied by policy, so it cannot be dispatched asynchronously either: ${variables?.reason || ""}`,
         "internal-tools-runtime.run_async_task.concurrencyLimit":
           `Maximum concurrent async tasks (${variables?.max || ""}) reached for this conversation.`,
         "internal-tools-runtime.list_async_tasks.noConversation":
@@ -402,6 +406,76 @@ describe("AsyncTaskTools Unit Tests", () => {
   });
 
   // ── run_async_task ──────────────────────────────────────────
+  // A dispatcher must never widen what the loop may run: the approval
+  // stack only sees `run_async_task`, so the inner call is held to the
+  // conversation's enabled set and to every DENY here. Lupos (full auto,
+  // execute_shell blocked by his persona) could otherwise run a blocked
+  // tool just by naming it.
+  describe("run_async_task governance", () => {
+    it("refuses a tool outside the conversation's enabled set", async () => {
+      const result = await InternalToolRegistry.execute(
+        ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
+        { toolName: "execute_shell", toolArguments: { command: "ls" } },
+        buildContext({
+          enabledTools: ["react_to_discord_message", "search_web", "run_async_task"],
+          _autoApprove: true,
+        }),
+      );
+
+      expect(result).toEqual({
+        error: expect.stringContaining('"execute_shell" is not enabled'),
+      });
+      expect(mockDispatch).not.toHaveBeenCalled();
+    });
+
+    it("dispatches a tool the conversation has enabled", async () => {
+      mockDispatch.mockReturnValue({ ...FIXED_TASK_STATE, toolName: "search_web" });
+
+      const result = await InternalToolRegistry.execute(
+        ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
+        { toolName: "search_web", toolArguments: { query: "wolves" } },
+        buildContext({ enabledTools: ["search_web", "run_async_task"] }),
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({ _directive: "NON_BLOCKING_DISPATCH" }),
+      );
+      expect(mockDispatch).toHaveBeenCalledTimes(1);
+    });
+
+    it("refuses a tool an agent policy denies, even under full auto", async () => {
+      const result = await InternalToolRegistry.execute(
+        ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
+        { toolName: "execute_command", toolArguments: { command: "ls" } },
+        buildContext({
+          enabledTools: ["execute_command", "run_async_task"],
+          _autoApprove: true,
+          _policies: [{ tool: "execute_command", decision: "DENY", name: "no-shell" }],
+        }),
+      );
+
+      expect(result).toEqual({
+        error: expect.stringContaining('"execute_command" is denied by policy'),
+      });
+      expect(mockDispatch).not.toHaveBeenCalled();
+    });
+
+    it("lets a call through when the only DENY names a different tool", async () => {
+      mockDispatch.mockReturnValue({ ...FIXED_TASK_STATE });
+
+      await InternalToolRegistry.execute(
+        ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
+        { toolName: "execute_command", toolArguments: { command: "ls" } },
+        buildContext({
+          enabledTools: ["execute_command", "run_async_task"],
+          _policies: [{ tool: "send_email", decision: "DENY", name: "no-mail" }],
+        }),
+      );
+
+      expect(mockDispatch).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("run_async_task", () => {
     it("should dispatch a tool and return NON_BLOCKING_DISPATCH directive", async () => {
       mockDispatch.mockReturnValue({ ...FIXED_TASK_STATE });
