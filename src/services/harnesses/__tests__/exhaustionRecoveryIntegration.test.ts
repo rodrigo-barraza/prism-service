@@ -53,8 +53,20 @@ vi.mock("#src/services/ConversationGenerationTracker", () => ({
 
 // ── Helpers ──────────────────────────────────────────────────
 
+/** The turn's declared tools, as the real harness reports them (lifecycle/ToolSurface.ts). */
+const TURN_TOOLS = [{ name: "search_web", description: "Search the web" }];
+
+/** The context of the test — the mock harness streams through its provider. */
+let currentContext: ReturnType<typeof createMockContext> | null = null;
+
 function createMockHarness(overrides: Record<string, unknown> = {}) {
   return {
+    requestToolOptions: vi.fn().mockReturnValue({ tools: TURN_TOOLS, toolLoadingMode: "bridge" }),
+    // The real harness resolves media, clamps output and wraps retries; the
+    // mock hands the request straight to the context's provider.
+    createProviderStream: vi.fn(async (messages: unknown[], options: Record<string, unknown>) =>
+      currentContext!.provider.generateTextStream(messages, currentContext!.resolvedModel, options),
+    ),
     enforceContextWindow: vi.fn().mockImplementation((messages: unknown[]) => messages),
     registerTrackerRequest: vi.fn(),
     createPassState: vi.fn().mockReturnValue({
@@ -88,7 +100,7 @@ function createMockProvider(recoveryText = "Here is your summary of progress so 
 
 function createMockContext(overrides: Record<string, unknown> = {}) {
   const provider = createMockProvider();
-  return {
+  const context = {
     emit: vi.fn(),
     signal: undefined,
     options: { maxTokens: 8192 },
@@ -102,6 +114,8 @@ function createMockContext(overrides: Record<string, unknown> = {}) {
     agent: "OMNI",
     ...overrides,
   };
+  currentContext = context;
+  return context;
 }
 
 /** Build a message array that simulates N iterations of tool-only calls. */
@@ -167,7 +181,7 @@ describe("ExhaustionRecovery — Tool-Only Subagent Failure Mode", () => {
       expect(recoverySystemMessage.content).toContain("Maximum tool-call iterations");
     });
 
-    it("should call provider.generateTextStream with NO tools in the options", async () => {
+    it("should keep the turn's tool block and forbid calls (tool_choice none)", async () => {
       const provider = createMockProvider();
       const context = createMockContext({ provider });
 
@@ -181,7 +195,9 @@ describe("ExhaustionRecovery — Tool-Only Subagent Failure Mode", () => {
       expect(provider.generateTextStream).toHaveBeenCalledTimes(1);
       const callArgs = provider.generateTextStream.mock.calls[0];
       const passedOptions = callArgs[2]; // (messages, model, options)
-      expect(passedOptions.tools).toBeUndefined();
+      // Dropping the tools would rewrite the front of the cached prompt.
+      expect(passedOptions.tools).toEqual(TURN_TOOLS);
+      expect(passedOptions.toolChoice).toBe("none");
     });
 
     it("should call consumeStream so the recovery output is actually streamed to the client", async () => {
@@ -294,7 +310,7 @@ describe("ExhaustionRecovery — Tool-Only Subagent Failure Mode", () => {
       ).rejects.toThrow("ECONNRESET");
     });
 
-    it("should strip tools from options but preserve maxTokens", async () => {
+    it("should keep the turn's tools, forbid calls, and preserve maxTokens", async () => {
       const provider = createMockProvider();
       const context = createMockContext({
         provider,
@@ -313,7 +329,8 @@ describe("ExhaustionRecovery — Tool-Only Subagent Failure Mode", () => {
       );
 
       const passedOptions = provider.generateTextStream.mock.calls[0][2];
-      expect(passedOptions.tools).toBeUndefined();
+      expect(passedOptions.tools).toEqual(TURN_TOOLS);
+      expect(passedOptions.toolChoice).toBe("none");
       expect(passedOptions.maxTokens).toBe(8192);
       expect(passedOptions.temperature).toBe(0.7);
     });

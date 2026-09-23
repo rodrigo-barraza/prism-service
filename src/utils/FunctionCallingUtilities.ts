@@ -216,9 +216,12 @@ interface ExpandOptions {
 // Tool results reach the model as JSON text, so a tool that renders
 // something visual (an animation snapshot, a generated image, a browser
 // screenshot) is invisible to the model that produced it — it only reads a
-// URL. For the current (latest) tool round, we attach those images to a
-// clearly-marked synthetic user message so vision models can SEE their own
-// output and self-correct without a describe_image round-trip.
+// URL. After each tool round that rendered something, we attach those
+// images to a clearly-marked synthetic user message so vision models can
+// SEE their own output and self-correct without a describe_image
+// round-trip. The message stays in every later request (history is only
+// appended to — a render that vanished one iteration later rewrote the
+// prompt prefix); the provider's prompt cache pays for keeping it.
 
 const MAXIMUM_MODEL_VISIBLE_IMAGES = 3;
 
@@ -282,6 +285,10 @@ interface ExpandedMessage {
   audio?: string | string[];
   pdf?: string[];
   documents?: string[];
+  /** Mid-conversation tool activation — rendered by the adapter of its mode. */
+  toolActivation?: ChatMessage["toolActivation"];
+  /** A one-turn system nudge (clear_at where the provider supports it). */
+  turnScoped?: boolean;
 }
 
 /**
@@ -317,22 +324,7 @@ export function expandMessagesForFunctionCall(
     }
   }
 
-  // Only the LAST embedded-result tool round gets model-visible media
-  // attached — re-attaching images for every historical round would grow
-  // each request by the whole session's renders.
-  let lastEmbeddedResultIndex = -1;
-  filtered.forEach((messageItem, index) => {
-    if (
-      messageItem.role === "assistant" &&
-      messageItem.toolCalls?.some(
-        (toolCall: ToolCallEntry) => toolCall.result !== undefined,
-      )
-    ) {
-      lastEmbeddedResultIndex = index;
-    }
-  });
-
-  return filtered.flatMap((message, messageIndex) => {
+  return filtered.flatMap((message) => {
     // Expand assistant messages with toolCalls into
     // [assistant(tool_calls), tool(result1), tool(result2), ...]
     if (
@@ -418,10 +410,10 @@ export function expandMessagesForFunctionCall(
           };
         });
 
-      // Attach visual tool outputs (latest round only) as a synthetic user
-      // message so the model can see what it just rendered.
+      // Attach visual tool outputs as a synthetic user message after the
+      // round's results, so the model can see what it rendered.
       const syntheticMediaMessages: ExpandedMessage[] = [];
-      if (messageIndex === lastEmbeddedResultIndex) {
+      {
         const visibleImages: string[] = [];
         const sourceToolNames: string[] = [];
         for (const toolCall of message.toolCalls) {
@@ -487,6 +479,8 @@ export function expandMessagesForFunctionCall(
           ? { audio: message.audio }
           : {}),
         ...(message.pdf && message.pdf.length > 0 ? { pdf: message.pdf } : {}),
+        ...(message.toolActivation ? { toolActivation: message.toolActivation } : {}),
+        ...(message.turnScoped === true ? { turnScoped: true } : {}),
         ...(message.documents && message.documents.length > 0
           ? { documents: message.documents }
           : {}),

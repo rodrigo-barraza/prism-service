@@ -41,6 +41,7 @@ import {
   hashChatPrefix,
   requestTelemetryChunk,
 } from "#src/utils/PromptPrefixHashes";
+import { TOOL_LOADING_MODES } from "#src/providers/toolLoading";
 
 const DEFAULT_BASE_URL = "https://api.moonshot.ai/v1";
 
@@ -84,10 +85,24 @@ export function buildMoonshotPayload(
     messages,
     options.systemPrompt,
   );
-  const prepared = prepareOpenAICompatMessages(
+  const converted = prepareOpenAICompatMessages(
     effectiveMessages as InputMessage[],
     { mediaStrategy: MEDIA_STRATEGY },
   );
+  // Kimi K3 loads tools activated mid-conversation from a content-less
+  // `{"role": "system", "tools": [...]}` message placed where they become
+  // available — the top-level `tools` never change (providers/toolLoading.ts).
+  const prepared: Array<Record<string, unknown>> = [];
+  converted.forEach((message, index) => {
+    prepared.push(message as unknown as Record<string, unknown>);
+    const activation = (effectiveMessages[index] as ChatMessage).toolActivation;
+    const loadedTools =
+      options.toolLoadingMode === TOOL_LOADING_MODES.KIMI_SYSTEM_TOOLS &&
+      activation?.added.length
+        ? convertToolsToOpenAI(activation.added)
+        : null;
+    if (loadedTools) prepared.push({ role: "system", tools: loadedTools });
+  });
 
   const payload: Record<string, unknown> = {
     messages: prepared,
@@ -101,7 +116,8 @@ export function buildMoonshotPayload(
   const tools = convertToolsToOpenAI(options.tools);
   if (tools) {
     payload.tools = tools;
-    payload.tool_choice = "auto";
+    // "none" (the exhaustion pass) keeps the tools and the prefix cache.
+    payload.tool_choice = options.toolChoice === "none" ? "none" : "auto";
   }
 
   // Reasoning control — Kimi K3 accepts reasoning_effort ("low" | "high" | "max").

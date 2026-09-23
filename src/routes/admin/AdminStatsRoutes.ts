@@ -1686,6 +1686,7 @@ router.get(
               cacheCreationInputTokens: 1,
               estimatedCost: 1,
               "cacheTelemetry.prefixChange": 1,
+              "cacheTelemetry.declaredBoundary": 1,
               "cacheTelemetry.providerDiagnostics.source": 1,
               "cacheTelemetry.providerDiagnostics.status": 1,
               "cacheTelemetry.providerDiagnostics.reason": 1,

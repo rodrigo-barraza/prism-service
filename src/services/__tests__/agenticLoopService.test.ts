@@ -290,12 +290,21 @@ describe("AgenticLoopService", () => {
 
     await AgenticLoopService.runAgenticLoop(mockContext);
 
-    const callArgs = mockProvider.generateTextStream.mock.calls[0][2];
+    const [firstMessages, , callArgs] = mockProvider.generateTextStream.mock.calls[0];
     const passTools = callArgs.tools;
-    
-    // Should only have exit_plan_mode
-    expect(passTools.every((tool: any) => tool.name === "exit_plan_mode")).toBe(true);
-    
+
+    // Plan mode keeps the whole tool list (the request prefix never
+    // changes); read-only is enforced on the calls, and the mode is
+    // announced by an appended system message.
+    expect(passTools.map((tool: any) => tool.name)).toEqual(
+      expect.arrayContaining(["read_file", "search_web"]),
+    );
+    expect(
+      firstMessages.some(
+        (message: any) => message.role === "system" && String(message.content).includes("<plan-mode>"),
+      ),
+    ).toBe(true);
+
     const enterEvents = emittedEvents.filter((e: any) => e.message === "plan_mode_entered");
     expect(enterEvents.length).toBe(1);
   });
@@ -333,7 +342,8 @@ describe("AgenticLoopService", () => {
 
   it("should handle native MCP tool call streaming directly", async () => {
     mockProvider.generateTextStream.mockImplementation(async function* (messages: any, model: any, options: any) {
-      if (options && !options.tools) {
+      // The exhaustion pass keeps the tools and forbids calls.
+      if (options?.toolChoice === "none") {
         yield "Recovery summary text";
         yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
         return;
@@ -442,26 +452,32 @@ describe("AgenticLoopService", () => {
     expect(passTools.find((tool: any) => tool.name === "generate_image")).toBeUndefined();
   });
 
-  it("should block unauthorized tools in plan mode by dropping them via schema enforcer", async () => {
+  it("should block a non-read-only call in plan mode through the gate, keeping the tools", async () => {
     mockContext.options.maxIterations = 2;
     mockContext.options.planFirst = true;
-    
-    // Iteration 1: model tries to use read_file (not allowed in plan mode)
+    const ToolOrchestratorService = (await import("#src/services/ToolOrchestratorService")).default;
+
+    // Iteration 1: the model tries generate_image (not read-only) while planning.
     mockProvider.generateTextStream.mockImplementationOnce(async function* () {
-      yield { type: "toolCall", name: "read_file", args: {}, id: "toolCall-bad" };
+      yield { type: "toolCall", name: "generate_image", args: {}, id: "toolCall-bad" };
       yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
     });
 
     await AgenticLoopService.runAgenticLoop(mockContext);
 
-    // Because it's dropped by the schema enforcer, no tool execution occurs
-    const toolExecEvents = emittedEvents.filter((e: any) => e.type === "tool_execution");
-    expect(toolExecEvents.length).toBe(0);
-    
-    // The first call produces empty output (tool call was dropped). The empty
-    // output recovery mechanism retries with a temperature bump and continuation
-    // nudge. Since maxIterations=2, only 1 retry happens before hitting the
-    // iteration limit. Total calls: 1 original + 1 retry = 2.
-    expect(mockProvider.generateTextStream).toHaveBeenCalledTimes(2);
+    // The call never ran…
+    expect(ToolOrchestratorService.executeTool).not.toHaveBeenCalledWith(
+      "generate_image",
+      expect.anything(),
+      expect.anything(),
+    );
+    // …the next request carries its error result, with the same tool block.
+    expect(mockProvider.generateTextStream.mock.calls.length).toBeGreaterThanOrEqual(2);
+    const [firstCall, secondCall] = mockProvider.generateTextStream.mock.calls;
+    expect(secondCall[2].tools).toEqual(firstCall[2].tools);
+    const blockedResult = secondCall[0].find(
+      (message: any) => message.role === "tool" && message.tool_call_id === "toolCall-bad",
+    );
+    expect(blockedResult.content).toContain("Plan mode is on");
   });
 });

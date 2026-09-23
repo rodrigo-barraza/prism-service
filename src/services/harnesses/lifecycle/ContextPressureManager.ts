@@ -23,6 +23,8 @@ import { buildHookPayload } from "#src/services/hooks/buildPayload";
 import { HOOK_EVENTS } from "#src/services/hooks/types";
 import type AgentHooks from "#src/services/AgentHooks";
 
+import { serverContextEditingFor } from "./ServerContextEditing.ts";
+
 import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type { ChatMessage } from "#src/types/admin";
 import type { ConversationMessage, AgenticContext } from "#src/services/harnesses/types";
@@ -45,7 +47,10 @@ import type { ConversationMessage, AgenticContext } from "#src/services/harnesse
  *      results (losslessly, via ToolResultOffloadService) when the
  *      context is near capacity, but skips when pressure is low to
  *      preserve the append-only prefix property required for KV
- *      cache reuse across iterations.
+ *      cache reuse across iterations. Each eviction is a declared
+ *      prefix boundary, re-armed only after real growth; Claude requests
+ *      skip it and clear old tool results server-side instead
+ *      (serverContextEditingFor).
  *
  *   2. Auto-compaction trigger — evaluates whether LLM-powered
  *      summarization is needed (even after micro-compaction) and
@@ -78,6 +83,15 @@ import type { ConversationMessage, AgenticContext } from "#src/services/harnesse
  */
 
 const CONTEXT_PRESSURE_THRESHOLD = HARNESS.CONTEXT_PRESSURE_THRESHOLD;
+
+/**
+ * After a micro-compaction eviction, the next one waits until the request
+ * has grown this fraction of the input budget past the post-eviction size —
+ * evictions happen as discrete, declared events (one prefix change, then
+ * stable) instead of one more stub per iteration while the pressure stays
+ * high. Growth beyond that belongs to LLM compaction.
+ */
+const MICRO_COMPACTION_REARM_BUDGET_FRACTION = 0.1;
 
 interface ContextPressureResult {
   messages: ConversationMessage[];
@@ -185,9 +199,19 @@ export async function manageContextPressure(
     );
   }
 
+  const serverClearsToolResults = !!serverContextEditingFor(context).contextEditing;
+  const lastEvictionTokens = state.lastMicroCompactionTokens;
+  const microCompactionArmed =
+    typeof lastEvictionTokens !== "number" ||
+    currentTokenEstimate >=
+      lastEvictionTokens +
+        availableInputBudget * MICRO_COMPACTION_REARM_BUDGET_FRACTION;
+
   if (
     contextPressureRatio > CONTEXT_PRESSURE_THRESHOLD &&
-    !microCompactionDeferred
+    !microCompactionDeferred &&
+    !serverClearsToolResults &&
+    microCompactionArmed
   ) {
     const microCompactionResult = MicroCompactionService.microcompactMessages(
       messages as ChatMessage[],
@@ -204,6 +228,10 @@ export async function manageContextPressure(
     if (microCompactionResult.clearedResultCount > 0) {
       messages = microCompactionResult.messages as ConversationMessage[];
       currentTokenEstimate = estimateRequest();
+      // This request rewrites tool results an earlier one sent — declared,
+      // so cache telemetry does not count it as an accidental prefix change.
+      state.pendingPrefixBoundary = "micro_compaction";
+      state.lastMicroCompactionTokens = currentTokenEstimate;
       logger.info(
         `[${harnessLabel}] Micro-compaction at ${(contextPressureRatio * 100).toFixed(0)}% context pressure — ` +
           `evicted ${microCompactionResult.clearedResultCount} results ` +
@@ -295,6 +323,8 @@ export async function manageContextPressure(
       messages = compactionResult.compactedMessages as ConversationMessage[];
       state.originalMessageCount = messages.length;
       state.compactionPerformed = true;
+      state.pendingPrefixBoundary = "compaction";
+      state.lastMicroCompactionTokens = null;
       state.preCompactTokenCount = compactionResult.preCompactTokenCount;
       state.postCompactTokenCount = compactionResult.postCompactTokenCount;
       // The Finalizer persists the latest boundary; a compaction whose span
