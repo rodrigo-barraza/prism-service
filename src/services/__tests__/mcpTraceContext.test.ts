@@ -32,6 +32,7 @@ vi.mock("@modelcontextprotocol/client", () => ({
     getProtocolEra = () => "modern";
     getServerCapabilities = () => ({ tools: {} });
     setRequestHandler = vi.fn();
+    setNotificationHandler = vi.fn();
   },
   UnauthorizedError: class UnauthorizedError extends Error {},
   StreamableHTTPClientTransport: class StreamableHTTPClientTransport {

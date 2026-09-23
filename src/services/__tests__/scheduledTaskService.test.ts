@@ -619,14 +619,24 @@ describe("ScheduledTaskService — Comprehensive Tests", () => {
       expect(loopArguments.workspaceRoot).toBeNull();
     });
 
-    it("should append trigger payload to prompt context", async () => {
+    it("should deliver a trigger payload as external input beside the task's prompt (prompt 22 L3)", async () => {
       mockRunAgenticLoop.mockResolvedValueOnce(undefined);
 
       await ScheduledTaskService.executeTask(TASK_FIXTURE as any, { event: "webhook", source: "github" }, { username: "rodrigo" });
 
       expect(mockRunAgenticLoop).toHaveBeenCalledTimes(1);
       const loopArguments = mockRunAgenticLoop.mock.calls[0][0];
-      expect(loopArguments.messages[0].content).toContain('Trigger payload: {"event":"webhook","source":"github"}');
+      // The prompt is the user's (written when the task was scheduled) and stays alone.
+      expect(loopArguments.messages[0].content).toBe("Verify server status");
+      // The payload is whoever fired the trigger: a webhook's external input.
+      const payload = loopArguments.messages[1];
+      expect(payload.role).toBe("user");
+      expect(payload._external).toEqual({ source: "webhook", sender: "trigger" });
+      expect(payload.content).toMatch(/^<external-input>/);
+      expect(payload.content).toContain('"source": "github"');
+      expect(payload.rawContent).toContain('"event": "webhook"');
+      // Stored on the new conversation as it ran.
+      expect(mockDatabase._collections.agent_conversations[0].messages).toHaveLength(2);
     });
 
     it("should reset isGenerating to false on loop failure", async () => {
@@ -742,11 +752,15 @@ describe("ScheduledTaskService — Comprehensive Tests", () => {
       expect([appendedId, appendedProject, appendedUsername]).toEqual([TARGET_ID, "prism-chat", "rodrigo"]);
       expect(meta).toBeNull();
       expect(options).toEqual({ collection: "agent_conversations" });
-      expect(appendedMessages).toHaveLength(1);
+      // The scheduler's notice, then the trigger's payload as external input
+      // (prompt 22 L3) — never folded into the user's words.
+      expect(appendedMessages).toHaveLength(2);
       const notification = appendedMessages[0];
       expect(notification.role).toBe("user");
       expect(notification.content).toContain("Verify server status");
-      expect(notification.content).toContain('Trigger payload: {"event":"webhook"}');
+      expect(notification.content).not.toContain("Trigger payload");
+      expect(appendedMessages[1]._external).toMatchObject({ source: "webhook" });
+      expect(appendedMessages[1].content).toContain('"event": "webhook"');
       expect(notification._alreadyPersisted).toBe(true);
       expect(notification._notificationSource).toBe("scheduler");
       expect(notification._notificationId).toMatch(
@@ -769,10 +783,11 @@ describe("ScheduledTaskService — Comprehensive Tests", () => {
       expect(loopArguments.options.autoApprove).toBeUndefined();
       expect(loopArguments.options.disabledTools).toEqual(["execute_shell"]);
       expect(loopArguments.userMessage).toBe(notification);
-      // Full history + the notification, every message marked persisted.
-      expect(loopArguments.messages).toHaveLength(3);
+      // Full history + the notification + the payload, every message marked persisted.
+      expect(loopArguments.messages).toHaveLength(4);
       expect(loopArguments.messages.every((message: any) => message._alreadyPersisted === true)).toBe(true);
       expect(loopArguments.messages[2]._notificationId).toBe(notification._notificationId);
+      expect(loopArguments.messages[3]._external).toMatchObject({ source: "webhook" });
       expect(loopArguments.conversationMeta.title).toBe("Long-running goal");
 
       // isGenerating bracket: true before, false after.

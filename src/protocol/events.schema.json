@@ -727,6 +727,22 @@
               "type": "boolean",
               "const": true
             },
+            "untrustedText": {
+              "type": "object",
+              "properties": {
+                "excerpt": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "excerpt",
+                "source"
+              ],
+              "additionalProperties": false
+            },
             "mode": {
               "type": "string"
             },
@@ -997,7 +1013,8 @@
                 "question_answer",
                 "task_completion",
                 "agent_message",
-                "goal_revision"
+                "goal_revision",
+                "external"
               ]
             },
             "content": {
@@ -1008,6 +1025,18 @@
               "items": {
                 "type": "string"
               }
+            },
+            "source": {
+              "type": "string",
+              "enum": [
+                "webhook",
+                "discord",
+                "mcp",
+                "subagent"
+              ]
+            },
+            "sender": {
+              "type": "string"
             },
             "boundary": {
               "type": "string",
@@ -1134,6 +1163,15 @@
                     }
                   },
                   "additionalProperties": false
+                },
+                "capabilities": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "boolean"
+                  }
                 },
                 "progress": {
                   "type": "object",
@@ -3852,7 +3890,8 @@
                 "question_answer",
                 "task_completion",
                 "agent_message",
-                "goal_revision"
+                "goal_revision",
+                "external"
               ]
             }
           },

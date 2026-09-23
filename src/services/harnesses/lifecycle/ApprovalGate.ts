@@ -318,7 +318,9 @@ export async function checkAndWaitForApproval(
           ? `${toolCall._approval.mode ?? "permission"} mode`
           : toolCall._approval?.deniedBy === "classifier"
             ? "the auto-mode classifier"
-            : "policy";
+            : toolCall._approval?.deniedBy === "scope"
+              ? "the run's capability scope"
+              : "policy";
       byLayer.set(label, [...(byLayer.get(label) ?? []), toolCall.name]);
     }
     emit({
@@ -333,7 +335,7 @@ export async function checkAndWaitForApproval(
         hooks,
         context,
         deniedCall,
-        deniedBy === "mode" || deniedBy === "classifier" ? deniedBy : "rule",
+        deniedBy === "mode" || deniedBy === "classifier" || deniedBy === "scope" ? deniedBy : "rule",
         deniedCall._approval?.reason || "policy rule",
       );
     }
@@ -494,7 +496,14 @@ export async function checkAndWaitForApproval(
         ? // Auto mode put this to the user: its classifier asked, failed, or is
           // paused by its breaker — the reason says which.
           { requestedBy: "classifier", reason: toolCall._approval.reason ?? null }
-        : {}),
+        : toolCall._approval?.untrustedSpan
+          ? // The arguments carry text the turn read from untrusted content:
+            // the card quotes it and names where it was read.
+            {
+              untrustedText: toolCall._approval.untrustedSpan,
+              reason: toolCall._approval.reason ?? null,
+            }
+          : {}),
   }));
 
   // Recorded first, THEN shown: a decision can only land on a call that
@@ -557,6 +566,12 @@ export async function checkAndWaitForApproval(
       // A protected-path write: "Always allow" cannot stop this card asking.
       ...(awaiting[index].toolCall._approval?.protectedPath && {
         protectedPath: awaiting[index].toolCall._approval!.protectedPath,
+        alwaysAsks: true,
+      }),
+      // Nor can it stop a call that carries untrusted text from asking.
+      ...(request.untrustedText && {
+        untrustedText: request.untrustedText,
+        reason: request.reason ?? null,
         alwaysAsks: true,
       }),
       ...(awaiting[index].toolCall._approval?.mode && {

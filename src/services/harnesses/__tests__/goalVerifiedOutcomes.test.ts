@@ -734,6 +734,37 @@ describe("goals become verified outcomes", () => {
     expect(goal.pause.reason).toBe("user_message");
   });
 
+  // Prompt 22 L3: a goal's declared capabilities hold the agent once it
+  // works on its own — and a person stepping back in lifts them.
+  it("a goal's capabilities narrow the run from the first continuation; the user speaking lifts them", async () => {
+    const { currentScope } = await import("#src/services/permissions/CapabilityScope");
+    seedGoal({ capabilities: { network: false } });
+    anthropicSdk.responses.push({ text: verdict({ c2: "4 bullets" }) });
+    const run = startTurn([
+      { kind: "tool", toolName: "read_file", args: { path: "report.md" } },
+      { kind: "text", text: "Done." },
+      { kind: "text", text: "Working on the bullet count now." },
+      { kind: "text", text: "Sure — stopping." },
+      { kind: "text", text: "never reached" },
+    ]);
+    const scopeAt: Record<number, unknown> = {};
+    beforeCall = (n) => {
+      scopeAt[n] = currentScope(run.context.options._capabilityScope);
+      if (n === 3) {
+        TurnInputMailbox.post(CONVERSATION_ID, { kind: "user_update", text: "Stop, I'll take it from here." });
+      }
+    };
+    await run.done;
+
+    // Before the verifier sent it back, the run had no narrowing.
+    expect(scopeAt[1]).toBeNull();
+    expect(scopeAt[2]).toBeNull();
+    // Working on its own: no network.
+    expect(scopeAt[3]).toEqual({ denied: ["network"] });
+    // The user's message was drained at call 4's boundary: lifted.
+    expect(scopeAt[4]).toBeNull();
+  });
+
   it("a goal that is not active is never verified", async () => {
     seedGoal({ status: "paused", pause: { reason: "user", at: new Date().toISOString() } });
     const run = startTurn([{ kind: "text", text: "Here is an unrelated answer." }]);

@@ -18,6 +18,7 @@ import ConversationTimerService from "#src/services/ConversationTimerService";
 import ConversationGoalService, {
   ConversationNotFoundError,
   GOAL_STATUSES,
+  InvalidGoalCapabilitiesError,
   type ConversationGoalBudget,
   type GoalPatch,
 } from "#src/services/ConversationGoalService";
@@ -38,6 +39,7 @@ import {
   deleteConversationSnapshotRefs,
   snapshotRootsOf,
 } from "#src/services/conversation/workspaceSnapshots";
+import { requireUserAuthority } from "#src/middleware/ExternalAuthority";
 
 /**
  * Raw messages → what the client is served: every message carries its id
@@ -1097,7 +1099,12 @@ router.post(
 // ─── Budget pause ────────────────────────────────────────────────
 // PATCH /conversations/:id/budget raises the cap of the turn paused at it
 // (ConversationBudgetRoute).
-router.patch("/:id/budget", asyncHandler(handleConversationBudgetPatch));
+router.patch(
+  "/:id/budget",
+  // Raising a cap is the user's decision, like an approval (ExternalAuthority).
+  requireUserAuthority("raise a budget"),
+  asyncHandler(handleConversationBudgetPatch),
+);
 
 // ─── Conversation goal ───────────────────────────────────────────
 // The persistent objective of a conversation (ConversationGoalService).
@@ -1149,6 +1156,7 @@ router.get(
  */
 router.put(
   "/:id/goal",
+  requireUserAuthority("set a goal"),
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { conversationId, project, username } = resolveGoalRouteScope(req);
@@ -1177,12 +1185,16 @@ router.put(
           stepRubric: body.stepRubric,
           verifier: body.verifier,
           maxIterations: body.maxIterations,
+          capabilities: body.capabilities,
         },
       );
       res.json({ goal });
     } catch (error: unknown) {
       if (error instanceof ConversationNotFoundError) {
         return res.status(404).json({ error: error.message });
+      }
+      if (error instanceof InvalidGoalCapabilitiesError) {
+        return res.status(400).json({ error: error.message });
       }
       logger.error(`Error setting conversation goal: ${errorMessage(error)}`);
       next(error);
@@ -1200,6 +1212,7 @@ router.put(
  */
 router.patch(
   "/:id/goal",
+  requireUserAuthority("change a goal"),
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { conversationId, project, username } = resolveGoalRouteScope(req);
@@ -1248,6 +1261,7 @@ router.patch(
       if (body.stepRubric !== undefined) patch.stepRubric = body.stepRubric;
       if (body.verifier !== undefined) patch.verifier = body.verifier;
       if (body.maxIterations !== undefined) patch.maxIterations = body.maxIterations;
+      if (body.capabilities !== undefined) patch.capabilities = body.capabilities;
       if (body.budget !== undefined) {
         patch.budget =
           body.budget && typeof body.budget === "object"
@@ -1288,6 +1302,9 @@ router.patch(
       if (error instanceof ConversationNotFoundError) {
         return res.status(404).json({ error: error.message });
       }
+      if (error instanceof InvalidGoalCapabilitiesError) {
+        return res.status(400).json({ error: error.message });
+      }
       logger.error(`Error updating conversation goal: ${errorMessage(error)}`);
       next(error);
     }
@@ -1300,6 +1317,7 @@ router.patch(
  */
 router.delete(
   "/:id/goal",
+  requireUserAuthority("clear a goal"),
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { conversationId, project, username } = resolveGoalRouteScope(req);
@@ -1326,6 +1344,7 @@ router.delete(
  */
 router.post(
   "/:id/goal/proposal/approve",
+  requireUserAuthority("approve a goal"),
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { conversationId, project, username } = resolveGoalRouteScope(req);
@@ -1354,6 +1373,7 @@ router.post(
  */
 router.post(
   "/:id/goal/proposal/decline",
+  requireUserAuthority("decline a goal"),
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { conversationId, project, username } = resolveGoalRouteScope(req);

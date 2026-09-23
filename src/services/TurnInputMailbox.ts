@@ -3,6 +3,7 @@ import NativeSteerRegistry from "#src/services/NativeSteerRegistry";
 import { SYSTEM_MESSAGE_TAGS, wrapSystemMessage } from "#src/utils/SystemMessageTags";
 import logger from "#src/utils/logger";
 import type { DecisionOwner } from "#src/services/PendingDecisionStore";
+import { parseExternalOrigin, type ExternalOrigin } from "#src/services/external/ExternalInput";
 
 /**
  * TurnInputMailbox — input that arrives WHILE a turn is running.
@@ -26,6 +27,17 @@ import type { DecisionOwner } from "#src/services/PendingDecisionStore";
  *                        that finished while the turn kept going
  *   - `goal_revision`    the goal verifier's gaps: the agent claimed the goal
  *                        done and the verifier disagrees (lifecycle/GoalGate)
+ *   - `external`         input from outside the conversation — a webhook, a
+ *                        Discord message relayed into someone else's turn, an
+ *                        MCP server, a sub-agent's message to its parent — with its
+ *                        `origin` (source, sender). Tool-level authority:
+ *                        it renders as an enveloped block, never as the
+ *                        user (external/ExternalInput).
+ *
+ * An input with an `origin` is external and nothing else: a post that
+ * carries one under any other kind — a steering update, an answer, a
+ * verifier's gaps, a hook's context — is refused, so an outside source
+ * can never speak with the user's authority through this box.
  *
  * Keyed by the loop's client-facing `conversationId` — for a root turn that
  * is the id the client holds; for a sub-agent it is the sub-agent's own
@@ -59,7 +71,8 @@ export type TurnInputKind =
   | "task_completion"
   | "agent_message"
   | "hook_context"
-  | "goal_revision";
+  | "goal_revision"
+  | "external";
 
 export interface TurnInputEntry {
   id: string;
@@ -70,6 +83,8 @@ export interface TurnInputEntry {
   receivedAt: number;
   /** Producer-specific metadata, copied verbatim onto the injected message. */
   meta?: Record<string, unknown>;
+  /** `external` only: where it came from. */
+  origin?: ExternalOrigin;
   /** Offered to the provider's native steering; held from drain() until it answers. */
   offeredNatively?: boolean;
 }
@@ -79,6 +94,8 @@ export interface TurnInputPost {
   text: string;
   images?: string[];
   meta?: Record<string, unknown>;
+  /** Required for `external`, refused on every other kind. */
+  origin?: ExternalOrigin | null;
 }
 
 interface Mailbox {
@@ -151,6 +168,11 @@ const TurnInputMailbox = {
     return !!box && !box.sealed;
   },
 
+  /** Who runs the conversation's open turn (its project and user), when it said. */
+  ownerOf(conversationId: string): DecisionOwner | null {
+    return mailboxes.get(conversationId)?.owner ?? null;
+  },
+
   /**
    * The turn has decided to end: refuse every further post (as
    * `no_active_turn`, so producers take their after-the-turn path) while
@@ -175,6 +197,15 @@ const TurnInputMailbox = {
     if (box.entries.length >= TURN_INPUT_MAXIMUM_PENDING) {
       return { accepted: false, reason: "mailbox_full" };
     }
+    // An outside source speaks only as `external`, and `external` always
+    // says who it is.
+    const origin = input.origin ? parseExternalOrigin(input.origin) : null;
+    if (input.kind === "external" && !origin) {
+      return { accepted: false, reason: "invalid_origin" };
+    }
+    if (input.kind !== "external" && input.origin) {
+      return { accepted: false, reason: "external_input_not_user" };
+    }
     const text = typeof input.text === "string" ? input.text : "";
     if (!text.trim() && !(input.images && input.images.length > 0)) {
       return { accepted: false, reason: "empty_input" };
@@ -186,6 +217,7 @@ const TurnInputMailbox = {
       ...(input.images && input.images.length > 0 ? { images: input.images } : {}),
       receivedAt: Date.now(),
       ...(input.meta ? { meta: input.meta } : {}),
+      ...(origin ? { origin } : {}),
     };
     box.entries.push(entry);
     box.acceptedCount++;

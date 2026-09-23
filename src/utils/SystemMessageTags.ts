@@ -72,8 +72,19 @@ export const SYSTEM_MESSAGE_TAGS = {
   USER_UPDATE: "user-update",
   /** The user's answer to a non-blocking ask_user card, delivered at a loop boundary. */
   USER_ANSWER: "user-answer",
-  /** A sub-agent's report_progress — a delegate's status, never the user's instruction. */
+  /**
+   * A sub-agent's report_progress, before it became external input (prompt
+   * 22 L3). Still a harness tag: older transcripts carry it, and external
+   * text must not be able to forge it.
+   */
   SUB_AGENT_PROGRESS: "subagent-progress",
+  /**
+   * Input from outside the conversation — a webhook, a Discord message
+   * relayed into someone else's turn, an MCP server, a sub-agent
+   * (external/ExternalInput). It carries tool-level authority, never the
+   * user's.
+   */
+  EXTERNAL_INPUT: "external-input",
   /** The conversation's persistent goal (objective, progress, budget) injected alongside system context. */
   GOAL: "goal",
   /** The goal verifier's verdict on a done claim: the criteria not yet met (lifecycle/GoalGate). */

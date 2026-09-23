@@ -493,6 +493,19 @@ export function buildDeniedToolResult(toolCall: ToolCall): ToolResult {
       },
     };
   }
+  if (toolCall._approval?.deniedBy === "scope") {
+    // Written for the model: which capability, and that nothing widens it.
+    return {
+      name: toolCall.name,
+      id: toolCall.id,
+      result: {
+        success: false,
+        error: "CAPABILITY_SCOPE_DENIED",
+        ...(toolCall._approval.rule ? { capability: toolCall._approval.rule } : {}),
+        message: reason,
+      },
+    };
+  }
   if (toolCall._approval?.deniedBy === "hook") {
     return {
       name: toolCall.name,
@@ -524,7 +537,7 @@ export async function firePermissionDenied(
   hooks: AgentHooks | undefined,
   context: AgenticContext,
   toolCall: ToolCall,
-  deniedBy: "rule" | "classifier" | "hook" | "mode" | ApprovalDecisionSource,
+  deniedBy: "rule" | "classifier" | "hook" | "mode" | "scope" | ApprovalDecisionSource,
   reason: string,
 ): Promise<void> {
   if (!hooks) return;

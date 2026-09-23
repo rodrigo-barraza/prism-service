@@ -1,6 +1,11 @@
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { NOTIFICATION_SOURCES, PROMPT_DELIMITERS } from "#src/constants";
 import { LOCAL_TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
+import { ASYNC_TASK_TOOL_NAMES } from "#src/services/AsyncTaskConstants";
+import {
+  externalOriginOfMessage,
+  type ExternalOrigin,
+} from "#src/services/external/ExternalInput";
 
 // ────────────────────────────────────────────────────────────
 // Memory provenance — where a memory came from, and how far to trust it
@@ -220,6 +225,16 @@ const THIRD_PARTY_TEXT_TOOLS = new Set<string>([
   "get_github_trending",
 ]);
 
+/**
+ * Tools that return what a sub-agent (or a background task) wrote: its
+ * output is another model's words, which may carry a page it read — the same
+ * external input a completion notice carries (external/ExternalInput).
+ */
+const SUB_AGENT_OUTPUT_TOOLS = new Set<string>([
+  ASYNC_TASK_TOOL_NAMES.WAIT_FOR_TASKS,
+  TOOL_NAMES.GET_SUBAGENT_OUTPUT,
+]);
+
 const MCP_PREFIX = "mcp__";
 
 /** `mcp__<server>__<tool>` → `<server>`; null for any other name. */
@@ -272,6 +287,7 @@ export function toolResultProvenance(
   if (name === LOCAL_TOOL_NAMES.READ_UNTRUSTED) return readUntrustedProvenance(args);
   if (WEB_CONTENT_TOOLS.has(name)) return { source: "web", trust: "untrusted" };
   if (THIRD_PARTY_TEXT_TOOLS.has(name)) return { source: `tool:${name}`, trust: "untrusted" };
+  if (SUB_AGENT_OUTPUT_TOOLS.has(name)) return { source: "subagent", trust: "untrusted" };
   return { source: `tool:${name}`, trust: "derived" };
 }
 
@@ -343,8 +359,24 @@ function withRef(label: ProvenanceLabel, ref: Omit<MemorySourceRef, "source" | "
   return { ...label, sourceRefs: [{ source: label.source, trust: label.trust, ...ref }] };
 }
 
+/**
+ * An external input's source as memory names it: a sub-agent, an MCP
+ * server by name, or the tool-like channel it came through.
+ */
+export function externalInputSource(origin: ExternalOrigin): MemorySource {
+  if (origin.source === "subagent") return "subagent";
+  if (origin.source === "mcp") {
+    const server = origin.sender?.replace(/[^A-Za-z0-9._-]/g, "");
+    return `mcp:${server || "server"}`;
+  }
+  return `tool:${origin.source}`;
+}
+
 /** A user-role message's own provenance: the user, the harness, or someone else's output. */
 function userMessageLabel(message: ProvenanceMessage): ProvenanceLabel {
+  // Input from outside the conversation, whatever else it carries.
+  const external = externalOriginOfMessage(message);
+  if (external) return { source: externalInputSource(external), trust: "untrusted" };
   const notification =
     typeof message._notificationSource === "string" ? message._notificationSource : null;
   if (notification) {

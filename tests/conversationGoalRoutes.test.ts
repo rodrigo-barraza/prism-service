@@ -247,6 +247,36 @@ describe('Conversation goal routes', () => {
     });
   });
 
+  it("PUT and PATCH take the goal's capabilities (prompt 22 L3) — a typo is a 400, never ignored", async () => {
+    const put = await agent
+      .put('/conversations/agent-conv-1/goal')
+      .set(headers)
+      .send({ objective: 'Tidy the notes', capabilities: { network: false, shell: true } })
+      .expect(200);
+    // Only what narrows is kept.
+    expect(put.body.goal.capabilities).toEqual({ network: false });
+
+    const typo = await agent
+      .put('/conversations/agent-conv-1/goal')
+      .set(headers)
+      .send({ objective: 'Tidy the notes', capabilities: { netwrok: false } });
+    expect(typo.status).toBe(400);
+    expect(typo.body.error).toContain('unknown capability "netwrok"');
+
+    const patched = await agent
+      .patch('/conversations/agent-conv-1/goal')
+      .set(headers)
+      .send({ capabilities: { network_write: false } })
+      .expect(200);
+    expect(patched.body.goal.capabilities).toEqual({ network_write: false });
+    const cleared = await agent
+      .patch('/conversations/agent-conv-1/goal')
+      .set(headers)
+      .send({ capabilities: null })
+      .expect(200);
+    expect(cleared.body.goal.capabilities).toBeUndefined();
+  });
+
   it('PATCH edits the goal in place and a pause records the user as its reason', async () => {
     await agent
       .put('/conversations/agent-conv-1/goal')

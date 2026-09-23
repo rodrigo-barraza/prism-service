@@ -1,5 +1,6 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { type Request, type Response, type NextFunction } from "express";
+import { requireUserAuthorityToChange } from "#src/middleware/ExternalAuthority";
 import CustomAgentService from "#src/services/CustomAgentService";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 import logger from "#src/utils/logger";
@@ -13,7 +14,8 @@ import {
 } from "#src/services/agents/AgentRuntime";
 import { resolveScope } from "#src/utils/ProfileScope";
 
-const router = express.Router();
+// An agent's instructions and tool policies are the user's to change.
+const router = express.Router().use(requireUserAuthorityToChange("change an agent or its tool policies"));
 
 /**
  * A create/update body's `runtime` and `acp` fields, checked. An `acp`

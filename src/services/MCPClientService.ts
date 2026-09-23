@@ -17,6 +17,8 @@ import type { Db } from "mongodb";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { traceMeta, tracedFetch } from "#src/services/Tracing";
 import { COLLECTIONS, MCP } from "#src/constants";
+import TurnInputMailbox from "#src/services/TurnInputMailbox";
+import { externalOrigin } from "#src/services/external/ExternalInput";
 import {
   DEFAULT_PROFILE_ID,
   normalizeProfileId,
@@ -180,7 +182,14 @@ interface ActiveCall {
   id: number;
   toolName: string;
   elicit?: McpElicitHandler;
+  /** The turn the call runs for — where the server's notifications go. */
+  turnLoopKey?: string | null;
+  /** Server notifications this call has passed to its turn. */
+  notificationsForwarded?: number;
 }
+
+/** MCP logging levels, least to most severe (RFC 5424 order, as the spec uses). */
+const LOGGING_LEVELS = ["debug", "info", "notice", "warning", "error", "critical", "alert", "emergency"];
 
 interface MCPAuthOptions {
   token?: string;
@@ -214,6 +223,11 @@ export interface MCPCallOptions {
    * Absent (hooks, tool programs), elicitations are answered `cancel`.
    */
   elicit?: McpElicitHandler;
+  /**
+   * The loop key of the turn making the call: the server's notifications
+   * during it reach that turn as external input. Absent, they are dropped.
+   */
+  turnLoopKey?: string | null;
   /**
    * Internal recursion guard. The reconnect-retry used to recurse UNBOUNDED
    * (callTool → catch → reconnect → callTool …) when a server kept dropping
@@ -627,6 +641,15 @@ const MCPClientService = {
     client.setRequestHandler("elicitation/create", (request) =>
       MCPClientService.handleElicitation(key, client, request.params as unknown as ElicitParamsLike),
     );
+    // What the server says while a call runs reaches the calling turn as
+    // external input — tool-level authority, never the user's.
+    client.setNotificationHandler("notifications/message", (notification) =>
+      MCPClientService.handleServerMessage(
+        key,
+        client,
+        notification.params as unknown as { level?: unknown; logger?: unknown; data?: unknown },
+      ),
+    );
 
     try {
       await client.connect(transport);
@@ -729,6 +752,51 @@ const MCPClientService = {
     logger.info(
       `[MCP] "${conn.serverName}" tool list changed — ${conn.tools.length} approved${describeQuarantine(conn)}`,
     );
+  },
+
+  /**
+   * A server's log notification. While calls of this connection are in
+   * flight, one at `MCP.NOTIFICATION_MINIMUM_LEVEL` or above goes to each
+   * calling turn's mailbox as `external` input from the server (source
+   * `mcp`, sender its name) — at most NOTIFICATIONS_FORWARDED_PER_CALL per
+   * call. With no call in flight there is no turn to tell: it is logged.
+   */
+  handleServerMessage(
+    key: string,
+    client: Client,
+    params: { level?: unknown; logger?: unknown; data?: unknown } | null | undefined,
+  ): void {
+    const conn = connections.get(key);
+    if (!conn || conn.client !== client || !params) return;
+    const level = typeof params.level === "string" ? params.level : "info";
+    const severity = LOGGING_LEVELS.indexOf(level);
+    if (severity < LOGGING_LEVELS.indexOf(MCP.NOTIFICATION_MINIMUM_LEVEL)) return;
+    let data: string;
+    try {
+      data = typeof params.data === "string" ? params.data : JSON.stringify(params.data);
+    } catch {
+      data = String(params.data);
+    }
+    const source = typeof params.logger === "string" && params.logger ? ` ${params.logger}` : "";
+    const text = `[${level}${source}] ${data ?? ""}`.slice(0, MCP.NOTIFICATION_MAXIMUM_CHARACTERS);
+    const delivered = new Set<string>();
+    for (const call of conn.activeCalls.values()) {
+      const loopKey = call.turnLoopKey;
+      if (!loopKey || delivered.has(loopKey)) continue;
+      if ((call.notificationsForwarded ?? 0) >= MCP.NOTIFICATIONS_FORWARDED_PER_CALL) continue;
+      const posted = TurnInputMailbox.post(loopKey, {
+        kind: "external",
+        origin: externalOrigin("mcp", conn.serverName),
+        text: `Message from MCP server "${conn.serverName}" during ${call.toolName}: ${text}`,
+      });
+      if (posted.accepted) {
+        call.notificationsForwarded = (call.notificationsForwarded ?? 0) + 1;
+        delivered.add(loopKey);
+      }
+    }
+    if (delivered.size === 0) {
+      logger.info(`[MCP] "${conn.serverName}" ${level}: ${text.slice(0, 300)}`);
+    }
   },
 
   /**
@@ -859,7 +927,12 @@ const MCPClientService = {
         ? Math.max(options.timeoutMilliseconds ?? 0, MCP.INTERACTIVE_CALL_TIMEOUT_MILLISECONDS)
         : options.timeoutMilliseconds;
     const callId = ++callSequence;
-    conn.activeCalls.set(callId, { id: callId, toolName: originalName, elicit: options.elicit });
+    conn.activeCalls.set(callId, {
+      id: callId,
+      toolName: originalName,
+      elicit: options.elicit,
+      turnLoopKey: options.turnLoopKey ?? null,
+    });
 
     try {
       const result = await callContext.run({ key: conn.key, callId }, () => conn.client.callTool(

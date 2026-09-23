@@ -4,6 +4,7 @@ import { handleAgent } from "./ChatRoutes.ts";
 import { handleApprovalDecision } from "./ApprovalDecisionRoute.ts";
 import { handleSseRequest, handleJsonRequest } from "#src/utils/SseUtilities";
 import { handleQuestionAnswer } from "./QuestionAnswerHandler.ts";
+import { applyExternalTurnAuthority, requireUserAuthority } from "#src/middleware/ExternalAuthority";
 
 const router = express.Router();
 
@@ -14,6 +15,7 @@ const router = express.Router();
  */
 router.post(
   "/approve",
+  requireUserAuthority("approve a tool call"),
   asyncHandler(async (req: Request, res: Response) =>
     handleApprovalDecision(req, res, "[conversation/approve]"),
   ),
@@ -26,6 +28,7 @@ router.post(
  */
 router.post(
   "/answer",
+  requireUserAuthority("answer a question on the user's behalf"),
   asyncHandler(handleQuestionAnswer("conversation/answer")),
 );
 
@@ -50,6 +53,8 @@ router.post(
         agent: req.body.agent || req.agent || null,
         workspaceRoot: req.workspaceRoot || req.body.workspaceRoot || null,
       };
+      // A relay's turn runs unattended and cannot pick its own approval mode.
+      applyExternalTurnAuthority(req, params);
 
       if (req.query.stream !== "false") {
         await handleSseRequest(req, res, params, handleAgent);

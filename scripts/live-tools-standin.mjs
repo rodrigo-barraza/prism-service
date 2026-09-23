@@ -11,9 +11,14 @@
 //     tools-service's AgenticRoutes does it — identity middleware with
 //     traceContext, getTraceHeaders() on the way back — so a save round-trips
 //     the real x-conversation-id / x-request-id hop;
+//   - with STANDIN_WEB_ORIGIN=http://localhost:<port3> set, read_web_page
+//     (POST /agentic/web/fetch) of a URL under that origin is answered here,
+//     in tools-service's result shape — the real tools-service's SSRF guard
+//     refuses every private address, so a scratch page served on this host
+//     is otherwise unreadable (prompt 22 L3's live check);
 //   - every other tool call is refused (403) and logged.
 //
-//   LOCAL_PRISM_PORT=<port> STANDIN_PORT=<port2> \
+//   LOCAL_PRISM_PORT=<port> STANDIN_PORT=<port2> [STANDIN_WEB_ORIGIN=…] \
 //     node scripts/live-tools-standin.mjs          (Bash run_in_background: true)
 //
 // Host and ports come from vault-service/projects.json (CLAUDE.md §0).
@@ -35,6 +40,7 @@ if (!prismPort || !listenPort) {
   throw new Error("LOCAL_PRISM_PORT and STANDIN_PORT are required");
 }
 const localPrism = `http://localhost:${prismPort}`;
+const webOrigin = process.env.STANDIN_WEB_ORIGIN || null;
 
 const app = express();
 app.use(express.json({ limit: "5mb" }));
@@ -58,6 +64,26 @@ app.post("/agentic/memory/save", async (request, response) => {
   response.status(forwarded.status).json(await forwarded.json());
 });
 
+/** A local scratch page as read_web_page returns a page: its text, no markup. */
+app.post("/agentic/web/fetch", async (request, response) => {
+  const { url } = request.body ?? {};
+  if (!webOrigin || typeof url !== "string" || !url.startsWith(webOrigin)) {
+    console.log(`[standin] refused read_web_page ${url}`);
+    return response.status(403).json({ error: "live-tools-standin: only STANDIN_WEB_ORIGIN pages are read" });
+  }
+  const page = await fetch(url);
+  const html = await page.text();
+  const content = html
+    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n\s*\n+/g, "\n\n")
+    .trim();
+  console.log(`[standin] read_web_page ${url} (${content.length} chars)`);
+  response.json({ url, contentType: "text/html", content, charCount: content.length, truncated: false });
+});
+
 app.get(/.*/, async (request, response) => {
   const upstream = await fetch(`${productionTools}${request.originalUrl}`, {
     headers: { accept: "application/json" },
@@ -74,5 +100,8 @@ app.all(/.*/, (request, response) => {
 });
 
 app.listen(listenPort, () =>
-  console.log(`[standin] tools stand-in on ${listenPort} → schemas from ${productionTools}, save_memory → ${localPrism}`),
+  console.log(
+    `[standin] tools stand-in on ${listenPort} → schemas from ${productionTools}, save_memory → ${localPrism}` +
+      (webOrigin ? `, read_web_page of ${webOrigin}` : ""),
+  ),
 );

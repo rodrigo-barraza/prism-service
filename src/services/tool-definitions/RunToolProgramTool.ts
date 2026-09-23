@@ -318,6 +318,9 @@ const runToolProgramTool = {
       permissionRules: context._permissionRules ?? null,
       // Plan mode refuses a program's network reads as it would the call.
       permissionMode: context._permissionMode ?? null,
+      // A capability the run was started without stays out of its programs.
+      capabilityScope: context._capabilityScope ?? null,
+      untrustedSpans: context._untrustedSpans ?? null,
       fullAuto: false,
     });
     const enabledTools = Array.isArray(context.enabledTools)

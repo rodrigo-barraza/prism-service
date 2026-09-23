@@ -4,8 +4,11 @@ import SettingsService from "#src/services/SettingsService";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { requireUserAuthorityToChange } from "#src/middleware/ExternalAuthority";
 
 const router = express.Router();
+// Settings hold the default mode and the taint threshold: the user's.
+router.use(requireUserAuthorityToChange("change settings"));
 
 /**
  * GET /settings

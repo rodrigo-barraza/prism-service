@@ -10,6 +10,11 @@ import logger from "#src/utils/logger";
 import { handleSseRequest, handleJsonRequest } from "#src/utils/SseUtilities";
 import { TIMERS } from "#src/constants";
 import { handleQuestionAnswer } from "./QuestionAnswerHandler.ts";
+import {
+  applyExternalTurnAuthority,
+  relayedInputOrigin,
+  requireUserAuthority,
+} from "#src/middleware/ExternalAuthority";
 
 const router = express.Router();
 
@@ -21,6 +26,8 @@ const router = express.Router();
  */
 router.post(
   "/approve",
+  // A relayed message is never the user's consent (ExternalAuthority).
+  requireUserAuthority("approve a tool call"),
   asyncHandler(async (request: Request, response: Response) =>
     handleApprovalDecision(request, response, "[agent/approve]"),
   ),
@@ -37,6 +44,7 @@ router.post(
  */
 router.post(
   "/answer",
+  requireUserAuthority("answer a question on the user's behalf"),
   asyncHandler(handleQuestionAnswer("agent/answer")),
 );
 
@@ -57,6 +65,13 @@ router.post(
  *
  * 409 when no turn is open: the client should queue the message as the next
  * turn instead (that is the pre-existing behaviour and remains the fallback).
+ *
+ * A relay's post (a webhook bridge, the Discord bot — ExternalAuthority)
+ * enters as `external` input with its source and sender: tool-level
+ * authority, never the user steering — unless a relay project posts it as
+ * the running turn's own user (Lupos folding a follow-up into its author's
+ * own reply), which is that user steering. The response's `kind` says
+ * which it became.
  */
 router.post(
   "/input",
@@ -70,9 +85,11 @@ router.post(
       return response.status(400).json({ error: "Missing text" });
     }
 
+    const inputText = typeof text === "string" ? text : "";
+    const origin = relayedInputOrigin(request, inputText, TurnInputMailbox.ownerOf(conversationId));
     const posted = TurnInputMailbox.post(conversationId, {
-      kind: "user_update",
-      text: typeof text === "string" ? text : "",
+      ...(origin ? { kind: "external" as const, origin } : { kind: "user_update" as const }),
+      text: inputText,
       ...(Array.isArray(images) && images.length > 0
         ? { images: images.filter((image: unknown) => typeof image === "string") }
         : {}),
@@ -93,13 +110,14 @@ router.post(
     }
 
     logger.info(
-      `[agent/input] update ${posted.id} queued for conversation ${conversationId} (position ${posted.position})`,
+      `[agent/input] ${origin ? `external input from ${origin.source}` : "update"} ${posted.id} queued for conversation ${conversationId} (position ${posted.position})`,
     );
 
     response.json({
       ok: true,
       inputId: posted.id,
       position: posted.position,
+      kind: origin ? "external" : "user_update",
       active: AgentSessionRegistry.isActive(conversationId),
     });
   }),
@@ -189,6 +207,9 @@ router.post(
       // reaches the caller on the stream's first event.
       serverConversationId: request.body.conversationId ? undefined : crypto.randomUUID(),
     };
+    // A relay's turn (a webhook, the Discord bot) runs unattended and cannot
+    // pick its own approval mode (ExternalAuthority).
+    applyExternalTurnAuthority(request, params);
 
     if (request.query.stream !== "false") {
       await handleSseRequest(request, response, params, handleAgent, {
