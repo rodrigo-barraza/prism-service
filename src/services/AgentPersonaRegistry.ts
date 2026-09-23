@@ -9,6 +9,11 @@ import {
 } from "./agents/AgentDefinitionFiles.ts";
 import { normalizeAgentDefinitionFields } from "./agents/AgentDefinitionFields.ts";
 import {
+  ACP_RUNTIME,
+  normalizeAgentRuntime,
+  type NormalizedAgentRuntime,
+} from "./agents/AgentRuntime.ts";
+import {
   BUILT_IN_PERSONAS,
   type Persona,
   type PersonaContext,
@@ -154,6 +159,7 @@ const AgentPersonaRegistry = {
         type: persona.type || "",
         description: persona.description || "",
         ...(persona.custom ? { custom: true, source: persona.source ?? "database" } : {}),
+        ...(persona.runtime === ACP_RUNTIME ? { runtime: ACP_RUNTIME } : {}),
       }));
   },
 
@@ -193,6 +199,20 @@ const AgentPersonaRegistry = {
         `[AgentPersonaRegistry] Agent ${doc.agentId}: ignoring invalid field(s) — ${definitionErrors.join("; ")}`,
       );
     }
+
+    // An external runtime (an ACP agent process) is a stored agent's alone:
+    // a workspace file never starts a process through its definition. An
+    // `acp` agent whose launch configuration is invalid keeps its runtime
+    // — it must never silently run as a Prism agent instead — and cannot
+    // be spawned (the spawn names the errors).
+    const runtimeDefinition: NormalizedAgentRuntime =
+      source === "database" ? normalizeAgentRuntime(doc) : { errors: [] };
+    if (runtimeDefinition.errors.length > 0) {
+      logger.warn(
+        `[AgentPersonaRegistry] Agent ${doc.agentId}: invalid runtime — ${runtimeDefinition.errors.join("; ")}`,
+      );
+    }
+    const isAcpAgent = runtimeDefinition.runtime === ACP_RUNTIME;
 
     // Reconstruct PolicyRules from serialized format
     const rawPolicies = Array.isArray(doc.policies)
@@ -248,6 +268,12 @@ const AgentPersonaRegistry = {
       ...(definitionFields.maxTurns && { maxTurns: definitionFields.maxTurns }),
       ...(definitionFields.permissionMode && { permissionMode: definitionFields.permissionMode }),
       ...(definitionFields.disallowedTools?.length && { blockedTools: definitionFields.disallowedTools }),
+      ...(isAcpAgent && {
+        runtime: ACP_RUNTIME,
+        ...(runtimeDefinition.acp
+          ? { acp: runtimeDefinition.acp }
+          : { runtimeErrors: runtimeDefinition.errors }),
+      }),
       icon: (doc.icon as string) || "",
       avatar: (doc.avatar as string) || "",
       color: (doc.color as string) || "",
@@ -314,7 +340,8 @@ const AgentPersonaRegistry = {
     isFileLayerStale = true;
     PERSONAS.set(doc.agentId as string, persona);
     logger.info(
-      `[AgentPersonaRegistry] Registered custom agent: "${doc.name}" (${doc.agentId}) with ${persona.availableTools.length} tools, ${policies.length} policies`,
+      `[AgentPersonaRegistry] Registered custom agent: "${doc.name}" (${doc.agentId}) with ${persona.availableTools.length} tools, ${policies.length} policies` +
+        (persona.runtime === ACP_RUNTIME ? `, runtime acp (${persona.acp?.command ?? "invalid launch configuration"})` : ""),
     );
   },
 

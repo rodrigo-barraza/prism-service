@@ -703,7 +703,8 @@
               "enum": [
                 "hook",
                 "restart",
-                "classifier"
+                "classifier",
+                "external_agent"
               ]
             },
             "reason": {
@@ -2152,6 +2153,10 @@
                       "type": "null"
                     }
                   ]
+                },
+                "costUnknown": {
+                  "type": "boolean",
+                  "const": true
                 }
               },
               "required": [

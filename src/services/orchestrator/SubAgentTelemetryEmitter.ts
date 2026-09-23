@@ -510,11 +510,16 @@ export class SubAgentTelemetryEmitter {
     }
   }
 
-  /** Emit a completion event to the parent SSE stream. */
+  /**
+   * Emit a completion event to the parent SSE stream. `costUnknown`: an
+   * external agent reported no cost — the event says so instead of a null
+   * cost reading as free.
+   */
   emitCompletion(
     durationMilliseconds: number,
     usage: Record<string, number> | null,
     estimatedCost: number | null,
+    { costUnknown = false }: { costUnknown?: boolean } = {},
   ) {
     if (this.parentEmit) {
       this.parentEmit({
@@ -528,6 +533,7 @@ export class SubAgentTelemetryEmitter {
         toolCount: this.toolCalls.length,
         usage: usage || null,
         estimatedCost: estimatedCost || null,
+        ...(costUnknown && { costUnknown: true }),
       });
     }
     // Remove sub-agent from parent's live status registry

@@ -56,6 +56,10 @@ const CustomAgentService = {
       // Sub-agent pins (prompt 17), validated by the route:
       // model/provider/effort/maxTurns/permissionMode/disallowedTools.
       ...pickAgentDefinitionPins(data),
+      // An external runtime and its launch configuration (agents/AgentRuntime),
+      // validated and owner-stamped by the route.
+      ...(typeof data.runtime === "string" && data.runtime ? { runtime: data.runtime } : {}),
+      ...(data.acp && typeof data.acp === "object" && !Array.isArray(data.acp) ? { acp: data.acp } : {}),
       project: data.project || "coding",
       icon: data.icon || "",
       avatar: data.avatar || "",

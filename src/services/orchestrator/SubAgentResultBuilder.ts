@@ -27,6 +27,10 @@ export interface SubAgentSummary {
   toolUses: number;
   hasChanges: boolean;
   totalCost?: number | null;
+  /** An external agent (ACP) that reported no cost: `totalCost` is unknown. */
+  costUnknown?: boolean;
+  /** An external runtime ran it (`acp`). */
+  runtime?: string;
   branchName?: string | null;
   files?: string[];
   toolCallCount?: number;
@@ -67,6 +71,8 @@ export function toLiveSubAgentSummary(
     toolUses: subAgent.toolCalls?.length || 0,
     hasChanges: (subAgent.diff?.files.length ?? 0) > 0,
     totalCost: subAgent.totalCost,
+    ...(subAgent.costUnknown && { costUnknown: true }),
+    ...(subAgent.runtime && { runtime: subAgent.runtime }),
     branchName: subAgent.branchName,
     files: subAgent.files,
     toolCallCount: subAgent.toolCalls?.length || 0,
@@ -92,6 +98,8 @@ export function toPersistedSubAgentSummary(
     toolUses: (document.subAgentToolUses as number) || 0,
     hasChanges: (document.subAgentHasChanges as boolean) || false,
     totalCost: document.subAgentTotalCost as number | null | undefined,
+    ...(document.subAgentCostUnknown === true && { costUnknown: true }),
+    ...(typeof document.subAgentRuntime === "string" && { runtime: document.subAgentRuntime }),
     branchName: document.subAgentBranchName as string | null | undefined,
     files: document.subAgentFiles as string[] | undefined,
     toolCallCount: (document.subAgentToolUses as number) || 0,
