@@ -31,6 +31,12 @@ vi.mock("#src/utils/logger", () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+// The importer reads only inside a registered workspace root.
+const registered = vi.hoisted(() => ({ roots: [] as string[] }));
+vi.mock("#src/services/ToolOrchestratorService", () => ({
+  default: { getWorkspaceRoots: () => registered.roots },
+}));
+
 // ── In-memory Mongo double (agent_skills + mcp_servers) ─────
 
 interface FakeRow {
@@ -139,10 +145,14 @@ vi.mock("#src/services/ProjectInstructionsService", async (importOriginal) => {
 const { default: ClaudeConfigImportService, parseFrontmatter } =
   await import("#src/services/ClaudeConfigImportService");
 const { COLLECTIONS } = await import("#src/constants");
+const { default: SkillFolderStore } = await import("#src/services/skills/SkillFolderStore");
+const { requestContext } = await import("#src/utils/RequestContext");
 
 // ── Fixture workspace ───────────────────────────────────────
 
 let workspaceRoot: string;
+let foldersDirectory: string;
+const previousFoldersDirectory = process.env.PRISM_SKILL_FOLDERS_DIRECTORY;
 
 const SCOPE = { project: "test-project", username: "test-user", agent: null };
 
@@ -150,6 +160,8 @@ beforeAll(async () => {
   workspaceRoot = await fs.mkdtemp(
     path.join(os.tmpdir(), "claude-config-fixture-"),
   );
+  foldersDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "claude-config-folders-"));
+  process.env.PRISM_SKILL_FOLDERS_DIRECTORY = foldersDirectory;
 
   await fs.writeFile(
     path.join(workspaceRoot, "CLAUDE.md"),
@@ -164,11 +176,27 @@ beforeAll(async () => {
     [
       "---",
       "name: deploy-app",
-      "description: Deploy the app to staging",
+      "description: >",
+      "  Deploy the app to staging",
+      "  and smoke-test it.",
+      "allowed-tools: Bash(./scripts/deploy.sh:*), Read",
       "---",
       "",
       "Run the deploy pipeline, then smoke-test staging.",
     ].join("\n"),
+  );
+  await fs.mkdir(path.join(workspaceRoot, ".claude", "skills", "deploy", "scripts"), {
+    recursive: true,
+  });
+  await fs.writeFile(
+    path.join(workspaceRoot, ".claude", "skills", "deploy", "scripts", "smoke.sh"),
+    "#!/bin/sh\ncurl -fsS https://staging.example.com/health\n",
+  );
+
+  await fs.mkdir(path.join(workspaceRoot, ".claude", "agents"), { recursive: true });
+  await fs.writeFile(
+    path.join(workspaceRoot, ".claude", "agents", "reviewer.md"),
+    "---\nname: reviewer\ndescription: Reviews diffs\n---\nYou review diffs.\n",
   );
 
   await fs.mkdir(path.join(workspaceRoot, ".claude", "skills", "review"), {
@@ -208,11 +236,15 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await fs.rm(workspaceRoot, { recursive: true, force: true });
+  await fs.rm(foldersDirectory, { recursive: true, force: true });
+  if (previousFoldersDirectory === undefined) delete process.env.PRISM_SKILL_FOLDERS_DIRECTORY;
+  else process.env.PRISM_SKILL_FOLDERS_DIRECTORY = previousFoldersDirectory;
 });
 
 beforeEach(() => {
   store.collections.clear();
   instructionsStore.current = null;
+  registered.roots = [workspaceRoot];
 });
 
 describe("parseFrontmatter", () => {
@@ -372,5 +404,86 @@ describe("importFromWorkspace", () => {
       SCOPE,
     );
     expect(result).toHaveProperty("error");
+  });
+});
+
+// ── Landing 2: real YAML, stored folders, registered roots, preview ──
+
+describe("importFromWorkspace — skill folders (prompt 19, Landing 2)", () => {
+  it("reads multi-line YAML and allowed-tools from SKILL.md frontmatter", async () => {
+    const summary = await ClaudeConfigImportService.importFromWorkspace(workspaceRoot, SCOPE);
+    if ("error" in summary) throw new Error(summary.error);
+
+    const deploy = store.collections
+      .get(COLLECTIONS.AGENT_SKILLS)!
+      .find((skill) => skill.skillId === "deploy_app")!;
+    expect(deploy.description).toBe("Deploy the app to staging and smoke-test it.");
+    expect(deploy.allowedTools).toEqual(["Bash(./scripts/deploy.sh:*)", "Read"]);
+    expect(deploy.content).toBe("Run the deploy pipeline, then smoke-test staging.");
+  });
+
+  it("stores the skill's folder so its bundled files resolve", async () => {
+    await ClaudeConfigImportService.importFromWorkspace(workspaceRoot, SCOPE);
+    const deploy = store.collections
+      .get(COLLECTIONS.AGENT_SKILLS)!
+      .find((skill) => skill.skillId === "deploy_app")!;
+    expect(deploy.folderRef).toMatch(/^file:/);
+    expect((deploy.resources as Array<{ path: string }>).map((resource) => resource.path)).toEqual([
+      "SKILL.md",
+      "scripts/smoke.sh",
+    ]);
+    const script = await SkillFolderStore.read(deploy.folderRef as string, "scripts/smoke.sh");
+    expect(script.toString("utf8")).toContain("staging.example.com/health");
+  });
+
+  it("stamps the importer's profile on the MCP servers it imports", async () => {
+    const summary = await requestContext.run(
+      { project: SCOPE.project, username: SCOPE.username, profileId: "work", clientIp: null, agent: null },
+      () => ClaudeConfigImportService.importFromWorkspace(workspaceRoot, SCOPE),
+    );
+    if ("error" in summary) throw new Error(summary.error);
+    const mcpServers = store.collections.get(COLLECTIONS.MCP_SERVERS)!;
+    expect(mcpServers.map((server) => server.profileId)).toEqual(["work", "work"]);
+  });
+
+  it("refuses a path outside every registered workspace", async () => {
+    registered.roots = [path.join(os.tmpdir(), "some-other-workspace")];
+    const result = await ClaudeConfigImportService.importFromWorkspace(workspaceRoot, SCOPE);
+    expect(result).toEqual({ error: expect.stringMatching(/registered workspace/) });
+    expect(store.collections.get(COLLECTIONS.AGENT_SKILLS) ?? []).toHaveLength(0);
+    expect(instructionsStore.current).toBeNull();
+  });
+
+  it("a dry run previews every item and writes nothing", async () => {
+    const preview = await ClaudeConfigImportService.importFromWorkspace(workspaceRoot, SCOPE, {
+      dryRun: true,
+    });
+    if ("error" in preview) throw new Error(preview.error);
+
+    expect(preview.dryRun).toBe(true);
+    expect(preview.projectInstructions).toMatchObject({ imported: false, bytes: expect.any(Number) });
+    expect(preview.projectInstructions.preview).toContain("Never push to main.");
+    expect(preview.skills.items).toEqual([
+      expect.objectContaining({
+        name: "deploy-app",
+        description: "Deploy the app to staging and smoke-test it.",
+        allowedTools: ["Bash(./scripts/deploy.sh:*)", "Read"],
+        files: ["SKILL.md", "scripts/smoke.sh"],
+        status: "created",
+      }),
+      expect.objectContaining({ name: "review", status: "created" }),
+    ]);
+    expect(preview.mcpServers.items).toEqual([
+      expect.objectContaining({ name: "filesystem", transport: "stdio", status: "imported" }),
+      expect.objectContaining({ name: "remote-api", transport: "streamable-http", status: "imported" }),
+    ]);
+    expect(preview.agents.found).toEqual([
+      expect.objectContaining({ name: "reviewer", path: ".claude/agents/reviewer.md" }),
+    ]);
+    expect(preview.hooks.skippedCount).toBe(2);
+
+    expect(store.collections.get(COLLECTIONS.AGENT_SKILLS) ?? []).toHaveLength(0);
+    expect(store.collections.get(COLLECTIONS.MCP_SERVERS) ?? []).toHaveLength(0);
+    expect(instructionsStore.current).toBeNull();
   });
 });

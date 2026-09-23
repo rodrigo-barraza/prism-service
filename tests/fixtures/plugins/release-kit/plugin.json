@@ -1,0 +1,13 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "release-kit",
+  "version": "1.2.0",
+  "description": "Release notes and a changelog linter",
+  "author": { "name": "Fixture Author", "url": "https://example.com" },
+  "license": "MIT",
+  "keywords": ["release", "changelog"],
+  "extensions": {
+    "com.example.other-client": { "anything": true }
+  },
+  "homepageUrl": "https://example.com/release-kit"
+}
