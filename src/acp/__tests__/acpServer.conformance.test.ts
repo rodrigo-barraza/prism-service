@@ -737,6 +737,35 @@ describe("ACP server — a turn that hands work to the background", () => {
     expect(answer).toBe("A sub-agent is surveying the repo.The survey found 3 files.");
   });
 
+  it("follows a turn that finished (done) while its detached work answers later in an auto-response", async () => {
+    mock.scripts.push(async (turn) => {
+      const conversationId = String(turn.body.conversationId);
+      turn.send({ type: "user_message", role: "user", content: "Dispatch it", conversationId, timestamp: 1, seq: 201 });
+      turn.send({ type: "sub_agent_status", subAgentId: "d1", message: "spawned", description: "List files", seq: 202 });
+      turn.send({ type: "chunk", content: "Dispatched.", seq: 203 });
+      turn.send({ type: "usage_update", usage: {}, estimatedCost: 0.02, seq: 204 });
+      mock.statuses.set(conversationId, { isGenerating: false, pendingBackgroundTasks: 1 });
+      turn.send({ type: "done", provider: "google", model: "m", usage: null, estimatedCost: 0.02, totalTime: 1, conversationId, seq: 205 });
+    });
+    const prompt = client.request("session/prompt", { sessionId, prompt: text("Dispatch it") }, 20_000);
+
+    const subscription = await within(mock.nextSubscription(), 10_000, "the /ws/chat subscription");
+    expect(subscription.subscribe).toMatchObject({ afterSeq: 205 });
+    subscription.send({ type: "sub_agent_status", subAgentId: "d1", message: "complete", durationMilliseconds: 900, toolCount: 1, seq: 206 });
+    subscription.send({ type: "user_message", role: "user", content: "[SUB-AGENT TEAM COMPLETED] README.md", conversationId: sessionId, timestamp: 2, seq: 207 });
+    subscription.send({ type: "chunk", content: " It found README.md.", seq: 208 });
+    subscription.send({ type: "done", provider: "google", model: "m", usage: null, estimatedCost: 0.03, totalTime: 1, conversationId: sessionId, seq: 209 });
+    mock.statuses.set(sessionId, { isGenerating: false, pendingBackgroundTasks: 0 });
+    subscription.send({ type: "conversation_state_update", pendingBackgroundTasks: 0, isActive: false });
+
+    const response = await prompt;
+    expect(response.result).toMatchObject({ stopReason: "end_turn" });
+    // The prompt's cost is both turns': the dispatching one and the auto-response.
+    const meta = (response.result?._meta as { prism: { sessionCostUsd: number } }).prism;
+    expect(meta.sessionCostUsd).toBeCloseTo(0.01 + 0.02 + 0.03, 10);
+    expect(JSON.stringify(client.updates(sessionId))).toContain("It found README.md.");
+  });
+
   it("catches up from the persisted conversation when the socket delivered nothing", async () => {
     mock.scripts.push(dispatchingTurn("s2"));
     const prompt = client.request("session/prompt", { sessionId, prompt: text("Survey it again") }, 20_000);
