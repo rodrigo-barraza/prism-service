@@ -349,10 +349,13 @@ export default class ReActHarness extends BaseAgenticHarness {
         message: STATUS_MESSAGES.PLAN_MODE_ENTERED,
       });
     }
-    // The planning instruction is never persisted: a turn re-driven in plan
-    // mode gets it again.
+    // The plan-mode notice is never persisted (PlanModeGate), and a
+    // re-driven turn skips the first-iteration block that appends it: it
+    // gets it again here.
     if (context.resume && state.planModeActive) {
-      await PlanningModeService.injectPlanningInstruction(currentMessages);
+      currentMessages.push(
+        planModeNotice("entered", options.locale as string | undefined),
+      );
     }
 
     // ── Register initial live status in the registry ──────────
