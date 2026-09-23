@@ -61,7 +61,18 @@ export async function importMcpServerConfigs(
   summary: McpImportSummary,
   { dryRun = false }: { dryRun?: boolean } = {},
 ): Promise<void> {
-  if (servers.length === 0) return;
+  if (servers.length > 0) await writeServers(servers, owner, importedFrom, summary, dryRun);
+  // Skipped entries were recorded while validating: one table, by name.
+  summary.items.sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0));
+}
+
+async function writeServers(
+  servers: ImportableMcpServer[],
+  owner: McpImportOwner,
+  importedFrom: string,
+  summary: McpImportSummary,
+  dryRun: boolean,
+): Promise<void> {
   const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTIONS.MCP_SERVERS);
 
   for (const server of servers) {
