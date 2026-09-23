@@ -10,7 +10,6 @@ Self-contained task prompts for the items in `docs/harness_modernization_2026-09
 
 | # | File | Branch slug(s) | Repos | Size | Depends on | Shares hub files with |
 |---|---|---|---|---|---|---|
-| 19 | `19-skills-progressive-disclosure.md` | `skills-catalog-and-loader`, `skill-folders-and-plugins`, `workspace-instructions` | service, client | L | 07 | 10 (`system-prompt/index.ts`) |
 | 22 | `22-security-depth.md` | `memory-provenance`, `quarantined-reader`, `external-input-lane` | service | L | — | 19 (memory/system prompt) |
 | 23 | `23-observability-and-evals.md` | `otel-tracing`, `log-redaction`, `benchmark-reliability` | service | L | — | 10 (`RequestLogger.ts`) |
 | 24 | `24-event-protocol-and-acp.md` | `event-protocol-v1`, `acp-server`, `acp-client-runtime` | service, client | L | — | 26 (client event types) |
@@ -49,8 +48,7 @@ The UI parts of 05, 12, 13, 15, 16 and 21 all touch `prism-client/src/components
    ```bash
    "$WT"/node_modules/.bin/tsc --noEmit -p "$WT"/tsconfig.json
    "$WT"/node_modules/.bin/vitest run --root "$WT"   # prism-service: covers src/**/__tests__ AND tests/
-   (cd "$WT" && ./node_modules/.bin/eslint src)      # prism-client's eslint 9 finds its config from the working directory
-   (cd "$WT" && ./node_modules/.bin/oxlint)          # tools-service lints with oxlint instead
+   (cd "$WT" && ./node_modules/.bin/oxlint)          # every repo lints with oxlint (eslint left with TS 7, 2026-09-22)
    ```
    - prism-client: `tsc` is clean on master, and `next build` type-checks (`ignoreBuildErrors: false` since prompt 08), so a new type error fails both. Run `next build` once at the end when you touch client types, from inside the worktree: `(cd "$WT" && ./node_modules/.bin/next build)`. Run from elsewhere, Next takes the main checkout as the workspace root and fails its type check with "Cannot find type definition file for 'node'" — master does too.
    - Report pre-existing lint failures separately from yours.
