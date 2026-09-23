@@ -5,6 +5,7 @@ import {
   TOOL_NAMES,
 } from "#src/services/ToolTaxonomyConstants";
 import { ASYNC_TASK_TOOL_NAMES } from "#src/services/AsyncTaskConstants";
+import { deny, type PolicyRule } from "#src/services/PolicyEngine";
 import { type Persona, type ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
 import PromptLocaleService from "#src/services/PromptLocaleService";
@@ -340,6 +341,78 @@ const LUPOS_UNUSED_CORE_HARNESS_TOOLS = [
 ];
 
 // ────────────────────────────────────────────────────────────
+// Tool Policies (defence in depth)
+// ────────────────────────────────────────────────────────────
+// A Discord reply runs under autoApprove on behalf of whoever pinged the
+// wolf, so no approval card stands between a model's call and its effect.
+// availableTools/blockedTools already keep every tool below out of his
+// resolved set; these DENY rules hold if some future path makes one
+// reachable anyway (a client toggle, an explicit enabledTools, a tool
+// program or async dispatcher re-checking an inner call). A DENY is final
+// in the approval stack — full auto, every permission mode and sub-agents
+// included (AutoApprovalEngine.explain). Names are the live catalog's
+// (tools-service ToolSchemaService / Prism's InternalToolRegistry,
+// 2026-09-22); tools-service names absent from the shared TOOL_NAMES are
+// spelled out.
+const LUPOS_DENIED_TOOLS = [
+  // Shell and command execution — the python/js sandboxes are his.
+  TOOL_NAMES.EXECUTE_SHELL,
+  TOOL_NAMES.EXECUTE_COMMAND,
+  // Dispatchers that run other tools out of sight.
+  ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
+  LOCAL_TOOL_NAMES.RUN_TOOL_PROGRAM,
+  // Sub-agents and the agent definitions they would run as.
+  TOOL_NAMES.CREATE_SUBAGENT,
+  TOOL_NAMES.CREATE_SUBAGENTS,
+  TOOL_NAMES.SEND_SUBAGENT_MESSAGE,
+  TOOL_NAMES.RESUME_SUBAGENT,
+  TOOL_NAMES.CREATE_CUSTOM_AGENT,
+  TOOL_NAMES.UPDATE_CUSTOM_AGENT,
+  // Skills — stored, then executed with the owner's tools.
+  TOOL_NAMES.CREATE_SKILL,
+  TOOL_NAMES.EXECUTE_SKILL,
+  TOOL_NAMES.DELETE_SKILL,
+  // Persistent writes to the owner's project state.
+  LOCAL_TOOL_NAMES.WRITE_DATASTORE,
+  LOCAL_TOOL_NAMES.DELETE_DATASTORE,
+  LOCAL_TOOL_NAMES.UPDATE_PROJECT_INSTRUCTIONS,
+  LOCAL_TOOL_NAMES.EDIT_PROJECT_INSTRUCTIONS,
+  // Timers and schedules wake the owner's Prism later; a Discord reminder
+  // is schedule_discord_reminder, which pings only the asker.
+  TOOL_NAMES.SET_TIMER,
+  TOOL_NAMES.CANCEL_TIMER,
+  TOOL_NAMES.CREATE_CRON_JOB,
+  TOOL_NAMES.DELETE_CRON_JOB,
+  TOOL_NAMES.TRIGGER_CRON_JOB,
+  // Its question card would park the turn in prism-client, where nobody
+  // in the channel can answer it.
+  TOOL_NAMES.ASK_USER,
+  // The owner's own accounts and home (Communication, Music, Smart Home).
+  "send_email",
+  "send_sms",
+  "send_push_notification",
+  "send_webhook",
+  TOOL_NAMES.CONTROL_SPOTIFY,
+  "set_light_state",
+  "set_light_states",
+  "adjust_light_state",
+  "toggle_light_power",
+  TOOL_NAMES.LIFX_BREATHE_EFFECT,
+  TOOL_NAMES.LIFX_PULSE_EFFECT,
+  "start_light_move_effect",
+  "start_light_flame_effect",
+  "start_light_morph_effect",
+  "stop_light_effects",
+  "paint_lights_from_image",
+  "activate_light_scene",
+  "enable_light_night_lock",
+];
+
+const LUPOS_POLICIES: PolicyRule[] = LUPOS_DENIED_TOOLS.map((toolName) =>
+  deny(toolName),
+);
+
+// ────────────────────────────────────────────────────────────
 // Persona Definition
 // ────────────────────────────────────────────────────────────
 
@@ -455,6 +528,7 @@ export const LuposPersona: Persona = {
     "get_discord_user_profile",
     "search_discord_messages",
   ],
+  policies: LUPOS_POLICIES,
   capabilities: "",
   hasSomaticState: true,
   // Lupos's resting temperament: mildly cynical, restless, a buried streak
