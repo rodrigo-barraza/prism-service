@@ -69,7 +69,7 @@ const FRONTMATTER_PATTERN = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/
  * Quote such top-level values and try once more — the same leniency Claude
  * Code applies. Anything else that fails to parse is reported as-is.
  */
-function quoteAmbiguousScalars(frontmatter: string): string {
+export function quoteAmbiguousScalars(frontmatter: string): string {
   return frontmatter
     .split("\n")
     .map((line) => {

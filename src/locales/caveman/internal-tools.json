@@ -60,6 +60,13 @@
       "name": "Skill name, same as skill list."
     }
   },
+  "read_skill_file": {
+    "description": "Read one file in skill folder (reference, template, script text) by path inside folder, as load_skill `resources` list. Read script not run it: run script with shell tool, it ask approval like always.",
+    "parameters": {
+      "skill": "Skill name, same as skill list.",
+      "path": "File path inside skill folder, like references/template.md. No absolute, no '..'."
+    }
+  },
   "delete_skill": {
     "description": "Delete skill by ID.",
     "parameters": {

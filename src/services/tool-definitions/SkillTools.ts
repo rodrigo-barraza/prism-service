@@ -16,11 +16,14 @@ import type {
 /** Prism-local skill tool names, not yet in the shared taxonomy's TOOL_NAMES. */
 export const SKILL_TOOL_NAMES = {
   LOAD_SKILL: "load_skill",
+  READ_SKILL_FILE: "read_skill_file",
 } as const;
 
 // ── Skill Tools ────────────────────────────────────────────
 // The system prompt lists a catalog of skills (name + one line);
-// load_skill reads one skill's body when a task needs it. The rest
+// load_skill reads one skill's body when a task needs it, and
+// read_skill_file one file of its folder (a reference, a template, a
+// script's text — a script runs only through the shell tool). The rest
 // manage skills. Every call reads and writes only the caller's scope
 // (project × username × profile, and the persona a skill is bound to).
 // Delegates to SkillService for MongoDB persistence.
@@ -303,6 +306,55 @@ const loadSkill = {
   },
 };
 
+const readSkillFile = {
+  name: SKILL_TOOL_NAMES.READ_SKILL_FILE,
+  capabilities: [] as const,
+  emoji: INTERNAL_TOOL_EMOJIS[SKILL_TOOL_NAMES.READ_SKILL_FILE],
+  description:
+    "Read one bundled file of a skill's folder — a reference, a template, a script's text — " +
+    "by its path inside the folder, as load_skill lists it under `resources`. Reading a " +
+    "script does not run it: run scripts with the shell tool, which asks for approval as usual.",
+  parameters: {
+    type: "object",
+    properties: {
+      skill: {
+        type: "string",
+        description: "The skill's name, exactly as the skill catalog lists it.",
+      },
+      path: {
+        type: "string",
+        description:
+          "The file's path inside the skill folder, e.g. references/template.md. Never absolute, never '..'.",
+      },
+    },
+    required: ["skill", "path"],
+  },
+  display: {
+    activeVerb: "Reading skill file",
+    completedVerb: "Read skill file",
+    subjectParam: "path",
+    subjectFormat: "truncate" as const,
+  },
+  labels: ["coding", "automation"],
+  domain: DOMAINS.CORE_SKILL.displayName,
+  async execute(
+    toolArguments: Record<string, unknown>,
+    context: InternalToolContext,
+  ) {
+    const skill =
+      typeof toolArguments.skill === "string" ? toolArguments.skill.trim() : "";
+    if (!skill)
+      return {
+        error: PromptLocaleService.get(
+          PromptLocaleService.getDefaultLocale(),
+          "internal-tools-runtime.read_skill_file.missingSkill",
+        ),
+      };
+    const SkillService = await loadSkillService();
+    return SkillService.readFile(skill, toolArguments.path, await callerOf(context));
+  },
+};
+
 const deleteSkill = {
   name: TOOL_NAMES.DELETE_SKILL,
   capabilities: ["memory_write"] as const,
@@ -341,4 +393,11 @@ const deleteSkill = {
   },
 };
 
-export default [createSkill, executeSkill, listSkills, loadSkill, deleteSkill];
+export default [
+  createSkill,
+  executeSkill,
+  listSkills,
+  loadSkill,
+  readSkillFile,
+  deleteSkill,
+];

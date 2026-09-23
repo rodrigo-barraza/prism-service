@@ -86,6 +86,9 @@
   "load_skill": {
     "missingName": "need name"
   },
+  "read_skill_file": {
+    "missingSkill": "need skill"
+  },
   "delete_skill": {
     "missingSkillId": "skillId required."
   },
