@@ -92,6 +92,10 @@ export async function runPreflightToolDiscovery({
     // Persona resolved to "all tools" — nothing to add.
     if (resolvedTools.resolvedEnabledTools === null) return none;
 
+    // The turn's own mode first: on_demand leaves discovery to the model,
+    // off leaves the resolved set as it is (a benchmark sweep's axis).
+    if (options.toolDiscovery === "on_demand" || options.toolDiscovery === "off") return none;
+
     const agentSettings = await SettingsService.getSection("agents");
     if (agentSettings?.dynamicToolActivation === false) return none;
     if (agentSettings?.preflightToolDiscovery === false) return none;

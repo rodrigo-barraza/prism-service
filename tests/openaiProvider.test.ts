@@ -959,7 +959,7 @@ describe("OpenAI Provider Adapter", () => {
     it("yields default zero usage block if stream terminates without usage info", async () => {
       const asyncGenerator = async function* () {
         yield {
-          choices: [{ delta: { content: "some text" } }],
+          choices: [{ delta: { content: "some text" }, finish_reason: "stop" }],
         };
       };
 

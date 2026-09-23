@@ -11,7 +11,6 @@ Self-contained task prompts for the items in `docs/harness_modernization_2026-09
 | # | File | Branch slug(s) | Repos | Size | Depends on | Shares hub files with |
 |---|---|---|---|---|---|---|
 | 22 | `22-security-depth.md` | `memory-provenance`, `quarantined-reader`, `external-input-lane` | service | L | — | 19 (memory/system prompt) |
-| 23 | `23-observability-and-evals.md` | `otel-tracing`, `log-redaction`, `benchmark-reliability` | service | L | — | 10 (`RequestLogger.ts`) |
 | 24 | `24-event-protocol-and-acp.md` | `event-protocol-v1`, `acp-server`, `acp-client-runtime` | service, client | L | — | 26 (client event types) |
 
 ## Waves

@@ -16,6 +16,7 @@ import {
 import crypto from "crypto";
 import { Readable } from "stream";
 import { ProviderError } from "#src/utils/errors";
+import { streamEndedEarlyError } from "#src/utils/ProviderStreamResilience";
 import logger from "#src/utils/logger";
 import { getDocumentContextText } from "#src/utils/documentContext";
 import {
@@ -1140,6 +1141,9 @@ const googleProvider = {
       const streamConfig: GenerateContentConfig = { ...config };
       if (options.signal) {
         streamConfig.httpOptions = { timeout: 0 };
+        // Without it a stop (or the idle watchdog's abort) never reached
+        // the request: the socket stayed open and Gemini kept generating.
+        streamConfig.abortSignal = options.signal;
       }
       const prefixHashes = options.cacheTelemetry
         ? hashGooglePrefix(contents as unknown[], streamConfig)
@@ -1224,6 +1228,11 @@ const googleProvider = {
           usage = normalizeGoogleUsage(chunk.usageMetadata);
         }
       }
+      // The last candidate carries a finishReason; a blocked prompt has no
+      // candidate at all. Neither means the body ended mid-reply.
+      if (!lastFinishReason && !promptBlockReason && !options.signal?.aborted) {
+        throw streamEndedEarlyError("google", "no finishReason");
+      }
       // Always reported ([] when nothing needs replaying) so the harness
       // knows this response's parts — and citations — replace the last one's.
       yield { type: "providerState", geminiParts: replayParts.parts() ?? [] };
@@ -1274,6 +1283,11 @@ const googleProvider = {
           safetyBlock: true,
         };
         return;
+      }
+      if (error instanceof ProviderError) throw error;
+      // The SDK's own words for a body cut inside an event.
+      if (/Incomplete JSON segment/i.test(getErrorMessage(error))) {
+        throw streamEndedEarlyError("google", getErrorMessage(error));
       }
       throw new ProviderError("google", getErrorMessage(error), 500, error as Error);
     }

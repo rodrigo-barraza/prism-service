@@ -293,3 +293,22 @@ describe("runPreflightToolDiscovery", () => {
     expect(searchArgs.query).toBe("convert this color");
   });
 });
+
+describe("the turn's own discovery mode (toolDiscovery)", () => {
+  it("on_demand and off skip preflight entirely; preflight runs it", async () => {
+    mockSearchToolsWithMCP.mockResolvedValue(searchResultOf("generate_qr_code"));
+    for (const mode of ["on_demand", "off"]) {
+      const result = await runPreflightToolDiscovery({
+        context: makeContext({ options: { toolDiscovery: mode } }),
+        resolvedTools: makeResolvedTools(),
+      });
+      expect(result.enabledTools).toEqual([]);
+    }
+    expect(mockSearchToolsWithMCP).not.toHaveBeenCalled();
+    const preflight = await runPreflightToolDiscovery({
+      context: makeContext({ options: { toolDiscovery: "preflight" } }),
+      resolvedTools: makeResolvedTools(),
+    });
+    expect(preflight.enabledTools).toEqual(["generate_qr_code"]);
+  });
+});

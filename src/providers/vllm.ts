@@ -278,6 +278,7 @@ export function createVllmProvider(
         for await (const chunk of parseSSEStream(reader, {
           signal: options.signal,
           thinkingEnabled: options.thinkingEnabled,
+          label: instanceId,
         })) {
           if (typeof chunk === "object") {
             if (chunk.type === "usage") {

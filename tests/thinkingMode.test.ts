@@ -278,7 +278,8 @@ describe("Gemini 3.5 Flash / Agentic Thinking Mode", () => {
           candidates: [{
             content: {
               parts: [{ text: "Here is my final answer." }]
-            }
+            },
+            finishReason: "STOP"
           }]
         };
         yield {
@@ -708,6 +709,7 @@ describe("Anthropic Claude / Agentic Thinking Mode", () => {
             type: "message_delta",
             usage: { output_tokens: 40 }
           };
+          yield { type: "message_stop" };
         },
         finalMessage: async () => ({
           usage: {

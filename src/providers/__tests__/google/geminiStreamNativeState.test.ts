@@ -74,7 +74,7 @@ describe("Gemini stream — geminiParts", () => {
       streamOf([
         partsChunk([{ text: "summary without sig", thought: true }]),
         partsChunk([{ text: "signed thought", thought: true, thoughtSignature: "sig-th" }]),
-        partsChunk([{ text: "The answer.", thoughtSignature: "sig-text" }]),
+        partsChunk([{ text: "The answer.", thoughtSignature: "sig-text" }], { finishReason: "STOP" }),
       ]),
     );
     const chunks = await collect(
@@ -87,7 +87,7 @@ describe("Gemini stream — geminiParts", () => {
   });
 
   it("sends no sampling parameters to gemini-3.8-flash", async () => {
-    streamMock.mockResolvedValue(streamOf([partsChunk([{ text: "hi" }])]));
+    streamMock.mockResolvedValue(streamOf([partsChunk([{ text: "hi" }], { finishReason: "STOP" })]));
     await collect(
       googleProvider.generateTextStream([{ role: "user", content: "go" }], "gemini-3.8-flash", {
         temperature: 0.1,
@@ -145,7 +145,7 @@ describe("Gemini stream — Google Search grounding", () => {
   });
 
   it("yields no citations chunk without grounding", async () => {
-    streamMock.mockResolvedValue(streamOf([partsChunk([{ text: "hi" }])]));
+    streamMock.mockResolvedValue(streamOf([partsChunk([{ text: "hi" }], { finishReason: "STOP" })]));
     const chunks = await collect(
       googleProvider.generateTextStream([{ role: "user", content: "go" }], "gemini-3.8-flash", {}),
     );
@@ -164,7 +164,7 @@ describe("Gemini — Google Search with function calling", () => {
   };
 
   it("asks for server-side tool invocations when built-in tools and functions go together (else a 400)", async () => {
-    streamMock.mockResolvedValue(streamOf([partsChunk([{ text: "hi" }])]));
+    streamMock.mockResolvedValue(streamOf([partsChunk([{ text: "hi" }], { finishReason: "STOP" })]));
     await collect(
       googleProvider.generateTextStream([{ role: "user", content: "go" }], "gemini-3.7-flash", {
         webSearch: true,
@@ -177,11 +177,11 @@ describe("Gemini — Google Search with function calling", () => {
   });
 
   it("does not ask for it with only built-in tools, or only functions", async () => {
-    streamMock.mockResolvedValue(streamOf([partsChunk([{ text: "hi" }])]));
+    streamMock.mockResolvedValue(streamOf([partsChunk([{ text: "hi" }], { finishReason: "STOP" })]));
     await collect(
       googleProvider.generateTextStream([{ role: "user", content: "go" }], "gemini-3.8-flash", { webSearch: true }),
     );
-    streamMock.mockResolvedValue(streamOf([partsChunk([{ text: "hi" }])]));
+    streamMock.mockResolvedValue(streamOf([partsChunk([{ text: "hi" }], { finishReason: "STOP" })]));
     await collect(
       googleProvider.generateTextStream([{ role: "user", content: "go" }], "gemini-3.8-flash", {
         tools: [{ name: "get_weather", parameters: { type: "object", properties: {} } }],
@@ -198,7 +198,7 @@ describe("Gemini — Google Search with function calling", () => {
         partsChunk([searchCall]),
         partsChunk([searchResult]),
         partsChunk([{ text: "Antonelli won." }]),
-        partsChunk([{ text: "", thoughtSignature: "sig-trailing" }]),
+        partsChunk([{ text: "", thoughtSignature: "sig-trailing" }], { finishReason: "STOP" }),
       ]),
     );
     const chunks = await collect(

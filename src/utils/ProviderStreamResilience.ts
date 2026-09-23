@@ -75,6 +75,31 @@ export function isTerminalQuotaError(error: unknown): boolean {
   return providerErrorCodes(error).some((code) => TERMINAL_QUOTA_ERROR_CODES.has(code));
 }
 
+/**
+ * The HTTP status of a failure. Most adapters wrap the SDK or transport
+ * error in `ProviderError(provider, message, 500, original)`, whose 500 is
+ * a placeholder (see protocol/errors.ts): a real status one layer down wins
+ * over it, so a wrapped 400 is not retried as if the server had failed.
+ */
+function statusOf(error: unknown, depth = 0): number | undefined {
+  if (!error || typeof error !== "object" || depth > 3) return undefined;
+  const record = error as Record<string, unknown>;
+  const own =
+    error instanceof ProviderError
+      ? error.statusCode
+      : (record.status ?? record.statusCode);
+  const ownStatus = typeof own === "number" ? own : undefined;
+  if (
+    error instanceof ProviderError &&
+    (ownStatus === undefined || ownStatus === 500) &&
+    error.originalError
+  ) {
+    const innerStatus = statusOf(error.originalError, depth + 1);
+    if (innerStatus !== undefined) return innerStatus;
+  }
+  return ownStatus;
+}
+
 /** Classify an error as a transient provider failure worth retrying. */
 export function isTransientProviderError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -86,10 +111,7 @@ export function isTransientProviderError(error: unknown): boolean {
   // A spend cap is a 429 too, but waiting does not clear it.
   if (isTerminalQuotaError(error)) return false;
 
-  const statusCode =
-    error instanceof ProviderError
-      ? error.statusCode
-      : ((errorRecord.status ?? errorRecord.statusCode) as number | undefined);
+  const statusCode = statusOf(error);
   if (typeof statusCode === "number" && RETRYABLE_STATUS_CODES.has(statusCode))
     return true;
 
@@ -137,25 +159,83 @@ export function computeRetryDelayMilliseconds(
   return Math.round(capped * (0.5 + Math.random()));
 }
 
-function extractRetryAfterSeconds(error: unknown): number | null {
-  if (!error || typeof error !== "object") return null;
-  const headers = (error as { headers?: unknown }).headers as
-    | Record<string, string>
-    | Map<string, string>
-    | { get?: (name: string) => string | null }
-    | undefined;
-  if (!headers) return null;
-  let raw: string | null | undefined;
+type HeaderBag =
+  | Record<string, string>
+  | { get?: (name: string) => string | null };
+
+function readHeader(headers: HeaderBag, name: string): string | null {
   if (typeof (headers as { get?: unknown }).get === "function") {
-    raw = (headers as { get: (name: string) => string | null }).get(
-      "retry-after",
-    );
-  } else {
-    raw = (headers as Record<string, string>)["retry-after"];
+    return (headers as { get: (name: string) => string | null }).get(name);
   }
+  return (headers as Record<string, string>)[name] ?? null;
+}
+
+/** Seconds from a Retry-After value: delta-seconds or an HTTP-date. */
+function parseRetryAfter(raw: string | null): number | null {
   if (!raw) return null;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds)) return seconds > 0 ? seconds : null;
+  const date = Date.parse(raw);
+  if (Number.isNaN(date)) return null;
+  const untilDate = (date - Date.now()) / 1000;
+  return untilDate > 0 ? untilDate : null;
+}
+
+/** google.rpc.RetryInfo in an error body: `"retryDelay": "17s"`. */
+const RETRY_INFO_DELAY = /"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/;
+
+/**
+ * When the provider asked to be retried, in seconds. Looked up through every
+ * layer of the error — the SDK or transport error a ProviderError wraps
+ * carries the response headers, not the wrapper — and, for Gemini, whose SDK
+ * keeps only the status and body, in the body's RetryInfo.
+ */
+function extractRetryAfterSeconds(error: unknown): number | null {
+  const layers: unknown[] = [error];
+  for (let index = 0; index < layers.length && index < 6; index++) {
+    const layer = layers[index];
+    if (!layer || typeof layer !== "object") continue;
+    const record = layer as Record<string, unknown>;
+    const headers = record.headers as HeaderBag | undefined;
+    if (headers && typeof headers === "object") {
+      const milliseconds = Number(readHeader(headers, "retry-after-ms"));
+      if (Number.isFinite(milliseconds) && milliseconds > 0) {
+        return milliseconds / 1000;
+      }
+      const seconds = parseRetryAfter(readHeader(headers, "retry-after"));
+      if (seconds != null) return seconds;
+    }
+    const retryInfo =
+      typeof record.message === "string"
+        ? record.message.match(RETRY_INFO_DELAY)
+        : null;
+    if (retryInfo) return Number(retryInfo[1]) || null;
+    layers.push(
+      layer instanceof ProviderError ? layer.originalError : undefined,
+      record.cause,
+    );
+  }
+  return null;
+}
+
+/**
+ * The error for a stream whose body ended before the provider's terminal
+ * event (`response.completed`, `message_stop`, a `finish_reason`, Ollama's
+ * `done`): the reply is cut off however cleanly the connection closed, and
+ * ending it like a finished one would hand back a truncated answer as if it
+ * were whole. 502 — the upstream answered incompletely — so it is transient:
+ * streamWithRetries retries it when nothing reached the consumer yet, and
+ * the pass fails with it otherwise.
+ */
+export function streamEndedEarlyError(
+  provider: string,
+  detail?: string,
+): ProviderError {
+  return new ProviderError(
+    provider,
+    `The ${provider} stream ended before the response completed${detail ? ` (${detail})` : ""}`,
+    502,
+  );
 }
 
 /**
@@ -389,11 +469,17 @@ export async function callWithRetries<T>(
  * `idleTimeoutMilliseconds`. Guards against providers that stall without
  * closing the socket — previously such a stall hung the turn until the
  * 2-hour housekeeping sweep.
+ *
+ * `onStall` runs first: the caller aborts the provider request there. The
+ * stalled generator is stuck in an await, so tearing it down cannot reach
+ * the socket — without the abort the connection stayed open and the
+ * provider kept generating for a turn that had already failed.
  */
 export async function* withIdleTimeout<T>(
   stream: AsyncIterable<T>,
   idleTimeoutMilliseconds: number = HARNESS.STREAM_IDLE_TIMEOUT_MILLISECONDS,
   label = "provider",
+  onStall?: () => void,
 ): AsyncGenerator<T> {
   const iterator = stream[Symbol.asyncIterator]();
   const STALLED = Symbol("stalled");
@@ -421,6 +507,11 @@ export async function* withIdleTimeout<T>(
         logger.error(
           `[StreamWatchdog] ${label} stream produced no chunk for ${Math.round(idleTimeoutMilliseconds / 1000)}s — aborting pass.`,
         );
+        try {
+          onStall?.();
+        } catch {
+          /* the abort is best-effort; the pass fails either way */
+        }
         throw new ProviderError(
           label,
           `Provider stream stalled: no data received for ${Math.round(idleTimeoutMilliseconds / 1000)}s`,

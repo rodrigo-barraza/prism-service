@@ -63,6 +63,10 @@ vi.mock('@anthropic-ai/sdk', () => {
             const scripted = (async function* () {
               for (const event of script.events) yield event;
               if (script.throwAfter) throw script.throwAfter;
+              // Every Messages stream ends with message_stop.
+              if (!script.events.some((event) => event?.type === 'message_stop')) {
+                yield { type: 'message_stop' };
+              }
             })();
             (scripted as any).abort = vi.fn();
             (scripted as any).response = { headers: { get: () => null } };
@@ -100,6 +104,7 @@ vi.mock('@anthropic-ai/sdk', () => {
               type: 'message_delta',
               usage: { output_tokens: 20 }
             };
+            yield { type: 'message_stop' };
           };
           const streamObj = asyncGen();
           (streamObj as any).abort = vi.fn();
