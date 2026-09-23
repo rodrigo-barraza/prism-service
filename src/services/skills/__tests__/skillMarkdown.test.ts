@@ -92,6 +92,12 @@ describe("parseSkillMarkdown", () => {
       body: "Body",
     },
     {
+      label: "a plain value with ': ' in it (Claude Code's habit) is quoted and retried",
+      content: "---\nname: t\ndescription: Use when: the user asks for notes\n---\nBody",
+      frontmatter: { name: "t", description: "Use when: the user asks for notes" },
+      body: "Body",
+    },
+    {
       label: "invalid YAML is an error, the body survives",
       content: "---\nname: [unclosed\n---\nBody",
       frontmatter: {},

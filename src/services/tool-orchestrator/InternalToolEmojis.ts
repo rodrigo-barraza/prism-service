@@ -14,6 +14,7 @@ export const INTERNAL_TOOL_EMOJIS: Record<string, string[]> = {
   execute_skill: ["⚡", "🪄"],
   list_skills: ["📋", "🪄"],
   load_skill: ["📖", "🪄"],
+  read_skill_file: ["📄", "🪄"],
   delete_skill: ["🗑️", "🪄"],
 
   // Worktree

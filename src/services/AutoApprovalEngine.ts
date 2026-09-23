@@ -127,9 +127,12 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   [TOOL_NAMES.EDIT_NOTEBOOK]: APPROVAL_TIERS.WRITE,
 
   // Tier 1 — skill discovery and reading (read-only over the caller's
-  // own skills; load_skill is Prism-local, not yet in TOOL_NAMES)
+  // own skills; load_skill and read_skill_file are Prism-local, not yet in
+  // TOOL_NAMES). Reading a bundled script runs nothing: running one is the
+  // shell tool's call, at the shell tool's tier.
   [TOOL_NAMES.LIST_SKILLS]: APPROVAL_TIERS.AUTO,
   load_skill: APPROVAL_TIERS.AUTO,
+  read_skill_file: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — structured output (data formatting only)
   [TOOL_NAMES.EMIT_STRUCTURED_OUTPUT]: APPROVAL_TIERS.AUTO,
