@@ -613,7 +613,10 @@ export function normalizeResponsesUsage(
     | {
         input_tokens?: number;
         output_tokens?: number;
-        input_tokens_details?: { cached_tokens?: number };
+        input_tokens_details?: {
+          cached_tokens?: number;
+          cache_write_tokens?: number;
+        };
         output_tokens_details?: { reasoning_tokens?: number };
       }
     | null
@@ -624,10 +627,17 @@ export function normalizeResponsesUsage(
     outputTokens: rawUsage?.output_tokens ?? 0,
   };
 
+  // input_tokens counts every prompt token; the cache read and (GPT-6) cache
+  // write buckets are carved out of it, since they bill at their own rates.
   const cachedTokens = rawUsage?.input_tokens_details?.cached_tokens;
   if (cachedTokens && cachedTokens > 0) {
     usage.cacheReadInputTokens = cachedTokens;
     usage.inputTokens = Math.max(0, (usage.inputTokens ?? 0) - cachedTokens);
+  }
+  const cacheWriteTokens = rawUsage?.input_tokens_details?.cache_write_tokens;
+  if (cacheWriteTokens && cacheWriteTokens > 0) {
+    usage.cacheCreationInputTokens = cacheWriteTokens;
+    usage.inputTokens = Math.max(0, (usage.inputTokens ?? 0) - cacheWriteTokens);
   }
 
   const reasoningTokens = rawUsage?.output_tokens_details?.reasoning_tokens;
