@@ -8,10 +8,6 @@ import logger from "#src/utils/logger";
 import { APPROVALS } from "#src/constants";
 import ConversationApprovalSettings from "#src/services/ConversationApprovalSettings";
 import {
-  SYSTEM_MESSAGE_TAGS,
-  wrapSystemMessage,
-} from "#src/utils/SystemMessageTags";
-import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
   TOOL_NAMES,
@@ -31,82 +27,12 @@ import type {
  * PlanModeController — manages plan mode state transitions during the agentic loop.
  *
  * Handles:
- *   - Blocking unauthorized tool calls during planning mode
  *   - Processing exit_plan_mode (proposal emission + user approval gate)
  *   - Entering/exiting plan mode based on tool calls
  *
  * Extracted from ReActHarness to allow future plan-aware harnesses
  * to reuse the same plan lifecycle without duplicating the logic.
  */
-
-/**
- * Filter out unauthorized tool calls during plan mode.
- * Only exit_plan_mode is allowed; all others are blocked and logged.
- */
-export function blockUnauthorizedToolCalls(
-  pendingToolCalls: ToolCall[],
-  currentMessages: ConversationMessage[],
-  pass: PassState,
-  _state: AgenticLoopState,
-  locale?: string,
-): { allBlocked: boolean } {
-  const blockedToolCalls = pendingToolCalls.filter(
-    (toolCall) => toolCall.name !== TOOL_NAMES.EXIT_PLAN_MODE,
-  );
-
-  if (blockedToolCalls.length === 0) {
-    return { allBlocked: false };
-  }
-
-  const blockedToolNames = blockedToolCalls
-    .map((toolCall) => toolCall.name)
-    .join(", ");
-
-  logger.warn(
-    `[PlanningMode] Blocked ${blockedToolCalls.length} unauthorized tool call(s): ${blockedToolNames}`,
-  );
-
-  // Remove blocked calls from the pending array
-  for (const blockedCall of blockedToolCalls) {
-    const index = pendingToolCalls.indexOf(blockedCall);
-    if (index >= 0) pendingToolCalls.splice(index, 1);
-  }
-
-  if (pendingToolCalls.length === 0) {
-    // All tool calls were blocked — add system feedback and continue loop
-    if (pass.finalStreamedText || pass.streamedText) {
-      currentMessages.push({
-        role: "assistant",
-        content: pass.finalStreamedText || pass.streamedText,
-        ...(pass.streamedThinking && {
-          thinking: pass.streamedThinking,
-        }),
-        ...(pass.thinkingSignature && {
-          thinkingSignature: pass.thinkingSignature,
-        }),
-        ...(pass.thinkingBlocks?.length && {
-          thinkingBlocks: pass.thinkingBlocks,
-        }),
-      });
-    }
-
-    currentMessages.push({
-      role: "system",
-      content: wrapSystemMessage(
-        SYSTEM_MESSAGE_TAGS.PLAN_MODE,
-        PromptLocaleService.get(
-          locale || PromptLocaleService.getDefaultLocale(),
-          "harness.planningMode.blocked",
-          { blockedNames: blockedToolNames },
-        ),
-      ),
-    });
-
-    return { allBlocked: true };
-  }
-
-  return { allBlocked: false };
-}
 
 /**
  * An approved plan ends plan mode: the conversation's permission mode goes

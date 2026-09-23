@@ -311,72 +311,10 @@ describe("PostExecutionEmitter", () => {
 
 // ─── PlanModeController ────────────────────────────────────────
 import {
-  blockUnauthorizedToolCalls,
   checkForPlanModeEntry,
 } from "#src/services/harnesses/lifecycle/PlanModeController";
 
 describe("PlanModeController", () => {
-  describe("blockUnauthorizedToolCalls", () => {
-    it("should not block exit_plan_mode", () => {
-      const pendingToolCalls = [
-        { name: "exit_plan_mode", id: "toolCall-1", args: {} },
-      ];
-      const currentMessages: any[] = [];
-      const pass = { streamedText: "", streamedThinking: "" };
-
-      const { allBlocked } = blockUnauthorizedToolCalls(
-        pendingToolCalls,
-        currentMessages,
-        pass as any,
-        {} as any,
-      );
-
-      expect(allBlocked).toBe(false);
-      expect(pendingToolCalls).toHaveLength(1);
-    });
-
-    it("should block non-exit tool calls and add system message", () => {
-      const pendingToolCalls = [
-        { name: "write_file", id: "toolCall-1", args: {} },
-        { name: "read_file", id: "toolCall-2", args: {} },
-      ];
-      const currentMessages: any[] = [];
-      const pass = { streamedText: "some text", streamedThinking: "" };
-
-      const { allBlocked } = blockUnauthorizedToolCalls(
-        pendingToolCalls,
-        currentMessages,
-        pass as any,
-        {} as any,
-      );
-
-      expect(allBlocked).toBe(true);
-      expect(pendingToolCalls).toHaveLength(0);
-      expect(currentMessages).toHaveLength(2);
-      expect(currentMessages[1].content).toContain("PLANNING MODE");
-    });
-
-    it("should allow exit_plan_mode while blocking others", () => {
-      const pendingToolCalls = [
-        { name: "write_file", id: "toolCall-1", args: {} },
-        { name: "exit_plan_mode", id: "toolCall-2", args: {} },
-      ];
-      const currentMessages: any[] = [];
-      const pass = { streamedText: "" };
-
-      const { allBlocked } = blockUnauthorizedToolCalls(
-        pendingToolCalls,
-        currentMessages,
-        pass as any,
-        {} as any,
-      );
-
-      expect(allBlocked).toBe(false);
-      expect(pendingToolCalls).toHaveLength(1);
-      expect(pendingToolCalls[0].name).toBe("exit_plan_mode");
-    });
-  });
-
   describe("checkForPlanModeEntry", () => {
     it("should activate plan mode when enter_plan_mode is in tool calls", async () => {
       const mockEmit = vi.fn();
