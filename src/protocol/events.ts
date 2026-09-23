@@ -586,6 +586,24 @@ const KnownStatusEvent = z.discriminatedUnion("message", [
     maxCostDollars: z.number(),
     iteration: z.number(),
   }),
+  // The tree reached its cost cap and waits for a raise (PATCH /conversations/:id/budget).
+  status("budget_reached", {
+    pauseId: z.string(),
+    spentDollars: z.number(),
+    /** The cap it reached: the lower of the turn's own and what is left of the goal's. */
+    maxCostDollars: z.number(),
+    limitedBy: z.enum(["turn", "goal"]),
+    iteration: z.number(),
+    turnCapDollars: z.number().optional(),
+    goalMaxCostDollars: z.number().optional(),
+  }),
+  status("budget_resolved", {
+    pauseId: z.string(),
+    action: z.enum(["raise", "stop"]),
+    source: z.enum(["user", "superseded", "turn_ended"]),
+    /** A raise: the cap the tree now runs under (absent when nothing caps it any more). */
+    maxCostDollars: z.number().optional(),
+  }),
   status("repetition_detected", { iteration: z.number(), rule: z.literal("repetition"), retry: z.number() }),
   status("semantic_stall_detected", { iteration: z.number(), rule: z.literal("semantic-stall"), retry: z.number() }),
   status("system_reminder_injected", { iteration: z.number(), interval: z.number() }),

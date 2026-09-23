@@ -32,9 +32,11 @@ import type { TurnResumeState } from "#src/services/harnesses/types";
  *
  * `prepare` (before the stale-flag sweep) decides, per turn:
  *   - RE-DRIVEN: a tool batch was in progress (the pass is newer than the
- *     checkpoint), the request is on record, and it has not been re-driven
- *     MAXIMUM_ATTEMPTS times already (a crash loop). Its checkpoint and
- *     decisions are kept for it.
+ *     checkpoint) or the turn was paused at its cost cap before a model
+ *     call (Landing 3), the request is on record, and it has not been
+ *     re-driven MAXIMUM_ATTEMPTS times already (a crash loop). Its
+ *     checkpoint and decisions are kept for it — and the spend and cap it
+ *     had, so it is held to the cap it paused at.
  *   - SALVAGED: everything else — its checkpoint is merged into the
  *     transcript as before, its record dropped, and the decisions it was
  *     waiting on lapse (a card nothing will act on must not keep asking).
@@ -99,13 +101,30 @@ async function findLoopConversation(
   return null;
 }
 
+/**
+ * Where a re-driven turn picks up: the pass whose tool batch was in progress
+ * (newer than the checkpoint), else the iteration a budget pause stopped
+ * before its model call. Null: neither — the turn has nothing to resume.
+ */
+function resumePoint(
+  run: Pick<TurnRunRecord, "pass" | "budgetPausedAt">,
+  checkpointIteration: number,
+): { pass: TurnRunRecord["pass"]; iteration: number } | null {
+  if (run.pass && run.pass.iteration >= checkpointIteration) {
+    return { pass: run.pass, iteration: run.pass.iteration };
+  }
+  if (typeof run.budgetPausedAt === "number" && run.budgetPausedAt >= checkpointIteration) {
+    return { pass: null, iteration: run.budgetPausedAt };
+  }
+  return null;
+}
+
 /** Why a record cannot be re-driven; null when it can. */
 function whyNotResumable(run: TurnRunRecord, document: ConversationDocument | null): string | null {
   if (!document) return "its conversation is gone";
   if (!document.turnCheckpoint) return "its turn had finished";
-  if (!run.pass) return "no tool batch was in progress";
-  if (run.pass.iteration < (document.turnCheckpoint.iteration ?? 0)) {
-    return "its last tool batch had completed";
+  if (!resumePoint(run, document.turnCheckpoint.iteration ?? 0)) {
+    return run.pass ? "its last tool batch had completed" : "no tool batch was in progress";
   }
   if (!run.request) return "its request is not on record";
   if (run.attempts >= TURN_RESUME.MAXIMUM_ATTEMPTS) {
@@ -121,10 +140,12 @@ async function lapseDecisionsOf(loopKeys: Iterable<string>): Promise<void> {
   const { default: ConversationRunState, locatorFor } = await import(
     "#src/services/conversation/ConversationRunState"
   );
+  const { default: BudgetPauseRegistry } = await import("#src/services/BudgetPauseRegistry");
   for (const loopKey of loopKeys) {
     const [record] = await PendingDecisionStore.find({ loopKey, status: "pending" });
     await ApprovalRegistry.cancel(loopKey);
     await QuestionRegistry.cancelAll(loopKey);
+    await BudgetPauseRegistry.cancel(loopKey);
     if (record) await ConversationRunState.clear(locatorFor(loopKey, record));
   }
 }
@@ -400,7 +421,8 @@ const TurnResumeService = {
     for (const { run, checkpoint } of plan.resumable) {
       try {
         const claimed = await TurnRunStore.claim(run.id);
-        if (!claimed?.pass) continue;
+        const point = claimed ? resumePoint(claimed, checkpoint.iteration ?? 0) : null;
+        if (!claimed || !point) continue;
         const collection = run.conversationCollection;
         const { default: ConversationService } = await import("#src/services/ConversationService");
         // The turn so far joins the transcript (a reloading client sees it);
@@ -421,7 +443,7 @@ const TurnResumeService = {
             $set: {
               turnCheckpoint: {
                 messages: [],
-                iteration: claimed.pass.iteration,
+                iteration: point.iteration,
                 savedAt: new Date().toISOString(),
               },
             },
@@ -445,7 +467,9 @@ const TurnResumeService = {
         }
 
         const resume: TurnResumeState = {
-          pass: claimed.pass,
+          pass: point.pass ?? null,
+          iteration: point.iteration,
+          costBudget: claimed.costBudget ?? null,
           planModeActive: claimed.planModeActive,
           autoApprove: claimed.autoApprove,
           skillsText: claimed.skillsText ?? null,
@@ -470,7 +494,8 @@ const TurnResumeService = {
         };
         delete params.serverConversationId;
         logger.info(
-          `[TurnResume] Re-driving ${run.id} at iteration ${claimed.pass.iteration} (attempt ${claimed.attempts}/${TURN_RESUME.MAXIMUM_ATTEMPTS})`,
+          `[TurnResume] Re-driving ${run.id} at iteration ${point.iteration} (attempt ${claimed.attempts}/${TURN_RESUME.MAXIMUM_ATTEMPTS})` +
+            (point.pass ? "" : " — paused at its cost cap before a model call"),
         );
         await drive(run, params);
       } catch (error: unknown) {

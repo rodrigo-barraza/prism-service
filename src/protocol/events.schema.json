@@ -2875,6 +2875,102 @@
             },
             "message": {
               "type": "string",
+              "const": "budget_reached"
+            },
+            "pauseId": {
+              "type": "string"
+            },
+            "spentDollars": {
+              "type": "number"
+            },
+            "maxCostDollars": {
+              "type": "number"
+            },
+            "limitedBy": {
+              "type": "string",
+              "enum": [
+                "turn",
+                "goal"
+              ]
+            },
+            "iteration": {
+              "type": "number"
+            },
+            "turnCapDollars": {
+              "type": "number"
+            },
+            "goalMaxCostDollars": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "pauseId",
+            "spentDollars",
+            "maxCostDollars",
+            "limitedBy",
+            "iteration"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "budget_resolved"
+            },
+            "pauseId": {
+              "type": "string"
+            },
+            "action": {
+              "type": "string",
+              "enum": [
+                "raise",
+                "stop"
+              ]
+            },
+            "source": {
+              "type": "string",
+              "enum": [
+                "user",
+                "superseded",
+                "turn_ended"
+              ]
+            },
+            "maxCostDollars": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "pauseId",
+            "action",
+            "source"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
               "const": "repetition_detected"
             },
             "iteration": {
@@ -3778,7 +3874,7 @@
         },
         "message": {
           "type": "string",
-          "pattern": "^(?!(?:tasks_updated|sub_agents_updated|memories_updated|generation_started|generation_progress|iteration_progress|iteration_limit_reached|empty_output|max_tokens_truncated|output_truncation_recovery|context_exhausted|context_truncated|cost_limit_reached|repetition_detected|semantic_stall_detected|system_reminder_injected|skills_injected|tool_set_changed|program_completed|compaction_started|compaction_failed|compaction_complete|plan_mode_entered|plan_mode_exited|branching_started|branch_selected|branch_backtracked|synthesis_started|worktree_entered|worktree_exited|turn_input_applied|hook_context_applied|question_pending|turn_resumed|hook_system_message|stop_hook_cap_reached|stop_hook_continue)$)"
+          "pattern": "^(?!(?:tasks_updated|sub_agents_updated|memories_updated|generation_started|generation_progress|iteration_progress|iteration_limit_reached|empty_output|max_tokens_truncated|output_truncation_recovery|context_exhausted|context_truncated|cost_limit_reached|budget_reached|budget_resolved|repetition_detected|semantic_stall_detected|system_reminder_injected|skills_injected|tool_set_changed|program_completed|compaction_started|compaction_failed|compaction_complete|plan_mode_entered|plan_mode_exited|branching_started|branch_selected|branch_backtracked|synthesis_started|worktree_entered|worktree_exited|turn_input_applied|hook_context_applied|question_pending|turn_resumed|hook_system_message|stop_hook_cap_reached|stop_hook_continue)$)"
         },
         "phase": {
           "type": "string"
