@@ -1,22 +1,60 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import {
+  Client,
+  SSEClientTransport,
+  StreamableHTTPClientTransport,
+  type Tool,
+  type VersionNegotiationOptions,
+} from "@modelcontextprotocol/client";
 import {
   StdioClientTransport,
   getDefaultEnvironment,
-} from "@modelcontextprotocol/sdk/client/stdio.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+} from "@modelcontextprotocol/client/stdio";
 import logger from "#src/utils/logger";
 import { registerCleanup } from "#src/utils/CleanupRegistry";
 import type { Db } from "mongodb";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
-import { COLLECTIONS } from "#src/constants";
-import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
-import { getRequestContext } from "#src/utils/RequestContext";
+import { COLLECTIONS, MCP } from "#src/constants";
 import {
-  capabilitiesFromMcpAnnotations,
-  registerToolCapabilities,
-} from "#src/services/permissions/ToolCapabilities";
+  DEFAULT_PROFILE_ID,
+  normalizeProfileId,
+  profileFilter,
+} from "#src/utils/ProfileScope";
+import { getRequestContext } from "#src/utils/RequestContext";
+import { capabilitiesFromMcpAnnotations } from "#src/services/permissions/ToolCapabilities";
 import type { Capability } from "#src/services/permissions/types";
+import {
+  MCP_DELIMITER as NAMESPACE_DELIMITER,
+  MCP_PREFIX as NAMESPACE_PREFIX,
+  MCP_SERVER_NAME_RULE,
+  findCollidingToolNames,
+  isValidMcpServerName,
+  parseNamespacedToolName,
+  toNamespacedToolName,
+} from "#src/services/mcp/McpNaming";
+import {
+  approveMcpTools,
+  reviewMcpTools,
+  type McpQuarantinedTool,
+  type McpToolPins,
+} from "#src/services/mcp/McpToolFingerprint";
+import {
+  mcpTierFromAnnotations,
+  removeConnection as removeRegisteredConnection,
+  setConnectionTools,
+  type McpToolPermissionFacts,
+} from "#src/services/mcp/McpToolRegistry";
+import {
+  isVisibleTo,
+  toMcpScope,
+  visibilityOverlaps,
+  type McpOwner,
+  type McpScope,
+} from "#src/services/mcp/McpScope";
+import {
+  capMcpToolResult,
+  resolveOutputCapTokens,
+} from "#src/services/mcp/McpOutputCap";
+import { updateMcpServerRecord } from "#src/services/mcp/McpServerStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,7 +72,7 @@ export interface MCPToolSchema {
 
 export interface TransformedMCPToolResult {
   error?: string;
-  result?: string;
+  result?: unknown;
   [key: string]: unknown;
 }
 
@@ -42,6 +80,7 @@ interface MCPRawTool {
   name: string;
   description?: string;
   inputSchema?: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
   domain?: string;
   labels?: string[];
   /** MCP-standard extension point — survives Zod validation unlike top-level custom fields */
@@ -50,6 +89,14 @@ interface MCPRawTool {
   annotations?: Record<string, unknown>;
 }
 
+/** Protocol negotiation: `auto` probes for 2026-07-28 and falls back to 2025. */
+export type MCPProtocolSetting = "auto" | "legacy" | "2026-07-28";
+
+/**
+ * One `mcp_servers` document (or a config shaped like one). Everything past
+ * the transport fields is optional so a bare `{name, transport, …}` still
+ * connects — it then belongs to the calling request's scope.
+ */
 export interface MCPServerConfig {
   name: string;
   transport: "stdio" | "streamable-http" | "sse";
@@ -58,20 +105,48 @@ export interface MCPServerConfig {
   env?: Record<string, string>;
   url?: string;
   headers?: Record<string, string>;
+  /** The document id — half of the pool key. Defaults to `name`. */
+  _id?: unknown;
+  username?: string;
+  profileId?: string | null;
+  /** Seeded from DEFAULT_MCP_SERVERS: visible to every scope. */
+  shared?: boolean;
+  /** Owner-set: only a trusted server's `readOnlyHint` lowers a tool to AUTO. */
+  trusted?: boolean;
+  /** Approved tool fingerprints; absent until the first approval. */
+  toolPins?: McpToolPins | null;
+  protocol?: MCPProtocolSetting;
+  outputCapTokens?: number | null;
+  toolOutputCapTokens?: Record<string, number> | null;
   [key: string]: unknown;
 }
 
+type MCPTransport =
+  | StdioClientTransport
+  | StreamableHTTPClientTransport
+  | SSEClientTransport;
+
 interface MCPConnection {
+  key: string;
+  serverId: string;
+  serverName: string;
+  owner: McpOwner;
   client: Client;
-  transport:
-    | StdioClientTransport
-    | StreamableHTTPClientTransport
-    | SSEClientTransport;
-  tools: MCPToolSchema[];
-  mcpTools: MCPRawTool[];
+  transport: MCPTransport;
   config: MCPServerConfig;
   status: string;
   connectedAt: Date;
+  protocolVersion: string | null;
+  protocolEra: string | null;
+  pins: McpToolPins | null;
+  /** Every tool the server lists, approved or not. */
+  offeredTools: MCPRawTool[];
+  /** The approved subset, as the server described it. */
+  mcpTools: MCPRawTool[];
+  /** The approved subset, as the model sees it. */
+  tools: MCPToolSchema[];
+  quarantined: McpQuarantinedTool[];
+  rejected: Set<string>;
 }
 
 interface MCPAuthOptions {
@@ -92,49 +167,90 @@ interface MCPContentBlock {
   mimeType?: string;
 }
 
+export interface MCPCallOptions {
+  signal?: AbortSignal;
+  /** Per-call timeout override (SDK default is 60s). */
+  timeoutMilliseconds?: number;
+  /** Whose servers to look in; defaults to the ambient request's. */
+  scope?: { username?: string | null; profileId?: string | null } | null;
+  /** Recorded on an offloaded (over-cap) result. */
+  conversationId?: string | null;
+  project?: string | null;
+  /**
+   * Internal recursion guard. The reconnect-retry used to recurse UNBOUNDED
+   * (callTool → catch → reconnect → callTool …) when a server kept dropping
+   * the transport.
+   */
+  _reconnectAttempt?: number;
+}
+
+export class McpServerNameConflictError extends Error {
+  constructor(serverName: string) {
+    super(
+      `An MCP server named "${serverName}" is already connected where this one would be visible. ` +
+        `Tool names are namespaced by server name, so two servers with one name would shadow each other — rename one.`,
+    );
+    this.name = "McpServerNameConflictError";
+  }
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /**
  * Tool name delimiter — MCP tools are namespaced as `mcp__{serverName}__{toolName}`.
- * Double underscore avoids collisions since neither server names nor tool names use it.
+ * Server names can't contain it (McpNaming), so the first one is the split.
  */
-export const MCP_DELIMITER = "__";
-export const MCP_PREFIX = "mcp" + MCP_DELIMITER;
+export const MCP_DELIMITER = NAMESPACE_DELIMITER;
+export const MCP_PREFIX = NAMESPACE_PREFIX;
 
 // ─── Connection Store ─────────────────────────────────────────────────────────
 
 /**
- * Map of serverName → { client: Client, transport, tools: [], config, status }
- *
- * NOTE: keyed by server name only — not by profile (or project/username).
- * Two profiles enabling a same-named server share/steal one connection. The
- * key is embedded in namespaced tool names (`mcp__{serverName}__{tool}`) and
- * consumed by harness call sites, so widening it fans out beyond this module.
+ * Connection pool keyed by `(profileId, serverId)`. It used to be keyed by
+ * server name alone, so two profiles with a same-named server shared (or
+ * evicted) one connection and each other's injected credentials.
  */
 const connections = new Map<string, MCPConnection>();
+
+/**
+ * Pins by pool key, kept across disconnects. The stored document is the
+ * record of approval; this covers a server connected from a config with no
+ * document, whose approvals would otherwise reset on every reconnect — and a
+ * reset approves whatever the server says next (trust on first use).
+ */
+const rememberedPins = new Map<string, McpToolPins>();
+
+export function connectionKey(profileId: string | null | undefined, serverId: string): string {
+  return `${normalizeProfileId(profileId)}::${serverId}`;
+}
+
+async function closeConnection(conn: MCPConnection): Promise<void> {
+  try {
+    await conn.client.close();
+  } catch (error: unknown) {
+    logger.warn(
+      `[MCP] Error closing "${conn.serverName}": ${getErrorMessage(error)}`,
+    );
+  }
+  // For stdio, ensure child process is killed
+  if (conn.transport?.close) {
+    try {
+      await conn.transport.close();
+    } catch {
+      // Best-effort cleanup
+    }
+  }
+}
 
 // Register shutdown cleanup — disconnect all MCP servers
 registerCleanup(async () => {
   if (connections.size === 0) return;
   logger.info(`[MCP] Shutdown: disconnecting ${connections.size} server(s)…`);
-  const names = [...connections.keys()];
   await Promise.allSettled(
-    names.map(async (name) => {
-      const conn = connections.get(name);
-      if (!conn) return;
-      try {
-        await conn.client.close();
-      } catch {
-        /* best-effort */
-      }
-      if (conn.transport?.close) {
-        try {
-          await conn.transport.close();
-        } catch {
-          /* best-effort */
-        }
-      }
-      connections.delete(name);
+    [...connections.values()].map(async (conn) => {
+      await closeConnection(conn);
+      connections.delete(conn.key);
+      removeRegisteredConnection(conn.key);
     }),
   );
 });
@@ -161,7 +277,7 @@ function mcpToolToSchema(
     (Array.isArray(meta.labels) ? (meta.labels as string[]) : undefined);
 
   return {
-    name: `${MCP_PREFIX}${serverName}${MCP_DELIMITER}${mcpTool.name}`,
+    name: toNamespacedToolName(serverName, mcpTool.name),
     description: mcpTool.description || "",
     parameters: mcpTool.inputSchema || { type: "object", properties: {} },
     // Metadata for UI display
@@ -173,26 +289,6 @@ function mcpToolToSchema(
   };
 }
 
-/**
- * Parse a namespaced MCP tool name back into { serverName, toolName }.
- * Returns null if the name doesn't match the MCP pattern.
- */
-function parseMCPToolName(
-  fullName: string,
-): { serverName: string; toolName: string } | null {
-  if (!fullName.startsWith(MCP_PREFIX)) return null;
-  const rest = fullName.slice(MCP_PREFIX.length);
-  const delimiterIndex = rest.indexOf(MCP_DELIMITER);
-  if (delimiterIndex === -1) return null;
-  return {
-    serverName: rest.slice(0, delimiterIndex),
-    toolName: rest.slice(delimiterIndex + MCP_DELIMITER.length),
-  };
-}
-
-/**
- * Create the appropriate transport based on server config.
- */
 /**
  * Environment for stdio MCP child processes.
  *
@@ -214,9 +310,10 @@ export function buildStdioEnvironment(
   return { ...getDefaultEnvironment(), ...(configEnv || {}) };
 }
 
-function createTransport(
-  config: MCPServerConfig,
-): StdioClientTransport | StreamableHTTPClientTransport | SSEClientTransport {
+/**
+ * Create the appropriate transport based on server config.
+ */
+function createTransport(config: MCPServerConfig): MCPTransport {
   if (config.transport === "stdio") {
     return new StdioClientTransport({
       command: config.command!,
@@ -246,6 +343,168 @@ function createTransport(
   throw new Error(`Unsupported MCP transport: ${config.transport}`);
 }
 
+/**
+ * Which handshake `connect()` runs. By default Prism probes for the
+ * 2026-07-28 revision and falls back to the 2025 `initialize` handshake.
+ * HTTP+SSE predates 2026, so it never probes. On stdio the probe runs in a
+ * short-lived sibling process and a silent server is treated as 2025-era
+ * after a short wait; a server that misbehaves under the probe can be set to
+ * `protocol: "legacy"`.
+ */
+function negotiationFor(config: MCPServerConfig): VersionNegotiationOptions {
+  if (config.transport === "sse" || config.protocol === "legacy") {
+    return { mode: "legacy" };
+  }
+  if (config.protocol === "2026-07-28") {
+    return { mode: { pin: "2026-07-28" } };
+  }
+  return config.transport === "stdio"
+    ? { mode: "auto", probe: { timeoutMs: MCP.STDIO_PROBE_TIMEOUT_MILLISECONDS } }
+    : { mode: "auto" };
+}
+
+function ownerOf(config: MCPServerConfig): McpOwner {
+  const scope = toMcpScope(config);
+  return { ...scope, shared: config.shared === true };
+}
+
+/** The permission facts for every tool the server offers. */
+function permissionFactsFor(conn: MCPConnection): Map<string, McpToolPermissionFacts> {
+  const trusted = conn.config.trusted === true;
+  const quarantinedNames = new Set(conn.quarantined.map((entry) => entry.name));
+  const facts = new Map<string, McpToolPermissionFacts>();
+  for (const tool of conn.offeredTools) {
+    if (conn.rejected.has(tool.name)) continue;
+    const quarantined = quarantinedNames.has(tool.name);
+    facts.set(toNamespacedToolName(conn.serverName, tool.name), {
+      tier: quarantined ? "danger" : mcpTierFromAnnotations(tool.annotations, trusted),
+      capabilities: capabilitiesFromMcpAnnotations(tool.annotations),
+      quarantined,
+    });
+  }
+  return facts;
+}
+
+/**
+ * Sort the server's current tool list into approved and quarantined, and
+ * publish the result. Returns whether the quarantine changed.
+ */
+function applyToolList(conn: MCPConnection, offered: MCPRawTool[]): boolean {
+  conn.rejected = findCollidingToolNames(
+    conn.serverName,
+    offered.map((tool) => tool.name),
+  );
+  const review = reviewMcpTools(offered, conn.pins, conn.rejected);
+  if (review.pins) {
+    conn.pins = review.pins;
+    rememberedPins.set(conn.key, review.pins);
+    void updateMcpServerRecord(conn.serverId, { toolPins: review.pins });
+  }
+  const before = JSON.stringify(conn.quarantined);
+  conn.offeredTools = offered;
+  conn.mcpTools = review.approved;
+  conn.tools = review.approved.map((tool) => mcpToolToSchema(conn.serverName, tool));
+  conn.quarantined = review.quarantined;
+  setConnectionTools(conn.key, conn.owner, permissionFactsFor(conn));
+  const changed = before !== JSON.stringify(conn.quarantined);
+  if (changed) {
+    void updateMcpServerRecord(conn.serverId, { quarantinedTools: conn.quarantined });
+  }
+  return changed;
+}
+
+function describeQuarantine(conn: MCPConnection): string {
+  if (conn.quarantined.length === 0) return "";
+  return ` — QUARANTINED ${conn.quarantined.length}: ${conn.quarantined
+    .map((entry) => `${entry.name} (${entry.reason})`)
+    .join(", ")}`;
+}
+
+/** The connection `scope` reaches under this server name, if any. */
+function findVisibleConnection(
+  serverName: string,
+  scope: McpScope,
+): MCPConnection | null {
+  for (const conn of connections.values()) {
+    if (conn.serverName === serverName && isVisibleTo(conn.owner, scope)) {
+      return conn;
+    }
+  }
+  return null;
+}
+
+/**
+ * Turn a `tools/call` result into what the model reads.
+ *
+ * `structuredContent` wins when present: the SDK has already validated it
+ * against the tool's `outputSchema` (the approved definition is passed as
+ * `toolDefinition`, so a server can't swap the schema under us), and it is
+ * handed on as JSON. Text content is the fallback, with a lone JSON text
+ * block parsed the way it always was.
+ */
+function transformCallResult(result: Record<string, unknown>): TransformedMCPToolResult {
+  const content = (Array.isArray(result.content) ? result.content : []) as MCPContentBlock[];
+  if (result.isError) {
+    const errorText =
+      content
+        .filter((item) => item.type === "text")
+        .map((item) => item.text)
+        .join("\n") || "MCP tool returned an error";
+    return { error: errorText };
+  }
+
+  // Preserve image content instead of dropping it: the first image
+  // block is surfaced as `image: { data, mimeType }`, which
+  // PostExecutionEmitter uploads to MinIO and stamps with `display`
+  // like any other image-producing tool result.
+  const firstImage = content.find(
+    (item) => item.type === "image" && item.data,
+  );
+  const imagePayload = firstImage
+    ? {
+        image: {
+          data: firstImage.data as string,
+          mimeType: firstImage.mimeType || "image/png",
+        },
+      }
+    : null;
+
+  if (result.structuredContent !== undefined) {
+    const structured = result.structuredContent;
+    const base =
+      structured !== null && typeof structured === "object" && !Array.isArray(structured)
+        ? { ...(structured as Record<string, unknown>) }
+        : { result: structured };
+    return imagePayload ? { ...base, ...imagePayload } : base;
+  }
+
+  // Flatten content to a usable format
+  const textParts = content
+    .filter((item) => item.type === "text")
+    .map((item) => item.text || "");
+
+  // If there's only one text part, return it directly for cleaner output
+  if (textParts.length === 1) {
+    // Try to parse as JSON (many MCP tools return JSON as text)
+    try {
+      const parsed = JSON.parse(textParts[0]);
+      if (!imagePayload) return parsed;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return { ...parsed, ...imagePayload };
+      }
+      return { result: parsed, ...imagePayload };
+    } catch {
+      return { result: textParts[0], ...(imagePayload || {}) };
+    }
+  }
+
+  const joinedText = textParts.join("\n");
+  if (imagePayload) {
+    return { ...(joinedText && { result: joinedText }), ...imagePayload };
+  }
+  return { result: joinedText };
+}
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 const MCPClientService = {
@@ -254,18 +513,41 @@ const MCPClientService = {
    */
   async connect(config: MCPServerConfig) {
     const { name: serverName } = config;
+    if (!isValidMcpServerName(serverName)) {
+      throw new Error(
+        `Invalid MCP server name "${serverName}": use ${MCP_SERVER_NAME_RULE}.`,
+      );
+    }
 
-    // Disconnect existing connection if any
-    if (connections.has(serverName)) {
-      await this.disconnect(serverName);
+    const owner = ownerOf(config);
+    const serverId = String(config._id ?? serverName);
+    const key = connectionKey(owner.profileId, serverId);
+
+    // Reconnecting the same server replaces its connection.
+    const existing = connections.get(key);
+    if (existing) await this.disconnectKey(key);
+
+    for (const other of connections.values()) {
+      if (other.serverName === serverName && visibilityOverlaps(other.owner, owner)) {
+        throw new McpServerNameConflictError(serverName);
+      }
     }
 
     logger.info(`[MCP] Connecting to "${serverName}" (${config.transport})...`);
 
     const transport = createTransport(config);
-    const client = new Client(
-      { name: "prism-mcp-client", version: "1.0.0" },
-      { capabilities: {} },
+    const client: Client = new Client(
+      { name: MCP.CLIENT_NAME, version: "1.0.0" },
+      {
+        capabilities: {},
+        versionNegotiation: negotiationFor(config),
+        listChanged: {
+          tools: {
+            onChanged: (error, tools) =>
+              MCPClientService.handleToolListChanged(key, client, error, tools),
+          },
+        },
+      },
     );
 
     try {
@@ -274,113 +556,171 @@ const MCPClientService = {
       logger.error(
         `[MCP] Failed to connect to "${serverName}": ${getErrorMessage(error)}`,
       );
+      try {
+        await transport.close();
+      } catch {
+        /* best-effort */
+      }
       throw error;
     }
 
     // Discover tools
-    let mcpTools: MCPRawTool[] = [];
+    let offered: MCPRawTool[] = [];
     try {
       const result = await client.listTools();
-      mcpTools = (result.tools || []) as MCPRawTool[];
+      offered = (result.tools || []) as MCPRawTool[];
     } catch (error: unknown) {
       logger.warn(
         `[MCP] Failed to list tools for "${serverName}": ${getErrorMessage(error)}`,
       );
     }
 
-    // Convert to our schema format
-    const schemas = mcpTools.map((tool) => mcpToolToSchema(serverName, tool));
-    registerToolCapabilities(schemas, `mcp:${serverName}`);
-
-    connections.set(serverName, {
+    const conn: MCPConnection = {
+      key,
+      serverId,
+      serverName,
+      owner,
       client,
       transport,
-      tools: schemas,
-      mcpTools,
       config,
       status: "connected",
       connectedAt: new Date(),
+      protocolVersion: client.getNegotiatedProtocolVersion() ?? null,
+      protocolEra: client.getProtocolEra() ?? null,
+      pins:
+        config.toolPins && typeof config.toolPins === "object"
+          ? { ...config.toolPins }
+          : (rememberedPins.get(key) ?? null),
+      offeredTools: [],
+      mcpTools: [],
+      tools: [],
+      quarantined: [],
+      rejected: new Set(),
+    };
+    connections.set(key, conn);
+    applyToolList(conn, offered);
+    void updateMcpServerRecord(serverId, {
+      protocolVersion: conn.protocolVersion,
+      protocolEra: conn.protocolEra,
+      quarantinedTools: conn.quarantined,
+      lastConnectedAt: conn.connectedAt.toISOString(),
     });
 
     logger.info(
-      `[MCP] Connected to "${serverName}" — ${schemas.length} tools: ${mcpTools.map((mCPRawTool) => mCPRawTool.name).join(", ")}`,
+      `[MCP] Connected to "${serverName}" (protocol ${conn.protocolVersion ?? "?"}) — ${conn.tools.length} tools: ${conn.mcpTools.map((tool) => tool.name).join(", ")}${describeQuarantine(conn)}`,
     );
 
-    return { tools: schemas, serverName };
+    return {
+      tools: conn.tools,
+      serverName,
+      serverId,
+      protocolVersion: conn.protocolVersion,
+      protocolEra: conn.protocolEra,
+      quarantinedTools: conn.quarantined,
+    };
   },
 
   /**
-   * Disconnect from an MCP server.
-
+   * `notifications/tools/list_changed`: the SDK has re-fetched the list.
+   * Re-review it against the pins — a changed description is quarantined
+   * right here, before the next turn can see it. The discovery index
+   * (`search_tools`) is built from `getToolSchemas()` on every search, so
+   * it follows without a separate rebuild.
    */
-  async disconnect(serverName: string) {
-    const conn = connections.get(serverName);
-    if (!conn) return;
-
-    try {
-      await conn.client.close();
-    } catch (error: unknown) {
+  handleToolListChanged(
+    key: string,
+    client: Client,
+    error: Error | null,
+    tools: Tool[] | null,
+  ): void {
+    const conn = connections.get(key);
+    // A late notification from a connection that has since been replaced.
+    if (!conn || conn.client !== client) return;
+    if (error || !tools) {
       logger.warn(
-        `[MCP] Error closing "${serverName}": ${getErrorMessage(error)}`,
+        `[MCP] "${conn.serverName}" announced a tool list change but the refresh failed: ${error ? getErrorMessage(error) : "no tools returned"}`,
       );
+      return;
     }
+    applyToolList(conn, tools as unknown as MCPRawTool[]);
+    logger.info(
+      `[MCP] "${conn.serverName}" tool list changed — ${conn.tools.length} approved${describeQuarantine(conn)}`,
+    );
+  },
 
-    // For stdio, ensure child process is killed
-    if (conn.transport?.close) {
-      try {
-        await conn.transport.close();
-      } catch {
-        // Best-effort cleanup
-      }
-    }
+  /** Disconnect one connection by pool key. */
+  async disconnectKey(key: string) {
+    const conn = connections.get(key);
+    if (!conn) return;
+    connections.delete(key);
+    removeRegisteredConnection(key);
+    await closeConnection(conn);
+    logger.info(`[MCP] Disconnected from "${conn.serverName}"`);
+  },
 
-    connections.delete(serverName);
-    logger.info(`[MCP] Disconnected from "${serverName}"`);
+  /** Disconnect the server a stored document describes. */
+  async disconnectServer(serverId: string, profileId?: string | null) {
+    await this.disconnectKey(connectionKey(profileId, serverId));
+  },
+
+  /** Disconnect the server `scope` reaches under this name. */
+  async disconnect(serverName: string, scope?: MCPCallOptions["scope"]) {
+    const conn = findVisibleConnection(serverName, toMcpScope(scope));
+    if (conn) await this.disconnectKey(conn.key);
   },
 
   /**
-   * Reconnect to an MCP server (disconnect then connect).
-
+   * Reconnect a connection (disconnect then connect).
    */
-  async reconnect(serverName: string) {
-    const conn = connections.get(serverName);
+  async reconnect(serverName: string, scope?: MCPCallOptions["scope"]) {
+    const conn = findVisibleConnection(serverName, toMcpScope(scope));
     if (!conn) throw new Error(`Server "${serverName}" is not connected`);
-    return this.connect(conn.config);
+    return this.connect({ ...conn.config, toolPins: conn.pins });
   },
 
   /**
    * Call a tool on a connected MCP server.
    *
-   * @param options.signal - abort signal from the agentic loop (user stop /
-   *   per-tool timeout) so an in-flight MCP call can actually be cancelled.
-   * @param options.timeoutMilliseconds - per-call timeout override
-   *   (SDK default is 60s).
-   * @param options._reconnectAttempt - internal recursion guard. The
-   *   reconnect-retry used to recurse UNBOUNDED (callTool → catch →
-   *   reconnect → callTool …) when a server kept dropping the transport.
+   * Only an approved tool is called; a quarantined one is refused with the
+   * reason, so a model holding a stale tool list can't reach a changed tool.
    */
   async callTool(
     serverName: string,
     toolName: string,
     args: Record<string, unknown> = {},
-    options: {
-      signal?: AbortSignal;
-      timeoutMilliseconds?: number;
-      _reconnectAttempt?: number;
-    } = {},
+    options: MCPCallOptions = {},
   ): Promise<TransformedMCPToolResult> {
-    const conn = connections.get(serverName);
+    const scope = toMcpScope(options.scope);
+    const conn = findVisibleConnection(serverName, scope);
     if (!conn) {
       return { error: `MCP server "${serverName}" is not connected` };
     }
 
+    const namespaced = toNamespacedToolName(serverName, toolName);
+    const approved = conn.tools.find((tool) => tool.name === namespaced);
+    if (!approved) {
+      const held = conn.quarantined.find(
+        (entry) => toNamespacedToolName(serverName, entry.name) === namespaced,
+      );
+      if (held) {
+        return {
+          error:
+            held.reason === "duplicate"
+              ? `MCP tool "${held.name}" on "${serverName}" was rejected: another tool on that server maps to the same name.`
+              : `MCP tool "${held.name}" on "${serverName}" is quarantined: its definition ${held.reason === "new" ? "appeared" : "changed"} after the server was approved. The owner has to re-approve it before it can run.`,
+        };
+      }
+      return { error: `MCP server "${serverName}" does not offer a tool named "${toolName}"` };
+    }
+    const originalName = approved._mcpOriginalName;
+    const definition = conn.mcpTools.find((tool) => tool.name === originalName);
+
     try {
       const result = await conn.client.callTool(
         {
-          name: toolName,
+          name: originalName,
           arguments: args,
         },
-        undefined,
         {
           ...(options.signal && { signal: options.signal }),
           ...(options.timeoutMilliseconds && {
@@ -389,61 +729,26 @@ const MCPClientService = {
           // Long-running MCP tools that report progress shouldn't be killed
           // by the flat timeout while they're demonstrably alive.
           resetTimeoutOnProgress: true,
+          // Validate against the definition the owner approved, not whatever
+          // the server's latest tools/list says.
+          ...(definition && { toolDefinition: definition as unknown as Tool }),
         },
       );
 
-      // MCP returns { content: [{ type: "text", text: "..." }, ...], isError? }
-      const content = (result.content || []) as MCPContentBlock[];
-      if (result.isError) {
-        const errorText =
-          content
-            .filter((item) => item.type === "text")
-            .map((item) => item.text)
-            .join("\n") || "MCP tool returned an error";
-        return { error: errorText };
+      const transformed = transformCallResult(result as unknown as Record<string, unknown>);
+      if (transformed && typeof transformed === "object" && !Array.isArray(transformed)) {
+        return capMcpToolResult(
+          transformed,
+          resolveOutputCapTokens(conn.config, originalName),
+          {
+            toolName: namespaced,
+            conversationId: options.conversationId,
+            project: options.project,
+            username: scope.username,
+          },
+        ) as TransformedMCPToolResult;
       }
-
-      // Flatten content to a usable format
-      const textParts = content
-        .filter((item) => item.type === "text")
-        .map((item) => item.text || "");
-
-      // Preserve image content instead of dropping it: the first image
-      // block is surfaced as `image: { data, mimeType }`, which
-      // PostExecutionEmitter uploads to MinIO and stamps with `display`
-      // like any other image-producing tool result.
-      const firstImage = content.find(
-        (item) => item.type === "image" && item.data,
-      );
-      const imagePayload = firstImage
-        ? {
-            image: {
-              data: firstImage.data as string,
-              mimeType: firstImage.mimeType || "image/png",
-            },
-          }
-        : null;
-
-      // If there's only one text part, return it directly for cleaner output
-      if (textParts.length === 1) {
-        // Try to parse as JSON (many MCP tools return JSON as text)
-        try {
-          const parsed = JSON.parse(textParts[0]);
-          if (!imagePayload) return parsed;
-          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-            return { ...parsed, ...imagePayload };
-          }
-          return { result: parsed, ...imagePayload };
-        } catch {
-          return { result: textParts[0], ...(imagePayload || {}) };
-        }
-      }
-
-      const joinedText = textParts.join("\n");
-      if (imagePayload) {
-        return { ...(joinedText && { result: joinedText }), ...imagePayload };
-      }
-      return { result: joinedText };
+      return transformed;
     } catch (error: unknown) {
       // Never reconnect-retry an aborted call
       if (options.signal?.aborted) {
@@ -463,9 +768,10 @@ const MCPClientService = {
           `[MCP] Connection lost to "${serverName}", attempting reconnect (retry ${reconnectAttempt + 1}/1)...`,
         );
         try {
-          await this.reconnect(serverName);
+          await this.reconnect(serverName, scope);
           const retriedResult = await this.callTool(serverName, toolName, args, {
             ...options,
+            scope,
             _reconnectAttempt: reconnectAttempt + 1,
           });
           if (retriedResult && typeof retriedResult === "object" && !("error" in retriedResult)) {
@@ -484,57 +790,74 @@ const MCPClientService = {
   },
 
   /**
-   * Get all tool schemas from all connected MCP servers.
+   * The approved tools of every server `scope` can see. Quarantined and
+   * rejected tools are never in it.
    */
-  getToolSchemas(): MCPToolSchema[] {
+  getToolSchemas(scope?: MCPCallOptions["scope"]): MCPToolSchema[] {
+    const resolved = toMcpScope(scope);
     const allSchemas: MCPToolSchema[] = [];
     for (const conn of connections.values()) {
-      allSchemas.push(...conn.tools);
+      if (isVisibleTo(conn.owner, resolved)) allSchemas.push(...conn.tools);
     }
     return allSchemas;
   },
 
   /**
-   * Get connection info for all servers.
+   * Get connection info for every server `scope` can see.
    */
-  getConnectedServers() {
+  getConnectedServers(scope?: MCPCallOptions["scope"]) {
+    const resolved = toMcpScope(scope);
     const servers: {
       name: string;
+      serverId: string;
       status: string;
       toolCount: number;
       tools: { name: string; description?: string }[];
+      quarantinedTools: McpQuarantinedTool[];
       transport: string;
       connectedAt: Date;
+      protocolVersion: string | null;
+      protocolEra: string | null;
+      shared: boolean;
+      trusted: boolean;
     }[] = [];
-    for (const [name, conn] of connections) {
+    for (const conn of connections.values()) {
+      if (!isVisibleTo(conn.owner, resolved)) continue;
       servers.push({
-        name,
+        name: conn.serverName,
+        serverId: conn.serverId,
         status: conn.status,
         toolCount: conn.tools.length,
         tools: conn.mcpTools.map((tool) => ({
           name: tool.name,
           description: tool.description,
         })),
+        quarantinedTools: conn.quarantined,
         transport: conn.config.transport,
         connectedAt: conn.connectedAt,
+        protocolVersion: conn.protocolVersion,
+        protocolEra: conn.protocolEra,
+        shared: conn.owner.shared,
+        trusted: conn.config.trusted === true,
       });
     }
     return servers;
   },
 
+  /** Whether a stored server is connected. */
+  isServerConnected(serverId: string, profileId?: string | null): boolean {
+    return connections.has(connectionKey(profileId, serverId));
+  },
+
   /**
-   * Check if a specific server is connected.
-
-
+   * Check if `scope` reaches a connected server with this name.
    */
-  isConnected(serverName: string): boolean {
-    return connections.has(serverName);
+  isConnected(serverName: string, scope?: MCPCallOptions["scope"]): boolean {
+    return findVisibleConnection(serverName, toMcpScope(scope)) !== null;
   },
 
   /**
    * Check if a tool name is an MCP tool.
-
-
    */
   isMCPTool(toolName: string): boolean {
     return toolName.startsWith(MCP_PREFIX);
@@ -542,10 +865,54 @@ const MCPClientService = {
 
   /**
    * Parse an MCP-namespaced tool name.
-
    */
   parseMCPToolName(fullName: string) {
-    return parseMCPToolName(fullName);
+    return parseNamespacedToolName(fullName);
+  },
+
+  /**
+   * Approve quarantined tools: pin them at their current definitions. With
+   * no names, every quarantined tool the server offers is approved.
+   */
+  async approveTools(
+    serverId: string,
+    profileId: string | null | undefined,
+    names: string[] | null,
+  ) {
+    const conn = connections.get(connectionKey(profileId, serverId));
+    if (!conn) return null;
+    const wanted = names ?? conn.quarantined.map((entry) => entry.name);
+    const result = approveMcpTools(conn.offeredTools, conn.pins, wanted, conn.rejected);
+    conn.pins = result.pins;
+    rememberedPins.set(conn.key, result.pins);
+    await updateMcpServerRecord(conn.serverId, { toolPins: result.pins });
+    applyToolList(conn, conn.offeredTools);
+    await updateMcpServerRecord(conn.serverId, { quarantinedTools: conn.quarantined });
+    logger.info(
+      `[MCP] "${conn.serverName}" tools approved: ${result.approved.join(", ") || "none"}${result.skipped.length ? ` (skipped: ${result.skipped.join(", ")})` : ""}`,
+    );
+    return {
+      approved: result.approved,
+      skipped: result.skipped,
+      quarantinedTools: conn.quarantined,
+      toolCount: conn.tools.length,
+    };
+  },
+
+  /**
+   * Apply an owner's settings change to a live connection: trust changes
+   * tiers, caps apply to the next call.
+   */
+  updateServerSettings(
+    serverId: string,
+    profileId: string | null | undefined,
+    settings: Pick<MCPServerConfig, "trusted" | "outputCapTokens" | "toolOutputCapTokens">,
+  ): boolean {
+    const conn = connections.get(connectionKey(profileId, serverId));
+    if (!conn) return false;
+    conn.config = { ...conn.config, ...settings };
+    setConnectionTools(conn.key, conn.owner, permissionFactsFor(conn));
+    return true;
   },
 
   /**
@@ -553,8 +920,8 @@ const MCPClientService = {
    * MCP Resources are read-only data sources (files, DB rows, API data)
    * that can be fetched by URI.
    */
-  async listResources(serverName: string) {
-    const conn = connections.get(serverName);
+  async listResources(serverName: string, scope?: MCPCallOptions["scope"]) {
+    const conn = findVisibleConnection(serverName, toMcpScope(scope));
     if (!conn) {
       return { error: `MCP server "${serverName}" is not connected` };
     }
@@ -598,8 +965,12 @@ const MCPClientService = {
   /**
    * Read a specific resource from a connected MCP server by URI.
    */
-  async readResource(serverName: string, uri: string) {
-    const conn = connections.get(serverName);
+  async readResource(
+    serverName: string,
+    uri: string,
+    scope?: MCPCallOptions["scope"],
+  ) {
+    const conn = findVisibleConnection(serverName, toMcpScope(scope));
     if (!conn) {
       return { error: `MCP server "${serverName}" is not connected` };
     }
@@ -645,13 +1016,17 @@ const MCPClientService = {
    * - API key header auth
    * - Environment variable injection (for stdio servers)
    */
-  async authenticate(serverName: string, auth: MCPAuthOptions = {}) {
-    const conn = connections.get(serverName);
+  async authenticate(
+    serverName: string,
+    auth: MCPAuthOptions = {},
+    scope?: MCPCallOptions["scope"],
+  ) {
+    const conn = findVisibleConnection(serverName, toMcpScope(scope));
     if (!conn) {
       return { error: `MCP server "${serverName}" is not connected` };
     }
 
-    const updatedConfig: MCPServerConfig = { ...conn.config };
+    const updatedConfig: MCPServerConfig = { ...conn.config, toolPins: conn.pins };
 
     // Apply auth to config based on transport type
     if (updatedConfig.transport === "streamable-http") {
@@ -761,11 +1136,13 @@ const MCPClientService = {
   },
 
   /**
-   * Disconnect all connected servers. Called on shutdown.
+   * Disconnect all connected servers, and forget the in-memory approvals of
+   * servers that have no stored document (tests start clean from here).
    */
   async disconnectAll() {
-    const names = [...connections.keys()];
-    await Promise.allSettled(names.map((name) => this.disconnect(name)));
+    const keys = [...connections.keys()];
+    await Promise.allSettled(keys.map((key) => this.disconnectKey(key)));
+    rememberedPins.clear();
   },
 };
 

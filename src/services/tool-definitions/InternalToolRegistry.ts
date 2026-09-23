@@ -75,6 +75,7 @@ export interface InternalToolContext {
   conversationId?: string | null;
   project?: string;
   username?: string;
+  profileId?: string | null;
   /** Persona id of the calling agent — used to scope tool discovery/activation to the persona's reachable universe. */
   agent?: string | null;
   isSubAgent?: boolean;
