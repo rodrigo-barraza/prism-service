@@ -1,0 +1,6 @@
+{"type":"hello","protocolVersion":1}
+{"type":"user_message","role":"user","content":"Name three primary colours, comma-separated, nothing else.","conversationId":"1e8373e3-1a9c-474f-bdb4-39e1139e7272","timestamp":1790125255181,"seq":1790125255182}
+{"type":"status","message":"generation_started","timeToFirstToken":1.487689557000005,"seq":1790125255183}
+{"type":"thinking","content":"**Defining the Core Concept**\n\nI've zeroed in on the core request: identify and format three primary colors. My focus is on ensuring a concise, correct response, adhering strictly to the \"nothing else\" constraint and comma-separated format. The simplicity of the task is deceptive, so precision is key.\n\n\n","outputCharacters":305,"seq":1790125255184}
+{"type":"chunk","content":"Red, Yellow, Blue","outputCharacters":322,"seq":1790125255185}
+{"type":"done","provider":"google","model":"gemini-3.6-flash","usage":{"inputTokens":13,"outputTokens":282,"reasoningOutputTokens":277,"totalInputTokens":13},"estimatedCost":0.00106725,"tokensPerSec":914.8,"timeToGeneration":1.488,"generationTime":0.308,"totalTime":1.804,"conversationId":"1e8373e3-1a9c-474f-bdb4-39e1139e7272","seq":1790125255186}

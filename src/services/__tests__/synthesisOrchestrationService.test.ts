@@ -32,6 +32,7 @@ import {
   type SynthesisGenerateInput,
 } from "#src/services/SynthesisOrchestrationService";
 import type { SseEvent } from "#src/types/SseTypes";
+import { SynthesisEventSchema } from "#src/protocol/events";
 
 // ── Helpers ────────────────────────────────────────────────
 
@@ -189,6 +190,13 @@ describe("runSynthesisGeneration", () => {
     const doneEvent = events.at(-1) as SseEvent & { synthesisRunId?: string };
     expect(doneEvent.conversationId).toBe("conv-1");
     expect(doneEvent.synthesisRunId).toBeTruthy();
+    // Every frame is a SynthesisEvent of the event protocol.
+    expect(
+      events.flatMap((event) => {
+        const result = SynthesisEventSchema.safeParse(event);
+        return result.success ? [] : [{ event, issues: result.error.issues }];
+      }),
+    ).toEqual([]);
 
     // The simulated user message is appended WITH meta (record-creating
     // append — no seeds existed); the assistant is persisted by /chat itself.
@@ -287,8 +295,11 @@ describe("runSynthesisGeneration", () => {
     expect(generateTurn).toHaveBeenCalledTimes(1);
     expect(events.at(-1)).toMatchObject({
       type: "error",
+      code: "internal",
       message: "provider exploded",
+      retryable: false,
     });
+    expect(events.every((event) => SynthesisEventSchema.safeParse(event).success)).toBe(true);
     expect(events.some((event) => event.type === "done")).toBe(false);
     expect(saveSynthesisRun).not.toHaveBeenCalled();
   });

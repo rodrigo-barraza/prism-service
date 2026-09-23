@@ -1220,9 +1220,11 @@ async function handleImageAPIModel(
   }
   emit({
     type: SERVER_SENT_EVENT_TYPES.DONE,
+    provider: providerName,
+    model: resolvedModel,
     usage: null,
     estimatedCost,
-    totalTime: totalSec,
+    totalTime: roundMilliseconds(totalSec),
     ...(traceId && { traceId }),
     ...(conversationId && { conversationId }),
   });
