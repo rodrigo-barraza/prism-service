@@ -20,8 +20,12 @@ import { TOOL_API_HEALTH_TIMEOUT_MILLISECONDS } from "#src/constants";
 //   model, messages, stream, temperature, top_p, frequency_penalty,
 //   presence_penalty, max_tokens, stop, tools, stream_options
 //
-// llama.cpp-specific extensions (passed via top-level body):
-//   top_k, min_p, repeat_penalty, grammar, json_schema
+// llama.cpp-specific extensions sent (top-level body):
+//   top_k, min_p, repeat_penalty, cache_prompt
+//
+// Constrained output: a JSON-schema response goes as `response_format`
+// (local-request-features.ts); tool-call arguments are constrained by the
+// server itself (--jinja lazy grammar). `grammar` is never sent.
 //
 // Streaming uses standard SSE with "data: " prefix lines.
 // The final event is "data: [DONE]".
@@ -38,6 +42,7 @@ import { TOOL_API_HEALTH_TIMEOUT_MILLISECONDS } from "#src/constants";
 import { ProviderError } from "#src/utils/errors";
 import logger from "#src/utils/logger";
 import { discoverContextLength } from "#src/utils/ContextLengthDiscovery";
+import { llamaCppResponseFormat } from "#src/providers/local-request-features";
 
 import { MODALITY_TYPES, getDefaultModels } from "#src/config";
 import {
@@ -232,6 +237,7 @@ export function createLlamaCppProvider(
           // of Anthropic prompt caching. Skips re-prefilling the whole
           // conversation on every agentic iteration.
           cache_prompt: true,
+          ...llamaCppResponseFormat(options),
           stream: false,
         };
 
@@ -330,6 +336,7 @@ export function createLlamaCppProvider(
           // llama.cpp extension: reuse the server-side KV cache for the
           // common prompt prefix across turns (see non-streaming payload).
           cache_prompt: true,
+          ...llamaCppResponseFormat(options),
           stream: true,
           // Per OpenAI spec: request usage stats in the final SSE chunk
           stream_options: { include_usage: true },

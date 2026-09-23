@@ -47,8 +47,25 @@ LM Studio, Ollama, llama.cpp, vLLM and SGLang servers are registered from indexe
 | `PROVIDER_<TYPE>_<N>_CONCURRENCY` | Requests Prism sends it at once (default 1) |
 | `PROVIDER_<TYPE>_<N>_NICKNAME` | Label shown in the client, e.g. `Desktop` |
 | `PROVIDER_<TYPE>_<N>_API_KEY` | Bearer token for a server started with an API key (SGLang only) |
+| `PROVIDER_VLLM_<N>_PRIORITY_SCHEDULING` | `true` for a vLLM server started with `--scheduling-policy priority`: background calls (memory extraction) then carry `X-Vllm-Priority: 10`, so interactive turns are served first. Leave unset otherwise — a server without priority scheduling rejects a non-zero priority. |
 
 `<TYPE>` is `LM_STUDIO`, `OLLAMA`, `LLAMA_CPP`, `VLLM` or `SGLANG`; `<N>` runs from 1 to 10.
+
+### Model profiles and local models
+
+`src/providers/ModelProfiles.ts` holds what each model's request surface accepts: the sampling parameters it rejects, its effort range, the `tool_choice` modes it takes, its caching mechanisms and its prompt/tool budget. The provider registry applies it to every text generation call before the adapter sees the options.
+
+- **Constrained output.** On vLLM, function tools are sent `strict: true` for model families whose tool parser supports it (Qwen, Llama 3, gpt-oss), and a JSON-schema response goes as `structured_outputs` (vLLM 0.12+) or `guided_json` (older servers, by `/version`). llama-server gets a JSON-schema response as `response_format` and constrains tool calls itself (`--jinja`).
+- **Lightweight budget.** A local model whose name declares 14B parameters or fewer gets at most 12 tools (discovery tools included, so it can enable more), no sub-agent or async-task tools, and a system prompt without the directory tree or the orchestrator addendum.
+
+### Cloud transport switches
+
+| Variable | Default | Other value |
+|---|---|---|
+| `OPENAI_RESPONSES_TRANSPORT` | `websocket` — GPT-6 turns stream over the Responses WebSocket (native steering, incremental continuation); falls back to HTTP when the socket fails | `http` |
+| `GEMINI_TRANSPORT` | `generate_content` | `interactions` — the Interactions API prototype |
+| `MOONSHOT_TRANSPORT` | `anthropic` — Kimi K3 through Moonshot's Anthropic-compatible endpoint and the Anthropic adapter | `openai` — the OpenAI-compatible Chat Completions path |
+| `MOONSHOT_CACHE_TTL` | `5m` — Kimi K3's top-level `cache_control` TTL | `1h` (cache writes cost twice as much) |
 
 ### SGLang
 
