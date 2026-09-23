@@ -43,6 +43,10 @@ interface QuestionPendingStatusEvent {
 
 interface AskUserContext extends InternalToolContext {
   _emit?: (event: UserQuestionEmitEvent | QuestionPendingStatusEvent) => void;
+  /** The ask_user call (ToolExecutor) — recorded on the question. */
+  _toolCallId?: string | null;
+  /** The call is from a pass replayed after a restart: its question may exist already. */
+  _resumedCall?: boolean;
 }
 
 let questionSequence = 0;
@@ -73,6 +77,62 @@ export function formatQuestionAnswers(
 
 interface QuestionAnswer {
   answer?: string | string[];
+}
+
+/**
+ * The resolver of a non-blocking card: the answer goes into the loop's
+ * running turn through its mailbox. Refused when no turn is open — the
+ * route then answers 404 and the client sends it as a message instead.
+ */
+function postAnswerToTurn(
+  loopKey: string,
+  questionId: string,
+  questions: NormalizedQuestion[],
+): (value: QuestionResult) => { delivered: boolean; reason?: string } {
+  return (value) => {
+    const posted = TurnInputMailbox.post(loopKey, {
+      kind: "question_answer",
+      text: formatQuestionAnswers(questions, value.answers, questionId),
+      meta: { questionId },
+    });
+    if (!posted.accepted) {
+      logger.warn(
+        `[AskUserQuestion] Answer to ${questionId} arrived with no open turn (${posted.reason})`,
+      );
+    }
+    return { delivered: posted.accepted, reason: posted.reason };
+  };
+}
+
+/**
+ * A turn re-driven after a restart takes over its loop's non-blocking
+ * cards: open ones get their resolver back (the answer reaches this turn),
+ * and answers that came while the server was down are delivered now —
+ * each once. Called when the re-driven turn's mailbox opens.
+ */
+export async function adoptNonBlockingQuestions(
+  loopKey: string,
+  owner: import("#src/services/PendingDecisionStore").DecisionOwner,
+): Promise<number> {
+  const { default: QuestionRegistry } = await import("#src/services/QuestionRegistry");
+  const { pending, undelivered } = await QuestionRegistry.listNonBlockingToAdopt(loopKey);
+  for (const record of pending) {
+    const questions = (record.questions ?? []) as NormalizedQuestion[];
+    await QuestionRegistry.reattach(
+      loopKey,
+      record.itemId,
+      { blocking: false, resolve: postAnswerToTurn(loopKey, record.itemId, questions) },
+      owner,
+    );
+  }
+  for (const record of undelivered) {
+    const questions = (record.questions ?? []) as NormalizedQuestion[];
+    const delivery = postAnswerToTurn(loopKey, record.itemId, questions)({
+      answers: (record.answers ?? null) as QuestionAnswer[] | null,
+    });
+    if (delivery.delivered) await QuestionRegistry.markDelivered(record.id);
+  }
+  return pending.length + undelivered.length;
 }
 
 interface QuestionResult {
@@ -286,12 +346,42 @@ export default {
         `"${normalizedQuestions[0].question.slice(0, LOG_PREVIEW.SHORT)}${normalizedQuestions[0].question.length > LOG_PREVIEW.SHORT ? "..." : ""}"`,
     );
 
-    const questionId = nextQuestionId();
     const isBlocking = toolArguments.blocking !== false;
+    const toolCallId = typeof context._toolCallId === "string" ? context._toolCallId : null;
 
     const { default: AgenticLoopService } =
       await import("#src/services/AgenticLoopService");
     const owner = decisionOwnerOf(context);
+
+    // ── Re-driven after a restart: this call asked before ────────────
+    // Its question is on record (PendingDecisionStore). An answer given
+    // meanwhile is the answer; a question still open is waited on again —
+    // the same card, not a second one.
+    const { default: QuestionRegistry } = await import("#src/services/QuestionRegistry");
+    const earlier =
+      context._resumedCall && toolCallId
+        ? await QuestionRegistry.findForToolCall(loopKey, toolCallId)
+        : null;
+    if (earlier?.status === "answered" && isBlocking) {
+      logger.info(`[AskUserQuestion] ${earlier.itemId} was answered while the turn was down`);
+      return {
+        questionId: earlier.itemId,
+        questions: normalizedQuestions.map((query) => query.question),
+        answers: earlier.answers ?? null,
+      };
+    }
+    if (earlier?.status === "answered" && !isBlocking) {
+      // Its answer reaches this turn through adoptNonBlockingQuestions.
+      return {
+        _directive: AGENT_DIRECTIVES.DETACHED_WORK,
+        questionId: earlier.itemId,
+        status: "answered",
+        blocking: false,
+        questions: normalizedQuestions.map((query) => query.question),
+      };
+    }
+    const reopened = earlier?.status === "pending" ? earlier.itemId : null;
+    const questionId = reopened ?? nextQuestionId();
     // The card is shown only once its question is recorded: an answer can
     // only land on a question that exists (PendingDecisionStore).
     const showCard = () =>
@@ -311,30 +401,24 @@ export default {
     // answers 404 — the client then sends the answer as a normal message,
     // which is the same text. Either way it is delivered exactly once.
     if (!isBlocking) {
-      await AgenticLoopService._setPendingQuestion(
-        loopKey,
-        {
-          questionId,
-          blocking: false,
-          createdAt: Date.now(),
-          agentConversationId,
-          resolve: (value: QuestionResult) => {
-            const posted = TurnInputMailbox.post(loopKey, {
-              kind: "question_answer",
-              text: formatQuestionAnswers(normalizedQuestions, value.answers, questionId),
-              meta: { questionId },
-            });
-            if (!posted.accepted) {
-              logger.warn(
-                `[AskUserQuestion] Answer to ${questionId} arrived with no open turn (${posted.reason})`,
-              );
-            }
-            return { delivered: posted.accepted, reason: posted.reason };
+      const resolve = postAnswerToTurn(loopKey, questionId, normalizedQuestions);
+      if (reopened) {
+        await QuestionRegistry.reattach(loopKey, questionId, { blocking: false, resolve }, owner);
+      } else {
+        await AgenticLoopService._setPendingQuestion(
+          loopKey,
+          {
+            questionId,
+            blocking: false,
+            createdAt: Date.now(),
+            agentConversationId,
+            resolve,
+            questions: normalizedQuestions,
+            toolCallId,
           },
-          questions: normalizedQuestions,
-        },
-        owner,
-      );
+          owner,
+        );
+      }
       showCard();
       if (context._emit) {
         context._emit({
@@ -367,18 +451,28 @@ export default {
       void AgenticLoopService._removePendingQuestion(loopKey, questionId);
       resolveAnswer({ answers: null, isCancelled: true });
     };
-    await AgenticLoopService._setPendingQuestion(
-      loopKey,
-      {
+    if (reopened) {
+      await QuestionRegistry.reattach(
+        loopKey,
         questionId,
-        blocking: true,
-        createdAt: Date.now(),
-        agentConversationId,
-        resolve: (value: QuestionResult) => resolveAnswer(value),
-        questions: normalizedQuestions,
-      },
-      owner,
-    );
+        { blocking: true, resolve: (value: QuestionResult) => resolveAnswer(value) },
+        owner,
+      );
+    } else {
+      await AgenticLoopService._setPendingQuestion(
+        loopKey,
+        {
+          questionId,
+          blocking: true,
+          createdAt: Date.now(),
+          agentConversationId,
+          resolve: (value: QuestionResult) => resolveAnswer(value),
+          questions: normalizedQuestions,
+          toolCallId,
+        },
+        owner,
+      );
+    }
     showCard();
     signal?.addEventListener("abort", withdraw, { once: true });
     if (signal?.aborted) withdraw();

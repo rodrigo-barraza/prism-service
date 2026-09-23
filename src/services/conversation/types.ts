@@ -190,7 +190,7 @@ export interface ConversationServiceInterface {
     project: string,
     username: string,
     messages: Array<ChatMessage | MessagePayload>,
-    options?: { collection?: string },
+    options?: { collection?: string; iteration?: number; allowEmpty?: boolean },
   ): Promise<void>;
   /**
    * Recover orphaned turn checkpoints: for every conversation that still has
@@ -200,6 +200,7 @@ export interface ConversationServiceInterface {
    */
   recoverOrphanedTurnCheckpoints(options?: {
     collection?: string;
+    skipConversationIds?: ReadonlySet<string>;
   }): Promise<number>;
   /**
    * Atomically increment or decrement the pendingBackgroundTasks counter.

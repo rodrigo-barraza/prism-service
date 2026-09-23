@@ -822,7 +822,8 @@ describe("AsyncTaskTools", () => {
       await settle();
 
       const [taskState] = AsyncTaskRegistry.listTasks("sub-agent-conv-3");
-      expect(taskState.deliveredVia).toBeUndefined();
+      // Dropped on purpose — recorded as such, so a restart never reports it.
+      expect(taskState.deliveredVia).toBe("dropped");
       expect(mockHandleAgent).not.toHaveBeenCalled();
       expect(mockAdjustPendingBackgroundTasks).not.toHaveBeenCalled();
       expect(findOne).not.toHaveBeenCalled();

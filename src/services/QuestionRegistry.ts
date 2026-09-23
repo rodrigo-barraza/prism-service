@@ -170,6 +170,7 @@ const QuestionRegistry = {
         position: 0,
         status: "pending",
         createdAt: new Date(entry.createdAt).toISOString(),
+        ...(entry.toolCallId ? { toolCallId: entry.toolCallId } : {}),
         blocking: entry.blocking,
         ...(entry.question !== undefined ? { question: entry.question } : {}),
         ...(entry.questions !== undefined ? { questions: entry.questions } : {}),
@@ -183,6 +184,53 @@ const QuestionRegistry = {
       resolve: entry.resolve,
     });
     if (entry.blocking) await ConversationRunState.park(locatorFor(loopKey, owner));
+  },
+
+  /**
+   * A turn re-driven after a restart waits on a question it asked before
+   * (TurnResumeService): hold its resolver again — no new record, no new id.
+   */
+  async reattach(
+    loopKey: string,
+    questionId: string,
+    entry: Pick<PendingQuestionEntry, "blocking" | "resolve">,
+    owner: DecisionOwner = {},
+  ): Promise<void> {
+    waiters.set(questionId, {
+      loopKey,
+      blocking: entry.blocking,
+      owner,
+      resolve: entry.resolve,
+    });
+    if (entry.blocking) await ConversationRunState.park(locatorFor(loopKey, owner));
+  },
+
+  /** The question an ask_user call asked on this loop, whatever its status (newest first wins). */
+  async findForToolCall(loopKey: string, toolCallId: string): Promise<PendingDecisionRecord | null> {
+    const records = await PendingDecisionStore.find({ loopKey, kinds: QUESTION_KINDS });
+    return records.filter((record) => record.toolCallId === toolCallId).at(-1) ?? null;
+  },
+
+  /**
+   * Non-blocking questions of a loop a restart left open or answered-but-
+   * undelivered — what a re-driven turn takes over.
+   */
+  async listNonBlockingToAdopt(loopKey: string): Promise<{
+    pending: PendingDecisionRecord[];
+    undelivered: PendingDecisionRecord[];
+  }> {
+    const records = (await PendingDecisionStore.find({ loopKey, kinds: QUESTION_KINDS })).filter(
+      (record) => record.blocking === false,
+    );
+    return {
+      pending: records.filter((record) => record.status === "pending"),
+      undelivered: records.filter((record) => record.status === "answered" && record.undelivered === true),
+    };
+  },
+
+  /** An undelivered answer reached a turn: it is not delivered again. */
+  async markDelivered(recordId: string): Promise<void> {
+    await PendingDecisionStore.update(recordId, { undelivered: false });
   },
 
   /** Withdraw one question unanswered (its turn was stopped). */
@@ -247,8 +295,13 @@ const QuestionRegistry = {
         await PendingDecisionStore.markUndelivered(record.id);
         return { resolved: false, reason: "no_active_turn", questionId: record.itemId };
       }
-    } else if (!(await PendingDecisionStore.isParked(loop.loopKey))) {
-      await ConversationRunState.clear(locatorFor(loop.loopKey, record));
+    } else {
+      // No turn here took it (the process that asked is gone): a non-blocking
+      // answer waits for the re-driven turn to deliver it, once.
+      if (!blocking) await PendingDecisionStore.update(record.id, { undelivered: true });
+      if (!(await PendingDecisionStore.isParked(loop.loopKey))) {
+        await ConversationRunState.clear(locatorFor(loop.loopKey, record));
+      }
     }
     return {
       resolved: true,

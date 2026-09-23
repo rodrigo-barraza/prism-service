@@ -70,6 +70,9 @@ export interface PendingToolCallSummary {
   batchId?: string;
   preview?: ApprovalPreview | null;
   _approval?: { tier: string; tierLabel: string };
+  /** Who asked for the card besides the tier: a hook, or a restart ("run it again?"). */
+  requestedBy?: string;
+  reason?: string | null;
 }
 
 export interface ApprovalRequestCall {
@@ -82,6 +85,9 @@ export interface ApprovalRequestCall {
   /** The tool's JSON-Schema `parameters`; edited arguments must satisfy it. */
   argsSchema?: Record<string, unknown> | null;
   preview?: ApprovalPreview | null;
+  /** Who asked for the card besides the tier: a hook, or a restart ("run it again?"). */
+  requestedBy?: string;
+  reason?: string | null;
 }
 
 export interface ApprovalBatchRequest {
@@ -125,6 +131,14 @@ export type ApprovalDecisionOutcome =
   /** No toolCallId and more than one call is pending — the client must name one. */
   | { status: "ambiguous"; pendingToolCallIds: string[] }
   | { status: "invalid"; error: string };
+
+/** What `open` parked: the batch's id (a resumed batch keeps its own) and the calls still undecided. */
+export interface OpenedApprovalBatch {
+  decisions: Promise<Map<string, ToolCallDecision>>;
+  batchId: string;
+  /** In the model's order; the cards to show. Empty when everything was decided already. */
+  pendingToolCallIds: string[];
+}
 
 export interface PendingApprovalSnapshot {
   type: "tool" | "plan";
@@ -179,6 +193,8 @@ export interface PendingQuestionEntry {
   question?: string;
   questions?: QuestionDefinition[];
   choices?: string[];
+  /** The ask_user call that asked it — found again when a restart re-drives the turn. */
+  toolCallId?: string | null;
 }
 
 // ── Approval Registry ──────────────────────────────────────
@@ -281,59 +297,145 @@ async function lapse(
   return settled;
 }
 
+function recordsFor(
+  loopKey: string,
+  batchId: string,
+  type: "tool" | "plan",
+  calls: ApprovalRequestCall[],
+  owner: DecisionOwner,
+  positionOf: (call: ApprovalRequestCall) => number,
+): PendingDecisionRecord[] {
+  const createdAt = new Date().toISOString();
+  return calls.map((call) => ({
+    ...owner,
+    id: pendingDecisionId(loopKey, batchId, call.toolCallId),
+    loopKey,
+    kind: type,
+    itemId: call.toolCallId,
+    batchId,
+    position: positionOf(call),
+    status: "pending",
+    createdAt,
+    name: call.name,
+    args: call.args,
+    ...(call.tier !== undefined ? { tier: call.tier } : {}),
+    ...(call.tierLabel !== undefined ? { tierLabel: call.tierLabel } : {}),
+    argsSchema: call.argsSchema ?? null,
+    ...(call.preview ? { preview: call.preview } : {}),
+    ...(call.requestedBy ? { requestedBy: call.requestedBy } : {}),
+    ...(call.reason ? { reason: call.reason } : {}),
+  }));
+}
+
+/** Park a waiter on the undecided calls of a batch (some may be decided already). */
+async function parkWaiter(
+  loopKey: string,
+  request: ApprovalBatchRequest,
+  batchId: string,
+  decided: Map<string, ToolCallDecision>,
+  owner: DecisionOwner,
+): Promise<OpenedApprovalBatch> {
+  const order = request.calls.map((call) => call.toolCallId);
+  const pendingToolCallIds = order.filter((toolCallId) => !decided.has(toolCallId));
+  if (pendingToolCallIds.length === 0) {
+    return {
+      decisions: Promise.resolve(new Map(order.map((id) => [id, decided.get(id)!] as const))),
+      batchId,
+      pendingToolCallIds,
+    };
+  }
+  let resolve!: BatchWaiter["resolve"];
+  const decisions = new Promise<Map<string, ToolCallDecision>>((settle) => {
+    resolve = settle;
+  });
+  waiters.set(loopKey, {
+    loopKey,
+    type: request.type,
+    batchId,
+    order,
+    decisions: new Map(decided),
+    onDecided: request.onDecided,
+    resolve,
+    owner,
+  });
+  await ConversationRunState.park(locatorFor(loopKey, owner));
+  return { decisions, batchId, pendingToolCallIds };
+}
+
+/**
+ * The batch a replayed pass asked about before a restart, if its records
+ * are still here: re-attach to it (same batch id, decisions already made —
+ * before the restart or while the server was down — applied) instead of
+ * superseding it. Calls it does not hold yet (a "run it again?" card) join
+ * it. Null when none of the calls were ever asked about.
+ */
+async function resumeBatch(
+  loopKey: string,
+  request: ApprovalBatchRequest,
+  owner: DecisionOwner,
+): Promise<OpenedApprovalBatch | null> {
+  const wanted = new Set(request.calls.map((call) => call.toolCallId));
+  const known = (await PendingDecisionStore.find({ loopKey, kinds: [request.type] })).filter(
+    (record) => wanted.has(record.itemId),
+  );
+  if (known.length === 0) return null;
+  const batchId = known.at(-1)!.batchId!;
+  const inBatch = new Map(
+    known.filter((record) => record.batchId === batchId).map((record) => [record.itemId, record]),
+  );
+  const missing = request.calls.filter((call) => !inBatch.has(call.toolCallId));
+  const positionOf = (call: ApprovalRequestCall) =>
+    request.calls.findIndex((candidate) => candidate.toolCallId === call.toolCallId);
+  await PendingDecisionStore.insert(
+    recordsFor(loopKey, batchId, request.type, missing, owner, positionOf),
+  );
+  const decided = new Map<string, ToolCallDecision>();
+  for (const [toolCallId, record] of inBatch) {
+    if (record.status === "pending") continue;
+    decided.set(
+      toolCallId,
+      recordDecision(record) ?? { decision: "deny", scope: "call", source: "turn_ended" },
+    );
+  }
+  logger.info(
+    `[ApprovalRegistry] Resumed batch ${batchId} of ${loopKey}: ${decided.size} decided, ${request.calls.length - decided.size} pending`,
+  );
+  return parkWaiter(loopKey, request, batchId, decided, owner);
+}
+
 export const ApprovalRegistry = {
   /**
    * Record a batch as pending and park it: the returned promise resolves
    * when every call in it is decided. Call BEFORE the cards go out — a
-   * decision can only land on a call that exists. A batch still open under
-   * the same loop key is superseded (its undecided calls are denied): one
-   * loop runs one tool batch at a time.
+   * decision can only land on a call that exists, and only the calls in
+   * `pendingToolCallIds` get a card. A batch still open under the same loop
+   * key is superseded (its undecided calls are denied): one loop runs one
+   * tool batch at a time.
+   *
+   * `resume`: the calls are a pass replayed after a restart
+   * (TurnResumeService) — the batch it opened before is picked up again.
    */
   async open(
     loopKey: string,
     request: ApprovalBatchRequest,
     owner: DecisionOwner = {},
-  ): Promise<{ decisions: Promise<Map<string, ToolCallDecision>> }> {
+    { resume = false }: { resume?: boolean } = {},
+  ): Promise<OpenedApprovalBatch> {
+    if (resume && request.calls.length > 0) {
+      const resumed = await resumeBatch(loopKey, request, owner);
+      if (resumed) return resumed;
+    }
     await lapse(loopKey, "superseded");
-    if (request.calls.length === 0) return { decisions: Promise.resolve(new Map()) };
+    if (request.calls.length === 0) {
+      return { decisions: Promise.resolve(new Map()), batchId: request.batchId, pendingToolCallIds: [] };
+    }
 
-    const createdAt = new Date().toISOString();
     await PendingDecisionStore.insert(
-      request.calls.map((call, position) => ({
-        ...owner,
-        id: pendingDecisionId(loopKey, request.batchId, call.toolCallId),
-        loopKey,
-        kind: request.type,
-        itemId: call.toolCallId,
-        batchId: request.batchId,
-        position,
-        status: "pending",
-        createdAt,
-        name: call.name,
-        args: call.args,
-        ...(call.tier !== undefined ? { tier: call.tier } : {}),
-        ...(call.tierLabel !== undefined ? { tierLabel: call.tierLabel } : {}),
-        argsSchema: call.argsSchema ?? null,
-        ...(call.preview ? { preview: call.preview } : {}),
-      })),
+      recordsFor(loopKey, request.batchId, request.type, request.calls, owner, (call) =>
+        request.calls.indexOf(call),
+      ),
     );
-
-    let resolve!: BatchWaiter["resolve"];
-    const decisions = new Promise<Map<string, ToolCallDecision>>((settle) => {
-      resolve = settle;
-    });
-    waiters.set(loopKey, {
-      loopKey,
-      type: request.type,
-      batchId: request.batchId,
-      order: request.calls.map((call) => call.toolCallId),
-      decisions: new Map(),
-      onDecided: request.onDecided,
-      resolve,
-      owner,
-    });
-    await ConversationRunState.park(locatorFor(loopKey, owner));
-    return { decisions };
+    return parkWaiter(loopKey, request, request.batchId, new Map(), owner);
   },
 
   /**
@@ -475,6 +577,8 @@ export const ApprovalRegistry = {
           tier: String(record.tier ?? ""),
           tierLabel: record.tierLabel ?? "",
         },
+        ...(record.requestedBy ? { requestedBy: record.requestedBy } : {}),
+        ...(record.reason ? { reason: record.reason } : {}),
       })),
     };
   },
@@ -499,6 +603,12 @@ export const ApprovalRegistry = {
   async retireOrphans(loopKey: string): Promise<PendingDecisionRecord[]> {
     if (waiters.has(loopKey)) return [];
     return lapse(loopKey, "superseded");
+  },
+
+  /** Test helper — a restart: every waiter is gone, the records stay. */
+  _dropWaiters(): void {
+    waiters.clear();
+    ConversationRunState._reset();
   },
 
   /** Test helper — forget every waiter and every in-memory record. */

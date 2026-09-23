@@ -94,5 +94,12 @@
     "declined": "The user declined this {{toolName}} call. It was not executed. Do not retry it as is; continue without it or ask the user how to proceed.",
     "declinedWithReason": "The user declined this {{toolName}} call. It was not executed. The user's reason: {{reason}}. Take the reason into account; do not retry the call as is.",
     "lapsed": "This {{toolName}} call was not decided before its turn moved on, so it was not executed. Do not assume it ran; continue without it or ask the user whether to try again."
+  },
+  "resume": {
+    "retryReason": "The server restarted while this {{toolName}} call was running. It may have partly run, and its result was lost. Run it again?",
+    "notRerun": "The server restarted while this {{toolName}} call was running, and it was not run again. It may have partly run: do not assume it did or did not take effect — check before relying on it, or ask the user.",
+    "interruptedTaskSummary": "[ASYNC TASK INTERRUPTED] Tool \"{{toolName}}\" (task {{taskId}}) was still running when the server restarted. It may have partly run; its result is unknown. It was not run again.",
+    "interruptedSubAgent": "Sub-agent {{agentId}} (\"{{description}}\") was still running when the server restarted. It stopped there; its work may be partial. resume_subagent continues it from its transcript.",
+    "interruptedSubAgentsSummary": "[SUB-AGENTS INTERRUPTED] The server restarted while {{count}} sub-agent(s) of this conversation were running or undelivered."
   }
 }

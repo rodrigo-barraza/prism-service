@@ -59,6 +59,9 @@ vi.mock("#src/services/AsyncTaskRegistry", () => ({
     cancelTask: (...arguments_: any[]) => mockCancelTask(...arguments_),
     getTask: (...arguments_: any[]) => mockGetTask(...arguments_),
     waitForTasks: (...arguments_: any[]) => mockWaitForTasks(...arguments_),
+    markDelivered: (taskState: { deliveredVia?: string }, via: string) => {
+      if (!taskState.deliveredVia) taskState.deliveredVia = via;
+    },
   },
 }));
 
