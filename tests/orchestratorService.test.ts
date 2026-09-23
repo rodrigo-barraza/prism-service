@@ -6,7 +6,6 @@ import { TOPOLOGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import SettingsService from "#src/services/SettingsService";
 import localModelQueue from "#src/services/LocalModelQueue";
 import { InstanceLoadBalancer } from "#src/services/orchestrator/InstanceLoadBalancer";
-import { existsSync } from "node:fs";
 
 let mockExistsSyncResult: boolean | undefined = undefined;
 
@@ -36,7 +35,6 @@ vi.mock("#src/services/AgenticLoopService", () => ({
 import AgenticLoopService from "#src/services/AgenticLoopService";
 import { runCleanupFunctions } from "#src/utils/CleanupRegistry";
 import { GitWorktreeHelper } from "#src/services/orchestrator/GitWorktreeHelper";
-import { SubAgentPersistenceService } from "#src/services/orchestrator/SubAgentPersistenceService";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
 
 // The tools-service diff contract with nothing changed (hoisted for vi.mock).
@@ -99,14 +97,6 @@ async function waitForMockCalls(mock: ReturnType<typeof vi.fn>, expectedCalls: n
 }
 
 let resolveDeferredPromise: ((value: any) => void) | undefined = undefined;
-
-function cleanAllConversations() {
-  OrchestratorService.cleanupConversation("session-id-456");
-  OrchestratorService.cleanupConversation("session-root");
-  OrchestratorService.cleanupConversation("root-conv");
-  OrchestratorService.cleanupConversation("custom-parent-conv-abc");
-  OrchestratorService.cleanupConversation("conv-id-789");
-}
 
 describe("OrchestratorService Spawning & Agent Types", () => {
   let orchestratorContext: OrchestratorContext;

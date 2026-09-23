@@ -19,8 +19,6 @@ import { describe, test, expect } from "vitest";
 import {
   PRISM_SERVICE_URL,
   consumeAgentSSE,
-  MULTI_AGENT_TIMEOUT_MILLISECONDS,
-  type AgentSSEResult,
   type SubAgentStatusEvent,
 } from "./helpers/agentTestHarness.ts";
 

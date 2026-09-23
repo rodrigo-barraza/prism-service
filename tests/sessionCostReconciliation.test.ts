@@ -339,14 +339,15 @@ describe("Session Cost Reconciliation", () => {
     let requests: any[] = [];
 
     beforeEach(async () => {
-      const request = (await import("supertest")).default;
       const { app } = await import("./setup.ts");
       const adminRouter = (await import("#src/routes/AdminRoutes")).default;
       const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
 
       try {
         app.use("/admin", adminRouter);
-      } catch (error) {}
+      } catch {
+        // mounting is best-effort; a failed mount shows up as a 404 in the requests below
+      }
 
       agentConversations = [
         {
@@ -385,7 +386,7 @@ describe("Session Cost Reconciliation", () => {
       const mockDb = {
         collection: (collectionName: string) => {
           return {
-            find: (queryFilter: any) => {
+            find: () => {
               let docs: any[] = [];
               if (collectionName === COLLECTIONS.AGENT_CONVERSATIONS) {
                 docs = agentConversations;
@@ -422,7 +423,7 @@ describe("Session Cost Reconciliation", () => {
               }
               return 0;
             },
-            aggregate: (pipeline: any[]) => {
+            aggregate: () => {
               return {
                 toArray: async () => {
                   return [
