@@ -280,6 +280,16 @@ export default class AutoApprovalEngine {
     const handle = this.permissionMode;
     return handle && typeof handle === "object" ? handle.cannotAsk : handle === "dontAsk";
   }
+
+  /**
+   * The persona pinned the run's mode (Persona.pinnedPermissionMode): full
+   * auto — the engine's own flag, a mid-turn "approve all", an explicit
+   * override — does not apply, so the mode and the policies decide alone.
+   */
+  private get modePinned(): boolean {
+    const handle = this.permissionMode;
+    return !!handle && typeof handle === "object" && handle.pinned === true;
+  }
   getTier(toolName: string): ApprovalTier {
     if (this.tierOverrides[toolName] !== undefined) {
       return this.tierOverrides[toolName];
@@ -395,6 +405,7 @@ export default class AutoApprovalEngine {
    *
    * `overrides.fullAuto` judges the call as if "approve all" were on — the
    * mid-turn switch (options.autoApprove) without rebuilding the engine.
+   * Under a mode a persona pinned, full auto does not apply at all.
    *
    * Every result names the layer (and rule) that decided, and the mode.
    */
@@ -406,6 +417,7 @@ export default class AutoApprovalEngine {
     const tierLabel = TIER_LABELS[tier] || "write";
     const mode = this.mode;
     const cannotAsk = this.cannotAsk;
+    const fullAutoApplies = fullAuto && !this.modePinned;
     const hookPermission = toolCall._hookPermission;
     const hookAsks = hookPermission?.decision === "ask";
     const hookAskReason = `hook_ask${hookPermission?.reason ? `: ${hookPermission.reason}` : ""}`;
@@ -516,7 +528,7 @@ export default class AutoApprovalEngine {
     if (decided && stamp) {
       switch (decided.decision) {
         case "ask":
-          if (!fullAuto || hookAsks) return ask({ ...stamp, ...(hookAsks && { alwaysAsks: true }) });
+          if (!fullAutoApplies || hookAsks) return ask({ ...stamp, ...(hookAsks && { alwaysAsks: true }) });
           break; // full auto answers "ask" with yes — unless a hook asked too
         case "allow":
           if (hookAsks) {
@@ -534,7 +546,7 @@ export default class AutoApprovalEngine {
     }
 
     // Full Auto mode: everything not denied runs
-    if (fullAuto) {
+    if (fullAutoApplies) {
       return { ...base, isApproved: true, reason: "full_auto", layer: "full_auto" };
     }
 
@@ -634,7 +646,7 @@ export default class AutoApprovalEngine {
       }
       // Mid-loop "approve all" flips options.autoApprove without rebuilding
       // this engine — honor it so already-permitted calls aren't blocked.
-      if (context?.options?.autoApprove && !this.fullAuto) {
+      if (context?.options?.autoApprove && !this.fullAuto && !this.modePinned) {
         const result = this.check(toolCall, { fullAuto: true });
         if (result.isDenied || !result.isApproved) return result; // a denial, or an ask no "approve all" answers
         return {

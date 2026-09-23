@@ -317,36 +317,56 @@ export function buildToolPolicy(
 /**
  * Returns tool policy guidance for dynamically-discovered tools.
  *
- * When tools are enabled mid-conversation via discover_and_enable_tools,
- * the system prompt has already been assembled without their policy
- * sections. This function evaluates the shared innate policy sections
- * against the newly-enabled tool names and returns any applicable
- * guidance text for injection into the <tool-update> addendum.
+ * When tools are enabled mid-conversation via discover_and_enable_tools
+ * (or pre-flight picks arrive as an activation), the system prompt has
+ * already been assembled without their policy sections. This function
+ * evaluates the shared innate policy sections — and the persona's own
+ * gated sections, when it exposes them (Persona.toolPolicySections) —
+ * against the newly-enabled tool names and returns any applicable guidance
+ * text for injection into the <tool-update> addendum. A persona section a
+ * tool that was already callable satisfied is in the system prompt; it is
+ * not repeated.
  */
 export function getToolPolicyAddendum(
   newlyEnabledToolNames: string[],
   locale = "en",
+  {
+    personaSections = [],
+    alreadyCallable = [],
+  }: {
+    personaSections?: ToolPolicySection[];
+    /** Tools callable before this activation. */
+    alreadyCallable?: Iterable<string>;
+  } = {},
 ): string {
   const policyOnlySections = [
     TASK_MANAGEMENT_POLICY_SECTION,
     PROACTIVE_MEMORY_POLICY_SECTION,
     AUDIO_TRACKER_POLICY_SECTION,
   ];
+  const callableBefore = [...alreadyCallable];
 
-  const newToolSet = new Set(newlyEnabledToolNames);
-
-  const matchingSections = policyOnlySections.filter((section) => {
-    if (!section.requires || section.requires.length === 0) return false;
-    return section.requires.some((requirement) => {
+  const matchesAny = (section: ToolPolicySection, toolNames: string[]) =>
+    (section.requires ?? []).some((requirement) => {
       if (requirement.endsWith("*")) {
         const prefix = requirement.slice(0, -1);
-        return newlyEnabledToolNames.some((toolName) =>
-          toolName.startsWith(prefix),
-        );
+        return toolNames.some((toolName) => toolName.startsWith(prefix));
       }
-      return newToolSet.has(requirement);
+      return toolNames.includes(requirement);
     });
-  });
+
+  const matchingSections = [
+    ...policyOnlySections.filter(
+      (section) =>
+        (section.requires?.length ?? 0) > 0 && matchesAny(section, newlyEnabledToolNames),
+    ),
+    ...personaSections.filter(
+      (section) =>
+        (section.requires?.length ?? 0) > 0 &&
+        matchesAny(section, newlyEnabledToolNames) &&
+        !matchesAny(section, callableBefore),
+    ),
+  ];
 
   if (matchingSections.length === 0) return "";
 

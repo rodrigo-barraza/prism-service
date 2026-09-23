@@ -354,6 +354,19 @@ describe("PermissionsRoutes", () => {
       expect(conversations[0].approvals.permissionMode).toBe("bypass");
     });
 
+    it("refuses to switch a turn whose agent pins its mode, and stores nothing", async () => {
+      conversations.push({ id: "conv-1", project: PROJECT, username: USERNAME });
+      process.env[BYPASS_OWNERS_ENV_VAR] = USERNAME;
+      const handle = new PermissionModeHandle("dontAsk", { source: "persona", pinned: true });
+      PermissionModeRegistry.register("conv-1", handle);
+
+      const refused = await put("/mode", { conversationId: "conv-1", mode: "bypass" }).expect(409);
+
+      expect(refused.body.error).toContain("pins its permission mode (dontAsk)");
+      expect(handle.mode).toBe("dontAsk");
+      expect(conversations[0].approvals).toBeUndefined();
+    });
+
     it("404s on an unknown conversation and 400s on an unknown mode", async () => {
       await put("/mode", { conversationId: "nope", mode: "plan" }).expect(404);
       await put("/mode", { conversationId: "nope", mode: "yolo" }).expect(400);
@@ -371,6 +384,18 @@ describe("PermissionsRoutes", () => {
       } finally {
         delete (SettingsService as any).update;
       }
+    });
+
+    it("the tester judges a pinned agent in its own mode, full auto off", async () => {
+      const response = await post("/rules/test", {
+        toolName: "get_ip_info",
+        agent: "LUPOS",
+        autoApprove: true,
+        permissionMode: "bypass",
+      }).expect(200);
+      expect(response.body).toMatchObject({ decision: "deny", layer: "mode", mode: "dontAsk" });
+      const listed = await post("/rules/test", { toolName: "mug_discord_gold", agent: "LUPOS" }).expect(200);
+      expect(listed.body).toMatchObject({ decision: "allow", layer: "agent_policy", mode: "dontAsk" });
     });
 
     it("the tester judges a call in a given mode", async () => {

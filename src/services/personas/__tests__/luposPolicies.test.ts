@@ -5,18 +5,31 @@ vi.mock("#src/utils/logger", () => ({
 }));
 
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
-import AutoApprovalEngine from "#src/services/AutoApprovalEngine";
-import PolicyEngine from "#src/services/PolicyEngine";
+import AutoApprovalEngine, { APPROVAL_TIERS } from "#src/services/AutoApprovalEngine";
+import PolicyEngine, { allow } from "#src/services/PolicyEngine";
 import { AGENT_IDS } from "#src/services/ToolTaxonomyConstants";
 import type { PermissionMode } from "#src/services/permissions/PermissionModes";
+import { PermissionModeHandle } from "#src/services/permissions/PermissionModeState";
+import { LUPOS_TOOL_POLICY_SECTIONS } from "#src/services/personas/LuposPersona";
 
-// A Discord reply runs under autoApprove for whoever pinged the wolf. The
-// tools below are already outside his resolved set; the persona's DENY
-// policies are the backstop if some future path hands him one anyway, so
-// they must hold exactly where nothing else asks: full auto, every mode.
+// A Discord reply acts for whoever pinged the wolf. The DENY tools below are
+// already outside his resolved set; the persona's DENY policies are the
+// backstop if some future path hands him one anyway, so they must hold
+// exactly where nothing else asks: full auto, every mode. Everything else
+// he may run is an APPROVE rule, and his turns are pinned to dontAsk.
 
 const lupos = AgentPersonaRegistry.get(AGENT_IDS.LUPOS);
 const policies = lupos?.policies ?? [];
+const deniedNames = policies.filter((policy) => policy.decision === "DENY").map((policy) => policy.tool);
+const allowedNames = policies.filter((policy) => policy.decision === "APPROVE").map((policy) => policy.tool);
+
+/** The handle a LUPOS turn runs under (AgenticLoopService.openPermissionMode). */
+const pinnedHandle = () =>
+  new PermissionModeHandle("dontAsk", { source: "persona", pinned: true });
+/** His engine as the harness builds it — a stale autoApprove included. */
+const luposEngine = (extraPolicies = policies) =>
+  new AutoApprovalEngine({ fullAuto: true, policies: extraPolicies, permissionMode: pinnedHandle() });
+const call = (name: string, args: Record<string, unknown> = {}) => ({ id: `call-${name}`, name, args });
 
 const MUST_NEVER_RUN = [
   // shell / command execution
@@ -92,12 +105,13 @@ const MODES: PermissionMode[] = ["default", "acceptEdits", "auto", "bypass"];
 describe("LUPOS tool policies", () => {
   it("are served by the persona registry, not only declared on the module", () => {
     expect(policies.length).toBeGreaterThan(0);
-    expect(policies.every((policy) => policy.decision === "DENY")).toBe(true);
+    expect(policies.every((policy) => ["DENY", "APPROVE"].includes(policy.decision))).toBe(true);
+    // No tool is on both lists: an APPROVE never exists to be overruled.
+    expect(allowedNames.filter((name) => deniedNames.includes(name))).toEqual([]);
   });
 
   it("deny every Discord-unsafe tool by name", () => {
-    const denied = policies.map((policy) => policy.tool).sort();
-    expect(denied).toEqual([...MUST_NEVER_RUN].sort());
+    expect([...deniedNames].sort()).toEqual([...MUST_NEVER_RUN].sort());
     for (const toolName of MUST_NEVER_RUN) {
       expect(PolicyEngine.isDenied(policies, toolName, {})).toBe(true);
     }
@@ -130,5 +144,98 @@ describe("LUPOS tool policies", () => {
       expect(result.isDenied, toolName).toBeFalsy();
       expect(result.isApproved, toolName).toBe(true);
     }
+  });
+});
+
+describe("LUPOS least privilege — pinned dontAsk and an allow list", () => {
+  it("pins his turns to dontAsk", () => {
+    expect(lupos?.pinnedPermissionMode).toBe("dontAsk");
+  });
+
+  it("runs every allow-listed tool without asking, whatever its tier", () => {
+    const engine = luposEngine();
+    const tiers = new Set(allowedNames.map((name) => engine.getTier(name)));
+    // The list is there for tools the tier would ask about: WRITE and DANGER.
+    expect([...tiers].sort()).toEqual([APPROVAL_TIERS.WRITE, APPROVAL_TIERS.DANGER]);
+    for (const toolName of allowedNames) {
+      expect(engine.check(call(toolName)), toolName).toMatchObject({
+        isApproved: true,
+        layer: "agent_policy",
+        mode: "dontAsk",
+      });
+    }
+  });
+
+  it("covers what his own prompt tells him to call", () => {
+    // enabledByDefaultTools and every tool a tool-policy section names: an
+    // instruction he cannot follow would only earn a refusal.
+    const engine = luposEngine();
+    const named = new Set([
+      ...(lupos?.enabledByDefaultTools ?? []),
+      ...LUPOS_TOOL_POLICY_SECTIONS.flatMap((section) => section.requires ?? []),
+    ]);
+    const refused = [...named].filter((toolName) => !engine.check(call(toolName)).isApproved);
+    expect(refused).toEqual([]);
+  });
+
+  it("refuses a WRITE tool of his universe that is not listed — with the don't-ask message, no card", () => {
+    const engine = luposEngine();
+    // get_ip_info sits in his Utilities domain; with no argument it looks up
+    // the server's own address.
+    const result = engine.check(call("get_ip_info"));
+    expect(engine.getTier("get_ip_info")).toBe(APPROVAL_TIERS.WRITE);
+    expect(result).toMatchObject({ isApproved: false, isDenied: true, deniedBy: "mode", mode: "dontAsk" });
+    expect(result.reason).toContain(`[Don't-ask mode] "get_ip_info" needs approval`);
+  });
+
+  it("refuses a DANGER tool he has no rule for (an MCP tool, a future sandbox)", () => {
+    const engine = luposEngine();
+    for (const toolName of ["mcp__github__create_issue", "execute_ruby"]) {
+      const result = engine.check(call(toolName));
+      expect(result, toolName).toMatchObject({ isApproved: false, isDenied: true, deniedBy: "mode" });
+    }
+    expect(engine.getTier("mcp__github__create_issue")).toBe(APPROVAL_TIERS.DANGER);
+  });
+
+  it("never leaves a call waiting on approval — every call is run or refused", () => {
+    const engine = luposEngine();
+    const calls = [
+      ...allowedNames,
+      ...deniedNames,
+      "get_ip_info",
+      "write_file",
+      "execute_shell",
+      "mcp__github__create_issue",
+      "ask_user",
+      "exit_plan_mode",
+      "search_web",
+      "some_tool_added_next_month",
+    ].map((name) => call(name));
+    const { needsApproval, autoApproved, denied } = engine.checkBatch(calls);
+    expect(needsApproval).toEqual([]);
+    expect(autoApproved.length + denied.length).toBe(calls.length);
+  });
+
+  it("keeps a DENY final over an APPROVE for the same tool", () => {
+    // A future edit that allow-lists a denied tool changes nothing.
+    const engine = luposEngine([...policies, allow("execute_shell"), allow("send_email")]);
+    for (const toolName of ["execute_shell", "send_email"]) {
+      expect(engine.check(call(toolName)), toolName).toMatchObject({
+        isApproved: false,
+        isDenied: true,
+        deniedBy: "rule",
+        layer: "agent_policy",
+      });
+    }
+  });
+
+  it("ignores full auto and a mid-turn approve-all under the pinned mode", async () => {
+    const engine = luposEngine();
+    const hook = engine.createHook();
+    const result = await hook(call("get_ip_info"), { options: { autoApprove: true } } as never);
+    expect(result).toMatchObject({ isApproved: false, isDenied: true, deniedBy: "mode" });
+    // The same engine without the pin: full auto would have run it.
+    const unpinned = new AutoApprovalEngine({ fullAuto: true, policies, permissionMode: "dontAsk" });
+    expect(unpinned.check(call("get_ip_info"))).toMatchObject({ isApproved: true, layer: "full_auto" });
   });
 });

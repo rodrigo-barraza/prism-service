@@ -82,6 +82,7 @@ import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import AgenticToolResolver from "#src/services/AgenticToolResolver";
 import { ToolDocFormatter } from "#src/services/system-prompt/ToolDocFormatter";
 import { getToolPolicyAddendum } from "#src/services/personas/utils";
+import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type AgentHooks from "#src/services/AgentHooks";
@@ -321,6 +322,7 @@ export default class BaseAgenticHarness {
       );
     }
     const removedNames = new Set(diff.removed);
+    const callableBefore = this.tools.finalTools.map((tool) => tool.name);
     this.tools = {
       ...this.tools,
       finalTools: [
@@ -341,7 +343,11 @@ export default class BaseAgenticHarness {
 
     if (currentMessages) {
       currentMessages.push(
-        this.buildToolUpdateMessage(diff, sourceToolCallIdOf(sourceToolCalls)),
+        this.buildToolUpdateMessage(
+          diff,
+          sourceToolCallIdOf(sourceToolCalls),
+          callableBefore,
+        ),
       );
     }
 
@@ -358,6 +364,7 @@ export default class BaseAgenticHarness {
   private buildToolUpdateMessage(
     diff: ToolSetDiff,
     sourceToolCallId: string | null,
+    callableBefore: string[],
   ): ConversationMessage {
     const activeLocale =
       (this.context.options?.locale as string | undefined) ||
@@ -393,7 +400,15 @@ export default class BaseAgenticHarness {
           addendumDocumentation,
         );
       }
-      const policyAddendum = getToolPolicyAddendum(addedNames, activeLocale);
+      // The persona's own sections these tools unlock (its system prompt was
+      // assembled before they were callable).
+      const personaSections = this.context.agent
+        ? AgentPersonaRegistry.get(this.context.agent)?.toolPolicySections
+        : undefined;
+      const policyAddendum = getToolPolicyAddendum(addedNames, activeLocale, {
+        personaSections,
+        alreadyCallable: callableBefore,
+      });
       if (policyAddendum) {
         sections.push(
           PromptLocaleService.get(

@@ -94,6 +94,7 @@ import {
   stampResumedCalls,
 } from "./lifecycle/ResumedPass.ts";
 import { recordPassInFlight } from "./lifecycle/TurnRunRecorder.ts";
+import { endTurnAfterToolsOf, endsTurnWithReply } from "./lifecycle/EndTurnAfterTools.ts";
 import SemanticStallDetector from "./lifecycle/SemanticStallDetector.ts";
 
 import PromptLocaleService from "#src/services/PromptLocaleService";
@@ -299,6 +300,9 @@ export default class ReActHarness extends BaseAgenticHarness {
 
     // ── Semantic stall detector ──────────────────────────────
     const semanticStallDetector = new SemanticStallDetector();
+
+    // Tools whose result the model never needs to read (Persona.endTurnAfterTools).
+    const fireAndForgetTools = endTurnAfterToolsOf(agent);
 
     // ── Initialize lifecycle hooks ──────────────────────────
     const standardHooks = createStandardHooks({
@@ -512,6 +516,12 @@ export default class ReActHarness extends BaseAgenticHarness {
           // without this, the assistant message with tool results can fall
           // outside the persistence slice and tool results are lost.
           state.originalMessageCount = currentMessages.length;
+
+          // Pre-flight picks the loop routes through activation
+          // (Persona.activatePreflightTools): the system prompt above was
+          // assembled from the declared tools alone, and the picks arrive
+          // here, after the user's message, as one tool-update message.
+          this.checkAndApplyToolSetChanges(currentMessages);
         }
 
         // ── Build pass options ─────────────────────────────────
@@ -938,9 +948,27 @@ export default class ReActHarness extends BaseAgenticHarness {
             }
           }
 
+          // The reply came with nothing but fire-and-forget calls
+          // (Persona.endTurnAfterTools, EndTurnAfterTools.ts): once they have
+          // run, the turn ends with that reply instead of another model call —
+          // unless input is waiting for an answer in this same turn.
+          const endsWithReply =
+            !isPlanRejected &&
+            !state.planModeActive &&
+            !signal?.aborted &&
+            endsTurnWithReply({
+              calls: bridge.callable,
+              rejectedCount: bridge.rejected.length,
+              replyText: pass.finalStreamedText,
+              fireAndForget: fireAndForgetTools,
+            }) &&
+            !hasPendingTurnInput(context);
+
           const assistantMessage: ConversationMessage = {
             role: "assistant",
-            content: pass.finalStreamedText || "",
+            // Ending here, the reply is the turn's final message (finalize
+            // appends it and records it as the turn's text): not kept twice.
+            content: endsWithReply ? "" : pass.finalStreamedText || "",
             thinking: pass.streamedThinking.trim(),
             thinkingSignature: pass.thinkingSignature,
             ...computePassPhaseDurations(pass),
@@ -962,6 +990,33 @@ export default class ReActHarness extends BaseAgenticHarness {
               stc.result = res.result;
               stc.durationMilliseconds = res.durationMilliseconds;
             }
+          }
+
+          if (endsWithReply) {
+            // Where the turn would end, Stop hooks have their say, as after
+            // a text answer.
+            const stopOutcome = await runStopStage(
+              context,
+              hooks,
+              state,
+              pass.finalStreamedText,
+              currentMessages,
+            );
+            if (!stopOutcome.continueWith || signal?.aborted) {
+              logger.info(
+                `[ReActHarness] ${pass.pendingToolCalls.map((toolCall) => toolCall.name).join(", ")} came with the reply — ` +
+                  `the turn ends on iteration ${state.iterations} without another model call`,
+              );
+              state.finalStreamedText = pass.finalStreamedText;
+              this.logIteration(pass, currentMessages);
+              this.deviationEngine.recordCompletedIteration(pass.pendingToolCalls);
+              hasCleanTextBreak = true;
+              break;
+            }
+            // A Stop hook keeps the turn going: the reply goes back into the
+            // history as the model's own words, then the hook's reason.
+            currentMessages.push({ role: "assistant", content: pass.finalStreamedText });
+            currentMessages.push(buildStopContinuationMessage(stopOutcome.continueWith));
           }
 
           // A rejected (or timed-out) plan ends the turn, but the turn still
