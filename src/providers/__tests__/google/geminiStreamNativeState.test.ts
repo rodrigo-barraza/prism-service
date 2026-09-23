@@ -152,3 +152,67 @@ describe("Gemini stream — Google Search grounding", () => {
     expect(ofType(chunks, "citations")).toEqual([]);
   });
 });
+
+describe("Gemini — Google Search with function calling", () => {
+  const searchCall = {
+    toolCall: { toolType: "GOOGLE_SEARCH_WEB", args: { queries: ["latest F1 winner"] } },
+    thoughtSignature: "sig-search-call",
+  };
+  const searchResult = {
+    toolResponse: { toolType: "GOOGLE_SEARCH_WEB", response: { search_suggestions: "<style>…</style>" } },
+    thoughtSignature: "sig-search-result",
+  };
+
+  it("asks for server-side tool invocations when built-in tools and functions go together (else a 400)", async () => {
+    streamMock.mockResolvedValue(streamOf([partsChunk([{ text: "hi" }])]));
+    await collect(
+      googleProvider.generateTextStream([{ role: "user", content: "go" }], "gemini-3.7-flash", {
+        webSearch: true,
+        tools: [{ name: "get_weather", parameters: { type: "object", properties: {} } }],
+      }),
+    );
+    expect(streamMock.mock.calls[0][0].config.toolConfig).toMatchObject({
+      includeServerSideToolInvocations: true,
+    });
+  });
+
+  it("does not ask for it with only built-in tools, or only functions", async () => {
+    streamMock.mockResolvedValue(streamOf([partsChunk([{ text: "hi" }])]));
+    await collect(
+      googleProvider.generateTextStream([{ role: "user", content: "go" }], "gemini-3.8-flash", { webSearch: true }),
+    );
+    streamMock.mockResolvedValue(streamOf([partsChunk([{ text: "hi" }])]));
+    await collect(
+      googleProvider.generateTextStream([{ role: "user", content: "go" }], "gemini-3.8-flash", {
+        tools: [{ name: "get_weather", parameters: { type: "object", properties: {} } }],
+      }),
+    );
+    for (const call of streamMock.mock.calls) {
+      expect(call[0].config.toolConfig?.includeServerSideToolInvocations).toBeUndefined();
+    }
+  });
+
+  it("records the signed server-side search call and result, in order", async () => {
+    streamMock.mockResolvedValue(
+      streamOf([
+        partsChunk([searchCall]),
+        partsChunk([searchResult]),
+        partsChunk([{ text: "Antonelli won." }]),
+        partsChunk([{ text: "", thoughtSignature: "sig-trailing" }]),
+      ]),
+    );
+    const chunks = await collect(
+      googleProvider.generateTextStream([{ role: "user", content: "F1?" }], "gemini-3.8-flash", {
+        webSearch: true,
+        tools: [{ name: "get_weather", parameters: { type: "object", properties: {} } }],
+      }),
+    );
+    expect(ofType(chunks, "providerState").find((chunk) => chunk.geminiParts)?.geminiParts).toEqual([
+      { toolCall: searchCall.toolCall, thoughtSignature: "sig-search-call" },
+      { toolResponse: searchResult.toolResponse, thoughtSignature: "sig-search-result" },
+      { text: "Antonelli won." },
+      { text: "", thoughtSignature: "sig-trailing" },
+    ]);
+  });
+});
+

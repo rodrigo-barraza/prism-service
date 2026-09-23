@@ -21,7 +21,7 @@ import {
   GEMINI_DUMMY_THOUGHT_SIGNATURE,
   type ConversationMessage,
 } from "#src/providers/google";
-import { MODELS, getModelByName } from "#src/config";
+import { getModelByName } from "#src/config";
 import type { ProviderOptions } from "#src/types/ProviderTypes";
 
 type CatalogModel = Record<string, unknown> & { name: string };
@@ -151,6 +151,28 @@ describe("convertMessages — thought signatures in order", () => {
       { functionCall: { name: "get_weather", args: { city: "Milan" } } },
       { text: " Done.", thoughtSignature: "sig-text" },
       { text: "", thoughtSignature: "sig-trailing" },
+    ]);
+  });
+
+  it("replays a server-side search call and result with their signatures", async () => {
+    const toolCall = { toolType: "GOOGLE_SEARCH_WEB", args: { queries: ["f1"] } };
+    const toolResponse = { toolType: "GOOGLE_SEARCH_WEB", response: { search_suggestions: "x" } };
+    const contents = await convertMessages([
+      { role: "user", content: "F1?" },
+      {
+        role: "assistant",
+        content: "Antonelli won.",
+        geminiParts: [
+          { toolCall, thoughtSignature: "sig-call" },
+          { toolResponse, thoughtSignature: "sig-result" },
+          { text: "Antonelli won." },
+        ],
+      },
+    ]);
+    expect(contents.find((content) => content.role === "model")!.parts).toEqual([
+      { toolCall, thoughtSignature: "sig-call" },
+      { toolResponse, thoughtSignature: "sig-result" },
+      { text: "Antonelli won." },
     ]);
   });
 

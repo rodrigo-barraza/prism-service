@@ -128,6 +128,29 @@ function validatesThoughtSignatures(model: string | undefined): boolean {
 }
 
 /**
+ * Built-in tools (Google Search, code execution, URL context) next to
+ * function declarations need `includeServerSideToolInvocations` on Gemini 3
+ * — without it the request is a 400 ("Please enable tool_config.
+ * include_server_side_tool_invocations to use Built-in tools with Function
+ * calling", measured on 3.7 and 3.8 Flash). The response then carries the
+ * server's signed toolCall / toolResponse parts, which GeminiPartsRecorder
+ * keeps for the replay.
+ */
+function withServerSideToolInvocations(config: GenerateContentConfig, model: string): void {
+  if (!validatesThoughtSignatures(model)) return;
+  const tools = (config.tools ?? []) as Array<Record<string, unknown>>;
+  const builtIn = tools.some(
+    (tool) => "googleSearch" in tool || "codeExecution" in tool || "urlContext" in tool,
+  );
+  const functions = tools.some(
+    (tool) => Array.isArray(tool.functionDeclarations) && tool.functionDeclarations.length > 0,
+  );
+  if (builtIn && functions) {
+    config.toolConfig = { ...(config.toolConfig ?? {}), includeServerSideToolInvocations: true };
+  }
+}
+
+/**
  * Records a Gemini response's parts, in order, for replay (see
  * GeminiReplayPart). Streamed text deltas merge into one run until a
  * signature or another kind of part closes it; a thought summary is kept
@@ -145,6 +168,19 @@ export class GeminiPartsRecorder {
     if (signature) this.signed = true;
     if (part.functionCall) {
       this.recorded.push({ functionCall: this.callCount++, ...signatureField });
+      return;
+    }
+    // A built-in tool the server ran (Google Search with function calling):
+    // its call and result are signed parts of the model turn, replayed as is.
+    const serverTool = part as { toolCall?: unknown; toolResponse?: unknown };
+    if (serverTool.toolCall !== undefined) {
+      this.signed = true;
+      this.recorded.push({ toolCall: serverTool.toolCall, ...signatureField });
+      return;
+    }
+    if (serverTool.toolResponse !== undefined) {
+      this.signed = true;
+      this.recorded.push({ toolResponse: serverTool.toolResponse, ...signatureField });
       return;
     }
     if (part.thought) {
@@ -607,7 +643,13 @@ function convertModelParts(
 
   const recorded = item.geminiParts ?? [];
   const recordedText = recorded
-    .filter((part) => !part.thought && part.functionCall === undefined)
+    .filter(
+      (part) =>
+        !part.thought &&
+        part.functionCall === undefined &&
+        part.toolCall === undefined &&
+        part.toolResponse === undefined,
+    )
     .map((part) => part.text ?? "")
     .join("");
   const replayable =
@@ -623,6 +665,14 @@ function convertModelParts(
       if (recordedPart.functionCall !== undefined) {
         const part = callPart(recordedPart.functionCall, recordedPart.thoughtSignature);
         if (part) parts.push(part);
+        continue;
+      }
+      if (recordedPart.toolCall !== undefined || recordedPart.toolResponse !== undefined) {
+        parts.push({
+          ...(recordedPart.toolCall !== undefined ? { toolCall: recordedPart.toolCall } : {}),
+          ...(recordedPart.toolResponse !== undefined ? { toolResponse: recordedPart.toolResponse } : {}),
+          ...(recordedPart.thoughtSignature ? { thoughtSignature: recordedPart.thoughtSignature } : {}),
+        } as Part);
         continue;
       }
       parts.push({
@@ -855,6 +905,7 @@ const googleProvider = {
       if (customTools) {
         config.tools = [...(config.tools || []), ...customTools];
       }
+      withServerSideToolInvocations(config, model);
 
       // For models that output images, set responseModalities explicitly.
       // These models REQUIRE ["TEXT", "IMAGE"] — ["TEXT"] alone returns 0 tokens.
@@ -1006,6 +1057,7 @@ const googleProvider = {
           : ["TEXT", "IMAGE"];
       }
 
+      withServerSideToolInvocations(config, model);
       const streamConfig: GenerateContentConfig = { ...config };
       if (options.signal) {
         streamConfig.httpOptions = { timeout: 0 };

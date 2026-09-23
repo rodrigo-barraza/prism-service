@@ -319,6 +319,9 @@ export interface GeminiReplayPart {
   text?: string;
   thought?: boolean;
   functionCall?: number;
+  /** A server-side (built-in) tool call or its result, verbatim (Google Search). */
+  toolCall?: unknown;
+  toolResponse?: unknown;
   thoughtSignature?: string;
 }
 
