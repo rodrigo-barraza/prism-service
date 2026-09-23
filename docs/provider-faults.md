@@ -85,8 +85,9 @@ tested in `src/providers/__tests__/lmStudioProvider.test.ts`, not in the
 suite. An in-stream `error` event there is shown as text on purpose.
 
 The OpenAI Responses **WebSocket** transport (GPT-6 turns with native
-steering) is not HTTP and is not in the suite; it falls back to HTTP when the
-socket cannot connect.
+steering) goes through the same stream loop — its terminal-event check
+included — but is not HTTP, so it is not in the suite; a socket that cannot
+connect falls back to HTTP.
 
 ## Adding an adapter or a fault
 
