@@ -370,6 +370,8 @@ export interface PassState {
   providerResponseId?: string;
   /** OpenAI Responses API reasoning effort this pass ran at (configuration_update models). */
   responsesEffort?: string;
+  /** Mid-turn input the provider applied natively during this pass (OpenAI response.steer). */
+  nativeTurnInput?: ConversationMessage[];
   /** Prompt-cache telemetry the adapter reported for this pass's request. */
   requestTelemetry?: RequestTelemetryChunk;
 }
@@ -460,6 +462,8 @@ export interface StreamChunk {
   phase?: ResponsesPhase;
   reasoningItems?: ResponsesReasoningItem[];
   responsesEffort?: string;
+  // Native steering applied (type: "turnInputApplied")
+  inputIds?: string[];
   // Prompt-cache telemetry (type: "requestTelemetry")
   prefixHashes?: RequestTelemetryChunk["prefixHashes"];
   cacheDiagnostics?: RequestTelemetryChunk["cacheDiagnostics"];

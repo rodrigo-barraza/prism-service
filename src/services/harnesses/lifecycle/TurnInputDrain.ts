@@ -48,7 +48,13 @@ import type {
 /** Status acknowledging an async hook's context reached the model. */
 export const HOOK_CONTEXT_APPLIED_STATUS = "hook_context_applied";
 
-export type TurnInputBoundary = "iteration_start" | "after_tools" | "before_end" | "turn_end";
+export type TurnInputBoundary =
+  | "iteration_start"
+  | "after_tools"
+  | "before_end"
+  | "turn_end"
+  // Applied by the provider mid-stream (OpenAI `response.steer`).
+  | "native_steer";
 
 export function buildTurnInputMessage(entry: TurnInputEntry): ConversationMessage {
   if (entry.kind === "hook_context") {
@@ -121,42 +127,94 @@ export function drainTurnInput(
 
   for (const entry of entries) {
     currentMessages.push(buildTurnInputMessage(entry));
-    if (entry.kind === "hook_context") {
-      context.emit({
-        type: SERVER_SENT_EVENT_TYPES.STATUS,
-        message: HOOK_CONTEXT_APPLIED_STATUS,
-        inputId: entry.id,
-        boundary,
-        iteration: state.iterations,
-        ...(entry.meta || {}),
-      });
-      continue;
-    }
-    state.turnInputApplied++;
-    // The event carries the entry so viewers (and the driving client, which
-    // rendered an optimistic bubble by id) can show it in the transcript.
-    context.emit({
-      type: TURN_INPUT.EVENT_TYPE,
-      id: entry.id,
-      kind: entry.kind,
-      content: displayTextOf(entry),
-      ...(entry.images && entry.images.length > 0 ? { images: entry.images } : {}),
-      boundary,
-      iteration: state.iterations,
-    });
-    context.emit({
-      type: SERVER_SENT_EVENT_TYPES.STATUS,
-      message: TURN_INPUT.STATUS_APPLIED,
-      inputId: entry.id,
-      kind: entry.kind,
-      boundary,
-      iteration: state.iterations,
-    });
+    acknowledgeTurnInput(entry, state, context, boundary);
   }
   logger.info(
     `[TurnInputDrain] Applied ${entries.length} entr${entries.length === 1 ? "y" : "ies"} at ${boundary} (iteration ${state.iterations}) for ${conversationId}`,
   );
   return entries.length;
+}
+
+/** The events a drained (or natively applied) entry is acknowledged with. */
+function acknowledgeTurnInput(
+  entry: TurnInputEntry,
+  state: AgenticLoopState,
+  context: AgenticContext,
+  boundary: TurnInputBoundary,
+): void {
+  if (entry.kind === "hook_context") {
+    context.emit({
+      type: SERVER_SENT_EVENT_TYPES.STATUS,
+      message: HOOK_CONTEXT_APPLIED_STATUS,
+      inputId: entry.id,
+      boundary,
+      iteration: state.iterations,
+      ...(entry.meta || {}),
+    });
+    return;
+  }
+  state.turnInputApplied++;
+  // The event carries the entry so viewers (and the driving client, which
+  // rendered an optimistic bubble by id) can show it in the transcript.
+  context.emit({
+    type: TURN_INPUT.EVENT_TYPE,
+    id: entry.id,
+    kind: entry.kind,
+    content: displayTextOf(entry),
+    ...(entry.images && entry.images.length > 0 ? { images: entry.images } : {}),
+    boundary,
+    iteration: state.iterations,
+  });
+  context.emit({
+    type: SERVER_SENT_EVENT_TYPES.STATUS,
+    message: TURN_INPUT.STATUS_APPLIED,
+    inputId: entry.id,
+    kind: entry.kind,
+    boundary,
+    iteration: state.iterations,
+  });
+}
+
+/**
+ * Inputs the provider applied natively mid-stream (OpenAI `response.steer`
+ * — the continuation now streaming carries them): take them out of the
+ * mailbox, acknowledge them like a drain (`turn_input` + applied status,
+ * boundary `native_steer`), and return their transcript messages. The model
+ * already has them; recordNativeTurnInput puts them in the transcript and
+ * nothing injects them again.
+ */
+export function takeNativeTurnInput(
+  inputIds: string[],
+  state: AgenticLoopState,
+  context: AgenticContext,
+): ConversationMessage[] {
+  const loopKey = resolveLoopKey(context);
+  if (!loopKey || inputIds.length === 0) return [];
+  const entries = TurnInputMailbox.take(loopKey, inputIds);
+  for (const entry of entries) acknowledgeTurnInput(entry, state, context, "native_steer");
+  if (entries.length > 0) {
+    logger.info(
+      `[TurnInputDrain] ${entries.length} input(s) applied natively (iteration ${state.iterations}) for ${loopKey}`,
+    );
+  }
+  return entries.map((entry) => ({
+    ...buildTurnInputMessage(entry),
+    _nativeSteer: true,
+  }));
+}
+
+/**
+ * Record a pass's natively applied inputs in the transcript — BEFORE the
+ * assistant message the pass will produce, since that output already acted
+ * on them. Called right after the stream is consumed.
+ */
+export function recordNativeTurnInput(
+  currentMessages: ConversationMessage[],
+  pass: { nativeTurnInput?: ConversationMessage[] },
+): void {
+  if (!pass.nativeTurnInput?.length) return;
+  currentMessages.push(...pass.nativeTurnInput);
+  pass.nativeTurnInput = undefined;
 }
 
 /**

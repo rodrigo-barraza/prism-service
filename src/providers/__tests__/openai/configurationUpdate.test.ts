@@ -261,6 +261,28 @@ describe("configuration_update on the wire (gpt-6-luna)", () => {
     ).toBe(false);
   });
 
+  it("thinking switched off is effort none on Sol/Luna, and no effort on Astra", async () => {
+    createMock.mockReturnValue(streamResponse("resp_1", "hi"));
+    const luna = await inputOf(
+      openaiProvider.generateTextStream([{ role: "user", content: "hi" }], MODEL, {
+        thinkingEnabled: false,
+        temperature: 0.3,
+      }),
+    );
+    expect(luna.payload.reasoning?.effort).toBe("none");
+    expect(luna.payload.temperature).toBe(0.3);
+
+    createMock.mockReturnValue(streamResponse("resp_2", "hi"));
+    const astra = await inputOf(
+      openaiProvider.generateTextStream([{ role: "user", content: "hi" }], "gpt-6-astra", {
+        thinkingEnabled: false,
+        temperature: 0.3,
+      }),
+    );
+    expect(astra.payload.reasoning?.effort).toBeUndefined();
+    expect(astra.payload.temperature).toBeUndefined();
+  });
+
   it("gates sampling on the effort in effect, not the top-level one", async () => {
     // Top-level none + update high: temperature is a 400 (measured live).
     createMock.mockReturnValue(streamResponse("resp_2", "ok"));

@@ -633,9 +633,10 @@ const MODELS = {
   // developers.openai.com/api/docs/models/gpt-6-sol and …/gpt-6-luna, and
   // live on the API: effort none…max (default medium), async tools,
   // configuration_update and WebSocket steering all accepted. Unlike Astra
-  // they take effort "none" — the only effort at which temperature/top_p
-  // are accepted, and the only one at which Chat Completions allows
-  // function calling, which is why both route through Responses.
+  // they take effort "none" (canDisableThinking) — the only effort at which
+  // temperature/top_p are accepted, and the only one at which Chat
+  // Completions allows function calling, which is why both route through
+  // Responses.
   GPT_6_SOL: {
     description:
       "OpenAI's GPT-6 Sol (2026-09-22): GPT-6 reasoning at mid-tier pricing, with async tool calling, mid-turn steering and mid-conversation effort updates for agentic work.",
@@ -668,7 +669,9 @@ const MODELS = {
     mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
     streaming: true,
     thinking: true,
-    thinkingLevels: ["none", "low", "medium", "high", "xhigh", "max"],
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    // Effort "none" (thinking off) — sent when thinking is disabled.
+    canDisableThinking: true,
     verbosity: true,
     reasoningSummary: true,
     responsesAPI: true,
@@ -715,7 +718,9 @@ const MODELS = {
     mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
     streaming: true,
     thinking: true,
-    thinkingLevels: ["none", "low", "medium", "high", "xhigh", "max"],
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    // Effort "none" (thinking off) — sent when thinking is disabled.
+    canDisableThinking: true,
     verbosity: true,
     reasoningSummary: true,
     responsesAPI: true,
