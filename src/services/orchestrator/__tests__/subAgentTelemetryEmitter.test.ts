@@ -378,7 +378,8 @@ describe("SubAgentTelemetryEmitter", () => {
     it("forwards the sub-agent's card to the parent, tagged with the conversation its decision goes to", () => {
       const emitFunction = createEmitter().createEmitFunction();
 
-      emitFunction(card);
+      // A copy: the sub-agent's own broadcast stamps its seq on the event.
+      emitFunction({ ...card });
 
       expect(parentEmitMock).toHaveBeenCalledWith({
         ...card,
@@ -486,7 +487,9 @@ describe("SubAgentTelemetryEmitter", () => {
         outputTokens: 50,
       };
 
-      emitFunction(grandchildEvent);
+      // A copy: the sub-agent's own broadcast stamps its seq on the event,
+      // which the parent stream must not receive.
+      emitFunction({ ...grandchildEvent });
 
       const forwardedEvent = parentEmitMock.mock.calls.find(
         (call: unknown[]) =>
