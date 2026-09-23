@@ -26,11 +26,12 @@ import type { SseEvent } from "#src/types/SseTypes";
  *
  * IMPORTANT — wrap-exactly-once invariant: the request layers
  * (handleSseRequest / handleJsonRequest / the WebSocket chat handler) wrap
- * with the REQUEST's conversationId, which only exists when the caller sent
- * one. When the id is minted server-side (new conversations, API callers
- * like lupos that never send an id), handleConversation / handleAgent wrap
- * with the resolved id instead. Exactly one of the two wraps is ever active
- * for a given request — wrapping both layers would double-deliver.
+ * with the REQUEST's conversationId, or with the `serverConversationId`
+ * /agent mints for a new conversation. When neither exists (a new /chat
+ * conversation, a workflow node calling handleAgent directly),
+ * handleConversation / handleAgent wrap with the resolved id instead.
+ * Exactly one of the two wraps is ever active for a given request —
+ * wrapping both layers would double-deliver.
  */
 
 // ─── Live turn buffer ─────────────────────────────────────────

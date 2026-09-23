@@ -891,12 +891,12 @@ export async function handleAgent(
       : null;
   const conversationId = incomingConversationId || serverConversationId || crypto.randomUUID();
   // The request layer binds the direct-viewer broadcast to the REQUEST's
-  // conversationId — undefined when the id is minted server-side (every
-  // lupos turn, any new conversation). Rebind here with the resolved id or
-  // viewers (/admin/chat, second tabs) receive nothing; when the request
-  // DID carry an id the request layer already broadcasts, and wrapping
-  // again would double-deliver.
-  if (!incomingConversationId) {
+  // conversationId, or to the `serverConversationId` /agent minted for a
+  // new conversation. Only a caller that brought neither (a workflow node
+  // calling handleAgent directly) arrives unwrapped: rebind here with the
+  // resolved id or viewers (/admin/chat, second tabs) receive nothing.
+  // Wrapping an already-wrapped emit would double-deliver every event.
+  if (!incomingConversationId && !serverConversationId) {
     emit = withDirectViewerBroadcast(conversationId, emit);
   }
   const traceId = incomingTraceId || null;
