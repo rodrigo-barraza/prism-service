@@ -99,6 +99,7 @@ export interface FinalizerPayload {
   phase?: ResponsesPhase;
   reasoningItems?: ResponsesReasoningItem[];
   providerResponseId?: string;
+  responsesEffort?: string;
   /** Anthropic thinking blocks of the final pass, verbatim and in order. */
   thinkingBlocks?: AnthropicThinkingBlock[];
   /** A safety-classifier refusal that ended the turn. */
@@ -194,6 +195,7 @@ export async function finalizeTextGeneration(
     phase,
     reasoningItems,
     providerResponseId,
+    responsesEffort,
     thinkingBlocks,
     refusal,
     servedModel,
@@ -437,6 +439,7 @@ export async function finalizeTextGeneration(
       phase,
       reasoningItems,
       providerResponseId,
+      responsesEffort,
       thinkingBlocks,
       refusal,
     });
@@ -793,6 +796,7 @@ export function assembleMessagesToAppend(options: {
   phase?: ResponsesPhase;
   reasoningItems?: ResponsesReasoningItem[];
   providerResponseId?: string;
+  responsesEffort?: string;
   /** Anthropic thinking blocks of the final pass. */
   thinkingBlocks?: AnthropicThinkingBlock[];
   /** A safety-classifier refusal that ended the turn. */
@@ -817,6 +821,7 @@ export function assembleMessagesToAppend(options: {
     phase,
     reasoningItems,
     providerResponseId,
+    responsesEffort,
     thinkingBlocks,
     refusal,
   } = options;
@@ -827,6 +832,7 @@ export function assembleMessagesToAppend(options: {
     ...(phase !== undefined && { phase }),
     ...(reasoningItems && reasoningItems.length > 0 && { reasoningItems }),
     ...(providerResponseId && { providerResponseId }),
+    ...(responsesEffort && { responsesEffort }),
     ...(thinkingBlocks && thinkingBlocks.length > 0 && { thinkingBlocks }),
   };
 

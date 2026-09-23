@@ -276,6 +276,7 @@ interface ExpandedMessage {
   phase?: ResponsesPhase;
   reasoningItems?: ResponsesReasoningItem[];
   providerResponseId?: string;
+  responsesEffort?: string;
   toolCalls?: ExpandedToolCall[];
   images?: string[];
   video?: string[];
@@ -521,6 +522,7 @@ function responsesNativeFields(message: ChatMessage): {
   phase?: ResponsesPhase;
   reasoningItems?: ResponsesReasoningItem[];
   providerResponseId?: string;
+  responsesEffort?: string;
 } {
   return {
     ...(message.phase !== undefined ? { phase: message.phase } : {}),
@@ -529,6 +531,9 @@ function responsesNativeFields(message: ChatMessage): {
       : {}),
     ...(message.providerResponseId
       ? { providerResponseId: message.providerResponseId }
+      : {}),
+    ...(typeof message.responsesEffort === "string"
+      ? { responsesEffort: message.responsesEffort }
       : {}),
   };
 }
