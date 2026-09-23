@@ -146,6 +146,7 @@ export function createMockCollection(initialData: any[] = []) {
       const cursor = {
         project: () => cursor,
         limit: () => cursor,
+        skip: () => cursor,
         sort: (criteria: any) => {
           sortCriteria = criteria;
           return cursor;

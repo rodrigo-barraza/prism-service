@@ -57,6 +57,7 @@ import {
   type ToolEndpoint,
 } from "./types.ts";
 import { INTERNAL_TOOL_EMOJIS } from "./InternalToolEmojis.ts";
+import { recordSaveMemoryProvenance } from "#src/services/memory/SaveMemoryProvenance";
 
 // ────────────────────────────────────────────────────────────
 // Schema Cache — fetched from tools-api at startup
@@ -1746,6 +1747,13 @@ export default class ToolOrchestratorService {
         args,
         context,
       );
+    }
+
+    // save_memory reaches /agent-memories through tools-service, which
+    // forwards the text but not the loop — record what the loop had read
+    // so the route can quarantine a write made after untrusted input.
+    if (name === TOOL_NAMES.SAVE_MEMORY) {
+      recordSaveMemoryProvenance(context);
     }
 
     // Route MCP tools to MCPClientService — thread the loop's abort signal
