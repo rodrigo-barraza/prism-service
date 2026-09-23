@@ -13,6 +13,12 @@ docker-compose.yml
 Dockerfile
 .oxlintrc.json
 vitest.config.*
-tests
+# tests/ stays IN the context: tsconfig typechecks src/**/__tests__, which
+# import tests/mongoMock.ts, and the Dockerfile runs that typecheck. The
+# runtime stage copies only src/, boot.ts, config.ts — tests never ship.
 *.md
 *.tsbuildinfo
+
+# Agent worktrees (.claude/worktrees/*, each with its own node_modules)
+# are not part of the image — keep them out of the build context.
+.claude
