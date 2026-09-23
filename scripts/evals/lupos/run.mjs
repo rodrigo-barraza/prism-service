@@ -198,6 +198,12 @@ function valueAt(object, dotted) {
   return dotted.split(".").reduce((value, key) => (value == null ? value : value[key]), object);
 }
 
+/** Tool-call syntax that has no business in a Discord reply. */
+const LEAKED_TOOL_CALL = /default_api\b|<\/?tool_call\b|\btool_call\s*[{(]|<\/?function_calls?\b/i;
+
+/** Graders every case runs on top of its own — failures no case may have. */
+const ALWAYS_GRADERS = [{ type: "no_leaked_tool_call" }];
+
 /** Every grader returns null when it passes, or the reason it failed. */
 function grade(grader, turn, context) {
   const used = new Set(turn.calls.map((call) => call.name));
@@ -226,6 +232,13 @@ function grade(grader, turn, context) {
       return new RegExp(grader.pattern, grader.flags).test(turn.text) ? `reply matched /${grader.pattern}/` : null;
     case "text_nonempty":
       return turn.text.trim() && turn.text.trim() !== "…" ? null : "empty reply";
+    case "no_leaked_tool_call": {
+      // A call written into the reply as text never ran, and lupos-bot posts
+      // the raw syntax to the channel (gemini-3.6-flash, bridged picks:
+      // `<default_api:tool_call{args:{…},name:react_to_discord_message}>`).
+      const leaked = LEAKED_TOOL_CALL.exec(turn.text);
+      return leaked ? `reply contains a tool call as text (${leaked[0]})` : null;
+    }
     case "max_passes":
       return turn.passes <= grader.value ? null : `${turn.passes} model passes (max ${grader.value})`;
     case "reminder_due_minutes": {
@@ -308,7 +321,7 @@ async function main() {
     try {
       const turn = await runTurn(testCase, suite.context, args);
       const failures = turn.error ? [`stream error: ${turn.error}`] : [];
-      for (const grader of testCase.graders) {
+      for (const grader of [...testCase.graders, ...ALWAYS_GRADERS]) {
         const failure = grade(grader, turn, suite.context);
         if (failure) failures.push(failure);
       }
