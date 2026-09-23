@@ -140,6 +140,19 @@ describe("sub-agent worktree — paths into the parent's checkout are redirected
     expect(lastHeaders["x-workspace-override"]).toBe(WORKTREE);
   });
 
+  it("RED: the streaming script path (execute_python / execute_shell) is redirected and runs in the worktree", async () => {
+    await ToolOrchestratorService.executeToolStreaming(
+      "execute_python",
+      { code: `open("${ROOT}/primes.txt", "a").write("x")` },
+      null,
+      { agentConversationId: SESSION, project: "p", username: "u", workspaceRoot: WORKTREE },
+    );
+
+    expect(lastUrl).toContain("/utility/python/stream");
+    expect(lastBody?.code).toBe(`open("${WORKTREE}/primes.txt", "a").write("x")`);
+    expect(lastHeaders["x-workspace-override"]).toBe(WORKTREE);
+  });
+
   it("leaves file CONTENT alone, and a session with no worktree untouched", async () => {
     const write = await run("write_file", { path: `${ROOT}/notes.md`, content: `See ${ROOT}/README.md` });
     expect(write.path).toBe(`${WORKTREE}/notes.md`);
