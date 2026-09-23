@@ -17,6 +17,8 @@ vi.mock('#config', () => ({
     geminiTransport: () => 'generate_content',
     ELEVENLABS_API_KEY: 'fake',
     MOONSHOT_API_KEY: 'fake',
+    moonshotTransport: () => 'anthropic',
+    moonshotCacheTtl: () => '5m',
     MOONSHOT_BASE_URL: undefined,
     INWORLD_BASIC: 'fake',
     PROVIDER_LM_STUDIO: [],

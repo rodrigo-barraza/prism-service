@@ -44,6 +44,7 @@ import {
 import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
 import { getRequestContext } from "#src/utils/RequestContext";
 import { estimateTokens } from "#src/utils/CostCalculator";
+import { sectionsWithinBudget } from "#src/services/BudgetPreset";
 
 /**
  * Wrap a system prompt section in XML semantic tags.
@@ -954,7 +955,7 @@ export default class SystemPromptAssembler {
     }
 
     return {
-      prompt: sections.join("\n\n"),
+      prompt: sectionsWithinBudget(sections, context.agentConversationId).join("\n\n"),
       platformContextMessage:
         platformContextSections.length > 0
           ? platformContextSections.join("\n\n")

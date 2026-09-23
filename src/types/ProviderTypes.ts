@@ -11,6 +11,8 @@ export interface ProviderInstanceConfig {
   nickname?: string;
   /** Bearer token for a server started with an API key (SGLang --api-key). */
   apiKey?: string;
+  /** vLLM started with --scheduling-policy priority: requests may carry a priority. */
+  priorityScheduling?: boolean;
 }
 
 export interface InstanceEntry {
