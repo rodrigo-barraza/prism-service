@@ -18,6 +18,8 @@ import {
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import { resolveLoopKey } from "#src/services/LoopKey";
 import type { InternalToolContext } from "./InternalToolRegistry.ts";
+import type { ToolExecutionContext } from "#src/services/tool-orchestrator/types";
+import AutoApprovalEngine from "#src/services/AutoApprovalEngine";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 
 type AsyncTaskState = import("../AsyncTaskRegistry.ts").AsyncTaskState;
@@ -92,6 +94,43 @@ const DISALLOWED_ASYNC_TOOL_NAMES = new Set<string>([
   TOOL_NAMES.DISCOVER_AND_ENABLE_TOOLS,
   TOOL_NAMES.SEARCH_TOOLS,
 ]);
+
+/**
+ * Why the dispatched call may not run, or null when it may: it must be in
+ * the conversation's enabled tools (when the loop supplied them) and must
+ * not be denied by the loop's permission rules, agent policies or
+ * self-protection.
+ */
+function governInnerCall(
+  toolName: string,
+  toolArguments: Record<string, unknown>,
+  context: RuntimeToolContext & ToolExecutionContext,
+): string | null {
+  const locale = PromptLocaleService.getDefaultLocale();
+  if (
+    Array.isArray(context.enabledTools) &&
+    !context.enabledTools.includes(toolName)
+  ) {
+    return PromptLocaleService.get(
+      locale,
+      "internal-tools-runtime.run_async_task.notEnabled",
+      { toolName },
+    );
+  }
+  const approval = new AutoApprovalEngine({
+    policies: context._policies ?? [],
+    permissionRules: context._permissionRules ?? null,
+    fullAuto: true,
+  }).check({ id: null, name: toolName, args: toolArguments });
+  if (approval.isDenied) {
+    return PromptLocaleService.get(
+      locale,
+      "internal-tools-runtime.run_async_task.denied",
+      { toolName, reason: approval.reason },
+    );
+  }
+  return null;
+}
 
 // ── run_async_task ─────────────────────────────────────────
 const runAsyncTask = {
@@ -187,6 +226,19 @@ const runAsyncTask = {
         ),
       };
     }
+
+    // A dispatcher must never widen what the loop may run. The approval
+    // stack only ever sees `run_async_task`, so the inner call faces here
+    // what a direct call would: the conversation's enabled set (a
+    // persona's blocked tool is absent from it) and every DENY — rules,
+    // agent policies, self-protection. The tier prompt is not re-asked:
+    // the dispatch itself already passed it, or ran under full auto.
+    const governance = governInnerCall(
+      toolName,
+      innerToolArguments,
+      context as RuntimeToolContext & ToolExecutionContext,
+    );
+    if (governance) return { error: governance };
 
     try {
       const { default: AsyncTaskRegistry } =
