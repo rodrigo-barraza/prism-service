@@ -104,13 +104,22 @@ export interface MemoryInvalidateParams {
   reason?: string | null;
 }
 
+/**
+ * A Discord participant as `/memory/extract` receives it: an object from
+ * lupos-bot (`{ id, username, displayName }`), or — from an older
+ * lupos-bot — a bare string, which is a display name with no id.
+ */
+export type MemoryParticipantInput =
+  | { id?: unknown; username?: unknown; displayName?: unknown }
+  | string;
+
 export interface MemoryExtractAndStoreParams {
   guildId?: string;
   channelId?: string;
   /** Profile partition — defaults to the request's profile (ALS), then "default". */
   profileId?: string;
   messages: Record<string, unknown>[];
-  participants: Record<string, unknown>[];
+  participants: MemoryParticipantInput[];
   sourceMessageId?: string;
   traceId?: string;
   project?: string;
@@ -231,13 +240,56 @@ interface ExtractedFact {
 }
 
 // ─── LUPOS Fact Extraction ────────────────────────────────────────────────────
+
+/** Longest participant name rendered into the extraction prompt (Discord caps names at 32). */
+const PARTICIPANT_NAME_MAXIMUM_CHARACTERS = 64;
+
+/**
+ * One participant field as prompt-safe text: a string, whitespace (line
+ * breaks included) collapsed so a display name cannot start a forged
+ * participant line, clipped. Anything else is absent.
+ */
+function participantField(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const text = value.replace(/\s+/g, " ").trim();
+  return text ? text.slice(0, PARTICIPANT_NAME_MAXIMUM_CHARACTERS) : null;
+}
+
+/**
+ * The participant list of the Discord extraction prompt, one line each.
+ * An object renders its id, username and display name — the ids are what
+ * the extractor must put in `aboutUserId` / `sourceUserId`. A bare string
+ * is a display name with no id, and says only that.
+ */
+export function formatParticipantList(participants: MemoryParticipantInput[]): string {
+  return participants
+    .map((participant) => {
+      if (typeof participant === "string") {
+        const displayName = participantField(participant);
+        return displayName ? `- Display: ${displayName}` : null;
+      }
+      if (!participant || typeof participant !== "object") return null;
+      const id = participantField(participant.id);
+      const username = participantField(participant.username);
+      const displayName = participantField(participant.displayName) || username;
+      const fields = [
+        id && `ID: ${id}`,
+        username && `Username: ${username}`,
+        displayName && `Display: ${displayName}`,
+      ].filter(Boolean);
+      return fields.length > 0 ? `- ${fields.join(", ")}` : null;
+    })
+    .filter((line): line is string => line !== null)
+    .join("\n");
+}
+
 /**
  * Call an AI provider to extract facts from a conversation.
  * Returns an array of { fact, aboutUserId, aboutUsername, category, confidence }.
  */
 async function extractFactsFromConversation(
   messages: Record<string, unknown>[],
-  participants: Record<string, unknown>[],
+  participants: MemoryParticipantInput[],
   meta: Record<string, unknown> = {},
 ): Promise<ExtractedFact[]> {
   const endpoint = meta.endpoint || null;
@@ -247,12 +299,7 @@ async function extractFactsFromConversation(
   const provider = getProvider(extractionProvider);
   const requestId = crypto.randomUUID();
   const requestStart = performance.now();
-  const participantList = participants
-    .map(
-      (participant: Record<string, unknown>) =>
-        `- ID: ${participant.id}, Username: ${participant.username}, Display: ${participant.displayName || participant.username}`,
-    )
-    .join("\n");
+  const participantList = formatParticipantList(participants);
   const conversationText = messages
     .map(
       (message: Record<string, unknown>) =>
@@ -685,7 +732,16 @@ const MemoryService = {
         const selfReported =
           !fact.sourceUserId || fact.sourceUserId === fact.aboutUserId;
         const trust = selfReported ? ("user" as const) : ("derived" as const);
+        // Hearsay is also held back: stored quarantined, so it is never
+        // recalled into a prompt (search excludes quarantined rows) — one
+        // member cannot plant "facts" about another in the wolf's memory.
+        // It goes live the way any quarantined memory does: when the
+        // subject later says it themselves, that self-report is a `user`
+        // store about the same member in the same guild, and store()'s
+        // corroboration promotes it (similarity, then `restates`); or when
+        // the owner accepts it in the review list.
         const memory = await this.store({
+          ...(!selfReported && { quarantined: true }),
           agent: AGENT_IDS.LUPOS,
           project: project || null,
           username: fact.sourceUsername || null,
