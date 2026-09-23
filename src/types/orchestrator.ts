@@ -163,6 +163,12 @@ export interface MergeBackReport {
 
 // ── Sub-Agent Result ───────────────────────────────────────
 
+/**
+ * What a parent model reads about a sub-agent — a BRIEF: its final report
+ * (`result`) and counts, never its transcript. Its raw tool output stays
+ * in the sub-agent's own conversation (the client reads it from there),
+ * so a lead's context — and its cached prefix — holds only the briefs.
+ */
 export interface SubAgentResult {
   agent_id: string;
   description: string;
@@ -173,7 +179,6 @@ export interface SubAgentResult {
   toolNames?: Record<string, number>;
   iterations: number;
   durationMilliseconds: number;
-  messages: ConversationMessage[];
   diff?: {
     additions: number;
     deletions: number;
@@ -257,6 +262,8 @@ export interface OrchestratorSpawnParams {
   agent?: string;
   assignedProvider?: string;
   assignedModel?: string;
+  /** The member's subagent role decision (TeamMember.routing) — its model, provider and effort. */
+  routing?: import("#src/services/routing/RoleModelResolver").RoleDecision;
   agentIndex?: number;
   /** Conversation-scoped monotonically increasing spawn index (0-based, unique across all teams). */
   globalSpawnIndex?: number;
@@ -331,6 +338,8 @@ export interface OrchestratorContext {
   maxCostDollars?: number;
   /** Shared cost accumulator threaded through the whole sub-agent tree. */
   sharedCostBudget?: import("#src/services/harnesses/lifecycle/CostBudgetEnforcer").SharedCostBudget;
+  /** The conversation's routing preset (routing/RoutingPresets) — e.g. lead_sidekick. */
+  routingPreset?: string | null;
   /** Extensibility for custom orchestrator data. */
   extensionData?: Record<string, string | number | boolean | null | undefined>;
 }
@@ -395,6 +404,13 @@ export interface TeamMember {
   files?: string[];
   model?: string;
   agent?: string;
+  /**
+   * The provider `model` runs on, when role routing put the member on
+   * another provider than its parent's (cross-provider sub-agents).
+   */
+  provider?: string;
+  /** The subagent role decision createTeam made for this member. */
+  routing?: import("#src/services/routing/RoleModelResolver").RoleDecision;
 }
 
 export interface TeamMemberResult {
