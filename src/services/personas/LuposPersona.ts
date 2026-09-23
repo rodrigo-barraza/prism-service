@@ -739,6 +739,10 @@ export const LuposPersona: Persona = {
   // Least privilege (see the allow list above): no request widens his turns,
   // and nothing he calls waits on a card nobody in the channel can answer.
   pinnedPermissionMode: "dontAsk",
+  // A reaction sent with the reply ends the turn: nothing in the reaction's
+  // `{ ok: true }` is worth another model call (EndTurnAfterTools). His
+  // Emoji Reactions section tells him to write the reply in that response.
+  endTurnAfterTools: ["react_to_discord_message"],
   capabilities: "",
   hasSomaticState: true,
   // Lupos's resting temperament: mildly cynical, restless, a buried streak
