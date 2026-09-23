@@ -263,10 +263,18 @@ describe("LUPOS: an activated pick is callable through the bridge", () => {
       [{ text: "bebop. obviously." }],
     ];
 
-    const { requests } = await runTurn("C", "lupos best anime ever, go", ["get_anime"]);
+    const { requests, emitted } = await runTurn("C", "lupos best anime ever, go", ["get_anime"]);
 
     expect(requests).toHaveLength(2);
     expect(execute.mock.calls.map((call) => [call[0], call[1]])).toEqual([["get_anime", { query: "bebop" }]]);
+    // Watchers (lupos-bot's presence line, the client) see the tool, not the bridge.
+    const frames = emitted
+      .filter((event) => event.type === "tool_execution")
+      .map((event) => [event.status, (event.tool as { name: string; args: unknown }).name, (event.tool as { args: unknown }).args]);
+    expect(frames).toEqual([
+      ["calling", "get_anime", { query: "bebop" }],
+      ["done", "get_anime", { query: "bebop" }],
+    ]);
     // The second request extends the first: same tools, same system.
     expect(toolsOf(requests[1])).toBe(toolsOf(requests[0]));
     expect(systemOf(requests[1])).toBe(systemOf(requests[0]));

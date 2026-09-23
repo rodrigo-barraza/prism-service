@@ -290,6 +290,26 @@ export function unwrapBridgedToolCalls(
   return { callable, rejected };
 }
 
+/**
+ * The call as a person watching the stream should see it: a `tool_call`
+ * bridge call shows as the tool it names, with that tool's arguments — the
+ * name `tool_call` says nothing in a status line ("Running tool_call…").
+ * Display only: the transcript keeps what the model sent (transcriptCallOf).
+ */
+export function displayedToolCall(
+  name: string,
+  args: Record<string, unknown>,
+): { name: string; args: Record<string, unknown> } {
+  if (name !== BRIDGE_TOOL_NAME) return { name, args };
+  const target = typeof args.name === "string" ? args.name.trim() : "";
+  if (!target) return { name, args };
+  const targetArgs =
+    args.args && typeof args.args === "object" && !Array.isArray(args.args)
+      ? (args.args as Record<string, unknown>)
+      : {};
+  return { name: target, args: targetArgs };
+}
+
 /** The name and arguments the model actually sent (the bridge call, when bridged). */
 export function transcriptCallOf(call: ToolCall): {
   name: string;
