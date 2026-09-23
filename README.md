@@ -86,6 +86,7 @@ Prism reads the model list and context window from `/v1/models`, and the parsers
 | `GET` | `/benchmark` | Model benchmarking engine |
 | `GET` | `/skills` | Agent skill definitions |
 | `GET` | `/settings` | User settings persistence |
+| `GET` | `/mcp-servers` | MCP server configs, connection status, quarantined tools — see `docs/mcp.md` |
 
 ### WebSocket
 
@@ -116,7 +117,7 @@ Prism reads the model list and context window from `/v1/models`, and the parsers
 | **SystemPromptAssembler** | 9-section agent system prompt (identity, tools, guidelines, environment, skills, memory) |
 | **MemoryService** | Agent-scoped memory with embedding search + dedup (cosine > 0.92) |
 | **LocalProviderGateway** | Local model discovery, routing, capability detection, VRAM estimation |
-| **MCPClientService** | Model Context Protocol client — connects to external MCP servers |
+| **MCPClientService** | Model Context Protocol client (SDK 2.x, protocol 2026-07-28 with 2025 fallback) — per-profile connections, tool pinning and quarantine, output caps (`docs/mcp.md`) |
 
 ## Scripts
 

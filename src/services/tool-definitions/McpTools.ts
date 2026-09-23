@@ -6,6 +6,12 @@ import {
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
 import MCPClientService from "#src/services/MCPClientService";
+import type { InternalToolContext } from "./InternalToolRegistry.ts";
+
+/** The caller's MCP scope — a run reaches only its own profile's servers. */
+function scopeOf(context: InternalToolContext = {}) {
+  return { username: context.username, profileId: context.profileId };
+}
 
 const listMcpResources = {
   name: TOOL_NAMES.LIST_MCP_RESOURCES,
@@ -30,21 +36,22 @@ const listMcpResources = {
   },
   domain: DOMAINS.MCP.displayName,
   labels: ["coding", "meta"],
-  async execute(toolArguments: Record<string, unknown>) {
+  async execute(toolArguments: Record<string, unknown>, context?: InternalToolContext) {
+    const scope = scopeOf(context);
     const serverName =
       typeof toolArguments.server_name === "string"
         ? toolArguments.server_name
         : undefined;
 
     if (serverName) {
-      const result = await MCPClientService.listResources(serverName);
+      const result = await MCPClientService.listResources(serverName, scope);
       logger.info(
         `[MCP] list_resources: ${serverName} → ${result.count ?? 0} resources`,
       );
       return result;
     }
 
-    const servers = MCPClientService.getConnectedServers();
+    const servers = MCPClientService.getConnectedServers(scope);
     if (servers.length === 0) {
       return {
         resources: [],
@@ -58,7 +65,7 @@ const listMcpResources = {
 
     const allResources: Record<string, unknown>[] = [];
     for (const server of servers) {
-      const result = await MCPClientService.listResources(server.name);
+      const result = await MCPClientService.listResources(server.name, scope);
       if (result.resources) {
         for (const resource of result.resources) {
           allResources.push({ ...resource, server: server.name });
@@ -103,7 +110,7 @@ const readMcpResource = {
   },
   domain: DOMAINS.MCP.displayName,
   labels: ["coding", "meta"],
-  async execute(toolArguments: Record<string, unknown>) {
+  async execute(toolArguments: Record<string, unknown>, context?: InternalToolContext) {
     const serverName =
       typeof toolArguments.server_name === "string"
         ? toolArguments.server_name
@@ -121,7 +128,7 @@ const readMcpResource = {
     }
 
     logger.info(`[MCP] read_resource: ${serverName} → ${uri}`);
-    return MCPClientService.readResource(serverName, uri);
+    return MCPClientService.readResource(serverName, uri, scopeOf(context));
   },
 };
 
@@ -162,7 +169,7 @@ const mcpAuthenticate = {
   },
   domain: DOMAINS.MCP.displayName,
   labels: ["coding", "meta"],
-  async execute(toolArguments: Record<string, unknown>) {
+  async execute(toolArguments: Record<string, unknown>, context?: InternalToolContext) {
     const serverName =
       typeof toolArguments.server_name === "string"
         ? toolArguments.server_name
@@ -210,12 +217,16 @@ const mcpAuthenticate = {
     }
 
     logger.info(`[MCP] authenticate: ${serverName}`);
-    return MCPClientService.authenticate(serverName, {
-      token,
-      apiKey,
-      apiKeyHeader,
-      env: envObject,
-    });
+    return MCPClientService.authenticate(
+      serverName,
+      {
+        token,
+        apiKey,
+        apiKeyHeader,
+        env: envObject,
+      },
+      scopeOf(context),
+    );
   },
 };
 

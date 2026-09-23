@@ -42,6 +42,7 @@ export {
   DeleteFavoritesQuerySchema,
   PostMcpServerSchema,
   PutMcpServerSchema,
+  ApproveMcpToolsSchema,
   GetConversationsQuerySchema,
   PostConversationMessagesBodySchema,
   PatchConversationBodySchema,

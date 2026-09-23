@@ -145,13 +145,16 @@ vi.mock('#src/services/WebhookEventBus', () => ({
 }));
 
 vi.mock('#src/services/MCPClientService', () => ({
+  McpServerNameConflictError: class McpServerNameConflictError extends Error {},
   default: {
     getConnectedServers: vi.fn().mockReturnValue([
-      { name: 'mock-mcp-server', status: 'connected', toolCount: 2, tools: [], transport: 'stdio', connectedAt: new Date() }
+      { name: 'mock-mcp-server', serverId: '507f1f77bcf86cd799439011', status: 'connected', toolCount: 2, tools: [], transport: 'stdio', connectedAt: new Date() }
     ]),
     isConnected: vi.fn().mockReturnValue(true),
     connect: vi.fn().mockResolvedValue({ serverName: 'mock-mcp-server', tools: [] }),
     disconnect: vi.fn().mockResolvedValue(true),
+    disconnectServer: vi.fn().mockResolvedValue(undefined),
+    updateServerSettings: vi.fn().mockReturnValue(false),
   }
 }));
 
@@ -389,7 +392,9 @@ describe('Feature Routes Integration Tests', () => {
         .expect(200);
       expect(listResponse.body).toBeInstanceOf(Array);
 
-      // Create
+      // Create — the name-clash lookup finds nothing (this mock's findOne
+      // otherwise answers every query with the same document).
+      mockDb.collection().findOne.mockResolvedValueOnce(null);
       const createResponse = await request(app)
         .post('/mcp-servers-test')
         .send({

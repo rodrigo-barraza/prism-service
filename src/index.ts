@@ -803,6 +803,10 @@ setupWebSocket(wss);
                 env,
                 headers,
                 enabled,
+                trusted,
+                protocol,
+                outputCapTokens,
+                toolOutputCapTokens,
               } = serverConfig;
               if (!name || !transport) continue;
 
@@ -821,6 +825,13 @@ setupWebSocket(wss);
                     env: env || {},
                     headers: headers || {},
                     enabled: enabled !== false,
+                    // Seeded servers are the deployment's: every profile
+                    // sees their tools (MCPClientService visibility).
+                    shared: true,
+                    trusted: trusted === true,
+                    ...(protocol && { protocol }),
+                    ...(outputCapTokens && { outputCapTokens }),
+                    ...(toolOutputCapTokens && { toolOutputCapTokens }),
                     updatedAt: new Date().toISOString(),
                   },
                 },

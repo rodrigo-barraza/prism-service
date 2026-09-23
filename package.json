@@ -41,7 +41,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",
     "@google/genai": "^2.11.0",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/client": "^2.0.0",
     "@rodrigo-barraza/utilities-library": "github:rodrigo-barraza/utilities-library",
     "cors": "^2.8.6",
     "express": "^5.2.1",
@@ -56,6 +56,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@modelcontextprotocol/server": "^2.0.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^26.1.1",

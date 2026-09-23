@@ -14,9 +14,9 @@ importers:
       '@google/genai':
         specifier: ^2.11.0
         version: 2.11.0(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))
-      '@modelcontextprotocol/sdk':
-        specifier: ^1.29.0
-        version: 1.29.0(zod@4.4.3)
+      '@modelcontextprotocol/client':
+        specifier: ^2.0.0
+        version: 2.0.0
       '@rodrigo-barraza/utilities-library':
         specifier: github:rodrigo-barraza/utilities-library
         version: https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/eb72517ec56b4c2735bf0f5605bacbae99fa62e3(express@5.2.1)
@@ -54,6 +54,9 @@ importers:
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.7.0)
+      '@modelcontextprotocol/server':
+        specifier: ^2.0.0
+        version: 2.0.0
       '@types/cors':
         specifier: ^2.8.19
         version: 2.8.19
@@ -553,6 +556,14 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
+  '@modelcontextprotocol/client@2.0.0':
+    resolution: {integrity: sha512-8f1OghQ2rjzIOfqgUCP+8GiUWqRs89njoWLNqAe8kWmDePv3s1fZXseej+QXemssEuuOvLLmLO/kqM3IQHtISw==}
+    engines: {node: '>=20'}
+
+  '@modelcontextprotocol/core@2.0.0':
+    resolution: {integrity: sha512-pJCEwGG7Lfr/+PQp9ZTwKXNeO5wzbfKL7H3MYpCorM4oFBoQrdjnBgEoqG+RjhsvS1FKrDbKux+M1HhlnGWqcA==}
+    engines: {node: '>=20'}
+
   '@modelcontextprotocol/sdk@1.29.0':
     resolution: {integrity: sha512-zo37mZA9hJWpULgkRpowewez1y6ML5GsXJPY8FI0tBBCd77HEvza4jDqRKOXgHNn867PVGCyTdzqpz0izu5ZjQ==}
     engines: {node: '>=18'}
@@ -562,6 +573,10 @@ packages:
     peerDependenciesMeta:
       '@cfworker/json-schema':
         optional: true
+
+  '@modelcontextprotocol/server@2.0.0':
+    resolution: {integrity: sha512-YhHWdHfpFMQfd0prsEnxKeS3Qz3ytIGmsS0sth4KDjnacIT7hxk6hXHkJ9KysxlkvTM+WZAtQbbcUhdoP4Hvtw==}
+    engines: {node: '>=20'}
 
   '@mongodb-js/saslprep@1.4.12':
     resolution: {integrity: sha512-QAfAMwNgnYxZ2C6D1HgeP7Gc4i/uvJRim415PCIL9ptRxWMNbWeLBYb2/9R4pGKny/s1FVu2JA2cxCUBUOggrA==}
@@ -2377,6 +2392,7 @@ snapshots:
   '@hono/node-server@1.19.14(hono@4.12.30)':
     dependencies:
       hono: 4.12.30
+    optional: true
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -2509,6 +2525,20 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
+  '@modelcontextprotocol/client@2.0.0':
+    dependencies:
+      '@modelcontextprotocol/core': 2.0.0
+      cross-spawn: 7.0.6
+      eventsource: 3.0.7
+      eventsource-parser: 3.1.0
+      jose: 6.2.3
+      pkce-challenge: 5.0.1
+      zod: 4.4.3
+
+  '@modelcontextprotocol/core@2.0.0':
+    dependencies:
+      zod: 4.4.3
+
   '@modelcontextprotocol/sdk@1.29.0(zod@4.4.3)':
     dependencies:
       '@hono/node-server': 1.19.14(hono@4.12.30)
@@ -2530,6 +2560,12 @@ snapshots:
       zod-to-json-schema: 3.25.2(zod@4.4.3)
     transitivePeerDependencies:
       - supports-color
+    optional: true
+
+  '@modelcontextprotocol/server@2.0.0':
+    dependencies:
+      '@modelcontextprotocol/core': 2.0.0
+      zod: 4.4.3
 
   '@mongodb-js/saslprep@1.4.12':
     dependencies:
@@ -2902,6 +2938,7 @@ snapshots:
   ajv-formats@3.0.1(ajv@8.20.0):
     optionalDependencies:
       ajv: 8.20.0
+    optional: true
 
   ajv@6.15.0:
     dependencies:
@@ -2916,6 +2953,7 @@ snapshots:
       fast-uri: 3.1.3
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
+    optional: true
 
   anynum@1.0.1: {}
 
@@ -3190,6 +3228,7 @@ snapshots:
     dependencies:
       express: 5.2.1
       ip-address: 10.2.0
+    optional: true
 
   express@5.2.1:
     dependencies:
@@ -3240,7 +3279,8 @@ snapshots:
 
   fast-sha256@1.3.0: {}
 
-  fast-uri@3.1.3: {}
+  fast-uri@3.1.3:
+    optional: true
 
   fast-xml-builder@1.3.0:
     dependencies:
@@ -3398,7 +3438,8 @@ snapshots:
     dependencies:
       libheif-js: 1.19.8
 
-  hono@4.12.30: {}
+  hono@4.12.30:
+    optional: true
 
   html-escaper@2.0.2: {}
 
@@ -3429,7 +3470,8 @@ snapshots:
 
   inherits@2.0.4: {}
 
-  ip-address@10.2.0: {}
+  ip-address@10.2.0:
+    optional: true
 
   ipaddr.js@1.9.1: {}
 
@@ -3479,9 +3521,11 @@ snapshots:
 
   json-schema-traverse@0.4.1: {}
 
-  json-schema-traverse@1.0.0: {}
+  json-schema-traverse@1.0.0:
+    optional: true
 
-  json-schema-typed@8.0.2: {}
+  json-schema-typed@8.0.2:
+    optional: true
 
   json-stable-stringify-without-jsonify@1.0.1: {}
 
@@ -3776,7 +3820,8 @@ snapshots:
       string_decoder: 1.3.0
       util-deprecate: 1.0.2
 
-  require-from-string@2.0.2: {}
+  require-from-string@2.0.2:
+    optional: true
 
   retry@0.13.1: {}
 
@@ -4134,5 +4179,6 @@ snapshots:
   zod-to-json-schema@3.25.2(zod@4.4.3):
     dependencies:
       zod: 4.4.3
+    optional: true
 
   zod@4.4.3: {}

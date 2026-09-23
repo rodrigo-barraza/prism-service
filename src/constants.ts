@@ -767,6 +767,27 @@ export const OFFLOAD = {
   DEFAULT_CONTEXT_LINES: 2,
 } as const;
 
+// ─── MCP Client Constants ───────────────────────────────────
+
+export const MCP = {
+  /** Client name sent to MCP servers. */
+  CLIENT_NAME: "prism",
+
+  /**
+   * Default cap on one MCP tool result, in estimated tokens. Anything past
+   * it is offloaded (retrieve_offloaded_content reads it back). A server's
+   * `outputCapTokens` / `toolOutputCapTokens` override it.
+   */
+  OUTPUT_CAP_TOKENS: 25_000,
+
+  /**
+   * How long protocol negotiation waits for `server/discover` on stdio
+   * before treating the server as 2025-era. A legacy server that ignores
+   * unknown pre-`initialize` requests stalls a connect for this long.
+   */
+  STDIO_PROBE_TIMEOUT_MILLISECONDS: 5_000,
+} as const;
+
 // ─── Context Window Constants ───────────────────────────────
 
 export const CONTEXT_WINDOW = {

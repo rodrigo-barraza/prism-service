@@ -5,6 +5,8 @@ import type { PolicyRule, PolicyDecision } from "./PolicyEngine.ts";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import type PermissionRuleSet from "./permissions/PermissionRuleSet.ts";
 import { resolveToolCapabilities } from "./permissions/ToolCapabilities.ts";
+import { lookupMcpTool } from "./mcp/McpToolRegistry.ts";
+import { toMcpScope } from "./mcp/McpScope.ts";
 import { checkSelfProtection } from "./permissions/SelfProtection.ts";
 import { strongestVerdict } from "./permissions/PermissionEvaluator.ts";
 import { recordUserApproval } from "./permissions/ApprovalHistory.ts";
@@ -234,14 +236,19 @@ export default class AutoApprovalEngine {
     }
     // SECURITY: MCP-namespaced tools are third-party code with unknown
     // side effects — they default to DANGER (Tier 3) so common
-    // WRITE-auto settings never silently auto-approve them. Trusted
-    // servers can be relaxed per-tool via tierOverrides.
+    // WRITE-auto settings never silently auto-approve them. The one way
+    // down is a `readOnlyHint` on a server its owner marked trusted
+    // (mcpTierFromAnnotations), looked up in the run's own scope;
+    // `destructiveHint` is always DANGER, and rules and tierOverrides still
+    // decide above the tier.
     // Research basis (harness_landscape_survey_2026-07.md, D4): VIPER-MCP
     // found 106 zero-days across ~40k MCP repos (arXiv 2605.21392,
     // https://arxiv.org/abs/2605.21392); see also Unit 42's OpenClaw
     // supply-chain report (cited in MCPClientService).
     if (toolName.startsWith("mcp__")) {
-      return APPROVAL_TIERS.DANGER;
+      return lookupMcpTool(toolName, toMcpScope(this.permissionRules?.identity))?.tier === "auto"
+        ? APPROVAL_TIERS.AUTO
+        : APPROVAL_TIERS.DANGER;
     }
     return DEFAULT_TIER_MAP[toolName] ?? APPROVAL_TIERS.WRITE; // Unknown tools default to Tier 2
   }
@@ -287,7 +294,7 @@ export default class AutoApprovalEngine {
       name: toolCall.name,
       args: (toolCall.args ?? {}) as Record<string, unknown>,
     };
-    const capabilities = resolveToolCapabilities(toolCall.name);
+    const capabilities = resolveToolCapabilities(toolCall.name, toMcpScope(this.permissionRules?.identity));
     const base = { tier, tierLabel, capabilities, matchedRules: [] as ApprovalExplanation["matchedRules"] };
 
     const guard = checkSelfProtection(call, capabilities);

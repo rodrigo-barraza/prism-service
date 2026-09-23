@@ -3,6 +3,10 @@
 > Hand to ONE session per landing: *"Read prism-service/docs/prompts/20-mcp-modernization.md and execute Landing N."*
 > Conventions, gates and the isolated live recipe: `docs/prompts/README.md`. Source: `docs/harness_modernization_2026-09.md` §4.10, §2.1 S8; `docs/mcp_server_recommendations_2026-07.md`.
 
+> **Landing 1 (`mcp-sdk-and-trust`) is done.** SDK → `@modelcontextprotocol/client` 2.0 (2026-07-28 via `server/discover`, 2025 fallback, version recorded); pool keyed by `(profileId, serverId)` with shared seeded servers; server-name namespacing; fingerprint pins + quarantine (`POST /mcp-servers/:id/tools/approve`); `list_changed` refresh; `structuredContent`; trusted-annotation tiers; per-tool output caps. Reference: `docs/mcp.md`.
+> Tests: `tests/mcpToolTrust.test.ts`, `tests/mcpProfilePool.test.ts`, `tests/mcpServersRoutes.test.ts`, `src/services/mcp/__tests__/`. Real SDK fixtures: `tests/fixtures/mcp/` — reuse them for Landing 2.
+> Landing 2 builds on it: `MCPClientService.connect` already takes a document-shaped config; `Client` capabilities are still `{}` (declare elicitation there); quarantined tools must stay out of any new prompt/resource surface too.
+
 **Repos:** prism-service, prism-client (Landing 2 UI) · **Size:** L · **Depends on:** 12 Landing 1 (capability tags and rules) is a soft dependency: annotations map into tiers here either way · **Shares hubs with:** 12 (`AutoApprovalEngine.ts` tier mapping).
 
 ## Today (`src/services/MCPClientService.ts`)
@@ -22,32 +26,6 @@ The attacks that motivate the trust work:
 - **Tool-description rug-pulls:** 69.5% success (arXiv 2608.23763).
 - **Multi-channel fragmentation** (2609.18217).
 - **Name shadowing** (2609.19425).
-
----
-
-## Landing 1 — `mcp-sdk-and-trust`
-
-**Changes.**
-- **Bump the SDK** (README §Conventions 2 for adding or updating a dependency) to the version supporting the 2026-07-28 revision. Keep all three transports working, and record which protocol version each server negotiated.
-- **`notifications/tools/list_changed`:** refresh that server's tools and rebuild the BM25 discovery index.
-- **`structuredContent`:** validate against `outputSchema` when present, then pass it to the model as JSON (with the text content as a fallback).
-- **Annotations → tier.** `readOnlyHint` → AUTO, unless the server is untrusted or a rule overrides; `destructiveHint` → DANGER; `openWorldHint` → `network` capability (prompt 12's tags). The default for unannotated tools stays DANGER.
-- **Pin and quarantine.**
-  - When a server is approved, hash each tool's `(name, description, inputSchema, annotations)`.
-  - On reconnect or refresh, a changed hash **quarantines** that tool: hidden from the model and flagged in the API and UI, until the owner re-approves it.
-  - Tools new since approval also start quarantined.
-- **Namespacing.** Tool names across servers can't collide or shadow: namespace by server id, and reject duplicates.
-- **Output cap per tool.** Default 25K tokens, configurable. The overflow goes to `ToolResultOffloadService` with a pointer.
-- **Connection pool** keyed by `(profileId, serverId)`.
-
-**Tests.** Use an in-process MCP test server built with the SDK's server classes, or the reference "everything" server over stdio in tests:
-- **Red first.** A changed tool description is quarantined. (Red: silently accepted.)
-- **Red first.** Two profiles with the same server name and different headers get separate connections. (Red: shared.)
-- **`list_changed`** refreshes the tools and the index.
-- **`structuredContent`** is passed through and schema-validated.
-- **Annotations** map to the right tiers.
-- **Output cap** offloads the overflow.
-- **Negotiated protocol version** is recorded.
 
 ---
 
