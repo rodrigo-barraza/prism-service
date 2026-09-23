@@ -159,7 +159,24 @@ export default class AgenticLoopService {
           context,
           resolvedTools,
         });
-    if (preflight.enabledTools.length > 0) {
+    if (
+      preflight.enabledTools.length > 0 &&
+      (await AgenticLoopService.activatesPreflightPicks(context, resolvedTools, preflight.enabledTools))
+    ) {
+      // The declared tools stay the persona's own set; the harness activates
+      // the picks after assembling the system prompt (the dirty flag is what
+      // a discovery call sets), so every conversation of this persona sends
+      // the same tools and system prompt — a cached prefix across
+      // conversations, not only within one.
+      ToolContext.set(resolvedAgentConversationId, "toolSetDirty", true);
+      context.emit({
+        type: SERVER_SENT_EVENT_TYPES.STATUS,
+        message: STATUS_MESSAGES.TOOL_SET_CHANGED,
+        enabledCount: resolvedTools.finalTools.length + preflight.enabledTools.length,
+        dynamicTools: preflight.enabledTools,
+        preflight: true,
+      });
+    } else if (preflight.enabledTools.length > 0) {
       // Re-resolve so the enlarged dynamic set flows through the exact same
       // filter pipeline (blocked/disabled/native-collision/sub-agent rules).
       // The client's disabledTools list is a snapshot of "not enabled when
@@ -405,6 +422,32 @@ export default class AgenticLoopService {
       // Nothing is left to re-drive: the turn ended in this process.
       await endTurnRun(context);
     }
+  }
+
+  /**
+   * Whether this turn's pre-flight picks reach the model as an activation
+   * instead of joining the declared tools (Persona.activatePreflightTools).
+   * Only where an activation needs no tool call to hang on — the `tool_call`
+   * bridge (Gemini, local models) — and only when the surface will declare
+   * the bridge (a discovery tool is loaded) and every pick is activatable.
+   * Anything else keeps today's path: re-resolve, declare the picks.
+   */
+  static async activatesPreflightPicks(
+    context: AgenticContext,
+    resolvedTools: { finalTools: ReadonlyArray<{ name: string }>; discoverableTools?: ReadonlyArray<{ name: string }> },
+    picks: string[],
+  ): Promise<boolean> {
+    if (!context.agent || context.options.isSubAgent) return false;
+    const { default: AgentPersonaRegistry } = await import("./AgentPersonaRegistry.ts");
+    if (AgentPersonaRegistry.get(context.agent)?.activatePreflightTools !== true) return false;
+    const { resolveToolLoadingMode, TOOL_LOADING_MODES } = await import("#src/providers/toolLoading");
+    if (resolveToolLoadingMode(context.providerName, context.resolvedModel) !== TOOL_LOADING_MODES.BRIDGE) {
+      return false;
+    }
+    const { isDiscoveryTool } = await import("./ToolDiscoveryScope.ts");
+    if (!resolvedTools.finalTools.some((tool) => isDiscoveryTool(tool.name))) return false;
+    const activatable = new Set((resolvedTools.discoverableTools ?? []).map((tool) => tool.name));
+    return picks.every((toolName) => activatable.has(toolName));
   }
 
   /**

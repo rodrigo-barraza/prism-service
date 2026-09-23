@@ -672,6 +672,18 @@ export const LuposPersona: Persona = {
       ),
   },
   toolPolicy: (context) => buildToolPolicy(LUPOS_TOOL_POLICY_SECTIONS, context),
+  // A tool he activates mid-turn — a pre-flight pick included — brings the
+  // sections it unlocks (Audio, Video, Music, Discord Actions) in its
+  // tool-update message.
+  toolPolicySections: LUPOS_TOOL_POLICY_SECTIONS,
+  // Every reply is a fresh conversation, so what makes his requests cheap is
+  // a prefix shared ACROSS conversations: the same tools and system prompt
+  // whatever the message. Pre-flight picks used to be declared among his
+  // defaults, reshuffling the tool block (sorted by name) and gating policy
+  // sections into the middle of the system prompt: two Discord messages
+  // shared ~140 tokens of a ~14K prefix. Activated instead, the picks ride
+  // a tool-update message after the user's message (audit K1).
+  activatePreflightTools: true,
   availableTools: LUPOS_AVAILABLE_TOOLS,
   // CORE_DISCOVER is deliberately NOT blocked: Lupos starts lean (see
   // enabledByDefaultTools) and relies on innate tool discovery to reach

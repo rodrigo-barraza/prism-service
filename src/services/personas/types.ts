@@ -117,6 +117,24 @@ export interface Persona {
    * LUPOS: his emoji reaction.
    */
   endTurnAfterTools?: string[];
+  /**
+   * Pre-flight tool discovery's picks reach the model as an activation — a
+   * tool-update message after the user's message, called through the fixed
+   * `tool_call` bridge — instead of joining the declared tool block
+   * (AgenticLoopService). Every conversation of the persona then sends the
+   * same tools and the same system prompt, so a new conversation starts on
+   * a cached prefix (audit K1). For personas whose every turn is a fresh
+   * conversation (LUPOS: one per Discord reply). Bridge-mode providers
+   * (Gemini, local models) only; elsewhere picks are declared as before.
+   */
+  activatePreflightTools?: boolean;
+  /**
+   * The persona's `requires`-gated tool-policy sections, when its toolPolicy
+   * is built from them. A tool activated mid-turn brings the sections it
+   * unlocks in its tool-update message — the system prompt was assembled
+   * before it was callable.
+   */
+  toolPolicySections?: ToolPolicySection[];
   capabilities: string;
   /** When true, tool descriptions in the system prompt are truncated to the first sentence and optional parameters are omitted. Saves ~1,500 tokens for conversational agents that don't need full parameter docs. */
   compactToolDocs?: boolean;
