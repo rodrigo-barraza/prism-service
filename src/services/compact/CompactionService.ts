@@ -27,6 +27,7 @@ import ToolResultOffloadService, {
   type OffloadMetadata,
 } from "./ToolResultOffloadService.ts";
 import { findRecencyBoundary } from "./RecencyProtection.ts";
+import { markDerivedMessage } from "./MessageLineage.ts";
 import {
   buildCompactionSummaryMessage,
   resolveBoundaryAnchorId,
@@ -494,8 +495,12 @@ export default class CompactionService {
       ...collectDroppedDeviationReminders(messages, recentTail),
     );
 
-    // Append recent tail (last few turns the model is actively reasoning about)
-    compactedMessages.push(...recentTail);
+    // Append recent tail (last few turns the model is actively reasoning about).
+    // Its Anthropic thinking blocks stay behind: each one's signature binds
+    // it to the full history it was produced under, which the summary just
+    // replaced — replayed after the swap, the API drops it (or 400s when
+    // binding mismatches are errors). Text and tool calls stay verbatim.
+    compactedMessages.push(...recentTail.map(withoutBoundThinking));
 
     const postCompactTokenCount = estimateTotalTokens(compactedMessages);
 
@@ -826,4 +831,17 @@ async function validateSummaryAgainstTail(
     `[CompactionService] Summary judge patched ${additions.split("\n").length} omission(s) into the summary`,
   );
   return `${summaryText}\n\n## Validation additions (facts the continuation depends on)\n${additions}`;
+}
+
+/**
+ * A retained message without the thinking that binds to the pre-compaction
+ * history: `thinkingBlocks` and the legacy signature go (the Anthropic
+ * adapter only replays a thinking block that has one); the thinking text
+ * stays for display. Persistence still writes the original (MessageLineage).
+ */
+function withoutBoundThinking(message: AdminChatMessage): AdminChatMessage {
+  if (!message.thinkingBlocks?.length && !message.thinkingSignature) return message;
+  const { thinkingBlocks: _thinkingBlocks, thinkingSignature: _thinkingSignature, ...rest } =
+    message;
+  return markDerivedMessage(rest as AdminChatMessage, message);
 }

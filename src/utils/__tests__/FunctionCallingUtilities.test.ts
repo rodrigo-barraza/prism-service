@@ -673,7 +673,7 @@ describe("model-visible tool media", () => {
     ]);
   });
 
-  it("only attaches media for the LAST embedded round, not historical ones", () => {
+  it("keeps every round's media where it was — history is only appended to", () => {
     const messages = [
       {
         role: "assistant",
@@ -694,8 +694,13 @@ describe("model-visible tool media", () => {
 
     const expanded = expandMessagesForFunctionCall(messages, { filterDeleted: false });
     const withImages = expanded.filter((m: any) => Array.isArray(m.images) && m.images.length > 0);
-    expect(withImages).toHaveLength(1);
-    expect(withImages[0].images).toEqual(["https://tools.rod.dev/asset?id=new"]);
+    // A render that vanished once a newer round arrived rewrote the prompt
+    // prefix; each round's render now stays right after its results.
+    expect(withImages).toHaveLength(2);
+    expect(withImages[0].images).toEqual([snapshotResult.snapshot.url]);
+    expect(withImages[1].images).toEqual(["https://tools.rod.dev/asset?id=new"]);
+    const oldRoundIndex = expanded.findIndex((m: any) => m.role === "tool" && m.tool_call_id === "old");
+    expect(expanded[oldRoundIndex + 1]).toBe(withImages[0]);
   });
 
   it("does not attach media for non-http URLs, base64 data, or plain results", () => {

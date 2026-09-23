@@ -61,6 +61,13 @@ export interface CacheTelemetryRecord {
   changed: PrefixComparison["changed"] | null;
   providerResponseId: string | null;
   providerDiagnostics: ProviderCacheDiagnostics | null;
+  /**
+   * The harness rewrote the prefix on purpose for this request (e.g.
+   * `micro_compaction`, `compaction`) — a deliberate boundary, not a leak.
+   */
+  declaredBoundary?: string;
+  /** Anthropic `input_transformations`: thinking blocks the API dropped (empty = history intact). */
+  inputTransformations?: unknown[];
 }
 
 export interface CacheTelemetryRowFields {
@@ -174,12 +181,14 @@ const PromptCacheTelemetry = {
     provider,
     model,
     telemetry,
+    declaredBoundary,
   }: {
     conversationKey: string | null | undefined;
     requestId: string;
     provider: string;
     model: string;
     telemetry: RequestTelemetryChunk | null | undefined;
+    declaredBoundary?: string | null;
   }): CacheTelemetryRowFields | null {
     const prefixHashes = telemetry?.prefixHashes;
     if (!prefixHashes) return null;
@@ -210,6 +219,10 @@ const PromptCacheTelemetry = {
         changed: comparison?.changed ?? null,
         providerResponseId,
         providerDiagnostics,
+        ...(declaredBoundary && { declaredBoundary }),
+        ...(Array.isArray(telemetry.inputTransformations) && {
+          inputTransformations: telemetry.inputTransformations,
+        }),
       },
     };
   },

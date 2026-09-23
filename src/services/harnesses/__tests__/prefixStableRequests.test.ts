@@ -46,6 +46,7 @@ import {
   registerToolCapabilities,
   resetToolCapabilities,
 } from "#src/services/permissions/ToolCapabilities";
+import SettingsService from "#src/services/SettingsService";
 import anthropicProvider from "#src/providers/anthropic";
 import openaiProvider from "#src/providers/openai";
 import googleProvider from "#src/providers/google";
@@ -541,7 +542,7 @@ function queueScript(adapter: AdapterCase, script: ScriptTurn[]) {
 const PNG_BYTES = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
 let fetchSpy: ReturnType<typeof vi.spyOn> | null = null;
 function installFetch() {
-  fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+  fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input instanceof Request ? input.url : input);
     if (url.startsWith("https://img.test/")) {
       return new Response(PNG_BYTES, { status: 200, headers: { "content-type": "image/png" } });
@@ -667,6 +668,76 @@ async function declaredBoundaryIndices(): Promise<Set<number>> {
   return indices;
 }
 
+// ── Mechanism probes on the raw payloads ────────────────────
+
+function rawRequests(adapter: AdapterCase): Array<Record<string, unknown>> {
+  return captured[adapter.provider as "anthropic" | "openai" | "google" | "vllm" | "moonshot"];
+}
+
+/** Every value in a payload, flattened — for "does this block appear anywhere". */
+function allValues(value: unknown, into: unknown[] = []): unknown[] {
+  into.push(value);
+  if (value && typeof value === "object") {
+    for (const entry of Object.values(value as Record<string, unknown>)) allValues(entry, into);
+  }
+  return into;
+}
+const findObjects = (payload: unknown, predicate: (entry: Record<string, unknown>) => boolean) =>
+  allValues(payload).filter(
+    (entry): entry is Record<string, unknown> =>
+      !!entry && typeof entry === "object" && !Array.isArray(entry) && predicate(entry as Record<string, unknown>),
+  );
+
+/** How the discovered tool reached the model — asserted per adapter. */
+function expectActivationDelivered(adapter: AdapterCase, payload: Record<string, unknown>) {
+  const payloadText = JSON.stringify(payload);
+  switch (adapter.id) {
+    case "anthropic (tool_addition)": {
+      const tools = payload.tools as Array<Record<string, unknown>>;
+      expect(tools.find((tool) => tool.name === "get_element")?.defer_loading).toBe(true);
+      const systemMessages = (payload.messages as Array<Record<string, unknown>>).filter((message) => message.role === "system");
+      expect(findObjects(systemMessages, (entry) => entry.type === "tool_addition").map((entry) => (entry.tool as { name: string }).name)).toEqual(["get_element"]);
+      break;
+    }
+    case "anthropic (tool_reference)": {
+      const tools = payload.tools as Array<Record<string, unknown>>;
+      expect(tools.find((tool) => tool.name === "get_element")?.defer_loading).toBe(true);
+      const toolResults = findObjects(payload.messages, (entry) => entry.type === "tool_result");
+      const referencing = toolResults.filter((result) => Array.isArray(result.content) && (result.content as Array<{ type: string }>).every((block) => block.type === "tool_reference"));
+      expect(referencing).toHaveLength(1);
+      expect(referencing[0].content).toEqual([{ type: "tool_reference", tool_name: "get_element" }]);
+      break;
+    }
+    case "openai (additional_tools)":
+      expect(findObjects(payload.input, (entry) => entry.type === "additional_tools").flatMap((entry) => (entry.tools as Array<{ name: string }>).map((tool) => tool.name))).toEqual(["get_element"]);
+      break;
+    case "moonshot (system tools)": {
+      const toolMessages = (payload.messages as Array<Record<string, unknown>>).filter((message) => message.role === "system" && Array.isArray(message.tools));
+      expect(toolMessages).toHaveLength(1);
+      expect("content" in toolMessages[0]).toBe(false);
+      expect((toolMessages[0].tools as Array<{ function: { name: string } }>)[0].function.name).toBe("get_element");
+      break;
+    }
+    default:
+      // The bridge: a fixed tool_call declaration, and the schema in the update text.
+      expect(payloadText).toContain('"tool_call"');
+      expect(payloadText).toContain("Call these through `tool_call`");
+  }
+}
+
+function expectToolChoiceNone(adapter: AdapterCase, payload: Record<string, unknown>) {
+  switch (adapter.provider) {
+    case "anthropic":
+      expect(payload.tool_choice).toEqual({ type: "none" });
+      break;
+    case "google":
+      expect((payload.config as Record<string, unknown>).toolConfig).toEqual({ functionCallingConfig: { mode: "NONE" } });
+      break;
+    default:
+      expect(payload.tool_choice).toBe("none");
+  }
+}
+
 // ── Loop factory ─────────────────────────────────────────────
 
 function providerFor(adapter: AdapterCase) {
@@ -758,9 +829,10 @@ const SCENARIOS: Scenario[] = [
       { calls: [{ name: "get_element", args: { symbol: "Fe" }, discovered: true }] },
       { text: "Iron is 7.874 g/cm3." },
     ],
-    verify: (_adapter, requests) => {
+    verify: (adapter, requests) => {
       expect(executedToolNames).toEqual(["discover_and_enable_tools", "get_element"]);
       expect(requests).toHaveLength(3);
+      expectActivationDelivered(adapter, rawRequests(adapter)[1]);
     },
   },
   {
@@ -776,6 +848,8 @@ const SCENARIOS: Scenario[] = [
       expect(executedToolNames).toEqual(["enter_plan_mode", "get_element", "exit_plan_mode"]);
       expect(state.planModeActive).toBe(false);
       expect(requests).toHaveLength(4);
+      expect(requests[1].items.some((item) => item.includes("harness.planningMode.planModeOn"))).toBe(true);
+      expect(requests[3].items.some((item) => item.includes("harness.planningMode.planModeOff"))).toBe(true);
     },
   },
   {
@@ -837,9 +911,15 @@ const SCENARIOS: Scenario[] = [
       ...["Fe", "Cu", "Ag", "Au", "Pt", "Pb", "Zn"].map((symbol) => ({ calls: [{ name: "get_element", args: { symbol } }] }) as ScriptTurn),
       { text: "Seven elements looked up." },
     ],
-    verify: (_adapter, requests) => {
+    verify: (adapter, requests) => {
       expect(requests).toHaveLength(8);
-      expect(requests[5].items.some((item) => item.includes("SYSTEM_REMINDER") || item.includes("system_reminder") || item.includes("harness.systemReminder"))).toBe(true);
+      expect(requests[5].items.some((item) => item.includes("harness.systemReminder"))).toBe(true);
+      if (adapter.id === "anthropic (tool_addition)") {
+        // Turn-scoped: stays in the transcript, renders for one turn only.
+        const reminders = findObjects(rawRequests(adapter)[7].messages, (entry) => entry.role === "system" && JSON.stringify(entry).includes("harness.systemReminder"));
+        expect(reminders.length).toBeGreaterThan(0);
+        expect(reminders.every((message) => message.clear_at === "next_user_message")).toBe(true);
+      }
     },
   },
   {
@@ -870,9 +950,10 @@ const SCENARIOS: Scenario[] = [
       { calls: [{ name: "convert_units", args: { value: 7.874, from: "g/cm3", to: "lb/ft3" } }] },
       { text: "Iron: 7.874 g/cm3, 491.6 lb/ft3." },
     ],
-    verify: (_adapter, requests) => {
+    verify: (adapter, requests) => {
       expect(executedToolNames).toEqual(["get_element", "convert_units"]);
       expect(requests).toHaveLength(3);
+      expectToolChoiceNone(adapter, rawRequests(adapter)[2]);
     },
   },
 ];
@@ -940,3 +1021,79 @@ describe("prefix-stable requests — scripted loops through every adapter", () =
   }
 });
 
+describe("Claude preserved thinking — binding mismatches are errors, and none happen", () => {
+  const adapter = ADAPTERS[0]; // claude-opus-5-5: preserved thinking, tool_addition
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    TurnInputMailbox._clearAll();
+    PromptCacheTelemetry._clear();
+    _resetProviderDiagnosticsSupport();
+    captured.anthropic.length = 0;
+    captured.anthropicOptions.length = 0;
+    captured.scripts.anthropic.length = 0;
+    toolContextStores.clear();
+    executedToolNames.length = 0;
+    reportedInputTokens.capByProvider = {};
+    executeToolBatchMock.fn = async (calls, context) =>
+      calls.map((call) => {
+        executedToolNames.push(call.name);
+        return { name: call.name, id: call.id, result: runToolForTest(call, context.agentConversationId ?? ""), durationMilliseconds: 3 };
+      });
+    // Tests and CI run with mismatches as errors; production keeps drop_block.
+    (SettingsService.getCached as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      anthropic: { thinkingBlockBinding: "error" },
+    });
+  });
+
+  afterEach(() => {
+    (SettingsService.getCached as unknown as ReturnType<typeof vi.fn>).mockReturnValue({});
+  });
+
+  it("replays every thinking block verbatim, in order, across a mid-loop tool activation", async () => {
+    queueScript(adapter, [
+      { thinking: "I need a periodic-table tool first.", calls: [{ name: "discover_and_enable_tools", args: { query: "periodic table" } }] },
+      { thinking: "get_element is loaded now; look up iron.", calls: [{ name: "get_element", args: { symbol: "Fe" }, discovered: true }] },
+      { thinking: "I have the density.", text: "Iron is 7.874 g/cm3." },
+    ]);
+    const { harness } = buildLoop(adapter, "conv-binding-error", {
+      toolNames: ["discover_and_enable_tools", "search_web"],
+      discoverable: ["get_element", "convert_units"],
+    });
+    await harness.run();
+
+    expect(executedToolNames).toEqual(["discover_and_enable_tools", "get_element"]);
+    const payloads = captured.anthropic;
+    expect(payloads).toHaveLength(3);
+
+    // Every request opts into enforcement with "error" (and the beta header).
+    for (const [index, payload] of payloads.entries()) {
+      expect((payload.thinking as { block_binding?: unknown }).block_binding).toEqual({ prefix_mismatch_behavior: "error" });
+      const headers = (captured.anthropicOptions[index]?.headers ?? {}) as Record<string, string>;
+      expect(headers["anthropic-beta"]).toContain("thinking-binding-controls-2026-08-01");
+    }
+
+    // The prefix every block was produced under is intact on every request.
+    expectPrefixStable(payloads.map(flattenAnthropic), new Set());
+    expect(payloads[1].tools).toEqual(payloads[0].tools);
+    expect(payloads[2].tools).toEqual(payloads[0].tools);
+
+    const messagesOf = (index: number) => payloads[index].messages as Array<{ role: string; content: unknown; clear_at?: string }>;
+    const blocksOf = (message: { content: unknown }) =>
+      (typeof message.content === "string" ? [{ type: "text", text: message.content }] : message.content) as Array<Record<string, unknown>>;
+
+    // Request 2: question → assistant(thinking, tool_use) → tool result → tool_addition.
+    const second = messagesOf(1);
+    expect(second.map((message) => message.role)).toEqual(["user", "assistant", "user", "system"]);
+    expect(blocksOf(second[1])[0]).toEqual({ type: "thinking", thinking: "I need a periodic-table tool first.", signature: "sig_0" });
+    expect(blocksOf(second[1])[1]).toMatchObject({ type: "tool_use", name: "discover_and_enable_tools" });
+    expect(blocksOf(second[3]).map((block) => block.type)).toEqual(["text", "tool_addition"]);
+
+    // Request 3: the activation stays where it was sent (checked byte for
+    // byte above), and the second turn's thinking follows it, verbatim.
+    const third = messagesOf(2);
+    expect(third.map((message) => message.role)).toEqual(["user", "assistant", "user", "system", "assistant", "user"]);
+    expect(blocksOf(third[4])[0]).toEqual({ type: "thinking", thinking: "get_element is loaded now; look up iron.", signature: "sig_1" });
+    expect(blocksOf(third[4])[1]).toMatchObject({ type: "tool_use", name: "get_element", input: { symbol: "Fe" } });
+  });
+});

@@ -44,10 +44,18 @@ import {
 } from "./lifecycle/PostExecutionEmitter.ts";
 import { runExhaustionRecoveryPass } from "./lifecycle/ExhaustionRecovery.ts";
 import {
-  blockUnauthorizedToolCalls,
   handleExitPlanMode,
   checkForPlanModeEntry,
 } from "./lifecycle/PlanModeController.ts";
+import {
+  flushPlanModeNotice,
+  gatePlanModeCalls,
+  planModeNotice,
+} from "./lifecycle/PlanModeGate.ts";
+import {
+  transcriptCallOf,
+  unwrapBridgedToolCalls,
+} from "./lifecycle/ToolSurface.ts";
 import { validateAfterToolExecution } from "./lifecycle/ValidationInterceptor.ts";
 import { buildToolRetryGuidance } from "./lifecycle/ToolRetryInterceptor.ts";
 import {
@@ -80,7 +88,6 @@ import {
 import { checkCostBudget } from "./lifecycle/CostBudgetEnforcer.ts";
 import SemanticStallDetector from "./lifecycle/SemanticStallDetector.ts";
 
-import PlanningModeService from "#src/services/PlanningModeService";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import ConversationStatusRegistry from "#src/services/ConversationStatusRegistry";
 import { HARNESS, AGENT_DIRECTIVES } from "#src/constants";
@@ -123,6 +130,30 @@ function providerNativeState(pass: PassState) {
     ...(pass.thinkingBlocks &&
       pass.thinkingBlocks.length > 0 && { thinkingBlocks: pass.thinkingBlocks }),
   };
+}
+
+/**
+ * The tool calls of a pass as the transcript keeps them: what the model
+ * sent (a bridged call stays `tool_call`, with `bridgedName` for display),
+ * each with its result.
+ */
+function transcriptToolCalls(pass: PassState, results: ToolResult[]) {
+  return pass.pendingToolCalls.map((toolCall) => {
+    const result = results.find((entry) => entry.id === toolCall.id);
+    const sent = transcriptCallOf(toolCall);
+    return {
+      id: toolCall.id || null,
+      responsesItemId: toolCall.responsesItemId,
+      name: sent.name,
+      args: sent.args,
+      ...(sent.bridgedName && { bridgedName: sent.bridgedName }),
+      thoughtSignature: toolCall.thoughtSignature,
+      reasoningItem: toolCall.reasoningItem,
+      result: result ? result.result : null,
+      durationMilliseconds: result?.durationMilliseconds,
+      ...approvalRecordFor(toolCall),
+    };
+  });
 }
 
 /** Compute thinking and content phase durations from a PassState's timestamps. */
@@ -433,9 +464,11 @@ export default class ReActHarness extends BaseAgenticHarness {
             });
           }
 
+          // Plan mode is announced after the user message, never spliced
+          // into the history the previous turn's requests sent.
           if (state.planModeActive) {
-            await PlanningModeService.injectPlanningInstruction(
-              currentMessages,
+            currentMessages.push(
+              planModeNotice("entered", options.locale as string | undefined),
             );
           }
 
@@ -449,26 +482,17 @@ export default class ReActHarness extends BaseAgenticHarness {
         }
 
         // ── Build pass options ─────────────────────────────────
+        // The same tool block on every request of the turn — plan mode and
+        // tools activated mid-loop never change it (lifecycle/ToolSurface.ts).
         const passOptions: IterationPassOptions = {
           ...options,
           project,
           agent,
           username,
           profileId,
+          ...this.requestToolOptions(),
         };
-        if (state.planModeActive) {
-          const planModeTools = this.tools.finalTools.filter(
-            (tool: ToolSchema) => tool.name === TOOL_NAMES.EXIT_PLAN_MODE,
-          );
-          passOptions.tools = planModeTools;
-        } else {
-          passOptions.tools = this.tools.finalTools;
-        }
-
-        const resolvedPassTools = passOptions.tools || [];
-        const allowedToolNames = new Set(
-          resolvedPassTools.map((tool: ToolSchema) => tool.name),
-        );
+        const allowedToolNames = this.callableToolNames();
 
         // ── Context pressure management ──────────────────────────
         const pressureResult = await manageContextPressure(
@@ -581,6 +605,7 @@ export default class ReActHarness extends BaseAgenticHarness {
                   activeLocale,
                 ),
               ),
+              turnScoped: true,
             });
 
             const retryPassOptions = this.deviationEngine.perturbRetryOptions(
@@ -722,26 +747,28 @@ export default class ReActHarness extends BaseAgenticHarness {
 
         // ── Tool execution ─────────────────────────────────────
         if (pass.pendingToolCalls.length > 0) {
-          if (state.planModeActive) {
-            const { allBlocked } = blockUnauthorizedToolCalls(
-              pass.pendingToolCalls,
-              currentMessages,
-              pass,
-              state,
-              this.context.options?.locale as string | undefined,
-            );
-            if (allBlocked) {
-              this.logIteration(pass, currentMessages);
-              continue;
-            }
-          }
+          // A `tool_call(name, args)` bridge call becomes the call it names
+          // before anything below sees it, so hooks, rules and approval judge
+          // the real tool. Plan mode then lets only read-only calls through.
+          // Neither step touches the request: the transcript keeps what the
+          // model sent, and a call that does not run gets an error result.
+          const bridge = unwrapBridgedToolCalls(
+            pass.pendingToolCalls,
+            this.tools.finalTools,
+          );
+          const planGate = state.planModeActive
+            ? gatePlanModeCalls(
+                bridge.callable,
+                this.context.options?.locale as string | undefined,
+              )
+            : { callable: bridge.callable, rejected: [] };
 
           // PreToolUse runs BEFORE the approval gate (hooks → rules → mode →
           // ask): a hook deny never reaches a human, a hook `ask` becomes an
           // approval request. The gate itself fires PermissionRequest and —
           // only when a person is actually asked — Notification.
           const preToolUse = await runPreToolUseStage(
-            pass.pendingToolCalls,
+            planGate.callable,
             context,
             hooks,
             state,
@@ -772,7 +799,13 @@ export default class ReActHarness extends BaseAgenticHarness {
               : [];
           const results: ToolResult[] = orderResultsLikeCalls(
             pass.pendingToolCalls,
-            [...executedResults, ...blockedResults, ...preToolUse.blocked],
+            [
+              ...executedResults,
+              ...blockedResults,
+              ...preToolUse.blocked,
+              ...bridge.rejected,
+              ...planGate.rejected,
+            ],
           );
 
           await processToolResultMedia(
@@ -814,20 +847,7 @@ export default class ReActHarness extends BaseAgenticHarness {
               thinkingSignature: pass.thinkingSignature,
               ...computePassPhaseDurations(pass),
               ...providerNativeState(pass),
-              toolCalls: pass.pendingToolCalls.map(tc => {
-                const res = results.find(r => r.id === tc.id);
-                return {
-                  id: tc.id || null,
-                  responsesItemId: tc.responsesItemId,
-                  name: tc.name,
-                  args: tc.args,
-                  thoughtSignature: tc.thoughtSignature,
-                  reasoningItem: tc.reasoningItem,
-                  result: res ? res.result : null,
-                  durationMilliseconds: res?.durationMilliseconds,
-                  ...approvalRecordFor(tc),
-                };
-              }),
+              toolCalls: transcriptToolCalls(pass, results),
             });
             flushHookContext(currentMessages, state);
 
@@ -858,6 +878,9 @@ export default class ReActHarness extends BaseAgenticHarness {
               exitPlanToolCall, pass, results, currentMessages, context, state,
             );
             isPlanRejected = !shouldContinueLoop;
+            if (shouldContinueLoop && !state.planModeActive) {
+              state.pendingPlanModeNotice = "exited";
+            }
           }
 
           const assistantMessage: ConversationMessage = {
@@ -867,23 +890,15 @@ export default class ReActHarness extends BaseAgenticHarness {
             thinkingSignature: pass.thinkingSignature,
             ...computePassPhaseDurations(pass),
             ...providerNativeState(pass),
-            toolCalls: pass.pendingToolCalls.map(tc => {
-              const res = results.find(r => r.id === tc.id);
-              return {
-                id: tc.id || null,
-                responsesItemId: tc.responsesItemId,
-                name: tc.name,
-                args: tc.args,
-                thoughtSignature: tc.thoughtSignature,
-                reasoningItem: tc.reasoningItem,
-                result: res ? res.result : null,
-                durationMilliseconds: res?.durationMilliseconds,
-                ...approvalRecordFor(tc),
-              };
-            }),
+            toolCalls: transcriptToolCalls(pass, results),
           };
           currentMessages.push(assistantMessage);
           flushHookContext(currentMessages, state);
+          flushPlanModeNotice(
+            currentMessages,
+            state,
+            this.context.options?.locale as string | undefined,
+          );
 
           for (const tc of pass.pendingToolCalls) {
             const res = results.find(r => r.id === tc.id);
@@ -907,17 +922,14 @@ export default class ReActHarness extends BaseAgenticHarness {
           const retryGuidance = buildToolRetryGuidance(
             pass.pendingToolCalls, results, state, MAX_CONSECUTIVE_TOOL_ERRORS, this.context.options?.locale as string,
           );
-          if (retryGuidance) currentMessages.push(retryGuidance);
+          if (retryGuidance) currentMessages.push({ ...retryGuidance, turnScoped: true });
 
-          // Drop empty assistant messages — but NEVER thinking-only ones.
-          // Deleting a mid-history thinking message orphans its
-          // "[System: Reasoning preserved…]" nudge, loses the thinking
-          // signature, and mutates the prompt prefix (full re-prefill,
-          // busting the provider prompt cache).
-          currentMessages = currentMessages.filter(m => !(m.role === "assistant" && !m.content?.trim() && !m.thinking?.trim() && (!m.toolCalls || m.toolCalls.length === 0)));
+          // Empty assistant messages stay where they are: history is only
+          // ever appended to, so every request starts with the previous one
+          // (adapters send them as a placeholder).
 
           injectToolDiscoveryNudge(pass.pendingToolCalls, results, currentMessages, context);
-          this.checkAndApplyToolSetChanges(currentMessages, pass.usage);
+          this.checkAndApplyToolSetChanges(currentMessages, pass.usage, pass.pendingToolCalls);
           this.logIteration(pass, currentMessages);
 
           // Feed the completed iteration to the mid-stream deviation
@@ -941,6 +953,7 @@ export default class ReActHarness extends BaseAgenticHarness {
                   SYSTEM_MESSAGE_TAGS.BEHAVIORAL_LOOP,
                   "You are in a behavioral loop. Try a different approach.",
                 ),
+                turnScoped: true,
               });
             }
           }
@@ -1148,6 +1161,7 @@ export default class ReActHarness extends BaseAgenticHarness {
               SYSTEM_MESSAGE_TAGS.EMPTY_OUTPUT,
               "Your previous response was empty. Please provide output.",
             ),
+            turnScoped: true,
           });
           this.logIteration(pass, currentMessages);
           continue;
