@@ -1,330 +1,317 @@
 /**
- * BenchmarkExecutor — one prompt through the real request path, observed.
+ * BenchmarkExecutor — one contestant answers one case, through the real
+ * request path, observed.
  *
- * Runs a prompt the way a client would (handleAgent when the target is an
- * agent or has tools, handleConversation otherwise), collects the stream,
- * and returns what graders need: the reply, the thinking, the tool trace,
- * turns, usage, cost and timing. Nothing here grades — single-prompt
- * benchmarks (BenchmarkService) and dataset runs (DatasetRunner) both build
- * on it. Harness settings (effort, compaction threshold, tool discovery,
- * topology) and a workspace root become the same request fields a client
- * would send.
+ * A contestant runs the way a client would send it: a model without tools
+ * through handleConversation, a model with tools or an agent persona
+ * through handleAgent (unattended, auto-approved, its harness knobs as the
+ * same request fields a client sends). The stream is collected into what
+ * scorers need — the reply, the thinking, the tool trace, turns, usage,
+ * cost and timing — and failures are classified, so the run can retry an
+ * infrastructure error and count a model's own failure. Nothing here grades.
  */
-import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { handleConversation, handleAgent } from "#src/routes/ChatRoutes";
 import logger from "#src/utils/logger";
-import { BENCHMARK } from "#src/constants";
 import type { SseEvent } from "#src/types/SseTypes";
-import type { BenchmarkToolCall, HarnessSettings } from "#src/types/benchmark";
+import type {
+  CaseMessage,
+  Contestant,
+  SampleError,
+  SampleOutput,
+  SampleToolCall,
+  SampleUsage,
+  SuiteToolPolicy,
+} from "#src/types/benchmark";
 
-export interface BenchmarkExecutionTarget {
-  provider: string;
-  model: string;
-  thinkingEnabled?: boolean;
-  toolsEnabled?: boolean;
-  agent?: string;
-  locale?: string;
-  enabledTools?: string[];
-}
+/** The tools a sample runs with, resolved from the contestant and the suite. */
+export type ResolvedTools = SuiteToolPolicy;
 
-export interface BenchmarkExecutionRequest {
-  prompt: string;
+export interface ExecutionRequest {
+  contestant: Contestant;
   systemPrompt?: string | null;
-  target: BenchmarkExecutionTarget;
-  /** Tools the run is limited to (undefined: the persona's own). */
-  enabledTools?: string[];
-  /** True when the tools above were chosen for this run, not defaulted. */
-  constrainTools?: boolean;
-  temperature?: number;
-  maxTokens?: number;
-  settings?: HarnessSettings;
-  /** The run's workspace root (a dataset case's scratch workspace). */
+  /** The conversation, ending on a user turn. */
+  messages: CaseMessage[];
+  tools: ResolvedTools;
+  /** Ceilings from the suite (the contestant's own lower values win). */
+  maxIterations?: number | null;
+  maxTokens?: number | null;
   workspaceRoot?: string | null;
   project: string | null;
   username: string;
+  /** The run's stop (cancel, budget). */
   signal?: AbortSignal;
-  onEvent?: (event: BenchmarkEvent) => void;
+  /** Wall clock for this sample (milliseconds). */
+  timeoutMs: number;
+  /** Every streamed event, for live views (arena battles). */
+  onEvent?: (event: StreamedEvent) => void;
 }
 
-export interface BenchmarkEvent {
+export interface StreamedEvent {
   type: string;
   content?: string;
   message?: string;
   status?: string;
-  usage?: Record<string, number>;
+  code?: string;
+  retryable?: boolean;
+  usage?: Record<string, number | null | undefined> | null;
   estimatedCost?: number | null;
+  tokensPerSec?: number | null;
   tokensPerSecond?: number | null;
   id?: string;
   name?: string;
-  args?: Record<string, unknown>;
+  args?: unknown;
   result?: unknown;
-  tool?: {
-    id?: string;
-    name?: string;
-    args?: Record<string, unknown>;
-    result?: unknown;
-  };
+  tool?: { id?: string; name?: string; args?: unknown; result?: unknown };
   [key: string]: unknown;
 }
 
-export interface BenchmarkExecution {
-  response: string;
-  thinking: string;
-  toolCalls: BenchmarkToolCall[];
-  toolNames: string[];
-  turnCount: number;
-  usage: Record<string, number> | null;
-  estimatedCost: number | null;
-  /** Seconds, unrounded. */
-  latency: number;
-  ttftMilliseconds: number | null;
+export interface Execution {
+  output: SampleOutput;
+  usage: SampleUsage | null;
+  cost: number | null;
+  latencyMs: number;
+  ttftMs: number | null;
   tokensPerSecond: number | null;
-  /** Set when the run failed (an error event, a throw, an abort). */
-  error: string | null;
+  error: SampleError | null;
 }
 
-/** Whether a target runs through the agent loop (tools, persona) or as a plain chat. */
-export function usesAgentHandler(target: BenchmarkExecutionTarget): boolean {
-  return !!(target.agent || target.toolsEnabled);
+const CONTENT_EVENT_TYPES = new Set(["chunk", "thinking", "toolCall", "tool_execution", "tool_output"]);
+/** Error codes that a later attempt may not repeat. */
+const RETRYABLE_CODES = new Set(["rate_limited", "overloaded", "internal"]);
+const DEFAULT_AGENT_ITERATIONS = 12;
+
+/** Whether the contestant runs through the agent loop. */
+export function usesAgentLoop(contestant: Contestant, tools: ResolvedTools): boolean {
+  return contestant.kind === "agent" || tools.mode === "list";
 }
 
 /**
- * The request fields a run's harness settings become. Effort needs thinking
- * on — ChatRoutes strips every thinking sub-parameter when it is off — and
- * "none" turns it off.
+ * The tools a sample runs with. A contestant's own list wins. Otherwise a
+ * suite that names its tools gives every contestant those; a suite without
+ * tools leaves a model with none and an agent with its persona's — an
+ * agent's tools are part of what is being measured ("does my agent beat
+ * the bare model?"), so contestants validation refuses `tools: "none"` on
+ * an agent rather than pretending to strip its core tools.
  */
-export function harnessSettingParams(settings: HarnessSettings = {}): Record<string, unknown> {
+export function resolveTools(contestant: Contestant, suitePolicy: SuiteToolPolicy): ResolvedTools {
+  if (Array.isArray(contestant.tools)) {
+    return contestant.tools.length > 0 ? { mode: "list", tools: contestant.tools } : { mode: "none" };
+  }
+  if (suitePolicy.mode === "list") return suitePolicy;
+  if (contestant.kind === "agent") return { mode: "agent" };
+  return { mode: "none" };
+}
+
+const lowest = (...values: Array<number | null | undefined>) => {
+  const present = values.filter((value): value is number => typeof value === "number" && value > 0);
+  return present.length > 0 ? Math.min(...present) : undefined;
+};
+
+/** The request a client would send for this contestant and case. */
+export function buildRequest(request: ExecutionRequest): Record<string, unknown> {
+  const { contestant, tools } = request;
+  const systemParts = [contestant.systemPrompt, request.systemPrompt].filter(
+    (part): part is string => typeof part === "string" && part.trim().length > 0,
+  );
+  const messages = [
+    ...(systemParts.length > 0 ? [{ role: "system", content: systemParts.join("\n\n") }] : []),
+    ...request.messages.map((message) => ({ role: message.role, content: message.content })),
+  ];
+  const agentLoop = usesAgentLoop(contestant, tools);
+  const harness = contestant.harness ?? {};
+  const maxTokens = lowest(contestant.maxTokens, request.maxTokens);
   return {
-    ...(settings.effort && {
-      thinkingEnabled: settings.effort !== "none",
-      reasoningEffort: settings.effort,
+    provider: contestant.provider,
+    model: contestant.model,
+    messages,
+    project: request.project,
+    username: request.username,
+    skipConversation: true,
+    ...(contestant.temperature != null && { temperature: contestant.temperature }),
+    ...(contestant.topP != null && { topP: contestant.topP }),
+    ...(contestant.seed != null && { seed: contestant.seed }),
+    ...(maxTokens !== undefined && { maxTokens }),
+    ...(contestant.effort && {
+      thinkingEnabled: contestant.effort !== "none",
+      ...(contestant.effort !== "none" && { reasoningEffort: contestant.effort }),
     }),
-    ...(settings.compactionThreshold && {
-      contextWindowLimit: settings.compactionThreshold,
+    ...(contestant.webSearch != null && { webSearch: contestant.webSearch }),
+    ...(agentLoop && {
+      ...(contestant.kind === "agent" && contestant.agent && { agent: contestant.agent }),
+      agenticLoopEnabled: true,
+      // No memories, workflows, embeddings, user hooks, timers or crons:
+      // nothing of one sample reaches another, or outlives the run.
+      evaluation: true,
+      // Full auto only over tools the suite or contestant named. An agent on
+      // its own persona's tools runs the read-only ones; a write or a shell
+      // call would act on the user's real world unasked, so it is denied.
+      autoApprove: tools.mode === "list",
+      // Nobody is watching: an ask no "approve all" answers is denied, not parked.
+      unattended: true,
+      onBudgetReached: "stop",
+      maxIterations: lowest(harness.maxIterations, request.maxIterations) ?? DEFAULT_AGENT_ITERATIONS,
+      ...(harness.toolDiscovery && { toolDiscovery: harness.toolDiscovery }),
+      ...(harness.compactionThreshold && { contextWindowLimit: harness.compactionThreshold }),
+      ...(harness.topology && { topology: harness.topology }),
+      ...(harness.thoughtStructure && { thoughtStructure: harness.thoughtStructure }),
+      ...(tools.mode === "list" && {
+        functionCallingEnabled: true,
+        enabledTools: tools.tools,
+      }),
+      ...(request.workspaceRoot && { workspaceRoot: request.workspaceRoot }),
     }),
-    ...(settings.toolDiscovery && { toolDiscovery: settings.toolDiscovery }),
-    ...(settings.topology && { topology: settings.topology }),
   };
 }
 
-const CONTENT_EVENT_TYPES = new Set([
-  "chunk",
-  "thinking",
-  "toolCall",
-  "tool_execution",
-  "tool_output",
-]);
+function normaliseUsage(raw: Record<string, number | null | undefined> | null | undefined): SampleUsage | null {
+  if (!raw) return null;
+  const read = (key: string) => (typeof raw[key] === "number" ? (raw[key] as number) : 0);
+  const input = read("totalInputTokens") || read("inputTokens") + read("cacheReadInputTokens") + read("cacheCreationInputTokens");
+  return {
+    inputTokens: input,
+    outputTokens: read("outputTokens"),
+    reasoningTokens: read("reasoningOutputTokens"),
+    cacheReadTokens: read("cacheReadInputTokens"),
+    cacheWriteTokens: read("cacheCreationInputTokens"),
+  };
+}
 
-/** Run one prompt and observe it. Never throws — failures come back in `error`. */
-export async function executeBenchmarkPrompt(
-  request: BenchmarkExecutionRequest,
-): Promise<BenchmarkExecution> {
-  const { target, signal, onEvent } = request;
-  const failure = (latency: number, error: string): BenchmarkExecution => ({
-    response: "",
-    thinking: "",
-    toolCalls: [],
-    toolNames: [],
-    turnCount: 0,
-    usage: null,
-    estimatedCost: null,
-    latency,
-    ttftMilliseconds: null,
-    tokensPerSecond: null,
-    error,
-  });
-  if (signal?.aborted) {
-    logger.info(`[benchmark] ⏭ Skipping ${target.provider}/${target.model} — already aborted`);
-    return failure(0, "Aborted");
+/** A failure: whether sending the same sample again could succeed. */
+export function classifyFailure(
+  message: string,
+  { code, retryable, timedOut, cancelled }: { code?: string; retryable?: boolean; timedOut?: boolean; cancelled?: boolean },
+): SampleError {
+  if (cancelled) return { kind: "cancelled", message, retryable: false };
+  if (timedOut) return { kind: "timeout", message, retryable: false };
+  if (code === "refusal") return { kind: "refusal", message, retryable: false };
+  if (code === "tool_failure") return { kind: "harness", message, retryable: false };
+  if (code) {
+    return { kind: "provider", message, retryable: retryable ?? RETRYABLE_CODES.has(code) };
   }
+  const transient = /\b(429|5\d\d|timeout|timed out|ECONNRESET|ECONNREFUSED|ETIMEDOUT|fetch failed|socket hang up|overloaded|rate limit|ended early)\b/i;
+  return { kind: "provider", message, retryable: retryable ?? transient.test(message) };
+}
 
+const emptyOutput = (): SampleOutput => ({ text: "", thinking: null, toolCalls: [], turns: 0 });
+
+/** Run one sample and observe it. Never throws — failures come back in `error`. */
+export async function executeSample(request: ExecutionRequest): Promise<Execution> {
+  const { contestant, signal } = request;
   const start = performance.now();
-  let firstContentAt: number | null = null;
-  const messages: Array<{ role: string; content: string }> = [];
-  if (request.systemPrompt) {
-    messages.push({ role: "system", content: request.systemPrompt });
+  const elapsed = () => Math.round(performance.now() - start);
+  if (signal?.aborted) {
+    return {
+      output: emptyOutput(),
+      usage: null,
+      cost: null,
+      latencyMs: 0,
+      ttftMs: null,
+      tokensPerSecond: null,
+      error: classifyFailure("Run stopped", { cancelled: true }),
+    };
   }
-  messages.push({ role: "user", content: request.prompt });
-  logger.info(`[benchmark] ▶ Running ${target.provider}/${target.model}`);
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, request.timeoutMs);
+  const forwardAbort = () => controller.abort();
+  signal?.addEventListener("abort", forwardAbort, { once: true });
 
+  const events: StreamedEvent[] = [];
+  let firstContentAt: number | null = null;
+  const tools = request.tools;
+  const handler = usesAgentLoop(contestant, tools) ? handleAgent : handleConversation;
   try {
-    const events: BenchmarkEvent[] = [];
-    const useAgentHandler = usesAgentHandler(target);
-    const handler = useAgentHandler ? handleAgent : handleConversation;
-    const enabledTools = request.enabledTools;
     await handler(
-      {
-        provider: target.provider,
-        model: target.model,
-        messages,
-        temperature: request.temperature ?? 0,
-        maxTokens: Math.max(
-          request.maxTokens ?? BENCHMARK.DEFAULT_MAX_TOKENS,
-          BENCHMARK.DEFAULT_MAX_TOKENS,
-        ),
-        project: request.project,
-        username: request.username,
-        skipConversation: true,
-        thinkingEnabled: target.thinkingEnabled || false,
-        ...(target.locale && { locale: target.locale }),
-        ...(useAgentHandler && {
-          ...(target.agent && { agent: target.agent }),
-          agenticLoopEnabled: true,
-          autoApprove: true,
-          // Unattended: an ask no "approve all" answers is denied, not parked.
-          unattended: true,
-          maxIterations: 10,
-        }),
-        // Plain models with tools get an explicit tool set; agents keep
-        // their persona's tools unless the run constrains them.
-        ...(target.toolsEnabled &&
-          !target.agent &&
-          enabledTools && {
-            functionCallingEnabled: true,
-            enabledTools,
-          }),
-        ...(target.agent &&
-          enabledTools &&
-          request.constrainTools && {
-            enabledTools,
-          }),
-        ...(useAgentHandler && request.workspaceRoot && { workspaceRoot: request.workspaceRoot }),
-        ...harnessSettingParams(request.settings),
-      },
+      buildRequest(request),
       (event: SseEvent) => {
-        const benchmarkEvent = event as SseEvent & BenchmarkEvent;
-        events.push(benchmarkEvent);
-        const isContentEvent = CONTENT_EVENT_TYPES.has(benchmarkEvent.type);
-        // Time-to-first-token: first streamed content of any kind
-        if (isContentEvent && firstContentAt === null) {
-          firstContentAt = performance.now();
-        }
-        // Forward chunk/thinking/tool events in real-time for live preview
-        if (isContentEvent && onEvent) {
+        const streamed = event as SseEvent & StreamedEvent;
+        events.push(streamed);
+        if (CONTENT_EVENT_TYPES.has(streamed.type) && firstContentAt === null) firstContentAt = performance.now();
+        if (request.onEvent) {
           try {
-            onEvent(benchmarkEvent);
+            request.onEvent(streamed);
           } catch {
-            /* noop */
+            /* a listener never breaks a sample */
           }
         }
-        if (benchmarkEvent.type === "chunk") {
-          logger.info(
-            `[benchmark]   📦 ${target.model} chunk (${benchmarkEvent.content?.length || 0} chars)`,
-          );
-        } else if (benchmarkEvent.type === "error") {
-          logger.error(`[benchmark]   ❌ ${target.model} error: ${benchmarkEvent.message}`);
-        } else if (benchmarkEvent.type === "done") {
-          logger.info(
-            `[benchmark]   ✅ ${target.model} done — usage: ${JSON.stringify(benchmarkEvent.usage || null)}, cost: ${benchmarkEvent.estimatedCost ?? "N/A"}`,
-          );
-        } else {
-          logger.info(`[benchmark]   📨 ${target.model} event: ${benchmarkEvent.type}`);
-        }
       },
-      { signal },
+      { signal: controller.signal },
     );
-    const latency = (performance.now() - start) / 1000;
-    const eventTypes = events.map((event) => event.type);
-    logger.info(
-      `[benchmark] ◀ ${target.model} finished in ${latency.toFixed(2)}s — events: [${eventTypes.join(", ")}]`,
-    );
-    const errorEvent = events.find((event) => event.type === "error");
-    if (errorEvent) {
-      logger.warn(`[benchmark]   ⚠ ${target.model} returned error event: ${errorEvent.message}`);
-      return failure(latency, errorEvent.message || "Unknown error");
-    }
-    const text = events
-      .filter((event) => event.type === "chunk")
-      .map((event) => event.content)
-      .join("");
-    if (!text) {
-      logger.warn(
-        `[benchmark]   ⚠ ${target.model} produced NO text — chunk count: ${events.filter((event) => event.type === "chunk").length}, all events: ${JSON.stringify(eventTypes)}`,
-      );
-    }
-    const doneEvent = events.find((event) => event.type === "done") || ({} as BenchmarkEvent);
-    const thinkingText = events
-      .filter((event) => event.type === "thinking")
-      .map((event) => event.content)
-      .join("");
-    // Tool calls come from two event paths:
-    // - "toolCall" with status "done" — native MCP path (e.g. LM Studio)
-    // - "tool_execution" with status "done"/"error" — standard agentic path
-    const nativeToolCalls: BenchmarkToolCall[] = events
+  } catch (error: unknown) {
+    events.push({ type: "error", message: getErrorMessage(error) });
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", forwardAbort);
+  }
+  const latencyMs = elapsed();
+  const ttftMs = firstContentAt !== null ? Math.round(firstContentAt - start) : null;
+
+  const text = events
+    .filter((event) => event.type === "chunk")
+    .map((event) => event.content ?? "")
+    .join("");
+  const thinking = events
+    .filter((event) => event.type === "thinking")
+    .map((event) => event.content ?? "")
+    .join("");
+  // Tool calls come from two paths: "toolCall" with status done (native
+  // provider tools), and "tool_execution" done/error (the agent loop).
+  const toolCalls: SampleToolCall[] = [
+    ...events
       .filter((event) => event.type === "toolCall" && event.status === "done")
-      .map((toolCall) => ({
-        id: toolCall.id,
-        name: toolCall.name,
-        args: toolCall.args,
-        result: toolCall.result,
-        status: "done",
-      }));
-    const agenticToolCalls: BenchmarkToolCall[] = events
-      .filter(
-        (event) =>
-          event.type === "tool_execution" &&
-          (event.status === "done" || event.status === "error"),
-      )
+      .map((event) => ({ id: event.id, name: event.name, args: event.args, result: event.result, status: "done" })),
+    ...events
+      .filter((event) => event.type === "tool_execution" && (event.status === "done" || event.status === "error"))
       .map((event) => ({
         id: event.tool?.id,
         name: event.tool?.name,
         args: event.tool?.args,
         result: event.tool?.result,
         status: event.status || "done",
-      }));
-    const toolCalls = [...nativeToolCalls, ...agenticToolCalls];
-    const toolNames = [
-      ...new Set(
-        toolCalls.map((toolCall) => toolCall.name).filter((name): name is string => Boolean(name)),
-      ),
-    ];
-    // A turn is roughly: user→model→(tools)→model. "done" events mark turns.
-    const turnCount = events.filter((event) => event.type === "done").length || 1;
-    const ttftMilliseconds = firstContentAt !== null ? Math.round(firstContentAt - start) : null;
-    const usage = (doneEvent.usage as Record<string, number>) || null;
-    let tokensPerSecond =
-      typeof doneEvent.tokensPerSecond === "number" && doneEvent.tokensPerSecond > 0
-        ? doneEvent.tokensPerSecond
-        : null;
-    if (tokensPerSecond === null && usage?.outputTokens) {
-      const generationSeconds =
-        ttftMilliseconds !== null ? Math.max(latency - ttftMilliseconds / 1000, 0.001) : latency;
-      if (generationSeconds > 0) {
-        tokensPerSecond = Math.round((usage.outputTokens / generationSeconds) * 10) / 10;
-      }
-    }
-    return {
-      response: text,
-      thinking: thinkingText,
-      toolCalls,
-      toolNames,
-      turnCount,
-      usage,
-      estimatedCost: (doneEvent.estimatedCost as number) ?? null,
-      latency,
-      ttftMilliseconds,
-      tokensPerSecond,
-      error: null,
-    };
-  } catch (error: unknown) {
-    const latency = (performance.now() - start) / 1000;
-    logger.error(`[benchmark]   💥 ${target.model} threw: ${getErrorMessage(error)}`);
-    return failure(latency, getErrorMessage(error));
+      })),
+  ];
+  const doneEvents = events.filter((event) => event.type === "done");
+  const done = doneEvents[doneEvents.length - 1];
+  const rawUsage = (done?.usage ?? null) as Record<string, number | null | undefined> | null;
+  const usage = normaliseUsage(rawUsage);
+  const turns =
+    (typeof rawUsage?.requests === "number" && rawUsage.requests > 0 ? rawUsage.requests : 0) ||
+    doneEvents.length ||
+    (text ? 1 : 0);
+  const reportedRate = done?.tokensPerSec ?? done?.tokensPerSecond;
+  let tokensPerSecond = typeof reportedRate === "number" && reportedRate > 0 ? reportedRate : null;
+  if (tokensPerSecond === null && usage?.outputTokens) {
+    const generationSeconds = Math.max((latencyMs - (ttftMs ?? 0)) / 1000, 0.001);
+    tokensPerSecond = Math.round((usage.outputTokens / generationSeconds) * 10) / 10;
   }
-}
+  const cost = typeof done?.estimatedCost === "number" ? done.estimatedCost : null;
+  const output: SampleOutput = {
+    text,
+    thinking: thinking || null,
+    toolCalls,
+    turns,
+  };
 
-/**
- * The tools a target runs with: its own selection, then the benchmark's or
- * dataset's, then the legacy calculator-only default for plain models with
- * tools on.
- */
-export function resolveEnabledTools(
-  ownerTools: string[] | undefined,
-  target: BenchmarkExecutionTarget,
-): string[] | undefined {
-  if (target.enabledTools?.length) return target.enabledTools;
-  if (ownerTools?.length) return ownerTools;
-  if (target.toolsEnabled) return [TOOL_NAMES.CALCULATE_PRECISE];
-  return undefined;
+  const errorEvent = events.find((event) => event.type === "error");
+  let error: SampleError | null = null;
+  if (timedOut) {
+    error = classifyFailure(`No answer within ${Math.round(request.timeoutMs / 1000)} s`, { timedOut: true });
+  } else if (signal?.aborted) {
+    error = classifyFailure("Run stopped", { cancelled: true });
+  } else if (errorEvent) {
+    error = classifyFailure(errorEvent.message || "Unknown error", {
+      code: typeof errorEvent.code === "string" ? errorEvent.code : undefined,
+      retryable: typeof errorEvent.retryable === "boolean" ? errorEvent.retryable : undefined,
+    });
+  } else if (!done && !text && toolCalls.length === 0) {
+    error = classifyFailure("The stream ended without an answer", {});
+  }
+  if (error) {
+    logger.warn(`[benchmark] ${contestant.label}: ${error.kind} — ${error.message}`);
+  }
+  return { output, usage, cost, latencyMs, ttftMs, tokensPerSecond, error };
 }

@@ -235,6 +235,7 @@ export async function runBeforePromptSetup(
     permissionMode: options._permissionMode,
     capabilityScope: options._capabilityScope,
     untrustedSpans: options._untrustedSpans,
+    evaluation: options.evaluation === true,
   });
   const { hooks } = standardHooks;
 
@@ -250,6 +251,7 @@ export async function runBeforePromptSetup(
     workspaceRoot,
     hookDepth: context.parentAgentConversationId ? 1 : 0,
     emit: emit as (event: Record<string, unknown>) => void,
+    evaluation: options.evaluation === true,
   });
 
   // The same turn-open events the ReAct loop fires. A refusal is reported on
@@ -286,6 +288,7 @@ export async function runBeforePromptSetup(
     // user-pinned rule whenever the conversation ran under Tree-of-Thoughts
     // or Graph-of-Thoughts.
     activeRuleNames: options.activeRuleNames as string[] | undefined,
+    evaluation: options.evaluation === true,
   };
   await hooks.run("beforePrompt", hookContext);
   await fireInstructionsLoaded(

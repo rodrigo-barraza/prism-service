@@ -123,6 +123,10 @@ export const ChatRequestSchema = z
     serviceTier: z.string().nullable().optional(),
     textOnly: z.boolean().nullable().optional(),
     skipConversation: z.boolean().nullable().optional(),
+    // A benchmark sample: the turn reads and writes none of the agent's
+    // learned state (memories, workflows, somatic state, response variety,
+    // conversation embeddings) and runs no user hooks (AgenticOptions.evaluation).
+    evaluation: z.boolean().nullable().optional(),
     autoApprove: z.boolean().nullable().optional(),
     // The conversation's permission mode for this turn (permissions/PermissionModes).
     permissionMode: z

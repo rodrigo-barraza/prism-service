@@ -43,6 +43,13 @@ interface HookInitOptions {
   capabilityScope?: CapabilityScopeHandle | CapabilityScope | null;
   /** The untrusted text the turn has seen — the taint check's input. */
   untrustedSpans?: UntrustedSpans | null;
+  /**
+   * A benchmark sample (AgenticOptions.evaluation): none of the
+   * afterResponse hooks, which all learn from the conversation — one
+   * sample's answer must not reach the next as a memory, a workflow, an
+   * embedding or goal spend.
+   */
+  evaluation?: boolean;
 }
 
 /** Create a fully wired AgentHooks instance with standard lifecycle hooks. */
@@ -54,6 +61,7 @@ export function createStandardHooks({
   permissionMode,
   capabilityScope,
   untrustedSpans,
+  evaluation = false,
 }: HookInitOptions = {}) {
   const hooks = new AgentHooks();
 
@@ -84,6 +92,8 @@ export function createStandardHooks({
     "SystemPromptAssembler",
     "transform",
   );
+
+  if (evaluation) return { hooks, approvalEngine, assembler };
 
   hooks.register(
     "afterResponse",
@@ -144,8 +154,11 @@ export async function attachConfiguredHooks(
     hookDepth?: number;
     /** The run's event stream — where a hook's `systemMessage` is shown. */
     emit?: (event: Record<string, unknown>) => void;
+    /** A benchmark sample runs none: a user's Stop hook is not part of the contestant. */
+    evaluation?: boolean;
   },
 ): Promise<number> {
+  if (scope.evaluation) return 0;
   try {
     const [{ default: MongoWrapper }, { MONGO_DB_NAME }, registry] =
       await Promise.all([

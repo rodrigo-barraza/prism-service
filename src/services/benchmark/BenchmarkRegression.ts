@@ -1,36 +1,234 @@
 /**
- * BenchmarkRegression — scheduled benchmark sweeps, and the alert when one
- * gets worse.
+ * BenchmarkRegression — comparing two runs, and scheduled runs that alert
+ * when they get worse.
  *
- * A scheduled task of kind "benchmark" (ScheduledTaskService) runs its
- * dataset across its axes (SweepRunner) whenever the scheduler finds it due
- * or someone triggers it. Every cell is then compared with the same cell of
- * the schedule's previous finished sweep: a cell whose metric — pass^k
- * unless the schedule names another — fell by more than the threshold has
- * regressed. A regression is announced on the webhook bus
- * (`benchmark.regression`, delivered signed to every subscription that
- * listens for it) and, when a topic is known, on ntfy through tools-service.
- * The report is stored on the sweep either way.
+ * Two runs are compared per suite they share and per contestant (by key)
+ * they share, on the cases both evaluated: the paired difference head −
+ * base with its interval and test (Statistics.pairedComparison), plus the
+ * cases that improved and regressed. A scheduled run (a scheduled task of
+ * kind "benchmark") is compared with the schedule's previous completed
+ * run when it ends; a contestant whose suite score fell by more than the
+ * threshold AND significantly has regressed — a drop inside the noise is
+ * not an alert. Regressions go out on the webhook bus
+ * (`benchmark.regression`) and ntfy, and are stored on the run.
  */
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
-import { PRISM_PUSH_NTFY_TOPIC } from "#config";
-import { BENCHMARK } from "#src/constants";
+import { MONGO_DB_NAME, PRISM_PUSH_NTFY_TOPIC } from "#config";
+import { BENCHMARK, COLLECTIONS } from "#src/constants";
+import MongoWrapper from "#src/wrappers/MongoWrapper";
 import logger from "#src/utils/logger";
 import WebhookEventBus, { BENCHMARK_WEBHOOK_EVENTS } from "#src/services/WebhookEventBus";
 import { sendNtfyMessage } from "#src/services/push/PushNotifier";
-import DatasetStore from "#src/services/benchmark/DatasetStore";
-import { runSweep, validateSweepAxes } from "#src/services/benchmark/SweepRunner";
+import BenchmarkStore from "#src/services/benchmark/BenchmarkStore";
+import { caseScoresOf } from "#src/services/benchmark/RunReport";
+import { caseTask } from "#src/services/benchmark/Cases";
+import { pairedComparison } from "#src/services/benchmark/Statistics";
+import { prepareContestants } from "#src/services/benchmark/Contestants";
 import type {
-  BenchmarkDataset,
-  BenchmarkSweep,
-  CellRegression,
-  DatasetRun,
+  BenchmarkRun,
+  BenchmarkSample,
+  Regression,
   RegressionReport,
-  ReliabilityMetric,
+  RunComparison,
+  RunComparisonCase,
   ScheduledBenchmarkConfig,
 } from "#src/types/benchmark";
 
-export const RELIABILITY_METRICS: readonly ReliabilityMetric[] = ["passHatK", "passAtK", "passRate"];
+const SIGNIFICANCE = 0.05;
+const MAX_COMPARISON_CASES = 3000;
+const round = (value: number, digits = 6) => Math.round(value * 10 ** digits) / 10 ** digits;
+
+/** Compare `head` with `base` on everything they share. */
+export function compareRuns(base: BenchmarkRun, head: BenchmarkRun, baseSamples: BenchmarkSample[], headSamples: BenchmarkSample[]): RunComparison {
+  const deltas: RunComparison["deltas"] = [];
+  const cases: RunComparisonCase[] = [];
+  for (const headSuite of head.suites) {
+    const baseSuite = base.suites.find((suite) => suite.id === headSuite.id);
+    if (!baseSuite) continue;
+    const caseText = new Map(headSuite.cases.map((datasetCase) => [datasetCase.id, caseTask(datasetCase)]));
+    for (const contestant of head.contestants) {
+      if (!base.contestants.some((other) => other.key === contestant.key)) continue;
+      const before = caseScoresOf(baseSuite, baseSamples, contestant.key);
+      const after = caseScoresOf(headSuite, headSamples, contestant.key);
+      const shared = [...after.keys()].filter((caseId) => before.has(caseId));
+      const baseScores = shared.map((caseId) => before.get(caseId)!.mean);
+      const headScores = shared.map((caseId) => after.get(caseId)!.mean);
+      const paired = pairedComparison(headScores, baseScores);
+      let improved = 0;
+      let regressed = 0;
+      for (const caseId of new Set([...before.keys(), ...after.keys()])) {
+        const previous = before.get(caseId)?.mean ?? null;
+        const current = after.get(caseId)?.mean ?? null;
+        let change: RunComparisonCase["change"];
+        if (previous === null) change = "new";
+        else if (current === null) change = "missing";
+        else if (current > previous + 1e-9) change = "improved";
+        else if (current < previous - 1e-9) change = "regressed";
+        else change = "unchanged";
+        if (change === "improved") improved++;
+        if (change === "regressed") regressed++;
+        if (change !== "unchanged" && cases.length < MAX_COMPARISON_CASES) {
+          const text = (caseText.get(caseId) ?? "").replace(/\s+/g, " ").trim();
+          cases.push({
+            suiteId: headSuite.id,
+            caseId,
+            input: text.length > 200 ? `${text.slice(0, 200)}…` : text,
+            contestantKey: contestant.key,
+            base: previous === null ? null : round(previous, 4),
+            head: current === null ? null : round(current, 4),
+            change,
+          });
+        }
+      }
+      const baseMean = baseScores.length > 0 ? baseScores.reduce((sum, value) => sum + value, 0) / baseScores.length : 0;
+      const headMean = headScores.length > 0 ? headScores.reduce((sum, value) => sum + value, 0) / headScores.length : 0;
+      deltas.push({
+        suiteId: headSuite.id,
+        suiteName: headSuite.name,
+        contestantKey: contestant.key,
+        label: contestant.label,
+        base: round(baseMean),
+        head: round(headMean),
+        diff: round(paired.diff),
+        ci: { low: round(paired.low), high: round(paired.high) },
+        pValue: round(paired.pValue, 8),
+        significant: paired.test !== "none" && paired.pValue < SIGNIFICANCE,
+        improved,
+        regressed,
+      });
+    }
+  }
+  return {
+    base: { id: base.id, name: base.name, completedAt: base.completedAt ?? null },
+    head: { id: head.id, name: head.name, completedAt: head.completedAt ?? null },
+    deltas,
+    cases,
+  };
+}
+
+/** Regressions: significant drops beyond the threshold, with the cases lost. */
+export function findRegressions(
+  comparison: RunComparison,
+  base: BenchmarkRun,
+  head: BenchmarkRun,
+  baseSamples: BenchmarkSample[],
+  headSamples: BenchmarkSample[],
+  threshold: number,
+): Regression[] {
+  const regressions: Regression[] = [];
+  for (const delta of comparison.deltas) {
+    if (!(delta.diff < -threshold && delta.significant)) continue;
+    const baseSuite = base.suites.find((suite) => suite.id === delta.suiteId)!;
+    const headSuite = head.suites.find((suite) => suite.id === delta.suiteId)!;
+    const before = caseScoresOf(baseSuite, baseSamples, delta.contestantKey);
+    const after = caseScoresOf(headSuite, headSamples, delta.contestantKey);
+    const casesLost = [...before.entries()]
+      .filter(([caseId, stats]) => stats.passes === stats.counted && after.has(caseId) && after.get(caseId)!.passes < after.get(caseId)!.counted)
+      .map(([caseId]) => caseId);
+    regressions.push({
+      suiteId: delta.suiteId,
+      suiteName: delta.suiteName,
+      contestantKey: delta.contestantKey,
+      label: delta.label,
+      baseline: delta.base,
+      current: delta.head,
+      diff: delta.diff,
+      ci: delta.ci,
+      pValue: delta.pValue,
+      casesLost,
+    });
+  }
+  return regressions;
+}
+
+async function announce(run: BenchmarkRun, report: RegressionReport, config: ScheduledBenchmarkConfig | null): Promise<RegressionReport["alerted"]> {
+  const alert = config?.alert ?? {};
+  const alerted = { webhook: false, ntfy: false };
+  if (alert.webhook !== false) {
+    WebhookEventBus.emit(BENCHMARK_WEBHOOK_EVENTS.REGRESSION, {
+      scheduleId: run.scheduleId,
+      runId: run.id,
+      runName: run.name,
+      project: run.project,
+      baselineRunId: report.baselineRunId,
+      threshold: report.threshold,
+      regressions: report.regressions,
+    });
+    alerted.webhook = true;
+  }
+  const topic = alert.ntfyTopic?.trim() || PRISM_PUSH_NTFY_TOPIC;
+  if (topic) {
+    const lines = report.regressions
+      .slice(0, 4)
+      .map(
+        (regression) =>
+          `${regression.label} · ${regression.suiteName}: ${Math.round(regression.baseline * 100)}% → ${Math.round(regression.current * 100)}%` +
+          (regression.casesLost.length > 0 ? ` (lost ${regression.casesLost.slice(0, 3).join(", ")})` : ""),
+      );
+    if (report.regressions.length > 4) lines.push(`…and ${report.regressions.length - 4} more`);
+    try {
+      alerted.ntfy = await sendNtfyMessage({
+        topic,
+        title: `Benchmark regression · ${run.name}`,
+        message: lines.join("\n"),
+        priority: "high",
+        clickPath: `/benchmarks/runs/${run.id}`,
+      });
+    } catch (error: unknown) {
+      logger.warn(`[BenchmarkRegression] ntfy alert failed: ${getErrorMessage(error)}`);
+    }
+  }
+  return alerted;
+}
+
+/** When a scheduled run completes: compare with the schedule's previous completed run and alert. */
+export async function compareWithPreviousScheduledRun(run: BenchmarkRun): Promise<RegressionReport | null> {
+  if (!run.scheduleId) return null;
+  const previous = (await BenchmarkStore.listRuns(run.project, { scheduleId: run.scheduleId, limit: 20 })).find(
+    (candidate) => candidate.id !== run.id && candidate.status === "completed" && candidate.createdAt < run.createdAt,
+  );
+  const task = (await MongoWrapper.getDb(MONGO_DB_NAME)
+    ?.collection(COLLECTIONS.SCHEDULED_TASKS)
+    .findOne({ id: run.scheduleId })
+    .catch(() => null)) as { benchmark?: ScheduledBenchmarkConfig } | null;
+  const threshold = task?.benchmark?.threshold ?? BENCHMARK.DEFAULT_REGRESSION_THRESHOLD;
+  if (!previous) {
+    const report: RegressionReport = { baselineRunId: null, threshold, regressed: false, regressions: [], alerted: { webhook: false, ntfy: false } };
+    await BenchmarkStore.updateRun(run.id, { regression: report });
+    return report;
+  }
+  const [baseSamples, headSamples] = await Promise.all([BenchmarkStore.listSamples(previous.id), BenchmarkStore.listSamples(run.id)]);
+  const comparison = compareRuns(previous, run, baseSamples, headSamples);
+  const regressions = findRegressions(comparison, previous, run, baseSamples, headSamples, threshold);
+  const report: RegressionReport = {
+    baselineRunId: previous.id,
+    threshold,
+    regressed: regressions.length > 0,
+    regressions,
+    alerted: { webhook: false, ntfy: false },
+  };
+  if (report.regressed) {
+    report.alerted = await announce(run, report, task?.benchmark ?? null);
+    logger.warn(`[BenchmarkRegression] "${run.name}" regressed for ${regressions.length} contestant/suite pair(s) — alerted ${JSON.stringify(report.alerted)}`);
+  }
+  await BenchmarkStore.updateRun(run.id, { regression: report, baselineRunId: previous.id });
+  return report;
+}
+
+/** A scheduled benchmark's mistakes, or null. */
+export function validateScheduledBenchmark(config: unknown): string | null {
+  if (!config || typeof config !== "object") return "benchmark must be an object";
+  const benchmark = config as Partial<ScheduledBenchmarkConfig>;
+  if (!Array.isArray(benchmark.suiteIds) || benchmark.suiteIds.length === 0) return "benchmark.suiteIds needs at least one suite";
+  const prepared = prepareContestants(benchmark.contestants);
+  if ("error" in prepared) return `benchmark.contestants: ${prepared.error}`;
+  if (benchmark.threshold != null && !(Number(benchmark.threshold) > 0 && Number(benchmark.threshold) < 1)) {
+    return "benchmark.threshold must be between 0 and 1";
+  }
+  const topic = benchmark.alert?.ntfyTopic;
+  if (topic != null && (typeof topic !== "string" || !topic.trim())) return "benchmark.alert.ntfyTopic must be a topic name";
+  return null;
+}
 
 /** The fields of a scheduled task this module reads. */
 export interface ScheduledBenchmarkTask {
@@ -40,207 +238,21 @@ export interface ScheduledBenchmarkTask {
   benchmark?: ScheduledBenchmarkConfig;
 }
 
-const METRIC_NAMES: Record<ReliabilityMetric, (k: number) => string> = {
-  passHatK: (k) => `pass^${k}`,
-  passAtK: (k) => `pass@${k}`,
-  passRate: () => "pass rate",
-};
-
-const round = (value: number) => Math.round(value * 1e6) / 1e6;
-
-/** A scheduled benchmark's mistakes, or null. */
-export function validateScheduledBenchmark(config: unknown): string | null {
-  if (!config || typeof config !== "object") return "benchmark must be an object";
-  const benchmark = config as Partial<ScheduledBenchmarkConfig>;
-  if (typeof benchmark.datasetId !== "string" || !benchmark.datasetId) {
-    return "benchmark.datasetId is required";
-  }
-  const axesError = validateSweepAxes(benchmark.axes);
-  if (axesError) return axesError;
-  if (benchmark.k !== undefined) {
-    const k = Number(benchmark.k);
-    if (!Number.isInteger(k) || k < 1 || k > BENCHMARK.MAX_K) {
-      return `benchmark.k must be an integer between 1 and ${BENCHMARK.MAX_K}`;
-    }
-  }
-  if (benchmark.metric !== undefined && !RELIABILITY_METRICS.includes(benchmark.metric)) {
-    return `benchmark.metric must be one of ${RELIABILITY_METRICS.join(", ")}`;
-  }
-  if (
-    benchmark.threshold !== undefined &&
-    (typeof benchmark.threshold !== "number" || benchmark.threshold < 0 || benchmark.threshold > 1)
-  ) {
-    return "benchmark.threshold must be a number between 0 and 1";
-  }
-  if (benchmark.alert !== undefined) {
-    const { webhook, ntfyTopic } = benchmark.alert ?? {};
-    if (webhook !== undefined && typeof webhook !== "boolean") return "benchmark.alert.webhook must be a boolean";
-    if (ntfyTopic !== undefined && ntfyTopic !== null && (typeof ntfyTopic !== "string" || !ntfyTopic.trim())) {
-      return "benchmark.alert.ntfyTopic must be a topic name";
-    }
-  }
-  return null;
-}
-
-/** Cases that passed every run of `baseline` and not every run of `current`. */
-function casesLost(baseline: DatasetRun | undefined, current: DatasetRun | undefined): string[] {
-  if (!baseline || !current) return [];
-  return current.cases
-    .filter((currentCase) => {
-      const before = baseline.cases.find((baselineCase) => baselineCase.caseId === currentCase.caseId);
-      return (
-        before !== undefined &&
-        before.trials > 0 &&
-        before.passed === before.trials &&
-        currentCase.passed < currentCase.trials
-      );
-    })
-    .map((currentCase) => currentCase.caseId);
-}
-
-/**
- * Compare a sweep with the schedule's previous one, cell by cell (cells are
- * matched by their configuration key). Pure: `runs` holds the dataset runs
- * of both sweeps, for the cases each cell lost.
- */
-export function compareSweeps(
-  previous: BenchmarkSweep | null,
-  current: BenchmarkSweep,
-  runs: Map<string, DatasetRun>,
-  metric: ReliabilityMetric = "passHatK",
-  threshold: number = BENCHMARK.DEFAULT_REGRESSION_THRESHOLD,
-): RegressionReport {
-  const cells: CellRegression[] = [];
-  for (const cell of current.cells) {
-    const before = previous?.cells.find((candidate) => candidate.key === cell.key);
-    if (!cell.summary || !before?.summary) continue;
-    const baselineValue = before.summary[metric];
-    const currentValue = cell.summary[metric];
-    const drop = round(baselineValue - currentValue);
-    if (drop <= threshold) continue;
-    cells.push({
-      key: cell.key,
-      label: cell.label,
-      baseline: baselineValue,
-      current: currentValue,
-      drop,
-      casesLost: casesLost(
-        before.runId ? runs.get(before.runId) : undefined,
-        cell.runId ? runs.get(cell.runId) : undefined,
-      ),
-    });
-  }
-  return {
-    metric,
-    threshold,
-    baselineSweepId: previous?.id ?? null,
-    regressed: cells.length > 0,
-    cells,
-    alerted: { webhook: false, ntfy: false },
-  };
-}
-
-/** Announce a regression on the webhook bus and ntfy. Resolves which channels carried it. */
-export async function announceRegression({
-  task,
-  dataset,
-  sweep,
-  report,
-}: {
-  task: ScheduledBenchmarkTask;
-  dataset: Pick<BenchmarkDataset, "id" | "name">;
-  sweep: BenchmarkSweep;
-  report: RegressionReport;
-}): Promise<RegressionReport["alerted"]> {
-  const alert = task.benchmark?.alert ?? {};
-  const metricName = METRIC_NAMES[report.metric](sweep.k);
-  const alerted = { webhook: false, ntfy: false };
-  if (alert.webhook !== false) {
-    WebhookEventBus.emit(BENCHMARK_WEBHOOK_EVENTS.REGRESSION, {
-      scheduleId: task.id,
-      scheduleName: task.name,
-      project: task.project,
-      datasetId: dataset.id,
-      datasetName: dataset.name,
-      sweepId: sweep.id,
-      baselineSweepId: report.baselineSweepId,
-      metric: report.metric,
-      threshold: report.threshold,
-      cells: report.cells,
-    });
-    alerted.webhook = true;
-  }
-  const topic = alert.ntfyTopic?.trim() || PRISM_PUSH_NTFY_TOPIC;
-  if (topic) {
-    const lines = report.cells
-      .slice(0, 3)
-      .map(
-        (cell) =>
-          `${cell.label}: ${metricName} ${cell.baseline.toFixed(2)} → ${cell.current.toFixed(2)}` +
-          (cell.casesLost.length > 0 ? ` (lost ${cell.casesLost.slice(0, 3).join(", ")})` : ""),
-      );
-    if (report.cells.length > 3) lines.push(`…and ${report.cells.length - 3} more`);
-    try {
-      alerted.ntfy = await sendNtfyMessage({
-        topic,
-        title: `Benchmark regression · ${dataset.name}`,
-        message: lines.join("\n"),
-        priority: "high",
-      });
-    } catch (error: unknown) {
-      logger.warn(`[BenchmarkRegression] ntfy alert failed: ${getErrorMessage(error)}`);
-    }
-  }
-  return alerted;
-}
-
-/**
- * Run a scheduled benchmark: its sweep, the comparison with the previous
- * one, the alert. The scheduler's tick and a manual trigger both land here.
- */
-export async function runScheduledBenchmark(
-  task: ScheduledBenchmarkTask,
-  { username }: { username: string },
-): Promise<BenchmarkSweep> {
+/** The scheduler's tick (or a manual trigger): start the schedule's run. It compares itself when it ends. */
+export async function runScheduledBenchmark(task: ScheduledBenchmarkTask, { username }: { username: string }): Promise<BenchmarkRun> {
   const config = task.benchmark;
   const invalid = validateScheduledBenchmark(config);
-  if (invalid || !config) {
-    throw new Error(`Scheduled benchmark "${task.name}" is misconfigured: ${invalid}`);
-  }
-  const dataset = await DatasetStore.get(config.datasetId, task.project);
-  if (!dataset) {
-    throw new Error(`Scheduled benchmark "${task.name}": dataset ${config.datasetId} not found`);
-  }
-  logger.info(`[BenchmarkRegression] Running scheduled benchmark "${task.name}" (${dataset.name})`);
-  const sweep = await runSweep({
-    dataset,
-    axes: config.axes,
-    k: config.k ?? dataset.k,
-    name: task.name,
-    project: task.project,
-    username,
-    scheduleId: task.id,
-  });
-  const previous = await DatasetStore.previousScheduledSweep(task.id, task.project, sweep.id);
-  const runIds = [...(previous?.cells ?? []), ...sweep.cells]
-    .map((cell) => cell.runId)
-    .filter((runId): runId is string => !!runId);
-  const runs = (await Promise.all(runIds.map((runId) => DatasetStore.getRun(runId, task.project))))
-    .filter((run): run is DatasetRun => !!run);
-  const report = compareSweeps(
-    previous,
-    sweep,
-    new Map(runs.map((run) => [run.id, run])),
-    config.metric ?? "passHatK",
-    config.threshold ?? BENCHMARK.DEFAULT_REGRESSION_THRESHOLD,
+  if (invalid || !config) throw new Error(`Scheduled benchmark "${task.name}" is misconfigured: ${invalid}`);
+  const { startRun } = await import("#src/services/benchmark/Runs");
+  logger.info(`[BenchmarkRegression] Starting scheduled benchmark "${task.name}"`);
+  return startRun(
+    {
+      name: `${config.name || task.name} · ${new Date().toISOString().slice(0, 16).replace("T", " ")}`,
+      suiteIds: config.suiteIds,
+      contestants: config.contestants,
+      settings: config.settings,
+      scheduleId: task.id,
+    },
+    { project: task.project, username },
   );
-  if (report.regressed) {
-    report.alerted = await announceRegression({ task, dataset, sweep, report });
-    logger.warn(
-      `[BenchmarkRegression] "${task.name}" regressed in ${report.cells.length} configuration(s) — alerted ${JSON.stringify(report.alerted)}`,
-    );
-  }
-  sweep.regression = report;
-  await DatasetStore.updateSweep(sweep.id, { regression: report });
-  return sweep;
 }

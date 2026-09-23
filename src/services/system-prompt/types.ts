@@ -69,6 +69,8 @@ export interface AssemblerContext {
   options?: Record<string, unknown>;
   /** The directory the turn works in (the request's workspaceRoot). */
   workspaceRoot?: string;
+  /** A benchmark sample (AgenticOptions.evaluation) — no learned-state sections. */
+  evaluation?: boolean;
   workspaceEnabled?: boolean;
   locale?: string;
   /** Names of user-pinned rules to inject as an <active-rules> section */

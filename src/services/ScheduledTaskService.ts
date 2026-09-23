@@ -98,7 +98,7 @@ export interface ScheduledTask {
    */
   conversationId?: string | null;
   /**
-   * "benchmark": each run is a benchmark sweep compared with the previous
+   * "benchmark": each run is a benchmark run compared with the previous
    * one (BenchmarkRegression), not an agent turn. Absent: an agent task.
    */
   kind?: "agent" | "benchmark";
@@ -145,8 +145,8 @@ export function triggerPayloadMessage(
 export interface ScheduledTaskRunResult {
   /** The conversation an agent task ran in. */
   agentConversationId?: string;
-  /** The sweep a benchmark task ran. */
-  benchmarkSweepId?: string;
+  /** The run a benchmark task started. */
+  benchmarkRunId?: string;
   /** Set when a continuation run did not start (paused goal, duplicate, busy). */
   skipped?: string;
 }
@@ -476,11 +476,11 @@ const ScheduledTaskService = {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
 
-    // A scheduled benchmark runs its sweep, not an agent turn.
+    // A scheduled benchmark starts a benchmark run, not an agent turn.
     if (task.kind === "benchmark") {
       const { runScheduledBenchmark } = await import("./benchmark/BenchmarkRegression.ts");
-      const sweep = await runScheduledBenchmark(task, { username });
-      return { benchmarkSweepId: sweep.id };
+      const run = await runScheduledBenchmark(task, { username });
+      return { benchmarkRunId: run.id };
     }
 
     if (task.conversationId) {
@@ -1086,8 +1086,7 @@ const ScheduledTaskService = {
       throw new Error(`Scheduled Task not found: ${id}`);
     }
 
-    // A benchmark sweep runs in the background; its sweep id is not known
-    // until it starts (GET /benchmark/sweeps?scheduleId= lists it).
+    // A benchmark run starts in the background (GET /benchmark/runs?scheduleId= lists it).
     if (task.kind === "benchmark") {
       this.executeTask({ ...task, id: task.id }, payload, { username, profileId }).catch(
         (error: Error) => {

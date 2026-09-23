@@ -302,11 +302,11 @@ You research questions and cite your sources.
     OrchestratorService.clearAllActiveSubAgents();
   });
 
-  async function spawnResearcher() {
+  async function spawnResearcher(parent: Record<string, unknown> = PARENT_TOOL_CONTEXT) {
     const result = (await ToolOrchestratorService.executeTool(
       "create_subagent",
       { description: "Research the question", prompt: "Compare the two sources.", agent: "researcher" },
-      PARENT_TOOL_CONTEXT,
+      parent,
     )) as { agents?: Array<{ agent_id: string }>; agent?: { agent_id: string } };
     expect(result).not.toHaveProperty("error");
     let subAgentId = "";
@@ -339,6 +339,14 @@ You research questions and cite your sources.
     expect(loop.resolvedModel).toBe("claude-sonnet-5");
     expect(loop.options.enabledTools).toEqual(expect.arrayContaining(["search_web", "read_web_page"]));
     expect(loop.options.enabledTools).not.toContain("write_file");
+    expect(loop.options).not.toHaveProperty("evaluation");
+  });
+
+  it("3. a benchmark sample's sub-agent is a benchmark sample too", async () => {
+    script = [{ kind: "text", text: "Both sources agree." }];
+    await spawnResearcher({ ...PARENT_TOOL_CONTEXT, _evaluation: true });
+    const [loop] = subAgentContexts;
+    expect(loop.options.evaluation).toBe(true);
   });
 
   it("2. maxTurns stops it mid-work as a partial result; resume_subagent continues it to completion", async () => {

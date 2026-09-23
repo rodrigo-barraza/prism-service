@@ -364,6 +364,8 @@ export interface OrchestratorContext {
   untrustedSpans?: import("#src/services/permissions/UntrustedSpans").UntrustedSpans;
   /** Parent loop's auto-mode reviewer model — inherited by sub-agents. */
   criticModel?: string;
+  /** Parent loop is a benchmark sample (AgenticOptions.evaluation) — inherited by sub-agents. */
+  evaluation?: boolean;
   /** Parent loop's cost ceiling — inherited by sub-agents. */
   maxCostDollars?: number;
   /** Shared cost accumulator threaded through the whole sub-agent tree. */

@@ -46,13 +46,18 @@ interface Recording {
 
 const recordings = new WeakMap<AgenticContext, Recording>();
 
-/** Whether this loop's turns are recorded (and so can be re-driven). */
+/**
+ * Whether this loop's turns are recorded (and so can be re-driven). A
+ * benchmark sample is not: its run marks it interrupted and runs it again
+ * on resume — a re-drive would be a second, orphaned copy.
+ */
 export function isRecordedTurn(context: AgenticContext): boolean {
   return (
     !!context.request &&
     !!context.conversationId &&
     !context.parentAgentConversationId &&
-    !context.options?.isSubAgent
+    !context.options?.isSubAgent &&
+    context.options?.evaluation !== true
   );
 }
 
