@@ -110,6 +110,64 @@ describe('ChatRoutes Integration', () => {
     });
   });
 
+  describe('traceId', () => {
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+    it.each([
+      ['mints a server-side traceId for /chat when the request brings none', undefined],
+      ['keeps the traceId a /chat caller sent', 'client-trace-1'],
+    ])('%s', async (_case, traceId) => {
+      const { default: RequestLogger } = await import('#src/services/RequestLogger');
+      MOCK_GENERATE_TEXT_STREAM.mockImplementation(async function* () {
+        yield 'traced';
+      });
+
+      const response = await agent
+        .post('/chat?stream=false')
+        .set('x-project', 'test')
+        .set('x-username', 'testuser')
+        .send({
+          provider: PROVIDERS.GOOGLE,
+          model: 'gemini-3.5-flash',
+          messages: [{ role: 'user', content: 'Hello assistant' }],
+          ...(traceId && { traceId }),
+        });
+
+      expect(response.status).toBe(200);
+      const loggedTraceId = vi.mocked(RequestLogger.logChatGeneration).mock.calls.at(-1)?.[0]?.traceId;
+      if (traceId) expect(loggedTraceId).toBe(traceId);
+      else expect(loggedTraceId).toMatch(UUID);
+    });
+
+    it.each([
+      ['mints a server-side traceId for the /agent loop when the request brings none', undefined],
+      ['hands the /agent loop the traceId the caller sent', 'client-trace-2'],
+    ])('%s', async (_case, traceId) => {
+      const { default: AgenticLoopService } = await import('#src/services/AgenticLoopService');
+      let loopTraceId: unknown;
+      vi.mocked(AgenticLoopService.runAgenticLoop).mockImplementationOnce(async (opts: any) => {
+        loopTraceId = opts.traceId;
+        opts.emit({ type: 'done', conversationId: opts.conversationId });
+        return { messages: [] } as never;
+      });
+
+      const response = await agent
+        .post('/agent?stream=false')
+        .set('x-project', 'test')
+        .set('x-username', 'testuser')
+        .send({
+          provider: PROVIDERS.OPENAI,
+          agent: 'CODING',
+          messages: [{ role: 'user', content: 'Help me write code' }],
+          ...(traceId && { traceId }),
+        });
+
+      expect(response.status).toBe(200);
+      if (traceId) expect(loopTraceId).toBe(traceId);
+      else expect(loopTraceId).toMatch(UUID);
+    });
+  });
+
   describe('POST /chat — Streaming', () => {
     it('should return text/event-stream with SSE events', async () => {
       MOCK_GENERATE_TEXT_STREAM.mockImplementation(async function* () {
