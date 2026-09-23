@@ -139,6 +139,19 @@ beforeEach(() => {
   mockGenerateText.mockReset();
 });
 
+describe("/memory/extract model call", () => {
+  // gemini-3.5-flash thinks by default: with thinking on it spent 958 of
+  // its 1000 output tokens reasoning and was cut off before the JSON, so
+  // production extracted 0 facts (2026-09-22) the day it was re-enabled.
+  it("asks the extraction model for JSON with thinking off", async () => {
+    extractorSays([]);
+    await extract([ALICE, BOB]);
+
+    const [, , options] = mockGenerateText.mock.calls.at(-1)!;
+    expect(options).toMatchObject({ thinkingEnabled: false });
+  });
+});
+
 describe("/memory/extract participants", () => {
   it("lists participant objects with their Discord ids", async () => {
     extractorSays([]);
