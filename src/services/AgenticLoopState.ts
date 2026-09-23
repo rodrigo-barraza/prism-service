@@ -16,6 +16,7 @@ import type { TokenUsage } from "#src/types/admin";
 import { MEDIA } from "#src/constants";
 import type { ModelRefusal } from "./harnesses/types.ts";
 import type { AnthropicThinkingBlock } from "#src/types/admin";
+import type { WorkspaceInstructions } from "#src/services/instructions/WorkspaceInstructions";
 import {
   buildToolExecutionRecord,
   type ToolExecutionRecord,
@@ -165,6 +166,12 @@ export default class AgenticLoopState {
   pendingHookContext: string[];
   /** Consecutive continuations Stop hooks have forced (capped). */
   stopHookContinuations: number;
+  /**
+   * The workspace's instruction files and rules, read at turn start — its
+   * glob-scoped rules apply after tool batches (WorkspaceRuleStage).
+   * undefined: not read this turn yet; null: the turn has no workspace.
+   */
+  workspaceInstructions: WorkspaceInstructions | null | undefined;
 
   // ── Error budget tracking ───────────────────────────────
   toolErrorCounts: Map<string, number>;
@@ -278,6 +285,7 @@ export default class AgenticLoopState {
     this.detachedWorkDispatched = false;
     this.pendingHookContext = [];
     this.stopHookContinuations = 0;
+    this.workspaceInstructions = undefined;
 
     this.toolErrorCounts = new Map();
     this.pendingRequestLogWrites = [];

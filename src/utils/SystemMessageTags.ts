@@ -66,6 +66,8 @@ export const SYSTEM_MESSAGE_TAGS = {
   SELF_CONTEXT: "self-context",
   /** Context injected by a user-configured lifecycle hook. */
   HOOK_CONTEXT: "hook-context",
+  /** Glob-scoped workspace rules for files the agent just read or edited (WorkspaceRuleStage). */
+  WORKSPACE_RULES: "workspace-rules",
   /** A user message that arrived mid-turn to steer the task in progress (TurnInputMailbox). */
   USER_UPDATE: "user-update",
   /** The user's answer to a non-blocking ask_user card, delivered at a loop boundary. */

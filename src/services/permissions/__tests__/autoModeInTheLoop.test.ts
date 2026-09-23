@@ -94,7 +94,11 @@ vi.mock("#src/wrappers/MongoWrapper", async () => {
 vi.mock("#src/services/ProjectInstructionsService", () => ({
   default: {
     getDatabase: () => ({}),
-    getCurrent: vi.fn().mockResolvedValue({ content: "PRISM.md: never touch the production database." }),
+    // The classifier reads both PRISM.md layers, merged as the prompt merges them.
+    getLayers: vi.fn().mockResolvedValue({
+      project: { content: "PRISM.md: never touch the production database." },
+      agent: { content: "PRISM.md (agent): keep migrations reversible." },
+    }),
   },
 }));
 vi.mock("#src/services/FileService", () => ({ default: { uploadFile: vi.fn().mockResolvedValue({ ref: "ref" }) } }));
@@ -307,6 +311,7 @@ describe("auto mode in a real loop", () => {
       expect(payload).toContain("read_web_page");
       expect(payload).toContain("rm -rf ~");
       expect(payload).toContain("never touch the production database");
+      expect(payload).toContain("keep migrations reversible");
     }
     expect(executedNames()).toEqual(["read_web_page"]);
     expect(cards()).toEqual([]);

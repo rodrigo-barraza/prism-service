@@ -17,5 +17,15 @@
   "liveApiLanguageHint": "Always respond in the same language the user speaks. The user's primary language is English.",
   "constraintsHeader": "## Behavioral Constraints\nThe following rules are absolute and must never be violated:",
   "skillCatalogHeader": "## Skills\nStored instructions for recurring tasks, one per line as `name: what it is for`. Only the names are here. When the task in front of you matches a skill, call `load_skill` with its name and follow what it returns before you start.",
-  "skillHighlight": "Skills that look relevant to this message: {{names}}. If one fits the task, read it with `load_skill` before you start."
+  "skillHighlight": "Skills that look relevant to this message: {{names}}. If one fits the task, read it with `load_skill` before you start.",
+  "instructionsProjectLabel": "Contents of PRISM.md (project instructions, for every agent in this project):",
+  "instructionsAgentLabel": "Contents of PRISM.md (instructions for the {{agent}} agent only):",
+  "instructionsWorkspaceFileLabel": "Contents of {{path}} (workspace instructions):",
+  "instructionsWorkspaceFileSameLabel": "Contents of {{path}} (workspace instructions; {{others}} holds the same text):",
+  "instructionsWorkspaceRuleLabel": "Contents of {{path}} (workspace rule, always on):",
+  "instructionsAlreadyInPrismLabel": "{{path}} (workspace instructions) holds text PRISM.md above already carries; it is not repeated.",
+  "instructionsTruncatedNote": "[Cut here to fit the prompt. Read the rest of {{path}} with read_file.]",
+  "instructionsOmittedNote": "Not loaded, past the {{limit}}-character budget for workspace instructions: {{paths}}. Read them with read_file when they bear on the task.",
+  "workspaceRulesHeader": "Workspace rules for files you just read or edited. Follow them whenever you work on these files.",
+  "workspaceRuleLabel": "Contents of {{path}} (for {{globs}}; you touched {{files}}):"
 }

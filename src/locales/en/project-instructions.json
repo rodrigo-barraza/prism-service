@@ -24,7 +24,8 @@
     "empty": "No project instructions have been set for this project yet. Use edit_project_instructions to start the document with a first section.",
     "unchanged": "The '{{heading}}' section already reads exactly this way — nothing was written.",
     "updated": "Project instructions replaced (now version {{version}}). This document is injected into every future conversation in this project.",
-    "edited": "Section '{{heading}}' {{action}} (now version {{version}}). This document is injected into every future conversation in this project."
+    "edited": "Section '{{heading}}' {{action}} (now version {{version}}). This document is injected into every future conversation in this project.",
+    "alsoInjected": "The project-wide document (version {{version}}) is in your prompt too, above this one. This tool reads and edits only the {{agent}} agent's document."
   },
   "actions": {
     "added": "added",
