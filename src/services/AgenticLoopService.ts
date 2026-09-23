@@ -576,16 +576,21 @@ export default class AgenticLoopService {
    * a CapabilityScopeHandle the goal gate can narrow while the agent works
    * on its own. `_untrustedSpans` arrives as the PARENT's registry for a
    * sub-agent; the turn gets its own, seeded from the messages it starts
-   * with and chained to the parent's. A value a request body smuggled in is
-   * not an instance and is replaced.
+   * with and the conversation's stored transcript, and chained to the
+   * parent's. A value a request body smuggled in is not an instance and is
+   * replaced.
    */
   static async openRunSafety(context: AgenticContext): Promise<void> {
     const { options } = context;
-    const [{ CapabilityScopeHandle, currentScope }, { UntrustedSpans, openUntrustedSpans }] =
-      await Promise.all([
-        import("./permissions/CapabilityScope.ts"),
-        import("./permissions/UntrustedSpans.ts"),
-      ]);
+    const [
+      { CapabilityScopeHandle, currentScope },
+      { UntrustedSpans, openUntrustedSpans, addUntrustedMessages },
+      { loadStoredTranscript },
+    ] = await Promise.all([
+      import("./permissions/CapabilityScope.ts"),
+      import("./permissions/UntrustedSpans.ts"),
+      import("./permissions/StoredTranscript.ts"),
+    ]);
     if (!(options._capabilityScope instanceof CapabilityScopeHandle)) {
       options._capabilityScope = new CapabilityScopeHandle(currentScope(options._capabilityScope));
     }
@@ -596,10 +601,24 @@ export default class AgenticLoopService {
       options._untrustedSpans = undefined;
       return;
     }
-    options._untrustedSpans = openUntrustedSpans(context.messages ?? [], {
+    const spans = openUntrustedSpans(context.messages ?? [], {
       minimumCharacters,
       parent: parentSpans,
     });
+    // The history a turn is sent is not the record of what the conversation
+    // read (StoredTranscript); a sub-agent's parent registry already is.
+    if (!parentSpans) {
+      addUntrustedMessages(
+        spans,
+        await loadStoredTranscript({
+          conversationId: context.conversationId,
+          project: context.project,
+          username: context.username,
+          agent: context.agent,
+        }),
+      );
+    }
+    options._untrustedSpans = spans;
   }
 
   /** Publish the run's scope by its loop key while it runs; returns the unregister. */
