@@ -16,6 +16,10 @@ import type { TokenUsage } from "#src/types/admin";
 import { MEDIA } from "#src/constants";
 import type { ModelRefusal } from "./harnesses/types.ts";
 import type { AnthropicThinkingBlock } from "#src/types/admin";
+import {
+  buildToolExecutionRecord,
+  type ToolExecutionRecord,
+} from "#src/utils/ToolExecutionRecord";
 interface CriteriaScores {
   correctness: number;
   risk: number;
@@ -155,6 +159,11 @@ export default class AgenticLoopState {
   // the requests-collection rollup sees every iteration of this turn.
   pendingRequestLogWrites: Promise<unknown>[];
 
+  // ── Tool executions awaiting their request row ──────────
+  // ToolExecutor records each executed call; the next logIteration takes
+  // them onto that iteration's row (`toolExecutions`).
+  private toolExecutions: ToolExecutionRecord[];
+
   // ── Conversation outcome ───────────────────────────
   // Set by harnesses before finalization to indicate how the
   // conversation ended. Used by afterResponse hooks (e.g. AWM) to
@@ -252,6 +261,7 @@ export default class AgenticLoopState {
 
     this.toolErrorCounts = new Map();
     this.pendingRequestLogWrites = [];
+    this.toolExecutions = [];
     this.conversationOutcome = "completed";
     this.costBudgetStop = null;
 
@@ -321,5 +331,23 @@ export default class AgenticLoopState {
     }
 
     return { cleanSegments, cleanTextFragments, cleanThinkingFragments };
+  }
+
+  /** Record one executed tool call — its own duration and outcome. */
+  recordToolExecution(
+    toolCall: ToolCall,
+    result: unknown,
+    durationMilliseconds: number,
+  ): void {
+    this.toolExecutions.push(
+      buildToolExecutionRecord(toolCall, result, durationMilliseconds),
+    );
+  }
+
+  /** The tool executions recorded since the last call, for one request row. */
+  takeToolExecutions(): ToolExecutionRecord[] {
+    const taken = this.toolExecutions;
+    this.toolExecutions = [];
+    return taken;
   }
 }

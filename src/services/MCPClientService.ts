@@ -9,6 +9,7 @@ import logger from "#src/utils/logger";
 import { registerCleanup } from "#src/utils/CleanupRegistry";
 import type { Db } from "mongodb";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { traceMeta, tracedFetch } from "#src/services/Tracing";
 import { COLLECTIONS } from "#src/constants";
 import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
 import { getRequestContext } from "#src/utils/RequestContext";
@@ -228,6 +229,8 @@ function createTransport(
   if (config.transport === "streamable-http") {
     const url = new URL(config.url!);
     return new StreamableHTTPClientTransport(url, {
+      // Adds traceparent to each request made inside a span (Tracing).
+      fetch: tracedFetch,
       requestInit: {
         headers: config.headers || {},
       },
@@ -237,6 +240,8 @@ function createTransport(
   if (config.transport === "sse") {
     const url = new URL(config.url!);
     return new SSEClientTransport(url, {
+      // Adds traceparent to each request made inside a span (Tracing).
+      fetch: tracedFetch,
       requestInit: {
         headers: config.headers || {},
       },
@@ -379,6 +384,8 @@ const MCPClientService = {
         {
           name: toolName,
           arguments: args,
+          // The trace context, where the MCP conventions carry it (any transport).
+          ...traceMeta(),
         },
         undefined,
         {

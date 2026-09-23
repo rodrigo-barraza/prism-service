@@ -18,6 +18,7 @@ import {
   withTotalInputTokens,
 } from "#src/utils/CostCalculator";
 import { calculateTokensPerSec } from "#src/utils/math";
+import { endChatSpan, startChatSpan } from "#src/services/Tracing";
 import { getPricing, MODALITY_TYPES } from "#src/config";
 import ContextWindowManager from "#src/services/ContextWindowManager";
 import ContextBudgetTracker from "./ContextBudgetTracker.ts";
@@ -926,10 +927,44 @@ export default class BaseAgenticHarness {
   // ── Stream consumption ────────────────────────────────────
 
   /**
+   * Consume a pass's LLM stream as its `chat` span (Tracing), which runs
+   * from the start of the pass to the end — or failure — of the stream.
+   */
+  public async consumeStream(
+    stream: AsyncIterable<unknown>,
+    pass: PassState,
+    allowedToolNames: Set<string>,
+  ): Promise<void> {
+    const iteration = this.state.iterations;
+    const chatSpan = startChatSpan(this.context, pass, {
+      iteration,
+      // The id of the requests-collection row this pass writes (logIteration).
+      requestId: this.context.requestId
+        ? `${this.context.requestId}-${iteration}`
+        : pass.requestId,
+    });
+    try {
+      await this.routeStreamChunks(stream, pass, allowedToolNames);
+    } catch (error: unknown) {
+      endChatSpan(chatSpan, pass, { costUsd: this.estimatePassCost(pass), error });
+      throw error;
+    }
+    endChatSpan(chatSpan, pass, { costUsd: this.estimatePassCost(pass) });
+  }
+
+  /** A pass's estimated cost at its model's text pricing (null when unpriced). */
+  private estimatePassCost(pass: PassState): number | null {
+    const pricing = getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[
+      this.context.resolvedModel
+    ];
+    return calculateTextCost(pass.usage, pricing);
+  }
+
+  /**
    * Consume an LLM stream, routing each chunk through `processStreamChunk`.
    * Handles abort signals, mid-stream deviation rules, and stream teardown.
    */
-  public async consumeStream(
+  private async routeStreamChunks(
     stream: AsyncIterable<unknown>,
     pass: PassState,
     allowedToolNames: Set<string>,
@@ -1182,6 +1217,8 @@ export default class BaseAgenticHarness {
     } = this.context;
     const state = this.state;
     const pricing = getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[resolvedModel];
+    // The tools this iteration ran, each with its own duration and outcome.
+    const toolExecutions = state.takeToolExecutions();
 
     const passTotalSec = (performance.now() - pass.start) / 1000;
     const passGenerationSec =
@@ -1249,6 +1286,7 @@ export default class BaseAgenticHarness {
       toolCalls: pass.pendingToolCalls as ToolCallPayload[],
       outputCharacters: pass.outputCharacters,
       agenticIteration: state.iterations,
+      ...(toolExecutions.length > 0 && { toolExecutions }),
       ...cacheTelemetryFields,
     };
 
@@ -1331,6 +1369,7 @@ export default class BaseAgenticHarness {
             : null,
         usage: pass.usage,
       },
+      ...(toolExecutions.length > 0 && { toolExecutions }),
       ...cacheTelemetryFields,
     };
 

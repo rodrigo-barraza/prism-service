@@ -2,6 +2,7 @@ import logger from "#src/utils/logger";
 import { TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import { TOOLS_SERVICE_URL } from "#config";
+import { traceHeaders } from "#src/services/Tracing";
 import { IDENTITY_HEADERS } from "@rodrigo-barraza/utilities-library/service";
 import path from "node:path";
 import fs from "node:fs";
@@ -247,6 +248,7 @@ async function runLspBatchValidator(
   // sandbox admits paths under /tmp/prism-worktrees (same as the tool proxy).
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    ...traceHeaders(),
   };
   const worktreeState = ToolOrchestratorService.getWorktreeState?.(
     context.agentConversationId,

@@ -4,6 +4,7 @@ import { app } from "./setup.ts";
 import adminRouter from "#src/routes/AdminRoutes";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { COLLECTIONS, PROVIDERS } from "#src/constants";
+import { StatsCache } from "#src/caches/StatsCache";
 
 
 app.use("/admin", adminRouter);
@@ -207,6 +208,8 @@ describe("GET /admin/stats/tools", () => {
   let mockDocuments: any[] = [];
 
   beforeEach(() => {
+    // Each test's rows answer the same query — don't serve the last test's.
+    StatsCache.clear();
     mockDocuments = [
       {
         requestId: "request-1",

@@ -683,6 +683,7 @@ describe("ToolExecutor", () => {
     } as unknown as AgentHooks;
     mockState = {
       iterations: 1,
+      recordToolExecution: vi.fn(),
     } as unknown as AgenticLoopState;
   });
 

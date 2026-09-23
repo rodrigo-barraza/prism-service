@@ -7,6 +7,7 @@
  */
 
 import type { DeviationVerdict } from "./lifecycle/DeviationRuleEngine.ts";
+import type { Context } from "@opentelemetry/api";
 
 // ── Usage & Cost ────────────────────────────────────────────
 
@@ -316,6 +317,9 @@ export interface AgenticContext {
   conversationMeta?: Record<string, unknown> | null;
   /** Injected by harnesses before tool execution for tools that need conversation history. */
   _currentMessages?: ConversationMessage[];
+  /** This turn's `invoke_agent` span context (Tracing.traceAgentTurn) — the
+   *  explicit parent of its `chat` and `execute_tool` spans. */
+  _traceContext?: Context;
   /** When true, this conversation was just created (no prior messages in DB).
    *  Prevents marking incoming context messages as _alreadyPersisted when
    *  they are ephemeral platform history (e.g. Discord channel messages). */
