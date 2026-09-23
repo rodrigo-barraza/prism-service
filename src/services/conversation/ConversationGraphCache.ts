@@ -30,14 +30,22 @@ const graphCache = new Map<string, GraphCacheEntry>();
  * Build a composite cache key from the parameters that affect
  * the graph output. If any of these change, the cache misses
  * and a fresh computation runs.
+ *
+ * `contentVersion` is the caller's fingerprint of the request rows it
+ * has seen (ids + status + tool count + success). The request COUNT
+ * alone does not move when a pending request completes or fails, so a
+ * rebuild that followed within the TTL was served the pending graph —
+ * a request that failed fast stayed "in flight" on the canvas.
  */
 export function buildGraphCacheKey(
   conversationId: string,
   requestCount: number,
   canvasWidth: number,
   canvasHeight: number,
+  contentVersion = "",
 ): string {
-  return `${conversationId}:${requestCount}:${canvasWidth}x${canvasHeight}`;
+  const baseKey = `${conversationId}:${requestCount}:${canvasWidth}x${canvasHeight}`;
+  return contentVersion ? `${baseKey}:${contentVersion}` : baseKey;
 }
 
 /**
