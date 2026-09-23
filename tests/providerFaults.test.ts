@@ -460,3 +460,113 @@ describe("OpenAI 429s: slow_down is a rate limit, a spend cap is not", () => {
     expect(event.retryable).toBe(false);
   });
 });
+
+/**
+ * The same faults seen by the harness itself: createProviderStream builds
+ * the composition the adapter cases above reproduce, and consumeStream is
+ * where a pass's outcome is decided and logged.
+ */
+describe("the harness under the same faults", () => {
+  async function harnessFor(
+    provider: { generateTextStream: (...args: never[]) => AsyncIterable<unknown> },
+    options: Record<string, unknown> = {},
+  ) {
+    const { default: BaseAgenticHarness } = await import("#src/services/harnesses/BaseAgenticHarness");
+    const { default: AgenticLoopState } = await import("#src/services/AgenticLoopState");
+    const context = {
+      emit: () => {},
+      signal: null,
+      provider,
+      providerName: "fault-provider",
+      resolvedModel: "fault-model",
+      modelDefinition: null,
+      options,
+      project: "test",
+      username: "tester",
+      agentConversationId: "fault-session",
+      conversationId: "fault-conversation",
+      requestId: "fault-request",
+    };
+    const state = new AgenticLoopState();
+    const harness = new BaseAgenticHarness(context as never, state, {
+      finalTools: [],
+      resolvedEnabledTools: [],
+    } as never);
+    return { harness, state };
+  }
+
+  it("a stalled pass aborts the provider request it was reading", async () => {
+    let providerSignal: AbortSignal | undefined;
+    const { harness } = await harnessFor(
+      {
+        async *generateTextStream(_messages: unknown, _model: unknown, options: { signal: AbortSignal }) {
+          providerSignal = options.signal;
+          yield "partial";
+          // A provider that stalls: nothing more until the request is aborted.
+          await new Promise((resolve) => options.signal.addEventListener("abort", resolve));
+        },
+      } as never,
+      { streamIdleTimeoutMilliseconds: 100 },
+    );
+    const pass = harness.createPassState({});
+    const stream = await harness.createProviderStream([{ role: "user", content: "hi" }], {});
+    await expect(harness.consumeStream(stream!, pass, new Set())).rejects.toThrow(/stalled/);
+    expect(providerSignal?.aborted).toBe(true);
+  });
+
+  it("the turn's stop still reaches the provider through the pass's signal", async () => {
+    const turn = new AbortController();
+    let providerSignal: AbortSignal | undefined;
+    const { harness } = await harnessFor({
+      async *generateTextStream(_messages: unknown, _model: unknown, options: { signal: AbortSignal }) {
+        providerSignal = options.signal;
+        yield "partial";
+      },
+    } as never);
+    (harness as unknown as { context: { signal: AbortSignal } }).context.signal = turn.signal;
+    const stream = await harness.createProviderStream([{ role: "user", content: "hi" }], {});
+    for await (const _chunk of stream!) break;
+    expect(providerSignal?.aborted).toBe(false);
+    turn.abort();
+    expect(providerSignal?.aborted).toBe(true);
+  });
+
+  it("missing usage: the pass records an estimate, marked usageEstimated on its request row", async () => {
+    const RequestLogger = (await import("#src/services/RequestLogger")).default as unknown as {
+      completePending: ReturnType<typeof vi.fn>;
+    };
+    RequestLogger.completePending.mockClear();
+    const { harness, state } = await harnessFor({
+      async *generateTextStream() {
+        yield "An answer of forty characters, roughly.";
+        yield { type: "usage", usage: { inputTokens: 0, outputTokens: 0 } };
+      },
+    } as never);
+    const messages = [{ role: "user", content: "A question the prompt estimate can count." }];
+    const pass = harness.createPassState({});
+    const stream = await harness.createProviderStream(messages as never, {});
+    await harness.consumeStream(stream!, pass, new Set());
+    expect(pass.usageEstimated).toBe(true);
+    expect(pass.usage.outputTokens).toBe(10);
+    expect(pass.usage.inputTokens).toBeGreaterThan(0);
+    expect(state.overallUsage.outputTokens).toBe(10);
+    harness.logIteration(pass, messages as never);
+    await Promise.all(state.pendingRequestLogWrites);
+    const [, row] = RequestLogger.completePending.mock.calls.at(-1)!;
+    expect(row).toMatchObject({ usageEstimated: true, usage: { outputTokens: 10 } });
+  });
+
+  it("reported usage is kept as reported, unmarked", async () => {
+    const { harness } = await harnessFor({
+      async *generateTextStream() {
+        yield "Counted.";
+        yield { type: "usage", usage: { inputTokens: 321, outputTokens: 7 } };
+      },
+    } as never);
+    const pass = harness.createPassState({});
+    const stream = await harness.createProviderStream([{ role: "user", content: "hi" }], {});
+    await harness.consumeStream(stream!, pass, new Set());
+    expect(pass.usageEstimated).toBeUndefined();
+    expect(pass.usage).toMatchObject({ inputTokens: 321, outputTokens: 7 });
+  });
+});
