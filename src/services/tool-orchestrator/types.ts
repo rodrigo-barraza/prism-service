@@ -33,6 +33,13 @@ export interface ToolExecutionContext {
   /** The run's profile — whose MCP servers (and other profile-scoped data) it reaches. */
   profileId?: string | null;
   agent?: string | null;
+  /**
+   * The turn's platform context (the request's `agentContext`). On a Discord
+   * turn its guild, channel and requester become the x-discord-* headers of
+   * every tools-service call (DiscordContextHeaders) — trusted context, never
+   * the model's arguments.
+   */
+  agentContext?: unknown;
   requestId?: string;
   traceId?: string | null;
   agentConversationId?: string | null;

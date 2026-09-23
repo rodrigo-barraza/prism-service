@@ -73,6 +73,7 @@ async function readCurrentFile(
         project: context.project,
         username: context.username,
         agent: context.agent || null,
+        agentContext: context.options?.agentContext,
         agentConversationId: context.agentConversationId || "",
         conversationId: context.conversationId,
         workspaceRoot: context.workspaceRoot,
