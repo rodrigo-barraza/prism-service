@@ -66,6 +66,8 @@ export interface TurnOutcome {
   conversationId: string | null;
   /** The turn's cumulative cost so far (USD), when reported. */
   turnCost: number | null;
+  /** The newest `seq` seen — where a `/ws/chat` subscription picks up without repeats. */
+  lastSeq: number | null;
 }
 
 interface ToolState {
@@ -167,6 +169,7 @@ export class TurnTranslator {
     iterationLimit: false,
     conversationId: null,
     turnCost: null,
+    lastSeq: null,
   };
 
   private readonly workspaceRoot: string | null;
@@ -195,6 +198,9 @@ export class TurnTranslator {
   }
 
   translate(event: TurnEvent): TranslatedEvent {
+    if (typeof event.seq === "number" && (this.outcome.lastSeq === null || event.seq > this.outcome.lastSeq)) {
+      this.outcome.lastSeq = event.seq;
+    }
     switch (event.type) {
       case "hello":
         if (event.protocolVersion > PROTOCOL_VERSION) {
