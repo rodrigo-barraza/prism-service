@@ -7,7 +7,7 @@
 // `mutate_*` tools change them mid-connection, which sends
 // notifications/tools/list_changed.
 import { readFileSync, writeFileSync } from "node:fs";
-import { McpServer } from "@modelcontextprotocol/server";
+import { McpServer, inputRequired } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import * as z from "zod/v4";
 
@@ -36,7 +36,17 @@ function writeState(patch) {
 
 const text = (value) => ({ content: [{ type: "text", text: value }] });
 
-serveStdio(() => {
+const TRIP_SCHEMA = {
+  type: "object",
+  properties: {
+    city: { type: "string", title: "City" },
+    nights: { type: "integer", title: "Nights", minimum: 1 },
+    window: { type: "boolean", title: "Window seat" },
+  },
+  required: ["city", "nights"],
+};
+
+serveStdio(({ era }) => {
   const state = readState();
   const server = new McpServer(
     { name: "trust-fixture", version: "1.0.0" },
@@ -125,6 +135,82 @@ serveStdio(() => {
       async () => text("late"),
     );
   }
+
+  // ── Elicitation — the same tool on both eras: a 2025-era server sends
+  // elicitation/create mid-call, a 2026-07-28 one returns input_required
+  // and reads the answer on the retry.
+  server.registerTool(
+    "book_trip",
+    { description: "Book a trip; asks where to.", inputSchema: z.object({}) },
+    async (_args, ctx) => {
+      let answer;
+      if (era === "modern") {
+        answer = ctx.mcpReq.inputResponses?.trip;
+        if (!answer) {
+          return inputRequired({
+            inputRequests: {
+              trip: inputRequired.elicit({ message: "Where to?", requestedSchema: TRIP_SCHEMA }),
+            },
+          });
+        }
+      } else {
+        answer = await ctx.mcpReq.elicitInput({
+          mode: "form",
+          message: "Where to?",
+          requestedSchema: TRIP_SCHEMA,
+        });
+      }
+      return text(JSON.stringify(answer));
+    },
+  );
+
+  server.registerTool(
+    "open_docs",
+    { description: "Needs the user to visit a page.", inputSchema: z.object({}) },
+    async (_args, ctx) => {
+      let answer;
+      if (era === "modern") {
+        answer = ctx.mcpReq.inputResponses?.visit;
+        if (!answer) {
+          return inputRequired({
+            inputRequests: {
+              visit: inputRequired.elicitUrl({ message: "Sign the form", url: "https://example.com/sign" }),
+            },
+          });
+        }
+      } else {
+        answer = await ctx.mcpReq.elicitInput({
+          mode: "url",
+          message: "Sign the form",
+          url: "https://example.com/sign",
+          elicitationId: "sign-1",
+        });
+      }
+      return text(JSON.stringify(answer));
+    },
+  );
+
+  // ── Prompts and resources (composer slash commands and @-mentions) ──
+  server.registerPrompt(
+    "summarize_topic",
+    {
+      title: "Summarize a topic",
+      description: "Summarize a topic in a given tone.",
+      argsSchema: z.object({ topic: z.string(), tone: z.string().optional() }),
+    },
+    ({ topic, tone }) => ({
+      messages: [
+        { role: "user", content: { type: "text", text: `Summarize ${topic}${tone ? ` in a ${tone} tone` : ""}.` } },
+      ],
+    }),
+  );
+
+  server.registerResource(
+    "today",
+    "notes://today",
+    { title: "Today's notes", description: "What happened today.", mimeType: "text/plain" },
+    async (uri) => ({ contents: [{ uri: uri.href, mimeType: "text/plain", text: "Shipped the MCP client." }] }),
+  );
 
   // ── Mid-connection changes (each sends tools/list_changed) ──
   server.registerTool(

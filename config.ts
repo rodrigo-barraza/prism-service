@@ -121,6 +121,18 @@ export const PRISM_PUSH_NTFY_TOPIC = process.env.PRISM_PUSH_NTFY_TOPIC;
 // Public origin of prism-client, for absolute links in ntfy messages.
 export const PRISM_CLIENT_PUBLIC_URL = process.env.PRISM_CLIENT_PUBLIC_URL;
 
+// ── MCP OAuth ─────────────────────────────────────────────────
+// Public origin of prism-service (vault-derived from the registry domain):
+// MCP OAuth redirects land on `${PRISM_SERVICE_PUBLIC_URL}/mcp/oauth/callback`.
+// Unset, the origin of the request that started the flow is used.
+export const PRISM_SERVICE_PUBLIC_URL = process.env.PRISM_SERVICE_PUBLIC_URL;
+// 32-byte key (base64 or hex) that encrypts MCP OAuth tokens and client
+// registrations at rest. Without it, OAuth MCP servers can't be connected.
+export const MCP_OAUTH_ENCRYPTION_KEY = process.env.MCP_OAUTH_ENCRYPTION_KEY;
+// Read-only GitHub token for the optional seeded GitHub MCP server
+// (https://api.githubcopilot.com/mcp/readonly). Unset, it stays disabled.
+export const GITHUB_MCP_TOKEN = process.env.GITHUB_MCP_TOKEN;
+
 // ── Anthropic Files API ───────────────────────────────────────
 // Upload-once media caching against Anthropic's Files API
 // (beta: files-api-2025-04-14). Default ON for the first-party API;

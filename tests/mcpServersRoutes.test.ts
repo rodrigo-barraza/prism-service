@@ -14,11 +14,13 @@ vi.mock("#src/services/MCPClientService", () => {
       disconnectServer: vi.fn().mockResolvedValue(undefined),
       updateServerSettings: vi.fn().mockReturnValue(false),
       approveTools: vi.fn().mockResolvedValue(null),
+      isServerConnected: vi.fn().mockReturnValue(false),
     },
   };
 });
 
 const { default: mcpServersRouter } = await import("#src/routes/McpServersRoutes");
+const { McpAuthorizationRequiredError } = await import("#src/services/mcp/McpOAuth");
 const { default: MCPClientService, McpServerNameConflictError } = await import(
   "#src/services/MCPClientService"
 );
@@ -216,6 +218,34 @@ describe("MCP server routes — naming, sharing, trust and approval", () => {
       "default",
       expect.objectContaining({ trusted: true }),
     );
+  });
+
+  it("hands back the authorization URL when an OAuth server has no tokens yet", async () => {
+    const doc = server({ name: "linear", transport: "streamable-http", url: "https://mcp.linear.app/mcp", auth: { type: "oauth" } });
+    vi.mocked(MCPClientService.connect).mockRejectedValueOnce(
+      new McpAuthorizationRequiredError("linear", "https://auth.example/authorize?client_id=x"),
+    );
+    const response = await agent
+      .post(`${BASE}/${doc._id}/connect`)
+      .set({ ...OWNER, "x-forwarded-proto": "https", "x-forwarded-host": "api.prism.test" })
+      .expect(200);
+    expect(response.body).toEqual({
+      success: false,
+      authorizationRequired: true,
+      authorizationUrl: "https://auth.example/authorize?client_id=x",
+    });
+    // The redirect base is the origin the request arrived on.
+    expect(vi.mocked(MCPClientService.connect).mock.calls[0][0]).toMatchObject({
+      _requestOrigin: "https://api.prism.test",
+    });
+  });
+
+  it("reports an OAuth server's authorization state without any token", async () => {
+    const doc = server({ name: "linear", transport: "streamable-http", auth: { type: "oauth" } });
+    const response = await agent.get(`${BASE}/${doc._id}/oauth`).set(OWNER).expect(200);
+    expect(response.body).toMatchObject({ status: "none", authorized: false });
+    const list = await agent.get(BASE).set(OWNER).expect(200);
+    expect(list.body[0].oauth).toMatchObject({ status: "none", authorized: false });
   });
 
   it("answers a name conflict at connect time with 409", async () => {

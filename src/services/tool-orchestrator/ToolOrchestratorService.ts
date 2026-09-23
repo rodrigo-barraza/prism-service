@@ -1,6 +1,7 @@
 import { TOOLS_SERVICE_URL } from "#config";
 import { IDENTITY_HEADERS } from "@rodrigo-barraza/utilities-library/service";
 import MCPClientService, { type MCPCallOptions } from "#src/services/MCPClientService";
+import { createLoopElicitHandler } from "#src/services/mcp/McpElicitation";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 import {
   partitionByDiscoverableUniverse,
@@ -1760,11 +1761,15 @@ export default class ToolOrchestratorService {
     // Route MCP tools to MCPClientService — thread the loop's abort signal
     // so user stops / per-tool timeouts actually cancel the in-flight call.
     if (MCPClientService.isMCPTool(name)) {
+      const serverName = MCPClientService.parseMCPToolName(name)?.serverName;
+      const elicit = serverName ? createLoopElicitHandler(context, serverName) : undefined;
       return ToolOrchestratorService.executeMCPTool(name, args, {
         signal: context.signal,
         scope: { username: context.username, profileId: context.profileId },
         conversationId: context.conversationId,
         project: context.project,
+        // A server that asks for input mid-call gets a question card.
+        ...(elicit && { elicit }),
       });
     }
 

@@ -58,6 +58,7 @@ export const COLLECTIONS = {
   PERMISSION_DECISIONS: "permission_decisions",
   AGENT_INSTRUCTIONS: "agent_instructions",
   MCP_SERVERS: "mcp_servers",
+  MCP_OAUTH: "mcp_oauth",
   MEMORIES: "memories",
   MEMORY_CONSOLIDATION_RUNS: "memory_consolidation_runs",
   MEMORY_CONSOLIDATION_HISTORY: "memory_consolidation_history",
@@ -786,6 +787,20 @@ export const MCP = {
    * unknown pre-`initialize` requests stalls a connect for this long.
    */
   STDIO_PROBE_TIMEOUT_MILLISECONDS: 5_000,
+
+  /**
+   * Request timeout for a call that may show an elicitation card on a
+   * 2025-era connection, where the call stays open while the person
+   * answers. (On 2026-07-28 the answer is collected between wire legs, so
+   * the default timeout applies.)
+   */
+  INTERACTIVE_CALL_TIMEOUT_MILLISECONDS: 300_000,
+
+  /** How long an OAuth `state` stays redeemable at the callback. */
+  OAUTH_STATE_TTL_MILLISECONDS: 15 * 60_000,
+
+  /** OAuth redirect path, on prism-service's public origin. */
+  OAUTH_CALLBACK_PATH: "/mcp/oauth/callback",
 } as const;
 
 // ─── Context Window Constants ───────────────────────────────

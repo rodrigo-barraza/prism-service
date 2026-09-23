@@ -43,6 +43,8 @@ export {
   PostMcpServerSchema,
   PutMcpServerSchema,
   ApproveMcpToolsSchema,
+  GetMcpPromptSchema,
+  ReadMcpResourceSchema,
   GetConversationsQuerySchema,
   PostConversationMessagesBodySchema,
   PatchConversationBodySchema,

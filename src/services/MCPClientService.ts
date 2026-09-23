@@ -1,7 +1,9 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import {
   Client,
   SSEClientTransport,
   StreamableHTTPClientTransport,
+  UnauthorizedError,
   type Tool,
   type VersionNegotiationOptions,
 } from "@modelcontextprotocol/client";
@@ -55,6 +57,17 @@ import {
   resolveOutputCapTokens,
 } from "#src/services/mcp/McpOutputCap";
 import { updateMcpServerRecord } from "#src/services/mcp/McpServerStore";
+import { resolveEnvHeaders, type EnvHeaderReference } from "#src/services/mcp/McpBuiltinServers";
+import {
+  McpAuthorizationRequiredError,
+  McpOAuthProvider,
+  resolveProviderRedirectUrl,
+} from "#src/services/mcp/McpOAuth";
+import type {
+  ElicitParamsLike,
+  ElicitResultLike,
+  McpElicitHandler,
+} from "#src/services/mcp/McpElicitation";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -118,6 +131,15 @@ export interface MCPServerConfig {
   protocol?: MCPProtocolSetting;
   outputCapTokens?: number | null;
   toolOutputCapTokens?: Record<string, number> | null;
+  /** OAuth 2.1 (PKCE, dynamic registration) instead of static headers. */
+  auth?: { type: "oauth"; scope?: string | null } | null;
+  /** Header values read from the environment at connect — shared servers only. */
+  envHeaders?: Record<string, EnvHeaderReference> | null;
+  /**
+   * Origin of the request that started a connect — the OAuth redirect base
+   * when PRISM_SERVICE_PUBLIC_URL is unset. Not stored.
+   */
+  _requestOrigin?: string | null;
   [key: string]: unknown;
 }
 
@@ -147,6 +169,14 @@ interface MCPConnection {
   tools: MCPToolSchema[];
   quarantined: McpQuarantinedTool[];
   rejected: Set<string>;
+  /** Tool calls in flight — who to ask when the server elicits input. */
+  activeCalls: Map<number, ActiveCall>;
+}
+
+interface ActiveCall {
+  id: number;
+  toolName: string;
+  elicit?: McpElicitHandler;
 }
 
 interface MCPAuthOptions {
@@ -176,6 +206,11 @@ export interface MCPCallOptions {
   /** Recorded on an offloaded (over-cap) result. */
   conversationId?: string | null;
   project?: string | null;
+  /**
+   * Shows the server's elicitation requests to the person running the turn.
+   * Absent (hooks, tool programs), elicitations are answered `cancel`.
+   */
+  elicit?: McpElicitHandler;
   /**
    * Internal recursion guard. The reconnect-retry used to recurse UNBOUNDED
    * (callTool → catch → reconnect → callTool …) when a server kept dropping
@@ -219,6 +254,14 @@ const connections = new Map<string, MCPConnection>();
  * reset approves whatever the server says next (trust on first use).
  */
 const rememberedPins = new Map<string, McpToolPins>();
+
+/**
+ * Which call is running, so an elicitation that arrives during it can be
+ * put to the right turn. The SDK does not say which request an incoming
+ * `elicitation/create` belongs to.
+ */
+const callContext = new AsyncLocalStorage<{ key: string; callId: number }>();
+let callSequence = 0;
 
 export function connectionKey(profileId: string | null | undefined, serverId: string): string {
   return `${normalizeProfileId(profileId)}::${serverId}`;
@@ -313,7 +356,10 @@ export function buildStdioEnvironment(
 /**
  * Create the appropriate transport based on server config.
  */
-function createTransport(config: MCPServerConfig): MCPTransport {
+function createTransport(
+  config: MCPServerConfig,
+  authProvider?: McpOAuthProvider,
+): MCPTransport {
   if (config.transport === "stdio") {
     return new StdioClientTransport({
       command: config.command!,
@@ -322,12 +368,17 @@ function createTransport(config: MCPServerConfig): MCPTransport {
     });
   }
 
+  // Secrets a shared (seeded) server references by env name, resolved now
+  // so they are never stored on its document.
+  const headers = { ...(config.headers || {}), ...resolveEnvHeaders(config) };
+
   if (config.transport === "streamable-http") {
     const url = new URL(config.url!);
     return new StreamableHTTPClientTransport(url, {
       requestInit: {
-        headers: config.headers || {},
+        headers,
       },
+      ...(authProvider && { authProvider }),
     });
   }
 
@@ -335,8 +386,9 @@ function createTransport(config: MCPServerConfig): MCPTransport {
     const url = new URL(config.url!);
     return new SSEClientTransport(url, {
       requestInit: {
-        headers: config.headers || {},
+        headers,
       },
+      ...(authProvider && { authProvider }),
     });
   }
 
@@ -535,11 +587,26 @@ const MCPClientService = {
 
     logger.info(`[MCP] Connecting to "${serverName}" (${config.transport})...`);
 
-    const transport = createTransport(config);
+    let authProvider: McpOAuthProvider | undefined;
+    if (config.auth?.type === "oauth") {
+      if (config.transport === "stdio") {
+        throw new Error(`MCP server "${serverName}": OAuth needs an HTTP transport`);
+      }
+      const identity = { serverId, profileId: owner.profileId, username: owner.username };
+      authProvider = new McpOAuthProvider(
+        identity,
+        await resolveProviderRedirectUrl(identity, config._requestOrigin),
+        config.auth.scope ?? null,
+      );
+    }
+
+    const transport = createTransport(config, authProvider);
     const client: Client = new Client(
       { name: MCP.CLIENT_NAME, version: "1.0.0" },
       {
-        capabilities: {},
+        // Elicitation, in both modes: a form is shown as a question card, a
+        // URL as a card with a link.
+        capabilities: { elicitation: { form: {}, url: {} } },
         versionNegotiation: negotiationFor(config),
         listChanged: {
           tools: {
@@ -549,18 +616,25 @@ const MCPClientService = {
         },
       },
     );
+    client.setRequestHandler("elicitation/create", (request) =>
+      MCPClientService.handleElicitation(key, client, request.params as unknown as ElicitParamsLike),
+    );
 
     try {
       await client.connect(transport);
     } catch (error: unknown) {
-      logger.error(
-        `[MCP] Failed to connect to "${serverName}": ${getErrorMessage(error)}`,
-      );
       try {
         await transport.close();
       } catch {
         /* best-effort */
       }
+      if (authProvider?.authorizationUrl && error instanceof UnauthorizedError) {
+        logger.info(`[MCP] "${serverName}" needs OAuth authorization`);
+        throw new McpAuthorizationRequiredError(serverName, authProvider.authorizationUrl);
+      }
+      logger.error(
+        `[MCP] Failed to connect to "${serverName}": ${getErrorMessage(error)}`,
+      );
       throw error;
     }
 
@@ -596,6 +670,7 @@ const MCPClientService = {
       tools: [],
       quarantined: [],
       rejected: new Set(),
+      activeCalls: new Map(),
     };
     connections.set(key, conn);
     applyToolList(conn, offered);
@@ -646,6 +721,61 @@ const MCPClientService = {
     logger.info(
       `[MCP] "${conn.serverName}" tool list changed — ${conn.tools.length} approved${describeQuarantine(conn)}`,
     );
+  },
+
+  /**
+   * An elicitation from a server: put it to the turn whose call is waiting
+   * on it. The call is found by async context when the SDK fulfils it inside
+   * `callTool` (2026-07-28), else as the connection's call in flight.
+   */
+  async handleElicitation(
+    key: string,
+    client: Client,
+    params: ElicitParamsLike,
+  ): Promise<ElicitResultLike> {
+    const conn = connections.get(key);
+    if (!conn || conn.client !== client) return { action: "cancel" };
+    const store = callContext.getStore();
+    let call = store?.key === key ? conn.activeCalls.get(store.callId) : undefined;
+    if (!call) {
+      const inFlight = [...conn.activeCalls.values()];
+      if (inFlight.length > 1) {
+        logger.warn(
+          `[MCP] "${conn.serverName}" elicited during ${inFlight.length} concurrent calls; asking on the latest (${inFlight.at(-1)!.toolName})`,
+        );
+      }
+      call = inFlight.at(-1);
+    }
+    if (!call?.elicit) {
+      logger.info(`[MCP] "${conn.serverName}" asked for input with nobody to ask — answering cancel`);
+      return { action: "cancel" };
+    }
+    return call.elicit(params);
+  },
+
+  /**
+   * Finish an OAuth authorization at the callback: the SDK validates `iss`,
+   * exchanges the code (with the stored PKCE verifier) and saves the tokens
+   * through the provider. The caller then connects as usual.
+   */
+  async finishOAuth(
+    config: MCPServerConfig,
+    provider: McpOAuthProvider,
+    params: URLSearchParams,
+  ): Promise<void> {
+    const transport = createTransport(config, provider);
+    if (!("finishAuth" in transport)) {
+      throw new Error(`MCP server "${config.name}": OAuth needs an HTTP transport`);
+    }
+    try {
+      await transport.finishAuth(params);
+    } finally {
+      try {
+        await transport.close();
+      } catch {
+        /* never started */
+      }
+    }
   },
 
   /** Disconnect one connection by pool key. */
@@ -714,18 +844,24 @@ const MCPClientService = {
     }
     const originalName = approved._mcpOriginalName;
     const definition = conn.mcpTools.find((tool) => tool.name === originalName);
+    // On a 2025-era connection the call stays open while a person answers
+    // an elicitation, so a call that can show a card gets a longer timeout.
+    const timeout =
+      options.elicit && conn.protocolEra !== "modern"
+        ? Math.max(options.timeoutMilliseconds ?? 0, MCP.INTERACTIVE_CALL_TIMEOUT_MILLISECONDS)
+        : options.timeoutMilliseconds;
+    const callId = ++callSequence;
+    conn.activeCalls.set(callId, { id: callId, toolName: originalName, elicit: options.elicit });
 
     try {
-      const result = await conn.client.callTool(
+      const result = await callContext.run({ key: conn.key, callId }, () => conn.client.callTool(
         {
           name: originalName,
           arguments: args,
         },
         {
           ...(options.signal && { signal: options.signal }),
-          ...(options.timeoutMilliseconds && {
-            timeout: options.timeoutMilliseconds,
-          }),
+          ...(timeout && { timeout }),
           // Long-running MCP tools that report progress shouldn't be killed
           // by the flat timeout while they're demonstrably alive.
           resetTimeoutOnProgress: true,
@@ -733,7 +869,7 @@ const MCPClientService = {
           // the server's latest tools/list says.
           ...(definition && { toolDefinition: definition as unknown as Tool }),
         },
-      );
+      ));
 
       const transformed = transformCallResult(result as unknown as Record<string, unknown>);
       if (transformed && typeof transformed === "object" && !Array.isArray(transformed)) {
@@ -786,6 +922,8 @@ const MCPClientService = {
         }
       }
       return { error: `MCP tool call failed: ${getErrorMessage(error)}` };
+    } finally {
+      conn.activeCalls.delete(callId);
     }
   },
 
@@ -1005,6 +1143,111 @@ const MCPClientService = {
         error: `Failed to read resource "${uri}" from "${serverName}": ${getErrorMessage(error)}`,
       };
     }
+  },
+
+  /**
+   * The prompts of every server `scope` can see — shown as slash commands
+   * in the composer.
+   */
+  async listPrompts(scope?: MCPCallOptions["scope"]) {
+    const resolved = toMcpScope(scope);
+    const prompts: Array<{
+      server: string;
+      name: string;
+      title: string | null;
+      description: string | null;
+      arguments: Array<{ name: string; description: string | null; required: boolean }>;
+    }> = [];
+    for (const conn of connections.values()) {
+      if (!isVisibleTo(conn.owner, resolved)) continue;
+      if (!conn.client.getServerCapabilities()?.prompts) continue;
+      try {
+        const result = await conn.client.listPrompts();
+        for (const prompt of result.prompts ?? []) {
+          prompts.push({
+            server: conn.serverName,
+            name: prompt.name,
+            title: prompt.title ?? null,
+            description: prompt.description ?? null,
+            arguments: (prompt.arguments ?? []).map((argument) => ({
+              name: argument.name,
+              description: argument.description ?? null,
+              required: argument.required === true,
+            })),
+          });
+        }
+      } catch (error: unknown) {
+        logger.warn(`[MCP] Could not list prompts of "${conn.serverName}": ${getErrorMessage(error)}`);
+      }
+    }
+    return prompts;
+  },
+
+  /**
+   * Fill a prompt. Its messages are flattened to text — the composer inserts
+   * them for the person to read and send.
+   */
+  async getPrompt(
+    serverName: string,
+    name: string,
+    args: Record<string, string> = {},
+    scope?: MCPCallOptions["scope"],
+  ) {
+    const conn = findVisibleConnection(serverName, toMcpScope(scope));
+    if (!conn) return { error: `MCP server "${serverName}" is not connected` };
+    try {
+      const result = await conn.client.getPrompt({ name, arguments: args });
+      const messages = (result.messages ?? []).map((message) => {
+        const content = message.content as {
+          type: string;
+          text?: string;
+          resource?: { uri?: string; text?: string };
+          uri?: string;
+        };
+        const text =
+          content.type === "text"
+            ? (content.text ?? "")
+            : content.type === "resource"
+              ? (content.resource?.text ?? `[resource ${content.resource?.uri ?? ""}]`)
+              : content.type === "resource_link"
+                ? `[resource ${content.uri ?? ""}]`
+                : `[${content.type}]`;
+        return { role: message.role, text };
+      });
+      return {
+        server: serverName,
+        name,
+        description: result.description ?? null,
+        messages,
+        text: messages.map((message) => message.text).join("\n\n"),
+      };
+    } catch (error: unknown) {
+      return { error: `Failed to get prompt "${name}" from "${serverName}": ${getErrorMessage(error)}` };
+    }
+  },
+
+  /**
+   * The resources of every server `scope` can see — offered as @-mentions
+   * in the composer.
+   */
+  async listAllResources(scope?: MCPCallOptions["scope"]) {
+    const resolved = toMcpScope(scope);
+    const resources: Array<{
+      server: string;
+      uri: string;
+      name: string;
+      description: string | null;
+      mimeType: string | null;
+    }> = [];
+    for (const conn of connections.values()) {
+      if (!isVisibleTo(conn.owner, resolved)) continue;
+      if (!conn.client.getServerCapabilities()?.resources) continue;
+      const listed = await this.listResources(conn.serverName, resolved);
+      for (const resource of listed.resources ?? []) {
+        resources.push({ server: conn.serverName, ...resource });
+      }
+    }
+    return resources;
   },
 
   /**

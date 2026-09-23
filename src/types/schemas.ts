@@ -270,6 +270,11 @@ const McpServerSettingsSchema = {
   protocol: z.enum(["auto", "legacy", "2026-07-28"]).optional(),
   outputCapTokens: McpOutputCapSchema.nullable().optional(),
   toolOutputCapTokens: z.record(z.string(), McpOutputCapSchema).optional(),
+  /** OAuth 2.1 (PKCE + dynamic registration) instead of static headers. */
+  auth: z
+    .object({ type: z.literal("oauth"), scope: z.string().max(500).nullable().optional() })
+    .nullable()
+    .optional(),
 };
 
 export const PostMcpServerSchema = z.object({
@@ -299,6 +304,19 @@ export const PutMcpServerSchema = z.object({
   headers: z.record(z.string(), z.string()).optional(),
   enabled: z.boolean().optional(),
   ...McpServerSettingsSchema,
+});
+
+/** `POST /mcp-servers/prompts/get` — fill one MCP prompt. */
+export const GetMcpPromptSchema = z.object({
+  server: z.string().min(1),
+  name: z.string().min(1),
+  arguments: z.record(z.string(), z.string()).optional().default({}),
+});
+
+/** `POST /mcp-servers/resources/read` — read one MCP resource. */
+export const ReadMcpResourceSchema = z.object({
+  server: z.string().min(1),
+  uri: z.string().min(1),
 });
 
 /** `POST /mcp-servers/:id/tools/approve` — no `tools` approves every quarantined tool. */

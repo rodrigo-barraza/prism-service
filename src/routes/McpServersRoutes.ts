@@ -11,12 +11,20 @@ import type {
   McpQuarantinedTool,
   McpToolPins,
 } from "#src/services/mcp/McpToolFingerprint";
+import {
+  McpAuthorizationRequiredError,
+  forgetMcpOAuth,
+  getMcpOAuthStatus,
+} from "#src/services/mcp/McpOAuth";
+import { McpOAuthKeyMissingError } from "#src/services/mcp/McpSecretBox";
 import logger from "#src/utils/logger";
 import { COLLECTIONS } from "#src/constants";
 import {
   ApproveMcpToolsSchema,
+  GetMcpPromptSchema,
   PostMcpServerSchema,
   PutMcpServerSchema,
+  ReadMcpResourceSchema,
 } from "#src/types/index";
 import {
   profileFilter,
@@ -52,6 +60,7 @@ interface McpServerDocument {
   toolOutputCapTokens?: Record<string, number>;
   toolPins?: McpToolPins;
   quarantinedTools?: McpQuarantinedTool[];
+  auth?: { type: "oauth"; scope?: string | null } | null;
   protocolVersion?: string | null;
   protocolEra?: string | null;
   lastConnectedAt?: string;
@@ -87,6 +96,24 @@ async function findNameClash(
   });
 }
 
+/**
+ * The origin this request came in on — the OAuth redirect base when
+ * PRISM_SERVICE_PUBLIC_URL is unset (a local instance).
+ */
+function requestOrigin(req: Request): string {
+  const forwardedProto = String(req.headers["x-forwarded-proto"] ?? "").split(",")[0]?.trim();
+  const forwardedHost = String(req.headers["x-forwarded-host"] ?? "").split(",")[0]?.trim();
+  return `${forwardedProto || req.protocol}://${forwardedHost || req.get("host")}`;
+}
+
+function oauthIdentity(server: McpServerDocument) {
+  return {
+    serverId: server._id.toString(),
+    profileId: server.profileId ?? "default",
+    username: server.username,
+  };
+}
+
 function nameClashResponse(res: Response, name: string) {
   return res.status(409).json({
     error: `An MCP server named "${name}" already exists in this profile (or is shared). Server names namespace their tools, so they must be unique.`,
@@ -117,12 +144,15 @@ router.get(
         ]),
       );
 
-      const enriched = servers.map((server) => {
+      const enriched = await Promise.all(servers.map(async (server) => {
         const id = server._id.toString();
         const { toolPins: _toolPins, ...rest } = server;
         const conn = connected.get(id);
         return {
           ...rest,
+          ...(server.auth?.type === "oauth" && {
+            oauth: await getMcpOAuthStatus(oauthIdentity(server)),
+          }),
           id,
           shared: server.shared === true,
           trusted: server.trusted === true,
@@ -134,7 +164,7 @@ router.get(
           protocolEra: conn?.protocolEra ?? server.protocolEra ?? null,
           connectedAt: conn?.connectedAt || null,
         };
-      });
+      }));
 
       res.json(enriched);
     } catch (error: unknown) {
@@ -309,7 +339,10 @@ router.post(
         return res.status(404).json({ error: "MCP server not found" });
       }
 
-      const result = await MCPClientService.connect(toConfig(server));
+      const result = await MCPClientService.connect({
+        ...toConfig(server),
+        _requestOrigin: requestOrigin(req),
+      });
       res.json({
         success: true,
         serverName: result.serverName,
@@ -323,12 +356,25 @@ router.post(
         protocolEra: result.protocolEra,
       });
     } catch (error: unknown) {
+      // An OAuth server without tokens: the client opens this URL in a
+      // popup, and the callback finishes the connect.
+      if (error instanceof McpAuthorizationRequiredError) {
+        return res.json({
+          success: false,
+          authorizationRequired: true,
+          authorizationUrl: error.authorizationUrl,
+        });
+      }
       const serverId = req.params.id as string;
       const errorText = errorMessage(error);
       logger.error(`MCP connect failed for ${serverId}: ${errorText}`);
-      res
-        .status(error instanceof McpServerNameConflictError ? 409 : 502)
-        .json({ error: `MCP server connection failed: ${errorText}` });
+      const status =
+        error instanceof McpServerNameConflictError
+          ? 409
+          : error instanceof McpOAuthKeyMissingError
+            ? 503
+            : 502;
+      res.status(status).json({ error: `MCP server connection failed: ${errorText}` });
     }
   }),
 );
@@ -359,6 +405,116 @@ router.post(
       res.json({ success: true });
     } catch (error: unknown) {
       _next(error);
+    }
+  }),
+);
+
+/**
+ * GET /mcp-servers/:id/oauth — the server's authorization state (never a token).
+ * DELETE /mcp-servers/:id/oauth — forget its tokens and registration, and disconnect.
+ */
+router.get(
+  "/:id/oauth",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const serverId = req.params.id as string;
+      if (!isObjectId(serverId)) return res.status(404).json({ error: "MCP server not found" });
+      const server = await req.db
+        .collection<McpServerDocument>(COLLECTION)
+        .findOne({ _id: new ObjectId(serverId), ...scopeFilter(req) });
+      if (!server) return res.status(404).json({ error: "MCP server not found" });
+      res.json({
+        ...(await getMcpOAuthStatus(oauthIdentity(server))),
+        connected: MCPClientService.isServerConnected(serverId, server.profileId),
+      });
+    } catch (error: unknown) {
+      next(error);
+    }
+  }),
+);
+
+router.delete(
+  "/:id/oauth",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const serverId = req.params.id as string;
+      if (!isObjectId(serverId)) return res.status(404).json({ error: "MCP server not found" });
+      const server = await req.db
+        .collection<McpServerDocument>(COLLECTION)
+        .findOne({ _id: new ObjectId(serverId), ...scopeFilter(req) });
+      if (!server) return res.status(404).json({ error: "MCP server not found" });
+      await MCPClientService.disconnectServer(serverId, server.profileId);
+      await forgetMcpOAuth(oauthIdentity(server));
+      res.json({ success: true });
+    } catch (error: unknown) {
+      next(error);
+    }
+  }),
+);
+
+/**
+ * GET /mcp-servers/prompts — every visible server's prompts (the composer's
+ * slash commands). POST /mcp-servers/prompts/get { server, name, arguments }
+ * fills one.
+ */
+router.get(
+  "/prompts",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ prompts: await MCPClientService.listPrompts(resolveScope(req)) });
+    } catch (error: unknown) {
+      next(error);
+    }
+  }),
+);
+
+router.post(
+  "/prompts/get",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = GetMcpPromptSchema.safeParse(req.body ?? {});
+      if (!parsed.success) return res.status(400).json({ error: parsed.error.format() });
+      const { server, name, arguments: promptArguments } = parsed.data;
+      const result = await MCPClientService.getPrompt(server, name, promptArguments, resolveScope(req));
+      if ("error" in result) return res.status(502).json(result);
+      res.json(result);
+    } catch (error: unknown) {
+      next(error);
+    }
+  }),
+);
+
+/**
+ * GET /mcp-servers/resources — every visible server's resources (the
+ * composer's @-mentions). POST /mcp-servers/resources/read { server, uri }
+ * reads one.
+ */
+router.get(
+  "/resources",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ resources: await MCPClientService.listAllResources(resolveScope(req)) });
+    } catch (error: unknown) {
+      next(error);
+    }
+  }),
+);
+
+router.post(
+  "/resources/read",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = ReadMcpResourceSchema.safeParse(req.body ?? {});
+      if (!parsed.success) return res.status(400).json({ error: parsed.error.format() });
+      const result = await MCPClientService.readResource(
+        parsed.data.server,
+        parsed.data.uri,
+        resolveScope(req),
+      );
+      if ("error" in result) return res.status(502).json(result);
+      res.json(result);
+    } catch (error: unknown) {
+      next(error);
     }
   }),
 );
