@@ -74,6 +74,13 @@ export interface ToolExecutionContext {
   /** Parent loop's stored permission rules — inherited by spawned sub-agents. */
   _permissionRules?: import("#src/services/permissions/PermissionRuleSet").default;
   _permissionMode?: import("#src/services/permissions/PermissionModeState").PermissionModeHandle;
+  /** The loop's capability scope — judged by every inner approval engine, narrowed further for a sub-agent. */
+  _capabilityScope?:
+    | import("#src/services/permissions/CapabilityScope").CapabilityScopeHandle
+    | import("#src/services/permissions/CapabilityScope").CapabilityScope
+    | null;
+  /** The untrusted text the loop has seen — the taint check's input; a sub-agent's registry sees it. */
+  _untrustedSpans?: import("#src/services/permissions/UntrustedSpans").UntrustedSpans;
   /** Parent loop's auto-mode reviewer model — inherited by spawned sub-agents. */
   _criticModel?: string;
   /** Parent loop's cost ceiling — inherited by spawned sub-agents. */

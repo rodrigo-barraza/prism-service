@@ -6,9 +6,12 @@ import logger from "#src/utils/logger";
 import { COLLECTIONS } from "#src/constants";
 import { PostRuleSchema, PutRuleSchema } from "#src/types/index";
 import { resolveScope, scopeFilter } from "#src/utils/ProfileScope";
+import { requireUserAuthorityToChange } from "#src/middleware/ExternalAuthority";
 
 const router = express.Router();
 router.use(requireDb);
+// The agent's rules are the user's instructions: a relay cannot write them.
+router.use(requireUserAuthorityToChange("change the agent's rules"));
 
 const COLLECTION = COLLECTIONS.AGENT_RULES;
 

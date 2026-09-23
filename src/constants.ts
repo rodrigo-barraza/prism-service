@@ -650,6 +650,12 @@ export const NOTIFICATION_SOURCES = {
   SUB_AGENT_PROGRESS: "subagent-progress",
   /** The goal verifier's gaps, delivered into the turn that claimed the goal done. */
   GOAL_VERIFIER: "goal-verifier",
+  /**
+   * Input from outside the conversation (external/ExternalInput): a webhook,
+   * a Discord message relayed into someone else's turn, an MCP server, a
+   * sub-agent. Never the user's words.
+   */
+  EXTERNAL_INPUT: "external-input",
 } as const;
 
 // ─── Auto Mode (permissions/AutoModeClassifier) ─────────────
@@ -910,6 +916,16 @@ export const MCP = {
 
   /** OAuth redirect path, on prism-service's public origin. */
   OAUTH_CALLBACK_PATH: "/mcp/oauth/callback",
+
+  /**
+   * A server's log notifications (`notifications/message`) during a call
+   * reach the calling turn as external input (external/ExternalInput) from
+   * this level up — lower levels are the server's own chatter — at most
+   * this many per call, each cut to this many characters.
+   */
+  NOTIFICATION_MINIMUM_LEVEL: "warning",
+  NOTIFICATIONS_FORWARDED_PER_CALL: 5,
+  NOTIFICATION_MAXIMUM_CHARACTERS: 2_000,
 } as const;
 
 // ─── Context Window Constants ───────────────────────────────

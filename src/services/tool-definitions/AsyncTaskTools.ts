@@ -21,6 +21,8 @@ import type { InternalToolContext } from "./InternalToolRegistry.ts";
 import type { ToolExecutionContext } from "#src/services/tool-orchestrator/types";
 import AutoApprovalEngine from "#src/services/AutoApprovalEngine";
 import PromptLocaleService from "#src/services/PromptLocaleService";
+import { isExternalContentTool } from "#src/services/memory/MemoryProvenance";
+import { wrapUntrustedToolContent } from "#src/utils/FunctionCallingUtilities";
 
 type AsyncTaskState = import("../AsyncTaskRegistry.ts").AsyncTaskState;
 type SubAgentResult = import("#src/types/orchestrator").SubAgentResult;
@@ -122,6 +124,8 @@ function governInnerCall(
   const approval = new AutoApprovalEngine({
     policies: context._policies ?? [],
     permissionRules: context._permissionRules ?? null,
+    capabilityScope: context._capabilityScope ?? null,
+    untrustedSpans: context._untrustedSpans ?? null,
     fullAuto: true,
   }).check({ id: null, name: toolName, args: toolArguments });
   if (approval.isDenied) {
@@ -129,6 +133,16 @@ function governInnerCall(
       locale,
       "internal-tools-runtime.run_async_task.denied",
       { toolName, reason: approval.reason },
+    );
+  }
+  // A call that always asks (untrusted text in its arguments, a protected
+  // path) needs a person, and nobody sees a background task: it must be
+  // called directly, where its card can be answered.
+  if (approval.alwaysAsks) {
+    return PromptLocaleService.get(
+      locale,
+      "internal-tools-runtime.run_async_task.denied",
+      { toolName, reason: `${approval.reason} — call ${toolName} directly so the user can confirm it` },
     );
   }
   return null;
@@ -817,6 +831,10 @@ export function formatTaskCompletionNotification(
     : `[ASYNC TASK COMPLETED] Tool "${taskState.toolName}" (task ${taskState.taskId}) has ${taskState.status}.`;
 
   const timestamp = new Date().toISOString();
+  // A web page, a mail or an MCP result is third-party text however it
+  // reaches the model: the same untrusted envelope its result gets when the
+  // tool is called directly (FunctionCallingUtilities).
+  const resultText = truncateForNotification(resultSummary);
   return {
     content: [
       `<task-notification>`,
@@ -824,7 +842,9 @@ export function formatTaskCompletionNotification(
       `<summary>${summary}</summary>`,
       `<duration_ms>${taskState.durationMilliseconds || 0}</duration_ms>`,
       `<result>`,
-      truncateForNotification(resultSummary),
+      taskState.status === SYSTEM_STATUSES.COMPLETED && isExternalContentTool(taskState.toolName)
+        ? wrapUntrustedToolContent(taskState.toolName, resultText)
+        : resultText,
       `</result>`,
       `</task-notification>`,
     ].join("\n"),

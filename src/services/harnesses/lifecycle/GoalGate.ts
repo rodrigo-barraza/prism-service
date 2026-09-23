@@ -18,6 +18,12 @@ import { resolveLoopKey } from "#src/services/LoopKey";
 import { SharedCostBudget } from "./CostBudgetEnforcer.ts";
 import { buildTurnInputMessage, drainTurnInput } from "./TurnInputDrain.ts";
 import { calculateTextCost } from "#src/utils/CostCalculator";
+import {
+  CapabilityScopeHandle,
+  GOAL_SCOPE_KEY,
+  describeScope,
+  scopeFromDeclaration,
+} from "#src/services/permissions/CapabilityScope";
 import { getPricing, MODALITY_TYPES } from "#src/config";
 import { SERVER_SENT_EVENT_TYPES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
@@ -40,6 +46,11 @@ import type { AgenticContext, ConversationMessage } from "#src/services/harnesse
  *                     agent's mailbox and the loop continues — at most
  *                     `maxIterations` verdicts, then the goal pauses
  *   failed          → the rubric contradicts the task: pause, ask the user
+ *
+ * While it works on its own (a verdict sent it back), the run is narrowed to
+ * the goal's declared `capabilities` — `{ network: false }` — on top of
+ * whatever it already had (permissions/CapabilityScope): the approval engine
+ * refuses a tool outside them for the rest of the turn.
  *
  * Breakers, each a pause with its reason: the budget (main loop, sub-agents
  * and the verifier all count), `max_iterations`, three empty continuations
@@ -349,6 +360,7 @@ export class GoalRun implements GoalTurnSpend {
         return { action: "end" };
       }
       return this.continueWith(
+        goal,
         formatEmptyContinuationNudge(goal, this.lastVerification ?? goal.verification, this.consecutiveEmptyContinuations),
         { emptyContinuation: this.consecutiveEmptyContinuations },
       );
@@ -430,18 +442,20 @@ export class GoalRun implements GoalTurnSpend {
     );
     if (verification.verdict !== GOAL_VERDICTS.NEEDS_REVISION || pause) return { action: "end" };
 
-    return this.continueWith(formatRevisionRequest(goal, verification, maxIterations), {
+    return this.continueWith(goal, formatRevisionRequest(goal, verification, maxIterations), {
       goalRound: round,
     });
   }
 
   private async continueWith(
+    goal: ConversationGoal,
     text: string,
     meta: Record<string, unknown>,
   ): Promise<GoalGateOutcome> {
     if (!this.continuing) {
       this.continuing = true;
       this.continuationStartedAt = Date.now();
+      this.narrowToGoal(goal);
       await ConversationGoalService.markContinuing(
         this.conversationId,
         this.project,
@@ -453,6 +467,19 @@ export class GoalRun implements GoalTurnSpend {
     }
     this.toolCallsAtContinuation = this.state.streamedToolCalls.length;
     return { action: "continue", input: { kind: "goal_revision", text, meta } };
+  }
+
+  /**
+   * From here the agent works on its own: hold it to the goal's declared
+   * capabilities for the rest of the turn (the run's scope handle, which
+   * every approval engine of the turn reads).
+   */
+  private narrowToGoal(goal: ConversationGoal): void {
+    const scope = scopeFromDeclaration(goal.capabilities);
+    const handle = this.context.options._capabilityScope;
+    if (!scope || !(handle instanceof CapabilityScopeHandle)) return;
+    handle.narrow(GOAL_SCOPE_KEY, scope);
+    logger.info(`[GoalGate] ${this.conversationId} continues on its own narrowed: ${describeScope(scope)}`);
   }
 
   /**

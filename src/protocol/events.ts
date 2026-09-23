@@ -96,7 +96,9 @@ const ExecutedTool = z.strictObject({
   durationMs: z.number().optional(),
 });
 
-const TurnInputKind = z.enum(["user_update", "question_answer", "task_completion", "agent_message", "goal_revision"]);
+const TurnInputKind = z.enum(["user_update", "question_answer", "task_completion", "agent_message", "goal_revision", "external"]);
+/** Where an `external` turn input came from — never the user (external/ExternalInput). */
+const ExternalInputSource = z.enum(["webhook", "discord", "mcp", "subagent"]);
 const TurnInputBoundary = z.enum(["iteration_start", "after_tools", "before_end", "turn_end"]);
 
 const GoalCriterion = z.strictObject({ id: z.string(), criterion: z.string() });
@@ -121,6 +123,11 @@ const ConversationGoal = z.strictObject({
       deadline: z.string().optional(),
     })
     .optional(),
+  /**
+   * Capabilities the agent goes without while it works on the goal on its
+   * own, after the verifier sent it back — `{ network: false }`.
+   */
+  capabilities: z.record(z.string(), z.boolean()).optional(),
   progress: z.strictObject({
     summary: z.string(),
     percent: z.number().nullable().optional(),
@@ -342,6 +349,12 @@ const ApprovalRequiredEvent = event("approval_required", {
   /** A write to a protected path: it asks in every mode, and "Always allow" cannot stop it asking. */
   protectedPath: z.string().optional(),
   alwaysAsks: z.literal(true).optional(),
+  /**
+   * The taint check: the arguments carry text the conversation read from
+   * untrusted content (`excerpt`, read in `source`). It asks in every mode,
+   * with `alwaysAsks`; `reason` says it in words.
+   */
+  untrustedText: z.strictObject({ excerpt: z.string(), source: z.string() }).optional(),
   /** The permission mode the call was judged in. */
   mode: z.string().optional(),
   ...SubAgentTag,
@@ -397,6 +410,9 @@ const TurnInputEvent = event("turn_input", {
   kind: TurnInputKind,
   content: z.string(),
   images: z.array(z.string()).optional(),
+  /** `external` only: its source, and who sent it when known (a label, not an identity). */
+  source: ExternalInputSource.optional(),
+  sender: z.string().optional(),
   boundary: TurnInputBoundary,
   iteration: z.number(),
 });

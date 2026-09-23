@@ -67,13 +67,15 @@ export interface ToolCall {
     isDenied?: boolean;
     reason?: string;
     /** Which layer denied: a rule, the classifier, a hook, the user, or the permission mode. */
-    deniedBy?: "rule" | "classifier" | "hook" | "user" | "mode";
+    deniedBy?: "rule" | "classifier" | "hook" | "user" | "mode" | "scope";
     /** The permission mode the call was judged in (permissions/PermissionModes). */
     mode?: string;
     /** An ask no "approve all" answers — a protected path, a hook's `ask`. */
     alwaysAsks?: boolean;
     /** The protected path an `alwaysAsks` write names. */
     protectedPath?: string;
+    /** The untrusted text an `alwaysAsks` call carries, and where it was read (UntrustedSpans). */
+    untrustedSpan?: { excerpt: string; source: string };
     /** Set by the ApprovalGate for a call a human decided (or that timed out waiting). */
     decidedBy?: "user" | "superseded" | "turn_ended";
     /** The user's own reason for declining. */
@@ -351,6 +353,22 @@ export interface AgenticOptions {
    * its parent's (the same object), so a switch reaches the whole tree.
    */
   _permissionMode?: import("#src/services/permissions/PermissionModeState").PermissionModeHandle;
+  /**
+   * What the run may do at all (permissions/CapabilityScope): declared when
+   * a sub-agent is spawned or a task scheduled — never widened by anything
+   * the model reads. AgenticLoopService turns a plain scope into the run's
+   * live handle, which a goal's continuation narrows further.
+   */
+  _capabilityScope?:
+    | import("#src/services/permissions/CapabilityScope").CapabilityScopeHandle
+    | import("#src/services/permissions/CapabilityScope").CapabilityScope
+    | null;
+  /**
+   * The untrusted text this turn has seen (permissions/UntrustedSpans) — in
+   * memory only, seeded by AgenticLoopService from the transcript and grown
+   * as tools return third-party text; a sub-agent's sees its parent's.
+   */
+  _untrustedSpans?: import("#src/services/permissions/UntrustedSpans").UntrustedSpans;
   /** Per-tool wall-clock timeout in milliseconds. 0 disables. Defaults to HARNESS.DEFAULT_TOOL_TIMEOUT_MILLISECONDS. */
   toolTimeoutMilliseconds?: number;
   /** Iteration interval at which abbreviated system prompt reminders are re-injected to counteract instruction fade-out. Default: 8. */

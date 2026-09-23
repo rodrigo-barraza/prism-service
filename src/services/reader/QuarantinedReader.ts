@@ -168,6 +168,43 @@ export function closeObjectSchemas(schema: unknown, insideAllOf = false): unknow
   return node;
 }
 
+const JSON_SCHEMA_TYPES = new Set(["string", "number", "integer", "boolean", "array", "object", "null"]);
+/** Keywords whose value maps names to schemas: the names are not keywords. */
+const SCHEMA_MAP_KEYWORDS = new Set(["properties", "patternProperties", "$defs", "definitions", "dependentSchemas"]);
+/** Keywords whose value is data, not a schema. */
+const LITERAL_KEYWORDS = new Set(["enum", "const", "default", "examples"]);
+
+function lowerTypeName(value: unknown): unknown {
+  return typeof value === "string" && JSON_SCHEMA_TYPES.has(value.toLowerCase()) ? value.toLowerCase() : value;
+}
+
+/**
+ * The schema with upper-case type names lowered: Gemini writes its
+ * function-call schemas OpenAPI-style (`"type": "OBJECT"`, `"STRING"`) and
+ * passes that style on to read_untrusted's `schema`. Only a `type` keyword's
+ * value is touched — enum and const values, and properties that happen to be
+ * named "type" or "enum", keep their spelling.
+ */
+export function lowerSchemaTypeNames(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map((entry) => lowerSchemaTypeNames(entry));
+  if (!isRecord(schema)) return schema;
+  const node: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(schema)) {
+    if (key === "type") {
+      node[key] = Array.isArray(value) ? value.map(lowerTypeName) : lowerTypeName(value);
+    } else if (LITERAL_KEYWORDS.has(key)) {
+      node[key] = value;
+    } else if (SCHEMA_MAP_KEYWORDS.has(key) && isRecord(value)) {
+      node[key] = Object.fromEntries(
+        Object.entries(value).map(([name, entry]) => [name, lowerSchemaTypeNames(entry)]),
+      );
+    } else {
+      node[key] = lowerSchemaTypeNames(value);
+    }
+  }
+  return node;
+}
+
 export type CompiledReaderSchema =
   | { ok: true; schema: JsonSchemaNode; validator: z.ZodType; text: string }
   | { ok: false; message: string };
@@ -177,7 +214,7 @@ export function compileReaderSchema(schema: unknown): CompiledReaderSchema {
   if (!isRecord(schema)) {
     return { ok: false, message: "schema must be a JSON Schema object." };
   }
-  const closed = closeObjectSchemas(schema) as JsonSchemaNode;
+  const closed = closeObjectSchemas(lowerSchemaTypeNames(schema)) as JsonSchemaNode;
   const text = JSON.stringify(closed);
   if (text.length > READER_MAX_SCHEMA_CHARACTERS) {
     return {

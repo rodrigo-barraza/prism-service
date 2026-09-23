@@ -10,7 +10,6 @@ Self-contained task prompts for the items in `docs/harness_modernization_2026-09
 
 | # | File | Branch slug(s) | Repos | Size | Depends on | Shares hub files with |
 |---|---|---|---|---|---|---|
-| 22 | `22-security-depth.md` | `memory-provenance`, `quarantined-reader`, `external-input-lane` | service | L | — | 19 (memory/system prompt) |
 
 ## Waves
 
@@ -106,6 +105,8 @@ PRISM_SERVICE_PORT=$PORT PRISM_SERVICE_MONGO_DB_NAME=prism_test_<slug> \
   - **Pick the model through the agent's model memory, not `?model=`,** when you drive a client older than prism-client `chat-component-split`: the local-model merge overwrote a `?model=` deep link there. Seed `localStorage["prism:modelMemory:agent"] = '{"provider":"google","model":"<model>","isLocal":false}'` for Coding (`prism:modelMemory:agent:<ID>` for other personas) and check the header shows it before sending.
   - Before you drive anything, confirm the page's requests go to `localhost:$PORT` (Playwright `page.on("request")`).
   - Drive it with the recipe in `prism-client/.claude/skills/verify/SKILL.md`: Playwright borrowed from `tools-service/node_modules`, `waitUntil: "domcontentloaded"`, and remove `<nextjs-portal>` before clicking.
+  - **To open in the UI what you ran with curl, send the UI's identity.** The client loads a conversation and its memories under the agent's project (`/config/agents`; `prism-chat` for CODING) and sends the username stored in localStorage `prism:username`. Send those as `x-project` / `x-username`, and set the key in an init script. Otherwise the UI gets a 404 for your conversation (prompt 22 L3, 2026-09-23).
+  - `next dev` writes `AGENTS.md` and `CLAUDE.md` into the client worktree. Delete them; never commit them.
   - Save screenshots to the scratchpad and name them in the report.
 - **Clean up.** Stop your servers. You may drop only your own `prism_test_<slug>` / `tools_test_<slug>` databases. The services' Mongo user is not allowed `dropDatabase`: drop each collection instead (a database with no collections is gone).
 

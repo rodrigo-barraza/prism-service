@@ -24,6 +24,7 @@ import { runConfiguredHook } from "#src/services/hooks/HookRunner";
 import { isCommandHookOwner } from "#src/services/hooks/handlers/CommandHookHandler";
 import { invalidateHookCache } from "#src/services/hooks/ConfiguredHookRegistry";
 import { resolveScope, scopeFilter } from "#src/utils/ProfileScope";
+import { requireUserAuthorityToChange } from "#src/middleware/ExternalAuthority";
 
 /**
  * CRUD for user-configured lifecycle hooks, plus a dry-run endpoint.
@@ -40,6 +41,8 @@ import { resolveScope, scopeFilter } from "#src/utils/ProfileScope";
 
 const router = express.Router();
 router.use(requireDb);
+// A hook can allow or deny calls: only the user configures one.
+router.use(requireUserAuthorityToChange("change configured hooks"));
 
 const COLLECTION = COLLECTIONS.AGENT_HOOKS;
 
