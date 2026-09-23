@@ -58,6 +58,7 @@ export default class ContextBudgetTracker {
   private systemPromptTokensEstimate = 0;
   private toolSchemaTokensEstimate = 0;
   private skillTokensEstimate = 0;
+  private skillCatalogTokensEstimate = 0;
   private toolCount = 0;
 
   constructor(emit: EmitFunction, contextWindow: number) {
@@ -77,6 +78,7 @@ export default class ContextBudgetTracker {
     toolSchemas: unknown[],
     requestedMaxTokens: number | undefined,
     skillTokens = 0,
+    skillCatalogTokens = 0,
   ): {
     clampedMaxTokens: number | undefined;
     adjustedInput: number;
@@ -88,10 +90,14 @@ export default class ContextBudgetTracker {
     );
     this.systemPromptTokensEstimate = fixedOverhead.systemPromptTokens;
     this.toolSchemaTokensEstimate = fixedOverhead.toolSchemaTokens;
-    // Skills are injected into the messages array (system context message),
-    // so their tokens are a carve-out of the message estimate — never
-    // additive on top of it.
+    // Skills sit in two places, and both are carve-outs — never additive:
+    // the per-turn highlight rides the messages array (system context
+    // message), the catalog rides the system prompt.
     this.skillTokensEstimate = Math.min(skillTokens, estimatedMessageTokens);
+    this.skillCatalogTokensEstimate = Math.min(
+      skillCatalogTokens,
+      this.systemPromptTokensEstimate,
+    );
     this.toolCount = toolSchemas.length;
 
     // Apply the calibration ratio to EVERY category. The ratio is measured
@@ -107,6 +113,9 @@ export default class ContextBudgetTracker {
         : tokens;
     const calibratedMessageTokens = calibrate(estimatedMessageTokens);
     const calibratedSkillTokens = calibrate(this.skillTokensEstimate);
+    const calibratedSkillCatalogTokens = calibrate(
+      this.skillCatalogTokensEstimate,
+    );
     const calibratedSystemPromptTokens = calibrate(
       this.systemPromptTokensEstimate,
     );
@@ -129,9 +138,12 @@ export default class ContextBudgetTracker {
         calibratedMessageTokens - calibratedSkillTokens,
         0,
       ),
-      systemPromptTokens: calibratedSystemPromptTokens,
+      systemPromptTokens: Math.max(
+        calibratedSystemPromptTokens - calibratedSkillCatalogTokens,
+        0,
+      ),
       toolSchemaTokens: calibratedToolSchemaTokens,
-      skillTokens: calibratedSkillTokens,
+      skillTokens: calibratedSkillTokens + calibratedSkillCatalogTokens,
       safetyMarginTokens: safetyMargin,
       totalInputTokens: adjustedInput,
       availableOutputTokens: Math.max(availableForOutput, 0),
@@ -203,8 +215,9 @@ export default class ContextBudgetTracker {
     const availableForOutput = this.contextWindow - adjustedInput;
 
     // Decompose the real input into components using the ratio of estimates.
-    // Skills live inside the message estimate, so they are carved out of the
-    // message share rather than added as an extra component.
+    // Skills live inside the message estimate (the highlight) and the system
+    // prompt estimate (the catalog), so they are carved out of those shares
+    // rather than added as an extra component.
     const estimatedTotal =
       estimatedMessageTokensForThisPass +
       this.systemPromptTokensEstimate +
@@ -224,13 +237,19 @@ export default class ContextBudgetTracker {
     const realSkillTokens =
       estimatedTotal > 0
         ? Math.round(
-            (this.skillTokensEstimate / estimatedTotal) * realInputTokens,
+            ((this.skillTokensEstimate + this.skillCatalogTokensEstimate) /
+              estimatedTotal) *
+              realInputTokens,
           )
         : 0;
     const realSystemPromptTokens =
       estimatedTotal > 0
         ? Math.round(
-            (this.systemPromptTokensEstimate / estimatedTotal) *
+            (Math.max(
+              this.systemPromptTokensEstimate - this.skillCatalogTokensEstimate,
+              0,
+            ) /
+              estimatedTotal) *
               realInputTokens,
           )
         : 0;

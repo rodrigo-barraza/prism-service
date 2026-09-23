@@ -1,74 +1,39 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { type Request, type Response, type NextFunction } from "express";
-import { ObjectId } from "mongodb";
 import requireDb from "#src/middleware/RequireDbMiddleware";
-import EmbeddingService from "#src/services/EmbeddingService";
+import SkillService, {
+  resolveSkillCaller,
+  toApiSkill,
+  type SkillCaller,
+} from "#src/services/SkillService";
 import logger from "#src/utils/logger";
-import { COLLECTIONS } from "#src/constants";
 import { PostSkillSchema, PutSkillSchema } from "#src/types/index";
-import { resolveScope, scopeFilter } from "#src/utils/ProfileScope";
-import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { resolveScope } from "#src/utils/ProfileScope";
+
+// The Skills panel's CRUD. Storage, scoping and embeddings live in
+// SkillService — the same code the agent's skill tools and the prompt's
+// skill catalog read through — so a skill written here is exactly what
+// the catalog lists and load_skill returns. Responses keep the panel's
+// field names (`content` is the body; vectors are never sent).
 
 const router = express.Router();
 router.use(requireDb);
 
-const COLLECTION = COLLECTIONS.AGENT_SKILLS;
-
-interface SkillDocument {
-  _id?: ObjectId;
-  project: string;
-  username: string;
-  /** Legacy docs lack it (default profile). Writes always stamp a string. */
-  profileId?: string | null;
-  name: string;
-  description: string;
-  content: string;
-  enabled: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  embedding?: number[] | null;
-}
-
-/**
- * Generate an embedding vector for skill content.
- * Combines name + description + content for richer semantic representation.
- */
-async function generateSkillEmbedding(
-  skill: Pick<SkillDocument, "name" | "description" | "content">,
-) {
-  const text = [skill.name, skill.description, skill.content]
-    .filter(Boolean)
-    .join("\n");
-  return EmbeddingService.embed(text, {
-    source: "skill-creation",
-    endpoint: "/skills",
-  });
+function callerOf(req: Request): SkillCaller {
+  return resolveSkillCaller({ ...resolveScope(req), agent: null });
 }
 
 /**
  * GET /skills
- * List all skills for the given project + username.
+ * Every skill the caller can manage: their own in this project and
+ * profile, plus unowned legacy skills (shared, as they always were).
  */
 router.get(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { db } = req;
-
-      const skills = await db
-        .collection<SkillDocument>(COLLECTION)
-        .find({ ...scopeFilter(req) })
-        .sort({ createdAt: -1 })
-        // Don't return embedding vectors to the client — they're large
-        .project<SkillDocument>({ embedding: 0 })
-        .toArray();
-
-      res.json(
-        skills.map((skill) => ({
-          ...skill,
-          id: skill._id ? skill._id.toString() : "",
-        })),
-      );
+      const skills = await SkillService.listManaged(callerOf(req));
+      res.json(skills.map(toApiSkill));
     } catch (error: unknown) {
       next(error);
     }
@@ -77,46 +42,31 @@ router.get(
 
 /**
  * POST /skills
- * Create a new skill. Generates an embedding vector at creation time.
+ * Create a skill in the caller's scope. A name is unique per scope.
  */
 router.post(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { project, username, profileId } = resolveScope(req);
-      const { db } = req;
-
       const validated = PostSkillSchema.parse(req.body);
-
-      const document: SkillDocument = {
-        project,
-        username,
-        profileId,
-        name: validated.name,
-        description: validated.description,
-        content: validated.content,
-        enabled: validated.enabled,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      // Generate embedding for semantic similarity search
-      try {
-        document.embedding = await generateSkillEmbedding(document);
-      } catch (error: unknown) {
-        logger.warn(
-          `[Skills] Embedding generation failed: ${getErrorMessage(error)}`,
-        );
-        document.embedding = null;
+      const result = await SkillService.create(
+        {
+          name: validated.name,
+          description: validated.description,
+          body: validated.content,
+          enabled: validated.enabled,
+          source: "user",
+        },
+        callerOf(req),
+      );
+      if (!("skill" in result) || !result.skill) {
+        const message = result.error || "Skill not created";
+        return res
+          .status(/already exists/.test(message) ? 409 : 400)
+          .json({ error: message });
       }
-
-      const result = await db
-        .collection<SkillDocument>(COLLECTION)
-        .insertOne(document);
-
-      logger.info(`Skill created: ${document.name} (${result.insertedId})`);
-      const { embedding: _, ...response } = document;
-      res.status(201).json({ ...response, id: result.insertedId.toString() });
+      logger.info(`Skill created: ${result.skill.name} (${result.skill.id})`);
+      res.status(201).json(toApiSkill(result.skill));
     } catch (error: unknown) {
       next(error);
     }
@@ -125,72 +75,28 @@ router.post(
 
 /**
  * PUT /skills/:id
- * Update an existing skill. Re-generates embedding if content changes.
+ * Update a skill the caller can see. Re-embeds when its text changes.
  */
 router.put(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { db } = req;
       const validated = PutSkillSchema.parse(req.body);
-
-      const updates: Partial<SkillDocument> = {
-        ...(validated.name !== undefined && { name: validated.name }),
-        ...(validated.description !== undefined && {
+      const updated = await SkillService.update(
+        req.params.id as string,
+        {
+          name: validated.name,
           description: validated.description,
-        }),
-        ...(validated.content !== undefined && { content: validated.content }),
-        ...(validated.enabled !== undefined && { enabled: validated.enabled }),
-        updatedAt: new Date(),
-      };
+          body: validated.content,
+          enabled: validated.enabled,
+        },
+        callerOf(req),
+      );
+      if (!updated) return res.status(404).json({ error: "Skill not found" });
+      if ("error" in updated) return res.status(503).json({ error: updated.error });
 
-      // Re-generate embedding if any semantic content changed
-      const contentChanged =
-        validated.name !== undefined ||
-        validated.description !== undefined ||
-        validated.content !== undefined;
-
-      if (contentChanged) {
-        try {
-          // Need current doc to merge fields for embedding
-          const current = await db
-            .collection<SkillDocument>(COLLECTION)
-            .findOne({
-              _id: new ObjectId(req.params.id as string),
-              ...scopeFilter(req),
-            });
-
-          if (current) {
-            const merged = {
-              name: updates.name ?? current.name,
-              description: updates.description ?? current.description,
-              content: updates.content ?? current.content,
-            };
-            updates.embedding = await generateSkillEmbedding(merged);
-          }
-        } catch (error: unknown) {
-          logger.warn(
-            `[Skills] Embedding re-generation failed: ${getErrorMessage(error)}`,
-          );
-        }
-      }
-
-      const result = await db
-        .collection<SkillDocument>(COLLECTION)
-        .findOneAndUpdate(
-          // Scope the filter, not just the lookup — without it, knowing a
-          // skill's id is enough to rewrite another scope's skill.
-          { _id: new ObjectId(req.params.id as string), ...scopeFilter(req) },
-          { $set: updates },
-          { returnDocument: "after", projection: { embedding: 0 } },
-        );
-
-      if (!result) {
-        return res.status(404).json({ error: "Skill not found" });
-      }
-
-      logger.info(`Skill updated: ${result.name} (${req.params.id})`);
-      res.json({ ...result, id: result._id ? result._id.toString() : "" });
+      logger.info(`Skill updated: ${updated.name} (${req.params.id})`);
+      res.json(toApiSkill(updated));
     } catch (error: unknown) {
       next(error);
     }
@@ -199,24 +105,17 @@ router.put(
 
 /**
  * DELETE /skills/:id
- * Delete a skill.
+ * Delete a skill the caller can see.
  */
 router.delete(
   "/:id",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { db } = req;
-
-      const result = await db
-        .collection<SkillDocument>(COLLECTION)
-        .findOneAndDelete({
-          _id: new ObjectId(req.params.id as string),
-          ...scopeFilter(req),
-        });
-
-      if (!result) {
-        return res.status(404).json({ error: "Skill not found" });
-      }
+      const result = await SkillService.delete(
+        req.params.id as string,
+        callerOf(req),
+      );
+      if ("error" in result) return res.status(404).json({ error: "Skill not found" });
 
       logger.info(`Skill deleted: ${result.name} (${req.params.id})`);
       res.json({ success: true });

@@ -20,9 +20,10 @@ import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 //       appendSection is a no-op when the content is unchanged.
 //   .claude/skills/*/SKILL.md
 //     → Prism skills (SkillService.upsertImported): frontmatter
-//       name/description, body = the skill prompt. Upsert keyed by
-//       name + source; a name collision with a skill NOT imported
-//       from this workspace is skipped, never clobbered.
+//       name/description, body = the skill body, in the importer's
+//       project/user/profile scope. Upsert keyed by name + source; a
+//       name collision with a skill NOT imported from this workspace
+//       is skipped, never clobbered.
 //   .mcp.json + .claude/settings.json mcpServers
 //     → MCP server configs (mcp_servers collection, same shape as
 //       McpServersRoutes). Imported DISABLED — configs may contain
@@ -260,7 +261,16 @@ async function importSkills(
     return summary;
   }
 
-  const { default: SkillService } = await import("#src/services/SkillService");
+  const { default: SkillService, resolveSkillCaller } = await import(
+    "#src/services/SkillService"
+  );
+  // Imported skills serve every persona (agent: null) in the importer's
+  // own project, user and profile (the profile comes from the request).
+  const caller = resolveSkillCaller({
+    project: scope.project,
+    username: scope.username,
+    agent: null,
+  });
 
   for (const skillDirectory of entries.sort()) {
     const skillFile = path.join(skillsDirectory, skillDirectory, "SKILL.md");
@@ -277,13 +287,15 @@ async function importSkills(
       continue;
     }
 
-    const result = await SkillService.upsertImported({
-      name,
-      description: frontmatter.description || "",
-      prompt: body,
-      project: scope.project,
-      source,
-    });
+    const result = await SkillService.upsertImported(
+      {
+        name,
+        description: frontmatter.description || "",
+        body,
+        source,
+      },
+      caller,
+    );
 
     if ("error" in result && result.error) {
       summary.skipped.push({ name, reason: result.error });

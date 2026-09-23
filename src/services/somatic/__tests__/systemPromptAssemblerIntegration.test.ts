@@ -89,11 +89,11 @@ vi.mock("#src/services/system-prompt/ToolDocFormatter", () => ({
 }));
 
 const mockFetchMemories = vi.fn().mockResolvedValue({ memoriesText: "", injectedMemoryIds: [] });
-const mockFetchSkills = vi.fn().mockResolvedValue({ text: null, skillNames: [] });
+const mockFetchSkillCatalog = vi.fn().mockResolvedValue({ entries: [], highlighted: [] });
 
 vi.mock("#src/services/system-prompt/SkillMemoryScorer", () => ({
   SkillMemoryScorer: class {
-    fetchSkills(...arguments_: unknown[]) { return mockFetchSkills(...arguments_); }
+    fetchSkillCatalog(...arguments_: unknown[]) { return mockFetchSkillCatalog(...arguments_); }
     fetchMemories(...arguments_: unknown[]) { return mockFetchMemories(...arguments_); }
   },
 }));

@@ -1,50 +1,105 @@
+import type { ObjectId } from "mongodb";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { MONGO_DB_NAME } from "#config";
 import { COLLECTIONS } from "#src/constants";
 import { MAX_TOOL_ITERATIONS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import logger from "#src/utils/logger";
+import { normalizeProfileId, profileFilter } from "#src/utils/ProfileScope";
+import { getRequestContext } from "#src/utils/RequestContext";
 
 // ────────────────────────────────────────────────────────────
-// SkillService — Reusable Workflow Templates
+// SkillService — the one reader and writer of `agent_skills`
 // ────────────────────────────────────────────────────────────
-// Skills are stored multi-step workflow templates that the
-// agent can invoke by name. Each skill defines:
-//   - A prompt template (with {{variable}} interpolation)
-//   - A list of steps (optional — for documentation)
-//   - Execution parameters (model, tools, max iterations)
+// A skill is a named body of instructions the agent loads on demand.
+// The system prompt carries only a catalog (name + one-line
+// description); `load_skill` returns the body when a task needs it
+// (progressive disclosure — prompt 19).
 //
-// Skills live in the `agent_skills` MongoDB collection and
-// are executed by spawning an AgenticLoopService run with
-// the skill's prompt + configuration.
-//
-// This is the SkillTool pattern from Claude Code — reusable
-// agentic workflows stored as atomic operations.
+// Two schemas share the collection, and every read goes through
+// `toSkill`, which maps both onto the one `Skill` type:
+//   - panel skills (SkillsRoutes before Landing 1, and every write
+//     since): body in `content`, scoped by project/username/profileId,
+//     `enabled`, an `embedding`;
+//   - SkillService skills (the create_skill tool and the Claude config
+//     importer before Landing 1): body in `prompt`, a `skillId` slug,
+//     execution settings (`tools`, `steps`, `maxIterations`, `model`),
+//     `project` possibly null, and no `username`, `profileId` or
+//     `enabled` at all.
+// Nothing is migrated in place: an unset scope field on a legacy
+// document reads as "every value" (a null project is every project, a
+// missing owner is shared), which is exactly who could reach those
+// documents before. New writes always stamp the caller's full scope.
 // ────────────────────────────────────────────────────────────
 
-export interface SkillConfig {
-  maxIterations: number;
-  model: string | null;
-  tools: string[] | null;
-  agent: string | null;
+/** Who a skill is visible to. `null` is unset: every value matches. */
+export interface SkillScope {
   project: string | null;
+  username: string | null;
+  profileId: string | null;
+  /** Persona the skill is bound to; null = every persona. */
+  agent: string | null;
 }
 
-export interface SkillDocument {
+/** A bundled file of a skill folder (Landing 2 stores folders). */
+export interface SkillResource {
+  path: string;
+  bytes?: number;
+}
+
+/** The one skill shape every reader sees, whichever schema stored it. */
+export interface Skill {
+  /** `String(_id)` — what the Skills panel addresses a skill by. */
+  id: string;
+  /** Name slug — what execute_skill / delete_skill address a skill by. */
   skillId: string;
   name: string;
   description: string;
-  prompt: string;
+  body: string;
+  scope: SkillScope;
+  enabled: boolean;
+  /** "user" (Skills panel), "agent" (create_skill), "claude-config:<root>" (importer). */
+  source: string;
+  folderRef: string | null;
+  /** Tools a skill run may use; null = no restriction. */
+  allowedTools: string[] | null;
+  embedding: number[] | null;
+  /** execute_skill settings (SkillService-schema skills). */
   steps: string[];
-  tools: string[] | null;
-  maxIterations: number;
+  maxIterations: number | null;
   model: string | null;
-  project: string | null;
-  agent: string | null;
   usageCount: number;
-  createdAt: string;
-  updatedAt: string;
-  /** Provenance of imported skills, e.g. "claude-config:<workspaceRoot>". Absent on user-created skills. */
+  lastUsedAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+/** The identity asking — always concrete, unlike a stored scope. */
+export interface SkillCaller {
+  project: string;
+  username: string;
+  profileId: string;
+  agent: string | null;
+}
+
+export interface SkillWriteInput {
+  name: string;
+  description?: string;
+  body: string;
+  enabled?: boolean;
+  agent?: string | null;
   source?: string;
+  allowedTools?: string[] | null;
+  steps?: string[];
+  maxIterations?: number;
+  model?: string | null;
+}
+
+export interface SkillPatch {
+  name?: string;
+  description?: string;
+  body?: string;
+  enabled?: boolean;
 }
 
 export interface SkillUpsertResult {
@@ -58,294 +113,622 @@ export interface SkillPrepareResult {
   skillId?: string;
   name?: string;
   prompt?: string;
-  config?: SkillConfig;
+  config?: {
+    maxIterations: number;
+    model: string | null;
+    tools: string[] | null;
+    agent: string | null;
+    project: string | null;
+  };
   unresolved?: string[];
   steps?: string[];
   error?: string;
 }
 
-/** @returns {import("mongodb").Collection} */
+export interface LoadedSkill {
+  name: string;
+  description: string;
+  body: string;
+  source: string;
+  resources: SkillResource[];
+  allowedTools?: string[];
+  steps?: string[];
+  /** `{{variable}}` placeholders — execute_skill fills them. */
+  templateVariables?: string[];
+}
+
+/** A document as stored — either schema, or both after a write. */
+interface StoredSkillDocument {
+  _id?: ObjectId;
+  skillId?: string;
+  name?: string;
+  description?: string;
+  content?: string;
+  prompt?: string;
+  project?: string | null;
+  username?: string | null;
+  profileId?: string | null;
+  agent?: string | null;
+  enabled?: boolean;
+  source?: string;
+  folderRef?: string | null;
+  allowedTools?: string[] | null;
+  tools?: string[] | null;
+  steps?: string[];
+  maxIterations?: number;
+  model?: string | null;
+  usageCount?: number;
+  lastUsedAt?: string | null;
+  embedding?: number[] | null;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+}
+
+interface VisibleSkill {
+  document: StoredSkillDocument;
+  skill: Skill;
+}
+
+const TEMPLATE_VARIABLE_PATTERN = /\{\{(\w+)\}\}/g;
+const CATALOG_DESCRIPTION_MAX_CHARS = 160;
+
 function getCollection() {
   return MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTIONS.AGENT_SKILLS);
 }
 
+/** The slug execute_skill and delete_skill address a skill by. */
+export function skillSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function isoString(value: Date | string | undefined): string | null {
+  if (value instanceof Date) return value.toISOString();
+  return typeof value === "string" ? value : null;
+}
+
+function stringList(value: unknown): string[] | null {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : null;
+}
+
+/** Read either stored schema as the one `Skill` type. */
+export function toSkill(document: StoredSkillDocument): Skill {
+  const name = String(document.name ?? document.skillId ?? "");
+  const body =
+    typeof document.content === "string"
+      ? document.content
+      : typeof document.prompt === "string"
+        ? document.prompt
+        : "";
+  const isLegacyServiceSchema =
+    typeof document.prompt === "string" && typeof document.content !== "string";
+  return {
+    id: document._id === undefined || document._id === null ? "" : String(document._id),
+    skillId: document.skillId || skillSlug(name),
+    name,
+    description: typeof document.description === "string" ? document.description : "",
+    body,
+    scope: {
+      project: document.project ?? null,
+      username: document.username ?? null,
+      profileId: document.profileId ?? null,
+      agent: document.agent ?? null,
+    },
+    enabled: document.enabled !== false,
+    source: document.source || (isLegacyServiceSchema ? "agent" : "user"),
+    folderRef: document.folderRef ?? null,
+    allowedTools: stringList(document.allowedTools) ?? stringList(document.tools),
+    embedding: Array.isArray(document.embedding) ? document.embedding : null,
+    steps: stringList(document.steps) ?? [],
+    maxIterations:
+      typeof document.maxIterations === "number" ? document.maxIterations : null,
+    model: document.model ?? null,
+    usageCount: typeof document.usageCount === "number" ? document.usageCount : 0,
+    lastUsedAt: document.lastUsedAt ?? null,
+    createdAt: isoString(document.createdAt),
+    updatedAt: isoString(document.updatedAt),
+  };
+}
+
+/**
+ * The caller's identity, from what the call site knows, then the request's
+ * async context (which carries the profile), then the unscoped defaults the
+ * routes use.
+ */
+export function resolveSkillCaller(
+  known: {
+    project?: string | null;
+    username?: string | null;
+    profileId?: string | null;
+    agent?: string | null;
+  } = {},
+): SkillCaller {
+  const request = getRequestContext();
+  return {
+    project: known.project || request.project || "any",
+    username: known.username || request.username || "any",
+    profileId: normalizeProfileId(known.profileId || request.profileId),
+    agent: known.agent ?? request.agent ?? null,
+  };
+}
+
+/**
+ * Documents the caller may see. An unset (null or missing) field matches
+ * every caller — `$in: [value, null]` matches missing fields too.
+ */
+function visibilityFilter(caller: SkillCaller, forAgent: boolean) {
+  return {
+    project: { $in: [caller.project, null] },
+    username: { $in: [caller.username, null] },
+    profileId: profileFilter(caller.profileId),
+    ...(forAgent ? { agent: { $in: [caller.agent, null] } } : {}),
+  };
+}
+
+/** Owned-by-this-caller documents (the scope a write stamps). */
+function ownerFilter(caller: SkillCaller) {
+  return {
+    project: caller.project,
+    username: caller.username,
+    profileId: profileFilter(caller.profileId),
+  };
+}
+
+/** Owner, then project, then persona: the narrower scope wins a name clash. */
+function specificity(skill: Skill): number {
+  return (
+    (skill.scope.username ? 4 : 0) +
+    (skill.scope.project ? 2 : 0) +
+    (skill.scope.agent ? 1 : 0)
+  );
+}
+
+/** Byte order, not locale order: the catalog must not move with ICU data. */
+function byNameThenId(left: Skill, right: Skill): number {
+  if (left.name !== right.name) return left.name < right.name ? -1 : 1;
+  if (left.id === right.id) return 0;
+  return left.id < right.id ? -1 : 1;
+}
+
+/** One skill per name — the most specific scope's — ordered by name. */
+function shadowByName(visible: VisibleSkill[]): VisibleSkill[] {
+  const byName = new Map<string, VisibleSkill>();
+  for (const entry of [...visible].sort((left, right) =>
+    byNameThenId(left.skill, right.skill),
+  )) {
+    const key = entry.skill.name.toLowerCase();
+    const held = byName.get(key);
+    if (!held || specificity(entry.skill) > specificity(held.skill)) {
+      byName.set(key, entry);
+    }
+  }
+  return [...byName.values()].sort((left, right) =>
+    byNameThenId(left.skill, right.skill),
+  );
+}
+
+function matchesReference(skill: Skill, reference: string): boolean {
+  return (
+    skill.id === reference ||
+    skill.name === reference ||
+    skill.skillId === reference ||
+    skill.skillId === skillSlug(reference)
+  );
+}
+
+function templateVariables(body: string): string[] {
+  return [...new Set([...body.matchAll(TEMPLATE_VARIABLE_PATTERN)].map((match) => match[1]))];
+}
+
+/** A catalog line's description: one line, bounded, never the body. */
+export function catalogDescription(skill: Skill): string {
+  const source =
+    skill.description.trim() ||
+    skill.body
+      .split("\n")
+      .map((line) => line.replace(/^#+\s*/, "").trim())
+      .find((line) => line.length > 0) ||
+    "";
+  const oneLine = source.replace(/\s+/g, " ").trim();
+  return oneLine.length > CATALOG_DESCRIPTION_MAX_CHARS
+    ? `${oneLine.slice(0, CATALOG_DESCRIPTION_MAX_CHARS - 1).trimEnd()}…`
+    : oneLine;
+}
+
+/** Embed name + description + body for relevance highlighting. Best effort. */
+async function embedSkill(
+  fields: { name: string; description: string; body: string },
+  endpoint: string,
+): Promise<number[] | null> {
+  try {
+    const { default: EmbeddingService } = await import(
+      "#src/services/EmbeddingService"
+    );
+    const text = [fields.name, fields.description, fields.body]
+      .filter(Boolean)
+      .join("\n");
+    const vector = await EmbeddingService.embed(text, {
+      source: "skill-creation",
+      endpoint,
+    });
+    return Array.isArray(vector) ? vector : null;
+  } catch (error: unknown) {
+    logger.warn(`[SkillService] Embedding failed: ${getErrorMessage(error)}`);
+    return null;
+  }
+}
+
+async function findVisible(
+  caller: SkillCaller,
+  {
+    forAgent,
+    includeDisabled = false,
+    withEmbeddings = false,
+  }: { forAgent: boolean; includeDisabled?: boolean; withEmbeddings?: boolean },
+): Promise<VisibleSkill[]> {
+  const collection = getCollection();
+  if (!collection) return [];
+  const documents = (await collection
+    .find({
+      ...visibilityFilter(caller, forAgent),
+      ...(includeDisabled ? {} : { enabled: { $ne: false } }),
+    })
+    .project(withEmbeddings ? {} : { embedding: 0 })
+    .toArray()) as unknown as StoredSkillDocument[];
+  return documents.map((document) => ({ document, skill: toSkill(document) }));
+}
+
+/** Skill as the Skills panel API returns it (legacy field names kept). */
+export function toApiSkill(skill: Skill) {
+  return {
+    id: skill.id,
+    skillId: skill.skillId,
+    name: skill.name,
+    description: skill.description,
+    content: skill.body,
+    enabled: skill.enabled,
+    project: skill.scope.project,
+    username: skill.scope.username,
+    profileId: skill.scope.profileId,
+    agent: skill.scope.agent,
+    source: skill.source,
+    allowedTools: skill.allowedTools,
+    usageCount: skill.usageCount,
+    lastUsedAt: skill.lastUsedAt,
+    createdAt: skill.createdAt,
+    updatedAt: skill.updatedAt,
+  };
+}
+
+/** Skill as the agent's list_skills sees it: no body, no vector. */
+function toListedSkill(skill: Skill) {
+  return {
+    name: skill.name,
+    skillId: skill.skillId,
+    description: catalogDescription(skill),
+    source: skill.source,
+    ...(skill.scope.agent ? { agent: skill.scope.agent } : {}),
+    usageCount: skill.usageCount,
+    lastUsedAt: skill.lastUsedAt,
+  };
+}
+
 const SkillService = {
-  /**
-   * Create a new skill.
-   */
-  async create(data: Partial<SkillDocument>) {
+  /** Create a skill in the caller's scope. A name is unique per scope. */
+  async create(input: SkillWriteInput, caller: SkillCaller) {
     const collection = getCollection();
-    if (!collection) throw new Error("Database not available");
+    if (!collection) return { error: "Database not available" };
 
-    const {
-      name,
-      description,
-      prompt,
-      steps,
-      tools,
-      maxIterations,
-      model,
-      project,
-      agent,
-    } = data;
+    const name = typeof input.name === "string" ? input.name.trim() : "";
+    const body = typeof input.body === "string" ? input.body : "";
+    if (!name) return { error: "'name' is required (string)" };
+    if (!body.trim()) return { error: "a skill needs a body" };
+    const skillId = skillSlug(name);
+    if (!skillId) return { error: `'${name}' has no letters or digits to name the skill by` };
 
-    if (!name || typeof name !== "string") {
-      return { error: "'name' is required (string)" };
-    }
-    if (!prompt || typeof prompt !== "string") {
-      return { error: "'prompt' is required (string)" };
-    }
-
-    // Derive a stable skill ID
-    const skillId = name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "");
-
-    // Check for duplicate
-    const existing = await collection.findOne({ skillId });
-    if (existing) {
+    const owned = (await collection
+      .find(ownerFilter(caller))
+      .project({ embedding: 0 })
+      .toArray()) as unknown as StoredSkillDocument[];
+    if (owned.some((document) => toSkill(document).skillId === skillId)) {
       return {
-        error: `Skill "${skillId}" already exists. Delete it first or use a different name.`,
+        error: `Skill "${skillId}" already exists in this scope. Delete it first or use a different name.`,
       };
     }
 
-    const document = {
+    const description = input.description || "";
+    const now = new Date();
+    const document: StoredSkillDocument = {
       skillId,
       name,
-      description: description || "",
-      prompt,
-      steps: Array.isArray(steps) ? steps : [],
-      tools: Array.isArray(tools) ? tools : null, // null = all tools
-      maxIterations:
-        typeof maxIterations === "number"
-          ? Math.min(100, Math.max(1, maxIterations))
-          : MAX_TOOL_ITERATIONS,
-      model: model || null,
-      project: project || null,
-      agent: agent || null,
+      description,
+      content: body,
+      project: caller.project,
+      username: caller.username,
+      profileId: caller.profileId,
+      agent: input.agent ?? null,
+      enabled: input.enabled !== false,
+      source: input.source || "user",
+      ...(input.allowedTools ? { allowedTools: input.allowedTools } : {}),
+      ...(input.steps?.length ? { steps: input.steps } : {}),
+      ...(typeof input.maxIterations === "number"
+        ? { maxIterations: Math.min(100, Math.max(1, input.maxIterations)) }
+        : {}),
+      ...(input.model ? { model: input.model } : {}),
       usageCount: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      embedding: await embedSkill({ name, description, body }, "/skills"),
+      createdAt: now,
+      updatedAt: now,
     };
 
-    await collection.insertOne(document);
-    logger.info(`[SkillService] Created skill "${name}" (${skillId})`);
-
+    const result = await collection.insertOne(document as Record<string, unknown>);
+    logger.info(`[SkillService] Created skill "${name}" (${skillId}) for ${caller.username}/${caller.project}`);
     return {
-      skill: sanitize(document as unknown as SkillDocument),
-      message: `Skill "${name}" created. Execute with execute_skill({ skillId: "${skillId}" }).`,
+      skill: toSkill({ ...document, _id: result.insertedId }),
+      message: `Skill "${name}" created. It is in the skill catalog from the next turn; load it with load_skill({ name: "${name}" }).`,
     };
   },
 
   /**
    * Idempotent upsert for skills imported from an external source
-   * (ClaudeConfigImportService). Keyed by skillId + source:
-   *   - no existing skill        → created
-   *   - same source              → updated in place (or unchanged)
-   *   - different/absent source  → skipped (never clobber a user skill)
+   * (ClaudeConfigImportService). Keyed by skillId + source among the skills
+   * the caller can see:
+   *   - no such skill           → created in the caller's scope
+   *   - same source             → updated in place (or unchanged); an
+   *                               unowned legacy import is claimed
+   *   - different/absent source → skipped (never clobber a user skill)
    */
-  async upsertImported(data: {
-    name: string;
-    description?: string;
-    prompt: string;
-    project?: string | null;
-    agent?: string | null;
-    source: string;
-  }): Promise<SkillUpsertResult> {
+  async upsertImported(
+    data: { name: string; description?: string; body: string; source: string; agent?: string | null },
+    caller: SkillCaller,
+  ): Promise<SkillUpsertResult> {
     const collection = getCollection();
     if (!collection) return { status: "skipped", error: "Database not available" };
 
-    const { name, description = "", prompt, project, agent, source } = data;
-    if (!name || !prompt || !source) {
-      return {
-        status: "skipped",
-        error: "'name', 'prompt' and 'source' are required",
-      };
+    const { name, description = "", body, source } = data;
+    if (!name || !body || !source) {
+      return { status: "skipped", error: "'name', 'body' and 'source' are required" };
     }
+    const skillId = skillSlug(name);
 
-    const skillId = name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "");
+    const existing = (
+      await findVisible(caller, { forAgent: false, includeDisabled: true })
+    ).find(({ skill }) => skill.skillId === skillId);
 
-    const existing = (await collection.findOne({
-      skillId,
-    })) as unknown as SkillDocument | null;
-
-    if (existing && existing.source !== source) {
+    if (existing && existing.skill.source !== source) {
       return {
         status: "skipped",
         skillId,
-        reason: `skill "${skillId}" already exists from a different source (${existing.source || "user-created"})`,
+        reason: `skill "${skillId}" already exists from a different source (${existing.skill.source})`,
       };
     }
 
-    const now = new Date().toISOString();
-
     if (existing) {
-      if (
-        existing.prompt === prompt &&
-        existing.description === description
-      ) {
+      const { skill, document } = existing;
+      const isClaimed = skill.scope.username !== null;
+      if (skill.body === body && skill.description === description && isClaimed) {
         return { status: "unchanged", skillId };
       }
       await collection.updateOne(
-        { skillId },
-        { $set: { description, prompt, updatedAt: now } },
+        { _id: document._id },
+        {
+          $set: {
+            description,
+            content: body,
+            ...(isClaimed
+              ? {}
+              : {
+                  project: caller.project,
+                  username: caller.username,
+                  profileId: caller.profileId,
+                }),
+            embedding: await embedSkill({ name, description, body }, "/claude-config-import"),
+            updatedAt: new Date(),
+          },
+        },
       );
       logger.info(`[SkillService] Re-imported skill "${name}" (${skillId})`);
       return { status: "updated", skillId };
     }
 
-    await collection.insertOne({
-      skillId,
-      name,
-      description,
-      prompt,
-      steps: [],
-      tools: null,
-      maxIterations: MAX_TOOL_ITERATIONS,
-      model: null,
-      project: project || null,
-      agent: agent || null,
-      usageCount: 0,
-      source,
-      createdAt: now,
-      updatedAt: now,
-    });
+    const created = await SkillService.create(
+      { name, description, body, source, agent: data.agent ?? null },
+      caller,
+    );
+    if ("error" in created && created.error) return { status: "skipped", skillId, error: created.error };
     logger.info(`[SkillService] Imported skill "${name}" (${skillId}) from ${source}`);
     return { status: "created", skillId };
   },
 
   /**
-   * List all skills.
-
-
+   * Every skill document the caller can manage (the Skills panel's list):
+   * disabled ones included, shadowed duplicates included, by name.
    */
-  async list({ project, limit = 50 }: Record<string, unknown> = {}) {
-    const collection = getCollection();
-    if (!collection) return { skills: [], total: 0 };
+  async listManaged(caller: SkillCaller): Promise<Skill[]> {
+    return (await findVisible(caller, { forAgent: false, includeDisabled: true }))
+      .map(({ skill }) => skill)
+      .sort(byNameThenId);
+  },
 
-    const filter: Record<string, unknown> = {};
-    if (project) filter.project = project;
-
-    const skills = await collection
-      .find(filter)
-      .sort({ usageCount: -1, name: 1 })
-      .limit(Math.min(limit as number, 100))
-      .toArray();
-
+  /** The agent's view: enabled, this persona's, one per name — no bodies, no vectors. */
+  async list(caller: SkillCaller) {
+    const skills = shadowByName(await findVisible(caller, { forAgent: true })).map(
+      ({ skill }) => toListedSkill(skill),
+    );
     return {
-      skills: (skills as unknown as SkillDocument[]).map(sanitize),
+      skills,
       total: skills.length,
+      ...(skills.length > 0
+        ? { hint: "Read a skill's instructions with load_skill({ name })." }
+        : {}),
     };
   },
 
   /**
-   * Get a single skill by skillId.
-
-
+   * The skills the system-prompt catalog lists for this caller, in catalog
+   * order. Embeddings are included for relevance highlighting only.
    */
-  async get(skillId: string) {
-    const collection = getCollection();
-    if (!collection) return null;
-    const document = (await collection.findOne({ skillId })) as unknown as SkillDocument;
-    return document ? sanitize(document) : null;
+  async catalog(caller: SkillCaller): Promise<Skill[]> {
+    return shadowByName(
+      await findVisible(caller, { forAgent: true, withEmbeddings: true }),
+    ).map(({ skill }) => skill);
   },
 
-  /**
-   * Delete a skill by skillId.
-   */
-  async delete(skillId: string) {
+  /** One skill the caller can see, by id, name or skillId (most specific wins). */
+  async get(reference: string, caller: SkillCaller): Promise<Skill | null> {
+    const match = shadowByName(
+      (await findVisible(caller, { forAgent: false, includeDisabled: true })).filter(
+        ({ skill }) => matchesReference(skill, reference),
+      ),
+    )[0];
+    return match ? match.skill : null;
+  },
+
+  /** `load_skill`: the body and its resources, for an enabled catalog skill. */
+  async load(name: string, caller: SkillCaller): Promise<LoadedSkill | { error: string }> {
     const collection = getCollection();
     if (!collection) return { error: "Database not available" };
 
-    const document = (await collection.findOne({ skillId })) as unknown as SkillDocument;
-    if (!document) {
-      return { error: `Skill "${skillId}" not found` };
+    const visible = shadowByName(await findVisible(caller, { forAgent: true }));
+    const found =
+      visible.find(({ skill }) => skill.name === name) ||
+      visible.find(({ skill }) => skill.name.toLowerCase() === name.toLowerCase()) ||
+      visible.find(({ skill }) => skill.skillId === skillSlug(name));
+    if (!found) {
+      const available = visible.map(({ skill }) => skill.name);
+      return {
+        error:
+          `No skill named "${name}" is available here.` +
+          (available.length > 0
+            ? ` Available: ${available.join(", ")}.`
+            : " This scope has no skills."),
+      };
     }
 
-    await collection.deleteOne({ skillId });
-    logger.info(`[SkillService] Deleted skill "${document.name}" (${skillId})`);
+    const { skill, document } = found;
+    await collection.updateOne(
+      { _id: document._id },
+      { $inc: { usageCount: 1 }, $set: { lastUsedAt: new Date().toISOString() } },
+    );
 
-    return { deleted: true, skillId, name: document.name };
+    const variables = templateVariables(skill.body);
+    return {
+      name: skill.name,
+      description: skill.description,
+      body: skill.body,
+      source: skill.source,
+      // Folders arrive with Landing 2 (folderRef); until then a skill is its body.
+      resources: [],
+      ...(skill.allowedTools ? { allowedTools: skill.allowedTools } : {}),
+      ...(skill.steps.length > 0 ? { steps: skill.steps } : {}),
+      ...(variables.length > 0 ? { templateVariables: variables } : {}),
+    };
+  },
+
+  /** Update a skill the caller can see. Returns null when there is none. */
+  async update(reference: string, patch: SkillPatch, caller: SkillCaller): Promise<Skill | { error: string } | null> {
+    const collection = getCollection();
+    if (!collection) return { error: "Database not available" };
+
+    const target = (
+      await findVisible(caller, { forAgent: false, includeDisabled: true })
+    ).find(({ skill }) => skill.id === reference || skill.skillId === reference);
+    if (!target) return null;
+
+    const { skill, document } = target;
+    const name = patch.name?.trim() || skill.name;
+    const description = patch.description ?? skill.description;
+    const body = patch.body ?? skill.body;
+    const $set: Record<string, unknown> = { updatedAt: new Date() };
+    if (patch.name !== undefined && name !== skill.name) {
+      $set.name = name;
+      $set.skillId = skillSlug(name);
+    }
+    if (patch.description !== undefined) $set.description = description;
+    if (patch.body !== undefined) $set.content = body;
+    if (patch.enabled !== undefined) $set.enabled = patch.enabled;
+    if (patch.name !== undefined || patch.description !== undefined || patch.body !== undefined) {
+      const embedding = await embedSkill({ name, description, body }, "/skills");
+      if (embedding) $set.embedding = embedding;
+    }
+
+    await collection.updateOne({ _id: document._id }, { $set });
+    logger.info(`[SkillService] Updated skill "${name}" (${skill.id})`);
+    return toSkill({ ...document, ...$set } as StoredSkillDocument);
+  },
+
+  /** Delete a skill the caller can see, by id, skillId or name. */
+  async delete(reference: string, caller: SkillCaller) {
+    const collection = getCollection();
+    if (!collection) return { error: "Database not available" };
+
+    const target = shadowByName(
+      (await findVisible(caller, { forAgent: false, includeDisabled: true })).filter(
+        ({ skill }) => matchesReference(skill, reference),
+      ),
+    )[0];
+    if (!target) return { error: `Skill "${reference}" not found` };
+
+    await collection.deleteOne({ _id: target.document._id });
+    logger.info(`[SkillService] Deleted skill "${target.skill.name}" (${target.skill.id})`);
+    return { deleted: true, skillId: target.skill.skillId, name: target.skill.name };
   },
 
   /**
-   * Execute a skill — interpolates variables, increments usage, and
-   * returns the assembled prompt + config for the agentic loop.
-   *
-   * The caller (ToolOrchestratorService) is responsible for actually
-   * running the agentic loop with the returned config.
+   * Execute a skill — interpolates variables, counts the use, and returns
+   * the assembled prompt + config for the agentic loop. The caller
+   * (execute_skill) runs it.
    */
   async prepare(
-    skillId: string,
-    variables: Record<string, unknown> = {},
+    reference: string,
+    variables: Record<string, unknown>,
+    caller: SkillCaller,
   ): Promise<SkillPrepareResult> {
     const collection = getCollection();
     if (!collection) return { error: "Database not available" };
 
-    const document = (await collection.findOne({
-      skillId,
-    })) as unknown as SkillDocument;
-    if (!document) {
+    const target = shadowByName(
+      (await findVisible(caller, { forAgent: true })).filter(({ skill }) =>
+        matchesReference(skill, reference),
+      ),
+    )[0];
+    if (!target) {
       return {
-        error: `Skill "${skillId}" not found. Use list_skills to see available skills.`,
+        error: `Skill "${reference}" not found. Use list_skills to see available skills.`,
       };
     }
+    const { skill, document } = target;
 
-    // Interpolate variables into the prompt template
-    let prompt = document.prompt;
+    let prompt = skill.body;
     for (const [key, value] of Object.entries(variables)) {
-      prompt = prompt.replace(
-        new RegExp(`\\{\\{${key}\\}\\}`, "g"),
-        String(value),
-      );
+      prompt = prompt.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), String(value));
     }
+    const unresolved = templateVariables(prompt);
 
-    // Warn about unresolved variables
-    const unresolvedMatch = prompt.match(/\{\{(\w+)\}\}/g);
-    const unresolved = unresolvedMatch
-      ? [
-          ...new Set(
-            unresolvedMatch.map((message: string) => message.slice(2, -2)),
-          ),
-        ]
-      : [];
-
-    // Increment usage counter
     await collection.updateOne(
-      { skillId },
-      {
-        $inc: { usageCount: 1 },
-        $set: { updatedAt: new Date().toISOString() },
-      },
+      { _id: document._id },
+      { $inc: { usageCount: 1 }, $set: { lastUsedAt: new Date().toISOString() } },
     );
 
-    const config = {
-      maxIterations: document.maxIterations || MAX_TOOL_ITERATIONS,
-      model: document.model || null,
-      tools: document.tools || null, // null = all tools
-      agent: document.agent || null,
-      project: document.project || null,
-    };
-
     return {
-      skillId,
-      name: document.name,
+      skillId: skill.skillId,
+      name: skill.name,
       prompt,
-      config,
+      config: {
+        maxIterations: skill.maxIterations || MAX_TOOL_ITERATIONS,
+        model: skill.model,
+        tools: skill.allowedTools, // null = all tools
+        agent: skill.scope.agent,
+        project: skill.scope.project,
+      },
       unresolved: unresolved.length > 0 ? unresolved : undefined,
-      steps: document.steps?.length > 0 ? document.steps : undefined,
+      steps: skill.steps.length > 0 ? skill.steps : undefined,
     };
   },
 };
-
-function sanitize(document: SkillDocument) {
-  if (!document) return null;
-  const { ...rest } = document;
-  return rest;
-}
 
 export default SkillService;
