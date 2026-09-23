@@ -616,7 +616,110 @@ const MODELS = {
     reasoningSummary: true,
     responsesAPI: true,
     webSearch: true,
-    // Native features only gpt-6-astra has (see getModelNativeCapabilities).
+    // Native GPT-6 features (see getModelNativeCapabilities).
+    asyncTools: true,
+    steering: true,
+    programmaticToolCalling: true,
+    configurationUpdate: true,
+    tools: [
+      "Thinking",
+      "Web Search",
+      "Tool Calling",
+      "File Search",
+      "Computer Use",
+    ],
+  },
+  // GPT-6 Sol and Luna (2026-09-22). Verified that day against
+  // developers.openai.com/api/docs/models/gpt-6-sol and …/gpt-6-luna, and
+  // live on the API: effort none…max (default medium), async tools,
+  // configuration_update and WebSocket steering all accepted. Unlike Astra
+  // they take effort "none" — the only effort at which temperature/top_p
+  // are accepted, and the only one at which Chat Completions allows
+  // function calling, which is why both route through Responses.
+  GPT_6_SOL: {
+    description:
+      "OpenAI's GPT-6 Sol (2026-09-22): GPT-6 reasoning at mid-tier pricing, with async tool calling, mid-turn steering and mid-conversation effort updates for agentic work.",
+    name: "gpt-6-sol",
+    label: "GPT 6 Sol",
+    provider: PROVIDERS.OPENAI,
+    modelType: MODEL_TYPES.CONVERSATION,
+    year: 2026,
+    defaultTemperature: 1.0,
+    // Published 2026-09-22 (per 1M): $2 in / $0.20 cached / $2.50 cache write /
+    // $10 out. Over 272K input the whole request bills 2x input and cache,
+    // 1.5x output.
+    pricing: {
+      inputPerMillion: 2.0,
+      cachedInputPerMillion: 0.2,
+      cacheWriteInputPerMillion: 2.5,
+      outputPerMillion: 10.0,
+      inputOver272kPerMillion: 4.0,
+      cachedInputOver272kPerMillion: 0.4,
+      cacheWriteInputOver272kPerMillion: 5.0,
+      outputOver272kPerMillion: 15.0,
+      webSearchPer1kCalls: 10.0,
+    },
+    // Context window 1,050,000 = 922,000 max input + 128,000 max output.
+    maxInputTokens: 922_000,
+    maxOutputTokens: 128_000,
+    knowledgeCutoff: "2026-04-20",
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
+    mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
+    streaming: true,
+    thinking: true,
+    thinkingLevels: ["none", "low", "medium", "high", "xhigh", "max"],
+    verbosity: true,
+    reasoningSummary: true,
+    responsesAPI: true,
+    webSearch: true,
+    asyncTools: true,
+    steering: true,
+    programmaticToolCalling: true,
+    configurationUpdate: true,
+    tools: [
+      "Thinking",
+      "Web Search",
+      "Tool Calling",
+      "File Search",
+      "Computer Use",
+    ],
+  },
+  GPT_6_LUNA: {
+    description:
+      "OpenAI's GPT-6 Luna (2026-09-22): the fast, low-cost GPT-6 model for high-volume and budget-conscious agentic work, with async tool calling, mid-turn steering and mid-conversation effort updates.",
+    name: "gpt-6-luna",
+    label: "GPT 6 Luna",
+    provider: PROVIDERS.OPENAI,
+    modelType: MODEL_TYPES.CONVERSATION,
+    year: 2026,
+    defaultTemperature: 1.0,
+    // Published 2026-09-22 (per 1M): $0.10 in / $0.01 cached / $0.125 cache
+    // write / $0.50 out. Over 272K input: 2x input and cache, 1.5x output.
+    pricing: {
+      inputPerMillion: 0.1,
+      cachedInputPerMillion: 0.01,
+      cacheWriteInputPerMillion: 0.125,
+      outputPerMillion: 0.5,
+      inputOver272kPerMillion: 0.2,
+      cachedInputOver272kPerMillion: 0.02,
+      cacheWriteInputOver272kPerMillion: 0.25,
+      outputOver272kPerMillion: 0.75,
+      webSearchPer1kCalls: 10.0,
+    },
+    maxInputTokens: 922_000,
+    maxOutputTokens: 128_000,
+    knowledgeCutoff: "2026-05-18",
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    outputTypes: [MODALITY_TYPES.TEXT],
+    mediaLimits: { image: { maxCount: 16, maxSizeMB: 20 } },
+    streaming: true,
+    thinking: true,
+    thinkingLevels: ["none", "low", "medium", "high", "xhigh", "max"],
+    verbosity: true,
+    reasoningSummary: true,
+    responsesAPI: true,
+    webSearch: true,
     asyncTools: true,
     steering: true,
     programmaticToolCalling: true,
