@@ -28,7 +28,7 @@
  * registries, the stores and the resume service are real, the model is
  * scripted at the provider. Pricing is pinned: 100 input tokens = $1.00.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import express from "express";
 import supertest from "supertest";
 import { createMockCollection } from "../../../../tests/mongoMock.ts";
@@ -514,6 +514,22 @@ function scriptReads(conversationId: string) {
   ]);
 }
 
+/** Every budget event any test emitted is a valid protocol event (strict schema). */
+async function expectBudgetEventsOnProtocol() {
+  const { validateTurnEvent } = await import("#src/protocol/events");
+  const budgetEvents = shared.events
+    .map((entry) => entry.event)
+    .filter((event) => event.type === "status" && String(event.message).startsWith("budget_"));
+  for (const event of budgetEvents) {
+    const verdict = validateTurnEvent(event);
+    expect(verdict.success, `${JSON.stringify(event)}: ${verdict.error?.message}`).toBe(true);
+  }
+}
+
+afterEach(async () => {
+  await expectBudgetEventsOnProtocol();
+});
+
 beforeEach(() => {
   shared.process = 0;
   shared.collections.clear();
@@ -568,6 +584,13 @@ describe("reaching the cost cap pauses the turn", () => {
     expect(invalid.status).toBe(400);
     await settle();
     expect(executionsOf(1, "read_file", "b.txt"), "still paused after a refused raise").toHaveLength(0);
+
+    // Another user's raise reads as nothing paused.
+    const stranger = await first.http
+      .patch(`/conversations/${conversationId}/budget`)
+      .set({ "x-project": PROJECT, "x-username": "someone-else" })
+      .send({ maxCostDollars: 50 });
+    expect(stranger.status).toBe(404);
 
     const raised = await patchBudget(first.http, conversationId, { maxCostDollars: 5 });
     expect(raised.status, JSON.stringify(raised.body)).toBe(200);
@@ -767,6 +790,11 @@ describe("a paused turn survives a restart", () => {
     startTurn(first.handleAgent, conversationId, "Read a and b", { maxCostDollars: 1.5 });
     await until(() => statusesOf(1, conversationId, "budget_reached").length === 1, "the budget pause");
     const [firstPause] = statusesOf(1, conversationId, "budget_reached");
+    // What the restart carries: the crossing pass, and the spend against the cap.
+    expect(turnRun(conversationId)).toMatchObject({
+      pass: expect.objectContaining({ iteration: 2 }),
+      costBudget: { spentDollars: 2, turnCapDollars: 1.5 },
+    });
 
     const second = await restart();
     expect(second.plan.resumable.map(({ run }) => run.id)).toEqual([conversationId]);
@@ -819,6 +847,8 @@ describe("a paused turn survives a restart", () => {
     const first = await bootProcess();
     startTurn(first.handleAgent, conversationId, "Read a", { maxCostDollars: 1.5 });
     await until(() => statusesOf(1, conversationId, "budget_reached").length === 1, "the budget pause");
+    // No tool batch in flight: the run is marked paused before iteration 3's model call.
+    expect(turnRun(conversationId)).toMatchObject({ budgetPausedAt: 3, costBudget: { spentDollars: 2 } });
 
     const second = await restart();
     expect(second.plan.resumable.map(({ run }) => run.id)).toEqual([conversationId]);

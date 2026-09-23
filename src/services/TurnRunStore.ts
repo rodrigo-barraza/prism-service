@@ -26,7 +26,11 @@ import type {
  *     a mid-turn "approve all";
  *   - the PASS whose tool batch was in progress: what the model said
  *     (text, thinking, provider-native state) and the calls it made, with
- *     each call's progress — running, or finished with its result.
+ *     each call's progress — running, or finished with its result;
+ *   - the tree's COST BUDGET: what it has spent and the turn's cap (a raise
+ *     included), so a re-driven turn is held to the cap it paused at — and
+ *     the iteration a budget pause stopped before its model call, which
+ *     makes a turn paused with no tool batch in progress re-drivable too.
  *
  * A pass belongs to the checkpoint iteration it was made in. The next
  * iteration's checkpoint already carries that pass's messages, so a pass
@@ -76,6 +80,13 @@ export interface StoredPass {
   calls: Record<string, StoredCallState>;
 }
 
+/** The tree's spend and the turn's own cap, as a restart must carry them. */
+export interface StoredCostBudget {
+  spentDollars: number;
+  /** Null: the turn has no cap of its own (the goal's is the only one). */
+  turnCapDollars: number | null;
+}
+
 export interface TurnRunRecord {
   /** The loop key: a root turn's conversation id. */
   id: string;
@@ -106,6 +117,9 @@ export interface TurnRunRecord {
   pass?: StoredPass | null;
   /** `pass.iteration`, top-level so a call's progress can only land on its own pass. */
   passIteration?: number | null;
+  costBudget?: StoredCostBudget | null;
+  /** The iteration a budget pause stopped at, before its model call (prompt 13, Landing 3). */
+  budgetPausedAt?: number | null;
   /** How many processes have re-driven this turn. */
   attempts: number;
   startedAt: string;
@@ -114,7 +128,7 @@ export interface TurnRunRecord {
 
 export type TurnRunStart = Omit<
   TurnRunRecord,
-  "attempts" | "startedAt" | "updatedAt" | "pass" | "passIteration"
+  "attempts" | "startedAt" | "updatedAt" | "pass" | "passIteration" | "budgetPausedAt"
 >;
 
 function collection(): Collection<Document> | null {
@@ -159,7 +173,7 @@ const TurnRunStore = {
             { id: start.id },
             {
               $set: { ...start, attempts: 0, startedAt: now, updatedAt: now },
-              $unset: { pass: "", passIteration: "" },
+              $unset: { pass: "", passIteration: "", budgetPausedAt: "" },
             },
             { upsert: true },
           ),
@@ -170,7 +184,13 @@ const TurnRunStore = {
   async checkpoint(
     id: string,
     turnId: string,
-    fields: { iteration: number; planModeActive: boolean; autoApprove: boolean; permissionMode?: string | null },
+    fields: {
+      iteration: number;
+      planModeActive: boolean;
+      autoApprove: boolean;
+      permissionMode?: string | null;
+      costBudget?: StoredCostBudget | null;
+    },
   ): Promise<void> {
     await write(`checkpoint ${id}`, (runs) =>
       runs.updateOne(
@@ -184,6 +204,23 @@ const TurnRunStore = {
   async recordPermissionMode(id: string, turnId: string, permissionMode: string): Promise<void> {
     await write(`mode ${id}`, (runs) =>
       runs.updateOne({ id, turnId }, { $set: { permissionMode, updatedAt: new Date().toISOString() } }),
+    );
+  },
+
+  /** The tree's spend or the turn's cap moved (a budget pause, a raise). */
+  async recordCostBudget(id: string, turnId: string, costBudget: StoredCostBudget): Promise<void> {
+    await write(`budget ${id}`, (runs) =>
+      runs.updateOne({ id, turnId }, { $set: { costBudget, updatedAt: new Date().toISOString() } }),
+    );
+  },
+
+  /** The turn paused at its cap before this iteration's model call. */
+  async recordBudgetPause(id: string, turnId: string, iteration: number): Promise<void> {
+    await write(`budget pause ${id}#${iteration}`, (runs) =>
+      runs.updateOne(
+        { id, turnId },
+        { $set: { budgetPausedAt: iteration, updatedAt: new Date().toISOString() } },
+      ),
     );
   },
 

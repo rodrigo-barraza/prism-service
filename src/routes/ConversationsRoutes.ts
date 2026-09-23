@@ -24,6 +24,7 @@ import ConversationGoalService, {
 import ConversationStatusRegistry from "#src/services/ConversationStatusRegistry";
 import ConversationAttentionRegistry from "#src/services/ConversationAttentionRegistry";
 import AgenticLoopService from "#src/services/AgenticLoopService";
+import { budgetRaiseResponse, handleConversationBudgetPatch } from "#src/routes/ConversationBudgetRoute";
 import {
   GetConversationsQuerySchema,
   PostConversationMessagesBodySchema,
@@ -532,6 +533,8 @@ router.get(
           await AgenticLoopService.getPendingApproval(conversationId);
         const pendingQuestion =
           await AgenticLoopService.getPendingQuestion(conversationId);
+        const pendingBudget =
+          await AgenticLoopService.getPendingBudget(conversationId);
         const attention = ConversationAttentionRegistry.get(conversationId);
         // Raw `messages` are deliberately omitted — displayMessages is the
         // serve-time form and shipping both doubles a multi-hundred-KB payload
@@ -556,6 +559,7 @@ router.get(
           pendingQuestion: pendingQuestion.isPending
             ? pendingQuestion
             : undefined,
+          pendingBudget: pendingBudget.isPending ? pendingBudget : undefined,
         });
       }
 
@@ -579,6 +583,8 @@ router.get(
           await AgenticLoopService.getPendingApproval(conversationId);
         const pendingQuestion =
           await AgenticLoopService.getPendingQuestion(conversationId);
+        const pendingBudget =
+          await AgenticLoopService.getPendingBudget(conversationId);
 
         // Derive hasSubAgents from the stored subAgents array when the
         // persisted boolean flag is missing (conversations created before the
@@ -624,6 +630,7 @@ router.get(
           pendingQuestion: pendingQuestion.isPending
             ? pendingQuestion
             : undefined,
+          pendingBudget: pendingBudget.isPending ? pendingBudget : undefined,
         });
       }
 
@@ -1087,6 +1094,11 @@ router.post(
   }),
 );
 
+// ─── Budget pause ────────────────────────────────────────────────
+// PATCH /conversations/:id/budget raises the cap of the turn paused at it
+// (ConversationBudgetRoute).
+router.patch("/:id/budget", asyncHandler(handleConversationBudgetPatch));
+
 // ─── Conversation goal ───────────────────────────────────────────
 // The persistent objective of a conversation (ConversationGoalService).
 // Same project/username scoping as the message routes above.
@@ -1175,7 +1187,9 @@ router.put(
  * PATCH /conversations/:id/goal
  * Partial update: { status?: "active"|"paused", progress?, blockedOn?, budget? }.
  * `progress` is a summary string or { summary?, percent? }. This is the
- * user's pause/resume lever — the model cannot pause a goal.
+ * user's pause/resume lever — the model cannot pause a goal. A `budget`
+ * change also reaches a turn paused at its cost cap: `budgetPause` in the
+ * response says whether it resumed (see ConversationBudgetRoute).
  */
 router.patch(
   "/:id/goal",
@@ -1235,6 +1249,18 @@ router.patch(
       );
       if (!goal) {
         return res.status(404).json({ error: "Conversation has no goal" });
+      }
+      // A turn paused at its cost cap resumes when the goal's budget is
+      // what held it and now leaves room (prompt 13, Landing 3).
+      if (patch.budget !== undefined) {
+        const outcome = await AgenticLoopService.raiseBudget(
+          conversationId,
+          { goalMaxCostDollars: goal.budget?.maxCostDollars ?? null },
+          { username },
+        );
+        if (outcome.status !== "not_found") {
+          return res.json({ goal, budgetPause: budgetRaiseResponse(outcome).body });
+        }
       }
       res.json({ goal });
     } catch (error: unknown) {

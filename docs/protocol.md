@@ -207,6 +207,8 @@ Fields for each `sub_agent_status` `message`:
 | `context_exhausted` | `availableOutputTokens`, `contextWindow` |
 | `context_truncated` | `strategy`, `estimatedTokens` |
 | `cost_limit_reached` | `estimatedCost`, `maxCostDollars`, `iteration` |
+| `budget_reached` | `pauseId`, `spentDollars`, `maxCostDollars`, `limitedBy: "turn" \| "goal"`, `iteration`, `turnCapDollars?`, `goalMaxCostDollars?` — the tree paused at its cost cap; raise it with `PATCH /conversations/:id/budget` (or the goal's budget) |
+| `budget_resolved` | `pauseId`, `action: "raise" \| "stop"`, `source: "user" \| "superseded" \| "turn_ended"`, `maxCostDollars?` |
 | `repetition_detected`, `semantic_stall_detected` | `iteration`, `rule`, `retry` |
 | `system_reminder_injected` | `iteration`, `interval` |
 | `skills_injected` | `skills` |

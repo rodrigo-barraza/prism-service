@@ -35,7 +35,13 @@ import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { TURN_RESUME } from "#src/constants";
+import { TURN_RESUME, type BudgetAction } from "#src/constants";
+import BudgetPauseRegistry, {
+  type BudgetRaiseInput,
+  type BudgetRaiseOutcome,
+  type PendingBudgetSnapshot,
+} from "./BudgetPauseRegistry.ts";
+import type { SharedCostBudget } from "./harnesses/lifecycle/CostBudgetEnforcer.ts";
 import logger from "#src/utils/logger";
 
 import type { AgenticContext, ConversationMessage } from "./harnesses/types.ts";
@@ -52,6 +58,19 @@ import type { AgenticContext, ConversationMessage } from "./harnesses/types.ts";
  *
  * Also exposes approval/question resolution APIs used by AgentRoutes.
  */
+/**
+ * What a turn does at its cost cap: what the request asked (`onBudgetReached`),
+ * else pause — unless the request said nobody will answer a card
+ * (autoApprove: the Discord bot; unattended: scheduled runs and timers).
+ * Those stop at the cap, as every turn did before budgets paused.
+ */
+export function resolveBudgetAction(options: AgenticContext["options"]): BudgetAction {
+  if (options.onBudgetReached === "pause" || options.onBudgetReached === "stop") {
+    return options.onBudgetReached;
+  }
+  return options.autoApprove === true || options.unattended === true ? "stop" : "pause";
+}
+
 export default class AgenticLoopService {
   /**
    * Run an agentic loop using the specified (or default) harness, as one
@@ -230,6 +249,11 @@ export default class AgenticLoopService {
       }
     }
 
+    // What the turn does at its cost cap is the REQUEST's call, read before
+    // a conversation-level "approve all" below flips autoApprove: the
+    // person who clicked that is still there to raise a cap.
+    const budgetAction = resolveBudgetAction(options);
+
     // "Auto-approve this conversation" (an approval card's conversation
     // scope) is persisted on the conversation, so it holds for every later
     // turn of it — and of no other. Root turns only: a sub-agent inherits
@@ -264,16 +288,7 @@ export default class AgenticLoopService {
     // Cost ceiling: create the tree-wide accumulator at the root loop.
     // Sub-agents receive the SAME object through their options, so spend
     // anywhere in the delegation tree counts against one budget.
-    if (
-      typeof options.maxCostDollars === "number" &&
-      options.maxCostDollars > 0 &&
-      !options._sharedCostBudget
-    ) {
-      const { SharedCostBudget } = await import(
-        "./harnesses/lifecycle/CostBudgetEnforcer.ts"
-      );
-      options._sharedCostBudget = new SharedCostBudget(options.maxCostDollars);
-    }
+    const ownCostBudget = await AgenticLoopService.openCostBudget(context, budgetAction);
 
     // 3. Select harness, topology, and thought structure
     let harnessId = options.harness;
@@ -352,7 +367,7 @@ export default class AgenticLoopService {
       // Picks up where the restart interrupted it: the pass is replayed at
       // its own iteration, and its decisions are its own — not orphans. The
       // loop state a checkpoint does not carry comes back with it.
-      state.iterations = context.resume.pass.iteration - 1;
+      state.iterations = context.resume.iteration - 1;
       if (context.resume.autoApprove) options.autoApprove = true;
       if (context.resume.skillsText && !options._skillsText) {
         options._skillsText = context.resume.skillsText;
@@ -380,6 +395,12 @@ export default class AgenticLoopService {
       // The turn is over: whatever it still waited on lapses (persisted as such).
       await ApprovalRegistry.cancel(loopKey);
       await QuestionRegistry.cancelAll(loopKey);
+      if (ownCostBudget) {
+        // A sub-agent still running on this budget stops at the cap now:
+        // nobody is left to raise it for.
+        ownCostBudget.detachPauser();
+        await BudgetPauseRegistry.cancel(loopKey);
+      }
       TurnInputMailbox.close(conversationId);
 
       // Always clean up per-session tracker entries to prevent memory leaks —
@@ -582,6 +603,7 @@ export default class AgenticLoopService {
       const retired = [
         ...(await ApprovalRegistry.retireOrphans(loopKey)),
         ...(await QuestionRegistry.retireOrphans(loopKey)),
+        ...(await BudgetPauseRegistry.retireOrphans(loopKey)),
       ];
       if (retired.length === 0) return;
       logger.info(
@@ -623,13 +645,113 @@ export default class AgenticLoopService {
     context.emit({
       type: SERVER_SENT_EVENT_TYPES.STATUS,
       message: TURN_RESUME.STATUS_RESUMED,
-      iteration: resume.pass.iteration,
+      iteration: resume.iteration,
       attempt: resume.attempt,
     });
     logger.info(
-      `[AgenticLoop] Re-driving ${loopKey} from iteration ${resume.pass.iteration} (attempt ${resume.attempt}): ` +
-        `${resume.pass.toolCalls.length} call(s) replayed, ${resume.inputs.length} input(s) restored, ${resume.notices.length} notice(s)`,
+      `[AgenticLoop] Re-driving ${loopKey} from iteration ${resume.iteration} (attempt ${resume.attempt}): ` +
+        (resume.pass
+          ? `${resume.pass.toolCalls.length} call(s) replayed`
+          : "paused at its cost cap before a model call") +
+        `, ${resume.inputs.length} input(s) restored, ${resume.notices.length} notice(s)`,
     );
+  }
+
+  // ── Budget Pause API (prompt 13, Landing 3) ────────────
+  // Keyed like approvals: a root turn's client-facing conversation id. A
+  // sub-agent's spend pauses its tree under the root's.
+
+  /**
+   * The root turn's cost budget: the lower of its own cap (the request's
+   * `maxCostDollars`) and what is left of its active goal's dollar budget,
+   * carrying what a re-driven turn's previous process spent (and a raise it
+   * made). When the turn pauses at its cap, it gets a pauser that asks its
+   * user. Null: the loop runs on its parent's budget, or nothing caps it.
+   */
+  static async openCostBudget(
+    context: AgenticContext,
+    budgetAction: BudgetAction,
+  ): Promise<SharedCostBudget | null> {
+    const { options } = context;
+    if (options._sharedCostBudget) return null;
+    const requestCap =
+      typeof options.maxCostDollars === "number" && options.maxCostDollars > 0
+        ? options.maxCostDollars
+        : null;
+    const carried = context.resume?.costBudget ?? null;
+    // A re-driven turn keeps the cap it ran under (a raise included).
+    const turnCapDollars = carried ? carried.turnCapDollars : requestCap;
+    const goal = options.isSubAgent ? null : await AgenticLoopService.readGoalBudgetLimit(context);
+    if (turnCapDollars === null && !goal) return null;
+
+    const { SharedCostBudget } = await import("./harnesses/lifecycle/CostBudgetEnforcer.ts");
+    const budget = new SharedCostBudget(
+      { turnCapDollars, goal },
+      { carriedSpendDollars: carried?.spentDollars ?? 0 },
+    );
+    options._sharedCostBudget = budget;
+    // Only a root turn asks: its conversation is the one the user holds.
+    if (budgetAction === "pause" && !options.isSubAgent) {
+      const { waitForBudgetRaise } = await import("./harnesses/lifecycle/BudgetPauseGate.ts");
+      budget.attachPauser((info) => waitForBudgetRaise(context, info));
+    }
+    return budget;
+  }
+
+  /** The active goal's dollar budget as a cap on this turn — null when there is none. */
+  static async readGoalBudgetLimit(
+    context: AgenticContext,
+  ): Promise<{ maxCostDollars: number; spentBeforeTurnDollars: number } | null> {
+    const { conversationId, project, username } = context;
+    if (!conversationId || context.isNewConversation || !project || !username) return null;
+    try {
+      const { default: ConversationGoalService, GOAL_STATUSES } = await import(
+        "./ConversationGoalService.ts"
+      );
+      const goal = await ConversationGoalService.get(conversationId, project, username);
+      const maxCostDollars = goal?.budget?.maxCostDollars;
+      if (goal?.status !== GOAL_STATUSES.ACTIVE || typeof maxCostDollars !== "number") return null;
+      return { maxCostDollars, spentBeforeTurnDollars: goal.spentDollars || 0 };
+    } catch (error: unknown) {
+      logger.warn(
+        `[AgenticLoop] Could not read the goal budget of ${conversationId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return null;
+    }
+  }
+
+  /** The turn paused at its cost cap on this conversation, if any (with its owner). */
+  static async getPendingBudget(
+    conversationId: string,
+  ): Promise<({ isPending: true } & PendingBudgetSnapshot) | { isPending: false }> {
+    const pending = await BudgetPauseRegistry.getPending(resolveLoopKey({ conversationId }));
+    return pending ? { isPending: true, ...pending } : { isPending: false };
+  }
+
+  /**
+   * Raise the cap of the turn paused on this conversation (PATCH
+   * /conversations/:id/budget, or a goal budget PATCH). A pause filed for
+   * another user reads as nothing paused.
+   */
+  static async raiseBudget(
+    conversationId: string,
+    input: BudgetRaiseInput,
+    requester: { username?: string | null } = {},
+  ): Promise<BudgetRaiseOutcome> {
+    const loopKey = resolveLoopKey({ conversationId });
+    const record = await BudgetPauseRegistry.getPendingRecord(loopKey);
+    if (!record) return { status: "not_found" };
+    const asking = requester.username && requester.username !== "any" ? requester.username : null;
+    if (asking && record.username && record.username !== asking) return { status: "not_found" };
+    const outcome = await BudgetPauseRegistry.raise(loopKey, input);
+    if (outcome.status === "raised" && !outcome.delivered) {
+      // No turn here emits the event that would close the "needs you" entry.
+      const { default: ConversationAttentionRegistry } = await import(
+        "./ConversationAttentionRegistry.ts"
+      );
+      ConversationAttentionRegistry.forget([record]);
+    }
+    return outcome;
   }
 
   // ── Harness Discovery API ──────────────────────────────
