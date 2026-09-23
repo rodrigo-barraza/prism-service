@@ -14,7 +14,6 @@ Self-contained task prompts for the items in `docs/harness_modernization_2026-09
 | 13 | `13-durable-run-state.md` | `persist-pending-decisions`, `resume-parked-turns`, `budget-pause` | service, client | L | 05 | 12, 17 |
 | 17 | `17-subagents-modern.md` | `nonblocking-subagent-dispatch`, `agent-definitions-as-files`, `oracle-and-independent-branches` | service | L | 04, 09 | 11, 21 |
 | 19 | `19-skills-progressive-disclosure.md` | `skills-catalog-and-loader`, `skill-folders-and-plugins`, `workspace-instructions` | service, client | L | 07 | 10 (`system-prompt/index.ts`) |
-| 21 | `21-goals-verified-outcomes.md` | `goals-verified-outcomes` | service, client | M | 17 (soft), 13 (soft) | 26 |
 | 22 | `22-security-depth.md` | `memory-provenance`, `quarantined-reader`, `external-input-lane` | service | L | — | 19 (memory/system prompt) |
 | 23 | `23-observability-and-evals.md` | `otel-tracing`, `log-redaction`, `benchmark-reliability` | service | L | — | 10 (`RequestLogger.ts`) |
 | 24 | `24-event-protocol-and-acp.md` | `event-protocol-v1`, `acp-server`, `acp-client-runtime` | service, client | L | — | 26 (client event types) |
