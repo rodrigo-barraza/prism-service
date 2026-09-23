@@ -3,6 +3,9 @@
 > **Landing 1 (`memory-provenance`, service + client) done 2026-09-22:** memories carry `source` / `trust` / `sourceRefs`, decided at write time (`src/services/memory/MemoryProvenance.ts`): assistant text written after untrusted input (web, MCP, third-party-text tools, sub-agent and async-task notices; carried across compaction) is untrusted; extraction cites numbered entries and takes the lowest trust, with a five-word quote backstop; `save_memory` provenance crosses the tools-service hop by trace headers (`memory/SaveMemoryProvenance.ts`). Untrusted → quarantined: never searched or injected, reviewed via `GET /agent-memories?quarantined=true` + `POST /:id/review` (client: Accept / Reject on the card, "needs review" toggle); a user restatement (similarity ≥ 0.8 AND `restates()` word agreement) promotes it. Injection renders quoted data with provenance; consolidation skips quarantined and never raises trust; the envelope neutralizes markers in content. Workflow memories keep the tool sequence but withhold arguments chosen after untrusted input; an unrecorded `save_memory` fails closed; `restates()` works in any language; `POST /agent-memories/review-all` + Accept all / Reject all.
 > Tests: `tests/memoryPoisoning.test.ts` (PMPA red), `tests/memoryQuarantine.test.ts` (quarantine, corroboration, review, rendering, routes, trace hop), `src/services/__tests__/memoryProvenance.test.ts`, `src/utils/__tests__/untrustedEnvelope.test.ts` (red), `memoryConsolidation.test.ts`, `memoryExtractor.test.ts`, `workflowMemoryService.test.ts`; client `src/components/__tests__/memoryCardReview.test.tsx`. Landing 3 can reuse `annotateMessageProvenance` / `untrustedInputProvenance` for its per-turn untrusted spans, and `isExternalContentTool` is now the one list of untrusted tools.
 
+> **Landing 2 (`quarantined-reader`, service) done 2026-09-22:** `read_untrusted({url | resource | tool | content}, schema, question)` (`src/services/tool-definitions/ReadUntrustedTool.ts`) fetches through the tool that owns the source — `tool` covers any third-party-content tool (`read_email`, `mcp__*`) so mail is readable too — and hands the text to `reader/QuarantinedReader`: a no-tools call on the `reader` role (`MODEL_ROLE_READER`, else the utility chain, local first) whose reply must validate against the caller's schema with every object closed; one retry, then `{error, issues}` naming only schema-declared paths. The planner gets `{result}` only, enveloped as untrusted and tainting memory provenance. The approval engine judges the call AS its fetch (`AutoApprovalEngine.explainReaderRead`: deny on either is final, plan mode refuses a network read); a tool-policy section steers pages, mail and MCP resources through it.
+> Tests: `src/services/harnesses/__tests__/readUntrustedIsolation.test.ts` (real loop + Anthropic adapter: the next planner request has the JSON, not the page's sentinel; a `read_web_page` control shows the check sees a leak), `tests/quarantinedReader.test.ts`, `tool-definitions/__tests__/readUntrustedTool.test.ts`, `permissions/__tests__/readUntrustedApproval.test.ts`. Landing 3's live check 3 can use it as is.
+
 > Hand to ONE session per landing: *"Read prism-service/docs/prompts/22-security-depth.md and execute Landing N."*
 > Conventions, gates and the isolated live recipe: `docs/prompts/README.md`. Source: `docs/harness_modernization_2026-09.md` §4.13, §2.1 S6.
 
@@ -18,23 +21,9 @@
 
 ## Today
 - **Memories** carry provenance and are quarantined when untrusted (Landing 1, above).
+- **Quarantined reader.** `read_untrusted` reads third-party text through a no-tools model and returns schema-valid JSON only (Landing 2, above).
 - **Untrusted wrapper.** `wrapUntrustedToolContent` (`FunctionCallingUtilities.ts`) envelopes web, MCP, third-party-text and file-read results; markers inside content are neutralized.
 - **One input lane.** Mailbox entries from sub-agents and webhook- or Discord-originated turns are not distinguished from user input.
-
----
-
-## Landing 2 — `quarantined-reader`
-
-**Changes.**
-- **New tool** `read_untrusted({url? | content? | resource?}, schema, question)`. A **no-tools** reader, preferably the local model role, reads the untrusted content and returns JSON that validates against the caller's schema. The main loop gets only the validated JSON. Raw text never enters the main context unless the user explicitly asks.
-- **Nudges.** Guidance in the tool policy prefers `read_untrusted` for pages, emails and MCP resources flagged untrusted.
-- **Failure handling.** An invalid output gets one retry, then a structured error.
-
-**Tests.**
-- **Reader request shape.** No `tools`; the schema is included.
-- **Isolation.** The main loop's next provider payload contains the JSON and not the raw text. Assert that a sentinel string from the raw content is absent.
-- **Schema failures.** Retry once, then error.
-- **Injection.** An injection string in the content doesn't change the JSON shape. The schema enforces this.
 
 ---
 

@@ -2157,7 +2157,6 @@ export default class ToolOrchestratorService {
       policies: context._policies,
       permissionRules: context._permissionRules,
       permissionMode: context._permissionMode,
-      enableCriticGate: context._enableCriticGate,
       criticModel: context._criticModel,
       maxCostDollars: context._maxCostDollars,
       sharedCostBudget: context._sharedCostBudget,

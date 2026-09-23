@@ -192,14 +192,15 @@ export default class AgenticLoopState {
     | "plan_rejected"
     | "error"
     | "aborted"
-    | "refused";
+    | "refused"
+    /** Auto mode's breaker tripped where nobody could answer (AutoModeGate). */
+    | "auto_mode_stopped";
   /** Spend at the moment the cost cap stopped the loop (null = no stop). */
   costBudgetStop: { spentDollars: number; maxCostDollars: number } | null;
 
   // ── Branch tracking (TreeOfThought) ─────────────────────
   branchesExplored: number;
   branchesBacktracked: number;
-  proactiveBacktracks: number;
   selectedBranchScores: number[];
   frontierCandidates: Array<{
     pass: PassState;
@@ -286,7 +287,6 @@ export default class AgenticLoopState {
 
     this.branchesExplored = 0;
     this.branchesBacktracked = 0;
-    this.proactiveBacktracks = 0;
     this.selectedBranchScores = [];
     this.frontierCandidates = [];
 

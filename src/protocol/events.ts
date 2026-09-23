@@ -328,9 +328,15 @@ const ApprovalRequiredEvent = event("approval_required", {
       isTruncated: z.boolean().optional(),
     })
     .optional(),
-  /** Who asked besides the tier: a PreToolUse hook, or a restart re-asking a call that was running. */
-  requestedBy: z.enum(["hook", "restart"]).optional(),
+  /**
+   * Who asked besides the tier: a PreToolUse hook, a restart re-asking a call
+   * that was running, or auto mode (its classifier asked, failed, or is
+   * paused by its breaker — `reason` says which).
+   */
+  requestedBy: z.enum(["hook", "restart", "classifier"]).optional(),
   reason: z.string().nullable().optional(),
+  /** Auto mode: the classifier's named category (e.g. "Data Exfiltration"). */
+  category: z.string().optional(),
   /** A write to a protected path: it asks in every mode, and "Always allow" cannot stop it asking. */
   protectedPath: z.string().optional(),
   alwaysAsks: z.literal(true).optional(),
@@ -629,6 +635,24 @@ const KnownStatusEvent = z.discriminatedUnion("message", [
     estimatedCost: z.number(),
     maxCostDollars: z.number(),
     iteration: z.number(),
+  }),
+  // The tree reached its cost cap and waits for a raise (PATCH /conversations/:id/budget).
+  status("budget_reached", {
+    pauseId: z.string(),
+    spentDollars: z.number(),
+    /** The cap it reached: the lower of the turn's own and what is left of the goal's. */
+    maxCostDollars: z.number(),
+    limitedBy: z.enum(["turn", "goal"]),
+    iteration: z.number(),
+    turnCapDollars: z.number().optional(),
+    goalMaxCostDollars: z.number().optional(),
+  }),
+  status("budget_resolved", {
+    pauseId: z.string(),
+    action: z.enum(["raise", "stop"]),
+    source: z.enum(["user", "superseded", "turn_ended"]),
+    /** A raise: the cap the tree now runs under (absent when nothing caps it any more). */
+    maxCostDollars: z.number().optional(),
   }),
   status("repetition_detected", { iteration: z.number(), rule: z.literal("repetition"), retry: z.number() }),
   status("semantic_stall_detected", { iteration: z.number(), rule: z.literal("semantic-stall"), retry: z.number() }),

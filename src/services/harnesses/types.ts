@@ -81,6 +81,16 @@ export interface ToolCall {
     /** The user edited the arguments on the approval card; `args` holds the edit. */
     editedByUser?: boolean;
     originalArgs?: Record<string, unknown>;
+    /** `auto` mode: the classifier is to decide (AutoApprovalEngine → ApprovalGate). */
+    awaitsClassifier?: boolean;
+    /** The classifier's named category, when it denied or asked. */
+    category?: string;
+    /** provider/model whose verdict decided, when the classifier did. */
+    classifierModel?: string;
+    /** The card was put out by auto mode (the classifier asked, failed, or is paused). */
+    askedByAutoMode?: boolean;
+    /** An allow rule `auto` mode set aside as too broad. */
+    setAsideRule?: string;
   };
   /**
    * The configured PreToolUse hooks' verdict, stamped BEFORE the approval
@@ -278,9 +288,10 @@ export interface AgenticOptions {
   tools?: ToolSchema[];
   /** Declarative tool call policies (allow/deny/askUser with argument predicates). */
   policies?: PolicyRule[];
-  /** Enable CriticGate multi-model review of dangerous tool calls. */
-  enableCriticGate?: boolean;
-  /** Model to use for CriticGate reviews (resolved from settings). */
+  /**
+   * The auto-mode reviewer's model (stage 2 of AutoModeClassifier), on the
+   * conversation's provider. Unset: MODEL_ROLE_CRITIC, then Settings → critic.
+   */
   criticModel?: string;
   /** Number of parallel branches for TreeOfThought harness (default: 3, max: 5). */
   branchCount?: number;
@@ -290,14 +301,13 @@ export interface AgenticOptions {
   valueThreshold?: number;
   /** Thought structure for the agentic loop: "chain_of_thought" (default single-pass) or "tree_of_thoughts" (parallel branching with scoring). */
   thoughtStructure?: string;
-  /** Skip CriticGate review for this session. */
-  skipCritic?: boolean;
   /** Maximum cost in dollars before the loop terminates with an exhaustion recovery. */
   maxCostDollars?: number;
   /**
    * Shared cost accumulator spanning this loop and every sub-agent it spawns.
-   * Created by AgenticLoopService when maxCostDollars is set; threaded through
-   * the sub-agent tree so delegation cannot escape the budget.
+   * Created by AgenticLoopService when the turn has a cap (maxCostDollars, or
+   * its active goal's dollar budget); threaded through the sub-agent tree so
+   * delegation cannot escape the budget.
    */
   _sharedCostBudget?: import("./lifecycle/CostBudgetEnforcer.ts").SharedCostBudget;
   /**
@@ -317,6 +327,13 @@ export interface AgenticOptions {
    * defaults to `dontAsk` when the conversation names none.
    */
   unattended?: boolean;
+  /**
+   * What the turn does at its cost cap (prompt 13, Landing 3): "pause" parks
+   * it on its user until the cap is raised, "stop" ends it with exhaustion
+   * recovery. Unset: pause, unless the request said nobody answers cards
+   * (autoApprove, unattended) — then stop.
+   */
+  onBudgetReached?: import("#src/constants").BudgetAction;
   /**
    * The turn's live mode handle. Set by AgenticLoopService; a sub-agent gets
    * its parent's (the same object), so a switch reaches the whole tree.
@@ -384,8 +401,16 @@ export interface AgenticContext {
 
 /** What a re-driven turn picks up from the one a restart interrupted. */
 export interface TurnResumeState {
-  /** The pass whose tool batch was in progress — replayed instead of asking the model again. */
-  pass: import("#src/services/TurnRunStore").StoredPass;
+  /**
+   * The pass whose tool batch was in progress — replayed instead of asking
+   * the model again. Null: the turn was paused at its cost cap before a
+   * model call, with no tool batch in progress.
+   */
+  pass: import("#src/services/TurnRunStore").StoredPass | null;
+  /** The iteration the re-driven turn picks up at: its pass's, or the one its budget pause stopped. */
+  iteration: number;
+  /** The tree's spend and the turn's cap when it stopped — the re-driven turn is held to them. */
+  costBudget?: import("#src/services/TurnRunStore").StoredCostBudget | null;
   planModeActive: boolean;
   autoApprove: boolean;
   skillsText?: string | null;

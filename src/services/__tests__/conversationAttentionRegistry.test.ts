@@ -157,6 +157,23 @@ describe("ConversationAttentionRegistry", () => {
     });
   });
 
+  it("a turn paused at its cost cap waits as one approval until the pause is resolved", () => {
+    observe({ type: "status", message: "budget_reached", pauseId: "pause-1", spentDollars: 2, maxCostDollars: 1.5 });
+    expect(attention().pendingApprovalCount).toBe(1);
+    observe({ type: "status", message: "budget_resolved", pauseId: "pause-1", action: "raise", source: "user" });
+    expect(attention()).toEqual({ pendingApprovalCount: 0, pendingQuestionCount: 0, awaitingSince: null });
+
+    // Restored from the store after a restart, forgotten once raised with no turn running.
+    const record = {
+      id: "p", loopKey: CONVERSATION, kind: "budget", itemId: "pause-2", batchId: null, position: 0,
+      status: "pending", createdAt: "2026-09-22T09:00:00.000Z",
+    };
+    ConversationAttentionRegistry.restore([record] as never);
+    expect(attention().pendingApprovalCount).toBe(1);
+    ConversationAttentionRegistry.forget([record] as never);
+    expect(attention().pendingApprovalCount).toBe(0);
+  });
+
   it("keeps conversations apart", () => {
     observe({ type: "approval_required", toolCall: { id: "call-1", name: "write_file" } });
     expect(ConversationAttentionRegistry.get("another-conversation").pendingApprovalCount).toBe(0);

@@ -20,12 +20,18 @@
  *   openai_additional_tools — an `additional_tools` developer input item
  *     (Responses API, GPT-5.4 and later; verified on gpt-5.6-luna).
  *   kimi_system_tools — a content-less `{"role": "system", "tools": [...]}`
- *     message (Kimi K3 only; other Kimi models reject it).
- *   bridge — everything else (Gemini, local models): one fixed `tool_call`
- *     tool whose schema never changes; activated tools are called through
- *     it and dispatched as themselves (lifecycle/ToolSurface.ts).
+ *     message (Kimi K3 on the Chat Completions endpoint only —
+ *     MOONSHOT_TRANSPORT=openai; other Kimi models reject it).
+ *   bridge — everything else (Gemini, local models, and Kimi K3 on its
+ *     default Anthropic-compatible endpoint, which documents no
+ *     `defer_loading`, `tool_reference` or mid-conversation system message —
+ *     platform.kimi.ai/docs/api/messages.md, 2026-09-22): one fixed
+ *     `tool_call` tool whose schema never changes; activated tools are
+ *     called through it and dispatched as themselves
+ *     (lifecycle/ToolSurface.ts).
  */
 import { getModelByName } from "#src/config";
+import { moonshotTransport } from "#config";
 import { resolveProviderBaseType } from "@rodrigo-barraza/utilities-library/taxonomy";
 
 export const TOOL_LOADING_MODES = {
@@ -99,6 +105,19 @@ export function supportsKimiSystemTools(model: string | undefined): boolean {
   return !!model && /^kimi-k3(?:$|[-.])/.test(model);
 }
 
+/**
+ * Whether a Kimi model is served through Moonshot's Anthropic-compatible
+ * endpoint and the Anthropic adapter (catalog flag `anthropicCompatible`,
+ * src/data/models.ts) rather than Chat Completions. MOONSHOT_TRANSPORT=openai
+ * keeps every Kimi model on Chat Completions. providers/moonshot.ts routes
+ * on this, so the loading mode and the wire always agree.
+ */
+export function usesKimiAnthropicEndpoint(model: string | undefined): boolean {
+  if (!model) return false;
+  const definition = getModelByName(model) as { anthropicCompatible?: boolean } | null;
+  return definition?.anthropicCompatible === true && moonshotTransport() === "anthropic";
+}
+
 /** The mode a provider/model pair uses for tools activated mid-conversation. */
 export function resolveToolLoadingMode(
   providerName: string | undefined,
@@ -117,7 +136,11 @@ export function resolveToolLoadingMode(
   if (baseType === "openai" && supportsAdditionalTools(model)) {
     return TOOL_LOADING_MODES.OPENAI_ADDITIONAL_TOOLS;
   }
-  if (baseType === "moonshot" && supportsKimiSystemTools(model)) {
+  if (
+    baseType === "moonshot" &&
+    supportsKimiSystemTools(model) &&
+    !usesKimiAnthropicEndpoint(model)
+  ) {
     return TOOL_LOADING_MODES.KIMI_SYSTEM_TOOLS;
   }
   return TOOL_LOADING_MODES.BRIDGE;

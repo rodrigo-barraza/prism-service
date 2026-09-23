@@ -91,6 +91,25 @@ describe("Lupos persona tool policy", () => {
   );
 });
 
+describe("Lupos persona reactions end the turn", () => {
+  // endTurnAfterTools: a reaction sent with the reply ends the turn, so the
+  // Emoji Reactions section must tell him to write the reply in that same
+  // response — a reaction on its own still costs the extra round.
+  it("names his emoji reaction as fire-and-forget", () => {
+    expect(LuposPersona.endTurnAfterTools).toEqual(["react_to_discord_message"]);
+  });
+
+  it.each([
+    ["en", "write your reply in that same response"],
+    ["caveman", "write reply in SAME response as reaction"],
+  ])("tells him to reply in the same response as the reaction (%s)", (locale, guidance) => {
+    const policy = buildColdStartPolicy(locale);
+    const start = policy.indexOf("react_to_discord_message");
+    expect(start).toBeGreaterThan(-1);
+    expect(policy).toContain(guidance);
+  });
+});
+
 describe("Lupos persona default tools", () => {
   // Image requests are half his traffic, and an edit of a picture already in
   // the channel never names a drawing verb for pre-flight discovery to match

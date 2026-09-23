@@ -7,31 +7,20 @@
 > Tests: `src/protocol/__tests__/` (harness contract, error mapping, transcripts, taxonomy, sync), `tests/eventProtocolRoutes.test.ts`; client `src/services/__tests__/protocolEvents.test.ts` and its sync test.
 > Landings 2–3 build on it: the ACP server maps `TurnEvent`s, never raw records.
 
+> **Landing 2 (`acp-server`) is done.** `node src/acp/server.ts` speaks ACP v1 (`@agentclientprotocol/sdk` 1.5.0, pinned) over stdio and drives prism-service over HTTP/SSE and `/ws/chat`: session = conversation, permission modes as session modes, approvals/plans/questions ↔ `request_permission` / `elicitation`, cancel → `/agent/stop`, background work followed to its answer. Setup (Zed) and the mapping: `docs/acp.md`.
+> Tests: `src/acp/__tests__/` (translator on the recorded live transcript, stdio conformance against a mocked prism-service with every message checked against ACP's schemas, config/parsing).
+> Landing 3's runtime is the other direction (Prism as the ACP client); `src/acp/TurnTranslator.ts` is the event mapping to mirror.
+
 **Repos:** prism-service, prism-client (Landing 1 types) · **Size:** L · **Depends on:** — · **Shares hubs with:** 26 (the client event types: land Landing 1 before or together with 26 Landing 2; coordinate).
 
 ## Today
 - **Streams.** SSE drives a turn and a WebSocket views it (`src/utils/DirectViewerBroadcast.ts`, `src/websocket/index.ts`). Events carry a per-conversation `seq`.
 - **The event protocol** (Landing 1): `docs/protocol.md`; every event is a `TurnEvent` from `src/protocol/events.ts`, errors carry `{code, retryable, provider?, status?}`.
-- **No ACP, A2A or AG-UI.**
+- **ACP, one way** (Landing 2): editors drive Prism through `src/acp/server.ts` (`docs/acp.md`). Prism cannot yet delegate to an ACP agent. No A2A or AG-UI.
 
 ## Reference
 - **Agent Client Protocol (ACP).** How editors (Zed, JetBrains) and harnesses (Kiro, Devin Desktop, Qwen Code's `executor`, OpenHands) drive agents. Read the current spec and the official TypeScript library at https://agentclientprotocol.com before coding, and pin the version you implement.
 - **Typed stream-json with `retryable` errors.** Antigravity CLI 1.1.8 / 1.2.6, and Claude Code headless mode.
-
----
-
-## Landing 2 — `acp-server`
-
-**Changes.**
-- **An ACP server entry point**, `node src/acp/server.ts`, speaking JSON-RPC over stdio. It talks to a prism-service over HTTP/SSE using env `PRISM_URL` and project/user headers, and an auth header once prompt #1 exists.
-- **Methods:** `initialize`, `session/new` (which maps to a Prism conversation and agent), `session/prompt` (streaming `session/update`: message chunks, tool calls with status, plans and todos), permission requests mapped to Prism approvals (prompt 05) and back, and `session/cancel` → `/agent/stop`.
-- **Setup doc:** configuring Zed's custom agent to launch it.
-
-**Tests.**
-- **Conformance** with a scripted ACP client over stdio pipes (spawn the server; the test drives JSON-RPC): initialize → new → prompt → updates stream → a permission request round-trip → cancel. Use a mocked Prism HTTP backend replaying fixtures.
-- **Malformed input.** Malformed JSON-RPC gets a proper error response, not a crash.
-
-**Live.** Point the server at the isolated local prism-service. Drive it with the scripted client; manually in Zed if it's installed (optional, with screenshots).
 
 ---
 

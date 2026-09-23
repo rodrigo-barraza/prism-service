@@ -34,7 +34,6 @@ import {
   PERMISSION_MODE_DESCRIPTIONS,
   PERMISSION_MODE_LABELS,
   canUseBypass,
-  isAutoModeClassifierAvailable,
   type PermissionMode,
 } from "#src/services/permissions/PermissionModes";
 import {
@@ -193,11 +192,14 @@ router.post(
       );
 
       const persona = agent ? AgentPersonaRegistry.get(agent) : null;
+      // An agent that pins its mode is judged in it, with full auto off —
+      // as its turns are (resolveTurnPermissionMode).
+      const pinned = persona?.pinnedPermissionMode ?? null;
       const engine = new AutoApprovalEngine({
-        fullAuto: autoApprove === true,
+        fullAuto: autoApprove === true && !pinned,
         policies: persona?.policies ?? [],
         permissionRules: ruleSet,
-        permissionMode: permissionMode ?? null,
+        permissionMode: pinned ?? permissionMode ?? null,
       });
       const explanation = engine.explain({ id: "test", name: toolName, args });
       const decision = explanation.isDenied ? "deny" : explanation.isApproved ? "allow" : "ask";
@@ -213,7 +215,6 @@ router.post(
 /** Every mode, with whether THIS user can pick it and why not. */
 function describeModes(username: string) {
   const bypassAllowed = canUseBypass(username);
-  const classifier = isAutoModeClassifierAvailable();
   return PERMISSION_MODES.map((id: PermissionMode) => ({
     id,
     label: PERMISSION_MODE_LABELS[id],
@@ -221,8 +222,6 @@ function describeModes(username: string) {
     available: id === "bypass" ? bypassAllowed : true,
     ...(id === "bypass" &&
       !bypassAllowed && { unavailableReason: `Owner only: add the username to ${BYPASS_OWNERS_ENV_VAR}.` }),
-    ...(id === "auto" &&
-      !classifier && { note: "The classifier arrives in a later release; until then auto mode asks where it would decide." }),
   }));
 }
 
@@ -265,6 +264,12 @@ router.put(
       if (mode === "bypass" && !canUseBypass(username)) {
         return res.status(403).json({
           error: `bypass is owner-only: "${username}" is not in ${BYPASS_OWNERS_ENV_VAR}.`,
+        });
+      }
+      const runningTurn = PermissionModeRegistry.get(conversationId);
+      if (runningTurn?.pinned) {
+        return res.status(409).json({
+          error: `This turn's agent pins its permission mode (${runningTurn.mode}); it cannot be switched.`,
         });
       }
       const stored = await ConversationApprovalSettings.setPermissionMode(

@@ -19,6 +19,8 @@ export class ConversationUtils {
       const parentAgent = Array.from(activeSubAgents.values()).find(
         (subAgent) => subAgent.subAgentConversationId === currentId,
       );
+      // Recorded at its spawn — still right after an ancestor was evicted.
+      if (parentAgent?.rootConversationId) return parentAgent.rootConversationId;
       if (parentAgent && parentAgent.parentConversationId) {
         currentId = parentAgent.parentConversationId;
       } else {

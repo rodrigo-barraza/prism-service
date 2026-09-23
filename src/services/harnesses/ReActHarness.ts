@@ -87,13 +87,15 @@ import {
   maybeInjectSystemReminder,
   cleanupReminderCache,
 } from "./lifecycle/SystemReminderInjector.ts";
-import { checkCostBudget } from "./lifecycle/CostBudgetEnforcer.ts";
+import { enforceCostBudget } from "./lifecycle/CostBudgetEnforcer.ts";
+import { recordBudgetPause } from "./lifecycle/TurnRunRecorder.ts";
 import {
   partitionResumedCalls,
   replayPassStream,
   stampResumedCalls,
 } from "./lifecycle/ResumedPass.ts";
 import { recordPassInFlight } from "./lifecycle/TurnRunRecorder.ts";
+import { endTurnAfterToolsOf, endsTurnWithReply } from "./lifecycle/EndTurnAfterTools.ts";
 import { GoalRun } from "./lifecycle/GoalGate.ts";
 import SemanticStallDetector from "./lifecycle/SemanticStallDetector.ts";
 
@@ -301,6 +303,9 @@ export default class ReActHarness extends BaseAgenticHarness {
     // ── Semantic stall detector ──────────────────────────────
     const semanticStallDetector = new SemanticStallDetector();
 
+    // Tools whose result the model never needs to read (Persona.endTurnAfterTools).
+    const fireAndForgetTools = endTurnAfterToolsOf(agent);
+
     // ── Initialize lifecycle hooks ──────────────────────────
     const standardHooks = createStandardHooks({
       workspaceRoot: workspaceRoot || undefined,
@@ -308,8 +313,6 @@ export default class ReActHarness extends BaseAgenticHarness {
       policies: options.policies,
       permissionRules: options._permissionRules,
     permissionMode: options._permissionMode,
-      enableCriticGate: options.enableCriticGate === true,
-      criticModel: options.criticModel || undefined,
     });
     const { hooks, approvalEngine } = standardHooks;
 
@@ -518,6 +521,12 @@ export default class ReActHarness extends BaseAgenticHarness {
           // without this, the assistant message with tool results can fall
           // outside the persistence slice and tool results are lost.
           state.originalMessageCount = currentMessages.length;
+
+          // Pre-flight picks the loop routes through activation
+          // (Persona.activatePreflightTools): the system prompt above was
+          // assembled from the declared tools alone, and the picks arrive
+          // here, after the user's message, as one tool-update message.
+          this.checkAndApplyToolSetChanges(currentMessages);
         }
 
         // ── Build pass options ─────────────────────────────────
@@ -549,6 +558,23 @@ export default class ReActHarness extends BaseAgenticHarness {
           currentMessages,
           this.tools.finalTools.length,
         );
+
+        // ── Cost cap, before the model is asked again ──────────
+        // Spend that crossed the cap since the last pass's check (a pass
+        // that called no tool, a sub-agent's) pauses the turn here, before
+        // another request is bought. Checkpointed first, and marked, so a
+        // restart re-drives the turn from this point.
+        if (
+          !replayPass &&
+          (await enforceCostBudget(context, state, {
+            beforePause: async () => {
+              await this.checkpointTurnProgress(currentMessages);
+              await recordBudgetPause(context, state.iterations);
+            },
+          }))
+        ) {
+          break;
+        }
 
         // ── Create per-iteration pass state ────────────────────
         const pass = this.createPassState(passOptions, { replayed: !!replayPass });
@@ -791,10 +817,6 @@ export default class ReActHarness extends BaseAgenticHarness {
         if (signal?.aborted) break;
         this.emitUsageUpdate();
 
-        if (checkCostBudget(state, context.resolvedModel, options.maxCostDollars, emit, { budget: options._sharedCostBudget, loopId: agentConversationId })) {
-          break;
-        }
-
         // ── Tool execution ─────────────────────────────────────
         if (pass.pendingToolCalls.length > 0) {
           // A `tool_call(name, args)` bridge call becomes the call it names
@@ -810,6 +832,13 @@ export default class ReActHarness extends BaseAgenticHarness {
           // On record before any card or tool sees the calls, so a restart
           // can re-drive this batch (TurnRunRecorder).
           await recordPassInFlight(context, state, pass);
+
+          // ── Cost cap ─────────────────────────────────────────
+          // The pass that crossed the cap runs nothing: the turn pauses
+          // until its user raises the cap (or stops at it — see
+          // CostBudgetEnforcer). A pass with no tool call is not stopped
+          // here; its answer stands, and the next model call is checked.
+          if (await enforceCostBudget(context, state)) break;
 
           // Calls of a replayed pass that finished before the restart
           // already ran: their recorded result stands, unasked (ResumedPass)
@@ -834,7 +863,10 @@ export default class ReActHarness extends BaseAgenticHarness {
             state,
           );
 
-          const { executableToolCalls, blockedResults, shouldApproveAll } =
+          // The transcript so far — what auto mode's classifier reads (its
+          // tool calls, never their results) and what history-aware tools use.
+          context._currentMessages = currentMessages;
+          const { executableToolCalls, blockedResults, shouldApproveAll, stopTurnReason } =
             await checkAndWaitForApproval(
               preToolUse.executable,
               context,
@@ -844,9 +876,8 @@ export default class ReActHarness extends BaseAgenticHarness {
           if (shouldApproveAll) options.autoApprove = true;
 
           // Denied calls (rule, PreToolUse or PermissionRequest hook, the
-          // user) never run; every call the gate cleared runs in one batch.
-          // Results keep the model's order.
-          context._currentMessages = currentMessages;
+          // classifier, the user) never run; every call the gate cleared
+          // runs in one batch. Results keep the model's order.
           const callsToRun = [...executableToolCalls, ...resumedFinished];
           const executedResults =
             callsToRun.length > 0
@@ -944,9 +975,28 @@ export default class ReActHarness extends BaseAgenticHarness {
             }
           }
 
+          // The reply came with nothing but fire-and-forget calls
+          // (Persona.endTurnAfterTools, EndTurnAfterTools.ts): once they have
+          // run, the turn ends with that reply instead of another model call —
+          // unless input is waiting for an answer in this same turn.
+          const endsWithReply =
+            !stopTurnReason &&
+            !isPlanRejected &&
+            !state.planModeActive &&
+            !signal?.aborted &&
+            endsTurnWithReply({
+              calls: bridge.callable,
+              rejectedCount: bridge.rejected.length,
+              replyText: pass.finalStreamedText,
+              fireAndForget: fireAndForgetTools,
+            }) &&
+            !hasPendingTurnInput(context);
+
           const assistantMessage: ConversationMessage = {
             role: "assistant",
-            content: pass.finalStreamedText || "",
+            // Ending here, the reply is the turn's final message (finalize
+            // appends it and records it as the turn's text): not kept twice.
+            content: endsWithReply ? "" : pass.finalStreamedText || "",
             thinking: pass.streamedThinking.trim(),
             thinkingSignature: pass.thinkingSignature,
             ...computePassPhaseDurations(pass),
@@ -968,6 +1018,43 @@ export default class ReActHarness extends BaseAgenticHarness {
               stc.result = res.result;
               stc.durationMilliseconds = res.durationMilliseconds;
             }
+          }
+
+          // Auto mode's breaker tripped and nobody is watching to answer: the
+          // turn ends here, and the summary pass (ExhaustionRecovery) tells
+          // the user what was refused and what they would have to allow.
+          if (stopTurnReason) {
+            state.conversationOutcome = "auto_mode_stopped";
+            emit({ type: SERVER_SENT_EVENT_TYPES.STATUS, message: `Auto mode stopped this run: ${stopTurnReason}` });
+            this.logIteration(pass, currentMessages);
+            break;
+          }
+
+          if (endsWithReply) {
+            // Where the turn would end, Stop hooks have their say, as after
+            // a text answer.
+            const stopOutcome = await runStopStage(
+              context,
+              hooks,
+              state,
+              pass.finalStreamedText,
+              currentMessages,
+            );
+            if (!stopOutcome.continueWith || signal?.aborted) {
+              logger.info(
+                `[ReActHarness] ${pass.pendingToolCalls.map((toolCall) => toolCall.name).join(", ")} came with the reply — ` +
+                  `the turn ends on iteration ${state.iterations} without another model call`,
+              );
+              state.finalStreamedText = pass.finalStreamedText;
+              this.logIteration(pass, currentMessages);
+              this.deviationEngine.recordCompletedIteration(pass.pendingToolCalls);
+              hasCleanTextBreak = true;
+              break;
+            }
+            // A Stop hook keeps the turn going: the reply goes back into the
+            // history as the model's own words, then the hook's reason.
+            currentMessages.push({ role: "assistant", content: pass.finalStreamedText });
+            currentMessages.push(buildStopContinuationMessage(stopOutcome.continueWith));
           }
 
           // A rejected (or timed-out) plan ends the turn, but the turn still

@@ -11,7 +11,9 @@ import { checkSelfProtection } from "./permissions/SelfProtection.ts";
 import { strongestVerdict } from "./permissions/PermissionEvaluator.ts";
 import { recordUserApproval } from "./permissions/ApprovalHistory.ts";
 import {
+  delegatesTask,
   isPlanSafe,
+  isTooBroadForAutoMode,
   isWorkspaceEdit,
   planModeDenialReason,
   requiresUserInteraction,
@@ -21,6 +23,7 @@ import {
 } from "./permissions/PermissionModes.ts";
 import { modeOf, type PermissionModeHandle } from "./permissions/PermissionModeState.ts";
 import { findProtectedPathWrite } from "./permissions/ProtectedPaths.ts";
+import { readerFetchCall, type ReaderFetchCall } from "./reader/ReaderSource.ts";
 import type {
   Capability,
   PermissionDecision,
@@ -59,7 +62,13 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   [TOOL_NAMES.GIT_STATUS]: APPROVAL_TIERS.AUTO,
   [TOOL_NAMES.GIT_DIFF]: APPROVAL_TIERS.AUTO,
   [TOOL_NAMES.GIT_LOG]: APPROVAL_TIERS.AUTO,
+  // tools-service's run_git takes only status / diff / log (fs_read). Unmapped,
+  // it asked in `default` and cost a classifier call per look in `auto`.
+  run_git: APPROVAL_TIERS.AUTO,
   [TOOL_NAMES.SUMMARIZE_PROJECT]: APPROVAL_TIERS.AUTO,
+  // A no-tools reader over untrusted text; the read is ALSO judged as the
+  // fetch it makes (explainReaderRead) — this tier covers the text alone
+  read_untrusted: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — task management (agent's own scratchpad, not user files)
   [TOOL_NAMES.CREATE_TASK]: APPROVAL_TIERS.AUTO,
@@ -90,6 +99,11 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   wait_for_tasks: APPROVAL_TIERS.AUTO,
   // run_tool_program only dispatches tier-AUTO tools itself (enforced inside)
   run_tool_program: APPROVAL_TIERS.AUTO,
+  // A sub-agent's status line to its parent; unmapped it fell to WRITE and
+  // asked the user before a delegate could say how far it had got.
+  report_progress: APPROVAL_TIERS.AUTO,
+  // Advice from the oracle model: no tools, no workspace, cost-budgeted.
+  ask_oracle: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — control flow (no side effects)
   [TOOL_NAMES.SLEEP]: APPROVAL_TIERS.AUTO,
@@ -128,9 +142,12 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   [TOOL_NAMES.EDIT_NOTEBOOK]: APPROVAL_TIERS.WRITE,
 
   // Tier 1 — skill discovery and reading (read-only over the caller's
-  // own skills; load_skill is Prism-local, not yet in TOOL_NAMES)
+  // own skills; load_skill and read_skill_file are Prism-local, not yet in
+  // TOOL_NAMES). Reading a bundled script runs nothing: running one is the
+  // shell tool's call, at the shell tool's tier.
   [TOOL_NAMES.LIST_SKILLS]: APPROVAL_TIERS.AUTO,
   load_skill: APPROVAL_TIERS.AUTO,
+  read_skill_file: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — structured output (data formatting only)
   [TOOL_NAMES.EMIT_STRUCTURED_OUTPUT]: APPROVAL_TIERS.AUTO,
@@ -196,6 +213,18 @@ export interface ApprovalResult {
   alwaysAsks?: boolean;
   /** The protected path an `alwaysAsks` write names. */
   protectedPath?: string;
+  /**
+   * `auto` mode: the classifier decides this call. The engine is synchronous
+   * and the classifier is a model, so the ApprovalGate runs it and replaces
+   * this stamp with the verdict (allowed, denied by `classifier`, or asked).
+   */
+  awaitsClassifier?: boolean;
+  /** Set when the classifier denied or asked: the named category (AutoModeClassifier). */
+  category?: string;
+  /** provider/model whose verdict decided, when the classifier did. */
+  classifierModel?: string;
+  /** An allow rule `auto` mode set aside as too broad (isTooBroadForAutoMode). */
+  setAsideRule?: string;
 }
 
 /** `check()` plus the evidence behind it — what the rules page's tester shows. */
@@ -277,6 +306,16 @@ export default class AutoApprovalEngine {
     const handle = this.permissionMode;
     return handle && typeof handle === "object" ? handle.cannotAsk : handle === "dontAsk";
   }
+
+  /**
+   * The persona pinned the run's mode (Persona.pinnedPermissionMode): full
+   * auto — the engine's own flag, a mid-turn "approve all", an explicit
+   * override — does not apply, so the mode and the policies decide alone.
+   */
+  private get modePinned(): boolean {
+    const handle = this.permissionMode;
+    return !!handle && typeof handle === "object" && handle.pinned === true;
+  }
   getTier(toolName: string): ApprovalTier {
     if (this.tierOverrides[toolName] !== undefined) {
       return this.tierOverrides[toolName];
@@ -309,6 +348,53 @@ export default class AutoApprovalEngine {
   }
 
   /**
+   * One call's verdict. A read_untrusted call is judged together with the
+   * fetch it makes (explainReaderRead); every other call by the stack below.
+   */
+  explain(
+    toolCall: ToolCall,
+    overrides: { fullAuto?: boolean } = {},
+  ): ApprovalExplanation {
+    const fetch = readerFetchCall(toolCall);
+    return fetch
+      ? this.explainReaderRead(toolCall, fetch, overrides)
+      : this.explainCall(toolCall, overrides);
+  }
+
+  /**
+   * read_untrusted fetches its source through another tool (ReaderSource)
+   * and hands the output to a no-tools reader. The planner never sees that
+   * output, but the fetch still acts on the world, so the read is judged
+   * as both calls: a deny on either is final, an ask on either asks, and
+   * plan mode refuses a network read as it would the fetch. An explicit
+   * allow on read_untrusted (a rule, policy or hook) answers the fetch's
+   * TIER prompt — so "always allow" on its card does not ask again — but
+   * never a rule the user wrote about the fetch.
+   */
+  private explainReaderRead(
+    toolCall: ToolCall,
+    fetch: ReaderFetchCall,
+    overrides: { fullAuto?: boolean },
+  ): ApprovalExplanation {
+    const own = this.explainCall(toolCall, overrides);
+    if (own.isDenied) return own;
+    const judged = this.explainCall(
+      { id: toolCall.id, name: fetch.name, args: fetch.args } as ToolCall,
+      overrides,
+    );
+    const asFetch = {
+      ...judged,
+      reason: `${toolCall.name} reads through ${fetch.name}: ${judged.reason}`,
+    };
+    if (judged.isDenied) return asFetch;
+    if (!own.isApproved) return own;
+    const ownExplicitAllow =
+      own.layer === "rules" || own.layer === "agent_policy" || own.layer === "hook";
+    if (!judged.isApproved && !(judged.layer === "tier" && ownExplicitAllow)) return asFetch;
+    return ownExplicitAllow ? own : asFetch;
+  }
+
+  /**
    * The permission stack, top to bottom:
    *
    *   1. Self-protection — built in; an agent cannot reach its own
@@ -325,10 +411,16 @@ export default class AutoApprovalEngine {
    *      no mode does.
    *   6. Full auto — everything not stopped above runs.
    *   7. The mode — `bypass` runs everything; `acceptEdits` and `auto` run
-   *      file edits inside the workspace.
-   *   8. The tier — AUTO runs. For the rest, `auto` would consult its
-   *      classifier (Landing 3; until then, and whenever it fails, it asks),
-   *      and every other mode asks.
+   *      file edits inside the workspace; `auto` sends a sub-agent's task to
+   *      its classifier before the sub-agent starts.
+   *   8. The tier — AUTO runs. For the rest, `auto` hands the call to its
+   *      classifier (`awaitsClassifier`: the ApprovalGate runs it — allow,
+   *      deny with a category, or ask; a failure asks), and every other
+   *      mode asks.
+   *
+   * In `auto`, an allow rule broad enough to skip the classifier (any shell
+   * command, any delegation — isTooBroadForAutoMode) is set aside, as Claude
+   * Code drops blanket rules on entering auto mode.
    *
    * Every "ask" is then checked against the run: where nobody can answer
    * (`dontAsk`, an unattended scheduled or timer run), it is a denial that
@@ -345,10 +437,11 @@ export default class AutoApprovalEngine {
    *
    * `overrides.fullAuto` judges the call as if "approve all" were on — the
    * mid-turn switch (options.autoApprove) without rebuilding the engine.
+   * Under a mode a persona pinned, full auto does not apply at all.
    *
    * Every result names the layer (and rule) that decided, and the mode.
    */
-  explain(
+  private explainCall(
     toolCall: ToolCall,
     { fullAuto = this.fullAuto }: { fullAuto?: boolean } = {},
   ): ApprovalExplanation {
@@ -356,6 +449,7 @@ export default class AutoApprovalEngine {
     const tierLabel = TIER_LABELS[tier] || "write";
     const mode = this.mode;
     const cannotAsk = this.cannotAsk;
+    const fullAutoApplies = fullAuto && !this.modePinned;
     const hookPermission = toolCall._hookPermission;
     const hookAsks = hookPermission?.decision === "ask";
     const hookAskReason = `hook_ask${hookPermission?.reason ? `: ${hookPermission.reason}` : ""}`;
@@ -428,7 +522,19 @@ export default class AutoApprovalEngine {
       }
     }
 
-    const decided = strongestVerdict(verdicts);
+    let decided = strongestVerdict(verdicts);
+    let setAsideRule: string | undefined;
+    if (
+      mode === "auto" &&
+      decided?.decision === "allow" &&
+      decided.layer === "rules" &&
+      decided.rule &&
+      isTooBroadForAutoMode(decided.rule, capabilities)
+    ) {
+      setAsideRule = decided.rule;
+      const setAside = decided;
+      decided = strongestVerdict(verdicts.filter((verdict) => verdict !== setAside));
+    }
     const stamp = decided
       ? {
           ...base,
@@ -466,7 +572,7 @@ export default class AutoApprovalEngine {
     if (decided && stamp) {
       switch (decided.decision) {
         case "ask":
-          if (!fullAuto || hookAsks) return ask({ ...stamp, ...(hookAsks && { alwaysAsks: true }) });
+          if (!fullAutoApplies || hookAsks) return ask({ ...stamp, ...(hookAsks && { alwaysAsks: true }) });
           break; // full auto answers "ask" with yes — unless a hook asked too
         case "allow":
           if (hookAsks) {
@@ -484,7 +590,7 @@ export default class AutoApprovalEngine {
     }
 
     // Full Auto mode: everything not denied runs
-    if (fullAuto) {
+    if (fullAutoApplies) {
       return { ...base, isApproved: true, reason: "full_auto", layer: "full_auto" };
     }
 
@@ -498,19 +604,32 @@ export default class AutoApprovalEngine {
       return { ...base, isApproved: true, reason: "workspace_edit", layer: "mode" };
     }
 
+    // `auto` hands the call to its classifier — not through `ask()`: where
+    // nobody can answer, the classifier still decides, and only its "ask"
+    // (or its failure) becomes a denial (ApprovalGate).
+    const toClassifier = (reason: string): ApprovalExplanation => ({
+      ...base,
+      isApproved: false,
+      awaitsClassifier: true,
+      reason,
+      layer: "classifier",
+      ...(setAsideRule && { setAsideRule }),
+    });
+    if (mode === "auto" && delegatesTask(toolCall.name)) {
+      return toClassifier("auto mode: the classifier reads a sub-agent's task before it starts");
+    }
+
     // Tier 1: always auto-approve
     if (tier === APPROVAL_TIERS.AUTO) {
       return { ...base, isApproved: true, reason: "read_only", layer: "tier" };
     }
 
-    // The auto-mode classifier's slot. It isn't here yet (Landing 3), and a
-    // classifier that cannot decide asks — it never allows.
     if (mode === "auto") {
-      return ask({
-        ...base,
-        reason: "auto mode: the classifier is not available, so this asks",
-        layer: "mode",
-      });
+      return toClassifier(
+        setAsideRule
+          ? `auto mode: the classifier decides (the allow rule \`${setAsideRule}\` is too broad for auto mode)`
+          : "auto mode: the classifier decides",
+      );
     }
 
     // Tier 2 and 3: require approval
@@ -529,8 +648,8 @@ export default class AutoApprovalEngine {
       const result = this.check(toolCall);
       // Stamp the approval onto the ORIGINAL tool call object, not just the
       // categorized copy — downstream consumers (ToolExecutor's hook pass,
-      // CriticGate's tier check) receive the originals, and without the stamp
-      // CriticGate sees every call as WRITE tier and never reviews anything.
+      // the auto-mode stage of the ApprovalGate) receive the originals and
+      // read the stamp there.
       toolCall._approval = result;
       if (result.isDenied) {
         denied.push({ ...toolCall, _approval: result });
@@ -542,10 +661,14 @@ export default class AutoApprovalEngine {
     }
 
     if (needsApproval.length > 0 || denied.length > 0) {
+      // `auto` mode's classifier decides some of these; the rest ask a person.
+      const toClassifier = needsApproval.filter((call) => call._approval.awaitsClassifier);
+      const toPerson = needsApproval.filter((call) => !call._approval.awaitsClassifier);
       logger.info(
-        `[AutoApproval] ${autoApproved.length} auto-approved, ${needsApproval.length} need approval` +
-          (needsApproval.length
-            ? `: ${needsApproval.map((approvedToolCall) => approvedToolCall.name).join(", ")}`
+        `[AutoApproval] ${autoApproved.length} auto-approved, ${toPerson.length} need approval` +
+          (toPerson.length ? `: ${toPerson.map((approvedToolCall) => approvedToolCall.name).join(", ")}` : "") +
+          (toClassifier.length
+            ? `; ${toClassifier.length} to the auto-mode classifier: ${toClassifier.map((call) => call.name).join(", ")}`
             : "") +
           (denied.length
             ? `; ${denied.length} denied by policy: ${denied.map((deniedToolCall) => deniedToolCall.name).join(", ")}`
@@ -584,7 +707,7 @@ export default class AutoApprovalEngine {
       }
       // Mid-loop "approve all" flips options.autoApprove without rebuilding
       // this engine — honor it so already-permitted calls aren't blocked.
-      if (context?.options?.autoApprove && !this.fullAuto) {
+      if (context?.options?.autoApprove && !this.fullAuto && !this.modePinned) {
         const result = this.check(toolCall, { fullAuto: true });
         if (result.isDenied || !result.isApproved) return result; // a denial, or an ask no "approve all" answers
         return {

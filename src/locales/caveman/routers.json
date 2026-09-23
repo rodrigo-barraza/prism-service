@@ -10,6 +10,7 @@
     "verdictInstruction": "ONE verdict:",
     "passVerdict": "**PASS** — fully satisfies task. Brief justification.",
     "failVerdict": "**FAIL** — has problem. Specific fix:\n- What wrong or missing\n- What change needed\n- File path, line, code where applicable",
+    "verifyToFail": "FAIL send work back only if check you RAN back it — test, typecheck, schema/output validation (execute_command etc). Run check, quote what failed. FAIL from reading only = advice, work not revised.",
     "verdictFormat": "First line: **PASS** or **FAIL**.",
     "revisionHeader": "Reviewed by {{criticCount}} critic in round {{roundNumber}} — revision needed.",
     "failedCount": "{{failedCount}} critic FAILED. Fix ALL complaint.",
@@ -20,9 +21,7 @@
     "judge": "Judge evaluating competing answer.",
     "evaluateInstruction": "Evaluate all {{actorCount}} answer, select BEST.\nScore: correctness, completeness, code quality, verification.",
     "responseFormat": "JSON object ONLY. No markdown fence, no text outside JSON.",
-    "bestActorDescription": "- `bestActorIndex`: 0-based index of best\n- `verdict`: PASS if complete, FAIL if needs work\n- `feedback`: FAIL→specific fix. PASS→brief justification.",
-    "revisionHeader": "Selected as best — revision needed (round {{roundNumber}}).",
-    "revisionInstructions": "1. Fix ALL issue judge raised\n2. Make specific change\n3. Verify (test, typecheck)\n4. Commit and report\n\nFix — don't restart unless feedback demands."
+    "bestActorDescription": "- `bestActorIndex`: 0-based index of best\n- `verdict`: PASS if complete, FAIL if needs work\n- `feedback`: FAIL→specific fix. PASS→brief justification."
   },
   "divideAndConquer": {
     "planner": "Task decomposition planner.",

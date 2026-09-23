@@ -22,9 +22,9 @@ import type { HookHandlerResult } from "#src/services/hooks/HookRunner";
 /**
  * PromptHookHandler — a hook whose body is a prompt.
  *
- * `CriticGate` is the precedent: an LLM sitting in a `decide` hook, asked a
- * narrow question about a tool call, answering in a fixed format. This is the
- * same machine with the question supplied by the user instead of hard-coded,
+ * The precedent was CriticGate (since rebuilt as auto mode's classifier,
+ * permissions/AutoModeClassifier): an LLM asked a narrow question about a
+ * tool call, answering in a fixed format. This is the same machine with the question supplied by the user instead of hard-coded,
  * which changes exactly one thing and makes it the whole design problem — the
  * template is untrusted, and so is the payload it interpolates.
  *
@@ -37,9 +37,9 @@ import type { HookHandlerResult } from "#src/services/hooks/HookRunner";
  *   2. **Ambiguity fails closed on blocking events.** An unparseable verdict
  *      on `PreToolUse` is not "no opinion" — it is a review that did not
  *      happen, and the most likely reason it did not happen is that something
- *      in the payload steered the model off-format. `CriticGate` reaches the
- *      same conclusion in `critic_ambiguous_fail_closed`; the model can
- *      always re-issue the call and get a clean verdict.
+ *      in the payload steered the model off-format. Auto mode's
+ *      reviewer reaches the same conclusion (an off-format verdict asks);
+ *      the model can always re-issue the call and get a clean verdict.
  *   3. **No extended thinking.** A verdict this small never justifies a
  *      reasoning budget, and this call sits on the tool-call critical path.
  */
@@ -361,7 +361,7 @@ export default async function runPromptHook(
           maxTokens: PROMPT_HOOK_MAX_TOKENS,
           temperature: 0,
           // A verdict never justifies extended thinking, and this call is on
-          // the critical path — same reasoning as CriticGate.
+          // the critical path — same reasoning as auto mode's classifier.
           thinkingEnabled: false,
           reasoningEffort: "none",
           ...(options.signal && { signal: options.signal }),

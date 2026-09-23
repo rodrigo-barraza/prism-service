@@ -1,9 +1,11 @@
 import crypto from "node:crypto";
 import TurnRunStore, {
   type StoredCallState,
+  type StoredCostBudget,
   type StoredPass,
   type StoredToolCall,
 } from "#src/services/TurnRunStore";
+import { recordLoopSpend } from "./CostBudgetEnforcer.ts";
 import { resolveLoopKey } from "#src/services/LoopKey";
 import { conversationCollectionFor } from "#src/services/conversation/ConversationRunState";
 import { TURN_RESUME } from "#src/constants";
@@ -12,15 +14,18 @@ import type { AgenticContext, PassState, ToolCall } from "#src/services/harnesse
 
 /**
  * TurnRunRecorder — writes a running turn's progress into TurnRunStore, so
- * a restart can re-drive it (TurnResumeService). Four moments:
+ * a restart can re-drive it (TurnResumeService). Five moments:
  *
  *   - every checkpoint (the top of an iteration): the loop state, and on
  *     the first one the request and system prompt the turn runs with;
  *   - a pass that asked for tools: the pass itself, BEFORE the approval
- *     gate or any tool sees its calls — a card or a tool never runs for a
- *     pass the record does not hold;
+ *     gate, the cost cap or any tool sees its calls — a card or a tool
+ *     never runs for a pass the record does not hold;
  *   - each call as it starts and as it finishes (with the result the loop
  *     acts on);
+ *   - a budget pause and a raise: the tree's spend and the turn's cap
+ *     (they also ride on every checkpoint and pass), and the iteration a
+ *     pause before a model call stopped at;
  *   - the end of the turn: the record is dropped.
  *
  * Only root turns that came through handleAgent (`context.request`) are
@@ -67,6 +72,17 @@ function recordingFor(context: AgenticContext): Recording | null {
   return recording;
 }
 
+/**
+ * The tree's spend and the turn's cap, as a restart must carry them — with
+ * this loop's latest spend recorded into the budget first. Null: no cap.
+ */
+function costBudgetOf(context: AgenticContext, state?: AgenticLoopState): StoredCostBudget | null {
+  const budget = context.options?._sharedCostBudget;
+  if (!budget) return null;
+  if (state) recordLoopSpend(context, state);
+  return { spentDollars: budget.totalSpentDollars(), turnCapDollars: budget.turnCapDollars };
+}
+
 /** The checkpoint at the top of an iteration. */
 export async function recordTurnCheckpoint(
   context: AgenticContext,
@@ -80,6 +96,7 @@ export async function recordTurnCheckpoint(
     planModeActive: state.planModeActive,
     autoApprove: context.options.autoApprove === true,
     permissionMode: modeHandle?.mode ?? null,
+    costBudget: costBudgetOf(context, state),
   };
   if (recording.begun) {
     await TurnRunStore.checkpoint(recording.loopKey, recording.turnId, loop);
@@ -146,11 +163,29 @@ export async function recordPassInFlight(
     ...(pass.reasoningItems?.length ? { reasoningItems: pass.reasoningItems } : {}),
     ...(pass.providerResponseId ? { providerResponseId: pass.providerResponseId } : {}),
     toolCalls: pass.pendingToolCalls.map(storedCall),
-    calls: pass.replayed ? { ...(context.resume?.pass.calls ?? {}) } : {},
+    calls: pass.replayed ? { ...(context.resume?.pass?.calls ?? {}) } : {},
   };
   recording.passIteration = stored.iteration;
   recording.passCalls = pass.pendingToolCalls.map(({ id, name }) => ({ id, name }));
   await TurnRunStore.recordPass(recording.loopKey, recording.turnId, stored);
+  // The pass's own spend: the cost cap judges this pass next.
+  const costBudget = costBudgetOf(context, state);
+  if (costBudget) await TurnRunStore.recordCostBudget(recording.loopKey, recording.turnId, costBudget);
+}
+
+/** The tree's spend and the turn's cap, now (a budget pause, a raise). Root turns only. */
+export async function recordCostBudget(context: AgenticContext): Promise<void> {
+  const recording = recordingFor(context);
+  const costBudget = costBudgetOf(context);
+  if (!recording?.begun || !costBudget) return;
+  await TurnRunStore.recordCostBudget(recording.loopKey, recording.turnId, costBudget);
+}
+
+/** The turn paused at its cap before this iteration's model call — re-drivable from here. */
+export async function recordBudgetPause(context: AgenticContext, iteration: number): Promise<void> {
+  const recording = recordingFor(context);
+  if (!recording?.begun) return;
+  await TurnRunStore.recordBudgetPause(recording.loopKey, recording.turnId, iteration);
 }
 
 function callIndex(recording: Recording, toolCall: ToolCall): number {

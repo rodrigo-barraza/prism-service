@@ -858,10 +858,9 @@ describe("ToolOrchestratorService", () => {
         thinkingBudget: 2000,
         workspaceEnabled: true,
         // Safety envelope inherited by sub-agents (A1/C8): approval mode,
-        // policies, critic settings, and cost budget from the parent loop.
+        // policies, auto-mode reviewer model, and cost budget from the parent loop.
         autoApprove: false,
         policies: undefined,
-        enableCriticGate: undefined,
         criticModel: undefined,
         maxCostDollars: undefined,
         sharedCostBudget: undefined,

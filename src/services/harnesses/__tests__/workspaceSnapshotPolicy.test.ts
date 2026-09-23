@@ -98,14 +98,14 @@ vi.mock("../lifecycle/SystemReminderInjector.ts", () => ({
   maybeInjectSystemReminder: vi.fn().mockResolvedValue(undefined),
   cleanupReminderCache: vi.fn(),
 }));
-vi.mock("../lifecycle/CostBudgetEnforcer.ts", () => ({ checkCostBudget: vi.fn().mockReturnValue(false) }));
+vi.mock("../lifecycle/CostBudgetEnforcer.ts", () => ({ checkCostBudget: vi.fn().mockReturnValue(false), enforceCostBudget: vi.fn().mockResolvedValue(false), recordLoopSpend: vi.fn() }));
 vi.mock("#src/utils/FunctionCallingUtilities", () => ({
   expandMessagesForFunctionCall: vi.fn().mockImplementation((messages: unknown[]) => messages),
 }));
 vi.mock("#src/services/ToolContext", () => ({ default: { getStore: vi.fn().mockReturnValue(new Map()) } }));
 vi.mock("#src/services/FileService", () => ({ default: { upsertFile: vi.fn().mockResolvedValue(undefined) } }));
 vi.mock("#src/services/WebhookEventBus", () => ({ default: { emit: vi.fn() } }));
-vi.mock("#src/services/AgentPersonaRegistry", () => ({ default: { isAgentProject: () => false } }));
+vi.mock("#src/services/AgentPersonaRegistry", () => ({ default: { isAgentProject: () => false, get: () => undefined } }));
 
 // The tools themselves: the real ToolExecutor dispatches through this.
 const executeToolMock = vi.fn();

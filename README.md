@@ -17,6 +17,10 @@ Configuration is environment variables, read by `config.ts`. At boot, `boot.ts` 
 
 OpenTelemetry traces are off by default. Point `OTEL_EXPORTER_OTLP_ENDPOINT` (or `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`) at an OTLP/HTTP collector and `boot.ts` exports, per the GenAI semantic conventions, one `invoke_agent` span per agent turn with a `chat` span per model call and an `execute_tool` span per tool call beneath it; a sub-agent's turn nests under the call that spawned it. The standard `OTEL_*` variables (service name, sampler, headers) apply. Tool calls send W3C `traceparent` to tools-service, which forwards it on its own outgoing calls, and to MCP servers (HTTP header and `params._meta`). Span and attribute names: `src/services/Tracing.ts`.
 
+### Secrets in logs
+
+Request rows (and their webhook copies, and the rows prompt/agent hooks write for their payloads) and every logger line are written with credentials masked to `***<last4>`: provider key shapes, PEM keys, JWTs, `Bearer`/`Basic` values, URL passwords, secret assignments (`X_API_KEY=…`, `"password": …`), and the values of the environment variables whose names end like a secret (`_API_KEY`, `_SECRET`, `_TOKEN`, `_PASSWORD`, `_CREDENTIALS`, …; a URL's password from any variable). `PRISM_LOG_REDACTION_DENYLIST` adds more: comma- or newline-separated literals, or `/regex/flags`. Rules and their false-positive corpus: `src/utils/SecretRedaction.ts` and its tests.
+
 ## Provider Capabilities
 
 | Provider | Text | Stream | TTS | STT | Image | Vision | Embed | Think | Search | Code |
@@ -43,8 +47,25 @@ LM Studio, Ollama, llama.cpp, vLLM and SGLang servers are registered from indexe
 | `PROVIDER_<TYPE>_<N>_CONCURRENCY` | Requests Prism sends it at once (default 1) |
 | `PROVIDER_<TYPE>_<N>_NICKNAME` | Label shown in the client, e.g. `Desktop` |
 | `PROVIDER_<TYPE>_<N>_API_KEY` | Bearer token for a server started with an API key (SGLang only) |
+| `PROVIDER_VLLM_<N>_PRIORITY_SCHEDULING` | `true` for a vLLM server started with `--scheduling-policy priority`: background calls (memory extraction) then carry `X-Vllm-Priority: 10`, so interactive turns are served first. Leave unset otherwise — a server without priority scheduling rejects a non-zero priority. |
 
 `<TYPE>` is `LM_STUDIO`, `OLLAMA`, `LLAMA_CPP`, `VLLM` or `SGLANG`; `<N>` runs from 1 to 10.
+
+### Model profiles and local models
+
+`src/providers/ModelProfiles.ts` holds what each model's request surface accepts: the sampling parameters it rejects, its effort range, the `tool_choice` modes it takes, its caching mechanisms and its prompt/tool budget. The provider registry applies it to every text generation call before the adapter sees the options.
+
+- **Constrained output.** On vLLM, function tools are sent `strict: true` for model families whose tool parser supports it (Qwen, Llama 3, gpt-oss), and a JSON-schema response goes as `structured_outputs` (vLLM 0.12+) or `guided_json` (older servers, by `/version`). llama-server gets a JSON-schema response as `response_format` and constrains tool calls itself (`--jinja`).
+- **Lightweight budget.** A local model whose name declares 14B parameters or fewer gets at most 12 tools (discovery tools included, so it can enable more), no sub-agent or async-task tools, and a system prompt without the directory tree or the orchestrator addendum.
+
+### Cloud transport switches
+
+| Variable | Default | Other value |
+|---|---|---|
+| `OPENAI_RESPONSES_TRANSPORT` | `websocket` — GPT-6 turns stream over the Responses WebSocket (native steering, incremental continuation); falls back to HTTP when the socket fails | `http` |
+| `GEMINI_TRANSPORT` | `generate_content` | `interactions` — the Interactions API prototype |
+| `MOONSHOT_TRANSPORT` | `anthropic` — Kimi K3 through Moonshot's Anthropic-compatible endpoint and the Anthropic adapter | `openai` — the OpenAI-compatible Chat Completions path |
+| `MOONSHOT_CACHE_TTL` | `5m` — Kimi K3's top-level `cache_control` TTL | `1h` (cache writes cost twice as much) |
 
 ### SGLang
 
@@ -99,6 +120,10 @@ Prism reads the model list and context window from `/v1/models`, and the parsers
 | `/ws/chat` | Streaming chat |
 | `/ws/text-to-audio` | Streaming TTS (binary audio frames) |
 | `/ws/live` | Persistent bidirectional Live API (Gemini Live) |
+
+### Editors (ACP)
+
+`node src/acp/server.ts` is an [Agent Client Protocol](https://agentclientprotocol.com) agent: Zed and other ACP editors drive a Prism conversation through it (JSON-RPC over stdio → this service's HTTP API). Setup and the event mapping: `docs/acp.md`.
 
 ### Admin (requires `x-admin-secret`)
 

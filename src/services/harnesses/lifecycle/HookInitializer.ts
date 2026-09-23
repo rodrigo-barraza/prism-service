@@ -5,7 +5,6 @@ import MemoryExtractor from "#src/services/MemoryExtractor";
 import ConversationEmbeddingService from "#src/services/ConversationEmbeddingService";
 import WorkflowMemoryService from "#src/services/WorkflowMemoryService";
 import ConversationGoalService from "#src/services/ConversationGoalService";
-import CriticGate from "./CriticGate.ts";
 import type { PolicyRule } from "#src/services/PolicyEngine";
 import type PermissionRuleSet from "#src/services/permissions/PermissionRuleSet";
 import type { PermissionModeHandle } from "#src/services/permissions/PermissionModeState";
@@ -35,10 +34,6 @@ interface HookInitOptions {
   permissionRules?: PermissionRuleSet | null;
   /** The turn's permission mode handle, passed to AutoApprovalEngine. */
   permissionMode?: PermissionModeHandle | null;
-  /** Enable CriticGate multi-model review of dangerous tool calls. */
-  enableCriticGate?: boolean;
-  /** Model to use for CriticGate reviews. */
-  criticModel?: string;
 }
 
 /** Create a fully wired AgentHooks instance with standard lifecycle hooks. */
@@ -48,23 +43,11 @@ export function createStandardHooks({
   policies,
   permissionRules,
   permissionMode,
-  enableCriticGate = false,
-  criticModel,
 }: HookInitOptions = {}) {
   const hooks = new AgentHooks();
 
-  // CriticGate: registered first as a 'decide' hook so it short-circuits
-  // before AutoApprovalEngine if the critic denies a dangerous tool call.
-  if (enableCriticGate) {
-    const criticGate = new CriticGate({ model: criticModel });
-    hooks.register(
-      "beforeToolCall",
-      criticGate.createHook() as HookHandler,
-      "CriticGate",
-      "decide",
-    );
-  }
-
+  // Auto mode's classifier (the rebuilt CriticGate) is not a hook: it
+  // decides inside the ApprovalGate, before any card (AutoModeGate).
   const approvalEngine = new AutoApprovalEngine({
     fullAuto: autoApprove === true,
     policies: policies || [],

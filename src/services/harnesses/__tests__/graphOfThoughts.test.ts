@@ -38,6 +38,8 @@ vi.mock("#src/services/harnesses/lifecycle/ExhaustionRecovery", () => ({
 
 vi.mock("#src/services/harnesses/lifecycle/CostBudgetEnforcer", () => ({
   checkCostBudget: vi.fn().mockReturnValue(false),
+  enforceCostBudget: vi.fn().mockResolvedValue(false),
+  recordLoopSpend: vi.fn(),
 }));
 
 vi.mock("#src/services/harnesses/lifecycle/ApprovalGate", () => ({
@@ -142,7 +144,6 @@ describe("GraphOfThoughtsStrategy", () => {
       iterations: 0,
       branchesExplored: 0,
       branchesBacktracked: 0,
-      proactiveBacktracks: 0,
       selectedBranchScores: [],
       originalMessageCount: 1,
       planModeActive: false,
@@ -409,7 +410,7 @@ describe("GraphOfThoughtsStrategy", () => {
     expect(synthesisPromptContent).toContain("Branch 3");
   });
 
-  it("should perform proactive backtracking when all branches score below threshold in GoT", async () => {
+  it("should synthesize from the best branch — not discard and redo the round — when all score below threshold in GoT", async () => {
     mockAgenticContext.options.branchCount = 2;
     mockAgenticContext.options.valueThreshold = 8.0;
     mockAgenticContext.options.maxIterations = 2;
@@ -426,9 +427,12 @@ describe("GraphOfThoughtsStrategy", () => {
 
     const graphOfThoughtsResult = await runGraphOfThoughts(mockHarnessInstance as any);
 
+    // The scorer selects; it cannot verify, so it never sends the round
+    // back (prompt 17 L3 — see independentBranches.test.ts).
     expect(graphOfThoughtsResult).toBeDefined();
-    expect(mockAgenticLoopState.branchesBacktracked).toBe(1);
-    expect(graphOfThoughtsResult.messages.some((msg: any) => msg.content && msg.content.includes("PROACTIVE BACKTRACK"))).toBe(true);
+    expect(mockAgenticLoopState.branchesBacktracked).toBe(0);
+    expect(mockAgenticLoopState.selectedBranchScores).toEqual([4]);
+    expect(graphOfThoughtsResult.messages.some((msg: any) => msg.content && msg.content.includes("PROACTIVE BACKTRACK"))).toBe(false);
   });
 
   it("should support system prompt assembly, skills status emission, and planFirst status in BFS/DFS mode in GoT", async () => {

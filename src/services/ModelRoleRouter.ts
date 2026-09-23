@@ -13,6 +13,7 @@ import SettingsService from "#src/services/SettingsService";
 import { isTransientProviderError } from "#src/utils/ProviderStreamResilience";
 import { ProviderError } from "#src/utils/errors";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
+import { runWithRequestPriority } from "#src/services/RequestPriority";
 import logger from "#src/utils/logger";
 
 // ────────────────────────────────────────────────────────────
@@ -32,8 +33,8 @@ import logger from "#src/utils/logger";
 //   4. Built-in defaults — for `utility`: the first configured local
 //      instance (vLLM / LM Studio / Ollama / llama-cpp) with a
 //      discoverable model, else the cheapest available cloud model.
-//      `critic`, `memory`, `compaction` and `classifier` default to the
-//      utility chain.
+//      `critic`, `memory`, `compaction`, `classifier` and `reader` default
+//      to the utility chain.
 //
 // The conversation-level roles (`main`, `subagent`, `oracle`) resolve
 // to ONE decision, not a chain: routing/RoleModelResolver.
@@ -74,6 +75,11 @@ export const MODEL_ROLES = {
   COMPACTION: "compaction",
   /** Short labelling calls (prompt 12's auto-mode classifier). */
   CLASSIFIER: "classifier",
+  /**
+   * The quarantined reader (read_untrusted): a no-tools call that turns
+   * untrusted text into schema-valid JSON. A local model by default.
+   */
+  READER: "reader",
 } as const;
 
 /** Roles whose default is the utility chain. */
@@ -82,6 +88,7 @@ const UTILITY_DERIVED_ROLES: ReadonlySet<string> = new Set([
   MODEL_ROLES.MEMORY,
   MODEL_ROLES.COMPACTION,
   MODEL_ROLES.CLASSIFIER,
+  MODEL_ROLES.READER,
 ]);
 
 /** Extensible — any string is a valid role; the named ones get defaults. */
@@ -412,6 +419,11 @@ export default class ModelRoleRouter {
    * Execute `attempt` against each chain entry in order, advancing to the
    * next entry on transient provider failures. Non-transient errors and
    * the final entry's failure propagate to the caller.
+   *
+   * Memory extraction runs after the turn has answered, so its calls are
+   * background priority (RequestPriority — a priority-scheduling vLLM serves
+   * interactive turns first). Compaction (`utility`) stays interactive: the
+   * turn waits on its summary.
    */
   static async runWithChain<T>(
     chain: RoleChainEntry[],
@@ -423,11 +435,12 @@ export default class ModelRoleRouter {
         `[ModelRoleRouter] Cannot run "${operation}": role "${role}" resolved to an empty model chain.`,
       );
     }
+    const priority = role === MODEL_ROLES.MEMORY ? "background" : "interactive";
     let lastError: unknown;
     for (let index = 0; index < chain.length; index++) {
       const entry = chain[index];
       try {
-        const value = await attempt(entry, index);
+        const value = await runWithRequestPriority(priority, () => attempt(entry, index));
         return { value, entry };
       } catch (error: unknown) {
         lastError = error;

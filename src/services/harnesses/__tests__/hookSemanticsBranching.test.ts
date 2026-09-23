@@ -73,6 +73,8 @@ vi.mock("#src/services/harnesses/lifecycle/ExhaustionRecovery", () => ({
 }));
 vi.mock("#src/services/harnesses/lifecycle/CostBudgetEnforcer", () => ({
   checkCostBudget: vi.fn().mockReturnValue(false),
+  enforceCostBudget: vi.fn().mockResolvedValue(false),
+  recordLoopSpend: vi.fn(),
 }));
 vi.mock("#src/services/harnesses/lifecycle/CodexPlanningDetector", () => ({
   handleCodexPlanningResponse: vi.fn().mockReturnValue({ shouldContinueLoop: false }),
@@ -117,7 +119,6 @@ function buildBranchingHarness(passFor: (iteration: number) => { text: string; t
     iterations: 0,
     branchesExplored: 0,
     branchesBacktracked: 0,
-    proactiveBacktracks: 0,
     selectedBranchScores: [],
     originalMessageCount: 1,
     planModeActive: false,

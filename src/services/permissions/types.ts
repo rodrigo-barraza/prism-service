@@ -55,7 +55,9 @@ export type PermissionLayer =
   /** The conversation's permission mode (PermissionModes.ts). */
   | "mode"
   /** A write to a protected path (ProtectedPaths.ts) — always asks. */
-  | "protected_path";
+  | "protected_path"
+  /** `auto` mode's classifier (AutoModeClassifier.ts) — allowed, denied or asked. */
+  | "classifier";
 
 /** A stored rule, as the API returns it. */
 export interface PermissionRuleDocument {

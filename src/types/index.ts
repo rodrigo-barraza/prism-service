@@ -61,6 +61,7 @@ export {
   PatchPromptSchema,
   GetPromptsQuerySchema,
   PostClaudeConfigImportSchema,
+  PostPluginImportSchema,
 } from "./schemas.ts";
 
 export type { ChatRequest } from "./schemas.ts";

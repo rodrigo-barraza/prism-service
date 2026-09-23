@@ -207,6 +207,8 @@ vi.mock("#src/services/harnesses/lifecycle/SystemReminderInjector", () => ({
 }));
 vi.mock("#src/services/harnesses/lifecycle/CostBudgetEnforcer", () => ({
   checkCostBudget: vi.fn().mockReturnValue(false),
+  enforceCostBudget: vi.fn().mockResolvedValue(false),
+  recordLoopSpend: vi.fn(),
 }));
 vi.mock("#src/services/harnesses/lifecycle/PlanModeController", () => ({
   handleExitPlanMode: vi.fn(),

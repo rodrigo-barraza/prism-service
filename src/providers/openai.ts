@@ -38,7 +38,7 @@ import {
 } from "#src/utils/media";
 import { getDocumentContextText } from "#src/utils/documentContext";
 import { LOG_PREVIEW } from "#src/constants";
-import { mergeUsage } from "#src/utils/CostCalculator";
+import { markLongContext, mergeUsage, type TextPricing } from "#src/utils/CostCalculator";
 import { ASYNC_TASK_TOOL_NAMES } from "#src/services/AsyncTaskConstants";
 import {
   TURN_INPUT_APPLIED_EVENT,
@@ -658,6 +658,11 @@ function responsesStopReason(response: unknown): string | undefined {
     return "length";
   }
   return undefined;
+}
+
+/** The catalog pricing of `model` (long-context tiers are per request — markLongContext). */
+function pricingOf(model: string): TextPricing | undefined {
+  return (getModelByName(model) as { pricing?: TextPricing } | null)?.pricing;
 }
 
 export function normalizeResponsesUsage(
@@ -1564,7 +1569,7 @@ const openaiProvider = {
     const result: Record<string, unknown> = {
       text: response.output_text || "",
       images,
-      usage: normalizeResponsesUsage(response.usage),
+      usage: markLongContext(normalizeResponsesUsage(response.usage), pricingOf(model)),
     };
     if (toolCalls.length > 0) result.toolCalls = toolCalls;
     if (rateLimits) result.rateLimits = rateLimits;
@@ -2203,7 +2208,10 @@ const openaiProvider = {
           | OpenAI.Responses.ResponseCompletedEvent
           | OpenAI.Responses.ResponseIncompleteEvent;
         if (typedEvent.response?.usage) {
-          const responseUsage = normalizeResponsesUsage(typedEvent.response.usage);
+          const responseUsage = markLongContext(
+            normalizeResponsesUsage(typedEvent.response.usage),
+            pricingOf(model),
+          );
           usage = usage ? (mergeUsage(usage, responseUsage) as TokenUsage) : responseUsage;
         }
         if (typedEvent.response?.id) {

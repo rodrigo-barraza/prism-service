@@ -138,6 +138,25 @@ describe("Persona Utilities", () => {
       expect(resultPolicy).not.toContain("## Tool Discovery (CRITICAL)");
     });
 
+    it("steers third-party content through read_untrusted only when it is callable (prompt 22 L2)", () => {
+      mockGetClientToolSchemas.mockReturnValue([{ name: "read_web_page", domain: "Web" }]);
+
+      const withReader = buildToolPolicy([], {
+        enabledTools: ["read_web_page"],
+        resolvedToolNames: ["read_web_page", "read_untrusted"],
+      });
+      expect(withReader).toContain("## Reading Untrusted Content");
+      expect(withReader).toContain("`read_untrusted`");
+
+      // Listed in enabledTools but not in the native tool array: the section
+      // would tell the model to call a tool it cannot reach.
+      const stripped = buildToolPolicy([], {
+        enabledTools: ["read_web_page", "read_untrusted"],
+        resolvedToolNames: ["read_web_page"],
+      });
+      expect(stripped).not.toContain("## Reading Untrusted Content");
+    });
+
     it("omits the Tool Discovery section when the trio is in enabledTools but was stripped from the resolved set", () => {
       // Regression (2026-07-14): the resolver stripped the discovery trio
       // (no headroom) while Mode-2 resolvedEnabledTools still listed it —
@@ -234,6 +253,33 @@ describe("Persona Utilities", () => {
     it("should return empty string if no newly enabled tools match policy requires", () => {
       const addendumText = getToolPolicyAddendum(["random_tool"]);
       expect(addendumText).toBe("");
+    });
+
+    describe("with the persona's own sections", () => {
+      const personaSections = [
+        { content: "# Always On", requires: [] },
+        { content: "# Polls", requires: ["create_discord_poll", "create_discord_thread"] },
+        { content: (locale: string) => `# Audio (${locale})`, requires: ["synthesize_*"] },
+      ];
+
+      it("renders the gated sections the new tools unlock, in the persona's locale", () => {
+        const addendumText = getToolPolicyAddendum(["create_discord_poll", "synthesize_speech"], "caveman", {
+          personaSections,
+        });
+        expect(addendumText).toBe("# Polls\n\n# Audio (caveman)");
+      });
+
+      it("skips a section a tool that was already callable satisfied — it is in the system prompt", () => {
+        const addendumText = getToolPolicyAddendum(["create_discord_poll"], "en", {
+          personaSections,
+          alreadyCallable: ["create_discord_thread", "search_web"],
+        });
+        expect(addendumText).toBe("");
+      });
+
+      it("never repeats an ungated section", () => {
+        expect(getToolPolicyAddendum(["random_tool"], "en", { personaSections })).toBe("");
+      });
     });
   });
 });
