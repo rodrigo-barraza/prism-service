@@ -128,10 +128,10 @@ taken from recorded streams ([`tests/fixtures/sse-transcripts`](../tests/fixture
 | `tool_execution` | `status: streaming \| calling \| done \| error`, `tool: {id, name, args, responsesItemId?, result?, durationMilliseconds?, durationMs?}`, `toolEmoji?`, `toolLabel?`, `timestamp?` | An agent-loop tool call. `streaming` (arguments still arriving, `args: {}`), then `calling`, then `done` or `error` with `result`. `durationMs` is a deprecated duplicate of `durationMilliseconds`. |
 | `tool_output` | `toolCallId`, `name`, `event: start \| stdout \| stderr \| exit`, `data?`, `meta?` | Live output of a streaming tool (shell, python, javascript, run_command). |
 | `toolCall` | `id`, `name?`, `args`, `status?`, `result?`, `responsesItemId?`, `thoughtSignature?`, `durationMilliseconds?` | A provider-executed (native / MCP) call, and `/chat`'s function-calling rounds. |
-| `approval_required` | `toolCallId`, `batchId`, `batchSize`, `toolCall: {id, name, args}`, `tier?`, `tierLabel?`, `preview?: {kind: "diff", path, diff, isNewFile?, isTruncated?}`, `requestedBy?: "hook"`, `reason?`, `subAgentId?`, `subAgentDescription?`, `approvalConversationId?` | One card per call. Decide it with `POST /agent/approve`. The `subAgent*` fields appear when a sub-agent asked. |
+| `approval_required` | `toolCallId`, `batchId`, `batchSize`, `toolCall: {id, name, args}`, `tier?`, `tierLabel?`, `preview?: {kind: "diff", path, diff, isNewFile?, isTruncated?}`, `requestedBy?: "hook" \| "restart"`, `reason?`, `subAgentId?`, `subAgentDescription?`, `approvalConversationId?` | One card per call. Decide it with `POST /agent/approve`. `requestedBy: "restart"` asks whether to run again a call a server restart interrupted. The `subAgent*` fields appear when a sub-agent asked. |
 | `approval_decided` | `toolCallId`, `batchId`, `decision: allow \| deny`, `scope: call \| batch \| conversation`, `source: user \| superseded \| turn_ended`, `reason?`, `editedByUser?`, `subAgent*?` | Close the card, whoever decided it. |
 | `plan_proposal` | `plan`, `steps`, `autoApproved`, `toolCallId`, `batchId` | Plan mode's proposal. It is decided like a tool approval. |
-| `user_question` | `questionId`, `blocking`, `context`, `questions: [{question, header, options: [{label, preview}], multiSelect}]` | `ask_user`. Answer with `POST /agent/answer`. With `blocking: false`, the agent keeps working. |
+| `user_question` | `questionId`, `blocking`, `context`, `questions: [{question, header, options: [{label, preview}], multiSelect, elicitation?: {server, mode: form \| url, requestedSchema?, url?}}]` | `ask_user`, and an MCP server's elicitation (`elicitation` set). Answer with `POST /agent/answer`. With `blocking: false`, the agent keeps working. |
 
 ```json
 {"type":"tool_execution","tool":{"name":"get_iss_location","args":{},"id":"google-toolCall-44c3…"},"toolEmoji":"https://…/u1f6f8_u1f4bb.png","toolLabel":"Locating","status":"calling","timestamp":1790125252092,"seq":1790125249463}
@@ -150,6 +150,7 @@ taken from recorded streams ([`tests/fixtures/sse-transcripts`](../tests/fixture
 | `context_budget` | `contextWindow`, `messageTokens`, `systemPromptTokens`, `toolSchemaTokens`, `skillTokens`, `safetyMarginTokens`, `totalInputTokens`, `availableOutputTokens`, `requestedOutputTokens?`, `isClamped`, `toolCount`, `source: estimated \| reported`, `lastReportedInputTokens?`, `calibrationRatio?` | How the context window is spent. |
 | `task_notification` | `content`, `timestamp` (ISO), `_notificationSource`, `_notificationId` | A background task or sub-agent finished. Its report starts the next turn. |
 | `conversation_state_update` | `pendingBackgroundTasks`, `isActive` | `/ws/chat` only. |
+| `permission_mode` | `conversationId`, `mode`, `source`, `previousMode?`, `unattended?`, `refused?: "bypass"`, `reason?` | The conversation's permission mode when the turn starts, and each switch while it runs. |
 | `memory_consolidation_complete` | `project`, `merged`, `deleted`, `errors`, `closedIds`, `createdIds`, `actionsApplied`, `batchCount`, `summary`, `total`, `trigger`, `durationMilliseconds` | Background memory upkeep that ran after the turn. It may arrive after `done`. |
 
 `usage` (here, in `done` and elsewhere) is `{inputTokens?, outputTokens?, cacheReadInputTokens?,
@@ -220,6 +221,7 @@ Fields for each `sub_agent_status` `message`:
 | `turn_input_applied` | `inputId`, `kind`, `boundary`, `iteration` |
 | `hook_context_applied` | `inputId`, `boundary`, `iteration`, `_hookName?`, `_hookEvent?` |
 | `question_pending` | `questionId` |
+| `turn_resumed` | `iteration`, `attempt` |
 | `hook_system_message` | `text`, `hookName`, `hookEvent` |
 | `stop_hook_cap_reached` | `continuations`, `reason` |
 | `stop_hook_continue` | `continuation`, `reason` |
@@ -262,6 +264,7 @@ recommendedModel?, model?}`.
 4. Update this page.
 
 The contract tests are in `src/protocol/__tests__/` and `tests/eventProtocolRoutes.test.ts`:
+- every `emit…({ type })` in `src/` names a protocol type (prism-client drops a type it does not know);
 - a scripted turn through a real `ReActHarness`;
 - the `/chat` and `/agent` SSE bodies;
 - one case per provider error;

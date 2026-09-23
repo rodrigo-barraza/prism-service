@@ -276,8 +276,8 @@ const ApprovalRequiredEvent = event("approval_required", {
       isTruncated: z.boolean().optional(),
     })
     .optional(),
-  /** Set when a PreToolUse hook asked for the approval. */
-  requestedBy: z.literal("hook").optional(),
+  /** Who asked besides the tier: a PreToolUse hook, or a restart re-asking a call that was running. */
+  requestedBy: z.enum(["hook", "restart"]).optional(),
   reason: z.string().nullable().optional(),
   ...SubAgentTag,
 });
@@ -312,6 +312,15 @@ const UserQuestionEvent = event("user_question", {
       header: z.string().nullable(),
       options: z.array(z.strictObject({ label: z.string(), preview: z.string().nullable() })),
       multiSelect: z.boolean(),
+      /** An MCP server asking for input mid-call: render a form from `requestedSchema`, or show `url`. */
+      elicitation: z
+        .strictObject({
+          server: z.string(),
+          mode: z.enum(["form", "url"]),
+          requestedSchema: JsonObject.optional(),
+          url: z.string().optional(),
+        })
+        .optional(),
     }),
   ),
 });
@@ -393,6 +402,18 @@ const TaskNotificationEvent = event("task_notification", {
   timestamp: z.string(),
   _notificationSource: z.string(),
   _notificationId: z.string(),
+});
+
+/** The conversation's permission mode: what the turn runs in, and every switch while it runs. */
+const PermissionModeEvent = event("permission_mode", {
+  conversationId: z.string(),
+  mode: z.string(),
+  source: z.string(),
+  previousMode: z.string().optional(),
+  unattended: z.literal(true).optional(),
+  /** A requested `bypass` the owner check refused, and why. */
+  refused: z.literal("bypass").optional(),
+  reason: z.string().optional(),
 });
 
 /** /ws/chat only. */
@@ -626,6 +647,7 @@ const KnownStatusEvent = z.discriminatedUnion("message", [
     _hookEvent: z.string().optional(),
   }),
   status("question_pending", { questionId: z.string() }),
+  status("turn_resumed", { iteration: z.number(), attempt: z.number() }),
   status("hook_system_message", { text: z.string(), hookName: z.string(), hookEvent: z.string() }),
   status("stop_hook_cap_reached", { continuations: z.number(), reason: z.string() }),
   status("stop_hook_continue", { continuation: z.number(), reason: z.string() }),
@@ -699,6 +721,7 @@ const TurnEventByType = z.discriminatedUnion("type", [
   ContextBudgetEvent,
   TaskNotificationEvent,
   ConversationStateUpdateEvent,
+  PermissionModeEvent,
   MemoryConsolidationCompleteEvent,
   SubAgentStatusEvent,
   SubAgentToolExecutionEvent,
@@ -764,6 +787,7 @@ export type UsageUpdateEvent = TurnEventOf<"usage_update">;
 export type ContextBudgetEvent = TurnEventOf<"context_budget">;
 export type TaskNotificationEvent = TurnEventOf<"task_notification">;
 export type ConversationStateUpdateEvent = TurnEventOf<"conversation_state_update">;
+export type PermissionModeEvent = TurnEventOf<"permission_mode">;
 export type SubAgentStatusEvent = TurnEventOf<"sub_agent_status">;
 export type SubAgentToolExecutionEvent = TurnEventOf<"sub_agent_tool_execution">;
 export type SubAgentToolOutputEvent = TurnEventOf<"sub_agent_tool_output">;
@@ -796,6 +820,7 @@ export const PROTOCOL_EVENT_TYPES = {
   APPROVAL_DECIDED: "approval_decided",
   TURN_INPUT: "turn_input",
   GOAL_UPDATE: "goal_update",
+  PERMISSION_MODE: "permission_mode",
   MEMORY_CONSOLIDATION_COMPLETE: "memory_consolidation_complete",
 } as const satisfies Record<string, TurnEventType>;
 
