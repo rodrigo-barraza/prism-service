@@ -5,6 +5,7 @@ import {
   PERMISSION_RULE_ORIGINS,
   PERMISSION_SCOPES,
 } from "./types.ts";
+import { PERMISSION_MODES } from "./PermissionModes.ts";
 
 /**
  * Request schemas for `/permissions`. Kept beside the rule syntax rather than
@@ -89,6 +90,8 @@ export const PostPermissionTestSchema = z
     conversationId: identifier.nullable().optional(),
     agent: identifier.nullable().optional(),
     autoApprove: z.boolean().optional(),
+    /** Judge the call in this mode (default: `default`). */
+    permissionMode: z.enum(PERMISSION_MODES).optional(),
     draft: z
       .object({ rule: ruleText, decision: z.enum(PERMISSION_DECISIONS) })
       .strict()
@@ -98,6 +101,23 @@ export const PostPermissionTestSchema = z
 
 /** The rule "Always allow" would write for one call. */
 export const PostPermissionProposeSchema = z.object(toolCallFields).strict();
+
+/** Switch a conversation's permission mode. */
+export const PutPermissionModeSchema = z
+  .object({
+    conversationId: identifier,
+    mode: z.enum(PERMISSION_MODES),
+  })
+  .strict();
+
+/** The mode conversations start in. `bypass` is chosen per conversation, never a default. */
+export const PutDefaultPermissionModeSchema = z
+  .object({
+    mode: z.enum(PERMISSION_MODES).refine((mode) => mode !== "bypass", {
+      message: "bypass cannot be a default — it is chosen per conversation",
+    }),
+  })
+  .strict();
 
 export type PostPermissionRuleInput = z.infer<typeof PostPermissionRuleSchema>;
 export type PutPermissionRuleInput = z.infer<typeof PutPermissionRuleSchema>;

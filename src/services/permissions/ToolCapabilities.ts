@@ -40,6 +40,13 @@ const BUILT_IN: Record<string, readonly Capability[]> = {
   delete_subagents: ["subagent"],
   get_subagent_output: ["subagent"],
 
+  // Plan-mode control flow and questions: no side effects of their own.
+  // Declared here too so plan mode can never refuse its own way out when a
+  // registry has not reported them.
+  enter_plan_mode: [],
+  exit_plan_mode: [],
+  ask_user: [],
+
   read_file: ["fs_read"],
   read_files: ["fs_read"],
   list_directory: ["fs_read"],

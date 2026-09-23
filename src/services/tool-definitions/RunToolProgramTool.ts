@@ -316,6 +316,8 @@ const runToolProgramTool = {
     const approvalEngine = new AutoApprovalEngine({
       policies: context._policies ?? [],
       permissionRules: context._permissionRules ?? null,
+      // Plan mode refuses a program's network reads as it would the call.
+      permissionMode: context._permissionMode ?? null,
       fullAuto: false,
     });
     const enabledTools = Array.isArray(context.enabledTools)

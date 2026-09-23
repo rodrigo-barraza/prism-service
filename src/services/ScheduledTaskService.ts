@@ -65,6 +65,12 @@ export interface ScheduledTask {
     disabledTools?: string[];
     enabledTools?: string[];
   };
+  /**
+   * The permission mode runs of this task use. Absent = the target
+   * conversation's mode, else `dontAsk`. Runs are unattended either way:
+   * anything that would ask is denied. `bypass` holds only for an owner.
+   */
+  permissionMode?: import("./permissions/PermissionModes.ts").PermissionMode;
   enabled: boolean;
   lastRunMinute?: string; // "YYYY-MM-DDTHH:mm"
   /**
@@ -516,7 +522,10 @@ const ScheduledTaskService = {
           agenticLoopEnabled: true,
           functionCallingEnabled: true,
           planFirst: false,
-          autoApprove: true,
+          // Nobody watches a scheduled run: what would ask is denied, and
+          // the mode is the task's own, else dontAsk.
+          unattended: true,
+          ...(task.permissionMode && { permissionMode: task.permissionMode }),
           ...(task.toolConfig?.disabledTools && {
             disabledTools: task.toolConfig.disabledTools,
           }),
@@ -731,7 +740,8 @@ const ScheduledTaskService = {
           agenticLoopEnabled: true,
           functionCallingEnabled: true,
           planFirst: false,
-          autoApprove: true,
+          unattended: true,
+          ...(task.permissionMode && { permissionMode: task.permissionMode }),
           ...(toolConfig?.disabledTools && {
             disabledTools: toolConfig.disabledTools,
           }),

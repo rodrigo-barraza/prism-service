@@ -6,6 +6,7 @@ import { decisionOwnerOf } from "#src/services/conversation/ConversationRunState
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import logger from "#src/utils/logger";
 import { APPROVALS } from "#src/constants";
+import ConversationApprovalSettings from "#src/services/ConversationApprovalSettings";
 import {
   SYSTEM_MESSAGE_TAGS,
   wrapSystemMessage,
@@ -108,6 +109,27 @@ export function blockUnauthorizedToolCalls(
 }
 
 /**
+ * An approved plan ends plan mode: the conversation's permission mode goes
+ * back to `default` — for this turn (the handle every engine in the tree
+ * reads) and for the turns after it (stored on the conversation). Anything
+ * other than `plan` is left as the user set it.
+ */
+function leavePlanPermissionMode(context: AgenticContext): void {
+  const handle = context.options._permissionMode;
+  if (handle?.mode !== "plan") return;
+  handle.set("default", "plan_approved");
+  if (context.options.isSubAgent || !context.conversationId) return;
+  void ConversationApprovalSettings.setPermissionMode(
+    context.conversationId,
+    context.project,
+    context.username,
+    "default",
+  ).catch((error: unknown) =>
+    logger.warn(`[PlanningMode] Could not store the mode after the plan was approved: ${String(error)}`),
+  );
+}
+
+/**
  * Handle the exit_plan_mode tool call: emit the plan proposal,
  * wait for user approval, and transition out of plan mode.
  *
@@ -128,6 +150,13 @@ export async function handleExitPlanMode(
   state: AgenticLoopState,
 ): Promise<{ shouldContinueLoop: boolean }> {
   const { options, emit, signal } = context;
+
+  // A denied exit_plan_mode proposes nothing: its tool result already says
+  // why (a deny rule, or a run nobody watches — where a plan card would
+  // park the turn on a person who will never come). The loop goes on.
+  if (exitPlanToolCall._approval?.isDenied) {
+    return { shouldContinueLoop: true };
+  }
 
   // Models that stream no plan text put it in the tool's `summary` argument.
   const summaryArgument = exitPlanToolCall.args?.summary;
@@ -251,6 +280,7 @@ export async function handleExitPlanMode(
   state.planModeActive = false;
   state.planModeText = "";
   PlanningModeService.stripPlanningInstruction(currentMessages);
+  leavePlanPermissionMode(context);
   emit({
     type: SERVER_SENT_EVENT_TYPES.STATUS,
     message: STATUS_MESSAGES.PLAN_MODE_EXITED,

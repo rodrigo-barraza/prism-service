@@ -7,6 +7,9 @@
 > Tests: `src/services/permissions/__tests__/*` (real-loop scheduler DENY, mid-turn rule), `tests/permissionsRoutes.test.ts`, `src/services/__tests__/policyInvalidPatternFailsClosed.test.ts`; client `permissionRulesPanelComponent` / `alwaysAllowControlComponent` / `permissionRulesService` tests; tools-service `src/services/__tests__/ToolCapabilities.test.ts`.
 > Recon correction: on master an invalid regex in a DENY policy already denied (the loader dropped the predicate, so the rule matched every call); the fail-open case was an invalid APPROVE, and that is what the red test pins.
 
+> **Landing 2 (`permission-modes`) — done 2026-09-22.** `src/services/permissions/PermissionModes.ts` (modes, plan-safe / workspace-edit predicates, denial messages), `PermissionModeState.ts` (the turn's live handle on `options._permissionMode`, shared by sub-agents; `PermissionModeRegistry` for mid-turn switches; resolution request > stored `approvals.permissionMode` > `settings.permissions.defaultMode`, unattended runs → `dontAsk` unless the conversation names a mode), `ProtectedPaths.ts` (`.git`, `.env*`, `.prism/`, `.claude/` minus worktrees, `PRISM.md`, `.mcp.json` always ask). In `explain()` the mode sits after deny (plan refusals, then protected paths) and before the tier; every ask becomes a denial where nobody can answer (`dontAsk`, `unattended`). `auto` asks in the classifier's slot — **Landing 3 replaces that branch** (search `the classifier is not available`) and `isAutoModeClassifierAvailable()`. Bypass is owner-only (`PRISM_PERMISSION_BYPASS_OWNERS`). Scheduled tasks, timers, workflows, benchmarks and async-task continuations are `unattended`. Routes `GET/PUT /permissions/mode`, `PUT /permissions/mode/default`; SSE `permission_mode`. Client: `PermissionModeSelectorComponent` above the composer (replaces the "Auto Approve Tool Use" toggle), bypass banner, default in Settings → Permissions, protected-path cards offer no "Always allow".
+> Tests: `src/services/permissions/__tests__/permissionModes.test.ts` (engine matrix per mode, predicates, resolution), `permissionModesInTheLoop.test.ts` (real loop: each mode, owner flag, protected paths, mid-turn switch, plan approval), `tests/permissionsRoutes.test.ts` (modes), `scheduledTaskService.test.ts` / `tests/conversationTimerService.test.ts` (unattended, no full auto); client `permissionModeSelectorComponent.test.tsx`.
+
 **Repos:** prism-service, prism-client, and tools-service (Landing 1: capability tags on its tool schemas) · **Size:** L · **Depends on:** 05 (per-call approvals; must have landed) · **Shares hubs with:** 13, 18, 20 (`src/services/AutoApprovalEngine.ts`, `PolicyEngine.ts`, the approval gate).
 
 ## What Prism has today
@@ -25,32 +28,6 @@ Read these before designing:
   6. sub-agents are checked at spawn, per action and on their final report.
 - **Codex Guardian V2.** One-token risk scoring by a cheap model, escalation to a full reviewer, and stopping the turn after 3 consecutive denials or 10 of the last 50.
 - **Kiro / Devin Desktop.** Capability-tagged tools. Deny always wins and names its layer. The agent can't edit its own permission files.
-
----
-
-## Landing 2 — `permission-modes`
-
-**Changes.** A mode per conversation, with a default in settings.
-
-| Mode | Behaviour |
-|---|---|
-| `default` | Ask per tier. |
-| `plan` | Read-only tools run. Write, shell and network calls are denied with an explanation telling the model it's in plan mode. |
-| `acceptEdits` | `fs_write` inside the workspace runs without asking. Anything outside asks. |
-| `auto` | The Landing 3 classifier decides. |
-| `dontAsk` | Anything that would ask is **denied** instead. The default for scheduled and timer runs and unattended goals. |
-| `bypass` | Owner only, explicit, with a visible banner. |
-
-- Mode switches emit an event, and the client shows the current mode with a selector.
-- **Protected paths** (`.git`, the Prism configuration, `.env*`) always ask, even under `acceptEdits`.
-
-**Tests.** A harness test per mode (a real `ReActHarness`, scripted tool calls):
-- **plan:** a write is denied with the plan message; a read runs.
-- **acceptEdits:** a write inside the workspace runs; outside, it asks.
-- **dontAsk:** an ask becomes a denial.
-- **bypass:** requires the owner flag.
-- **Protected paths:** always ask.
-- **Scheduler default:** a scheduled run uses `dontAsk`.
 
 ---
 
