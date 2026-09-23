@@ -68,6 +68,7 @@ import {
   composeSubAgentPolicies,
   pinnedSubAgentModel,
   resolveSubAgentApproval,
+  subAgentModeHandle,
   withoutDisallowedTools,
 } from "./orchestrator/SubAgentDefinitionPins.ts";
 
@@ -2710,13 +2711,24 @@ export class OrchestratorService {
         ToolOrchestratorService.getClientToolSchemas() || [],
       );
     }
+    // The parent's mode is its live handle's (permission-modes); a caller
+    // without one falls back to what its own definition resolved to.
+    const parentModeHandle = orchestratorContext.permissionMode;
     const approval = resolveSubAgentApproval(
       {
         autoApprove: orchestratorContext.autoApprove === true,
-        permissionMode: OrchestratorService._callerPermissionMode(orchestratorContext),
+        permissionMode:
+          parentModeHandle?.mode ?? OrchestratorService._callerPermissionMode(orchestratorContext),
       },
       subAgentDefinition?.permissionMode,
     );
+    const subAgentMode = parentModeHandle
+      ? subAgentModeHandle(
+          parentModeHandle,
+          orchestratorContext.autoApprove === true,
+          subAgentDefinition?.permissionMode,
+        )
+      : null;
     subAgent.permissionMode = approval.permissionMode;
     if (approval.narrowedFrom) {
       logger.info(
@@ -2762,9 +2774,8 @@ export class OrchestratorService {
           }),
           // The parent's mode handle itself: plan mode stays read-only all the
           // way down, and a switch of the parent's mode reaches its sub-agents.
-          ...(orchestratorContext.permissionMode && {
-            _permissionMode: orchestratorContext.permissionMode,
-          }),
+          // A definition that names a mode gets it narrowed (subAgentModeHandle).
+          ...(subAgentMode && { _permissionMode: subAgentMode.handle }),
           ...(orchestratorContext.enableCriticGate !== undefined && {
             enableCriticGate: orchestratorContext.enableCriticGate,
           }),
@@ -2838,6 +2849,8 @@ export class OrchestratorService {
         }
         throw error;
       }
+    } finally {
+      subAgentMode?.dispose();
     }
 
     // Capture the full conversation from the loop (includes all assistant

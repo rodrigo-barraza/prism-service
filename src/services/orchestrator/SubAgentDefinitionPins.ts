@@ -1,6 +1,7 @@
 import type { Persona } from "#src/services/personas/types";
 import type { PolicyRule } from "#src/services/PolicyEngine";
 import type { AgentPermissionMode } from "#src/services/agents/AgentDefinitionFields";
+import { PermissionModeHandle } from "#src/services/permissions/PermissionModeState";
 import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";
 
 // ────────────────────────────────────────────────────────────
@@ -71,8 +72,8 @@ const RESTRICTING_MODES: readonly AgentPermissionMode[] = ["plan", "dontAsk"];
  *
  *   (none)                    the parent's mode, as before.
  *   default                   asks per tier, even under a parent that auto-approves.
- *   plan                      read-only; approvals off, so until the mode layer
- *                             enforces `plan` a write asks a person instead of running.
+ *   plan                      read-only; approvals off, and the sub-agent's mode
+ *                             handle is `plan` (subAgentModeHandle), so a write is refused.
  *   dontAsk                   asks become denials; the parent's approvals stand.
  *   acceptEdits/auto/bypass   never wider than the parent: the parent's mode
  *                             (`narrowedFrom` records the request when that is less).
@@ -107,6 +108,35 @@ export function resolveSubAgentApproval(
     ...(parentMode && { permissionMode: parentMode }),
     ...(!parent.autoApprove && { narrowedFrom: requested }),
   };
+}
+
+/**
+ * The permission-mode handle a sub-agent runs under (permission-modes'
+ * PermissionModeHandle). With no mode in its definition it shares its
+ * parent's handle, so a switch of the parent's mode reaches it. A definition
+ * that names a mode gets a handle of its own: the parent's mode narrowed by
+ * resolveSubAgentApproval, re-narrowed on every switch of the parent's —
+ * a `plan` agent stays read-only under a parent in acceptEdits, and a child
+ * of an unattended run can ask nobody either. `dispose` stops the following
+ * when the sub-agent's run ends.
+ */
+export function subAgentModeHandle(
+  parent: PermissionModeHandle,
+  parentAutoApprove: boolean,
+  requested: AgentPermissionMode | null | undefined,
+): { handle: PermissionModeHandle; dispose: () => void } {
+  if (!requested) return { handle: parent, dispose: () => {} };
+  const narrow = (mode: AgentPermissionMode): AgentPermissionMode =>
+    resolveSubAgentApproval({ autoApprove: parentAutoApprove, permissionMode: mode }, requested)
+      .permissionMode ?? mode;
+  const handle = new PermissionModeHandle(narrow(parent.mode), {
+    source: parent.source,
+    unattended: parent.unattended,
+  });
+  const dispose = parent.onChange((change) => {
+    handle.set(narrow(change.mode), change.source);
+  });
+  return { handle, dispose };
 }
 
 /**

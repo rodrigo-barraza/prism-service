@@ -9,8 +9,10 @@ import {
   composeSubAgentPolicies,
   pinnedSubAgentModel,
   resolveSubAgentApproval,
+  subAgentModeHandle,
   withoutDisallowedTools,
 } from "#src/services/orchestrator/SubAgentDefinitionPins";
+import { PermissionModeHandle } from "#src/services/permissions/PermissionModeState";
 import PolicyEngine, { allow, deny, allowAll, denyAll } from "#src/services/PolicyEngine";
 import type { Persona } from "#src/services/personas/types";
 
@@ -98,6 +100,57 @@ describe("resolveSubAgentApproval — a definition only narrows", () => {
     const dontAskParent = { autoApprove: true, permissionMode: "dontAsk" as const };
     expect(resolveSubAgentApproval(dontAskParent, "default")).toEqual({ autoApprove: false, permissionMode: "dontAsk" });
     expect(resolveSubAgentApproval(dontAskParent, "auto")).toEqual({ autoApprove: true, permissionMode: "dontAsk" });
+  });
+});
+
+describe("subAgentModeHandle — a definition's mode narrows the parent's live handle", () => {
+  it("no mode: the parent's handle itself, so its switches reach the sub-agent", () => {
+    const parent = new PermissionModeHandle("acceptEdits");
+    expect(subAgentModeHandle(parent, false, undefined).handle).toBe(parent);
+  });
+
+  it("plan under a parent in acceptEdits stays plan, whatever the parent switches to", () => {
+    const parent = new PermissionModeHandle("acceptEdits", { source: "request" });
+    const { handle, dispose } = subAgentModeHandle(parent, false, "plan");
+    expect(handle).not.toBe(parent);
+    expect(handle.mode).toBe("plan");
+    parent.set("bypass", "user");
+    expect(handle.mode).toBe("plan");
+    dispose();
+  });
+
+  it("dontAsk follows the parent into plan and back out", () => {
+    const parent = new PermissionModeHandle("default");
+    const { handle, dispose } = subAgentModeHandle(parent, false, "dontAsk");
+    expect(handle.mode).toBe("dontAsk");
+    expect(handle.cannotAsk).toBe(true);
+    parent.set("plan", "user");
+    expect(handle.mode).toBe("plan");
+    parent.set("default", "plan_approved");
+    expect(handle.mode).toBe("dontAsk");
+    dispose();
+  });
+
+  it("a mode wider than the parent's is the parent's, and follows it", () => {
+    const parent = new PermissionModeHandle("default");
+    const { handle, dispose } = subAgentModeHandle(parent, false, "acceptEdits");
+    expect(handle.mode).toBe("default");
+    parent.set("acceptEdits", "user");
+    expect(handle.mode).toBe("acceptEdits");
+    dispose();
+  });
+
+  it("the child of an unattended run can ask nobody either", () => {
+    const parent = new PermissionModeHandle("acceptEdits", { unattended: true });
+    expect(subAgentModeHandle(parent, false, "default").handle.cannotAsk).toBe(true);
+  });
+
+  it("after dispose it stops following", () => {
+    const parent = new PermissionModeHandle("default");
+    const { handle, dispose } = subAgentModeHandle(parent, false, "dontAsk");
+    dispose();
+    parent.set("plan", "user");
+    expect(handle.mode).toBe("dontAsk");
   });
 });
 
