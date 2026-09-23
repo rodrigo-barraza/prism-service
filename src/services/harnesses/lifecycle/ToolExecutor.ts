@@ -317,6 +317,9 @@ export async function executeToolBatch(
               _criticModel: context.options?.criticModel,
               _maxCostDollars: context.options?.maxCostDollars,
               _sharedCostBudget: context.options?._sharedCostBudget,
+              // A native async call (OpenAI async tools): run_async_task binds
+              // its task to the call id the result must come back on.
+              ...(toolCall.nativeAsync && toolCall.id ? { _nativeAsyncCallId: toolCall.id } : {}),
             },
           ),
         timeoutMilliseconds,

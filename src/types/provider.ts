@@ -104,6 +104,8 @@ export interface StreamProviderStateChunk {
   providerResponseId?: string;
   phase?: ResponsesPhase;
   reasoningItems?: ResponsesReasoningItem[];
+  /** Reasoning effort in effect for this response (configuration_update models). */
+  responsesEffort?: string;
 }
 
 export interface StreamUsageChunk {
@@ -192,6 +194,8 @@ export interface GenerateTextResult {
   reasoningItems?: ResponsesReasoningItem[];
   /** OpenAI Responses API `response.id`. */
   providerResponseId?: string;
+  /** OpenAI Responses API reasoning effort in effect (configuration_update models). */
+  responsesEffort?: string;
   /** Anthropic thinking blocks, verbatim and in order. */
   thinkingBlocks?: AnthropicThinkingBlock[];
   /** Anthropic safety-classifier refusal — `text` is then empty. */

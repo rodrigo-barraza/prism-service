@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import NativeSteerRegistry from "#src/services/NativeSteerRegistry";
+import { SYSTEM_MESSAGE_TAGS, wrapSystemMessage } from "#src/utils/SystemMessageTags";
 import logger from "#src/utils/logger";
 
 /**
@@ -37,6 +39,12 @@ import logger from "#src/utils/logger";
  * exactly as if the box were closed. Without the seal, input arriving during
  * finalize was accepted and then dropped by `close()` — a sub-agent team's
  * whole result, or a user's update, lost to a window of database writes.
+ *
+ * Native steering (NativeSteerRegistry): a text `user_update` posted while
+ * the turn's provider stream can steer natively is HELD — invisible to
+ * drain() — and offered to the stream. The harness takes it when the
+ * provider applied it (`take`); otherwise it is released and drained here
+ * like any other entry.
  */
 
 export type TurnInputKind =
@@ -55,6 +63,8 @@ export interface TurnInputEntry {
   receivedAt: number;
   /** Producer-specific metadata, copied verbatim onto the injected message. */
   meta?: Record<string, unknown>;
+  /** Offered to the provider's native steering; held from drain() until it answers. */
+  offeredNatively?: boolean;
 }
 
 export interface TurnInputPost {
@@ -148,6 +158,7 @@ const TurnInputMailbox = {
     logger.info(
       `[TurnInputMailbox] ${input.kind} ${entry.id} queued for ${conversationId} (pending=${box.entries.length})`,
     );
+    offerNatively(conversationId, entry);
     return { accepted: true, id: entry.id, position: box.entries.length };
   },
 
@@ -155,14 +166,33 @@ const TurnInputMailbox = {
   drain(conversationId: string): TurnInputEntry[] {
     const box = mailboxes.get(conversationId);
     if (!box || box.entries.length === 0) return [];
-    const entries = box.entries;
-    box.entries = [];
-    return entries;
+    // An entry offered to native steering stays until the harness takes it
+    // (applied) or the offer is released (fallback).
+    const drained = box.entries.filter((entry) => !entry.offeredNatively);
+    if (drained.length === 0) return [];
+    box.entries = box.entries.filter((entry) => entry.offeredNatively);
+    return drained;
   },
 
-  /** Number of entries waiting for the next boundary. */
+  /** Number of entries waiting for the next boundary (held native offers excluded). */
   pendingCount(conversationId: string): number {
-    return mailboxes.get(conversationId)?.entries.length ?? 0;
+    return (
+      mailboxes.get(conversationId)?.entries.filter((entry) => !entry.offeredNatively)
+        .length ?? 0
+    );
+  },
+
+  /**
+   * Remove and return the entries the provider applied natively (by id, in
+   * arrival order). The caller records them; nothing re-injects them.
+   */
+  take(conversationId: string, ids: string[]): TurnInputEntry[] {
+    const box = mailboxes.get(conversationId);
+    if (!box || ids.length === 0) return [];
+    const wanted = new Set(ids);
+    const taken = box.entries.filter((entry) => wanted.has(entry.id));
+    box.entries = box.entries.filter((entry) => !wanted.has(entry.id));
+    return taken;
   },
 
   /**
@@ -192,5 +222,31 @@ const TurnInputMailbox = {
     mailboxes.clear();
   },
 };
+
+/**
+ * A text update the running stream can steer with natively is held and
+ * offered; a `fallback` answer releases it to the next drain. (`applied` is
+ * the harness's to act on — it takes the entry when the stream says so.)
+ */
+function offerNatively(conversationId: string, entry: TurnInputEntry): void {
+  if (entry.kind !== "user_update" || entry.images?.length) return;
+  const sender = NativeSteerRegistry.get(conversationId);
+  if (!sender) return;
+  entry.offeredNatively = true;
+  const release = () => {
+    entry.offeredNatively = false;
+  };
+  sender
+    .steer({
+      id: entry.id,
+      // The same wrapper the drain would inject, so the transcript and the
+      // model's context carry one form of the update.
+      text: wrapSystemMessage(SYSTEM_MESSAGE_TAGS.USER_UPDATE, entry.text),
+    })
+    .then((outcome) => {
+      if (outcome === "fallback") release();
+    })
+    .catch(release);
+}
 
 export default TurnInputMailbox;

@@ -58,6 +58,10 @@ export interface ChatMessage {
   reasoningItems?: ResponsesReasoningItem[];
   /** OpenAI Responses API `response.id` that produced this message. */
   providerResponseId?: string;
+  /** OpenAI Responses API reasoning effort in effect when this message was produced — where a configuration_update goes on replay. */
+  responsesEffort?: string;
+  /** A native async call's completion (OpenAI): replayed as that call's output. */
+  asyncCallId?: string;
   /** Tool result correlation — maps this message to the tool_use that produced it. */
   tool_call_id?: string;
   /** Generic message ID — fallback for tool correlation. */
@@ -179,6 +183,13 @@ export interface ProviderOptions {
    * can chain turns server-side instead of replaying the transcript.
    */
   previousResponseId?: string;
+  /**
+   * The running turn's loop key (TurnInputMailbox), set by a harness that
+   * can take input natively applied mid-stream. OpenAI streams GPT-6 turns
+   * that carry it over the Responses WebSocket and steers them with
+   * `response.steer`.
+   */
+  turnInputKey?: string;
   // Provider routing
   agent?: string;
   username?: string;
