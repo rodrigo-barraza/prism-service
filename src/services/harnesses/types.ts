@@ -85,6 +85,17 @@ export interface ToolCall {
   result?: unknown;
   status?: string;
   durationMilliseconds?: number;
+  /**
+   * A call of a pass replayed after a restart (TurnResumeService), as the
+   * restart left it: `finished` keeps its recorded result and is neither
+   * re-asked nor re-run; `rerun` was interrupted but is read-only;
+   * `interrupted` was cut off mid-run and runs again only if the user says so.
+   */
+  _resumed?: {
+    status: "finished" | "rerun" | "interrupted";
+    result?: unknown;
+    durationMilliseconds?: number;
+  };
   /** Set when the provider could not parse the model's tool-call JSON (e.g. truncated at output-token exhaustion). */
   _argsParseError?: boolean;
   /** Raw (unparseable) argument text excerpt, for the synthetic error result. */
@@ -320,7 +331,30 @@ export interface AgenticContext {
    *  Prevents marking incoming context messages as _alreadyPersisted when
    *  they are ephemeral platform history (e.g. Discord channel messages). */
   isNewConversation?: boolean;
+  /**
+   * The handleAgent params the turn was started with, without `messages` —
+   * what TurnRunRecorder keeps so a restart can start it again. Absent for
+   * loops that did not come through handleAgent (they are not re-driven).
+   */
+  request?: Record<string, unknown> | null;
+  /** Set when this turn is the re-drive of one a restart interrupted (TurnResumeService). */
+  resume?: TurnResumeState | null;
   [key: string]: unknown;
+}
+
+/** What a re-driven turn picks up from the one a restart interrupted. */
+export interface TurnResumeState {
+  /** The pass whose tool batch was in progress — replayed instead of asking the model again. */
+  pass: import("#src/services/TurnRunStore").StoredPass;
+  planModeActive: boolean;
+  autoApprove: boolean;
+  skillsText?: string | null;
+  /** Mailbox entries accepted before the restart and never delivered — restored when the turn opens. */
+  inputs: import("#src/services/TurnInputMailbox").TurnInputEntry[];
+  /** Notices the restart owes this turn (interrupted background work) — posted when it opens. */
+  notices: import("#src/services/TurnInputMailbox").TurnInputPost[];
+  /** 1 for the first re-drive of this turn. */
+  attempt: number;
 }
 
 // ── Per-Iteration Pass State ────────────────────────────────
@@ -336,6 +370,8 @@ export interface PassState {
   refusal?: ModelRefusal;
   /** The model that actually served the pass, when a fallback did. */
   servedModel?: string;
+  /** The pass was replayed from TurnRunStore after a restart — no request was made. */
+  replayed?: boolean;
   pendingToolCalls: ToolCall[];
   /** Tool calls the model emitted but that were dropped because the tool is
    *  not in the current native schema. Used to give the model explicit

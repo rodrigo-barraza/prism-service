@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import type DetachedWorkStoreModule from "#src/services/DetachedWorkStore";
 
 /**
  * DetachedDispatchRegistry — top-level sub-agent work whose result the
@@ -20,8 +21,10 @@ import crypto from "node:crypto";
  * `countedAsPending`; delivery pays that +1 back once. A dispatch delivered
  * inside its own turn was never counted and pays nothing back.
  *
- * In-memory like the sub-agents themselves: a restart ends the loops, and
- * boot clears the counters.
+ * The map is in memory like the sub-agents themselves; each dispatch is
+ * also a DetachedWorkStore record (opened, agents assigned, settled), so a
+ * restart that ends the loops still tells the parent once what became of
+ * them (TurnResumeService). Boot clears the counters.
  */
 
 export type DispatchDelivery = "wait" | "mailbox" | "auto_response" | "cancelled";
@@ -42,6 +45,23 @@ export interface DetachedSubAgentDispatch {
 
 const dispatches = new Map<string, DetachedSubAgentDispatch>();
 
+/** Write a dispatch's record through to DetachedWorkStore — lazily, best-effort. */
+function persist(
+  dispatch: DetachedSubAgentDispatch,
+  operation: (store: typeof DetachedWorkStoreModule, recordId: string) => Promise<void>,
+): void {
+  void import("#src/services/DetachedWorkStore")
+    .then(({ default: store, detachedWorkId }) =>
+      operation(
+        store,
+        detachedWorkId("subagent_dispatch", dispatch.parentAgentConversationId, dispatch.dispatchId),
+      ),
+    )
+    .catch(() => {
+      /* best-effort: delivery in this process is unaffected */
+    });
+}
+
 export const DetachedDispatchRegistry = {
   open(dispatch: Omit<DetachedSubAgentDispatch, "dispatchId" | "agentIds" | "countedAsPending">): DetachedSubAgentDispatch {
     const record: DetachedSubAgentDispatch = {
@@ -51,7 +71,26 @@ export const DetachedDispatchRegistry = {
       countedAsPending: false,
     };
     dispatches.set(record.dispatchId, record);
+    persist(record, (store, recordId) =>
+      store.started({
+        id: recordId,
+        itemId: record.dispatchId,
+        kind: "subagent_dispatch",
+        loopKey: record.conversationId,
+        conversationId: record.conversationId,
+        agentConversationId: record.parentAgentConversationId,
+        project: record.project,
+        username: record.username,
+        agentIds: [],
+      }),
+    );
     return record;
+  },
+
+  /** The sub-agents a dispatch covers, once they are spawned. */
+  assignAgents(dispatch: DetachedSubAgentDispatch, agentIds: string[]): void {
+    dispatch.agentIds = agentIds;
+    persist(dispatch, (store, recordId) => store.assignAgents(recordId, agentIds));
   },
 
   /**
@@ -82,6 +121,7 @@ export const DetachedDispatchRegistry = {
     if (dispatch.deliveredVia) return false;
     dispatch.deliveredVia = via;
     dispatches.delete(dispatch.dispatchId);
+    persist(dispatch, (store, recordId) => store.delivered(recordId, via));
     return dispatch.countedAsPending;
   },
 

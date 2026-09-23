@@ -56,6 +56,9 @@ export function buildTurnInputMessage(entry: TurnInputEntry): ConversationMessag
       role: "system",
       content: wrapSystemMessage(SYSTEM_MESSAGE_TAGS.HOOK_CONTEXT, entry.text),
       ...(entry.meta || {}),
+      // Not a bubble (no `_turnInput`), but still recognisable as delivered
+      // when a restart asks which entries reached the turn (TurnInputStore).
+      _turnInputId: entry.id,
     } as ConversationMessage;
   }
   const base: ConversationMessage = {

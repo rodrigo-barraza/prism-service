@@ -78,6 +78,12 @@ import {
   cleanupReminderCache,
 } from "./lifecycle/SystemReminderInjector.ts";
 import { checkCostBudget } from "./lifecycle/CostBudgetEnforcer.ts";
+import {
+  partitionResumedCalls,
+  replayPassStream,
+  stampResumedCalls,
+} from "./lifecycle/ResumedPass.ts";
+import { recordPassInFlight } from "./lifecycle/TurnRunRecorder.ts";
 import SemanticStallDetector from "./lifecycle/SemanticStallDetector.ts";
 
 import PlanningModeService from "#src/services/PlanningModeService";
@@ -251,6 +257,9 @@ export default class ReActHarness extends BaseAgenticHarness {
     let droppedToolFeedbackCount = 0;
     let hasCleanTextBreak = false;
     let hasNonBlockingDispatchBreak = false;
+    // A turn re-driven after a restart plays back the pass the restart
+    // interrupted instead of asking the model again (ResumedPass).
+    let replayPass = context.resume?.pass ?? null;
 
     // ── Semantic stall detector ──────────────────────────────
     const semanticStallDetector = new SemanticStallDetector();
@@ -302,6 +311,11 @@ export default class ReActHarness extends BaseAgenticHarness {
         type: SERVER_SENT_EVENT_TYPES.STATUS,
         message: STATUS_MESSAGES.PLAN_MODE_ENTERED,
       });
+    }
+    // The planning instruction is never persisted: a turn re-driven in plan
+    // mode gets it again.
+    if (context.resume && state.planModeActive) {
+      await PlanningModeService.injectPlanningInstruction(currentMessages);
     }
 
     // ── Register initial live status in the registry ──────────
@@ -355,11 +369,14 @@ export default class ReActHarness extends BaseAgenticHarness {
 
         // ── Mid-turn input (steering / answers / completions) ───
         // Anything that reached the TurnInputMailbox since the last
-        // boundary goes in front of this iteration's model call.
-        drainTurnInput(currentMessages, state, context, "iteration_start");
+        // boundary goes in front of this iteration's model call. A replayed
+        // pass was made before it arrived: it goes in after that batch.
+        if (!replayPass) drainTurnInput(currentMessages, state, context, "iteration_start");
 
         // ── beforePrompt hook (iteration 1 only) ──────────────
-        if (state.iterations === 1) {
+        // Not for a re-driven turn: its system prompt was assembled (and its
+        // context injected into the checkpointed messages) before the restart.
+        if (state.iterations === 1 && !context.resume) {
           const hookContext: BeforePromptHookContext = {
             messages: currentMessages,
             project,
@@ -488,7 +505,7 @@ export default class ReActHarness extends BaseAgenticHarness {
         );
 
         // ── Create per-iteration pass state ────────────────────
-        const pass = this.createPassState(passOptions);
+        const pass = this.createPassState(passOptions, { replayed: !!replayPass });
         const requestIdBase =
           context.requestId || agentConversationId || crypto.randomUUID();
         const passRequestId = `${requestIdBase}-iter-${state.iterations}`;
@@ -507,7 +524,9 @@ export default class ReActHarness extends BaseAgenticHarness {
         // back to this point so aborted partial content never reaches
         // the final transcript.
         const streamStateSnapshot = this.captureStreamStateSnapshot();
-        const stream = await this.createProviderStream(currentMessages, passOptions);
+        const stream = replayPass
+          ? replayPassStream(replayPass)
+          : await this.createProviderStream(currentMessages, passOptions);
 
         // ── Context exhaustion pre-flight ──────────────────────
         // When the output budget is critically low, createProviderStream
@@ -533,6 +552,11 @@ export default class ReActHarness extends BaseAgenticHarness {
         }
 
         await this.consumeStream(stream, pass, allowedToolNames);
+        if (replayPass) {
+          // Which of its calls finished, which were cut off (ResumedPass).
+          stampResumedCalls(pass, replayPass, approvalEngine);
+          replayPass = null;
+        }
 
         // ── Mid-stream deviation recovery ──────────────────────
         // A deviation rule (repetition, pre-emptive semantic stall, ...)
@@ -736,12 +760,21 @@ export default class ReActHarness extends BaseAgenticHarness {
             }
           }
 
+          // On record before any card or tool sees the calls, so a restart
+          // can re-drive this batch (TurnRunRecorder).
+          await recordPassInFlight(context, state, pass);
+
+          // Calls of a replayed pass that finished before the restart
+          // already ran: their recorded result stands, unasked (ResumedPass).
+          const { finished: resumedFinished, remaining: callsToGate } =
+            partitionResumedCalls(pass.pendingToolCalls);
+
           // PreToolUse runs BEFORE the approval gate (hooks → rules → mode →
           // ask): a hook deny never reaches a human, a hook `ask` becomes an
           // approval request. The gate itself fires PermissionRequest and —
           // only when a person is actually asked — Notification.
           const preToolUse = await runPreToolUseStage(
-            pass.pendingToolCalls,
+            callsToGate,
             context,
             hooks,
             state,
@@ -752,7 +785,7 @@ export default class ReActHarness extends BaseAgenticHarness {
               preToolUse.executable,
               context,
               approvalEngine,
-              { toolSchemas: this.tools.finalTools, hooks },
+              { toolSchemas: this.tools.finalTools, hooks, resume: pass.replayed === true },
             );
           if (shouldApproveAll) options.autoApprove = true;
 
@@ -760,10 +793,11 @@ export default class ReActHarness extends BaseAgenticHarness {
           // user) never run; every call the gate cleared runs in one batch.
           // Results keep the model's order.
           context._currentMessages = currentMessages;
+          const callsToRun = [...executableToolCalls, ...resumedFinished];
           const executedResults =
-            executableToolCalls.length > 0
+            callsToRun.length > 0
               ? await executeToolBatch(
-                  executableToolCalls,
+                  callsToRun,
                   context,
                   this.tools,
                   hooks,

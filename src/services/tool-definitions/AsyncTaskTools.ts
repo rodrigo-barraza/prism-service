@@ -599,7 +599,7 @@ const waitForTasks = {
           });
           return;
         }
-        if (!taskState.deliveredVia) taskState.deliveredVia = "wait";
+        AsyncTaskRegistry.markDelivered(taskState, "wait");
         entries.push({
           taskId,
           kind: "async_task",
@@ -726,18 +726,29 @@ export interface TaskCompletionNotification {
 export function formatTaskCompletionNotification(
   taskState: AsyncTaskState,
 ): TaskCompletionNotification {
-  const taskStatusEmoji = taskState.status === SYSTEM_STATUSES.COMPLETED ? "✅" : "❌";
+  const isUncertain = taskState.status === SYSTEM_STATUSES.UNCERTAIN;
+  const taskStatusEmoji =
+    taskState.status === SYSTEM_STATUSES.COMPLETED ? "✅" : isUncertain ? "⚠️" : "❌";
   const resultSummary =
     taskState.status === SYSTEM_STATUSES.COMPLETED
       ? stringifyResult(taskState.result)
       : taskState.error || "Unknown error";
+  // A restart cut it off mid-run (TurnResumeService): it may have partly
+  // happened, and it was not run again.
+  const summary = isUncertain
+    ? PromptLocaleService.get(
+        PromptLocaleService.getDefaultLocale(),
+        "harness.resume.interruptedTaskSummary",
+        { toolName: taskState.toolName, taskId: taskState.taskId },
+      )
+    : `[ASYNC TASK COMPLETED] Tool "${taskState.toolName}" (task ${taskState.taskId}) has ${taskState.status}.`;
 
   const timestamp = new Date().toISOString();
   return {
     content: [
       `<task-notification>`,
       `<status>${taskStatusEmoji} ${taskState.status}</status>`,
-      `<summary>[ASYNC TASK COMPLETED] Tool "${taskState.toolName}" (task ${taskState.taskId}) has ${taskState.status}.</summary>`,
+      `<summary>${summary}</summary>`,
       `<duration_ms>${taskState.durationMilliseconds || 0}</duration_ms>`,
       `<result>`,
       truncateForNotification(resultSummary),
@@ -806,7 +817,7 @@ export async function deliverTaskCompletion(
 ): Promise<void> {
   // 1. A wait_for_tasks call owns this result.
   if (taskState.awaitedBy) {
-    taskState.deliveredVia = "wait";
+    await markTaskDelivered(taskState, "wait");
     logger.info(
       `[AsyncTaskTools] Task ${taskState.taskId} is awaited by ${taskState.awaitedBy} — delivery left to the waiter`,
     );
@@ -849,7 +860,7 @@ export async function deliverTaskCompletion(
         // drain and TurnInputMailbox.close is returned by close() and
         // dropped (microseconds — the loop has already decided to end).
         // `deliveredVia` records the intent for a later audit.
-        taskState.deliveredVia = "mailbox";
+        await markTaskDelivered(taskState, "mailbox");
         await payBackCountedPending(taskState);
         logger.info(
           `[AsyncTaskTools] Task ${taskState.taskId} delivered to the running turn ${mailboxKey} (${posted.id})`,
@@ -867,12 +878,23 @@ export async function deliverTaskCompletion(
     logger.info(
       `[AsyncTaskTools] Task ${taskState.taskId} completed for sub-agent ${taskState.agentConversationId} after its turn ended — dropped (the orchestrator owns sub-agent wake-ups)`,
     );
+    const { default: AsyncTaskRegistry } = await import("#src/services/AsyncTaskRegistry");
+    AsyncTaskRegistry.markDelivered(taskState, "dropped");
     return;
   }
 
   // 4. Root conversation, turn already ended → wake a new turn.
-  taskState.deliveredVia = "auto_response";
+  await markTaskDelivered(taskState, "auto_response");
   await triggerAsyncTaskAutoResponse(taskState, context);
+}
+
+/** Record how a completion reached its parent (DetachedWorkStore) — once. */
+async function markTaskDelivered(
+  taskState: AsyncTaskState,
+  via: NonNullable<AsyncTaskState["deliveredVia"]>,
+): Promise<void> {
+  const { default: AsyncTaskRegistry } = await import("#src/services/AsyncTaskRegistry");
+  AsyncTaskRegistry.markDelivered(taskState, via);
 }
 
 async function triggerAsyncTaskAutoResponse(

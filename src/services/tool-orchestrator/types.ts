@@ -38,6 +38,10 @@ export interface ToolExecutionContext {
   iteration?: number;
   workspaceRoot?: string | null;
   signal?: AbortSignal;
+  /** The call being executed (ToolExecutor) — a tool that parks on its user records it. */
+  _toolCallId?: string | null;
+  /** The call is from a pass replayed after a restart (ResumedPass). */
+  _resumedCall?: boolean;
   messages?: Array<{ role: string; images?: string[]; [key: string]: unknown }>;
   _providerName?: string;
   _resolvedModel?: string;

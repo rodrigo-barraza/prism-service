@@ -579,6 +579,39 @@ setupWebSocket(wss);
           keys: { expiresAt: 1 },
           options: { expireAfterSeconds: 0 },
         },
+        // turn_runs — the turn each root loop is running (TurnRunStore),
+        // one per loop; turn_inputs / detached_work — what a restart still
+        // owes someone (TurnInputStore, DetachedWorkStore). Kept once
+        // settled only until `expiresAt`.
+        {
+          collection: COLLECTIONS.TURN_RUNS,
+          keys: { id: 1 },
+          options: { unique: true },
+        },
+        {
+          collection: COLLECTIONS.TURN_INPUTS,
+          keys: { id: 1 },
+          options: { unique: true },
+        },
+        {
+          collection: COLLECTIONS.TURN_INPUTS,
+          keys: { expiresAt: 1 },
+          options: { expireAfterSeconds: 0 },
+        },
+        {
+          collection: COLLECTIONS.DETACHED_WORK,
+          keys: { id: 1 },
+          options: { unique: true },
+        },
+        {
+          collection: COLLECTIONS.DETACHED_WORK,
+          keys: { status: 1, createdAt: 1 },
+        },
+        {
+          collection: COLLECTIONS.DETACHED_WORK,
+          keys: { expiresAt: 1 },
+          options: { expireAfterSeconds: 0 },
+        },
         // permission_decisions — approval history behind rule suggestions,
         // expired after APPROVAL_HISTORY.RETENTION_DAYS (90)
         {
@@ -651,31 +684,19 @@ setupWebSocket(wss);
     logger.error(`Failed to ensure indexes: ${getErrorMessage(error)}`);
   }
 
-  // Recover turn checkpoints orphaned by a crash/restart BEFORE clearing
-  // stale flags — a checkpoint surviving to startup means the process died
-  // mid-turn and the shadow-persisted messages must be merged into the
-  // conversation, otherwise the turn (user message included) is lost and
-  // the conversation appears as an empty stub.
+  // Turns the previous process never finished, BEFORE clearing stale flags
+  // (prompt 13). A turn whose tool batch was in progress is re-driven
+  // (TurnResumeService.start, below); every other checkpoint surviving to
+  // startup is merged into its conversation — otherwise the turn (user
+  // message included) is lost and the conversation appears as an empty
+  // stub — and the decisions of turns that will not run again lapse.
+  let resumePlan: import("./services/TurnResumeService.ts").ResumePlan = { resumable: [] };
   try {
-    const { default: ConversationService } =
-      await import("./services/ConversationService.ts");
-    for (const collection of [
-      COLLECTIONS.AGENT_CONVERSATIONS,
-      COLLECTIONS.MODEL_CONVERSATIONS,
-    ]) {
-      const recoveredCount =
-        await ConversationService.recoverOrphanedTurnCheckpoints({
-          collection,
-        });
-      if (recoveredCount > 0) {
-        logger.info(
-          `Recovered ${recoveredCount} interrupted turn(s) in ${collection} from crash checkpoints`,
-        );
-      }
-    }
+    const { default: TurnResumeService } = await import("./services/TurnResumeService.ts");
+    resumePlan = await TurnResumeService.prepare();
   } catch (error: unknown) {
     logger.error(
-      `Failed to recover orphaned turn checkpoints: ${getErrorMessage(error)}`,
+      `Failed to recover interrupted turns: ${getErrorMessage(error)}`,
     );
   }
 
@@ -986,6 +1007,19 @@ setupWebSocket(wss);
     logger.info(
       "MinIO not configured — files will be stored inline in MongoDB",
     );
+  }
+
+  // Re-drive the turns a restart interrupted, and deliver what the previous
+  // process still owed (mailbox input, background work outcomes) — once.
+  // The turns run detached, like requests.
+  try {
+    const { default: TurnResumeService } = await import("./services/TurnResumeService.ts");
+    await TurnResumeService.start(resumePlan);
+    if (resumePlan.resumable.length > 0) {
+      logger.info(`Re-driving ${resumePlan.resumable.length} turn(s) interrupted by the restart`);
+    }
+  } catch (error: unknown) {
+    logger.error(`Failed to re-drive interrupted turns: ${getErrorMessage(error)}`);
   }
 
   server.listen(PORT, () => {

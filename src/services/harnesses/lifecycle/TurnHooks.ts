@@ -170,6 +170,7 @@ export async function openTurnHooks(
       is_sub_agent: subAgent,
       provider: context.providerName,
       model: context.resolvedModel,
+      ...(context.resume ? { resumed: true } : {}),
     }),
   );
 
@@ -180,13 +181,16 @@ export async function openTurnHooks(
   };
 
   // UserPromptSubmit — one of the events allowed to block: a deny here ends
-  // the run before a single token is spent.
-  const promptVerdict = await hooks.run(
-    "userPromptSubmit",
-    payloadFor(HOOK_EVENTS.USER_PROMPT_SUBMIT, context, {
-      prompt: extractLatestUserMessageText(currentMessages),
-    }),
-  );
+  // the run before a single token is spent. A turn re-driven after a restart
+  // submits nothing: its prompt went through this before the restart.
+  const promptVerdict = context.resume
+    ? null
+    : await hooks.run(
+        "userPromptSubmit",
+        payloadFor(HOOK_EVENTS.USER_PROMPT_SUBMIT, context, {
+          prompt: extractLatestUserMessageText(currentMessages),
+        }),
+      );
   if (promptVerdict && promptVerdict.isApproved === false) {
     const reason = reasonOf(promptVerdict, "blocked by a UserPromptSubmit hook");
     logger.warn(`[TurnHooks] Prompt blocked before generation: ${reason}`);

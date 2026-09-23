@@ -73,6 +73,7 @@ import type {
   ConversationMessage,
   EmitFunction,
   ToolSchema,
+  TurnResumeState,
 } from "#src/services/harnesses/types";
 import type { ChatMessage } from "#src/types/ProviderTypes";
 import { streamWithRetries } from "#src/utils/ProviderStreamResilience";
@@ -847,6 +848,16 @@ export async function handleConversation(
  *
  * Used exclusively by the /agent route.
  */
+/**
+ * The params a turn was started with, as TurnRunStore keeps them: without
+ * the messages (the conversation and its checkpoint hold those) and
+ * without a resume payload of its own.
+ */
+function requestParamsOf(params: Record<string, unknown>): Record<string, unknown> {
+  const { messages: _messages, _resume: _resumePayload, ...request } = params;
+  return request;
+}
+
 export async function handleAgent(
   params: Record<string, unknown>,
   emit: (event: SseEvent) => void,
@@ -990,6 +1001,10 @@ export async function handleAgent(
         requestStart,
         emit,
         signal,
+        // What a restart needs to start this turn again (TurnRunRecorder),
+        // and — when this IS that restart — where it picks up.
+        request: requestParamsOf(params),
+        resume: (params._resume as TurnResumeState | undefined) ?? null,
       });
     } finally {
       if (localRelease) {
