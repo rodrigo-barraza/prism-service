@@ -379,6 +379,10 @@ export default class ReActHarness extends BaseAgenticHarness {
             workspaceEnabled: options.workspaceEnabled as boolean | undefined,
             locale: options.locale as string | undefined,
             activeRuleNames: options.activeRuleNames as string[] | undefined,
+            // A sub-agent's loop never runs under its parent's preset.
+            routingPreset: options.isSubAgent
+              ? undefined
+              : (options.routingPreset as string | undefined),
           };
           await hooks.run("beforePrompt", hookContext);
           await fireInstructionsLoaded(

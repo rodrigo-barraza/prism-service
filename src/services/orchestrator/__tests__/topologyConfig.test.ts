@@ -73,7 +73,6 @@ describe("TopologyConfig Test Suite", () => {
     toolUses: 2,
     durationMilliseconds: 120,
     iterations: 1,
-    messages: [],
     diff: { additions: 1, deletions: 0, files: ["test.txt"] },
   });
 
@@ -104,7 +103,6 @@ describe("TopologyConfig Test Suite", () => {
       toolUses: 1,
       durationMilliseconds: 80,
       iterations: 1,
-      messages: [],
     }));
   });
 
@@ -1003,7 +1001,6 @@ describe("TopologyConfig Test Suite", () => {
         toolUses: 0,
         durationMilliseconds: 50,
         iterations: 1,
-        messages: [],
         // No diff — research task
       }));
 

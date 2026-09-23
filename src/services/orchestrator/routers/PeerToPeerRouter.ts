@@ -225,6 +225,7 @@ export class PeerToPeerRouter implements TopologyRouter {
           files: member.files,
           model: member.model,
           agent: member.agent,
+          routing: member.routing,
           assignedProvider,
           assignedModel,
           agentIndex: memberIndex,

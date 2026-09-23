@@ -315,6 +315,7 @@ export async function executeToolBatch(
               _criticModel: context.options?.criticModel,
               _maxCostDollars: context.options?.maxCostDollars,
               _sharedCostBudget: context.options?._sharedCostBudget,
+              _routingPreset: context.options?.routingPreset as string | undefined,
             },
           ),
         timeoutMilliseconds,

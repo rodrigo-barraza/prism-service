@@ -78,6 +78,9 @@ import type {
 import type { ConversationMessage, LLMProvider } from "./harnesses/types.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import ConversationService from "./ConversationService.ts";
+import { resolveSubAgentModel } from "./routing/RoleModelResolver.ts";
+import { recordRoutingDecision } from "./routing/RoutingDecisionLog.ts";
+import { getInstanceType } from "#src/providers/instance-registry";
 import { COLLECTIONS, ORCHESTRATOR, NOTIFICATION_SOURCES, SYSTEM_STATUSES, AGENT_DIRECTIVES } from "#src/constants";
 
 type AgenticLoopServiceModule = typeof import("./AgenticLoopService.ts");
@@ -160,6 +163,14 @@ function resolveMaxSubAgentIterations(
         ),
       )
     : baseMaxIterations;
+}
+
+/** Two provider ids of one family — a local instance ("lm-studio-2") counts as its type. */
+function isSameProviderFamily(firstProvider: string, secondProvider: string): boolean {
+  return (
+    (getInstanceType(firstProvider) || firstProvider) ===
+    (getInstanceType(secondProvider) || secondProvider)
+  );
 }
 
 /** Active sub-agents spawned via chat tools, keyed by agentId */
@@ -255,6 +266,7 @@ export class OrchestratorService {
     agent: memberAgentName,
     assignedProvider,
     assignedModel,
+    routing: memberRouting,
     agentIndex,
     globalSpawnIndex,
     teamSize,
@@ -351,16 +363,33 @@ export class OrchestratorService {
       }
     }
 
+    // ── Role routing: the model this sub-agent runs on ──────────
+    // createTeam decided it per member (the routers carry it here); a
+    // direct caller gets the same decision now. It may name another
+    // provider than the parent's — and, for a sub-agent nothing pins,
+    // the parent's model at a lower effort (RoleModelResolver).
+    const routing =
+      memberRouting ??
+      (await resolveSubAgentModel({
+        memberAgent: memberAgentName ?? null,
+        parentAgent: agent,
+        explicitModel: model ?? null,
+        parent: {
+          provider: providerName,
+          model: resolvedModel,
+          effort: reasoningEffort ?? null,
+        },
+      }));
+
     // ── Pre-assigned instance (from createTeam batch assignment) ──
     // When createTeam calls us, it has already resolved model availability
     // and assigned instances serially with proper reservation counting.
     // Skip the entire instance selection path to avoid double-counting.
-    let subAgentProvider = assignedProvider || providerName;
-    // For local providers, the LLM can't know valid GGUF identifiers —
-    // skip the LLM-provided `model` param to prevent hallucinated names.
-    const isLocal = localModelQueue.isLocal(providerName);
-    let subAgentModel =
-      assignedModel || (isLocal ? resolvedModel : model || resolvedModel);
+    let subAgentProvider = assignedProvider || routing.provider;
+    // A local provider's GGUF identifiers were never taken from the LLM's
+    // `model` guess — resolveSubAgentModel ignores it there.
+    const isLocal = localModelQueue.isLocal(routing.provider);
+    let subAgentModel = assignedModel || routing.model;
     const isPreAssigned = !!assignedProvider;
 
     if (isPreAssigned) {
@@ -374,7 +403,10 @@ export class OrchestratorService {
       // the topology routers use (InstanceResolver / InstanceLoadBalancer).
       // Passing activeSubAgents lets load accounting see already-running
       // agents in addition to synchronous reservations.
-      const instanceContext = { providerName, resolvedModel: subAgentModel };
+      const instanceContext = {
+        providerName: routing.provider,
+        resolvedModel: subAgentModel,
+      };
       const resolvedSiblings = await resolveSiblingInstances(
         instanceContext,
         "Orchestrator",
@@ -502,11 +534,30 @@ export class OrchestratorService {
       totalRounds,
       recursionDepth: currentRecursionDepth + 1,
       thinkingEnabled,
-      reasoningEffort,
-      thinkingBudget,
+      reasoningEffort: routing.effort ?? reasoningEffort,
+      // A token budget is an Anthropic knob of the parent's model; a
+      // sub-agent routed to another provider does not carry it.
+      thinkingBudget: isSameProviderFamily(subAgentProvider, providerName)
+        ? thinkingBudget
+        : undefined,
     };
 
     activeSubAgents.set(agentId, subAgentState);
+
+    await recordRoutingDecision({
+      decision: { ...routing, provider: subAgentProvider, model: subAgentModel },
+      project,
+      username,
+      conversationId: concurrencyRootId || parentConversationId || null,
+      agentConversationId: subAgentConversationId,
+      agent,
+      subAgentId: agentId,
+      memberAgent: subAgentAgentType,
+      preset: orchestratorContext.routingPreset ?? null,
+      relatedConversationIds: [parentConversationId, agentConversationId].filter(
+        (conversationId): conversationId is string => !!conversationId,
+      ),
+    });
 
     logger.info(
       `[Orchestrator] Spawned sub-agent ${agentId}: "${description}" → ${subAgentProvider} (model="${subAgentModel}") in ${worktreePath}${subAgentState.isolated ? " (isolated worktree)" : " (shared workspace)"}`,
@@ -1306,6 +1357,15 @@ export class OrchestratorService {
       return [{ error: errorMessage }];
     }
 
+    // ── Role routing: each member's model, decided at spawn ─────
+    // (RoleModelResolver) — the member's own agent pin, the parent
+    // agent's `subagent` pin, Settings, else the parent's model at a
+    // lower effort. The routers carry the decision to spawnFromTool.
+    await OrchestratorService._routeMembers(
+      teamCreationArguments.members,
+      orchestratorContext,
+    );
+
     // Sync the active topology to the conversation settings in MongoDB so the UI badge and state match execution
     if (orchestratorContext.conversationId) {
       await TopologyExecutionService.syncTopologyToDatabase(
@@ -1521,6 +1581,28 @@ export class OrchestratorService {
     );
 
     return registeredResults;
+  }
+
+  /** Decide each member's model (subagent role) before a router assigns instances. */
+  static async _routeMembers(
+    members: TeamMember[],
+    orchestratorContext: OrchestratorContext,
+  ): Promise<void> {
+    for (const member of members) {
+      const decision = await resolveSubAgentModel({
+        memberAgent: member.agent ?? null,
+        parentAgent: orchestratorContext.agent,
+        explicitModel: member.model ?? null,
+        parent: {
+          provider: orchestratorContext.providerName,
+          model: orchestratorContext.resolvedModel,
+          effort: orchestratorContext.reasoningEffort ?? null,
+        },
+      });
+      member.routing = decision;
+      member.provider = decision.provider;
+      member.model = decision.model;
+    }
   }
 
   static async deleteTeam(
@@ -2600,6 +2682,12 @@ export class OrchestratorService {
           ...(subAgent.reasoningEffort !== undefined && {
             reasoningEffort: subAgent.reasoningEffort,
           }),
+          // Gemini reads its effort as thinkingLevel (the /agent route
+          // mirrors the two; a sub-agent's options are built here).
+          ...(subAgent.reasoningEffort !== undefined &&
+            subAgent.thinkingEnabled !== false && {
+              thinkingLevel: subAgent.reasoningEffort,
+            }),
           ...(subAgent.thinkingBudget !== undefined && {
             thinkingBudget: subAgent.thinkingBudget,
           }),

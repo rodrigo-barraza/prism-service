@@ -80,6 +80,7 @@ export const COLLECTIONS = {
   PROFILES: "profiles",
   PUSH_SUBSCRIPTIONS: "push_subscriptions",
   PENDING_DECISIONS: "pending_decisions",
+  MODEL_ROUTING_DECISIONS: "model_routing_decisions",
 };
 
 /** Shared system-wide statuses for agents, tasks, and workflows. */

@@ -68,6 +68,8 @@ export interface ToolExecutionContext {
   _maxCostDollars?: number;
   /** Shared cost accumulator threaded through the whole sub-agent tree. */
   _sharedCostBudget?: import("../harnesses/lifecycle/CostBudgetEnforcer.ts").SharedCostBudget;
+  /** The conversation's routing preset (routing/RoutingPresets). */
+  _routingPreset?: string;
 }
 
 export interface TransformedSearchToolsResult {

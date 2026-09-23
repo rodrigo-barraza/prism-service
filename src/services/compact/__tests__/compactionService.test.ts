@@ -206,14 +206,15 @@ describe("CompactionService", () => {
   ];
 
   it("returns null only when the utility role chain is truly empty (no config, no fallback, no defaults)", async () => {
-    vi.mocked(SettingsService.getSection).mockResolvedValueOnce(null as any);
+    // Compaction reads its own knob (agents) first, then the utility knob (memory).
+    vi.mocked(SettingsService.getSection).mockResolvedValueOnce(null as any).mockResolvedValueOnce(null as any);
     const result = await CompactionService.compactConversation(sampleMessages, {
       project: "test-proj",
       username: "rodrigo",
     });
     expect(result).toBeNull();
 
-    vi.mocked(SettingsService.getSection).mockResolvedValueOnce({
+    vi.mocked(SettingsService.getSection).mockResolvedValueOnce({} as any).mockResolvedValueOnce({
       extractionProvider: "",
       extractionModel: "",
     });
@@ -225,7 +226,8 @@ describe("CompactionService", () => {
   });
 
   it("is NOT silently disabled — unset settings fall back to the conversation model via the utility role", async () => {
-    vi.mocked(SettingsService.getSection).mockResolvedValueOnce({
+    // Compaction reads its own knob (agents) first, then the utility knob (memory).
+    vi.mocked(SettingsService.getSection).mockResolvedValueOnce({} as any).mockResolvedValueOnce({
       extractionProvider: "",
       extractionModel: "",
     });
@@ -253,7 +255,9 @@ describe("CompactionService", () => {
   });
 
   it("should return null if settings check throws and nothing else resolves", async () => {
-    vi.mocked(SettingsService.getSection).mockRejectedValueOnce(new Error("Database disconnected"));
+    vi.mocked(SettingsService.getSection)
+      .mockRejectedValueOnce(new Error("Database disconnected"))
+      .mockRejectedValueOnce(new Error("Database disconnected"));
     const result = await CompactionService.compactConversation(sampleMessages, {
       project: "test-proj",
       username: "rodrigo",
