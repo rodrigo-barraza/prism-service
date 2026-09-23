@@ -181,6 +181,13 @@ export interface ProviderOptions {
    * can chain turns server-side instead of replaying the transcript.
    */
   previousResponseId?: string;
+  /**
+   * The running turn's loop key (TurnInputMailbox), set by a harness that
+   * can take input natively applied mid-stream. OpenAI streams GPT-6 turns
+   * that carry it over the Responses WebSocket and steers them with
+   * `response.steer`.
+   */
+  turnInputKey?: string;
   // Provider routing
   agent?: string;
   username?: string;

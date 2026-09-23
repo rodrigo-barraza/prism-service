@@ -34,14 +34,17 @@ describe("gpt-6-sol and gpt-6-luna catalog entries", () => {
   });
 
   it.each(["gpt-6-sol", "gpt-6-luna"])(
-    "%s: 922K input + 128K output, effort none…max, Responses only",
+    "%s: 922K input + 128K output, effort none (thinking off) … max, Responses only",
     (name) => {
       const model = getModelByName(name) as unknown as Record<string, unknown>;
       expect(model).toBeTruthy();
       expect(model.provider).toBe(PROVIDERS.OPENAI);
       expect(model.maxInputTokens).toBe(922_000);
       expect(model.maxOutputTokens).toBe(128_000);
-      expect(model.thinkingLevels).toEqual(ALL_EFFORTS);
+      // "none" is thinking off — never a listed level (the catalog's shared
+      // vocabulary); canDisableThinking is how the model says it takes it.
+      expect(model.thinkingLevels).toEqual(["low", "medium", "high", "xhigh", "max"]);
+      expect(model.canDisableThinking).toBe(true);
       // Chat Completions only allows function calling at effort "none".
       expect(model.responsesAPI).toBe(true);
       expect(model.inputTypes).toEqual([MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE]);

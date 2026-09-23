@@ -10,6 +10,7 @@
 import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { mergeUsage } from "#src/utils/CostCalculator";
+import { takeNativeTurnInput } from "#src/services/harnesses/lifecycle/TurnInputDrain";
 import { stripToolCallMarkup } from "#src/utils/StreamChunkDispatcher";
 import ConversationGenerationTracker from "#src/services/ConversationGenerationTracker";
 import WebhookEventBus from "#src/services/WebhookEventBus";
@@ -256,6 +257,17 @@ export function routeStreamChunk(
         ...streamChunk.reasoningItems,
       ];
       loopState.reasoningItems = pass.reasoningItems;
+    }
+    return { action: "continue" };
+  }
+
+  // ── Mid-turn input applied natively (OpenAI response.steer) ──
+  // The continuation now streaming carries it: acknowledge it now, and the
+  // harness records it ahead of this pass's assistant message.
+  if (streamChunk?.type === "turnInputApplied") {
+    const applied = takeNativeTurnInput(streamChunk.inputIds ?? [], state, context);
+    if (applied.length > 0) {
+      pass.nativeTurnInput = [...(pass.nativeTurnInput ?? []), ...applied];
     }
     return { action: "continue" };
   }

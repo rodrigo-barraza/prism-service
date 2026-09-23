@@ -6,7 +6,11 @@ import { ProviderError } from "#src/utils/errors";
 import logger from "#src/utils/logger";
 import { extractOpenAIRateLimits } from "#src/utils/rateLimits";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
-import { OPENAI_API_KEY, OPENAI_TRANSCRIPTION_MODEL } from "#config";
+import {
+  OPENAI_API_KEY,
+  OPENAI_TRANSCRIPTION_MODEL,
+  openAIResponsesTransport,
+} from "#config";
 import {
   MODALITY_TYPES,
   MODELS,
@@ -33,6 +37,12 @@ import {
 } from "#src/utils/media";
 import { getDocumentContextText } from "#src/utils/documentContext";
 import { LOG_PREVIEW } from "#src/constants";
+import { mergeUsage } from "#src/utils/CostCalculator";
+import {
+  TURN_INPUT_APPLIED_EVENT,
+  isResponsesSocketTransportFailure,
+  openResponsesSocketStream,
+} from "#src/providers/openai-responses-socket";
 
 import type { ToolSchema } from "#src/services/harnesses/types";
 import {
@@ -94,6 +104,35 @@ export function normalizeOpenAICacheDiagnostics(
     comparedResponseId,
     raw,
   };
+}
+
+/** When the socket last failed to connect: HTTP until this passes. */
+let responsesSocketUnavailableUntil = 0;
+const RESPONSES_SOCKET_RETRY_MILLISECONDS = 5 * 60_000;
+
+function markResponsesSocketUnavailable(error: unknown): void {
+  responsesSocketUnavailableUntil = Date.now() + RESPONSES_SOCKET_RETRY_MILLISECONDS;
+  logger.warn(
+    `[OpenAI/WS] Responses WebSocket unavailable (${(error as Error)?.message ?? error}) — streaming over HTTP for ${RESPONSES_SOCKET_RETRY_MILLISECONDS / 60_000} min`,
+  );
+}
+
+/**
+ * The loop key to stream a request over the Responses WebSocket with, or
+ * null for HTTP: a turn that can take native steering (`turnInputKey`), on
+ * a model that steers, with the transport enabled and reachable.
+ */
+function responsesSocketKey(model: string, options: ProviderOptions): string | null {
+  if (!options.turnInputKey) return null;
+  if (!getModelNativeCapabilities(model).steering) return null;
+  if (openAIResponsesTransport() !== "websocket") return null;
+  if (Date.now() < responsesSocketUnavailableUntil) return null;
+  return options.turnInputKey;
+}
+
+/** Tests: forget a socket failure. */
+export function resetResponsesSocketAvailability(): void {
+  responsesSocketUnavailableUntil = 0;
 }
 
 function useResponsesAPI(model: string): boolean {
@@ -604,6 +643,8 @@ function responsesStopReason(response: unknown): string | undefined {
     incomplete_details?: { reason?: string } | null;
   } | null;
   const reason = record?.incomplete_details?.reason;
+  // Steered: interrupted by a steer; its continuation follows on the stream.
+  if (reason === "steered") return undefined;
   if (reason === "content_filter") return "content_filter";
   if (reason === "max_output_tokens" || record?.status === "incomplete") {
     return "length";
@@ -817,6 +858,14 @@ export function effortForModel(
 ): string | undefined {
   if (!effort) return undefined;
   const modelDefinition = getModelByName(model);
+  // "none" is thinking off, never a listed level: a model that can switch
+  // thinking off takes it (gpt-6-sol/luna); one that cannot, rejects it.
+  if (
+    effort === "none" &&
+    (modelDefinition as { canDisableThinking?: boolean } | null)?.canDisableThinking === true
+  ) {
+    return "none";
+  }
   const levels =
     modelDefinition && "thinkingLevels" in modelDefinition
       ? ((modelDefinition as { thinkingLevels?: string[] }).thinkingLevels ?? [])
@@ -936,6 +985,18 @@ export function withConfigurationUpdates(
   }
   result.push(...convert(messages.slice(start)));
   return result;
+}
+
+/**
+ * The effort a request asks for: thinking switched off is effort "none" on
+ * a model that takes it (the routes drop `reasoningEffort` then); anything
+ * else is the requested effort.
+ */
+function requestedResponsesEffort(model: string, options: ProviderOptions): string | undefined {
+  if (options.thinkingEnabled === false && effortForModel(model, "none") === "none") {
+    return "none";
+  }
+  return options.reasoningEffort;
 }
 
 /** Whether a response's effort is recorded on its message (configuration_update models). */
@@ -1191,7 +1252,7 @@ const openaiProvider = {
     model: string,
     options: ProviderOptions,
   ) {
-    const effortPlan = planResponsesEffort(model, messages, options.reasoningEffort);
+    const effortPlan = planResponsesEffort(model, messages, requestedResponsesEffort(model, options));
     const input = withConfigurationUpdates(messages, effortPlan.updates, prepareResponsesInput);
     const payload: OpenAI.Responses.ResponseCreateParamsNonStreaming & {
       seed?: number;
@@ -1581,7 +1642,7 @@ const openaiProvider = {
     model: string,
     options: ProviderOptions,
   ) {
-    const effortPlan = planResponsesEffort(model, messages, options.reasoningEffort);
+    const effortPlan = planResponsesEffort(model, messages, requestedResponsesEffort(model, options));
     const input = withConfigurationUpdates(messages, effortPlan.updates, prepareResponsesInput);
     const payload: OpenAI.Responses.ResponseCreateParamsStreaming & {
       seed?: number;
@@ -1735,12 +1796,38 @@ const openaiProvider = {
       `[OpenAI/Responses] Sending stream payload: ${JSON.stringify(payload)}`,
     );
 
-    const createResponseStream = () =>
-      getClient()
+    // GPT-6 agent turns stream over the Responses WebSocket (native
+    // steering, incremental continuation); the SSE request is the fallback
+    // when the socket is busy or cannot connect.
+    const socketKey = responsesSocketKey(model, options);
+    const createResponseStream = async (): Promise<{
+      data: AsyncIterable<OpenAI.Responses.ResponseStreamEvent>;
+      response: Response | null;
+    }> => {
+      if (socketKey) {
+        try {
+          const socketEvents = await openResponsesSocketStream(
+            socketKey,
+            payload as unknown as Record<string, unknown> & { input: unknown[] },
+            { signal: options.signal, steering: true, client: getClient },
+          );
+          if (socketEvents) {
+            return {
+              data: socketEvents as unknown as AsyncIterable<OpenAI.Responses.ResponseStreamEvent>,
+              response: null,
+            };
+          }
+        } catch (error: unknown) {
+          if (!isResponsesSocketTransportFailure(error)) throw error;
+          markResponsesSocketUnavailable(error);
+        }
+      }
+      return getClient()
         .responses.create(payload, {
           ...(options.signal && { signal: options.signal }),
         })
         .withResponse();
+    };
     let createdStream: Awaited<ReturnType<typeof createResponseStream>>;
     try {
       createdStream = await createResponseStream();
@@ -1767,7 +1854,9 @@ const openaiProvider = {
     const { data: streamData, response: rawStreamResponse } = createdStream;
     const rateLimits = extractOpenAIRateLimits(rawStreamResponse, model);
     let promptCacheDiagnostics: unknown;
-    let usage = null;
+    // Summed over the responses of one stream (a steer's continuation is a
+    // second response on the same socket stream).
+    let usage: TokenUsage | null = null;
     // Track function names from output_item.added events; the arguments.done
     // event may not include the name property (known OpenAI SDK issue).
     const pendingFunctions: Record<
@@ -1786,6 +1875,15 @@ const openaiProvider = {
     let phase: ResponsesPhase | undefined;
     for await (const event of streamData) {
       if (options.signal?.aborted) break;
+      // Native steering applied mid-stream: the harness records the inputs
+      // the continuation now starting carries.
+      if ((event as { type: string }).type === TURN_INPUT_APPLIED_EVENT) {
+        yield {
+          type: "turnInputApplied",
+          inputIds: (event as unknown as { inputIds: string[] }).inputIds,
+        };
+        continue;
+      }
       // Response id — the handle for stateful continuation
       if (event.type === "response.created") {
         const typedEvent = event as OpenAI.Responses.ResponseCreatedEvent;
@@ -1975,7 +2073,8 @@ const openaiProvider = {
           | OpenAI.Responses.ResponseCompletedEvent
           | OpenAI.Responses.ResponseIncompleteEvent;
         if (typedEvent.response?.usage) {
-          usage = normalizeResponsesUsage(typedEvent.response.usage);
+          const responseUsage = normalizeResponsesUsage(typedEvent.response.usage);
+          usage = usage ? (mergeUsage(usage, responseUsage) as TokenUsage) : responseUsage;
         }
         if (typedEvent.response?.id) {
           providerResponseId = typedEvent.response.id;
