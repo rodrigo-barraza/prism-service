@@ -395,6 +395,21 @@ describe("permission modes in a real loop", () => {
     await vi.waitFor(() => expect(storedMode()).toBe("default"));
   });
 
+  it("an unattended run never parks on a plan card — exit_plan_mode is refused, the plan goes in the reply", async () => {
+    await storeConversation({ permissionMode: "plan" });
+    script({ name: "exit_plan_mode", args: { summary: "1. Edit a.ts" }, id: "call-plan" });
+
+    await run({ unattended: true });
+
+    expect(emitted.filter((event) => event.type === "plan_proposal")).toEqual([]);
+    const result = JSON.parse(resultFor("call-plan"));
+    expect(result).toMatchObject({ error: "PERMISSION_MODE_DENIED" });
+    expect(result.message).toContain("Write the plan in your reply");
+    // Still in plan mode: nothing approved the plan.
+    expect(modeEvents()).toHaveLength(1);
+    expect(storedMode()).toBe("plan");
+  });
+
   it("a new conversation keeps the mode its first request named; a caller's override on an existing one is not stored", async () => {
     await storeConversation({ permissionMode: "acceptEdits" });
     script({ name: "read_file", args: { path: "a" }, id: "call-read" });

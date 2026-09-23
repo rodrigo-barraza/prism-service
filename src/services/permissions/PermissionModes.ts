@@ -150,7 +150,7 @@ export function isWorkspaceEdit(
 }
 
 /** Tools that need a person to answer — refused where nobody will. */
-const USER_INTERACTION_TOOLS = new Set(["ask_user"]);
+const USER_INTERACTION_TOOLS = new Set(["ask_user", "exit_plan_mode"]);
 
 export function requiresUserInteraction(toolName: string): boolean {
   return USER_INTERACTION_TOOLS.has(toolName);
@@ -181,8 +181,12 @@ export function unattendedDenialReason(
 }
 
 export function userInteractionDenialReason(toolName: string, mode: PermissionMode): string {
+  const instead =
+    toolName === "exit_plan_mode"
+      ? "Write the plan in your reply instead; the user will read it there."
+      : "Decide on your own and say what you assumed.";
   return (
     `[${mode === "dontAsk" ? "Don't-ask mode" : "Unattended run"}] "${toolName}" waits for the ` +
-    `user to answer, and nobody is watching this run. Decide on your own and say what you assumed.`
+    `user to answer, and nobody is watching this run. ${instead}`
   );
 }

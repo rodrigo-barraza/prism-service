@@ -151,6 +151,13 @@ export async function handleExitPlanMode(
 ): Promise<{ shouldContinueLoop: boolean }> {
   const { options, emit, signal } = context;
 
+  // A denied exit_plan_mode proposes nothing: its tool result already says
+  // why (a deny rule, or a run nobody watches — where a plan card would
+  // park the turn on a person who will never come). The loop goes on.
+  if (exitPlanToolCall._approval?.isDenied) {
+    return { shouldContinueLoop: true };
+  }
+
   // Models that stream no plan text put it in the tool's `summary` argument.
   const summaryArgument = exitPlanToolCall.args?.summary;
   const planText =
