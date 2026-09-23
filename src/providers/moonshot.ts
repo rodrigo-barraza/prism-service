@@ -23,7 +23,10 @@ import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { PROVIDERS } from "#src/constants";
 import { MODALITY_TYPES, getDefaultModels, getModelByName } from "#src/config";
-import { MOONSHOT_API_KEY, MOONSHOT_BASE_URL } from "#config";
+import { MOONSHOT_API_KEY, MOONSHOT_BASE_URL, moonshotTransport } from "#config";
+import anthropicProvider from "#src/providers/anthropic";
+import { onKimiEndpoint, streamOnKimiEndpoint } from "#src/providers/moonshot-anthropic";
+import { getModelProfile } from "#src/providers/ModelProfiles";
 import { extractOpenAIRateLimits } from "#src/utils/rateLimits";
 import {
   convertToolsToOpenAI,
@@ -62,6 +65,22 @@ function authHeaders(): Record<string, string> {
     throw new ProviderError("moonshot", "MOONSHOT_API_KEY is not set", 401);
   }
   return { Authorization: `Bearer ${MOONSHOT_API_KEY}` };
+}
+
+/**
+ * Kimi K3 goes through Moonshot's Anthropic-compatible endpoint and the
+ * Anthropic adapter (moonshot-anthropic.ts): top-level cache_control, signed
+ * thinking, effort low|high|max. MOONSHOT_TRANSPORT=openai keeps it on the
+ * Chat Completions path below, as every other Kimi model is.
+ */
+function usesAnthropicEndpoint(model: string): boolean {
+  const definition = getModelByName(model) as { anthropicCompatible?: boolean } | null;
+  return definition?.anthropicCompatible === true && moonshotTransport() === "anthropic";
+}
+
+/** Anthropic-adapter options for a Kimi call: Kimi has no Files API. */
+function anthropicOptions(options: ProviderOptions): ProviderOptions {
+  return { ...options, disableAnthropicFileSources: true };
 }
 
 function defaultModel(): string {
@@ -130,6 +149,13 @@ export function buildMoonshotPayload(
         : responseFormat;
   }
 
+  // A model with fixed sampling (Kimi K3) gets none, the default included.
+  const rejected = getModelProfile(model, PROVIDERS.MOONSHOT).rejectedParameters;
+  if (rejected.includes("temperature")) delete payload.temperature;
+  if (rejected.includes("topP")) delete payload.top_p;
+  if (rejected.includes("frequencyPenalty")) delete payload.frequency_penalty;
+  if (rejected.includes("presencePenalty")) delete payload.presence_penalty;
+
   return payload;
 }
 
@@ -145,6 +171,11 @@ const moonshotProvider = {
     options: ProviderOptions = {},
   ): Promise<GenerateTextResult> {
     logger.provider("Moonshot", `generateText model=${model}`);
+    if (usesAnthropicEndpoint(model)) {
+      return onKimiEndpoint(options, () =>
+        anthropicProvider.generateText(messages, model, anthropicOptions(options)),
+      ) as Promise<GenerateTextResult>;
+    }
     try {
       const payload = buildMoonshotPayload(messages, model, options, false);
       const response = await fetchOpenAICompat(
@@ -201,6 +232,12 @@ const moonshotProvider = {
     options: ProviderOptions = {},
   ) {
     logger.provider("Moonshot", `generateTextStream model=${model}`);
+    if (usesAnthropicEndpoint(model)) {
+      yield* streamOnKimiEndpoint(options, () =>
+        anthropicProvider.generateTextStream(messages, model, anthropicOptions(options)),
+      );
+      return;
+    }
     try {
       const payload = buildMoonshotPayload(messages, model, options, true);
       const prefixHashes = options.cacheTelemetry

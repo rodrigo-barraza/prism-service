@@ -1262,11 +1262,14 @@ const MODELS = {
     ],
   },
   // ----- Moonshot AI (Kimi) — Text Generation -----
-  // Kimi's API is OpenAI Chat Completions–compatible. Pricing is per 1M tokens
-  // from platform.moonshot.ai (K3 confirmed: 3.00 input / 0.30 cache-hit /
-  // 15.00 output). K2.6 & K2.7-Code list prices are via OpenRouter; their
-  // cache-hit rate is estimated at ~10% of input (K3's ratio) pending a
-  // published figure — adjust cachedInputPerMillion once confirmed.
+  // Kimi's API is OpenAI Chat Completions–compatible; K3 also has an
+  // Anthropic Messages–compatible endpoint (api.moonshot.ai/anthropic), which
+  // Prism uses for it (anthropicCompatible — see providers/moonshot.ts).
+  // Pricing per 1M tokens, verified 2026-09-22 against platform.kimi.ai
+  // pricing: K3 $3.00 in / $0.30 cache hit / $3.00 cache write (5 min TTL),
+  // $6.00 (1 h TTL) / $15.00 out; K2.6 $0.95 / $0.16 hit / $4.00;
+  // K2.7-Code $0.95 / $0.19 hit / $4.00. kimi-k2.5 and moonshot-v1 are
+  // retired (404) and offered nowhere.
   KIMI_K3: {
     description:
       "Moonshot's flagship Kimi K3 — a 1M-token-context reasoning model built for long-horizon coding and end-to-end agentic knowledge work.",
@@ -1275,10 +1278,20 @@ const MODELS = {
     provider: PROVIDERS.MOONSHOT,
     modelType: MODEL_TYPES.CONVERSATION,
     year: 2026,
-    defaultTemperature: 0.6,
+    defaultTemperature: 1.0,
+    // Served through the Anthropic-compatible endpoint (providers/moonshot.ts):
+    // thinking is always on, effort is output_config.effort low|high|max
+    // (default max), temperature 1.0 / top_p 0.95 are fixed (omit them), and
+    // signed thinking blocks go back unchanged.
+    anthropicCompatible: true,
+    adaptiveThinking: true,
+    thinkingAlwaysOn: true,
+    lockedSampling: true,
     pricing: {
       inputPerMillion: 3.0,
       cachedInputPerMillion: 0.3,
+      cacheWriteInputPerMillion: 3.0,
+      cacheWrite1hInputPerMillion: 6.0,
       outputPerMillion: 15.0,
     },
     maxInputTokens: 1_048_576,

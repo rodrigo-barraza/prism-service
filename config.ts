@@ -12,6 +12,7 @@ export interface ProviderInstance {
   concurrency: number;
   nickname?: string;
   apiKey?: string;
+  priorityScheduling?: boolean;
 }
 
 /**
@@ -50,6 +51,9 @@ function parseProviderInstances(
     if (apiKey) {
       entry.apiKey = apiKey;
     }
+    if (process.env[`${environmentVariablePrefix}_${index}_PRIORITY_SCHEDULING`] === "true") {
+      entry.priorityScheduling = true;
+    }
     instances.push(entry);
   }
   return instances;
@@ -83,6 +87,18 @@ export const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 export const INWORLD_BASIC = process.env.INWORLD_BASIC;
 // Moonshot AI (Kimi) — OpenAI-compatible cloud provider.
 export const MOONSHOT_API_KEY = process.env.MOONSHOT_API_KEY;
+/**
+ * Kimi K3's endpoint: "anthropic" (default — api.moonshot.ai/anthropic,
+ * through the Anthropic adapter: cache_control, signed thinking, effort) or
+ * "openai" (the Chat Completions fallback every other Kimi model uses).
+ */
+export function moonshotTransport(): "anthropic" | "openai" {
+  return process.env.MOONSHOT_TRANSPORT === "openai" ? "openai" : "anthropic";
+}
+/** TTL tier Kimi writes its prompt cache at: "5m" (default) or "1h". */
+export function moonshotCacheTtl(): "5m" | "1h" {
+  return process.env.MOONSHOT_CACHE_TTL === "1h" ? "1h" : "5m";
+}
 // Optional endpoint override — defaults to https://api.moonshot.ai/v1.
 // Set to https://api.moonshot.cn/v1 for the China region.
 export const MOONSHOT_BASE_URL = process.env.MOONSHOT_BASE_URL;
