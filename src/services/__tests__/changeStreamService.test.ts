@@ -12,8 +12,10 @@ const mockCollection = vi.fn(() => ({
   watch: mockWatch,
   updateMany: vi.fn().mockResolvedValue({ modifiedCount: 1 }),
 }));
+const mockHello = vi.fn();
 const mockDatabase = {
   collection: mockCollection,
+  admin: () => ({ command: mockHello }),
 };
 
 vi.mock("#src/wrappers/MongoWrapper", () => ({
@@ -47,6 +49,7 @@ describe("ChangeStreamService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    mockHello.mockResolvedValue({ setName: "rs0" });
   });
 
   afterEach(() => {
@@ -63,25 +66,34 @@ describe("ChangeStreamService", () => {
     getDatabaseSpy.mockRestore();
   });
 
-  it("should set available to false if test stream fails (e.g., standalone mode)", async () => {
-    mockWatch.mockImplementationOnce(() => {
-      throw new Error("Change streams only supported on replica sets");
-    });
+  it("reports change streams unavailable on a standalone server, and opens none", async () => {
+    // A standalone `hello` has no setName; `watch()` there would not throw
+    // until its first getMore, so it cannot be the probe.
+    mockHello.mockResolvedValueOnce({ isWritablePrimary: true });
 
     await ChangeStreamService.init();
 
     expect(ChangeStreamService.available).toBe(false);
+    expect(mockWatch).not.toHaveBeenCalled();
+  });
+
+  it("treats a mongos router as change-stream capable", async () => {
+    mockHello.mockResolvedValueOnce({ msg: "isdbgrid" });
+    mockWatch.mockImplementation(() => new MockChangeStream());
+
+    await ChangeStreamService.init();
+
+    expect(ChangeStreamService.available).toBe(true);
+    await ChangeStreamService.close();
+    mockWatch.mockReset();
   });
 
   it("should initialize streams and set available to true when replica sets are active", async () => {
-    const mockTestStream = new MockChangeStream();
     const mockConversationsStream = new MockChangeStream();
     const mockAgentsStream = new MockChangeStream();
     const mockRequestsStream = new MockChangeStream();
 
-    // First call is the test watch, next calls are real collection watches
     mockWatch
-      .mockReturnValueOnce(mockTestStream)
       .mockReturnValueOnce(mockConversationsStream)
       .mockReturnValueOnce(mockAgentsStream)
       .mockReturnValueOnce(mockRequestsStream);
@@ -89,20 +101,18 @@ describe("ChangeStreamService", () => {
     await ChangeStreamService.init();
 
     expect(ChangeStreamService.available).toBe(true);
-    expect(mockWatch).toHaveBeenCalledTimes(4); // 1 test watch + 3 watched collections
+    expect(mockWatch).toHaveBeenCalledTimes(3); // the 3 watched collections
 
     // Clean up
     await ChangeStreamService.close();
   });
 
   it("should subscribe, unsubscribe, and dispatch events correctly", async () => {
-    const mockTestStream = new MockChangeStream();
     const mockConversationsStream = new MockChangeStream();
     const mockAgentsStream = new MockChangeStream();
     const mockRequestsStream = new MockChangeStream();
 
     mockWatch
-      .mockReturnValueOnce(mockTestStream)
       .mockReturnValueOnce(mockConversationsStream)
       .mockReturnValueOnce(mockAgentsStream)
       .mockReturnValueOnce(mockRequestsStream);
@@ -146,13 +156,11 @@ describe("ChangeStreamService", () => {
   });
 
   it("should enrich request collection change events with conversationId", async () => {
-    const mockTestStream = new MockChangeStream();
     const mockConversationsStream = new MockChangeStream();
     const mockAgentsStream = new MockChangeStream();
     const mockRequestsStream = new MockChangeStream();
 
     mockWatch
-      .mockReturnValueOnce(mockTestStream)
       .mockReturnValueOnce(mockConversationsStream)
       .mockReturnValueOnce(mockAgentsStream)
       .mockReturnValueOnce(mockRequestsStream);
@@ -182,13 +190,11 @@ describe("ChangeStreamService", () => {
   });
 
   it("should enrich request update events with conversationId (two-phase lifecycle)", async () => {
-    const mockTestStream = new MockChangeStream();
     const mockConversationsStream = new MockChangeStream();
     const mockAgentsStream = new MockChangeStream();
     const mockRequestsStream = new MockChangeStream();
 
     mockWatch
-      .mockReturnValueOnce(mockTestStream)
       .mockReturnValueOnce(mockConversationsStream)
       .mockReturnValueOnce(mockAgentsStream)
       .mockReturnValueOnce(mockRequestsStream);
@@ -230,21 +236,19 @@ describe("ChangeStreamService", () => {
   });
 
   it("should reconnect after stream error after delay", async () => {
-    const mockTestStream = new MockChangeStream();
     const mockConversationsStream = new MockChangeStream();
     const mockAgentsStream = new MockChangeStream();
     const mockRequestsStream = new MockChangeStream();
     const mockReopenedStream = new MockChangeStream();
 
     mockWatch
-      .mockReturnValueOnce(mockTestStream)
       .mockReturnValueOnce(mockConversationsStream)
       .mockReturnValueOnce(mockAgentsStream)
       .mockReturnValueOnce(mockRequestsStream)
       .mockReturnValueOnce(mockReopenedStream);
 
     await ChangeStreamService.init();
-    expect(mockWatch).toHaveBeenCalledTimes(4);
+    expect(mockWatch).toHaveBeenCalledTimes(3);
 
     // Trigger error on the active stream
     mockConversationsStream.emit("error", new Error("Connection lost"));
@@ -253,7 +257,7 @@ describe("ChangeStreamService", () => {
     await vi.advanceTimersByTimeAsync(5000);
 
     // It should try to reopen the collection stream
-    expect(mockWatch).toHaveBeenCalledTimes(5);
+    expect(mockWatch).toHaveBeenCalledTimes(4);
 
     await ChangeStreamService.close();
   });
