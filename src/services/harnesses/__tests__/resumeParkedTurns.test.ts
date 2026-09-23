@@ -266,12 +266,6 @@ vi.mock("#src/services/ToolContext", () => ({
     cleanupInMemory: vi.fn(),
   },
 }));
-vi.mock("#src/services/permissions/PermissionRuleSet", () => ({
-  default: { load: vi.fn().mockResolvedValue(null) },
-}));
-vi.mock("#src/services/ConversationApprovalSettings", () => ({
-  default: { isAutoApproveEnabled: vi.fn().mockResolvedValue(false) },
-}));
 vi.mock("#src/services/MediaResolutionService", () => ({
   resolveMessageMediaReferences: async (messages: unknown[]) => messages,
 }));
