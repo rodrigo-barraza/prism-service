@@ -1046,8 +1046,8 @@ const ScheduledTaskService = {
     project: string,
     username: string,
     payload?: Record<string, unknown>,
-    profileId: string = getRequestContext().profileId ?? DEFAULT_PROFILE_ID,
     payloadOrigin: ExternalOrigin | null = null,
+    profileId: string = getRequestContext().profileId ?? DEFAULT_PROFILE_ID,
   ): Promise<{ success: boolean; agentConversationId: string }> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
