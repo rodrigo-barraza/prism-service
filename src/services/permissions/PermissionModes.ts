@@ -43,6 +43,21 @@ export const DEFAULT_PERMISSION_MODE: PermissionMode = "default";
 /** The mode unattended runs get when their conversation names none. */
 export const UNATTENDED_PERMISSION_MODE: PermissionMode = "dontAsk";
 
+/**
+ * Modes a persona may pin every one of its turns to
+ * (Persona.pinnedPermissionMode): those that never run more than the tier
+ * lets through. A pin exists to narrow — an agent that talks for strangers
+ * (LUPOS on Discord) must not be widened by whoever sends the request.
+ */
+export const PINNABLE_PERMISSION_MODES = ["default", "plan", "dontAsk"] as const;
+export type PinnablePermissionMode = (typeof PINNABLE_PERMISSION_MODES)[number];
+
+export function isPinnablePermissionMode(value: unknown): value is PinnablePermissionMode {
+  return (
+    typeof value === "string" && (PINNABLE_PERMISSION_MODES as readonly string[]).includes(value)
+  );
+}
+
 /** Env var naming the usernames allowed to turn `bypass` on. Empty = nobody. */
 export const BYPASS_OWNERS_ENV_VAR = "PRISM_PERMISSION_BYPASS_OWNERS";
 

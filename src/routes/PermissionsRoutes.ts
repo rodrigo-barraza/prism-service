@@ -193,11 +193,14 @@ router.post(
       );
 
       const persona = agent ? AgentPersonaRegistry.get(agent) : null;
+      // An agent that pins its mode is judged in it, with full auto off —
+      // as its turns are (resolveTurnPermissionMode).
+      const pinned = persona?.pinnedPermissionMode ?? null;
       const engine = new AutoApprovalEngine({
-        fullAuto: autoApprove === true,
+        fullAuto: autoApprove === true && !pinned,
         policies: persona?.policies ?? [],
         permissionRules: ruleSet,
-        permissionMode: permissionMode ?? null,
+        permissionMode: pinned ?? permissionMode ?? null,
       });
       const explanation = engine.explain({ id: "test", name: toolName, args });
       const decision = explanation.isDenied ? "deny" : explanation.isApproved ? "allow" : "ask";
@@ -265,6 +268,12 @@ router.put(
       if (mode === "bypass" && !canUseBypass(username)) {
         return res.status(403).json({
           error: `bypass is owner-only: "${username}" is not in ${BYPASS_OWNERS_ENV_VAR}.`,
+        });
+      }
+      const runningTurn = PermissionModeRegistry.get(conversationId);
+      if (runningTurn?.pinned) {
+        return res.status(409).json({
+          error: `This turn's agent pins its permission mode (${runningTurn.mode}); it cannot be switched.`,
         });
       }
       const stored = await ConversationApprovalSettings.setPermissionMode(

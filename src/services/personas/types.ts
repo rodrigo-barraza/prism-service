@@ -3,6 +3,7 @@ import type {
   AgentPermissionMode,
 } from "#src/services/agents/AgentDefinitionFields";
 import type { PolicyRule } from "#src/services/PolicyEngine";
+import type { PinnablePermissionMode } from "#src/services/permissions/PermissionModes";
 import type { EmotionPersonality } from "#src/services/somatic/SomaticConstants";
 import type { RoleModelSpec } from "#src/services/routing/AgentModelPins";
 
@@ -97,6 +98,16 @@ export interface Persona {
   coreToolsLocked?: boolean;
   /** Declarative tool call policies (serialized for custom agents). */
   policies?: PolicyRule[];
+  /**
+   * The permission mode every root turn of this agent runs in, whatever the
+   * request (`permissionMode`, `autoApprove`), the conversation or the
+   * settings say — and "approve all" (full auto) never applies to it
+   * (PermissionModeState.resolveTurnPermissionMode). Only modes that narrow
+   * can be pinned. For an agent that acts for whoever talks to it: LUPOS runs
+   * `dontAsk`, so a tool his APPROVE policies do not list and whose tier
+   * would ask is refused, never parked on a card nobody in the channel sees.
+   */
+  pinnedPermissionMode?: PinnablePermissionMode;
   capabilities: string;
   /** When true, tool descriptions in the system prompt are truncated to the first sentence and optional parameters are omitted. Saves ~1,500 tokens for conversational agents that don't need full parameter docs. */
   compactToolDocs?: boolean;

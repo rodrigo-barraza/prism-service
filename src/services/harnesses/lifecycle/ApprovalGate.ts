@@ -324,16 +324,18 @@ export async function checkAndWaitForApproval(
   // Mid-loop "auto-approve this conversation" (options.autoApprove flipped
   // after engine construction) answers every prompt — except those no
   // "approve all" answers: a PreToolUse hook's `ask` (the whole point of
-  // `ask`) and a write to a protected path.
+  // `ask`) and a write to a protected path. Never under a mode the persona
+  // pinned (Persona.pinnedPermissionMode): there only the mode decides.
+  const approveAll = options.autoApprove === true && options._permissionMode?.pinned !== true;
   let pending = toolCalls.filter(
     (toolCall) =>
       awaitingOriginals.has(toolCall) &&
-      (!options.autoApprove ||
+      (!approveAll ||
         toolCall._hookPermission?.decision === "ask" ||
         toolCall._approval?.alwaysAsks === true),
   );
 
-  if (options.autoApprove) {
+  if (approveAll) {
     // Stamp the skipped-over calls as approved so the decide-hook pass in
     // ToolExecutor doesn't re-veto them.
     const pendingCalls = new Set(pending);

@@ -5,6 +5,7 @@ import {
   UNATTENDED_PERMISSION_MODE,
   canUseBypass,
   isPermissionMode,
+  isPinnablePermissionMode,
   type PermissionMode,
 } from "./PermissionModes.ts";
 
@@ -34,7 +35,9 @@ export type PermissionModeSource =
   /** The user approved the plan — plan mode is over. */
   | "plan_approved"
   /** `bypass` was asked for by someone it is not open to. */
-  | "owner_check";
+  | "owner_check"
+  /** The agent's persona pins every turn to one mode (Persona.pinnedPermissionMode). */
+  | "persona";
 
 export interface PermissionModeChange {
   mode: PermissionMode;
@@ -52,15 +55,26 @@ export class PermissionModeHandle {
    * read-only when a timer fires on it.
    */
   readonly unattended: boolean;
+  /**
+   * The persona pinned this mode: nothing switches it (the selector, an
+   * approved plan), and "approve all" (full auto) does not apply to the run
+   * (AutoApprovalEngine, ApprovalGate).
+   */
+  readonly pinned: boolean;
   private readonly listeners = new Set<(change: PermissionModeChange) => void>();
 
   constructor(
     mode: PermissionMode,
-    { source = "settings", unattended = false }: { source?: PermissionModeSource; unattended?: boolean } = {},
+    {
+      source = "settings",
+      unattended = false,
+      pinned = false,
+    }: { source?: PermissionModeSource; unattended?: boolean; pinned?: boolean } = {},
   ) {
     this.current = mode;
     this.currentSource = source;
     this.unattended = unattended;
+    this.pinned = pinned;
   }
 
   get mode(): PermissionMode {
@@ -79,6 +93,12 @@ export class PermissionModeHandle {
   /** Switch modes. Returns whether anything changed; listeners hear only real changes. */
   set(mode: PermissionMode, source: PermissionModeSource): boolean {
     if (mode === this.current) return false;
+    if (this.pinned) {
+      logger.warn(
+        `[PermissionModes] ${source} asked for ${mode}; this run's persona pins ${this.current}, so it stays`,
+      );
+      return false;
+    }
     const previousMode = this.current;
     this.current = mode;
     this.currentSource = source;
@@ -152,6 +172,8 @@ export interface ResolvedPermissionMode {
 /**
  * The mode a turn starts in:
  *
+ *   0. the persona's pinned mode (Persona.pinnedPermissionMode) — whatever
+ *      the request, the conversation or the settings say;
  *   1. the request's `permissionMode` (the client's selector, or a caller's
  *      explicit override);
  *   2. unattended runs: the conversation's stored mode when it names one
@@ -167,12 +189,17 @@ export async function resolveTurnPermissionMode({
   unattended = false,
   storedMode,
   username,
+  pinned,
 }: {
   requested?: unknown;
   unattended?: boolean;
   storedMode: PermissionMode | null;
   username?: string | null;
+  /** The agent persona's pinned mode, if it pins one. */
+  pinned?: unknown;
 }): Promise<ResolvedPermissionMode> {
+  if (isPinnablePermissionMode(pinned)) return { mode: pinned, source: "persona" };
+
   let resolved: ResolvedPermissionMode;
   if (isPermissionMode(requested)) {
     resolved = { mode: requested, source: "request" };

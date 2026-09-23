@@ -428,21 +428,47 @@ export default class AgenticLoopService {
       isRoot && conversationId && !context.isNewConversation
         ? await ConversationApprovalSettings.getPermissionMode(conversationId, project, username)
         : null;
+    // A persona that speaks for strangers pins its mode (LUPOS: dontAsk), so
+    // no request — `permissionMode`, `autoApprove`, a stored conversation
+    // mode — widens what its turns may do.
+    let pinned: string | null = null;
+    if (context.agent) {
+      const { default: AgentPersonaRegistry } = await import("./AgentPersonaRegistry.ts");
+      pinned = AgentPersonaRegistry.get(context.agent)?.pinnedPermissionMode ?? null;
+    }
     const resolved = await resolveTurnPermissionMode({
       requested: options.permissionMode,
       unattended: options.unattended === true,
       storedMode,
       username,
+      pinned,
     });
+    const isPinned = resolved.source === "persona";
     const handle = new PermissionModeHandle(resolved.mode, {
       source: resolved.source,
       unattended: options.unattended === true,
+      pinned: isPinned,
     });
     options._permissionMode = handle;
     if (resolved.refusedBypass) {
       logger.warn(
         `[PermissionModes] ${conversationId}: ${resolved.refusedBypass.reason}; running in ${resolved.mode}`,
       );
+    }
+    if (isPinned) {
+      const asked = [
+        options.permissionMode && options.permissionMode !== resolved.mode
+          ? `permissionMode "${String(options.permissionMode)}"`
+          : null,
+        options.autoApprove ? "autoApprove" : null,
+      ].filter(Boolean);
+      if (asked.length > 0) {
+        logger.info(
+          `[PermissionModes] ${conversationId}: agent ${context.agent} pins ${resolved.mode}; ignoring ${asked.join(" and ")}`,
+        );
+      }
+      // Full auto is the one switch the mode layer does not cover.
+      options.autoApprove = false;
     }
     if (!isRoot || !conversationId) return () => {};
 
