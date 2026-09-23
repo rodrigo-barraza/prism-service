@@ -68,6 +68,17 @@ export function recordSaveMemoryProvenance(
   return provenance;
 }
 
+/**
+ * A save whose loop was never recorded (no trace headers, an entry that
+ * expired): nobody can say what the model had read, so it is treated as
+ * untrusted — quarantined for review rather than trusted by default.
+ */
+export const UNRECORDED_SAVE_PROVENANCE: MemoryProvenance = {
+  source: "assistant",
+  trust: "untrusted",
+  sourceRefs: [{ source: "assistant", trust: "untrusted", detail: "provenance-unrecorded" }],
+};
+
 /** The provenance recorded for this call, found by the trace headers tools-service forwards. */
 export function savedMemoryProvenanceFor(
   headers: Record<string, string | string[] | undefined>,

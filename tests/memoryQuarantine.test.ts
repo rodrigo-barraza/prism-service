@@ -57,6 +57,7 @@ const { recordSaveMemoryProvenance, clearSaveMemoryProvenance } = await import(
   "#src/services/memory/SaveMemoryProvenance"
 );
 const { COLLECTIONS } = await import("#src/constants");
+const { createAuthMiddleware } = await import("@rodrigo-barraza/utilities-library/service");
 
 const PROJECT = "prism-test";
 const WEB: MemoryProvenance = {
@@ -278,7 +279,11 @@ describe("rendering", () => {
 });
 
 describe("/agent-memories routes", () => {
-  const app = express().use(express.json()).use("/agent-memories", agentMemoriesRouter);
+  // The identity middleware the real app mounts (req.project, req.username).
+  const app = express()
+    .use(express.json())
+    .use(createAuthMiddleware())
+    .use("/agent-memories", agentMemoriesRouter);
 
   it("quarantines a save_memory made after the loop read a web page", async () => {
     recordSaveMemoryProvenance({
@@ -313,6 +318,38 @@ describe("/agent-memories routes", () => {
       .expect(200);
     expect(response.body).toMatchObject({ quarantined: false, source: "assistant", trust: "derived" });
     expect(response.body).not.toHaveProperty("message");
+  });
+
+  it("quarantines a save_memory whose loop was never recorded (fails closed)", async () => {
+    const response = await request(app)
+      .post("/agent-memories")
+      .set("x-conversation-id", "conv-never-recorded")
+      .send({ content: "Something nobody can vouch for." })
+      .expect(200);
+    expect(response.body).toMatchObject({ quarantined: true, trust: "untrusted", status: "pending_review" });
+    expect(response.body.message).toMatch(/could not be checked/);
+    expect(response.body.sourceRefs).toEqual([
+      expect.objectContaining({ detail: "provenance-unrecorded" }),
+    ]);
+  });
+
+  it("reviews every pending memory in a project at once", async () => {
+    await store(WEB);
+    await store(WEB, { title: "Editor theme", content: "A forum post says the user writes code in Helix." });
+    await MemoryService.store({ agent: "CODING", project: "other-project", ...FACT, provenance: WEB });
+
+    await request(app).post(`/agent-memories/review-all?project=${PROJECT}`).send({ decision: "maybe" }).expect(400);
+    const response = await request(app)
+      .post(`/agent-memories/review-all?project=${PROJECT}&agent=CODING`)
+      .send({ decision: "reject" })
+      .expect(200);
+
+    expect(response.body).toEqual({ success: true, decision: "reject", reviewed: 2 });
+    const pending = (await allMemories()).filter(
+      (memory) => memory.quarantined === true && memory.validTo === null,
+    );
+    // Only the other project's memory is still waiting.
+    expect(pending.map((memory) => memory.project)).toEqual(["other-project"]);
   });
 
   it("finds the recorded provenance by request id when no conversation id is forwarded", async () => {

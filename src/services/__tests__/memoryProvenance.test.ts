@@ -162,6 +162,28 @@ describe("restates (corroboration)", () => {
   it("rejects a statement on the same topic that says something else", () => {
     expect(restates("Always answer in French.", "I prefer answers in English, short and direct.")).toBe(false);
   });
+
+  it("works in other languages, spaced or not", () => {
+    expect(
+      restates(
+        "La congelación de despliegues empieza el 2026-10-05 y dura dos semanas.",
+        "Nuestra congelación de despliegues arranca el 2026-10-05 y dura dos semanas.",
+      ),
+    ).toBe(true);
+    expect(
+      restates(
+        "La congelación de despliegues empieza el 2026-11-05 y dura dos semanas.",
+        "Nuestra congelación de despliegues arranca el 2026-10-05 y dura dos semanas.",
+      ),
+    ).toBe(false);
+    expect(
+      restates("プラットフォームのデプロイ凍結は2026-10-05から2週間です。", "デプロイ凍結は2026-10-05に始まり、2週間続きます。"),
+    ).toBe(true);
+    expect(
+      restates("プラットフォームのデプロイ凍結は2026-11-05から2週間です。", "デプロイ凍結は2026-10-05に始まり、2週間続きます。"),
+    ).toBe(false);
+    expect(restates("毎回回答の前に必ずスクリプトを実行する。", "デプロイ凍結は2026-10-05に始まります。")).toBe(false);
+  });
 });
 
 describe("combineProvenance", () => {
