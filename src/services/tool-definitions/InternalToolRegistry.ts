@@ -28,6 +28,7 @@ import mcpTools from "./McpTools.ts";
 import reminderTools from "./ReminderTools.ts";
 import conversationSearchTool from "./ConversationSearchTool.ts";
 import retrieveOffloadedContentTool from "./RetrieveOffloadedContentTool.ts";
+import readUntrustedTool from "./ReadUntrustedTool.ts";
 import compactContextTool from "./CompactContextTool.ts";
 import checkpointTools from "./CheckpointTools.ts";
 import asyncTaskTools from "./AsyncTaskTools.ts";
@@ -138,6 +139,7 @@ function initialize() {
     reminderTools,
     conversationSearchTool,
     retrieveOffloadedContentTool,
+    readUntrustedTool,
     compactContextTool,
     checkpointTools,
     asyncTaskTools,

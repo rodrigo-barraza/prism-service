@@ -61,6 +61,9 @@ export const INTERNAL_TOOL_EMOJIS: Record<string, string[]> = {
   // Programmatic tool composition
   run_tool_program: ["🧮", "🔧"],
 
+  // Quarantined reader (untrusted content → schema-valid JSON)
+  read_untrusted: ["🧪", "📄"],
+
   // Goals (persistent objective on the conversation)
   set_goal: ["🎯", "📝"],
   update_goal: ["🎯", "📈"],

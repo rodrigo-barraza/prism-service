@@ -1,4 +1,5 @@
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { LOCAL_TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
 import { type PersonaContext, type ToolPolicySection } from "./types.ts";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import PromptLocaleService from "#src/services/PromptLocaleService";
@@ -204,6 +205,15 @@ const PROACTIVE_MEMORY_POLICY_SECTION: ToolPolicySection = {
   requires: [TOOL_NAMES.SAVE_MEMORY],
 };
 
+// Gated on read_untrusted being in the native tool array: the section
+// tells the model to call it.
+const UNTRUSTED_READER_POLICY_SECTION: ToolPolicySection = {
+  content: (locale) =>
+    PromptLocaleService.get(locale, "tool-policy.untrustedReader"),
+  requires: [LOCAL_TOOL_NAMES.READ_UNTRUSTED],
+  requiresResolved: true,
+};
+
 const AUDIO_TRACKER_POLICY_SECTION: ToolPolicySection = {
   content: (locale) =>
     PromptLocaleService.get(locale, "tool-policy.audioTracker"),
@@ -228,6 +238,7 @@ const AUDIO_TRACKER_POLICY_SECTION: ToolPolicySection = {
  * - Tool Discovery (how to search for and enable tools)
  * - Task Management (proactive task tracking)
  * - Proactive Memory (auto-save user preferences)
+ * - Untrusted Reader (read third-party text through read_untrusted)
  * - Audio Tracker (incremental multi-track composition workflow)
  */
 export function buildToolPolicy(
@@ -240,6 +251,7 @@ export function buildToolPolicy(
     TOOL_DISCOVERY_POLICY_SECTION,
     TASK_MANAGEMENT_POLICY_SECTION,
     PROACTIVE_MEMORY_POLICY_SECTION,
+    UNTRUSTED_READER_POLICY_SECTION,
     AUDIO_TRACKER_POLICY_SECTION,
     ...sections,
   ];
