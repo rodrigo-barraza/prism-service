@@ -1,7 +1,7 @@
 import type { Collection, Document } from "mongodb";
 import { MONGO_DB_NAME } from "#config";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
-import { COLLECTIONS, TURN_INPUT, TURN_RESUME } from "#src/constants";
+import { COLLECTIONS, TURN_INPUT } from "#src/constants";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import type { TurnInputEntry } from "#src/services/TurnInputMailbox";
@@ -14,8 +14,10 @@ import type { DecisionOwner } from "#src/services/PendingDecisionStore";
  *
  * An entry is written when the mailbox accepts it and forgotten when the
  * turn that accepted it ends (by then it is in the turn's persisted
- * messages, or it was dropped exactly as it always was). One still here
- * when a process starts was accepted by a turn that never finished; the
+ * messages, or it was dropped exactly as it always was). No expiry: a turn
+ * parked on its user waits as long as it takes, and so does its input. One
+ * still here when a process starts was accepted by a turn that never
+ * finished; the
  * turn's messages say whether it got in — an injected message carries the
  * entry's id (`_turnInput.id`, `_turnInputId`) — and TurnResumeService
  * delivers the rest once: into the re-driven turn, or into the transcript.
@@ -27,7 +29,6 @@ export interface StoredTurnInput extends TurnInputEntry {
   username?: string | null;
   agent?: string | null;
   conversationCollection?: string | null;
-  expiresAt: Date;
 }
 
 function collection(): Collection<Document> | null {
@@ -62,7 +63,6 @@ const TurnInputStore = {
         username: owner.username ?? null,
         agent: owner.agent ?? null,
         conversationCollection: owner.conversationCollection ?? null,
-        expiresAt: new Date(entry.receivedAt + TURN_RESUME.SETTLED_RETENTION_DAYS * 86_400_000),
       });
     } catch (error: unknown) {
       logger.warn(`[TurnInputStore] Could not record ${entry.id} for ${loopKey}: ${getErrorMessage(error)}`);
