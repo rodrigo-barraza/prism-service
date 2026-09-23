@@ -80,6 +80,11 @@ describe("the engine in auto mode", () => {
     expect(engine.check({ ...editInside })).toMatchObject({ isApproved: true, reason: "workspace_edit" });
     expect(engine.check({ ...shell })).toMatchObject({ isApproved: false, awaitsClassifier: true, layer: "classifier" });
     expect(engine.check({ ...shell }).isDenied).toBeFalsy();
+    // run_git only reads (status / diff / log): no classifier call for a look at the repo.
+    expect(engine.check({ id: "g", name: "run_git", args: { action: "status" } })).toMatchObject({
+      isApproved: true,
+      reason: "read_only",
+    });
   });
 
   it("reads a sub-agent's task before it starts, though delegating is read-only as a tool", () => {
