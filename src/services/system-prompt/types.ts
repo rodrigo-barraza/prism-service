@@ -9,11 +9,14 @@ export interface DirectoryData {
   entries: DirectoryEntry[];
 }
 
-export interface ScoredSkill {
-  name: string;
-  content: string;
-  description: string;
-  score: number;
+/**
+ * The skills a turn's prompt can name: the catalog (stable, name order —
+ * it sits in the cached system prompt) and the entries relevance scoring
+ * highlights for this turn's message. Neither carries a body.
+ */
+export interface SkillCatalogResult {
+  entries: Array<{ name: string; description: string }>;
+  highlighted: string[];
 }
 
 export interface PlatformContext {
@@ -66,8 +69,12 @@ export interface AssemblerContext {
   locale?: string;
   /** Names of user-pinned rules to inject as an <active-rules> section */
   activeRuleNames?: string[];
+  /** Skills highlighted for this turn (names only; bodies load on demand). */
   _injectedSkills?: string[];
+  /** Per-turn skill text (the highlight), inside the injected context message. */
   _skillsText?: string;
+  /** The catalog section, inside the system prompt. */
+  _skillCatalogText?: string;
   _currentMessages?: Array<Record<string, unknown>>;
   [key: string]: unknown;
 }
@@ -95,6 +102,7 @@ export interface SkillFetchOptions {
   traceId?: string | null;
   agentConversationId?: string | null;
   endpoint?: string;
+  /** Persona asking; skills bound to another persona are left out. */
   agent?: string | null;
   /** Defaults to the request's profile (ALS), then "default". */
   profileId?: string | null;

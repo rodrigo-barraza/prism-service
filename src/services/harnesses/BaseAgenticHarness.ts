@@ -645,11 +645,17 @@ export default class BaseAgenticHarness {
     // 3. Tool schemas (serialized JSON function definitions)
     const toolSchemas = this.tools.finalTools;
 
-    // 4. Injected skills text (lives inside the messages array; the tracker
-    //    carves it out of the message estimate as its own budget category)
+    // 4. Skills — the per-turn highlight (inside the messages array) and
+    //    the catalog (inside the system prompt); the tracker carves each out
+    //    of its host estimate as the skills budget category
     const skillsText =
       (this.context.options?._skillsText as string | undefined) || "";
     const skillTokens = skillsText ? estimateTokens(skillsText) : 0;
+    const skillCatalogText =
+      (this.context.options?._skillCatalogText as string | undefined) || "";
+    const skillCatalogTokens = skillCatalogText
+      ? estimateTokens(skillCatalogText)
+      : 0;
 
     // Delegate budget computation and SSE emission to the tracker
     if (tracker) {
@@ -660,6 +666,7 @@ export default class BaseAgenticHarness {
           toolSchemas,
           requestedMaxTokens,
           skillTokens,
+          skillCatalogTokens,
         );
 
       this.lastEstimatedTotalInputTokens = adjustedInput;
@@ -672,7 +679,7 @@ export default class BaseAgenticHarness {
           `messages=${estimatedMessageTokens}${calibrationRatio !== null ? ` (calibrated ×${calibrationRatio.toFixed(3)})` : ""}, ` +
           `systemPrompt=${estimateTokens(systemPromptText)} (${systemPromptText.length} chars), ` +
           `toolSchemas=${toolSchemas.length > 0 ? estimateTokens(JSON.stringify(toolSchemas)) : 0} (${toolSchemas.length} tools), ` +
-          `skills=${skillTokens}, ` +
+          `skills=${skillTokens + skillCatalogTokens} (catalog ${skillCatalogTokens}), ` +
           `adjusted=${adjustedInput}, available=${availableForOutput}, ` +
           `requested=${requestedMaxTokens}, ` +
           `willClamp=${requestedMaxTokens ? requestedMaxTokens > availableForOutput : false}`,

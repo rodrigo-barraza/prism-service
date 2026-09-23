@@ -83,6 +83,9 @@
   "execute_skill": {
     "missingSkillId": "skillId is required"
   },
+  "load_skill": {
+    "missingName": "name is required"
+  },
   "delete_skill": {
     "missingSkillId": "skillId is required"
   },
