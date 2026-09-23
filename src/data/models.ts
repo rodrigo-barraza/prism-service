@@ -1463,6 +1463,43 @@ const MODELS = {
     tools: ["Thinking", "Google Search", "Tool Calling"],
   },
 
+  // Stable 2026-09 — replaces gemini-3.1-flash-live-preview. Verified
+  // 2026-09-22 against its model page: 131,072 in / 65,536 out, thinking is
+  // interleaved and "thinking_level configuration is no longer supported"
+  // (so no thinkingLevels), no caching.
+  GEMINI_38_LIVE: {
+    description:
+      "Google's Gemini 3.8 Live — the default Live API model for low-latency voice agents, with interleaved reasoning.",
+    name: "gemini-3.8-live",
+    label: "Gemini 3.8 Live",
+    provider: PROVIDERS.GOOGLE,
+    modelType: MODEL_TYPES.CONVERSATION,
+    year: 2026,
+    defaultTemperature: 1.0,
+    // Sampling deprecated (see gemini-3.6-flash).
+    lockedSampling: true,
+    pricing: {
+      inputPerMillion: 0.75,
+      audioInputPerMillion: 3.0,
+      outputPerMillion: 4.5,
+      audioOutputPerMillion: 12.0,
+    },
+    maxInputTokens: 131_072,
+    maxOutputTokens: 65_536,
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.AUDIO, MODALITY_TYPES.VIDEO],
+    outputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.AUDIO],
+    mediaLimits: {
+      image: { maxCount: 3000, maxSizeMB: 100 },
+      audio: { maxCount: 50, maxSizeMB: 100 },
+      video: { maxCount: 10, maxSizeMB: 100 },
+    },
+    streaming: true,
+    thinking: true,
+    liveAPI: true,
+    webSearch: "Google Search",
+    tools: ["Thinking", "Google Search", "Tool Calling"],
+  },
+
   GEMINI_35_FLASH: {
     description:
       "Google's Gemini 3.5 Flash, bringing higher reasoning scores, visual understanding, and rapid multimodal performance.",
@@ -1521,6 +1558,10 @@ const MODELS = {
     modelType: MODEL_TYPES.CONVERSATION,
     year: 2026,
     defaultTemperature: 1.0,
+    // temperature / top_p / top_k are deprecated from this model on:
+    // accepted and ignored today, a 400 in later generations (Gemini API
+    // changelog). Never sent (buildGenerateConfig).
+    lockedSampling: true,
     // Promotional rate, in effect through 2026-12-31; reverts to $1.50 in /
     // $7.50 out (cached $0.15) on 2027-01-01. Audio input is not published
     // separately for this tier — carried at Google's usual 2x input ratio.
@@ -1568,6 +1609,8 @@ const MODELS = {
     default: true,
     year: 2026,
     defaultTemperature: 1.0,
+    // Sampling deprecated (see gemini-3.6-flash).
+    lockedSampling: true,
     // Promotional rate, in effect through 2026-12-31; reverts to $1.50 in /
     // $7.50 out (cached $0.15) on 2027-01-01. Audio input is not published
     // separately for this tier — carried at Google's usual 2x input ratio.
@@ -1597,6 +1640,56 @@ const MODELS = {
     // (verified 200). Stated explicitly because the absence of "minimal" is
     // otherwise read as "thinking is always on", which is true of 3.1 Pro but
     // NOT of this model.
+    canDisableThinking: true,
+    webSearch: "Google Search",
+    codeExecution: true,
+    urlContext: true,
+    tools: [
+      "Thinking",
+      "Google Search",
+      "Tool Calling",
+      "Code Execution",
+      "URL Context",
+    ],
+  },
+
+  // GA 2026-09-02. Verified 2026-09-22 against ai.google.dev (models page,
+  // model page, pricing) and live: "minimal" is a 400 ("Thinking level
+  // MINIMAL is not supported for this model"), thinkingBudget: 0 is a 200.
+  // Same introductory rate card as 3.6/3.7 Flash through 2026-12-31 ($1.50 in
+  // / $7.50 out / $0.15 cached from 2027-01-01). Not the Flash default.
+  GEMINI_38_FLASH: {
+    description:
+      "Google's Gemini 3.8 Flash (GA 2026-09-02) — the most capable Flash model, built for long-horizon software engineering, autonomous agents and complex enterprise workflows.",
+    name: "gemini-3.8-flash",
+    label: "Gemini 3.8 Flash",
+    provider: PROVIDERS.GOOGLE,
+    modelType: MODEL_TYPES.CONVERSATION,
+    year: 2026,
+    defaultTemperature: 1.0,
+    // Sampling deprecated (see gemini-3.6-flash).
+    lockedSampling: true,
+    pricing: {
+      inputPerMillion: 0.75,
+      cachedInputPerMillion: 0.075,
+      audioInputPerMillion: 1.5,
+      outputPerMillion: 3.75,
+      webSearchPer1kCalls: 14.0,
+    },
+    maxInputTokens: 1_048_576,
+    maxOutputTokens: 65_536,
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.AUDIO, MODALITY_TYPES.VIDEO, MODALITY_TYPES.PDF],
+    outputTypes: [MODALITY_TYPES.TEXT],
+    mediaLimits: {
+      image: { maxCount: 3000, maxSizeMB: 100 },
+      audio: { maxCount: 50, maxSizeMB: 100 },
+      video: { maxCount: 10, maxSizeMB: 100 },
+      pdf: { maxCount: 50, maxSizeMB: 100 },
+    },
+    streaming: true,
+    thinking: true,
+    thinkingLevels: ["low", "medium", "high"],
+    // No "minimal"; thinking switches off with thinkingBudget: 0.
     canDisableThinking: true,
     webSearch: "Google Search",
     codeExecution: true,
@@ -1659,6 +1752,8 @@ const MODELS = {
     modelType: MODEL_TYPES.CONVERSATION,
     year: 2026,
     defaultTemperature: 1.0,
+    // Sampling deprecated (see gemini-3.6-flash).
+    lockedSampling: true,
     pricing: {
       inputPerMillion: 0.3,
       cachedInputPerMillion: 0.03,

@@ -145,6 +145,10 @@ export interface ConversationMessage {
   providerResponseId?: string;
   /** OpenAI Responses API reasoning effort in effect when this message was produced — where a configuration_update goes on replay. */
   responsesEffort?: string;
+  /** Gemini: the turn's parts in order, with their thought signatures. */
+  geminiParts?: import("#src/types/admin").GeminiReplayPart[];
+  /** Sources a grounded answer cited. */
+  citations?: import("#src/types/admin").MessageCitations;
   images?: string[];
   audio?: string;
   timestamp?: string;
@@ -372,6 +376,10 @@ export interface PassState {
   providerResponseId?: string;
   /** OpenAI Responses API reasoning effort this pass ran at (configuration_update models). */
   responsesEffort?: string;
+  /** Gemini: this pass's parts in order, with their thought signatures. */
+  geminiParts?: import("#src/types/admin").GeminiReplayPart[];
+  /** Sources this pass's grounded answer cited. */
+  citations?: import("#src/types/admin").MessageCitations;
   /** Mid-turn input the provider applied natively during this pass (OpenAI response.steer). */
   nativeTurnInput?: ConversationMessage[];
   /** Prompt-cache telemetry the adapter reported for this pass's request. */
@@ -464,6 +472,11 @@ export interface StreamChunk {
   phase?: ResponsesPhase;
   reasoningItems?: ResponsesReasoningItem[];
   responsesEffort?: string;
+  geminiParts?: import("#src/types/admin").GeminiReplayPart[];
+  // Grounding citations (type: "citations")
+  sources?: import("#src/types/admin").MessageCitations["sources"];
+  queries?: string[];
+  supports?: import("#src/types/admin").MessageCitations["supports"];
   // Native steering applied (type: "turnInputApplied")
   inputIds?: string[];
   // A native async tool call (type: "toolCall")
