@@ -100,6 +100,8 @@ export interface FinalizerPayload {
   reasoningItems?: ResponsesReasoningItem[];
   providerResponseId?: string;
   responsesEffort?: string;
+  geminiParts?: import("#src/types/admin").GeminiReplayPart[];
+  citations?: import("#src/types/admin").MessageCitations;
   /** Anthropic thinking blocks of the final pass, verbatim and in order. */
   thinkingBlocks?: AnthropicThinkingBlock[];
   /** A safety-classifier refusal that ended the turn. */
@@ -196,6 +198,8 @@ export async function finalizeTextGeneration(
     reasoningItems,
     providerResponseId,
     responsesEffort,
+    geminiParts,
+    citations,
     thinkingBlocks,
     refusal,
     servedModel,
@@ -440,6 +444,8 @@ export async function finalizeTextGeneration(
       reasoningItems,
       providerResponseId,
       responsesEffort,
+      geminiParts,
+      citations,
       thinkingBlocks,
       refusal,
     });
@@ -797,6 +803,8 @@ export function assembleMessagesToAppend(options: {
   reasoningItems?: ResponsesReasoningItem[];
   providerResponseId?: string;
   responsesEffort?: string;
+  geminiParts?: import("#src/types/admin").GeminiReplayPart[];
+  citations?: import("#src/types/admin").MessageCitations;
   /** Anthropic thinking blocks of the final pass. */
   thinkingBlocks?: AnthropicThinkingBlock[];
   /** A safety-classifier refusal that ended the turn. */
@@ -822,6 +830,8 @@ export function assembleMessagesToAppend(options: {
     reasoningItems,
     providerResponseId,
     responsesEffort,
+    geminiParts,
+    citations,
     thinkingBlocks,
     refusal,
   } = options;
@@ -833,6 +843,8 @@ export function assembleMessagesToAppend(options: {
     ...(reasoningItems && reasoningItems.length > 0 && { reasoningItems }),
     ...(providerResponseId && { providerResponseId }),
     ...(responsesEffort && { responsesEffort }),
+    ...(geminiParts && geminiParts.length > 0 && { geminiParts }),
+    ...(citations && { citations }),
     ...(thinkingBlocks && thinkingBlocks.length > 0 && { thinkingBlocks }),
   };
 

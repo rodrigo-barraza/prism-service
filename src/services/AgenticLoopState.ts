@@ -124,6 +124,8 @@ export default class AgenticLoopState {
   reasoningItems?: Array<{ id: string; summary: Array<{ type: string; text: string }>; encrypted_content?: string }>;
   providerResponseId?: string;
   responsesEffort?: string;
+  geminiParts?: import("#src/types/admin").GeminiReplayPart[];
+  citations?: import("#src/types/admin").MessageCitations;
   /** Anthropic thinking blocks of the final pass (reset with each pass). */
   thinkingBlocks?: AnthropicThinkingBlock[];
   /** Set when a safety classifier declined the turn; stored on the final message. */

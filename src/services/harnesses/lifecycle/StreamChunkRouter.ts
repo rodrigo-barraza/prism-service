@@ -247,6 +247,14 @@ export function routeStreamChunk(
       pass.responsesEffort = streamChunk.responsesEffort;
       loopState.responsesEffort = streamChunk.responsesEffort;
     }
+    // Gemini reports its parts once per response ([] when none need
+    // replaying): the loop state tracks the newest pass, citations included.
+    if (streamChunk.geminiParts) {
+      const parts = streamChunk.geminiParts.length > 0 ? streamChunk.geminiParts : undefined;
+      pass.geminiParts = parts;
+      loopState.geminiParts = parts;
+      loopState.citations = undefined;
+    }
     if (streamChunk.phase !== undefined) {
       pass.phase = streamChunk.phase;
       loopState.phase = streamChunk.phase;
@@ -258,6 +266,21 @@ export function routeStreamChunk(
       ];
       loopState.reasoningItems = pass.reasoningItems;
     }
+    return { action: "continue" };
+  }
+
+  // ── Grounding citations (Gemini Google Search) ──────────
+  // Stored on the answer's message and shown live as the turn's sources.
+  if (streamChunk?.type === "citations") {
+    const citations = {
+      sources: streamChunk.sources ?? [],
+      queries: streamChunk.queries ?? [],
+      supports: streamChunk.supports ?? [],
+    };
+    pass.citations = citations;
+    harness["state"].citations = citations;
+    emit({ type: "citations", sources: citations.sources, queries: citations.queries });
+    emit({ type: "webSearchResult", results: citations.sources });
     return { action: "continue" };
   }
 

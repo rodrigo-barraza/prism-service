@@ -40,6 +40,8 @@ interface ModelDefinition {
    * by a mechanism other than a "minimal" level (3.7 Flash: thinkingBudget 0).
    */
   canDisableThinking?: boolean;
+  /** temperature / top_p / top_k are never sent (deprecated from Gemini 3.6 Flash on). */
+  lockedSampling?: boolean;
   outputTypes?: string[];
   listed?: boolean;
   imageAPI?: boolean;
@@ -100,6 +102,111 @@ export function hashGooglePrefix(
   });
 }
 
+/**
+ * One part of a Gemini model turn, kept in the order the model produced it
+ * so a replay returns every thought signature "in the exact part where it
+ * was received" (thought-signatures guide): text runs, function calls (by
+ * index into the message's toolCalls), thought parts that carry a
+ * signature, and the empty text part a stream ends with to carry one.
+ */
+export type { GeminiReplayPart } from "#src/types/admin";
+type GeminiReplayPart = import("#src/types/admin").GeminiReplayPart;
+
+/**
+ * Google's documented stand-in for a function call the API did not
+ * generate (history from another model or provider): Gemini 3 skips
+ * signature validation for it instead of rejecting the request.
+ */
+export const GEMINI_DUMMY_THOUGHT_SIGNATURE = "skip_thought_signature_validator";
+
+/** Gemini 3 and later validate function-call thought signatures. */
+function validatesThoughtSignatures(model: string | undefined): boolean {
+  const match = /^gemini-(\d+)/.exec(model ?? "");
+  return !!match && Number(match[1]) >= 3;
+}
+
+/**
+ * Records a Gemini response's parts, in order, for replay (see
+ * GeminiReplayPart). Streamed text deltas merge into one run until a
+ * signature or another kind of part closes it; a thought summary is kept
+ * only when it carries a signature (unsigned thoughts are never replayed);
+ * the empty text part a stream ends with is kept when it carries one.
+ */
+export class GeminiPartsRecorder {
+  private recorded: GeminiReplayPart[] = [];
+  private callCount = 0;
+  private signed = false;
+
+  add(part: Part & { thoughtSignature?: string }): void {
+    const signature = part.thoughtSignature;
+    const signatureField = signature ? { thoughtSignature: signature } : {};
+    if (signature) this.signed = true;
+    if (part.functionCall) {
+      this.recorded.push({ functionCall: this.callCount++, ...signatureField });
+      return;
+    }
+    if (part.thought) {
+      if (signature) this.recorded.push({ thought: true, text: part.text ?? "", ...signatureField });
+      return;
+    }
+    if (typeof part.text !== "string") return;
+    const last = this.recorded.at(-1);
+    const continuesRun =
+      part.text !== "" &&
+      last !== undefined &&
+      last.functionCall === undefined &&
+      !last.thought &&
+      !last.thoughtSignature;
+    if (continuesRun) {
+      last.text = (last.text ?? "") + part.text;
+      if (signature) last.thoughtSignature = signature;
+      return;
+    }
+    if (part.text === "" && !signature) return;
+    this.recorded.push({ text: part.text, ...signatureField });
+  }
+
+  /** The recorded parts — when there is anything a replay needs them for. */
+  parts(): GeminiReplayPart[] | null {
+    return this.signed || this.callCount > 0 ? this.recorded : null;
+  }
+}
+
+/** Google Search grounding, as the chunk the harness stores and renders. */
+export interface GroundingCitations {
+  type: "citations";
+  sources: Array<{ url: string; title: string }>;
+  queries: string[];
+  supports: Array<{ text: string; sources: number[] }>;
+}
+
+/** A response's groundingMetadata as citations, or null when it cited nothing. */
+export function citationsFromGrounding(metadata: unknown): GroundingCitations | null {
+  const grounding = metadata as {
+    groundingChunks?: Array<{ web?: { uri?: string; title?: string } }>;
+    webSearchQueries?: string[];
+    groundingSupports?: Array<{
+      segment?: { text?: string };
+      groundingChunkIndices?: number[];
+    }>;
+  } | null;
+  const sources = (grounding?.groundingChunks ?? [])
+    .filter((chunk) => typeof chunk.web?.uri === "string")
+    .map((chunk) => ({ url: chunk.web!.uri!, title: chunk.web!.title || chunk.web!.uri! }));
+  if (sources.length === 0) return null;
+  return {
+    type: "citations",
+    sources,
+    queries: (grounding?.webSearchQueries ?? []).filter((query) => typeof query === "string"),
+    supports: (grounding?.groundingSupports ?? [])
+      .filter((support) => support.segment?.text)
+      .map((support) => ({
+        text: support.segment!.text!,
+        sources: support.groundingChunkIndices ?? [],
+      })),
+  };
+}
+
 export interface ConversationMessage {
   role: string;
   content?: string;
@@ -109,6 +216,8 @@ export interface ConversationMessage {
     args: Record<string, unknown>;
     thoughtSignature?: string;
   }>;
+  /** The model turn's parts in order, with their signatures (Gemini replay). */
+  geminiParts?: GeminiReplayPart[];
   images?: string[];
   audio?: string[];
   video?: string[];
@@ -360,10 +469,14 @@ export function buildGenerateConfig(
 ): GenerateContentConfig {
   const config: GenerateContentConfig = {};
 
-  if (options.temperature !== undefined)
-    config.temperature = options.temperature;
-  if (options.topP !== undefined) config.topP = options.topP;
-  if (options.topK !== undefined) config.topK = options.topK;
+  // Deprecated from Gemini 3.6 Flash / 3.5 Flash-Lite on: ignored today, a
+  // 400 in later generations — so never sent to a model that locked them.
+  if (!modelDefinition?.lockedSampling) {
+    if (options.temperature !== undefined)
+      config.temperature = options.temperature;
+    if (options.topP !== undefined) config.topP = options.topP;
+    if (options.topK !== undefined) config.topK = options.topK;
+  }
   if (options.presencePenalty !== undefined)
     config.presencePenalty = options.presencePenalty;
   if (options.frequencyPenalty !== undefined)
@@ -462,11 +575,85 @@ export function buildGenerateConfig(
   return config;
 }
 
+/**
+ * The parts of an assistant message, as Gemini produced them. A message
+ * that recorded its parts (`geminiParts`) replays them verbatim — text,
+ * signed thoughts, calls and the trailing signature part, in order — as
+ * long as its text is still what the model wrote (a rewritten message, e.g.
+ * compacted, falls back). Otherwise: its text, then its calls (the order
+ * the model emits them; the calls used to come first).
+ *
+ * On a model that validates signatures, a function call the API did not
+ * generate (another provider's history) gets Google's documented dummy
+ * signature on the first call of its step — the part Gemini itself signs.
+ */
+function convertModelParts(
+  item: ConversationMessage,
+  withDummySignature: boolean,
+): Part[] {
+  const toolCalls = item.toolCalls ?? [];
+  const callPart = (index: number, signature?: string): Part | null => {
+    const toolCall = toolCalls[index];
+    if (!toolCall) return null;
+    const part: Part = {
+      functionCall: { name: toolCall.name, args: toolCall.args || {} },
+    };
+    const thoughtSignature = signature ?? toolCall.thoughtSignature;
+    if (thoughtSignature) part.thoughtSignature = thoughtSignature;
+    return part;
+  };
+
+  const recorded = item.geminiParts ?? [];
+  const recordedText = recorded
+    .filter((part) => !part.thought && part.functionCall === undefined)
+    .map((part) => part.text ?? "")
+    .join("");
+  const replayable =
+    recorded.length > 0 &&
+    recordedText.trim() === (item.content ?? "").trim() &&
+    recorded
+      .filter((part) => part.functionCall !== undefined)
+      .every((part) => part.functionCall! < toolCalls.length);
+
+  const parts: Part[] = [];
+  if (replayable) {
+    for (const recordedPart of recorded) {
+      if (recordedPart.functionCall !== undefined) {
+        const part = callPart(recordedPart.functionCall, recordedPart.thoughtSignature);
+        if (part) parts.push(part);
+        continue;
+      }
+      parts.push({
+        text: recordedPart.text ?? "",
+        ...(recordedPart.thought ? { thought: true } : {}),
+        ...(recordedPart.thoughtSignature
+          ? { thoughtSignature: recordedPart.thoughtSignature }
+          : {}),
+      });
+    }
+  } else {
+    if (item.content) parts.push({ text: item.content });
+    toolCalls.forEach((_toolCall, index) => {
+      const part = callPart(index);
+      if (part) parts.push(part);
+    });
+  }
+
+  if (withDummySignature) {
+    const firstCall = parts.find((part) => part.functionCall);
+    if (firstCall && !firstCall.thoughtSignature) {
+      firstCall.thoughtSignature = GEMINI_DUMMY_THOUGHT_SIGNATURE;
+    }
+  }
+  return parts;
+}
+
 /** Gemini accepts at most 14 reference images per request */
 const MAX_INLINE_IMAGES = 14;
 
 export async function convertMessages(
   messages: ConversationMessage[],
+  { model }: { model?: string } = {},
 ): Promise<Content[]> {
   const result: Content[] = [];
   let inlineImageCount = 0;
@@ -589,18 +776,12 @@ export async function convertMessages(
       }
     }
 
-    // Assistant messages with tool calls — include functionCall parts
-    if (item.role === "assistant" && item.toolCalls) {
-      for (const toolCall of item.toolCalls) {
-        const functionCallPart: Part = {
-          functionCall: { name: toolCall.name, args: toolCall.args || {} },
-        };
-        // Preserve thoughtSignature (sibling of functionCall, required by Gemini)
-        if (toolCall.thoughtSignature) {
-          functionCallPart.thoughtSignature = toolCall.thoughtSignature;
-        }
-        parts.push(functionCallPart);
-      }
+    // Assistant turns: the model's parts in the order it produced them,
+    // each with the thought signature it carried (convertModelParts).
+    if (item.role === "assistant") {
+      const modelParts = convertModelParts(item, validatesThoughtSignatures(model));
+      if (modelParts.length > 0) result.push({ role: "model", parts: modelParts });
+      continue;
     }
 
     // Mid-conversation system messages (e.g. dynamic tool updates from the
@@ -656,7 +837,7 @@ const googleProvider = {
   ) {
     logger.provider("Google", `generateText model=${model}`);
     try {
-      const contents = await convertMessages(messages);
+      const contents = await convertMessages(messages, { model });
       const modelDefinition = Object.values(MODELS).find(
         (modelDefinitionItem) => modelDefinitionItem.name === model,
       ) as ModelDefinition | undefined;
@@ -708,7 +889,9 @@ const googleProvider = {
       const thoughtParts: string[] = [];
       const images: ImageResult[] = [];
       const maxImages = options.imageCount || 1;
+      const replayParts = new GeminiPartsRecorder();
       for (const part of response.candidates?.[0]?.content?.parts || []) {
+        replayParts.add(part as PartWithThoughtSignature);
         if (part.functionCall) {
           toolCalls.push({
             id: `google-toolCall-${crypto.randomUUID()}`,
@@ -737,6 +920,10 @@ const googleProvider = {
       if (thoughtParts.length > 0) result.thinking = thoughtParts.join("");
       if (toolCalls.length > 0) result.toolCalls = toolCalls;
       if (images.length > 0) result.images = images;
+      const geminiParts = replayParts.parts();
+      if (geminiParts) result.geminiParts = geminiParts;
+      const citations = citationsFromGrounding(response.candidates?.[0]?.groundingMetadata);
+      if (citations) result.citations = citations;
       return result;
     } catch (error: unknown) {
       // Content safety blocks (PROHIBITED_CONTENT, SAFETY, IMAGE_SAFETY)
@@ -763,7 +950,7 @@ const googleProvider = {
   ) {
     logger.provider("Google", `generateTextStream model=${model}`);
     try {
-      const contents = await convertMessages(messages);
+      const contents = await convertMessages(messages, { model });
       const modelDefinition = Object.values(MODELS).find(
         (modelDefinitionItem) => modelDefinitionItem.name === model,
       ) as ModelDefinition | undefined;
@@ -808,15 +995,23 @@ const googleProvider = {
       const maxImages = options.imageCount || 1;
       let imageCount = 0;
       let lastFinishReason: string | null = null;
+      // The response's parts in order (signatures) and its search grounding,
+      // handed to the harness at the end to store on the assistant message.
+      const replayParts = new GeminiPartsRecorder();
+      let groundingMetadata: unknown = null;
       for await (const chunk of responseStream) {
         if (options.signal?.aborted) break;
         geminiResponseId = chunk.responseId || geminiResponseId;
+        if (chunk.candidates?.[0]?.groundingMetadata) {
+          groundingMetadata = chunk.candidates[0].groundingMetadata;
+        }
         // Track finishReason for truncation detection
         const candidateFinishReason = chunk.candidates?.[0]?.finishReason;
         if (candidateFinishReason) lastFinishReason = candidateFinishReason;
         // Process all parts in the chunk
         if (chunk.candidates?.[0]?.content?.parts) {
           for (const part of chunk.candidates[0].content.parts) {
+            replayParts.add(part as PartWithThoughtSignature);
             if (part.functionCall) {
               yield {
                 type: "toolCall",
@@ -858,6 +1053,11 @@ const googleProvider = {
           usage = normalizeGoogleUsage(chunk.usageMetadata);
         }
       }
+      // Always reported ([] when nothing needs replaying) so the harness
+      // knows this response's parts — and citations — replace the last one's.
+      yield { type: "providerState", geminiParts: replayParts.parts() ?? [] };
+      const citations = citationsFromGrounding(groundingMetadata);
+      if (citations) yield citations;
       // Surface max_tokens truncation so harnesses can detect and warn the user
       if (lastFinishReason === "MAX_TOKENS") {
         yield { type: "stopReason", stopReason: "max_tokens" };
@@ -919,10 +1119,14 @@ const googleProvider = {
         outputAudioTranscription: {},
       };
 
-      if (options.temperature !== undefined)
-        liveConfig.temperature = options.temperature;
-      if (options.topP !== undefined) liveConfig.topP = options.topP;
-      if (options.topK !== undefined) liveConfig.topK = options.topK;
+      // Deprecated on the current Live models (gemini-3.8-live) like on
+      // Gemini 3.6+ — never sent to a model that locked them.
+      if (!modelDefinition?.lockedSampling) {
+        if (options.temperature !== undefined)
+          liveConfig.temperature = options.temperature;
+        if (options.topP !== undefined) liveConfig.topP = options.topP;
+        if (options.topK !== undefined) liveConfig.topK = options.topK;
+      }
       if (
         options.maxTokens !== undefined &&
         options.maxTokens !== null &&
