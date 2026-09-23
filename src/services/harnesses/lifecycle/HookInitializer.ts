@@ -8,6 +8,7 @@ import ConversationGoalService from "#src/services/ConversationGoalService";
 import CriticGate from "./CriticGate.ts";
 import type { PolicyRule } from "#src/services/PolicyEngine";
 import type PermissionRuleSet from "#src/services/permissions/PermissionRuleSet";
+import type { PermissionModeHandle } from "#src/services/permissions/PermissionModeState";
 import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 
@@ -32,6 +33,8 @@ interface HookInitOptions {
   policies?: PolicyRule[];
   /** The run's stored permission rules, passed to AutoApprovalEngine. */
   permissionRules?: PermissionRuleSet | null;
+  /** The turn's permission mode handle, passed to AutoApprovalEngine. */
+  permissionMode?: PermissionModeHandle | null;
   /** Enable CriticGate multi-model review of dangerous tool calls. */
   enableCriticGate?: boolean;
   /** Model to use for CriticGate reviews. */
@@ -44,6 +47,7 @@ export function createStandardHooks({
   autoApprove = false,
   policies,
   permissionRules,
+  permissionMode,
   enableCriticGate = false,
   criticModel,
 }: HookInitOptions = {}) {
@@ -65,6 +69,8 @@ export function createStandardHooks({
     fullAuto: autoApprove === true,
     policies: policies || [],
     permissionRules: permissionRules ?? null,
+    permissionMode: permissionMode ?? null,
+    workspaceRoot: workspaceRoot ?? null,
   });
   hooks.register(
     "beforeToolCall",

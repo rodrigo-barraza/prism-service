@@ -49,6 +49,14 @@ export interface SettingsData {
   security: {
     allowEnvFiles: boolean;
   };
+  /**
+   * `defaultMode` — the permission mode a conversation starts in when it
+   * names none (permissions/PermissionModes.ts). `bypass` is never honoured
+   * here: it is chosen per conversation.
+   */
+  permissions?: {
+    defaultMode: string;
+  };
   creative?: {
     imageProvider: string;
     imageModel: string;
@@ -99,6 +107,9 @@ const DEFAULTS: SettingsData = {
   },
   security: {
     allowEnvFiles: false,
+  },
+  permissions: {
+    defaultMode: "default",
   },
   creative: {
     imageProvider: PROVIDERS.GOOGLE,

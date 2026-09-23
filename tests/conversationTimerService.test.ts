@@ -469,6 +469,21 @@ describe("ConversationTimerService", () => {
       expect(mockRunAgenticLoop).toHaveBeenCalled();
     });
 
+    it("a timer run is unattended — dontAsk unless its conversation names a mode, never full auto", async () => {
+      mockGetDocuments(COLLECTIONS.CONVERSATION_TIMERS).push({ ...TIMER_FIXTURE });
+      mockGetDocuments(COLLECTIONS.AGENT_CONVERSATIONS).push({
+        ...CONVERSATION_FIXTURE,
+        isGenerating: false,
+      });
+
+      await ConversationTimerService.tick();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const { options } = mockRunAgenticLoop.mock.calls[0][0] as { options: Record<string, unknown> };
+      expect(options.unattended).toBe(true);
+      expect(options.autoApprove).toBeUndefined();
+    });
+
     it("reloads a compacted conversation through its boundary (summary + tail)", async () => {
       mockGetDocuments(COLLECTIONS.CONVERSATION_TIMERS).push({ ...TIMER_FIXTURE });
       mockGetDocuments(COLLECTIONS.AGENT_CONVERSATIONS).push({

@@ -51,7 +51,11 @@ export type PermissionLayer =
   | "approve_all"
   | "user"
   /** A configured PreToolUse hook's `ask` / `allow` (hooks run before rules). */
-  | "hook";
+  | "hook"
+  /** The conversation's permission mode (PermissionModes.ts). */
+  | "mode"
+  /** A write to a protected path (ProtectedPaths.ts) — always asks. */
+  | "protected_path";
 
 /** A stored rule, as the API returns it. */
 export interface PermissionRuleDocument {

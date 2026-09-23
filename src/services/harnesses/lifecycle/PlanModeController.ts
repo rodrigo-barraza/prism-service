@@ -6,6 +6,7 @@ import { decisionOwnerOf } from "#src/services/conversation/ConversationRunState
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import logger from "#src/utils/logger";
 import { APPROVALS } from "#src/constants";
+import ConversationApprovalSettings from "#src/services/ConversationApprovalSettings";
 import {
   SYSTEM_MESSAGE_TAGS,
   wrapSystemMessage,
@@ -105,6 +106,27 @@ export function blockUnauthorizedToolCalls(
   }
 
   return { allBlocked: false };
+}
+
+/**
+ * An approved plan ends plan mode: the conversation's permission mode goes
+ * back to `default` — for this turn (the handle every engine in the tree
+ * reads) and for the turns after it (stored on the conversation). Anything
+ * other than `plan` is left as the user set it.
+ */
+function leavePlanPermissionMode(context: AgenticContext): void {
+  const handle = context.options._permissionMode;
+  if (handle?.mode !== "plan") return;
+  handle.set("default", "plan_approved");
+  if (context.options.isSubAgent || !context.conversationId) return;
+  void ConversationApprovalSettings.setPermissionMode(
+    context.conversationId,
+    context.project,
+    context.username,
+    "default",
+  ).catch((error: unknown) =>
+    logger.warn(`[PlanningMode] Could not store the mode after the plan was approved: ${String(error)}`),
+  );
 }
 
 /**
@@ -251,6 +273,7 @@ export async function handleExitPlanMode(
   state.planModeActive = false;
   state.planModeText = "";
   PlanningModeService.stripPlanningInstruction(currentMessages);
+  leavePlanPermissionMode(context);
   emit({
     type: SERVER_SENT_EVENT_TYPES.STATUS,
     message: STATUS_MESSAGES.PLAN_MODE_EXITED,

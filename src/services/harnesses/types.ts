@@ -63,8 +63,14 @@ export interface ToolCall {
     isApproved?: boolean;
     isDenied?: boolean;
     reason?: string;
-    /** Which layer denied: a rule, the classifier, a hook, or the user. */
-    deniedBy?: "rule" | "classifier" | "hook" | "user";
+    /** Which layer denied: a rule, the classifier, a hook, the user, or the permission mode. */
+    deniedBy?: "rule" | "classifier" | "hook" | "user" | "mode";
+    /** The permission mode the call was judged in (permissions/PermissionModes). */
+    mode?: string;
+    /** An ask no "approve all" answers — a protected path, a hook's `ask`. */
+    alwaysAsks?: boolean;
+    /** The protected path an `alwaysAsks` write names. */
+    protectedPath?: string;
     /** Set by the ApprovalGate for a call a human decided (or that timed out waiting). */
     decidedBy?: "user" | "superseded" | "turn_ended";
     /** The user's own reason for declining. */
@@ -274,6 +280,23 @@ export interface AgenticOptions {
    * entry point; a sub-agent inherits its parent's (see `forSubAgent`).
    */
   _permissionRules?: import("#src/services/permissions/PermissionRuleSet").default;
+  /**
+   * The conversation's permission mode for this turn (the request's, the
+   * conversation's stored one, or the settings default), or a caller's.
+   * Resolved into `_permissionMode` by AgenticLoopService.
+   */
+  permissionMode?: import("#src/services/permissions/PermissionModes").PermissionMode;
+  /**
+   * Nobody is watching this turn (scheduled task, timer, background
+   * auto-response): anything that would ask is denied instead, and the mode
+   * defaults to `dontAsk` when the conversation names none.
+   */
+  unattended?: boolean;
+  /**
+   * The turn's live mode handle. Set by AgenticLoopService; a sub-agent gets
+   * its parent's (the same object), so a switch reaches the whole tree.
+   */
+  _permissionMode?: import("#src/services/permissions/PermissionModeState").PermissionModeHandle;
   /** Per-tool wall-clock timeout in milliseconds. 0 disables. Defaults to HARNESS.DEFAULT_TOOL_TIMEOUT_MILLISECONDS. */
   toolTimeoutMilliseconds?: number;
   /** Iteration interval at which abbreviated system prompt reminders are re-injected to counteract instruction fade-out. Default: 8. */
