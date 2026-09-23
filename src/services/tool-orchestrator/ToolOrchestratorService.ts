@@ -544,6 +544,19 @@ async function fetchJsonWithBody(
 // Orchestrator Tool Schemas — Prism-local, not routed to tools-api
 // ────────────────────────────────────────────────────────────
 
+/** Longest agent description the spawn tools' roster carries, per agent. */
+const AGENT_ROSTER_DESCRIPTION_MAXIMUM_CHARACTERS = 160;
+
+/** An agent's description for the roster: its first sentence, clipped. */
+function summarizeAgentDescription(description: string | undefined): string {
+  const text = (description ?? "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  const firstSentence = /^(.+?[.!?])(\s|$)/.exec(text)?.[1] ?? text;
+  return firstSentence.length > AGENT_ROSTER_DESCRIPTION_MAXIMUM_CHARACTERS
+    ? `${firstSentence.slice(0, AGENT_ROSTER_DESCRIPTION_MAXIMUM_CHARACTERS - 1).trimEnd()}…`
+    : firstSentence;
+}
+
 /**
  * Dynamically builds the `agent` parameter description for the
  * create_subagents schema by reading all registered persona IDs from
@@ -553,9 +566,13 @@ async function fetchJsonWithBody(
 function buildAgentParameterDescription(locale?: string, toolName: string = "create_subagents"): string {
   const activeLocale = locale || PromptLocaleService.getDefaultLocale();
   const registeredAgents = AgentPersonaRegistry.list();
+  // Name AND description: the name alone never said when to pick an agent.
   const agentNames = registeredAgents
-    .map((entry) => `'${entry.name}'`)
-    .join(", ");
+    .map((entry) => {
+      const summary = summarizeAgentDescription(entry.description);
+      return summary ? `'${entry.name}' — ${summary}` : `'${entry.name}'`;
+    })
+    .join("; ");
 
   const agentKey = toolName === "create_subagent"
     ? "orchestrator.tools.create_subagent.parameters.agent"

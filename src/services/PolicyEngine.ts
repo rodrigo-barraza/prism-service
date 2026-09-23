@@ -49,6 +49,13 @@ export interface PolicyRule {
   when?: (args: Record<string, unknown>) => boolean;
   /** Human-readable label for logging and deny reasons. */
   name?: string;
+  /**
+   * Rules of different layers are evaluated apart and the strongest verdict
+   * wins (DENY > ASK_USER > APPROVE) — a sub-agent's own definition policies
+   * beside its parent's, where one list's specific APPROVE must not outrank
+   * the other's wildcard DENY. Untagged rules form one layer.
+   */
+  layer?: string;
 }
 
 export interface PolicyEvaluation {
@@ -148,6 +155,33 @@ export default class PolicyEngine {
   ): PolicyEvaluation | null {
     if (!policies || policies.length === 0) return null;
 
+    const layers = new Map<string, PolicyRule[]>();
+    for (const rule of policies) {
+      const layer = rule.layer ?? "";
+      layers.set(layer, [...(layers.get(layer) ?? []), rule]);
+    }
+    if (layers.size > 1) {
+      let strongest: PolicyEvaluation | null = null;
+      for (const layerRules of layers.values()) {
+        const evaluation = PolicyEngine.evaluateLayer(layerRules, toolName, args);
+        if (
+          evaluation &&
+          (!strongest || DECISION_PRIORITY[evaluation.decision] < DECISION_PRIORITY[strongest.decision])
+        ) {
+          strongest = evaluation;
+        }
+      }
+      return strongest;
+    }
+    return PolicyEngine.evaluateLayer(policies, toolName, args);
+  }
+
+  /** One layer: priority order, first match wins. */
+  private static evaluateLayer(
+    policies: PolicyRule[],
+    toolName: string,
+    args: Record<string, unknown>,
+  ): PolicyEvaluation | null {
     // Sort policies by priority (specific deny first, wildcard allow last)
     const sorted = [...policies].sort(
       (firstRule, secondRule) =>
