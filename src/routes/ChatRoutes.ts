@@ -1435,6 +1435,8 @@ async function handleStreamingText(context: GenerationContext) {
       ...(streamState.responsesEffort
         ? { responsesEffort: streamState.responsesEffort }
         : {}),
+      ...(streamState.geminiParts ? { geminiParts: streamState.geminiParts } : {}),
+      ...(streamState.citations ? { citations: streamState.citations } : {}),
       // Anthropic thinking blocks — replayed verbatim on the follow-up.
       ...(streamState.thinkingBlocks?.length
         ? { thinkingBlocks: streamState.thinkingBlocks }
@@ -1465,6 +1467,8 @@ async function handleStreamingText(context: GenerationContext) {
     streamState.reasoningItems = undefined;
     streamState.providerResponseId = undefined;
     streamState.responsesEffort = undefined;
+    streamState.geminiParts = undefined;
+    streamState.citations = undefined;
     streamState.thinkingBlocks = undefined;
     streamState.toolCalls.length = 0;
     const followUpStream = streamWithRetries(
@@ -1551,6 +1555,8 @@ async function handleStreamingText(context: GenerationContext) {
     ...(streamState.reasoningItems && streamState.reasoningItems.length > 0 && { reasoningItems: streamState.reasoningItems }),
     ...(streamState.providerResponseId && { providerResponseId: streamState.providerResponseId }),
     ...(streamState.responsesEffort && { responsesEffort: streamState.responsesEffort }),
+    ...(streamState.geminiParts && { geminiParts: streamState.geminiParts }),
+    ...(streamState.citations && { citations: streamState.citations }),
     toolCalls: streamState.toolCalls.map(
       (toolCall): ToolCallPayload => ({
         name: toolCall.name,
@@ -1701,6 +1707,8 @@ async function handleNonStreamingText(context: GenerationContext) {
     ...(genResult.reasoningItems && genResult.reasoningItems.length > 0 && { reasoningItems: genResult.reasoningItems }),
     ...(genResult.providerResponseId && { providerResponseId: genResult.providerResponseId }),
     ...(genResult.responsesEffort && { responsesEffort: genResult.responsesEffort }),
+    ...(genResult.geminiParts && { geminiParts: genResult.geminiParts }),
+    ...(genResult.citations && { citations: genResult.citations }),
     ...(genResult.thinkingBlocks && genResult.thinkingBlocks.length > 0 && { thinkingBlocks: genResult.thinkingBlocks }),
     ...(genResult.refusal && { refusal: genResult.refusal }),
     ...(genResult.servedModel && { servedModel: genResult.servedModel }),

@@ -60,6 +60,8 @@ export interface ChatMessage {
   providerResponseId?: string;
   /** OpenAI Responses API reasoning effort in effect when this message was produced — where a configuration_update goes on replay. */
   responsesEffort?: string;
+  /** Gemini: the turn's parts in order, with their thought signatures (replayed verbatim). */
+  geminiParts?: import("#src/types/admin").GeminiReplayPart[];
   /** A native async call's completion (OpenAI): replayed as that call's output. */
   asyncCallId?: string;
   /** Tool result correlation — maps this message to the tool_use that produced it. */

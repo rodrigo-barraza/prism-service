@@ -106,6 +106,8 @@ export interface StreamProviderStateChunk {
   reasoningItems?: ResponsesReasoningItem[];
   /** Reasoning effort in effect for this response (configuration_update models). */
   responsesEffort?: string;
+  /** Gemini: the response's parts in order, with their signatures ([] = none this pass). */
+  geminiParts?: import("#src/types/admin").GeminiReplayPart[];
 }
 
 export interface StreamUsageChunk {
@@ -196,6 +198,10 @@ export interface GenerateTextResult {
   providerResponseId?: string;
   /** OpenAI Responses API reasoning effort in effect (configuration_update models). */
   responsesEffort?: string;
+  /** Gemini: the response's parts in order, with their thought signatures. */
+  geminiParts?: import("#src/types/admin").GeminiReplayPart[];
+  /** Sources a grounded answer cited (Gemini Google Search grounding). */
+  citations?: import("#src/types/admin").MessageCitations;
   /** Anthropic thinking blocks, verbatim and in order. */
   thinkingBlocks?: AnthropicThinkingBlock[];
   /** Anthropic safety-classifier refusal — `text` is then empty. */

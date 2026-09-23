@@ -51,6 +51,10 @@ export interface StreamState {
   providerResponseId?: string;
   /** OpenAI Responses API reasoning effort in effect (configuration_update models). */
   responsesEffort?: string;
+  /** Gemini: the response's parts in order, with their thought signatures. */
+  geminiParts?: import("#src/types/admin").GeminiReplayPart[];
+  /** Sources a grounded answer cited. */
+  citations?: import("#src/types/admin").MessageCitations;
   /** Anthropic thinking blocks, verbatim and in order. */
   thinkingBlocks?: AnthropicThinkingBlock[];
   /** Anthropic safety-classifier refusal — the streamed text is not an answer. */
@@ -100,6 +104,10 @@ interface StreamChunk {
   providerResponseId?: string;
   reasoningItems?: ResponsesReasoningItem[];
   responsesEffort?: string;
+  geminiParts?: import("#src/types/admin").GeminiReplayPart[];
+  sources?: import("#src/types/admin").MessageCitations["sources"];
+  queries?: string[];
+  supports?: import("#src/types/admin").MessageCitations["supports"];
 }
 
 /** Union of all SSE event shapes emitted to the client. */
@@ -425,6 +433,9 @@ export async function dispatchChunk(
       if (chunk.responsesEffort) {
         state.responsesEffort = chunk.responsesEffort;
       }
+      if (chunk.geminiParts) {
+        state.geminiParts = chunk.geminiParts.length > 0 ? chunk.geminiParts : undefined;
+      }
       if (chunk.reasoningItems && chunk.reasoningItems.length > 0) {
         state.reasoningItems = [
           ...(state.reasoningItems ?? []),
@@ -436,6 +447,22 @@ export async function dispatchChunk(
     case "requestTelemetry":
       // Prompt-cache telemetry for the request log — never shown to the
       // client, and never text.
+      return true;
+
+    case "citations":
+      // Sources a grounded answer cited (Gemini Google Search): stored on
+      // the assistant message, shown live as this turn's sources.
+      state.citations = {
+        sources: chunk.sources ?? [],
+        queries: chunk.queries ?? [],
+        supports: chunk.supports ?? [],
+      };
+      emit({
+        type: "citations",
+        sources: state.citations.sources,
+        queries: state.citations.queries,
+      });
+      emit({ type: "webSearchResult", results: state.citations.sources });
       return true;
 
     case "toolCallDelta":
