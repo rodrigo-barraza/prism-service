@@ -35,6 +35,7 @@ import {
   AGENT_DIRECTIVES,
 } from "#src/constants";
 import FileService from "#src/services/FileService";
+import { redirectArgumentsToWorktree } from "./WorktreePathRewrite.ts";
 import InternalToolRegistry from "#src/services/tool-definitions/InternalToolRegistry";
 import { registerToolCapabilities } from "#src/services/permissions/ToolCapabilities";
 import SettingsService from "#src/services/SettingsService";
@@ -376,6 +377,11 @@ async function executeToolGeneric(
   // Build caller-context headers for tools-api telemetry
   const contextHeaders = buildContextHeaders(context);
 
+  // A sub-agent in a worktree works in it: paths into its parent's
+  // checkout move into the worktree (WorktreePathRewrite), and tools-service
+  // resolves relative paths and runs commands there.
+  resolvedArgs = withWorktreeRedirect(resolvedArgs, context, contextHeaders);
+
   // Body-carrying methods send args as JSON body
   const bodyMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
   if (schema.endpoint.method && bodyMethods.has(schema.endpoint.method)) {
@@ -390,39 +396,6 @@ async function executeToolGeneric(
     if (context.agent) body.agent = context.agent;
     if (context.username) body.username = context.username;
 
-    // Worktree path rewriting — redirect file paths to the worktree directory
-    // when the session has an active worktree.
-    if (
-      context.agentConversationId &&
-      activeWorktrees.has(context.agentConversationId)
-    ) {
-      const worktreeState = activeWorktrees.get(context.agentConversationId)!;
-      const rewritePath = (
-        targetPath: string | number | boolean | object | null | undefined,
-      ): string | number | boolean | object | null | undefined => {
-        if (typeof targetPath !== "string") return targetPath;
-        if (targetPath.startsWith(worktreeState.originalRoot)) {
-          return (
-            worktreeState.worktreePath +
-            targetPath.slice(worktreeState.originalRoot.length)
-          );
-        }
-        return targetPath;
-      };
-
-      // Rewrite common path fields used by file/git/shell tools
-      if (body.path) body.path = rewritePath(body.path as string);
-      if (body.filePath) body.filePath = rewritePath(body.filePath as string);
-      if (body.oldPath) body.oldPath = rewritePath(body.oldPath as string);
-      if (body.newPath) body.newPath = rewritePath(body.newPath as string);
-      if (body.cwd) body.cwd = rewritePath(body.cwd as string);
-      if (body.directory) body.directory = rewritePath(body.directory as string);
-
-      // Inject workspace override header so tools-api sandbox validation passes
-      contextHeaders[IDENTITY_HEADERS.workspaceOverride] =
-        worktreeState.worktreePath;
-    }
-
     return fetchJsonWithBody(
       url,
       schema.endpoint.method,
@@ -434,6 +407,24 @@ async function executeToolGeneric(
 
   const url = buildUrlFromEndpoint(schema.endpoint, resolvedArgs);
   return fetchJson(url, contextHeaders, context.signal);
+}
+
+/**
+ * A worktree session's arguments, redirected into its worktree, with the
+ * workspace-override header set (tools-service resolves relative paths and
+ * runs commands there). Any other session's arguments pass through.
+ */
+function withWorktreeRedirect(
+  args: Record<string, unknown>,
+  context: ToolExecutionContext,
+  contextHeaders: Record<string, string>,
+): Record<string, unknown> {
+  const worktreeState = context.agentConversationId
+    ? activeWorktrees.get(context.agentConversationId)
+    : undefined;
+  if (!worktreeState) return args;
+  contextHeaders[IDENTITY_HEADERS.workspaceOverride] = worktreeState.worktreePath;
+  return redirectArgumentsToWorktree(args, worktreeState);
 }
 
 /**
@@ -2498,6 +2489,7 @@ export default class ToolOrchestratorService {
 
     const url = `${TOOLS_SERVICE_URL}${streamPath}`;
     const contextHeaders = buildContextHeaders(context);
+    resolvedArgs = withWorktreeRedirect(resolvedArgs, context, contextHeaders);
 
     try {
       // Combine session abort signal with a 65s timeout.

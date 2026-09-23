@@ -2263,9 +2263,17 @@ export class OrchestratorService {
       ? `- Only modify files within your workspace\n`
       : "";
 
-    const workspaceIntroLine = shouldShowWorkspaceConstraint
-      ? `Your workspace is: ${subAgent.worktreePath}\n`
-      : "";
+    // An isolated sub-agent is told what its worktree is a checkout of: its
+    // task may name the parent's paths (tool calls redirect them into the
+    // worktree — WorktreePathRewrite), and its report should name files
+    // where they land once its changes merge back.
+    const workspaceIntroLine = !shouldShowWorkspaceConstraint
+      ? ""
+      : subAgent.isolated && subAgent.worktreePath
+        ? `Your workspace is: ${subAgent.worktreePath}, your own checkout of ${subAgent.repositoryPath}. ` +
+          `Paths under ${subAgent.repositoryPath} are redirected here, and your changes merge back into it when you finish: ` +
+          `name files relative to ${subAgent.repositoryPath} in your report.\n`
+        : `Your workspace is: ${subAgent.worktreePath}\n`;
 
     // ── Recursive spawning: depth tracking ──────────────────────────
     // Paper alignment: THREAD (arXiv:2405.17402), RAH (2026), Anthropic production architecture.
