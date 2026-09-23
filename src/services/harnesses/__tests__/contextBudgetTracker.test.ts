@@ -152,6 +152,58 @@ describe("ContextBudgetTracker", () => {
 
   // ── Real usage recording tests ──────────────────────────────
 
+  describe("skills category — catalog and per-turn highlight", () => {
+    // The catalog rides the system prompt and the highlight rides the
+    // messages; both are carve-outs of their host, never added on top.
+    const systemPrompt = "x".repeat(40_000); // 10,000 tokens
+    const catalogTokens = 600;
+    const highlightTokens = 40;
+
+    it("carves the catalog out of the system prompt and the highlight out of the messages", () => {
+      const { emit, emittedEvents } = createMockEmit();
+      const tracker = new ContextBudgetTracker(emit, CONTEXT_WINDOW);
+
+      tracker.computeAndEmitEstimate(
+        5_000,
+        systemPrompt,
+        [],
+        16_384,
+        highlightTokens,
+        catalogTokens,
+      );
+
+      const event = emittedEvents[0];
+      expect(event.skillTokens).toBe(catalogTokens + highlightTokens);
+      expect(event.systemPromptTokens).toBe(10_000 - catalogTokens);
+      expect(event.messageTokens).toBe(5_000 - highlightTokens);
+    });
+
+    it("splits reported usage the same way, summing to the reported total", () => {
+      const { emit, emittedEvents } = createMockEmit();
+      const tracker = new ContextBudgetTracker(emit, CONTEXT_WINDOW);
+      tracker.computeAndEmitEstimate(
+        5_000,
+        systemPrompt,
+        [],
+        16_384,
+        highlightTokens,
+        catalogTokens,
+      );
+
+      tracker.recordRealUsage({ inputTokens: 15_000 }, 5_000);
+
+      const reported = emittedEvents[1];
+      expect(reported.skillTokens).toBe(640);
+      expect(reported.systemPromptTokens).toBe(9_400);
+      expect(
+        (reported.skillTokens as number) +
+          (reported.systemPromptTokens as number) +
+          (reported.messageTokens as number) +
+          (reported.toolSchemaTokens as number),
+      ).toBe(15_000);
+    });
+  });
+
   describe("recordRealUsage", () => {
     it("should re-emit budget with source 'reported' after real usage arrives", () => {
       const { emit, emittedEvents } = createMockEmit();
