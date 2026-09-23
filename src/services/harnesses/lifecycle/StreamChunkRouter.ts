@@ -240,6 +240,11 @@ export function routeStreamChunk(
       loopState.providerResponseId = streamChunk.providerResponseId;
       loopState.phase = undefined;
       loopState.reasoningItems = undefined;
+      loopState.responsesEffort = undefined;
+    }
+    if (streamChunk.responsesEffort) {
+      pass.responsesEffort = streamChunk.responsesEffort;
+      loopState.responsesEffort = streamChunk.responsesEffort;
     }
     if (streamChunk.phase !== undefined) {
       pass.phase = streamChunk.phase;

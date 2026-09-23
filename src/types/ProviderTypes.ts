@@ -58,6 +58,8 @@ export interface ChatMessage {
   reasoningItems?: ResponsesReasoningItem[];
   /** OpenAI Responses API `response.id` that produced this message. */
   providerResponseId?: string;
+  /** OpenAI Responses API reasoning effort in effect when this message was produced — where a configuration_update goes on replay. */
+  responsesEffort?: string;
   /** Tool result correlation — maps this message to the tool_use that produced it. */
   tool_call_id?: string;
   /** Generic message ID — fallback for tool correlation. */
