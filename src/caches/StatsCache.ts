@@ -14,6 +14,12 @@ interface CacheEntry<T> {
 class StatsCacheManager {
   private cacheStore = new Map<string, CacheEntry<unknown>>();
   private activePromisesStore = new Map<string, Promise<unknown>>();
+  /**
+   * Bumped by every clear(). A computation that started before a change
+   * finishes with pre-change data: it must neither be cached nor be joined by
+   * a caller that arrived after the change.
+   */
+  private generation = 0;
 
   constructor() {
     // Invalidate the cache immediately when any MongoDB change event occurs
@@ -51,17 +57,25 @@ class StatsCacheManager {
     // Coalesce duplicate requests currently in-flight
     let activePromise = this.activePromisesStore.get(cacheKey) as Promise<T> | undefined;
     if (!activePromise) {
+      const startedGeneration = this.generation;
+      const settle = () => {
+        if (this.activePromisesStore.get(cacheKey) === activePromise) {
+          this.activePromisesStore.delete(cacheKey);
+        }
+      };
       activePromise = fetcherFunction()
         .then((resultData) => {
-          this.cacheStore.set(cacheKey, {
-            resultData,
-            cachedAtTimestamp: Date.now(),
-          });
-          this.activePromisesStore.delete(cacheKey);
+          if (this.generation === startedGeneration) {
+            this.cacheStore.set(cacheKey, {
+              resultData,
+              cachedAtTimestamp: Date.now(),
+            });
+          }
+          settle();
           return resultData;
         })
         .catch((error: unknown) => {
-          this.activePromisesStore.delete(cacheKey);
+          settle();
           throw error;
         });
       this.activePromisesStore.set(cacheKey, activePromise);
@@ -88,7 +102,9 @@ class StatsCacheManager {
    * Clear the entire cache store.
    */
   public clear(): void {
+    this.generation++;
     this.cacheStore.clear();
+    this.activePromisesStore.clear();
   }
 }
 

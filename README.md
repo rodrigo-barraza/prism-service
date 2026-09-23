@@ -131,9 +131,10 @@ Prism reads the model list and context window from `/v1/models`, and the parsers
 |---|---|---|
 | `GET` | `/admin/requests` | Paginated request logs with filters |
 | `GET` | `/admin/stats` | Aggregate stats (tokens, cost, latency) |
+| `GET` | `/admin/stats/dashboard` | Everything the admin dashboard shows — totals, projects, providers, models, agents — from ONE scan of the `requests` covering index (`src/services/RequestStatsIndex.ts`) |
 | `GET` | `/admin/stats/models` | Per-model breakdown |
 | `GET` | `/admin/stats/tools` | Per-tool calls, share of the calling requests' cost, and the tools' own latency (ms) and error rate |
-| `GET` | `/admin/stats/timeline` | Hourly request/cost timeline |
+| `GET` | `/admin/stats/timeline` | Request/cost timeline at an adaptive granularity (`hours=N` or `hours=all`, `granularity`, `tz` for calendar-day buckets) |
 | `GET` | `/admin/health` | System health, memory, DB stats |
 | `POST` | `/admin/lm-studio/load` | Load/unload LM Studio models |
 

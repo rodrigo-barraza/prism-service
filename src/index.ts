@@ -26,6 +26,7 @@ import MinioWrapper from "./wrappers/MinioWrapper.ts";
 import ChangeStreamService from "./services/ChangeStreamService.ts";
 import MemoryConsolidationService from "./services/MemoryConsolidationService.ts";
 import BackgroundHousekeepingService from "./services/BackgroundHousekeepingService.ts";
+import { prepareRequestStatsIndex } from "./services/RequestStatsIndex.ts";
 import {
   installShutdownHandlers,
   registerCleanup,
@@ -679,6 +680,11 @@ setupWebSocket(wss);
       logger.success(
         `Database indexes ensured (${succeededCount}/${indexDefinitions.length})`,
       );
+
+      // Not awaited: the admin stats covering index takes minutes to build on
+      // a large requests collection, and the stats routes run unhinted until
+      // it is there (RequestStatsIndex).
+      void prepareRequestStatsIndex(db);
     }
   } catch (error: unknown) {
     logger.error(`Failed to ensure indexes: ${getErrorMessage(error)}`);

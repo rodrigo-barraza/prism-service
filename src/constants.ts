@@ -86,6 +86,8 @@ export const COLLECTIONS = {
   PUSH_SUBSCRIPTIONS: "push_subscriptions",
   PENDING_DECISIONS: "pending_decisions",
   MODEL_ROUTING_DECISIONS: "model_routing_decisions",
+  /** One-time data backfills already applied, keyed by name. */
+  MIGRATIONS: "migrations",
 };
 
 /** Shared system-wide statuses for agents, tasks, and workflows. */

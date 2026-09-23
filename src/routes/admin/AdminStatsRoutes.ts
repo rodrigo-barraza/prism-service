@@ -1,6 +1,7 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
+import type { Db } from "mongodb";
 import {
   COLLECTIONS,
   COST_SUMMATION_EXPRESSION,
@@ -22,6 +23,32 @@ import {
   DEFAULT_MAX_GAP_SECONDS,
   type CacheStatsRow,
 } from "#src/services/PromptCacheStats";
+import {
+  aggregateRequestStats,
+  aggregateWithIndex,
+  isCoveredMatch,
+} from "#src/services/RequestStatsIndex";
+import {
+  agentsFacet,
+  matchStages,
+  modelsFacet,
+  projectsFacet,
+  providersFacet,
+  toAgentRows,
+  toModelRow,
+  toProjectRow,
+  toProviderRow,
+  totalsFacet,
+  toTotals,
+  traceCountFacet,
+} from "#src/services/RequestStatsFacets";
+import {
+  buildTimeline,
+  resolveGranularity,
+  resolveTimeZone,
+  timelineGroupStage,
+  type TimelineBaseBucket,
+} from "#src/services/StatsTimeline";
 
 export interface TransformedStatsMatchFilter {
   project?: unknown;
@@ -42,6 +69,14 @@ const {
 
 router.use(requireDb);
 
+/** `a` → "a", `a,b` → `{ $in: ["a", "b"] }`, empty → undefined. */
+function listFilter(value: unknown): string | { $in: string[] } | undefined {
+  if (!value) return undefined;
+  const values = String(value).split(",").filter(Boolean);
+  if (values.length === 0) return undefined;
+  return values.length === 1 ? values[0] : { $in: values };
+}
+
 async function buildMatchFilter(
   req: Request,
 ): Promise<TransformedStatsMatchFilter> {
@@ -51,33 +86,12 @@ async function buildMatchFilter(
   if (project) {
     match.project = project;
   }
-
-  if (agent) {
-    const agentIds = String(agent).split(",").filter(Boolean);
-    if (agentIds.length === 1) {
-      match.agent = agentIds[0];
-    } else if (agentIds.length > 1) {
-      match.agent = { $in: agentIds };
-    }
-  }
-
-  if (provider) {
-    const providerNames = String(provider).split(",").filter(Boolean);
-    if (providerNames.length === 1) {
-      match.provider = providerNames[0];
-    } else if (providerNames.length > 1) {
-      match.provider = { $in: providerNames };
-    }
-  }
-
-  if (model) {
-    const modelNames = String(model).split(",").filter(Boolean);
-    if (modelNames.length === 1) {
-      match.model = modelNames[0];
-    } else if (modelNames.length > 1) {
-      match.model = { $in: modelNames };
-    }
-  }
+  const agentFilter = listFilter(agent);
+  if (agentFilter) match.agent = agentFilter;
+  const providerFilter = listFilter(provider);
+  if (providerFilter) match.provider = providerFilter;
+  const modelFilter = listFilter(model);
+  if (modelFilter) match.model = modelFilter;
 
   applyDateRangeFilter(match, from as string, to as string);
 
@@ -106,6 +120,92 @@ async function buildMatchFilter(
   return match;
 }
 
+/**
+ * The conversation-side filter for the same query. Dated by `updatedAt`, as
+ * the Chat page is: a conversation counts for a range it was active in.
+ */
+function buildConversationMatch(query: Request["query"]): Record<string, unknown> {
+  const { from, to, project, provider, model, workspace } = query;
+  const match: Record<string, unknown> = {};
+  if (project) match.project = project;
+  if (workspace) match.workspaceRoot = workspace;
+  const providerFilter = listFilter(provider);
+  if (providerFilter) match.providers = providerFilter;
+  const modelFilter = listFilter(model);
+  if (modelFilter) match["messages.model"] = modelFilter;
+  applyDateRangeFilter(match, from as string, to as string, "updatedAt");
+  return match;
+}
+
+/** Answers a project/updatedAt-only conversation filter from index keys. */
+const CONVERSATION_PROJECT_INDEX = {
+  name: "project_1_username_1_profileId_1_updatedAt_-1",
+  leadingField: "project",
+};
+
+function isCoveredConversationMatch(match: Record<string, unknown>): boolean {
+  return Object.keys(match).every((field) => field === "project" || field === "updatedAt");
+}
+
+/** Conversations per project (`"any"` for none) under the conversation filter. */
+async function conversationCountsByProject(
+  db: Db,
+  match: Record<string, unknown>,
+): Promise<Record<string, number>> {
+  const rows = await aggregateWithIndex(
+    db,
+    CONVERSATIONS_COLLECTION,
+    CONVERSATION_PROJECT_INDEX,
+    [...matchStages(match), { $group: { _id: "$project", conversationCount: { $sum: 1 } } }],
+    { covered: isCoveredConversationMatch(match) },
+  );
+  const counts: Record<string, number> = {};
+  for (const row of rows) {
+    const project = (row._id as string) || "any";
+    counts[project] = (counts[project] || 0) + (row.conversationCount as number);
+  }
+  return counts;
+}
+
+function countConversations(db: Db, match: Record<string, unknown>): Promise<number> {
+  const conversations = db.collection(CONVERSATIONS_COLLECTION);
+  return Object.keys(match).length === 0
+    ? conversations.estimatedDocumentCount()
+    : conversations.countDocuments(match);
+}
+
+/** Workflows per project, through the conversations each workflow ran in. */
+async function workflowCountsByProject(db: Db): Promise<Record<string, number>> {
+  const rows = await db
+    .collection(WORKFLOWS_COLLECTION)
+    .aggregate([
+      { $match: { conversationIds: { $exists: true, $ne: [] } } },
+      {
+        $lookup: {
+          from: CONVERSATIONS_COLLECTION,
+          localField: "conversationIds",
+          foreignField: "id",
+          as: "_convs",
+          pipeline: [{ $project: { project: 1 } }],
+        },
+      },
+      { $unwind: "$_convs" },
+      { $group: { _id: "$_convs.project", workflowIds: { $addToSet: "$_id" } } },
+      { $project: { _id: 1, workflowCount: { $size: "$workflowIds" } } },
+    ])
+    .toArray();
+  const counts: Record<string, number> = {};
+  for (const row of rows) counts[(row._id as string) || "any"] = row.workflowCount;
+  return counts;
+}
+
+function registryCounts() {
+  return {
+    agentCount: AgentPersonaRegistry.list().length,
+    workspaceCount: ToolOrchestratorService.getWorkspaceRoots().length,
+  };
+}
+
 // ─── GET /stats — aggregate stats ─────────────────────
 router.get(
   "/",
@@ -114,104 +214,82 @@ router.get(
       const cacheKey = StatsCache.buildCacheKey("/stats", req.query);
       const responseData = await StatsCache.getOrFetch(cacheKey, async () => {
         const match = await buildMatchFilter(req);
-        const { from, to, project, provider, model, workspace } = req.query;
-
-        const pipeline: Record<string, unknown>[] = [
-          ...(Object.keys(match).length ? [{ $match: match }] : []),
-          {
-            $group: {
-              _id: null,
-              totalRequests: { $sum: 1 },
-              totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
-              totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
-              totalCost: COST_SUMMATION_EXPRESSION,
-              avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
-              avgTokensPerSec: AVERAGE_TOKENS_PER_SECOND_EXPRESSION,
-              totalDuration: { $sum: { $ifNull: ["$totalTime", 0] } },
-              successCount: {
-                $sum: { $cond: [{ $eq: ["$success", true] }, 1, 0] },
-              },
-              errorCount: {
-                $sum: { $cond: [{ $eq: ["$success", false] }, 1, 0] },
-              },
-              totalToolCalls: {
-                $sum: { $size: { $ifNull: ["$toolApiNames", []] } },
-              },
-            },
-          },
-        ];
-
-        const convMatch: Record<string, unknown> = {};
-        if (project) convMatch.project = project;
-        if (workspace) convMatch.workspaceRoot = workspace;
-        if (provider) {
-          const providerNames = String(provider).split(",").filter(Boolean);
-          if (providerNames.length === 1) convMatch.providers = providerNames[0];
-          else if (providerNames.length > 1)
-            convMatch.providers = { $in: providerNames };
-        }
-        if (model) {
-          const modelNames = String(model).split(",").filter(Boolean);
-          if (modelNames.length === 1)
-            convMatch["messages.model"] = modelNames[0];
-          else if (modelNames.length > 1)
-            convMatch["messages.model"] = { $in: modelNames };
-        }
-        applyDateRangeFilter(
-          convMatch,
-          from as string,
-          to as string,
-          "createdAt",
-        );
-
-        const traceMatch = { ...match, traceId: { $ne: null } };
-
-        const traceCountPipeline: Record<string, unknown>[] = [
-          { $match: traceMatch },
-          { $group: { _id: "$traceId" } },
-          { $count: "total" },
-        ];
-
-        const agentCount = AgentPersonaRegistry.list().length;
-        const workspaceCount = ToolOrchestratorService.getWorkspaceRoots().length;
-
-        const [resultDocs, traceResult, conversationCount] =
-          await Promise.all([
-            req.db.collection(REQUESTS_COLLECTION).aggregate(pipeline).toArray(),
-            req.db
-              .collection(REQUESTS_COLLECTION)
-              .aggregate(traceCountPipeline)
-              .toArray(),
-            Object.keys(convMatch).length === 0
-              ? req.db.collection(CONVERSATIONS_COLLECTION).estimatedDocumentCount()
-              : req.db.collection(CONVERSATIONS_COLLECTION).countDocuments(convMatch),
-          ]);
-        const result = (resultDocs[0] || {}) as Record<string, unknown>;
-        const traceCount = traceResult[0]?.total || 0;
-        const totalToolCalls = (result.totalToolCalls as number) || 0;
-
+        const [[facets], conversationCount] = await Promise.all([
+          aggregateRequestStats(
+            req.db,
+            [...matchStages(match), { $facet: { totals: totalsFacet, traceCount: traceCountFacet } }],
+            { covered: isCoveredMatch(match) },
+          ),
+          countConversations(req.db, buildConversationMatch(req.query)),
+        ]);
         return {
-          totalRequests: 0,
-          totalInputTokens: 0,
-          totalOutputTokens: 0,
-          totalCost: 0,
-          avgLatency: 0,
-          avgTokensPerSec: 0,
-          totalDuration: 0,
-          successCount: 0,
-          errorCount: 0,
-          ...result,
-          traceCount,
+          ...toTotals(facets.totals, facets.traceCount),
           conversationCount,
-          totalToolCalls,
-          agentCount,
-          workspaceCount,
+          ...registryCounts(),
         };
       });
 
       res.json(responseData);
     } catch (error: unknown) {
       logger.error(`Admin /stats error: ${getErrorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+// ─── GET /stats/dashboard — everything the admin dashboard shows ──
+// Totals, projects, providers, models and agents in ONE `$facet` over the
+// covering index: one scan of `requests`, where the separate endpoints
+// scanned it five times.
+router.get(
+  "/dashboard",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const cacheKey = StatsCache.buildCacheKey("/stats/dashboard", req.query);
+      const responseData = await StatsCache.getOrFetch(cacheKey, async () => {
+        const match = await buildMatchFilter(req);
+        const [[facets], conversations, workflows] = await Promise.all([
+          aggregateRequestStats(
+            req.db,
+            [
+              ...matchStages(match),
+              {
+                $facet: {
+                  totals: totalsFacet,
+                  traceCount: traceCountFacet,
+                  projects: projectsFacet,
+                  providers: providersFacet,
+                  models: modelsFacet,
+                  agents: agentsFacet,
+                },
+              },
+            ],
+            { covered: isCoveredMatch(match) },
+          ),
+          conversationCountsByProject(req.db, buildConversationMatch(req.query)),
+          workflowCountsByProject(req.db),
+        ]);
+        return {
+          stats: {
+            ...toTotals(facets.totals, facets.traceCount),
+            conversationCount: Object.values(conversations).reduce(
+              (sum, count) => sum + count,
+              0,
+            ),
+            ...registryCounts(),
+          },
+          projects: facets.projects.map((row: Record<string, unknown>) =>
+            toProjectRow(row, { conversations, workflows }),
+          ),
+          providers: facets.providers.map(toProviderRow),
+          models: facets.models.map(toModelRow),
+          agents: toAgentRows(facets.agents),
+        };
+      });
+
+      res.json(responseData);
+    } catch (error: unknown) {
+      logger.error(`Admin /stats/dashboard error: ${getErrorMessage(error)}`);
       next(error);
     }
   }),
@@ -225,148 +303,14 @@ router.get(
       const cacheKey = StatsCache.buildCacheKey("/stats/projects", req.query);
       const responseData = await StatsCache.getOrFetch(cacheKey, async () => {
         const match = await buildMatchFilter(req);
-        const { from, to, project, provider, model, workspace } = req.query;
-
-        const pipeline: Record<string, unknown>[] = [
-          ...(Object.keys(match).length ? [{ $match: match }] : []),
-          {
-            $group: {
-              _id: "$project",
-              totalRequests: { $sum: 1 },
-              totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
-              totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
-              totalTokens: TOTAL_TOKENS_EXPRESSION,
-              totalCost: COST_SUMMATION_EXPRESSION,
-              avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
-              avgTokensPerSec: AVERAGE_TOKENS_PER_SECOND_EXPRESSION,
-              lastRequest: { $max: "$createdAt" },
-              _models: { $addToSet: "$model" },
-              _providers: { $addToSet: "$provider" },
-              _traceIds: { $addToSet: "$traceId" },
-            },
-          },
-          {
-            $project: {
-              totalRequests: 1,
-              totalInputTokens: 1,
-              totalOutputTokens: 1,
-              totalTokens: 1,
-              totalCost: 1,
-              avgLatency: 1,
-              avgTokensPerSec: 1,
-              lastRequest: 1,
-              _models: 1,
-              _providers: 1,
-              traceCount: {
-                $size: {
-                  $filter: {
-                    input: "$_traceIds",
-                    as: "id",
-                    cond: { $ne: ["$$id", null] },
-                  },
-                },
-              },
-            },
-          },
-          {
-            $addFields: {
-              modelCount: { $size: "$_models" },
-              providerCount: { $size: "$_providers" },
-            },
-          },
-          { $sort: { totalRequests: -1 } },
-        ];
-
-        const workflowPipeline: Record<string, unknown>[] = [
-          { $match: { conversationIds: { $exists: true, $ne: [] } } },
-          {
-            $lookup: {
-              from: CONVERSATIONS_COLLECTION,
-              localField: "conversationIds",
-              foreignField: "id",
-              as: "_convs",
-              pipeline: [{ $project: { project: 1 } }],
-            },
-          },
-          { $unwind: "$_convs" },
-          {
-            $group: {
-              _id: "$_convs.project",
-              workflowIds: { $addToSet: "$_id" },
-            },
-          },
-          { $project: { _id: 1, workflowCount: { $size: "$workflowIds" } } },
-        ];
-
-        const convMatch: Record<string, unknown> = {};
-        if (project) convMatch.project = project;
-        if (workspace) convMatch.workspaceRoot = workspace;
-        if (provider) {
-          const providerNames = String(provider).split(",").filter(Boolean);
-          if (providerNames.length === 1) convMatch.providers = providerNames[0];
-          else if (providerNames.length > 1)
-            convMatch.providers = { $in: providerNames };
-        }
-        if (model) {
-          const modelNames = String(model).split(",").filter(Boolean);
-          if (modelNames.length === 1)
-            convMatch["messages.model"] = modelNames[0];
-          else if (modelNames.length > 1)
-            convMatch["messages.model"] = { $in: modelNames };
-        }
-        applyDateRangeFilter(
-          convMatch,
-          from as string,
-          to as string,
-          "updatedAt",
-        );
-
-        const convPipeline: Record<string, unknown>[] = [
-          ...(Object.keys(convMatch).length ? [{ $match: convMatch }] : []),
-          { $group: { _id: "$project", conversationCount: { $sum: 1 } } },
-        ];
-
-        const [results, workflowCounts, convCounts] =
-          await Promise.all([
-            req.db.collection(REQUESTS_COLLECTION).aggregate(pipeline).toArray(),
-            req.db
-              .collection(WORKFLOWS_COLLECTION)
-              .aggregate(workflowPipeline)
-              .toArray(),
-            req.db
-              .collection(CONVERSATIONS_COLLECTION)
-              .aggregate(convPipeline)
-              .toArray(),
-          ]);
-
-        const wfMap: Record<string, number> = {};
-        for (const wc of workflowCounts) {
-          wfMap[wc._id || "any"] = wc.workflowCount;
-        }
-
-        const convMap: Record<string, number> = {};
-        for (const cc of convCounts) {
-          convMap[cc._id || "any"] = cc.conversationCount;
-        }
-
-        return results.map((r: Record<string, unknown>) => ({
-          project: r._id || "any",
-          totalRequests: r.totalRequests,
-          totalInputTokens: r.totalInputTokens,
-          totalOutputTokens: r.totalOutputTokens,
-          totalTokens: r.totalTokens,
-          totalCost: r.totalCost,
-          avgLatency: r.avgLatency,
-          avgTokensPerSec: r.avgTokensPerSec,
-          lastRequest: r.lastRequest,
-          modelCount: r.modelCount,
-          providerCount: r.providerCount,
-          models: ((r._models || []) as string[]).filter(Boolean),
-          providers: ((r._providers || []) as string[]).filter(Boolean),
-          workflowCount: wfMap[(r._id as string) || "any"] || 0,
-          conversationCount: convMap[(r._id as string) || "any"] || 0,
-          traceCount: (r.traceCount as number) || 0,
-        }));
+        const [rows, conversations, workflows] = await Promise.all([
+          aggregateRequestStats(req.db, [...matchStages(match), ...projectsFacet], {
+            covered: isCoveredMatch(match),
+          }),
+          conversationCountsByProject(req.db, buildConversationMatch(req.query)),
+          workflowCountsByProject(req.db),
+        ]);
+        return rows.map((row) => toProjectRow(row, { conversations, workflows }));
       });
 
       res.json(responseData);
@@ -431,81 +375,10 @@ router.get(
       const cacheKey = StatsCache.buildCacheKey("/stats/models", req.query);
       const responseData = await StatsCache.getOrFetch(cacheKey, async () => {
         const match = await buildMatchFilter(req);
-
-        const pipeline: Record<string, unknown>[] = [
-          ...(Object.keys(match).length ? [{ $match: match }] : []),
-          {
-            $group: {
-              _id: { model: "$model", provider: "$provider" },
-              totalRequests: { $sum: 1 },
-              totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
-              totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
-              totalTokens: TOTAL_TOKENS_EXPRESSION,
-              totalCost: COST_SUMMATION_EXPRESSION,
-              avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
-              avgTokensPerSec: AVERAGE_TOKENS_PER_SECOND_EXPRESSION,
-              toolsUsed: {
-                $max: { $cond: [{ $eq: ["$toolsUsed", true] }, true, false] },
-              },
-              _conversationIds: { $addToSet: "$conversationId" },
-              _traceIds: { $addToSet: "$traceId" },
-            },
-          },
-          {
-            $project: {
-              totalRequests: 1,
-              totalInputTokens: 1,
-              totalOutputTokens: 1,
-              totalTokens: 1,
-              totalCost: 1,
-              avgLatency: 1,
-              avgTokensPerSec: 1,
-              toolsUsed: 1,
-              conversationCount: {
-                $size: {
-                  $filter: {
-                    input: "$_conversationIds",
-                    as: "id",
-                    cond: { $ne: ["$$id", null] },
-                  },
-                },
-              },
-              traceCount: {
-                $size: {
-                  $filter: {
-                    input: "$_traceIds",
-                    as: "id",
-                    cond: { $ne: ["$$id", null] },
-                  },
-                },
-              },
-            },
-          },
-          { $sort: { totalRequests: -1 } },
-        ];
-
-        const results = await req.db
-          .collection(REQUESTS_COLLECTION)
-          .aggregate(pipeline)
-          .toArray();
-
-        return results.map((r: Record<string, unknown>) => {
-          return {
-            model: (r._id as { model: string }).model,
-            provider: (r._id as { provider: string }).provider,
-            totalRequests: r.totalRequests,
-            totalInputTokens: r.totalInputTokens,
-            totalOutputTokens: r.totalOutputTokens,
-            totalTokens: r.totalTokens,
-            totalCost: r.totalCost,
-            avgLatency: r.avgLatency,
-            avgTokensPerSec: r.avgTokensPerSec,
-            toolsUsed: r.toolsUsed || false,
-            conversationCount: (r.conversationCount as number) || 0,
-            workflowCount: 0,
-            traceCount: (r.traceCount as number) || 0,
-          };
+        const rows = await aggregateRequestStats(req.db, [...matchStages(match), ...modelsFacet], {
+          covered: isCoveredMatch(match),
         });
+        return rows.map(toModelRow);
       });
 
       res.json(responseData);
@@ -695,7 +568,7 @@ router.get(
         const match = await buildMatchFilter(req);
 
         const pipeline: Record<string, unknown>[] = [
-          ...(Object.keys(match).length ? [{ $match: match }] : []),
+          ...matchStages(match),
           {
             $group: {
               _id: "$endpoint",
@@ -711,10 +584,9 @@ router.get(
           { $sort: { totalRequests: -1 } },
         ];
 
-        const results = await req.db
-          .collection(REQUESTS_COLLECTION)
-          .aggregate(pipeline)
-          .toArray();
+        const results = await aggregateRequestStats(req.db, pipeline, {
+          covered: isCoveredMatch(match),
+        });
 
         return results.map((result: Record<string, unknown>) => ({
           endpoint: result._id || "any",
@@ -742,7 +614,6 @@ router.get(
       const cacheKey = StatsCache.buildCacheKey("/stats/costs", req.query);
       const responseData = await StatsCache.getOrFetch(cacheKey, async () => {
         const match = await buildMatchFilter(req);
-        const matchStage = Object.keys(match).length ? [{ $match: match }] : [];
 
         const groupFields = {
           totalCost: COST_SUMMATION_EXPRESSION,
@@ -756,20 +627,10 @@ router.get(
           avgTokensPerSec: AVERAGE_TOKENS_PER_SECOND_EXPRESSION,
         };
 
-        // Provider-grain rollup carries the extra fields the admin providers
-        // table renders (distinct model/conversation counts), computed once
-        // server-side so no consumer re-aggregates per-model rows by hand.
-        const providerGroupFields = {
-          ...groupFields,
-          _models: { $addToSet: "$model" },
-          _conversationIds: { $addToSet: "$conversationId" },
-          _traceIds: { $addToSet: "$traceId" },
-        };
-
-        const [result] = await req.db
-          .collection(REQUESTS_COLLECTION)
-          .aggregate([
-            ...matchStage,
+        const [result] = await aggregateRequestStats(
+          req.db,
+          [
+            ...matchStages(match),
             {
               $facet: {
                 totals: [{ $group: { _id: null, ...groupFields } }],
@@ -777,41 +638,8 @@ router.get(
                   { $group: { _id: "$project", ...groupFields } },
                   { $sort: { totalCost: -1 } },
                 ],
-                byProvider: [
-                  { $group: { _id: "$provider", ...providerGroupFields } },
-                  {
-                    $addFields: {
-                      modelCount: {
-                        $size: {
-                          $filter: {
-                            input: "$_models",
-                            as: "m",
-                            cond: { $ne: ["$$m", null] },
-                          },
-                        },
-                      },
-                      conversationCount: {
-                        $size: {
-                          $filter: {
-                            input: "$_conversationIds",
-                            as: "id",
-                            cond: { $ne: ["$$id", null] },
-                          },
-                        },
-                      },
-                      traceCount: {
-                        $size: {
-                          $filter: {
-                            input: "$_traceIds",
-                            as: "id",
-                            cond: { $ne: ["$$id", null] },
-                          },
-                        },
-                      },
-                    },
-                  },
-                  { $sort: { totalCost: -1 } },
-                ],
+                // Also the dashboard's providers table (RequestStatsFacets).
+                byProvider: providersFacet,
                 byModel: [
                   {
                     $group: {
@@ -858,8 +686,9 @@ router.get(
                 ],
               },
             },
-          ])
-          .toArray();
+          ],
+          { covered: isCoveredMatch(match) },
+        );
 
         const {
           totals,
@@ -941,19 +770,7 @@ router.get(
               models: modelsByProject[proj] || [],
             };
           }),
-          providers: byProvider.map((row: Record<string, any>) => ({
-            provider: row._id || "any",
-            totalCost: row.totalCost,
-            totalInputTokens: row.totalInputTokens,
-            totalOutputTokens: row.totalOutputTokens,
-            totalRequests: row.totalRequests,
-            avgLatency: row.avgLatency,
-            avgTokensPerSec: row.avgTokensPerSec,
-            modelCount: row.modelCount,
-            models: ((row._models || []) as string[]).filter(Boolean),
-            conversationCount: row.conversationCount,
-            traceCount: row.traceCount,
-          })),
+          providers: byProvider.map(toProviderRow),
           models: byModel.map((row: Record<string, any>) => ({
             model: row._id.model || "any",
             provider: row._id.provider || "any",
@@ -983,605 +800,71 @@ router.get(
 );
 
 // ─── GET /stats/timeline — requests grouped by adaptive granularity ─
-// Supports an optional `granularity` query param for user-selected resolution.
-// Returns `validGranularities` and `defaultGranularity` so the frontend can
-// render a resolution picker constrained to sane bounds per time span.
+// `hours` (default 24) or `from`/`to` set the span; `hours=all` starts at the
+// first request the filters match. `granularity` picks a resolution from the
+// returned `validGranularities`; `tz` (IANA) sets the calendar day and week
+// buckets. Bucketing and gap-filling live in StatsTimeline.
 router.get(
   "/timeline",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const { hours, from, to, granularity: requestedGranularity, tz } = req.query;
+      const since = typeof from === "string" && from ? new Date(from) : null;
+      const until = typeof to === "string" && to ? new Date(to) : null;
+      const hoursBack = hours === undefined ? 24 : Number(hours);
+      if (
+        (since && Number.isNaN(since.getTime())) ||
+        (until && Number.isNaN(until.getTime())) ||
+        (!since && hours !== "all" && !(hoursBack > 0))
+      ) {
+        res.status(400).json({ error: "Invalid timeline range" });
+        return;
+      }
+
       const cacheKey = StatsCache.buildCacheKey("/stats/timeline", req.query);
       const responseData = await StatsCache.getOrFetch(cacheKey, async () => {
-        const {
-          hours = 24,
-          from,
-          to,
-          granularity: requestedGranularity,
-        } = req.query;
+        const match = await buildMatchFilter(req);
+        delete match.createdAt;
+        const covered = isCoveredMatch(match);
+        const end = until ?? new Date();
 
-        let sinceDate: Date;
-        let untilDate: Date | undefined;
-        if (typeof from === "string") {
-          sinceDate = new Date(from);
-        } else {
-          sinceDate = new Date(
-            Date.now() - hoursToMilliseconds(parseInt(hours as string, 10)),
+        let start = since;
+        if (!start && hours === "all") {
+          const [first] = await aggregateRequestStats<{ createdAt: string }>(
+            req.db,
+            [
+              // `$gt: ""` skips rows without a createdAt (null sorts first).
+              { $match: { ...match, createdAt: { $gt: "" } } },
+              { $sort: { createdAt: 1 } },
+              { $limit: 1 },
+              { $project: { _id: 0, createdAt: 1 } },
+            ],
+            { covered },
           );
+          start = first ? new Date(first.createdAt) : null;
         }
-        if (typeof to === "string") {
-          untilDate = new Date(to);
-        }
+        start ??= new Date(end.getTime() - hoursToMilliseconds(hours === "all" ? 24 : hoursBack));
 
-        const spanMilliseconds =
-          (untilDate ? untilDate.getTime() : Date.now()) - sinceDate.getTime();
-
-        // ── Granularity tier definitions (ordered finest → coarsest) ──
-        const TIER_KEYS = [
-          "1s",
-          "5s",
-          "15s",
-          "30s",
-          "1min",
-          "5min",
-          "15min",
-          "1hr",
-          "4hr",
-          "1day",
-          "1week",
-        ];
-        const TIER_INDEX: Record<string, number> = {};
-        TIER_KEYS.forEach((key, index) => {
-          TIER_INDEX[key] = index;
-        });
-
-        const MINUTES_MILLISECONDS = 60_000;
-        const HOURS_MILLISECONDS = 3_600_000;
-        const DAYS_MILLISECONDS = 86_400_000;
-
-        const SPAN_RULES = [
-          {
-            maxSpanMilliseconds: 2 * MINUTES_MILLISECONDS,
-            defaultGranularity: "1s",
-            minGranularity: "1s",
-            maxGranularity: "15s",
-          },
-          {
-            maxSpanMilliseconds: 10 * MINUTES_MILLISECONDS,
-            defaultGranularity: "5s",
-            minGranularity: "1s",
-            maxGranularity: "1min",
-          },
-          {
-            maxSpanMilliseconds: 30 * MINUTES_MILLISECONDS,
-            defaultGranularity: "15s",
-            minGranularity: "5s",
-            maxGranularity: "5min",
-          },
-          {
-            maxSpanMilliseconds: 1 * HOURS_MILLISECONDS,
-            defaultGranularity: "30s",
-            minGranularity: "15s",
-            maxGranularity: "5min",
-          },
-          {
-            maxSpanMilliseconds: 6 * HOURS_MILLISECONDS,
-            defaultGranularity: "1min",
-            minGranularity: "15s",
-            maxGranularity: "15min",
-          },
-          {
-            maxSpanMilliseconds: 1 * DAYS_MILLISECONDS,
-            defaultGranularity: "5min",
-            minGranularity: "1min",
-            maxGranularity: "1hr",
-          },
-          {
-            maxSpanMilliseconds: 3 * DAYS_MILLISECONDS,
-            defaultGranularity: "15min",
-            minGranularity: "5min",
-            maxGranularity: "1day",
-          },
-          {
-            maxSpanMilliseconds: 7 * DAYS_MILLISECONDS,
-            defaultGranularity: "1day",
-            minGranularity: "1hr",
-            maxGranularity: "1day",
-          },
-          {
-            maxSpanMilliseconds: 14 * DAYS_MILLISECONDS,
-            defaultGranularity: "1day",
-            minGranularity: "4hr",
-            maxGranularity: "1day",
-          },
-          {
-            maxSpanMilliseconds: 30 * DAYS_MILLISECONDS,
-            defaultGranularity: "1day",
-            minGranularity: "4hr",
-            maxGranularity: "1week",
-          },
-          {
-            maxSpanMilliseconds: 90 * DAYS_MILLISECONDS,
-            defaultGranularity: "1day",
-            minGranularity: "1day",
-            maxGranularity: "1week",
-          },
-          {
-            maxSpanMilliseconds: Infinity,
-            defaultGranularity: "1week",
-            minGranularity: "1day",
-            maxGranularity: "1week",
-          },
-        ];
-
-        const rule =
-          SPAN_RULES.find((r) => spanMilliseconds <= r.maxSpanMilliseconds) ||
-          SPAN_RULES[SPAN_RULES.length - 1];
-
-        const defaultGranularity = rule.defaultGranularity;
-        const validGranularities = TIER_KEYS.slice(
-          TIER_INDEX[rule.minGranularity],
-          TIER_INDEX[rule.maxGranularity] + 1,
+        const { granularity, defaultGranularity, validGranularities } = resolveGranularity(
+          end.getTime() - start.getTime(),
+          requestedGranularity,
         );
+        const timeZone = resolveTimeZone(tz);
 
-        let granularity = defaultGranularity;
-        if (
-          typeof requestedGranularity === "string" &&
-          validGranularities.includes(requestedGranularity)
-        ) {
-          granularity = requestedGranularity;
-        }
-
-        // ── MongoDB $group _id expressions per granularity ──
-
-        const floorSecondsExpr = (interval: number) => ({
-          $concat: [
-            {
-              $dateToString: {
-                format: "%Y-%m-%dT%H:%M:",
-                date: { $toDate: "$createdAt" },
-                timezone: "UTC",
-              },
-            },
-            {
-              $cond: [
-                {
-                  $lt: [
-                    {
-                      $multiply: [
-                        {
-                          $floor: {
-                            $divide: [
-                              { $second: { $toDate: "$createdAt" } },
-                              interval,
-                            ],
-                          },
-                        },
-                        interval,
-                      ],
-                    },
-                    10,
-                  ],
-                },
-                {
-                  $concat: [
-                    "0",
-                    {
-                      $toString: {
-                        $multiply: [
-                          {
-                            $floor: {
-                              $divide: [
-                                { $second: { $toDate: "$createdAt" } },
-                                interval,
-                              ],
-                            },
-                          },
-                          interval,
-                        ],
-                      },
-                    },
-                  ],
-                },
-                {
-                  $toString: {
-                    $multiply: [
-                      {
-                        $floor: {
-                          $divide: [
-                            { $second: { $toDate: "$createdAt" } },
-                            interval,
-                          ],
-                        },
-                      },
-                      interval,
-                    ],
-                  },
-                },
-              ],
-            },
-          ],
-        });
-
-        const floorMinutesExpr = (interval: number) => ({
-          $concat: [
-            {
-              $dateToString: {
-                format: "%Y-%m-%dT%H:",
-                date: { $toDate: "$createdAt" },
-                timezone: "UTC",
-              },
-            },
-            {
-              $cond: [
-                {
-                  $lt: [
-                    {
-                      $multiply: [
-                        {
-                          $floor: {
-                            $divide: [
-                              { $minute: { $toDate: "$createdAt" } },
-                              interval,
-                            ],
-                          },
-                        },
-                        interval,
-                      ],
-                    },
-                    10,
-                  ],
-                },
-                {
-                  $concat: [
-                    "0",
-                    {
-                      $toString: {
-                        $multiply: [
-                          {
-                            $floor: {
-                              $divide: [
-                                { $minute: { $toDate: "$createdAt" } },
-                                interval,
-                              ],
-                            },
-                          },
-                          interval,
-                        ],
-                      },
-                    },
-                  ],
-                },
-                {
-                  $toString: {
-                    $multiply: [
-                      {
-                        $floor: {
-                          $divide: [
-                            { $minute: { $toDate: "$createdAt" } },
-                            interval,
-                          ],
-                        },
-                      },
-                      interval,
-                    ],
-                  },
-                },
-              ],
-            },
-          ],
-        });
-
-        const floorHoursExpr = (interval: number) => ({
-          $concat: [
-            {
-              $dateToString: {
-                format: "%Y-%m-%dT",
-                date: { $toDate: "$createdAt" },
-                timezone: "UTC",
-              },
-            },
-            {
-              $cond: [
-                {
-                  $lt: [
-                    {
-                      $multiply: [
-                        {
-                          $floor: {
-                            $divide: [
-                              { $hour: { $toDate: "$createdAt" } },
-                              interval,
-                            ],
-                          },
-                        },
-                        interval,
-                      ],
-                    },
-                    10,
-                  ],
-                },
-                {
-                  $concat: [
-                    "0",
-                    {
-                      $toString: {
-                        $multiply: [
-                          {
-                            $floor: {
-                              $divide: [
-                                { $hour: { $toDate: "$createdAt" } },
-                                interval,
-                              ],
-                            },
-                          },
-                          interval,
-                        ],
-                      },
-                    },
-                  ],
-                },
-                {
-                  $toString: {
-                    $multiply: [
-                      {
-                        $floor: {
-                          $divide: [
-                            { $hour: { $toDate: "$createdAt" } },
-                            interval,
-                          ],
-                        },
-                      },
-                      interval,
-                    ],
-                  },
-                },
-              ],
-            },
-          ],
-        });
-
-        // ISO week start (Monday) expression
-        const weekStartExpr = {
-          $dateToString: {
-            format: "%Y-%m-%d",
-            date: {
-              $dateSubtract: {
-                startDate: { $toDate: "$createdAt" },
-                unit: "day",
-                amount: {
-                  $mod: [
-                    {
-                      $add: [
-                        {
-                          $subtract: [
-                            { $dayOfWeek: { $toDate: "$createdAt" } },
-                            2,
-                          ],
-                        },
-                        7,
-                      ],
-                    },
-                    7,
-                  ],
-                },
-              },
-            },
-            timezone: "UTC",
-          },
-        };
-
-        let groupId: Record<string, unknown> | string;
-        switch (granularity) {
-          case "1s":
-            groupId = {
-              $dateToString: {
-                format: "%Y-%m-%dT%H:%M:%S",
-                date: { $toDate: "$createdAt" },
-                timezone: "UTC",
-              },
-            };
-            break;
-          case "5s":
-            groupId = floorSecondsExpr(5);
-            break;
-          case "15s":
-            groupId = floorSecondsExpr(15);
-            break;
-          case "30s":
-            groupId = floorSecondsExpr(30);
-            break;
-          case "1min":
-            groupId = {
-              $dateToString: {
-                format: "%Y-%m-%dT%H:%M",
-                date: { $toDate: "$createdAt" },
-                timezone: "UTC",
-              },
-            };
-            break;
-          case "5min":
-            groupId = floorMinutesExpr(5);
-            break;
-          case "15min":
-            groupId = floorMinutesExpr(15);
-            break;
-          case "1hr":
-            groupId = { $substr: ["$createdAt", 0, 13] };
-            break;
-          case "4hr":
-            groupId = floorHoursExpr(4);
-            break;
-          case "1day":
-            groupId = { $substr: ["$createdAt", 0, 10] };
-            break;
-          case "1week":
-            groupId = weekStartExpr;
-            break;
-          default:
-            groupId = { $substr: ["$createdAt", 0, 10] };
-        }
-
-        const timeMatch: Record<string, string> = {
-          $gte: sinceDate.toISOString(),
-        };
-        if (untilDate) timeMatch.$lte = untilDate!.toISOString();
-
-        const matchFilter = await buildMatchFilter(req);
-        matchFilter.createdAt = timeMatch;
-
-        const timelinePipeline: Record<string, unknown>[] = [
-          { $match: matchFilter },
-          {
-            $group: {
-              _id: groupId,
-              requests: { $sum: 1 },
-              tokens: {
-                $sum: {
-                  $add: [
-                    { $ifNull: ["$inputTokens", 0] },
-                    { $ifNull: ["$outputTokens", 0] },
-                  ],
-                },
-              },
-              cost: COST_SUMMATION_EXPRESSION,
-              avgLatency: { $avg: { $ifNull: ["$totalTime", null] } },
-              successes: {
-                $sum: { $cond: [{ $eq: ["$success", true] }, 1, 0] },
-              },
-            },
-          },
-          { $sort: { _id: 1 } },
-        ];
-
-        const results = await req.db
-          .collection(REQUESTS_COLLECTION)
-          .aggregate(timelinePipeline)
-          .toArray();
-
-        // ── Gap Filling Logic ─────────────────────────────────
-        // We iterate from sinceDate to untilDate based on granularity
-        // and fill missing buckets with zeroed data.
-
-        const getStepMs = (g: string): number => {
-          switch (g) {
-            case "1s": return 1000;
-            case "5s": return 5000;
-            case "15s": return 15000;
-            case "30s": return 30000;
-            case "1min": return 60000;
-            case "5min": return 300000;
-            case "15min": return 900000;
-            case "1hr": return 3600000;
-            case "4hr": return 14400000;
-            case "1day": return 86400000;
-            case "1week": return 604800000;
-            default: return 86400000;
-          }
-        };
-
-        const getBucketIdFromDate = (date: Date, g: string): string => {
-          const iso = date.toISOString();
-          switch (g) {
-            case "1s": return iso.slice(0, 19);
-            case "5s":
-            case "15s":
-            case "30s": {
-              const interval = parseInt(g.replace("s", ""), 10);
-              const s = Math.floor(date.getUTCSeconds() / interval) * interval;
-              return iso.slice(0, 17) + String(s).padStart(2, "0");
-            }
-            case "1min": return iso.slice(0, 16);
-            case "5min":
-            case "15min": {
-              const interval = parseInt(g.replace("min", ""), 10);
-              const m = Math.floor(date.getUTCMinutes() / interval) * interval;
-              return iso.slice(0, 14) + String(m).padStart(2, "0");
-            }
-            case "1hr": return iso.slice(0, 13);
-            case "4hr": {
-              const h = Math.floor(date.getUTCHours() / 4) * 4;
-              return iso.slice(0, 11) + String(h).padStart(2, "0");
-            }
-            case "1day": return iso.slice(0, 10);
-            case "1week": {
-              const day = date.getUTCDay();
-              const diff = (day === 0 ? 6 : day - 1);
-              const monday = new Date(date);
-              monday.setUTCDate(date.getUTCDate() - diff);
-              return monday.toISOString().slice(0, 10);
-            }
-            default: return iso.slice(0, 10);
-          }
-        };
-
-        const resultsMap = new Map(results.map((r) => [r._id, r]));
-        const filledData = [];
-        const stepMs = getStepMs(granularity);
-
-        // Align sinceDate to bucket start to avoid missing the first bucket
-        const alignedSince = new Date(sinceDate);
-        alignedSince.setUTCMilliseconds(0);
-        if (stepMs >= 1000) alignedSince.setUTCSeconds(0);
-        if (stepMs >= 60000) alignedSince.setUTCMinutes(0);
-        // For hourly or larger granularities, floor to the hour (but NOT to UTC midnight unless it's a day-long bin)
-        if (stepMs >= 3600000 && stepMs < 86400000) {
-          // If it's a 4hr bin, floor to nearest 4 hours of the day
-          const hourInterval = stepMs / 3600000;
-          alignedSince.setUTCHours(Math.floor(alignedSince.getUTCHours() / hourInterval) * hourInterval);
-        } else if (stepMs >= 86400000) {
-          // Daily or weekly, floor to midnight
-          alignedSince.setUTCHours(0);
-        }
-
-        // Re-calculate alignment based on granularity specifically
-        const cursor = new Date(alignedSince);
-        // Ensure the cursor starts exactly at the bucket start for sub-hourly granularities
-        if (granularity.endsWith("s")) {
-          const interval = parseInt(granularity.replace("s", ""), 10);
-          cursor.setUTCSeconds(Math.floor(cursor.getUTCSeconds() / interval) * interval);
-        } else if (granularity.endsWith("min")) {
-          const interval = parseInt(granularity.replace("min", ""), 10);
-          cursor.setUTCMinutes(Math.floor(cursor.getUTCMinutes() / interval) * interval);
-        } else if (granularity === "4hr") {
-          cursor.setUTCHours(Math.floor(cursor.getUTCHours() / 4) * 4);
-        } else if (granularity === "1week") {
-          const day = cursor.getUTCDay();
-          const diff = (day === 0 ? 6 : day - 1);
-          cursor.setUTCDate(cursor.getUTCDate() - diff);
-        }
-
-        const endLimitDate = untilDate || new Date();
-        const endId = getBucketIdFromDate(endLimitDate, granularity);
-
-        // Safety break to prevent infinite loops or huge payloads (max 1000 points)
-        let iterations = 0;
-        const MAX_ITERATIONS = 1000;
-
-        while (iterations < MAX_ITERATIONS) {
-          const bucketId = getBucketIdFromDate(cursor, granularity);
-          const result = resultsMap.get(bucketId);
-
-          filledData.push({
-            hour: bucketId,
-            requests: result ? result.requests : 0,
-            tokens: result ? result.tokens : 0,
-            cost: result ? result.cost : 0,
-            avgLatency: result && result.avgLatency ? Math.round(result.avgLatency as number) : 0,
-            successRate: result && result.requests > 0
-              ? Math.round(((result.successes as number) / (result.requests as number)) * 100)
-              : 100,
-          });
-
-          if (bucketId === endId) break;
-          cursor.setTime(cursor.getTime() + stepMs);
-          iterations++;
-        }
+        const createdAt: Record<string, string> = { $gte: start.toISOString() };
+        if (until) createdAt.$lte = until.toISOString();
+        const baseBuckets = await aggregateRequestStats<TimelineBaseBucket>(
+          req.db,
+          [{ $match: { ...match, createdAt } }, timelineGroupStage(granularity)],
+          { covered },
+        );
 
         return {
           granularity,
           defaultGranularity,
           validGranularities,
-          data: filledData,
+          timezone: timeZone,
+          data: buildTimeline(baseBuckets, { granularity, since: start, until: end, timeZone }),
         };
       });
 
@@ -1601,74 +884,10 @@ router.get(
       const cacheKey = StatsCache.buildCacheKey("/stats/agents", req.query);
       const responseData = await StatsCache.getOrFetch(cacheKey, async () => {
         const match = await buildMatchFilter(req);
-        match.agent = { $exists: true, $ne: null };
-
-        const pipeline: Record<string, unknown>[] = [
-          { $match: match },
-          {
-            $group: {
-              _id: "$agent",
-              totalRequests: { $sum: 1 },
-              totalInputTokens: { $sum: { $ifNull: ["$inputTokens", 0] } },
-              totalOutputTokens: { $sum: { $ifNull: ["$outputTokens", 0] } },
-              totalTokens: TOTAL_TOKENS_EXPRESSION,
-              totalCost: COST_SUMMATION_EXPRESSION,
-              avgLatency: { $avg: { $ifNull: ["$totalTime", 0] } },
-              avgTokensPerSec: AVERAGE_TOKENS_PER_SECOND_EXPRESSION,
-              _models: { $addToSet: "$model" },
-              _providers: { $addToSet: "$provider" },
-              _convIds: { $addToSet: "$conversationId" },
-              _traceIds: { $addToSet: "$traceId" },
-              lastRequest: { $max: "$createdAt" },
-              successCount: {
-                $sum: { $cond: [{ $eq: ["$success", true] }, 1, 0] },
-              },
-              errorCount: {
-                $sum: { $cond: [{ $eq: ["$success", false] }, 1, 0] },
-              },
-            },
-          },
-          { $sort: { totalRequests: -1 } },
-        ];
-
-        const results = await req.db
-          .collection(REQUESTS_COLLECTION)
-          .aggregate(pipeline)
-          .toArray();
-
-        return results.map((result: Record<string, unknown>) => {
-          const agentId = (result._id as string) || "";
-          const persona = AgentPersonaRegistry.get(agentId);
-          const models = ((result._models || []) as string[]).filter(Boolean);
-          const providers = ((result._providers || []) as string[]).filter(Boolean);
-          const conversationIds = ((result._convIds || []) as string[]).filter(
-            Boolean,
-          );
-          const traceIds = ((result._traceIds || []) as string[]).filter(Boolean);
-
-          return {
-            agent: agentId,
-            name: persona?.name || agentId,
-            type: persona?.type || "",
-            custom: persona?.custom || false,
-            totalRequests: result.totalRequests,
-            totalInputTokens: result.totalInputTokens,
-            totalOutputTokens: result.totalOutputTokens,
-            totalTokens: result.totalTokens,
-            totalCost: result.totalCost,
-            avgLatency: result.avgLatency,
-            avgTokensPerSec: result.avgTokensPerSec,
-            modelCount: models.length,
-            models,
-            providerCount: providers.length,
-            providers,
-            conversationCount: conversationIds.length,
-            sessionCount: traceIds.length,
-            lastRequest: result.lastRequest,
-            successCount: result.successCount,
-            errorCount: result.errorCount,
-          };
+        const rows = await aggregateRequestStats(req.db, [...matchStages(match), ...agentsFacet], {
+          covered: isCoveredMatch(match),
         });
+        return toAgentRows(rows);
       });
 
       res.json(responseData);

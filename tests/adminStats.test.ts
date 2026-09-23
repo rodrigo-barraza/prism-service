@@ -447,18 +447,30 @@ describe("GET /admin/stats/tools", () => {
                       });
                     }
 
+                    const totalsOf = (rows: any[]) => [{
+                      totalRequests: rows.length,
+                      totalInputTokens: rows.reduce((sum, d) => sum + d.inputTokens, 0),
+                      totalOutputTokens: rows.reduce((sum, d) => sum + d.outputTokens, 0),
+                      totalCost: rows.reduce((sum, d) => sum + d.estimatedCost, 0),
+                      avgLatency: rows.length ? rows.reduce((sum, d) => sum + d.totalTime, 0) / rows.length : 0,
+                      successCount: rows.filter(d => d.success).length,
+                      errorCount: rows.filter(d => !d.success).length,
+                    }];
+
+                    // GET /stats runs its totals and trace count as one $facet.
+                    const facetStage = pipeline.find(stage => stage.$facet)?.$facet;
+                    if (facetStage) {
+                      const traceIds = new Set(filtered.map(d => d.traceId).filter(Boolean));
+                      return [{
+                        totals: facetStage.totals ? totalsOf(filtered) : undefined,
+                        traceCount: traceIds.size ? [{ total: traceIds.size }] : [],
+                      }];
+                    }
+
                     const groupStage = pipeline.find(stage => stage.$group)?.$group;
                     if (groupStage) {
                       if (groupStage._id === null) {
-                        return [{
-                          totalRequests: filtered.length,
-                          totalInputTokens: filtered.reduce((sum, d) => sum + d.inputTokens, 0),
-                          totalOutputTokens: filtered.reduce((sum, d) => sum + d.outputTokens, 0),
-                          totalCost: filtered.reduce((sum, d) => sum + d.estimatedCost, 0),
-                          avgLatency: filtered.length ? filtered.reduce((sum, d) => sum + d.totalTime, 0) / filtered.length : 0,
-                          successCount: filtered.filter(d => d.success).length,
-                          errorCount: filtered.filter(d => !d.success).length,
-                        }];
+                        return totalsOf(filtered);
                       }
                     }
                     return filtered;
