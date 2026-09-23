@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SubAgentTelemetryEmitter } from "#src/services/orchestrator/SubAgentTelemetryEmitter";
+import { LiveTurnBuffer, withDirectViewerBroadcast } from "#src/utils/DirectViewerBroadcast";
 
 vi.mock("#src/services/ConversationGenerationTracker", () => ({
   default: {
@@ -410,6 +411,66 @@ describe("SubAgentTelemetryEmitter", () => {
       expect(parentEmitMock).toHaveBeenCalledWith(
         expect.objectContaining({ subAgentId: "grandchild-1", approvalConversationId: "grandchild-conv" }),
       );
+    });
+  });
+
+  describe("sequence ids on the parent stream", () => {
+    // Every event this emitter sees is stamped with the SUB-AGENT
+    // conversation's seq (broadcastToDirectViewers → LiveTurnBuffer.record)
+    // before some are forwarded up. The parent stream numbers its own
+    // events; a forwarded event must take the parent's next seq, or it runs
+    // backwards whenever the parent has emitted more than the sub-agent —
+    // and a client cursor (afterSeq, liveTurnCursor) drops it as seen.
+    beforeEach(() => {
+      LiveTurnBuffer.clearAll();
+    });
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("gives a forwarded card, decision, usage update and grandchild event the parent's next seq", () => {
+      vi.spyOn(Date, "now").mockReturnValue(1_790_000_000_000);
+      const parentStream: Array<Record<string, unknown>> = [];
+      const parentEmit = withDirectViewerBroadcast("parent-conv-1", (event: Record<string, unknown>) => {
+        parentStream.push({ ...event });
+      });
+      const emitFunction = createEmitter({ parentEmit: parentEmit as typeof parentEmitMock }).createEmitFunction();
+
+      emitFunction({ type: "chunk", content: "Reading the config" });
+      // The parent keeps streaming its own reply meanwhile (non-blocking
+      // dispatch), so its counter runs ahead of the sub-agent's.
+      for (let index = 0; index < 20; index++) parentEmit({ type: "chunk", content: `parent ${index}` });
+
+      emitFunction({
+        type: "approval_required",
+        toolCallId: "call-1",
+        batchId: "batch-1",
+        batchSize: 1,
+        toolCall: { name: "write_file", args: { path: "a.txt" }, id: "call-1" },
+      });
+      emitFunction({ type: "approval_decided", toolCallId: "call-1", batchId: "batch-1", decision: "allow", scope: "call", source: "user" });
+      emitFunction({ type: "usage_update", usage: { inputTokens: 10, outputTokens: 2 } });
+      emitFunction({ type: "sub_agent_status", subAgentId: "grandchild-1", message: "phase", phase: "thinking" });
+
+      const seqs = parentStream.map((event) => event.seq as number);
+      for (let index = 1; index < seqs.length; index++) {
+        expect(seqs[index], `parent event ${index} (${String(parentStream[index].type)})`).toBe(seqs[index - 1] + 1);
+      }
+      expect(LiveTurnBuffer.lastSeq("parent-conv-1")).toBe(seqs[seqs.length - 1]);
+    });
+
+    it("leaves the sub-agent's own numbering to viewers of its conversation", () => {
+      vi.spyOn(Date, "now").mockReturnValue(1_790_000_000_000);
+      const parentEmit = withDirectViewerBroadcast("parent-conv-1", () => {});
+      const emitFunction = createEmitter({ parentEmit: parentEmit as typeof parentEmitMock }).createEmitFunction();
+
+      emitFunction({ type: "chunk", content: "Reading" });
+      for (let index = 0; index < 20; index++) parentEmit({ type: "chunk", content: `parent ${index}` });
+      emitFunction({ type: "usage_update", usage: { inputTokens: 10, outputTokens: 2 } });
+
+      const subAgentTurn = LiveTurnBuffer.replay("sub-conv-test-1");
+      expect(subAgentTurn.map((event) => event.type)).toEqual(["chunk", "usage_update"]);
+      expect(subAgentTurn[1].seq).toBe(subAgentTurn[0].seq! + 1);
     });
   });
 
