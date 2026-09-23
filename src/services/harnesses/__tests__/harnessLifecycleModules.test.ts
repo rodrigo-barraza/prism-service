@@ -9,7 +9,7 @@ import { checkAndWaitForApproval } from "#src/services/harnesses/lifecycle/Appro
 import { manageContextPressure } from "#src/services/harnesses/lifecycle/ContextPressureManager";
 import { checkCostBudget } from "#src/services/harnesses/lifecycle/CostBudgetEnforcer";
 import { runExhaustionRecoveryPass } from "#src/services/harnesses/lifecycle/ExhaustionRecovery";
-import { createStandardHooks } from "#src/services/harnesses/lifecycle/HookInitializer";
+import { attachConfiguredHooks, createStandardHooks } from "#src/services/harnesses/lifecycle/HookInitializer";
 import {
   handleExitPlanMode,
   checkForPlanModeEntry,
@@ -572,6 +572,18 @@ describe("Harness Lifecycle Modules", () => {
 
       expect(hooks).toBeInstanceOf(AgentHooks);
       expect(approvalEngine).toBeInstanceOf(AutoApprovalEngine);
+    });
+
+    it("gives a benchmark sample no hook that learns from it, and none of the user's", async () => {
+      expect(createStandardHooks({ autoApprove: true }).hooks.hasHooks("afterResponse")).toBe(true);
+      const { hooks } = createStandardHooks({ autoApprove: true, evaluation: true });
+      // Memory extraction, conversation embedding, workflow memory, goal spend: all afterResponse.
+      expect(hooks.hasHooks("afterResponse")).toBe(false);
+      // The prompt and the approval gate are still the agent's own.
+      expect(hooks.hasHooks("beforePrompt")).toBe(true);
+      expect(hooks.hasHooks("beforeToolCall")).toBe(true);
+      expect(await attachConfiguredHooks(hooks, { project: "p", username: "u", evaluation: true })).toBe(0);
+      expect(hooks.hasHooks("preToolUse")).toBe(false);
     });
   });
 

@@ -38,6 +38,24 @@ const MOCK_TOOLS_API_SCHEMAS = [
     parameters: { type: "object", properties: {} },
     endpoint: { method: "POST", path: "/calculator" },
   },
+  {
+    name: "save_memory",
+    description: "Remember something about the user",
+    parameters: { type: "object", properties: {} },
+    endpoint: { method: "POST", path: "/memory" },
+  },
+  {
+    name: "set_timer",
+    description: "Set a reminder",
+    parameters: { type: "object", properties: {} },
+    endpoint: { method: "POST", path: "/timer" },
+  },
+  {
+    name: "search_conversations",
+    description: "Search past conversations",
+    parameters: { type: "object", properties: {} },
+    endpoint: { method: "POST", path: "/conversations/search" },
+  },
 ];
 
 const MOCK_MCP_TOOL_SCHEMAS = [
@@ -269,6 +287,29 @@ describe("AgenticToolResolver — tool resolution", () => {
     // Explicitly enabled tools should still be present
     expect(toolNames).toContain("read_file");
     expect(toolNames).toContain("write_file");
+  });
+
+  it("gives a benchmark sample no tool whose effect outlives it, even one it names", async () => {
+    const resolveFor = async (evaluation: boolean, enabledTools?: string[]) =>
+      (
+        await AgenticToolResolver.resolve({
+          options: { evaluation, ...(enabledTools && { enabledTools }) },
+          agent: "WILDCARD_AGENT",
+          project: "prism-client",
+          username: "anonymous",
+          modelDefinition: undefined,
+        })
+      ).finalTools.map((tool) => tool.name);
+
+    const persistent = ["save_memory", "set_timer", "search_conversations"];
+    const live = await resolveFor(false);
+    expect(live).toEqual(expect.arrayContaining(persistent));
+    const sample = await resolveFor(true);
+    for (const name of persistent) expect(sample).not.toContain(name);
+    // Everything else the persona has stays: the agent is still itself.
+    expect(sample).toEqual(expect.arrayContaining(["read_file", "write_file", "get_weather"]));
+    // A suite cannot hand them back by naming them.
+    expect(await resolveFor(true, ["read_file", "save_memory"])).not.toContain("save_memory");
   });
 
   it("gives report_progress to sub-agents only — a root agent has no parent to report to", async () => {

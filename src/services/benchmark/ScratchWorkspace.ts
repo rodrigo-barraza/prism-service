@@ -99,18 +99,27 @@ export async function createScratchWorkspace({
   if (markerError) {
     throw new Error(`Could not create the scratch workspace ${root}: ${markerError}`);
   }
+  await writeWorkspaceFiles({ root }, files, identity);
+  return { root };
+}
+
+/** Write files into the workspace (relative path → text): seed files before a run, hidden tests after it. */
+export async function writeWorkspaceFiles(
+  workspace: ScratchWorkspace,
+  files: Record<string, string> | null | undefined,
+  identity: WorkspaceIdentity,
+): Promise<void> {
   for (const [path, content] of Object.entries(files ?? {})) {
     const relativePath = normaliseWorkspacePath(path);
-    if (!relativePath) throw new Error(`Seed file path escapes the workspace: ${path}`);
+    if (!relativePath) throw new Error(`File path escapes the workspace: ${path}`);
     const written = await ToolOrchestratorService.executeTool(
       TOOL_NAMES.WRITE_FILE,
-      { path: `${root}/${relativePath}`, content },
-      toolContext(root, identity),
+      { path: `${workspace.root}/${relativePath}`, content },
+      toolContext(workspace.root, identity),
     );
     const writeError = errorOf(written);
-    if (writeError) throw new Error(`Could not seed ${relativePath}: ${writeError}`);
+    if (writeError) throw new Error(`Could not write ${relativePath}: ${writeError}`);
   }
-  return { root };
 }
 
 /**

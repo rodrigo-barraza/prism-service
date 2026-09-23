@@ -319,6 +319,7 @@ export default class ReActHarness extends BaseAgenticHarness {
       permissionMode: options._permissionMode,
       capabilityScope: options._capabilityScope,
       untrustedSpans: options._untrustedSpans,
+      evaluation: options.evaluation === true,
     });
     const { hooks, approvalEngine } = standardHooks;
 
@@ -335,6 +336,7 @@ export default class ReActHarness extends BaseAgenticHarness {
       workspaceRoot,
       hookDepth: context.parentAgentConversationId ? 1 : 0,
       emit: emit as (event: Record<string, unknown>) => void,
+      evaluation: options.evaluation === true,
     });
 
     // ── Turn-open hook events ────────────────────────────────
@@ -455,6 +457,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             routingPreset: options.isSubAgent
               ? undefined
               : (options.routingPreset as string | undefined),
+            evaluation: options.evaluation === true,
           };
           await hooks.run("beforePrompt", hookContext);
           await fireInstructionsLoaded(

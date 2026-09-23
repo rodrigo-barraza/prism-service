@@ -342,6 +342,7 @@ export async function executeToolBatch(
               _capabilityScope: context.options?._capabilityScope,
               _untrustedSpans: context.options?._untrustedSpans,
               _criticModel: context.options?.criticModel,
+              _evaluation: context.options?.evaluation === true,
               _maxCostDollars: context.options?.maxCostDollars,
               _sharedCostBudget: context.options?._sharedCostBudget,
               _routingPreset: context.options?.routingPreset as string | undefined,

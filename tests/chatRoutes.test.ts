@@ -391,3 +391,28 @@ describe('handleAgent — what a restart needs', () => {
     expect(seen.resume).toBeNull();
   });
 });
+
+// A benchmark sample (AgenticOptions.evaluation) reaches the loop marked as one.
+describe('handleAgent — a benchmark sample', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('carries the evaluation flag into the loop options, and only when asked', async () => {
+    const { default: AgenticLoopService } = await import('#src/services/AgenticLoopService');
+    const { handleAgent } = await import('#src/routes/ChatRoutes');
+    const seen: Array<Record<string, unknown>> = [];
+    const capture = async (opts: any) => {
+      seen.push(opts.options);
+      return { messages: [] } as never;
+    };
+    vi.mocked(AgenticLoopService.runAgenticLoop).mockImplementationOnce(capture).mockImplementationOnce(capture);
+    const params = { provider: PROVIDERS.OPENAI, agent: 'CODING', project: 'test', username: 'testuser', messages: [{ role: 'user', content: 'Case 1' }] };
+
+    await handleAgent({ ...params, evaluation: true }, () => {});
+    await handleAgent(params, () => {});
+
+    expect(seen[0]).toMatchObject({ evaluation: true });
+    expect(seen[1]).not.toHaveProperty('evaluation');
+  });
+});

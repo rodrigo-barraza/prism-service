@@ -87,7 +87,7 @@ import conversationRouter from "./routes/ConversationExecutionRoute.ts";
 import statsRouter from "./routes/StatsRoutes.ts";
 import somaticRouter from "./routes/SomaticRoutes.ts";
 import benchmarkRouter from "./routes/BenchmarkRoutes.ts";
-import benchmarkReliabilityRouter from "./routes/BenchmarkReliabilityRoutes.ts";
+import { BENCHMARK_INDEXES } from "./services/benchmark/BenchmarkStore.ts";
 import synthesisRouter from "./routes/SynthesisRoutes.ts";
 import vramBenchmarksRouter from "./routes/VramBenchmarksRoutes.ts";
 import orchestratorRouter from "./routes/OrchestratorRoutes.ts";
@@ -232,7 +232,6 @@ app.use("/conversation", conversationRouter);
 app.use("/stats", statsRouter);
 app.use("/somatic", somaticRouter);
 // Datasets, sweeps and schedules first: BenchmarkRoutes' `/:id` would take their paths.
-app.use("/benchmark", benchmarkReliabilityRouter);
 app.use("/benchmark", benchmarkRouter);
 app.use("/synthesis", synthesisRouter);
 app.use("/vram-benchmarks", vramBenchmarksRouter);
@@ -462,56 +461,8 @@ setupWebSocket(wss);
           collection: COLLECTIONS.AGENT_ARTIFACTS,
           keys: { project: 1, url: 1 },
         },
-        // benchmarks
-        {
-          collection: COLLECTIONS.BENCHMARKS,
-          keys: { id: 1 },
-          options: { unique: true },
-        },
-        {
-          collection: COLLECTIONS.BENCHMARKS,
-          keys: { project: 1, updatedAt: -1 },
-        },
-        {
-          collection: COLLECTIONS.BENCHMARK_RUNS,
-          keys: { id: 1 },
-          options: { unique: true },
-        },
-        {
-          collection: COLLECTIONS.BENCHMARK_RUNS,
-          keys: { benchmarkId: 1, project: 1, startedAt: -1 },
-        },
-        {
-          collection: COLLECTIONS.BENCHMARK_DATASETS,
-          keys: { id: 1 },
-          options: { unique: true },
-        },
-        {
-          collection: COLLECTIONS.BENCHMARK_DATASETS,
-          keys: { project: 1, updatedAt: -1 },
-        },
-        {
-          collection: COLLECTIONS.BENCHMARK_DATASET_RUNS,
-          keys: { id: 1 },
-          options: { unique: true },
-        },
-        {
-          collection: COLLECTIONS.BENCHMARK_DATASET_RUNS,
-          keys: { datasetId: 1, project: 1, startedAt: -1 },
-        },
-        {
-          collection: COLLECTIONS.BENCHMARK_SWEEPS,
-          keys: { id: 1 },
-          options: { unique: true },
-        },
-        {
-          collection: COLLECTIONS.BENCHMARK_SWEEPS,
-          keys: { scheduleId: 1, project: 1, startedAt: -1 },
-        },
-        {
-          collection: COLLECTIONS.BENCHMARK_SWEEPS,
-          keys: { datasetId: 1, project: 1, startedAt: -1 },
-        },
+        // benchmarks (suites, runs, samples, battles, lineups)
+        ...BENCHMARK_INDEXES,
         // synthesis
         {
           collection: COLLECTIONS.SYNTHESIS,
@@ -995,6 +946,18 @@ setupWebSocket(wss);
   logger.info(
     `[AutoDream] Scheduled consolidation every ${CONSOLIDATION_INTERVAL_MILLISECONDS / 3_600_000}h`,
   );
+
+  // ── Benchmarks: runs a restart cut off are resumable, not running ──
+  try {
+    const { default: RunEngine } = await import("./services/benchmark/RunEngine.ts");
+    const interrupted = await RunEngine.markInterrupted();
+    if (interrupted > 0) logger.info(`[Benchmarks] ${interrupted} run(s) interrupted by the restart — resume them from the run page`);
+    registerCleanup(async () => {
+      RunEngine.stopAll();
+    });
+  } catch (error: unknown) {
+    logger.error("Failed to recover benchmark runs: " + getErrorMessage(error));
+  }
 
   // ── Scheduled Tasks Background Daemon ──────────────────
   try {

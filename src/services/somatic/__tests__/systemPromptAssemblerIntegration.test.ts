@@ -647,3 +647,64 @@ describe("Sub-agent memory isolation", () => {
     expect(mockRenderSystemMessage).toHaveBeenCalledWith("LUPOS", "en", []);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+// Assembler — Benchmark sample isolation
+// A benchmark sample (evaluation) carries none of the agent's learned
+// state: a memory of the last sample is its answer, and adapting Lupos's
+// mood from a test case changes the live Lupos.
+// ═══════════════════════════════════════════════════════════════
+
+describe("Benchmark sample isolation", () => {
+  let assembler: SystemPromptAssembler;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPersonas.clear();
+    assembler = new SystemPromptAssembler({ workspaceRoot: "/test" });
+  });
+
+  it("reads no memories and no workflows for a top-level agent under evaluation", async () => {
+    mockPersonas.set("CODING", createCodingPersona());
+    mockFetchMemories.mockResolvedValue({ memoriesText: "[project] The answer to case 7 is 42", injectedMemoryIds: ["memory-id-case-7"] });
+    mockRetrieveRelevantWorkflows.mockResolvedValue("Past Workflow: how case 7 was solved");
+
+    const result = await assembler.assemble(
+      createContext({
+        agent: "CODING",
+        project: "prism-client",
+        parentAgentConversationId: null,
+        evaluation: true,
+        messages: [
+          { role: "system", content: "" },
+          { role: "user", content: "Case 7" },
+        ],
+        agentContext: undefined,
+      }),
+    );
+
+    expect(mockFetchMemories).not.toHaveBeenCalled();
+    expect(mockRetrieveRelevantWorkflows).not.toHaveBeenCalled();
+    expect(result.memoriesText).toBe("");
+    expect(result.workflowsText).toBe("");
+  });
+
+  it("leaves Lupos's somatic state alone under evaluation", async () => {
+    mockPersonas.set("LUPOS", createLuposPersona());
+    mockRenderSystemMessage.mockResolvedValue("[Somatic State] calm");
+
+    await assembler.assemble(
+      createContext({
+        agent: "LUPOS",
+        evaluation: true,
+        messages: [
+          { role: "system", content: "" },
+          { role: "user", content: "You are terrible at this." },
+        ],
+      }),
+    );
+
+    expect(mockAdaptFromMessage).not.toHaveBeenCalled();
+    expect(mockRenderSystemMessage).not.toHaveBeenCalled();
+  });
+});

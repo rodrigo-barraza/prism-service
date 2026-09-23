@@ -108,7 +108,7 @@ Prism reads the model list and context window from `/v1/models`, and the parsers
 | `GET` | `/conversations` | Conversation CRUD |
 | `GET` | `/memory` | Memory management — list, store, delete, search |
 | `GET` | `/workflows` | Multi-step workflow CRUD + execution |
-| `GET` | `/benchmark` | Model benchmarking engine |
+| `GET` | `/benchmark/*` | Benchmarks: suites, background runs, reports with confidence intervals, the arena, the leaderboard — see `docs/benchmarks.md` |
 | `GET` | `/skills` | Agent skill definitions |
 | `GET` | `/settings` | User settings persistence |
 | `GET` | `/mcp-servers` | MCP server configs, connection status, quarantined tools — see `docs/mcp.md` |
