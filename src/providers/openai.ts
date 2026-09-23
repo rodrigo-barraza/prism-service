@@ -37,6 +37,7 @@ import {
   inferMimeFromUrl,
 } from "#src/utils/media";
 import { getDocumentContextText } from "#src/utils/documentContext";
+import { streamEndedEarlyError } from "#src/utils/ProviderStreamResilience";
 import { LOG_PREVIEW } from "#src/constants";
 import { markLongContext, mergeUsage, type TextPricing } from "#src/utils/CostCalculator";
 import { ASYNC_TASK_TOOL_NAMES } from "#src/services/AsyncTaskConstants";
@@ -543,6 +544,33 @@ function convertToolsToResponsesAPI(
   });
 }
 
+/** Statuses for the error codes a Responses stream reports after its 200. */
+const RESPONSES_STREAM_ERROR_STATUS: Record<string, number> = {
+  server_error: 500,
+  rate_limit_exceeded: 429,
+  slow_down: 429,
+  insufficient_quota: 429,
+  invalid_prompt: 400,
+};
+
+/**
+ * A Responses stream that failed after its 200 — `response.failed`, or an
+ * `error` event (the SDK throws only for `data.error`, and these carry
+ * none). The code keeps its meaning: a server error stays retryable, a
+ * spend cap terminal (isTerminalQuotaError reads it), a bad prompt final.
+ */
+function responsesStreamError(
+  code: string | null | undefined,
+  message: string,
+): ProviderError {
+  const status = (code && RESPONSES_STREAM_ERROR_STATUS[code]) || 500;
+  return new ProviderError("openai", message, status, {
+    code: code ?? undefined,
+    message,
+    status,
+  });
+}
+
 /** Narrow any errors into ProviderError for all catch blocks. */
 function toProviderError(
   error:
@@ -555,6 +583,7 @@ function toProviderError(
     | symbol
     | ((...argumentsList: unknown[]) => unknown),
 ): never {
+  if (error instanceof ProviderError) throw error;
   let message = String(error);
   let status = 500;
   if (error && typeof error === "object") {
@@ -1957,6 +1986,10 @@ const openaiProvider = {
       return getClient()
         .responses.create(payload, {
           ...(options.signal && { signal: options.signal }),
+          // Streams are retried by streamWithRetries at every call site;
+          // the SDK's own retries would multiply its attempts and retry a
+          // spend cap that must surface at once.
+          maxRetries: 0,
         })
         .withResponse();
     };
@@ -2005,8 +2038,22 @@ const openaiProvider = {
     const reasoningSummaryAccumulator: Record<string, string> = {};
     let providerResponseId: string | undefined;
     let phase: ResponsesPhase | undefined;
+    // `response.completed` / `response.incomplete`: without one the body
+    // ended mid-reply, and its pending function calls are incomplete.
+    let sawTerminalEvent = false;
     for await (const event of streamData) {
       if (options.signal?.aborted) break;
+      // A response that failed after the 200, and a stream-level error
+      // event: both end the reply, and dropping them would end the turn
+      // looking finished with whatever had streamed so far.
+      if (event.type === "response.failed") {
+        const failure = (event as OpenAI.Responses.ResponseFailedEvent).response?.error;
+        throw responsesStreamError(failure?.code, failure?.message || "The response failed");
+      }
+      if ((event as { type: string }).type === "error") {
+        const streamError = event as unknown as { code?: string | null; message?: string };
+        throw responsesStreamError(streamError.code, streamError.message || "The stream reported an error");
+      }
       // Native steering applied mid-stream: the harness records the inputs
       // the continuation now starting carries.
       if ((event as { type: string }).type === TURN_INPUT_APPLIED_EVENT) {
@@ -2204,6 +2251,7 @@ const openaiProvider = {
         event.type === "response.completed" ||
         event.type === "response.incomplete"
       ) {
+        sawTerminalEvent = true;
         const typedEvent = event as
           | OpenAI.Responses.ResponseCompletedEvent
           | OpenAI.Responses.ResponseIncompleteEvent;
@@ -2258,6 +2306,9 @@ const openaiProvider = {
           yield { type: "stopReason", stopReason };
         }
       }
+    }
+    if (!sawTerminalEvent && !options.signal?.aborted) {
+      throw streamEndedEarlyError("openai", "no response.completed");
     }
     if (usage) {
       yield { type: "usage", usage };
@@ -2378,6 +2429,7 @@ const openaiProvider = {
         await getClient()
           .chat.completions.create(payload, {
             ...(options.signal && { signal: options.signal }),
+            maxRetries: 0,
           })
           .withResponse();
       stream = streamData;
@@ -2415,6 +2467,7 @@ const openaiProvider = {
           const retryResult = await getClient()
             .chat.completions.create(payload, {
               ...(options.signal && { signal: options.signal }),
+              maxRetries: 0,
             })
             .withResponse();
           stream = retryResult.data;
@@ -2515,6 +2568,9 @@ const openaiProvider = {
           };
         }
       }
+    }
+    if (!lastFinishReason && !options.signal?.aborted) {
+      throw streamEndedEarlyError("openai", "no finish_reason");
     }
     // Surface max_tokens truncation so harnesses can detect and warn the user
     if (lastFinishReason === "length") {

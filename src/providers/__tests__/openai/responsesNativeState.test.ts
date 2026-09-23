@@ -56,9 +56,16 @@ function nonStreamResponse(output: unknown[], id = "resp_123") {
   };
 }
 
+/** Every Responses stream ends with its terminal event. */
+const TERMINAL_EVENTS = new Set(["response.completed", "response.incomplete", "response.failed"]);
+
 function streamResponse(events: unknown[]) {
+  const ended = events.some((event) => TERMINAL_EVENTS.has((event as { type?: string }).type ?? ""));
   async function* iterate() {
     for (const event of events) yield event;
+    if (!ended) {
+      yield { type: "response.completed", response: { id: "resp_test", status: "completed", output: [] } };
+    }
   }
   return {
     withResponse: async () => ({

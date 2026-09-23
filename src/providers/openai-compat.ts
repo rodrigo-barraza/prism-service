@@ -13,6 +13,7 @@ import type {
   ChatMessageContent,
 } from "#src/types/ProviderTypes";
 import type { TokenUsage, ToolCallEntry } from "#src/types/admin";
+import { streamEndedEarlyError } from "#src/utils/ProviderStreamResilience";
 
 // ─── Streaming fetch dispatcher ─────────────────────────────
 // Node.js's built-in fetch (powered by undici) defaults bodyTimeout to
@@ -133,6 +134,8 @@ export interface PreparedMessage {
 interface SSEParseOptions {
   signal?: AbortSignal;
   thinkingEnabled?: boolean;
+  /** The provider named in a stream-ended-early error. */
+  label?: string;
   onUsage?: (json: OpenAICompletionResponse, usage: TokenUsage) => void;
   onChunkJson?: (json: OpenAICompletionResponse) => void;
 }
@@ -170,6 +173,9 @@ export type SSEStreamChunk =
       result?: unknown;
       status?: "calling" | "done" | "error";
       native?: boolean;
+      /** The arguments were not valid JSON: `args` is empty, `rawArgs` has the text. */
+      argsParseError?: boolean;
+      rawArgs?: string;
     }
   | { type: "toolCallStart"; id: string; name: string }
   | { type: "toolCallDelta"; characters: number }
@@ -663,6 +669,8 @@ export async function* parseSSEStream(
   const thinkParser = suppressThinking ? null : new ThinkTagParser();
   const pendingToolCalls: Record<number, PendingToolCall> = {};
   let lastFinishReason: string | null = null;
+  // A finish_reason or `[DONE]`: without one the body ended mid-reply.
+  let sawTerminalEvent = false;
   // Track partial output for fallback usage estimation on premature termination
   let partialOutputCharacters = 0;
   let partialReasoningCharacters = 0;
@@ -700,7 +708,10 @@ export async function* parseSSEStream(
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith(":")) continue; // skip empty lines / comments
-        if (trimmed === "data: [DONE]") continue;
+        if (trimmed === "data: [DONE]") {
+          sawTerminalEvent = true;
+          continue;
+        }
         if (!trimmed.startsWith("data: ")) continue;
 
         let json: OpenAICompletionResponse;
@@ -804,20 +815,30 @@ export async function* parseSSEStream(
 
           // If finish_reason indicates tool calls, yield accumulated tool calls
           const finishReason = json.choices?.[0]?.finish_reason;
-          if (finishReason) lastFinishReason = finishReason;
+          if (finishReason) {
+            lastFinishReason = finishReason;
+            sawTerminalEvent = true;
+          }
           if (finishReason === "tool_calls" || finishReason === "tool") {
             for (const toolCall of Object.values(pendingToolCalls)) {
               let args: Record<string, unknown> = {};
+              let argsParseError = false;
               try {
                 args = JSON.parse(toolCall.args || "{}");
               } catch {
-                /* ignore */
+                // Never run a call with arguments the model did not write:
+                // the harness hands the raw text back as a malformed call.
+                argsParseError = true;
               }
               yield {
                 type: "toolCall",
                 id: toolCall.id,
                 name: toolCall.name,
                 args,
+                ...(argsParseError && {
+                  argsParseError: true,
+                  rawArgs: toolCall.args.slice(0, 2000),
+                }),
               };
             }
           }
@@ -825,6 +846,15 @@ export async function* parseSSEStream(
           // a chunk this parser cannot use — keep reading
         }
       }
+    }
+
+    // A body that closed without a finish_reason or [DONE] is a cut-off
+    // reply, not a finished one (its pending tool calls are incomplete).
+    if (!sawTerminalEvent && !options.signal?.aborted) {
+      throw streamEndedEarlyError(
+        options.label ?? "OpenAI-compatible",
+        "no finish_reason",
+      );
     }
 
     // Flush any remaining buffered content from the think parser
@@ -918,7 +948,11 @@ export async function fetchOpenAICompat(
     } catch {
       /* raw text fallback */
     }
-    throw Object.assign(new Error(errorMessage), { status: response.status });
+    // The headers go along for a Retry-After (computeRetryDelayMilliseconds).
+    throw Object.assign(new Error(errorMessage), {
+      status: response.status,
+      headers: response.headers,
+    });
   }
 
   return response;

@@ -14,6 +14,7 @@ import {
 } from "#src/providers/openai-compat";
 import logger from "#src/utils/logger";
 import { discoverContextLength } from "#src/utils/ContextLengthDiscovery";
+import { streamEndedEarlyError } from "#src/utils/ProviderStreamResilience";
 
 import { MODALITY_TYPES, getDefaultModels } from "#src/config";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
@@ -161,7 +162,12 @@ async function postOllamaChat(
     if (response.ok) return response;
     errorText = await response.text();
   }
-  throw new Error(`API error: ${response.status} ${errorText}`);
+  // Status and headers go along: a 429/5xx is retried (honouring its
+  // Retry-After) and a 400 is not (ProviderStreamResilience).
+  throw Object.assign(new Error(`API error: ${response.status} ${errorText}`), {
+    status: response.status,
+    headers: response.headers,
+  });
 }
 
 /**
@@ -386,6 +392,9 @@ export function createOllamaProvider(
         const decoder = new TextDecoder();
         let buffer = "";
         let usage = null;
+        // The `done: true` line ends every reply; a body that closes without
+        // it was cut off, and its last tool call may be missing.
+        let sawDone = false;
 
         while (true) {
           if (options.signal?.aborted) {
@@ -437,6 +446,7 @@ export function createOllamaProvider(
 
               // Final chunk has done: true with usage stats
               if (parsedJson.done) {
+                sawDone = true;
                 const evalDurationSec = parsedJson.eval_duration
                   ? parsedJson.eval_duration / 1_000_000_000
                   : null;
@@ -461,6 +471,9 @@ export function createOllamaProvider(
           }
         }
 
+        if (!sawDone && !options.signal?.aborted) {
+          throw streamEndedEarlyError(instanceId, "no done line");
+        }
         if (usage) {
           yield {
             type: "usage",

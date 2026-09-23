@@ -88,6 +88,7 @@ describe("Google Provider Adapter", () => {
                 content: {
                   parts: [{ text: " world" }],
                 },
+                finishReason: "STOP",
               },
             ],
             usageMetadata: {
@@ -530,6 +531,7 @@ describe("Google Provider Adapter", () => {
                       },
                     ],
                   },
+                  finishReason: "STOP",
                 },
               ],
             };
@@ -596,7 +598,7 @@ describe("Google Provider Adapter", () => {
         [Symbol.asyncIterator]: () => {
           async function* generator() {
             yield {
-              candidates: [{ content: { parts: [{ text: "done" }] } }],
+              candidates: [{ content: { parts: [{ text: "done" }] }, finishReason: "STOP" }],
             };
           }
           return generator();

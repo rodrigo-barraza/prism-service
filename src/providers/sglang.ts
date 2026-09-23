@@ -416,6 +416,7 @@ export function createSglangProvider(
         for await (const chunk of parseSSEStream(reader, {
           signal: options.signal,
           thinkingEnabled: options.thinkingEnabled,
+          label: instanceId,
         })) {
           if (typeof chunk === "object" && chunk.type === "usage") {
             yield {

@@ -223,6 +223,7 @@ function plannerCalls(toolName: string, input: Record<string, unknown>) {
     yield { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: JSON.stringify(input) } };
     yield { type: "content_block_stop", index: 0 };
     yield { type: "message_delta", delta: { stop_reason: "tool_use" }, usage: { output_tokens: 30 } };
+    yield { type: "message_stop" };
   };
 }
 function plannerAnswers(text: string) {
@@ -232,6 +233,7 @@ function plannerAnswers(text: string) {
     yield { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } };
     yield { type: "content_block_stop", index: 0 };
     yield { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 8 } };
+    yield { type: "message_stop" };
   };
 }
 
