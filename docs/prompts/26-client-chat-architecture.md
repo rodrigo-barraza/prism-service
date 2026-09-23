@@ -3,6 +3,9 @@
 > Hand to ONE session per landing: *"Read prism-service/docs/prompts/26-client-chat-architecture.md and execute Landing N."*
 > Conventions, gates and the isolated live recipe: `docs/prompts/README.md`. Source: `docs/harness_modernization_2026-09.md` §4.17; `prism-client/docs/agentic-harness-improvement-plan.md` Phase 2 (never landed).
 
+**Landing 1 done** (`chat-characterization-tests`, prism-client): 34 tests in `src/components/__tests__/chat-characterization/` mount the real `AgentChatComponent` and replay `src/__fixtures__/sse-transcripts/*.jsonl` over the SSE and the live-viewer socket, snapshotting trace, state (`utils/chatDebugProbe`) and region text, and counting row renders per token.
+Read `prism-client/docs/chat-characterization.md` before Landing 2 or 3: the contract they keep, the SSE/viewer divergences the snapshots pin (unifying them changes those lines on purpose — say so), and the baseline: 2,000 messages, 2,002 row renders per token.
+
 **Repos:** prism-client (plus a prism-service worktree only to retire this prompt) · **Size:** L · **Depends on:** 08 (bug fixes land first). Land 24 Landing 1 (the typed event protocol) before or with Landing 2 here, if possible. · **Shares hubs with:** every client prompt.
 
 Before starting, run `node /home/rodrigo/development/.claude/hooks/hub-lease.mjs status`. If another live session holds `AgentChatComponent.tsx`, coordinate first: exchange line spans.
@@ -29,21 +32,6 @@ Other problems:
   - `WorkspaceSelectorComponent`;
   - `TimerBadgeComponent`;
   - the post-stream poller `attemptPostStreamRefresh` (~6059–6144). The server's `Finalizer` persists before `done`; verify this.
-
----
-
-## Landing 1 — `chat-characterization-tests` (the safety net; no behaviour change)
-
-**Changes.**
-- A replay harness that feeds recorded event transcripts (`src/__fixtures__/sse-transcripts/`) through the **current** component: both the SSE-driving path and the WebSocket-viewing path. It snapshots:
-  - **state:** messages, tool calls, statuses, usage and pending cards, extracted through test hooks or a debug export;
-  - **DOM:** key regions, as snapshots or RTL queries.
-- **New fixtures** where coverage is missing: approvals, a question (blocking and non-blocking), sub-agents, compaction, errors, steering (`turn_input`), goals, and a reconnect replay with `afterSeq`.
-- **Render counter.** A test that counts rows re-rendered per streamed token, using React Profiler or a render counter.
-
-**Tests.** This landing *is* tests.
-- All snapshots are green on the current code.
-- Document the render-count baseline, e.g. "2,000-message conversation: N row renders per token".
 
 ---
 

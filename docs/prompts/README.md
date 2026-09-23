@@ -58,9 +58,10 @@ The UI parts of 05, 12, 13, 15, 16 and 21 all touch `prism-client/src/components
    ```bash
    "$WT"/node_modules/.bin/tsc --noEmit -p "$WT"/tsconfig.json
    "$WT"/node_modules/.bin/vitest run --root "$WT"   # prism-service: covers src/**/__tests__ AND tests/
-   "$WT"/node_modules/.bin/eslint "$WT"/src
+   (cd "$WT" && ./node_modules/.bin/eslint src)      # prism-client's eslint 9 finds its config from the working directory
+   (cd "$WT" && ./node_modules/.bin/oxlint)          # tools-service lints with oxlint instead
    ```
-   - prism-client: `tsc` is clean on master, and `next build` type-checks (`ignoreBuildErrors: false` since prompt 08), so a new type error fails both. Run `next build` once at the end when you touch client types.
+   - prism-client: `tsc` is clean on master, and `next build` type-checks (`ignoreBuildErrors: false` since prompt 08), so a new type error fails both. Run `next build` once at the end when you touch client types, from inside the worktree: `(cd "$WT" && ./node_modules/.bin/next build)`. Run from elsewhere, Next takes the main checkout as the workspace root and fails its type check with "Cannot find type definition file for 'node'" — master does too.
    - Report pre-existing lint failures separately from yours.
 5. **Test patterns to copy** (prism-service unless noted):
    - **Provider request shapes:** `tests/anthropicProvider.test.ts`. It uses `vi.mock('@anthropic-ai/sdk')` and asserts on the exact payload passed to `messages.create` / `messages.stream`. `tests/googleProvider.test.ts` does the same for Gemini.
