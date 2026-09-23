@@ -229,6 +229,10 @@ conversationStatsRouter.get(
       const rootConversationId = req.params.id as string;
       const canvasWidth = parseInt(req.query.width as string, 10) || 1600;
       const canvasHeight = parseInt(req.query.height as string, 10) || 900;
+      // The client's fingerprint of the request rows it holds — see
+      // buildGraphCacheKey. Bounded so it cannot bloat the key.
+      const contentVersion =
+        typeof req.query.v === "string" ? req.query.v.slice(0, 64) : "";
 
       // Fast path: discover descendant IDs and count requests to build
       // the cache key. countDocuments is cheaper than fetching all fields.
@@ -248,6 +252,7 @@ conversationStatsRouter.get(
         requestCount,
         canvasWidth,
         canvasHeight,
+        contentVersion,
       );
 
       const cachedGraphData = getGraphFromCache(cacheKey);
@@ -272,6 +277,7 @@ conversationStatsRouter.get(
             model: 1,
             operation: 1,
             success: 1,
+            errorMessage: 1,
             inputTokens: 1,
             outputTokens: 1,
             estimatedCost: 1,
@@ -281,6 +287,9 @@ conversationStatsRouter.get(
             agent: 1,
             username: 1,
             status: 1,
+            // RequestLogger writes totalTime (seconds); duration/timestamp
+            // are kept for rows written by older loggers.
+            totalTime: 1,
             duration: 1,
             timestamp: 1,
           })

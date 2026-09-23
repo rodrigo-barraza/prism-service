@@ -390,11 +390,13 @@ describe("buildConversationGraph", () => {
       }
     });
 
+    // Parent-based topologies still lay out against the canvas; the
+    // hierarchical grid is fixed on purpose (see "Stable hierarchical layout").
     it("should produce different layouts for different canvas dimensions", () => {
       const requests = [
         createMockRequest({ _id: "req-1", createdAt: "2026-07-01T00:01:00Z" }),
       ];
-      const conversation = createMockConversation();
+      const conversation = createMockConversation({ settings: { agents: { topology: "sequential" } } });
 
       const smallGraph = buildConversationGraph(conversation, null, requests, 800, 600);
       const largeGraph = buildConversationGraph(conversation, null, requests, 3200, 1800);
@@ -560,6 +562,193 @@ describe("buildConversationGraph", () => {
       const fullEdgeKeys = new Set(fullGraph.edges.map((edge) => `${edge.source}→${edge.target}`));
       const shuffledEdgeKeys = new Set(shuffledGraph.edges.map((edge) => `${edge.source}→${edge.target}`));
       expect(shuffledEdgeKeys).toEqual(fullEdgeKeys);
+    });
+  });
+
+  describe("Node metadata the detail panel reads", () => {
+    it("derives the session totals from the requests when no stats are passed", () => {
+      const requests = [
+        createMockRequest({ _id: "req-1", createdAt: "2026-07-01T00:01:00Z", estimatedCost: 0.25, inputTokens: 100, outputTokens: 20 }),
+        createMockRequest({ _id: "req-2", createdAt: "2026-07-01T00:03:00Z", estimatedCost: 0.5, inputTokens: 300, outputTokens: 80, success: false }),
+      ];
+      const graph = buildConversationGraph(createMockConversation(), null, requests, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      const sessionNode = findNodesByCategory(graph, "session")[0];
+      expect(sessionNode.metadata?.requestCount).toBe(2);
+      expect(sessionNode.metadata?.totalCost).toBeCloseTo(0.75);
+      expect(sessionNode.metadata?.totalTokens).toBe(500);
+      // Same definition as GET /:id/stats — first to last request start.
+      expect(sessionNode.metadata?.totalElapsedTime).toBe(120);
+      expect(sessionNode.metadata?.failedRequestCount).toBe(1);
+    });
+
+    it("reads a request's duration from totalTime and its time from createdAt", () => {
+      const requests = [
+        createMockRequest({ _id: "req-timed", createdAt: "2026-07-01T00:01:00Z", totalTime: 4.2 }),
+      ];
+      const graph = buildConversationGraph(createMockConversation(), null, requests, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      const requestNode = findNodeById(graph, "request:req-timed")!;
+      expect(requestNode.metadata?.duration).toBe(4.2);
+      expect(requestNode.metadata?.timestamp).toBe("2026-07-01T00:01:00Z");
+    });
+
+    it("carries success and a bounded error message only for failed requests", () => {
+      const longError = `Provider returned 400: ${"x".repeat(900)}`;
+      const requests = [
+        createMockRequest({ _id: "req-ok", createdAt: "2026-07-01T00:01:00Z", success: true, errorMessage: "ignored" }),
+        createMockRequest({ _id: "req-bad", createdAt: "2026-07-01T00:02:00Z", success: false, errorMessage: longError }),
+        createMockRequest({ _id: "req-pending", createdAt: "2026-07-01T00:03:00Z", success: null, status: "pending" }),
+      ];
+      const graph = buildConversationGraph(createMockConversation(), null, requests, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      expect(findNodeById(graph, "request:req-ok")!.metadata?.success).toBe(true);
+      expect(findNodeById(graph, "request:req-ok")!.metadata?.errorMessage).toBeNull();
+      const failedMetadata = findNodeById(graph, "request:req-bad")!.metadata!;
+      expect(failedMetadata.success).toBe(false);
+      expect(String(failedMetadata.errorMessage).startsWith("Provider returned 400")).toBe(true);
+      expect(String(failedMetadata.errorMessage).length).toBeLessThanOrEqual(400);
+      expect(findNodeById(graph, "request:req-pending")!.metadata?.success).toBeNull();
+    });
+
+    it("keeps the whole user message on the turn node (the label is cut at 30)", () => {
+      const message = "Refactor the auth middleware to use the new session store, then add tests";
+      const conversation = createMockConversation({ messages: [{ role: "user", content: message }] });
+      const graph = buildConversationGraph(
+        conversation, null, [createMockRequest({ _id: "req-1", agentConversationId: "turn-1" })], CANVAS_WIDTH, CANVAS_HEIGHT,
+      );
+
+      const turnNode = findNodesByCategory(graph, "turn")[0];
+      expect(turnNode.label.length).toBeLessThanOrEqual(30);
+      expect(turnNode.metadata?.message).toBe(message);
+    });
+
+    it("totals requests, cost, tokens and failures per agent and sub-agent", () => {
+      const requests = [
+        createMockRequest({ _id: "req-main", createdAt: "2026-07-01T00:01:00Z", estimatedCost: 1, inputTokens: 10, outputTokens: 5, toolApiNames: ["create_subagents"] }),
+        createMockRequest({ _id: "req-sub-1", agentConversationId: "sub-1", parentAgentConversationId: TEST_AGENT_CONVERSATION_ID, agent: "WORKER", createdAt: "2026-07-01T00:02:00Z", estimatedCost: 2, inputTokens: 20, outputTokens: 10 }),
+        createMockRequest({ _id: "req-sub-2", agentConversationId: "sub-1", parentAgentConversationId: TEST_AGENT_CONVERSATION_ID, agent: "WORKER", createdAt: "2026-07-01T00:03:00Z", estimatedCost: 3, inputTokens: 30, outputTokens: 15, success: false }),
+      ];
+      const graph = buildConversationGraph(createMockConversation(), null, requests, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      const agentMetadata = findNodesByCategory(graph, "agent")[0].metadata!;
+      expect(agentMetadata.requestCount).toBe(1);
+      expect(agentMetadata.totalCost).toBe(1);
+      const subAgentMetadata = findNodesByCategory(graph, "subagent")[0].metadata!;
+      expect(subAgentMetadata.requestCount).toBe(2);
+      expect(subAgentMetadata.totalCost).toBe(5);
+      expect(subAgentMetadata.totalTokens).toBe(75);
+      expect(subAgentMetadata.failedRequestCount).toBe(1);
+      expect(findNodesByCategory(graph, "session")[0].metadata?.subAgentCount).toBe(1);
+    });
+  });
+
+  describe("Spawn edges", () => {
+    it("links each sub-agent batch to the create_subagents call that launched it", () => {
+      const requests = [
+        createMockRequest({ _id: "req-spawn-a", createdAt: "2026-07-01T00:01:00Z", toolApiNames: ["create_subagents"] }),
+        createMockRequest({ _id: "req-a", agentConversationId: "sub-a", parentAgentConversationId: TEST_AGENT_CONVERSATION_ID, agent: "A", createdAt: "2026-07-01T00:02:00Z" }),
+        createMockRequest({ _id: "req-spawn-b", createdAt: "2026-07-01T00:03:00Z", toolApiNames: ["create_subagent"] }),
+        createMockRequest({ _id: "req-b", agentConversationId: "sub-b", parentAgentConversationId: TEST_AGENT_CONVERSATION_ID, agent: "B", createdAt: "2026-07-01T00:04:00Z" }),
+      ];
+      const graph = buildConversationGraph(createMockConversation(), null, requests, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      expect(findEdge(graph, "request:req-spawn-a", "agent:sub-a:A")).toBeDefined();
+      expect(findEdge(graph, "request:req-spawn-b", "agent:sub-b:B")).toBeDefined();
+      expect(findEdge(graph, "request:req-spawn-a", "agent:sub-b:B")).toBeUndefined();
+    });
+  });
+
+  describe("Stable hierarchical layout", () => {
+    const COLLISION_DISTANCE = 24 * 2 + 15; // the client's settle loop pushes anything closer
+
+    function mainRequests(count: number) {
+      return Array.from({ length: count }, (_, index) =>
+        createMockRequest({ _id: `req-${index}`, createdAt: new Date(Date.UTC(2026, 6, 1, 0, 1, index)).toISOString() }),
+      );
+    }
+
+    function positionsOf(graph: GraphData) {
+      return new Map(graph.nodes.map((node) => [node.id, { x: node.x, y: node.y }]));
+    }
+
+    function expectNoCollisions(graph: GraphData) {
+      for (let indexA = 0; indexA < graph.nodes.length; indexA++) {
+        for (let indexB = indexA + 1; indexB < graph.nodes.length; indexB++) {
+          const nodeA = graph.nodes[indexA];
+          const nodeB = graph.nodes[indexB];
+          const distance = Math.hypot(nodeA.x - nodeB.x, nodeA.y - nodeB.y);
+          expect(distance, `${nodeA.id} vs ${nodeB.id}`).toBeGreaterThanOrEqual(COLLISION_DISTANCE);
+        }
+      }
+    }
+
+    it("never moves an existing node when a request is appended", () => {
+      const before = buildConversationGraph(createMockConversation(), null, mainRequests(6), CANVAS_WIDTH, CANVAS_HEIGHT);
+      const after = buildConversationGraph(createMockConversation(), null, mainRequests(7), CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      const afterPositions = positionsOf(after);
+      for (const [nodeId, position] of positionsOf(before)) {
+        expect(afterPositions.get(nodeId), nodeId).toEqual(position);
+      }
+    });
+
+    it("keeps the main graph in place when the first sub-agent appears", () => {
+      const baseRequests = [
+        createMockRequest({ _id: "req-0", createdAt: "2026-07-01T00:01:00Z" }),
+        createMockRequest({ _id: "req-1", createdAt: "2026-07-01T00:02:00Z", toolApiNames: ["create_subagents"] }),
+      ];
+      const before = buildConversationGraph(createMockConversation(), null, baseRequests, CANVAS_WIDTH, CANVAS_HEIGHT);
+      const after = buildConversationGraph(createMockConversation(), null, [
+        ...baseRequests,
+        createMockRequest({ _id: "req-sub", agentConversationId: "sub-1", parentAgentConversationId: TEST_AGENT_CONVERSATION_ID, agent: "WORKER", createdAt: "2026-07-01T00:03:00Z" }),
+      ], CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      const afterPositions = positionsOf(after);
+      for (const [nodeId, position] of positionsOf(before)) {
+        expect(afterPositions.get(nodeId), nodeId).toEqual(position);
+      }
+    });
+
+    it("does not depend on the canvas size", () => {
+      const small = buildConversationGraph(createMockConversation(), null, mainRequests(4), 800, 600);
+      const large = buildConversationGraph(createMockConversation(), null, mainRequests(4), 3200, 1800);
+      expect(positionsOf(large)).toEqual(positionsOf(small));
+    });
+
+    it("puts a sub-agent level with the request that spawned it and stacks siblings without overlap", () => {
+      const requests = [
+        ...mainRequests(5),
+        createMockRequest({ _id: "req-spawn", createdAt: "2026-07-01T00:02:00Z", toolApiNames: ["create_subagents"] }),
+        ...["a", "b", "c"].flatMap((name, siblingIndex) =>
+          Array.from({ length: 3 }, (_, requestIndex) => createMockRequest({
+            _id: `req-${name}-${requestIndex}`,
+            agentConversationId: `sub-${name}`,
+            parentAgentConversationId: TEST_AGENT_CONVERSATION_ID,
+            agent: name.toUpperCase(),
+            createdAt: new Date(Date.UTC(2026, 6, 1, 0, 3, siblingIndex * 10 + requestIndex)).toISOString(),
+          })),
+        ),
+        createMockRequest({ _id: "req-nested", agentConversationId: "sub-a-child", parentAgentConversationId: "sub-a", agent: "CHILD", createdAt: "2026-07-01T00:04:00Z" }),
+      ];
+      const graph = buildConversationGraph(createMockConversation(), null, requests, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      const spawner = findNodeById(graph, "request:req-spawn")!;
+      const firstSibling = findNodeById(graph, "agent:sub-a:A")!;
+      expect(firstSibling.y).toBe(spawner.y);
+      expect(firstSibling.x).toBeGreaterThan(spawner.x);
+      const nested = findNodeById(graph, "agent:sub-a-child:CHILD")!;
+      expect(nested.x).toBeGreaterThan(firstSibling.x);
+      expectNoCollisions(graph);
+    });
+
+    it("keeps every node of a plain multi-turn chat clear of the collision distance", () => {
+      const requests = [
+        createMockRequest({ _id: "req-t1-a", agentConversationId: "turn-1", createdAt: "2026-07-01T00:01:00Z" }),
+        createMockRequest({ _id: "req-t1-b", agentConversationId: "turn-1", createdAt: "2026-07-01T00:02:00Z" }),
+        createMockRequest({ _id: "req-t2-a", agentConversationId: "turn-2", createdAt: "2026-07-01T00:03:00Z", username: "alice" }),
+      ];
+      expectNoCollisions(buildConversationGraph(createMockConversation(), null, requests, CANVAS_WIDTH, CANVAS_HEIGHT));
     });
   });
 });
