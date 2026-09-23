@@ -267,6 +267,30 @@ describe("schema preparation", () => {
     expect(closed.allOf[0].additionalProperties).toBeUndefined();
   });
 
+  // Seen live (prompt 22 L3): Gemini writes its function-call schemas
+  // OpenAPI-style and passed `"type": "OBJECT"` on — a wasted round trip.
+  it("accepts upper-case type names, keeping enum values and a property named type as written", () => {
+    const compiled = compileReaderSchema({
+      type: "OBJECT",
+      properties: {
+        summary: { type: "STRING" },
+        type: { type: "STRING", enum: ["OBJECT", "LIST"] },
+        enum: { type: "STRING" },
+        tags: { type: ["ARRAY", "NULL"], items: { type: "STRING" } },
+      },
+      required: ["summary"],
+    });
+    expect(compiled.ok).toBe(true);
+    const schema = (compiled as { schema: any }).schema;
+    expect(schema.type).toBe("object");
+    expect(schema.additionalProperties).toBe(false);
+    expect(schema.properties.type).toEqual({ type: "string", enum: ["OBJECT", "LIST"] });
+    // A property's name is not a keyword: one named "enum" is a schema like any other.
+    expect(schema.properties.enum).toEqual({ type: "string" });
+    expect(schema.properties.tags.type).toEqual(["array", "null"]);
+    expect((compiled as { validator: any }).validator.safeParse({ summary: "s", type: "OBJECT" }).success).toBe(true);
+  });
+
   it("refuses a schema past the size limit", () => {
     const big = { type: "object", properties: Object.fromEntries(Array.from({ length: 400 }, (_, i) => [`field_${i}`, { type: "string" }])) };
     expect(compileReaderSchema(big)).toMatchObject({ ok: false, message: expect.stringContaining("limit") });
