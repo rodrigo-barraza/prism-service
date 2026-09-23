@@ -12,7 +12,6 @@ import { checkCostBudget } from "#src/services/harnesses/lifecycle/CostBudgetEnf
 import { runExhaustionRecoveryPass } from "#src/services/harnesses/lifecycle/ExhaustionRecovery";
 import { createStandardHooks } from "#src/services/harnesses/lifecycle/HookInitializer";
 import {
-  blockUnauthorizedToolCalls,
   handleExitPlanMode,
   checkForPlanModeEntry,
 } from "#src/services/harnesses/lifecycle/PlanModeController";
@@ -815,35 +814,6 @@ describe("Harness Lifecycle Modules", () => {
   });
 
   describe("PlanModeController", () => {
-    it("should block non-exit_plan_mode tools during plan mode", () => {
-      const pendingToolCalls = [
-        { id: "call-1", name: "read_file", args: {} },
-        { id: "call-2", name: "exit_plan_mode", args: {} },
-      ];
-      const currentMessages: any[] = [];
-      const pass = { streamedText: "" };
-
-      const result = blockUnauthorizedToolCalls(pendingToolCalls as any, currentMessages, pass as any, {} as any);
-      expect(result.allBlocked).toBe(false);
-      expect(pendingToolCalls).toHaveLength(1);
-      expect(pendingToolCalls[0].name).toBe("exit_plan_mode");
-    });
-
-    it("should block all tools during plan mode and append warning message", () => {
-      const pendingToolCalls = [
-        { id: "call-1", name: "read_file", args: {} },
-      ];
-      const currentMessages: any[] = [];
-      const pass = { streamedText: "distilled plan text", streamedThinking: "thinking content", thinkingSignature: "signature" };
-
-      const result = blockUnauthorizedToolCalls(pendingToolCalls as any, currentMessages, pass as any, {} as any);
-      expect(result.allBlocked).toBe(true);
-      expect(pendingToolCalls).toHaveLength(0);
-      expect(currentMessages).toHaveLength(2);
-      expect(currentMessages[0].content).toBe("distilled plan text");
-      expect(currentMessages[1].content).toContain("You are in PLANNING MODE");
-    });
-
     it("should enter plan mode when enter_plan_mode is encountered", async () => {
       const state = { planModeActive: false, planModeText: "" };
       const emitSpy = vi.fn();

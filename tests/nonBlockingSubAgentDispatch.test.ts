@@ -187,7 +187,6 @@ vi.mock("#src/services/harnesses/lifecycle/CostBudgetEnforcer", () => ({
   checkCostBudget: vi.fn().mockReturnValue(false),
 }));
 vi.mock("#src/services/harnesses/lifecycle/PlanModeController", () => ({
-  blockUnauthorizedToolCalls: vi.fn(),
   handleExitPlanMode: vi.fn(),
   checkForPlanModeEntry: vi.fn().mockResolvedValue(undefined),
 }));

@@ -203,7 +203,6 @@ vi.mock("../lifecycle/SandboxExecutor.ts", () => ({
   restoreSandboxCheckpoint: vi.fn(),
 }));
 vi.mock("../lifecycle/PlanModeController.ts", () => ({
-  blockUnauthorizedToolCalls: vi.fn(),
   handleExitPlanMode: vi.fn(),
   checkForPlanModeEntry: vi.fn().mockResolvedValue(undefined),
 }));
