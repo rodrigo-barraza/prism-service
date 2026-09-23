@@ -4,9 +4,9 @@ import { SYSTEM_MESSAGE_TAGS, wrapSystemMessage } from "#src/utils/SystemMessage
 // ────────────────────────────────────────────────────────────
 // External input — what reaches a turn from outside the conversation
 // ────────────────────────────────────────────────────────────
-// A webhook, a Discord user who is not the owner, an MCP server and a
-// sub-agent can all put words in front of the model. None of them is the
-// user. Codex's `ExternalMessage` (2026-09-10) states the rule this module
+// A webhook, a Discord message relayed into someone else's turn, an MCP
+// server and a sub-agent can all put words in front of the model. None of
+// them is the turn's user. Codex's `ExternalMessage` (2026-09-10) states the rule this module
 // implements: external content carries "tool-level authority; it does not
 // grant user authorization".
 //

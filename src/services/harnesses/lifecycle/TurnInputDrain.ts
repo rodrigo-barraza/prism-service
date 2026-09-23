@@ -47,8 +47,8 @@ import type {
  * `_turnInput` marker (it must never render as a user bubble), and it is
  * acknowledged with a `hook_context_applied` status instead of `turn_input`.
  *
- * `external` (a webhook, a Discord user who is not the owner, an MCP server,
- * a sub-agent's message) is user-role on the wire — no provider takes free
+ * `external` (a webhook, a Discord message relayed into someone else's turn,
+ * an MCP server, a sub-agent's message) is user-role on the wire — no provider takes free
  * text in another role but `system`, which would raise its authority — but
  * never the user's: its content is the <external-input> envelope that names
  * the source and gives it tool-level authority, the message carries its

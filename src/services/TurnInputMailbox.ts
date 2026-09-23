@@ -28,8 +28,8 @@ import { parseExternalOrigin, type ExternalOrigin } from "#src/services/external
  *   - `goal_revision`    the goal verifier's gaps: the agent claimed the goal
  *                        done and the verifier disagrees (lifecycle/GoalGate)
  *   - `external`         input from outside the conversation — a webhook, a
- *                        Discord user who is not the owner, an MCP server, a
- *                        sub-agent's message to its parent — with its
+ *                        Discord message relayed into someone else's turn, an
+ *                        MCP server, a sub-agent's message to its parent — with its
  *                        `origin` (source, sender). Tool-level authority:
  *                        it renders as an enveloped block, never as the
  *                        user (external/ExternalInput).
@@ -166,6 +166,11 @@ const TurnInputMailbox = {
   isOpen(conversationId: string): boolean {
     const box = mailboxes.get(conversationId);
     return !!box && !box.sealed;
+  },
+
+  /** Who runs the conversation's open turn (its project and user), when it said. */
+  ownerOf(conversationId: string): DecisionOwner | null {
+    return mailboxes.get(conversationId)?.owner ?? null;
   },
 
   /**
