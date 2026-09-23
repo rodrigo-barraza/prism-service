@@ -299,6 +299,7 @@ export class TournamentRouter implements TopologyRouter {
         files: member.files,
         model: member.model,
         agent: member.agent,
+        routing: member.routing,
         assignedProvider,
         assignedModel,
         agentIndex: memberIndex,
@@ -407,6 +408,7 @@ export class TournamentRouter implements TopologyRouter {
               files: members[0].files,
               model: members[0].model,
               agent: members[0].agent,
+              routing: members[0].routing,
               assignedProvider,
               assignedModel,
               agentIndex: resultIndex,
@@ -573,7 +575,6 @@ export class TournamentRouter implements TopologyRouter {
         toolUses: 0,
         iterations: 1,
         durationMilliseconds: selectionDurationMilliseconds,
-        messages: [],
         diff: { additions: 0, deletions: 0, files: [] },
       };
 

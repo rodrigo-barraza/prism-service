@@ -64,7 +64,6 @@ function result(agentId: string, text: string, mergeBack?: MergeBackReport): Sub
     toolUses: 1,
     iterations: 1,
     durationMilliseconds: 10,
-    messages: [],
     diff: { additions: 1, deletions: 0, files: [`${agentId}.txt`] },
     ...(mergeBack && { mergeBack }),
   };

@@ -70,6 +70,13 @@ const CustomAgentService = {
         : [],
       usesDirectoryTree: data.usesDirectoryTree || false,
       usesCodingGuidelines: data.usesCodingGuidelines || false,
+      // Role models this agent pins ({ main: { provider, model, effort }, … })
+      // and its routing preset — routing/RoleModelResolver.
+      modelRoles:
+        typeof data.modelRoles === "object" && data.modelRoles !== null
+          ? data.modelRoles
+          : {},
+      routingPreset: typeof data.routingPreset === "string" ? data.routingPreset : "",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
