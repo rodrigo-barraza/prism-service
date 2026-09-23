@@ -422,6 +422,7 @@ export function routeStreamChunk(
       args: streamChunk.args || {},
       thoughtSignature: streamChunk.thoughtSignature || undefined,
       reasoningItem: streamChunk.reasoningItem || undefined,
+      ...(streamChunk.nativeAsync === true && { nativeAsync: true }),
       ...(streamChunk.argsParseError === true && {
         _argsParseError: true,
         _rawArgs:

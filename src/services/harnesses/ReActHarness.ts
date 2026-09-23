@@ -973,6 +973,22 @@ export default class ReActHarness extends BaseAgenticHarness {
             break;
           }
 
+          // Native async calls only (OpenAI async tools): the model already
+          // worked past them inside its response and ended it, so another
+          // model call would have nothing new to answer. Unless input is
+          // waiting, the turn ends here like a text answer — the pass's text
+          // is already on the message just pushed — and each result comes
+          // back later as its call's output (mailbox or a new turn).
+          if (
+            results.length > 0 &&
+            results.every((r) => (r.result as { nativeAsyncCallId?: string } | null)?.nativeAsyncCallId) &&
+            !hasPendingTurnInput(context)
+          ) {
+            state.finalStreamedText = "";
+            hasCleanTextBreak = true;
+            break;
+          }
+
           // Input that arrived during the tool batch is observed together
           // with the tool results, before the next model call.
           drainTurnInput(currentMessages, state, context, "after_tools");
