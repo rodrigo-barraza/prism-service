@@ -543,22 +543,22 @@ describe("SubAgentTelemetryEmitter", () => {
   });
 
   describe("usage_update event handling", () => {
-    it("should forward usage_update events to parent", () => {
+    // On the parent stream a `usage_update` without `operation` is the PARENT
+    // turn's running total (docs/protocol.md). Forwarded as-is, a sub-agent's
+    // totals read as the parent's: prism-client filed them as the turn's
+    // intermediate usage, and the ACP server's cost went backwards. The
+    // sub-agent's spend reaches the parent on `sub_agent_status` (progress,
+    // `complete` with usage and estimatedCost).
+    it("keeps a sub-agent's running totals off the parent stream", () => {
       const emitter = createEmitter();
       const emitFunction = emitter.createEmitFunction();
 
-      const usageEvent = {
-        type: "usage_update",
-        inputTokens: 1000,
-        outputTokens: 500,
-      };
+      emitFunction({ type: "usage_update", usage: { inputTokens: 1000, outputTokens: 500 }, estimatedCost: 0.02 });
 
-      emitFunction(usageEvent);
-
-      const forwardedEvent = parentEmitMock.mock.calls.find(
+      const forwarded = parentEmitMock.mock.calls.find(
         (call: unknown[]) => (call[0] as Record<string, unknown>).type === "usage_update",
       );
-      expect(forwardedEvent).toBeDefined();
+      expect(forwarded).toBeUndefined();
     });
   });
 
