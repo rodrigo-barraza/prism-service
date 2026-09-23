@@ -17,7 +17,7 @@
  */
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
 import "./setup.ts";
-import { PROVIDERS, NOTIFICATION_SOURCES, TURN_INPUT } from "#src/constants";
+import { PROVIDERS } from "#src/constants";
 import type {
   AgenticContext,
   ConversationMessage,
@@ -25,12 +25,7 @@ import type {
   ResolvedTools,
 } from "#src/services/harnesses/types";
 
-// ── Sub-agent loops: scripted, released by the test ──────────
-interface SubAgentRun {
-  args: { conversationId: string; agentConversationId: string; messages: ConversationMessage[] };
-  finish: (text: string) => void;
-}
-const subAgentRuns: SubAgentRun[] = [];
+// ── Sub-agent loops: scripted by each test ───────────────────
 const mockRunAgenticLoop = vi.fn();
 vi.mock("#src/services/AgenticLoopService", () => ({
   default: {
