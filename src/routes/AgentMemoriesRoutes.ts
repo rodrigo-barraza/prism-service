@@ -67,12 +67,15 @@ router.post(
 
       // Strip embedding from response (large vector, not needed by caller)
       const { embedding: _emb, ...safe } = result;
-      // This is the model's tool result: say plainly that it is on hold.
+      // This is the model's tool result: say plainly, and first, that it is
+      // on hold — a live run showed a model reporting "saved" when the note
+      // sat after the echoed memory.
       res.json(
         safe.quarantined === true
           ? {
+              status: "pending_review",
+              message: `NOT remembered yet — held for the user's review. This conversation read untrusted content (${String(safe.source)}), so the memory stays quarantined until the user accepts it in the Memories panel. Tell the user that.`,
               ...safe,
-              message: `Saved for the user's review, not yet remembered: this conversation read untrusted content (${String(safe.source)}), so the memory stays quarantined until the user accepts it.`,
             }
           : safe,
       );

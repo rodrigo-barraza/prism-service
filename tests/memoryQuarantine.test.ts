@@ -51,6 +51,7 @@ vi.mock("#src/services/RequestLogger", () => ({
 }));
 
 const { default: MemoryService } = await import("#src/services/MemoryService");
+const { default: EmbeddingService } = await import("#src/services/EmbeddingService");
 const { default: agentMemoriesRouter } = await import("#src/routes/AgentMemoriesRoutes");
 const { recordSaveMemoryProvenance, clearSaveMemoryProvenance } = await import(
   "#src/services/memory/SaveMemoryProvenance"
@@ -87,7 +88,33 @@ async function allMemories() {
 beforeEach(() => {
   collections.clear();
   clearSaveMemoryProvenance();
+  vi.mocked(EmbeddingService.embed).mockImplementation(async (text: string) => wordVector(text));
 });
+
+/**
+ * Scripted similarities for the corroboration cases: the page's claim and the
+ * user's statement land where a real embedder put them (0.847 live) — or
+ * closer — whatever their dates say, which is exactly why embeddings alone
+ * must not promote.
+ */
+function embedFreezeAt(similarity: number) {
+  vi.mocked(EmbeddingService.embed).mockImplementation(async (text: string) => {
+    if (text.startsWith("Platform deploy freeze starting")) return [1, 0, 0];
+    if (text.startsWith("Platform deploy freeze dates")) {
+      return [similarity, Math.sqrt(1 - similarity * similarity), 0];
+    }
+    return wordVector(text);
+  });
+}
+
+const FREEZE_PAGE = (date: string) => ({
+  title: `Platform deploy freeze starting ${date}`,
+  content: `There is a platform deploy freeze scheduled for two weeks starting on ${date}.`,
+});
+const FREEZE_SAID = {
+  title: "Platform deploy freeze dates",
+  content: "The platform deploy freeze starts on 2026-10-05 and lasts two weeks, so release before then.",
+};
 
 describe("write-time quarantine", () => {
   it("stores an untrusted memory quarantined, with its provenance, and never recalls it", async () => {
@@ -136,10 +163,49 @@ describe("corroboration", () => {
     expect(MemoryService.formatForPrompt(recalled)).toContain("source: web, confirmed by the user");
   });
 
+  it("promotes on a reworded restatement and keeps the user's own words too", async () => {
+    embedFreezeAt(0.85);
+    const page = await store(WEB, FREEZE_PAGE("2026-10-05"));
+    const said = await store(USER, FREEZE_SAID);
+
+    expect(said).toMatchObject({ trust: "user", quarantined: false, corroborated: true });
+    const memories = await allMemories();
+    expect(memories).toHaveLength(2);
+    expect(memories.find((memory) => memory.id === page!.id)).toMatchObject({
+      quarantined: false,
+      reviewDecision: "corroborated",
+      trust: "untrusted",
+    });
+  });
+
+  it("does not promote a page's claim the user contradicts in the details", async () => {
+    embedFreezeAt(0.85);
+    await store(WEB, FREEZE_PAGE("2026-11-05"));
+    const said = await store(USER, FREEZE_SAID);
+
+    expect(said).toMatchObject({ trust: "user", quarantined: false });
+    expect(said!.corroborated).toBeUndefined();
+    expect((await allMemories()).filter((memory) => memory.quarantined === true)).toHaveLength(1);
+  });
+
+  it("stores a user's fact even when it embeds as a near-copy of a quarantined claim it contradicts", async () => {
+    embedFreezeAt(0.99);
+    await store(WEB, FREEZE_PAGE("2026-11-05"));
+    const said = await store(USER, FREEZE_SAID);
+
+    expect(said).toMatchObject({ trust: "user", quarantined: false });
+    expect(await allMemories()).toHaveLength(2);
+  });
+
   it("does not promote on a derived (assistant) restatement", async () => {
-    await store(WEB);
-    expect(await store(DERIVED)).toBeNull(); // a verbatim duplicate, skipped
-    expect((await allMemories())[0].quarantined).toBe(true);
+    const quarantined = await store(WEB);
+    // Only the user vouches. The agent's own words in a clean loop are a
+    // live memory of their own, never a copy of the quarantined one.
+    const derived = await store(DERIVED);
+    expect(derived).toMatchObject({ trust: "derived", quarantined: false });
+    expect(derived!.corroborated).toBeUndefined();
+    const memories = await allMemories();
+    expect(memories.find((memory) => memory.id === quarantined!.id)!.quarantined).toBe(true);
   });
 
   it("does not promote on an unrelated user fact", async () => {

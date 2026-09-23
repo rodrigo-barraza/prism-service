@@ -21,7 +21,9 @@ import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
 import { getRequestContext } from "#src/utils/RequestContext";
 import type { MemoryDocument, MemorySearchResult } from "#src/types/memory";
 import {
+  CORROBORATION_CANDIDATE_THRESHOLD,
   LEGACY_PROVENANCE,
+  restates,
   shouldQuarantine,
   sourceOf,
   trustOf,
@@ -398,6 +400,8 @@ const MemoryService = {
       sourceRefs: [],
     };
     const isQuarantined = quarantined ?? shouldQuarantine(resolvedProvenance);
+    // Quarantined memories this write confirmed (corroboration, below).
+    const corroboratedIds: string[] = [];
     const embedText = title ? `${title}: ${content}` : content;
     // Generate embedding if not provided
     if (!embedding) {
@@ -427,45 +431,62 @@ const MemoryService = {
       if (metadata.aboutUserId) dedupFilter.aboutUserId = metadata.aboutUserId;
       const existing = await collection
         .find(dedupFilter)
-        .project({ embedding: 1, id: 1, quarantined: 1 })
+        .project({ embedding: 1, id: 1, quarantined: 1, content: 1 })
         .sort({ createdAt: -1 })
         .limit(200)
         .toArray();
       let maximumSimilarity = 0;
-      let closestQuarantined: { id: string; similarity: number } | null = null;
+      let closestId: string | null = null;
       for (const document of existing as Record<string, unknown>[]) {
         if (!document.embedding) continue;
         const similarity = cosineSimilarity(
           embedding as number[],
           document.embedding as number[],
         );
-        if (similarity > maximumSimilarity) maximumSimilarity = similarity;
+        // Corroboration: the user has now said, in their own words, what an
+        // untrusted source said before. The quarantined memory goes live —
+        // its provenance unchanged, the confirmation recorded.
+        let corroborated = false;
         if (
+          resolvedProvenance.trust === "user" &&
           document.quarantined === true &&
           typeof document.id === "string" &&
-          similarity > (closestQuarantined?.similarity ?? 0)
+          similarity >= CORROBORATION_CANDIDATE_THRESHOLD &&
+          restates(String(document.content ?? ""), embedText) &&
+          (await this.promoteCorroborated(document.id, resolvedProvenance))
         ) {
-          closestQuarantined = { id: document.id, similarity };
+          corroboratedIds.push(document.id);
+          corroborated = true;
+          logger.info(
+            `[MemoryService] Corroborated quarantined memory ${document.id} (similarity ${similarity.toFixed(3)}) — now live`,
+          );
+        }
+        // A live memory is a duplicate only of something live: a user's
+        // fact must not vanish into a quarantined claim it contradicts.
+        const comparable =
+          isQuarantined || document.quarantined !== true || corroborated;
+        if (comparable && similarity > maximumSimilarity) {
+          maximumSimilarity = similarity;
+          closestId = typeof document.id === "string" ? document.id : null;
         }
       }
-      // Corroboration: the user has now said, in their own words, what an
-      // untrusted source said before. The quarantined memory goes live —
-      // its provenance unchanged, the confirmation recorded — and this one
-      // is its duplicate.
       if (
-        resolvedProvenance.trust === "user" &&
-        closestQuarantined &&
-        closestQuarantined.similarity > DUPLICATE_THRESHOLD
+        maximumSimilarity > MEMORY.EXACT_DUPLICATE_THRESHOLD &&
+        closestId &&
+        corroboratedIds.includes(closestId)
       ) {
-        const promoted = await this.promoteCorroborated(
-          closestQuarantined.id,
-          resolvedProvenance,
+        // The user's words ARE the quarantined memory: it is live now, and
+        // storing them again would be a verbatim duplicate.
+        const promoted = await collection.findOne(
+          { id: closestId },
+          { projection: { embedding: 0 } },
         );
         if (promoted) {
-          logger.info(
-            `[MemoryService] Corroborated quarantined memory ${closestQuarantined.id} (similarity ${closestQuarantined.similarity.toFixed(3)}) — now live`,
-          );
-          return promoted;
+          return {
+            ...promoted,
+            id: closestId,
+            corroborated: true,
+          } as unknown as StoredMemoryDocument;
         }
       }
       if (maximumSimilarity > MEMORY.EXACT_DUPLICATE_THRESHOLD) {
@@ -504,7 +525,7 @@ const MemoryService = {
       }
     }
     const now = new Date().toISOString();
-    const memory = {
+    const memory: StoredMemoryDocument = {
       // Spread agent-specific metadata first — core fields below take precedence
       // to prevent accidental overwrites of id, agent, embedding, etc.
       ...metadata,
@@ -534,6 +555,7 @@ const MemoryService = {
       reviewDecision: null as MemoryReviewDecision | null,
     };
     await collection.insertOne(memory);
+    if (corroboratedIds.length > 0) memory.corroborated = true;
     logger.info(
       `[MemoryService] ${isQuarantined ? "Quarantined" : "Stored"} [${agent}/${memory.type}] ` +
         `"${(title || content).substring(0, LOG_PREVIEW.SHORT)}" (source: ${memory.source}, trust: ${memory.trust})`,
@@ -569,7 +591,7 @@ const MemoryService = {
   async promoteCorroborated(
     memoryId: string,
     corroboration: MemoryProvenance,
-  ): Promise<StoredMemoryDocument | null> {
+  ): Promise<boolean> {
     const collection = MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTION);
     const now = new Date().toISOString();
     const corroboratedBy: MemorySourceRef[] = corroboration.sourceRefs.filter(
@@ -588,14 +610,7 @@ const MemoryService = {
         },
       },
     );
-    if (result.modifiedCount === 0) return null;
-    const promoted = await collection.findOne(
-      { id: memoryId },
-      { projection: { embedding: 0 } },
-    );
-    return promoted
-      ? ({ ...promoted, id: memoryId, corroborated: true } as unknown as StoredMemoryDocument)
-      : null;
+    return result.modifiedCount > 0;
   },
   // ── LUPOS: Extract & Store ─────────────────────────────────────────────────
   async extractAndStore({
