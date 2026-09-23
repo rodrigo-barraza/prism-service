@@ -766,6 +766,45 @@ describe("ACP server — a turn that hands work to the background", () => {
     expect(JSON.stringify(client.updates(sessionId))).toContain("It found README.md.");
   });
 
+  it("ends the prompt with the conversation's recorded cost, which counts a failed sub-agent the events cannot", async () => {
+    mock.scripts.push(async (turn) => {
+      const conversationId = String(turn.body.conversationId);
+      turn.send({ type: "sub_agent_status", subAgentId: "f1", message: "spawned", description: "Fails", seq: 301 });
+      turn.send({
+        type: "context_budget",
+        contextWindow: 1_000_000,
+        messageTokens: 10,
+        systemPromptTokens: 10,
+        toolSchemaTokens: 10,
+        skillTokens: 0,
+        safetyMarginTokens: 10,
+        totalInputTokens: 40,
+        availableOutputTokens: 999_960,
+        isClamped: false,
+        toolCount: 1,
+        source: "estimated",
+        seq: 302,
+      });
+      mock.statuses.set(conversationId, { isGenerating: false, pendingBackgroundTasks: 1 });
+      turn.send({ type: "done", provider: "google", model: "m", usage: null, estimatedCost: 0.02, totalTime: 1, conversationId, seq: 303 });
+    });
+    const prompt = client.request("session/prompt", { sessionId, prompt: text("Try it") }, 20_000);
+    const subscription = await within(mock.nextSubscription(), 10_000, "the /ws/chat subscription");
+    // A failed sub-agent reports no cost on its stream…
+    subscription.send({ type: "sub_agent_status", subAgentId: "f1", message: "failed", conversationId: "sub-f1", error: "boom", seq: 304 });
+    subscription.send({ type: "done", provider: "google", model: "m", usage: null, estimatedCost: 0.01, totalTime: 1, conversationId: sessionId, seq: 305 });
+    // …but its requests are on the conversation's record.
+    mock.recordedCosts.set(sessionId, 4.25);
+    mock.statuses.set(sessionId, { isGenerating: false, pendingBackgroundTasks: 0 });
+    subscription.send({ type: "conversation_state_update", pendingBackgroundTasks: 0, isActive: false });
+
+    const response = await prompt;
+    expect(response.result).toMatchObject({ stopReason: "end_turn", _meta: { prism: { sessionCostUsd: 4.25 } } });
+    const lastUsage = client.updates(sessionId).filter((update) => update.sessionUpdate === "usage_update").at(-1);
+    expect(lastUsage).toEqual({ sessionUpdate: "usage_update", used: 40, size: 1_000_000, cost: { amount: 4.25, currency: "USD" } });
+    mock.recordedCosts.delete(sessionId);
+  });
+
   it("catches up from the persisted conversation when the socket delivered nothing", async () => {
     mock.scripts.push(dispatchingTurn("s2"));
     const prompt = client.request("session/prompt", { sessionId, prompt: text("Survey it again") }, 20_000);

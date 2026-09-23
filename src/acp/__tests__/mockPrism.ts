@@ -59,6 +59,8 @@ export class MockPrism {
   private readonly taken = new Set<RecordedRequest>();
   private readonly waiters: Array<{ path: string; resolve: (request: RecordedRequest) => void }> = [];
   private readonly activeStops = new Map<string, () => void>();
+  /** `stats.totalCost` of `GET /conversations/:id`; a conversation not listed has no stats. */
+  readonly recordedCosts = new Map<string, number>();
   /** `GET /conversations/:id/status`; a conversation not listed is idle. */
   readonly statuses = new Map<string, ConversationStatus>();
   private readonly subscriptions: Subscription[] = [];
@@ -184,8 +186,12 @@ export class MockPrism {
     }
     const conversation = recorded.path.match(/^\/conversations\/([^/]+)$/);
     if (recorded.method === "GET" && conversation) {
-      const messages = this.conversations.get(decodeURIComponent(conversation[1]!));
-      return messages ? json(200, { id: conversation[1], displayMessages: messages }) : json(404, { error: "Not found" });
+      const id = decodeURIComponent(conversation[1]!);
+      const messages = this.conversations.get(id);
+      const totalCost = this.recordedCosts.get(id);
+      return messages
+        ? json(200, { id, displayMessages: messages, ...(totalCost !== undefined ? { stats: { totalCost } } : {}) })
+        : json(404, { error: "Not found" });
     }
     json(404, { error: `mock has no route ${recorded.method} ${recorded.path}` });
   }

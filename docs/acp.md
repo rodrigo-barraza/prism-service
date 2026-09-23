@@ -102,7 +102,9 @@ the owners in `PRISM_PERMISSION_BYPASS_OWNERS`.
 | Stop reasons | `end_turn`. `refusal` after a provider refusal. `max_turn_requests` when the iteration limit was reached. `cancelled`. |
 | Errors | A failed turn answers `session/prompt` with JSON-RPC error `-32603`, message = Prism's, and `data.prism = {code, retryable, provider?, status?}` from the typed `error` event. A second prompt while the conversation is busy elsewhere gets the service's 409 the same way. |
 
-`_meta.prism` on every prompt response carries `conversationId` and `sessionCostUsd`.
+`_meta.prism` on every prompt response carries `conversationId` and `sessionCostUsd`, the
+conversation's recorded total at that moment. Background work that bills after the prompt
+has ended (memory extraction) appears at the end of the next prompt.
 
 ## Background work
 
@@ -116,9 +118,14 @@ tool calls and the answer into the same prompt. It ends when the conversation is
 missed). If the socket saw none of it, the answer is read back from the persisted
 messages.
 
-One prompt can therefore span several turns. The cost sums each turn's `done` and each
-sub-agent's `complete`. A sub-agent's running totals stay on its own conversation's
-stream: on the parent stream, a `usage_update` is only ever the parent turn's.
+One prompt can therefore span several turns. While it runs, the cost shown is a live
+estimate: the sum of each turn's `done` and each sub-agent's `complete`. (A sub-agent's
+running totals stay on its own conversation's stream; on the parent stream, a
+`usage_update` is only ever the parent turn's.) When the prompt ends, the server reports
+the conversation's recorded total instead. That is `stats.totalCost` from
+`GET /conversations/:id`, the number prism-client shows. It covers every request of the
+conversation and of its sub-agents at any depth, including a failed sub-agent whose stream
+reports no cost, and background work such as memory extraction.
 
 ## Behaviour worth knowing
 
