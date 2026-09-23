@@ -14,6 +14,10 @@ import SkillFolderStore, {
 } from "#src/services/skills/SkillFolderStore";
 import { normalizeSkillFilePath } from "#src/services/skills/skillFilePaths";
 import { SKILL_FILE_NAME } from "#src/services/skills/skillMarkdown";
+import type {
+  SkillInvocationKind,
+  SkillInvocationWhere,
+} from "#src/services/skills/SkillUsage";
 
 // ────────────────────────────────────────────────────────────
 // SkillService — the one reader and writer of `agent_skills`
@@ -519,6 +523,28 @@ async function findLoadable(
   };
 }
 
+/**
+ * Count one use: the skill's lifetime counter and last use, and a usage row
+ * for the admin report's window (SkillUsage.ts).
+ */
+async function countUse(
+  collection: NonNullable<ReturnType<typeof getCollection>>,
+  document: StoredSkillDocument,
+  skill: Skill,
+  caller: SkillCaller,
+  kind: SkillInvocationKind,
+  where: SkillInvocationWhere,
+): Promise<void> {
+  const { recordSkillUsage } = await import("#src/services/skills/SkillUsage");
+  await Promise.all([
+    collection.updateOne(
+      { _id: document._id },
+      { $inc: { usageCount: 1 }, $set: { lastUsedAt: new Date().toISOString() } },
+    ),
+    recordSkillUsage(skill, caller, kind, where),
+  ]);
+}
+
 const SkillService = {
   /** Create a skill in the caller's scope. A name is unique per scope. */
   async create(input: SkillWriteInput, caller: SkillCaller) {
@@ -726,7 +752,11 @@ const SkillService = {
   },
 
   /** `load_skill`: the body and its resources, for an enabled catalog skill. */
-  async load(name: string, caller: SkillCaller): Promise<LoadedSkill | { error: string }> {
+  async load(
+    name: string,
+    caller: SkillCaller,
+    where: SkillInvocationWhere = {},
+  ): Promise<LoadedSkill | { error: string }> {
     const collection = getCollection();
     if (!collection) return { error: "Database not available" };
 
@@ -734,10 +764,7 @@ const SkillService = {
     if ("error" in found) return found;
 
     const { skill, document } = found;
-    await collection.updateOne(
-      { _id: document._id },
-      { $inc: { usageCount: 1 }, $set: { lastUsedAt: new Date().toISOString() } },
-    );
+    await countUse(collection, document, skill, caller, "load", where);
 
     const variables = templateVariables(skill.body);
     // The body is SKILL.md; the rest of the folder is listed, read on demand.
@@ -878,6 +905,7 @@ const SkillService = {
     reference: string,
     variables: Record<string, unknown>,
     caller: SkillCaller,
+    where: SkillInvocationWhere = {},
   ): Promise<SkillPrepareResult> {
     const collection = getCollection();
     if (!collection) return { error: "Database not available" };
@@ -900,10 +928,7 @@ const SkillService = {
     }
     const unresolved = templateVariables(prompt);
 
-    await collection.updateOne(
-      { _id: document._id },
-      { $inc: { usageCount: 1 }, $set: { lastUsedAt: new Date().toISOString() } },
-    );
+    await countUse(collection, document, skill, caller, "execute", where);
 
     return {
       skillId: skill.skillId,

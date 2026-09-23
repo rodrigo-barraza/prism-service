@@ -427,6 +427,15 @@ setupWebSocket(wss);
         },
         // scheduled_tasks — daemon tick scans enabled tasks every minute
         { collection: COLLECTIONS.SCHEDULED_TASKS, keys: { enabled: 1 } },
+        // skill_usage — the admin usage report's 30-day window
+        // (skills/SkillUsage.ts); rows expire after 180 days, the lifetime
+        // count lives on the skill
+        {
+          collection: COLLECTIONS.SKILL_USAGE,
+          keys: { at: 1 },
+          options: { expireAfterSeconds: 180 * 24 * 60 * 60 },
+        },
+        { collection: COLLECTIONS.SKILL_USAGE, keys: { skillDocumentId: 1, at: -1 } },
         // favorites — scoped listing sorted by recency
         {
           collection: COLLECTIONS.FAVORITES,

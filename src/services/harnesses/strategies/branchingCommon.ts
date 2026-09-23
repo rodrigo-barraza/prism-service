@@ -70,6 +70,10 @@ import {
   type LoadedInstruction,
   type TurnHookHandle,
 } from "#src/services/harnesses/lifecycle/TurnHooks";
+import {
+  applyWorkspaceRules,
+  rememberWorkspaceInstructions,
+} from "#src/services/harnesses/lifecycle/WorkspaceRuleStage";
 import { buildHookPayload } from "#src/services/hooks/buildPayload";
 import { HOOK_EVENTS } from "#src/services/hooks/types";
 import {
@@ -287,6 +291,7 @@ export async function runBeforePromptSetup(
     hooks,
     hookContext._loadedInstructions as LoadedInstruction[] | undefined,
   );
+  rememberWorkspaceInstructions(harness["state"], hookContext);
 
   if (hookContext._assembledSystemPrompt) {
     const assembledPrompt = hookContext._assembledSystemPrompt as string;
@@ -978,6 +983,14 @@ export async function commitToolCallResults(
   };
   currentMessages.push(assistantMessage);
   flushHookContext(currentMessages, state);
+  await applyWorkspaceRules(
+    currentMessages,
+    context,
+    openTurns.get(harness)?.hooks,
+    state,
+    pass.pendingToolCalls,
+    results,
+  );
 
   const retryGuidanceMessage = buildToolRetryGuidance(
     pass.pendingToolCalls,

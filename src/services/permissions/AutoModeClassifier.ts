@@ -766,19 +766,27 @@ export function withReportReview(report: string, review: ReportReview): string {
 
 // ── PRISM.md ─────────────────────────────────────────────────────
 
-/** PRISM.md for the run's scope, read once per session; "" when there is none or it cannot be read. */
+/**
+ * PRISM.md for the run's scope — the project document, then the agent's,
+ * merged as the prompt merges them — read once per session; "" when there
+ * is none or it cannot be read. Workspace files (AGENTS.md, CLAUDE.md) are
+ * not here: this is what the USER wrote, and a repository's files are not.
+ */
 export function projectInstructionsFor(context: AgenticContext, session: AutoModeSession | null): Promise<string> {
   const read = async (): Promise<string> => {
     try {
       const { default: ProjectInstructionsService } = await import("#src/services/ProjectInstructionsService");
       const database = ProjectInstructionsService.getDatabase();
       if (!database) return "";
-      const document = await ProjectInstructionsService.getCurrent(database, {
+      const layers = await ProjectInstructionsService.getLayers(database, {
         project: context.project || "any",
         username: context.username || "any",
         agent: context.agent || null,
       });
-      return typeof document?.content === "string" ? document.content.trim() : "";
+      return [layers.project?.content, layers.agent?.content]
+        .map((content) => (typeof content === "string" ? content.trim() : ""))
+        .filter(Boolean)
+        .join("\n\n");
     } catch (error: unknown) {
       logger.warn(`[AutoMode] Could not read PRISM.md: ${errorMessage(error)}`);
       return "";

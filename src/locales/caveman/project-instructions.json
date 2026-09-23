@@ -24,7 +24,8 @@
     "empty": "No cave rule carved yet for this project. Use edit_project_instructions to carve first section.",
     "unchanged": "'{{heading}}' section already say exact this — nothing carved.",
     "updated": "Rule stone replaced (now version {{version}}). This stone go into every future talk in project.",
-    "edited": "Section '{{heading}}' {{action}} (now version {{version}}). This stone go into every future talk in project."
+    "edited": "Section '{{heading}}' {{action}} (now version {{version}}). This stone go into every future talk in project.",
+    "alsoInjected": "Project-wide stone (version {{version}}) also in prompt, above this one. This tool read and carve only {{agent}} agent stone."
   },
   "actions": {
     "added": "added",

@@ -57,6 +57,10 @@ import {
   unwrapBridgedToolCalls,
 } from "./lifecycle/ToolSurface.ts";
 import { validateAfterToolExecution } from "./lifecycle/ValidationInterceptor.ts";
+import {
+  applyWorkspaceRules,
+  rememberWorkspaceInstructions,
+} from "./lifecycle/WorkspaceRuleStage.ts";
 import { buildToolRetryGuidance } from "./lifecycle/ToolRetryInterceptor.ts";
 import {
   isOutputTruncated,
@@ -456,6 +460,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             hooks,
             hookContext._loadedInstructions as LoadedInstruction[] | undefined,
           );
+          rememberWorkspaceInstructions(state, hookContext);
 
           // ── Persist assembled system prompt to conversationMeta ──
           if (hookContext._assembledSystemPrompt) {
@@ -942,6 +947,7 @@ export default class ReActHarness extends BaseAgenticHarness {
               toolCalls: transcriptToolCalls(pass, results),
             });
             flushHookContext(currentMessages, state);
+            await applyWorkspaceRules(currentMessages, context, hooks, state, pass.pendingToolCalls, results);
 
             currentMessages.push({
               role: "system",
@@ -1005,6 +1011,7 @@ export default class ReActHarness extends BaseAgenticHarness {
           };
           currentMessages.push(assistantMessage);
           flushHookContext(currentMessages, state);
+          await applyWorkspaceRules(currentMessages, context, hooks, state, pass.pendingToolCalls, results);
           flushPlanModeNotice(
             currentMessages,
             state,
