@@ -65,6 +65,12 @@ export const MODEL_ROLES = {
   SUBAGENT: "subagent",
   /** A stronger second opinion (prompt 17's ask_oracle consults it). */
   ORACLE: "oracle",
+  /**
+   * The judge of a conversation goal (goals/GoalVerifier). Its default is
+   * NOT a chain here: GoalVerifier picks a model on another provider than
+   * the conversation's, which only the caller knows.
+   */
+  VERIFIER: "verifier",
   /** Conversation summarization (CompactionService). */
   COMPACTION: "compaction",
   /** Short labelling calls (prompt 12's auto-mode classifier). */

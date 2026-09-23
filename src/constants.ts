@@ -635,6 +635,8 @@ export const NOTIFICATION_SOURCES = {
   USER_UPDATE: "user-update",
   /** A running sub-agent's report_progress, delivered into its parent's turn. */
   SUB_AGENT_PROGRESS: "subagent-progress",
+  /** The goal verifier's gaps, delivered into the turn that claimed the goal done. */
+  GOAL_VERIFIER: "goal-verifier",
 } as const;
 
 // ─── Auto Mode (permissions/AutoModeClassifier) ─────────────

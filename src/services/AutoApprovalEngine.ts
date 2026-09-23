@@ -92,7 +92,8 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
 
   // Tier 1 — conversation goal metadata, bounded waits, read-only programs
   // (local tool names — see GoalTools / AsyncTaskConstants / RunToolProgramTool)
-  set_goal: APPROVAL_TIERS.AUTO,
+  // A proposal waits for the user's own card — no approval card before it.
+  propose_goal: APPROVAL_TIERS.AUTO,
   update_goal: APPROVAL_TIERS.AUTO,
   clear_goal: APPROVAL_TIERS.AUTO,
   wait_for_tasks: APPROVAL_TIERS.AUTO,

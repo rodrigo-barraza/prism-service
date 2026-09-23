@@ -46,6 +46,23 @@ vi.mock("#src/wrappers/MongoWrapper", () => ({
               }
               const rows = store.collections.get(collectionName)!;
               return {
+                // Only the boot sweep's query shape: a dotted path with $type.
+                find: (filter: Record<string, { $type?: string }>) => ({
+                  toArray: async () =>
+                    rows
+                      .filter((document) =>
+                        Object.entries(filter).every(([path, condition]) => {
+                          const value = path
+                            .split(".")
+                            .reduce<unknown>(
+                              (node, key) => (node as Record<string, unknown> | undefined)?.[key],
+                              document,
+                            );
+                          return typeof value === condition.$type;
+                        }),
+                      )
+                      .map((document) => structuredClone(document)),
+                }),
                 findOne: async (filter: Record<string, unknown>) => {
                   if (store.failFindOne) throw new Error("boom");
                   const found = rows.find((document) => matches(document, filter));
@@ -80,10 +97,13 @@ const {
   applyGoalPatch,
   describeBudgetExhaustion,
   detectMeaningfulChange,
+  effectiveRubric,
   formatGoalForPrompt,
   normalizeBudget,
+  normalizeRubric,
   resolveGoalConversationId,
 } = await import("#src/services/ConversationGoalService");
+type GoalVerification = import("#src/services/ConversationGoalService").GoalVerification;
 type ConversationGoal = import("#src/services/ConversationGoalService").ConversationGoal;
 const { COLLECTIONS } = await import("#src/constants");
 
@@ -100,6 +120,7 @@ function seed(
 function stored(collection: string = COLLECTIONS.AGENT_CONVERSATIONS) {
   return store.collections.get(collection)![0] as FakeDocument & {
     goal?: ConversationGoal;
+    goalProposal?: ConversationGoal;
   };
 }
 
@@ -387,7 +408,7 @@ describe("recordTurn and budget exhaustion", () => {
     expect(goal).toMatchObject({ spentDollars: 0, turnsUsed: 1 });
   });
 
-  it("blocks the goal when the dollar budget is spent and emits change=status", async () => {
+  it("pauses the goal (reason budget) when the dollar budget is spent and emits change=status", async () => {
     seed(COLLECTIONS.AGENT_CONVERSATIONS, {
       goal: baseGoal({ budget: { maxCostDollars: 0.5 }, spentDollars: 0.45 }),
     });
@@ -397,36 +418,52 @@ describe("recordTurn and budget exhaustion", () => {
       { costDollars: 0.1 },
       { emit },
     ))!;
-    expect(goal.status).toBe("blocked");
-    expect(goal.blockedOn).toMatch(/^budget exhausted: \$0\.5500 spent of \$0\.5 allowed$/);
+    expect(goal.status).toBe("paused");
+    expect(goal.pause).toMatchObject({ reason: "budget" });
+    expect(goal.pause!.detail).toMatch(/^budget exhausted: \$0\.5500 spent of \$0\.5 allowed$/);
+    expect(goal.blockedOn).toBeNull();
     expect(emit).toHaveBeenCalledWith({
       type: GOAL_UPDATE_EVENT_TYPE,
       goal,
       change: "status",
     });
 
-    // A second exhausted turn does not re-emit — the block is already recorded.
+    // A second exhausted turn does not re-emit — the pause is already recorded.
     emit.mockClear();
     await ConversationGoalService.recordTurn(...ARGS, { costDollars: 0.01 }, { emit });
     expect(emit).not.toHaveBeenCalled();
   });
 
-  it("blocks on the turn budget and on a passed deadline", async () => {
+  it("pauses on the turn budget and on a passed deadline", async () => {
     seed(COLLECTIONS.AGENT_CONVERSATIONS, {
       goal: baseGoal({ budget: { maxTurns: 2 }, turnsUsed: 1 }),
     });
     const byTurns = (await ConversationGoalService.recordTurn(...ARGS))!;
-    expect(byTurns.status).toBe("blocked");
-    expect(byTurns.blockedOn).toBe("budget exhausted: 2 of 2 turns used");
+    expect(byTurns.status).toBe("paused");
+    expect(byTurns.pause).toMatchObject({ reason: "budget", detail: "budget exhausted: 2 of 2 turns used" });
 
     seed(COLLECTIONS.AGENT_CONVERSATIONS, {
       goal: baseGoal({ budget: { deadline: "2000-01-01T00:00:00.000Z" } }),
     });
     const byDeadline = (await ConversationGoalService.recordTurn(...ARGS))!;
-    expect(byDeadline.status).toBe("blocked");
-    expect(byDeadline.blockedOn).toBe(
+    expect(byDeadline.status).toBe("paused");
+    expect(byDeadline.pause!.detail).toBe(
       "budget exhausted: deadline 2000-01-01T00:00:00.000Z has passed",
     );
+  });
+
+  it("a user-paused goal over budget is re-labelled budget once, then left alone", async () => {
+    seed(COLLECTIONS.AGENT_CONVERSATIONS, {
+      goal: baseGoal({
+        status: "paused",
+        pause: { reason: "user", at: "t" },
+        budget: { maxTurns: 1 },
+      }),
+    });
+    const first = (await ConversationGoalService.recordTurn(...ARGS))!;
+    expect(first.pause).toMatchObject({ reason: "budget" });
+    const second = (await ConversationGoalService.recordTurn(...ARGS))!;
+    expect(second.pause!.at).toBe(first.pause!.at);
   });
 
   it("never blocks a completed goal", async () => {
@@ -488,7 +525,7 @@ describe("afterResponse hook", () => {
     expect(stored().goal).toMatchObject({ spentDollars: 0, turnsUsed: 1 });
   });
 
-  it("emits the budget block through the context emit", async () => {
+  it("emits the budget pause through the context emit", async () => {
     seed(COLLECTIONS.AGENT_CONVERSATIONS, {
       goal: baseGoal({ budget: { maxTurns: 1 } }),
       messages: [{ role: "assistant", content: "done", estimatedCost: 0.01 }],
@@ -499,8 +536,24 @@ describe("afterResponse hook", () => {
     expect(emit.mock.calls[0][0]).toMatchObject({
       type: GOAL_UPDATE_EVENT_TYPE,
       change: "status",
-      goal: { status: "blocked", turnsUsed: 1 },
+      goal: { status: "paused", pause: { reason: "budget" }, turnsUsed: 1 },
     });
+  });
+
+  it("books a goal run's whole spend (main loop, sub-agents, verifier) over the message's cost", async () => {
+    seed(COLLECTIONS.AGENT_CONVERSATIONS, {
+      goal: baseGoal(),
+      messages: [{ role: "assistant", content: "done", estimatedCost: 0.01 }],
+    });
+    const bookTurnSpend = vi.fn().mockReturnValue(0.42);
+    await hook({
+      conversationId: SCOPE.id,
+      project: SCOPE.project,
+      username: SCOPE.username,
+      options: { _goalRun: { bookTurnSpend } },
+    });
+    expect(bookTurnSpend).toHaveBeenCalledTimes(1);
+    expect(stored().goal).toMatchObject({ spentDollars: 0.42, turnsUsed: 1 });
   });
 
   it("skips sub-agents, contexts without ids, and conversations without a goal", async () => {
@@ -573,9 +626,243 @@ describe("formatGoalForPrompt", () => {
 
   it("carries the update_goal instruction for an active goal and the pause notice when paused", () => {
     expect(formatGoalForPrompt(baseGoal(), now)).toContain("update_goal");
-    expect(formatGoalForPrompt(baseGoal(), now)).toContain("status completed");
+    expect(formatGoalForPrompt(baseGoal(), now)).toContain("independent verifier");
+    expect(formatGoalForPrompt(baseGoal(), now)).toContain("never your reasoning");
     expect(formatGoalForPrompt(baseGoal(), now)).toContain("$0.0000 spent · 0 turns used");
     expect(formatGoalForPrompt(baseGoal({ status: "paused" }), now)).toContain("paused");
     expect(formatGoalForPrompt(baseGoal({ status: "completed" }), now)).toContain("completed");
+  });
+});
+
+// ─── Verified outcomes (prompt 21) ─────────────────────────────
+
+describe("rubric normalization", () => {
+  it("takes strings or {id, criterion}, trims, drops blanks, and keeps safe unique ids", () => {
+    expect(
+      normalizeRubric([
+        "  report.md exists ",
+        { id: "bullets", criterion: "exactly 3 bullets" },
+        { id: "bullets", criterion: "a duplicate id gets a new one" },
+        { id: "has spaces", criterion: "an unsafe id gets a new one" },
+        "",
+        { criterion: "   " },
+        42,
+      ]),
+    ).toEqual([
+      { id: "c1", criterion: "report.md exists" },
+      { id: "bullets", criterion: "exactly 3 bullets" },
+      { id: "c3", criterion: "a duplicate id gets a new one" },
+      { id: "c4", criterion: "an unsafe id gets a new one" },
+    ]);
+    expect(normalizeRubric([])).toBeUndefined();
+    expect(normalizeRubric("not a list")).toBeUndefined();
+    expect(normalizeRubric(Array.from({ length: 30 }, (_, index) => `criterion ${index}`))).toHaveLength(20);
+    expect(normalizeRubric(["x".repeat(900)])![0].criterion).toHaveLength(500);
+  });
+
+  it("the verifier checks the rubric, else the completion criteria, else the objective", () => {
+    expect(effectiveRubric(baseGoal({ rubric: [{ id: "a", criterion: "A" }] }))).toEqual([{ id: "a", criterion: "A" }]);
+    expect(effectiveRubric(baseGoal({ completionCriteria: "tests green" }))).toEqual([
+      { id: "criteria", criterion: "tests green" },
+    ]);
+    expect(effectiveRubric(baseGoal())).toEqual([{ id: "objective", criterion: "Ship the widget" }]);
+  });
+});
+
+describe("set, propose, approve, decline", () => {
+  it("set stores rubric, step rubric, verifier and maxIterations (default 3), and drops a waiting proposal", async () => {
+    seed(COLLECTIONS.AGENT_CONVERSATIONS, { goalProposal: baseGoal({ status: "proposed" }) });
+    const goal = await ConversationGoalService.set(...ARGS, {
+      objective: "Ship it",
+      rubric: ["CI green"],
+      stepRubric: ["no failing command ignored"],
+      verifier: { provider: "anthropic", model: "claude-sonnet-5" },
+    });
+    expect(goal).toMatchObject({
+      status: "active",
+      rubric: [{ id: "c1", criterion: "CI green" }],
+      stepRubric: [{ id: "c1", criterion: "no failing command ignored" }],
+      verifier: { provider: "anthropic", model: "claude-sonnet-5" },
+      maxIterations: 3,
+      pause: null,
+      verification: null,
+      verificationRounds: 0,
+    });
+    expect(stored().goalProposal).toBeUndefined();
+
+    const bounded = await ConversationGoalService.set(...ARGS, { objective: "x", maxIterations: 99, verifier: { provider: "" } });
+    expect(bounded.maxIterations).toBe(20);
+    expect(bounded.verifier).toBeUndefined();
+  });
+
+  it("a proposal is inactive until approved; approving makes it the goal, declining drops it", async () => {
+    seed(COLLECTIONS.AGENT_CONVERSATIONS, { goal: baseGoal({ objective: "Current" }) });
+    const emit = vi.fn();
+    const proposal = await ConversationGoalService.propose(
+      ...ARGS,
+      { objective: "Proposed", rubric: ["A", "B"], budget: { maxCostDollars: 2 } },
+      { emit },
+    );
+    expect(proposal).toMatchObject({ status: "proposed", progress: { summary: "Proposed" } });
+    expect(stored().goal!.objective).toBe("Current");
+    expect(emit).toHaveBeenCalledWith({ type: GOAL_UPDATE_EVENT_TYPE, goal: proposal, change: "proposed" });
+
+    const approved = await ConversationGoalService.approveProposal(...ARGS, { emit });
+    expect(approved).toMatchObject({
+      objective: "Proposed",
+      status: "active",
+      rubric: [
+        { id: "c1", criterion: "A" },
+        { id: "c2", criterion: "B" },
+      ],
+      budget: { maxCostDollars: 2 },
+      spentDollars: 0,
+    });
+    expect(stored().goal).toEqual(approved);
+    expect(stored().goalProposal).toBeUndefined();
+    expect(await ConversationGoalService.approveProposal(...ARGS)).toBeNull();
+
+    await ConversationGoalService.propose(...ARGS, { objective: "Again", rubric: ["C"] });
+    emit.mockClear();
+    expect(await ConversationGoalService.declineProposal(...ARGS, { emit })).toBe(true);
+    expect(stored().goalProposal).toBeUndefined();
+    expect(emit).toHaveBeenCalledWith(expect.objectContaining({ change: "proposal_declined" }));
+    expect(await ConversationGoalService.declineProposal(...ARGS)).toBe(false);
+    await expect(ConversationGoalService.getState(...ARGS)).resolves.toEqual({ goal: approved, proposal: null });
+  });
+});
+
+describe("pause and resume", () => {
+  const verification: GoalVerification = {
+    verdict: "needs_revision",
+    criteria: [{ id: "c1", pass: false, evidence: "missing" }],
+    iteration: 2,
+    verifier: { provider: "anthropic", model: "claude-sonnet-5" },
+    costDollars: 0.05,
+    at: "2026-09-22T10:00:00.000Z",
+  };
+
+  it("a pause records its reason (the user's by default); resuming forgets it and restarts the verifier's rounds", () => {
+    const active = baseGoal({ verificationRounds: 3, continuingSince: "t" });
+    const paused = applyGoalPatch(active, { status: "paused" }, "now");
+    expect(paused.pause).toEqual({ reason: "user", at: "now" });
+    expect(paused.continuingSince).toBeNull();
+    const budget = applyGoalPatch(active, { status: "paused", pauseReason: "budget", pauseDetail: "$2 of $2" }, "now");
+    expect(budget.pause).toEqual({ reason: "budget", detail: "$2 of $2", at: "now" });
+
+    const resumed = applyGoalPatch(paused, { status: "active" }, "later");
+    expect(resumed.pause).toBeNull();
+    expect(resumed.verificationRounds).toBe(0);
+    expect(detectMeaningfulChange(active, paused)).toBe("status");
+    expect(detectMeaningfulChange(paused, budget)).toBe("status");
+  });
+
+  it("a new rubric forgets the verdict about the old one; an edit is a 'set' change", () => {
+    const verified = baseGoal({ rubric: [{ id: "c1", criterion: "A" }], verification, verificationRounds: 2 });
+    const edited = applyGoalPatch(verified, { rubric: ["A", "B"] });
+    expect(edited.verification).toBeNull();
+    expect(edited.verificationRounds).toBe(0);
+    expect(detectMeaningfulChange(verified, edited)).toBe("set");
+    const sameRubric = applyGoalPatch(verified, { progressSummary: "x" });
+    expect(sameRubric.verification).toEqual(verification);
+    expect(detectMeaningfulChange(verified, applyGoalPatch(verified, { verifier: { provider: "google", model: "gemini-3.8-flash" } }))).toBe("set");
+    expect(detectMeaningfulChange(verified, applyGoalPatch(verified, { maxIterations: 5 }))).toBe("set");
+  });
+
+  it("recordVerification: satisfied completes the goal; a paused verdict pauses it — one write, one 'verified' event", async () => {
+    seed(COLLECTIONS.AGENT_CONVERSATIONS, { goal: baseGoal({ rubric: [{ id: "c1", criterion: "A" }] }) });
+    const emit = vi.fn();
+    const failing = await ConversationGoalService.recordVerification(...ARGS, verification, {
+      pause: { reason: "max_iterations", detail: "2 rounds" },
+      emit,
+    });
+    expect(failing).toMatchObject({
+      status: "paused",
+      pause: { reason: "max_iterations", detail: "2 rounds" },
+      verification,
+      verificationRounds: 2,
+    });
+    expect(emit).toHaveBeenCalledTimes(1);
+    expect(emit).toHaveBeenCalledWith(expect.objectContaining({ change: "verified" }));
+
+    seed(COLLECTIONS.AGENT_CONVERSATIONS, { goal: baseGoal({ rubric: [{ id: "c1", criterion: "A" }] }) });
+    const satisfied = await ConversationGoalService.recordVerification(...ARGS, {
+      ...verification,
+      verdict: "satisfied",
+      criteria: [{ id: "c1", pass: true, evidence: "read_file shows it" }],
+      iteration: 1,
+      at: "2026-09-22T11:00:00.000Z",
+    });
+    expect(satisfied).toMatchObject({
+      status: "completed",
+      progress: { summary: "Verified: all 1 criteria met", percent: 100 },
+      verification: { verdict: "satisfied" },
+    });
+  });
+
+  it("a restart pauses the goals it cut off (reason restart) and only clears the mark on the others", async () => {
+    seed(COLLECTIONS.AGENT_CONVERSATIONS, { goal: baseGoal() });
+    await ConversationGoalService.markContinuing(...ARGS, "2026-09-22T09:00:00.000Z");
+    expect(stored().goal!.continuingSince).toBe("2026-09-22T09:00:00.000Z");
+    store.collections.get(COLLECTIONS.AGENT_CONVERSATIONS)!.push({
+      id: "conv-2",
+      project: SCOPE.project,
+      username: SCOPE.username,
+      goal: baseGoal({ status: "completed", continuingSince: "2026-09-22T09:00:00.000Z" }),
+    });
+    store.collections.get(COLLECTIONS.AGENT_CONVERSATIONS)!.push({
+      id: "conv-3",
+      project: SCOPE.project,
+      username: SCOPE.username,
+      goal: baseGoal(),
+    });
+
+    expect(await ConversationGoalService.pauseInterruptedRuns()).toBe(1);
+    const rows = store.collections.get(COLLECTIONS.AGENT_CONVERSATIONS)! as Array<FakeDocument & { goal: ConversationGoal }>;
+    expect(rows[0].goal).toMatchObject({ status: "paused", pause: { reason: "restart" }, continuingSince: null });
+    expect(rows[1].goal).toMatchObject({ status: "completed", continuingSince: null });
+    expect(rows[2].goal).toMatchObject({ status: "active" });
+
+    // A goal that stopped being active is never marked.
+    await ConversationGoalService.markContinuing(...ARGS, "2026-09-22T12:00:00.000Z");
+    expect(stored().goal!.continuingSince).toBeNull();
+  });
+
+  it("late spend is booked without counting a turn", async () => {
+    seed(COLLECTIONS.AGENT_CONVERSATIONS, { goal: baseGoal({ spentDollars: 1, turnsUsed: 2 }) });
+    await ConversationGoalService.recordLateSpend(...ARGS, 0.25);
+    expect(stored().goal).toMatchObject({ spentDollars: 1.25, turnsUsed: 2 });
+  });
+});
+
+describe("formatGoalForPrompt — rubric and verdict", () => {
+  it("lists the rubric with each criterion's last verdict, and a paused goal's reason", () => {
+    const goal = baseGoal({
+      rubric: [
+        { id: "c1", criterion: "report.md exists" },
+        { id: "c2", criterion: "exactly 3 bullets" },
+      ],
+      stepRubric: [{ id: "s1", criterion: "no failing command ignored" }],
+      verification: {
+        verdict: "needs_revision",
+        criteria: [
+          { id: "c1", pass: true, evidence: "read_file" },
+          { id: "c2", pass: false, evidence: "4 bullets" },
+          { id: "s1", pass: true, evidence: "none failed" },
+        ],
+        iteration: 1,
+        verifier: { provider: "anthropic", model: "claude-sonnet-5" },
+        costDollars: 0.05,
+        at: "t",
+      },
+    });
+    const text = formatGoalForPrompt(goal);
+    expect(text).toContain("[c1] report.md exists — verified ✓");
+    expect(text).toContain("[c2] exactly 3 bullets — NOT met: 4 bullets");
+    expect(text).toContain("Step rubric");
+    expect(text).toContain("[s1] no failing command ignored — verified ✓");
+    expect(
+      formatGoalForPrompt(baseGoal({ status: "paused", pause: { reason: "budget", detail: "$2 of $2", at: "t" } })),
+    ).toContain("Status: paused (budget: $2 of $2)");
   });
 });

@@ -96,6 +96,7 @@ import {
 } from "./lifecycle/ResumedPass.ts";
 import { recordPassInFlight } from "./lifecycle/TurnRunRecorder.ts";
 import { endTurnAfterToolsOf, endsTurnWithReply } from "./lifecycle/EndTurnAfterTools.ts";
+import { GoalRun } from "./lifecycle/GoalGate.ts";
 import SemanticStallDetector from "./lifecycle/SemanticStallDetector.ts";
 
 import PromptLocaleService from "#src/services/PromptLocaleService";
@@ -382,6 +383,11 @@ export default class ReActHarness extends BaseAgenticHarness {
         subAgents: {},
       });
     }
+
+    // ── Conversation goal ─────────────────────────────────────
+    // A root turn of a conversation with a goal keeps working until the
+    // goal's verifier is satisfied (lifecycle/GoalGate.ts).
+    const goalRun = await GoalRun.open(context, state);
 
     // ── Main loop ────────────────────────────────────────────
     // Wrapped in try/catch to persist accumulated messages on error.
@@ -1306,6 +1312,26 @@ export default class ReActHarness extends BaseAgenticHarness {
               }
             }
 
+            // The conversation's goal is done when its verifier says so: a
+            // verdict that finds gaps sends them back and the loop goes on.
+            const goalOutcome = goalRun
+              ? await goalRun.atTextEnd(currentMessages, pass.finalStreamedText || pass.streamedText)
+              : null;
+            if (goalRun && goalOutcome?.action === "continue" && !signal?.aborted) {
+              currentMessages.push({
+                role: "assistant",
+                content: pass.finalStreamedText || pass.streamedText,
+                thinking: pass.streamedThinking.trim(),
+                thinkingSignature: pass.thinkingSignature,
+                ...computePassPhaseDurations(pass),
+                ...providerNativeState(pass),
+              });
+              goalRun.deliver(currentMessages, goalOutcome.input);
+              this.logIteration(pass, currentMessages);
+              this.deviationEngine.recordCompletedIteration([]);
+              continue;
+            }
+
             this.logIteration(pass, currentMessages);
             this.deviationEngine.recordCompletedIteration([]);
             semanticStallDetector.recordIteration([], pass.streamedText);
@@ -1439,6 +1465,7 @@ export default class ReActHarness extends BaseAgenticHarness {
       // Every exit converges here — clean break, budget stop, user abort, or
       // a throw already handled above: SubagentStop, TurnEnd, and the session
       // bookkeeping that later fires SessionEnd when the conversation idles.
+      await goalRun?.close();
       await closeTurnHooks(context, hooks, state, turnHooks);
     }
   }

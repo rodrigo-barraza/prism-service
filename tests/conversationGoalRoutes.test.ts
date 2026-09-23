@@ -4,6 +4,7 @@ import { app } from './setup.ts';
 import conversationsRouter from '#src/routes/ConversationsRoutes';
 import MongoWrapper from '#src/wrappers/MongoWrapper';
 import { COLLECTIONS } from '#src/constants';
+import InternalToolRegistry from '#src/services/tool-definitions/InternalToolRegistry';
 
 // Mount the conversations router
 app.use('/conversations', conversationsRouter);
@@ -66,12 +67,12 @@ describe('Conversation goal routes', () => {
     vi.mocked(MongoWrapper.getDb).mockReturnValue(null as any);
   });
 
-  it('GET returns { goal: null } before a goal is set', async () => {
+  it('GET returns { goal: null, proposal: null } before a goal is set', async () => {
     const response = await agent
       .get('/conversations/agent-conv-1/goal')
       .set(headers)
       .expect(200);
-    expect(response.body).toEqual({ goal: null });
+    expect(response.body).toEqual({ goal: null, proposal: null });
   });
 
   it('PUT rejects a missing objective and an unknown conversation', async () => {
@@ -218,5 +219,142 @@ describe('Conversation goal routes', () => {
     expect(again.body).toEqual({ success: false });
 
     await agent.delete('/conversations/nope/goal').set(headers).expect(404);
+  });
+
+  it('PUT takes a rubric, a verifier and maxIterations', async () => {
+    const put = await agent
+      .put('/conversations/agent-conv-1/goal')
+      .set(headers)
+      .send({
+        objective: 'Create report.md',
+        rubric: [{ criterion: 'report.md exists' }, 'exactly 3 bullets', { id: 'real', criterion: 'each bullet names a real file' }],
+        verifier: { provider: 'anthropic', model: 'claude-sonnet-5' },
+        maxIterations: 4,
+        budget: { maxCostDollars: 1 },
+      })
+      .expect(200);
+    expect(put.body.goal).toMatchObject({
+      rubric: [
+        { id: 'c1', criterion: 'report.md exists' },
+        { id: 'c2', criterion: 'exactly 3 bullets' },
+        { id: 'real', criterion: 'each bullet names a real file' },
+      ],
+      verifier: { provider: 'anthropic', model: 'claude-sonnet-5' },
+      maxIterations: 4,
+      status: 'active',
+      pause: null,
+      verification: null,
+    });
+  });
+
+  it('PATCH edits the goal in place and a pause records the user as its reason', async () => {
+    await agent
+      .put('/conversations/agent-conv-1/goal')
+      .set(headers)
+      .send({ objective: 'Ship the widget', rubric: ['tests green'] })
+      .expect(200);
+
+    const edited = await agent
+      .patch('/conversations/agent-conv-1/goal')
+      .set(headers)
+      .send({
+        objective: 'Ship the widget v2',
+        rubric: ['tests green', 'changelog updated'],
+        verifier: { provider: 'google', model: 'gemini-3.8-flash' },
+        maxIterations: 5,
+      })
+      .expect(200);
+    expect(edited.body.goal).toMatchObject({
+      objective: 'Ship the widget v2',
+      rubric: [
+        { id: 'c1', criterion: 'tests green' },
+        { id: 'c2', criterion: 'changelog updated' },
+      ],
+      verifier: { provider: 'google', model: 'gemini-3.8-flash' },
+      maxIterations: 5,
+    });
+
+    const defaultVerifier = await agent
+      .patch('/conversations/agent-conv-1/goal')
+      .set(headers)
+      .send({ verifier: null })
+      .expect(200);
+    expect(defaultVerifier.body.goal.verifier).toBeUndefined();
+
+    const paused = await agent
+      .patch('/conversations/agent-conv-1/goal')
+      .set(headers)
+      .send({ status: 'paused' })
+      .expect(200);
+    expect(paused.body.goal.pause).toMatchObject({ reason: 'user' });
+    const resumed = await agent
+      .patch('/conversations/agent-conv-1/goal')
+      .set(headers)
+      .send({ status: 'active' })
+      .expect(200);
+    expect(resumed.body.goal.pause).toBeNull();
+  });
+
+  it('a goal the model proposes is inactive until the user approves it', async () => {
+    const proposed = (await InternalToolRegistry.execute(
+      'propose_goal',
+      { objective: 'Write the report', rubric: ['report.md exists', 'exactly 3 bullets'], maxCostDollars: 0.5 },
+      { conversationId: 'agent-conv-1', agentConversationId: 'loop-1', project: 'test', username: 'testuser' },
+    )) as Record<string, unknown>;
+    expect(proposed.success).toBe(true);
+
+    // Not the goal: the harness, the scheduler and the prompt see no goal.
+    const waiting = await agent.get('/conversations/agent-conv-1/goal').set(headers).expect(200);
+    expect(waiting.body.goal).toBeNull();
+    expect(waiting.body.proposal).toMatchObject({ objective: 'Write the report', status: 'proposed' });
+    expect(mockAgentConversations[0].goal).toBeUndefined();
+    await agent.patch('/conversations/agent-conv-1/goal').set(headers).send({ status: 'active' }).expect(404);
+
+    const approved = await agent
+      .post('/conversations/agent-conv-1/goal/proposal/approve')
+      .set(headers)
+      .expect(200);
+    expect(approved.body).toMatchObject({
+      goal: {
+        objective: 'Write the report',
+        status: 'active',
+        rubric: [
+          { id: 'c1', criterion: 'report.md exists' },
+          { id: 'c2', criterion: 'exactly 3 bullets' },
+        ],
+        budget: { maxCostDollars: 0.5 },
+      },
+      proposal: null,
+    });
+    expect(mockAgentConversations[0].goal.status).toBe('active');
+    expect(mockAgentConversations[0].goalProposal).toBeUndefined();
+    await agent.post('/conversations/agent-conv-1/goal/proposal/approve').set(headers).expect(404);
+  });
+
+  it('declining a proposal drops it and leaves the current goal alone', async () => {
+    await agent
+      .put('/conversations/agent-conv-1/goal')
+      .set(headers)
+      .send({ objective: 'Current goal' })
+      .expect(200);
+    await InternalToolRegistry.execute(
+      'propose_goal',
+      { objective: 'Something else', rubric: ['x'] },
+      { conversationId: 'agent-conv-1', agentConversationId: 'loop-1', project: 'test', username: 'testuser' },
+    );
+    const declined = await agent
+      .post('/conversations/agent-conv-1/goal/proposal/decline')
+      .set(headers)
+      .expect(200);
+    expect(declined.body).toEqual({ success: true });
+    const state = await agent.get('/conversations/agent-conv-1/goal').set(headers).expect(200);
+    expect(state.body.goal.objective).toBe('Current goal');
+    expect(state.body.proposal).toBeNull();
+    const again = await agent
+      .post('/conversations/agent-conv-1/goal/proposal/decline')
+      .set(headers)
+      .expect(200);
+    expect(again.body).toEqual({ success: false });
+    await agent.post('/conversations/nope/goal/proposal/decline').set(headers).expect(404);
   });
 });
