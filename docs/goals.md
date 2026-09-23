@@ -105,3 +105,10 @@ the read did not project. Until 2026-09-22 every goal write was keyed on
 `null` — and silently matched nothing: goals never persisted.
 `conversationGoalPersistence.test.ts` uses a double that behaves like the
 driver.
+
+The goal routes resolve a conversation by `?project=` (else `x-project`). An
+agent conversation lives under its agent's project (the CODING persona's is
+`prism-chat`), not the client's default — so every client goal call passes
+the conversation's project (`useConversationGoal(conversationId,
+agentProject)`). Until 2026-09-22 the panel's Pause / Resume / Clear went out
+unscoped and answered "not found".
