@@ -347,7 +347,6 @@ export default class AgenticLoopService {
     try {
       return await harness.run();
     } finally {
-
       // Clean up in-memory cache keyed by agentConversationId (keeps MongoDB state for next turn)
       ToolContext.cleanupInMemory(resolvedAgentConversationId);
 
