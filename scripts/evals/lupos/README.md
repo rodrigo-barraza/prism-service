@@ -11,7 +11,12 @@ stream: tool calls and results, the final reply, model passes, cost, latency.
 **pass^k** = the case passed on all k runs (what a user feels); **pass@k** = on
 at least one. Graders: `tool_used`, `tool_not_used`, `tool_args_match`,
 `text_matches`, `text_not_matches`, `text_nonempty`, `max_passes`,
-`reminder_due_minutes`, `no_cross_guild_success`.
+`reminder_due_minutes`, `no_cross_guild_success`. Every case also runs
+`no_leaked_tool_call`: a reply that writes a tool call as text
+(`<default_api:tool_call{…}>`) fails, because the call never ran and lupos-bot
+would post the syntax to the channel — gemini-3.6-flash did it on 3 of 30 runs
+on 2026-09-22, all on bridged `react_to_discord_message` picks, and the suite
+passed them.
 
 ## Run it against an isolated stack
 
