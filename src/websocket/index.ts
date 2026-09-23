@@ -37,6 +37,8 @@ import type { IncomingMessage } from "http";
 import type { WebSocketServer } from "ws";
 import type { GoogleToolConfigEntry } from "#src/providers/google";
 import WebSocketConnectionRegistry from "./WebSocketConnectionRegistry.ts";
+import { helloEvent } from "#src/protocol/events";
+import { toErrorEvent } from "#src/protocol/errors";
 import {
   withDirectViewerBroadcast,
   LiveTurnBuffer,
@@ -188,10 +190,12 @@ export function setupWebSocket(webSocketServer: WebSocketServer) {
       );
     } else {
       websocket.send(
-        JSON.stringify({
-          type: "error",
-          message: `Unknown WebSocket path: ${pathname}`,
-        }),
+        JSON.stringify(
+          toErrorEvent(`Unknown WebSocket path: ${pathname}`, {
+            code: "invalid_request",
+            status: 404,
+          }),
+        ),
       );
       websocket.close();
     }
@@ -210,6 +214,8 @@ function handleWebsocketChat(
       websocket.send(JSON.stringify(event));
     }
   };
+  // The protocol version goes out before anything else on this socket.
+  emitFunction(helloEvent());
 
   const connectionStore: RequestContextStore = {
     project,
@@ -223,8 +229,8 @@ function handleWebsocketChat(
     try {
       data = JSON.parse(rawData.toString());
     } catch {
-      websocket.send(
-        JSON.stringify({ type: "error", message: "Invalid JSON" }),
+      emitFunction(
+        toErrorEvent("Invalid JSON", { code: "invalid_request", status: 400 }),
       );
       return;
     }

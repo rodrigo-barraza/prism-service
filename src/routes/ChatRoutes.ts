@@ -86,6 +86,7 @@ import {
 } from "#src/constants";
 import { getRequestContext } from "#src/utils/RequestContext";
 import { DEFAULT_PROFILE_ID, normalizeProfileId } from "#src/utils/ProfileScope";
+import { toErrorEvent } from "#src/protocol/errors";
 
 interface ToolSchemaWithDomain extends ToolSchema {
   domain?: string;
@@ -637,10 +638,7 @@ export async function handleConversation(
   try {
     context = await prepareGenerationContext(params, emit, { signal });
   } catch (error: unknown) {
-    emit({
-      type: SERVER_SENT_EVENT_TYPES.ERROR,
-      message: getErrorMessage(error),
-    });
+    emit(toErrorEvent(error, { provider: params.provider as string | undefined }));
     return;
   }
   const {
@@ -834,10 +832,7 @@ export async function handleConversation(
       messages: context.rawMessages || [],
       options,
     });
-    emit({
-      type: SERVER_SENT_EVENT_TYPES.ERROR,
-      message: getErrorMessage(error),
-    });
+    emit(toErrorEvent(error, { provider: providerName }));
   }
 }
 // ─── Agent conversation path (agentConversationId, no conversationId) ─
@@ -856,10 +851,7 @@ export async function handleAgent(
   try {
     context = await prepareGenerationContext(params, emit, { signal });
   } catch (error: unknown) {
-    emit({
-      type: SERVER_SENT_EVENT_TYPES.ERROR,
-      message: getErrorMessage(error),
-    });
+    emit(toErrorEvent(error, { provider: params.provider as string | undefined }));
     return;
   }
   const {
@@ -1042,10 +1034,7 @@ export async function handleAgent(
       messages: context.rawMessages || [],
       options,
     });
-    emit({
-      type: SERVER_SENT_EVENT_TYPES.ERROR,
-      message: getErrorMessage(error),
-    });
+    emit(toErrorEvent(error, { provider: providerName }));
   }
 }
 // ─── Dispatch: Image API models (e.g. GPT Image 1.5, OpenAI images) ─
