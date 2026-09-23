@@ -26,6 +26,14 @@ export const NEEDS_YOU_WEBHOOK_EVENTS = {
   TURN_FAILED: "turn.failed",
 } as const;
 
+/**
+ * A scheduled benchmark sweep got worse than its previous run by more than
+ * its threshold (BenchmarkRegression).
+ */
+export const BENCHMARK_WEBHOOK_EVENTS = {
+  REGRESSION: "benchmark.regression",
+} as const;
+
 const REPLAY_BUFFER_CAPACITY = WEBHOOK.REPLAY_BUFFER_CAPACITY;
 
 const listeners = new Set<WebhookEventCallback>();

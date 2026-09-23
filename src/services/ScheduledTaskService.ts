@@ -79,6 +79,13 @@ export interface ScheduledTask {
    * with the conversation's own settings) instead of opening a new one.
    */
   conversationId?: string | null;
+  /**
+   * "benchmark": each run is a benchmark sweep compared with the previous
+   * one (BenchmarkRegression), not an agent turn. Absent: an agent task.
+   */
+  kind?: "agent" | "benchmark";
+  /** What a benchmark task runs, and when it alerts. */
+  benchmark?: import("#src/types/benchmark").ScheduledBenchmarkConfig;
   createdAt: string;
   updatedAt: string;
 }
@@ -93,7 +100,10 @@ interface ScheduledConversationSettings extends ConversationSettings {
 }
 
 export interface ScheduledTaskRunResult {
-  agentConversationId: string;
+  /** The conversation an agent task ran in. */
+  agentConversationId?: string;
+  /** The sweep a benchmark task ran. */
+  benchmarkSweepId?: string;
   /** Set when a continuation run did not start (paused goal, duplicate, busy). */
   skipped?: string;
 }
@@ -419,6 +429,13 @@ const ScheduledTaskService = {
   ): Promise<ScheduledTaskRunResult> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
+
+    // A scheduled benchmark runs its sweep, not an agent turn.
+    if (task.kind === "benchmark") {
+      const { runScheduledBenchmark } = await import("./benchmark/BenchmarkRegression.ts");
+      const sweep = await runScheduledBenchmark(task, { username });
+      return { benchmarkSweepId: sweep.id };
+    }
 
     if (task.conversationId) {
       return this.continueConversation(task, payload, { username, profileId });
@@ -977,7 +994,7 @@ const ScheduledTaskService = {
     username: string,
     payload?: Record<string, unknown>,
     profileId: string = getRequestContext().profileId ?? DEFAULT_PROFILE_ID,
-  ): Promise<{ success: boolean; agentConversationId: string }> {
+  ): Promise<{ success: boolean; agentConversationId?: string; kind?: "benchmark" }> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
 
@@ -996,6 +1013,19 @@ const ScheduledTaskService = {
     }
     if (!task) {
       throw new Error(`Scheduled Task not found: ${id}`);
+    }
+
+    // A benchmark sweep runs in the background; its sweep id is not known
+    // until it starts (GET /benchmark/sweeps?scheduleId= lists it).
+    if (task.kind === "benchmark") {
+      this.executeTask({ ...task, id: task.id }, payload, { username, profileId }).catch(
+        (error: Error) => {
+          logger.error(
+            `[ScheduledTasks] Manual trigger failed for benchmark "${task.name}": ${getErrorMessage(error)}`,
+          );
+        },
+      );
+      return { success: true, kind: "benchmark" };
     }
 
     // A task bound to a conversation continues it; otherwise pre-generate
