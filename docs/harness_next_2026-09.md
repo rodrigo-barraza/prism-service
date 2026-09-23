@@ -49,9 +49,12 @@ Tests: `turnInputMailbox.test.ts`, `turnInputDrain.test.ts`,
 model call; update on the final answer keeps the turn alive; DETACHED_WORK vs
 NON_BLOCKING_DISPATCH; counter accounting).
 
-Native steering (`response.steer`, WebSocket, gpt-6-astra only) is NOT wired;
-the mailbox is the provider-independent fallback the review asked for, and the
-catalog flag `steering` marks where a native path can be added.
+Native steering is wired (prompt 25 Landing 1, 2026-09-22): GPT-6 turns stream
+over the Responses WebSocket (`providers/openai-responses-socket.ts`), and a
+text `user_update` posted while one streams is held and sent as
+`response.steer`; the continuation carries it (`turnInputApplied` → boundary
+`native_steer`, recorded ahead of the answer), while `pending`/`failed` release
+it to the mailbox, which stays the provider-independent path.
 
 ### 2.2 Non-blocking questions
 `ask_user` gains `blocking` (default true). `blocking:false` emits the card
@@ -110,9 +113,10 @@ on the RESOLVED effort so gpt-6-astra never receives `"none"`.
 Catalog: `gpt-6-astra` (+ `asyncTools`, `steering`, `programmaticToolCalling`,
 `configurationUpdate`), `programmaticToolCalling` on the 5.6 family,
 `getModelNativeCapabilities()`.
-NOT wired: native async tools (`"async": true`), `configuration_update`
-items, native programmatic tool calling — each needs the stateful
-`previous_response_id` flow; the flags and the passthrough are the hooks.
+Wired since prompt 25 Landing 1: `run_async_task` as a native async call (its
+result returns as the call's `function_call_output`), per-turn effort as
+`configuration_update` items (`planResponsesEffort`), and `previous_response_id`
+continuation on the WebSocket. Still NOT wired: native programmatic tool calling.
 
 ### 2.6 Programmatic tool composition
 `run_tool_program {code, timeoutSeconds?, description?}` — `node:vm`
