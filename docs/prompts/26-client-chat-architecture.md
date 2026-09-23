@@ -4,50 +4,35 @@
 > Conventions, gates and the isolated live recipe: `docs/prompts/README.md`. Source: `docs/harness_modernization_2026-09.md` §4.17; `prism-client/docs/agentic-harness-improvement-plan.md` Phase 2 (never landed).
 
 **Landing 1 done** (`chat-characterization-tests`, prism-client): 34 tests in `src/components/__tests__/chat-characterization/` mount the real `AgentChatComponent` and replay `src/__fixtures__/sse-transcripts/*.jsonl` over the SSE and the live-viewer socket, snapshotting trace, state (`utils/chatDebugProbe`) and region text, and counting row renders per token.
-Read `prism-client/docs/chat-characterization.md` before Landing 2 or 3: the contract they keep, the SSE/viewer divergences the snapshots pin (unifying them changes those lines on purpose — say so), and the baseline: 2,000 messages, 2,002 row renders per token.
+Read `prism-client/docs/chat-characterization.md` before Landing 3: the contract it keeps, where the turn state lives now, and the baseline: 2,000 messages, 2,002 row renders per token.
+
+> **Landing 2 (`chat-event-reducer`, prism-client) done 2026-09-22.** One pure reducer (`src/utils/agentConversationReducer.ts`, held by `src/hooks/useAgentConversation.ts`) takes every turn event from every transport (`src/services/agentStream.ts`: the SSE, the viewer socket, recovery), with side effects as data (`src/utils/agentConversationEffects.ts`). The viewer's handler set is gone, render writes and the window-event URL sync too.
+> Tests: `src/utils/__tests__/agentConversationReducer.test.ts` (every event type), `src/services/__tests__/agentStream.test.ts` (reconnect, de-duplication), and the characterization suite; its doc lists the viewer snapshot changes and three bugs fixed red-first.
 
 **Repos:** prism-client (plus a prism-service worktree only to retire this prompt) · **Size:** L · **Depends on:** 08 (bug fixes land first). Land 24 Landing 1 (the typed event protocol) before or with Landing 2 here, if possible. · **Shares hubs with:** every client prompt.
 
 Before starting, run `node /home/rodrigo/development/.claude/hooks/hub-lease.mjs status`. If another live session holds `AgentChatComponent.tsx`, coordinate first: exchange line spans.
 
 ## Today
-`src/components/AgentChatComponent.tsx` is **10,034 lines**: 110 `useState`, 53 `useRef`, 54 `useEffect`, 0 `useReducer`, 69 eslint-disables and 36 `as any`. The largest blocks:
+After Landing 2, `src/components/AgentChatComponent.tsx` is **8,522 lines**: 95 `useState`, 53 `useRef`, 55 `useEffect`, the conversation reducer (`useAgentConversation`), 48 eslint-disables and 2 `as any`. The largest blocks:
 
 | Block | Lines |
 |---|---|
-| Main stream handler (`runOrchestrationLoop`) | ~4063–5713 |
-| `handleSend` | ~5781–6323 |
-| `applyConversationData` | ~6578–7004 |
-| Live-viewer WebSocket, a second, diverging handler set | ~7399–7806 |
-| Admin mode | ~595–660, ~2146–2845 |
-| Stats and status-bar builders recomputed every render | ~8206–8503, ~9152–9449 |
+| Turn streams: the effect runner, `routeTurnEvent`, `driveTurnStream`, the `/agent` and `/chat` payloads | ~4030–4550 |
+| `handleSend`, with `attemptPostStreamRefresh` and the recovery follow | ~4554–5115 |
+| `applyConversationData` | ~5357–5740 |
+| The live-viewer effect (one loop over the reducer) | ~6130–6310 |
+| Admin mode | ~577–650, ~2189–2800 |
+| Stats and status-bar builders recomputed every render | ~6679–7050, ~7589–7872 |
 
 Other problems:
-- **Writes during render:** `tokenHwmRef` (~8327) and `document.documentElement.style` (~9354).
-- **URL sync** goes through window events.
-- **No list virtualization.** Every streamed token re-renders the whole transcript (~4432–4463).
-- **More large files:** `MessageListComponent.tsx` is 2,957 lines, most of it one ~2,050-line function. `src/services/PrismService.tsx` is 2,934 lines.
+- **No list virtualization.** Every streamed token re-renders the whole transcript: rows are inline JSX in `MessageList`'s map.
+- **More large files:** `MessageListComponent.tsx` is 2,957 lines, most of it one ~2,050-line function. `src/services/PrismService.tsx` is 2,818 lines.
 - **Dead code:**
   - `CustomAgentsPanelComponent` (973 lines, duplicating `AgentsDetailPanel`);
   - `WorkspaceSelectorComponent`;
   - `TimerBadgeComponent`;
-  - the post-stream poller `attemptPostStreamRefresh` (~6059–6144). The server's `Finalizer` persists before `done`; verify this.
-
----
-
-## Landing 2 — `chat-event-reducer`
-
-**Changes.**
-- **`useAgentConversation`.** One typed reducer (`useReducer`) over one event union: prompt 24's protocol types if landed, otherwise a local union with the same shape. It handles both transports' events through the **same** code (`handleToolEvent`, etc.). Delete the duplicated WebSocket handler set.
-- **`src/services/agentStream.ts`.** The transport layer: the SSE driver plus the WebSocket viewer, with reconnect and `afterSeq` (reuse prompt 08's `liveViewerSocket`). It exposes a single async iterator of typed events.
-- **Render purity.** Remove the writes during render, and replace the window-event URL sync with the router.
-- **Behaviour is unchanged.** All Landing 1 snapshots stay identical. Document and justify any intentional difference (a fixed bug).
-
-**Tests.**
-- Landing 1's suite, unchanged and green.
-- Reducer unit tests: pure (event, state) → state for every event type.
-- Transport tests: reconnect and de-duplication.
-- Gates per README.
+  - the post-stream poller `attemptPostStreamRefresh` (~4831–4915, in `handleSend`). The server's `Finalizer` persists before `done`; verify this.
 
 ---
 
