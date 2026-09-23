@@ -55,6 +55,17 @@ import type { MessagePayload } from "./RequestLogger.ts";
 const MIN_MESSAGES_FOR_EXTRACTION = MEMORY.MIN_MESSAGES_FOR_EXTRACTION;
 
 /**
+ * Agents whose platform extracts their memories itself, so the in-loop
+ * extractor skips their turns. lupos-bot posts each Discord exchange to
+ * POST /memory/extract (MemoryService.extractAndStore), which stores
+ * guild-scoped facts keyed to the members' Discord ids — the only rows a
+ * guild turn recalls. This extractor's rows for LUPOS were conversation-
+ * scoped or global, never recalled by a guild turn, and cost ≈$6.9/month
+ * of extraction calls (2026-08-23 → 09-22).
+ */
+const PLATFORM_EXTRACTED_AGENTS = new Set<string>([AGENT_IDS.LUPOS]);
+
+/**
  * An untrusted entry says so where the extraction model reads it: text the
  * agent wrote after reading a web page, an MCP result or a sub-agent report
  * repeats that content, and an instruction in it is data, not a memory.
@@ -594,6 +605,7 @@ export default class MemoryExtractor {
       context: AgenticContext,
       { _text, messages, toolCalls }: AfterResponseOutput,
     ) => {
+      if (context.agent && PLATFORM_EXTRACTED_AGENTS.has(context.agent)) return;
       // Fire-and-forget — don't block the response
       MemoryExtractor.extractAndStore({
         project: context.project,
