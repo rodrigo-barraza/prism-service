@@ -231,14 +231,6 @@ export default class AgenticLoopService {
       options.autoApprove = true;
     }
 
-    // A re-driven turn restores the loop state its checkpoint does not carry.
-    if (context.resume) {
-      if (context.resume.autoApprove) options.autoApprove = true;
-      if (context.resume.skillsText && !options._skillsText) {
-        options._skillsText = context.resume.skillsText;
-      }
-    }
-
     // 2. Initialize shared state
     const state = new AgenticLoopState({
       originalMessageCount: messages.length,
@@ -334,8 +326,13 @@ export default class AgenticLoopService {
     const loopKey = resolveLoopKey(context);
     if (context.resume) {
       // Picks up where the restart interrupted it: the pass is replayed at
-      // its own iteration, and its decisions are its own — not orphans.
+      // its own iteration, and its decisions are its own — not orphans. The
+      // loop state a checkpoint does not carry comes back with it.
       state.iterations = context.resume.pass.iteration - 1;
+      if (context.resume.autoApprove) options.autoApprove = true;
+      if (context.resume.skillsText && !options._skillsText) {
+        options._skillsText = context.resume.skillsText;
+      }
     } else {
       // Decisions still pending from a turn that died with a previous process
       // will never be acted on by this one: the user moved on. Supersede them
@@ -350,8 +347,6 @@ export default class AgenticLoopService {
     try {
       return await harness.run();
     } finally {
-      // Nothing is left to re-drive: the turn ended in this process.
-      await endTurnRun(context);
 
       // Clean up in-memory cache keyed by agentConversationId (keeps MongoDB state for next turn)
       ToolContext.cleanupInMemory(resolvedAgentConversationId);
@@ -380,41 +375,10 @@ export default class AgenticLoopService {
           /* OrchestratorService may not be used */
         }
       }
-    }
-  }
 
-  /**
-   * A re-driven turn's mailbox is open: give it what the restart owed it —
-   * the input accepted before the restart and never delivered (same ids),
-   * the notices of background work the restart cut off, and the
-   * non-blocking cards it asked before (open ones answer into it; answers
-   * that came while the server was down are delivered now). Each once.
-   */
-  static async reopenResumedTurn(context: AgenticContext, loopKey: string): Promise<void> {
-    const resume = context.resume;
-    if (!resume) return;
-    for (const entry of resume.inputs) TurnInputMailbox.restore(loopKey, entry);
-    for (const notice of resume.notices) TurnInputMailbox.post(loopKey, notice);
-    try {
-      const { adoptNonBlockingQuestions } = await import(
-        "./tool-definitions/AskUserQuestionTool.ts"
-      );
-      await adoptNonBlockingQuestions(loopKey, decisionOwnerOf(context));
-    } catch (error: unknown) {
-      logger.warn(
-        `[AgenticLoop] Could not adopt the open questions of ${loopKey}: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      // Nothing is left to re-drive: the turn ended in this process.
+      await endTurnRun(context);
     }
-    context.emit({
-      type: SERVER_SENT_EVENT_TYPES.STATUS,
-      message: TURN_RESUME.STATUS_RESUMED,
-      iteration: resume.pass.iteration,
-      attempt: resume.attempt,
-    });
-    logger.info(
-      `[AgenticLoop] Re-driving ${loopKey} from iteration ${resume.pass.iteration} (attempt ${resume.attempt}): ` +
-        `${resume.pass.toolCalls.length} call(s) replayed, ${resume.inputs.length} input(s) restored, ${resume.notices.length} notice(s)`,
-    );
   }
 
   // ── Approval Resolution API ─────────────────────────────
@@ -532,6 +496,40 @@ export default class AgenticLoopService {
         `[AgenticLoop] Could not retire orphaned decisions on ${loopKey}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+  }
+
+  /**
+   * A re-driven turn's mailbox is open: give it what the restart owed it —
+   * the input accepted before the restart and never delivered (same ids),
+   * the notices of background work the restart cut off, and the
+   * non-blocking cards it asked before (open ones answer into it; answers
+   * that came while the server was down are delivered now). Each once.
+   */
+  static async reopenResumedTurn(context: AgenticContext, loopKey: string): Promise<void> {
+    const resume = context.resume;
+    if (!resume) return;
+    for (const entry of resume.inputs) TurnInputMailbox.restore(loopKey, entry);
+    for (const notice of resume.notices) TurnInputMailbox.post(loopKey, notice);
+    try {
+      const { adoptNonBlockingQuestions } = await import(
+        "./tool-definitions/AskUserQuestionTool.ts"
+      );
+      await adoptNonBlockingQuestions(loopKey, decisionOwnerOf(context));
+    } catch (error: unknown) {
+      logger.warn(
+        `[AgenticLoop] Could not adopt the open questions of ${loopKey}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    context.emit({
+      type: SERVER_SENT_EVENT_TYPES.STATUS,
+      message: TURN_RESUME.STATUS_RESUMED,
+      iteration: resume.pass.iteration,
+      attempt: resume.attempt,
+    });
+    logger.info(
+      `[AgenticLoop] Re-driving ${loopKey} from iteration ${resume.pass.iteration} (attempt ${resume.attempt}): ` +
+        `${resume.pass.toolCalls.length} call(s) replayed, ${resume.inputs.length} input(s) restored, ${resume.notices.length} notice(s)`,
+    );
   }
 
   // ── Harness Discovery API ──────────────────────────────

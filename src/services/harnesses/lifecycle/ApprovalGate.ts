@@ -295,13 +295,10 @@ export async function checkAndWaitForApproval(
   // Mid-loop "auto-approve this conversation" (options.autoApprove flipped
   // after engine construction) answers every prompt — except the ones a
   // PreToolUse hook explicitly asked for, which is the whole point of `ask`.
-  // A call a restart cut off mid-run is asked about whatever its tier or the
-  // mode: "run it again?" is not a permission the mode already gave.
   let pending = toolCalls.filter(
     (toolCall) =>
-      (isInterruptedCall(toolCall) && !deniedOriginals.has(toolCall)) ||
-      (awaitingOriginals.has(toolCall) &&
-        (!options.autoApprove || toolCall._hookPermission?.decision === "ask")),
+      awaitingOriginals.has(toolCall) &&
+      (!options.autoApprove || toolCall._hookPermission?.decision === "ask"),
   );
 
   if (options.autoApprove) {
@@ -321,17 +318,22 @@ export async function checkAndWaitForApproval(
     }
   }
 
+  // A call a restart cut off mid-run is asked about whatever its tier or the
+  // mode, and only a person answers "run it again?" — not the mode, not a
+  // PermissionRequest hook: it is not a permission anyone gave already.
+  const interruptedCalls = toolCalls.filter(
+    (toolCall) => isInterruptedCall(toolCall) && !deniedOriginals.has(toolCall),
+  );
+  pending = pending.filter((toolCall) => !isInterruptedCall(toolCall));
+
   if (pending.length > 0 && hooks) {
-    const interrupted = pending.filter(isInterruptedCall);
-    pending = [
-      ...interrupted,
-      ...(await runPermissionRequestHooks(
-        pending.filter((toolCall) => !isInterruptedCall(toolCall)),
-        context,
-        hooks,
-      )),
-    ];
-    pending.sort((left, right) => toolCalls.indexOf(left) - toolCalls.indexOf(right));
+    pending = await runPermissionRequestHooks(pending, context, hooks);
+  }
+
+  if (interruptedCalls.length > 0) {
+    pending = [...pending, ...interruptedCalls].sort(
+      (left, right) => toolCalls.indexOf(left) - toolCalls.indexOf(right),
+    );
   }
 
   const isDenied = (toolCall: ToolCall) =>
@@ -462,13 +464,13 @@ export async function checkAndWaitForApproval(
       tier: request.tier,
       tierLabel: request.tierLabel,
       ...(request.preview ? { preview: request.preview } : {}),
-      ...(hookPermission?.decision === "ask" && {
-        requestedBy: "hook",
-        reason: hookPermission.reason ?? null,
-      }),
       ...(request.requestedBy && {
         requestedBy: request.requestedBy,
         reason: request.reason ?? null,
+      }),
+      ...(hookPermission?.decision === "ask" && {
+        requestedBy: "hook",
+        reason: hookPermission.reason ?? null,
       }),
     });
   });
