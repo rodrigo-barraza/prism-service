@@ -6,7 +6,7 @@
  * was served the pending graph and the node never left "in flight". The
  * client now sends its fingerprint of the rows it holds as `v`.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import supertest from "supertest";
 import { app } from "./setup.ts";
 import { conversationStatsRouter } from "#src/routes/admin/AdminAgentConversationRoutes";
@@ -53,6 +53,9 @@ describe("GET /agent-conversations/:id/graph", () => {
     body.nodes.find((node) => node.id === "request:req-1")!;
 
   beforeEach(() => {
+    // A frozen clock keeps every request inside the cache's 500 ms TTL, so
+    // a stale-cache regression fails deterministically, even under load.
+    vi.useFakeTimers({ toFake: ["Date"] });
     clearGraphCache();
     vi.mocked(MongoWrapper.getDb).mockReturnValue(mockDb as never);
     requestRows = [{
@@ -66,12 +69,16 @@ describe("GET /agent-conversations/:id/graph", () => {
     }];
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("serves the failed request, not the cached pending one, once the client's version moves", async () => {
     const pending = await agent.get("/graph-route-test/conv-graph/graph?width=1600&height=1000&v=one");
     expect(pending.status).toBe(200);
     expect(requestNode(pending.body).metadata?.status).toBe("pending");
 
-    // Fails fast: same row, same count, well inside the 500 ms TTL.
+    // Fails fast: same row, same count, inside the TTL (the clock is frozen).
     requestRows[0] = { ...requestRows[0], status: "completed", success: false, errorMessage: "400 invalid_request", totalTime: 0.3 };
     const failed = await agent.get("/graph-route-test/conv-graph/graph?width=1600&height=1000&v=two");
 
