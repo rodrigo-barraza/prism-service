@@ -38,6 +38,7 @@ import {
 import { getDocumentContextText } from "#src/utils/documentContext";
 import { LOG_PREVIEW } from "#src/constants";
 import { mergeUsage } from "#src/utils/CostCalculator";
+import { ASYNC_TASK_TOOL_NAMES } from "#src/services/AsyncTaskConstants";
 import {
   TURN_INPUT_APPLIED_EVENT,
   isResponsesSocketTransportFailure,
@@ -222,6 +223,8 @@ export interface OpenAIMessage {
   providerResponseId?: string;
   /** Reasoning effort in effect for the response that produced this message. */
   responsesEffort?: string;
+  /** A completion delivered for this native async call id (replayed as its output). */
+  asyncCallId?: string;
 }
 
 /**
@@ -1008,6 +1011,80 @@ function recordsResponsesEffort(
 }
 
 /**
+ * Async tool calling (GPT-6 Astra and later): Prism's detached dispatch —
+ * `run_async_task`, which the model keeps working past — is declared
+ * `"async": true`, so the call does not pause the model's response and its
+ * result is returned later as a `function_call_output` on the call's id.
+ * Not with programmatic tool calling (incompatible, per the async tools
+ * guide); not on models without the flag.
+ */
+export function markNativeAsyncTools(
+  tools: OpenAI.Responses.Tool[] | undefined,
+  model: string,
+): void {
+  if (!tools?.length || !getModelNativeCapabilities(model).asyncTools) return;
+  if (tools.some((tool) => (tool as { type: string }).type === "programmatic_tool_calling")) return;
+  for (const tool of tools) {
+    if (tool.type === "function" && tool.name === ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK) {
+      (tool as unknown as { async: boolean }).async = true;
+    }
+  }
+}
+
+/** A run_async_task acknowledgement of a native async call (the tool's own result). */
+function nativeAsyncAckCallId(message: OpenAIMessage): string | undefined {
+  if (message.role !== "tool" || typeof message.content !== "string") return undefined;
+  if (!message.content.includes('"nativeAsyncCallId"')) return undefined;
+  try {
+    const parsed = JSON.parse(message.content) as { nativeAsyncCallId?: unknown };
+    return parsed.nativeAsyncCallId === message.tool_call_id
+      ? (parsed.nativeAsyncCallId as string)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The replay of native async calls on a model that takes them: the call
+ * stays pending (its immediate acknowledgement is not sent — measured live,
+ * a pending async call replays fine without an output), and the completion
+ * that arrives later (a message carrying `asyncCallId`) becomes that call's
+ * `function_call_output` where it was delivered. On any other model the
+ * history is unchanged: the acknowledgement is the call's output and the
+ * completion a <task-notification> message, as for every provider.
+ */
+export function replayNativeAsyncCalls(
+  messages: OpenAIMessage[],
+  model: string,
+): OpenAIMessage[] {
+  if (!getModelNativeCapabilities(model).asyncTools) return messages;
+  const pending = new Set<string>();
+  let changed = false;
+  const replayed: OpenAIMessage[] = [];
+  for (const message of messages) {
+    const ackCallId = nativeAsyncAckCallId(message);
+    if (ackCallId) {
+      pending.add(ackCallId);
+      changed = true;
+      continue;
+    }
+    if (message.asyncCallId && pending.has(message.asyncCallId)) {
+      pending.delete(message.asyncCallId);
+      changed = true;
+      replayed.push({
+        role: "tool",
+        tool_call_id: message.asyncCallId,
+        content: message.content ?? "",
+      });
+      continue;
+    }
+    replayed.push(message);
+  }
+  return changed ? replayed : messages;
+}
+
+/**
  * Convert messages to Responses API input format.
  * System messages become developer messages; images use input_image, PDFs use input_file.
  */
@@ -1252,6 +1329,7 @@ const openaiProvider = {
     model: string,
     options: ProviderOptions,
   ) {
+    messages = replayNativeAsyncCalls(messages, model);
     const effortPlan = planResponsesEffort(model, messages, requestedResponsesEffort(model, options));
     const input = withConfigurationUpdates(messages, effortPlan.updates, prepareResponsesInput);
     const payload: OpenAI.Responses.ResponseCreateParamsNonStreaming & {
@@ -1368,6 +1446,7 @@ const openaiProvider = {
         ...customTools,
       ];
     }
+    markNativeAsyncTools(payload.tools as OpenAI.Responses.Tool[] | undefined, model);
 
     // Parallel tool calls — defaults to true; set false for sequential FC
     if (options.parallelToolCalls === false) {
@@ -1403,6 +1482,7 @@ const openaiProvider = {
       name: string;
       args: Record<string, unknown>;
       reasoningItem?: ResponsesReasoningItem;
+      nativeAsync?: boolean;
     }> = [];
     // Track pending reasoning items to pair with subsequent function calls;
     // whatever is left unpaired belongs to the message itself.
@@ -1440,6 +1520,7 @@ const openaiProvider = {
             ...(pairedReasoningItem
               ? { reasoningItem: pairedReasoningItem }
               : {}),
+            ...((item as { async?: boolean }).async ? { nativeAsync: true } : {}),
           });
         }
       }
@@ -1642,6 +1723,7 @@ const openaiProvider = {
     model: string,
     options: ProviderOptions,
   ) {
+    messages = replayNativeAsyncCalls(messages, model);
     const effortPlan = planResponsesEffort(model, messages, requestedResponsesEffort(model, options));
     const input = withConfigurationUpdates(messages, effortPlan.updates, prepareResponsesInput);
     const payload: OpenAI.Responses.ResponseCreateParamsStreaming & {
@@ -1758,6 +1840,7 @@ const openaiProvider = {
         ...customTools,
       ];
     }
+    markNativeAsyncTools(payload.tools as OpenAI.Responses.Tool[] | undefined, model);
 
     // Parallel tool calls — defaults to true; set false for sequential FC
     if (options.parallelToolCalls === false) {
@@ -1861,7 +1944,7 @@ const openaiProvider = {
     // event may not include the name property (known OpenAI SDK issue).
     const pendingFunctions: Record<
       string,
-      { name: string; callId: string; args: string }
+      { name: string; callId: string; args: string; nativeAsync?: boolean }
     > = {};
     // Track reasoning output items so we can pair them with subsequent function calls.
     // The Responses API emits reasoning items before their paired function_call items.
@@ -1956,6 +2039,8 @@ const openaiProvider = {
               name: item.name,
               callId: item.call_id,
               args: "",
+              // A native async call: the model keeps going past it.
+              ...((item as { async?: boolean }).async ? { nativeAsync: true } : {}),
             };
             if (item.name && item.call_id) {
               yield {
@@ -2056,6 +2141,7 @@ const openaiProvider = {
           ...(pairedReasoningItem
             ? { reasoningItem: pairedReasoningItem }
             : {}),
+          ...(tracked?.nativeAsync ? { nativeAsync: true } : {}),
         };
         // Clean up
         delete pendingFunctions[typedEvent.item_id];

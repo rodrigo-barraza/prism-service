@@ -556,4 +556,45 @@ describe("TurnInputMailbox acceptance — a running agent receives mid-turn inpu
     expect(messages.filter((message) => message._notificationSource === "user-update")).toHaveLength(1);
     expect(TurnInputMailbox.pendingCount(conversationId)).toBe(0);
   });
+  it("7. a pass whose only calls are native async ends the turn — unless input is waiting", async () => {
+    const nativeAck = (toolCalls: Array<{ name: string; id: string }>) =>
+      toolResults(toolCalls, {
+        _directive: AGENT_DIRECTIVES.DETACHED_WORK,
+        nativeAsyncCallId: toolCalls[0].id,
+        task: { taskId: "task-1" },
+      });
+
+    // The model already worked past the call inside its response: no second model call.
+    const ended = buildScriptedHarness([
+      { kind: "tool", toolName: "run_async_task", args: { toolName: "lookup_price" } },
+      { kind: "text", text: "never reached" },
+    ]);
+    TurnInputMailbox.open(ended.conversationId);
+    executeToolBatchMock.mockImplementationOnce(async (toolCalls: Array<{ name: string; id: string }>) =>
+      nativeAck(toolCalls),
+    );
+    countRunningTasksMock.mockReturnValue(1); // the lookup is still running
+    const { messages } = await ended.harness.run();
+    expect(ended.iterations()).toBe(1);
+    // The pass's text lives on its tool-call message; nothing appends it again.
+    expect(ended.state.finalStreamedText).toBe("");
+    expect(messages.filter((message) => message.role === "assistant")).toHaveLength(1);
+    // Still running when the turn ended: its completion wakes a new turn.
+    expect(adjustPendingBackgroundTasksMock).toHaveBeenCalledWith(
+      ended.conversationId, "prism-chat", "test-user", 1, expect.anything(),
+    );
+
+    // An update typed during the batch keeps the turn going instead.
+    const kept = buildScriptedHarness([
+      { kind: "tool", toolName: "run_async_task", args: { toolName: "lookup_price" } },
+      { kind: "text", text: "answered the update" },
+    ]);
+    TurnInputMailbox.open(kept.conversationId);
+    executeToolBatchMock.mockImplementationOnce(async (toolCalls: Array<{ name: string; id: string }>) => {
+      TurnInputMailbox.post(kept.conversationId, { kind: "user_update", text: "also EUR" });
+      return nativeAck(toolCalls);
+    });
+    await kept.harness.run();
+    expect(kept.iterations()).toBe(2);
+  });
 });

@@ -164,6 +164,8 @@ vi.mock("#src/types/GlobalToolOrchestratorRegistry", () => ({
 import InternalToolRegistry from "#src/services/tool-definitions/InternalToolRegistry";
 import { ASYNC_TASK_TOOL_NAMES, MAXIMUM_CONCURRENT_ASYNC_TASKS } from "#src/services/AsyncTaskConstants";
 import { AGENT_DIRECTIVES } from "#src/constants";
+import { deliverTaskCompletion } from "#src/services/tool-definitions/AsyncTaskTools";
+import TurnInputMailbox from "#src/services/TurnInputMailbox";
 
 // ────────────────────────────────────────────────────────────
 // Helpers
@@ -839,5 +841,60 @@ describe("AsyncTaskTools Unit Tests", () => {
         }),
       );
     });
+  });
+});
+
+// ── Native async calls (OpenAI async tools) ─────────────────────────────
+describe("run_async_task as a native async call", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    TurnInputMailbox._clearAll();
+  });
+
+  it("keeps working whatever continueWorking says, and binds the task to the call id", async () => {
+    const dispatched = { ...FIXED_TASK_STATE } as Record<string, unknown>;
+    mockDispatch.mockReturnValue(dispatched);
+    const result = await InternalToolRegistry.execute(
+      ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
+      { toolName: "execute_command", toolArguments: { command: "make" } },
+      buildContext({ _nativeAsyncCallId: "call_async_1" }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        _directive: AGENT_DIRECTIVES.DETACHED_WORK,
+        nativeAsyncCallId: "call_async_1",
+      }),
+    );
+    expect(dispatched.nativeCallId).toBe("call_async_1");
+  });
+
+  it("an ordinary call carries no call id", async () => {
+    mockDispatch.mockReturnValue({ ...FIXED_TASK_STATE });
+    const result = (await InternalToolRegistry.execute(
+      ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
+      { toolName: "execute_command", toolArguments: {}, continueWorking: true },
+      buildContext(),
+    )) as Record<string, unknown>;
+    expect(result).not.toHaveProperty("nativeAsyncCallId");
+  });
+
+  it("the completion delivered to the running turn names the call it answers", async () => {
+    TurnInputMailbox.open("client-conv");
+    await deliverTaskCompletion(
+      {
+        ...FIXED_TASK_STATE,
+        status: "completed",
+        result: { price: 12 },
+        error: null,
+        conversationId: "client-conv",
+        agentConversationId: "conv-async-test",
+        nativeCallId: "call_async_1",
+      } as never,
+      buildContext({ conversationId: "client-conv", isSubAgent: false }) as never,
+      { continueWorking: true },
+    );
+    const [entry] = TurnInputMailbox.drain("client-conv");
+    expect(entry.kind).toBe("task_completion");
+    expect(entry.meta).toMatchObject({ asyncCallId: "call_async_1", taskId: "task-1-abcd" });
   });
 });

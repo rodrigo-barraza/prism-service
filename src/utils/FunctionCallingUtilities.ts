@@ -277,6 +277,7 @@ interface ExpandedMessage {
   reasoningItems?: ResponsesReasoningItem[];
   providerResponseId?: string;
   responsesEffort?: string;
+  asyncCallId?: string;
   toolCalls?: ExpandedToolCall[];
   images?: string[];
   video?: string[];
@@ -475,6 +476,10 @@ export function expandMessagesForFunctionCall(
         ...(message.content?.toString().trim()
           ? { content: message.content }
           : { content: " " }),
+        // A native async call's completion (OpenAI replays it as the output).
+        ...(message.role === "user" && typeof message.asyncCallId === "string"
+          ? { asyncCallId: message.asyncCallId }
+          : {}),
         ...(message.images && message.images.length > 0
           ? { images: message.images }
           : {}),

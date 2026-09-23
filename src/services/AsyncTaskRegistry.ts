@@ -71,6 +71,11 @@ export interface AsyncTaskState {
    * task). See `markRunningAsCounted` / `clearCountedAsPending`.
    */
   countedAsPending?: boolean;
+  /**
+   * Dispatched by a native async call (OpenAI async tools): the provider call
+   * id the completion is returned on, as that call's output.
+   */
+  nativeCallId?: string;
 }
 
 export interface AsyncTaskWaitOptions {

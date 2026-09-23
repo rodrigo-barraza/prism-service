@@ -51,6 +51,8 @@ export interface ToolCall {
   thoughtSignature?: string;
   /** OpenAI Responses API reasoning output item paired with this function call. */
   reasoningItem?: ResponsesReasoningItem;
+  /** A native async call (OpenAI async tools): its result is returned later on its id. */
+  nativeAsync?: boolean;
   /** Populated by AutoApprovalEngine.checkBatch / the ApprovalGate. */
   _approval?: {
     tier: number | string;
@@ -464,6 +466,8 @@ export interface StreamChunk {
   responsesEffort?: string;
   // Native steering applied (type: "turnInputApplied")
   inputIds?: string[];
+  // A native async tool call (type: "toolCall")
+  nativeAsync?: boolean;
   // Prompt-cache telemetry (type: "requestTelemetry")
   prefixHashes?: RequestTelemetryChunk["prefixHashes"];
   cacheDiagnostics?: RequestTelemetryChunk["cacheDiagnostics"];
