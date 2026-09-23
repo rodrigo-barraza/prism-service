@@ -87,7 +87,8 @@ import {
   maybeInjectSystemReminder,
   cleanupReminderCache,
 } from "./lifecycle/SystemReminderInjector.ts";
-import { checkCostBudget } from "./lifecycle/CostBudgetEnforcer.ts";
+import { enforceCostBudget } from "./lifecycle/CostBudgetEnforcer.ts";
+import { recordBudgetPause } from "./lifecycle/TurnRunRecorder.ts";
 import {
   partitionResumedCalls,
   replayPassStream,
@@ -544,6 +545,23 @@ export default class ReActHarness extends BaseAgenticHarness {
           this.tools.finalTools.length,
         );
 
+        // ── Cost cap, before the model is asked again ──────────
+        // Spend that crossed the cap since the last pass's check (a pass
+        // that called no tool, a sub-agent's) pauses the turn here, before
+        // another request is bought. Checkpointed first, and marked, so a
+        // restart re-drives the turn from this point.
+        if (
+          !replayPass &&
+          (await enforceCostBudget(context, state, {
+            beforePause: async () => {
+              await this.checkpointTurnProgress(currentMessages);
+              await recordBudgetPause(context, state.iterations);
+            },
+          }))
+        ) {
+          break;
+        }
+
         // ── Create per-iteration pass state ────────────────────
         const pass = this.createPassState(passOptions, { replayed: !!replayPass });
         const requestIdBase =
@@ -785,10 +803,6 @@ export default class ReActHarness extends BaseAgenticHarness {
         if (signal?.aborted) break;
         this.emitUsageUpdate();
 
-        if (checkCostBudget(state, context.resolvedModel, options.maxCostDollars, emit, { budget: options._sharedCostBudget, loopId: agentConversationId })) {
-          break;
-        }
-
         // ── Tool execution ─────────────────────────────────────
         if (pass.pendingToolCalls.length > 0) {
           // A `tool_call(name, args)` bridge call becomes the call it names
@@ -804,6 +818,13 @@ export default class ReActHarness extends BaseAgenticHarness {
           // On record before any card or tool sees the calls, so a restart
           // can re-drive this batch (TurnRunRecorder).
           await recordPassInFlight(context, state, pass);
+
+          // ── Cost cap ─────────────────────────────────────────
+          // The pass that crossed the cap runs nothing: the turn pauses
+          // until its user raises the cap (or stops at it — see
+          // CostBudgetEnforcer). A pass with no tool call is not stopped
+          // here; its answer stands, and the next model call is checked.
+          if (await enforceCostBudget(context, state)) break;
 
           // Calls of a replayed pass that finished before the restart
           // already ran: their recorded result stands, unasked (ResumedPass)

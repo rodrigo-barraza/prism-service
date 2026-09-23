@@ -73,6 +73,8 @@ vi.mock("#src/services/harnesses/lifecycle/ExhaustionRecovery", () => ({
 }));
 vi.mock("#src/services/harnesses/lifecycle/CostBudgetEnforcer", () => ({
   checkCostBudget: vi.fn().mockReturnValue(false),
+  enforceCostBudget: vi.fn().mockResolvedValue(false),
+  recordLoopSpend: vi.fn(),
 }));
 vi.mock("#src/services/harnesses/lifecycle/CodexPlanningDetector", () => ({
   handleCodexPlanningResponse: vi.fn().mockReturnValue({ shouldContinueLoop: false }),

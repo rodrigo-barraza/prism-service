@@ -38,7 +38,7 @@ import { manageContextPressure } from "#src/services/harnesses/lifecycle/Context
 import { logKVCacheHitRate } from "#src/services/harnesses/lifecycle/KVCacheReporter";
 import { finalizePassTracker } from "#src/services/harnesses/lifecycle/TrackerFinalizer";
 import { maybeInjectSystemReminder } from "#src/services/harnesses/lifecycle/SystemReminderInjector";
-import { checkCostBudget } from "#src/services/harnesses/lifecycle/CostBudgetEnforcer";
+import { enforceCostBudget } from "#src/services/harnesses/lifecycle/CostBudgetEnforcer";
 import { HARNESS } from "#src/constants";
 import type {
   IterationPassOptions,
@@ -326,15 +326,8 @@ async function runGraphOfThoughtsTurn(
       harness.emitUsageUpdate();
 
       // ── Cost budget enforcement ────────────────────────────
-      if (
-        checkCostBudget(
-          state,
-          context.resolvedModel,
-          options.maxCostDollars,
-          emit,
-          { budget: options._sharedCostBudget, loopId: context.agentConversationId },
-        )
-      ) {
+      // At the cap the tree pauses for a raise (or stops — CostBudgetEnforcer).
+      if (await enforceCostBudget(context, state)) {
         break;
       }
 
