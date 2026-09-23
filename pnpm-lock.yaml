@@ -31,7 +31,7 @@ importers:
         version: 0.222.0(@opentelemetry/api@1.9.1)
       '@rodrigo-barraza/utilities-library':
         specifier: github:rodrigo-barraza/utilities-library
-        version: https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/eb72517ec56b4c2735bf0f5605bacbae99fa62e3(express@5.2.1)
+        version: https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/a4bd47ac364876139339378da12df286826be93f(express@5.2.1)
       cors:
         specifier: ^2.8.6
         version: 2.8.6
@@ -888,8 +888,8 @@ packages:
   '@protobufjs/utf8@1.1.2':
     resolution: {integrity: sha512-b1UQwcEZ4yCnMCD8DAL1VlbvBJE9/IX4FTIp7BG1xYpf29SLazLSrqUkj4w7Y5y7cCVP6E5tcqqcI0xemPkHug==}
 
-  '@rodrigo-barraza/utilities-library@https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/eb72517ec56b4c2735bf0f5605bacbae99fa62e3':
-    resolution: {gitHosted: true, integrity: sha512-hjEvkA1PNM54Se3tU+QtCgjFzQKz7Hzg92Mhdf3oqzm1U1vCPdWYmaJcxqAlz/NWgol/LJyFr4U73opJc09pEQ==, tarball: https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/eb72517ec56b4c2735bf0f5605bacbae99fa62e3}
+  '@rodrigo-barraza/utilities-library@https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/a4bd47ac364876139339378da12df286826be93f':
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/a4bd47ac364876139339378da12df286826be93f}
     version: 0.7.0
     peerDependencies:
       express: '>=5.0.0'
@@ -3013,7 +3013,7 @@ snapshots:
 
   '@protobufjs/utf8@1.1.2': {}
 
-  '@rodrigo-barraza/utilities-library@https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/eb72517ec56b4c2735bf0f5605bacbae99fa62e3(express@5.2.1)':
+  '@rodrigo-barraza/utilities-library@https://codeload.github.com/rodrigo-barraza/utilities-library/tar.gz/a4bd47ac364876139339378da12df286826be93f(express@5.2.1)':
     dependencies:
       mongodb: 7.5.0
       nanoid: 5.1.16
