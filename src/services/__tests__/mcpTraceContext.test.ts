@@ -18,7 +18,9 @@ const mockListTools = vi.fn();
 const mockCallTool = vi.fn();
 const transportOptions: Array<{ kind: string; options: any }> = [];
 
-vi.mock("@modelcontextprotocol/sdk/client/index.js", () => ({
+// The MCP client SDK 2.0 (@modelcontextprotocol/client), mocked the way
+// mcpClientService.test.ts does; the HTTP transports record their options.
+vi.mock("@modelcontextprotocol/client", () => ({
   Client: class Client {
     connect = mockConnect;
     close = vi.fn();
@@ -26,32 +28,31 @@ vi.mock("@modelcontextprotocol/sdk/client/index.js", () => ({
     callTool = mockCallTool;
     listResources = vi.fn().mockResolvedValue({ resources: [] });
     readResource = vi.fn();
+    getNegotiatedProtocolVersion = () => "2026-07-28";
+    getProtocolEra = () => "modern";
+    getServerCapabilities = () => ({ tools: {} });
+    setRequestHandler = vi.fn();
   },
-}));
-
-vi.mock("@modelcontextprotocol/sdk/client/stdio.js", () => ({
-  StdioClientTransport: class StdioClientTransport {
-    close = vi.fn();
-  },
-  getDefaultEnvironment: vi.fn().mockReturnValue({ PATH: "/usr/bin" }),
-}));
-
-vi.mock("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
+  UnauthorizedError: class UnauthorizedError extends Error {},
   StreamableHTTPClientTransport: class StreamableHTTPClientTransport {
     close = vi.fn();
     constructor(_url: URL, options: unknown) {
       transportOptions.push({ kind: "streamable-http", options });
     }
   },
-}));
-
-vi.mock("@modelcontextprotocol/sdk/client/sse.js", () => ({
   SSEClientTransport: class SSEClientTransport {
     close = vi.fn();
     constructor(_url: URL, options: unknown) {
       transportOptions.push({ kind: "sse", options });
     }
   },
+}));
+
+vi.mock("@modelcontextprotocol/client/stdio", () => ({
+  StdioClientTransport: class StdioClientTransport {
+    close = vi.fn();
+  },
+  getDefaultEnvironment: vi.fn().mockReturnValue({ PATH: "/usr/bin" }),
 }));
 
 import MCPClientService from "#src/services/MCPClientService";

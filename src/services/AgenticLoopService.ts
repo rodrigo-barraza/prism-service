@@ -3,6 +3,7 @@ import {
   DEFAULT_THOUGHT_STRUCTURE,
   THOUGHT_STRUCTURES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { PROTOCOL_EVENT_TYPES } from "#src/protocol/events";
 import AgenticToolResolver from "./AgenticToolResolver.ts";
 import AgenticLoopState from "./AgenticLoopState.ts";
 import HarnessRegistry from "./harnesses/HarnessRegistry.ts";
@@ -419,13 +420,8 @@ export default class AgenticLoopService {
    */
   static async openPermissionMode(context: AgenticContext): Promise<() => void> {
     const { options, conversationId, project, username } = context;
-    const [
-      { PermissionModeHandle, PermissionModeRegistry, resolveTurnPermissionMode },
-      { PERMISSION_MODE_EVENT_TYPE },
-    ] = await Promise.all([
-      import("./permissions/PermissionModeState.ts"),
-      import("./permissions/PermissionModes.ts"),
-    ]);
+    const { PermissionModeHandle, PermissionModeRegistry, resolveTurnPermissionMode } =
+      await import("./permissions/PermissionModeState.ts");
     const isRoot = !options.isSubAgent;
     // A sub-agent's own conversation never stores a mode; it inherits one.
     const storedMode =
@@ -462,7 +458,7 @@ export default class AgenticLoopService {
     }
 
     context.emit({
-      type: PERMISSION_MODE_EVENT_TYPE,
+      type: PROTOCOL_EVENT_TYPES.PERMISSION_MODE,
       conversationId,
       mode: resolved.mode,
       source: resolved.source,
@@ -471,7 +467,7 @@ export default class AgenticLoopService {
     });
     const stopListening = handle.onChange((change) => {
       context.emit({
-        type: PERMISSION_MODE_EVENT_TYPE,
+        type: PROTOCOL_EVENT_TYPES.PERMISSION_MODE,
         conversationId,
         mode: change.mode,
         previousMode: change.previousMode,
