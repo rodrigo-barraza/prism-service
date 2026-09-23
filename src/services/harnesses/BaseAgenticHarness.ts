@@ -800,7 +800,7 @@ export default class BaseAgenticHarness {
         { maxImageDimension: getMaxImageDimensionForModel(resolvedModel) },
       );
     } catch (error) {
-      console.warn(
+      logger.warn(
         "[BaseAgenticHarness] media resolution failed; sending unresolved messages:",
         error instanceof Error ? error.message : error,
       );

@@ -20,6 +20,7 @@ import { DEFAULT_PROFILE_ID } from "#src/utils/ProfileScope";
 import type { PromptPrefixHashes } from "#src/utils/PromptPrefixHashes";
 import type { CacheTelemetryRecord } from "./PromptCacheTelemetry.ts";
 import type { ToolExecutionRecord } from "#src/utils/ToolExecutionRecord";
+import { redactSecrets } from "#src/utils/SecretRedaction";
 const COLLECTION = COLLECTIONS.REQUESTS;
 
 /** Literal profile id for a request-log write: params → ALS → default. */
@@ -311,7 +312,8 @@ const RequestLogger = {
           reasoningOutputTokens,
         } = deriveTokenFields(usage));
       }
-      const document = {
+      // Rows are kept and streamed to webhooks: never with a credential in them.
+      const document = redactSecrets({
         requestId,
         createdAt: new Date().toISOString(),
         endpoint,
@@ -366,7 +368,7 @@ const RequestLogger = {
         ...cacheTelemetryRowFields(cacheTelemetryParams),
         ...toolExecutionRowFields(cacheTelemetryParams),
         status: SYSTEM_STATUSES.COMPLETED,
-      };
+      });
       await db.collection(COLLECTION).insertOne(document);
 
       WebhookEventBus.emit("request.created", { ...document });
@@ -641,7 +643,8 @@ const RequestLogger = {
       },
       responsePayload: success
         ? {
-            textPreview: (resultText || "").slice(0, 200),
+            // Masked before the cut, or a key straddling it is kept as a stub.
+            textPreview: redactSecrets(resultText || "").slice(0, 200),
             ...extraResponsePayload,
           }
         : { error: errorMessage },
@@ -678,7 +681,7 @@ const RequestLogger = {
         );
         return null;
       }
-      const pendingDocument = {
+      const pendingDocument = redactSecrets({
         requestId,
         createdAt: new Date().toISOString(),
         endpoint: endpoint || null,
@@ -701,7 +704,7 @@ const RequestLogger = {
         outputTokens: 0,
         estimatedCost: null,
         success: null,
-      };
+      });
       const insertResult = await db
         .collection(COLLECTION)
         .insertOne(pendingDocument);
@@ -807,7 +810,7 @@ const RequestLogger = {
             }
           : responsePayload;
 
-      const updateFields: Record<string, unknown> = {
+      const updateFields: Record<string, unknown> = redactSecrets({
         status: SYSTEM_STATUSES.COMPLETED,
         requestId,
         endpoint,
@@ -851,7 +854,7 @@ const RequestLogger = {
         rateLimits,
         ...cacheTelemetryRowFields(fullPayload),
         ...toolExecutionRowFields(fullPayload),
-      };
+      });
 
       if (agentConversationId)
         updateFields.agentConversationId = agentConversationId;

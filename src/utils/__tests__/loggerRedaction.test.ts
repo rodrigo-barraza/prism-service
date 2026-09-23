@@ -10,8 +10,7 @@ import { FAKE_SECRETS, lastFour } from "./fakeSecrets.ts";
 // ────────────────────────────────────────────────────────────
 
 const printed = (spy: ReturnType<typeof vi.spyOn>) =>
-  spy.mock.calls
-    .flat()
+  (spy.mock.calls.flat() as unknown[])
     .map((argument) =>
       argument instanceof Error
         ? `${argument.message}\n${argument.stack}`
