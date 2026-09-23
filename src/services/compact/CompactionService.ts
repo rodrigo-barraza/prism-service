@@ -36,6 +36,10 @@ import { SYSTEM_MESSAGE_TAGS } from "#src/utils/SystemMessageTags";
 import type { ChatMessage as AdminChatMessage } from "#src/types/admin";
 import type { ChatMessage, GenerateTextResult } from "#src/types/provider";
 import type { EmitFunction } from "#src/services/harnesses/types";
+import {
+  untrustedInputProvenance,
+  type ProvenanceMessage,
+} from "#src/services/memory/MemoryProvenance";
 
 // ────────────────────────────────────────────────────────────
 // CompactionService — LLM-Powered Conversation Summarization
@@ -484,8 +488,19 @@ export default class CompactionService {
     // Insert the summary as a user message with a marker. It names the last
     // message it covers — the boundary the next turn loads through.
     const throughMessageId = resolveBoundaryAnchorId(droppedSpan);
+    // Memory provenance: a summary of untrusted input is untrusted input.
+    const taint = untrustedInputProvenance(
+      droppedSpan as unknown as ProvenanceMessage[],
+    );
+    const inputProvenance = taint
+      ? { source: taint.source, trust: taint.trust }
+      : null;
     compactedMessages.push(
-      buildCompactionSummaryMessage(summaryWithRecovery, throughMessageId),
+      buildCompactionSummaryMessage(
+        summaryWithRecovery,
+        throughMessageId,
+        inputProvenance,
+      ),
     );
 
     // Carry active deviation-rule reminders from the dropped span across
@@ -532,6 +547,7 @@ export default class CompactionService {
           model: compactionModel,
           tokensBefore: preCompactTokenCount,
           tokensAfter: postCompactTokenCount,
+          ...(inputProvenance && { inputProvenance }),
         }
       : null;
     if (!boundary) {

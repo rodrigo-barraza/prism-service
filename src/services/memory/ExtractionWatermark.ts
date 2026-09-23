@@ -10,6 +10,10 @@ import {
 } from "#src/constants";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import logger from "#src/utils/logger";
+import {
+  annotateMessageProvenance,
+  type MemoryProvenance,
+} from "./MemoryProvenance.ts";
 
 // ────────────────────────────────────────────────────────────
 // Memory-extraction watermark — the `memory:extract` diet
@@ -59,6 +63,8 @@ export interface TranscriptEntry {
   identities: string[];
   /** Characters the user actually wrote (0 for assistant or harness-injected turns). */
   authoredCharacters: number;
+  /** Who wrote it and how far to trust it — a memory drawn from it inherits this. */
+  provenance: MemoryProvenance;
 }
 
 export interface ExtractionTranscript {
@@ -219,21 +225,26 @@ export function authoredCharacters(message: TranscriptMessage): number {
 /**
  * The user/assistant messages an extraction can read, in order. Messages
  * without text (tool-call-only assistant turns) are dropped, as before;
- * a compaction summary is dropped and remembered as a boundary.
+ * a compaction summary is dropped and remembered as a boundary. Each entry
+ * carries its provenance, computed over the WHOLE message list — a tool
+ * result or a sub-agent report the transcript leaves out still taints the
+ * assistant text written after it.
  */
 export function buildExtractionTranscript(
   messages: TranscriptMessage[],
+  { conversationId = null }: { conversationId?: string | null } = {},
 ): ExtractionTranscript {
+  const provenance = annotateMessageProvenance(messages, { conversationId });
   const entries: TranscriptEntry[] = [];
   let afterSummaryIndex = -1;
-  for (const message of messages) {
-    if (message.role !== "user" && message.role !== "assistant") continue;
+  messages.forEach((message, index) => {
+    if (message.role !== "user" && message.role !== "assistant") return;
     if (isCompactionSummary(message)) {
       afterSummaryIndex = entries.length;
-      continue;
+      return;
     }
     const content = contentText(message.content);
-    if (!content.trim()) continue;
+    if (!content.trim()) return;
     entries.push({
       role: message.role,
       text:
@@ -242,8 +253,13 @@ export function buildExtractionTranscript(
           : content,
       identities: messageIdentities(message),
       authoredCharacters: authoredCharacters(message),
+      provenance: provenance[index] ?? {
+        source: "assistant",
+        trust: "derived",
+        sourceRefs: [],
+      },
     });
-  }
+  });
   return { entries, afterSummaryIndex };
 }
 

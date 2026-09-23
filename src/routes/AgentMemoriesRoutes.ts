@@ -6,6 +6,7 @@ import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { type Request, type Response, type NextFunction } from "express";
 import MemoryService from "#src/services/MemoryService";
 import MemoryConsolidationService from "#src/services/MemoryConsolidationService";
+import { savedMemoryProvenanceFor } from "#src/services/memory/SaveMemoryProvenance";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 
@@ -14,7 +15,11 @@ const router = express.Router();
 /**
  * POST /agent-memories
  * Create a new memory via MemoryService.store() (embedding + dedup).
- * Called by tools-api's save_memory route.
+ * Called by tools-api's save_memory route. The body carries no provenance —
+ * a caller could claim anything — so it comes from what prism recorded when
+ * it dispatched the call (memory/SaveMemoryProvenance): a save made after
+ * the loop read untrusted input is stored quarantined, for the user to
+ * review. Unrecorded (no trace headers): the agent's own, `derived`.
  */
 router.post(
   "/",
@@ -33,6 +38,12 @@ router.post(
         return res.status(400).json({ error: "content is required" });
       }
 
+      const provenance = savedMemoryProvenanceFor(req.headers);
+      if (!provenance) {
+        logger.warn(
+          "[agent-memories] POST without recorded provenance (no matching trace headers) — storing as the agent's own",
+        );
+      }
       const result = await MemoryService.store({
         agent: agent || AGENT_IDS.CODING,
         project: project || DEFAULT_PROJECT,
@@ -43,6 +54,7 @@ router.post(
         title: title || null,
         agentConversationId: agentConversationId || null,
         endpoint: "/agent-memories",
+        ...(provenance && { provenance }),
       });
 
       if (!result) {
@@ -55,7 +67,15 @@ router.post(
 
       // Strip embedding from response (large vector, not needed by caller)
       const { embedding: _emb, ...safe } = result;
-      res.json(safe);
+      // This is the model's tool result: say plainly that it is on hold.
+      res.json(
+        safe.quarantined === true
+          ? {
+              ...safe,
+              message: `Saved for the user's review, not yet remembered: this conversation read untrusted content (${String(safe.source)}), so the memory stays quarantined until the user accepts it.`,
+            }
+          : safe,
+      );
     } catch (error: unknown) {
       logger.error(`[agent-memories] POST ${getErrorMessage(error)}`);
       next(error);
@@ -82,6 +102,8 @@ router.get(
       const sourceUserId = (req.query.sourceUserId as string) || undefined;
       // History view: include soft-closed (superseded/invalidated) rows
       const includeSuperseded = req.query.includeSuperseded === "true";
+      // Review view: only memories held in quarantine
+      const quarantined = req.query.quarantined === "true";
 
       const result = await MemoryService.list({
         agent: agent as string,
@@ -93,6 +115,7 @@ router.get(
         aboutUserId,
         sourceUserId,
         includeSuperseded,
+        quarantined,
       });
       res.json(result);
     } catch (error: unknown) {
@@ -150,6 +173,41 @@ router.delete(
       res.json({ success: true, deletedCount: result.deletedCount });
     } catch (error: unknown) {
       logger.error(`[agent-memories] DELETE ALL ${getErrorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+/**
+ * POST /agent-memories/:id/review
+ * The user's decision on a quarantined memory. Body: { decision: "accept" | "reject" }.
+ * Accept makes it live (provenance kept); reject closes it for good.
+ * 404 unknown id, 409 not awaiting review.
+ */
+router.post(
+  "/:id/review",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const decision = (req.body as { decision?: unknown } | undefined)?.decision;
+      if (decision !== "accept" && decision !== "reject") {
+        return res
+          .status(400)
+          .json({ error: 'decision must be "accept" or "reject"' });
+      }
+      const outcome = await MemoryService.review(String(req.params.id), decision, {
+        by: req.username || "user",
+      });
+      if (outcome === "not-found") {
+        return res.status(404).json({ error: "Memory not found" });
+      }
+      if (outcome === "not-pending") {
+        return res
+          .status(409)
+          .json({ error: "Memory is not awaiting review" });
+      }
+      res.json({ success: true, decision });
+    } catch (error: unknown) {
+      logger.error(`[agent-memories] REVIEW ${getErrorMessage(error)}`);
       next(error);
     }
   }),

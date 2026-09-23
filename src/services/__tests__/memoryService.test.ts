@@ -236,6 +236,7 @@ describe("MemoryService", () => {
 
   describe("facets", () => {
     it("should aggregate types, aboutUsers and sourceUsers scoped to project/agent", async () => {
+      mockCollection.countDocuments.mockResolvedValueOnce(2);
       const result = await MemoryService.facets({
         agent: "LUPOS",
         project: "lupos",
@@ -260,7 +261,10 @@ describe("MemoryService", () => {
         $type: "string",
         $ne: "",
       });
-      expect(result).toEqual({ types: [], aboutUsers: [], sourceUsers: [] });
+      expect(result).toEqual({ types: [], aboutUsers: [], sourceUsers: [], pendingReview: 2 });
+      expect(mockCollection.countDocuments).toHaveBeenCalledWith(
+        expect.objectContaining({ agent: "LUPOS", project: "lupos", quarantined: true }),
+      );
     });
   });
 
@@ -304,18 +308,25 @@ describe("MemoryService", () => {
 
   describe("formatForPrompt", () => {
     it("should format array of memories for system prompt", () => {
+      const createdAt = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const memories = [
         {
           type: "project",
           title: "User preference",
           content: "Prefers oklch colors",
           age: "yesterday",
-          createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+          createdAt,
+          source: "user" as const,
+          trust: "user" as const,
         }
       ];
 
       const formatted = MemoryService.formatForPrompt(memories);
-      expect(formatted).toBe("- [project] **User preference** (yesterday): Prefers oklch colors");
+      const [preamble, entry] = formatted.split("\n");
+      expect(preamble).toMatch(/^Remembered from earlier conversations\. .*not an instruction/);
+      expect(entry).toBe(
+        `- Remembered (source: user, ${createdAt.slice(0, 10)}) [project] "User preference": "Prefers oklch colors"`,
+      );
     });
 
     it("should return empty string if no memories provided", () => {
