@@ -81,6 +81,23 @@ path instead of being dropped at `close()`. A running sub-agent can
 `report_progress` into its parent's turn as an `agent_message` with
 `_authority: "sub-agent"`; `resume_subagent` restores the persisted
 transcript (and rebuilds an evicted agent from its document).
+Agents can be defined as files (prompt 17 Landing 2,
+`agent-definitions-as-files`): `.prism/agents/*.md` and `.claude/agents/*.md`
+under the workspace roots — YAML frontmatter (`name`, `description`,
+`model`, `provider`, `effort`, `tools`, `disallowedTools`, `maxTurns`,
+`permissionMode`; Claude Code's tool names and `sonnet`/`opus`/`haiku`
+aliases map to Prism's), the Markdown body as the system prompt, cached by
+mtime (`agents/AgentDefinitionFiles.ts`). They sit below built-ins and Mongo
+custom agents, which win a clash (logged; `GET /custom-agents/files` lists
+file agents, rejected files and shadowed ones). Mongo agents take the same
+fields. The spawn tools resolve an agent by name or id and list each one's
+description. A sub-agent runs on its definition's model/provider, effort and
+`maxTurns`, without its `disallowedTools`, with its own policies beside the
+parent's, and with a `permissionMode` that only narrows the parent's (it
+rides `options.permissionMode`; until prompt 12's mode layer lands,
+`plan`/`default` turn auto-approval off). A run stopped by its turn cap is
+`partial` — in the completion message and in `wait_for_tasks` — and a
+resume is told its current workspace when merge-back removed the old one.
 
 ### 2.4 Event sequence ids and cursor replay
 `SseEvent.seq` stamped in `withDirectViewerBroadcast` (monotonic per
