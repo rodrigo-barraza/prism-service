@@ -21,6 +21,7 @@ import {
 } from "./permissions/PermissionModes.ts";
 import { modeOf, type PermissionModeHandle } from "./permissions/PermissionModeState.ts";
 import { findProtectedPathWrite } from "./permissions/ProtectedPaths.ts";
+import { readerFetchCall, type ReaderFetchCall } from "./reader/ReaderSource.ts";
 import type {
   Capability,
   PermissionDecision,
@@ -60,6 +61,9 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   [TOOL_NAMES.GIT_DIFF]: APPROVAL_TIERS.AUTO,
   [TOOL_NAMES.GIT_LOG]: APPROVAL_TIERS.AUTO,
   [TOOL_NAMES.SUMMARIZE_PROJECT]: APPROVAL_TIERS.AUTO,
+  // A no-tools reader over untrusted text; the read is ALSO judged as the
+  // fetch it makes (explainReaderRead) — this tier covers the text alone
+  read_untrusted: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — task management (agent's own scratchpad, not user files)
   [TOOL_NAMES.CREATE_TASK]: APPROVAL_TIERS.AUTO,
@@ -308,6 +312,53 @@ export default class AutoApprovalEngine {
   }
 
   /**
+   * One call's verdict. A read_untrusted call is judged together with the
+   * fetch it makes (explainReaderRead); every other call by the stack below.
+   */
+  explain(
+    toolCall: ToolCall,
+    overrides: { fullAuto?: boolean } = {},
+  ): ApprovalExplanation {
+    const fetch = readerFetchCall(toolCall);
+    return fetch
+      ? this.explainReaderRead(toolCall, fetch, overrides)
+      : this.explainCall(toolCall, overrides);
+  }
+
+  /**
+   * read_untrusted fetches its source through another tool (ReaderSource)
+   * and hands the output to a no-tools reader. The planner never sees that
+   * output, but the fetch still acts on the world, so the read is judged
+   * as both calls: a deny on either is final, an ask on either asks, and
+   * plan mode refuses a network read as it would the fetch. An explicit
+   * allow on read_untrusted (a rule, policy or hook) answers the fetch's
+   * TIER prompt — so "always allow" on its card does not ask again — but
+   * never a rule the user wrote about the fetch.
+   */
+  private explainReaderRead(
+    toolCall: ToolCall,
+    fetch: ReaderFetchCall,
+    overrides: { fullAuto?: boolean },
+  ): ApprovalExplanation {
+    const own = this.explainCall(toolCall, overrides);
+    if (own.isDenied) return own;
+    const judged = this.explainCall(
+      { id: toolCall.id, name: fetch.name, args: fetch.args } as ToolCall,
+      overrides,
+    );
+    const asFetch = {
+      ...judged,
+      reason: `${toolCall.name} reads through ${fetch.name}: ${judged.reason}`,
+    };
+    if (judged.isDenied) return asFetch;
+    if (!own.isApproved) return own;
+    const ownExplicitAllow =
+      own.layer === "rules" || own.layer === "agent_policy" || own.layer === "hook";
+    if (!judged.isApproved && !(judged.layer === "tier" && ownExplicitAllow)) return asFetch;
+    return ownExplicitAllow ? own : asFetch;
+  }
+
+  /**
    * The permission stack, top to bottom:
    *
    *   1. Self-protection — built in; an agent cannot reach its own
@@ -347,7 +398,7 @@ export default class AutoApprovalEngine {
    *
    * Every result names the layer (and rule) that decided, and the mode.
    */
-  explain(
+  private explainCall(
     toolCall: ToolCall,
     { fullAuto = this.fullAuto }: { fullAuto?: boolean } = {},
   ): ApprovalExplanation {

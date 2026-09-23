@@ -358,6 +358,9 @@ const LUPOS_UNUSED_CORE_HARNESS_TOOLS = [
   LOCAL_TOOL_NAMES.SET_GOAL,
   LOCAL_TOOL_NAMES.UPDATE_GOAL,
   LOCAL_TOOL_NAMES.CLEAR_GOAL,
+  // New since the trim (prompt 22 L2, 2026-09-22): reaching him is a call
+  // to make on its own, so his pages stay on read_url until it is made.
+  LOCAL_TOOL_NAMES.READ_UNTRUSTED,
 ];
 
 // ────────────────────────────────────────────────────────────

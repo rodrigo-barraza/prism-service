@@ -47,6 +47,7 @@ const ROLE_ENVIRONMENT_KEYS = [
   "MODEL_ROLE_VISION",
   "MODEL_ROLE_DEFAULT",
   "MODEL_ROLE_MEMORY",
+  "MODEL_ROLE_READER",
 ];
 
 describe("ModelRoleRouter — chain resolution order", () => {
@@ -240,6 +241,24 @@ describe("ModelRoleRouter — chain resolution order", () => {
     const chain = await ModelRoleRouter.resolveChain(MODEL_ROLES.CRITIC);
 
     expect(chain).toEqual([{ provider: "google", model: "gemini-3.5-flash" }]);
+  });
+
+  it("reader (read_untrusted) is the utility chain — a local instance first — unless MODEL_ROLE_READER names one", async () => {
+    vi.mocked(listInstances).mockReturnValue([
+      { id: "vllm", type: "vllm", baseUrl: "http://localhost:8080", concurrency: 1, instanceNumber: 1, provider: {} },
+    ] as never);
+    vi.mocked(getProvider).mockReturnValue({
+      listModels: vi.fn().mockResolvedValue({ models: [{ key: "Qwen/Qwen3-4B-Instruct", loaded_instances: [{ id: "x" }] }] }),
+    } as never);
+    vi.mocked(resolveRecommendedDefault).mockReturnValue({ provider: "google", model: "gemini-3.5-flash", temperature: 1.0 });
+
+    const reader = await ModelRoleRouter.resolveChain(MODEL_ROLES.READER);
+
+    expect(reader[0]).toEqual({ provider: "vllm", model: "Qwen/Qwen3-4B-Instruct" });
+    expect(reader).toEqual(await ModelRoleRouter.resolveChain(MODEL_ROLES.UTILITY));
+
+    process.env.MODEL_ROLE_READER = "lm-studio=reader-7b";
+    expect((await ModelRoleRouter.resolveChain(MODEL_ROLES.READER))[0]).toEqual({ provider: "lm-studio", model: "reader-7b" });
   });
 
   it("critic honors its own DB knob ahead of the utility chain", async () => {

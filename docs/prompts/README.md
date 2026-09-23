@@ -100,6 +100,7 @@ PRISM_SERVICE_PORT=$PORT PRISM_SERVICE_MONGO_DB_NAME=prism_test_<slug> \
   - Use `POST http://localhost:$PORT/agent?stream=false` with headers `x-username: rodrigo` and `x-project: prism-test`.
   - The body is flat: `provider`, `model`, `agent`, `messages`, `conversationId`, `autoApprove`, `workspaceRoot`, and so on.
   - Streaming is the same endpoint without `stream=false`, read with `curl -N`.
+- **What the model saw.** The `requests` rows keep message text, not tool-result bodies: a page fetched with `read_web_page` does not show up in them, so a sentinel search there passes whether or not the page leaked. Search the turn's `agent_conversations` document instead (its `tool` messages are the history the next request is built from); a `?stream=false` turn lands there, not in `conversations`. Run a control turn that is supposed to leak, to prove the search can see it (prompt 22 L2, 2026-09-22).
 - **Live test files.** `tests/live/*.live.test.ts` default `PRISM_TEST_URL` to production. Always pass `PRISM_TEST_URL=http://localhost:$PORT`, then run `"$WT"/node_modules/.bin/vitest run --root "$WT" --config "$WT"/vitest.live.config.ts <file>`.
 - **tools-service.**
   - If your task changes tools-service, boot it from its worktree: `TOOLS_SERVICE_PORT=<port2> TOOLS_SERVICE_MONGO_DB_NAME=tools_test_<slug> node "$TOOLS_WT"/src/boot.ts`.
