@@ -158,6 +158,11 @@ reports no cost, and background work such as memory extraction.
 
 ## Prism as an ACP client: external agents as sub-agents
 
+> **Status (2026-09-23): built, and turned off on purpose.** `PRISM_ACP_AGENT_OWNERS` is
+> set nowhere (not in the vault config, not in the deploy), so no ACP agent can be saved or
+> run: the routes answer 403, and a spawn fails and says why. The owner chose to keep it off
+> for now. [Turning it on](#turning-it-on) is the checklist.
+
 A custom agent can run on an external ACP agent instead of Prism's own loop. Candidates
 are Claude Code (through its ACP adapter), Codex (through `codex-acp`), Gemini CLI
 (`--experimental-acp`), or any other program that speaks ACP v1 on stdio. The parent spawns
@@ -311,6 +316,33 @@ If the agent reports no cost, the cost is **unknown**, not zero. The completion 
   parent sees the sub-agent `failed` with that error.
 - **Timeouts.** `initialize` has 120 s (an `npx` agent may be downloading) and `session/new`
   has 60 s. The prompt itself has none, like any Prism turn: stop it.
+
+### Turning it on
+
+It stays off until all four steps are done:
+
+1. **Choose who may use it.** Add `PRISM_ACP_AGENT_OWNERS` (comma-separated usernames, for
+   example `rodrigo`) to the vault's top-level `config`, then restart prism-service. This
+   lets those users' turns start processes on the prism-service host, with its privileges
+   and no sandbox.
+2. **Install the agent and sign it in on the host prism-service runs on**, as the user it
+   runs as. It needs an ACP-speaking command:
+   - Claude Code through its ACP adapter (Zed's `@zed-industries/claude-code-acp`, run with
+     `npx -y`);
+   - Codex through `codex-acp`;
+   - Gemini CLI with `--experimental-acp`.
+
+   Check the current package names when you do this. The agent signs in with its own login;
+   Prism does not sign agents in.
+3. **Share the worktree folder.** The agent works in the worktree tools-service creates
+   (`WORKTREE_DIR`, default `/tmp/prism-worktrees`), so prism-service must see the same path.
+   - **One machine:** nothing to do.
+   - **The NAS containers:** mount one host directory into both containers at the same
+     path, and set `WORKTREE_DIR` to it.
+4. **Save the agent** as an owner (`POST /custom-agents`, as in [Define one](#define-one)).
+   Give it a description that says when to use it: the orchestrating model picks a helper
+   by its name and the first sentence of its description, or because you asked for it by
+   name.
 
 ### Tests
 

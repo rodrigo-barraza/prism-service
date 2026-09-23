@@ -125,6 +125,8 @@ Prism reads the model list and context window from `/v1/models`, and the parsers
 
 `node src/acp/server.ts` is an [Agent Client Protocol](https://agentclientprotocol.com) agent: Zed and other ACP editors drive a Prism conversation through it (JSON-RPC over stdio → this service's HTTP API). Setup and the event mapping: `docs/acp.md`.
 
+The other direction, Prism handing a sub-agent to Claude Code, Codex or any other ACP agent (a custom agent with `runtime: "acp"`), is built but **turned off**: nothing works until `PRISM_ACP_AGENT_OWNERS` is set. To turn it on, follow "Turning it on" in `docs/acp.md`.
+
 ### Admin (requires `x-admin-secret`)
 
 | Method | Endpoint | Description |
