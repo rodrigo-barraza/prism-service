@@ -108,6 +108,15 @@ export interface Persona {
    * would ask is refused, never parked on a card nobody in the channel sees.
    */
   pinnedPermissionMode?: PinnablePermissionMode;
+  /**
+   * Fire-and-forget tools (the StopAtTools pattern): when EVERY call of a
+   * model response is one of these and the same response carried reply
+   * text, the calls run and the turn ends with that text — no further model
+   * call to read results nobody needs (harnesses/lifecycle/EndTurnAfterTools).
+   * Any other tool in the batch, or no text, and the loop goes on as usual.
+   * LUPOS: his emoji reaction.
+   */
+  endTurnAfterTools?: string[];
   capabilities: string;
   /** When true, tool descriptions in the system prompt are truncated to the first sentence and optional parameters are omitted. Saves ~1,500 tokens for conversational agents that don't need full parameter docs. */
   compactToolDocs?: boolean;
