@@ -89,6 +89,11 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   wait_for_tasks: APPROVAL_TIERS.AUTO,
   // run_tool_program only dispatches tier-AUTO tools itself (enforced inside)
   run_tool_program: APPROVAL_TIERS.AUTO,
+  // A sub-agent's status line to its parent; unmapped it fell to WRITE and
+  // asked the user before a delegate could say how far it had got.
+  report_progress: APPROVAL_TIERS.AUTO,
+  // Advice from the oracle model: no tools, no workspace, cost-budgeted.
+  ask_oracle: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — control flow (no side effects)
   [TOOL_NAMES.SLEEP]: APPROVAL_TIERS.AUTO,

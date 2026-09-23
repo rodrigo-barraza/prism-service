@@ -52,6 +52,7 @@ export const INTERNAL_TOOL_EMOJIS: Record<string, string[]> = {
   delete_subagents: ["🗑️", "👥"],
   resume_subagent: ["🔄", "🤖"],
   report_progress: ["📣", "🤖"],
+  ask_oracle: ["🔮", "💬"],
 
   // Async tasks
   run_async_task: ["⚡", "🔄"],

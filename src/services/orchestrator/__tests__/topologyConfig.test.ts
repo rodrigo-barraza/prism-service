@@ -76,6 +76,12 @@ describe("TopologyConfig Test Suite", () => {
     diff: { additions: 1, deletions: 0, files: ["test.txt"] },
   });
 
+  /** A critic whose verdict is backed by a check it ran (ReviewAuthority). */
+  const createCheckedReview = (description: string, result: string): SubAgentResult => ({
+    ...createMockResult(description, result),
+    toolNames: { read_file: 1, execute_command: 1 },
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -126,7 +132,7 @@ describe("TopologyConfig Test Suite", () => {
       ];
       for (const feedback of roundFeedback) {
         spawnSubAgentMock.mockResolvedValueOnce(
-          createMockResult("Critic", feedback),
+          createCheckedReview("Critic", feedback),
         );
       }
 
@@ -181,7 +187,7 @@ describe("TopologyConfig Test Suite", () => {
       ];
       for (const feedback of extendedFeedback) {
         spawnSubAgentMock.mockResolvedValueOnce(
-          createMockResult("Critic", feedback),
+          createCheckedReview("Critic", feedback),
         );
       }
 
@@ -234,7 +240,7 @@ describe("TopologyConfig Test Suite", () => {
         .mockResolvedValueOnce(actorResult)
         // Round 1: fact checker passes, style critic fails
         .mockResolvedValueOnce(createMockResult("Fact Checker", "PASS — all facts correct"))
-        .mockResolvedValueOnce(createMockResult("Style Critic", "FAIL — inconsistent naming"))
+        .mockResolvedValueOnce(createCheckedReview("Style Critic", "FAIL — inconsistent naming (lint: 3 errors)"))
         // Round 2: both pass
         .mockResolvedValueOnce(createMockResult("Fact Checker", "PASS — still correct"))
         .mockResolvedValueOnce(createMockResult("Style Critic", "PASS — naming fixed"));
@@ -251,6 +257,53 @@ describe("TopologyConfig Test Suite", () => {
       const revisionPrompt = continueSubAgentMock.mock.calls[0][1];
       expect(revisionPrompt).toContain("FAILED");
       expect(revisionPrompt).toContain("Style Critic");
+    });
+
+    it("a FAIL no check backs is advice: the actor is not sent back (arXiv 2609.14767)", async () => {
+      const router = new CriticLoopRouter();
+      const members = [
+        { description: "Actor", prompt: "Write code" },
+        { description: "Reader", prompt: "Review code" },
+        { description: "Tester", prompt: "Run the tests" },
+      ];
+
+      spawnSubAgentMock
+        .mockResolvedValueOnce(createMockResult("Actor", "Code", "actor-001"))
+        // Read the files and judged — ran nothing.
+        .mockResolvedValueOnce({
+          ...createMockResult("Reader", "FAIL — I would structure this differently"),
+          toolNames: { read_file: 3 },
+        })
+        .mockResolvedValueOnce(createCheckedReview("Tester", "PASS — 42 tests green"));
+
+      const results = await router.execute(
+        "test-team", members, orchestratorContext,
+        spawnSubAgentMock, continueSubAgentMock,
+        { maxRounds: 3 },
+      );
+
+      expect(continueSubAgentMock).not.toHaveBeenCalled();
+      // The unverified review still reaches the parent, with the team's results.
+      expect(results.map((result) => ("result" in result ? result.result : ""))).toContain(
+        "FAIL — I would structure this differently",
+      );
+    });
+
+    it("a critic that errored or never finished does not send the actor back", async () => {
+      const router = new CriticLoopRouter();
+      spawnSubAgentMock
+        .mockResolvedValueOnce(createMockResult("Actor", "Code", "actor-001"))
+        .mockResolvedValueOnce({ error: "provider down" });
+
+      await router.execute(
+        "test-team",
+        [{ description: "Actor", prompt: "Write code" }, { description: "Critic", prompt: "Review" }],
+        orchestratorContext,
+        spawnSubAgentMock, continueSubAgentMock,
+        { maxRounds: 3 },
+      );
+
+      expect(continueSubAgentMock).not.toHaveBeenCalled();
     });
   });
 
@@ -289,7 +342,7 @@ describe("TopologyConfig Test Suite", () => {
       expect(continueSubAgentMock).not.toHaveBeenCalled();
     });
 
-    it("should refine the winning actor when judge returns FAIL", async () => {
+    it("selects the winner and does not send it back on a FAIL — the judge runs no check", async () => {
       const router = new CriticLoopRouter();
       const members = [
         { description: "Actor A", prompt: "Write code v1" },
@@ -318,11 +371,10 @@ describe("TopologyConfig Test Suite", () => {
         { actorCount: 2, maxRounds: 3 },
       );
 
-      // 2 actors spawned + 1 continuation on the winner
+      // 2 actors spawned, one judge call, no revision round.
       expect(spawnSubAgentMock).toHaveBeenCalledTimes(2);
-      expect(continueSubAgentMock).toHaveBeenCalledTimes(1);
-      // Continuation should use the winning actor's ID
-      expect(continueSubAgentMock.mock.calls[0][0]).toBe("actor-b");
+      expect(mockGenerateText).toHaveBeenCalledTimes(1);
+      expect(continueSubAgentMock).not.toHaveBeenCalled();
     });
 
     it("should clamp actorCount to member count when more actors than members", async () => {
@@ -348,37 +400,6 @@ describe("TopologyConfig Test Suite", () => {
 
       // Only 1 actor actually spawned (clamped to members.length)
       expect(spawnSubAgentMock).toHaveBeenCalledTimes(1);
-    });
-
-    it("should respect maxRounds in Jury mode", async () => {
-      const router = new CriticLoopRouter();
-      const members = [
-        { description: "Actor A", prompt: "Write code v1" },
-        { description: "Actor B", prompt: "Write code v2" },
-      ];
-
-      spawnSubAgentMock
-        .mockResolvedValueOnce(createMockResult("Actor A", "Code A", "actor-a"))
-        .mockResolvedValueOnce(createMockResult("Actor B", "Code B", "actor-b"));
-
-      // Judge always FAILs with different feedback
-      mockGenerateText.mockImplementation(async () => ({
-        text: JSON.stringify({
-          bestActorIndex: 0,
-          verdict: "FAIL",
-          feedback: `Issue found at ${Date.now()}`,
-        }),
-        usage: { inputTokens: 100, outputTokens: 50 },
-      }));
-
-      await router.execute(
-        "test-team", members, orchestratorContext,
-        spawnSubAgentMock, continueSubAgentMock,
-        { actorCount: 2, maxRounds: 2 },
-      );
-
-      // maxRounds=2: round 1 (tournament) + round 2 (revision) = 1 continuation
-      expect(continueSubAgentMock).toHaveBeenCalledTimes(1);
     });
   });
 

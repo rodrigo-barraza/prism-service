@@ -36,6 +36,7 @@ import projectInstructionsTools from "./ProjectInstructionsTools.ts";
 import runToolProgramTool from "./RunToolProgramTool.ts";
 import goalTools from "./GoalTools.ts";
 import subAgentProgressTool from "./SubAgentProgressTool.ts";
+import oracleTool from "./OracleTool.ts";
 
 // ─── Parameter Types (aligned with tools-service) ──────────────
 
@@ -146,6 +147,7 @@ function initialize() {
     runToolProgramTool,
     goalTools,
     subAgentProgressTool,
+    oracleTool,
   ];
 
   for (const toolOrTools of toolModulesList) {

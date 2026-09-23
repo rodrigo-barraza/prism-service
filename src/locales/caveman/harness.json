@@ -85,13 +85,11 @@
     "wrapper": "**error:** {{errorDescription}}"
   },
   "treeOfThoughts": {
-    "proactiveBacktrack": "[BACKTRACK — ALL {{branchCount}} BRANCH BELOW THRESHOLD (best: {{bestScore}}/{{threshold}})]\n\nAll branch scored poorly. Approach failing.\n\nReconsider:\n1. Approach fundamentally flawed?\n2. Different strategy?\n3. Simpler, safer path?\n\nDIFFERENT approach next attempt.",
     "frontierFallback": "[SWITCH — BRANCH {{branchIndex}} FAILED]\n\nPrevious: {{errorCount}} error:\n\n{{errorBlock}}\n\nSwitching to next-best. Avoid same error.",
     "reflexion": "[REFLEXION — BRANCH {{branchIndex}} FAILED]\n\nPrevious: {{errorCount}} error:\n\n{{errorBlock}}\n\nANALYZE:\n1. What assumption caused failure?\n2. How correct solution differs?\n3. Alternative avoiding this error class?\n\nAnalyze, then DIFFERENT approach.",
     "budgetExhausted": "[VALIDATION ERROR — NO RETRY LEFT]\n\n{{errorBlock}}\n\nMultiple approach failed. Fix remaining directly."
   },
   "graphOfThoughts": {
-    "proactiveBacktrack": "[BACKTRACK — ALL BRANCH BELOW THRESHOLD (best: {{bestScore}}/{{threshold}})]\n\nAll branch scored poorly. Approach failing.\n\nReconsider:\n1. Approach fundamentally flawed?\n2. Different strategy?\n3. Simpler, safer path?\n\nDIFFERENT approach next attempt.",
     "synthesizedValidationError": "[VALIDATION ERROR — MERGED RESULT]\n\nMerged approach: {{errorCount}} error:\n\n{{errorBlock}}\n\nCombined {{branchCount}} branch but tool call still failed.\nFix remaining — NOT same tool call."
   },
   "approval": {

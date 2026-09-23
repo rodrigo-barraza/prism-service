@@ -5,7 +5,17 @@
 // to spawn their own sub-teams) is NOT a topology. It's a cross-cutting
 // capability configurable via `maxRecursionDepth` in agent settings,
 // applicable to any topology listed here. See OrchestratorService for
-// the depth-gated implementation.
+// the depth-gated implementation, and orchestrator/SpawnCaps.ts for the
+// runaway caps on it (per root conversation).
+//
+// REVIEW AUTHORITY (`reviewAuthority`, orchestrator/ReviewAuthority.ts):
+// a reviewer may SELECT among work done independently — pick, rank,
+// merge — on its judgement alone. It may SEND WORK BACK to be redone only
+// where it can verify it: a check it ran (tests, a type-check, a schema or
+// output validation). A manager's reject authority cost 51.5% more tokens
+// for no quality gain without that (arXiv 2609.14767); an unverified
+// rejection is returned as advice instead. The same rule holds for the
+// branching thought structures (strategies/branchingCommon.ts).
 // ─────────────────────────────────────────────────────────────
 
 import { TOPOLOGIES } from "@rodrigo-barraza/utilities-library/taxonomy";
@@ -21,6 +31,17 @@ export interface TopologyConfigOption {
   type: "number" | "string" | "boolean";
   defaultValue: string;
   description: string;
+}
+
+/**
+ * What a topology's reviewer — if it has one — may do with the members'
+ * work: nothing, select among it, or send it back to be redone (and on
+ * what verification).
+ */
+export interface TopologyReviewAuthority {
+  reviewer: string | null;
+  power: "none" | "select" | "send_back";
+  detail: string;
 }
 
 export interface TopologyDefinition {
@@ -43,6 +64,7 @@ export interface TopologyDefinition {
   phases: string[];
   configOptions: TopologyConfigOption[];
   alignment: TopologyAlignmentEntry[];
+  reviewAuthority: TopologyReviewAuthority;
   flowDescription: string;
 }
 
@@ -98,6 +120,12 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
           "Not implemented — paper uses few-shot chain exemplars; this uses direct task prompts",
       },
     ],
+    reviewAuthority: {
+      reviewer: null,
+      power: "none",
+      detail:
+        "No reviewer: each step builds on the previous step's output, and a failed step aborts the pipeline.",
+    },
     flowDescription: "[A] → [B] → [C] serial accumulation",
   },
   {
@@ -146,6 +174,12 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
           "Not implemented — paper uses structured BFS/DFS traversal; this is a single-depth fan-out with no tree structure",
       },
     ],
+    reviewAuthority: {
+      reviewer: null,
+      power: "none",
+      detail:
+        "No reviewer: members work independently on the same task and every result is returned.",
+    },
     flowDescription: "[A] [B] [C] → return all",
   },
   {
@@ -207,6 +241,12 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
         detail: "Each layer's synthesis feeds into next layer as context",
       },
     ],
+    reviewAuthority: {
+      reviewer: "aggregator LLM",
+      power: "select",
+      detail:
+        "The aggregator merges proposals written independently; it never has one redone.",
+    },
     flowDescription: "[A] [B] [C] → [Σ] merge",
   },
   {
@@ -274,6 +314,12 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
         detail: "Agents can edit files and see each other's edits",
       },
     ],
+    reviewAuthority: {
+      reviewer: null,
+      power: "none",
+      detail:
+        "No reviewer. Agents read each other's full contributions by design (debate) — the pattern that converges within one round (arXiv 2608.23541); use a parallel topology when independent proposals matter.",
+    },
     flowDescription: "[A] ↔ [B] ↔ [C] round-robin shared board",
   },
   {
@@ -341,6 +387,12 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
           "Judge selects best result verbatim, informed by verification outcomes",
       },
     ],
+    reviewAuthority: {
+      reviewer: "LLM judge",
+      power: "select",
+      detail:
+        "The judge picks the winner verbatim — informed by the candidates' tsc/test results when enableVerification is on. No candidate is sent back.",
+    },
     flowDescription: "[A] [B] [C] → [✔ Verify] → [Judge] pick best",
   },
   {
@@ -348,12 +400,12 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
     promptSummary: {
       name: "Critic Loop (Actor-Critic)",
       description:
-        "Actor produces output, critic evaluates and provides pass/fail feedback. If failed, actor revises. Iterates until critic approves or max rounds reached.",
+        "Actor produces output, critics evaluate with PASS/FAIL. A FAIL sends the actor back to revise only when the critic backs it with a check it ran (tests, type-check, schema or output validation); otherwise it is advice. Iterates until every critic passes, no FAIL is verified, or max rounds.",
     },
     displayName: "Critic Loop",
     abbreviation: "MAR",
     description:
-      "An iterative generate→feedback→refine loop where actor agent(s) produce output and critic agent(s) evaluate with structured improvement instructions. Extended beyond the paper to multi-agent: separate actor and critic agents with stateful session continuity, degeneration-of-thought detection, and unanimous consensus gating across multiple critic modes (solo, council, jury).",
+      "An iterative generate→feedback→refine loop where an actor agent produces output and critic agents evaluate it with structured improvement instructions. Extended beyond the paper to multi-agent: separate actor and critic agents with stateful session continuity, degeneration-of-thought detection, and unanimous consensus gating. A critic's FAIL has the actor revise only when a check the critic ran backs it. With several actors (jury), a judge picks the winner and the loop ends there.",
     paperTitle: "Self-Refine: Iterative Refinement with Self-Feedback",
     paperAuthors: "Madaan et al.",
     paperYear: 2023,
@@ -372,14 +424,14 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
         type: "number",
         defaultValue: "3",
         description:
-          "Maximum number of actor→critic refinement iterations before force-passing.",
+          "Maximum number of actor→critic rounds (council). A revision round happens only when a critic's FAIL is backed by a check it ran.",
       },
       {
         name: "criticMode",
         type: "string",
         defaultValue: "solo",
         description:
-          "Critic panel configuration: 'solo' (single critic), 'council' (multiple critics, majority vote), or 'jury' (unanimous consensus required).",
+          "Critic panel configuration: 'solo' (single critic), 'council' (multiple critics, unanimous PASS required), or 'jury' (competing actors; a judge selects the winner, no revision).",
       },
       {
         name: "criticCount",
@@ -407,7 +459,13 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
       {
         component: "Iterative loop",
         status: "aligned",
-        detail: "Loops until unanimous PASS or maxRounds",
+        detail: "Loops until unanimous PASS, maxRounds, or a round whose FAILs no check backs",
+      },
+      {
+        component: "Verified rejection",
+        status: "extended",
+        detail:
+          "A FAIL sends the actor back only when the critic ran a check (tests, type-check, validation) — reject authority without verification costs tokens for no gain (arXiv 2609.14767)",
       },
       {
         component: "Single-LLM (paper)",
@@ -417,9 +475,15 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
       {
         component: "Council / Jury modes",
         status: "extended",
-        detail: "Original extensions beyond paper scope",
+        detail: "Original extensions beyond paper scope; the jury's judge selects only",
       },
     ],
+    reviewAuthority: {
+      reviewer: "critic sub-agents (council) / LLM judge (jury)",
+      power: "send_back",
+      detail:
+        "A council critic's FAIL sends the actor back only when the critic ran a check — command or code execution: tests, a type-check, a schema or output validation. A FAIL from reading alone is returned as advice and ends the loop. The jury's judge runs nothing: it selects the winner and never sends it back.",
+    },
     flowDescription: "[Actor] → [Critic] → [Actor] → … until pass",
   },
   {
@@ -499,6 +563,12 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
           "Subtasks exceeding complexity threshold are recursively decomposed (configurable depth, max 3)",
       },
     ],
+    reviewAuthority: {
+      reviewer: "synthesis LLM",
+      power: "select",
+      detail:
+        "The synthesis merges the subtasks' results; nothing is redone.",
+    },
     flowDescription: "[Planner] → [T₁] [T₂] [T₃] → [Synth] → Result",
   },
   {
@@ -597,6 +667,12 @@ export const TOPOLOGY_DEFINITIONS: TopologyDefinition[] = [
           "Full tree maintained with UCB1-guided re-visitation of unexplored siblings",
       },
     ],
+    reviewAuthority: {
+      reviewer: "LLM evaluator",
+      power: "select",
+      detail:
+        "Scores steer which node UCB1 expands next, and the evaluator's notes shape the refinement of that node; no branch is rejected and redone.",
+    },
     flowDescription:
       "[UCB1 Select] → [B₁ B₂ B₃] → [Eval] → [Backprop] → [UCB1 Select] → …",
   },
