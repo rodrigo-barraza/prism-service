@@ -243,3 +243,59 @@ describe('ChatRoutes Integration', () => {
     });
   });
 });
+
+// prompt 13, Landing 2: a turn a restart interrupted is started again from its request.
+describe('handleAgent — what a restart needs', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('hands the loop the request it can be started again from (no messages) and, on a re-drive, the resume payload', async () => {
+    const { default: AgenticLoopService } = await import('#src/services/AgenticLoopService');
+    const { handleAgent } = await import('#src/routes/ChatRoutes');
+    let seen: { request?: Record<string, unknown>; resume?: unknown } = {};
+    const capture = async (opts: any) => {
+      seen = { request: opts.request, resume: opts.resume };
+      return { messages: [] } as never;
+    };
+    vi.mocked(AgenticLoopService.runAgenticLoop)
+      .mockImplementationOnce(capture)
+      .mockImplementationOnce(capture);
+    const resume = { pass: { iteration: 2, toolCalls: [], calls: {} }, inputs: [], notices: [], attempt: 1 };
+
+    await handleAgent(
+      {
+        provider: PROVIDERS.OPENAI,
+        agent: 'CODING',
+        project: 'test',
+        username: 'testuser',
+        conversationId: 'resumed-conversation',
+        autoApprove: false,
+        messages: [{ role: 'user', content: 'Help me write code' }],
+        _resume: resume,
+      },
+      () => {},
+    );
+    expect(seen.request).toMatchObject({
+      provider: PROVIDERS.OPENAI,
+      agent: 'CODING',
+      conversationId: 'resumed-conversation',
+      autoApprove: false,
+    });
+    expect(seen.request).not.toHaveProperty('messages');
+    expect(seen.request).not.toHaveProperty('_resume');
+    expect(seen.resume).toEqual(resume);
+
+    await handleAgent(
+      {
+        provider: PROVIDERS.OPENAI,
+        agent: 'CODING',
+        project: 'test',
+        username: 'testuser',
+        messages: [{ role: 'user', content: 'A fresh turn' }],
+      },
+      () => {},
+    );
+    expect(seen.resume).toBeNull();
+  });
+});
