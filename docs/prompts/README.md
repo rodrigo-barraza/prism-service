@@ -121,6 +121,7 @@ PRISM_SERVICE_PORT=$PORT PRISM_SERVICE_MONGO_DB_NAME=prism_test_<slug> \
 An executed prompt is removed when its work lands. Git history keeps the text. The executing session does this on its own branch, in a prism-service commit; create a prism-service worktree for it if the work was client- or tools-only:
 
 - **Single-landing prompt:** delete the file and delete its row above.
-- **Multi-landing prompt** (the sections headed `Landing N — \`slug\``): delete the landed section, and leave a 3-line record at the top of the file saying what it did, the branch, and where the tests are. The last landing deletes the file.
+- **Multi-landing prompt** (the sections headed `Landing N — \`slug\``): delete the landed section, heading included, and leave a 3-line record at the top of the file saying what it did, the branch, and where the tests are. The last landing deletes the file.
+- **Landings retired in parallel** each see the others still open, so none of them deletes the file (prompt 09, 2026-09-22). `tests/promptRetirement.test.ts` goes red in the batch that merges the last one; that batch deletes the file and its row.
 
 **Evidence that a slug landed:** `git -C <repo> log master --oneline --grep "batch: merge <slug>"`. A branch of that name is not evidence, because branches are deleted at teardown. A file still sitting here is not proof of live work; run the prompt's §1 recon first.
