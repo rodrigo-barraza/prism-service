@@ -403,10 +403,13 @@ export default class ReActHarness extends BaseAgenticHarness {
             }
           }
 
-          // Expose injected skills text to the context budget tracker so
-          // skill tokens can be reported as their own budget category.
+          // Expose the skill highlight and catalog to the context budget
+          // tracker so skill tokens are reported as their own category.
           if (typeof hookContext._skillsText === "string") {
             options._skillsText = hookContext._skillsText;
+          }
+          if (typeof hookContext._skillCatalogText === "string") {
+            options._skillCatalogText = hookContext._skillCatalogText;
           }
 
           // ── Persist newly injected memory IDs to conversationMeta ──

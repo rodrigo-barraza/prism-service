@@ -113,8 +113,10 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   [TOOL_NAMES.TRIGGER_CRON_JOB]: APPROVAL_TIERS.WRITE,
   [TOOL_NAMES.EDIT_NOTEBOOK]: APPROVAL_TIERS.WRITE,
 
-  // Tier 1 — skill management (read-only discovery)
+  // Tier 1 — skill discovery and reading (read-only over the caller's
+  // own skills; load_skill is Prism-local, not yet in TOOL_NAMES)
   [TOOL_NAMES.LIST_SKILLS]: APPROVAL_TIERS.AUTO,
+  load_skill: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — structured output (data formatting only)
   [TOOL_NAMES.EMIT_STRUCTURED_OUTPUT]: APPROVAL_TIERS.AUTO,

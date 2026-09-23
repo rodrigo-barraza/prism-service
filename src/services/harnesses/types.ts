@@ -485,5 +485,6 @@ export interface BeforePromptHookContext {
   activeRuleNames?: string[];
   _injectedSkills?: string[];
   _skillsText?: string;
+  _skillCatalogText?: string;
   [key: string]: unknown;
 }

@@ -105,6 +105,7 @@ const mockSkillPrepare = vi.fn().mockResolvedValue({
   config: { model: PROVIDERS.GOOGLE },
 });
 const mockSkillList = vi.fn().mockResolvedValue([{ name: "test_skill" }]);
+const mockSkillLoad = vi.fn().mockResolvedValue({ name: "test_skill", body: "Do it", resources: [] });
 const mockSkillDelete = vi.fn().mockResolvedValue({ success: true });
 
 vi.mock("#src/services/SkillService", () => ({
@@ -112,8 +113,15 @@ vi.mock("#src/services/SkillService", () => ({
     create: (...args: any[]) => mockSkillCreate(...args),
     prepare: (...args: any[]) => mockSkillPrepare(...args),
     list: (...args: any[]) => mockSkillList(...args),
+    load: (...args: any[]) => mockSkillLoad(...args),
     delete: (...args: any[]) => mockSkillDelete(...args),
   },
+  resolveSkillCaller: (known: Record<string, unknown>) => ({
+    project: known.project || "any",
+    username: known.username || "any",
+    profileId: "default",
+    agent: known.agent ?? null,
+  }),
 }));
 
 // ── Mock ToolOrchestratorService ──────────────────────────────────────
@@ -441,19 +449,43 @@ describe("Local Tools Unit Tests Suite", () => {
 
   // 10. SkillTools
   it("should support skill CRUD operations", async () => {
-    const createResult = await InternalToolRegistry.execute("create_skill", {
-      name: "verify_lint",
-      prompt: "Run npm run lint and fix files",
-    });
+    const skillContext = { project: "p1", username: "u1", agent: "CODING" };
+    const caller = { project: "p1", username: "u1", profileId: "default", agent: "CODING" };
+
+    const createResult = await InternalToolRegistry.execute(
+      "create_skill",
+      { name: "verify_lint", prompt: "Run npm run lint and fix files" },
+      skillContext,
+    );
     expect(createResult).toEqual({ success: true, name: "test_skill" });
+    expect(mockSkillCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "verify_lint",
+        body: "Run npm run lint and fix files",
+        source: "agent",
+      }),
+      caller,
+    );
 
-    const listResult = await InternalToolRegistry.execute("list_skills", {});
+    const listResult = await InternalToolRegistry.execute("list_skills", {}, skillContext);
     expect(listResult).toEqual([{ name: "test_skill" }]);
+    expect(mockSkillList).toHaveBeenCalledWith(caller);
 
-    const deleteResult = await InternalToolRegistry.execute("delete_skill", {
-      skillId: "verify_lint",
-    });
+    const loadResult = await InternalToolRegistry.execute(
+      "load_skill",
+      { name: "test_skill" },
+      skillContext,
+    );
+    expect(loadResult).toEqual({ name: "test_skill", body: "Do it", resources: [] });
+    expect(mockSkillLoad).toHaveBeenCalledWith("test_skill", caller);
+
+    const deleteResult = await InternalToolRegistry.execute(
+      "delete_skill",
+      { skillId: "verify_lint" },
+      skillContext,
+    );
     expect(deleteResult).toEqual({ success: true });
+    expect(mockSkillDelete).toHaveBeenCalledWith("verify_lint", caller);
 
     const executeResult = await InternalToolRegistry.execute("execute_skill", {
       skillId: "verify_lint",

@@ -359,6 +359,8 @@ export const SYSTEM_PROMPT_SECTIONS = {
   CONSTRAINTS: "constraints",
   ENVIRONMENT: "environment",
   PROJECT_STRUCTURE: "project-structure",
+  /** Skill catalog — one line per skill; bodies load through load_skill */
+  SKILLS: "skills",
 } as const;
 
 /**

@@ -15,5 +15,7 @@
   "discordGuildIdLine": "- Guild ID: {{guildId}}",
   "discordChannelIdLine": "\n- Channel ID: {{channelId}}",
   "liveApiLanguageHint": "Always respond in the same language the user speaks. The user's primary language is English.",
-  "constraintsHeader": "## Behavioral Constraints\nThe following rules are absolute and must never be violated:"
+  "constraintsHeader": "## Behavioral Constraints\nThe following rules are absolute and must never be violated:",
+  "skillCatalogHeader": "## Skills\nStored instructions for recurring tasks, one per line as `name: what it is for`. Only the names are here. When the task in front of you matches a skill, call `load_skill` with its name and follow what it returns before you start.",
+  "skillHighlight": "Skills that look relevant to this message: {{names}}. If one fits the task, read it with `load_skill` before you start."
 }

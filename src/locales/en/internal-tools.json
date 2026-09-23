@@ -51,9 +51,13 @@
     }
   },
   "list_skills": {
-    "description": "List all available skills. Skills are reusable workflow templates created with create_skill.",
+    "description": "List the skills available in this scope: name, skillId and what each is for. Read a skill's instructions with load_skill.",
+    "parameters": {}
+  },
+  "load_skill": {
+    "description": "Read a skill's full instructions by name. The system prompt lists each available skill as `name: what it is for`; when your task matches one, call this and follow the instructions it returns. Returns the skill's body and its bundled resources.",
     "parameters": {
-      "project": "Optional: filter by project scope."
+      "name": "The skill's name, exactly as the skill catalog lists it."
     }
   },
   "delete_skill": {

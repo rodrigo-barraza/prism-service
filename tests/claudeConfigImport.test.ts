@@ -23,6 +23,10 @@ vi.mock("#config", () => ({
   MONGO_DB_NAME: "prism-test",
 }));
 
+vi.mock("#src/services/EmbeddingService", () => ({
+  default: { embed: vi.fn().mockRejectedValue(new Error("no embeddings here")) },
+}));
+
 vi.mock("#src/utils/logger", () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -38,7 +42,17 @@ const store = vi.hoisted(() => ({
 }));
 
 function matches(row: FakeRow, filter: Record<string, unknown>) {
-  return Object.entries(filter).every(([key, value]) => row[key] === value);
+  return Object.entries(filter).every(([key, value]) => {
+    const operators = value as { $in?: unknown[]; $ne?: unknown } | null;
+    // Real MongoDB: null in an $in list matches a missing field too.
+    if (operators && typeof operators === "object" && "$in" in operators) {
+      return operators.$in!.includes(row[key] ?? null);
+    }
+    if (operators && typeof operators === "object" && "$ne" in operators) {
+      return row[key] !== operators.$ne;
+    }
+    return row[key] === value;
+  });
 }
 
 vi.mock("#src/wrappers/MongoWrapper", () => ({
@@ -49,11 +63,19 @@ vi.mock("#src/wrappers/MongoWrapper", () => ({
       }
       const rows = store.collections.get(collectionName)!;
       return {
+        find: (filter: Record<string, unknown>) => {
+          const cursor = {
+            project: () => cursor,
+            toArray: async () => rows.filter((row) => matches(row, filter)),
+          };
+          return cursor;
+        },
         findOne: async (filter: Record<string, unknown>) =>
           rows.find((row) => matches(row, filter)) ?? null,
         insertOne: async (document: FakeRow) => {
-          rows.push(structuredClone(document));
-          return { insertedId: rows.length };
+          const insertedId = `row-${rows.length + 1}`;
+          rows.push({ _id: insertedId, ...structuredClone(document) });
+          return { insertedId };
         },
         updateOne: async (
           filter: Record<string, unknown>,
@@ -292,6 +314,7 @@ describe("importFromWorkspace", () => {
   it("never clobbers a user-created skill with the same name", async () => {
     store.collections.set(COLLECTIONS.AGENT_SKILLS, [
       {
+        _id: "user-row",
         skillId: "deploy_app",
         name: "deploy-app",
         prompt: "the user's own deploy skill",
