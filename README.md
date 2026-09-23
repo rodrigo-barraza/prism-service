@@ -100,6 +100,10 @@ Prism reads the model list and context window from `/v1/models`, and the parsers
 | `/ws/text-to-audio` | Streaming TTS (binary audio frames) |
 | `/ws/live` | Persistent bidirectional Live API (Gemini Live) |
 
+### Editors (ACP)
+
+`node src/acp/server.ts` is an [Agent Client Protocol](https://agentclientprotocol.com) agent: Zed and other ACP editors drive a Prism conversation through it (JSON-RPC over stdio → this service's HTTP API). Setup and the event mapping: `docs/acp.md`.
+
 ### Admin (requires `x-admin-secret`)
 
 | Method | Endpoint | Description |

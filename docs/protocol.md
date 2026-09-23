@@ -14,6 +14,9 @@ two disagree, `events.ts` is right.
 | `/ws/chat` — a turn it drives, a conversation it views (`subscribe`) | WebSocket, one JSON object per text frame | `TurnEvent` |
 | `POST /synthesis/generate` | SSE response body | `SynthesisEvent` (below) |
 
+Two clients read these streams: prism-client, and the ACP server (`src/acp/server.ts`,
+[`acp.md`](acp.md)), which turns them into Agent Client Protocol updates for editors.
+
 The benchmark, workflow, webhook, LM Studio load and admin change streams, `/ws/live` (Gemini Live
 audio) and `/ws/text-to-audio` are endpoint-specific. They are not part of this protocol.
 
