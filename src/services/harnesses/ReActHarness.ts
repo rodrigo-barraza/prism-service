@@ -1111,6 +1111,30 @@ export default class ReActHarness extends BaseAgenticHarness {
               continue;
             }
 
+            // A sub-agent's turn is its whole run: an async task it started
+            // and did not wait for would complete after it ends, and be
+            // dropped. It waits for its own tasks here, then answers them.
+            if (options.isSubAgent && agentConversationId && !signal?.aborted) {
+              const { holdSubAgentForOwnTasks } = await import(
+                "#src/services/tool-definitions/AsyncTaskTools"
+              );
+              await holdSubAgentForOwnTasks({ conversationId, agentConversationId }, signal ?? undefined);
+              if (hasPendingTurnInput(context) && !signal?.aborted) {
+                currentMessages.push({
+                  role: "assistant",
+                  content: pass.finalStreamedText || pass.streamedText,
+                  thinking: pass.streamedThinking.trim(),
+                  thinkingSignature: pass.thinkingSignature,
+                  ...computePassPhaseDurations(pass),
+                  ...providerNativeState(pass),
+                });
+                drainTurnInput(currentMessages, state, context, "before_end");
+                this.logIteration(pass, currentMessages);
+                this.deviationEngine.recordCompletedIteration([]);
+                continue;
+              }
+            }
+
             this.logIteration(pass, currentMessages);
             this.deviationEngine.recordCompletedIteration([]);
             semanticStallDetector.recordIteration([], pass.streamedText);
