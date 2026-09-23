@@ -24,6 +24,8 @@ import type { DecisionOwner } from "#src/services/PendingDecisionStore";
  *                        sub-agent (previously queued into a field nobody read)
  *   - `hook_context`     the `additionalContext` of an async configured hook
  *                        that finished while the turn kept going
+ *   - `goal_revision`    the goal verifier's gaps: the agent claimed the goal
+ *                        done and the verifier disagrees (lifecycle/GoalGate)
  *
  * Keyed by the loop's client-facing `conversationId` — for a root turn that
  * is the id the client holds; for a sub-agent it is the sub-agent's own
@@ -56,7 +58,8 @@ export type TurnInputKind =
   | "question_answer"
   | "task_completion"
   | "agent_message"
-  | "hook_context";
+  | "hook_context"
+  | "goal_revision";
 
 export interface TurnInputEntry {
   id: string;

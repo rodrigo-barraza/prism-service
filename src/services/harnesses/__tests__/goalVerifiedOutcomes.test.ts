@@ -569,10 +569,14 @@ describe("goals become verified outcomes", () => {
     expect(sent).toContain("read_file");
     expect(sent).toContain("- beta.ts: helpers");
     expect(sent).toContain("FINAL-ANSWER: report.md summarizes alpha.ts, beta.ts and gamma.md.");
-    // Never the agent's reasoning, nor what it said about its own work.
+    // Never the agent's reasoning, nor what it said about its own work —
+    // and no thinking content at all (the verifier's own thinking is off).
     expect(sent).not.toContain("PRIVATE-REASONING");
     expect(sent).not.toContain("NARRATION");
-    expect(sent).not.toContain("thinking");
+    const content = JSON.stringify({ system: payload.system, messages: payload.messages });
+    expect(content).not.toMatch(/"type":"(redacted_)?thinking"/);
+    expect(content).not.toContain("thinkingSignature");
+    expect((payload.thinking as { type?: string } | undefined)?.type ?? "disabled").toBe("disabled");
     expect(storedGoal().status).toBe("completed");
   });
 
@@ -694,6 +698,9 @@ describe("goals become verified outcomes", () => {
     const run = startTurn([
       { kind: "tool", toolName: "read_file", args: { path: "report.md" } },
       { kind: "text", text: "Done." },
+      // The user speaks while this pass streams: the harness hands the
+      // message to the model before anything else happens.
+      { kind: "text", text: "Working on the bullet count now." },
       { kind: "text", text: "Sure — stopping here as you asked." },
       { kind: "text", text: "never reached" },
     ]);
@@ -704,7 +711,9 @@ describe("goals become verified outcomes", () => {
     };
     await run.done;
 
-    expect(callIndex).toBe(3);
+    // The user's message is answered (call 4); then the goal stops driving.
+    expect(callIndex).toBe(4);
+    expect(finalText).toBe("Sure — stopping here as you asked.");
     expect(verifierCalls()).toHaveLength(1);
     const goal = storedGoal();
     expect(goal.status).toBe("paused");

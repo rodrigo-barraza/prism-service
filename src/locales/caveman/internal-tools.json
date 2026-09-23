@@ -240,23 +240,25 @@
       "timeoutSeconds": "Optional: max wait (default 60, max 300)."
     }
   },
-  "set_goal": {
-    "description": "Set persistent goal for conversation: what 'done' mean, in user words. Optional: how to know done, max dollars, max turns, deadline. Shown every turn. Refused for sub-agent.",
+  "propose_goal": {
+    "description": "Propose goal for conversation: what 'done' mean, as list of checkable criteria, optional budget. User approve or decline card; goal only real after approve. Approved goal keep you working until independent verifier check every criterion from evidence. Refused for sub-agent.",
     "parameters": {
       "objective": "Goal in user words.",
-      "completionCriteria": "Optional: how to know done.",
-      "maxCostDollars": "Optional: dollar cap for goal.",
+      "rubric": "Criteria that must all hold, each checkable from tool results.",
+      "stepRubric": "Optional: criteria for HOW work done, checked every step.",
+      "maxCostDollars": "Optional: dollar cap for goal (verifier count).",
       "maxTurns": "Optional: turn cap.",
-      "deadline": "Optional: ISO deadline."
+      "deadline": "Optional: ISO deadline.",
+      "maxIterations": "Optional: how many times verifier send work back before goal pause (default 3)."
     }
   },
   "update_goal": {
-    "description": "Update goal: progress (summary/percent), what block you, or status. Use status 'completed' when criteria met; set blockedOn when stuck, not spin. Only user can pause.",
+    "description": "Update goal: progress (summary/percent), what block you, or status. Status 'completed' only a CLAIM: independent verifier check every criterion from evidence at end of turn. Set blockedOn when stuck or need user, not spin. Only user can pause.",
     "parameters": {
       "progress": "Short progress summary.",
       "percent": "Optional: 0-100.",
       "blockedOn": "Current obstacle, or null when clear.",
-      "status": "active | completed | blocked."
+      "status": "active | blocked | completed (claim, verifier check)."
     }
   },
   "clear_goal": {
