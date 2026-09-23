@@ -1,15 +1,14 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { type Request, type Response, type NextFunction } from "express";
+import { requireUserAuthorityToChange } from "#src/middleware/ExternalAuthority";
 import CustomAgentService from "#src/services/CustomAgentService";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { normalizeAgentDefinitionBody } from "#src/services/agents/AgentDefinitionFields";
-import { requireUserAuthorityToChange } from "#src/middleware/ExternalAuthority";
 
-const router = express.Router();
 // An agent's instructions and tool policies are the user's to change.
-router.use(requireUserAuthorityToChange("change an agent or its tool policies"));
+const router = express.Router().use(requireUserAuthorityToChange("change an agent or its tool policies"));
 
 /**
  * GET /custom-agents
