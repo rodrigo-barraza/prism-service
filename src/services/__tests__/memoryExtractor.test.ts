@@ -252,6 +252,35 @@ describe("MemoryExtractor", () => {
     expect(MemoryConsolidationService.checkAndRun).toHaveBeenCalled();
   });
 
+  // lupos-bot extracts LUPOS's memories through POST /memory/extract, the
+  // guild-scoped rows his turns recall. The in-loop extractor's rows for him
+  // were never read back — it must not spend an extraction call on his turns.
+  it("does not run for LUPOS, whose platform extracts his memories", async () => {
+    const extractSpy = vi.spyOn(MemoryExtractor, "extractAndStore");
+    const hook = MemoryExtractor.createHook();
+
+    await hook(
+      {
+        project: "lupos",
+        username: "discord",
+        agent: "LUPOS",
+        messages: [...SESSION],
+        emit: vi.fn(),
+        options: { agentContext: { platform: "discord", guildId: "g1", channelId: "c1" } },
+      } as any,
+      {},
+    );
+    await hook(
+      { project: "test-proj", username: "rodrigo", agent: "CODING", messages: [...SESSION], emit: vi.fn() } as any,
+      {},
+    );
+
+    expect(extractSpy).toHaveBeenCalledTimes(1);
+    expect(extractSpy).toHaveBeenCalledWith(expect.objectContaining({ agent: "CODING" }));
+    expect(extractSpy).not.toHaveBeenCalledWith(expect.objectContaining({ agent: "LUPOS" }));
+    extractSpy.mockRestore();
+  });
+
   describe("provenance (prompt 22)", () => {
     const WEB_SESSION = [
       { role: "user", content: "I am a senior developer and I work in TypeScript." },

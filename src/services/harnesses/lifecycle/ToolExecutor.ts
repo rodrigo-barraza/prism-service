@@ -250,6 +250,9 @@ export async function executeToolBatch(
                 project,
                 username,
                 agent,
+                // A Discord turn's scope rides every tools-service call as
+                // x-discord-* headers (DiscordContextHeaders).
+                agentContext: context.options?.agentContext,
                 requestId: context.requestId,
                 agentConversationId: resolvedAgentConversationId,
                 conversationId,
@@ -293,6 +296,7 @@ export async function executeToolBatch(
               username,
               profileId: context.profileId,
               agent: agent || null,
+              agentContext: context.options?.agentContext,
               traceId: traceId || null,
               agentConversationId: resolvedAgentConversationId,
               conversationId,

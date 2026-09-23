@@ -28,6 +28,7 @@ import {
   getDefaultModels,
   getPricing,
   getModelByName,
+  resolveModelAlias,
   getAgentDefaults,
 } from "#src/config";
 import {
@@ -228,7 +229,7 @@ async function prepareGenerationContext(
 
   const {
     provider: _providerName,
-    model: requestedModel,
+    model: rawRequestedModel,
     messages,
     conversationId: incomingConversationId,
     agentConversationId: incomingAgentConversationId,
@@ -308,6 +309,15 @@ async function prepareGenerationContext(
   } = validatedParams;
 
   let providerName = _providerName;
+  // A model ID the catalog lists under another name (tools-service's image
+  // generation still sends gemini-3-pro-image-preview) becomes the catalog
+  // name here, before anything reads it — so the provider call, the model
+  // definition (streaming, output modalities), logging and pricing all see
+  // the model the catalog describes (config MODEL_ID_ALIASES).
+  const requestedModel =
+    typeof rawRequestedModel === "string"
+      ? resolveModelAlias(rawRequestedModel)
+      : rawRequestedModel;
   // Build the internal options object that providers expect
   const options: Record<string, unknown> = {
     ...(tools && { tools }),
@@ -1397,6 +1407,7 @@ async function handleStreamingText(context: GenerationContext) {
             project,
             username,
             agent: agent || null,
+            agentContext: options.agentContext,
             requestId,
             conversationId: conversationId || null,
             traceId: traceId || null,

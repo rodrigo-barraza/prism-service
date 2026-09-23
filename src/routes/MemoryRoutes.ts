@@ -11,6 +11,8 @@ const router = express.Router();
  * POST /memory/extract
  * Extract and store memories from a conversation chunk.
  * Body: { guildId, channelId, messages, participants, sourceMessageId? }
+ * `participants` entries are `{ id, username, displayName }` objects, or bare
+ * display-name strings from an older lupos-bot (no id).
  */
 router.post(
   "/extract",
@@ -25,7 +27,7 @@ router.post(
         traceId,
       } = req.body;
 
-      if (!guildId || !messages || !participants) {
+      if (!guildId || !Array.isArray(messages) || !Array.isArray(participants)) {
         return res.status(400).json({
           error: "Missing required fields: guildId, messages, participants",
         });
