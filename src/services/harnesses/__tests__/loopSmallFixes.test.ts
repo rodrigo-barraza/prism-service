@@ -1,7 +1,8 @@
 /**
  * loopSmallFixes.test.ts
  *
- * Regression tests for docs/prompts/09-harness-small-fixes.md, Landing 1,
+ * Regression tests for docs/harness_modernization_2026-09.md B5 (a), B7 (c)
+ * and S4 (f),
  * run against the REAL AgenticLoopService and a REAL ReActHarness whose model
  * is scripted (same dependency mocks as turnInputAcceptance.test.ts):
  *
