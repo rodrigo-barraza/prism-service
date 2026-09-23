@@ -255,7 +255,7 @@ vi.mock("../lifecycle/CodexPlanningDetector.ts", () => ({
 vi.mock("../lifecycle/SystemReminderExtractor.ts", () => ({
   extractReminderViaLLM: vi.fn().mockResolvedValue("Stay on task and cite the tool results."),
 }));
-vi.mock("../lifecycle/CostBudgetEnforcer.ts", () => ({ checkCostBudget: vi.fn().mockReturnValue(false) }));
+vi.mock("../lifecycle/CostBudgetEnforcer.ts", () => ({ checkCostBudget: vi.fn().mockReturnValue(false), enforceCostBudget: vi.fn().mockResolvedValue(false), recordLoopSpend: vi.fn() }));
 vi.mock("../lifecycle/ToolRetryInterceptor.ts", () => ({ buildToolRetryGuidance: vi.fn().mockReturnValue(null) }));
 
 const toolContextStores = vi.hoisted(() => new Map<string, Map<string, unknown>>());

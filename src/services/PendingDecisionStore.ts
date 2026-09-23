@@ -28,7 +28,7 @@ import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
  * which is exactly what they did before this store existed.
  */
 
-export type PendingDecisionKind = "tool" | "plan" | "question";
+export type PendingDecisionKind = "tool" | "plan" | "question" | "budget";
 export type PendingDecisionStatus = "pending" | "decided" | "answered" | "cancelled";
 
 /** An approval as recorded — the same shape the loop acts on. */
@@ -38,6 +38,19 @@ export interface StoredApprovalDecision {
   source: "user" | "superseded" | "turn_ended";
   reason?: string;
   editedArgs?: Record<string, unknown>;
+}
+
+/** Which cap a budget pause is bound by: the turn's own, or the conversation goal's. */
+export type BudgetLimit = "turn" | "goal";
+
+/** A budget pause as decided: raise a cap (the turn's and/or the goal's), or stop. */
+export interface StoredBudgetDecision {
+  action: "raise" | "stop";
+  source: "user" | "superseded" | "turn_ended";
+  /** The turn's new cap. */
+  turnCapDollars?: number | null;
+  /** The goal's new dollar budget (null: the goal no longer caps it). */
+  goalMaxCostDollars?: number | null;
 }
 
 /** Who asked, and where their conversation lives — enough to find it after a restart. */
@@ -96,6 +109,23 @@ export interface PendingDecisionRecord extends DecisionOwner {
   questions?: unknown[];
   choices?: string[];
   answers?: unknown[];
+
+  // ── A budget pause (the tree reached its cost cap) ──
+  /** What the tree had spent when it paused. */
+  spentDollars?: number;
+  /** The cap it reached — the lower of the turn's and the goal's. */
+  maxCostDollars?: number;
+  limitedBy?: BudgetLimit;
+  /** The turn's own cap (null: none — the goal's is the only one). */
+  turnCapDollars?: number | null;
+  /** The goal's dollar budget and what it had spent before this turn (null: no goal cap). */
+  goalMaxCostDollars?: number | null;
+  goalSpentBeforeTurnDollars?: number | null;
+  /** The iteration the pause stopped at. */
+  iteration?: number;
+  budgetDecision?: StoredBudgetDecision;
+  /** False: the raise was stored with no turn running to take it — the re-driven turn applies it. */
+  delivered?: boolean;
 }
 
 export interface PendingDecisionQuery {
@@ -111,6 +141,7 @@ export interface PendingDecisionQuery {
 export type SettlePatch =
   | { status: "decided"; decision: StoredApprovalDecision }
   | { status: "answered"; answers: unknown[] }
+  | { status: "decided"; budgetDecision: StoredBudgetDecision; delivered: boolean }
   | { status: "cancelled" };
 
 // ── Backends ─────────────────────────────────────────────────────────
@@ -281,7 +312,7 @@ const PendingDecisionStore = {
   /** Set bookkeeping fields on a record (never its status — `settle` owns that). */
   async update(
     id: string,
-    fields: Partial<Pick<PendingDecisionRecord, "undelivered">>,
+    fields: Partial<Pick<PendingDecisionRecord, "undelivered" | "delivered">>,
   ): Promise<void> {
     const inMemory = memoryRecords.get(id);
     if (inMemory) {

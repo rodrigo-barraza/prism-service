@@ -14,6 +14,9 @@ two disagree, `events.ts` is right.
 | `/ws/chat` — a turn it drives, a conversation it views (`subscribe`) | WebSocket, one JSON object per text frame | `TurnEvent` |
 | `POST /synthesis/generate` | SSE response body | `SynthesisEvent` (below) |
 
+Two clients read these streams: prism-client, and the ACP server (`src/acp/server.ts`,
+[`acp.md`](acp.md)), which turns them into Agent Client Protocol updates for editors.
+
 The benchmark, workflow, webhook, LM Studio load and admin change streams, `/ws/live` (Gemini Live
 audio) and `/ws/text-to-audio` are endpoint-specific. They are not part of this protocol.
 
@@ -207,6 +210,8 @@ Fields for each `sub_agent_status` `message`:
 | `context_exhausted` | `availableOutputTokens`, `contextWindow` |
 | `context_truncated` | `strategy`, `estimatedTokens` |
 | `cost_limit_reached` | `estimatedCost`, `maxCostDollars`, `iteration` |
+| `budget_reached` | `pauseId`, `spentDollars`, `maxCostDollars`, `limitedBy: "turn" \| "goal"`, `iteration`, `turnCapDollars?`, `goalMaxCostDollars?` — the tree paused at its cost cap; raise it with `PATCH /conversations/:id/budget` (or the goal's budget) |
+| `budget_resolved` | `pauseId`, `action: "raise" \| "stop"`, `source: "user" \| "superseded" \| "turn_ended"`, `maxCostDollars?` |
 | `repetition_detected`, `semantic_stall_detected` | `iteration`, `rule`, `retry` |
 | `system_reminder_injected` | `iteration`, `interval` |
 | `skills_injected` | `skills` |

@@ -40,8 +40,14 @@ import { sendWebPush, type VapidDetails } from "./WebPushProtocol.ts";
 export type PushMomentKind =
   | "approval_required"
   | "question_asked"
+  | "budget_reached"
   | "turn_completed"
   | "turn_failed";
+
+/** Moments that wait on a person: they ring at high urgency. */
+function isDecisionMoment(kind: PushMomentKind): boolean {
+  return kind === "approval_required" || kind === "question_asked" || kind === "budget_reached";
+}
 
 export interface PushMomentOwner {
   project: string | null;
@@ -59,6 +65,9 @@ export interface PushMoment {
   questionId?: string | null;
   questionText?: string | null;
   errorMessage?: string | null;
+  /** A budget pause: what the turn spent, against which cap. */
+  spentDollars?: number | null;
+  maxCostDollars?: number | null;
   owner?: PushMomentOwner;
 }
 
@@ -172,6 +181,14 @@ export function describeMoment(
         title: `Question · ${where}`,
         body: truncate(moment.questionText || "The agent is waiting for your answer."),
       };
+    case "budget_reached":
+      return {
+        title: `Budget reached · ${where}`,
+        body:
+          typeof moment.spentDollars === "number" && typeof moment.maxCostDollars === "number"
+            ? `$${moment.spentDollars.toFixed(2)} spent of the $${moment.maxCostDollars.toFixed(2)} cap — raise it to let the agent continue.`
+            : "The agent reached its cost cap — raise it to let the agent continue.",
+      };
     case "turn_completed":
       return { title: `Done · ${where}`, body: "The agent finished its turn." };
     case "turn_failed":
@@ -191,10 +208,7 @@ async function sendThroughNtfy(payload: PushNotificationPayload): Promise<void> 
       topic: PRISM_PUSH_NTFY_TOPIC,
       title: payload.title,
       message: payload.body,
-      priority:
-        payload.kind === "approval_required" || payload.kind === "question_asked"
-          ? "high"
-          : "default",
+      priority: isDecisionMoment(payload.kind) ? "high" : "default",
       ...(PRISM_CLIENT_PUBLIC_URL
         ? { clickUrl: new URL(payload.url, PRISM_CLIENT_PUBLIC_URL).toString() }
         : {}),
@@ -212,10 +226,7 @@ async function sendToSubscriptions(
   vapid: VapidDetails,
 ): Promise<void> {
   const serialized = JSON.stringify(payload);
-  const urgency =
-    payload.kind === "approval_required" || payload.kind === "question_asked"
-      ? "high"
-      : "normal";
+  const urgency = isDecisionMoment(payload.kind) ? "high" : "normal";
   await Promise.all(
     subscriptions.map(async (subscription) => {
       try {
