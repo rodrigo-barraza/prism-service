@@ -88,6 +88,10 @@ export interface SubAgentState {
   progressReportCount?: number;
   /** The latest report_progress message, delivered or not. */
   lastProgress?: { message: string; reportedAt: number };
+  /** The permission mode its last run had (its definition's, narrowed to the parent's). */
+  permissionMode?: import("#src/services/agents/AgentDefinitionFields").AgentPermissionMode;
+  /** Its last run stopped at its turn cap (maxTurns) before finishing — resumable. */
+  partial?: boolean;
 }
 
 // ── Worktree diff contract (tools-service) ─────────────────
@@ -181,6 +185,8 @@ export interface SubAgentResult {
   };
   mergeBack?: MergeBackReport;
   error?: string;
+  /** Stopped at its turn cap before finishing; `resume_subagent` continues it. */
+  partial?: boolean;
   recursionDepth?: number;
   subtreeMetrics?: SubtreeMetrics;
 }

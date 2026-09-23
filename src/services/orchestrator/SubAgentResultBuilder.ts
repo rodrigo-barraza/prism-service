@@ -238,6 +238,13 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
     };
   }
 
+  if (subAgent.partial && status === "completed") {
+    result.partial = true;
+    result.summary =
+      `Agent "${subAgent.description}" stopped at its turn limit (${subAgent.maxIterations}) before finishing — ` +
+      `resume_subagent with agent_id "${subAgent.agentId}" continues it`;
+  }
+
   // Shared by reference: a router settling a deferred worktree later updates
   // this result too.
   if (subAgent.mergeBack) {
@@ -267,6 +274,25 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
   }
 
   return result;
+}
+
+/**
+ * How a finished sub-agent reads in its parent's completion message:
+ * "✅", "⏸ partial — …" (stopped at its turn cap; says how to continue), or
+ * "⚠️ <status>". `withStatus` spells the status out ("✅ completed").
+ */
+export function describeSubAgentOutcome(
+  result: Pick<SubAgentResult, "agent_id" | "status" | "partial" | "iterations">,
+  { withStatus = false }: { withStatus?: boolean } = {},
+): string {
+  if (result.status !== "completed") return `⚠️ ${result.status}`;
+  if (result.partial) {
+    return (
+      `⏸ partial — stopped at its turn limit (${result.iterations} iterations) before finishing; ` +
+      `resume_subagent with agent_id "${result.agent_id}" continues it`
+    );
+  }
+  return withStatus ? "✅ completed" : "✅";
 }
 
 function buildDiagnosticSummary(
