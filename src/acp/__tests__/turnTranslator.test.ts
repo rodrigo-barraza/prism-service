@@ -207,14 +207,13 @@ describe("TurnTranslator — plans, modes and outcomes", () => {
     expect(translator.sessionCost).toBeCloseTo(1.4, 10);
   });
 
-  it("counts a sub-agent's cost once, from its `complete`, not from the totals it forwards untagged", () => {
+  it("adds a sub-agent's cost from its `complete`, beside the turns' own", () => {
     const translator = new TurnTranslator({ workspaceRoot: null });
-    translator.translate(valid({ type: "usage_update", usage: {}, estimatedCost: 0.01 }));
-    translator.translate(valid({ type: "done", provider: "p", model: "m", usage: null, estimatedCost: 0.01, totalTime: 1 }));
     translator.translate(valid({ type: "sub_agent_status", subAgentId: "s", message: "spawned", description: "d" }));
-    const during = translator.translate(valid({ type: "usage_update", usage: {}, estimatedCost: 0.5 }));
-    expect(during.updates).toEqual([]);
+    // The parent keeps working while a detached sub-agent runs: its own totals count.
+    translator.translate(valid({ type: "usage_update", usage: {}, estimatedCost: 0.01 }));
     expect(translator.outcome.turnCost).toBeCloseTo(0.01, 10);
+    translator.translate(valid({ type: "done", provider: "p", model: "m", usage: null, estimatedCost: 0.01, totalTime: 1 }));
     translator.translate(
       valid({ type: "sub_agent_status", subAgentId: "s", message: "complete", durationMilliseconds: 1, toolCount: 0, estimatedCost: 0.04 }),
     );

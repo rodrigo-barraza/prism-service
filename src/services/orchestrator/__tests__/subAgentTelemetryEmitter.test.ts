@@ -429,7 +429,7 @@ describe("SubAgentTelemetryEmitter", () => {
       vi.restoreAllMocks();
     });
 
-    it("gives a forwarded card, decision, usage update and grandchild event the parent's next seq", () => {
+    it("gives a forwarded card, decision and grandchild event the parent's next seq", () => {
       vi.spyOn(Date, "now").mockReturnValue(1_790_000_000_000);
       const parentStream: Array<Record<string, unknown>> = [];
       const parentEmit = withDirectViewerBroadcast("parent-conv-1", (event: Record<string, unknown>) => {
@@ -450,7 +450,6 @@ describe("SubAgentTelemetryEmitter", () => {
         toolCall: { name: "write_file", args: { path: "a.txt" }, id: "call-1" },
       });
       emitFunction({ type: "approval_decided", toolCallId: "call-1", batchId: "batch-1", decision: "allow", scope: "call", source: "user" });
-      emitFunction({ type: "usage_update", usage: { inputTokens: 10, outputTokens: 2 } });
       emitFunction({ type: "sub_agent_status", subAgentId: "grandchild-1", message: "phase", phase: "thinking" });
 
       const seqs = parentStream.map((event) => event.seq as number);
