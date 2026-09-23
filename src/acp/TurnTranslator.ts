@@ -291,18 +291,14 @@ export class TurnTranslator {
       case "permission_mode":
         return { updates: [{ sessionUpdate: "current_mode_update", currentModeId: event.mode }] };
       case "context_budget":
-        // A running sub-agent's budget reaches this stream untagged; the
-        // context that matters here is the turn's own.
-        if (this.subAgentRunning()) return { updates: [] };
         this.contextWindow = event.contextWindow;
         this.contextUsed = event.totalInputTokens;
         return this.usage();
       case "usage_update":
         // A background operation (`operation` set) bills separately; the turn's
-        // own running total is the one without it. A running sub-agent's
-        // totals arrive untagged too: its cost is counted from its
-        // `complete` instead.
-        if (event.operation || this.subAgentRunning()) return { updates: [] };
+        // own running total is the one without it. A sub-agent's spend arrives
+        // on its `complete` (sub_agent_status), counted there.
+        if (event.operation) return { updates: [] };
         if (typeof event.estimatedCost === "number") this.runningTurnCost = event.estimatedCost;
         this.updateCost();
         return this.usage();
@@ -624,13 +620,6 @@ export class TurnTranslator {
       ],
       interaction: { kind: "plan", event, toolCall },
     };
-  }
-
-  private subAgentRunning(): boolean {
-    for (const state of this.tools.values()) {
-      if (state.name === "sub_agent" && state.status === "in_progress") return true;
-    }
-    return false;
   }
 
   private updateCost(): void {

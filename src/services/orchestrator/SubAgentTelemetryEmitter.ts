@@ -381,11 +381,12 @@ export class SubAgentTelemetryEmitter {
         this.broadcastToDirectViewers(event);
         this.handleDoneEvent(event);
       } else if (event.type === "usage_update") {
-        // Broadcast usage updates to direct WebSocket viewers
+        // The sub-agent's running totals belong to its own conversation's
+        // viewers. On the parent stream a usage_update is the PARENT turn's
+        // running total (docs/protocol.md); the sub-agent's spend reaches the
+        // parent on sub_agent_status (progress, and `complete` with usage and
+        // estimatedCost) instead.
         this.broadcastToDirectViewers(event);
-        if (this.parentEmit) {
-          this.parentEmit(forParentStream(event));
-        }
       } else if (
         event.type === "approval_required" ||
         event.type === APPROVALS.DECIDED_EVENT_TYPE

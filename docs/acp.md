@@ -117,8 +117,8 @@ missed). If the socket saw none of it, the answer is read back from the persiste
 messages.
 
 One prompt can therefore span several turns. The cost sums each turn's `done` and each
-sub-agent's `complete`. A running sub-agent's own usage events reach the parent stream
-untagged, so they are not counted twice.
+sub-agent's `complete`. A sub-agent's running totals stay on its own conversation's
+stream: on the parent stream, a `usage_update` is only ever the parent turn's.
 
 ## Behaviour worth knowing
 
