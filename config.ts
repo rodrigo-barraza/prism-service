@@ -71,6 +71,14 @@ export function openAIResponsesTransport(): "websocket" | "http" {
 export const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 export const GOOGLE_CLOUD_GEMINI_API_KEY =
   process.env.GOOGLE_CLOUD_GEMINI_API_KEY;
+/**
+ * PROTOTYPE switch (prompt 25 Landing 2): "interactions" streams Gemini agent
+ * turns over the Interactions API; anything else keeps generateContent, the
+ * default until the transport decision is made.
+ */
+export function geminiTransport(): "interactions" | "generate_content" {
+  return process.env.GEMINI_TRANSPORT === "interactions" ? "interactions" : "generate_content";
+}
 export const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 export const INWORLD_BASIC = process.env.INWORLD_BASIC;
 // Moonshot AI (Kimi) — OpenAI-compatible cloud provider.
