@@ -388,11 +388,18 @@ export const LuposPersona: Persona = {
   //     place the wolf is told the economy exists at all, and it is
   //     `requires`-gated on these three, so leaving them to discovery
   //     left him unaware of his own hoard on every turn.
+  //   - generate_image is half his traffic, and the commonest request —
+  //     an edit of an image already in the channel ("now make it gay",
+  //     "switch the weapon") — never names a drawing verb for pre-flight
+  //     to match. Left to discovery, 73% of image turns (2026-08-23 →
+  //     09-22) spent a whole model call on discover_and_enable_tools
+  //     first: 18% of his iteration cost, several seconds each.
   enabledByDefaultTools: [
     "react_to_discord_message",
     "get_discord_gold_balance",
     "give_discord_gold",
     "mug_discord_gold",
+    "generate_image",
   ],
   capabilities: "",
   hasSomaticState: true,

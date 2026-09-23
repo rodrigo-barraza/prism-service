@@ -69,4 +69,34 @@ describe("Lupos persona tool policy", () => {
       expect(goldRules).not.toContain("theater, not finance");
     },
   );
+
+  // The caps live in lupos-bot (src/commands/utility/gold/luposAgentGold.ts:
+  // LUPOS_GIFT_MIN/MAX = 1/5, LUPOS_MUG_MIN/MAX = 1/3) and clamp silently.
+  // When the economy was cut to a tenth (lupos-bot f6c0319) this text kept
+  // promising 5-50g gifts and 5-25g muggings, with 12g/15g/18g examples — a
+  // wolf asking for 15g moved 3g and announced 15g. Change both together.
+  it.each(["en", "caveman"])(
+    "states only amounts the bot's gold caps allow (%s)",
+    (locale) => {
+      const goldRules = extractGoldRules(buildColdStartPolicy(locale));
+
+      expect(goldRules).toContain("1-5g");
+      expect(goldRules).toContain("1-3g");
+      const amounts = [...goldRules.matchAll(/(\d+)g\b/g)].map((match) =>
+        Number(match[1]),
+      );
+      expect(amounts.length).toBeGreaterThan(0);
+      expect(Math.max(...amounts)).toBeLessThanOrEqual(5);
+    },
+  );
+});
+
+describe("Lupos persona default tools", () => {
+  // Image requests are half his traffic, and an edit of a picture already in
+  // the channel never names a drawing verb for pre-flight discovery to match
+  // — so 73% of image turns spent a model call on discover_and_enable_tools
+  // before drawing anything.
+  it("can draw on the first iteration without a discovery round", () => {
+    expect(defaultEnabledTools).toContain("generate_image");
+  });
 });
