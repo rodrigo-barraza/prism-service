@@ -592,6 +592,45 @@ describe("ProjectInstructionsService.setContent", () => {
   });
 });
 
+describe("ProjectInstructionsService.getLayers — merged, not replaced", () => {
+  it("returns the project document AND the agent's, each the current revision", async () => {
+    const fake = createFakeDatabase();
+    await ProjectInstructionsService.setContent(fake.db, SCOPE, "project v1", "user");
+    await ProjectInstructionsService.setContent(fake.db, SCOPE, "project v2", "user");
+    await ProjectInstructionsService.setContent(fake.db, { ...SCOPE, agent: "CODING" }, "coding-only", "user");
+
+    const layers = await ProjectInstructionsService.getLayers(fake.db, { ...SCOPE, agent: "CODING" });
+
+    expect(layers.project?.content).toBe("project v2");
+    expect(layers.agent?.content).toBe("coding-only");
+  });
+
+  it("has no agent layer for an agent without a document, or without an agent", async () => {
+    const fake = createFakeDatabase();
+    await ProjectInstructionsService.setContent(fake.db, SCOPE, "shared", "user");
+    await ProjectInstructionsService.setContent(fake.db, { ...SCOPE, agent: "CODING" }, "coding-only", "user");
+
+    const forOther = await ProjectInstructionsService.getLayers(fake.db, { ...SCOPE, agent: "LUPOS" });
+    expect(forOther.project?.content).toBe("shared");
+    expect(forOther.agent).toBeNull();
+
+    const direct = await ProjectInstructionsService.getLayers(fake.db, SCOPE);
+    expect(direct.project?.content).toBe("shared");
+    expect(direct.agent).toBeNull();
+  });
+
+  it("drops a cleared layer and keeps the other", async () => {
+    const fake = createFakeDatabase();
+    await ProjectInstructionsService.setContent(fake.db, SCOPE, "shared", "user");
+    await ProjectInstructionsService.setContent(fake.db, { ...SCOPE, agent: "CODING" }, "coding-only", "user");
+    await ProjectInstructionsService.clear(fake.db, SCOPE);
+
+    const layers = await ProjectInstructionsService.getLayers(fake.db, { ...SCOPE, agent: "CODING" });
+    expect(layers.project).toBeNull();
+    expect(layers.agent?.content).toBe("coding-only");
+  });
+});
+
 describe("ProjectInstructionsService.getCurrent — scope resolution", () => {
   it("prefers the agent-scoped document over the project-wide one", async () => {
     const fake = createFakeDatabase();

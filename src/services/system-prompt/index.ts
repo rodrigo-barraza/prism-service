@@ -47,6 +47,12 @@ import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
 import { getRequestContext } from "#src/utils/RequestContext";
 import { estimateTokens } from "#src/utils/CostCalculator";
 import { sectionsWithinBudget } from "#src/services/BudgetPreset";
+import {
+  buildInstructionsSection,
+  type LoadedInstruction,
+} from "#src/services/instructions/InstructionsSection";
+import type { WorkspaceInstructions } from "#src/services/instructions/WorkspaceInstructions";
+import { readTurnWorkspaceInstructions } from "#src/services/instructions/turnInstructions";
 
 /**
  * Wrap a system prompt section in XML semantic tags.
@@ -130,46 +136,46 @@ async function fetchActiveRules(
 }
 
 /**
- * Fetch the project instructions document — the PRISM.md analogue of
- * CLAUDE.md. Unlike rules, which the client pins per turn, this is a single
- * always-on document per scope.
- *
- * Resolution is most-specific-wins: an agent-scoped document beats the
- * scope-wide one, so a project can carry shared instructions plus a narrower
- * overlay for one agent. `validTo: null` selects the current revision —
- * writes supersede rather than overwrite, so history stays queryable.
+ * Fetch the PRISM.md documents a turn carries — the analogue of CLAUDE.md,
+ * stored in Mongo. Unlike rules, which the client pins per turn, these are
+ * always on: the project document (every agent) and, for a persona, its own
+ * document too. Merged, not replaced (InstructionsSection.ts documents the
+ * order). `validTo: null` selects the current revision — writes supersede
+ * rather than overwrite, so history stays queryable.
  */
-async function fetchProjectInstructions(
+async function fetchProjectInstructionLayers(
   project: string | null | undefined,
   username: string | undefined,
   agent: string | null | undefined,
-): Promise<string> {
+): Promise<{ project: string; agent: { agent: string; content: string } | null }> {
   try {
     // Delegate to the service rather than re-querying here. Both would have
-    // to agree on `validTo: null`, on most-specific-wins, and on how to break
-    // a tie when a crashed write leaves two current rows — three chances for
-    // the reader and the writer to drift apart on the same document.
-    // NOTE(profiles): agent_instructions is NOT profile-scoped yet —
-    // ProjectInstructionsService owns both read and write scope, so the
-    // profileId dimension must be added there (reader + writer together),
-    // not threaded through this call alone.
+    // to agree on `validTo: null` and on how to break a tie when a crashed
+    // write leaves two current rows — two chances for the reader and the
+    // writer to drift apart on the same document.
+    // NOTE(profiles): the service stamps the request's profile (normalizeScope).
     const { default: ProjectInstructionsService } = await import(
       "#src/services/ProjectInstructionsService"
     );
     const database = ProjectInstructionsService.getDatabase();
-    if (!database) return "";
-    const document = await ProjectInstructionsService.getCurrent(database, {
+    if (!database) return { project: "", agent: null };
+    const layers = await ProjectInstructionsService.getLayers(database, {
       project: project || "any",
       username: username || "any",
       agent: agent || null,
     });
-    const content = document?.content;
-    return typeof content === "string" ? content.trim() : "";
+    const agentContent =
+      typeof layers.agent?.content === "string" ? layers.agent.content.trim() : "";
+    return {
+      project:
+        typeof layers.project?.content === "string" ? layers.project.content.trim() : "",
+      agent: agent && agentContent ? { agent, content: agentContent } : null,
+    };
   } catch (error: unknown) {
     logger.warn(
       `[SystemPromptAssembler] Could not load project instructions: ${getErrorMessage(error)}`,
     );
-    return "";
+    return { project: "", agent: null };
   }
 }
 
@@ -201,11 +207,14 @@ async function fetchAlreadyInjectedMemoryIds(
 
 export default class SystemPromptAssembler {
   workspaceRoot: string;
+  /** The root the caller named — unlike workspaceRoot, never the $HOME fallback. */
+  private explicitWorkspaceRoot: string | null;
   private directoryFormatter: DirectoryTreeFormatter;
   private docFormatter: ToolDocFormatter;
   private scorer: SkillMemoryScorer;
 
   constructor(options: { workspaceRoot?: string } = {}) {
+    this.explicitWorkspaceRoot = options.workspaceRoot || null;
     this.workspaceRoot =
       options.workspaceRoot ||
       ToolOrchestratorService.getWorkspaceRoot() ||
@@ -245,12 +254,9 @@ export default class SystemPromptAssembler {
   async assemble(context: AssemblerContext) {
     const sections: string[] = [];
     // What the `InstructionsLoaded` hook event reports: each standing
-    // instruction this prompt carries (PRISM.md, every pinned rule).
-    const loadedInstructions: Array<{
-      instructionType: "project_instructions" | "rule";
-      name: string;
-      content: string;
-    }> = [];
+    // instruction this prompt carries (PRISM.md, workspace files and
+    // always-on rules, every pinned rule).
+    const loadedInstructions: LoadedInstruction[] = [];
     const isDirectMode = !context.agent;
     const agentId = context.agent || AGENT_IDS.CODING;
     const persona = isDirectMode ? null : AgentPersonaRegistry.get(agentId);
@@ -432,6 +438,18 @@ export default class SystemPromptAssembler {
     // content when the client has workspace mode disabled.
     const isWorkspaceEnabled = context.workspaceEnabled !== false;
 
+    // Started here, awaited at 5b2: the tools-service round trips overlap
+    // the tool-doc work below. Neither ever rejects.
+    const instructionLayersPromise = fetchProjectInstructionLayers(
+      context.project,
+      context.username,
+      context.agent,
+    );
+    const workspaceInstructionsPromise: Promise<WorkspaceInstructions | null> =
+      isWorkspaceEnabled
+        ? readTurnWorkspaceInstructions(context, this.explicitWorkspaceRoot)
+        : Promise.resolve(null);
+
     // ── 4. Enabled Tools (domain-grouped) ──────────────────────
     {
       // Guarantee locale-specific remote tool schemas are cached
@@ -606,34 +624,38 @@ export default class SystemPromptAssembler {
       }
     }
 
-    // ── 5b2. Project Instructions (the PRISM.md document) ─────────
-    // Always-on, user-and-agent-authored standing policy for this project.
+    // ── 5b2. Project Instructions (PRISM.md + the workspace's files) ─
+    // Always-on standing policy: PRISM.md (user- and agent-authored, in
+    // Mongo) merged with the workspace's AGENTS.md / CLAUDE.md / PRISM.md
+    // and always-on rules, in the order InstructionsSection.ts documents.
     // Deliberately placed in the cached system prompt rather than beside the
     // per-turn injections: this is stable policy read on every turn, not
-    // retrieved context, and it should read as authoritative. A self-edit
+    // retrieved context, and it should read as authoritative. An edit
     // reprices the cached prefix exactly once, which is the right trade for
     // content that otherwise holds still across a whole conversation.
     // Sits directly above active-rules so a rule the user pins for one turn
     // can override standing instructions.
-    const projectInstructions = await fetchProjectInstructions(
-      context.project,
-      context.username,
-      context.agent,
-    );
-    if (projectInstructions) {
-      loadedInstructions.push({
-        instructionType: "project_instructions",
-        name: "PRISM.md",
-        content: projectInstructions,
-      });
+    const [instructionLayers, workspaceInstructions] = await Promise.all([
+      instructionLayersPromise,
+      workspaceInstructionsPromise,
+    ]);
+    const instructionsSection = buildInstructionsSection({
+      projectDocument: instructionLayers.project,
+      agentDocument: instructionLayers.agent,
+      workspace: workspaceInstructions,
+      locale,
+    });
+    if (instructionsSection.text) {
+      loadedInstructions.push(...instructionsSection.loaded);
       sections.push(
         wrapSection(
           SYSTEM_PROMPT_SECTIONS.PROJECT_INSTRUCTIONS,
-          projectInstructions,
+          instructionsSection.text,
         ),
       );
       logger.info(
-        `[SystemPromptAssembler] Injected project instructions (${projectInstructions.length} chars)`,
+        `[SystemPromptAssembler] Injected project instructions (${instructionsSection.text.length} chars: ` +
+          `${instructionsSection.loaded.map((instruction) => instruction.filePath ?? instruction.name).join(", ")})`,
       );
     }
 
@@ -1006,6 +1028,7 @@ export default class SystemPromptAssembler {
       goalText,
       injectedMemoryIds,
       loadedInstructions,
+      workspaceInstructions,
     };
   }
 
@@ -1024,12 +1047,15 @@ export default class SystemPromptAssembler {
           goalText,
           injectedMemoryIds,
           loadedInstructions,
+          workspaceInstructions,
         } = await this.assemble(context);
         if (!systemPrompt) return;
 
         if (loadedInstructions.length > 0) {
           context._loadedInstructions = loadedInstructions;
         }
+        // The glob-scoped rules apply after tool batches (WorkspaceRuleStage).
+        context._workspaceInstructions = workspaceInstructions;
 
         context._injectedSkills = skillNames;
         context._skillsText = skillsText;

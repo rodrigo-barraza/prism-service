@@ -1,3 +1,5 @@
+import type { WorkspaceInstructions } from "#src/services/instructions/WorkspaceInstructions";
+
 export interface DirectoryEntry {
   name?: string;
   path?: string;
@@ -65,6 +67,8 @@ export interface AssemblerContext {
   clientIp?: string | null;
   requestId?: string;
   options?: Record<string, unknown>;
+  /** The directory the turn works in (the request's workspaceRoot). */
+  workspaceRoot?: string;
   workspaceEnabled?: boolean;
   locale?: string;
   /** Names of user-pinned rules to inject as an <active-rules> section */
@@ -75,6 +79,8 @@ export interface AssemblerContext {
   _skillsText?: string;
   /** The catalog section, inside the system prompt. */
   _skillCatalogText?: string;
+  /** The workspace's instruction files and rules this turn read (null: no workspace). */
+  _workspaceInstructions?: WorkspaceInstructions | null;
   _currentMessages?: Array<Record<string, unknown>>;
   [key: string]: unknown;
 }

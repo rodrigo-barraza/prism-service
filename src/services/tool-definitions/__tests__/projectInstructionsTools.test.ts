@@ -338,6 +338,24 @@ describe("project instruction tools — reading and writing", () => {
     expect(fake.rows.some((row) => row.agent === null)).toBe(false);
   });
 
+  it("says the project document is in the prompt too when it reads the agent's", async () => {
+    const service = await import("#src/services/ProjectInstructionsService");
+    await service.default.setContent(fake.db, { ...CONTEXT, agent: null }, "Project text.", "user");
+    await service.default.setContent(fake.db, CONTEXT, "Coding text.", "user");
+
+    const read = asRecord(await readTool?.execute({}, CONTEXT));
+
+    expect(read.content).toBe("Coding text.");
+    expect(read.agent).toBe("CODING");
+    expect(String(read.note)).toContain("project-wide document (version 1) is in your prompt too");
+  });
+
+  it("adds no note when it reads the project document itself", async () => {
+    await editTool?.execute({ heading: "Build", body: "Build it." }, CONTEXT);
+    const read = asRecord(await readTool?.execute({}, CONTEXT));
+    expect(read.note).toBeUndefined();
+  });
+
   it("rewrites the whole document with update_project_instructions", async () => {
     await editTool?.execute({ heading: "Build", body: "Build it." }, CONTEXT);
 

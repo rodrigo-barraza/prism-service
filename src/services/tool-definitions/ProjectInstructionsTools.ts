@@ -149,6 +149,11 @@ const readProjectInstructionsTool = {
         };
       }
 
+      // The prompt carries the project document AND the agent's (merged):
+      // say so when this read shows only the agent's.
+      const layers = document.agent
+        ? await ProjectInstructionsService.getLayers(database, scopeFromContext(context))
+        : null;
       return {
         exists: true,
         content: document.content,
@@ -156,6 +161,14 @@ const readProjectInstructionsTool = {
         agent: document.agent,
         updatedBy: document.updatedBy,
         updatedAt: document.updatedAt,
+        ...(layers?.project
+          ? {
+              note: localize("results.alsoInjected", {
+                version: String(layers.project.version),
+                agent: document.agent as string,
+              }),
+            }
+          : {}),
       };
     } catch (error: unknown) {
       return {

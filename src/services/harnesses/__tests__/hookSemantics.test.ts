@@ -43,6 +43,8 @@ const hookState = vi.hoisted(() => ({
   approve: true as boolean | "lapse",
   /** What the system-prompt assembler stub reports as loaded. */
   loadedInstructions: undefined as unknown,
+  /** The workspace instructions the assembler stub hands the turn (WorkspaceRuleStage). */
+  workspaceInstructions: undefined as unknown,
   /** The conversation document the model-switch check reads. */
   conversationDocument: null as Record<string, unknown> | null,
   /** Called inside executeTool — lets a test act mid-batch. */
@@ -104,6 +106,9 @@ vi.mock("../lifecycle/HookInitializer.ts", async () => {
           target._injectedSkills = [];
           if (hookState.loadedInstructions) {
             target._loadedInstructions = hookState.loadedInstructions;
+          }
+          if (hookState.workspaceInstructions !== undefined) {
+            target._workspaceInstructions = hookState.workspaceInstructions;
           }
         },
         "SystemPromptAssembler",
@@ -594,6 +599,7 @@ describe("configured hooks — the new events fire once, at the right moment", (
     hookState.decide = () => ({});
     hookState.approve = true;
     hookState.loadedInstructions = undefined;
+    hookState.workspaceInstructions = undefined;
     hookState.conversationDocument = null;
     hookState.duringTool = null;
   });
@@ -659,6 +665,66 @@ describe("configured hooks — the new events fire once, at the right moment", (
       expect.objectContaining({ tool_name: "write_file", tool_use_id: "call-1-1" }),
     ]);
     expect(recordedFor("TurnEnd")[0]).toMatchObject({ iterations: 2, response_text: "done" });
+  });
+
+  it("InstructionsLoaded fires for a glob-scoped workspace rule when a matching file is read — and the rule reaches the model once", async () => {
+    hookState.configured = [configuredHook("InstructionsLoaded")];
+    hookState.workspaceInstructions = {
+      root: "/ws",
+      workingDirectory: "/ws",
+      directories: ["/ws"],
+      files: [],
+      skipped: [],
+      rules: [
+        {
+          path: "/ws/.claude/rules/typescript.md",
+          base: "/ws",
+          globs: ["src/**/*.ts"],
+          content: "RULE-TS: no default exports.",
+          truncated: false,
+          lastModified: "2026-09-23T00:00:00.000Z",
+        },
+      ],
+    };
+    const { harness, seenMessages } = buildHarness(
+      [
+        { kind: "tool", calls: [{ name: "read_file", args: { absolutePath: "/ws/src/notes.md" } }] },
+        { kind: "tool", calls: [{ name: "read_file", args: { absolutePath: "/ws/src/app/main.ts" } }] },
+        { kind: "tool", calls: [{ name: "write_file", args: { path: "src/app/other.ts", content: "x" } }] },
+        { kind: "text", text: "done" },
+      ],
+      { autoApprove: true },
+    );
+
+    await harness.run();
+    await settle();
+
+    const carrying = (messages: ConversationMessage[]) =>
+      messages.filter((message) => typeof message.content === "string" && message.content.includes("RULE-TS"));
+    // A Markdown file under src: not the TypeScript rule's.
+    expect(carrying(seenMessages[1])).toHaveLength(0);
+    // main.ts was read: the rule arrives right after that batch's results.
+    const second = seenMessages[2];
+    const [ruleMessage] = carrying(second);
+    expect(ruleMessage?.role).toBe("system");
+    expect(ruleMessage?.content).toMatch(/^<workspace-rules>/);
+    const readIndex = second.findIndex(
+      (message) => message.role === "assistant" && JSON.stringify(message.toolCalls ?? []).includes("main.ts"),
+    );
+    expect(second.indexOf(ruleMessage!)).toBe(readIndex + 1);
+    // other.ts was edited (a relative path): the conversation already carries the rule.
+    expect(carrying(seenMessages[3])).toHaveLength(1);
+
+    const loaded = recordedFor("InstructionsLoaded");
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]).toMatchObject({
+      instruction_type: "workspace_rule",
+      load_reason: "path_glob_match",
+      file_path: "/ws/.claude/rules/typescript.md",
+      file_content: "RULE-TS: no default exports.",
+      globs: ["src/**/*.ts"],
+      trigger_file_path: "/ws/src/app/main.ts",
+    });
   });
 
   it("SessionStart fires per session, TurnStart per turn; SessionEnd when the session idles out", async () => {
