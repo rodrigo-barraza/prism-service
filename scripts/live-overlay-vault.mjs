@@ -5,10 +5,13 @@
 // with PRISM_SERVICE_URL=http://localhost:<port> does nothing: the UI still
 // talks to the production prism-service. Point the client at this server
 // instead (VAULT_SERVICE_URL=http://127.0.0.1:$OVERLAY_VAULT_PORT). It proxies
-// the real vault and replaces only the prism-service URL keys.
+// the real vault and replaces only the prism-service URL keys, plus
+// TOOLS_SERVICE_URL when LOCAL_TOOLS_PORT names an isolated tools-service: the
+// client's /api/tools rewrite (task lists, tool-call logs, raw workspace files)
+// reads the vault's value too, which is the production tools-service.
 //
-//   LOCAL_PRISM_PORT=<port> LOCAL_CLIENT_PORT=<port3> OVERLAY_VAULT_PORT=<port4> \
-//     node scripts/live-overlay-vault.mjs          (Bash run_in_background: true)
+//   LOCAL_PRISM_PORT=<port> [LOCAL_TOOLS_PORT=<port2>] LOCAL_CLIENT_PORT=<port3> \
+//     OVERLAY_VAULT_PORT=<port4> node scripts/live-overlay-vault.mjs   (Bash run_in_background: true)
 //
 // Host and vault port come from vault-service/projects.json (CLAUDE.md §0); the
 // token from vault-service/vault.key, as the vault client itself reads it.
@@ -22,6 +25,7 @@ const realVault = `http://${registry.defaultHost}:${vaultProject.port}`;
 const token = fs.readFileSync(`${WORKSPACE}/vault-service/vault.key`, "utf8").trim();
 
 const prismPort = process.env.LOCAL_PRISM_PORT;
+const toolsPort = process.env.LOCAL_TOOLS_PORT;
 const clientPort = process.env.LOCAL_CLIENT_PORT;
 const listenPort = Number(process.env.OVERLAY_VAULT_PORT);
 if (!prismPort || !listenPort) {
@@ -35,6 +39,7 @@ const overrides = {
   PRISM_WS_URL: `ws://localhost:${prismPort}`,
   PRISM_WS_PUBLIC_URL: `ws://localhost:${prismPort}`,
   PRISM_SERVICE_PORT: String(prismPort),
+  ...(toolsPort ? { TOOLS_SERVICE_URL: `http://localhost:${toolsPort}` } : {}),
   ...(clientPort
     ? { PRISM_CLIENT_PORT: String(clientPort), PRISM_CLIENT_URL: `http://localhost:${clientPort}` }
     : {}),
@@ -62,5 +67,8 @@ http
     }
   })
   .listen(listenPort, "127.0.0.1", () => {
-    console.log(`overlay vault on 127.0.0.1:${listenPort} → prism-service localhost:${prismPort}`);
+    const tools = toolsPort ? `localhost:${toolsPort}` : "the vault's (production)";
+    console.log(
+      `overlay vault on 127.0.0.1:${listenPort} → prism-service localhost:${prismPort}, tools-service ${tools}`,
+    );
   });
