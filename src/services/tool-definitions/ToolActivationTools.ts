@@ -8,7 +8,10 @@ import {
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { INTERNAL_TOOL_EMOJIS } from "#src/services/tool-orchestrator/InternalToolEmojis";
 import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";
-import { partitionByDiscoverableUniverse } from "#src/services/ToolDiscoveryScope";
+import {
+  isToolDiscoveryOff,
+  partitionByDiscoverableUniverse,
+} from "#src/services/ToolDiscoveryScope";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 import SettingsService from "#src/services/SettingsService";
 import { TOOLS } from "#src/constants";
@@ -79,7 +82,10 @@ const enableTools = {
     }
 
     const agentSettings = await SettingsService.getSection("agents");
-    if (agentSettings?.dynamicToolActivation === false) {
+    if (
+      agentSettings?.dynamicToolActivation === false ||
+      isToolDiscoveryOff(context.agentConversationId)
+    ) {
       return {
         error: PromptLocaleService.get(
           PromptLocaleService.getDefaultLocale(),
@@ -250,7 +256,10 @@ const disableTools = {
     }
 
     const agentSettings = await SettingsService.getSection("agents");
-    if (agentSettings?.dynamicToolActivation === false) {
+    if (
+      agentSettings?.dynamicToolActivation === false ||
+      isToolDiscoveryOff(context.agentConversationId)
+    ) {
       return {
         error: PromptLocaleService.get(
           PromptLocaleService.getDefaultLocale(),

@@ -301,6 +301,12 @@ export interface AgenticOptions {
   valueThreshold?: number;
   /** Thought structure for the agentic loop: "chain_of_thought" (default single-pass) or "tree_of_thoughts" (parallel branching with scoring). */
   thoughtStructure?: string;
+  /**
+   * This turn's tool discovery (a benchmark sweep's axis): "preflight" (the
+   * default — matches enabled before the first call), "on_demand" (only
+   * through discover_and_enable_tools), "off" (the resolved set only).
+   */
+  toolDiscovery?: import("#src/types/benchmark").ToolDiscoveryMode;
   /** Maximum cost in dollars before the loop terminates with an exhaustion recovery. */
   maxCostDollars?: number;
   /**

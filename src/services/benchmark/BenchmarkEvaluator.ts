@@ -273,7 +273,7 @@ function parseToolSequence(assertion: AgentAssertion): string[] {
 }
 
 /** True when `expected` appears in `observed` in order (gaps allowed). */
-function isInOrderSubsequence(expected: string[], observed: string[]): boolean {
+export function isInOrderSubsequence(expected: string[], observed: string[]): boolean {
   let cursor = 0;
   for (const name of observed) {
     if (name === expected[cursor]) cursor++;

@@ -242,6 +242,7 @@ async function prepareGenerationContext(
     harness,
     topology,
     thoughtStructure,
+    toolDiscovery,
     routingPreset,
     activeRuleNames,
     // Generation options — flat at top-level (OpenAI-style)
@@ -369,6 +370,7 @@ async function prepareGenerationContext(
     ...(harness != null && { harness }),
     ...(topology != null && { topology }),
     ...(thoughtStructure != null && { thoughtStructure }),
+    ...(toolDiscovery != null && { toolDiscovery }),
     ...(typeof routingPreset === "string" && routingPreset && { routingPreset }),
     ...(Array.isArray(activeRuleNames) &&
       activeRuleNames.length > 0 && { activeRuleNames }),

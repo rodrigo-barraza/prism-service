@@ -13,6 +13,7 @@ import {
 import {
   partitionByDiscoverableUniverse,
   isScopedPersona,
+  isToolDiscoveryOff,
 } from "#src/services/ToolDiscoveryScope";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 
@@ -200,7 +201,10 @@ const discoverAndEnableTools = {
     }
 
     const agentSettings = await SettingsService.getSection("agents");
-    if (agentSettings?.dynamicToolActivation === false) {
+    if (
+      agentSettings?.dynamicToolActivation === false ||
+      isToolDiscoveryOff(context.agentConversationId)
+    ) {
       return {
         error: PromptLocaleService.get(
           PromptLocaleService.getDefaultLocale(),

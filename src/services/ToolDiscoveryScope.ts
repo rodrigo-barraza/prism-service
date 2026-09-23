@@ -1,5 +1,36 @@
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";
+import ToolContext from "#src/services/ToolContext";
+import type { ToolDiscoveryMode } from "#src/types/benchmark";
+
+const TOOL_DISCOVERY_MODE_KEY = "toolDiscovery";
+
+/**
+ * Record a turn's tool-discovery mode where the activation tools read it
+ * (the conversation's ToolContext); a turn that names none clears the last
+ * one, so a mode never outlives the turn that asked for it.
+ */
+export function syncToolDiscoveryMode(
+  agentConversationId: string,
+  mode: ToolDiscoveryMode | undefined,
+): void {
+  if (!agentConversationId) return;
+  // Written only when it changes: ToolContext writes through to Mongo.
+  const current = ToolContext.getStore(agentConversationId).get(TOOL_DISCOVERY_MODE_KEY);
+  if (mode) {
+    if (current !== mode) ToolContext.set(agentConversationId, TOOL_DISCOVERY_MODE_KEY, mode);
+  } else if (current !== undefined) {
+    ToolContext.delete(agentConversationId, TOOL_DISCOVERY_MODE_KEY);
+  }
+}
+
+/** The running turn asked for no tool discovery: activation tools refuse. */
+export function isToolDiscoveryOff(agentConversationId: string | undefined): boolean {
+  return (
+    !!agentConversationId &&
+    ToolContext.getStore(agentConversationId).get(TOOL_DISCOVERY_MODE_KEY) === "off"
+  );
+}
 
 // ── Innate Tool Discovery Scope ──────────────────────────────
 //
