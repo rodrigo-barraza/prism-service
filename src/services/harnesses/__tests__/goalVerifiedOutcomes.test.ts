@@ -66,7 +66,12 @@ vi.mock("#config", async (importOriginal) => ({
 
 const anthropicSdk = vi.hoisted(() => ({
   create: [] as Array<Record<string, unknown>>,
-  responses: [] as Array<{ text: string; inputTokens?: number; outputTokens?: number }>,
+  responses: [] as Array<{
+    text: string;
+    inputTokens?: number;
+    outputTokens?: number;
+    cacheCreationInputTokens?: number;
+  }>,
 }));
 
 vi.mock("@anthropic-ai/sdk", () => ({
@@ -83,7 +88,7 @@ vi.mock("@anthropic-ai/sdk", () => ({
             input_tokens: next.inputTokens ?? 20_000,
             output_tokens: next.outputTokens ?? 1_000,
             cache_read_input_tokens: 0,
-            cache_creation_input_tokens: 0,
+            cache_creation_input_tokens: next.cacheCreationInputTokens ?? 0,
           },
           stop_reason: "end_turn",
         };
@@ -540,7 +545,8 @@ describe("goals become verified outcomes", () => {
 
   it("the verifier is sent the rubric, user messages, tool calls, tool results and the final answer — never thinking or narration", async () => {
     seedGoal();
-    anthropicSdk.responses.push({ text: verdict() });
+    // Anthropic reports a cached prompt apart from input_tokens.
+    anthropicSdk.responses.push({ text: verdict(), inputTokens: 2, outputTokens: 219, cacheCreationInputTokens: 6_000 });
     const run = startTurn([
       { kind: "tool", toolName: "list_directory", narration: NARRATION },
       { kind: "tool", toolName: "read_file", args: { path: "report.md" } },
@@ -569,6 +575,14 @@ describe("goals become verified outcomes", () => {
     expect(sent).toContain("read_file");
     expect(sent).toContain("- beta.ts: helpers");
     expect(sent).toContain("FINAL-ANSWER: report.md summarizes alpha.ts, beta.ts and gamma.md.");
+    // Its spend is on the stream, cache writes counted in the prompt total.
+    const verifierUsage = run.events.find((event) => event.type === "usage_update" && event.operation === "goal:verify");
+    expect(verifierUsage?.usage).toMatchObject({
+      inputTokens: 2,
+      cacheCreationInputTokens: 6_000,
+      totalInputTokens: 6_002,
+      outputTokens: 219,
+    });
     // Never the agent's reasoning, nor what it said about its own work —
     // and no thinking content at all (the verifier's own thinking is off).
     expect(sent).not.toContain("PRIVATE-REASONING");

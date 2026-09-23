@@ -425,10 +425,12 @@ export interface VerifyGoalInput {
   signal?: AbortSignal | null;
 }
 
-/** Tokens the verifier's calls used, summed over attempts. */
+/** Tokens the verifier's calls used, summed over attempts (cache reads and writes apart, as providers report them). */
 export interface VerifierUsage {
   inputTokens: number;
   outputTokens: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
 }
 
 export type VerifyGoalResult =
@@ -465,7 +467,12 @@ export async function verifyGoal(input: VerifyGoalInput): Promise<VerifyGoalResu
   ];
 
   let costDollars = 0;
-  const usage: VerifierUsage = { inputTokens: 0, outputTokens: 0 };
+  const usage: VerifierUsage = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadInputTokens: 0,
+    cacheCreationInputTokens: 0,
+  };
   let lastError = "no verifier model is available";
   let verifier: GoalVerifierModel | null = null;
   const MAXIMUM_ATTEMPTS = 2;
@@ -508,6 +515,8 @@ export async function verifyGoal(input: VerifyGoalInput): Promise<VerifyGoalResu
       costDollars += costOf(entry.model, result?.usage);
       usage.inputTokens += result?.usage?.inputTokens ?? 0;
       usage.outputTokens += result?.usage?.outputTokens ?? 0;
+      usage.cacheReadInputTokens += result?.usage?.cacheReadInputTokens ?? 0;
+      usage.cacheCreationInputTokens += result?.usage?.cacheCreationInputTokens ?? 0;
       logVerifierCall(input, entry, messages, text, result?.usage ?? null, requestStartMilliseconds, attempt, null);
     } catch (error: unknown) {
       lastError = `verifier call failed: ${getErrorMessage(error)}`;

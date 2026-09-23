@@ -12,7 +12,7 @@ import ConversationGoalService, {
   type GoalTurnSpend,
   type GoalVerification,
 } from "#src/services/ConversationGoalService";
-import { verifyGoal } from "#src/services/goals/GoalVerifier";
+import { verifyGoal, type VerifierUsage } from "#src/services/goals/GoalVerifier";
 import TurnInputMailbox, { type TurnInputPost } from "#src/services/TurnInputMailbox";
 import { resolveLoopKey } from "#src/services/LoopKey";
 import { SharedCostBudget } from "./CostBudgetEnforcer.ts";
@@ -482,15 +482,14 @@ export class GoalRun implements GoalTurnSpend {
   }
 
   /** The verifier's spend on the stream, so the cost badge counts it before stats refresh. */
-  private emitVerifierUsage(
-    costDollars: number,
-    usage: { inputTokens: number; outputTokens: number },
-  ): void {
-    if (!(costDollars > 0) && usage.inputTokens === 0) return;
+  private emitVerifierUsage(costDollars: number, usage: VerifierUsage): void {
+    const totalInputTokens =
+      usage.inputTokens + usage.cacheReadInputTokens + usage.cacheCreationInputTokens;
+    if (!(costDollars > 0) && totalInputTokens === 0) return;
     this.emit({
       type: SERVER_SENT_EVENT_TYPES.USAGE_UPDATE,
       operation: "goal:verify",
-      usage: { ...usage, estimatedCost: costDollars },
+      usage: { ...usage, totalInputTokens, requests: 1, estimatedCost: costDollars },
     });
   }
 
