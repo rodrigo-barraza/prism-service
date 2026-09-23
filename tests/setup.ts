@@ -14,6 +14,7 @@ vi.mock('#config', () => ({
     OPENAI_TRANSCRIPTION_MODEL: 'whisper-1',
     ANTHROPIC_API_KEY: 'fake',
     GOOGLE_CLOUD_GEMINI_API_KEY: 'fake',
+    geminiTransport: () => 'generate_content',
     ELEVENLABS_API_KEY: 'fake',
     MOONSHOT_API_KEY: 'fake',
     MOONSHOT_BASE_URL: undefined,

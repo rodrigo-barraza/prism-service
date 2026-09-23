@@ -21,6 +21,7 @@ import {
   GOOGLE_CLOUD_GEMINI_API_KEY,
   GOOGLE_TEXT_TO_SPEECH_MODEL,
   GOOGLE_EMBEDDING_MODEL,
+  geminiTransport,
 } from "#config";
 import { MODALITY_TYPES, MODELS, DEFAULT_VOICES, getDefaultModels } from "#src/config";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
@@ -28,6 +29,7 @@ import {
   hashPromptPrefix,
   requestTelemetryChunk,
 } from "#src/utils/PromptPrefixHashes";
+import { streamOverInteractions } from "#src/providers/google-interactions";
 
 /** Shape of a model definition from the MODELS catalog. */
 interface ModelDefinition {
@@ -950,6 +952,32 @@ const googleProvider = {
   ) {
     logger.provider("Google", `generateTextStream model=${model}`);
     try {
+      // PROTOTYPE: Gemini over the Interactions API (GEMINI_TRANSPORT=
+      // interactions) when the request continues its chain; generateContent
+      // otherwise, and by default.
+      if (geminiTransport() === "interactions") {
+        const definition = Object.values(MODELS).find(
+          (candidate) => candidate.name === model,
+        ) as ModelDefinition | undefined;
+        const overInteractions = streamOverInteractions(getClient(), messages, model, options, {
+          systemInstruction: options.systemPrompt,
+          tools: options.tools?.map((tool) => ({
+            ...tool,
+            parameters: sanitizeSchemaForGoogle(tool.parameters as unknown as JsonValue) as
+              | Record<string, unknown>
+              | undefined,
+          })),
+          thinkingLevel:
+            options.thinkingLevel && definition?.thinkingLevels?.includes(options.thinkingLevel)
+              ? options.thinkingLevel
+              : undefined,
+          maxOutputTokens: options.maxTokens,
+        });
+        if (overInteractions) {
+          yield* overInteractions;
+          return;
+        }
+      }
       const contents = await convertMessages(messages, { model });
       const modelDefinition = Object.values(MODELS).find(
         (modelDefinitionItem) => modelDefinitionItem.name === model,
