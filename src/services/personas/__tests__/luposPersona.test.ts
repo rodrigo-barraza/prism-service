@@ -123,3 +123,77 @@ describe("Lupos persona default tools", () => {
     },
   );
 });
+
+describe("Lupos persona Discord actions section", () => {
+  const DISCORD_ACTION_TOOLS = [
+    "create_discord_poll",
+    "create_discord_thread",
+    "schedule_discord_reminder",
+    "list_discord_reminders",
+    "cancel_discord_reminder",
+    "set_discord_nickname",
+  ];
+
+  function policyWith(toolNames: string[], locale = "en"): string {
+    if (typeof LuposPersona.toolPolicy !== "function") return "";
+    const enabledTools = [...defaultEnabledTools, ...toolNames];
+    return LuposPersona.toolPolicy({
+      locale,
+      enabledTools,
+      resolvedToolNames: enabledTools,
+    });
+  }
+
+  /** The section alone — up to the next top-level heading. */
+  function extractSection(policy: string, heading: string): string {
+    const start = policy.indexOf(heading);
+    if (start === -1) return "";
+    const next = policy.indexOf("\n# ", start + 1);
+    return next === -1 ? policy.slice(start) : policy.slice(start, next);
+  }
+
+  const HEADINGS: Record<string, string> = {
+    en: "# Discord Actions",
+    caveman: "# Discord Action",
+  };
+
+  // The action tools stay discoverable, not enabled by default: a turn that
+  // discovered none of them must not be told how to use them.
+  it("stays out of a turn that reached none of the action tools", () => {
+    for (const toolName of DISCORD_ACTION_TOOLS) {
+      expect(defaultEnabledTools).not.toContain(toolName);
+    }
+    expect(buildColdStartPolicy()).not.toContain(HEADINGS.en);
+  });
+
+  it.each(DISCORD_ACTION_TOOLS)("renders once %s reaches the model", (toolName) => {
+    expect(policyWith([toolName])).toContain(HEADINGS.en);
+  });
+
+  it.each(["en", "caveman"])("names every action tool it gates on (%s)", (locale) => {
+    const section = extractSection(
+      policyWith(DISCORD_ACTION_TOOLS, locale),
+      HEADINGS[locale],
+    );
+    expect(section).not.toBe("");
+    for (const toolName of DISCORD_ACTION_TOOLS) {
+      expect(section).toContain(`\`${toolName}\``);
+    }
+  });
+
+  // lupos-bot delivers a reminder to the asker only, caps pending ones at
+  // five per member, and refuses a nickname on anyone but the bot. The text
+  // must promise nothing the routes will not do.
+  it.each(["en", "caveman"])("states the reminder and nickname limits the bot enforces (%s)", (locale) => {
+    const section = extractSection(
+      policyWith(DISCORD_ACTION_TOOLS, locale),
+      HEADINGS[locale],
+    );
+    expect(section).toMatch(/ONLY when someone ask/);
+    expect(section).toMatch(/nobody else/);
+    expect(section).toContain("5 pending");
+    expect(section).toMatch(/plain word/);
+    expect(section).toContain("OWN name");
+    expect(section).toMatch(/[Nn]ever (a )?slur/);
+  });
+});
