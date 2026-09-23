@@ -632,4 +632,25 @@ export const GetPromptsQuerySchema = z.object({
 export const PostClaudeConfigImportSchema = z.object({
   workspacePath: z.string().min(1, "workspacePath is required"),
   agent: z.string().nullable().optional(),
+  /** Preview what would be imported; write nothing. */
+  dryRun: z.boolean().optional().default(false),
 });
+
+/** A plugin zip is at most this big (base64 is 4/3 of it). */
+export const PLUGIN_ARCHIVE_MAX_BYTES = 25 * 1024 * 1024;
+
+export const PostPluginImportSchema = z
+  .object({
+    workspacePath: z.string().min(1).optional(),
+    archiveBase64: z
+      .string()
+      .min(1)
+      .max(Math.ceil((PLUGIN_ARCHIVE_MAX_BYTES * 4) / 3) + 4, "the plugin archive is larger than 25 MB")
+      .optional(),
+    archiveName: z.string().max(255).optional(),
+    agent: z.string().nullable().optional(),
+    dryRun: z.boolean().optional().default(false),
+  })
+  .refine((body) => (body.workspacePath ? 1 : 0) + (body.archiveBase64 ? 1 : 0) === 1, {
+    message: "send exactly one source: workspacePath or archiveBase64",
+  });

@@ -7,6 +7,13 @@ import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import logger from "#src/utils/logger";
 import { normalizeProfileId, profileFilter } from "#src/utils/ProfileScope";
 import { getRequestContext } from "#src/utils/RequestContext";
+import SkillFolderStore, {
+  type SkillFolderFile,
+  type SkillFolderResource,
+  type StoredSkillFolder,
+} from "#src/services/skills/SkillFolderStore";
+import { normalizeSkillFilePath } from "#src/services/skills/skillFilePaths";
+import { SKILL_FILE_NAME } from "#src/services/skills/skillMarkdown";
 
 // ────────────────────────────────────────────────────────────
 // SkillService — the one reader and writer of `agent_skills`
@@ -30,6 +37,10 @@ import { getRequestContext } from "#src/utils/RequestContext";
 // document reads as "every value" (a null project is every project, a
 // missing owner is shared), which is exactly who could reach those
 // documents before. New writes always stamp the caller's full scope.
+//
+// An imported skill keeps its folder (Landing 2): `folderRef` names it in
+// SkillFolderStore and `resources` is its manifest. load_skill lists the
+// bundled files; read_skill_file reads one, only by a manifest path.
 // ────────────────────────────────────────────────────────────
 
 /** Who a skill is visible to. `null` is unset: every value matches. */
@@ -41,10 +52,10 @@ export interface SkillScope {
   agent: string | null;
 }
 
-/** A bundled file of a skill folder (Landing 2 stores folders). */
+/** A bundled file of a skill folder, as load_skill lists it. */
 export interface SkillResource {
   path: string;
-  bytes?: number;
+  bytes: number;
 }
 
 /** The one skill shape every reader sees, whichever schema stored it. */
@@ -60,7 +71,10 @@ export interface Skill {
   enabled: boolean;
   /** "user" (Skills panel), "agent" (create_skill), "claude-config:<root>" (importer). */
   source: string;
+  /** Where SkillFolderStore keeps the skill's folder; null = a body only. */
   folderRef: string | null;
+  /** The stored folder's manifest (SKILL.md included), by path. */
+  resources: SkillFolderResource[];
   /** Tools a skill run may use; null = no restriction. */
   allowedTools: string[] | null;
   embedding: number[] | null;
@@ -93,6 +107,20 @@ export interface SkillWriteInput {
   steps?: string[];
   maxIterations?: number;
   model?: string | null;
+  /** A folder already written to SkillFolderStore. */
+  folder?: StoredSkillFolder | null;
+}
+
+/** A skill read from an external source (a Claude config or a plugin). */
+export interface ImportedSkillInput {
+  name: string;
+  description?: string;
+  body: string;
+  source: string;
+  agent?: string | null;
+  allowedTools?: string[] | null;
+  /** The skill's folder, SKILL.md included; stored on create or change. */
+  files?: SkillFolderFile[];
 }
 
 export interface SkillPatch {
@@ -131,6 +159,8 @@ export interface LoadedSkill {
   body: string;
   source: string;
   resources: SkillResource[];
+  /** How to read a bundled file — present when there are any. */
+  hint?: string;
   allowedTools?: string[];
   steps?: string[];
   /** `{{variable}}` placeholders — execute_skill fills them. */
@@ -152,6 +182,7 @@ interface StoredSkillDocument {
   enabled?: boolean;
   source?: string;
   folderRef?: string | null;
+  resources?: SkillFolderResource[];
   allowedTools?: string[] | null;
   tools?: string[] | null;
   steps?: string[];
@@ -171,6 +202,13 @@ interface VisibleSkill {
 
 const TEMPLATE_VARIABLE_PATTERN = /\{\{(\w+)\}\}/g;
 const CATALOG_DESCRIPTION_MAX_CHARS = 160;
+/** read_skill_file returns at most this much of a text file. */
+const SKILL_FILE_READ_MAX_BYTES = 256 * 1024;
+/** Bytes sniffed for a NUL when telling text from binary. */
+const BINARY_SNIFF_BYTES = 8_000;
+const SCRIPT_NOTE =
+  "This is a bundled script: reading it runs nothing. To run it, use the shell tool — it " +
+  "gets the normal approvals, and nothing about coming from a skill changes that.";
 
 function getCollection() {
   return MongoWrapper.getCollection(MONGO_DB_NAME, COLLECTIONS.AGENT_SKILLS);
@@ -221,6 +259,12 @@ export function toSkill(document: StoredSkillDocument): Skill {
     enabled: document.enabled !== false,
     source: document.source || (isLegacyServiceSchema ? "agent" : "user"),
     folderRef: document.folderRef ?? null,
+    resources: Array.isArray(document.resources)
+      ? document.resources.filter(
+          (resource): resource is SkillFolderResource =>
+            !!resource && typeof resource.path === "string",
+        )
+      : [],
     allowedTools: stringList(document.allowedTools) ?? stringList(document.tools),
     embedding: Array.isArray(document.embedding) ? document.embedding : null,
     steps: stringList(document.steps) ?? [],
@@ -398,6 +442,7 @@ export function toApiSkill(skill: Skill) {
     agent: skill.scope.agent,
     source: skill.source,
     allowedTools: skill.allowedTools,
+    resources: skill.resources.map(({ path, bytes }) => ({ path, bytes })),
     usageCount: skill.usageCount,
     lastUsedAt: skill.lastUsedAt,
     createdAt: skill.createdAt,
@@ -415,6 +460,62 @@ function toListedSkill(skill: Skill) {
     ...(skill.scope.agent ? { agent: skill.scope.agent } : {}),
     usageCount: skill.usageCount,
     lastUsedAt: skill.lastUsedAt,
+  };
+}
+
+function sameList(left: string[] | null, right: string[] | null): boolean {
+  if (left === null || right === null) return left === right;
+  return left.length === right.length && left.every((entry, index) => entry === right[index]);
+}
+
+/** Same files, same bytes — the stored folder can stay. */
+function sameManifest(stored: SkillFolderResource[], incoming: SkillFolderResource[]): boolean {
+  if (stored.length !== incoming.length) return false;
+  const byPath = new Map(stored.map((resource) => [resource.path, resource.sha256]));
+  return incoming.every(
+    (resource) => resource.sha256 !== undefined && byPath.get(resource.path) === resource.sha256,
+  );
+}
+
+/** Best effort: a folder no document points at is only wasted space. */
+async function dropFolder(folderRef: string | null | undefined): Promise<void> {
+  try {
+    await SkillFolderStore.remove(folderRef);
+  } catch (error: unknown) {
+    logger.warn(`[SkillService] Could not drop skill folder ${folderRef}: ${getErrorMessage(error)}`);
+  }
+}
+
+/** A buffer's text when it reads as UTF-8 text; null for binary. */
+function asText(content: Buffer): string | null {
+  if (content.subarray(0, BINARY_SNIFF_BYTES).includes(0)) return null;
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(content);
+  } catch {
+    return null;
+  }
+}
+
+function isScript(filePath: string, text: string): boolean {
+  return filePath.startsWith("scripts/") || text.startsWith("#!");
+}
+
+/** The enabled catalog skill `name` names for this caller, or why not. */
+async function findLoadable(
+  name: string,
+  caller: SkillCaller,
+): Promise<VisibleSkill | { error: string }> {
+  const visible = shadowByName(await findVisible(caller, { forAgent: true }));
+  const found =
+    visible.find(({ skill }) => skill.name === name) ||
+    visible.find(({ skill }) => skill.name.toLowerCase() === name.toLowerCase()) ||
+    visible.find(({ skill }) => skill.skillId === skillSlug(name));
+  if (found) return found;
+  const available = visible.map(({ skill }) => skill.name);
+  return {
+    error:
+      `No skill named "${name}" is available here.` +
+      (available.length > 0 ? ` Available: ${available.join(", ")}.` : " This scope has no skills."),
   };
 }
 
@@ -460,6 +561,9 @@ const SkillService = {
         ? { maxIterations: Math.min(100, Math.max(1, input.maxIterations)) }
         : {}),
       ...(input.model ? { model: input.model } : {}),
+      ...(input.folder
+        ? { folderRef: input.folder.folderRef, resources: input.folder.resources }
+        : {}),
       usageCount: 0,
       embedding: await embedSkill({ name, description, body }, "/skills"),
       createdAt: now,
@@ -475,17 +579,23 @@ const SkillService = {
   },
 
   /**
-   * Idempotent upsert for skills imported from an external source
-   * (ClaudeConfigImportService). Keyed by skillId + source among the skills
-   * the caller can see:
-   *   - no such skill           → created in the caller's scope
-   *   - same source             → updated in place (or unchanged); an
-   *                               unowned legacy import is claimed
+   * Idempotent upsert for skills imported from an external source (the
+   * Claude config and Agent Plugins importers). Keyed by skillId + source
+   * among the skills the caller can see:
+   *   - no such skill           → created in the caller's scope, its
+   *                               folder stored
+   *   - same source             → updated in place (or unchanged: same
+   *                               body, description, allowed tools and
+   *                               folder); an unowned legacy import is
+   *                               claimed; a changed folder is re-stored
+   *                               and the old one dropped
    *   - different/absent source → skipped (never clobber a user skill)
+   * `dryRun` reports the same status and writes nothing.
    */
   async upsertImported(
-    data: { name: string; description?: string; body: string; source: string; agent?: string | null },
+    data: ImportedSkillInput,
     caller: SkillCaller,
+    { dryRun = false }: { dryRun?: boolean } = {},
   ): Promise<SkillUpsertResult> {
     const collection = getCollection();
     if (!collection) return { status: "skipped", error: "Database not available" };
@@ -495,6 +605,9 @@ const SkillService = {
       return { status: "skipped", error: "'name', 'body' and 'source' are required" };
     }
     const skillId = skillSlug(name);
+    const allowedTools = data.allowedTools ?? null;
+    const files = data.files ?? [];
+    const manifest = files.length > 0 ? SkillFolderStore.describe(files) : [];
 
     const existing = (
       await findVisible(caller, { forAgent: false, includeDisabled: true })
@@ -511,15 +624,32 @@ const SkillService = {
     if (existing) {
       const { skill, document } = existing;
       const isClaimed = skill.scope.username !== null;
-      if (skill.body === body && skill.description === description && isClaimed) {
+      const sameFolder = sameManifest(skill.resources, manifest);
+      if (
+        skill.body === body &&
+        skill.description === description &&
+        sameList(skill.allowedTools, allowedTools) &&
+        sameFolder &&
+        isClaimed
+      ) {
         return { status: "unchanged", skillId };
       }
+      if (dryRun) return { status: "updated", skillId };
+
+      const folder = !sameFolder && files.length > 0 ? await SkillFolderStore.save(files) : null;
       await collection.updateOne(
         { _id: document._id },
         {
           $set: {
             description,
             content: body,
+            allowedTools,
+            ...(sameFolder
+              ? {}
+              : {
+                  folderRef: folder?.folderRef ?? null,
+                  resources: folder?.resources ?? [],
+                }),
             ...(isClaimed
               ? {}
               : {
@@ -527,20 +657,26 @@ const SkillService = {
                   username: caller.username,
                   profileId: caller.profileId,
                 }),
-            embedding: await embedSkill({ name, description, body }, "/claude-config-import"),
+            embedding: await embedSkill({ name, description, body }, "/skills/import"),
             updatedAt: new Date(),
           },
         },
       );
+      if (!sameFolder) await dropFolder(skill.folderRef);
       logger.info(`[SkillService] Re-imported skill "${name}" (${skillId})`);
       return { status: "updated", skillId };
     }
 
+    if (dryRun) return { status: "created", skillId };
+    const folder = files.length > 0 ? await SkillFolderStore.save(files) : null;
     const created = await SkillService.create(
-      { name, description, body, source, agent: data.agent ?? null },
+      { name, description, body, source, agent: data.agent ?? null, allowedTools, folder },
       caller,
     );
-    if ("error" in created && created.error) return { status: "skipped", skillId, error: created.error };
+    if ("error" in created && created.error) {
+      await dropFolder(folder?.folderRef);
+      return { status: "skipped", skillId, error: created.error };
+    }
     logger.info(`[SkillService] Imported skill "${name}" (${skillId}) from ${source}`);
     return { status: "created", skillId };
   },
@@ -594,21 +730,8 @@ const SkillService = {
     const collection = getCollection();
     if (!collection) return { error: "Database not available" };
 
-    const visible = shadowByName(await findVisible(caller, { forAgent: true }));
-    const found =
-      visible.find(({ skill }) => skill.name === name) ||
-      visible.find(({ skill }) => skill.name.toLowerCase() === name.toLowerCase()) ||
-      visible.find(({ skill }) => skill.skillId === skillSlug(name));
-    if (!found) {
-      const available = visible.map(({ skill }) => skill.name);
-      return {
-        error:
-          `No skill named "${name}" is available here.` +
-          (available.length > 0
-            ? ` Available: ${available.join(", ")}.`
-            : " This scope has no skills."),
-      };
-    }
+    const found = await findLoadable(name, caller);
+    if ("error" in found) return found;
 
     const { skill, document } = found;
     await collection.updateOne(
@@ -617,16 +740,82 @@ const SkillService = {
     );
 
     const variables = templateVariables(skill.body);
+    // The body is SKILL.md; the rest of the folder is listed, read on demand.
+    const resources = skill.resources
+      .filter((resource) => resource.path !== SKILL_FILE_NAME)
+      .map(({ path, bytes }) => ({ path, bytes }));
     return {
       name: skill.name,
       description: skill.description,
       body: skill.body,
       source: skill.source,
-      // Folders arrive with Landing 2 (folderRef); until then a skill is its body.
-      resources: [],
+      resources,
+      ...(resources.length > 0
+        ? {
+            hint: `Read a bundled file with read_skill_file({ skill: "${skill.name}", path }). Scripts run only through the shell tool, with its normal approvals.`,
+          }
+        : {}),
       ...(skill.allowedTools ? { allowedTools: skill.allowedTools } : {}),
       ...(skill.steps.length > 0 ? { steps: skill.steps } : {}),
       ...(variables.length > 0 ? { templateVariables: variables } : {}),
+    };
+  },
+
+  /**
+   * `read_skill_file`: one file of an enabled catalog skill's folder, by a
+   * path its manifest lists — never anything else. Text comes back as
+   * text (bounded); binary is described, not dumped. Reading a script runs
+   * nothing.
+   */
+  async readFile(
+    name: string,
+    requestedPath: unknown,
+    caller: SkillCaller,
+  ): Promise<Record<string, unknown> | { error: string }> {
+    const normalized = normalizeSkillFilePath(requestedPath);
+    if ("error" in normalized) return { error: normalized.error };
+
+    const found = await findLoadable(name, caller);
+    if ("error" in found) return found;
+    const { skill } = found;
+    if (!skill.folderRef || skill.resources.length === 0) {
+      return {
+        error: `Skill "${skill.name}" has no bundled files: load_skill returns all of it.`,
+      };
+    }
+
+    const resource = skill.resources.find((entry) => entry.path === normalized.path);
+    if (!resource) {
+      return {
+        error:
+          `"${normalized.path}" is not a file of skill "${skill.name}". ` +
+          `Its files: ${skill.resources.map((entry) => entry.path).join(", ")}.`,
+      };
+    }
+
+    let content: Buffer;
+    try {
+      content = await SkillFolderStore.read(skill.folderRef, resource.path);
+    } catch (error: unknown) {
+      logger.warn(
+        `[SkillService] read_skill_file ${skill.name}/${resource.path}: ${getErrorMessage(error)}`,
+      );
+      return { error: `Could not read "${resource.path}" from skill "${skill.name}".` };
+    }
+
+    const base = { skill: skill.name, path: resource.path, bytes: content.length };
+    const text = asText(content);
+    if (text === null) {
+      return { ...base, binary: true, note: "A binary file: its bytes are not returned." };
+    }
+    const truncated = content.length > SKILL_FILE_READ_MAX_BYTES;
+    return {
+      ...base,
+      content: truncated
+        ? new TextDecoder().decode(content.subarray(0, SKILL_FILE_READ_MAX_BYTES))
+        : text,
+      ...(truncated ? { truncated: true } : {}),
+      ...(isScript(resource.path, text) ? { note: SCRIPT_NOTE } : {}),
     };
   },
 
@@ -675,6 +864,7 @@ const SkillService = {
     if (!target) return { error: `Skill "${reference}" not found` };
 
     await collection.deleteOne({ _id: target.document._id });
+    await dropFolder(target.skill.folderRef);
     logger.info(`[SkillService] Deleted skill "${target.skill.name}" (${target.skill.id})`);
     return { deleted: true, skillId: target.skill.skillId, name: target.skill.name };
   },

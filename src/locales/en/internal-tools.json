@@ -60,6 +60,13 @@
       "name": "The skill's name, exactly as the skill catalog lists it."
     }
   },
+  "read_skill_file": {
+    "description": "Read one bundled file of a skill's folder — a reference, a template, a script's text — by its path inside the folder, as load_skill lists it under `resources`. Reading a script does not run it: run scripts with the shell tool, which asks for approval as usual.",
+    "parameters": {
+      "skill": "The skill's name, exactly as the skill catalog lists it.",
+      "path": "The file's path inside the skill folder, e.g. references/template.md. Never absolute, never '..'."
+    }
+  },
   "delete_skill": {
     "description": "Delete a skill by its ID.",
     "parameters": {

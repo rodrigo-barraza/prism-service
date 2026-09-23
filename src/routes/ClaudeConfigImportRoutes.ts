@@ -11,12 +11,14 @@ router.use(requireDb);
 
 /**
  * POST /claude-config-import
- * Body: { workspacePath: string, agent?: string }
+ * Body: { workspacePath: string, agent?: string, dryRun?: boolean }
  *
- * Discovers Claude Code assets in the workspace (CLAUDE.md,
- * .claude/skills/&lt;name&gt;/SKILL.md, .mcp.json / settings.json mcpServers)
- * and imports them into Prism. Idempotent; MCP servers land disabled;
- * hooks are never imported. Returns a structured import summary.
+ * Discovers Claude Code assets in a directory inside a registered
+ * workspace (CLAUDE.md, .claude/skills/&lt;name&gt;/ folders,
+ * .mcp.json / settings.json mcpServers, and lists .claude/agents) and
+ * imports them into Prism. Idempotent; MCP servers land disabled; hooks
+ * are never imported. `dryRun` returns the same summary — per-item
+ * statuses included — and writes nothing (the client's import preview).
  *
  * Route-only trigger by design: workspace selection is client-side
  * state sent per-request (workspaceRoot), so there is no server-side
@@ -39,12 +41,14 @@ router.post(
         {
           project: req.project || "any",
           username: req.username || "any",
+          profileId: req.profileId,
           agent: parseResult.data.agent || req.agent || null,
         },
+        { dryRun: parseResult.data.dryRun },
       );
 
       if ("error" in result) {
-        return res.status(404).json({ error: result.error });
+        return res.status(result.notFound ? 404 : 400).json({ error: result.error });
       }
 
       res.json(result);
