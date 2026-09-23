@@ -92,6 +92,7 @@ import {
 } from "#src/services/routing/ConversationModelRouting";
 import { DEFAULT_PROFILE_ID, normalizeProfileId } from "#src/utils/ProfileScope";
 import { toErrorEvent } from "#src/protocol/errors";
+import { PROTOCOL_EVENT_TYPES } from "#src/protocol/events";
 
 interface ToolSchemaWithDomain extends ToolSchema {
   domain?: string;
@@ -1684,6 +1685,15 @@ async function handleNonStreamingText(context: GenerationContext) {
   // Emit chunk/thinking/toolCall events before finalization
   if (genResult.text) {
     emit({ type: SERVER_SENT_EVENT_TYPES.CHUNK, content: genResult.text });
+  }
+  // The same typed refusal the streaming path's dispatcher emits, so a
+  // ?stream=false caller (tools-service's generate_image) learns why.
+  if (genResult.refusal) {
+    emit({
+      type: PROTOCOL_EVENT_TYPES.REFUSAL,
+      category: genResult.refusal.category,
+      explanation: genResult.refusal.explanation,
+    });
   }
   if (genResult.thinking) {
     emit({
