@@ -8,6 +8,9 @@ import { vi } from 'vitest';
 vi.mock('#config', () => ({
     PRISM_SERVICE_PORT: 0,
     OPENAI_API_KEY: 'fake',
+    // Never a real Responses WebSocket in shared-setup tests (the socket
+    // tests inject a fake one through setResponsesSocketFactory).
+    openAIResponsesTransport: () => 'http',
     OPENAI_TRANSCRIPTION_MODEL: 'whisper-1',
     ANTHROPIC_API_KEY: 'fake',
     GOOGLE_CLOUD_GEMINI_API_KEY: 'fake',
