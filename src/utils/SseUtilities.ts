@@ -141,6 +141,10 @@ export function buildJsonResponseFromEvents(
       status: event.status,
     }));
 
+  // A declined response (a Gemini image model that drew nothing, a
+  // safety classifier): the reason a JSON caller would otherwise never see.
+  const refusalEvent = events.find((event: SseEvent) => event.type === "refusal");
+
   const audioEvents = events
     .filter((event: SseEvent) => event.type === "audio")
     .map((event: SseEvent) => ({
@@ -162,6 +166,12 @@ export function buildJsonResponseFromEvents(
       model: doneEvent.model || requestBody.model,
       usage: doneEvent.usage || null,
       estimatedCost: doneEvent.estimatedCost ?? null,
+      ...(refusalEvent && {
+        refusal: {
+          category: refusalEvent.category ?? null,
+          explanation: refusalEvent.explanation ?? null,
+        },
+      }),
       ...(doneEvent.audioRef && { audioRef: doneEvent.audioRef }),
       ...(doneEvent.traceId && { traceId: doneEvent.traceId }),
       ...(doneEvent.conversationId && {
