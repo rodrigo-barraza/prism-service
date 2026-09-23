@@ -315,6 +315,9 @@ async function processBatch(
     result = (await provider.generateText(aiMessages, consolidationModel, {
       maxTokens: LLM_MAX_OUTPUT_TOKENS,
       temperature: 0.1,
+      // Structured output from a settings-chosen model: a thinking model
+      // would otherwise spend the output budget before the JSON.
+      thinkingEnabled: false,
     })) as unknown as { text?: string; usage?: Record<string, number> };
   } catch (error: unknown) {
     llmSuccess = false;
