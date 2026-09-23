@@ -1,3 +1,7 @@
+import type {
+  AgentEffort,
+  AgentPermissionMode,
+} from "#src/services/agents/AgentDefinitionFields";
 import type { PolicyRule } from "#src/services/PolicyEngine";
 import type { EmotionPersonality } from "#src/services/somatic/SomaticConstants";
 import type { RoleModelSpec } from "#src/services/routing/AgentModelPins";
@@ -61,7 +65,21 @@ export interface Persona {
   project: string;
   displayOrder?: number;
   custom?: boolean;
+  /** Where a custom agent was defined: a Mongo document or a workspace file. */
+  source?: "database" | "file";
+  /** The `.claude/agents` / `.prism/agents` file a file-defined agent came from. */
+  sourcePath?: string;
   description?: string;
+  /**
+   * Agent-definition pins (prompt 17) — honoured when the agent is spawned as
+   * a sub-agent: the model/provider/effort it runs on, its turn cap, and a
+   * permission mode that can only narrow the parent's (OrchestratorService).
+   */
+  model?: string;
+  provider?: string;
+  effort?: AgentEffort;
+  maxTurns?: number;
+  permissionMode?: AgentPermissionMode;
   icon?: string;
   avatar?: string;
   color?: string;

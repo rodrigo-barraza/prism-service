@@ -101,6 +101,8 @@ export class SubAgentTelemetryEmitter {
   totalCost: number | null = null;
   usage: Record<string, number> | null = null;
   iterations: number | null = null;
+  /** The harness ended the run at its iteration limit while it was still calling tools. */
+  iterationLimitReached = false;
 
   constructor(config: SubAgentTelemetryConfig) {
     this.subAgentId = config.subAgentId;
@@ -424,6 +426,14 @@ export class SubAgentTelemetryEmitter {
   }
 
   private handleStatusEvent(event: Record<string, unknown>) {
+    // Recorded whether or not a parent stream is attached — the result
+    // (partial or not) depends on them.
+    if (event.message === STATUS_MESSAGES.ITERATION_PROGRESS && typeof event.iteration === "number") {
+      this.iterations = event.iteration;
+    }
+    if (event.message === STATUS_MESSAGES.ITERATION_LIMIT_REACHED) {
+      this.iterationLimitReached = true;
+    }
     if (
       this.parentEmit &&
       (event.message === "iteration_progress" ||

@@ -4,6 +4,7 @@ import CustomAgentService from "#src/services/CustomAgentService";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { normalizeAgentDefinitionBody } from "#src/services/agents/AgentDefinitionFields";
 
 const router = express.Router();
 
@@ -25,6 +26,20 @@ router.get(
 );
 
 /**
+ * GET /custom-agents/files
+ * The agents defined as `.prism/agents` / `.claude/agents` files under the
+ * workspace roots, the files that did not become one (and why), and the
+ * files shadowed by another definition of the same agent.
+ */
+router.get(
+  "/files",
+  asyncHandler(async (req: Request, res: Response) => {
+    if (req.query.refresh === "true") AgentPersonaRegistry.refreshFileAgents();
+    res.json(AgentPersonaRegistry.describeFileAgents());
+  }),
+);
+
+/**
  * POST /custom-agents
  * Create a new custom agent and register it in the persona registry.
  */
@@ -32,12 +47,15 @@ router.post(
   "/",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const data = req.body;
-      if (!data?.name?.trim()) {
+      if (!req.body?.name?.trim()) {
         return res.status(400).json({ error: "Agent name is required" });
       }
+      const normalized = normalizeAgentDefinitionBody(req.body);
+      if ("errors" in normalized) {
+        return res.status(400).json({ error: normalized.errors.join("; ") });
+      }
 
-      const created = await CustomAgentService.create(data);
+      const created = await CustomAgentService.create(normalized.body);
 
       // Register into live persona registry
       AgentPersonaRegistry.registerCustom(created);
@@ -62,12 +80,16 @@ router.put(
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const updates = req.body;
-      if (!updates || typeof updates !== "object") {
+      if (!req.body || typeof req.body !== "object") {
         return res
           .status(400)
           .json({ error: "Request body must be an object" });
       }
+      const normalized = normalizeAgentDefinitionBody(req.body);
+      if ("errors" in normalized) {
+        return res.status(400).json({ error: normalized.errors.join("; ") });
+      }
+      const updates = normalized.body;
 
       // Get the old doc to unregister the old agentId if name changed
       const oldDoc = await CustomAgentService.get(String(id));
