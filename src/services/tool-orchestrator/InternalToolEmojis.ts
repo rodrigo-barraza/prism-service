@@ -62,7 +62,7 @@ export const INTERNAL_TOOL_EMOJIS: Record<string, string[]> = {
   run_tool_program: ["🧮", "🔧"],
 
   // Goals (persistent objective on the conversation)
-  set_goal: ["🎯", "📝"],
+  propose_goal: ["🎯", "📝"],
   update_goal: ["🎯", "📈"],
   clear_goal: ["🎯", "🗑️"],
   cancel_async_task: ["⏹️", "🔄"],

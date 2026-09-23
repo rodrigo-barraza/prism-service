@@ -74,6 +74,8 @@ export const SYSTEM_MESSAGE_TAGS = {
   SUB_AGENT_PROGRESS: "subagent-progress",
   /** The conversation's persistent goal (objective, progress, budget) injected alongside system context. */
   GOAL: "goal",
+  /** The goal verifier's verdict on a done claim: the criteria not yet met (lifecycle/GoalGate). */
+  GOAL_VERIFICATION: "goal-verification",
 } as const;
 
 export type SystemMessageTag =

@@ -44,7 +44,7 @@ export const LOCAL_TOOL_NAMES = {
   UPDATE_PROJECT_INSTRUCTIONS: "update_project_instructions",
   EDIT_PROJECT_INSTRUCTIONS: "edit_project_instructions",
   RUN_TOOL_PROGRAM: "run_tool_program",
-  SET_GOAL: "set_goal",
+  PROPOSE_GOAL: "propose_goal",
   UPDATE_GOAL: "update_goal",
   CLEAR_GOAL: "clear_goal",
 } as const;

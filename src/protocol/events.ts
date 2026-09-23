@@ -96,12 +96,24 @@ const ExecutedTool = z.strictObject({
   durationMs: z.number().optional(),
 });
 
-const TurnInputKind = z.enum(["user_update", "question_answer", "task_completion", "agent_message"]);
+const TurnInputKind = z.enum(["user_update", "question_answer", "task_completion", "agent_message", "goal_revision"]);
 const TurnInputBoundary = z.enum(["iteration_start", "after_tools", "before_end", "turn_end"]);
+
+const GoalCriterion = z.strictObject({ id: z.string(), criterion: z.string() });
+const GoalCriterionResult = z.strictObject({ id: z.string(), pass: z.boolean(), evidence: z.string() });
+const GoalVerifierModel = z.strictObject({ provider: z.string(), model: z.string() });
 
 const ConversationGoal = z.strictObject({
   objective: z.string(),
   completionCriteria: z.string().optional(),
+  /** What the verifier checks, criterion by criterion. */
+  rubric: z.array(GoalCriterion).optional(),
+  /** Criteria judged over every step of the work. */
+  stepRubric: z.array(GoalCriterion).optional(),
+  /** The verifier's model; absent = the default (another provider). */
+  verifier: GoalVerifierModel.optional(),
+  /** Revisions the verifier may ask for before the goal pauses. */
+  maxIterations: z.number().optional(),
   budget: z
     .strictObject({
       maxCostDollars: z.number().optional(),
@@ -115,7 +127,41 @@ const ConversationGoal = z.strictObject({
     updatedAt: z.string(),
   }),
   blockedOn: z.string().nullable().optional(),
-  status: z.enum(["active", "paused", "completed", "blocked"]),
+  /** `proposed` only on a goal the model proposed (`change: "proposed"`). */
+  status: z.enum(["active", "paused", "completed", "blocked", "proposed"]),
+  /** Why the goal is paused — every pause records one. */
+  pause: z
+    .strictObject({
+      reason: z.enum([
+        "budget",
+        "max_iterations",
+        "empty_continuations",
+        "user_message",
+        "restart",
+        "failed",
+        "user",
+      ]),
+      detail: z.string().optional(),
+      at: z.string(),
+    })
+    .nullable()
+    .optional(),
+  /** The verifier's last verdict, per criterion. */
+  verification: z
+    .strictObject({
+      verdict: z.enum(["satisfied", "needs_revision", "failed"]),
+      criteria: z.array(GoalCriterionResult),
+      reason: z.string().optional(),
+      iteration: z.number(),
+      verifier: GoalVerifierModel,
+      costDollars: z.number(),
+      at: z.string(),
+    })
+    .nullable()
+    .optional(),
+  verificationRounds: z.number().optional(),
+  /** Set while the harness works on the goal on its own. */
+  continuingSince: z.string().nullable().optional(),
   spentDollars: z.number(),
   turnsUsed: z.number(),
   createdAt: z.string(),
@@ -348,8 +394,12 @@ const TurnInputEvent = event("turn_input", {
 });
 
 const GoalUpdateEvent = event("goal_update", {
-  change: z.enum(["set", "progress", "status", "cleared"]),
-  /** On `cleared`, the goal that was removed. */
+  change: z.enum(["set", "progress", "status", "verified", "cleared", "proposed", "proposal_declined"]),
+  /**
+   * On `cleared`, the goal that was removed. On `proposed`, the goal the
+   * model proposes (status `proposed`) — the current goal is unchanged until
+   * the user approves it; on `proposal_declined`, the declined proposal.
+   */
   goal: ConversationGoal,
 });
 
@@ -662,6 +712,8 @@ const KnownStatusEvent = z.discriminatedUnion("message", [
   status("hook_system_message", { text: z.string(), hookName: z.string(), hookEvent: z.string() }),
   status("stop_hook_cap_reached", { continuations: z.number(), reason: z.string() }),
   status("stop_hook_continue", { continuation: z.number(), reason: z.string() }),
+  // Goals: the verifier is judging a done claim (round of maxIterations).
+  status("goal_verifying", { round: z.number(), maxIterations: z.number() }),
 ]);
 
 export const KNOWN_STATUS_MESSAGES: readonly string[] = KnownStatusEvent.options.map(

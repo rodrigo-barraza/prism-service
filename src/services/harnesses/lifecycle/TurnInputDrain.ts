@@ -90,6 +90,15 @@ export function buildTurnInputMessage(entry: TurnInputEntry): ConversationMessag
         _notificationSource: NOTIFICATION_SOURCES.USER_ANSWER,
         _notificationId: `${NOTIFICATION_SOURCES.USER_ANSWER}:${entry.id}:${entry.receivedAt}`,
       };
+    case "goal_revision":
+      // The verifier speaking, not the user: marked so memory extraction
+      // and the client never take it for the user's words.
+      return {
+        ...base,
+        content: wrapSystemMessage(SYSTEM_MESSAGE_TAGS.GOAL_VERIFICATION, entry.text),
+        _notificationSource: NOTIFICATION_SOURCES.GOAL_VERIFIER,
+        _notificationId: `${NOTIFICATION_SOURCES.GOAL_VERIFIER}:${entry.id}:${entry.receivedAt}`,
+      };
     case "task_completion":
     case "agent_message":
     default:

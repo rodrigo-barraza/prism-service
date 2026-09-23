@@ -271,6 +271,9 @@ export interface ProvenanceMessage {
 const UNTRUSTED_NOTIFICATION_SOURCES: Record<string, MemorySource> = {
   [NOTIFICATION_SOURCES.ORCHESTRATOR]: "subagent",
   [NOTIFICATION_SOURCES.SUB_AGENT_PROGRESS]: "subagent",
+  // The goal verifier quotes tool results (a web read among them) back
+  // into the loop: another model's output, like a sub-agent's.
+  [NOTIFICATION_SOURCES.GOAL_VERIFIER]: "subagent",
   // A background task's output is a tool result whose tool the message no
   // longer names — it may have been a web read.
   [NOTIFICATION_SOURCES.ASYNC_TASK]: `tool:${NOTIFICATION_SOURCES.ASYNC_TASK}`,

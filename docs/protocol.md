@@ -143,8 +143,8 @@ taken from recorded streams ([`tests/fixtures/sse-transcripts`](../tests/fixture
 
 | `type` | Fields | Notes |
 |---|---|---|
-| `turn_input` | `id`, `kind: user_update \| question_answer \| task_completion \| agent_message`, `content`, `images?`, `boundary: iteration_start \| after_tools \| before_end \| turn_end`, `iteration` | Input that reached the running turn (`POST /agent/input`, an answer, a finished task). A `status` `turn_input_applied` acknowledges it. |
-| `goal_update` | `change: set \| progress \| status \| cleared`, `goal: {objective, completionCriteria?, budget?, progress: {summary, percent?, updatedAt}, blockedOn?, status, spentDollars, turnsUsed, createdAt, updatedAt}` | On `cleared`, `goal` is the goal that was removed. |
+| `turn_input` | `id`, `kind: user_update \| question_answer \| task_completion \| agent_message \| goal_revision`, `content`, `images?`, `boundary: iteration_start \| after_tools \| before_end \| turn_end`, `iteration` | Input that reached the running turn (`POST /agent/input`, an answer, a finished task, the goal verifier's gaps). A `status` `turn_input_applied` acknowledges it. `goal_revision` is the verifier speaking, never the user. |
+| `goal_update` | `change: set \| progress \| status \| verified \| cleared \| proposed \| proposal_declined`, `goal: {objective, completionCriteria?, rubric?: [{id, criterion}], stepRubric?, verifier?: {provider, model}, maxIterations?, budget?, progress: {summary, percent?, updatedAt}, blockedOn?, status: active \| paused \| completed \| blocked \| proposed, pause?: {reason: budget \| max_iterations \| empty_continuations \| user_message \| restart \| failed \| user, detail?, at}, verification?: {verdict: satisfied \| needs_revision \| failed, criteria: [{id, pass, evidence}], reason?, iteration, verifier, costDollars, at}, verificationRounds?, continuingSince?, spentDollars, turnsUsed, createdAt, updatedAt}` | On `cleared`, `goal` is the goal that was removed. `verified` carries the verifier's new verdict. On `proposed`, `goal` is the model's proposal (status `proposed`); the current goal is unchanged until `POST /conversations/:id/goal/proposal/approve`. `spentDollars` counts the main loop, its sub-agents and the verifier. |
 | `todo_update` | `items: [{id, content, status, priority}]`, `stats: {total, pending, in_progress, completed}` | The agent's checklist. |
 | `brief_update` | `brief: {summary, keyFiles, openQuestions, timestamp}` | The agent's running brief. |
 | `usage_update` | `usage`, `estimatedCost?`, `operation?` | The turn's running totals. With `operation` set (`memory:extract`, `memory:embed`, `memory:consolidate`, `compact:summarize`), it is a background call, and its cost is `usage.estimatedCost`. |
@@ -226,6 +226,7 @@ Fields for each `sub_agent_status` `message`:
 | `hook_system_message` | `text`, `hookName`, `hookEvent` |
 | `stop_hook_cap_reached` | `continuations`, `reason` |
 | `stop_hook_continue` | `continuation`, `reason` |
+| `goal_verifying` | `round`, `maxIterations` |
 
 ```json
 {"type":"status","message":"iteration_progress","iteration":2,"maxIterations":25,"seq":1790125249470}
