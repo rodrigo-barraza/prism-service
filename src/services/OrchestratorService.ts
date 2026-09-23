@@ -2309,8 +2309,18 @@ export class OrchestratorService {
       ? `- Only modify files within your workspace\n`
       : "";
 
+    // Where this run works. A resumed agent whose worktree was merged back
+    // and removed runs in the parent's workspace — its transcript still
+    // names the old worktree, so say that it is gone (it used to read
+    // "Your workspace is: null", and the model reused the dead paths).
+    const runWorkspacePath = subAgent.worktreePath || parentWorkspaceRoot;
+    const previousWorkspacePath = subAgent.lastWorkspacePath;
+    subAgent.lastWorkspacePath = runWorkspacePath;
     const workspaceIntroLine = shouldShowWorkspaceConstraint
-      ? `Your workspace is: ${subAgent.worktreePath}\n`
+      ? `Your workspace is: ${runWorkspacePath}\n` +
+        (previousWorkspacePath && previousWorkspacePath !== runWorkspacePath
+          ? `Your previous run's workspace (${previousWorkspacePath}) no longer exists — its changes were merged into this one. Use paths under ${runWorkspacePath}.\n`
+          : "")
       : "";
 
     // ── Recursive spawning: depth tracking ──────────────────────────
