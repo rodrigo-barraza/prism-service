@@ -114,9 +114,8 @@ The `/admin` half was flagged on 2026-07-15 and deferred. The `autoApprove`/`wor
 Move it to a QuickJS-WASM VM or a separate low-privilege process, keeping the tool bridge as the only capability. Codex moved code mode onto a sandboxed V8 on 2026-08-07. Vercel Workflow ships a QuickJS engine with the same semantics as `node:vm`.
 
 **S8. Secrets at rest and across profiles.**
-- `RequestLogger.ts:161-184` stores tool args, results and hook payloads verbatim; only `data:` URIs are stripped.
-- MCP connections are pooled by server name alone (`MCPClientService.ts:100-107`), so same-named servers in different profiles share connections and injected credentials.
-- Fix: redact known secret shapes when logging, and key the pool by `(profile, server)`.
+- Request rows, hook payload rows and log lines are masked since 2026-09-22 (`src/utils/SecretRedaction.ts`, prompt 23 Landing 2): known key shapes, auth headers, URL passwords, secret assignments and the values of secret-named environment variables become `***<last4>`. Conversation transcripts are not rows and still hold what the tools returned.
+- MCP connections are pooled by `(profile, server)` (`tests/mcpProfilePool.test.ts`); keyed by server name alone, same-named servers in different profiles shared connections and injected credentials.
 
 ### 2.2 Current-model API compatibility
 
