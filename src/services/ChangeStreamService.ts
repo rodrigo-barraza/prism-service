@@ -221,12 +221,15 @@ const ChangeStreamService = {
       return;
     }
 
-    // Test if Change Streams are supported by opening a brief watch
+    // Only a replica set or a sharded cluster (mongos) serves change
+    // streams. Opening a probe `watch()` proves nothing — it is lazy, and on a
+    // standalone server it fails only at its first getMore, after this has
+    // reported change streams available and the admin UI stopped polling.
     try {
-      const testStream = db.collection(WATCHED_COLLECTIONS[0]).watch();
-      // If watch() succeeds without throwing, Change Streams are supported.
-      // We need to close this test stream and open real ones.
-      await testStream.close();
+      const hello = await db.admin().command({ hello: 1 });
+      if (!hello.setName && hello.msg !== "isdbgrid") {
+        throw new Error("MongoDB is a standalone server");
+      }
     } catch (error: unknown) {
       logger.warn(
         `Change Streams not available (${errorMessage(error)}). ` +
