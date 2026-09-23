@@ -6,11 +6,14 @@
   },
   "planningMode": {
     "blocked": "PLAN MODE active. Tool [{{blockedNames}}] blocked — only exit_plan_mode works. Write plan as text, then call exit_plan_mode.",
+    "blockedNotReadOnly": "PLAN MODE on. {{blockedNames}} not run — only read-only tools work while plan. Explore read-only, write plan, then call exit_plan_mode.",
     "submitPlan": "Plan written. Now call exit_plan_mode with plan so user review. No repeat as text.",
     "approvalResult": "Plan approved. Proceed with execution. Update todo if applicable.",
     "rejectionStatus": "Plan rejected — cancelled.",
     "rejectionResult": "User no approve plan. Plan not done. No act. Wait for user next message.",
     "planningInstruction": "## PLANNING MODE — TOOL RESTRICTED\n\nPLAN MODE. Only available:\n- **exit_plan_mode** — submit plan\n- **think** — reasoning\n\nAll other tool BLOCKED.\n\n**Steps:**\n1. Analyze request\n2. Design approach as text\n3. Call exit_plan_mode — user reviews before execution\n\nKeep concise. Simple task need brief summary.",
+    "planModeOn": "PLAN MODE on. All tools still listed, but only read-only calls run. Write, run, change state = blocked until plan approved. Explore, write plan as text, then call exit_plan_mode. Keep plan short.",
+    "planModeOff": "PLAN MODE off. Plan approved, all tools run again. Do the plan.",
     "rejectionStatusWithReason": "Plan rejected — cancelled. Reason: {{reason}}"
   },
   "reminderExtractor": {
@@ -46,7 +49,8 @@
   "toolSetUpdated": {
     "header": "[NEW TOOL] {{count}} enabled: {{toolNames}}",
     "availableDocumentation": "Tool ready with documentation:",
-    "usageGuidelines": "## Tool Usage"
+    "usageGuidelines": "## Tool Usage",
+    "removed": "Tool gone from this conversation: {{toolNames}}. Calls no run."
   },
   "validationError": {
     "header": "[VALIDATION ERROR] Edit introduced {{errorCount}} error:",

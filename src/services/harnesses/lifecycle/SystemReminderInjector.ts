@@ -119,6 +119,9 @@ export async function maybeInjectSystemReminder(
         `${reminderContent}\n\n` +
         PromptLocaleService.get(activeLocale, "harness.systemReminder.footer"),
     ),
+    // One turn's nudge: where the provider can (clear_at), an earlier copy
+    // stops rendering once a later one arrives — it is never removed.
+    turnScoped: true,
   });
 
   emit({

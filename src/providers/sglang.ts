@@ -218,7 +218,7 @@ export function buildSglangPayload(
   const tools = convertToolsToOpenAI(options.tools);
   if (tools) {
     payload.tools = tools;
-    payload.tool_choice = "auto";
+    payload.tool_choice = options.toolChoice === "none" ? "none" : "auto";
   }
 
   // Thinking hard switch for templates that read it (Qwen3 and kin)

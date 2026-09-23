@@ -66,8 +66,18 @@ import {
 
 import ToolContext from "#src/services/ToolContext";
 import InternalToolRegistry from "#src/services/tool-definitions/InternalToolRegistry";
+import ToolSurface, {
+  buildToolActivation,
+  describeBridgedTools,
+  type ToolSetDiff,
+} from "./lifecycle/ToolSurface.ts";
+import { serverContextEditingFor } from "./lifecycle/ServerContextEditing.ts";
+import {
+  resolveToolLoadingMode,
+  TOOL_LOADING_MODES,
+} from "#src/providers/toolLoading";
+import { isDiscoveryTool } from "#src/services/ToolDiscoveryScope";
 
-import WebhookEventBus from "#src/services/WebhookEventBus";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import AgenticToolResolver from "#src/services/AgenticToolResolver";
 import { ToolDocFormatter } from "#src/services/system-prompt/ToolDocFormatter";
@@ -86,9 +96,23 @@ import type {
   ConversationMessage,
   StreamChunk,
   StreamStateSnapshot,
+  ToolCall,
+  ToolSchema,
   UsageAccumulator,
 } from "./types.ts";
 
+
+/**
+ * The call a tool-set change came from: the batch's last discovery call
+ * (discover_and_enable_tools, enable_tools, search_tools), else its last call.
+ */
+function sourceToolCallIdOf(toolCalls: ToolCall[] | undefined): string | null {
+  if (!toolCalls || toolCalls.length === 0) return null;
+  const discoveryCall = [...toolCalls]
+    .reverse()
+    .find((toolCall) => isDiscoveryTool(toolCall.name));
+  return (discoveryCall ?? toolCalls[toolCalls.length - 1]).id ?? null;
+}
 
 /**
  * BaseAgenticHarness — abstract base class that defines the contract
@@ -114,7 +138,10 @@ export default class BaseAgenticHarness {
 
   protected context: AgenticContext;
   protected state: AgenticLoopState;
+  /** `finalTools` are the tools the model may call now (declared + activated). */
   protected tools: ResolvedTools;
+  /** The tool list every request of the turn declares (lifecycle/ToolSurface.ts). */
+  protected toolSurface: ToolSurface;
   protected trackerConversationId: string;
   protected deviationEngine: DeviationRuleEngine;
   protected budgetTracker: ContextBudgetTracker | null;
@@ -150,6 +177,14 @@ export default class BaseAgenticHarness {
       context.agentConversationId ||
       "") as string;
     this.deviationEngine = new DeviationRuleEngine();
+    this.toolSurface = new ToolSurface({
+      mode: resolveToolLoadingMode(context.providerName, context.resolvedModel),
+      loadedTools: tools.finalTools,
+      activatableTools:
+        tools.discoverableTools ?? this.fallbackActivatableTools(),
+      initiallyEnabled: this.initiallyEnabledToolNames(tools),
+      discoveryAvailable: tools.finalTools.some((tool) => isDiscoveryTool(tool.name)),
+    });
 
     // Budget tracker is lazily initialized when the context window
     // first becomes available — see ensureBudgetTracker().
@@ -176,21 +211,93 @@ export default class BaseAgenticHarness {
 
   private static readonly toolDocFormatter = new ToolDocFormatter();
 
+  /** Never deactivated by disable_tools: the core tools, Prism's own, MCP. */
+  private static isProtectedTool(toolName: string): boolean {
+    return (
+      BaseAgenticHarness.CORE_AGENTIC_SET.has(toolName) ||
+      BaseAgenticHarness.CORE_ORCHESTRATOR_SET.has(toolName) ||
+      InternalToolRegistry.has(toolName) ||
+      toolName.startsWith("mcp__")
+    );
+  }
+
   /**
-   * Check ToolContext for a dirty flag set by enable_tools / disable_tools.
-   * If set, re-filter `this.tools` from the full schema catalog using the
-   * dynamic enabled set stored in ToolContext.
+   * What may be activated when the resolver did not say (callers that build
+   * ResolvedTools by hand): the catalog, minus what this agent can never
+   * call — the same filter the mid-loop rebuild used.
+   */
+  private fallbackActivatableTools(): ToolSchema[] {
+    try {
+      const isSubAgent = !!this.context.parentAgentConversationId;
+      const hasNativeThinking = AgenticToolResolver.detectNativeThinking(
+        this.context.modelDefinition || undefined,
+        this.context.providerName,
+        this.context.resolvedModel,
+        this.context.options?.thinkingEnabled as boolean | undefined,
+      );
+      const catalog = [
+        ...ToolOrchestratorService.getToolSchemas(),
+        ...ToolOrchestratorService.getMCPToolSchemas({
+          username: this.context.username,
+          profileId: this.context.profileId,
+        }).map((mcpTool) => {
+          const { _mcpServer, _mcpOriginalName, ...schema } =
+            mcpTool as unknown as Record<string, unknown>;
+          return schema as unknown as ToolSchema;
+        }),
+      ] as unknown as ToolSchema[];
+      return catalog.filter(
+        (tool) =>
+          !(hasNativeThinking && tool.name === TOOL_NAMES.THINK) &&
+          !(isSubAgent && BaseAgenticHarness.CORE_ORCHESTRATOR_SET.has(tool.name)),
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  /** The dynamic enabled set this turn starts from (disable_tools diffs against it). */
+  private initiallyEnabledToolNames(tools: ResolvedTools): string[] {
+    try {
+      const stored = ToolContext.getStore(
+        this.context.agentConversationId as string,
+      ).get("dynamicEnabledTools");
+      if (Array.isArray(stored)) return stored as string[];
+    } catch {
+      // no tool context (tests, one-off callers)
+    }
+    return tools.resolvedEnabledTools ?? tools.finalTools.map((tool) => tool.name);
+  }
+
+  /** The tool options every request of this turn carries. */
+  requestToolOptions() {
+    return this.toolSurface.requestToolOptions();
+  }
+
+  /** Tool names the model may call now (plus the bridge). */
+  callableToolNames(): Set<string> {
+    return this.toolSurface.callableNames(this.tools.finalTools);
+  }
+
+  /**
+   * Check ToolContext for a dirty flag set by enable_tools / disable_tools /
+   * discover_and_enable_tools, and apply the change WITHOUT touching the
+   * request's tool block: activated tools become callable, deactivated ones
+   * stop being callable, and one tool-update system message is appended —
+   * carrying the new tools' documentation and the `toolActivation` the
+   * provider adapter renders natively (providers/toolLoading.ts). In bridge
+   * mode the message also carries their parameter schemas, since they are
+   * called through `tool_call`.
    *
-   * When tools are added, injects a documentation addendum into
-   * currentMessages so the model receives human-readable descriptions
-   * and parameter docs for dynamically activated tools (the initial
-   * system prompt is only assembled on iteration 1 and never rebuilt).
+   * `sourceToolCalls` is the batch that caused the change; its discovery
+   * call (or else its last call) is where `tool_reference` blocks attach.
    *
-   * Returns true if the tool set was mutated.
+   * Returns true if the callable tool set changed.
    */
   checkAndApplyToolSetChanges(
     currentMessages?: ConversationMessage[],
-    lastPassUsage?: UsageAccumulator | null,
+    _lastPassUsage?: UsageAccumulator | null,
+    sourceToolCalls?: ToolCall[],
   ): boolean {
     const conversationId = this.context.agentConversationId;
     const toolContextStore = ToolContext.getStore(conversationId);
@@ -203,178 +310,115 @@ export default class BaseAgenticHarness {
       | null;
     if (!Array.isArray(dynamicEnabledArray)) return false;
 
-    const dynamicEnabledSet = new Set(dynamicEnabledArray);
-
-    const previousToolNames = new Set(
-      (this.tools.finalTools as Array<{ name: string }>).map(
-        (tool) => tool.name,
-      ),
+    const diff = this.toolSurface.diff(
+      dynamicEnabledArray,
+      this.tools.finalTools,
+      BaseAgenticHarness.isProtectedTool,
     );
-
-    const allSchemas = [
-      ...ToolOrchestratorService.getToolSchemas(),
-      ...ToolOrchestratorService.getMCPToolSchemas({
-        username: this.context.username,
-        profileId: this.context.profileId,
-      }).map((mcpTool) => {
-        const { _mcpServer, _mcpOriginalName, ...schema } =
-          mcpTool as unknown as Record<string, unknown>;
-        return schema as { name: string; [key: string]: unknown };
-      }),
-    ] as Array<{ name: string; [key: string]: unknown }>;
-
-    const isSubAgent = !!this.context.parentAgentConversationId;
-
-    // When the model has native thinking, the think tool is redundant —
-    // re-apply the same exclusion that AgenticToolResolver.resolve() does
-    // during initial resolution, so dynamic tool set mutations don't
-    // accidentally re-introduce it.
-    const hasNativeThinking = AgenticToolResolver.detectNativeThinking(
-      this.context.modelDefinition || undefined,
-      this.context.providerName,
-      this.context.resolvedModel,
-      this.context.options?.thinkingEnabled as boolean | undefined,
-    );
-
-    const filteredTools = allSchemas.filter((tool) => {
-      if (hasNativeThinking && tool.name === TOOL_NAMES.THINK) return false;
-      return (
-        dynamicEnabledSet.has(tool.name) ||
-        tool.name.startsWith("mcp__") ||
-        BaseAgenticHarness.CORE_AGENTIC_SET.has(tool.name) ||
-        (!isSubAgent &&
-          BaseAgenticHarness.CORE_ORCHESTRATOR_SET.has(tool.name)) ||
-        InternalToolRegistry.has(tool.name)
+    if (diff.unavailable.length > 0) {
+      logger.info(
+        `[BaseAgenticHarness] Not activatable this turn (outside the declared catalog): [${diff.unavailable.join(", ")}]`,
       );
-    }) as unknown as ResolvedTools["finalTools"];
-
+    }
+    const removedNames = new Set(diff.removed);
     this.tools = {
-      finalTools: filteredTools,
+      ...this.tools,
+      finalTools: [
+        ...this.tools.finalTools.filter((tool) => !removedNames.has(tool.name)),
+        ...diff.added,
+      ],
       resolvedEnabledTools: dynamicEnabledArray,
     };
-
-    // Tool definitions serialize AHEAD of messages in provider payloads, so a
-    // mid-loop tool-set swap invalidates the entire prompt-cache prefix. The
-    // cost was previously silent — surface it so cache-thrash is diagnosable.
-    // The last pass's total input (remainder + cache read + cache write) is
-    // the prefix the next iteration must re-prefill from scratch.
-    const estimatedInvalidatedTokens = lastPassUsage
-      ? (Number(lastPassUsage.inputTokens) || 0) +
-        (Number(lastPassUsage.cacheReadInputTokens) || 0) +
-        (Number(lastPassUsage.cacheCreationInputTokens) || 0)
-      : null;
-    logger.warn(
-      `[AgenticLoop] Tool set changed mid-loop at iteration ${this.state.iterations} ` +
-        `(${previousToolNames.size} → ${filteredTools.length} tools) — ` +
-        `this busts the provider prompt-cache prefix for subsequent iterations` +
-        (estimatedInvalidatedTokens !== null
-          ? ` (~${estimatedInvalidatedTokens} prefix tokens invalidated).`
-          : `.`),
-    );
-
-    WebhookEventBus.emit("request.cache_invalidated", {
-      agentConversationId: conversationId,
-      conversationId: this.context.conversationId,
-      provider: this.context.providerName,
-      model: this.context.resolvedModel,
-      iteration: this.state.iterations,
-      previousToolCount: previousToolNames.size,
-      newToolCount: filteredTools.length,
-      estimatedInvalidatedTokens,
-      reason: "tool_set_changed",
-    });
+    if (diff.added.length === 0 && diff.removed.length === 0) return false;
 
     this.context.emit({
       type: SERVER_SENT_EVENT_TYPES.STATUS,
       message: STATUS_MESSAGES.TOOL_SET_CHANGED,
-      enabledCount: filteredTools.length,
+      enabledCount: this.tools.finalTools.length,
       dynamicTools: dynamicEnabledArray,
-      ...(estimatedInvalidatedTokens !== null && {
-        estimatedInvalidatedTokens,
-      }),
+      toolLoadingMode: this.toolSurface.mode,
     });
 
-    // Compute newly added tools and inject documentation addendum
-    const newlyAddedToolSchemas = (
-      filteredTools as unknown as Array<{
-        name: string;
-        [key: string]: unknown;
-      }>
-    ).filter(
-      (tool) =>
-        !previousToolNames.has(tool.name) &&
-        !BaseAgenticHarness.CORE_AGENTIC_SET.has(tool.name) &&
-        !BaseAgenticHarness.CORE_ORCHESTRATOR_SET.has(tool.name) &&
-        !InternalToolRegistry.has(tool.name),
-    );
-
-    if (currentMessages && newlyAddedToolSchemas.length > 0) {
-      const activeLocale =
-        (this.context.options?.locale as string | undefined) ||
-        PromptLocaleService.getDefaultLocale();
-      const addendumDocumentation =
-        BaseAgenticHarness.toolDocFormatter.buildToolDescriptions(
-          newlyAddedToolSchemas.map((tool) => tool.name),
-          undefined,
-          undefined,
-          newlyAddedToolSchemas.map((tool) => tool.name),
-          undefined,
-          undefined,
-          activeLocale,
-        );
-
-      if (addendumDocumentation) {
-        const toolNamesList = newlyAddedToolSchemas
-          .map((tool) => tool.name)
-          .join(", ");
-
-        const policyAddendum = getToolPolicyAddendum(
-          newlyAddedToolSchemas.map((tool) => tool.name),
-          activeLocale,
-        );
-
-        const headerText = PromptLocaleService.get(
-          activeLocale,
-          "harness.toolSetUpdated.header",
-          {
-            count: String(newlyAddedToolSchemas.length),
-            toolNames: toolNamesList,
-          },
-        );
-        const availableText = PromptLocaleService.get(
-          activeLocale,
-          "harness.toolSetUpdated.availableDocumentation",
-        );
-        const guidelinesHeader = PromptLocaleService.get(
-          activeLocale,
-          "harness.toolSetUpdated.usageGuidelines",
-        );
-
-        currentMessages.push({
-          role: "system",
-          content: wrapSystemMessage(
-            SYSTEM_MESSAGE_TAGS.TOOL_UPDATE,
-            `${headerText}\n\n` +
-              `${availableText}\n\n` +
-              addendumDocumentation +
-              (policyAddendum
-                ? `\n\n${guidelinesHeader}\n\n${policyAddendum}`
-                : ""),
-          ),
-        });
-
-        logger.info(
-          `[BaseAgenticHarness] Injected documentation addendum for ${newlyAddedToolSchemas.length} newly activated tools: [${toolNamesList}]` +
-            (policyAddendum ? ` (with policy guidance)` : ""),
-        );
-      }
+    if (currentMessages) {
+      currentMessages.push(
+        this.buildToolUpdateMessage(diff, sourceToolCallIdOf(sourceToolCalls)),
+      );
     }
 
     logger.info(
-      `[BaseAgenticHarness] Tool set mutated: ${filteredTools.length} tools active (${dynamicEnabledArray.length} dynamic)`,
+      `[BaseAgenticHarness] Tool set changed without touching the request (${this.toolSurface.mode}): ` +
+        `+[${diff.added.map((tool) => tool.name).join(", ")}] -[${diff.removed.join(", ")}] — ` +
+        `${this.tools.finalTools.length} callable`,
     );
 
     return true;
+  }
+
+  /** The appended tool-update message for a tool-set change. */
+  private buildToolUpdateMessage(
+    diff: ToolSetDiff,
+    sourceToolCallId: string | null,
+  ): ConversationMessage {
+    const activeLocale =
+      (this.context.options?.locale as string | undefined) ||
+      PromptLocaleService.getDefaultLocale();
+    const sections: string[] = [];
+    if (diff.added.length > 0) {
+      const addedNames = diff.added.map((tool) => tool.name);
+      sections.push(
+        PromptLocaleService.get(activeLocale, "harness.toolSetUpdated.header", {
+          count: String(addedNames.length),
+          toolNames: addedNames.join(", "),
+        }),
+      );
+      if (this.toolSurface.mode === TOOL_LOADING_MODES.BRIDGE) {
+        sections.push(describeBridgedTools(diff.added));
+      }
+      const addendumDocumentation =
+        BaseAgenticHarness.toolDocFormatter.buildToolDescriptions(
+          addedNames,
+          undefined,
+          undefined,
+          addedNames,
+          undefined,
+          undefined,
+          activeLocale,
+        );
+      if (addendumDocumentation) {
+        sections.push(
+          PromptLocaleService.get(
+            activeLocale,
+            "harness.toolSetUpdated.availableDocumentation",
+          ),
+          addendumDocumentation,
+        );
+      }
+      const policyAddendum = getToolPolicyAddendum(addedNames, activeLocale);
+      if (policyAddendum) {
+        sections.push(
+          PromptLocaleService.get(
+            activeLocale,
+            "harness.toolSetUpdated.usageGuidelines",
+          ),
+          policyAddendum,
+        );
+      }
+    }
+    if (diff.removed.length > 0) {
+      sections.push(
+        PromptLocaleService.get(activeLocale, "harness.toolSetUpdated.removed", {
+          toolNames: diff.removed.join(", "),
+        }),
+      );
+    }
+    return {
+      role: "system",
+      content: wrapSystemMessage(
+        SYSTEM_MESSAGE_TAGS.TOOL_UPDATE,
+        sections.join("\n\n"),
+      ),
+      toolActivation: buildToolActivation(diff, sourceToolCallId),
+    };
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -842,6 +886,9 @@ export default class BaseAgenticHarness {
           this.context.providerName,
         ),
       },
+      // Claude clears old tool results server-side instead of the client
+      // rewriting them into offload stubs (ContextPressureManager).
+      ...serverContextEditingFor(this.context),
     };
 
     for (const optionKey of [
@@ -1266,12 +1313,15 @@ export default class BaseAgenticHarness {
 
     // Hashes of what the adapter sent, compared with the previous request
     // of this agent conversation (null when the adapter reported none).
+    const declaredBoundary = state.pendingPrefixBoundary;
+    state.pendingPrefixBoundary = null;
     const cacheTelemetryFields = PromptCacheTelemetry.recordRequest({
       conversationKey: this.cacheTelemetryKey(),
       requestId: `${this.context.requestId}-${state.iterations}`,
       provider: providerName,
       model: resolvedModel,
       telemetry: pass.requestTelemetry,
+      declaredBoundary,
     });
 
     // Two-phase completion: if we pre-inserted a pending skeleton on

@@ -36,7 +36,16 @@ import {
   type RequestTelemetryChunk,
 } from "#src/utils/PromptPrefixHashes";
 
-import { type ProviderOptions, type ChatMessage } from "#src/types/ProviderTypes";
+import {
+  type ProviderOptions,
+  type ChatMessage,
+  type ToolActivation,
+} from "#src/types/ProviderTypes";
+import {
+  TOOL_LOADING_MODES,
+  supportsMidConversationSystem,
+  type ToolLoadingMode,
+} from "#src/providers/toolLoading";
 import type { TokenUsage } from "#src/types/admin";
 
 export type { AnthropicThinkingBlock };
@@ -125,6 +134,9 @@ export type TransformedStreamEvent =
   | { type: "usage"; usage: TokenUsage }
   | { type: "rateLimits"; rateLimits: ReturnType<typeof extractAnthropicRateLimits> }
   | RequestTelemetryChunk;
+
+/** Rejection-registry key for server-side context editing (PromptPrefixHashes). */
+const CONTEXT_EDITING_FEATURE_KEY = "anthropic-context-editing";
 
 /** Beta that returns why the prompt cache missed against a previous message. */
 export const ANTHROPIC_CACHE_DIAGNOSIS_BETA = "cache-diagnosis-2026-04-07";
@@ -240,6 +252,14 @@ const ANTHROPIC_BETA_SERVER_SIDE_FALLBACK = "server-side-fallback-2026-07-01";
 const ANTHROPIC_BETA_THINKING_DISPLAY_UPDATES =
   "thinking-display-updates-2026-08-18";
 const ANTHROPIC_BETA_THINKING_BINDING = "thinking-binding-controls-2026-08-01";
+/** `tool_addition` / `tool_removal` blocks in mid-conversation system messages. */
+export const ANTHROPIC_BETA_MID_CONVERSATION_TOOL_CHANGES =
+  "mid-conversation-tool-changes-2026-07-01";
+/** Turn-scoped (`clear_at: "next_user_message"`) mid-conversation system messages. */
+export const ANTHROPIC_BETA_SYSTEM_CLEAR_AT =
+  "mid-conversation-system-clear-at-2026-08-21";
+/** Server-side context editing (`clear_tool_uses_20250919`). */
+export const ANTHROPIC_BETA_CONTEXT_MANAGEMENT = "context-management-2025-06-27";
 
 const EFFORT_RANK: Record<string, number> = {
   low: 0,
@@ -544,6 +564,42 @@ export function buildAnthropicRequest(
 
   const tools = buildTools(options, { eagerInputStreaming: streaming });
   if (tools) payload.tools = tools;
+  if (tools && options.toolChoice === "none") {
+    // The exhaustion pass: same tool block, no calls.
+    payload.tool_choice = { type: "none" };
+  }
+  if (
+    options.toolLoadingMode === TOOL_LOADING_MODES.ANTHROPIC_TOOL_ADDITION &&
+    options.deferredTools?.length
+  ) {
+    betas.push(ANTHROPIC_BETA_MID_CONVERSATION_TOOL_CHANGES);
+  }
+  if (options.contextEditing && tools?.length) {
+    payload.context_management = {
+      edits: [
+        {
+          type: "clear_tool_uses_20250919",
+          trigger: {
+            type: "input_tokens",
+            value: options.contextEditing.triggerInputTokens,
+          },
+          keep: { type: "tool_uses", value: options.contextEditing.keepToolUses },
+          clear_at_least: {
+            type: "input_tokens",
+            value: options.contextEditing.clearAtLeastInputTokens,
+          },
+        },
+      ],
+    };
+    betas.push(ANTHROPIC_BETA_CONTEXT_MANAGEMENT);
+  }
+  if (
+    (prepared.messages as unknown as Array<Record<string, unknown>>).some(
+      (message) => message.clear_at !== undefined,
+    )
+  ) {
+    betas.push(ANTHROPIC_BETA_SYSTEM_CLEAR_AT);
+  }
 
   const requestedEffort = normalizeEffort(options.reasoningEffort);
   const thinkingOff =
@@ -708,16 +764,110 @@ async function enforceImageSizeLimits(
 }
 
 /**
- * Whether the model natively accepts `role: "system"` messages mid-conversation.
- *
- * Per Anthropic's docs (verified 2026-07): Claude Opus 4.8 only — no beta
- * header required. All other Claude models return a 400
- * ("role 'system' is not supported on this model"). Matched with includes()
- * so provider-prefixed IDs (e.g. Bedrock's "anthropic.claude-opus-4-8")
- * are also recognized.
+ * Whether the model natively accepts `role: "system"` messages
+ * mid-conversation: Opus 4.8, Opus 5 / 5.5 and Fable 5 / 5.1 (the catalog's
+ * `midConversationSystem` flag; no beta header). Every other Claude model
+ * returns a 400 ("role 'system' is not supported on this model"), so their
+ * system messages are demoted to user role. Provider-prefixed IDs (Bedrock's
+ * "anthropic.claude-opus-4-8") resolve too.
  */
 export function supportsMidConversationSystemMessages(model?: string): boolean {
-  return !!model && model.includes("claude-opus-4-8");
+  return supportsMidConversationSystem(model);
+}
+
+/** Placeholder block marking where a `tool_reference` activation goes (resolved after merging). */
+const TOOL_REFERENCE_ATTACHMENT = "__prism_tool_reference_attachment";
+
+/**
+ * A mid-conversation system message's content as Anthropic blocks: its text,
+ * then — when the tools are activated with `tool_addition` — one block per
+ * added / removed tool (rendered only in that mode; the harness declared the
+ * added tools with `defer_loading`).
+ */
+function systemMessageBlocks(
+  text: string,
+  activation: ToolActivation | undefined,
+  toolLoadingMode: ToolLoadingMode | undefined,
+): string | AnthropicBlock[] {
+  if (
+    !activation ||
+    toolLoadingMode !== TOOL_LOADING_MODES.ANTHROPIC_TOOL_ADDITION
+  ) {
+    return text;
+  }
+  return [
+    ...(text.trim() ? [{ type: "text", text }] : []),
+    ...activation.added.map((tool) => ({
+      type: "tool_addition",
+      tool: { type: "tool_reference", name: tool.name },
+    })),
+    ...activation.removed.map((toolName) => ({
+      type: "tool_removal",
+      tool: { type: "tool_reference", name: toolName },
+    })),
+  ] as unknown as AnthropicBlock[];
+}
+
+/**
+ * Custom tool search: the tools a `tool_reference`-mode activation loads are
+ * referenced from the result of the call that activated them. A tool result
+ * that carries references may hold nothing else, so its own text moves to a
+ * text block right after it, in the same user turn (verified live on
+ * claude-sonnet-5 and claude-haiku-4-5, 2026-09-22). Runs after merging, on
+ * placeholders left by the demoted activation message.
+ */
+function attachToolReferences(messages: ChatMessage[]): void {
+  for (const message of messages) {
+    if (message.role !== "user" || !Array.isArray(message.content)) continue;
+    const blocks = message.content as unknown as AnthropicBlock[];
+    if (!blocks.some((block) => block.type === TOOL_REFERENCE_ATTACHMENT)) continue;
+    const output: AnthropicBlock[] = [];
+    const attachments: Array<{ names: string[]; sourceToolCallId?: string | null }> = [];
+    for (const block of blocks) {
+      if (block.type === TOOL_REFERENCE_ATTACHMENT) {
+        attachments.push(
+          block as unknown as { names: string[]; sourceToolCallId?: string | null },
+        );
+      } else {
+        output.push(block);
+      }
+    }
+    for (const attachment of attachments) {
+      const results = output.filter((block) => block.type === "tool_result");
+      const target =
+        results.find((block) => block.tool_use_id === attachment.sourceToolCallId) ??
+        results[results.length - 1];
+      if (!target) {
+        logger.warn(
+          `[anthropic] No tool result to carry tool_reference for [${attachment.names.join(", ")}] — not loaded`,
+        );
+        continue;
+      }
+      const existing = Array.isArray(target.content) ? target.content : [];
+      const alreadyReferences = existing.every(
+        (block) => (block as { type?: string }).type === "tool_reference",
+      );
+      const references = [
+        ...(alreadyReferences ? existing : []),
+        ...attachment.names.map((toolName) => ({
+          type: "tool_reference",
+          tool_name: toolName,
+        })),
+      ];
+      if (!alreadyReferences || typeof target.content === "string") {
+        const originalText =
+          typeof target.content === "string"
+            ? target.content
+            : JSON.stringify(target.content);
+        output.splice(output.indexOf(target) + 1, 0, {
+          type: "text",
+          text: originalText,
+        });
+      }
+      target.content = references as unknown as AnthropicBlock[];
+    }
+    message.content = output as unknown as ChatMessage["content"];
+  }
 }
 
 /**
@@ -895,11 +1045,43 @@ async function buildMediaBlocksForReference(
   ];
 }
 
+/**
+ * A mid-conversation system message that breaks placement rules goes out
+ * as user text: a user turn carries no `clear_at` and no tool-change blocks.
+ */
+function demoteSystemMessage(message: ChatMessage): void {
+  const record = message as unknown as Record<string, unknown>;
+  message.role = "user";
+  delete record.clear_at;
+  if (Array.isArray(message.content)) {
+    const blocks = message.content as unknown as AnthropicBlock[];
+    const kept = blocks.filter(
+      (block) => block.type !== "tool_addition" && block.type !== "tool_removal",
+    );
+    if (kept.length !== blocks.length) {
+      logger.warn(
+        "[anthropic] A tool-change system message could not stay a system message (placement) — its tool_addition / tool_removal blocks were dropped",
+      );
+    }
+    message.content = (kept.length > 0
+      ? kept
+      : [{ type: "text", text: " " }]) as unknown as ChatMessage["content"];
+  }
+}
+
 /** Merge consecutive same-role messages into a single turn. */
 function mergeConsecutiveSameRole(messages: ChatMessage[]): ChatMessage[] {
   return messages.reduce((acc: ChatMessage[], current: ChatMessage) => {
     if (acc.length && acc[acc.length - 1].role === current.role) {
       const previous = acc[acc.length - 1];
+      // A merged system message is turn-scoped only if every part was.
+      const previousRecord = previous as unknown as Record<string, unknown>;
+      if (
+        previousRecord.clear_at !==
+        (current as unknown as Record<string, unknown>).clear_at
+      ) {
+        delete previousRecord.clear_at;
+      }
       // Handle merging when content might be string or array
       if (
         typeof previous.content === "string" &&
@@ -977,7 +1159,11 @@ function layoutAssistantTurn(
  * `role: "system"` on models that support them (Opus 4.8) instead of being
  * demoted to user role.
  */
-export async function prepareMessages(messages: ChatMessage[], model?: string) {
+export async function prepareMessages(
+  messages: ChatMessage[],
+  model?: string,
+  { toolLoadingMode }: { toolLoadingMode?: ToolLoadingMode } = {},
+) {
   let systemMessage: string | undefined;
   const keepSystemRole = supportsMidConversationSystemMessages(model);
   // High-res Anthropic vision models accept a 2576px long edge; everything
@@ -1043,13 +1229,41 @@ export async function prepareMessages(messages: ChatMessage[], model?: string) {
         // are demoted to user role — the harness's XML tags let the model
         // distinguish them from actual user messages.
         if (message.role === "system") {
-          return {
-            role: keepSystemRole ? "system" : "user",
-            content:
-              typeof message.content === "string"
-                ? message.content
-                : JSON.stringify(message.content),
-          };
+          const text =
+            typeof message.content === "string"
+              ? message.content
+              : JSON.stringify(message.content);
+          if (keepSystemRole) {
+            return {
+              role: "system",
+              content: systemMessageBlocks(
+                text,
+                message.toolActivation,
+                toolLoadingMode,
+              ),
+              // A one-turn nudge renders for this turn only and stays in
+              // the transcript (beta mid-conversation-system-clear-at).
+              ...(message.turnScoped && { clear_at: "next_user_message" }),
+            };
+          }
+          const activation = message.toolActivation;
+          if (
+            activation?.added.length &&
+            toolLoadingMode === TOOL_LOADING_MODES.ANTHROPIC_TOOL_REFERENCE
+          ) {
+            return {
+              role: "user",
+              content: [
+                { type: "text", text },
+                {
+                  type: TOOL_REFERENCE_ATTACHMENT,
+                  names: activation.added.map((tool) => tool.name),
+                  sourceToolCallId: activation.sourceToolCallId ?? null,
+                },
+              ],
+            };
+          }
+          return { role: "user", content: text };
         }
 
         // Convert assistant messages with toolCalls to multi-part content
@@ -1227,7 +1441,7 @@ export async function prepareMessages(messages: ChatMessage[], model?: string) {
       const validSuccessor =
         i === merged.length - 1 || merged[i + 1].role === "assistant";
       if (!followsUser || !validSuccessor) {
-        merged[i].role = "user";
+        demoteSystemMessage(merged[i]);
         demotedAny = true;
       }
     }
@@ -1253,6 +1467,9 @@ export async function prepareMessages(messages: ChatMessage[], model?: string) {
       },
     );
   }
+
+  // Custom tool search: tool references into the activating call's result.
+  attachToolReferences(merged);
 
   // Ensure conversation starts with a user message
   if (merged.length > 0 && merged[0].role === "assistant") {
@@ -1357,6 +1574,27 @@ export function buildTools(
         // after server-side buffering — which also means unvalidated, so
         // the stream checks it against the schema (findToolInputViolation).
         ...(eagerInputStreaming && { eager_input_streaming: true }),
+      });
+    }
+  }
+  // Tools the conversation may activate later, declared now and loaded only
+  // when a tool_addition / tool_reference says so — the tool block never
+  // changes mid-conversation (providers/toolLoading.ts).
+  const declaredNames = new Set(tools.map((tool) => tool.name));
+  if (
+    options.deferredTools?.length &&
+    (options.toolLoadingMode === TOOL_LOADING_MODES.ANTHROPIC_TOOL_ADDITION ||
+      options.toolLoadingMode === TOOL_LOADING_MODES.ANTHROPIC_TOOL_REFERENCE) &&
+    tools.length > 0
+  ) {
+    for (const tool of options.deferredTools) {
+      if (declaredNames.has(tool.name)) continue;
+      tools.push({
+        name: tool.name,
+        description: tool.description || "",
+        input_schema: tool.parameters || { type: "object", properties: {} },
+        ...(eagerInputStreaming && { eager_input_streaming: true }),
+        defer_loading: true,
       });
     }
   }
@@ -1555,13 +1793,15 @@ const EPHEMERAL_CACHE = { type: "ephemeral" } as const;
  *      cached by the previous turn's marker and extends it.
  */
 export function applyCacheBreakpoints(payload: Record<string, unknown>): void {
-  // 1. Tools — serialize first in the prompt; mark the last definition
+  // 1. Tools — serialize first in the prompt; mark the last loaded
+  //    definition (a deferred one cannot carry cache_control — a 400).
   const tools = payload.tools as Array<Record<string, unknown>> | undefined;
   if (Array.isArray(tools) && tools.length > 0) {
-    tools[tools.length - 1] = {
-      ...tools[tools.length - 1],
-      cache_control: EPHEMERAL_CACHE,
-    };
+    let markIndex = tools.length - 1;
+    while (markIndex >= 0 && tools[markIndex].defer_loading === true) markIndex--;
+    if (markIndex >= 0) {
+      tools[markIndex] = { ...tools[markIndex], cache_control: EPHEMERAL_CACHE };
+    }
   }
 
   // 2. System — convert the plain string to a cacheable text block
@@ -1571,12 +1811,16 @@ export function applyCacheBreakpoints(payload: Record<string, unknown>): void {
     ];
   }
 
-  // 3. Messages — moving breakpoint on the last cacheable content block
+  // 3. Messages — moving breakpoint on the last cacheable content block.
+  //    A turn-scoped (clear_at) system message takes no cache_control: the
+  //    breakpoint goes on the turn before it.
   const messages = payload.messages as
     | Array<{ content: unknown; [key: string]: unknown }>
     | undefined;
   if (!Array.isArray(messages) || messages.length === 0) return;
-  const lastMessage = messages[messages.length - 1];
+  let lastIndex = messages.length - 1;
+  while (lastIndex > 0 && messages[lastIndex].clear_at !== undefined) lastIndex--;
+  const lastMessage = messages[lastIndex];
   if (typeof lastMessage.content === "string") {
     if (!lastMessage.content.trim()) return; // empty text blocks are rejected
     lastMessage.content = [
@@ -1613,7 +1857,9 @@ const anthropicProvider = {
   ): Promise<AnthropicGenerateResult> {
     logger.provider("Anthropic", `generateText model=${model}`);
 
-    const prepared = await prepareMessages(messages, model);
+    const prepared = await prepareMessages(messages, model, {
+      toolLoadingMode: options.toolLoadingMode,
+    });
     const { payload, betas } = buildAnthropicRequest(prepared, model, options, {
       streaming: false,
     });
@@ -1852,11 +2098,21 @@ const anthropicProvider = {
       fileIds: [],
     };
     let receivedAnyStreamChunk = false;
+    // A model that rejected server-side context editing this process is not
+    // asked again (the loop then relies on compaction alone).
+    if (
+      options.contextEditing &&
+      isProviderDiagnosticsRejected(CONTEXT_EDITING_FEATURE_KEY, model)
+    ) {
+      options = { ...options, contextEditing: undefined };
+    }
     const cacheTelemetry = options.cacheTelemetry;
     const requestsCacheDiagnostics =
       !!cacheTelemetry && !isProviderDiagnosticsRejected("anthropic", model);
     try {
-      const prepared = await prepareMessages(messages, model);
+      const prepared = await prepareMessages(messages, model, {
+        toolLoadingMode: options.toolLoadingMode,
+      });
       const { payload: streamPayload, betas } = buildAnthropicRequest(
         prepared,
         model,
@@ -1916,6 +2172,9 @@ const anthropicProvider = {
       );
       let anthropicMessageId: string | undefined;
       let diagnosticsEnvelope: unknown;
+      // With the thinking-binding beta every response carries this array
+      // (empty = no replayed thinking block was dropped).
+      let inputTransformations: unknown[] | null = null;
 
       // Track current content block type for server tool response processing
       let currentBlockType: string | null = null;
@@ -1965,11 +2224,13 @@ const anthropicProvider = {
           if (chunk.message.model && chunk.message.model !== model) {
             yield { type: "servedModel", model: chunk.message.model };
           }
-          logInputTransformations(
-            (chunk.message as { input_transformations?: unknown })
-              .input_transformations,
-            model,
-          );
+          const startTransformations = (
+            chunk.message as { input_transformations?: unknown }
+          ).input_transformations;
+          logInputTransformations(startTransformations, model);
+          if (Array.isArray(startTransformations)) {
+            inputTransformations = startTransformations;
+          }
           const startIterations = (
             chunk.message.usage as { iterations?: unknown[] }
           ).iterations;
@@ -2277,10 +2538,13 @@ const anthropicProvider = {
             chunk.usage as { iterations?: unknown[] } | undefined
           )?.iterations;
           if (Array.isArray(deltaIterations)) usageIterations = deltaIterations;
-          logInputTransformations(
-            (chunk as { input_transformations?: unknown }).input_transformations,
-            model,
-          );
+          const deltaTransformations = (
+            chunk as { input_transformations?: unknown }
+          ).input_transformations;
+          logInputTransformations(deltaTransformations, model);
+          if (Array.isArray(deltaTransformations)) {
+            inputTransformations = deltaTransformations;
+          }
           // Read before anything treats the output as an answer: a refusal
           // (before or during output) is not an empty response to retry.
           if (chunk.delta?.stop_reason === "refusal") {
@@ -2339,6 +2603,7 @@ const anthropicProvider = {
                 cacheTelemetry.previousResponseId ?? null,
               )
             : null,
+          inputTransformations,
         });
       }
       const pauseContinuations = options.anthropicPauseContinuations ?? 0;
@@ -2402,6 +2667,23 @@ const anthropicProvider = {
         yield* anthropicProvider.generateTextStream(messages, model, {
           ...options,
           disableAnthropicFileSources: true,
+        });
+        return;
+      }
+      // Server-side context editing is an optimization: a request rejected
+      // for it is sent again without it (nothing reached the consumer yet).
+      if (
+        !receivedAnyStreamChunk &&
+        options.contextEditing &&
+        isDiagnosticsRejection(error, /context_management|context-management|clear_tool_uses/i)
+      ) {
+        logger.warn(
+          `[anthropic] context editing rejected for ${model} (${getErrorMessage(error)}) — retrying without`,
+        );
+        markProviderDiagnosticsRejected(CONTEXT_EDITING_FEATURE_KEY, model);
+        yield* anthropicProvider.generateTextStream(messages, model, {
+          ...options,
+          contextEditing: undefined,
         });
         return;
       }
