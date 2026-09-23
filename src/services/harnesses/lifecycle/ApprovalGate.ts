@@ -16,7 +16,7 @@ import type AgentHooks from "#src/services/AgentHooks";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import { resolveLoopKey } from "#src/services/LoopKey";
 import { decisionOwnerOf } from "#src/services/conversation/ConversationRunState";
-import { APPROVALS } from "#src/constants";
+import { APPROVALS, TURN_RESUME } from "#src/constants";
 import { buildHookPayload } from "#src/services/hooks/buildPayload";
 import { HOOK_EVENTS } from "#src/services/hooks/types";
 import { buildApprovalPreview } from "./ApprovalPreview.ts";
@@ -76,6 +76,19 @@ export interface ApprovalGateOptions {
   toolSchemas?: ToolSchema[];
   /** The run's hooks — PermissionRequest, Notification and PermissionDenied fire through them. */
   hooks?: AgentHooks;
+  /**
+   * The batch is a pass replayed after a restart (ResumedPass): the cards it
+   * put out before are picked up again, not asked twice.
+   */
+  resume?: boolean;
+}
+
+/**
+ * A call a restart cut off mid-run that is not read-only: it may have
+ * partly happened, so it runs again only if the user says so.
+ */
+function isInterruptedCall(toolCall: ToolCall): boolean {
+  return toolCall._resumed?.status === "interrupted";
 }
 
 /** Order results the way the model emitted the calls. */
@@ -126,6 +139,22 @@ function userDeclinedResult(
   decision: ToolCallDecision,
   locale: string,
 ): ToolResult {
+  if (isInterruptedCall(toolCall)) {
+    // Not "declined": it ran (at least partly) before the restart; it was
+    // not run AGAIN. The model must not assume either outcome.
+    return {
+      name: toolCall.name,
+      id: toolCall.id,
+      result: {
+        success: false,
+        error: "INTERRUPTED_BY_RESTART",
+        message: PromptLocaleService.get(locale, "harness.resume.notRerun", {
+          toolName: toolCall.name,
+        }),
+        ...(decision.reason ? { reason: decision.reason } : {}),
+      },
+    };
+  }
   const isLapsed = decision.source !== "user";
   const messageKey = isLapsed
     ? "harness.approval.lapsed"
@@ -239,7 +268,7 @@ export async function checkAndWaitForApproval(
   toolCalls: ToolCall[],
   context: AgenticContext,
   approvalEngine: AutoApprovalEngine,
-  { toolSchemas = [], hooks }: ApprovalGateOptions = {},
+  { toolSchemas = [], hooks, resume = false }: ApprovalGateOptions = {},
 ): Promise<ApprovalVerdict> {
   const { emit, options } = context;
 
@@ -266,10 +295,13 @@ export async function checkAndWaitForApproval(
   // Mid-loop "auto-approve this conversation" (options.autoApprove flipped
   // after engine construction) answers every prompt — except the ones a
   // PreToolUse hook explicitly asked for, which is the whole point of `ask`.
+  // A call a restart cut off mid-run is asked about whatever its tier or the
+  // mode: "run it again?" is not a permission the mode already gave.
   let pending = toolCalls.filter(
     (toolCall) =>
-      awaitingOriginals.has(toolCall) &&
-      (!options.autoApprove || toolCall._hookPermission?.decision === "ask"),
+      (isInterruptedCall(toolCall) && !deniedOriginals.has(toolCall)) ||
+      (awaitingOriginals.has(toolCall) &&
+        (!options.autoApprove || toolCall._hookPermission?.decision === "ask")),
   );
 
   if (options.autoApprove) {
@@ -290,7 +322,16 @@ export async function checkAndWaitForApproval(
   }
 
   if (pending.length > 0 && hooks) {
-    pending = await runPermissionRequestHooks(pending, context, hooks);
+    const interrupted = pending.filter(isInterruptedCall);
+    pending = [
+      ...interrupted,
+      ...(await runPermissionRequestHooks(
+        pending.filter((toolCall) => !isInterruptedCall(toolCall)),
+        context,
+        hooks,
+      )),
+    ];
+    pending.sort((left, right) => toolCalls.indexOf(left) - toolCalls.indexOf(right));
   }
 
   const isDenied = (toolCall: ToolCall) =>
@@ -330,16 +371,19 @@ export async function checkAndWaitForApproval(
   );
 
   // ── One decision per call ────────────────────────────────────
-  const batchId = crypto.randomUUID();
+  const proposedBatchId = crypto.randomUUID();
   const usedKeys = new Set<string>();
   const pendingCalls = new Set(pending);
   const awaiting = toolCalls.flatMap((toolCall, index) => {
     if (!pendingCalls.has(toolCall)) return [];
     // The id the client decides the call by: the provider's id, made
     // unique within the batch (providers without ids, or repeating ones).
-    let toolCallId = toolCall.id || `${batchId}:${index}`;
+    let toolCallId = toolCall.id || `${proposedBatchId}:${index}`;
     if (usedKeys.has(toolCallId)) toolCallId = `${toolCallId}#${index}`;
     usedKeys.add(toolCallId);
+    // "Run it again?" is its own decision — never the approval it had
+    // before the restart, which is spent.
+    if (isInterruptedCall(toolCall)) toolCallId += TURN_RESUME.RETRY_DECISION_SUFFIX;
     return [{ toolCallId, toolCall }];
   });
 
@@ -349,6 +393,8 @@ export async function checkAndWaitForApproval(
   const previews = await Promise.all(
     awaiting.map(({ toolCall }) => buildApprovalPreview(toolCall, context)),
   );
+  const locale =
+    (options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale();
   const requests: ApprovalRequestCall[] = awaiting.map(({ toolCallId, toolCall }, index) => ({
     toolCallId,
     name: toolCall.name,
@@ -357,16 +403,28 @@ export async function checkAndWaitForApproval(
     tierLabel: toolCall._approval?.tierLabel,
     argsSchema: (schemaByName.get(toolCall.name) as Record<string, unknown> | null) ?? null,
     preview: previews[index],
+    ...(isInterruptedCall(toolCall)
+      ? {
+          requestedBy: TURN_RESUME.RETRY_REQUESTED_BY,
+          reason: PromptLocaleService.get(locale, "harness.resume.retryReason", {
+            toolName: toolCall.name,
+          }),
+        }
+      : {}),
   }));
 
   // Recorded first, THEN shown: a decision can only land on a call that
   // exists, and a card must never outlive the process that showed it.
+  // A replayed pass picks up the batch it opened before the restart (its
+  // own batch id, the decisions already made) — only what is still
+  // undecided gets a card.
   const loopKey = resolveLoopKey(context);
-  const { decisions: decisionsPromise } = await ApprovalRegistry.open(
+  let batchId: string = proposedBatchId;
+  const opened = await ApprovalRegistry.open(
     loopKey,
     {
       type: "tool",
-      batchId,
+      batchId: proposedBatchId,
       calls: requests,
       onDecided: (toolCallId, decision) => {
         emit({
@@ -382,9 +440,14 @@ export async function checkAndWaitForApproval(
       },
     },
     decisionOwnerOf(context),
+    { resume },
   );
+  batchId = opened.batchId;
+  const decisionsPromise = opened.decisions;
+  const stillPending = new Set(opened.pendingToolCallIds);
 
   requests.forEach((request, index) => {
+    if (!stillPending.has(request.toolCallId)) return;
     const hookPermission = awaiting[index].toolCall._hookPermission;
     emit({
       type: "approval_required",
@@ -403,6 +466,10 @@ export async function checkAndWaitForApproval(
         requestedBy: "hook",
         reason: hookPermission.reason ?? null,
       }),
+      ...(request.requestedBy && {
+        requestedBy: request.requestedBy,
+        reason: request.reason ?? null,
+      }),
     });
   });
 
@@ -418,8 +485,6 @@ export async function checkAndWaitForApproval(
   }
 
   // ── Assemble, in the model's order ───────────────────────────
-  const locale =
-    (options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale();
   const decisionByCall = new Map(
     awaiting.map(({ toolCallId, toolCall }) => [toolCall, decisions.get(toolCallId)]),
   );

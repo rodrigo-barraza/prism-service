@@ -143,16 +143,19 @@ export async function handleExitPlanMode(
 
   // The plan is decided like any other call: by the exit_plan_mode call's
   // id, through the same registry and POST /agent/approve as tool cards.
-  const batchId = crypto.randomUUID();
+  let batchId: string = crypto.randomUUID();
   const toolCallId = exitPlanToolCall.id || `${batchId}:plan`;
 
   let planDecision: "approved" | "rejected";
   let rejectionReason: string | undefined;
   let decisionsPromise: Promise<Map<string, ToolCallDecision>> | null = null;
+  // A pass replayed after a restart picks up the proposal it made before
+  // (ResumedPass): a decision already made is applied, not asked again.
+  let isProposalPending = true;
   const loopKey = resolveLoopKey(context);
   if (!options.autoApprove) {
     // Recorded first, THEN shown — as ApprovalGate does for tool cards.
-    ({ decisions: decisionsPromise } = await ApprovalRegistry.open(
+    const opened = await ApprovalRegistry.open(
       loopKey,
       {
         type: "plan",
@@ -171,17 +174,23 @@ export async function handleExitPlanMode(
         },
       },
       decisionOwnerOf(context),
-    ));
+      { resume: pass.replayed === true },
+    );
+    decisionsPromise = opened.decisions;
+    batchId = opened.batchId;
+    isProposalPending = opened.pendingToolCallIds.length > 0;
   }
 
-  emit({
-    type: "plan_proposal",
-    plan: planText,
-    steps: planSteps,
-    autoApproved: !!options.autoApprove,
-    toolCallId,
-    batchId,
-  });
+  if (isProposalPending) {
+    emit({
+      type: "plan_proposal",
+      plan: planText,
+      steps: planSteps,
+      autoApproved: !!options.autoApprove,
+      toolCallId,
+      batchId,
+    });
+  }
 
   if (!decisionsPromise) {
     planDecision = "approved";

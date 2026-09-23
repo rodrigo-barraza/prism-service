@@ -78,9 +78,19 @@ export interface PendingDecisionRecord extends DecisionOwner {
   /** The tool's JSON-Schema `parameters` — edited arguments must satisfy it. */
   argsSchema?: Record<string, unknown> | null;
   preview?: unknown;
+  /** Who asked for the card besides the tier: a hook, or a restart ("run it again?"). */
+  requestedBy?: string;
+  reason?: string;
   decision?: StoredApprovalDecision;
 
   // ── A question ──
+  /** The ask_user call that asked it — how a turn re-driven after a restart finds it again. */
+  toolCallId?: string | null;
+  /**
+   * An answer to a non-blocking card that no turn took (it arrived while
+   * the server was down); the re-driven turn delivers it and clears this.
+   */
+  undelivered?: boolean;
   blocking?: boolean;
   question?: string;
   questions?: unknown[];
@@ -266,6 +276,19 @@ const PendingDecisionStore = {
       return;
     }
     await database()?.updateOne({ id }, { $set: { status: "cancelled" } });
+  },
+
+  /** Set bookkeeping fields on a record (never its status — `settle` owns that). */
+  async update(
+    id: string,
+    fields: Partial<Pick<PendingDecisionRecord, "undelivered">>,
+  ): Promise<void> {
+    const inMemory = memoryRecords.get(id);
+    if (inMemory) {
+      Object.assign(inMemory, fields);
+      return;
+    }
+    await database()?.updateOne({ id }, { $set: fields });
   },
 
   /** Settle every pending record matching the query; returns the ones this call settled. */

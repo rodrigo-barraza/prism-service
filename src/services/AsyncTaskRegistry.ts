@@ -7,11 +7,18 @@ import {
   COMPLETED_TASK_TIME_TO_LIVE_MILLISECONDS,
   TASK_PRUNING_INTERVAL_MILLISECONDS,
 } from "./AsyncTaskConstants.ts";
-import { SYSTEM_STATUSES } from "#src/constants";
+import { ORCHESTRATOR, SYSTEM_STATUSES } from "#src/constants";
+import type DetachedWorkStoreModule from "./DetachedWorkStore.ts";
 
 // ────────────────────────────────────────────────────────────
 // AsyncTaskRegistry — General-Purpose Background Task Tracking
 // ────────────────────────────────────────────────────────────
+// Durable shadow (prompt 13): every task is also a DetachedWorkStore
+// record — started, settled, delivered — so a restart that kills a
+// running task tells its parent once that the outcome is UNCERTAIN
+// (never re-running it), and a finished task whose result had not been
+// delivered yet is still delivered (TurnResumeService).
+//
 // In-memory singleton that tracks background task promises for
 // any tool dispatched via run_async_task. Analogous to
 // OrchestratorService's activeSubAgents map but generic — any
@@ -52,10 +59,11 @@ export interface AsyncTaskState {
   /**
    * How the completion reached the parent: through the running turn's
    * TurnInputMailbox, by waking a new turn (auto-response), or returned
-   * directly by a `wait_for_tasks` call. Unset while running or when the
-   * completion was dropped (sub-agent whose turn had already ended).
+   * directly by a `wait_for_tasks` call; `restart` when a restart settled
+   * it, `dropped` for a sub-agent's task whose turn had already ended.
+   * Unset while running.
    */
-  deliveredVia?: "mailbox" | "auto_response" | "wait";
+  deliveredVia?: "mailbox" | "auto_response" | "wait" | "restart" | "dropped";
   /**
    * The agentConversationId of a `wait_for_tasks` call currently blocked on
    * this task. While set, the completion callback must NOT deliver the
@@ -99,6 +107,37 @@ const activeTasks = new Map<string, AsyncTaskState>();
 
 /** Resolvers for each task's `settled` promise, keyed by taskId */
 const settleResolvers = new Map<string, () => void>();
+
+/** Write a task's record through to DetachedWorkStore — lazily, and never in the task's way. */
+function persist(
+  taskState: Pick<AsyncTaskState, "taskId" | "agentConversationId">,
+  operation: (store: typeof DetachedWorkStoreModule, recordId: string) => Promise<void>,
+): void {
+  void import("./DetachedWorkStore.ts")
+    .then(({ default: store, detachedWorkId }) =>
+      operation(store, detachedWorkId("async_task", taskState.agentConversationId, taskState.taskId)),
+    )
+    .catch(() => {
+      /* best-effort: the task itself is unaffected */
+    });
+}
+
+/** A task's result as its completion notification carries it. */
+function resultTextOf(result: unknown): string {
+  let text: string;
+  if (typeof result === "string") text = result;
+  else if (result === undefined || result === null) text = "";
+  else {
+    try {
+      text = JSON.stringify(result);
+    } catch {
+      text = String(result);
+    }
+  }
+  return text.length > ORCHESTRATOR.ASYNC_TASK_RESULT_TRUNCATION_LIMIT
+    ? text.slice(0, ORCHESTRATOR.ASYNC_TASK_RESULT_TRUNCATION_LIMIT) + "\n... (truncated)"
+    : text;
+}
 
 /** Resolve (once) the `settled` promise of a task. Idempotent. */
 function markSettled(taskId: string): void {
@@ -245,6 +284,20 @@ export default class AsyncTaskRegistry {
     };
 
     activeTasks.set(taskId, taskState);
+    persist(taskState, (store, recordId) =>
+      store.started({
+        id: recordId,
+        itemId: taskId,
+        kind: "async_task",
+        loopKey: context.conversationId || context.agentConversationId || "",
+        conversationId: context.conversationId || null,
+        agentConversationId: context.agentConversationId || null,
+        project: context.project || null,
+        username: context.username || null,
+        toolName,
+        toolArguments,
+      }),
+    );
 
     logger.info(
       `[AsyncTaskRegistry] Dispatched task ${taskId}: tool="${toolName}" for conversation ${conversationKey}`,
@@ -264,6 +317,13 @@ export default class AsyncTaskRegistry {
 
         logger.info(
           `[AsyncTaskRegistry] Task ${taskId} completed: tool="${toolName}" durationMilliseconds=${taskState.durationMilliseconds}`,
+        );
+        persist(taskState, (store, recordId) =>
+          store.settled(recordId, {
+            outcome: SYSTEM_STATUSES.COMPLETED,
+            resultText: resultTextOf(executionResult),
+            durationMilliseconds: taskState.durationMilliseconds ?? 0,
+          }),
         );
 
         // Settle BEFORE onComplete: a wait_for_tasks waiter has already
@@ -291,6 +351,13 @@ export default class AsyncTaskRegistry {
 
         taskState.completedAt = Date.now();
         taskState.durationMilliseconds = taskState.completedAt - taskState.startedAt;
+        persist(taskState, (store, recordId) =>
+          store.settled(recordId, {
+            outcome: taskState.status,
+            error: taskState.error,
+            durationMilliseconds: taskState.durationMilliseconds ?? 0,
+          }),
+        );
 
         markSettled(taskId);
         onComplete?.(taskState);
@@ -334,9 +401,71 @@ export default class AsyncTaskRegistry {
     taskState.completedAt = Date.now();
     taskState.durationMilliseconds = taskState.completedAt - taskState.startedAt;
     markSettled(taskId);
+    // Whoever cancelled it knows: there is no outcome left to deliver.
+    persist(taskState, (store, recordId) => store.delivered(recordId, "cancelled"));
 
     logger.info(`[AsyncTaskRegistry] Cancelled task ${taskId}: tool="${taskState.toolName}"`);
     return true;
+  }
+
+  /** The task's outcome reached its parent, by `via` — exactly once. */
+  static markDelivered(
+    taskState: AsyncTaskState,
+    via: NonNullable<AsyncTaskState["deliveredVia"]>,
+  ): void {
+    if (taskState.deliveredVia) return;
+    taskState.deliveredVia = via;
+    persist(taskState, (store, recordId) => store.delivered(recordId, via));
+  }
+
+  /**
+   * A task a previous process ran, as its record left it — so the tools
+   * (list, wait, cancel) still know it after a restart. A task that was
+   * running comes back UNCERTAIN: it may have partly happened, and it is
+   * not run again. Already settled; never delivered from here.
+   */
+  static restore(record: {
+    itemId: string;
+    toolName?: string;
+    toolArguments?: Record<string, unknown>;
+    conversationId: string | null;
+    agentConversationId: string | null;
+    project: string | null;
+    username: string | null;
+    status: string;
+    outcome?: string;
+    resultText?: string;
+    error?: string | null;
+    durationMilliseconds?: number;
+    createdAt: string;
+  }): AsyncTaskState {
+    const startedAt = Date.parse(record.createdAt) || Date.now();
+    const status = (record.status === "running"
+      ? SYSTEM_STATUSES.UNCERTAIN
+      : record.outcome || SYSTEM_STATUSES.COMPLETED) as AsyncTaskState["status"];
+    const taskState: AsyncTaskState = {
+      taskId: record.itemId,
+      toolName: record.toolName || "",
+      toolArguments: record.toolArguments || {},
+      status,
+      result: record.resultText ?? null,
+      error:
+        status === SYSTEM_STATUSES.UNCERTAIN
+          ? "The server restarted while this task was running; it may have partly run and was not run again."
+          : (record.error ?? null),
+      startedAt,
+      completedAt: Date.now(),
+      durationMilliseconds: record.durationMilliseconds ?? null,
+      conversationId: record.conversationId,
+      agentConversationId: record.agentConversationId,
+      project: record.project,
+      username: record.username,
+      abortController: null,
+      settled: Promise.resolve(),
+      deliveredVia: "restart",
+    };
+    activeTasks.set(record.itemId, taskState);
+    return taskState;
   }
 
   /**

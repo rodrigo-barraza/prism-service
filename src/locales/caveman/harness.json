@@ -94,5 +94,12 @@
     "declined": "User say no to {{toolName}}. Not run. No retry same call; go on without or ask user.",
     "declinedWithReason": "User say no to {{toolName}}. Not run. User reason: {{reason}}. Heed reason; no retry same call.",
     "lapsed": "No decide on {{toolName}} before turn moved on. Not run. No assume ran; go on without or ask user."
+  },
+  "resume": {
+    "retryReason": "Server restart while {{toolName}} run. Maybe half done, result lost. Run again?",
+    "notRerun": "Server restart while {{toolName}} run. Not run again. Maybe half done: no assume done or not done — check first, or ask user.",
+    "interruptedTaskSummary": "[ASYNC TASK INTERRUPTED] Tool \"{{toolName}}\" (task {{taskId}}) still run when server restart. Maybe half done; result unknown. Not run again.",
+    "interruptedSubAgent": "Sub-agent {{agentId}} (\"{{description}}\") still run when server restart. Stop there; work maybe half. resume_subagent go on from transcript.",
+    "interruptedSubAgentsSummary": "[SUB-AGENTS INTERRUPTED] Server restart while {{count}} sub-agent(s) of this chat run or not delivered."
   }
 }
