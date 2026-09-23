@@ -145,7 +145,10 @@ describe("executor requests", () => {
     expect(request).toMatchObject({
       agent: "CODING",
       agenticLoopEnabled: true,
-      autoApprove: true,
+      // A sample: no learned state in or out.
+      evaluation: true,
+      // On its persona's own tools nothing that writes runs unasked — and nobody answers.
+      autoApprove: false,
       unattended: true,
       onBudgetReached: "stop",
       maxIterations: 10,
@@ -154,6 +157,11 @@ describe("executor requests", () => {
       workspaceRoot: "/w",
     });
     expect(request.enabledTools).toBeUndefined();
+  });
+
+  it("gives full auto only over the tools a suite names", () => {
+    const request = buildRequest({ contestant: agent, messages: [{ role: "user", content: "hi" }], tools: resolveTools(agent, { mode: "list", tools: ["calc"] }), project: "p", username: "u", timeoutMs: 1000 });
+    expect(request).toMatchObject({ evaluation: true, autoApprove: true, unattended: true, enabledTools: ["calc"] });
   });
 
   it("gives a suite's tool list to models and agents alike; a contestant's own list wins", () => {

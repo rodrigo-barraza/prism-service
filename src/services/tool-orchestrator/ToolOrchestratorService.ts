@@ -2158,6 +2158,7 @@ export default class ToolOrchestratorService {
       permissionRules: context._permissionRules,
       permissionMode: context._permissionMode,
       criticModel: context._criticModel,
+      ...(context._evaluation === true && { evaluation: true }),
       maxCostDollars: context._maxCostDollars,
       sharedCostBudget: context._sharedCostBudget,
       routingPreset: context._routingPreset ?? null,

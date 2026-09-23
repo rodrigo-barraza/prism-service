@@ -140,7 +140,13 @@ export function buildRequest(request: ExecutionRequest): Record<string, unknown>
     ...(agentLoop && {
       ...(contestant.kind === "agent" && contestant.agent && { agent: contestant.agent }),
       agenticLoopEnabled: true,
-      autoApprove: true,
+      // No memories, workflows, embeddings, user hooks, timers or crons:
+      // nothing of one sample reaches another, or outlives the run.
+      evaluation: true,
+      // Full auto only over tools the suite or contestant named. An agent on
+      // its own persona's tools runs the read-only ones; a write or a shell
+      // call would act on the user's real world unasked, so it is denied.
+      autoApprove: tools.mode === "list",
       // Nobody is watching: an ask no "approve all" answers is denied, not parked.
       unattended: true,
       onBudgetReached: "stop",

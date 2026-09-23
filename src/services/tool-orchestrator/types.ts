@@ -76,6 +76,8 @@ export interface ToolExecutionContext {
   _permissionMode?: import("#src/services/permissions/PermissionModeState").PermissionModeHandle;
   /** Parent loop's auto-mode reviewer model — inherited by spawned sub-agents. */
   _criticModel?: string;
+  /** Parent loop is a benchmark sample (AgenticOptions.evaluation) — so are its sub-agents. */
+  _evaluation?: boolean;
   /** Parent loop's cost ceiling — inherited by spawned sub-agents. */
   _maxCostDollars?: number;
   /** Shared cost accumulator threaded through the whole sub-agent tree. */

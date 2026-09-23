@@ -336,6 +336,7 @@ export async function executeToolBatch(
               _permissionRules: context.options?._permissionRules,
               _permissionMode: context.options?._permissionMode,
               _criticModel: context.options?.criticModel,
+              _evaluation: context.options?.evaluation === true,
               _maxCostDollars: context.options?.maxCostDollars,
               _sharedCostBudget: context.options?._sharedCostBudget,
               _routingPreset: context.options?.routingPreset as string | undefined,
