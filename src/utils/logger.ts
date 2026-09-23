@@ -1,7 +1,24 @@
 import { createLogger } from "@rodrigo-barraza/utilities-library/node";
 import { getRequestContext } from "./RequestContext.ts";
+import { redactSecrets } from "./SecretRedaction.ts";
 
-const base = createLogger("prism");
+const unredacted = createLogger("prism");
+
+type LogMethod = (message: string, ...additionalData: unknown[]) => void;
+
+/** Every printed line — message, extra data, Errors — goes out with credentials masked. */
+function redacting(method: LogMethod): LogMethod {
+  return (message, ...additionalData) =>
+    method(redactSecrets(message), ...additionalData.map(redactSecrets));
+}
+
+const base = {
+  info: redacting(unredacted.info),
+  success: redacting(unredacted.success),
+  warn: redacting(unredacted.warn),
+  error: redacting(unredacted.error),
+  debug: redacting(unredacted.debug),
+};
 
 function buildContextTags(
   project: string,

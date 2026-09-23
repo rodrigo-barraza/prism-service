@@ -17,6 +17,10 @@ Configuration is environment variables, read by `config.ts`. At boot, `boot.ts` 
 
 OpenTelemetry traces are off by default. Point `OTEL_EXPORTER_OTLP_ENDPOINT` (or `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`) at an OTLP/HTTP collector and `boot.ts` exports, per the GenAI semantic conventions, one `invoke_agent` span per agent turn with a `chat` span per model call and an `execute_tool` span per tool call beneath it; a sub-agent's turn nests under the call that spawned it. The standard `OTEL_*` variables (service name, sampler, headers) apply. Tool calls send W3C `traceparent` to tools-service, which forwards it on its own outgoing calls, and to MCP servers (HTTP header and `params._meta`). Span and attribute names: `src/services/Tracing.ts`.
 
+### Secrets in logs
+
+Request rows (and their webhook copies, and the rows prompt/agent hooks write for their payloads) and every logger line are written with credentials masked to `***<last4>`: provider key shapes, PEM keys, JWTs, `Bearer`/`Basic` values, URL passwords, secret assignments (`X_API_KEY=…`, `"password": …`), and the values of the environment variables whose names end like a secret (`_API_KEY`, `_SECRET`, `_TOKEN`, `_PASSWORD`, `_CREDENTIALS`, …; a URL's password from any variable). `PRISM_LOG_REDACTION_DENYLIST` adds more: comma- or newline-separated literals, or `/regex/flags`. Rules and their false-positive corpus: `src/utils/SecretRedaction.ts` and its tests.
+
 ## Provider Capabilities
 
 | Provider | Text | Stream | TTS | STT | Image | Vision | Embed | Think | Search | Code |
