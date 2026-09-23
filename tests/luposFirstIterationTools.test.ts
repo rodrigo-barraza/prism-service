@@ -168,7 +168,7 @@ describe("LUPOS iteration 1 — core surface", () => {
       TOOL_NAMES.CREATE_SKILL,
       "run_async_task",
       "run_tool_program",
-      "set_goal",
+      "propose_goal",
       TOOL_NAMES.SLEEP,
     ];
     const { allowed, blocked } = partitionByDiscoverableUniverse(

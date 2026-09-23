@@ -1120,19 +1120,20 @@ const USER_SETTABLE_GOAL_STATUSES: readonly string[] = [
 
 /**
  * GET /conversations/:id/goal
- * The conversation's goal, or null when none is set.
+ * `{ goal, proposal }`: the conversation's goal and the goal its model
+ * proposed (waiting for approval), each null when there is none.
  */
 router.get(
   "/:id/goal",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { conversationId, project, username } = resolveGoalRouteScope(req);
-      const goal = await ConversationGoalService.get(
+      const { goal, proposal } = await ConversationGoalService.getState(
         conversationId,
         project,
         username,
       );
-      res.json({ goal });
+      res.json({ goal, proposal });
     } catch (error: unknown) {
       logger.error(`Error fetching conversation goal: ${errorMessage(error)}`);
       next(error);
@@ -1142,7 +1143,9 @@ router.get(
 
 /**
  * PUT /conversations/:id/goal
- * Create or replace the goal: { objective, completionCriteria?, budget? }.
+ * Create or replace the goal: { objective, rubric?: [{id?, criterion}] or
+ * strings, stepRubric?, verifier?: {provider, model}, maxIterations?,
+ * completionCriteria?, budget? }. A proposal still waiting is dropped.
  */
 router.put(
   "/:id/goal",
@@ -1170,6 +1173,10 @@ router.put(
             body.budget && typeof body.budget === "object"
               ? (body.budget as ConversationGoalBudget)
               : undefined,
+          rubric: body.rubric,
+          stepRubric: body.stepRubric,
+          verifier: body.verifier,
+          maxIterations: body.maxIterations,
         },
       );
       res.json({ goal });
@@ -1228,6 +1235,19 @@ router.patch(
       if (body.blockedOn === null || typeof body.blockedOn === "string") {
         patch.blockedOn = body.blockedOn;
       }
+      // Edit in place: the objective, its rubric (a new rubric forgets the
+      // verdict about the old one), the verifier (null = the default) and
+      // how many revisions it may ask for.
+      if (typeof body.objective === "string" && body.objective.trim()) {
+        patch.objective = body.objective;
+      }
+      if (body.completionCriteria === null || typeof body.completionCriteria === "string") {
+        patch.completionCriteria = body.completionCriteria;
+      }
+      if (body.rubric !== undefined) patch.rubric = body.rubric;
+      if (body.stepRubric !== undefined) patch.stepRubric = body.stepRubric;
+      if (body.verifier !== undefined) patch.verifier = body.verifier;
+      if (body.maxIterations !== undefined) patch.maxIterations = body.maxIterations;
       if (body.budget !== undefined) {
         patch.budget =
           body.budget && typeof body.budget === "object"
@@ -1237,7 +1257,8 @@ router.patch(
 
       if (Object.keys(patch).length === 0) {
         return res.status(400).json({
-          error: "Nothing to update: send status, progress, percent, blockedOn or budget",
+          error:
+            "Nothing to update: send status, progress, percent, blockedOn, budget, objective, rubric, stepRubric, verifier or maxIterations",
         });
       }
 
@@ -1293,6 +1314,60 @@ router.delete(
         return res.status(404).json({ error: error.message });
       }
       logger.error(`Error clearing conversation goal: ${errorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+/**
+ * POST /conversations/:id/goal/proposal/approve
+ * The goal the model proposed becomes the conversation's goal (active).
+ * 404 when no proposal waits.
+ */
+router.post(
+  "/:id/goal/proposal/approve",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { conversationId, project, username } = resolveGoalRouteScope(req);
+      const goal = await ConversationGoalService.approveProposal(
+        conversationId,
+        project,
+        username,
+      );
+      if (!goal) {
+        return res.status(404).json({ error: "No proposed goal is waiting" });
+      }
+      res.json({ goal, proposal: null });
+    } catch (error: unknown) {
+      if (error instanceof ConversationNotFoundError) {
+        return res.status(404).json({ error: error.message });
+      }
+      logger.error(`Error approving the proposed goal: ${errorMessage(error)}`);
+      next(error);
+    }
+  }),
+);
+
+/**
+ * POST /conversations/:id/goal/proposal/decline
+ * Drop the goal the model proposed. { success: false } when none waits.
+ */
+router.post(
+  "/:id/goal/proposal/decline",
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { conversationId, project, username } = resolveGoalRouteScope(req);
+      const declined = await ConversationGoalService.declineProposal(
+        conversationId,
+        project,
+        username,
+      );
+      res.json({ success: declined });
+    } catch (error: unknown) {
+      if (error instanceof ConversationNotFoundError) {
+        return res.status(404).json({ error: error.message });
+      }
+      logger.error(`Error declining the proposed goal: ${errorMessage(error)}`);
       next(error);
     }
   }),

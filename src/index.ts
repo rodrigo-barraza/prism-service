@@ -700,6 +700,16 @@ setupWebSocket(wss);
     );
   }
 
+  // A goal the agent was working on by itself when the process died is
+  // paused (reason `restart`) before any turn is re-driven: a restart must
+  // not resume unattended spend on its own.
+  try {
+    const { default: ConversationGoalService } = await import("./services/ConversationGoalService.ts");
+    await ConversationGoalService.pauseInterruptedRuns();
+  } catch (error: unknown) {
+    logger.error(`Failed to pause interrupted goal runs: ${getErrorMessage(error)}`);
+  }
+
   // Clear any stale isGenerating flags left over from a previous crash/restart.
   // A turn that was parked on its user keeps `runState: "awaiting_user"`:
   // nothing is generating any more, but its decisions are still pending

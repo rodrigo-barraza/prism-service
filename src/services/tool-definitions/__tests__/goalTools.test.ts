@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ────────────────────────────────────────────────────────────
-// set_goal / update_goal / clear_goal — registry wiring, scope
+// propose_goal / update_goal / clear_goal — registry wiring, scope
 // refusals (no conversation id, sub-agent), the goal_update emit
 // shape, and end-to-end execution against the real goal service
-// over an in-memory Mongo double.
+// over an in-memory Mongo double. The model never activates a goal
+// (proposals wait for the user) and never completes one (a claim
+// waits for the verifier).
 // ────────────────────────────────────────────────────────────
 
 vi.mock("#config", () => ({
@@ -77,6 +79,7 @@ const { default: InternalToolRegistry } =
 const { GOAL_TOOL_NAMES } =
   await import("#src/services/tool-definitions/GoalTools");
 const { COLLECTIONS } = await import("#src/constants");
+const { default: ConversationGoalService } = await import("#src/services/ConversationGoalService");
 
 const CONTEXT = {
   conversationId: "conversation-1",
@@ -101,7 +104,16 @@ function seed() {
 function stored() {
   return store.collections.get(COLLECTIONS.AGENT_CONVERSATIONS)![0] as FakeDocument & {
     goal?: Record<string, unknown>;
+    goalProposal?: Record<string, unknown>;
   };
+}
+
+/** The user sets the goal (PUT /conversations/:id/goal) — the model cannot. */
+async function userSetsGoal(objective = "Ship it") {
+  return ConversationGoalService.set(CONTEXT.conversationId, CONTEXT.project, CONTEXT.username, {
+    objective,
+    rubric: ["CI is green", "the release note exists"],
+  });
 }
 
 async function run(name: string, args: Record<string, unknown>, context: Record<string, unknown> = CONTEXT) {
@@ -113,10 +125,12 @@ beforeEach(() => {
 });
 
 describe("registry wiring", () => {
-  it("registers set_goal, update_goal and clear_goal as internal tools", () => {
+  it("registers propose_goal, update_goal and clear_goal as internal tools — and no set_goal", () => {
     for (const name of TOOL_NAMES) {
       expect(InternalToolRegistry.has(name), name).toBe(true);
     }
+    expect(TOOL_NAMES).toEqual(["propose_goal", "update_goal", "clear_goal"]);
+    expect(InternalToolRegistry.has("set_goal")).toBe(false);
   });
 
   it("serves schemas for both locales without missing keys", () => {
@@ -130,13 +144,21 @@ describe("registry wiring", () => {
     }
   });
 
-  it("update_goal never offers 'paused' to the model", () => {
+  it("update_goal never offers 'paused' to the model, and calls 'completed' a claim", () => {
     const schema = InternalToolRegistry.getSchemas("en").find(
       (entry) => entry.name === GOAL_TOOL_NAMES.UPDATE_GOAL,
     )!;
     const status = (schema.parameters as { properties: Record<string, { enum?: string[] }> })
       .properties.status;
     expect(status.enum).toEqual(["active", "completed", "blocked"]);
+    expect(schema.description).toMatch(/CLAIM/);
+  });
+
+  it("propose_goal requires a rubric", () => {
+    const schema = InternalToolRegistry.getSchemas("en").find(
+      (entry) => entry.name === GOAL_TOOL_NAMES.PROPOSE_GOAL,
+    )!;
+    expect((schema.parameters as { required: string[] }).required).toEqual(["objective", "rubric"]);
   });
 });
 
@@ -144,7 +166,7 @@ describe("scope refusals", () => {
   it("refuses every goal tool without a conversation id", async () => {
     seed();
     for (const name of TOOL_NAMES) {
-      const result = await run(name, { objective: "x", progress: "y" }, {
+      const result = await run(name, { objective: "x", rubric: ["y"], progress: "y" }, {
         project: CONTEXT.project,
         username: CONTEXT.username,
       });
@@ -152,19 +174,20 @@ describe("scope refusals", () => {
       expect(String(result.error)).toMatch(/conversation id/);
     }
     expect(stored().goal).toBeUndefined();
+    expect(stored().goalProposal).toBeUndefined();
   });
 
-  it("refuses set_goal and clear_goal from a sub-agent but lets it report progress", async () => {
+  it("refuses propose_goal and clear_goal from a sub-agent but lets it report progress", async () => {
     seed();
     const subAgent = { ...CONTEXT, isSubAgent: true };
-    const set = await run(GOAL_TOOL_NAMES.SET_GOAL, { objective: "x" }, subAgent);
-    expect(set.success).toBe(false);
-    expect(String(set.error)).toMatch(/read-only/);
+    const proposed = await run(GOAL_TOOL_NAMES.PROPOSE_GOAL, { objective: "x", rubric: ["y"] }, subAgent);
+    expect(proposed.success).toBe(false);
+    expect(String(proposed.error)).toMatch(/read-only/);
     const clear = await run(GOAL_TOOL_NAMES.CLEAR_GOAL, {}, subAgent);
     expect(clear.success).toBe(false);
-    expect(stored().goal).toBeUndefined();
+    expect(stored().goalProposal).toBeUndefined();
 
-    await run(GOAL_TOOL_NAMES.SET_GOAL, { objective: "Parent goal" });
+    await userSetsGoal("Parent goal");
     const child = {
       conversationId: "child-doc",
       agentConversationId: "child-loop",
@@ -176,55 +199,73 @@ describe("scope refusals", () => {
     const update = await run(GOAL_TOOL_NAMES.UPDATE_GOAL, { progress: "worker done" }, child);
     expect(update.success).toBe(true);
     expect(stored().goal).toMatchObject({ progress: { summary: "worker done" } });
-    const childSet = await run(GOAL_TOOL_NAMES.SET_GOAL, { objective: "hijack" }, child);
-    expect(childSet.success).toBe(false);
+    const childProposal = await run(GOAL_TOOL_NAMES.PROPOSE_GOAL, { objective: "hijack", rubric: ["y"] }, child);
+    expect(childProposal.success).toBe(false);
   });
 
   it("reports a missing conversation instead of throwing", async () => {
-    const result = await run(GOAL_TOOL_NAMES.SET_GOAL, { objective: "x" });
+    const result = await run(GOAL_TOOL_NAMES.PROPOSE_GOAL, { objective: "x", rubric: ["y"] });
     expect(result.success).toBe(false);
     expect(String(result.error)).toMatch(/not found/);
   });
 });
 
-describe("set_goal", () => {
-  it("persists an active goal with its budget and emits goal_update change=set", async () => {
+describe("propose_goal", () => {
+  it("stores a proposal — never the goal — and emits goal_update change=proposed", async () => {
     seed();
     const emit = vi.fn();
     const result = await run(
-      GOAL_TOOL_NAMES.SET_GOAL,
+      GOAL_TOOL_NAMES.PROPOSE_GOAL,
       {
         objective: "Ship it",
-        completionCriteria: "CI green",
+        rubric: ["CI is green", "the release note exists"],
+        stepRubric: ["no failing command is left unaddressed"],
         maxCostDollars: 3,
         maxTurns: 12,
+        maxIterations: 4,
         deadline: "2030-01-01T00:00:00Z",
       },
       { ...CONTEXT, _emit: emit },
     );
 
     expect(result.success).toBe(true);
-    expect(result.goal).toMatchObject({
+    expect(result.proposal).toMatchObject({
       objective: "Ship it",
-      completionCriteria: "CI green",
-      status: "active",
+      status: "proposed",
+      rubric: [
+        { id: "c1", criterion: "CI is green" },
+        { id: "c2", criterion: "the release note exists" },
+      ],
+      stepRubric: [{ id: "c1", criterion: "no failing command is left unaddressed" }],
+      maxIterations: 4,
       budget: { maxCostDollars: 3, maxTurns: 12, deadline: "2030-01-01T00:00:00.000Z" },
-      progress: { summary: "Not started", percent: 0 },
     });
-    expect(stored().goal).toEqual(result.goal);
+    // Inactive until the user approves it.
+    expect(stored().goal).toBeUndefined();
+    expect(stored().goalProposal).toEqual(result.proposal);
     expect(emit).toHaveBeenCalledTimes(1);
     expect(emit).toHaveBeenCalledWith({
       type: "goal_update",
-      goal: result.goal,
-      change: "set",
+      goal: result.proposal,
+      change: "proposed",
     });
   });
 
-  it("rejects an empty objective", async () => {
+  it("leaves the current goal untouched", async () => {
     seed();
-    const result = await run(GOAL_TOOL_NAMES.SET_GOAL, { objective: " " });
-    expect(result.success).toBe(false);
-    expect(stored().goal).toBeUndefined();
+    const current = await userSetsGoal("Current goal");
+    await run(GOAL_TOOL_NAMES.PROPOSE_GOAL, { objective: "Another goal", rubric: ["x"] });
+    expect(stored().goal).toEqual(current);
+    expect(stored().goalProposal).toMatchObject({ objective: "Another goal", status: "proposed" });
+  });
+
+  it("rejects an empty objective and a missing rubric", async () => {
+    seed();
+    expect((await run(GOAL_TOOL_NAMES.PROPOSE_GOAL, { objective: " ", rubric: ["x"] })).success).toBe(false);
+    const noRubric = await run(GOAL_TOOL_NAMES.PROPOSE_GOAL, { objective: "Ship it" });
+    expect(noRubric.success).toBe(false);
+    expect(String(noRubric.error)).toMatch(/rubric/);
+    expect(stored().goalProposal).toBeUndefined();
   });
 });
 
@@ -233,28 +274,27 @@ describe("update_goal", () => {
     seed();
     const noGoal = await run(GOAL_TOOL_NAMES.UPDATE_GOAL, { progress: "x" });
     expect(noGoal.success).toBe(false);
-    expect(String(noGoal.error)).toMatch(/set_goal/);
+    expect(String(noGoal.error)).toMatch(/propose_goal/);
 
-    await run(GOAL_TOOL_NAMES.SET_GOAL, { objective: "Ship it" });
+    await userSetsGoal();
     const empty = await run(GOAL_TOOL_NAMES.UPDATE_GOAL, {});
     expect(empty.success).toBe(false);
   });
 
   it("refuses to pause — only the user can", async () => {
     seed();
-    await run(GOAL_TOOL_NAMES.SET_GOAL, { objective: "Ship it" });
+    await userSetsGoal();
     const result = await run(GOAL_TOOL_NAMES.UPDATE_GOAL, { status: "paused" });
     expect(result.success).toBe(false);
     expect(String(result.error)).toMatch(/user/);
     expect(stored().goal!.status).toBe("active");
   });
 
-  it("reports progress, blocks on an obstacle, unblocks, and completes — emitting only meaningful changes", async () => {
+  it("reports progress, blocks on an obstacle, unblocks — emitting only meaningful changes", async () => {
     seed();
     const emit = vi.fn();
     const context = { ...CONTEXT, _emit: emit };
-    await run(GOAL_TOOL_NAMES.SET_GOAL, { objective: "Ship it" }, context);
-    emit.mockClear();
+    await userSetsGoal();
 
     const progress = await run(
       GOAL_TOOL_NAMES.UPDATE_GOAL,
@@ -282,17 +322,38 @@ describe("update_goal", () => {
 
     const unblocked = await run(GOAL_TOOL_NAMES.UPDATE_GOAL, { blockedOn: "" }, context);
     expect(unblocked.goal).toMatchObject({ status: "active", blockedOn: null });
+  });
 
-    const completed = await run(
-      GOAL_TOOL_NAMES.UPDATE_GOAL,
-      { status: "completed", progress: "Shipped" },
-      context,
-    );
-    expect(completed.goal).toMatchObject({
-      status: "completed",
-      progress: { summary: "Shipped", percent: 100 },
+  it("status completed is a claim: the goal stays active until the verifier confirms it", async () => {
+    seed();
+    await userSetsGoal();
+    const claim = await run(GOAL_TOOL_NAMES.UPDATE_GOAL, { status: "completed", progress: "Shipped" });
+    expect(claim.success).toBe(true);
+    expect(claim.verification).toBe("pending");
+    expect(String(claim.note)).toMatch(/NOT completed/);
+    expect(claim.goal).toMatchObject({ status: "active", progress: { summary: "Shipped" } });
+    expect(stored().goal!.status).toBe("active");
+
+    // A bare claim (no other field) is accepted too.
+    const bare = await run(GOAL_TOOL_NAMES.UPDATE_GOAL, { status: "completed" });
+    expect(bare.success).toBe(true);
+    expect(stored().goal!.status).toBe("active");
+  });
+
+  it("a claim on a blocked goal re-activates it for the verifier; a paused goal refuses it", async () => {
+    seed();
+    await userSetsGoal();
+    await run(GOAL_TOOL_NAMES.UPDATE_GOAL, { blockedOn: "need API key" });
+    const claim = await run(GOAL_TOOL_NAMES.UPDATE_GOAL, { status: "completed" });
+    expect(claim.goal).toMatchObject({ status: "active", blockedOn: null });
+
+    await ConversationGoalService.update(CONTEXT.conversationId, CONTEXT.project, CONTEXT.username, {
+      status: "paused",
     });
-    expect(stored().goal!.status).toBe("completed");
+    const paused = await run(GOAL_TOOL_NAMES.UPDATE_GOAL, { status: "completed" });
+    expect(paused.success).toBe(false);
+    expect(String(paused.error)).toMatch(/paused \(user\)/);
+    expect(stored().goal!.status).toBe("paused");
   });
 });
 
@@ -301,15 +362,14 @@ describe("clear_goal", () => {
     seed();
     const emit = vi.fn();
     const context = { ...CONTEXT, _emit: emit };
-    const set = await run(GOAL_TOOL_NAMES.SET_GOAL, { objective: "Ship it" }, context);
-    emit.mockClear();
+    const goal = await userSetsGoal();
 
     const result = await run(GOAL_TOOL_NAMES.CLEAR_GOAL, {}, context);
     expect(result).toEqual({ success: true, cleared: true });
     expect(stored().goal).toBeUndefined();
     expect(emit).toHaveBeenCalledWith({
       type: "goal_update",
-      goal: set.goal,
+      goal,
       change: "cleared",
     });
 

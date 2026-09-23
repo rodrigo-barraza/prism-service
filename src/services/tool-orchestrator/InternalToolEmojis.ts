@@ -67,7 +67,7 @@ export const INTERNAL_TOOL_EMOJIS: Record<string, string[]> = {
   read_untrusted: ["🧪", "📄"],
 
   // Goals (persistent objective on the conversation)
-  set_goal: ["🎯", "📝"],
+  propose_goal: ["🎯", "📝"],
   update_goal: ["🎯", "📈"],
   clear_goal: ["🎯", "🗑️"],
   cancel_async_task: ["⏹️", "🔄"],
