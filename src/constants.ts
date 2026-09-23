@@ -53,6 +53,8 @@ export const COLLECTIONS = {
   SYNTHESIS: "synthesis",
   FAVORITES: "favorites",
   AGENT_SKILLS: "agent_skills",
+  /** One row per load_skill / execute_skill call (skills/SkillUsage.ts). */
+  SKILL_USAGE: "skill_usage",
   AGENT_RULES: "agent_rules",
   AGENT_HOOKS: "agent_hooks",
   PERMISSION_RULES: "permission_rules",
