@@ -35,6 +35,8 @@ interface Recording {
   /** The iteration of the pass on record, and its calls in order. */
   passIteration: number | null;
   passCalls: Array<Pick<ToolCall, "id" | "name">>;
+  /** Stops recording the permission mode's switches. */
+  stopFollowingMode?: () => void;
 }
 
 const recordings = new WeakMap<AgenticContext, Recording>();
@@ -72,16 +74,23 @@ export async function recordTurnCheckpoint(
 ): Promise<void> {
   const recording = recordingFor(context);
   if (!recording) return;
+  const modeHandle = context.options._permissionMode;
   const loop = {
     iteration: state.iterations,
     planModeActive: state.planModeActive,
     autoApprove: context.options.autoApprove === true,
+    permissionMode: modeHandle?.mode ?? null,
   };
   if (recording.begun) {
     await TurnRunStore.checkpoint(recording.loopKey, recording.turnId, loop);
     return;
   }
   recording.begun = true;
+  // A switch while the turn waits on a card is the likeliest one: record it
+  // when it happens, not at the next checkpoint.
+  recording.stopFollowingMode = modeHandle?.onChange((change) => {
+    void TurnRunStore.recordPermissionMode(recording.loopKey, recording.turnId, change.mode);
+  });
   const { options } = context;
   await TurnRunStore.begin(
     {
@@ -210,5 +219,6 @@ export async function endTurnRun(context: AgenticContext): Promise<void> {
   const recording = recordings.get(context);
   if (!recording) return;
   recordings.delete(context);
+  recording.stopFollowingMode?.();
   await TurnRunStore.finish(recording.loopKey, recording.turnId);
 }
