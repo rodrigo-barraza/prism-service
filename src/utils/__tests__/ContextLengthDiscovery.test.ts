@@ -138,3 +138,28 @@ describe("SGLang context length", () => {
     );
   });
 });
+
+describe("Ollama context length", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("routes an ollama instance to /api/show, not llama.cpp's /props", async () => {
+    // "ollama" contains "llama": the llama.cpp branch used to catch every
+    // Ollama instance, so its window was never discovered.
+    const fetchMock = vi.fn(async (url: string) =>
+      url.endsWith("/api/show")
+        ? new Response(
+            JSON.stringify({ model_info: { "llama.context_length": 40960 } }),
+            { status: 200 },
+          )
+        : new Response("not found", { status: 404 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const options: ProviderOptions = {};
+    await discoverContextLength("ollama-2", "http://ollama-box:11434", "qwen3:32b", options);
+
+    expect(options._loadedContextLength).toBe(40960);
+    const urls = fetchMock.mock.calls.map(([url]) => url);
+    expect(urls).toEqual(["http://ollama-box:11434/api/show"]);
+  });
+});
