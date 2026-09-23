@@ -39,7 +39,7 @@ let sentHeaders: Record<string, string> | undefined;
 
 beforeAll(async () => {
   await startTracing({
-    spanProcessors: [new SimpleSpanProcessor(new InMemorySpanExporter())],
+    spanProcessors: [new SimpleSpanProcessor({ exporter: new InMemorySpanExporter() })],
   });
 });
 

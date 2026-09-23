@@ -1,6 +1,7 @@
 import { resolve, relative } from "node:path";
 import { existsSync } from "node:fs";
 import { TOOLS_SERVICE_URL } from "#config";
+import { traceHeaders } from "#src/services/Tracing";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import type {
   ToolsApiResponse,
@@ -115,7 +116,7 @@ export class GitWorktreeHelper {
     try {
       const response = await fetch(`${TOOLS_SERVICE_URL}${path}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...traceHeaders() },
         body: JSON.stringify(body),
       });
       if (!response.ok) {

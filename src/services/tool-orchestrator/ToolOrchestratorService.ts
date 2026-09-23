@@ -15,6 +15,7 @@ import {
 } from "@rodrigo-barraza/utilities-library";
 import { ORCHESTRATOR_ONLY_TOOLS } from "#src/services/OrchestratorPrompt";
 import { createAbortController } from "#src/utils/AbortController";
+import { traceHeaders } from "#src/services/Tracing";
 import {
   DOMAINS,
   TOOL_NAMES,
@@ -466,7 +467,8 @@ function buildContextHeaders(
   }
   if (context._providerName) headers["X-Provider"] = context._providerName;
   if (context._resolvedModel) headers["X-Model"] = context._resolvedModel;
-  return headers;
+  // W3C traceparent of the tool call's span, when tracing is on (Tracing).
+  return { ...headers, ...traceHeaders() };
 }
 
 async function fetchJson(

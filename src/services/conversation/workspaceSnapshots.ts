@@ -7,6 +7,7 @@ import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { MONGO_DB_NAME, TOOLS_SERVICE_URL } from "#config";
 import { COLLECTIONS, WORKSPACE_SNAPSHOTS } from "#src/constants";
 import logger from "#src/utils/logger";
+import { traceHeaders } from "#src/services/Tracing";
 import type { Document } from "mongodb";
 import type AgenticLoopState from "#src/services/AgenticLoopState";
 import type { AgenticContext, ToolCall } from "#src/services/harnesses/types";
@@ -119,7 +120,10 @@ async function postToTools<T extends object>(
   body: Record<string, unknown>,
   identity: CallerIdentity,
 ): Promise<T & { httpStatus: number }> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...traceHeaders(),
+  };
   if (identity.project) headers[IDENTITY_HEADERS.project] = identity.project;
   if (identity.username) headers[IDENTITY_HEADERS.username] = identity.username;
   if (identity.conversationId) {

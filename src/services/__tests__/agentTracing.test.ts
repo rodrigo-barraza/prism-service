@@ -185,7 +185,7 @@ vi.mock("#src/services/PlanningModeService", () => ({
 const exporter = new InMemorySpanExporter();
 
 beforeAll(async () => {
-  await startTracing({ spanProcessors: [new SimpleSpanProcessor(exporter)] });
+  await startTracing({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
 });
 
 afterAll(async () => {
@@ -447,7 +447,9 @@ describe("tool durations on the request row", () => {
     const toolRow = rows.find((row) => row.requestId === "req-123-1")!;
     const answerRow = rows.find((row) => row.requestId === "req-123-2")!;
 
-    expect(toolRow.toolExecutions).toEqual([
+    // Recorded as they finish (the calls run in parallel), so in no set order.
+    expect(toolRow.toolExecutions).toHaveLength(2);
+    expect(toolRow.toolExecutions).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: "tc-1",
         name: "read_file",
@@ -461,8 +463,10 @@ describe("tool durations on the request row", () => {
         errorType: "TOOL_TIMEOUT",
         durationMilliseconds: expect.any(Number),
       }),
-    ]);
-    const readFile = toolRow.toolExecutions[0];
+    ]));
+    const readFile = toolRow.toolExecutions.find(
+      (execution: { name: string }) => execution.name === "read_file",
+    );
     expect(readFile.durationMilliseconds).toBeGreaterThanOrEqual(14);
     // The answering pass ran no tools, so it carries none of the first pass's.
     expect(answerRow.toolExecutions ?? []).toEqual([]);

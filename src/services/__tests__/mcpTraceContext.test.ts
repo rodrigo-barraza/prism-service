@@ -59,7 +59,7 @@ import { startTracing, stopTracing } from "#src/services/Tracing";
 
 beforeAll(async () => {
   await startTracing({
-    spanProcessors: [new SimpleSpanProcessor(new InMemorySpanExporter())],
+    spanProcessors: [new SimpleSpanProcessor({ exporter: new InMemorySpanExporter() })],
   });
 });
 

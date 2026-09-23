@@ -19,6 +19,7 @@ import { getRequestContext } from "#src/utils/RequestContext";
 import { DEFAULT_PROFILE_ID } from "#src/utils/ProfileScope";
 import type { PromptPrefixHashes } from "#src/utils/PromptPrefixHashes";
 import type { CacheTelemetryRecord } from "./PromptCacheTelemetry.ts";
+import type { ToolExecutionRecord } from "#src/utils/ToolExecutionRecord";
 const COLLECTION = COLLECTIONS.REQUESTS;
 
 /** Literal profile id for a request-log write: params → ALS → default. */
@@ -95,6 +96,15 @@ export interface LogParams {
   firstDivergenceIndex?: number | null;
   /** What changed against that request, and the provider's diagnostics. */
   cacheTelemetry?: CacheTelemetryRecord | null;
+  /** The tools this agent iteration ran — their own durations and outcomes. */
+  toolExecutions?: ToolExecutionRecord[] | null;
+}
+
+/** Row field for the iteration's tool executions — written only when there are any. */
+function toolExecutionRowFields({
+  toolExecutions,
+}: LogParams): Record<string, unknown> {
+  return toolExecutions && toolExecutions.length > 0 ? { toolExecutions } : {};
 }
 
 /** Row fields for prompt-cache telemetry — written only when present. */
@@ -354,6 +364,7 @@ const RequestLogger = {
         ...(evalBatchSize != null && { evalBatchSize }),
         ...(physicalBatchSize != null && { physicalBatchSize }),
         ...cacheTelemetryRowFields(cacheTelemetryParams),
+        ...toolExecutionRowFields(cacheTelemetryParams),
         status: SYSTEM_STATUSES.COMPLETED,
       };
       await db.collection(COLLECTION).insertOne(document);
@@ -411,6 +422,7 @@ const RequestLogger = {
     prefixHashes = null,
     firstDivergenceIndex = null,
     cacheTelemetry = null,
+    toolExecutions = null,
   }: LogChatGenerationParams) {
     // Build synthetic message array for computeModalities (same function used by conversations)
     const syntheticMessages = [
@@ -531,6 +543,7 @@ const RequestLogger = {
       prefixHashes,
       firstDivergenceIndex,
       cacheTelemetry,
+      toolExecutions,
     });
   },
   /**
@@ -837,6 +850,7 @@ const RequestLogger = {
         modalities,
         rateLimits,
         ...cacheTelemetryRowFields(fullPayload),
+        ...toolExecutionRowFields(fullPayload),
       };
 
       if (agentConversationId)

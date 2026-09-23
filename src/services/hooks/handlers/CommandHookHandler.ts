@@ -2,6 +2,7 @@ import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { IDENTITY_HEADERS } from "@rodrigo-barraza/utilities-library/service";
 import { TOOLS_SERVICE_URL } from "#config";
+import { traceHeaders } from "#src/services/Tracing";
 import { HOOKS } from "#src/constants";
 import {
   BLOCKING_EVENTS,
@@ -205,6 +206,7 @@ export default async function runCommandHook(
         "Content-Type": "application/json",
         [IDENTITY_HEADERS.project]: options.project || "any",
         [IDENTITY_HEADERS.username]: options.owner || "any",
+        ...traceHeaders(),
       },
       body: JSON.stringify({
         command: config.command,
