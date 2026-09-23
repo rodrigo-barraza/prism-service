@@ -14,7 +14,10 @@
 //   { type: "turn_complete", role, message }     — turn finished; message is
 //                                                   the canonical {role, content, thinking?}
 //   { type: "done", conversationId, synthesisRunId? }
-//   { type: "error", message }
+//   { type: "error", code, message, retryable, provider?, status? }
+//
+// The schema is SynthesisEvent in src/protocol/events.ts (the stream opens
+// with the protocol's `hello`, written by handleSseRequest).
 
 import crypto from "crypto";
 import { handleConversation } from "#src/routes/ChatRoutes";
@@ -22,6 +25,8 @@ import { appendAndFinalize } from "#src/utils/ConversationUtilities";
 import type { SseEvent } from "#src/types/SseTypes";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import type { ErrorEvent } from "#src/protocol/events";
+import { toErrorEvent } from "#src/protocol/errors";
 
 export interface SynthesisModelSettings {
   provider: string;
@@ -180,10 +185,10 @@ async function runTurn(
   emit: (event: SseEvent) => void,
   signal: AbortSignal | undefined,
   generateTurn: TurnGenerator,
-): Promise<{ content: string; thinking: string; errorMessage: string | null }> {
+): Promise<{ content: string; thinking: string; error: ErrorEvent | null }> {
   let content = "";
   let thinking = "";
-  let errorMessage: string | null = null;
+  let error: ErrorEvent | null = null;
 
   const wrappedEmit = (event: SynthesisTurnEvent) => {
     if (event.type === "chunk") {
@@ -193,14 +198,18 @@ async function runTurn(
       thinking += (event.content as string) || "";
       emit(event as SseEvent);
     } else if (event.type === "error") {
-      errorMessage = (event.message as string) || "Generation failed";
+      // The /chat pipeline already typed it; anything else is typed here.
+      const { seq: _seq, ...turnError } = event as Partial<ErrorEvent> & { seq?: number };
+      error = turnError.code
+        ? (turnError as ErrorEvent)
+        : toErrorEvent((event.message as string) || "Generation failed");
     }
     // Everything else (per-turn done, usage, status) is loop-internal noise —
     // the synthesis stream has its own turn_start/turn_complete/done framing.
   };
 
   await generateTurn(chatParams, wrappedEmit, { signal });
-  return { content, thinking, errorMessage };
+  return { content, thinking, error };
 }
 
 /**
@@ -318,8 +327,8 @@ export async function runSynthesisGeneration(
 
     const turn = await runTurn(buildAssistantParams(), emit, signal, generateTurn);
     conversationCreated = true;
-    if (turn.errorMessage) {
-      emit({ type: "error", message: turn.errorMessage });
+    if (turn.error) {
+      emit(turn.error);
       return false;
     }
     if (signal?.aborted) return false;
@@ -374,8 +383,8 @@ export async function runSynthesisGeneration(
     applyThinkingSettings(payload, simulatorSettings);
 
     const turn = await runTurn(payload, emit, signal, generateTurn);
-    if (turn.errorMessage) {
-      emit({ type: "error", message: turn.errorMessage });
+    if (turn.error) {
+      emit(turn.error);
       return false;
     }
     if (signal?.aborted) return false;

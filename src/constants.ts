@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { COLLECTIONS as TAXONOMY_COLLECTIONS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { PROTOCOL_EVENT_TYPES } from "#src/protocol/events";
 
 // ─── Timing Constants ───────────────────────────────────────
 
@@ -131,11 +132,12 @@ export const AGENT_DIRECTIVES = {
 
 /**
  * Turn input — messages that reach a RUNNING turn (see TurnInputMailbox).
- * Event/status literals are local until promoted to the shared taxonomy.
+ * The event type is the event protocol's (src/protocol/events.ts); the
+ * status literals are local until promoted to the shared taxonomy.
  */
 export const TURN_INPUT = {
   /** SSE event: an input entry was injected into the running turn. */
-  EVENT_TYPE: "turn_input",
+  EVENT_TYPE: PROTOCOL_EVENT_TYPES.TURN_INPUT,
   /** `status` message value: acknowledgement that an entry was applied. */
   STATUS_APPLIED: "turn_input_applied",
   /** `status` message value: a non-blocking question is awaiting an answer. */
@@ -150,7 +152,7 @@ export const TURN_INPUT = {
  */
 export const APPROVALS = {
   /** SSE event: one pending call was decided (user, another tab, scope, superseded, turn end). */
-  DECIDED_EVENT_TYPE: "approval_decided",
+  DECIDED_EVENT_TYPE: PROTOCOL_EVENT_TYPES.APPROVAL_DECIDED,
   /** A denial reason longer than this is cut before it reaches the model. */
   MAXIMUM_REASON_LENGTH: 2_000,
   /** File-write previews: a diff is only computed when both sides fit. */

@@ -86,6 +86,7 @@ import {
 } from "#src/constants";
 import { getRequestContext } from "#src/utils/RequestContext";
 import { DEFAULT_PROFILE_ID, normalizeProfileId } from "#src/utils/ProfileScope";
+import { toErrorEvent } from "#src/protocol/errors";
 
 interface ToolSchemaWithDomain extends ToolSchema {
   domain?: string;
@@ -637,10 +638,7 @@ export async function handleConversation(
   try {
     context = await prepareGenerationContext(params, emit, { signal });
   } catch (error: unknown) {
-    emit({
-      type: SERVER_SENT_EVENT_TYPES.ERROR,
-      message: getErrorMessage(error),
-    });
+    emit(toErrorEvent(error, { provider: params.provider as string | undefined }));
     return;
   }
   const {
@@ -834,10 +832,7 @@ export async function handleConversation(
       messages: context.rawMessages || [],
       options,
     });
-    emit({
-      type: SERVER_SENT_EVENT_TYPES.ERROR,
-      message: getErrorMessage(error),
-    });
+    emit(toErrorEvent(error, { provider: providerName }));
   }
 }
 // ─── Agent conversation path (agentConversationId, no conversationId) ─
@@ -856,10 +851,7 @@ export async function handleAgent(
   try {
     context = await prepareGenerationContext(params, emit, { signal });
   } catch (error: unknown) {
-    emit({
-      type: SERVER_SENT_EVENT_TYPES.ERROR,
-      message: getErrorMessage(error),
-    });
+    emit(toErrorEvent(error, { provider: params.provider as string | undefined }));
     return;
   }
   const {
@@ -891,12 +883,12 @@ export async function handleAgent(
       : null;
   const conversationId = incomingConversationId || serverConversationId || crypto.randomUUID();
   // The request layer binds the direct-viewer broadcast to the REQUEST's
-  // conversationId — undefined when the id is minted server-side (every
-  // lupos turn, any new conversation). Rebind here with the resolved id or
-  // viewers (/admin/chat, second tabs) receive nothing; when the request
-  // DID carry an id the request layer already broadcasts, and wrapping
-  // again would double-deliver.
-  if (!incomingConversationId) {
+  // conversationId, or to the `serverConversationId` /agent minted for a
+  // new conversation. Only a caller that brought neither (a workflow node
+  // calling handleAgent directly) arrives unwrapped: rebind here with the
+  // resolved id or viewers (/admin/chat, second tabs) receive nothing.
+  // Wrapping an already-wrapped emit would double-deliver every event.
+  if (!incomingConversationId && !serverConversationId) {
     emit = withDirectViewerBroadcast(conversationId, emit);
   }
   const traceId = incomingTraceId || null;
@@ -1042,10 +1034,7 @@ export async function handleAgent(
       messages: context.rawMessages || [],
       options,
     });
-    emit({
-      type: SERVER_SENT_EVENT_TYPES.ERROR,
-      message: getErrorMessage(error),
-    });
+    emit(toErrorEvent(error, { provider: providerName }));
   }
 }
 // ─── Dispatch: Image API models (e.g. GPT Image 1.5, OpenAI images) ─
@@ -1231,9 +1220,11 @@ async function handleImageAPIModel(
   }
   emit({
     type: SERVER_SENT_EVENT_TYPES.DONE,
+    provider: providerName,
+    model: resolvedModel,
     usage: null,
     estimatedCost,
-    totalTime: totalSec,
+    totalTime: roundMilliseconds(totalSec),
     ...(traceId && { traceId }),
     ...(conversationId && { conversationId }),
   });
