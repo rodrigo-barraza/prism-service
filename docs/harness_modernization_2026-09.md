@@ -683,7 +683,7 @@ The same discipline, applied to every provider, is K1.
 - **An external-input lane with tool-level authority** for webhook, Discord, MCP and sub-agent traffic. Codex `ExternalMessage` (2026-09-10) does this. Gemini CLI asks for confirmation when untrusted words appear in shell or edit arguments (2026-09-15).
 - **Capability narrowing** for sub-agents and scheduled tasks.
 
-**Effort:** M.
+**Effort:** M. **Built** 2026-09-22/23 (prompt 22, three landings) — see `docs/security-depth.md`.
 
 ### 4.14 Observability and evals
 **Prism today:**
