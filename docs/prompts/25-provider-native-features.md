@@ -9,26 +9,7 @@ Verify every model id, price and parameter against the provider's current docs b
 
 **Landed record.**
 - Landing 1 `openai-gpt6-native` (2026-09-22): gpt-6-sol/luna in the catalog; GPT-6 turns stream over the Responses WebSocket with native `response.steer` behind the TurnInputMailbox (pending/failed fall back to it) and incremental `previous_response_id` continuation; per-turn effort as `configuration_update` items; `run_async_task` as a native async call whose result returns on the call id; spend-cap 429s terminal; GPT-6 cache writes billed. Tests: `src/providers/__tests__/openai/{gpt6SolLuna,configurationUpdate,responsesSocket,asyncTools}.test.ts`, `src/utils/__tests__/providerErrorClasses.test.ts`, `turnInputAcceptance.test.ts` scenarios 6–7.
-
----
-
-## Landing 2 — `gemini-current`
-
-**Changes** (`src/providers/google.ts`, catalog).
-- **Catalog.** Add `gemini-3.8-flash`: GA 2026-09-02, 1,048,576 input / 65,536 output, thinking `low|medium|high`; no `minimal`. Introductory prices until 2026-12-31. Also add `gemini-3.8-live`.
-- **Parameters.** Drop sampling parameters for Gemini 3.6+ (deprecated). Map thinking levels per model, with no `minimal` on 3.7 and 3.8.
-- **Thought signatures on every part that carries one**, including text and thought parts, not just function calls, and in order. Stop reordering text after calls (~568–598, ~683–691). For history that came from another provider, apply Google's documented fallback for missing signatures.
-- **Grounding.** Read `groundingMetadata` and emit a citations event. The client renders the sources (small, in the tool/answer renderer).
-- **Transport decision.** Google now labels `generateContent` legacy. The Interactions API offers `previous_interaction_id`, `store` and background mode, with implicit caching only. Prototype the Interactions transport behind a flag and measure cache-read share and latency on a fixed 5-iteration run with both transports. Write a short decision note in your report; don't switch the default in this landing.
-
-**Tests.**
-- **Signatures.** Request-shape tests: signatures on text and thought parts are preserved in order across a tool loop; the cross-provider fallback applies.
-- **Grounding.** Parsed into the citations event.
-- **Sampling.** Sampling parameters are absent for 3.6+.
-- **Thinking level.** Mapped per model.
-- **Client (RTL).** The citations render.
-
-**Live.** One `gemini-3.8-flash` turn with search grounding; the sources render in the UI. Then the transport comparison numbers.
+- Landing 2 `gemini-current` (2026-09-22; prism-service + prism-client): gemini-3.8-flash/live in the catalog; sampling never sent to Gemini 3.6+/3.5 Flash-Lite; thought signatures recorded per part in order (`geminiParts`) and replayed verbatim, with Google's dummy signature for another provider's calls; Google Search next to function calling asks for server-side tool invocations (a 400 before, on the 3.7 default too) and replays their signed parts; grounding stored as `citations` and rendered under the answer; an Interactions API transport prototype behind `GEMINI_TRANSPORT=interactions` (default unchanged — same 93.7% cache-read share, slower per step). Tests: `src/providers/__tests__/google/{gemini38,geminiStreamNativeState,interactionsTransport}.test.ts`, `tests/geminiNativeState.test.ts`, client `src/components/__tests__/citationsComponent.test.tsx`.
 
 ---
 
