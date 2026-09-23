@@ -189,6 +189,39 @@ describe('ChatRoutes Integration', () => {
       expect(AgentSessionRegistry.isActive(seen.conversationId!)).toBe(false);
     });
 
+    it.each([
+      ['streaming', '/agent'],
+      ['non-streaming', '/agent?stream=false'],
+    ])('mirrors each event of a %s turn that brings no conversationId to a viewer exactly once', async (_mode, path) => {
+      const { default: AgenticLoopService } = await import('#src/services/AgenticLoopService');
+      const { default: WebSocketConnectionRegistry } = await import('#src/websocket/WebSocketConnectionRegistry');
+      const viewerSocket = { readyState: 1, OPEN: 1 } as never;
+      const viewed: string[] = [];
+      vi.mocked(AgenticLoopService.runAgenticLoop).mockImplementationOnce(async (opts: any) => {
+        // A viewer (second tab, /admin/chat) subscribed to the minted id mid-turn.
+        WebSocketConnectionRegistry.register(opts.conversationId, viewerSocket, (event) => {
+          viewed.push(event.type);
+        });
+        opts.emit({ type: 'chunk', content: 'once' });
+        opts.emit({ type: 'done', conversationId: opts.conversationId });
+        return { messages: [] } as never;
+      });
+
+      const response = await agent
+        .post(path)
+        .set('x-project', 'test')
+        .set('x-username', 'testuser')
+        .send({
+          provider: PROVIDERS.OPENAI,
+          agent: 'CODING',
+          messages: [{ role: 'user', content: 'Help me write code' }],
+        });
+      WebSocketConnectionRegistry.deregisterByWebSocket(viewerSocket);
+
+      expect(response.status).toBe(200);
+      expect(viewed).toEqual(['chunk', 'done']);
+    });
+
     it('should trigger agent loop in streaming mode', async () => {
       const response = await agent
         .post('/agent')

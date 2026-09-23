@@ -4,6 +4,7 @@ import { COLLECTIONS } from "#src/constants";
 import logger from "#src/utils/logger";
 import WebhookEventBus, { NEEDS_YOU_WEBHOOK_EVENTS } from "#src/services/WebhookEventBus";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { PROTOCOL_EVENT_TYPES } from "#src/protocol/events";
 
 /**
  * ConversationGoalService — the persistent objective of a conversation.
@@ -59,7 +60,7 @@ export interface ConversationGoal {
   updatedAt: string;
 }
 
-export const GOAL_UPDATE_EVENT_TYPE = "goal_update" as const;
+export const GOAL_UPDATE_EVENT_TYPE = PROTOCOL_EVENT_TYPES.GOAL_UPDATE;
 
 export type GoalChange = "set" | "progress" | "status" | "cleared";
 

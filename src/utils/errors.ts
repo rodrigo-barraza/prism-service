@@ -6,6 +6,10 @@ export class ProviderError extends Error {
   statusCode: number;
   originalError: Error | object | null | undefined;
   errorType: string | null;
+  /** Protocol error code, when the error came from a turn stream's `error` event. */
+  code?: string;
+  /** Whether sending the same request again later may succeed (with `code`). */
+  retryable?: boolean;
 
   constructor(
     provider: string,
@@ -32,6 +36,7 @@ export class ProviderError extends Error {
       message: this.message,
       statusCode: this.statusCode,
       ...(this.errorType && { errorType: this.errorType }),
+      ...(this.code && { code: this.code, retryable: this.retryable ?? false }),
     };
   }
 }
