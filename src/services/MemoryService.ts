@@ -329,6 +329,11 @@ async function extractFactsFromConversation(
     result = await provider.generateText(aiMessages, extractionModel, {
       maxTokens: MEMORY.EXTRACTION_MAX_TOKENS,
       temperature: 0.1,
+      // A JSON list of facts, not a reasoning task. With thinking left on,
+      // gemini-3.5-flash spent 958 of its 1000 output tokens thinking and
+      // was cut off before the JSON (0 facts, 2026-09-22) — the in-loop
+      // MemoryExtractor already turns it off for the same reason.
+      thinkingEnabled: false,
     });
   } catch (error: unknown) {
     success = false;
