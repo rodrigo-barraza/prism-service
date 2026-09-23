@@ -3,44 +3,20 @@
 > Hand to ONE session per landing: *"Read prism-service/docs/prompts/23-observability-and-evals.md and execute Landing N."*
 > Conventions, gates and the isolated live recipe: `docs/prompts/README.md`. Source: `docs/harness_modernization_2026-09.md` §4.14, §2.1 S8.
 
-**Repos:** prism-service (Landing 1 adds `traceparent` forwarding in tools-service) · **Size:** L · **Depends on:** — · **Shares hubs with:** 10 (`src/services/RequestLogger.ts` and the iteration log write in `BaseAgenticHarness.ts` ~1180–1260). Coordinate: 10 adds prefix hashes on the same row, and this adds redaction on the same write path.
+**Repos:** prism-service · **Size:** L · **Depends on:** — · **Shares hubs with:** 10 (`src/services/RequestLogger.ts` and the iteration log write in `BaseAgenticHarness.ts` ~1180–1260). Coordinate: 10 adds prefix hashes on the same row, and this adds redaction on the same write path.
+
+> **Landing 1 `otel-tracing` — done** (prism-service + tools-service, branch `otel-tracing`, 2026-09-22): OpenTelemetry GenAI spans (`src/services/Tracing.ts`; off unless `OTEL_EXPORTER_OTLP_ENDPOINT`), W3C `traceparent` to tools-service (which forwards it on its fetches) and MCP (header and `params._meta`), a server-minted `traceId`, and each executed tool's own duration on its request row (`toolExecutions`), which `/admin/stats/tools` now reports.
+> Tests: `src/services/__tests__/{agentTracing,tracingDisabled,mcpTraceContext}.test.ts`, `tests/{toolsServiceTraceparent,chatRoutes,adminStats}.test.ts`; tools-service `tests/TraceContextForwarding.test.ts`.
+> For Landing 2: spans carry no messages, tool args or results, and `toolExecutions` only id/name/duration/outcome, so redaction still targets the existing row, hook and error writes; a new row field goes through RequestLogger's `*RowFields` helpers (both `log()` and `completePending()`).
 
 ## Today
-- **No tracing or metrics.** There is no OpenTelemetry and no metrics.
-- **`traceId`** comes only from the request body (`ChatRoutes.ts` ~224, ~793, `traceId || null`), and it isn't propagated to tools-service or MCP.
-- **Tool latency.** The admin "tool latency" figure is actually LLM request time (`admin/AdminStatsRoutes.ts` ~515–640).
 - **Secrets at rest.** Request logs store tool args, results and hook payloads verbatim (`RequestLogger.ts` ~161–184; only `data:` URIs are stripped).
 - **Benchmarks** cover one prompt × models × trials, with 8 match modes, an LLM judge and trajectory assertions (`benchmark/BenchmarkEvaluator.ts` ~268–331). They have no datasets, no pass^k, no harness-setting sweeps and no scheduled regression runs.
 
 ## Reference
-- **OpenTelemetry GenAI semantic conventions**: `invoke_agent` / `chat` / `execute_tool` spans. Check the current semconv version before choosing attribute names.
 - **`claude plugin eval` graders**: regex, tool_used, file_exists, llm, baseline.
 - **Warp's scorers** sample 25% of runs.
 - **Research.** AgentChaos (arXiv 2608.06790): HTTP-level fault injection costs up to 50 points of pass@1, and robustness depends on the implementation. Also 2609.01660: per-step reliability decays over long runs.
-
----
-
-## Landing 1 — `otel-tracing`
-
-**Changes.**
-- **Dependencies:** add `@opentelemetry/api`, `@opentelemetry/sdk-node` and `@opentelemetry/exporter-trace-otlp-http` (README §Conventions 2).
-- **Off by default.** Enabled by `OTEL_EXPORTER_OTLP_ENDPOINT`, and a no-op when unset.
-- **Spans:**
-  - `invoke_agent` per turn: conversation, agent, provider, model.
-  - `chat` per model call: `gen_ai.*` attributes including input, output, cache-read and cache-write tokens, and cost.
-  - `execute_tool` per tool: name, tier, approval decision, duration, error.
-  - Sub-agents nest under their parent.
-- **Trace ids.** Generate a server-side id when the request has none. Propagate W3C `traceparent` to tools-service (which forwards it on its outgoing calls) and on MCP HTTP requests.
-- **Real per-tool metrics.** Fix the admin "tool latency" to use tool durations.
-
-**Tests.**
-- **Span tree.** With an in-memory span exporter, a scripted turn with 2 tool calls yields `invoke_agent → chat, execute_tool ×2, chat`, with correct parent/child links and the key attributes present.
-- **No-op when unset.** No exporter, no crash, negligible overhead.
-- **`traceparent`** is present on tools-service calls (mock the fetch).
-- **Server-side trace id.** Red first: today's `traceId || null`.
-- **Admin stats.** The tool-latency endpoint returns tool durations from seeded rows. (Red.)
-
-**Live.** Run a tiny local OTLP/HTTP receiver: a Node script in your scratchpad that logs the JSON it receives. Point the isolated boot at it, run a turn, and paste the span tree.
 
 ---
 

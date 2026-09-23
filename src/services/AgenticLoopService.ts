@@ -19,6 +19,8 @@ import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import ConversationGenerationTracker from "./ConversationGenerationTracker.ts";
 import ConversationStatusRegistry from "./ConversationStatusRegistry.ts";
 import ToolContext from "./ToolContext.ts";
+import { recordAgentTurnOutcome, traceAgentTurn } from "./Tracing.ts";
+import type { Span } from "@opentelemetry/api";
 import QuestionRegistry, {
   type PendingQuestionSummary,
   type QuestionAnswerOutcome,
@@ -46,9 +48,21 @@ import type { AgenticContext, ConversationMessage } from "./harnesses/types.ts";
  * Also exposes approval/question resolution APIs used by AgentRoutes.
  */
 export default class AgenticLoopService {
-  /** Run an agentic loop using the specified (or default) harness. */
+  /**
+   * Run an agentic loop using the specified (or default) harness, as one
+   * `invoke_agent` span (Tracing) — every entry point comes through here.
+   */
   static async runAgenticLoop(
     context: AgenticContext,
+  ): Promise<{ messages: ConversationMessage[] }> {
+    return traceAgentTurn(context, (turnSpan) =>
+      AgenticLoopService.runTurn(context, turnSpan),
+    );
+  }
+
+  private static async runTurn(
+    context: AgenticContext,
+    turnSpan: Span,
   ): Promise<{ messages: ConversationMessage[] }> {
     const {
       options,
@@ -309,6 +323,8 @@ export default class AgenticLoopService {
     try {
       return await harness.run();
     } finally {
+      recordAgentTurnOutcome(turnSpan, state);
+
       // Clean up in-memory cache keyed by agentConversationId (keeps MongoDB state for next turn)
       ToolContext.cleanupInMemory(resolvedAgentConversationId);
 

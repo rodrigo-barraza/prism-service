@@ -153,6 +153,7 @@ describe("TreeOfThoughtsStrategy", () => {
       streamedToolCalls: [],
       turnTranscript: null,
       turnTranscriptSeen: new WeakSet(),
+      recordToolExecution: vi.fn(),
     };
 
     mockHarnessInstance = {

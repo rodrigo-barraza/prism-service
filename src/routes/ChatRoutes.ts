@@ -674,10 +674,14 @@ export async function handleConversation(
     // systemPrompt) — title policy is server-owned.
     conversationMeta = { title: titleSnippet, ...(conversationMeta || {}) };
   }
-  const traceId = incomingTraceId || null;
-  if (traceId && conversationMeta) {
+  // Minted when the caller sent none, so the turn's request rows still group.
+  // The conversation takes a caller's id, or a minted one only when it is new
+  // too: conversationMeta also marks a turn's first call (the user message is
+  // appended on it), so it is never created just to carry a minted id.
+  const traceId = incomingTraceId || crypto.randomUUID();
+  if (conversationMeta && (incomingTraceId || !incomingConversationId)) {
     (conversationMeta as Record<string, unknown>).traceId = traceId;
-  } else if (traceId) {
+  } else if (incomingTraceId) {
     conversationMeta = { traceId };
   }
   // The request layer binds the direct-viewer broadcast to the REQUEST's
@@ -891,7 +895,8 @@ export async function handleAgent(
   if (!incomingConversationId && !serverConversationId) {
     emit = withDirectViewerBroadcast(conversationId, emit);
   }
-  const traceId = incomingTraceId || null;
+  // Minted when the caller sent none, so the turn's request rows still group.
+  const traceId = incomingTraceId || crypto.randomUUID();
   let conversationMeta = incomingConversationMeta || null;
   // Title policy is server-owned: when the client didn't send one (new
   // conversations), derive it from the user message — same snippet rule

@@ -6,6 +6,7 @@ import {
   TOOL_NAMES,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { HARNESS } from "#src/constants";
+import { traceToolExecution } from "#src/services/Tracing";
 import { firePermissionDenied, rememberHookContext } from "./TurnHooks.ts";
 import {
   snapshotAfterToolBatch,
@@ -208,7 +209,7 @@ export async function executeToolBatch(
 
       if (ToolOrchestratorService.isStreamable(toolCall.name)) {
         const startTime = Date.now();
-        const result = await runWithTimeout(
+        const result = await traceToolExecution(context, toolCall, () => runWithTimeout(
           () =>
             ToolOrchestratorService.executeToolStreaming(
               toolCall.name,
@@ -243,8 +244,9 @@ export async function executeToolBatch(
             ),
           timeoutMilliseconds,
           toolCall.name,
-        );
+        ));
         const durationMilliseconds = Date.now() - startTime;
+        state.recordToolExecution(toolCall, result, durationMilliseconds);
         const finalResult = await runPostToolHooks(
           hooks,
           toolCall,
@@ -261,7 +263,7 @@ export async function executeToolBatch(
       }
 
       const startTime = Date.now();
-      const result = await runWithTimeout(
+      const result = await traceToolExecution(context, toolCall, () => runWithTimeout(
         () =>
           ToolOrchestratorService.executeTool(
             toolCall.name,
@@ -319,8 +321,9 @@ export async function executeToolBatch(
           ),
         timeoutMilliseconds,
         toolCall.name,
-      );
+      ));
       const durationMilliseconds = Date.now() - startTime;
+      state.recordToolExecution(toolCall, result, durationMilliseconds);
       const finalResult = await runPostToolHooks(
         hooks,
         toolCall,

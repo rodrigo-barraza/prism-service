@@ -1208,7 +1208,7 @@ describe("Harness Lifecycle Modules", () => {
         context as any,
         tools as any,
         hooks,
-        { iterations: 1 } as any,
+        { iterations: 1, recordToolExecution: vi.fn() } as any,
       );
 
       expect(results).toHaveLength(1);
@@ -1234,7 +1234,7 @@ describe("Harness Lifecycle Modules", () => {
         context as any,
         tools as any,
         hooks,
-        { iterations: 2 } as any,
+        { iterations: 2, recordToolExecution: vi.fn() } as any,
       );
 
       expect(results).toHaveLength(1);
@@ -1261,7 +1261,7 @@ describe("Harness Lifecycle Modules", () => {
         context as any,
         tools as any,
         hooks,
-        { iterations: 1 } as any,
+        { iterations: 1, recordToolExecution: vi.fn() } as any,
       );
 
       expect(result.result).toBe("single-val");
