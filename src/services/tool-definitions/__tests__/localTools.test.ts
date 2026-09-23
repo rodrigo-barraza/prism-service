@@ -477,7 +477,11 @@ describe("Local Tools Unit Tests Suite", () => {
       skillContext,
     );
     expect(loadResult).toEqual({ name: "test_skill", body: "Do it", resources: [] });
-    expect(mockSkillLoad).toHaveBeenCalledWith("test_skill", caller);
+    // Where the load happened goes on the usage report's row.
+    expect(mockSkillLoad).toHaveBeenCalledWith("test_skill", caller, {
+      conversationId: null,
+      agentConversationId: null,
+    });
 
     const deleteResult = await InternalToolRegistry.execute(
       "delete_skill",
