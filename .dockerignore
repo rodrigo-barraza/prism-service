@@ -16,3 +16,7 @@ vitest.config.*
 tests
 *.md
 *.tsbuildinfo
+
+# Agent worktrees (.claude/worktrees/*, each with its own node_modules)
+# are not part of the image — keep them out of the build context.
+.claude
