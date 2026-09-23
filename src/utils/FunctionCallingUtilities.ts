@@ -312,6 +312,7 @@ interface ExpandedMessage {
   reasoningItems?: ResponsesReasoningItem[];
   providerResponseId?: string;
   responsesEffort?: string;
+  geminiParts?: import("#src/types/admin").GeminiReplayPart[];
   asyncCallId?: string;
   toolCalls?: ExpandedToolCall[];
   images?: string[];
@@ -563,6 +564,7 @@ function responsesNativeFields(message: ChatMessage): {
   reasoningItems?: ResponsesReasoningItem[];
   providerResponseId?: string;
   responsesEffort?: string;
+  geminiParts?: import("#src/types/admin").GeminiReplayPart[];
 } {
   return {
     ...(message.phase !== undefined ? { phase: message.phase } : {}),
@@ -574,6 +576,10 @@ function responsesNativeFields(message: ChatMessage): {
       : {}),
     ...(typeof message.responsesEffort === "string"
       ? { responsesEffort: message.responsesEffort }
+      : {}),
+    // Gemini's parts, replayed with their thought signatures (google.ts).
+    ...(Array.isArray(message.geminiParts) && message.geminiParts.length > 0
+      ? { geminiParts: message.geminiParts }
       : {}),
   };
 }

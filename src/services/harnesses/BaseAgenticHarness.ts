@@ -1656,6 +1656,8 @@ export default class BaseAgenticHarness {
         ...(state.reasoningItems && state.reasoningItems.length > 0 && { reasoningItems: state.reasoningItems }),
         ...(state.providerResponseId && { providerResponseId: state.providerResponseId }),
         ...(state.responsesEffort && { responsesEffort: state.responsesEffort }),
+        ...(state.geminiParts && { geminiParts: state.geminiParts }),
+        ...(state.citations && { citations: state.citations }),
         ...(state.thinkingBlocks && state.thinkingBlocks.length > 0 && { thinkingBlocks: state.thinkingBlocks }),
         ...(state.refusal && { refusal: state.refusal }),
         compactionBoundary: state.compactionBoundary,
@@ -1692,6 +1694,8 @@ export default class BaseAgenticHarness {
       ...(state.reasoningItems && state.reasoningItems.length > 0 && { reasoningItems: state.reasoningItems }),
       ...(state.providerResponseId && { providerResponseId: state.providerResponseId }),
       ...(state.responsesEffort && { responsesEffort: state.responsesEffort }),
+      ...(state.geminiParts && { geminiParts: state.geminiParts }),
+      ...(state.citations && { citations: state.citations }),
       ...(state.thinkingBlocks && state.thinkingBlocks.length > 0 && { thinkingBlocks: state.thinkingBlocks }),
       ...(state.refusal && { refusal: state.refusal }),
       ...(state.streamedThinking.trim() && {

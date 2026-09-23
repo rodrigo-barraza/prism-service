@@ -309,6 +309,30 @@ export interface ToolEntry {
  * when `include: ["reasoning.encrypted_content"]` is requested (or `store`
  * is false); without it the model re-reasons from the summary alone.
  */
+/**
+ * Gemini: one part of a model turn, kept in the order the model produced it
+ * so a replay returns every thought signature where it was received
+ * (providers/google.ts convertModelParts). `functionCall` indexes the
+ * message's toolCalls.
+ */
+export interface GeminiReplayPart {
+  text?: string;
+  thought?: boolean;
+  functionCall?: number;
+  /** A server-side (built-in) tool call or its result, verbatim (Google Search). */
+  toolCall?: unknown;
+  toolResponse?: unknown;
+  thoughtSignature?: string;
+}
+
+/** Web sources a grounded answer cited (Gemini Google Search grounding). */
+export interface MessageCitations {
+  sources: Array<{ url: string; title: string }>;
+  queries: string[];
+  /** Answer segments and the indices of the sources that support them. */
+  supports: Array<{ text: string; sources: number[] }>;
+}
+
 export interface ResponsesReasoningItem {
   id: string;
   summary: Array<{ type: string; text: string }>;
@@ -357,6 +381,10 @@ export interface ChatMessage {
   providerResponseId?: string;
   /** OpenAI Responses API reasoning effort in effect when this message was produced — where a configuration_update goes on replay. */
   responsesEffort?: string;
+  /** Gemini: the turn's parts in order, with their thought signatures (replayed verbatim). */
+  geminiParts?: GeminiReplayPart[];
+  /** Sources a grounded answer cited — rendered under the answer. */
+  citations?: MessageCitations;
   deleted?: boolean;
   /** Soft rewind-pruned flag — excluded from model context, kept for the UI. */
   pruned?: boolean;

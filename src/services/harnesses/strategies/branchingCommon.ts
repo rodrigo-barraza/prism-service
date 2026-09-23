@@ -163,6 +163,8 @@ export function providerNativeState(pass: PassState) {
       providerResponseId: pass.providerResponseId,
     }),
     ...(pass.responsesEffort && { responsesEffort: pass.responsesEffort }),
+    ...(pass.geminiParts && pass.geminiParts.length > 0 && { geminiParts: pass.geminiParts }),
+    ...(pass.citations && { citations: pass.citations }),
     // Anthropic: the pass's thinking blocks, verbatim and in order
     ...(pass.thinkingBlocks &&
       pass.thinkingBlocks.length > 0 && { thinkingBlocks: pass.thinkingBlocks }),
