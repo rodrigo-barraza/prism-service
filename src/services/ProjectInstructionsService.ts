@@ -17,9 +17,12 @@ import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 // editable from BOTH sides — the UI (ProjectInstructionsRoutes)
 // and the agent itself (ProjectInstructionsTools).
 //
-// Scope resolution is most-specific-wins: a document scoped to a
-// named agent shadows the project-wide (agent: null) one, exactly
-// the way a nested CLAUDE.md shadows the repo root's.
+// A scope has up to two documents: the project-wide one (agent: null)
+// and one per named agent. The prompt carries both, the agent's after
+// the project's — merged, since prompt 19 L3; it used to shadow it
+// (getLayers, InstructionsSection.ts). An editor addresses one: for an
+// agent, its own document when it has one, else the project document
+// it is shown (getCurrent) — and a write goes to the scope it names.
 //
 // Versioning reuses MemoryService's bi-temporal soft-close model
 // (validTo / supersededBy / closedReason). A write NEVER destroys
@@ -408,8 +411,9 @@ async function getExactCurrent(
 }
 
 /**
- * The EFFECTIVE document for a scope — most-specific-wins. An agent-scoped
- * current document beats the project-wide (agent: null) one.
+ * The document an editor of a scope sees — most-specific-wins: an
+ * agent-scoped current document beats the project-wide (agent: null) one.
+ * The prompt carries both (getLayers).
  */
 async function getCurrent(
   db: Db,
@@ -437,6 +441,33 @@ async function getCurrent(
     if (agentScoped) return agentScoped;
   }
   return rows.find((row) => !row.agent) ?? rows[0] ?? null;
+}
+
+/**
+ * The documents a prompt carries for a scope — merged, not replaced
+ * (InstructionsSection.ts): the project-wide document and, when the scope
+ * names an agent, that agent's own. Each is the current revision, or null.
+ */
+async function getLayers(
+  db: Db,
+  scope: ProjectInstructionsScope,
+): Promise<{
+  project: ProjectInstructionsDocument | null;
+  agent: ProjectInstructionsDocument | null;
+}> {
+  const resolved = normalizeScope(scope);
+  await ensureIndexes(db);
+  const rows = await findRows(db, {
+    ...exactScopeFilter(resolved),
+    agent: resolved.agent ? { $in: [resolved.agent, null] } : null,
+    ...CURRENT_INSTRUCTIONS_FILTER,
+  } as Filter<ProjectInstructionsDocument>);
+  return {
+    project: rows.find((row) => !row.agent) ?? null,
+    agent: resolved.agent
+      ? (rows.find((row) => row.agent === resolved.agent) ?? null)
+      : null,
+  };
 }
 
 /**
@@ -666,6 +697,7 @@ const ProjectInstructionsService = {
   normalizeScope,
   resolveWriteScope,
   getCurrent,
+  getLayers,
   getExactCurrent,
   setContent,
   appendSection,

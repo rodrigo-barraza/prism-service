@@ -24,7 +24,11 @@ export const HOOK_EVENTS = {
   /** Once per turn (every agentic run), before the first model call. */
   TURN_START: "TurnStart",
   USER_PROMPT_SUBMIT: "UserPromptSubmit",
-  /** PRISM.md or a pinned rule was loaded into the system prompt. */
+  /**
+   * A standing instruction reached the model: PRISM.md, a workspace file or
+   * always-on rule, or a pinned rule at turn start; a glob-scoped workspace
+   * rule after the batch that touched a matching file.
+   */
   INSTRUCTIONS_LOADED: "InstructionsLoaded",
   /** The turn runs a different model from the conversation's last turn. */
   PRE_MODEL_SWITCH: "PreModelSwitch",

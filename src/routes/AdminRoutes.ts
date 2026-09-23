@@ -10,6 +10,7 @@ import {
 } from "./admin/AdminAgentConversationRoutes.ts";
 import systemRoutes from "./admin/AdminSystemRoutes.ts";
 import lmStudioRoutes from "./admin/AdminLmStudioRoutes.ts";
+import skillRoutes from "./admin/AdminSkillRoutes.ts";
 
 const router: Router = express.Router();
 
@@ -20,6 +21,7 @@ router.use("/traces", traceRoutes);
 router.use("/agent-conversations", conversationStatsRouter);
 router.use("/agent-conversations", agentConversationRouter);
 router.use("/lm-studio", lmStudioRoutes);
+router.use("/skills", skillRoutes);
 router.use(systemRoutes);
 router.use(contentRoutes);
 

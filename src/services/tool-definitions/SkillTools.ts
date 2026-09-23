@@ -32,6 +32,14 @@ async function loadSkillService() {
   return (await import("#src/services/SkillService")).default;
 }
 
+/** Where a use happened, for the usage report's rows. */
+function invocationOf(context: InternalToolContext) {
+  return {
+    conversationId: context.conversationId ?? null,
+    agentConversationId: context.agentConversationId ?? null,
+  };
+}
+
 async function callerOf(context: InternalToolContext): Promise<SkillCaller> {
   const { resolveSkillCaller } = await import("#src/services/SkillService");
   return resolveSkillCaller({
@@ -205,6 +213,7 @@ const executeSkill = {
       skillId,
       variables,
       await callerOf(context),
+      invocationOf(context),
     );
     if (prepared.error) return prepared;
 
@@ -302,7 +311,7 @@ const loadSkill = {
         ),
       };
     const SkillService = await loadSkillService();
-    return SkillService.load(name, await callerOf(context));
+    return SkillService.load(name, await callerOf(context), invocationOf(context));
   },
 };
 

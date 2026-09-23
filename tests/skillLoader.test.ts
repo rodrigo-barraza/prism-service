@@ -108,12 +108,18 @@ function legacyToolSkill(overrides: Record<string, unknown> = {}) {
 
 describe("skill tools", () => {
   let collection: ReturnType<typeof createMockCollection>;
+  let usageRows: ReturnType<typeof createMockCollection>;
 
   beforeEach(() => {
     collection = createMockCollection([]);
+    usageRows = createMockCollection([]);
     vi.mocked(MongoWrapper.getCollection).mockImplementation(
       (_database: string, name: string) =>
-        (name === COLLECTIONS.AGENT_SKILLS ? collection : null) as any,
+        (name === COLLECTIONS.AGENT_SKILLS
+          ? collection
+          : name === COLLECTIONS.SKILL_USAGE
+            ? usageRows
+            : null) as any,
     );
   });
 
@@ -155,6 +161,29 @@ describe("skill tools", () => {
       const stored = await collection.findOne({ name: "deploy-service" });
       expect(stored.usageCount).toBe(2);
       expect(typeof stored.lastUsedAt).toBe("string");
+    });
+
+    it("records a usage row per load, for the usage report", async () => {
+      collection = createMockCollection([panelSkill()]);
+
+      await run("load_skill", { name: "deploy-service" }, {
+        conversationId: "conversation-9",
+        agentConversationId: "agent-conversation-9",
+      });
+
+      const rows = await usageRows.find({}).toArray();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        skillDocumentId: "panel-deploy-service-alice-default",
+        name: "deploy-service",
+        kind: "load",
+        project: "prism-chat",
+        username: "alice",
+        agent: "CODING",
+        conversationId: "conversation-9",
+        agentConversationId: "agent-conversation-9",
+      });
+      expect(rows[0].at).toBeInstanceOf(Date);
     });
 
     it("names what IS available when the skill is not in scope", async () => {

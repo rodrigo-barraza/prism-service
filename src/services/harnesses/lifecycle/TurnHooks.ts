@@ -28,6 +28,7 @@ import type {
   ToolCall,
   ToolResult,
 } from "#src/services/harnesses/types";
+import type { LoadedInstruction } from "#src/services/instructions/InstructionsSection";
 
 /**
  * TurnHooks — every configured-hook seam of an agentic turn, in one place,
@@ -343,15 +344,13 @@ async function runModelSwitchHooks(
 
 // ─── Instructions ─────────────────────────────────────────────────────────────
 
-export interface LoadedInstruction {
-  instructionType: "project_instructions" | "rule";
-  name: string;
-  content: string;
-}
+export type { LoadedInstruction };
 
 /**
- * `InstructionsLoaded` — once per instruction the system-prompt assembler
- * put into this turn's prompt (PRISM.md, each pinned rule).
+ * `InstructionsLoaded` — once per instruction that reached the model: at
+ * turn start, each one the system-prompt assembler put into the prompt
+ * (PRISM.md, workspace files and always-on rules, each pinned rule); after
+ * a tool batch, each glob-scoped rule it brought in (WorkspaceRuleStage).
  */
 export async function fireInstructionsLoaded(
   context: AgenticContext,
@@ -364,13 +363,18 @@ export async function fireInstructionsLoaded(
       "instructionsLoaded",
       payloadFor(HOOK_EVENTS.INSTRUCTIONS_LOADED, context, {
         instruction_type: instruction.instructionType,
-        load_reason: "turn_start",
+        load_reason: instruction.loadReason ?? "turn_start",
         name: instruction.name,
         file_path:
-          instruction.instructionType === "project_instructions"
+          instruction.filePath ??
+          (instruction.instructionType === "project_instructions"
             ? "PRISM.md"
-            : `rules/${instruction.name}`,
+            : `rules/${instruction.name}`),
         file_content: instruction.content,
+        ...(instruction.globs ? { globs: instruction.globs } : {}),
+        ...(instruction.triggerFilePath
+          ? { trigger_file_path: instruction.triggerFilePath }
+          : {}),
       }),
     );
   }
