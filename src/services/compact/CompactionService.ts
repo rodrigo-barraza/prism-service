@@ -286,12 +286,14 @@ export default class CompactionService {
       return skip("no_shrink_cooldown");
     }
 
-    // ── Resolve the compaction model through the utility role ──
+    // ── Resolve the compaction model through its role ──
     // Silently skipping compaction means silent context blowups (the loop
     // keeps growing until the provider rejects the request), so the chain
-    // is never empty while any model exists: env/DB utility config →
-    // the conversation's own model → local-instance/cheap-cloud defaults.
-    const roleChain = await ModelRoleRouter.resolveChain(MODEL_ROLES.UTILITY, {
+    // is never empty while any model exists: the agent's compaction pin →
+    // env/DB compaction config → env/DB utility config → the
+    // conversation's own model → local-instance/cheap-cloud defaults.
+    const roleChain = await ModelRoleRouter.resolveChain(MODEL_ROLES.COMPACTION, {
+      agents: [options.agent],
       fallback:
         options.fallbackProvider && options.fallbackModel
           ? {
@@ -381,7 +383,7 @@ export default class CompactionService {
             },
           );
         },
-        { role: MODEL_ROLES.UTILITY, operation: "compact:summarize" },
+        { role: MODEL_ROLES.COMPACTION, operation: "compact:summarize" },
       ));
     } catch (error: unknown) {
       success = false;

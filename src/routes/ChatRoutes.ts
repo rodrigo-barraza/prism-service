@@ -85,6 +85,10 @@ import {
   MESSAGE_ROLES,
 } from "#src/constants";
 import { getRequestContext } from "#src/utils/RequestContext";
+import {
+  routeAgentTurn,
+  saveConversationModelRouting,
+} from "#src/services/routing/ConversationModelRouting";
 import { DEFAULT_PROFILE_ID, normalizeProfileId } from "#src/utils/ProfileScope";
 
 interface ToolSchemaWithDomain extends ToolSchema {
@@ -234,6 +238,7 @@ async function prepareGenerationContext(
     harness,
     topology,
     thoughtStructure,
+    routingPreset,
     activeRuleNames,
     // Generation options — flat at top-level (OpenAI-style)
     tools,
@@ -347,6 +352,7 @@ async function prepareGenerationContext(
     ...(harness != null && { harness }),
     ...(topology != null && { topology }),
     ...(thoughtStructure != null && { thoughtStructure }),
+    ...(typeof routingPreset === "string" && routingPreset && { routingPreset }),
     ...(Array.isArray(activeRuleNames) &&
       activeRuleNames.length > 0 && { activeRuleNames }),
     ...(parallelToolCalls != null && { parallelToolCalls }),
@@ -852,9 +858,14 @@ export async function handleAgent(
   emit: (event: SseEvent) => void,
   { signal }: { signal?: AbortSignal } = {},
 ) {
+  // Role routing: the conversation's main model (and its routing preset)
+  // is decided at its start and kept for its life — BEFORE anything is
+  // assembled for it, because the model decides the system prompt, the
+  // tools and the cache (routing/ConversationModelRouting).
+  const { params: routedParams, routed } = await routeAgentTurn(params);
   let context: Awaited<ReturnType<typeof prepareGenerationContext>> | null;
   try {
-    context = await prepareGenerationContext(params, emit, { signal });
+    context = await prepareGenerationContext(routedParams, emit, { signal });
   } catch (error: unknown) {
     emit({
       type: SERVER_SENT_EVENT_TYPES.ERROR,
@@ -995,6 +1006,14 @@ export async function handleAgent(
       if (localRelease) {
         localRelease();
         logger.info(`[agent] 🔓 Released local GPU lock for ${resolvedModel}`);
+      }
+      if (routed?.decided) {
+        await saveConversationModelRouting({
+          conversationId,
+          project: String(project),
+          username: String(username),
+          record: routed.record,
+        });
       }
       // When the SSE connection is severed (user pressed stop), abort any
       // spawned sub-agents that are still running under this orchestrator session.

@@ -483,6 +483,8 @@ export interface BeforePromptHookContext {
   locale?: string;
   /** Names of user-pinned rules to inject as an <active-rules> section */
   activeRuleNames?: string[];
+  /** The conversation's routing preset — the lead's prompt carries its addendum. */
+  routingPreset?: string;
   _injectedSkills?: string[];
   _skillsText?: string;
   [key: string]: unknown;

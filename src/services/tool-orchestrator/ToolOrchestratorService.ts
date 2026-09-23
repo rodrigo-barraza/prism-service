@@ -45,6 +45,7 @@ import {
 } from "#src/utils/VoiceCatalog";
 import { Bm25ToolIndex } from "@rodrigo-barraza/utilities-library/search";
 import type { OrchestratorContext, TeamMember } from "#src/types/orchestrator";
+import { ROUTING_PRESETS } from "#src/services/routing/RoutingPresetIds";
 import {
   type ToolSchemaFull,
   type ToolExecutionContext,
@@ -2129,12 +2130,57 @@ export default class ToolOrchestratorService {
       criticModel: context._criticModel,
       maxCostDollars: context._maxCostDollars,
       sharedCostBudget: context._sharedCostBudget,
+      routingPreset: context._routingPreset ?? null,
     };
 
     switch (name) {
       case TOOL_NAMES.CREATE_SUBAGENT: {
         // Wrap flat singular args into the createTeam format (single member, no topology)
         const singularArgs = args as { description?: string; prompt?: string; files?: string[]; model?: string; agent?: string };
+
+        // lead_sidekick: the lead's delegations all go to ONE sidekick that
+        // keeps its own context — a later create_subagent continues it.
+        const sidekickScope =
+          orchestratorContext.routingPreset === ROUTING_PRESETS.LEAD_SIDEKICK &&
+          (orchestratorContext.recursionDepth ?? 0) === 0 &&
+          orchestratorContext.conversationId &&
+          orchestratorContext.project &&
+          orchestratorContext.username
+            ? {
+                conversationId: orchestratorContext.conversationId,
+                project: orchestratorContext.project,
+                username: orchestratorContext.username,
+              }
+            : null;
+        const leadSidekick = sidekickScope
+          ? await import("#src/services/routing/LeadSidekick")
+          : null;
+        if (sidekickScope && leadSidekick) {
+          const sidekickId = await leadSidekick.findSidekick(sidekickScope);
+          if (sidekickId) {
+            const continued = await OrchestratorService.resumeAgent(
+              sidekickId,
+              singularArgs.prompt || "",
+              orchestratorContext as OrchestratorContext,
+            );
+            if (!("error" in continued)) {
+              logger.info(
+                `[ToolOrchestrator] lead_sidekick: continued sidekick ${sidekickId} of ${sidekickScope.conversationId}`,
+              );
+              return { ...continued, sidekick: { agent_id: sidekickId, continued: true } };
+            }
+            if (String(continued.error).includes("currently running")) {
+              return {
+                error:
+                  `Your sidekick ${sidekickId} is still working on your previous delegation. ` +
+                  `Call wait_for_tasks with ["${sidekickId}"] for its brief, or send_subagent_message to add to its task.`,
+              };
+            }
+            // Gone (expired, failed): the next sidekick starts fresh.
+            leadSidekick.forgetSidekick(sidekickScope.conversationId);
+          }
+        }
+
         const teamName = (singularArgs.description || "subagent").toLowerCase().replace(/\s+/g, "_").slice(0, 32);
         const wrappedArgs = {
           name: teamName,
@@ -2150,6 +2196,14 @@ export default class ToolOrchestratorService {
           wrappedArgs as unknown as { name: string; members: TeamMember[] },
           orchestratorContext as OrchestratorContext,
         );
+        const spawnedAgentId = Array.isArray(singleResult)
+          ? singleResult
+              .map((agentResult) => ("agent_id" in agentResult ? agentResult.agent_id : undefined))
+              .find((agentId): agentId is string => typeof agentId === "string" && agentId !== "")
+          : undefined;
+        if (sidekickScope && leadSidekick && spawnedAgentId) {
+          await leadSidekick.rememberSidekick({ ...sidekickScope, agentId: spawnedAgentId });
+        }
 
         const singleCallerDepth = orchestratorContext.recursionDepth ?? 0;
         if (singleCallerDepth > 0) {

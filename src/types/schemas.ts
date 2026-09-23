@@ -79,6 +79,8 @@ export const ChatRequestSchema = z
     harness: sanitizedString().nullable().optional(),
     topology: z.string().nullable().optional(),
     thoughtStructure: z.string().nullable().optional(),
+    /** A routing preset (routing/RoutingPresets) — e.g. "lead_sidekick". */
+    routingPreset: z.string().nullable().optional(),
     // Names of user-pinned rules for this turn — content is resolved
     // server-side by SystemPromptAssembler from the rules collection
     activeRuleNames: z.array(z.string()).nullable().optional(),

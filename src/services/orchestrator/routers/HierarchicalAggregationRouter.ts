@@ -183,6 +183,7 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
           files: member.files,
           model: member.model,
           agent: member.agent,
+          routing: member.routing,
           assignedProvider,
           assignedModel,
           agentIndex: memberIndex,
@@ -333,7 +334,6 @@ export class HierarchicalAggregationRouter implements TopologyRouter {
           toolUses: 0,
           iterations: 1,
           durationMilliseconds: synthesisDurationMilliseconds,
-          messages: [],
           diff: { additions: 0, deletions: 0, files: [] },
         };
 

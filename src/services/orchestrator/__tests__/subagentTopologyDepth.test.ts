@@ -82,7 +82,6 @@ function createSubAgentResult(overrides: Partial<SubAgentResult> & { description
     toolUses: overrides.toolUses ?? 2,
     durationMilliseconds: overrides.durationMilliseconds ?? 150,
     iterations: overrides.iterations ?? 1,
-    messages: overrides.messages ?? [],
     diff: overrides.diff,
     recursionDepth: overrides.recursionDepth,
     subtreeMetrics: overrides.subtreeMetrics,
@@ -170,7 +169,6 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
       toolUses: 1,
       durationMilliseconds: 80,
       iterations: 1,
-      messages: [],
     }));
   });
 
@@ -1357,7 +1355,6 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
         toolNames: { create_team: 2, read_file: 3 },
         iterations: 8,
         durationMilliseconds: 15000,
-        messages: [],
       };
 
       const fallback = buildToolCallFallbackSummary(coordinatorResult);
@@ -1378,7 +1375,6 @@ describe("Sub-Agent Topology Depth Tests (depth 1→2→3)", () => {
         toolNames: { create_team: 1, send_message: 1, stop_agent: 1 },
         iterations: 3,
         durationMilliseconds: 5000,
-        messages: [],
       };
 
       const fallback = buildToolCallFallbackSummary(coordinatorResult);

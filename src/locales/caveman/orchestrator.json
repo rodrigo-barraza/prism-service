@@ -128,5 +128,6 @@
     "noOutput": "(no output)",
     "mergeBackKept": "⚠️ Changes NOT merged ({{status}}{{files}}). Kept: branch `{{branch}}` ({{location}}). {{error}}",
     "truncated": "\n... (truncated)"
-  }
+  },
+  "leadSidekick": "### Lead and Sidekick\nYou lead. Sidekick execute. You plan, decide, review.\n- Give each concrete step to sidekick with `create_subagent` — self-contained prompt, say what done looks like. First call start sidekick; every later `create_subagent` continue SAME sidekick. It remember earlier work — refer to it, not repeat context.\n- You get sidekick brief (final report), never raw tool output. Brief not enough? Ask sidekick report what you need. Not redo its work yourself.\n- Review each brief before next step: accept, or send correction with `create_subagent`.\n- Quick single-step answer: do yourself. Tool-heavy execution: delegate."
 }

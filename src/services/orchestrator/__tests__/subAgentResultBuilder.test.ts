@@ -227,7 +227,6 @@ describe("buildToolCallFallbackSummary", () => {
       toolNames: { web_search: 5, read_file: 3, analyze_data: 2 },
       iterations: 15,
       durationMilliseconds: 5000,
-      messages: [],
     };
 
     const fallback = buildToolCallFallbackSummary(agentResult);
@@ -248,7 +247,6 @@ describe("buildToolCallFallbackSummary", () => {
       toolUses: 4,
       iterations: 3,
       durationMilliseconds: 2000,
-      messages: [],
     };
 
     const fallback = buildToolCallFallbackSummary(agentResult);
@@ -266,7 +264,6 @@ describe("buildToolCallFallbackSummary", () => {
       toolUses: 0,
       iterations: 0,
       durationMilliseconds: 100,
-      messages: [],
     };
 
     const fallback = buildToolCallFallbackSummary(agentResult);
@@ -284,7 +281,6 @@ describe("buildToolCallFallbackSummary", () => {
       toolNames: { read_file: 1 },
       iterations: 1,
       durationMilliseconds: 500,
-      messages: [],
     };
 
     const fallback = buildToolCallFallbackSummary(agentResult);
@@ -598,113 +594,30 @@ describe("buildSubAgentResult — channel token stripping", () => {
     expect(result.result).toBeNull();
   });
 
-  it("should sanitize channel tokens from embedded messages content", () => {
-    const subAgentState = createSubAgentState("Clean output");
+  // Prompt 11 Landing 2 — the parent reads a BRIEF. The result used to
+  // embed the sub-agent's whole transcript, tool results included, and a
+  // parent reading it through wait_for_tasks / get_subagent_output / a
+  // blocking create_subagent carried its sub-agent's raw tool output in
+  // its own context.
+  it("is a brief: the final report, never the transcript or its raw tool output", () => {
+    const subAgentState = createSubAgentState("Found it: the answer is 42.");
     subAgentState.messages = [
-      { role: "user", content: "Do something" },
+      { role: "system", content: "You are a sub-agent." },
+      { role: "user", content: "Look it up" },
       {
         role: "assistant",
-        content:
-          "<|channel>thought Let me think about this carefully.<channel|>" +
-          "I have completed the recursive task.",
+        content: "",
+        toolCalls: [{ id: "call-1", name: "search_web", args: { query: "answer" } }],
       },
-      {
-        role: "assistant",
-        content: "Here is the final summary.",
-      },
-    ];
+      { role: "tool", name: "search_web", tool_call_id: "call-1", content: "RAW_TOOL_OUTPUT_7f3a" },
+      { role: "assistant", content: "Found it: the answer is 42." },
+    ] as ConversationMessage[];
 
     const result = buildSubAgentResult(subAgentState);
 
-    for (const message of result.messages || []) {
-      expect(message.content).not.toContain("<|channel>");
-      expect(message.content).not.toContain("<channel|>");
-      expect(message.content).not.toContain("thought Let me think");
-    }
-
-    const assistantMessages = (result.messages || []).filter(
-      (message) => message.role === "assistant",
-    );
-    expect(assistantMessages[0].content).toBe(
-      "I have completed the recursive task.",
-    );
-    expect(assistantMessages[1].content).toBe("Here is the final summary.");
-  });
-
-  it("should sanitize orphan channel delimiters from embedded messages", () => {
-    const subAgentState = createSubAgentState("Clean output");
-    subAgentState.messages = [
-      { role: "user", content: "hello" },
-      {
-        role: "assistant",
-        content: "<|channel>thought Some leaked reasoning<channel|>\n\nActual response text",
-      },
-    ];
-
-    const result = buildSubAgentResult(subAgentState);
-
-    const assistantMessage = (result.messages || []).find(
-      (message) => message.role === "assistant",
-    );
-    expect(assistantMessage).toBeDefined();
-    expect(assistantMessage!.content).not.toContain("<|channel>");
-    expect(assistantMessage!.content).not.toContain("<channel|>");
-    expect(assistantMessage!.content).toContain("Actual response text");
-  });
-
-  it("should leave clean messages unmodified", () => {
-    const subAgentState = createSubAgentState("Clean output");
-    subAgentState.messages = [
-      { role: "user", content: "Do something" },
-      { role: "assistant", content: "Here is the result with no leaked tokens." },
-    ];
-
-    const result = buildSubAgentResult(subAgentState);
-
-    const assistantMessage = (result.messages || []).find(
-      (message) => message.role === "assistant",
-    );
-    expect(assistantMessage!.content).toBe(
-      "Here is the result with no leaked tokens.",
-    );
-  });
-
-  it("should strip tool_call XML markup from embedded messages", () => {
-    const subAgentState = createSubAgentState("Clean output");
-    subAgentState.messages = [
-      { role: "user", content: "hello" },
-      {
-        role: "assistant",
-        content:
-          "Response text <|tool_call|>{\"name\": \"search\"}</tool_call> more text",
-      },
-    ];
-
-    const result = buildSubAgentResult(subAgentState);
-
-    const assistantMessage = (result.messages || []).find(
-      (message) => message.role === "assistant",
-    );
-    expect(assistantMessage!.content).not.toContain("tool_call");
-    expect(assistantMessage!.content).toContain("Response text");
-    expect(assistantMessage!.content).toContain("more text");
-  });
-
-  it("should filter out system messages from embedded messages", () => {
-    const subAgentState = createSubAgentState("Clean output");
-    subAgentState.messages = [
-      { role: "system", content: "You are a helpful assistant." },
-      { role: "user", content: "hello" },
-      { role: "assistant", content: "Hi there!" },
-    ];
-
-    const result = buildSubAgentResult(subAgentState);
-
-    const systemMessages = (result.messages || []).filter(
-      (message) => message.role === "system",
-    );
-    expect(systemMessages).toHaveLength(0);
-    expect(result.messages).toHaveLength(2);
+    expect(result.result).toBe("Found it: the answer is 42.");
+    expect(result).not.toHaveProperty("messages");
+    expect(JSON.stringify(result)).not.toContain("RAW_TOOL_OUTPUT_7f3a");
   });
 });
 
@@ -733,7 +646,6 @@ describe("toLiveSubAgentSummary", () => {
       totalCost: 0.02,
       usage: null,
       abortController: null,
-      messages: [],
       files: ["a.ts"],
       providerName: "lm-studio",
       resolvedModel: "gemma-4-12b",

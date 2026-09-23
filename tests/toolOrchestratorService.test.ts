@@ -865,6 +865,8 @@ describe("ToolOrchestratorService", () => {
         criticModel: undefined,
         maxCostDollars: undefined,
         sharedCostBudget: undefined,
+        // The conversation's routing preset (none here).
+        routingPreset: null,
       });
     });
 

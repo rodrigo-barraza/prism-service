@@ -155,6 +155,14 @@ const AgentPersonaRegistry = {
         : undefined,
       usesDirectoryTree: (doc.usesDirectoryTree as boolean) || false,
       usesCodingGuidelines: (doc.usesCodingGuidelines as boolean) || false,
+      modelRoles:
+        typeof doc.modelRoles === "object" && doc.modelRoles !== null
+          ? (doc.modelRoles as Persona["modelRoles"])
+          : undefined,
+      routingPreset:
+        typeof doc.routingPreset === "string" && doc.routingPreset
+          ? doc.routingPreset
+          : undefined,
     };
 
     PERSONAS.set(doc.agentId as string, persona);

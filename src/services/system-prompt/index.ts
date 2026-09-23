@@ -7,6 +7,7 @@ import {
   ORCHESTRATOR_ONLY_TOOLS,
 } from "#src/services/OrchestratorPrompt";
 import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";
+import { ROUTING_PRESETS } from "#src/services/routing/RoutingPresetIds";
 import { resolveLockedOffToolNames } from "#src/utils/resolveLockedOffToolNames";
 import SettingsService from "#src/services/SettingsService";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
@@ -733,6 +734,12 @@ export default class SystemPromptAssembler {
           (toolName) =>
             !orchestratorSet.has(toolName) && !lockedOffSet.has(toolName),
         );
+        // lead_sidekick: the lead delegates execution to one persistent
+        // sidekick and reads only its briefs (routing/LeadSidekick).
+        const leadSidekickAddendum =
+          context.routingPreset === ROUTING_PRESETS.LEAD_SIDEKICK
+            ? "\n\n" + PromptLocaleService.get(locale, "orchestrator.leadSidekick")
+            : "";
         sections.push(
           wrapSection(
             SYSTEM_PROMPT_SECTIONS.ORCHESTRATOR,
@@ -740,7 +747,7 @@ export default class SystemPromptAssembler {
               subAgentTools,
               defaultTopology,
               locale,
-            }),
+            }) + leadSidekickAddendum,
           ),
         );
       }
